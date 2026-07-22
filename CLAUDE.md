@@ -143,6 +143,20 @@ Key design points:
   documents this as intentional, spec-derived behavior, not a bug, so don't "fix" it without re-reading
   that entry first.
 
+### Conformance suite integration (`ConformanceSuiteTest`)
+
+Separate from `LexerTest`/`ParserTest` (fine-grained unit tests) is `ConformanceSuiteTest`, which runs
+every vector in the sibling [ltr8-io-tson-test-suite](https://github.com/litterat/ltr8-io-tson-test-suite)
+repo against the real `Lexer`/`Parser` as JUnit 5 dynamic tests (one per vector, named
+`<layer>/<bucket>/<slug>`). This is a conformance/integration test against an external, spec-derived,
+language-agnostic fixture set — it exists to catch drift against the spec, not to pinpoint which internal
+rule broke.
+
+It assumes the sibling repo is checked out at `../../ltr8-io-tson-test-suite` relative to this module's
+directory (Gradle's and most IDEs' default test working directory) and skips gracefully via
+`Assumptions.assumeTrue` — reported as *aborted*, not failed — if it isn't there. CI deliberately doesn't
+check the sibling repo out, so this always shows as skipped in CI; that's expected, not a problem to fix.
+
 ## Build and test
 
 No system Gradle — always use the wrapper:
@@ -152,6 +166,7 @@ No system Gradle — always use the wrapper:
 ./gradlew test
 ./gradlew test --tests "io.ltr8.tson.parser.lexer.LexerTest"
 ./gradlew test --tests "io.ltr8.tson.parser.ParserTest"
+./gradlew test --tests "io.ltr8.tson.parser.ConformanceSuiteTest"   # skipped unless ../../ltr8-io-tson-test-suite exists
 ./gradlew test --tests "io.ltr8.tson.parser.lexer.LexerTest.multilineBasicIndentStripping"
 ```
 

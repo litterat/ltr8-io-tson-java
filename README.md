@@ -35,7 +35,10 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
 ## Related
 
 - [ltr8-io-tson-test-suite](https://github.com/litterat/ltr8-io-tson-test-suite) — language-agnostic
-  conformance test vectors for any TSON implementation, including this one.
+  conformance test vectors for any TSON implementation, including this one. If checked out as a sibling
+  directory (`../ltr8-io-tson-test-suite`), `ConformanceSuiteTest` runs every vector against this
+  implementation's real lexer and parser; it's skipped, not failed, if the sibling isn't present (CI
+  doesn't check it out).
 
 ## License
 
