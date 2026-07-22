@@ -264,3 +264,33 @@ unambiguously assigns "range violations by the numeric atoms" to the `validation
 check actually happens architecturally and avoiding the canonical-phrasing collision), or add a clause to
 §8.1's canonical-phrasing rule or parser-error description explicitly carving out built-in-vocabulary
 format violations as parser-category despite occurring after structural parsing completes.
+
+---
+
+## 9. `text_type` exists in meta-kernel.tn1 but `!text` is not part of Part 1's published built-in vocabulary
+
+**Section:** §5 (all of §5.3–§5.6), cross-referenced against `meta-kernel.tn1`.
+
+**Problem:** `meta-kernel.tn1` defines `text_type` (`min_length`/`max_length`/`length`/`pattern`) and an
+instance `text => !text_type {}`, and several other constructors compose with it (`uri_type`,
+`regex_type`, `email_type` all extend `text_type`'s shape). It would be reasonable to expect `!text` to be
+promoted to a schemaless built-in annotation the same way `!uuid`/`!date`/etc. are, especially since it's
+one of the *simplest* possible atoms — an unconstrained text check is nearly a no-op. It isn't: `!text`
+appears nowhere in §5.3 (Binary), §5.4 (Temporal), §5.5 (Identifier and Network), or §5.6 (Numeric) — the
+four family tables that between them are the complete published vocabulary (confirmed by grepping the
+whole document for every `` `!name` `` table row). This is the same shape of gap as entry #5 (`!email`),
+but for a type that's arguably a more natural inclusion than `email`, since `text` needs no external RFC
+and is the foundation `uri_type`/`regex_type`/`email_type` all build on. Unlike entry #6 (the integer
+family), this one has *not* been confirmed as an oversight — it may be entirely deliberate (an unannotated
+token already resolves to a string via base type resolution, §4.4, so a bare `!text` annotation would add
+essentially nothing beyond what's already the default), but the spec doesn't say so.
+
+**Interpretation chosen:** `!text` is not implemented as a built-in annotation in this implementation's
+Class 1 resolver, matching the letter of §5's tables. An unannotated string-shaped token, or one under an
+unrecognized `!text` annotation, is handled the same as any other non-vocabulary name (§5.1: preserved as
+an uninterpreted marker at the Class 1 layer; a binding error at `tson-mapper`'s layer per entry #7).
+
+**Suggested resolution:** Either add a `!text` row somewhere in §5 (there's no obviously-correct
+subsection for it among the four existing family headings, which is itself a small structural
+observation), or add a sentence noting that `text` is deliberately schema-only/omitted from the
+schemaless vocabulary because base type resolution already covers the unconstrained case.

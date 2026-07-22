@@ -21,7 +21,10 @@ import java.util.Optional;
  *
  * <p>Also seeded with {@code decimal_type} ({@code number}), {@code float_type} ({@code float32}/
  * {@code float64}), {@code rational_type} ({@code rational}), and {@code complex_type} ({@code
- * complex}) -- all fully published in §5.6's table as-is, unlike the integer family.
+ * complex}) -- all fully published in §5.6's table as-is, unlike the integer family. And with {@code
+ * uuid_type} ({@code uuid}, §5.5) -- deliberately *not* {@code text_type}, despite existing in
+ * meta-kernel.tn1, since {@code !text} never appears in §5's published table at all (see {@code
+ * SPEC-FEEDBACK.md} #9).
  */
 public final class BuiltinTypeVocabulary {
 
@@ -52,6 +55,8 @@ public final class BuiltinTypeVocabulary {
         types.put("float64", FloatType.FLOAT64);
         types.put("rational", RationalType.UNCONSTRAINED);
         types.put("complex", ComplexType.UNCONSTRAINED);
+
+        types.put("uuid", UuidType.UNCONSTRAINED);
 
         return Map.copyOf(types);
     }

@@ -15,6 +15,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -402,6 +403,27 @@ class TsonMapperTest {
     void builtinFloat64AnnotationRejectsBasedIntegerThroughTheMapper() throws DataBindException {
         // §5.6: float atoms accept integer/float/hex-float/special-value, not based-integer.
         assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !float64 0xFF }", DoubleHolder.class));
+    }
+
+    // ── UUID (§5.5) ──────────────────────────────────────────────────────
+
+    public record UuidHolder(UUID value) {
+    }
+
+    @Test
+    void builtinUuidAnnotationBindsDirectlyThroughTheMapper() throws DataBindException {
+        // Unlike Rational/Complex, UUID isn't a Java record, so it doesn't collide with
+        // tson-bind's record auto-detection -- but it also can't self-declare @Atom (it's a JDK
+        // class), so TsonMapper's default DataBindContext pre-registers it (see TsonMapper's
+        // defaultContext()) rather than requiring every caller to do so themselves.
+        UuidHolder h = mapper.toObject("{ value: !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09 }", UuidHolder.class);
+        assertEquals(UUID.fromString("9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09"), h.value());
+    }
+
+    @Test
+    void builtinUuidAnnotationRejectsMalformedUuidThroughTheMapper() throws DataBindException {
+        // UUID.fromString itself would accept "1-2-3-4-5" -- UuidType's own shape check must not.
+        assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !uuid 1-2-3-4-5 }", UuidHolder.class));
     }
 
     // ── Rational/Complex: binding to a richer third-party type via DataBridge ──────────────

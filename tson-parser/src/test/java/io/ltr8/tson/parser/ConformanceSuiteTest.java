@@ -39,6 +39,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -451,6 +452,10 @@ class ConformanceSuiteTest {
                 RecordValue expected = (RecordValue) fieldCore(sidecar, "value");
                 assertEquals(0, new BigDecimal(fieldText(expected, "real")).compareTo(actual.real()), "complex real part");
                 assertEquals(0, new BigDecimal(fieldText(expected, "imaginary")).compareTo(actual.imaginary()), "complex imaginary part");
+            }
+            case "uuid" -> {
+                UUID actual = (UUID) atomType.read(token, UUID.class);
+                assertEquals(UUID.fromString(fieldText(sidecar, "value")), actual, "vocabulary value");
             }
             default -> {
                 BigDecimal actual = (BigDecimal) atomType.read(token, BigDecimal.class);

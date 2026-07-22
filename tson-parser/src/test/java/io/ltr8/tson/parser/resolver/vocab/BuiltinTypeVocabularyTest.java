@@ -44,10 +44,22 @@ class BuiltinTypeVocabularyTest {
         assertTrue(BuiltinTypeVocabulary.lookup(name).isPresent());
     }
 
+    @org.junit.jupiter.api.Test
+    void uuidAtomIsRegistered() {
+        assertTrue(BuiltinTypeVocabulary.lookup("uuid").isPresent());
+    }
+
     @ParameterizedTest
-    @ValueSource(strings = {"uuid", "not_a_type"})
+    @ValueSource(strings = {"uri", "date", "not_a_type"})
     void namesFromFamiliesNotYetImplementedAreNotRegistered(String name) {
         assertFalse(BuiltinTypeVocabulary.lookup(name).isPresent());
+    }
+
+    @org.junit.jupiter.api.Test
+    void textIsDeliberatelyNotRegistered() {
+        // text_type exists in meta-kernel.tn1 but !text never appears in §5's published table --
+        // see SPEC-FEEDBACK.md #9.
+        assertFalse(BuiltinTypeVocabulary.lookup("text").isPresent());
     }
 
     @org.junit.jupiter.api.Test

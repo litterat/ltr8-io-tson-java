@@ -29,6 +29,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Binds a parsed TSON {@link DataValue} tree to a Java object, given its {@link DataClass}
@@ -68,7 +69,28 @@ public final class TsonMapper {
     }
 
     public TsonMapper() {
-        this(DataBindContext.builder().build());
+        this(defaultContext());
+    }
+
+    /**
+     * {@code UUID} is §5.5's {@code uuid} atom's natural host type, but {@code tson-bind} can't
+     * pre-register it itself -- {@code tson-bind} is deliberately TSON-agnostic (not even in the
+     * {@code io.ltr8.tson} package tree), and {@code java.util.UUID} being a JDK class means it also
+     * can't self-declare {@code @Atom} the way a hand-written class could. Registering it here,
+     * rather than in {@code DataBindContext}'s own constructor, keeps that general-purpose library's
+     * default atom set free of TSON-specific decisions -- a caller supplying their own {@code
+     * DataBindContext} (e.g. to register a {@code DataBridge} for {@code Rational}/{@code Complex},
+     * see their Javadoc) is free to register {@code UUID} on their own terms instead, including with
+     * a bridge to a different representation.
+     */
+    private static DataBindContext defaultContext() {
+        DataBindContext context = DataBindContext.builder().build();
+        try {
+            context.registerAtom(UUID.class);
+        } catch (DataBindException e) {
+            throw new IllegalStateException("failed to register UUID on a fresh DataBindContext", e);
+        }
+        return context;
     }
 
     // ── Entry points ─────────────────────────────────────────────────────
