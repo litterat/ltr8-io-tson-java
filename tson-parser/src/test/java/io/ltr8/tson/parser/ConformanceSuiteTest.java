@@ -37,11 +37,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Stream;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -406,8 +408,13 @@ class ConformanceSuiteTest {
      * {@code rational}'s {@code value} is a {@code "numerator/denominator"} string parsed directly
      * into a {@link Rational} (comparable via its own value-based {@code equals}); {@code complex}'s
      * {@code value} is a {@code { real: ... imaginary: ... }} record, each part compared via {@link
-     * BigDecimal#compareTo} the same way the {@code BigDecimal}-based families are. On an {@code
-     * error} vector, {@code category} is additionally checked against which of {@link
+     * BigDecimal#compareTo} the same way the {@code BigDecimal}-based families are. {@code base64}/
+     * {@code base64url}/{@code base32}/{@code hex} (§5.3) have no {@code BigDecimal} representation
+     * either -- their {@code value} is a plain hex string decoded via {@link HexFormat} and compared
+     * against the atom's {@code byte[]} result with {@link
+     * org.junit.jupiter.api.Assertions#assertArrayEquals}, not {@code equals} (arrays don't have
+     * value-based {@code equals} in Java). On an {@code error} vector, {@code category} is
+     * additionally checked against which of {@link
      * AtomParseException}/{@link AtomValidationException} was actually thrown, per this
      * implementation's own interpretation of the §5.2/§8.1 categorization question the test suite's
      * own README flags as unsettled (see SPEC-FEEDBACK.md #8): parse-shape failures as {@code
@@ -456,6 +463,10 @@ class ConformanceSuiteTest {
             case "uuid" -> {
                 UUID actual = (UUID) atomType.read(token, UUID.class);
                 assertEquals(UUID.fromString(fieldText(sidecar, "value")), actual, "vocabulary value");
+            }
+            case "base64", "base64url", "base32", "hex" -> {
+                byte[] actual = (byte[]) atomType.read(token, byte[].class);
+                assertArrayEquals(HexFormat.of().parseHex(fieldText(sidecar, "value")), actual, "vocabulary value");
             }
             default -> {
                 BigDecimal actual = (BigDecimal) atomType.read(token, BigDecimal.class);

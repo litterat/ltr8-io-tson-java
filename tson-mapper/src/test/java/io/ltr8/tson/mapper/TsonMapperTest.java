@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -424,6 +425,51 @@ class TsonMapperTest {
     void builtinUuidAnnotationRejectsMalformedUuidThroughTheMapper() throws DataBindException {
         // UUID.fromString itself would accept "1-2-3-4-5" -- UuidType's own shape check must not.
         assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !uuid 1-2-3-4-5 }", UuidHolder.class));
+    }
+
+    // ── Binary types (§5.3) ──────────────────────────────────────────────
+
+    public record BytesHolder(byte[] value) {
+    }
+
+    @Test
+    void directBindingToByteArrayFailsWithoutTsonMappersDefaultPreRegistration() throws DataBindException {
+        // byte[].isArray() is true, so DefaultClassBinder's array auto-detection would claim it
+        // ahead of the atom/vocabulary path -- the same shape of collision Rational/Complex have
+        // with record auto-detection, just against arrays instead of records -- on a bare context
+        // that hasn't pre-registered byte[].class the way TsonMapper's own default constructor does
+        // (see TsonMapper.defaultContext()). This documents *why* that pre-registration exists.
+        TsonMapper bareMapper = new TsonMapper(DataBindContext.builder().build());
+        assertThrows(DataBindException.class, () -> bareMapper.toObject("{ value: !base64 TWFu }", BytesHolder.class));
+    }
+
+    @Test
+    void builtinBase64AnnotationBindsDirectlyThroughTheMapper() throws DataBindException {
+        BytesHolder h = mapper.toObject("{ value: !base64 TWFu }", BytesHolder.class);
+        assertArrayEquals("Man".getBytes(java.nio.charset.StandardCharsets.UTF_8), h.value());
+    }
+
+    @Test
+    void builtinBase64UrlAnnotationBindsDirectlyThroughTheMapper() throws DataBindException {
+        BytesHolder h = mapper.toObject("{ value: !base64url TWFu }", BytesHolder.class);
+        assertArrayEquals("Man".getBytes(java.nio.charset.StandardCharsets.UTF_8), h.value());
+    }
+
+    @Test
+    void builtinHexAnnotationBindsDirectlyThroughTheMapper() throws DataBindException {
+        BytesHolder h = mapper.toObject("{ value: !hex deadbeef }", BytesHolder.class);
+        assertArrayEquals(new byte[]{(byte) 0xDE, (byte) 0xAD, (byte) 0xBE, (byte) 0xEF}, h.value());
+    }
+
+    @Test
+    void builtinBase32AnnotationBindsDirectlyThroughTheMapper() throws DataBindException {
+        BytesHolder h = mapper.toObject("{ value: !base32 MZXW6YTB }", BytesHolder.class);
+        assertArrayEquals("fooba".getBytes(java.nio.charset.StandardCharsets.UTF_8), h.value());
+    }
+
+    @Test
+    void builtinBase64AnnotationRejectsMissingPaddingThroughTheMapper() throws DataBindException {
+        assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !base64 TWE }", BytesHolder.class));
     }
 
     // ── Rational/Complex: binding to a richer third-party type via DataBridge ──────────────

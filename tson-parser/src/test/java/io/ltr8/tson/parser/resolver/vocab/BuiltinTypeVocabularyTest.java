@@ -50,7 +50,13 @@ class BuiltinTypeVocabularyTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"uri", "date", "not_a_type"})
+    @ValueSource(strings = {"base64", "base64url", "base32", "hex"})
+    void binaryAtomsAreRegistered(String name) {
+        assertTrue(BuiltinTypeVocabulary.lookup(name).isPresent());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"uri", "date", "not_a_type", "binary"})
     void namesFromFamiliesNotYetImplementedAreNotRegistered(String name) {
         assertFalse(BuiltinTypeVocabulary.lookup(name).isPresent());
     }

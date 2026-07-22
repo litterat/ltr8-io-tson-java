@@ -24,7 +24,10 @@ import java.util.Optional;
  * complex}) -- all fully published in §5.6's table as-is, unlike the integer family. And with {@code
  * uuid_type} ({@code uuid}, §5.5) -- deliberately *not* {@code text_type}, despite existing in
  * meta-kernel.tn1, since {@code !text} never appears in §5's published table at all (see {@code
- * SPEC-FEEDBACK.md} #9).
+ * SPEC-FEEDBACK.md} #9). And with the full {@code binary} family (§5.3) -- {@code base64}, {@code
+ * base64url}, {@code base32}, {@code hex} -- four instances of one {@link BinaryType} constructor,
+ * each a distinct {@code binary_encoding} value, not one generic {@code !binary} annotation,
+ * matching §5.3's own "there is no generic {@code !binary} annotation."
  */
 public final class BuiltinTypeVocabulary {
 
@@ -57,6 +60,11 @@ public final class BuiltinTypeVocabulary {
         types.put("complex", ComplexType.UNCONSTRAINED);
 
         types.put("uuid", UuidType.UNCONSTRAINED);
+
+        types.put("base64", BinaryType.BASE64);
+        types.put("base64url", BinaryType.BASE64URL);
+        types.put("base32", BinaryType.BASE32);
+        types.put("hex", BinaryType.HEX);
 
         return Map.copyOf(types);
     }

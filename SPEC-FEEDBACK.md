@@ -294,3 +294,73 @@ an uninterpreted marker at the Class 1 layer; a binding error at `tson-mapper`'s
 subsection for it among the four existing family headings, which is itself a small structural
 observation), or add a sentence noting that `text` is deliberately schema-only/omitted from the
 schemaless vocabulary because base type resolution already covers the unconstrained case.
+
+---
+
+## 10. §5.3 doesn't say whether `!base64`/`!base64url` require padding
+
+**Section:** §5.3, cross-referenced against RFC 4648 §3.2.
+
+**Problem:** §5.3 says only "a token that is not a valid encoding under the named scheme is a parse
+error" and meta.tn1 says only "Encoding alphabets are pinned to RFC 4648" — neither addresses whether a
+`!base64`/`!base64url` token must include the `=` padding characters RFC 4648 §4/§5 describe. RFC 4648
+§3.2 itself says implementations "MUST include appropriate pad characters at the end of encoded data
+unless the specification referring to this document explicitly states otherwise" — TSON is exactly such a
+referring specification, and §5.3 doesn't state otherwise, so a literal reading requires padding. But this
+is exactly the kind of detail an implementation could easily get wrong by trusting a standard library
+instead of the RFC text: `java.util.Base64.getDecoder()` accepts input with the padding omitted entirely
+(`"TWE"` decodes identically to the correctly-padded `"TWE="`) — confirmed empirically before writing
+`BinaryType`, not assumed. An implementation that just calls `Base64.getDecoder().decode(text)` and
+propagates whatever it throws would silently accept unpadded input, deviating from RFC 4648 §3.2's MUST
+without any test ever catching it, since the JDK never complains.
+
+**Interpretation chosen:** `BinaryType`'s `BASE64`/`BASE64URL` encodings (via a shared `Base64Decoding`
+helper) reject any token whose length isn't a multiple of 4 before ever reaching `java.util.Base64`'s
+decoder — i.e. padding is required. Not similarly strict about RFC 4648 §3.5's *canonical* padding-bits
+requirement (the unused bits in the last encoded character before `=` should be zero) — §3.5 makes
+rejecting non-canonical encodings a MAY, not a MUST, so the JDK decoder's leniency there is left alone;
+`BASE32`'s from-scratch decoder follows the same distinction (required padding *count*, not
+required-canonical padding *bits*).
+
+**Suggested resolution:** Add a sentence to §5.3 stating explicitly whether padding is required for
+`!base64`/`!base64url`, rather than leaving it to RFC 4648 §3.2's general "unless stated otherwise" default
+-- easy to get right by reading the RFC carefully, easy to get wrong by trusting a standard library's
+decoder, which is exactly the trap this entry documents checking for empirically before writing any code,
+rather than after a test failure caught it (the JDK never raises an error either way, so nothing would
+have caught it automatically).
+
+---
+
+## 11. `binary`'s constructor name doesn't follow the `_type` suffix every other constructor uses
+
+**Section:** meta.tn1.
+
+**Problem:** Every constraint-vocabulary constructor in meta-kernel.tn1/meta.tn1 is named `xxx_type` --
+`integer_type`, `float_type`, `decimal_type`, `rational_type`, `complex_type`, `uuid_type`, `text_type`,
+`date_type`, `time_type`, `datetime_type`, `duration_type`, `email_type`, `ipv4_type`, `ipv6_type`,
+`cidr4_type`, `cidr6_type`, `mac_type`, `uri_type`, `regex_type` -- nineteen constructors, one naming
+convention, no exceptions among the `_type`-suffixed group. `binary` (§5.3's four encodings' shared
+constructor) is the one constructor of this general shape that doesn't follow it: not `binary_type`, just
+`binary`. It isn't obviously a typo, though -- meta.tn1's own introductory doc explicitly buckets
+constructors into three families, and puts `binary` in a different bucket from the `_type`-suffixed ones:
+"1. Structural constructors: `binary` (with `binary_encoding` enum) and `extern`... 3. Constraint
+vocabulary constructors for atom families the kernel itself doesn't need: numeric..., temporal...,
+identifier..., network..., and text (`email_type`)." So `binary`/`extern` are explicitly categorized as
+"structural constructors," distinct from "constraint vocabulary constructors" -- but the *reason* for that
+categorization isn't obvious from the constructor's own shape: `binary` is atom-kind like every `_type`
+constructor (unlike `extern`, which is sum-kind, matching its "structural" label more intuitively), and it
+has `min_length`/`max_length` fields playing exactly the same constraint-vocabulary role `text_type`'s
+`min_length`/`max_length` do. Nothing else about `binary`'s definition explains why it's grouped with
+`extern` rather than with the nineteen `_type` constructors it otherwise resembles.
+
+**Interpretation chosen:** Treated as the same constructor either way -- this implementation's
+`BinaryType` class (in `tson-parser`'s `resolver.vocab` package) is named to match the established
+`_type`-suffix convention of its siblings (`IntegerType`, `FloatType`, ...) rather than mirror `binary`'s
+own unsuffixed spelling, since the naming asymmetry doesn't appear to carry semantic weight for an
+implementation (it's still one atom constructor, `~atom`, with a constraint-vocabulary-shaped field set).
+
+**Suggested resolution:** Either rename `binary` to `binary_type` for consistency, or add a sentence
+explaining what distinguishes a "structural constructor" from a "constraint vocabulary constructor" beyond
+the naming convention itself, since as written the category boundary reads as arbitrary for `binary`
+specifically (unlike `extern`, whose sum-kind and schema-reference-list shape make "structural" a much
+more legible label).

@@ -82,13 +82,24 @@ public final class TsonMapper {
      * DataBindContext} (e.g. to register a {@code DataBridge} for {@code Rational}/{@code Complex},
      * see their Javadoc) is free to register {@code UUID} on their own terms instead, including with
      * a bridge to a different representation.
+     *
+     * <p>{@code byte[]} gets the same treatment, for a related but distinct reason: it's the natural
+     * host type for all four §5.3 binary atoms ({@code base64}/{@code base64url}/{@code base32}/
+     * {@code hex}), but {@code byte[].isArray()} is {@code true}, so {@code DefaultClassBinder}'s
+     * array auto-detection claims it ahead of the atom/vocabulary path the same way real records
+     * claim {@link io.ltr8.tson.parser.resolver.vocab.Rational}/{@link
+     * io.ltr8.tson.parser.resolver.vocab.Complex} -- but unlike those two, there's no competing
+     * richer type a caller would plausibly want to defer to instead (§5.3's host value is
+     * unconditionally "byte array"), so pre-registering it by default is the right call here, not
+     * just a workaround.
      */
     private static DataBindContext defaultContext() {
         DataBindContext context = DataBindContext.builder().build();
         try {
             context.registerAtom(UUID.class);
+            context.registerAtom(byte[].class);
         } catch (DataBindException e) {
-            throw new IllegalStateException("failed to register UUID on a fresh DataBindContext", e);
+            throw new IllegalStateException("failed to register UUID/byte[] on a fresh DataBindContext", e);
         }
         return context;
     }
