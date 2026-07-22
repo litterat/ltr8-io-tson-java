@@ -15,6 +15,16 @@ The spec is a *working revision* (2026 series) and changes between revisions wit
 guarantees — re-fetch the current URL rather than trusting a cached copy of the text when in doubt, and
 check the revision number at the top of the document.
 
+`spec/` holds local snapshots fetched 2026-07-22, revision 32, for quick reference without re-fetching
+every session: `spec/tson-part1-data.md` (Part 1, verbatim) and `spec/m/{core,meta,meta-kernel}.tn1` — the
+pre-loaded meta-kernel bootstrap layer, the canonical meta-schema built on it, and the core type library
+built on that (Part 2 schema documents, reachable via `!!meta`/`!!import` chaining from `core.tn1`). These
+three `.tn1` files are what §5's built-in type vocabulary formally resolves to when a schema *is* in
+scope — useful ground truth for constraint details (e.g. `integer_type`'s bit-width bounds formula) even
+though a Class 1 (schemaless) processor never parses or executes them. Treat this directory as a cache,
+not a source of truth: if a revision bump is suspected, re-fetch from the URLs above rather than trusting
+these files.
+
 **Hard constraints for this codebase:**
 - Java 25 only.
 - No external runtime dependencies (main code). JUnit (Jupiter) is permitted for tests only.

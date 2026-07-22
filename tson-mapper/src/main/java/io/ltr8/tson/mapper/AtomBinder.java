@@ -3,6 +3,8 @@ package io.ltr8.tson.mapper;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.tson.parser.resolver.BaseValue;
 import io.ltr8.tson.parser.resolver.NumberForm;
+import io.ltr8.tson.parser.resolver.NumberForms;
+import io.ltr8.tson.parser.resolver.NumberNarrowing;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -17,10 +19,15 @@ import java.math.BigInteger;
  * field actually declares.
  *
  * <p>Numbers are bound via an exact intermediate ({@link BigInteger} for integer/based-integer
- * forms, {@link BigDecimal} for float forms) and only narrowed to the target type at the last
- * step, so {@code 0xFF} and {@code 255} bind identically regardless of which representation was
- * written (§4.3's equivalence requirement) -- this is the layer that requirement actually needed,
- * and {@code NumberForm} deliberately didn't have it.
+ * forms, {@link BigDecimal} for float forms, extracted by {@link NumberForms}) and only narrowed
+ * to the target type at the last step via {@link NumberNarrowing}, so {@code 0xFF} and {@code 255}
+ * bind identically regardless of which representation was written (§4.3's equivalence requirement)
+ * -- this is the layer that requirement actually needed, and {@code NumberForm} deliberately didn't
+ * have it. Both {@code NumberForms} and {@code NumberNarrowing} live in {@code tson-parser}, not
+ * here: the exact-intermediate step is target-type-agnostic, and the narrowing step is the exact
+ * same target-matching logic the §5 built-in vocabulary's numeric atom types (also in {@code
+ * tson-parser}) need for their own {@code read(TokenValue, Class)} -- one shared implementation
+ * rather than one per caller.
  */
 final class AtomBinder {
 
@@ -65,10 +72,10 @@ final class AtomBinder {
             return bindSpecial(special, target);
         }
         if (form instanceof NumberForm.IntegerForm || form instanceof NumberForm.BasedIntegerForm) {
-            return bindIntegral(toBigInteger(form), target);
+            return bindIntegral(NumberForms.toBigInteger(form), target);
         }
         if (form instanceof NumberForm.FloatForm floatForm) {
-            return bindDecimal(toBigDecimal(floatForm), target);
+            return bindDecimal(NumberForms.toBigDecimal(floatForm), target);
         }
         throw new DataBindException("unrecognised number form: " + form);
     }
@@ -90,89 +97,21 @@ final class AtomBinder {
                 + " -- only float/double can represent it");
     }
 
-    private static BigInteger toBigInteger(NumberForm form) {
-        java.util.Optional<NumberForm.Sign> sign;
-        String digits;
-        int radix;
-        if (form instanceof NumberForm.IntegerForm f) {
-            sign = f.sign();
-            digits = f.digits();
-            radix = 10;
-        } else if (form instanceof NumberForm.BasedIntegerForm f) {
-            sign = f.sign();
-            digits = f.digits();
-            radix = switch (f.radix()) {
-                case HEX -> 16;
-                case OCTAL -> 8;
-                case BINARY -> 2;
-            };
-        } else {
-            throw new IllegalArgumentException("not an integer form: " + form);
-        }
-        BigInteger value = new BigInteger(digits.replace("_", ""), radix);
-        return sign.filter(s -> s == NumberForm.Sign.MINUS).isPresent() ? value.negate() : value;
-    }
-
-    private static BigDecimal toBigDecimal(NumberForm.FloatForm f) {
-        StringBuilder sb = new StringBuilder();
-        if (f.sign().filter(s -> s == NumberForm.Sign.MINUS).isPresent()) {
-            sb.append('-');
-        }
-        sb.append(f.integerPart().map(s -> s.replace("_", "")).orElse("0"));
-        f.fractionDigits().ifPresent(frac -> sb.append('.').append(frac.replace("_", "")));
-        f.exponent().ifPresent(exp -> {
-            sb.append('e');
-            if (exp.sign().filter(s -> s == NumberForm.Sign.MINUS).isPresent()) {
-                sb.append('-');
-            }
-            sb.append(exp.digits().replace("_", ""));
-        });
-        return new BigDecimal(sb.toString());
-    }
-
     private static Object bindIntegral(BigInteger value, Class<?> target) throws DataBindException {
         try {
-            if (target == int.class || target == Integer.class) {
-                return value.intValueExact();
-            }
-            if (target == long.class || target == Long.class) {
-                return value.longValueExact();
-            }
-            if (target == short.class || target == Short.class) {
-                return value.shortValueExact();
-            }
-            if (target == byte.class || target == Byte.class) {
-                return value.byteValueExact();
-            }
+            return NumberNarrowing.narrowIntegral(value, target);
         } catch (ArithmeticException e) {
             throw new DataBindException(value + " does not fit in " + target.getSimpleName(), e);
+        } catch (IllegalArgumentException e) {
+            throw new DataBindException("cannot bind integer value " + value + " to " + target, e);
         }
-        if (target == BigInteger.class) {
-            return value;
-        }
-        if (target == float.class || target == Float.class) {
-            return value.floatValue();
-        }
-        if (target == double.class || target == Double.class) {
-            return value.doubleValue();
-        }
-        if (target == BigDecimal.class) {
-            return new BigDecimal(value);
-        }
-        throw new DataBindException("cannot bind integer value " + value + " to " + target);
     }
 
     private static Object bindDecimal(BigDecimal value, Class<?> target) throws DataBindException {
-        if (target == float.class || target == Float.class) {
-            return value.floatValue();
+        try {
+            return NumberNarrowing.narrowDecimal(value, target);
+        } catch (IllegalArgumentException e) {
+            throw new DataBindException(e.getMessage(), e);
         }
-        if (target == double.class || target == Double.class) {
-            return value.doubleValue();
-        }
-        if (target == BigDecimal.class) {
-            return value;
-        }
-        throw new DataBindException("cannot bind float value " + value + " to " + target
-                + " -- write it as an integer token if an exact integral type is intended");
     }
 }

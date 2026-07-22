@@ -131,3 +131,95 @@ claim to govern this case at all.
 **Suggested resolution:** Not a Part 1 defect to fix — flagging so that whenever Part 2 defines real
 schema-driven type-name resolution, this implementation's ad hoc `TsonMapper` heuristic gets revisited and
 either conformed to the real rule or clearly scoped as "no schema in play" fallback behavior.
+
+---
+
+## 5. `!email` is present in the core type library but missing from Part 1's built-in vocabulary table
+
+**Section:** §5.5 ("Identifier and Network Types"), cross-referenced against the core type library
+(`core.tn1`, reachable via `!!meta` from a schema; see also §5.1: "schemas wanting these names import the
+core type library, whose entries denote the same parsing contracts defined here").
+
+**Problem:** `core.tn1` groups `email` together with `uuid`, `ipv4`, `ipv6`, `cidr4`, `cidr6`, and `mac`
+under one documentation banner ("Network Types") and gives it the same shape as its siblings —
+`email => !email_type {}`, backed by an `email_type` constructor in `meta.tn1` pinned to RFC 5322,
+identical in form to `uuid_type`/`ipv4_type`/etc. Every other member of that family is promoted to a Part
+1 §5.5 built-in annotation (`!uuid`, `!ipv4`, `!ipv6`, `!cidr4`, `!cidr6`, `!mac`) — `!email` is not; the
+§5.5 table has no row for it, and `!email` appears nowhere else in Part 1. Nothing in §5.1's applicability
+rules or §5.5's prose explains the omission (no stated rationale like "email validation is intentionally
+schema-only"), so a reader relying on core.tn1 as the built-in vocabulary's source of truth (as §5.1
+explicitly invites) would reasonably expect `!email` to exist as a schemaless annotation and be surprised
+to find it doesn't parse.
+
+**Interpretation chosen:** Treat the Part 1 §5.5 table as authoritative and exhaustive for the schemaless
+vocabulary — `!email` is not implemented as a built-in annotation in this implementation's Class 1
+resolver, matching the letter of §5.5. An unannotated email-shaped token, or one under an unrecognized
+`!email` annotation, falls through to ordinary base type resolution (§4) / uninterpreted-marker
+preservation (§3.2) respectively, same as any other non-vocabulary name.
+
+**Suggested resolution:** Either add an `!email` row to §5.5 (if the omission is accidental), or add a
+sentence to §5.1/§5.5 stating explicitly that `email` is deliberately schema-only and not part of the
+schemaless built-in set — RFC 5322 email validation is notoriously heavyweight/contentious to fully
+implement, which would be a reasonable rationale, but the spec doesn't currently say so.
+
+---
+
+## 6. §5.6's published integer atoms are a strict subset of `core.tn1`'s `integer_type` family
+
+**Section:** §5.6 ("Numeric Types"), cross-referenced against `core.tn1`.
+
+**Problem:** §5.6's table lists exactly four fixed-width integer annotations: `!int32`, `!int64`,
+`!uint32`, `!uint64`. `core.tn1` defines the same `integer_type` constructor applied across the full
+`int8`/`int16`/`int32`/`int64`/`int128`/`int256` and `uint8`/`uint16`/`uint32`/`uint64`/`uint128`/`uint256`
+width ladder, plus a `positive_integer`/`non_negative_integer`/`negative_integer`/`non_positive_integer`
+bound-only refinement family — sixteen instances of `integer_type` total, of which §5.6 promotes only
+four to the schemaless built-in vocabulary. Confirmed (outside the spec text itself, via direct guidance)
+that the missing twelve are an oversight in the published table, not a deliberate narrowing of the
+schemaless surface relative to the core type library.
+
+**Interpretation chosen:** `tson-parser`'s built-in vocabulary (`BuiltinTypeVocabulary`,
+`resolver.vocab` package) implements the full sixteen-instance `integer_type` family from `core.tn1` —
+`int8` through `int256`, `uint8` through `uint256`, and all four bound-only refinements — not just the
+four §5.6 currently lists. `IntegerType`/`IntegerConstraints`/`IntegerSize` are written generically
+against the constructor (arbitrary width, arbitrary signedness, optional bounds), so this cost nothing
+beyond populating the map with twelve more entries.
+
+**Suggested resolution:** Update §5.6's table to list the full `integer_type` family, matching
+`core.tn1`.
+
+---
+
+## 7. §5.1's "preserved as uninterpreted marker" rule doesn't address what a typed-binding consumer should do with it
+
+**Section:** §5.1.
+
+**Problem:** §5.1 requires a Class 1 processor to preserve an unrecognized type annotation "as an
+uninterpreted marker" rather than erroring — correct and necessary at the parsing/resolution layer, since
+a Class 1 processor can't know the full universe of names some future schema or application might define,
+and choking on them would make the format not forward-compatible. But the rule only addresses that
+processing step; it says nothing about what happens next. An application built on top of a Class 1
+processor that binds a value directly to a caller-declared, strongly-typed target (this implementation's
+`TsonMapper.toObject(source, MyRecord.class)`) has a real choice to make on hitting a marker it can't
+interpret: treat the value as if the annotation weren't there (silently falling back to base type
+resolution), or treat an unresolvable annotation on a value it's actively trying to type-check as an
+error. Getting this wrong either way has a real cost: silently ignoring means a typo like `!Uuid`
+(case-sensitive per §5.1, so not the same as `!uuid`) quietly disables the validation the author clearly
+intended; erroring unconditionally means an application that deliberately wants passthrough/lenient
+behavior for forward compatibility has no way to ask for it. Every implementation doing typed binding on
+top of TSON will face exactly this decision, and Part 1 has nothing to say about it — reasonably, since
+it's application-binding policy, not format conformance, but worth recording as a gap a future
+implementer's guide could usefully address.
+
+**Interpretation chosen:** `TsonMapper` treats an atom-typed value carrying a type-ref that
+`BuiltinTypeVocabulary` doesn't recognize as a binding error (`DataBindException`), not silent fallthrough
+to base type resolution. The Class 1 processing step itself (`tson-parser`'s `Parser`/`BaseTypeResolver`)
+still faithfully preserves the type-ref exactly as §5.1 requires — this is a binding-layer policy choice
+layered on top, not a change to Part 1 conformance. Rationale: a mistyped or unimplemented type-ref on a
+value the caller is actively binding to a specific Java type is far more likely to be a bug worth
+surfacing than an intentional forward-compatibility signal, and `TsonMapper` has no schema layer yet to
+make "this annotation is legitimately not mine to interpret" a safe default assumption.
+
+**Suggested resolution:** Not a Part 1 defect — flagging as guidance worth a note in a future
+implementer's guide ([TSON-GUIDE]?) rather than the format spec itself: implementations binding typed
+values directly to host objects should consider failing on unrecognized type-refs by default, with
+passthrough as an explicit opt-in, rather than the reverse.

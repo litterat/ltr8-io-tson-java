@@ -259,6 +259,71 @@ class TsonMapperTest {
         assertEquals(Double.NEGATIVE_INFINITY, mapper.toObject("{ value: -.inf }", NegInf.class).value());
     }
 
+    // ── Built-in type vocabulary (§5) ───────────────────────────────────────
+
+    @Test
+    void unannotatedTargetTypeStillBindsAsBefore() throws DataBindException {
+        // No !type-ref present at all -- falls through to plain BaseTypeResolver/AtomBinder,
+        // unaffected by the built-in vocabulary path existing.
+        assertEquals(42, mapper.toObject("{ value: 42 }", IntHolder.class).value());
+    }
+
+    @Test
+    void unrecognizedTypeRefThrowsRatherThanSilentlyFallingThrough() throws DataBindException {
+        // SPEC-FEEDBACK.md #7: §5.1's "preserved as an uninterpreted marker" rule governs the
+        // Class 1 processing step (tson-parser), not this binding layer -- an unresolvable
+        // annotation on a value we're actively binding to a declared type is treated as an error,
+        // so a typo doesn't silently disable the validation the author intended.
+        assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !notabuiltin 42 }", IntHolder.class));
+    }
+
+    @Test
+    void caseSensitiveTypoOfABuiltinNameIsRejectedRatherThanSilentlyUnvalidated() throws DataBindException {
+        // §5.1: "Annotation names are case-sensitive." !Int32 is not !int32.
+        assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !Int32 42 }", IntHolder.class));
+    }
+
+    @Test
+    void builtinIntegerAnnotationBindsDirectlyToTheDeclaredTarget() throws DataBindException {
+        // !uint8's own contract (0..255) is checked, then narrowed straight to the declared int
+        // field -- no intermediate natural-width value.
+        assertEquals(200, mapper.toObject("{ value: !uint8 200 }", IntHolder.class).value());
+    }
+
+    @Test
+    void builtinIntegerAnnotationValidatesAgainstItsOwnRangeNotJustTheTarget() throws DataBindException {
+        // 300 would fit comfortably in an int field, but uint8's own declared range rejects it --
+        // the built-in vocabulary's constraint applies regardless of how wide the target is.
+        assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !uint8 300 }", IntHolder.class));
+    }
+
+    @Test
+    void builtinIntegerAnnotationRejectsATargetNarrowerThanItsOwnGuarantee() throws DataBindException {
+        // int32 guarantees up to 2^31-1; a byte target can't hold 200 even though 200 alone would
+        // satisfy int32's own range.
+        assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !int32 200 }", ByteHolder.class));
+    }
+
+    @Test
+    void unsignedNegativeValueParsesThenFailsValidationThroughTheMapper() throws DataBindException {
+        // §5.6: "the range constraint, not the lexer, enforces unsignedness" -- exercised end to end.
+        assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !uint32 -10 }", IntHolder.class));
+    }
+
+    @Test
+    void nonIntegerTokenUnderAnIntegerAnnotationIsAParseErrorThroughTheMapper() throws DataBindException {
+        assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !int32 3.14 }", IntHolder.class));
+    }
+
+    public record WideInt(long value) {
+    }
+
+    @Test
+    void extendedIntegerFamilyWidthsAreReachableThroughTheMapper() throws DataBindException {
+        // SPEC-FEEDBACK.md #6: int16 isn't in §5.6's published table but is implemented anyway.
+        assertEquals(30000L, mapper.toObject("{ value: !int16 30000 }", WideInt.class).value());
+    }
+
     // ── Unions ───────────────────────────────────────────────────────────
 
     @Union({ Circle.class, Rectangle.class })

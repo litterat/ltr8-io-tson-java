@@ -1,0 +1,302 @@
+!!id:"https://tson.io/2026/32/m/core.tn1"
+!!meta:"https://tson.io/2026/32/m/meta.tn1"
+@doc:"""
+  TSON Core Type Library — canonical types for data interchange
+  (2026 Revision 32 draft).
+
+  Every type in core comes from a constructor defined in meta-kernel
+  or meta. Atoms are uniformly defined as empty instances:
+
+      integer => !integer_type {}
+      text    => !text_type {}
+      date    => !date_type {}
+      ...
+
+  Refinements overlay literal values via the ^ operator:
+
+      uint8            => !integer ^ { size: { bits: 8  signed: false } }
+      non_empty_text   => !text ^ { min_length: 1 }
+
+  Annotation types (`@ordered`, `@bounded`, `@exact`, `@numeric`,
+  `@deprecated`, `@since`, `@todo`, `@lang`) live in meta.tn1 —
+  annotations resolve one hop against the governing target's
+  namespace (Part 2 §3.3.3, §6), so for this schema document they
+  must be reachable through the `!!meta` chain; they appear here
+  only by use. Core's own `annotation`, `documentation`, `doc`, and
+  `alias` declarations (and its `void` sibling) face the other
+  direction: they exist so that *data documents* governed by
+  core-importing schemas can use them — the same one-hop rule, seen
+  from the data side.
+
+  References:
+    ISO/IEC 11404:2007    General Purpose Datatypes
+    W3C XSD Part 2        Facet model and constraint vocabulary
+    JSON Schema 2020-12   Modern constraint vocabulary
+    IEEE 754-2019         Floating-point semantics
+    ISO 8601-1:2019       Date and time formats (duration)
+    RFC 3339              Internet date/time profile
+    RFC 9562              UUID format
+    RFC 4648              Base encoding
+    RFC 3986              URI syntax (incl. IPv4address grammar)
+    RFC 4291              IPv6 addressing architecture
+    RFC 4632              Classless Inter-domain Routing (CIDR)
+    RFC 9542              IEEE 802 parameters (EUI-48 format)
+    RFC 5322              Email address format
+    RFC 5646              BCP 47 language tags
+  """
+{
+  @doc:"""
+    Void primitive. A fresh sibling of the meta-kernel's `void` under
+    the same name — the same `!unit {}` construction and contract, a
+    distinct type entity — so that data documents governed by
+    core-importing schemas can target it. The atom whose parsing
+    contract admits only the absent sentinel `_`. See Part 2 §6 and §7.3.
+    """
+  void => !unit {}
+
+  @doc:"Two-value boolean enumeration."
+  boolean => !enum [true false]
+
+  @doc:"Arbitrary-precision signed integer. Decimal, hex, octal, and binary forms; [TSON-DATA] §7.6."
+  @ordered:TOTAL @bounded:false @exact:true @numeric
+  integer => !integer_type {}
+
+  @doc:"""
+    Exact number of arbitrary magnitude and precision, finite, with no
+    special values (SQL exact tier; ISO/IEC 11404 `scaled`, radix 10).
+    The canonical numeric type and the JSON Schema `number` mapping:
+    a bare JSON number is a TSON `number`. Preserved as written, so
+    equality is safe and ordering is TOTAL. Lossiness enters only when
+    a consumer narrows to an approximate type (`float32`/`float64`),
+    where the value is rounded onto an IEEE grid. A value
+    needing `.inf`/`.nan` is not a `number` — those belong to the
+    approximate tier.
+    """
+  @ordered:TOTAL @bounded:false @exact:true @numeric
+  number => !decimal_type {}
+
+  @doc:"""
+    Exact fraction a/b; positive nonzero denominator by grammar. Not
+    normalized: the token is preserved as written and 2/4 round-trips
+    as 2/4. Equality and constraints operate on the value (2/4 equals
+    1/2); receivers reduce if their representation needs it. Contains
+    `/`, so data values must be quoted.
+    """
+  @ordered:TOTAL @bounded:false @exact:true @numeric
+  rational => !rational_type {}
+
+  @doc:"""
+    Complex number, a pair of components (real and imaginary parts).
+    Components default to `NUMBER` (exact); a narrowing may set
+    `component` to another member of the closed vocabulary — e.g.
+    `!complex ^ { component: INTEGER }` for Gaussian integers,
+    `!complex ^ { component: FLOAT64 }` for floating-point complex. Exactness follows the component type,
+    so `complex` carries no `@exact` marker. Surface forms a+bi and
+    a+bj are both accepted; component representation is host-defined.
+    """
+  @ordered:NONE @bounded:false @numeric
+  complex => !complex_type {}
+
+  @doc:"Signed 8-bit integer (-128 to 127)."
+  @ordered:TOTAL @bounded:true @exact:true @numeric
+  int8 => !integer ^ { size: { bits: 8  signed: true } }
+
+  @doc:"Signed 16-bit integer."
+  @ordered:TOTAL @bounded:true @exact:true @numeric
+  int16 => !integer ^ { size: { bits: 16  signed: true } }
+
+  @doc:"Signed 32-bit integer."
+  @ordered:TOTAL @bounded:true @exact:true @numeric
+  int32 => !integer ^ { size: { bits: 32  signed: true } }
+
+  @doc:"Signed 64-bit integer."
+  @ordered:TOTAL @bounded:true @exact:true @numeric
+  int64 => !integer ^ { size: { bits: 64  signed: true } }
+
+  @doc:"Signed 128-bit integer."
+  @ordered:TOTAL @bounded:true @exact:true @numeric
+  int128 => !integer ^ { size: { bits: 128  signed: true } }
+
+  @doc:"Signed 256-bit integer."
+  @ordered:TOTAL @bounded:true @exact:true @numeric
+  int256 => !integer ^ { size: { bits: 256  signed: true } }
+
+  @doc:"Unsigned 8-bit integer (0 to 255)."
+  @ordered:TOTAL @bounded:true @exact:true @numeric
+  uint8 => !integer ^ { size: { bits: 8  signed: false } }
+
+  @doc:"Unsigned 16-bit integer."
+  @ordered:TOTAL @bounded:true @exact:true @numeric
+  uint16 => !integer ^ { size: { bits: 16  signed: false } }
+
+  @doc:"Unsigned 32-bit integer."
+  @ordered:TOTAL @bounded:true @exact:true @numeric
+  uint32 => !integer ^ { size: { bits: 32  signed: false } }
+
+  @doc:"Unsigned 64-bit integer."
+  @ordered:TOTAL @bounded:true @exact:true @numeric
+  uint64 => !integer ^ { size: { bits: 64  signed: false } }
+
+  @doc:"Unsigned 128-bit integer."
+  @ordered:TOTAL @bounded:true @exact:true @numeric
+  uint128 => !integer ^ { size: { bits: 128  signed: false } }
+
+  @doc:"Unsigned 256-bit integer."
+  @ordered:TOTAL @bounded:true @exact:true @numeric
+  uint256 => !integer ^ { size: { bits: 256  signed: false } }
+
+  @doc:"Integer greater than zero."
+  @ordered:TOTAL @bounded:false @exact:true @numeric
+  positive_integer => !integer ^ { min: 1 }
+
+  @doc:"Integer zero or greater."
+  @ordered:TOTAL @bounded:false @exact:true @numeric
+  non_negative_integer => !integer ^ { min: 0 }
+
+  @doc:"Integer less than zero."
+  @ordered:TOTAL @bounded:false @exact:true @numeric
+  negative_integer => !integer ^ { max: -1 }
+
+  @doc:"Integer zero or less."
+  @ordered:TOTAL @bounded:false @exact:true @numeric
+  non_positive_integer => !integer ^ { max: 0 }
+
+  @doc:"IEEE 754 binary32. Value set is the binary32 grid plus signed zeros, subnormals, both infinities, and quiet NaN."
+  @ordered:PARTIAL @bounded:false @exact:false @numeric
+  float32 => !float_type { format: BINARY32 }
+
+  @doc:"IEEE 754 binary64. Value set is the binary64 grid plus signed zeros, subnormals, both infinities, and quiet NaN."
+  @ordered:PARTIAL @bounded:false @exact:false @numeric
+  float64 => !float_type { format: BINARY64 }
+
+  @doc:"Unicode code point sequence. The universal text type."
+  @ordered:NONE @bounded:false
+  text => !text_type {}
+
+  @doc:"Text with at least one character."
+  non_empty_text => !text ^ { min_length: 1 }
+
+  @doc:"Interoperable regular expression pattern per RFC 9485 (I-Regexp)."
+  @ordered:NONE @bounded:false
+  regex => !regex_type {}
+
+  @doc:"Uniform Resource Identifier per RFC 3986."
+  @ordered:NONE @bounded:false
+  uri => !uri_type {}
+
+  @doc:"Base64-encoded binary (RFC 4648)."
+  base64 => !binary BASE64
+
+  @doc:"URL-safe base64-encoded binary (RFC 4648 §5)."
+  base64url => !binary BASE64URL
+
+  @doc:"Base32-encoded binary (RFC 4648)."
+  base32 => !binary BASE32
+
+  @doc:"Hex-encoded binary."
+  hex => !binary HEX
+
+  @doc:"Calendar date. RFC 3339 full-date YYYY-MM-DD."
+  @ordered:TOTAL @bounded:false
+  date => !date_type {}
+
+  @doc:"""
+    Time of day. RFC 3339 full-time HH:MM:SS. PARTIAL ordering reflects
+    that times with different timezone offsets are not unconditionally
+    comparable without resolving to a common reference; times within a
+    single timezone are totally ordered.
+    """
+  @ordered:PARTIAL @bounded:true
+  time => !time_type {}
+
+  @doc:"""
+    Date and time. RFC 3339 date-time. PARTIAL ordering reflects that
+    datetimes with different timezone offsets require resolution to a
+    common reference (typically UTC) before comparison; datetimes
+    within a single timezone or all in UTC are totally ordered.
+    """
+  @ordered:PARTIAL @bounded:false
+  datetime => !datetime_type {}
+
+  @doc:"""
+    Time duration. ISO 8601 PnYnMnDTnHnMnS. PARTIAL ordering reflects
+    that durations expressed with calendar units (years, months) have
+    no fixed length — P1M may be 28, 29, 30, or 31 days depending on
+    when applied — so two such durations are not unconditionally
+    comparable. Durations expressed only in fixed-length units (days,
+    hours, minutes, seconds) are totally ordered.
+    """
+  @ordered:PARTIAL @bounded:false
+  duration => !duration_type {}
+
+  @doc:"128-bit identifier per RFC 9562."
+  @ordered:NONE @bounded:true
+  uuid => !uuid_type {}
+
+  @doc:"Email address per RFC 5322."
+  @ordered:NONE @bounded:false
+  email => !email_type {}
+
+  @doc:"""
+    IPv4 address, dotted-quad per the RFC 3986 IPv4address production.
+    Totally ordered by numeric address value over a finite 32-bit space.
+    """
+  @ordered:TOTAL @bounded:true
+  ipv4 => !ipv4_type {}
+
+  @doc:"""
+    IPv6 address, RFC 4291 §2.2 text representation. Zone identifiers
+    (RFC 4007, `fe80::1%eth0`) are host-local and excluded from the
+    contract. Totally ordered by numeric address value over a finite
+    128-bit space. Contains colons, so data values must be quoted.
+    """
+  @ordered:TOTAL @bounded:true
+  ipv6 => !ipv6_type {}
+
+  @doc:"""
+    IPv4 network, address `/` prefix length 0-32 (RFC 4632). PARTIAL
+    ordering is by containment: a network precedes another when its
+    address range is a strict subset; CIDR blocks never partially
+    overlap, so any two are nested or disjoint, and disjoint networks
+    are incomparable. Contains `/`, so data values must be quoted.
+    """
+  @ordered:PARTIAL @bounded:true
+  cidr4 => !cidr4_type {}
+
+  @doc:"""
+    IPv6 network, address `/` prefix length 0-128 (RFC 4291 §2.3).
+    PARTIAL ordering is by containment, as for cidr4. Contains colons
+    and `/`, so data values must be quoted.
+    """
+  @ordered:PARTIAL @bounded:true
+  cidr6 => !cidr6_type {}
+
+  @doc:"""
+    MAC address, EUI-48: six hex octets, colon- or hyphen-separated
+    (RFC 9542). The colon form must be quoted; the hyphen form may be
+    written unquoted. An opaque hardware identifier — like uuid,
+    ordering is not semantically meaningful.
+    """
+  @ordered:NONE @bounded:true
+  mac => !mac_type {}
+
+  @doc:"""
+    Value whose type is unconstrained. Membership is the universe of
+    types. Distinct from absent and from the unit type. The validator
+    accepts any well-formed value of any type.
+    """
+  @ordered:NONE @bounded:false
+  unknown => !unknown_type {}
+
+  @doc:"Marker annotation."
+  annotation => @annotation void
+
+  @doc:"Text-valued documentation annotation."
+  documentation => @annotation text
+
+  @doc:"Short alias for documentation annotation."
+  doc => @annotation documentation
+
+  @doc:"Source-level alias name preserved on a resolved type reference."
+  alias => @annotation text
+}

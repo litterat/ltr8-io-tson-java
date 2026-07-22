@@ -1,0 +1,368 @@
+!!id:"https://tson.io/2026/32/m/meta.tn1"
+!!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
+!!import:"https://tson.io/2026/32/m/meta-kernel.tn1"
+@doc:"""
+  TSON meta-schema — 2026 Revision 32 draft.
+
+  The canonical meta-schema for user schemas: a schema governed by the
+  meta-kernel that adds the type constructors the core type library
+  (core.tn1) instantiates. Type constructors are a meta-schema concern:
+  user schemas use them but should not define new ones.
+
+  User schemas normally chain to this file via `!!meta`. The
+  meta-kernel is reachable but not typically referenced directly —
+  schemas that chain to meta-kernel are either alternative type
+  libraries replacing meta, or extensions of the meta layer itself
+  (the format's sanctioned extension point: new type vocabularies
+  arrive as new meta layers, never as grammar changes).
+
+  Three families of constructors live here:
+
+  1. Structural constructors: `binary` (with `binary_encoding` enum)
+     and `extern`.
+
+  2. The `unknown_type` sum constructor whose instance in core is the
+     universal `unknown` sum.
+
+  3. Constraint vocabulary constructors for atom families that the
+     kernel itself doesn't need: numeric (`float_type` for the
+     approximate tier, with the `ieee_format` enum; `decimal_type`
+     for the exact tier; `rational_type`; `complex_type`, with the
+     `complex_component` enum), temporal (`date_type`, `time_type`,
+     `datetime_type`, `duration_type`), identifier (`uuid_type`),
+     network (`ipv4_type`, `ipv6_type`, `cidr4_type`, `cidr6_type`,
+     `mac_type`), and text (`email_type`).
+
+  Plus annotation types — `ordered`, `bounded`, `exact`, `numeric`,
+  `disjoint`, `deprecated`, `since`, `todo`, `lang`. Annotation types must
+  reside in the governing target's namespace (per Part 2 §6); placing them
+  in meta makes them reachable from core and from every schema that
+  meta governs.
+
+  Constructors that bind to a governing specification compose with
+  the kernel's atom_specification mixin and pin the spec field with
+  `=`. Their instances in core are uniformly empty.
+
+  Constraint fields whose values are of the constrained atom's family
+  use the kernel's `value` escape hatch where the constrained atom is
+  not defined in meta-kernel or meta. Where the type is integer, the
+  field uses `integer?` directly (available through this schema's
+  kernel import).
+
+  The ordered numeric families state their bounds as field groups
+  ([TSON-SCHEMA] §5.11): one inclusive-or-exclusive group per side,
+  so an inclusive and an exclusive bound on the same side is
+  unrepresentable rather than a prose rule. Value-level coherence
+  (the lower bound not exceeding the upper) remains a schema-load
+  check.
+  """
+{
+  @doc:"Binary encoding formats per RFC 4648."
+  binary_encoding => !enum [BASE64 BASE64URL BASE32 HEX]
+
+  @doc:"Binary data constructor. Encoding alphabets are pinned to RFC 4648."
+  binary => ~atom & atom_specification & {
+    spec:        = "https://www.rfc-editor.org/rfc/rfc4648"
+    encoding:    binary_encoding
+    min_length:  integer?
+    max_length:  integer?
+  }
+
+  @doc:"""
+    Constructor for sum types whose members belong to a named external
+    schema. When `types` is absent, any type from the schema is
+    accepted. When present, only the listed types are accepted.
+    """
+  extern => ~sum & {
+    schema: uri
+    types:  [type_name]?
+  }
+
+  @doc:"""
+    Unknown sum constructor. An empty sum whose instance, `unknown`,
+    accepts any well-formed value of any type. Membership is the
+    universe of types. Distinct from absent and from the unit type.
+    """
+  unknown_type => ~sum & {}
+
+  @doc:"""
+    Fixed-size array constructor.
+    """
+  vector => <T, S> ~array<T> ^ {
+    min_items: = S
+    max_items: = S
+  }
+
+  @doc:"""
+    IEEE 754-2019 interchange formats, both radices. Selects the
+    representable grid of an approximate (`float_type`) value. The
+    binary formats are the familiar base-2 floats; the decimal formats
+    (decimal32/64/128) are base-10 *floating-point* — still approximate,
+    with their own special values — and are NOT the exact fixed-point
+    decimals of `decimal_type`.
+    """
+  ieee_format => !enum [
+    BINARY16 BINARY32 BINARY64 BINARY128 BINARY256
+    DECIMAL32 DECIMAL64 DECIMAL128
+  ]
+
+  @doc:"""
+    Approximate-numeric constraint vocabulary (SQL's approximate tier;
+    ISO/IEC 11404 approximate real). Instances in core are `float32`
+    and `float64`. An approximate value is not stored as written: the receiver rounds it
+    onto the discrete IEEE 754-2019 grid named by `format`, so precision
+    may be lost and equality comparison is unsafe (ordering is PARTIAL —
+    NaN is unordered). The `format` radix (binary or decimal) is the ISO
+    11404 radix characteristic of the type. The value set is that grid
+    together with signed zeros, subnormals, the two infinities, and the
+    canonical quiet NaN (Part 1 §5.6); `allow_nan`, `allow_infinity`,
+    `allow_subnormal`, and `allow_negative_zero` default to true
+    (`~ true` — the format's full set) and may be narrowed to false to
+    exclude those representation artifacts. The bounds are OPTIONAL domain
+    restrictions validated against the value as written, before
+    rounding; they do not bound the special values. Not a narrowing of
+    the exact tier: infinities and NaN are not exact numbers.
+
+    Bounds: each side is a field group ([TSON-SCHEMA] §5.11) — the
+    inclusive `min` or the exclusive `exclusive_min`; likewise `max`
+    or `exclusive_max` — so at most one bound per side holds by
+    shape. There is deliberately no
+    `multiple_of` here — a step constraint cannot hold on a binary grid
+    (e.g. 0.05 is not a binary32 value, so nothing is exactly a multiple
+    of it); use the exact tier (`decimal_type`) when a step is required.
+    A value that does not land on the grid is rounded to nearest, ties
+    to even (IEEE 754-2019 roundTiesToEven), the default across the
+    format; loss of precision is expected, not an error.
+    """
+  float_type => ~atom & atom_specification & {
+    spec:                 = "https://ieeexplore.ieee.org/document/8766229"
+    format:               ieee_format
+    ( min: value | exclusive_min: value )?
+    ( max: value | exclusive_max: value )?
+    allow_nan:            boolean ~ true
+    allow_infinity:       boolean ~ true
+    allow_subnormal:      boolean ~ true
+    allow_negative_zero:  boolean ~ true
+  }
+
+  @doc:"""
+    Exact-numeric constraint vocabulary (SQL's exact tier; ISO/IEC
+    11404 `scaled`, radix 10). Instance in core is `number` — the
+    unrestricted exact number, which is also the JSON Schema `number`
+    mapping (arbitrary magnitude and precision, finite, no special
+    values). An exact value is preserved as written within its declared
+    precision, so equality is safe and ordering is TOTAL.
+    `total_digits`/`fraction_digits` are the ISO `scaled` precision and
+    scale (SQL `DECIMAL(precision, scale)`): total significant digits
+    and digits after the point.
+
+    Bounds: each side is a field group ([TSON-SCHEMA] §5.11) — the
+    inclusive `min` or the exclusive `exclusive_min`; likewise `max`
+    or `exclusive_max` — so at most one bound per side holds by
+    shape. `multiple_of` is exact here (e.g. `multiple_of` 0.05
+    admits only nickel steps) and composes with the other constraints —
+    a value must satisfy all present facets. `fraction_digits` and
+    `multiple_of` overlap but are not equivalent: `fraction_digits` 2
+    admits any hundredth, `multiple_of` 0.05 only multiples of a nickel.
+    """
+  decimal_type => ~atom & {
+    ( min: value | exclusive_min: value )?
+    ( max: value | exclusive_max: value )?
+    multiple_of:      value?
+    total_digits:     integer?
+    fraction_digits:  integer?
+  }
+
+  @doc:"""
+    Rational constraint vocabulary. Instance is `rational` in core.
+    Exact (ℚ; ISO/IEC 11404 `rational`), so bounds and `multiple_of`
+    are exact. Bounds: each side is a field group ([TSON-SCHEMA]
+    §5.11) — inclusive `min` or exclusive `exclusive_min`; `max` or
+    `exclusive_max` — at most one bound per side by shape.
+    Constraints operate on the value, not the written
+    token: tokens are not normalized, so `"2/4"` and `"1/2"` satisfy
+    the same constraints.
+    """
+  rational_type => ~atom & {
+    ( min: value | exclusive_min: value )?
+    ( max: value | exclusive_max: value )?
+    multiple_of:  value?
+  }
+
+  @doc:"""
+    Allowed component types for a complex value. A closed vocabulary of
+    numeric types (naming their core counterparts): exact `INTEGER`
+    (Gaussian integers ℤ+ℤi), `NUMBER` (exact arbitrary precision),
+    `RATIONAL` (ℚ+ℚi); approximate `FLOAT32`, `FLOAT64`. Being an enum,
+    it restricts `complex_type.component` at schema-load time and is
+    self-contained in meta (no dependency on the core type namespace).
+    """
+  complex_component => !enum [INTEGER NUMBER RATIONAL FLOAT32 FLOAT64]
+
+  @doc:"""
+    Complex constraint vocabulary. Instance is `complex` in core.
+    A complex value is a pair of components (real and imaginary parts).
+    `component` selects the type of both parts from the closed
+    `complex_component` vocabulary; it defaults to `NUMBER`
+    (REQUIRED_DEFAULT, §5.2), so a bare complex has exact components.
+    The enum both enforces that a component is numeric (unlike a free
+    `type_name`, which any token would satisfy) and keeps meta free of
+    any reference to core's type names. Complex has no useful total
+    order (`@ordered:NONE`), so the order-based facets of the other
+    numeric tiers do not apply here. Exactness is inherited from
+    `component` rather than fixed: `INTEGER`/`NUMBER`/`RATIONAL`
+    components give an exact complex, `FLOAT32`/`FLOAT64` an approximate
+    one — which is why `complex` carries no `@exact` marker of its own.
+    """
+  complex_type => ~atom & {
+    component:  complex_component ~ NUMBER
+  }
+
+  @doc:"Date constraint vocabulary. Instance is `date` in core."
+  date_type => ~atom & atom_specification & {
+    spec:  = "https://www.rfc-editor.org/rfc/rfc3339"
+    min:   value?
+    max:   value?
+  }
+
+  @doc:"Time constraint vocabulary. Instance is `time` in core."
+  time_type => ~atom & atom_specification & {
+    spec:              = "https://www.rfc-editor.org/rfc/rfc3339"
+    min:               value?
+    max:               value?
+    precision:         integer?
+    require_timezone:  boolean?
+  }
+
+  @doc:"Datetime constraint vocabulary. Instance is `datetime` in core."
+  datetime_type => ~atom & atom_specification & {
+    spec:              = "https://www.rfc-editor.org/rfc/rfc3339"
+    min:               value?
+    max:               value?
+    precision:         integer?
+    require_timezone:  boolean?
+  }
+
+  @doc:"Duration constraint vocabulary. Instance is `duration` in core."
+  duration_type => ~atom & atom_specification & {
+    spec:  = "https://www.iso.org/standard/70907.html"
+    min:   value?
+    max:   value?
+  }
+
+  @doc:"UUID constraint vocabulary. Instance is `uuid` in core."
+  uuid_type => ~atom & atom_specification & {
+    spec:     = "https://www.rfc-editor.org/rfc/rfc9562"
+    version:  integer?
+  }
+
+  @doc:"Email constraint vocabulary. Instance is `email` in core."
+  email_type => ~text_type & atom_specification & {
+    spec: = "https://www.rfc-editor.org/rfc/rfc5322"
+  }
+
+  @doc:"""
+    IPv4 address constraint vocabulary. Instance is `ipv4` in core.
+    The spec pin cites RFC 3986 for its `IPv4address` production —
+    the normative dotted-quad grammar (Part 1 §5.5). `within` and
+    `excluding` list IPv4 networks in CIDR text (quoted — the form
+    contains `/`): the address must lie inside at least one `within`
+    network when the field is present, and inside no `excluding`
+    network. `excluding` carves holes out of `within`.
+    """
+  ipv4_type => ~atom & atom_specification & {
+    spec:       = "https://www.rfc-editor.org/rfc/rfc3986"
+    within:     [value]?
+    excluding:  [value]?
+  }
+
+  @doc:"""
+    IPv6 address constraint vocabulary. Instance is `ipv6` in core.
+    `within` and `excluding` list IPv6 networks in CIDR text (quoted):
+    the address must lie inside at least one `within` network when
+    the field is present, and inside no `excluding` network.
+    """
+  ipv6_type => ~atom & atom_specification & {
+    spec:       = "https://www.rfc-editor.org/rfc/rfc4291"
+    within:     [value]?
+    excluding:  [value]?
+  }
+
+  @doc:"""
+    IPv4 network constraint vocabulary. Instance is `cidr4` in core.
+    `min_prefix`/`max_prefix` narrow the prefix length within the
+    family range 0-32; bounds outside that range are invalid at the
+    schema level. `within` lists IPv4 networks in CIDR text (quoted):
+    the value must be a subnet of at least one. `excluding`: the
+    value must not overlap any listed network — overlap, not
+    containment, so a wider value cannot smuggle an excluded block.
+    """
+  cidr4_type => ~atom & atom_specification & {
+    spec:        = "https://www.rfc-editor.org/rfc/rfc4632"
+    min_prefix:  integer?
+    max_prefix:  integer?
+    within:      [value]?
+    excluding:   [value]?
+  }
+
+  @doc:"""
+    IPv6 network constraint vocabulary. Instance is `cidr6` in core.
+    `min_prefix`/`max_prefix` narrow the prefix length within the
+    family range 0-128. `within` and `excluding` list IPv6 networks
+    in CIDR text (quoted), with the semantics of `cidr4_type`:
+    subnet-of for `within`, non-overlap for `excluding`.
+    """
+  cidr6_type => ~atom & atom_specification & {
+    spec:        = "https://www.rfc-editor.org/rfc/rfc4291"
+    min_prefix:  integer?
+    max_prefix:  integer?
+    within:      [value]?
+    excluding:   [value]?
+  }
+
+  @doc:"""
+    MAC address (EUI-48) constraint vocabulary. Instance is `mac` in
+    core. Deliberately bare beyond the pinned spec: I/G- and U/L-bit
+    predicates and OUI (vendor) prefixes were considered and rejected
+    as niche, and OUI is a living registry.
+    """
+  mac_type => ~atom & atom_specification & {
+    spec: = "https://www.rfc-editor.org/rfc/rfc9542"
+  }
+
+  @doc:"Ordering classification (ISO/IEC 11404 / XSD fundamental facet)."
+  ordered => @annotation !enum [NONE PARTIAL TOTAL]
+
+  @doc:"Boundedness annotation."
+  bounded => @annotation boolean
+
+  @doc:"Exactness classification (ISO/IEC 11404 characterizing property): true for exact types (values preserved as written), false for approximate types (values rounded to a representation grid)."
+  exact => @annotation boolean
+
+  @doc:"Numeric type marker annotation."
+  numeric => @annotation void
+
+  @doc:"""
+    Author's assertion that a choice's variants are pairwise disjoint
+    as value sets — advisory intent, checked against the resolver's
+    derived `type_definition.disjoint` fact ([TSON-SCHEMA] §5.4). A
+    void-targeted presence marker like `@numeric`: written bare, and
+    presence is the assertion. Carries no decode force — the resolver
+    computes disjointness whether or not the annotation is present.
+    Present and refuted is a schema-load error; present and unprovable
+    is a warning; present and proved, or absent, is silent.
+    """
+  disjoint => @annotation void
+
+  @doc:"Marks a definition or field as deprecated."
+  deprecated => @annotation text
+
+  @doc:"Records when a definition or field was introduced."
+  since => @annotation text
+
+  @doc:"Marks incomplete work requiring attention."
+  todo => @annotation text
+
+  @doc:"BCP 47 language tag (RFC 5646)."
+  lang => @annotation text
+}

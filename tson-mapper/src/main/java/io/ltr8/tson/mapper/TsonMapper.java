@@ -21,6 +21,9 @@ import io.ltr8.tson.parser.ast.ScopedValue;
 import io.ltr8.tson.parser.ast.TokenValue;
 import io.ltr8.tson.parser.resolver.BaseTypeResolver;
 import io.ltr8.tson.parser.resolver.BaseValue;
+import io.ltr8.tson.parser.resolver.vocab.AtomType;
+import io.ltr8.tson.parser.resolver.vocab.AtomTypeException;
+import io.ltr8.tson.parser.resolver.vocab.BuiltinTypeVocabulary;
 
 import java.util.HashMap;
 import java.util.List;
@@ -39,12 +42,22 @@ import java.util.Optional;
  * no need to buffer array elements into a temporary list first -- {@code ArrayValue.elements()}
  * is already a concrete {@code List}.
  *
- * <p>Atom binding goes through {@link BaseTypeResolver} (identification: which of
- * null/boolean/number/string, and for numbers which of the four §7.6 grammar forms) and then
+ * <p>Atom binding first checks whether the value carries a type-ref at all. If it does, {@link
+ * BuiltinTypeVocabulary} must resolve it (§5) -- an unrecognized type-ref is a binding error here,
+ * not silently ignored, even though the Class 1 processing step underneath (§5.1) is required to
+ * (and does, in {@code tson-parser}'s {@code Parser}/{@code BaseTypeResolver}) preserve an
+ * unrecognized annotation as an uninterpreted marker rather than erroring -- that rule is about
+ * passive preservation during parsing, not about what an application actively binding the value to
+ * a caller-declared Java type should do with a marker it can't interpret; see SPEC-FEEDBACK.md #7.
+ * A resolved built-in type does identification, validation, and narrowing to the target class in
+ * one call ({@link AtomType#read(TokenValue, Class)}), since it alone knows both its own parsing
+ * contract and (per the target {@code Class<?>} passed in) how to narrow to it. With no type-ref at
+ * all, binding falls through to plain untyped resolution: {@link BaseTypeResolver} (identification:
+ * which of null/boolean/number/string, and for numbers which of the four §7.6 grammar forms) then
  * {@link AtomBinder} (binding: that identified shape into whatever concrete Java type the target
- * field actually declares -- {@code int}, {@code BigInteger}, etc.). That split mirrors the one
- * already established in {@code tson-parser}'s resolver package; this is where the "binding" half
- * finally gets implemented, driven by a real target type instead of guessing at one.
+ * field actually declares). Both paths end up sharing the same narrowing code ({@code
+ * NumberNarrowing}, in {@code tson-parser}) one level down, so a plain {@code 42} and a {@code
+ * !uint8 42} bind through the same final step regardless of which path found them.
  */
 public final class TsonMapper {
 
@@ -99,7 +112,7 @@ public final class TsonMapper {
         return value == null || value.coreValue() instanceof AbsentValue;
     }
 
-    // ── Atoms: identification (BaseTypeResolver) + binding (AtomBinder) ──
+    // ── Atoms: built-in vocabulary (§5) or identification (BaseTypeResolver) + binding (AtomBinder) ──
 
     private Object toAtom(DataValue value, DataClassAtom dataClass) throws DataBindException {
         if (isAbsent(value)) {
@@ -109,8 +122,39 @@ public final class TsonMapper {
         if (!(core instanceof TokenValue token)) {
             throw new DataBindException("expected a token for " + dataClass.typeClass() + ", found " + core);
         }
+
+        Optional<String> typeRef = value.typeRef();
+        if (typeRef.isPresent()) {
+            // Unlike the Class 1 processing step underneath us (Parser/BaseTypeResolver, which
+            // correctly preserves an unrecognized type-ref as an uninterpreted marker per §5.1),
+            // an unresolvable annotation on a value we're actively binding to a caller-declared
+            // Java type is treated as an error here, not silent fallthrough -- see
+            // SPEC-FEEDBACK.md #7. A typo like !Uuid (case-sensitive per §5.1) should be loud, not
+            // quietly disable the validation the author clearly wanted.
+            AtomType<?> atomType = BuiltinTypeVocabulary.lookup(typeRef.get())
+                    .orElseThrow(() -> new DataBindException("unrecognized type annotation '!"
+                            + typeRef.get() + "' for " + dataClass.typeClass()));
+            return bindBuiltin(atomType, token, dataClass.dataClass());
+        }
+
         BaseValue resolved = BaseTypeResolver.resolve(token);
         return AtomBinder.bind(resolved, dataClass.dataClass());
+    }
+
+    private static Object bindBuiltin(AtomType<?> atomType, TokenValue token, Class<?> target) throws DataBindException {
+        try {
+            return atomType.read(token, target);
+        } catch (AtomTypeException e) {
+            // §5.2's parse/validation distinction doesn't need to survive past this boundary today --
+            // both are just "this value doesn't satisfy its own declared type" from a binding caller's
+            // perspective -- but the underlying AtomParseException/AtomValidationException is preserved
+            // as the cause for anyone who wants to distinguish them.
+            throw new DataBindException(e.getMessage(), e);
+        } catch (ArithmeticException e) {
+            throw new DataBindException(token.text() + " does not fit in " + target, e);
+        } catch (IllegalArgumentException e) {
+            throw new DataBindException("cannot bind '" + token.text() + "' to " + target, e);
+        }
     }
 
     // ── Records ──────────────────────────────────────────────────────────
