@@ -223,3 +223,44 @@ make "this annotation is legitimately not mine to interpret" a safe default assu
 implementer's guide ([TSON-GUIDE]?) rather than the format spec itself: implementations binding typed
 values directly to host objects should consider failing on unrecognized type-refs by default, with
 passthrough as an explicit opt-in, rather than the reverse.
+
+---
+
+## 8. §5.2's "is a parse error" phrasing for atom-format violations conflicts with §8.1's own category description
+
+**Section:** §5.2, §8.1.
+
+**Problem:** §5.2 states: "A token the atom's grammar rejects 'is a parse error'; a parsed value violating
+the atom's range 'is a validation error'." §8.1's "Canonical phrasing" rule states these exact four
+phrases each map "unambiguously" to a category, and lists "is a parse error" as mapping to the `parser`
+category. But §8.1's own description of parser errors is "Structural mismatches: unclosed brackets,
+adjacency violations, unexpected tokens, missing separators, `!!` without an adjacent colon form, a
+directive name outside the closed positional set or outside its placement (§3.3)" — nothing about an
+atom's own value-format contract. A built-in vocabulary annotation's parsing contract (§5) is checked well
+after the structural parser has already accepted the document as well-formed — `!int32 twelve` is a
+syntactically complete data-value (type-ref + token core-value); the failure only surfaces once something
+interprets the token against `int32`'s specific format, which is architecturally a resolver-layer concern
+(recognizing/binding a token against a type's contract) in every implementation this project is aware of,
+not a structural-parser concern. §8.1's resolver-error description doesn't mention this case either
+("Reference and resolution failures... an absent sentinel in map key position; a built-in type annotation
+on a container value (§5.1)"). So §5.2's own use of "is a parse error" appears to invoke §8.1's `parser`
+category by the letter of the canonical-phrasing rule, while conflicting with both categories' own prose
+descriptions — most plausibly because §5.2 is using "parse error" in the ordinary-English sense ("this
+token failed to be interpreted"), written without cross-checking §8.1's stricter technical claim that the
+exact phrase is a fixed mapping to one specific processing-layer category.
+
+**Interpretation chosen:** This implementation's atom types (`resolver.vocab.AtomParseException`) live in
+`tson-parser`'s resolver package, architecturally alongside — not inside — the structural parser
+(`Parser`/`ParseException`), and are raised only from atom-type `read()` calls, never from `Parser` itself.
+For the conformance test suite (`ltr8-io-tson-test-suite`'s `vocabulary/invalid` vectors), this failure
+mode is tagged `category: resolver`, not `parser`, as the more architecturally coherent reading — but each
+such vector's own `description` flags this as provisional, and the suite's README documents the ambiguity
+explicitly, since a literal reading of §8.1's canonical-phrasing table would put it under `parser` instead.
+Range/constraint violations (§5.2's other phrase, "is a validation error") have no such ambiguity — §8.1
+unambiguously assigns "range violations by the numeric atoms" to the `validation` category, and both
+`AtomValidationException` and the suite's vectors use it without qualification.
+
+**Suggested resolution:** Either restate §5.2's phrasing to use "is a resolver error" (matching where this
+check actually happens architecturally and avoiding the canonical-phrasing collision), or add a clause to
+§8.1's canonical-phrasing rule or parser-error description explicitly carving out built-in-vocabulary
+format violations as parser-category despite occurring after structural parsing completes.

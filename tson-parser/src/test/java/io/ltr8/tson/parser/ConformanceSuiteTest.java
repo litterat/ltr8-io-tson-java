@@ -17,12 +17,18 @@ import io.ltr8.tson.parser.lexer.TokenType;
 import io.ltr8.tson.parser.resolver.BaseTypeResolver;
 import io.ltr8.tson.parser.resolver.BaseValue;
 import io.ltr8.tson.parser.resolver.NumberForm;
+import io.ltr8.tson.parser.resolver.vocab.AtomParseException;
+import io.ltr8.tson.parser.resolver.vocab.AtomType;
+import io.ltr8.tson.parser.resolver.vocab.AtomTypeException;
+import io.ltr8.tson.parser.resolver.vocab.AtomValidationException;
+import io.ltr8.tson.parser.resolver.vocab.BuiltinTypeVocabulary;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -40,7 +46,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 /**
  * Runs every vector in the sibling {@code ltr8-io-tson-test-suite} repo (see its own README for
  * the vector/sidecar format) against this implementation's real {@link Lexer}, {@link Parser},
- * and {@link BaseTypeResolver}.
+ * {@link BaseTypeResolver}, and {@link BuiltinTypeVocabulary}.
  *
  * <p>This is deliberately separate from {@link io.ltr8.tson.parser.lexer.LexerTest} and
  * {@link ParserTest}: those are fine-grained unit tests of individual grammar rules with
@@ -73,6 +79,11 @@ class ConformanceSuiteTest {
     @TestFactory
     Stream<DynamicTest> resolverVectors() {
         return vectorsIn("resolver", ConformanceSuiteTest::checkResolverVector);
+    }
+
+    @TestFactory
+    Stream<DynamicTest> vocabularyVectors() {
+        return vectorsIn("vocabulary", ConformanceSuiteTest::checkVocabularyVector);
     }
 
     private interface VectorCheck {
@@ -375,6 +386,50 @@ class ConformanceSuiteTest {
             case "binary" -> NumberForm.BasedIntegerForm.Radix.BINARY;
             default -> throw new AssertionError("unknown radix literal: " + fieldText(r, "radix"));
         };
+    }
+
+    // ── Vocabulary-layer vectors (§5) ────────────────────────────────────
+
+    /**
+     * The .tn1 is a {@code !type-ref token} data-value. {@code value}, on a {@code valid} vector,
+     * is asserted against {@link AtomType#read(TokenValue, Class)} with {@link BigInteger} as the
+     * target -- host-representation-neutral, matching the suite's own resolver-vector philosophy
+     * (§5.2 leaves the concrete bound type implementation-defined). On an {@code error} vector,
+     * {@code category} is additionally checked against which of {@link AtomParseException}/
+     * {@link AtomValidationException} was actually thrown, per this implementation's own
+     * interpretation of the §5.2/§8.1 categorization question the test suite's own README flags as
+     * unsettled (see SPEC-FEEDBACK.md #8): parse-shape failures as {@code resolver}, range/constraint
+     * failures as {@code validation}.
+     */
+    private static void checkVocabularyVector(String bucket, Path tn1, RecordValue sidecar) throws IOException {
+        String outcome = fieldText(sidecar, "outcome");
+        Document doc = new Parser(readRaw(tn1)).parseDocument();
+        DataValue root = doc.root();
+        String typeRef = root.typeRef().orElseThrow(
+                () -> new AssertionError("vocabulary vector .tn1 must carry a type-ref"));
+        TokenValue token = assertInstanceOf(TokenValue.class, root.coreValue(),
+                "vocabulary vector .tn1 must be a type-ref'd token");
+        AtomType<?> atomType = BuiltinTypeVocabulary.lookup(typeRef)
+                .orElseThrow(() -> new AssertionError("unrecognized type-ref in vocabulary vector: " + typeRef));
+
+        switch (outcome) {
+            case "valid" -> {
+                BigInteger actual = (BigInteger) atomType.read(token, BigInteger.class);
+                assertEquals(new BigInteger(fieldText(sidecar, "value")), actual, "vocabulary value");
+            }
+            case "error" -> {
+                String category = fieldText(sidecar, "category");
+                AtomTypeException thrown = assertThrows(AtomTypeException.class, () -> atomType.read(token));
+                switch (category) {
+                    case "resolver" -> assertInstanceOf(AtomParseException.class, thrown,
+                            "category 'resolver' -> AtomParseException");
+                    case "validation" -> assertInstanceOf(AtomValidationException.class, thrown,
+                            "category 'validation' -> AtomValidationException");
+                    default -> fail("unexpected category for vocabulary-layer error: " + category);
+                }
+            }
+            default -> fail("unknown vocabulary-layer outcome: " + outcome);
+        }
     }
 
     // ── Sidecar field helpers ────────────────────────────────────────────
