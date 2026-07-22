@@ -33,6 +33,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -491,6 +492,10 @@ class ConformanceSuiteTest {
                 RecordValue expected = (RecordValue) fieldCore(sidecar, "value");
                 assertEquals(Period.parse(fieldText(expected, "period")), actual.calendarPart(), "duration calendar part");
                 assertEquals(Duration.parse(fieldText(expected, "clock")), actual.clockPart(), "duration clock part");
+            }
+            case "uri" -> {
+                URI actual = (URI) atomType.read(token, URI.class);
+                assertEquals(URI.create(fieldText(sidecar, "value")), actual, "vocabulary value");
             }
             default -> {
                 BigDecimal actual = (BigDecimal) atomType.read(token, BigDecimal.class);

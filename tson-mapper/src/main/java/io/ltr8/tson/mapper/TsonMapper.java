@@ -106,6 +106,9 @@ public final class TsonMapper {
      * java.time.Duration} is a defensible default representation, but not obviously the *only* one a
      * caller would want, so binding it requires an explicit {@code DataBridge} rather than assuming
      * one opinionated shape.
+     *
+     * <p>{@code java.net.URI} (§5.5's {@code uri}) is the same story as {@code UUID}/{@code
+     * LocalDate}: an ordinary JDK class, so pre-registered here rather than left to fail.
      */
     private static DataBindContext defaultContext() {
         DataBindContext context = DataBindContext.builder().build();
@@ -115,6 +118,7 @@ public final class TsonMapper {
             context.registerAtom(LocalDate.class);
             context.registerAtom(OffsetTime.class);
             context.registerAtom(OffsetDateTime.class);
+            context.registerAtom(java.net.URI.class);
         } catch (DataBindException e) {
             throw new IllegalStateException("failed to register default atom types on a fresh DataBindContext", e);
         }

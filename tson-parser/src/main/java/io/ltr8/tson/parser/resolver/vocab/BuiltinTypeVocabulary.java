@@ -29,7 +29,9 @@ import java.util.Optional;
  * each a distinct {@code binary_encoding} value, not one generic {@code !binary} annotation,
  * matching §5.3's own "there is no generic {@code !binary} annotation." And with the temporal
  * family (§5.4) -- {@code date_type} ({@code date}), {@code time_type} ({@code time}), {@code
- * datetime_type} ({@code datetime}), {@code duration_type} ({@code duration}).
+ * datetime_type} ({@code datetime}), {@code duration_type} ({@code duration}). And with {@code
+ * uri_type} ({@code uri}, §5.5) -- see {@link UriType}'s Javadoc for why it's the one atom here that
+ * doesn't validate its own shape ahead of the JDK type it delegates to.
  */
 public final class BuiltinTypeVocabulary {
 
@@ -72,6 +74,8 @@ public final class BuiltinTypeVocabulary {
         types.put("time", TimeType.UNCONSTRAINED);
         types.put("datetime", DateTimeType.UNCONSTRAINED);
         types.put("duration", DurationType.UNCONSTRAINED);
+
+        types.put("uri", UriType.UNCONSTRAINED);
 
         return Map.copyOf(types);
     }

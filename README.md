@@ -24,20 +24,20 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
 - [x] Base type resolution, binding to Java host types (`int`/`long`/`double`/`BigInteger`/`BigDecimal`/...)
       — `tson-mapper`'s `AtomBinder`
 - [x] Built-in type vocabulary (§5), `integer_type`/`decimal_type`/`float_type`/`rational_type`/
-      `complex_type`/`uuid_type`/`binary`/`date_type`/`time_type`/`datetime_type`/`duration_type`
-      families — `int8`..`int256`, `uint8`..`uint256`, `positive_integer` and siblings (§5.6,
-      extended beyond the four currently published — see [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #6),
-      `number`, `float32`/`float64` (including `hex-float`), `rational`, `complex` (§7.6's
+      `complex_type`/`uuid_type`/`binary`/`date_type`/`time_type`/`datetime_type`/`duration_type`/
+      `uri_type` families — `int8`..`int256`, `uint8`..`uint256`, `positive_integer` and siblings
+      (§5.6, extended beyond the four currently published — see [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md)
+      #6), `number`, `float32`/`float64` (including `hex-float`), `rational`, `complex` (§7.6's
       `hex-float`/`rational`/`complex` extended grammar forms, only reachable through these atoms),
-      `uuid` (§5.5), `base64`/`base64url`/`base32`/`hex` (§5.3), `date`/`time`/`datetime`/
+      `uuid`/`uri` (§5.5), `base64`/`base64url`/`base32`/`hex` (§5.3), `date`/`time`/`datetime`/
       `duration` (§5.4) — `tson-parser`'s `resolver.vocab` package. Binding `!rational`/`!complex`/
       `!duration` to a Java field requires a `DataBridge` registered on the `DataBindContext`
       (`Rational`/`Complex`/`IsoDuration` are themselves Java records, so `tson-bind`'s record
       auto-detection claims them ahead of the vocabulary path — direct binding to them doesn't
-      work, by design; see their Javadoc). `!uuid`, the binary atoms, and `!date`/`!time`/
-      `!datetime` bind directly to `java.util.UUID`/`byte[]`/`LocalDate`/`OffsetTime`/
-      `OffsetDateTime` — `TsonMapper`'s default `DataBindContext` pre-registers all of them (none
-      can self-declare `@Atom`, being JDK classes; `byte[].isArray()` is `true`, so array
+      work, by design; see their Javadoc). `!uuid`, `!uri`, the binary atoms, and `!date`/`!time`/
+      `!datetime` bind directly to `java.util.UUID`/`java.net.URI`/`byte[]`/`LocalDate`/
+      `OffsetTime`/`OffsetDateTime` — `TsonMapper`'s default `DataBindContext` pre-registers all of
+      them (none can self-declare `@Atom`, being JDK classes; `byte[].isArray()` is `true`, so array
       auto-detection would otherwise claim it the same way records claim `Rational`/`Complex`, but
       unlike those there's no competing richer type to defer to), TSON-specific defaults kept out
       of `tson-bind` itself deliberately (see `TsonMapper.defaultContext()`) — see
@@ -53,7 +53,7 @@ See [CLAUDE.md](CLAUDE.md#architecture) for the current architecture and design 
 **Not yet implemented:**
 
 - [ ] Built-in type vocabulary (§5), remaining families:
-  - [ ] Identifier/network types — `uri`/`ipv4`/`ipv6`/`cidr4`/`cidr6`/`mac` (§5.5, `uuid` done)
+  - [ ] Network/identifier types — `ipv4`/`ipv6`/`cidr4`/`cidr6`/`mac` (§5.5, `uuid`/`uri` done)
 - [ ] Resolver-layer structural rules: record/map "last value wins" deduplication (§2.5/§2.6), `EmptyBrace`
       resolution (§2.8), Absent Sentinel semantics (§2.9)
 - [ ] `Map<K, V>` support in `tson-bind` (no `DataClass` currently recognizes a map target)
@@ -95,6 +95,14 @@ accommodation), but `java.time` has no leap-second concept at all — `!time`/`!
 spec-legal leap-second token as a parse error. There's no reasonable fix short of a from-scratch time
 representation built solely for this one case, so it's documented (`TimeType`'s Javadoc) rather than
 solved.
+
+**One accepted, different-revision gap.** `!uri` (§5.5) is the one atom here that does *not* get an
+extra shape check ahead of the JDK type it delegates to — the opposite situation from the atoms above.
+§5.5 cites RFC 3986, but `java.net.URI`'s own Javadoc states it implements RFC 2396 (as amended by RFC
+2732), an older revision of the same standard, not a looser/stricter variant of the same grammar. There's
+no simple shape to shim in front of `URI`'s constructor the way a four-group hex pattern works for UUID,
+and writing an RFC 3986 validator from scratch isn't worth it at this stage, so `java.net.URI`'s behavior
+is accepted as `!uri`'s actual contract for now. See `UriType`'s Javadoc.
 
 **One open question.** Whether `!duration` accepts ISO 8601's alternative `PnW` week form is genuinely
 ambiguous — §5.4's table shows only `PnYnMnDTnHnMnS`. This implementation rejects `PnW` as the more

@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.net.URI;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.OffsetTime;
@@ -430,6 +431,29 @@ class TsonMapperTest {
     void builtinUuidAnnotationRejectsMalformedUuidThroughTheMapper() throws DataBindException {
         // UUID.fromString itself would accept "1-2-3-4-5" -- UuidType's own shape check must not.
         assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !uuid 1-2-3-4-5 }", UuidHolder.class));
+    }
+
+    // ── URI (§5.5) ───────────────────────────────────────────────────────
+
+    public record UriHolder(URI value) {
+    }
+
+    @Test
+    void builtinUriAnnotationBindsDirectlyThroughTheMapper() throws DataBindException {
+        // Like UUID, java.net.URI isn't a record or an array, so no auto-detection collision --
+        // but it also can't self-declare @Atom, being a JDK class, so TsonMapper's default context
+        // pre-registers it the same way it does UUID/LocalDate. Quoted because ':' '/' '?' '=' are
+        // not legal unquoted-token characters (§7.2) -- the URI value itself is unaffected by that,
+        // it's a lexer-layer constraint, not a UriType one.
+        UriHolder h = mapper.toObject("{ value: !uri \"https://example.com/a/b?x=1\" }", UriHolder.class);
+        assertEquals(URI.create("https://example.com/a/b?x=1"), h.value());
+    }
+
+    @Test
+    void builtinUriAnnotationRejectsMalformedUriThroughTheMapper() throws DataBindException {
+        // An unescaped space is not valid anywhere in a URI -- java.net.URI itself rejects it, so
+        // this is really exercising the mapper wiring rather than UriType's own leniency.
+        assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !uri \"http://example.com/a b\" }", UriHolder.class));
     }
 
     // ── Temporal types (§5.4) ────────────────────────────────────────────
