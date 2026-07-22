@@ -279,4 +279,126 @@ class NumberGrammarTest {
             assertFalse(parse(s).isEmpty(), s);
         }
     }
+
+    // ── Extended forms (§7.6, only reachable through §5.6's atoms, not tryParse) ────────────────
+
+    @Test
+    void hexFloatNotRecognizedByTryParse() {
+        assertNoMatch("0x1.8p3");
+    }
+
+    @Test
+    void rationalNotRecognizedByTryParse() {
+        assertNoMatch("2/3");
+    }
+
+    @Test
+    void complexNotRecognizedByTryParse() {
+        assertNoMatch("3+4i");
+    }
+
+    @Test
+    void hexFloatRecognized() {
+        assertTrue(NumberGrammar.isHexFloat("0x1.8p3"));
+        assertTrue(NumberGrammar.isHexFloat("0x.8p1"));
+        assertTrue(NumberGrammar.isHexFloat("-0x1p-1074"));
+        assertFalse(NumberGrammar.isHexFloat("0xFF")); // based-integer, no 'p' exponent -- not a hex-float
+        assertFalse(NumberGrammar.isHexFloat("1.5")); // plain decimal float, no "0x"
+    }
+
+    @Test
+    void rationalRecognized() {
+        RationalForm f = NumberGrammar.tryRational("2/3").orElseThrow();
+        assertEquals(Optional.empty(), f.sign());
+        assertEquals("2", f.numerator());
+        assertEquals("3", f.denominator());
+    }
+
+    @Test
+    void rationalSignAppliesToNumeratorOnly() {
+        RationalForm f = NumberGrammar.tryRational("-2/3").orElseThrow();
+        assertEquals(Optional.of(NumberForm.Sign.MINUS), f.sign());
+        assertEquals("2", f.numerator());
+        assertEquals("3", f.denominator());
+    }
+
+    @Test
+    void rationalNumeratorMayBeZero() {
+        RationalForm f = NumberGrammar.tryRational("0/5").orElseThrow();
+        assertEquals("0", f.numerator());
+    }
+
+    @Test
+    void rationalDenominatorCannotBeZeroOrLeadingZero() {
+        // denominator = nonzero-digit *( ["_"] DIGIT ) -- no "0" alternative, unlike the numerator.
+        assertTrue(NumberGrammar.tryRational("1/0").isEmpty());
+        assertTrue(NumberGrammar.tryRational("1/05").isEmpty());
+    }
+
+    @Test
+    void rationalDenominatorCannotBeSigned() {
+        assertTrue(NumberGrammar.tryRational("1/-3").isEmpty());
+    }
+
+    @Test
+    void rationalUnderscoreSeparatorsInDenominator() {
+        RationalForm f = NumberGrammar.tryRational("1/1_000").orElseThrow();
+        assertEquals("1_000", f.denominator());
+    }
+
+    @Test
+    void complexTwoPartForm() {
+        ComplexForm f = NumberGrammar.tryComplex("3+4i").orElseThrow();
+        assertEquals(Optional.empty(), f.realSign());
+        assertEquals(Optional.of("3"), f.realMagnitude());
+        assertEquals(Optional.of(NumberForm.Sign.PLUS), f.imaginarySign());
+        assertEquals("4", f.imaginaryMagnitude());
+    }
+
+    @Test
+    void complexTwoPartFormWithNegativeRealAndImaginary() {
+        ComplexForm f = NumberGrammar.tryComplex("-3.5-2e1j").orElseThrow();
+        assertEquals(Optional.of(NumberForm.Sign.MINUS), f.realSign());
+        assertEquals(Optional.of("3.5"), f.realMagnitude());
+        assertEquals(Optional.of(NumberForm.Sign.MINUS), f.imaginarySign());
+        assertEquals("2e1", f.imaginaryMagnitude());
+    }
+
+    @Test
+    void complexTwoPartFormRequiresAnExplicitMiddleSign() {
+        // "3 4i" or "3,4i" -- no separator sign between the parts -- doesn't match at all.
+        assertTrue(NumberGrammar.tryComplex("3 4i").isEmpty());
+    }
+
+    @Test
+    void complexImaginaryOnlyForm() {
+        ComplexForm f = NumberGrammar.tryComplex("4i").orElseThrow();
+        assertEquals(Optional.empty(), f.realSign());
+        assertEquals(Optional.empty(), f.realMagnitude());
+        assertEquals(Optional.empty(), f.imaginarySign());
+        assertEquals("4", f.imaginaryMagnitude());
+    }
+
+    @Test
+    void complexImaginaryOnlyFormNegative() {
+        ComplexForm f = NumberGrammar.tryComplex("-2.5j").orElseThrow();
+        assertEquals(Optional.empty(), f.realSign());
+        assertEquals(Optional.empty(), f.realMagnitude());
+        assertEquals(Optional.of(NumberForm.Sign.MINUS), f.imaginarySign());
+        assertEquals("2.5", f.imaginaryMagnitude());
+    }
+
+    @Test
+    void complexBareMagnitudeWithoutImagUnitDoesNotMatch() {
+        // "3+4" (no trailing i/j) is not a complex form at all.
+        assertTrue(NumberGrammar.tryComplex("3+4").isEmpty());
+    }
+
+    @Test
+    void complexMagnitudeAcceptsBareNaturalNumberWithNoDotOrExponent() {
+        // magnitude, unlike base float, allows a bare natural number (no dot, no exponent).
+        ComplexForm f = NumberGrammar.tryComplex("3+4i").orElseThrow();
+        assertEquals(Optional.of("3"), f.realMagnitude());
+        assertEquals("4", f.imaginaryMagnitude());
+    }
 }

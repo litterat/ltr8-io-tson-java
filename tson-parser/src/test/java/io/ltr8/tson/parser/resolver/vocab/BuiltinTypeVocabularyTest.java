@@ -39,7 +39,13 @@ class BuiltinTypeVocabularyTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"rational", "complex", "uuid", "not_a_type"})
+    @ValueSource(strings = {"rational", "complex"})
+    void rationalAndComplexAtomsAreRegistered(String name) {
+        assertTrue(BuiltinTypeVocabulary.lookup(name).isPresent());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"uuid", "not_a_type"})
     void namesFromFamiliesNotYetImplementedAreNotRegistered(String name) {
         assertFalse(BuiltinTypeVocabulary.lookup(name).isPresent());
     }

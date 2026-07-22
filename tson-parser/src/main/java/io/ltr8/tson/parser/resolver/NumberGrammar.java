@@ -17,9 +17,11 @@ import java.util.regex.Pattern;
  * and three {@code based-integer} radixes each want their own named groups, so one pattern per
  * alternative reads far closer to the grammar than one combined pattern would.
  *
- * <p>{@link #isHexFloat} recognizes one of §7.6's *extended* forms (not part of {@code number},
- * reachable only through the built-in vocabulary's {@code float32}/{@code float64} atoms) -- see
- * its Javadoc for why it's a shape check only, with no corresponding {@code NumberForm} variant.
+ * <p>{@link #isHexFloat}, {@link #tryRational}, and {@link #tryComplex} recognize §7.6's *extended*
+ * forms -- not part of {@code number}, each reachable only through its own built-in vocabulary atom
+ * ({@code float32}/{@code float64}; {@code rational}; {@code complex}). See their own Javadoc for
+ * why hex-float is a shape check with no structural record, while rational/complex decompose into
+ * {@link RationalForm}/{@link ComplexForm}.
  */
 public final class NumberGrammar {
 
@@ -75,6 +77,34 @@ public final class NumberGrammar {
             Pattern.compile("[+-]?0x" + HEX_DIGITS + "(?:\\." + HEX_DIGITS + ")?[pP][+-]?" + DIGITS);
     private static final Pattern HEX_FLOAT_NO_INT =
             Pattern.compile("[+-]?0x\\." + HEX_DIGITS + "[pP][+-]?" + DIGITS);
+
+    /**
+     * {@code rational = [sign] decimal-natural "/" denominator}, {@code denominator = nonzero-digit
+     * *( ["_"] DIGIT )} -- another extended form, only reachable through the {@code rational} atom.
+     */
+    private static final Pattern RATIONAL = Pattern.compile(
+            "(?<sign>[+-])?(?<num>" + DECIMAL_NATURAL + ")/(?<den>[1-9](?:_?[0-9])*)");
+
+    /**
+     * {@code magnitude = decimal-natural [ "." digits ] [ exponent ] / "." digits [ exponent ]},
+     * unsigned and with no named groups of its own -- {@link #COMPLEX_TWO_PART} embeds it twice
+     * (real and imaginary parts), and a named group can't repeat within one pattern. Every string
+     * this matches is also exactly an {@code integer} or {@code float} shape under {@link #tryParse}
+     * (a bare natural number has no {@code float} alternative that admits it, but does satisfy
+     * {@code integer}; everything else here is precisely what {@code float} already covers), so
+     * {@link #tryComplex} decomposes captured magnitude substrings by re-running {@link #tryParse}
+     * on them rather than duplicating digit-extraction here.
+     */
+    private static final String MAGNITUDE =
+            "(?:" + DECIMAL_NATURAL + "(?:\\." + DIGITS + ")?(?:[eE][+-]?" + DIGITS + ")?"
+            + "|\\." + DIGITS + "(?:[eE][+-]?" + DIGITS + ")?)";
+
+    /** {@code [sign] magnitude sign magnitude imag-unit} -- e.g. {@code 3+4i}, {@code -3.5-2e1j}. The middle sign is mandatory, unlike every other sign in this grammar. */
+    private static final Pattern COMPLEX_TWO_PART = Pattern.compile(
+            "(?<sign1>[+-])?(?<mag1>" + MAGNITUDE + ")(?<sign2>[+-])(?<mag2>" + MAGNITUDE + ")(?<unit>[ij])");
+    /** {@code [sign] magnitude imag-unit} -- purely imaginary, e.g. {@code 4i}, {@code -2.5j}; real part implicitly zero. */
+    private static final Pattern COMPLEX_IMAGINARY_ONLY = Pattern.compile(
+            "(?<sign1>[+-])?(?<mag1>" + MAGNITUDE + ")(?<unit>[ij])");
 
     /**
      * Attempts to match {@code text} against the {@code number} production in full. Returns
@@ -147,6 +177,32 @@ public final class NumberGrammar {
     /** See {@link #HEX_FLOAT_WITH_INT}'s Javadoc. Not tried by {@link #tryParse} -- an extended form, opt-in only. */
     public static boolean isHexFloat(String text) {
         return HEX_FLOAT_WITH_INT.matcher(text).matches() || HEX_FLOAT_NO_INT.matcher(text).matches();
+    }
+
+    /** See {@link #RATIONAL}'s Javadoc. Not tried by {@link #tryParse} -- an extended form, opt-in only. */
+    public static Optional<RationalForm> tryRational(String text) {
+        Matcher m = RATIONAL.matcher(text);
+        if (!m.matches()) {
+            return Optional.empty();
+        }
+        return Optional.of(new RationalForm(sign(m), m.group("num"), m.group("den")));
+    }
+
+    /** See {@link #COMPLEX_TWO_PART}'s Javadoc. Not tried by {@link #tryParse} -- an extended form, opt-in only. */
+    public static Optional<ComplexForm> tryComplex(String text) {
+        Matcher two = COMPLEX_TWO_PART.matcher(text);
+        if (two.matches()) {
+            return Optional.of(new ComplexForm(
+                    toSign(two.group("sign1")), Optional.of(two.group("mag1")),
+                    toSign(two.group("sign2")), two.group("mag2")));
+        }
+        Matcher imaginaryOnly = COMPLEX_IMAGINARY_ONLY.matcher(text);
+        if (imaginaryOnly.matches()) {
+            return Optional.of(new ComplexForm(
+                    Optional.empty(), Optional.empty(),
+                    toSign(imaginaryOnly.group("sign1")), imaginaryOnly.group("mag1")));
+        }
+        return Optional.empty();
     }
 
     private static Optional<NumberForm> tryInteger(String text) {

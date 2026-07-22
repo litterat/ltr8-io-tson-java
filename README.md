@@ -23,11 +23,16 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       numbers, which of the four §7.6 grammar forms) — `tson-parser`
 - [x] Base type resolution, binding to Java host types (`int`/`long`/`double`/`BigInteger`/`BigDecimal`/...)
       — `tson-mapper`'s `AtomBinder`
-- [x] Built-in type vocabulary (§5), `integer_type`/`decimal_type`/`float_type` families —
-      `int8`..`int256`, `uint8`..`uint256`, `positive_integer` and siblings (§5.6, extended beyond
-      the four currently published — see [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #6), `number`,
-      `float32`/`float64` (including `hex-float`, §7.6's extended grammar form only reachable
-      through these atoms) — `tson-parser`'s `resolver.vocab` package
+- [x] Built-in type vocabulary (§5), `integer_type`/`decimal_type`/`float_type`/`rational_type`/
+      `complex_type` families — `int8`..`int256`, `uint8`..`uint256`, `positive_integer` and
+      siblings (§5.6, extended beyond the four currently published — see
+      [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #6), `number`, `float32`/`float64` (including
+      `hex-float`), `rational`, `complex` (§7.6's `hex-float`/`rational`/`complex` extended grammar
+      forms, only reachable through these atoms) — `tson-parser`'s `resolver.vocab` package. Binding
+      `!rational`/`!complex` to a Java field requires a `DataBridge` registered on the
+      `DataBindContext` (`Rational`/`Complex` are themselves Java records, so `tson-bind`'s record
+      auto-detection claims them ahead of the vocabulary path — direct binding to them doesn't work,
+      by design; see their Javadoc)
 - [x] Object binding library (`tson-annotation` + `tson-bind`) — reflection/`MethodHandle`-based Java
       object ↔ data binding, including hand-written (pre-record) immutable class support via the
       `java.lang.classfile` API
@@ -39,13 +44,15 @@ See [CLAUDE.md](CLAUDE.md#architecture) for the current architecture and design 
 **Not yet implemented:**
 
 - [ ] Built-in type vocabulary (§5), remaining families:
-  - [ ] `rational`/`complex` (`rational_type`/`complex_type`)
   - [ ] Binary types — `base64`/`base64url`/`base32`/`hex` (§5.3)
   - [ ] Temporal types — `date`/`datetime`/`time`/`duration` (§5.4)
   - [ ] Identifier/network types — `uuid`/`uri`/`ipv4`/`ipv6`/`cidr4`/`cidr6`/`mac` (§5.5)
 - [ ] Resolver-layer structural rules: record/map "last value wins" deduplication (§2.5/§2.6), `EmptyBrace`
       resolution (§2.8), Absent Sentinel semantics (§2.9)
 - [ ] `Map<K, V>` support in `tson-bind` (no `DataClass` currently recognizes a map target)
+- [ ] Auto-detect plain Java `enum`s in `tson-bind` the way real records/arrays already are — today
+      `DefaultAtomBinder` only wires `EnumStringBridge` when the enum type itself carries `@Atom`;
+      a bare `enum` with no annotation fails to bind at all
 - [ ] General `@`-annotation binding to user classes (only the `!typeName` type-ref is consumed today;
       arbitrary `@`-annotations parse but aren't exposed to bound objects)
 - [ ] Header/value directive interpretation — `!!id` content-addressing verification, `!!schema` loading

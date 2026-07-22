@@ -19,11 +19,9 @@ import java.util.Optional;
  * confirmed as an oversight, not deliberate scoping -- this implementation exposes the full family
  * {@code core.tn1} defines, not just the four the current table happens to list.
  *
- * <p>Also seeded with {@code decimal_type} ({@code number}) and {@code float_type} ({@code float32}/
- * {@code float64}), both fully published in §5.6's table as-is, unlike the integer family.
- *
- * <p>{@code rational} and {@code complex} (backed by {@code rational_type}/{@code complex_type}) are
- * not yet in this table -- separate constructors, separate work.
+ * <p>Also seeded with {@code decimal_type} ({@code number}), {@code float_type} ({@code float32}/
+ * {@code float64}), {@code rational_type} ({@code rational}), and {@code complex_type} ({@code
+ * complex}) -- all fully published in §5.6's table as-is, unlike the integer family.
  */
 public final class BuiltinTypeVocabulary {
 
@@ -52,6 +50,8 @@ public final class BuiltinTypeVocabulary {
         types.put("number", DecimalType.UNCONSTRAINED);
         types.put("float32", FloatType.FLOAT32);
         types.put("float64", FloatType.FLOAT64);
+        types.put("rational", RationalType.UNCONSTRAINED);
+        types.put("complex", ComplexType.UNCONSTRAINED);
 
         return Map.copyOf(types);
     }

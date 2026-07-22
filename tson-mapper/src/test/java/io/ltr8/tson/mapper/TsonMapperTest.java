@@ -1,9 +1,14 @@
 package io.ltr8.tson.mapper;
 
+import io.ltr8.annotation.Atom;
+import io.ltr8.annotation.DataBridge;
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Typename;
 import io.ltr8.annotation.Union;
+import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
+import io.ltr8.tson.parser.resolver.vocab.Complex;
+import io.ltr8.tson.parser.resolver.vocab.Rational;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -173,6 +178,46 @@ class TsonMapperTest {
     @Test
     void cannotBindNullToPrimitive() throws DataBindException {
         assertThrows(DataBindException.class, () -> mapper.toObject("{ x: null }", RequiresInt.class));
+    }
+
+    // ── Atoms: enums (EnumStringBridge) ──────────────────────────────────
+
+    @Atom
+    public enum Color { RED, GREEN, BLUE }
+
+    public record Paint(Color color) {
+    }
+
+    @Test
+    void enumBindsViaEnumStringBridge() throws DataBindException {
+        Paint p = mapper.toObject("{ color: RED }", Paint.class);
+        assertEquals(Color.RED, p.color());
+    }
+
+    @Test
+    void enumRoundTripsThroughEveryMember() throws DataBindException {
+        for (Color c : Color.values()) {
+            Paint p = mapper.toObject("{ color: " + c.name() + " }", Paint.class);
+            assertEquals(c, p.color());
+        }
+    }
+
+    @Test
+    void unrecognizedEnumMemberThrows() throws DataBindException {
+        assertThrows(DataBindException.class, () -> mapper.toObject("{ color: PURPLE }", Paint.class));
+    }
+
+    public record UnannotatedColorHolder(UnannotatedColor color) {
+    }
+
+    public enum UnannotatedColor { RED, GREEN, BLUE }
+
+    @Test
+    void enumWithoutAtomAnnotationDoesNotBind() throws DataBindException {
+        // DefaultAtomBinder only wires EnumStringBridge when the enum type carries @Atom
+        // (DefaultAtomBinder.resolveAtom's isEnum() check is gated on enumAtom != null) --
+        // documenting the current requirement, not (yet) a claim it's the right one.
+        assertThrows(DataBindException.class, () -> mapper.toObject("{ color: RED }", UnannotatedColorHolder.class));
     }
 
     // ── Numeric binding (AtomBinder) ─────────────────────────────────────
@@ -357,6 +402,90 @@ class TsonMapperTest {
     void builtinFloat64AnnotationRejectsBasedIntegerThroughTheMapper() throws DataBindException {
         // §5.6: float atoms accept integer/float/hex-float/special-value, not based-integer.
         assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !float64 0xFF }", DoubleHolder.class));
+    }
+
+    // ── Rational/Complex: binding to a richer third-party type via DataBridge ──────────────
+
+    public record RationalHolder(Rational value) {
+    }
+
+    @Test
+    void directBindingToTsonsOwnRationalDoesNotWork() throws DataBindException {
+        // Rational is itself a Java record (numerator, denominator) -- DefaultClassBinder auto-
+        // detects real records ahead of anything atom-related, so a target of Rational.class gets
+        // treated as a 2-field record, not routed through RationalType at all. The value's core is
+        // a token ("2/3"), not a record, so binding fails outright. This is exactly why the
+        // recommended path is a DataBridge (below), not direct binding to tson-parser's own minimal
+        // Rational/Complex types.
+        assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !rational \"2/3\" }", RationalHolder.class));
+    }
+
+    /** Stand-in for a richer third-party type an application might already use, e.g. Apache Commons Math's {@code BigFraction} -- structurally similar, but a different class the binder has never heard of. */
+    public record UserFraction(long numerator, long denominator) {
+    }
+
+    public static class UserFractionBridge implements DataBridge<Rational, UserFraction> {
+        @Override
+        public Rational toData(UserFraction f) {
+            return new Rational(BigInteger.valueOf(f.numerator()), BigInteger.valueOf(f.denominator()));
+        }
+
+        @Override
+        public UserFraction toObject(Rational r) {
+            return new UserFraction(r.numerator().longValueExact(), r.denominator().longValueExact());
+        }
+    }
+
+    public record UserFractionHolder(UserFraction value) {
+    }
+
+    @Test
+    void rationalBindsToAThirdPartyTypeViaRegisteredDataBridge() throws DataBindException {
+        DataBindContext context = DataBindContext.builder().build();
+        context.registerAtom(UserFraction.class, new UserFractionBridge());
+        TsonMapper bridgedMapper = new TsonMapper(context);
+
+        UserFractionHolder h = bridgedMapper.toObject("{ value: !rational \"2/3\" }", UserFractionHolder.class);
+        assertEquals(new UserFraction(2, 3), h.value());
+    }
+
+    public record ComplexHolder(Complex value) {
+    }
+
+    @Test
+    void directBindingToTsonsOwnComplexDoesNotWork() throws DataBindException {
+        // Same reasoning as Rational: Complex is itself a Java record (real, imaginary), so it's
+        // auto-detected as a record target, not routed through ComplexType.
+        assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !complex 3+4i }", ComplexHolder.class));
+    }
+
+    /** Stand-in for e.g. Apache Commons Math's {@code Complex} (always double-precision, unlike tson-parser's exact-by-default {@link Complex}). */
+    public record UserComplex(double real, double imaginary) {
+    }
+
+    public static class UserComplexBridge implements DataBridge<Complex, UserComplex> {
+        @Override
+        public Complex toData(UserComplex c) {
+            return new Complex(BigDecimal.valueOf(c.real()), BigDecimal.valueOf(c.imaginary()));
+        }
+
+        @Override
+        public UserComplex toObject(Complex c) {
+            return new UserComplex(c.real().doubleValue(), c.imaginary().doubleValue());
+        }
+    }
+
+    public record UserComplexHolder(UserComplex value) {
+    }
+
+    @Test
+    void complexBindsToAThirdPartyTypeViaRegisteredDataBridge() throws DataBindException {
+        DataBindContext context = DataBindContext.builder().build();
+        context.registerAtom(UserComplex.class, new UserComplexBridge());
+        TsonMapper bridgedMapper = new TsonMapper(context);
+
+        UserComplexHolder h = bridgedMapper.toObject("{ value: !complex 3+4i }", UserComplexHolder.class);
+        assertEquals(new UserComplex(3.0, 4.0), h.value());
     }
 
     // ── Unions ───────────────────────────────────────────────────────────
