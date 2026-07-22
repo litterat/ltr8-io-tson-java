@@ -41,17 +41,6 @@ resolution if you have one. Don't silently pick an interpretation and move on wi
 resolved ambiguity is exactly the kind of thing that's invisible again three sessions later unless it's
 written down. This applies to every layer as it gets built, not just the lexer.
 
-## Build and test
-
-No system Gradle — always use the wrapper:
-
-```
-./gradlew build
-./gradlew test
-./gradlew test --tests "io.ltr8.tson.parser.lexer.LexerTest"
-./gradlew test --tests "io.ltr8.tson.parser.lexer.LexerTest.multilineBasicIndentStripping"
-```
-
 ## Architecture
 
 Single Gradle module so far: `tson-parser`, holding both the lexer and (eventually) the structural
@@ -67,7 +56,7 @@ verification actually checks), not the subject matter. `tson.io` is the spec's h
 implement it — and this is one implementation of it, published under the `ltr8.io` banner, not a claim to
 be *the* tson.io-blessed implementation.
 
-### Lexer (`tson-parser/src/main/java/io/tson/parser/lexer/`)
+### Lexer (`tson-parser/src/main/java/io/ltr8/tson/parser/lexer/`)
 
 `Lexer` is a single hand-written scanner (`Lexer.java`) producing a stream of `Token`s. Key design
 points, tied to specific spec sections:
@@ -111,9 +100,63 @@ points, tied to specific spec sections:
 - Errors are fail-fast (`LexException`, unchecked), not the spec's "SHOULD continue processing to report
   multiple issues" recommendation (§8.1) — error recovery/multi-error reporting is left for later.
 
-Not yet implemented: the structural parser (records, maps, arrays, augmentation, directives — §2–§3,
-§7.4), base type resolution (§4), and the built-in type vocabulary (§5). None of that is lexer-layer
-work per the spec's own layering (§1.2), so it belongs in new classes under `io.tson.parser`, consuming
-`Lexer`'s token stream rather than changing it — the spec states the lexer is complete and frozen for the
-whole series (§1.3): "higher parts introduce no new tokens, no new lexer modes, and no changes to
-character classification."
+The lexer is complete and frozen for the whole series per the spec itself (§1.3): "higher parts introduce
+no new tokens, no new lexer modes, and no changes to character classification." Everything above it
+changes; the lexer doesn't.
+
+### Structural parser (`tson-parser/src/main/java/io/ltr8/tson/parser/`)
+
+`Parser` (`Parser.java`) turns the lexer's token stream into a `Document` (§2, §3, §7.4). AST types live
+in the `ast` subpackage as a sealed `CoreValue` hierarchy (`RecordValue`, `MapValue`, `ArrayValue`,
+`EmptyBrace`, `AbsentValue`, `TokenValue`) built on Java 25 records, matching the grammar's own shape.
+Key design points:
+
+- **Whitespace is invisible by the time tokens reach the parser** — the lexer already discarded it,
+  leaving only `Position` gaps as evidence it was there. Two consequences run through the whole class:
+  (1) wherever the grammar shows `ws` between tokens, nothing special is needed — it's already permitted
+  by default; (2) wherever the spec requires strict *adjacency* (`!`, `!!`, `@` to their operand, `:` to a
+  preceding annotation/directive name, §7.5), the parser checks it explicitly via `Position` equality
+  between one token's `end()` and the next's `start()`. The inverse comes up once too: a valueless
+  annotation requires a whitespace *gap* to follow (§3.1) — checked as positions being *unequal*.
+- **Separator detection (§2.4) works the same way.** Between record fields / map entries / array
+  elements, "zero-width separation is a parse error" and "trailing separators are not permitted" are both
+  implemented by comparing the end position of the previous element's last token against the start
+  position of whatever comes next (`Parser.consumeSeparatorOrCloseCheck`) — a real comma token is
+  optional evidence, a position gap is the other kind of evidence, and at least one of the two is
+  required unless the closing delimiter is immediately next (which needs no separator at all,
+  §2.4: structural delimiters create their own token boundary).
+- **Layering is deliberately incomplete, on purpose, matching the spec's own division of labor (§1.2):**
+  the parser does not deduplicate record fields or detect duplicate map keys ("last value wins" is a
+  resolver-layer rule, §2.5/§2.6), does not NFC-normalize field names or reject `_` as a map key (both
+  explicitly resolver-layer, §2.9/§7.2.1), does not resolve `EmptyBrace` to a record or typed container
+  (explicitly deferred to the resolver, §2.8), and does not interpret `TokenValue` text as null/boolean/
+  number/string (base type resolution, §4, not yet implemented). All of these are intentional gaps, not
+  omissions — a resolver layer consuming `Document`/`DataValue` is the next natural piece of work.
+- **`!!meta` in the header throws `SchemaDocumentException`, not `ParseException`.** This is a Class 1
+  (data-format-only) processor (§1.5); encountering a schema document isn't malformed input, it's a
+  well-formed document of a kind this parser doesn't implement, and the spec requires that distinction be
+  visible in how it's reported (§8.1: "MUST report the document as a TSON schema document that this
+  processor does not support" — a categorized diagnostic, not a generic parse error).
+- **Nested annotation value-scope is right-recursive and can legitimately leave an outer data-value
+  without a core-value.** `@a:@b:val` fully consumes everything as `@a`'s nested value, all the way down
+  — see `SPEC-FEEDBACK.md` #3 for the exact trace; `ParserTest.nestedAnnotationValueScopeAloneIsIncomplete`
+  documents this as intentional, spec-derived behavior, not a bug, so don't "fix" it without re-reading
+  that entry first.
+
+## Build and test
+
+No system Gradle — always use the wrapper:
+
+```
+./gradlew build
+./gradlew test
+./gradlew test --tests "io.ltr8.tson.parser.lexer.LexerTest"
+./gradlew test --tests "io.ltr8.tson.parser.ParserTest"
+./gradlew test --tests "io.ltr8.tson.parser.lexer.LexerTest.multilineBasicIndentStripping"
+```
+
+## Not yet implemented
+
+Base type resolution (§4) and the built-in type vocabulary (§5) — interpreting `TokenValue` text as
+null/boolean/number/string, and resolving `!uuid`/`!date`/etc. annotations. That's the natural next layer,
+consuming `Document`/`DataValue` from the parser above rather than changing anything below it.

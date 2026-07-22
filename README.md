@@ -10,9 +10,10 @@ Published under the [litterat](https://github.com/litterat) org, group id `io.lt
 
 ## Status
 
-**Lexer only, so far.** Structural parsing (records, maps, arrays, augmentation, directives), base type
-resolution, and the built-in type vocabulary are not yet implemented. See
-[CLAUDE.md](CLAUDE.md#architecture) for the current architecture and design notes.
+**Lexer and structural parser.** The lexer (§7) and structural parser (§2, §3, §7.4 — records, maps,
+arrays, augmentation, directives) are implemented. Base type resolution (§4) and the built-in type
+vocabulary (§5) are not yet implemented. See [CLAUDE.md](CLAUDE.md#architecture) for the current
+architecture and design notes.
 
 Built against TSON Part 1 (lexer + data format), a working draft: https://tson.io/raw/2026/32/tson-part1-data.md
 
