@@ -14,6 +14,9 @@ import io.ltr8.tson.parser.lexer.LexException;
 import io.ltr8.tson.parser.lexer.Lexer;
 import io.ltr8.tson.parser.lexer.Token;
 import io.ltr8.tson.parser.lexer.TokenType;
+import io.ltr8.tson.parser.resolver.BaseTypeResolver;
+import io.ltr8.tson.parser.resolver.BaseValue;
+import io.ltr8.tson.parser.resolver.NumberForm;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
@@ -36,7 +39,8 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Runs every vector in the sibling {@code ltr8-io-tson-test-suite} repo (see its own README for
- * the vector/sidecar format) against this implementation's real {@link Lexer} and {@link Parser}.
+ * the vector/sidecar format) against this implementation's real {@link Lexer}, {@link Parser},
+ * and {@link BaseTypeResolver}.
  *
  * <p>This is deliberately separate from {@link io.ltr8.tson.parser.lexer.LexerTest} and
  * {@link ParserTest}: those are fine-grained unit tests of individual grammar rules with
@@ -64,6 +68,11 @@ class ConformanceSuiteTest {
     @TestFactory
     Stream<DynamicTest> parserVectors() {
         return vectorsIn("parser", ConformanceSuiteTest::checkParserVector);
+    }
+
+    @TestFactory
+    Stream<DynamicTest> resolverVectors() {
+        return vectorsIn("resolver", ConformanceSuiteTest::checkResolverVector);
     }
 
     private interface VectorCheck {
@@ -267,6 +276,105 @@ class ConformanceSuiteTest {
     private static void assertScopedValueMatches(RecordValue expected, ScopedValue actual) {
         assertEquals(fieldTextOrAbsent(expected, "schema-ref"), actual.schemaRef().orElse(null), "schema-ref");
         assertDataValueMatches((RecordValue) fieldValue(expected, "value").coreValue(), actual.value());
+    }
+
+    // ── Resolver-layer vectors ───────────────────────────────────────────
+
+    private static void checkResolverVector(String bucket, Path tn1, RecordValue sidecar) throws IOException {
+        String outcome = fieldText(sidecar, "outcome");
+        if (!outcome.equals("valid")) {
+            fail("unknown resolver-layer outcome: " + outcome);
+            return;
+        }
+        Document doc = new Parser(readRaw(tn1)).parseDocument();
+        TokenValue token = assertInstanceOf(TokenValue.class, doc.root().coreValue(),
+                "resolver vector .tn1 must be a single bare token");
+        BaseValue actual = BaseTypeResolver.resolve(token);
+        RecordValue expected = (RecordValue) fieldCore(sidecar, "base-value");
+        assertBaseValueMatches(expected, actual);
+    }
+
+    private static void assertBaseValueMatches(RecordValue expected, BaseValue actual) {
+        String kind = fieldText(expected, "kind");
+        switch (kind) {
+            case "null" -> assertInstanceOf(BaseValue.NullValue.class, actual, "base-value kind 'null'");
+            case "boolean" -> {
+                BaseValue.BooleanValue bv = assertInstanceOf(BaseValue.BooleanValue.class, actual, "base-value kind 'boolean'");
+                assertEquals(fieldText(expected, "value").equals("true"), bv.value(), "boolean value");
+            }
+            case "string" -> {
+                BaseValue.StringValue sv = assertInstanceOf(BaseValue.StringValue.class, actual, "base-value kind 'string'");
+                assertEquals(fieldText(expected, "text"), sv.text(), "string text");
+            }
+            case "number" -> {
+                BaseValue.NumberValue nv = assertInstanceOf(BaseValue.NumberValue.class, actual, "base-value kind 'number'");
+                assertNumberFormMatches((RecordValue) fieldValue(expected, "form").coreValue(), nv.form());
+            }
+            default -> fail("unknown expected base-value kind: " + kind);
+        }
+    }
+
+    private static void assertNumberFormMatches(RecordValue expected, NumberForm actual) {
+        String shape = fieldText(expected, "shape");
+        switch (shape) {
+            case "integer" -> {
+                NumberForm.IntegerForm f = assertInstanceOf(NumberForm.IntegerForm.class, actual, "number-form shape 'integer'");
+                assertEquals(fieldSignOrAbsent(expected), f.sign().orElse(null), "integer sign");
+                assertEquals(fieldText(expected, "digits"), f.digits(), "integer digits");
+            }
+            case "based-integer" -> {
+                NumberForm.BasedIntegerForm f = assertInstanceOf(NumberForm.BasedIntegerForm.class, actual, "number-form shape 'based-integer'");
+                assertEquals(fieldSignOrAbsent(expected), f.sign().orElse(null), "based-integer sign");
+                assertEquals(fieldRadix(expected), f.radix(), "based-integer radix");
+                assertEquals(fieldText(expected, "digits"), f.digits(), "based-integer digits");
+            }
+            case "float" -> {
+                NumberForm.FloatForm f = assertInstanceOf(NumberForm.FloatForm.class, actual, "number-form shape 'float'");
+                assertEquals(fieldSignOrAbsent(expected), f.sign().orElse(null), "float sign");
+                assertEquals(fieldTextOrAbsent(expected, "integer-part"), f.integerPart().orElse(null), "float integer-part");
+                assertEquals(fieldTextOrAbsent(expected, "fraction-digits"), f.fractionDigits().orElse(null), "float fraction-digits");
+
+                DataValue expExponent = fieldValue(expected, "exponent");
+                boolean expectsExponent = !(expExponent.coreValue() instanceof AbsentValue);
+                assertEquals(expectsExponent, f.exponent().isPresent(), "float exponent presence");
+                if (expectsExponent) {
+                    RecordValue expExpRecord = (RecordValue) expExponent.coreValue();
+                    NumberForm.ExponentPart exp = f.exponent().orElseThrow();
+                    assertEquals(fieldSignOrAbsent(expExpRecord), exp.sign().orElse(null), "exponent sign");
+                    assertEquals(fieldText(expExpRecord, "digits"), exp.digits(), "exponent digits");
+                }
+            }
+            case "special-value" -> {
+                NumberForm.SpecialValueForm f = assertInstanceOf(NumberForm.SpecialValueForm.class, actual, "number-form shape 'special-value'");
+                assertEquals(fieldSignOrAbsent(expected), f.sign().orElse(null), "special-value sign");
+                String expKind = fieldText(expected, "kind");
+                NumberForm.SpecialValueForm.Kind actKind = f.kind();
+                assertEquals(expKind, switch (actKind) {
+                    case NAN -> "nan";
+                    case INFINITY -> "infinity";
+                }, "special-value kind");
+            }
+            default -> fail("unknown expected number-form shape: " + shape);
+        }
+    }
+
+    private static NumberForm.Sign fieldSignOrAbsent(RecordValue r) {
+        String s = fieldTextOrAbsent(r, "sign");
+        if (s == null) return null;
+        return switch (s) {
+            case "plus" -> NumberForm.Sign.PLUS;
+            case "minus" -> NumberForm.Sign.MINUS;
+            default -> throw new AssertionError("unknown sign literal: " + s);
+        };
+    }
+
+    private static NumberForm.BasedIntegerForm.Radix fieldRadix(RecordValue r) {
+        return switch (fieldText(r, "radix")) {
+            case "hex" -> NumberForm.BasedIntegerForm.Radix.HEX;
+            case "octal" -> NumberForm.BasedIntegerForm.Radix.OCTAL;
+            case "binary" -> NumberForm.BasedIntegerForm.Radix.BINARY;
+            default -> throw new AssertionError("unknown radix literal: " + fieldText(r, "radix"));
+        };
     }
 
     // ── Sidecar field helpers ────────────────────────────────────────────

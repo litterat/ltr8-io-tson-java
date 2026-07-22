@@ -10,10 +10,12 @@ Published under the [litterat](https://github.com/litterat) org, group id `io.lt
 
 ## Status
 
-**Lexer and structural parser.** The lexer (§7) and structural parser (§2, §3, §7.4 — records, maps,
-arrays, augmentation, directives) are implemented. Base type resolution (§4) and the built-in type
-vocabulary (§5) are not yet implemented. See [CLAUDE.md](CLAUDE.md#architecture) for the current
-architecture and design notes.
+**Lexer, structural parser, and base type identification.** The lexer (§7) and structural parser (§2, §3,
+§7.4 — records, maps, arrays, augmentation, directives) are implemented. Base type resolution (§4) is
+implemented as far as *identification* — recognizing which of null/boolean/number/string a token is, and
+for numbers, which of the four grammar forms and their components — but not yet *binding* those numbers to
+a Java numeric type (`long`/`double`/`BigInteger`/`BigDecimal`). The built-in type vocabulary (§5) is not
+yet implemented. See [CLAUDE.md](CLAUDE.md#architecture) for the current architecture and design notes.
 
 Built against TSON Part 1 (lexer + data format), a working draft: https://tson.io/raw/2026/32/tson-part1-data.md
 

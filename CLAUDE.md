@@ -143,6 +143,37 @@ Key design points:
   documents this as intentional, spec-derived behavior, not a bug, so don't "fix" it without re-reading
   that entry first.
 
+### Base type resolution (`tson-parser/src/main/java/io/ltr8/tson/parser/resolver/`)
+
+`BaseTypeResolver.resolve(TokenValue)` implements §4's fixed resolution order (null → boolean → number →
+string, §4.5) for `TokenValue`s produced by the parser. `NumberGrammar.tryParse(String)` recognizes the
+`number` production of §7.6 against a token's complete text.
+
+- **Identification is deliberately separate from binding to a Java numeric type.** `NumberGrammar`
+  determines which of the four grammar alternatives (special-value / based-integer / float / integer) a
+  token matches and extracts the grammar's own structural components (sign, digit groups) as raw
+  substrings into `NumberForm` — it does not convert into `long`/`double`/`BigInteger`/`BigDecimal`. The
+  spec explicitly leaves that mapping open ("how values map to host-language numeric types is an
+  implementation concern," §4.3) — different consumers legitimately want different host types (a fast
+  `long`/`double` path vs. exact arbitrary-precision `BigInteger`/`BigDecimal`), and binding is where the
+  spec's required equivalence between representations (`255`/`0xFF`, `.5`/`0.5`, `1_000`/`1000`) actually
+  needs enforcing — none of that belongs in the recognizer. Binding is intentionally not built yet; it
+  consumes `NumberForm`, not a replacement for it.
+- **Each number-grammar alternative is its own small, anchored regex**, not one combined pattern — Java
+  regex forbids a named capture group from repeating across alternation branches, and the three `float`
+  alternatives and three `based-integer` radixes each want their own named groups for extraction. One
+  pattern per ABNF alternative, tried in sequence, reads close to the grammar and sidesteps that
+  restriction entirely.
+- **Quoted tokens always resolve to `StringValue`, regardless of content** (§4.4) — `BaseTypeResolver`
+  checks `TokenForm` first and only attempts null/boolean/number matching for `TokenForm.UNQUOTED`. The
+  quoted string `"42"` and the unquoted token `42` must resolve differently even though `TokenValue.text()`
+  is identical for both — form is consulted exactly once, here, per §2.4.
+- **§9.1's numeric-literal length limit (SHOULD, default 4096 digits) is not enforced anywhere yet.** It's
+  a DoS-hardening recommendation, not a grammar rule, and adding an unconfigurable limit now would be
+  premature without a real configuration mechanism — noted here so it isn't mistaken for an oversight.
+- The built-in type vocabulary (§5 — `!uuid`, `!date`, `!int32`, etc.) is a separate, much larger piece of
+  work, not started. `BaseTypeResolver` only implements the *default*, untyped resolution path.
+
 ### Conformance suite integration (`ConformanceSuiteTest`)
 
 Separate from `LexerTest`/`ParserTest` (fine-grained unit tests) is `ConformanceSuiteTest`, which runs
@@ -166,12 +197,16 @@ No system Gradle — always use the wrapper:
 ./gradlew test
 ./gradlew test --tests "io.ltr8.tson.parser.lexer.LexerTest"
 ./gradlew test --tests "io.ltr8.tson.parser.ParserTest"
+./gradlew test --tests "io.ltr8.tson.parser.resolver.NumberGrammarTest"
+./gradlew test --tests "io.ltr8.tson.parser.resolver.BaseTypeResolverTest"
 ./gradlew test --tests "io.ltr8.tson.parser.ConformanceSuiteTest"   # skipped unless ../../ltr8-io-tson-test-suite exists
 ./gradlew test --tests "io.ltr8.tson.parser.lexer.LexerTest.multilineBasicIndentStripping"
 ```
 
 ## Not yet implemented
 
-Base type resolution (§4) and the built-in type vocabulary (§5) — interpreting `TokenValue` text as
-null/boolean/number/string, and resolving `!uuid`/`!date`/etc. annotations. That's the natural next layer,
-consuming `Document`/`DataValue` from the parser above rather than changing anything below it.
+- Binding `NumberForm` to a Java numeric type (`long`/`double`/`BigInteger`/`BigDecimal`), including the
+  spec's required equivalence between different representations of the same value (§4.3).
+- The built-in type vocabulary (§5) — resolving `!uuid`/`!date`/`!int32`/etc. annotations. A separate,
+  larger piece of work from base type resolution.
+- Anything from Part 2 (schema grammar, type system) — not started.
