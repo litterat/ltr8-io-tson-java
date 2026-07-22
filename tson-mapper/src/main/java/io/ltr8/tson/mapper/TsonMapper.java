@@ -25,6 +25,9 @@ import io.ltr8.tson.parser.resolver.vocab.AtomType;
 import io.ltr8.tson.parser.resolver.vocab.AtomTypeException;
 import io.ltr8.tson.parser.resolver.vocab.BuiltinTypeVocabulary;
 
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.OffsetTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -92,14 +95,28 @@ public final class TsonMapper {
      * richer type a caller would plausibly want to defer to instead (§5.3's host value is
      * unconditionally "byte array"), so pre-registering it by default is the right call here, not
      * just a workaround.
+     *
+     * <p>{@code LocalDate}/{@code OffsetTime}/{@code OffsetDateTime} (§5.4's {@code date}/{@code
+     * time}/{@code datetime}) are the same story as {@code UUID}: ordinary JDK classes, not records
+     * or arrays, so no auto-detection collision, but also unable to self-declare {@code @Atom}, so
+     * pre-registered here rather than left to fail. {@code IsoDuration} (§5.4's {@code duration}) is
+     * the opposite story, matching {@code Rational}/{@code Complex}: it's this library's own record,
+     * so it collides with record auto-detection the same way they do, and isn't pre-registered here
+     * for the same reason they aren't -- a coarse pairing of {@link java.time.Period}/{@link
+     * java.time.Duration} is a defensible default representation, but not obviously the *only* one a
+     * caller would want, so binding it requires an explicit {@code DataBridge} rather than assuming
+     * one opinionated shape.
      */
     private static DataBindContext defaultContext() {
         DataBindContext context = DataBindContext.builder().build();
         try {
             context.registerAtom(UUID.class);
             context.registerAtom(byte[].class);
+            context.registerAtom(LocalDate.class);
+            context.registerAtom(OffsetTime.class);
+            context.registerAtom(OffsetDateTime.class);
         } catch (DataBindException e) {
-            throw new IllegalStateException("failed to register UUID/byte[] on a fresh DataBindContext", e);
+            throw new IllegalStateException("failed to register default atom types on a fresh DataBindContext", e);
         }
         return context;
     }

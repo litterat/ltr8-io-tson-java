@@ -23,6 +23,7 @@ import io.ltr8.tson.parser.resolver.vocab.AtomTypeException;
 import io.ltr8.tson.parser.resolver.vocab.AtomValidationException;
 import io.ltr8.tson.parser.resolver.vocab.BuiltinTypeVocabulary;
 import io.ltr8.tson.parser.resolver.vocab.Complex;
+import io.ltr8.tson.parser.resolver.vocab.IsoDuration;
 import io.ltr8.tson.parser.resolver.vocab.Rational;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DynamicTest;
@@ -36,6 +37,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.OffsetTime;
+import java.time.Period;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
@@ -467,6 +473,24 @@ class ConformanceSuiteTest {
             case "base64", "base64url", "base32", "hex" -> {
                 byte[] actual = (byte[]) atomType.read(token, byte[].class);
                 assertArrayEquals(HexFormat.of().parseHex(fieldText(sidecar, "value")), actual, "vocabulary value");
+            }
+            case "date" -> {
+                LocalDate actual = (LocalDate) atomType.read(token, LocalDate.class);
+                assertEquals(LocalDate.parse(fieldText(sidecar, "value")), actual, "vocabulary value");
+            }
+            case "time" -> {
+                OffsetTime actual = (OffsetTime) atomType.read(token, OffsetTime.class);
+                assertEquals(OffsetTime.parse(fieldText(sidecar, "value")), actual, "vocabulary value");
+            }
+            case "datetime" -> {
+                OffsetDateTime actual = (OffsetDateTime) atomType.read(token, OffsetDateTime.class);
+                assertEquals(OffsetDateTime.parse(fieldText(sidecar, "value")), actual, "vocabulary value");
+            }
+            case "duration" -> {
+                IsoDuration actual = (IsoDuration) atomType.read(token, IsoDuration.class);
+                RecordValue expected = (RecordValue) fieldCore(sidecar, "value");
+                assertEquals(Period.parse(fieldText(expected, "period")), actual.calendarPart(), "duration calendar part");
+                assertEquals(Duration.parse(fieldText(expected, "clock")), actual.clockPart(), "duration clock part");
             }
             default -> {
                 BigDecimal actual = (BigDecimal) atomType.read(token, BigDecimal.class);

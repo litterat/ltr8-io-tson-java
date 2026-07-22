@@ -8,11 +8,16 @@ import io.ltr8.annotation.Union;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.tson.parser.resolver.vocab.Complex;
+import io.ltr8.tson.parser.resolver.vocab.IsoDuration;
 import io.ltr8.tson.parser.resolver.vocab.Rational;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.OffsetTime;
+import java.time.Period;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -425,6 +430,87 @@ class TsonMapperTest {
     void builtinUuidAnnotationRejectsMalformedUuidThroughTheMapper() throws DataBindException {
         // UUID.fromString itself would accept "1-2-3-4-5" -- UuidType's own shape check must not.
         assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !uuid 1-2-3-4-5 }", UuidHolder.class));
+    }
+
+    // ── Temporal types (§5.4) ────────────────────────────────────────────
+
+    public record DateHolder(LocalDate value) {
+    }
+
+    @Test
+    void builtinDateAnnotationBindsDirectlyThroughTheMapper() throws DataBindException {
+        // LocalDate isn't a record or an array, so no auto-detection collision -- but it also
+        // can't self-declare @Atom, being a JDK class, so TsonMapper's default context
+        // pre-registers it the same way it does UUID.
+        DateHolder h = mapper.toObject("{ value: !date 2025-03-13 }", DateHolder.class);
+        assertEquals(LocalDate.of(2025, 3, 13), h.value());
+    }
+
+    @Test
+    void builtinDateAnnotationRejectsExtendedYearThroughTheMapper() throws DataBindException {
+        // LocalDate.parse("+12025-03-13") would succeed on its own -- DateType's own shape check
+        // must not accept RFC 3339's stricter 4-digit-year requirement being violated.
+        assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !date +12025-03-13 }", DateHolder.class));
+    }
+
+    public record TimeHolder(OffsetTime value) {
+    }
+
+    @Test
+    void builtinTimeAnnotationBindsDirectlyThroughTheMapper() throws DataBindException {
+        TimeHolder h = mapper.toObject("{ value: !time \"10:15:30Z\" }", TimeHolder.class);
+        assertEquals(OffsetTime.parse("10:15:30Z"), h.value());
+    }
+
+    public record DateTimeHolder(OffsetDateTime value) {
+    }
+
+    @Test
+    void builtinDateTimeAnnotationBindsDirectlyThroughTheMapper() throws DataBindException {
+        DateTimeHolder h = mapper.toObject("{ value: !datetime \"2025-03-13T10:15:30Z\" }", DateTimeHolder.class);
+        assertEquals(OffsetDateTime.parse("2025-03-13T10:15:30Z"), h.value());
+    }
+
+    public record DurationHolder(IsoDuration value) {
+    }
+
+    @Test
+    void directBindingToTsonsOwnIsoDurationDoesNotWork() throws DataBindException {
+        // IsoDuration is itself a Java record (calendarPart, clockPart) -- same collision as
+        // Rational/Complex, same reason: tson-bind's record auto-detection claims it first.
+        assertThrows(DataBindException.class,
+                () -> mapper.toObject("{ value: !duration P1Y2M3DT4H5M6S }", DurationHolder.class));
+    }
+
+    /** Stand-in for an application's own preferred duration representation -- e.g. threeten-extra's PeriodDuration, or just a total estimate collapsing calendar units. */
+    public record UserDuration(int years, int months, int days, long totalSeconds) {
+    }
+
+    public static class UserDurationBridge implements DataBridge<IsoDuration, UserDuration> {
+        @Override
+        public IsoDuration toData(UserDuration d) {
+            return new IsoDuration(Period.of(d.years(), d.months(), d.days()),
+                    java.time.Duration.ofSeconds(d.totalSeconds()));
+        }
+
+        @Override
+        public UserDuration toObject(IsoDuration d) {
+            Period p = d.calendarPart();
+            return new UserDuration(p.getYears(), p.getMonths(), p.getDays(), d.clockPart().toSeconds());
+        }
+    }
+
+    public record UserDurationHolder(UserDuration value) {
+    }
+
+    @Test
+    void durationBindsToAThirdPartyTypeViaRegisteredDataBridge() throws DataBindException {
+        DataBindContext context = DataBindContext.builder().build();
+        context.registerAtom(UserDuration.class, new UserDurationBridge());
+        TsonMapper bridgedMapper = new TsonMapper(context);
+
+        UserDurationHolder h = bridgedMapper.toObject("{ value: !duration P1Y2M3DT4H5M6S }", UserDurationHolder.class);
+        assertEquals(new UserDuration(1, 2, 3, 4 * 3600L + 5 * 60L + 6L), h.value());
     }
 
     // ── Binary types (§5.3) ──────────────────────────────────────────────

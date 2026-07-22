@@ -27,7 +27,9 @@ import java.util.Optional;
  * SPEC-FEEDBACK.md} #9). And with the full {@code binary} family (§5.3) -- {@code base64}, {@code
  * base64url}, {@code base32}, {@code hex} -- four instances of one {@link BinaryType} constructor,
  * each a distinct {@code binary_encoding} value, not one generic {@code !binary} annotation,
- * matching §5.3's own "there is no generic {@code !binary} annotation."
+ * matching §5.3's own "there is no generic {@code !binary} annotation." And with the temporal
+ * family (§5.4) -- {@code date_type} ({@code date}), {@code time_type} ({@code time}), {@code
+ * datetime_type} ({@code datetime}), {@code duration_type} ({@code duration}).
  */
 public final class BuiltinTypeVocabulary {
 
@@ -65,6 +67,11 @@ public final class BuiltinTypeVocabulary {
         types.put("base64url", BinaryType.BASE64URL);
         types.put("base32", BinaryType.BASE32);
         types.put("hex", BinaryType.HEX);
+
+        types.put("date", DateType.UNCONSTRAINED);
+        types.put("time", TimeType.UNCONSTRAINED);
+        types.put("datetime", DateTimeType.UNCONSTRAINED);
+        types.put("duration", DurationType.UNCONSTRAINED);
 
         return Map.copyOf(types);
     }

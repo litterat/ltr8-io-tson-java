@@ -56,7 +56,13 @@ class BuiltinTypeVocabularyTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"uri", "date", "not_a_type", "binary"})
+    @ValueSource(strings = {"date", "time", "datetime", "duration"})
+    void temporalAtomsAreRegistered(String name) {
+        assertTrue(BuiltinTypeVocabulary.lookup(name).isPresent());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"uri", "ipv4", "not_a_type", "binary"})
     void namesFromFamiliesNotYetImplementedAreNotRegistered(String name) {
         assertFalse(BuiltinTypeVocabulary.lookup(name).isPresent());
     }

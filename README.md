@@ -24,21 +24,24 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
 - [x] Base type resolution, binding to Java host types (`int`/`long`/`double`/`BigInteger`/`BigDecimal`/...)
       — `tson-mapper`'s `AtomBinder`
 - [x] Built-in type vocabulary (§5), `integer_type`/`decimal_type`/`float_type`/`rational_type`/
-      `complex_type`/`uuid_type`/`binary` families — `int8`..`int256`, `uint8`..`uint256`,
-      `positive_integer` and siblings (§5.6, extended beyond the four currently published — see
-      [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #6), `number`, `float32`/`float64` (including
-      `hex-float`), `rational`, `complex` (§7.6's `hex-float`/`rational`/`complex` extended grammar
-      forms, only reachable through these atoms), `uuid` (§5.5), `base64`/`base64url`/`base32`/
-      `hex` (§5.3) — `tson-parser`'s `resolver.vocab` package. Binding `!rational`/`!complex` to a
-      Java field requires a `DataBridge` registered on the `DataBindContext` (`Rational`/`Complex`
-      are themselves Java records, so `tson-bind`'s record auto-detection claims them ahead of the
-      vocabulary path — direct binding to them doesn't work, by design; see their Javadoc). `!uuid`
-      and the binary atoms bind directly to `java.util.UUID`/`byte[]` — `TsonMapper`'s default
-      `DataBindContext` pre-registers both (`UUID` can't self-declare `@Atom`, being a JDK class;
-      `byte[].isArray()` is `true`, so array auto-detection would otherwise claim it the same way
-      records claim `Rational`/`Complex`, but unlike those two there's no competing richer type to
-      defer to), TSON-specific defaults kept out of `tson-bind` itself deliberately (see
-      `TsonMapper.defaultContext()`)
+      `complex_type`/`uuid_type`/`binary`/`date_type`/`time_type`/`datetime_type`/`duration_type`
+      families — `int8`..`int256`, `uint8`..`uint256`, `positive_integer` and siblings (§5.6,
+      extended beyond the four currently published — see [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #6),
+      `number`, `float32`/`float64` (including `hex-float`), `rational`, `complex` (§7.6's
+      `hex-float`/`rational`/`complex` extended grammar forms, only reachable through these atoms),
+      `uuid` (§5.5), `base64`/`base64url`/`base32`/`hex` (§5.3), `date`/`time`/`datetime`/
+      `duration` (§5.4) — `tson-parser`'s `resolver.vocab` package. Binding `!rational`/`!complex`/
+      `!duration` to a Java field requires a `DataBridge` registered on the `DataBindContext`
+      (`Rational`/`Complex`/`IsoDuration` are themselves Java records, so `tson-bind`'s record
+      auto-detection claims them ahead of the vocabulary path — direct binding to them doesn't
+      work, by design; see their Javadoc). `!uuid`, the binary atoms, and `!date`/`!time`/
+      `!datetime` bind directly to `java.util.UUID`/`byte[]`/`LocalDate`/`OffsetTime`/
+      `OffsetDateTime` — `TsonMapper`'s default `DataBindContext` pre-registers all of them (none
+      can self-declare `@Atom`, being JDK classes; `byte[].isArray()` is `true`, so array
+      auto-detection would otherwise claim it the same way records claim `Rational`/`Complex`, but
+      unlike those there's no competing richer type to defer to), TSON-specific defaults kept out
+      of `tson-bind` itself deliberately (see `TsonMapper.defaultContext()`) — see
+      [Conformance](#conformance) below for a few edge-case behaviors worth knowing about
 - [x] Object binding library (`tson-annotation` + `tson-bind`) — reflection/`MethodHandle`-based Java
       object ↔ data binding, including hand-written (pre-record) immutable class support via the
       `java.lang.classfile` API
@@ -50,7 +53,6 @@ See [CLAUDE.md](CLAUDE.md#architecture) for the current architecture and design 
 **Not yet implemented:**
 
 - [ ] Built-in type vocabulary (§5), remaining families:
-  - [ ] Temporal types — `date`/`datetime`/`time`/`duration` (§5.4)
   - [ ] Identifier/network types — `uri`/`ipv4`/`ipv6`/`cidr4`/`cidr6`/`mac` (§5.5, `uuid` done)
 - [ ] Resolver-layer structural rules: record/map "last value wins" deduplication (§2.5/§2.6), `EmptyBrace`
       resolution (§2.8), Absent Sentinel semantics (§2.9)
@@ -65,6 +67,41 @@ See [CLAUDE.md](CLAUDE.md#architecture) for the current architecture and design 
 - [ ] Security hardening enforcement (§9) — numeric-literal length limit (§9.1), confusable-character and
       bidi-formatting-character warnings (§9.4/§9.5)
 - [ ] Anything from Part 2 (schema grammar, type system) — not started
+
+## Conformance
+
+A handful of implementation choices are worth calling out on their own — not *what's* implemented (the
+checklists above), but *how* it behaves at the edges, where a well-known JDK parser and the RFC/ISO
+standard the spec cites don't quite agree.
+
+**Stricter than the underlying JDK default, matching the cited RFC exactly.** Several built-in atoms
+delegate to a JDK type for the bulk of parsing, but only after an explicit shape check of their own —
+because the relevant JDK parser, checked empirically in each case rather than assumed, is consistently
+*more lenient* than the RFC/ISO grammar the spec cites:
+
+- `!uuid` requires RFC 9562's canonical 8-4-4-4-12 grouping; `UUID.fromString` alone accepts unpadded
+  groups (`"1-2-3-4-5"` succeeds, silently reinterpreting where the groups fall).
+- `!base64`/`!base64url` require padding; `Base64.getDecoder()` alone accepts it missing.
+- `!date`/`!datetime`/`!time` reject ISO 8601's "extended year" form (a leading sign, more than 4 digits);
+  `LocalDate`/`OffsetDateTime`/`OffsetTime.parse()` alone accept it, even though RFC 3339's `full-date`
+  grammar requires exactly 4 digits and no sign.
+- `!duration` requires uppercase designators and no leading sign; `Duration.parse`/`Period.parse` alone
+  accept both.
+
+See the relevant class's Javadoc for the specific check in each case.
+
+**One accepted, unfixable gap.** RFC 3339's grammar permits `time-second` up to `60` (leap-second
+accommodation), but `java.time` has no leap-second concept at all — `!time`/`!datetime` reject a
+spec-legal leap-second token as a parse error. There's no reasonable fix short of a from-scratch time
+representation built solely for this one case, so it's documented (`TimeType`'s Javadoc) rather than
+solved.
+
+**One open question.** Whether `!duration` accepts ISO 8601's alternative `PnW` week form is genuinely
+ambiguous — §5.4's table shows only `PnYnMnDTnHnMnS`. This implementation rejects `PnW` as the more
+conservative of the two readings, not a confident call — see [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #12.
+
+Ambiguities, inconsistencies, and errors in the spec text itself — as opposed to this implementation's own
+behavior at the edges — are tracked separately in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
 
 ## Requirements
 

@@ -364,3 +364,34 @@ explaining what distinguishes a "structural constructor" from a "constraint voca
 the naming convention itself, since as written the category boundary reads as arbitrary for `binary`
 specifically (unlike `extern`, whose sum-kind and schema-reference-list shape make "structural" a much
 more legible label).
+
+---
+
+## 12. Does `!duration` accept ISO 8601's `PnW` week form, or only `PnYnMnDTnHnMnS`?
+
+**Section:** §5.4.
+
+**Problem:** §5.4's table gives `!duration`'s format as "ISO 8601 duration (`PnYnMnDTnHnMnS`)" — a
+parenthetical showing one specific designator sequence. ISO 8601-1:2019 (the spec `duration_type` itself
+pins to, per meta.tn1's `spec` field) also defines a second, mutually-exclusive alternative form for
+expressing a duration in whole weeks: `PnW` (e.g. `P3W` for three weeks), which cannot be combined with
+the `Y`/`M`/`D`/`H`/`M`/`S` designators in the same value. §5.4's parenthetical doesn't mention `W`
+anywhere, and nothing in the surrounding prose says whether that's because the week form is deliberately
+excluded from the schemaless `!duration` atom, or because the parenthetical is a representative example of
+the ISO 8601 duration format rather than an exhaustive grammar (the same way, elsewhere in the document,
+a parenthetical sometimes illustrates rather than fully specifies). Both readings are defensible: excluding
+`W` would be consistent with `!duration`'s host value being modeled as year/month/day/hour/minute/second
+components (a week doesn't decompose uniquely into those without picking a day-length, though `P3W` itself
+carries no such ambiguity on its own terms); including it would be consistent with simply deferring to "the
+ISO 8601 duration format" as a whole, of which `PnW` is a normal part.
+
+**Interpretation chosen:** `DurationType`'s parser accepts only `P` followed optionally by `Y`/`M`/`D`
+designators, optionally followed by `T` and `H`/`M`/`S` designators, matching §5.4's parenthetical
+literally — `P3W` is rejected as a parse error, not specially recognized. This was the more conservative
+reading available (implementing a format the annotation's own table doesn't show would be a bigger leap
+than declining to implement one it might have intended by reference), but it's a real coin flip, not a
+confident call.
+
+**Suggested resolution:** State explicitly whether `PnW` is part of `!duration`'s accepted format or not.
+If it is, the table's parenthetical should show it (`PnYnMnDTnHnMnS` / `PnW`) the same way §5.6's table
+spells out multiple accepted grammar forms per numeric atom explicitly rather than by implication.
