@@ -28,6 +28,7 @@ import org.junit.jupiter.api.TestFactory;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -392,14 +393,20 @@ class ConformanceSuiteTest {
 
     /**
      * The .tn1 is a {@code !type-ref token} data-value. {@code value}, on a {@code valid} vector,
-     * is asserted against {@link AtomType#read(TokenValue, Class)} with {@link BigInteger} as the
+     * is asserted against {@link AtomType#read(TokenValue, Class)} with {@link BigDecimal} as the
      * target -- host-representation-neutral, matching the suite's own resolver-vector philosophy
-     * (§5.2 leaves the concrete bound type implementation-defined). On an {@code error} vector,
-     * {@code category} is additionally checked against which of {@link AtomParseException}/
-     * {@link AtomValidationException} was actually thrown, per this implementation's own
-     * interpretation of the §5.2/§8.1 categorization question the test suite's own README flags as
-     * unsettled (see SPEC-FEEDBACK.md #8): parse-shape failures as {@code resolver}, range/constraint
-     * failures as {@code validation}.
+     * (§5.2 leaves the concrete bound type implementation-defined), and the one target every atom
+     * family implemented so far ({@link io.ltr8.tson.parser.resolver.vocab.IntegerType}/{@link
+     * io.ltr8.tson.parser.resolver.vocab.DecimalType}/{@link io.ltr8.tson.parser.resolver.vocab.FloatType})
+     * shares, unlike {@link BigInteger} (which {@code DecimalType}/{@code FloatType} can't narrow
+     * to). Compared via {@link BigDecimal#compareTo} rather than {@code equals} -- {@code equals} is
+     * scale-sensitive ({@code 12.0} != {@code 12}), and nothing in §5.2 requires a canonical scale,
+     * only that the value's information content survive. On an {@code error} vector, {@code
+     * category} is additionally checked against which of {@link AtomParseException}/{@link
+     * AtomValidationException} was actually thrown, per this implementation's own interpretation of
+     * the §5.2/§8.1 categorization question the test suite's own README flags as unsettled (see
+     * SPEC-FEEDBACK.md #8): parse-shape failures as {@code resolver}, range/constraint failures as
+     * {@code validation}.
      */
     private static void checkVocabularyVector(String bucket, Path tn1, RecordValue sidecar) throws IOException {
         String outcome = fieldText(sidecar, "outcome");
@@ -414,8 +421,10 @@ class ConformanceSuiteTest {
 
         switch (outcome) {
             case "valid" -> {
-                BigInteger actual = (BigInteger) atomType.read(token, BigInteger.class);
-                assertEquals(new BigInteger(fieldText(sidecar, "value")), actual, "vocabulary value");
+                BigDecimal actual = (BigDecimal) atomType.read(token, BigDecimal.class);
+                BigDecimal expected = new BigDecimal(fieldText(sidecar, "value"));
+                assertEquals(0, expected.compareTo(actual),
+                        "vocabulary value: expected " + expected + ", got " + actual);
             }
             case "error" -> {
                 String category = fieldText(sidecar, "category");

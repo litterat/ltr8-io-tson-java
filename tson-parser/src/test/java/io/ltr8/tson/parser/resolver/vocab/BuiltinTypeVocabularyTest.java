@@ -33,8 +33,14 @@ class BuiltinTypeVocabularyTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"number", "float32", "float64", "rational", "complex", "uuid", "not_a_type"})
-    void nonIntegerNamesAreNotYetRegistered(String name) {
+    @ValueSource(strings = {"number", "float32", "float64"})
+    void decimalAndFloatAtomsAreRegistered(String name) {
+        assertTrue(BuiltinTypeVocabulary.lookup(name).isPresent());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"rational", "complex", "uuid", "not_a_type"})
+    void namesFromFamiliesNotYetImplementedAreNotRegistered(String name) {
         assertFalse(BuiltinTypeVocabulary.lookup(name).isPresent());
     }
 

@@ -87,14 +87,12 @@ final class AtomBinder {
                     ? Double.NEGATIVE_INFINITY
                     : Double.POSITIVE_INFINITY;
         };
-        if (target == double.class || target == Double.class) {
-            return d;
+        try {
+            return NumberNarrowing.narrowApproximate(d, target);
+        } catch (IllegalArgumentException e) {
+            throw new DataBindException("cannot bind '" + special.kind() + "' to " + target
+                    + " -- only float/double can represent it", e);
         }
-        if (target == float.class || target == Float.class) {
-            return (float) d;
-        }
-        throw new DataBindException("cannot bind '" + special.kind() + "' to " + target
-                + " -- only float/double can represent it");
     }
 
     private static Object bindIntegral(BigInteger value, Class<?> target) throws DataBindException {

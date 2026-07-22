@@ -16,6 +16,10 @@ import java.util.regex.Pattern;
  * a named group to repeat across alternation branches, and the three {@code float} alternatives
  * and three {@code based-integer} radixes each want their own named groups, so one pattern per
  * alternative reads far closer to the grammar than one combined pattern would.
+ *
+ * <p>{@link #isHexFloat} recognizes one of §7.6's *extended* forms (not part of {@code number},
+ * reachable only through the built-in vocabulary's {@code float32}/{@code float64} atoms) -- see
+ * its Javadoc for why it's a shape check only, with no corresponding {@code NumberForm} variant.
  */
 public final class NumberGrammar {
 
@@ -52,6 +56,25 @@ public final class NumberGrammar {
     private static final Pattern INFINITY = Pattern.compile("(?<sign>[+-])?\\.(?:inf|infinity)");
     /** {@code ".nan"} -- never signed (see {@link NumberForm.SpecialValueForm}). */
     private static final Pattern NAN = Pattern.compile("\\.nan");
+
+    /**
+     * {@code hex-float = [sign] "0x" hex-digits [ "." hex-digits ] hex-exponent
+     *              / [sign] "0x" "." hex-digits hex-exponent}
+     * -- an extended form (§7.6: "recognised only through the numeric atoms of the type vocabulary,
+     * §5.6"), never part of the base {@code number} production {@link #tryParse} recognizes, only
+     * reachable through {@code float32}/{@code float64}. Unlike every other form here, this isn't
+     * decomposed into a structural record: {@code float32}/{@code float64} are approximate anyway
+     * (no representation-equivalence requirement to preserve, unlike the integer family's {@code
+     * 0xFF}/{@code 255}), and this exact syntax is also Java's own hexadecimal floating-point
+     * literal grammar (JLS §3.10.2, minus the optional type suffix TSON's grammar doesn't have) --
+     * {@link Double#parseDouble}/{@link Float#parseFloat} parse it directly and correctly, so this
+     * method exists only to confirm the text matches TSON's grammar *before* handing it to them
+     * (whose accepted syntax isn't necessarily identical in every corner case).
+     */
+    private static final Pattern HEX_FLOAT_WITH_INT =
+            Pattern.compile("[+-]?0x" + HEX_DIGITS + "(?:\\." + HEX_DIGITS + ")?[pP][+-]?" + DIGITS);
+    private static final Pattern HEX_FLOAT_NO_INT =
+            Pattern.compile("[+-]?0x\\." + HEX_DIGITS + "[pP][+-]?" + DIGITS);
 
     /**
      * Attempts to match {@code text} against the {@code number} production in full. Returns
@@ -119,6 +142,11 @@ public final class NumberGrammar {
                     sign(expNoDot), Optional.of(expNoDot.group("intpart")), Optional.empty(), exponent(expNoDot)));
         }
         return Optional.empty();
+    }
+
+    /** See {@link #HEX_FLOAT_WITH_INT}'s Javadoc. Not tried by {@link #tryParse} -- an extended form, opt-in only. */
+    public static boolean isHexFloat(String text) {
+        return HEX_FLOAT_WITH_INT.matcher(text).matches() || HEX_FLOAT_NO_INT.matcher(text).matches();
     }
 
     private static Optional<NumberForm> tryInteger(String text) {

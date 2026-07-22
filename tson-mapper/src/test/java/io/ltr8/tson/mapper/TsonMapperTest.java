@@ -324,6 +324,41 @@ class TsonMapperTest {
         assertEquals(30000L, mapper.toObject("{ value: !int16 30000 }", WideInt.class).value());
     }
 
+    public record DecimalHolder(BigDecimal value) {
+    }
+
+    @Test
+    void builtinNumberAnnotationPreservesExactValueThroughTheMapper() throws DataBindException {
+        // !number is the exact tier -- 199.90's trailing zero survives, unlike a double round-trip.
+        assertEquals(new BigDecimal("199.90"), mapper.toObject("{ value: !number 199.90 }", DecimalHolder.class).value());
+    }
+
+    @Test
+    void builtinNumberAnnotationRejectsSpecialValuesThroughTheMapper() throws DataBindException {
+        // §5.6: "!number, being exact, does not accept the special values."
+        assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !number .inf }", DecimalHolder.class));
+    }
+
+    @Test
+    void builtinFloat32AnnotationBindsThroughTheMapper() throws DataBindException {
+        assertEquals(3.14f, mapper.toObject("{ value: !float32 3.14 }", FloatHolder.class).value());
+    }
+
+    public record FloatHolder(float value) {
+    }
+
+    @Test
+    void builtinFloat64AnnotationAcceptsHexFloatThroughTheMapper() throws DataBindException {
+        // 0x1.8p3 = 1.5 * 2^3 = 12.0 -- only reachable through the typed atom, never base resolution.
+        assertEquals(12.0, mapper.toObject("{ value: !float64 0x1.8p3 }", DoubleHolder.class).value());
+    }
+
+    @Test
+    void builtinFloat64AnnotationRejectsBasedIntegerThroughTheMapper() throws DataBindException {
+        // §5.6: float atoms accept integer/float/hex-float/special-value, not based-integer.
+        assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !float64 0xFF }", DoubleHolder.class));
+    }
+
     // ── Unions ───────────────────────────────────────────────────────────
 
     @Union({ Circle.class, Rectangle.class })

@@ -65,4 +65,34 @@ public final class NumberNarrowing {
         throw new IllegalArgumentException("cannot represent a float value as " + target
                 + " -- write it as an integer token if an exact integral type is intended");
     }
+
+    /**
+     * Narrows an already-rounded approximate value (a {@code double}, at whatever precision its
+     * source atom actually rounded to -- {@code float32}/{@code float64} both round through here
+     * uniformly, since a float-precision value widens to {@code double} losslessly) to a target,
+     * including {@code NaN}/{@code Infinity}, which {@link #narrowIntegral}/{@link #narrowDecimal}
+     * never see. Unlike those two, there is no "exact fit" concept to enforce for {@code float}
+     * targets -- IEEE narrowing (double to float) is inherently lossy by definition, not an error
+     * condition the way an out-of-range integer narrowing is -- so this never throws {@link
+     * ArithmeticException}, only {@link IllegalArgumentException} for a target that can't represent
+     * the value at all ({@code BigInteger}/{@code BigDecimal} can't hold {@code NaN}/{@code
+     * Infinity}; nothing but {@code float}/{@code double} can).
+     */
+    public static Object narrowApproximate(double value, Class<?> target) {
+        if (target == double.class || target == Double.class) {
+            return value;
+        }
+        if (target == float.class || target == Float.class) {
+            return (float) value;
+        }
+        if (target == BigDecimal.class) {
+            if (Double.isNaN(value) || Double.isInfinite(value)) {
+                throw new IllegalArgumentException("cannot represent "
+                        + (Double.isNaN(value) ? "NaN" : (value > 0 ? "Infinity" : "-Infinity")) + " as BigDecimal");
+            }
+            return new BigDecimal(value);
+        }
+        throw new IllegalArgumentException("cannot represent an approximate value as " + target
+                + " -- only float/double/BigDecimal can represent it");
+    }
 }
