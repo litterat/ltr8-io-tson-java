@@ -98,3 +98,36 @@ why).
 and directly comparable to the second (e.g. `@a:@b:val target extra`), or add a sentence noting that
 `@a:@b:val target` alone is intentionally incomplete and only illustrates `@a`'s value in isolation, not a
 full data-value.
+
+---
+
+## 4. Custom (non-built-in) type-ref matching semantics are entirely undefined in Part 1
+
+**Section:** §3.2 (type annotations / `type-ref`), §5.1.
+
+**Problem:** §3.2 requires a Class 1 processor to preserve a type annotation it does not resolve "as an
+uninterpreted marker attached to \[its] value" — i.e. Part 1 explicitly declines to define what a custom
+type name like `!Circle` *means*, deferring that to Part 2's schema/type-system layer, which doesn't
+exist yet (§1.3). §5.1 does establish a matching rule, but only for the closed, built-in vocabulary:
+"Annotation names are case-sensitive. Only the exact names listed below are recognised." That rule's
+scope is explicitly the fixed table in §5.3–§5.6 (`!uuid`, `!date`, `!int32`, etc.) — it says nothing
+about, and by its own "only the exact names listed below" wording arguably excludes, how a name *outside*
+that table should ever be matched against anything, since Part 1 has no concept of "the set of names a
+schema declares." This isn't a bug in Part 1 — it's explicitly out of scope by design — but it means an
+application-level consumer that wants to use `type-ref` for host-language type disambiguation (e.g.
+resolving a Java union member from `!Circle`) has zero spec guidance today, and no way to know whether the
+eventual Part 2 rule will be case-sensitive-only (as §5.1 is, for the built-in set) or something looser.
+
+**Interpretation chosen:** `TsonMapper.resolveUnionMember` (tson-mapper) treats this as purely an
+application-binding decision, not a spec-conformance one — the Class 1/Class 2 preservation requirement is
+satisfied upstream (the parser hands the type-ref through as an uninterpreted string), and everything
+downstream of that is this implementation's own policy: try an exact match against a member class's
+`@Typename` annotation first, then fall back to a case-*insensitive* match against the member's simple
+Java class name (so `!circle` matches a class named `Circle` without requiring every fixture to carry an
+explicit annotation). Note this fallback is deliberately *not* consistent with §5.1's case-sensitivity
+rule for the built-in vocabulary — there was no spec basis to be consistent with, since §5.1 doesn't
+claim to govern this case at all.
+
+**Suggested resolution:** Not a Part 1 defect to fix — flagging so that whenever Part 2 defines real
+schema-driven type-name resolution, this implementation's ad hoc `TsonMapper` heuristic gets revisited and
+either conformed to the real rule or clearly scoped as "no schema in play" fallback behavior.
