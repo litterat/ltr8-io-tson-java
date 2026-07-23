@@ -17,82 +17,31 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
 
 **Implemented:**
 
-- [x] Lexer (§7) — `tson-parser`
-- [x] Structural parser (§2, §3, §7.4 — records, maps, arrays, augmentation, directives) — `tson-parser`
-- [x] Base type resolution, identification (§4 — which of null/boolean/number/string a token is, and for
-      numbers, which of the four §7.6 grammar forms) — `tson-parser`
-- [x] Base type resolution, binding to Java host types (`int`/`long`/`double`/`BigInteger`/`BigDecimal`/...)
-      — `tson-mapper`'s `AtomBinder`
-- [x] Built-in type vocabulary (§5), `integer_type`/`decimal_type`/`float_type`/`rational_type`/
-      `complex_type`/`uuid_type`/`binary`/`date_type`/`time_type`/`datetime_type`/`duration_type`/
-      `uri_type`/`ipv4_type`/`ipv6_type` families — `int8`..`int256`, `uint8`..`uint256`,
-      `positive_integer` and siblings (§5.6, extended beyond the four currently published — see
-      [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #6), `number`, `float32`/`float64` (including
-      `hex-float`), `rational`, `complex` (§7.6's `hex-float`/`rational`/`complex` extended grammar
-      forms, only reachable through these atoms), `uuid`/`uri`/`ipv4`/`ipv6` (§5.5),
-      `base64`/`base64url`/`base32`/`hex` (§5.3), `date`/`time`/`datetime`/`duration` (§5.4) —
-      `tson-parser`'s `resolver.vocab` package. Binding `!rational`/`!complex`/`!duration` to a Java
-      field requires a `DataBridge` registered on the `DataBindContext` (`Rational`/`Complex`/
-      `IsoDuration` are themselves Java records, so `tson-bind`'s record auto-detection claims them
-      ahead of the vocabulary path — direct binding to them doesn't work, by design; see their
-      Javadoc). `!uuid`, `!uri`, `!ipv4`, `!ipv6`, the binary atoms, and `!date`/`!time`/`!datetime`
-      bind directly to `java.util.UUID`/`java.net.URI`/`java.net.Inet4Address`/
-      `java.net.Inet6Address`/`byte[]`/`LocalDate`/`OffsetTime`/`OffsetDateTime` — `TsonMapper`'s
-      default `DataBindContext` pre-registers all of them (none can self-declare `@Atom`, being JDK
-      classes; `byte[].isArray()` is `true`, so array auto-detection would otherwise claim it the
-      same way records claim `Rational`/`Complex`, but unlike those there's no competing richer type
-      to defer to), TSON-specific defaults kept out of `tson-bind` itself deliberately (see
-      `TsonMapper.defaultContext()`) — see [Conformance](#conformance) below for a few edge-case
-      behaviors worth knowing about
-- [x] Object binding library (`tson-annotation` + `tson-bind`) — reflection/`MethodHandle`-based Java
-      object ↔ data binding, including hand-written (pre-record) immutable class support via the
-      `java.lang.classfile` API, `Map<K, V>` field support (`DataClassMap`/`DefaultMapBinder`,
-      the same `MethodHandle`-interface shape as `DataClassArray`/`DefaultArrayBinder` but for keyed
-      entries — construct-then-`put` for reading a TSON map into a Java `Map`, plus a symmetric
-      iterator/next/key/value side for a future write direction, not yet called by `tson-mapper`),
-      and tuple support for `@Tuple`-annotated genuine Java records (`DataClassTuple`/
-      `DefaultTupleBinder`/`DataClassElement`) — the meta-kernel's `tuple` constructor is a
-      `product` like `record` (heterogeneous, each slot has its own type) but with `array`'s
-      `INDEX` access pattern instead of `NAMED`, so a tuple binds positionally (constructor
-      argument / `RecordComponent` order) from a TSON array, not by field name from a TSON record;
-      built ahead of Part 2 schema work for alignment, `@Tuple` standing in for what a schema will
-      eventually declare instead
-- [x] `tson-mapper` — binds parsed TSON documents directly to Java objects/records, including dispatch
-      into the built-in type vocabulary, `Map<K, V>` fields (a TSON map's key is a full data-value,
-      §2.6, bound recursively the same way a value is), and `@Tuple`-annotated records (bound from a
-      TSON array positionally, arity-checked against the record's own component count). "Last value
-      wins" for a duplicate record field (§2.5) or map key (§2.6) falls out of `toRecord`/`toMap`'s
-      own binding order — both collect entries into a temporary `Map` first (`byName.put()` /
-      `DataClassMap.put()`), so a later duplicate simply overwrites the earlier one in source order,
-      no explicit dedup step needed. Not a general resolver-layer primitive other `Document`/
-      `DataValue` consumers could reuse (see the checklist below), and not the most efficient way to
-      do it (a full temporary map per record, not a single pass) — good enough for now. The Absent
-      Sentinel's (§2.9) one MUST-NOT rule — `_` is never valid in map-key position — is enforced in
-      `toMap` too: the grammar itself permits `{ _ => 1 }` (confirmed in `ParserTest`, since that's
-      a resolver-layer restriction, not a parse error), so `toMap` is where it's actually rejected
+- [x] Lexer and structural parser — records, maps, arrays, annotations, directives
+- [x] Base types — null, boolean, string, numbers (integer, float, hex-float, based-integer)
+- [x] Integer types — `int8`–`int256`, `uint8`–`uint256`, `positive_integer` and siblings
+- [x] Decimal/float types — `number`, `float32`, `float64`, `rational`, `complex`
+- [x] Identifier/network types — `uuid`, `uri`, `ipv4`, `ipv6`
+- [x] Binary types — `base64`, `base64url`, `base32`, `hex`
+- [x] Temporal types — `date`, `time`, `datetime`, `duration`
+- [x] Object binding — Java records, hand-written immutable classes, `Map<K, V>`, tuples, plain
+      enums, sealed interfaces/unions
+- [x] Full document binding — TSON text straight to Java objects, dispatching into all of the above
 
-See [CLAUDE.md](CLAUDE.md#architecture) for the current architecture and design notes.
+See [CLAUDE.md](CLAUDE.md#architecture) for architecture and design notes, and
+[Conformance](#conformance) below for edge-case behavior worth knowing about.
 
 **Not yet implemented:**
 
-- [ ] Built-in type vocabulary (§5), remaining families:
-  - [ ] Network/identifier types — `cidr4`/`cidr6`/`mac` (§5.5, `uuid`/`uri`/`ipv4`/`ipv6` done)
-- [ ] Resolver-layer structural rules as general, reusable primitives (today "last value wins"
-      dedup and the Absent Sentinel's map-key restriction only exist as `tson-mapper`'s own
-      binding-time behavior, not exposed for other `Document`/`DataValue` consumers) — a DOM-style
-      tree over the AST is the natural home for these once there's a second consumer, not before:
-      `EmptyBrace` resolution (§2.8), and (§2.9) whether "missing" and "explicitly `_`" should ever
-      be distinguished rather than deliberately collapsed the way `TsonMapper.isAbsent` does today
-- [ ] Auto-detect plain Java `enum`s in `tson-bind` the way real records/arrays already are — today
-      `DefaultAtomBinder` only wires `EnumStringBridge` when the enum type itself carries `@Atom`;
-      a bare `enum` with no annotation fails to bind at all
-- [ ] General `@`-annotation binding to user classes (only the `!typeName` type-ref is consumed today;
-      arbitrary `@`-annotations parse but aren't exposed to bound objects)
-- [ ] Header/value directive interpretation — `!!id` content-addressing verification, `!!schema` loading
-- [ ] Multi-error reporting (§8.1) — currently fail-fast on the first lex/parse error
-- [ ] Security hardening enforcement (§9) — numeric-literal length limit (§9.1), confusable-character and
-      bidi-formatting-character warnings (§9.4/§9.5)
-- [ ] Anything from Part 2 (schema grammar, type system) — not started
+- [ ] Network/identifier types — `cidr4`, `cidr6`, `mac`
+- [ ] General resolver-layer structural rules as reusable primitives, rather than binding-time-only
+      behavior — empty-brace resolution, absent-vs-missing distinction
+- [ ] General `@`-annotation binding to user classes (only the type annotation is consumed today)
+- [ ] Header/value directive interpretation — `!!id` verification, `!!schema` loading
+- [ ] Multi-error reporting — currently fail-fast on the first lex/parse error
+- [ ] Security hardening — numeric-literal length limits, confusable-character and
+      bidi-formatting-character warnings
+- [ ] Anything from Part 2 (schema grammar, type system)
 
 ## Conformance
 

@@ -57,6 +57,14 @@ public class DefaultClassBinder {
 			result = recordBinder.resolveRecord(context, targetClass);
 		} else if (isUnion(targetClass)) {
 			result = unionBinder.resolveUnion(context, targetClass, parameterizedType);
+		} else if (targetClass.isEnum()) {
+			// A plain Java enum needs no annotation, the same as record/array -- Class#isEnum() is
+			// exactly as unambiguous a JDK signal as Class#isRecord(). Binds via EnumStringBridge
+			// (by name()); a caller wanting a different representation (by ordinal, by a custom
+			// code) pre-registers their own bridge on the DataBindContext instead, the same
+			// override mechanism every other auto-detected type already has -- an explicit
+			// registration is cached and short-circuits this resolver entirely.
+			result = atomBinder.resolveEnum(targetClass);
 		} else if (isAtom(targetClass)) {
 			result = atomBinder.resolveAtom(context, targetClass);
 		} else if (isMap(targetClass)) {

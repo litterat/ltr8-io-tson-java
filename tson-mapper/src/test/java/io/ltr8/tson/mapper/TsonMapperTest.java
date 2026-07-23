@@ -352,11 +352,11 @@ class TsonMapperTest {
     public enum UnannotatedColor { RED, GREEN, BLUE }
 
     @Test
-    void enumWithoutAtomAnnotationDoesNotBind() throws DataBindException {
-        // DefaultAtomBinder only wires EnumStringBridge when the enum type carries @Atom
-        // (DefaultAtomBinder.resolveAtom's isEnum() check is gated on enumAtom != null) --
-        // documenting the current requirement, not (yet) a claim it's the right one.
-        assertThrows(DataBindException.class, () -> mapper.toObject("{ color: RED }", UnannotatedColorHolder.class));
+    void enumWithoutAtomAnnotationBindsViaEnumStringBridge() throws DataBindException {
+        // DefaultClassBinder auto-detects Class#isEnum() the same way it does isRecord()/isArray()
+        // -- no @Atom needed, same default EnumStringBridge (by name()) as an annotated enum gets.
+        UnannotatedColorHolder h = mapper.toObject("{ color: RED }", UnannotatedColorHolder.class);
+        assertEquals(UnannotatedColor.RED, h.color());
     }
 
     // ── Numeric binding (AtomBinder) ─────────────────────────────────────

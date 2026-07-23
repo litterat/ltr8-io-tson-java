@@ -115,29 +115,36 @@ public class DefaultAtomBinder {
 				}
 			}
 
-			// Allow enums to be serialized to their String value if using default
-			// serialization.
-			Atom enumAtom = targetClass
-					.getAnnotation(Atom.class);
-			if (targetClass.isEnum() && enumAtom != null) {
-
-				EnumStringBridge bridge = new EnumStringBridge(targetClass);
-
-				MethodHandle toObject = MethodHandles.lookup()
-						.findVirtual(EnumStringBridge.class, TOOBJECT_METHOD, MethodType.methodType(Enum.class, String.class))
-						.bindTo(bridge).asType(MethodType.methodType(targetClass, String.class));
-				MethodHandle toData = MethodHandles.lookup()
-						.findVirtual(EnumStringBridge.class, TODATA_METHOD, MethodType.methodType(String.class, Enum.class))
-						.bindTo(bridge).asType(MethodType.methodType(String.class, targetClass));
-
-				DataClassBridge enumBridge = new DataClassBridge(String.class, toData, toObject);
-				descriptor = new DataClassAtom(targetClass, enumBridge);
-
-			}
 		} catch (SecurityException | IllegalAccessException | NoSuchMethodException | CodeAnalysisException e) {
 			throw new CodeAnalysisException("Failed to get atom descriptor", e);
 		}
 
 		return descriptor;
+	}
+
+	/**
+	 * Binds a plain Java enum to its {@code name()} via {@link EnumStringBridge} -- the default,
+	 * overridable representation {@link DefaultClassBinder} routes every enum to directly, no
+	 * {@code @Atom} required (see its own comment on why: {@code Class#isEnum()} is as unambiguous
+	 * as {@code Class#isRecord()}, so there's nothing for an annotation to disambiguate here that
+	 * record/array auto-detection doesn't already handle the same way for their own JDK-recognizable
+	 * shapes).
+	 */
+	public DataClassAtom resolveEnum(Class<?> targetClass) throws CodeAnalysisException {
+		try {
+			EnumStringBridge bridge = new EnumStringBridge(targetClass);
+
+			MethodHandle toObject = MethodHandles.lookup()
+					.findVirtual(EnumStringBridge.class, TOOBJECT_METHOD, MethodType.methodType(Enum.class, String.class))
+					.bindTo(bridge).asType(MethodType.methodType(targetClass, String.class));
+			MethodHandle toData = MethodHandles.lookup()
+					.findVirtual(EnumStringBridge.class, TODATA_METHOD, MethodType.methodType(String.class, Enum.class))
+					.bindTo(bridge).asType(MethodType.methodType(String.class, targetClass));
+
+			DataClassBridge enumBridge = new DataClassBridge(String.class, toData, toObject);
+			return new DataClassAtom(targetClass, enumBridge);
+		} catch (IllegalAccessException | NoSuchMethodException e) {
+			throw new CodeAnalysisException("Failed to get atom descriptor for enum " + targetClass, e);
+		}
 	}
 }
