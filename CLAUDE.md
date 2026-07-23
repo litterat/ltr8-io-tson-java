@@ -668,6 +668,105 @@ written out at all before) with `@Record` attached -- both annotations stay in p
   `Unit`/`EnumBody`/etc. values exercising shapes `SchemaResolver` doesn't produce yet, `type_name`'s/
   `value`'s/`boolean`'s own entries too.
 
+### Schema registry (`tson-schema/src/main/java/io/ltr8/tson/schema/`, `.../registry/`)
+
+`SchemaResolver`/`MetaKernelParser` (both in `tson-parser`) resolve each declaration
+*individually* — no whole-schema consistency checking, references carried through as bare,
+unverified strings, `!!import` parsed but never consulted, and a `type_ref` with arguments (e.g.
+`enum`'s own `members: set<token>` field, or any field using §5.3's `[X]`/`[X]?` array sugar) left
+exactly as written. `SchemaRegistry` adds the missing second stage on top: internal-consistency
+validation, flattening every argument-bearing `type_ref` into a real named entry, and — once
+satisfied — locking the schema into a registry keyed by its canonical `!!id` identity. Added
+2026-07-24, entirely in `tson-schema` (no dependency on `tson-parser`, preserving the established
+one-way direction).
+
+**Package split, user-facing vs. internal-by-convention (per explicit user direction):**
+`io.ltr8.tson.schema` holds the public surface — `SchemaRegistry`, `SchemaLoader`,
+`SchemaValidationException` — alongside `TsonSchema`/`MetaSchema`. `io.ltr8.tson.schema.registry`
+holds `CanonicalIdentity` and `SchemaValidator`, the private pass-2 machinery nothing outside this
+module calls directly. **Note on enforcement:** `tson-schema` has no `module-info.java` (unlike
+`tson-bind`/`tson-annotation`, which do), so there's no JPMS boundary to truly hide `.registry`
+behind — both classes are `public` purely because `SchemaRegistry` needs to call them
+cross-package; "private" here means internal-by-convention/package-naming only, a deliberate,
+confirmed tradeoff rather than adding a module descriptor now.
+
+- **`CanonicalIdentity.of(String)`** implements `[TSON-DATA] §2.2.1`'s canonical-identity algorithm
+  exactly — **not** general URI normalization. The spec performs exactly two reductions (strip
+  scheme + `://`, strip query) and requires everything else already be canonical — lowercase host,
+  no userinfo, no port (default or otherwise), no percent-encoding of *unreserved* characters
+  (`A-Za-z0-9-._~`; encoding anything else is fine), no dot-segments, no fragment — rejecting
+  (`SchemaValidationException`) rather than fixing up an identifier that isn't. E.g.
+  `"https://tson.io/2026/32/m/meta-kernel.tn1"` → `"tson.io/2026/32/m/meta-kernel.tn1"`; `http://`
+  and `https://` resolve to the same identity; a `?sha256=...` query is dropped, not validated.
+- **`SchemaLoader`** (`@FunctionalInterface Optional<TsonSchema> load(String canonicalIdentity)`) —
+  the pluggable-with-a-default hook for resolving a `!!import` target, matching Part 2 §10.1's
+  precedence order (pre-loaded/registered authoritative, "fetched" opt-in and disabled by default).
+  `SchemaRegistry`'s own no-arg constructor supplies a default that only ever finds an
+  *already-registered* schema — nothing is fetched from anywhere. Not consulted yet (see below);
+  exists now so a caller building against this API doesn't need an API change once import merging
+  lands.
+- **`SchemaValidator.validate(TsonSchema, SchemaLoader)`** — the actual pass-2 engine:
+  1. **Import guard** — a schema declaring any `!!import` is rejected outright
+     (`SchemaValidationException`) rather than mishandled, matching this project's established
+     convention for every not-yet-built construct.
+  2. **Materialize** — walks every entry's `TypeBody` (deliberately *not* `TypeDefinition.source` —
+     see below) for any `TypeRef` with non-empty `arguments`, bottom-up (a nested argument that's
+     itself argument-bearing materializes first, so an outer synthesized name is built from an
+     already-flattened application). **Uniform** — *any* argument-bearing `type_ref` gets a
+     synthesized entry, regardless of whether the applied name is itself a constructor (`set`) or a
+     genuine non-constructor template — a deliberate simplification confirmed with the user,
+     narrower/simpler than Part 2 §8.2's literal text (constructor applications "never materialise
+     entries" per the spec; here they do too, uniformly). Deduped via a `Map<TypeRef, String>` keyed
+     by the flattened application (`TypeRef`'s own record equality is exactly §8.2's "flattened
+     applications are structurally equal" test) — first occurrence creates the entry, later
+     structurally-identical occurrences reuse it. Each synthesized entry is exactly
+     `TypeDefinition.reference(TypeRef)`'s existing shape (that method's own Javadoc already flagged
+     this gap: "this resolver doesn't materialise instantiation entries yet ... until that exists").
+     A synthesized name is `head_arg1..._hash` (§8.2's own non-normative "readable head plus
+     structural hash" guidance; not conformance-relevant, free to refine). Every `TypeBody` variant
+     has its own rewrite case, written as an **exhaustive switch over the sealed interface** (no
+     `default`) so a future new variant is a compile error here, not a silent miss.
+  3. **Validate** — over the now-expanded map (originals + synthesized), every reference must
+     resolve: `TypeDefinition.source`/`supertypes`/`subtypes`, and every `TypeRef` reachable through
+     the same exhaustive `TypeBody` switch (`RecordBody.fields`, `Reference.target`,
+     `MapBody.keyType`/`valueType`, `ArrayBody.elementType`, `TupleBody.elements`,
+     `ChoiceBody.variants`). **Type-parameter exception** (load-bearing for every parameterized
+     declaration — `array`, `set`, `map`, `array_min`, `array_max`, `array_ranged`): a bare name is
+     valid if it resolves in the namespace *or* is one of the checked entry's own declared
+     `parameters` — e.g. `set => <T> ~array<T> ^ {...}` resolves its own `source` (`array<T>`) where
+     `T` is `set`'s own parameter, not a real entry. `RecordBody.groups[].members` gets a bonus
+     check against a different namespace (sibling field names within the same record, not type
+     names). Any failure throws `SchemaValidationException` naming the offending entry/reference.
+  4. Returns a new plain `TsonSchema` — even when the input was a `MetaSchema`; once
+     validated/registered, which resolver produced it no longer matters.
+
+  **Scope note on `source`:** `TypeDefinition.source` is *provenance* (how an entry was itself
+  derived — composition/refinement/construction), not a field consuming another type, so it's
+  validated but never itself materialized into a further synthetic entry, even when it carries
+  arguments (`set`'s own `source: array<T>` is exactly this case) — materializing it would create a
+  synthetic entry with no standalone meaning, tied only to `set`'s own identity.
+- **`SchemaRegistry`** — `register(TsonSchema)` computes the canonical identity from the schema's
+  own `!!id` (throwing if absent), rejects a duplicate identity outright (no overwrite — together
+  with `TsonSchema.entries()` already being an unmodifiable map, this rejection *is* the "locked, no
+  mutations allowed" guarantee), then runs `SchemaValidator` and stores the result. `get(String uri)`
+  takes a *raw* URI and canonicalizes internally — callers never need to call `CanonicalIdentity`
+  themselves for either method. (Its private `lookupByCanonicalIdentity` helper, which expects an
+  *already*-canonical identity, is the piece actually shared with `SchemaLoader`'s own contract, and
+  is what the default loader delegates to — `get`'s public, raw-URI-taking form can't be reused
+  directly there.)
+
+**Verified against the real fixture, not just hand-built schemas.**
+`MetaKernelSchemaRegistryTest` (in `tson-parser`, not `tson-schema` — that module has no dependency
+on `tson-parser`/`MetaKernelParser` at all, so this is the one place both are available) registers
+`MetaKernelParser.parse()`'s real output end-to-end. It produces **9** synthesized entries, not the
+1 (`set_token_*`) a naive `<...>` grep of the source predicts: `[X]`/`[X]?` array-sugar field types
+elsewhere in the fixture (`arguments: [type_argument]?`, `fields: [record_field]`, `groups:
+[field_group]?`, `supertypes`/`subtypes`/`parameters: [type_name]?`/`[param_name]?`, `elements:
+[tuple_element]`, `variants: [type_ref]`, `members: [field_name]`) desugar to `array<X>`
+applications too (§5.3) — three separate `[type_name]?` uses across different declarations
+correctly dedup to a single `array_type_name_*` entry, confirmed against the real data, not just a
+hand-built case.
+
 ### Conformance suite integration (`ConformanceSuiteTest`)
 
 Separate from `LexerTest`/`ParserTest` (fine-grained unit tests) is `ConformanceSuiteTest`, which runs
@@ -695,15 +794,23 @@ No system Gradle — always use the wrapper:
 ./gradlew test --tests "io.ltr8.tson.parser.resolver.BaseTypeResolverTest"
 ./gradlew test --tests "io.ltr8.tson.parser.ConformanceSuiteTest"   # skipped unless ../../ltr8-io-tson-test-suite exists
 ./gradlew test --tests "io.ltr8.tson.parser.lexer.LexerTest.multilineBasicIndentStripping"
+./gradlew :tson-schema:test --tests "io.ltr8.tson.schema.SchemaRegistryTest"
+./gradlew :tson-schema:test --tests "io.ltr8.tson.schema.registry.SchemaValidatorTest"
+./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.MetaKernelSchemaRegistryTest"
 ```
 
 ## Not yet implemented
 
-- Part 2 schema resolution: atom refinement (`!I ^ { ... }`), subtraction, templates/instantiation
-  entries, elided field types outside a tightening entry, restating a field group in a refinement
-  body, and generic type-refs beyond a bare two-argument `map<K, V>` application or a refinement
-  source — see `SchemaResolver`'s own Javadoc (under "Schema resolution" above) for the exact,
-  current boundary of what resolves.
+- Part 2 schema resolution: atom refinement (`!I ^ { ... }`), subtraction, elided field types
+  outside a tightening entry, restating a field group in a refinement body, and generic type-refs
+  beyond a bare two-argument `map<K, V>` application or a refinement source — see `SchemaResolver`'s
+  own Javadoc (under "Schema resolution" above) for the exact, current boundary of what resolves.
+  (Template/instantiation-entry *materialization* itself is now handled — see "Schema registry"
+  above — just not per §8.2's precise constructor-vs-template split; materialization is uniform.)
+- `!!import` merging — `SchemaRegistry`/`SchemaValidator` (see "Schema registry" above) reject a
+  schema declaring any `!!import` outright rather than merging the imported schema's entries into
+  the importer's namespace; the `SchemaLoader` hook is wired but not yet consulted. Next real step
+  once `meta.tn1` (which imports meta-kernel) is tackled.
 - A schema-validating data parser (Class 2) that consults a resolved `TsonSchema`/`TypeDefinition`
   while parsing data — the built-in vocabulary's `schema.meta`/`resolver.vocab` split (see "Built-in
   type vocabulary" above) is groundwork for this, not this itself.
