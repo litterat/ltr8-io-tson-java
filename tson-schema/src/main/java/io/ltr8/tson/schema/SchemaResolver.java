@@ -1,13 +1,21 @@
 package io.ltr8.tson.schema;
 
+import io.ltr8.tson.parser.ast.TokenForm;
+import io.ltr8.tson.parser.ast.TokenValue;
+import io.ltr8.tson.parser.ast.schema.ArrayContainerDef;
 import io.ltr8.tson.parser.ast.schema.ConstructionDef;
+import io.ltr8.tson.parser.ast.schema.ContainerDef;
+import io.ltr8.tson.parser.ast.schema.ContainerTypeDef;
+import io.ltr8.tson.parser.ast.schema.ElementType;
 import io.ltr8.tson.parser.ast.schema.FieldDef;
 import io.ltr8.tson.parser.ast.schema.GroupDef;
+import io.ltr8.tson.parser.ast.schema.InlineArrayRef;
 import io.ltr8.tson.parser.ast.schema.RecordDef;
 import io.ltr8.tson.parser.ast.schema.RecordEntry;
 import io.ltr8.tson.parser.ast.schema.ReferenceTypeDef;
 import io.ltr8.tson.parser.ast.schema.SchemaMap;
 import io.ltr8.tson.parser.ast.schema.SimpleRef;
+import io.ltr8.tson.parser.ast.schema.SizeSpec;
 import io.ltr8.tson.parser.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.parser.ast.schema.TypeDef;
 import io.ltr8.tson.parser.ast.schema.TypeRef;
@@ -16,6 +24,7 @@ import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
+import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 
@@ -31,14 +40,15 @@ import java.util.Set;
  * Resolves declarations from a {@link SchemaMap} (the grammar-layer AST, {@code tson-parser}) into
  * {@link TypeDefinition}s (Part 2 §8's resolved schema-value shape, {@code io.ltr8.tson.schema.meta})
  * -- an incremental, deliberately narrow resolver, not the full two-pass resolver of §3.4.1. It
- * handles three constructs so far:
+ * handles four constructs so far:
  *
  * <ul>
  *   <li>A record (no supertypes, no type parameters), optionally {@code ~}-marked (the {@code
  *   constructor} flag threads straight from {@code StructuralTypeDef.constructor()} into the
- *   result), whose fields are plain simple type-refs, each REQUIRED or OPTIONAL (a {@code ?}
- *   suffix), and whose entries may include field groups (§5.11) -- {@code integer_size}'s own
- *   shape, and (via a {@code ~atom & {...}} composition body, see below) {@code integer_type}'s.</li>
+ *   result), whose fields are simple type-refs or the inline array sugar {@code [T]} (see below),
+ *   each REQUIRED or OPTIONAL (a {@code ?} suffix), and whose entries may include field groups
+ *   (§5.11) -- {@code integer_size}'s own shape, and (via a {@code ~atom & {...}} composition
+ *   body, see below) {@code integer_type}'s.</li>
  *   <li>Composition ({@code A & B & { ... }}, §5.8), also optionally {@code ~}-marked, over
  *   supertypes that are themselves already resolved, simple (non-generic) references, whose own
  *   body is a {@link RecordBody} -- {@code atom => top & {}}, {@code product => top & {
@@ -52,6 +62,13 @@ import java.util.Set;
  *   annotation}/{@code documentation}/{@code doc}/{@code alias}'s own shape. No namespace lookup
  *   happens here either: the referenced name is carried through as a bare string, unverified,
  *   exactly like an ordinary field's type-ref.</li>
+ *   <li>A field's inline array sugar {@code [T]} (§5.3) resolves in place to the {@code type_ref}
+ *   value {@code { name: array  arguments: [ { name: T } ] } } -- the {@code @alias:field_name}-style
+ *   annotation §8.3 would add when {@code T} is itself an aliased reference is not produced yet, so
+ *   the bare form is used instead (see {@link #resolveTypeRef}). Declaration-level sized-array sugar
+ *   ({@code [T; N..]}/{@code [T; ..M]}/{@code [T; N..M]}/{@code [T; N]}, §5.3) desugars to a
+ *   {@code REFERENCE}-kind entry targeting {@code array_min}/{@code array_max}/{@code array_ranged}
+ *   (§5.10) -- see {@link #resolveContainerTypeDef}.</li>
  * </ul>
  *
  * Everything else -- elided field types, field modifiers (default/fixed values), refinement,
@@ -133,9 +150,64 @@ public final class SchemaResolver {
                 && referenceTypeDef.ref() instanceof SimpleRef simple) {
             return TypeDefinition.reference(simple.name());
         }
+        if (typeDef instanceof ContainerTypeDef containerTypeDef && containerTypeDef.typeParams().isEmpty()) {
+            return resolveContainerTypeDef(name, containerTypeDef.container());
+        }
         throw new UnsupportedOperationException(
-                "'" + name + "': only fresh record constructions, composition, and simple type references are resolved so far, got "
-                        + typeDef.getClass().getSimpleName());
+                "'" + name + "': only fresh record constructions, composition, simple type references, and "
+                        + "declaration-level sized arrays are resolved so far, got " + typeDef.getClass().getSimpleName());
+    }
+
+    // ── Declaration-level array size sugar (§5.3, §5.10) ──────────────────
+
+    /**
+     * {@code [T; N..]}/{@code [T; ..M]}/{@code [T; N..M]}/{@code [T; N]} desugar to the kernel's
+     * size-refinement templates -- {@code array_min<T, N>}/{@code array_max<T, M>}/{@code
+     * array_ranged<T, N, M>} (the bare-{@code N} form is {@code array_ranged<T, N, N>}, "two
+     * spellings of the same application", §5.3). All three are non-constructor templates, so a
+     * fully-bound application resolves to a {@code REFERENCE}-kind entry (§5.10) -- see {@link
+     * TypeDefinition#reference(io.ltr8.tson.schema.meta.TypeRef)}'s own Javadoc for why {@code
+     * body.target} reuses the application itself rather than a materialised instantiation entry's
+     * name. A size-less declaration-level array ({@code id_list => [text]}) is a top-level
+     * *constructor* application instead (§5.6) -- a different, not-yet-resolved case -- so it's
+     * rejected explicitly here rather than mishandled as a reference.
+     */
+    private TypeDefinition resolveContainerTypeDef(String name, ContainerDef container) {
+        if (!(container instanceof ArrayContainerDef arrayContainer)) {
+            throw new UnsupportedOperationException(
+                    "'" + name + "': only declaration-level array forms are resolved so far, got " + container.getClass().getSimpleName());
+        }
+        if (arrayContainer.size().isEmpty()) {
+            throw new UnsupportedOperationException("'" + name + "': a size-less declaration-level array "
+                    + "is a top-level constructor application (§5.6), not resolved yet");
+        }
+        ElementType elementType = arrayContainer.elementType();
+        if (elementType.optional()) {
+            throw new UnsupportedOperationException("'" + name + "': an OPTIONAL array element is not resolved yet");
+        }
+        if (!(elementType.expr() instanceof ElementType.Expr.Plain plain) || !(plain.typeRef() instanceof SimpleRef elementSimple)) {
+            throw new UnsupportedOperationException(
+                    "'" + name + "': only a simple (non-nested, non-generic) element type is resolved so far: " + elementType);
+        }
+        io.ltr8.tson.schema.meta.TypeRef element = io.ltr8.tson.schema.meta.TypeRef.of(elementSimple.name());
+
+        io.ltr8.tson.schema.meta.TypeRef applied = switch (arrayContainer.size().get()) {
+            case SizeSpec.Min min -> sizeTemplateApplication("array_min", element, min.lower());
+            case SizeSpec.Max max -> sizeTemplateApplication("array_max", element, max.upper());
+            case SizeSpec.Ranged ranged -> sizeTemplateApplication("array_ranged", element, ranged.lower(), ranged.upper());
+            case SizeSpec.Exact exact -> sizeTemplateApplication("array_ranged", element, exact.bound(), exact.bound());
+        };
+        return TypeDefinition.reference(applied);
+    }
+
+    private static io.ltr8.tson.schema.meta.TypeRef sizeTemplateApplication(
+            String templateName, io.ltr8.tson.schema.meta.TypeRef element, String... bounds) {
+        List<TypeArgument> arguments = new ArrayList<>();
+        arguments.add(new TypeArgument.Ref(element));
+        for (String bound : bounds) {
+            arguments.add(new TypeArgument.Value(new TokenValue(bound, TokenForm.UNQUOTED)));
+        }
+        return new io.ltr8.tson.schema.meta.TypeRef(templateName, arguments);
     }
 
     // ── Composition (§5.8) ────────────────────────────────────────────────
@@ -297,21 +369,34 @@ public final class SchemaResolver {
         if (field.modifier().isPresent()) {
             throw new UnsupportedOperationException("field modifiers (~/=) are not resolved yet: " + field);
         }
-        TypeRef ref = field.type().get().typeRef();
-        if (!(ref instanceof SimpleRef simple)) {
-            throw new UnsupportedOperationException("only simple (non-generic) type-refs are resolved so far: " + ref);
-        }
+        io.ltr8.tson.schema.meta.TypeRef type = resolveTypeRef(field.type().get().typeRef());
         FieldState state = field.type().get().optional() ? FieldState.OPTIONAL : FieldState.REQUIRED;
-        return new RecordField(field.name(), io.ltr8.tson.schema.meta.TypeRef.of(simple.name()), state,
-                Optional.empty(), Optional.empty());
+        return new RecordField(field.name(), type, state, Optional.empty(), Optional.empty());
     }
 
     private RecordField resolveGroupMember(GroupDef.Member member) {
-        if (!(member.typeRef() instanceof SimpleRef simple)) {
-            throw new UnsupportedOperationException(
-                    "only simple (non-generic) type-refs are resolved so far: " + member.typeRef());
-        }
-        return new RecordField(member.name(), io.ltr8.tson.schema.meta.TypeRef.of(simple.name()), FieldState.OPTIONAL,
+        return new RecordField(member.name(), resolveTypeRef(member.typeRef()), FieldState.OPTIONAL,
                 Optional.empty(), Optional.empty());
+    }
+
+    /**
+     * A field/group-member's type-ref: a bare simple reference, or the inline array sugar {@code
+     * [T]} (§5.3), which desugars to the constructor application {@code !array { element_type: T }}
+     * -- represented in place as a {@code type_ref} value, {@code { name: array  arguments: [ {
+     * name: T } ] } }, exactly like any other generic application (§5.3: "An inline constructor
+     * application does not materialise a schema entry"). Per the same section this would carry
+     * {@code @alias:field_name} when {@code T} is itself an aliased reference (§8.3's reference
+     * flattening) -- not implemented yet, so the bare, unaliased form is produced instead.
+     */
+    private io.ltr8.tson.schema.meta.TypeRef resolveTypeRef(TypeRef ref) {
+        if (ref instanceof SimpleRef simple) {
+            return io.ltr8.tson.schema.meta.TypeRef.of(simple.name());
+        }
+        if (ref instanceof InlineArrayRef inlineArray && inlineArray.elementType() instanceof SimpleRef elementSimple) {
+            return new io.ltr8.tson.schema.meta.TypeRef("array",
+                    List.of(new TypeArgument.Ref(io.ltr8.tson.schema.meta.TypeRef.of(elementSimple.name()))));
+        }
+        throw new UnsupportedOperationException(
+                "only simple (non-generic) type-refs and inline arrays of one are resolved so far: " + ref);
     }
 }

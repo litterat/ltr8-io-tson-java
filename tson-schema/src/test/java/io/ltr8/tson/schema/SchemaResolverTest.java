@@ -328,6 +328,119 @@ class SchemaResolverTest {
         assertEquals(write(documentation), write(alias));
     }
 
+    // ── A field's inline array sugar [T] (§5.3): type_ref.arguments ───────
+
+    @Test
+    void resolvesAFieldsInlineArraySugarFromTheRealMetaKernelFixture() throws IOException, DataBindException {
+        // type_ref => { name: type_name  arguments: [type_argument]? }
+        SchemaMap schemaMap = new SchemaParser(readFixture()).parseSchemaDocument().body();
+
+        TypeDefinition typeRefDef = resolver.resolve(schemaMap.declarations().get("type_ref"));
+
+        // "!ref"/"!value" wrapping each type_argument is a known toTson divergence from the
+        // kernel's own tag-less field-group shape -- see TypeArgument's own Javadoc for why.
+        assertEquals("{ kind: \"PRODUCT\" parameters: [] constructor: false supertypes: [] subtypes: [] "
+                        + "body: !record { supertypes: [] fields: [ "
+                        + "{ name: \"name\" type: { name: \"type_name\" arguments: [] } state: \"REQUIRED\" } "
+                        + "{ name: \"arguments\" type: { name: \"array\" "
+                        + "arguments: [ !ref { ref: { name: \"type_argument\" arguments: [] } } ] } "
+                        + "state: \"OPTIONAL\" } ] groups: [] } }",
+                write(typeRefDef));
+    }
+
+    // ── Declaration-level sized-array sugar (§5.3, §5.10): array_min/array_max/array_ranged ──
+    //    No real meta-kernel.tn1 declaration uses this sugar; these mirror §5.3's own worked
+    //    examples (score_list/order_batch/matrix9) and §5.10's string_triple example directly.
+
+    @Test
+    void resolvesAtLeastNSugarToArrayMin() throws DataBindException {
+        TypeDefinition scoreList = resolveSnippet("score_list => [integer; 1..]");
+
+        assertEquals(TypeKind.REFERENCE, scoreList.kind());
+        // "!ref"/"!value" wrapping each type_argument is a known toTson divergence -- see
+        // TypeArgument's own Javadoc for why (mutually-recursive types + tson-bind's record
+        // resolution has no cycle protection, only union resolution does).
+        assertEquals("{ source: { name: \"array_min\" arguments: [ "
+                        + "!ref { ref: { name: \"integer\" arguments: [] } } "
+                        + "!value { value: { text: \"1\" form: \"UNQUOTED\" } } ] } "
+                        + "kind: \"REFERENCE\" parameters: [] constructor: false supertypes: [] subtypes: [] "
+                        + "body: !reference { target: { name: \"array_min\" arguments: [ "
+                        + "!ref { ref: { name: \"integer\" arguments: [] } } "
+                        + "!value { value: { text: \"1\" form: \"UNQUOTED\" } } ] } } }",
+                write(scoreList));
+    }
+
+    @Test
+    void resolvesAtMostMSugarToArrayMax() throws DataBindException {
+        TypeDefinition recent = resolveSnippet("recent => [text; ..5]");
+
+        assertEquals("{ source: { name: \"array_max\" arguments: [ "
+                        + "!ref { ref: { name: \"text\" arguments: [] } } "
+                        + "!value { value: { text: \"5\" form: \"UNQUOTED\" } } ] } "
+                        + "kind: \"REFERENCE\" parameters: [] constructor: false supertypes: [] subtypes: [] "
+                        + "body: !reference { target: { name: \"array_max\" arguments: [ "
+                        + "!ref { ref: { name: \"text\" arguments: [] } } "
+                        + "!value { value: { text: \"5\" form: \"UNQUOTED\" } } ] } } }",
+                write(recent));
+    }
+
+    @Test
+    void resolvesABoundedRangeToArrayRanged() throws DataBindException {
+        TypeDefinition orderBatch = resolveSnippet("order_batch => [order; 1..100]");
+
+        assertEquals("{ source: { name: \"array_ranged\" arguments: [ "
+                        + "!ref { ref: { name: \"order\" arguments: [] } } "
+                        + "!value { value: { text: \"1\" form: \"UNQUOTED\" } } "
+                        + "!value { value: { text: \"100\" form: \"UNQUOTED\" } } ] } "
+                        + "kind: \"REFERENCE\" parameters: [] constructor: false supertypes: [] subtypes: [] "
+                        + "body: !reference { target: { name: \"array_ranged\" arguments: [ "
+                        + "!ref { ref: { name: \"order\" arguments: [] } } "
+                        + "!value { value: { text: \"1\" form: \"UNQUOTED\" } } "
+                        + "!value { value: { text: \"100\" form: \"UNQUOTED\" } } ] } } }",
+                write(orderBatch));
+    }
+
+    @Test
+    void resolvesAnExactSizeToArrayRangedWithTheSameBoundTwice() throws DataBindException {
+        // matrix9 => [number; 9] -- "two spellings of the same application" as [number; 9..9] (§5.3).
+        TypeDefinition matrix9 = resolveSnippet("matrix9 => [number; 9]");
+        TypeDefinition stringTriple = resolveSnippet("string_triple => [text; 3..3]");
+
+        assertEquals("{ source: { name: \"array_ranged\" arguments: [ "
+                        + "!ref { ref: { name: \"number\" arguments: [] } } "
+                        + "!value { value: { text: \"9\" form: \"UNQUOTED\" } } "
+                        + "!value { value: { text: \"9\" form: \"UNQUOTED\" } } ] } "
+                        + "kind: \"REFERENCE\" parameters: [] constructor: false supertypes: [] subtypes: [] "
+                        + "body: !reference { target: { name: \"array_ranged\" arguments: [ "
+                        + "!ref { ref: { name: \"number\" arguments: [] } } "
+                        + "!value { value: { text: \"9\" form: \"UNQUOTED\" } } "
+                        + "!value { value: { text: \"9\" form: \"UNQUOTED\" } } ] } } }",
+                write(matrix9));
+        // §5.10's own worked example: array_ranged<text, 3, 3>, equivalently [text; 3].
+        assertEquals("{ source: { name: \"array_ranged\" arguments: [ "
+                        + "!ref { ref: { name: \"text\" arguments: [] } } "
+                        + "!value { value: { text: \"3\" form: \"UNQUOTED\" } } "
+                        + "!value { value: { text: \"3\" form: \"UNQUOTED\" } } ] } "
+                        + "kind: \"REFERENCE\" parameters: [] constructor: false supertypes: [] subtypes: [] "
+                        + "body: !reference { target: { name: \"array_ranged\" arguments: [ "
+                        + "!ref { ref: { name: \"text\" arguments: [] } } "
+                        + "!value { value: { text: \"3\" form: \"UNQUOTED\" } } "
+                        + "!value { value: { text: \"3\" form: \"UNQUOTED\" } } ] } } }",
+                write(stringTriple));
+    }
+
+    @Test
+    void rejectsASizeLessDeclarationLevelArrayAsAConstructorApplicationNotYetResolved() {
+        assertThrows(UnsupportedOperationException.class, () -> resolveSnippet("id_list => [text]"));
+    }
+
+    private TypeDefinition resolveSnippet(String declaration) {
+        SchemaMap schemaMap = new SchemaParser("""
+                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
+                { %s }""".formatted(declaration)).parseSchemaDocument().body();
+        return resolver.resolve(schemaMap.declarations().values().iterator().next());
+    }
+
     @Test
     void compositionRejectsAnUnresolvedSupertype() throws IOException {
         SchemaMap schemaMap = new SchemaParser(readFixture()).parseSchemaDocument().body();

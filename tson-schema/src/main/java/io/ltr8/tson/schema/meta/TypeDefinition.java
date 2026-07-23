@@ -37,9 +37,24 @@ public record TypeDefinition(Optional<TypeRef> source, TypeKind kind, List<Strin
                 Optional.empty(), body);
     }
 
-    /** A reference definition -- {@code type_name}, {@code annotation}, {@code doc}, and similar kernel aliases. */
+    /**
+     * A reference definition whose target is a bare name -- {@code type_name}, {@code annotation},
+     * {@code doc}, and similar kernel aliases.
+     */
     public static TypeDefinition reference(String target) {
-        return new TypeDefinition(Optional.of(TypeRef.of(target)), TypeKind.REFERENCE, List.of(), false, List.of(),
-                List.of(), Optional.empty(), new Reference(TypeRef.of(target)));
+        return reference(TypeRef.of(target));
+    }
+
+    /**
+     * A reference definition whose target may itself carry arguments -- a fully-bound template
+     * application like {@code array_min<T, N>} (§5.10). Per §5.10/§8.2 the resolved {@code
+     * body.target} should point at a *materialised instantiation entry*'s internal name, not at the
+     * application itself -- this resolver doesn't materialise instantiation entries yet, so {@code
+     * target} is reused as both {@code source} and (as a placeholder) {@code body.target} until
+     * that exists.
+     */
+    public static TypeDefinition reference(TypeRef target) {
+        return new TypeDefinition(Optional.of(target), TypeKind.REFERENCE, List.of(), false, List.of(),
+                List.of(), Optional.empty(), new Reference(target));
     }
 }

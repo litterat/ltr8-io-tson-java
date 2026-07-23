@@ -286,11 +286,43 @@ string, §4.5) for `TokenValue`s produced by the parser. `NumberGrammar.tryParse
   `doc`/`alias` from the real fixture -- `@annotation` on `annotation`'s own declaration is metadata
   on the type-def (`SchemaMap.Declaration.typeDefAnnotations`), not part of what this resolves, so
   it plays no role.
+- **A field's inline array sugar `[T]`** (§5.3) resolves in place to the `type_ref` value `{ name:
+  array  arguments: [ { name: T } ] } }` -- verified against `type_ref => { name: type_name
+  arguments: [type_argument]? }` from the real fixture. The `@alias:field_name`-style annotation
+  §8.3 would add when `T` is itself an aliased reference isn't produced yet, so the bare form is
+  used instead. **Declaration-level sized-array sugar** (`[T; N..]`/`[T; ..M]`/`[T; N..M]`/`[T; N]`,
+  §5.3, §5.10) desugars to a `REFERENCE`-kind entry targeting `array_min`/`array_max`/
+  `array_ranged` respectively (the bare-`N` form to `array_ranged<T, N, N>`, "two spellings of the
+  same application") -- per §5.10/§8.2 `body.target` should point at a *materialised instantiation
+  entry*, which this resolver doesn't create yet, so it reuses the application itself as a
+  placeholder (see `TypeDefinition.reference(TypeRef)`'s own Javadoc). A size-less declaration-level
+  array (`id_list => [text]`) is a top-level *constructor* application instead (§5.6), a different,
+  not-yet-resolved case, rejected explicitly rather than mishandled. No real `meta-kernel.tn1`
+  declaration uses this sugar; verified against §5.3's own worked examples
+  (`score_list`/`order_batch`/`matrix9`) and §5.10's `string_triple` example directly.
 
 Every other construct (elided field types, field modifiers/default-fixed values, refinement,
-subtraction, generic type-refs, templates, tightening) throws `UnsupportedOperationException`
-rather than silently mis-resolving -- `SchemaResolver`'s own Javadoc
-lists exactly what's in scope.
+subtraction, generic type-refs elsewhere, templates, tightening) throws
+`UnsupportedOperationException` rather than silently mis-resolving -- `SchemaResolver`'s own
+Javadoc lists exactly what's in scope.
+
+**A real recursion trap, found and fixed along the way -- read before touching `TypeArgument`.**
+`TypeRef`/`TypeArgument` are mutually recursive (`TypeRef.arguments: List<TypeArgument>`, and a
+reference argument wraps a `TypeRef` right back -- a genuine shape, e.g. nested size sugar like
+`grid => <T, N> [[T; N]; N]` desugars to `array_ranged<array_ranged<T, N, N>, N, N>`). `TypeArgument`
+was first modeled as a plain record with two `Optional` fields (the literal translation of the
+kernel's own field-group shape, `{ (name: type_ref | value: value) }`) -- and every test in this
+module immediately started failing with `StackOverflowError` the moment `array_min` resolution (the
+first real user of a non-empty `arguments` list) exercised it: `tson-bind`'s record resolution
+(`DefaultRecordBinder`) eagerly resolves every field's descriptor while building a record's own, with
+no cycle protection, so the mutual recursion loops forever. `DefaultUnionBinder` exists precisely to
+avoid this -- its own code comment says it deliberately does not resolve member descriptors up front,
+"by using the actual member classes the resolution loop is broken." So `TypeArgument` is a sealed
+interface (`Ref`/`Value`) instead, not a stylistic choice but the one shape that lets a
+mutually-recursive pair like this bind at all today -- at the cost of a spurious `!ref`/`!value`
+type-ref `toTson` writes that the kernel's own tag-less form doesn't have (documented in
+`TypeArgument`'s own Javadoc and `SchemaResolverTest`'s array-sugar assertions). If a future session
+is tempted to "fix" this back to a plain record, re-read `TypeArgument`'s Javadoc first.
 
 - **`io.ltr8.tson.schema.meta`** holds the resolved-value model -- one Java type per meta-kernel
   vocabulary record/enum, named to match: `TypeDefinition`, `TypeKind`, `FieldState`, `ElementState`,
