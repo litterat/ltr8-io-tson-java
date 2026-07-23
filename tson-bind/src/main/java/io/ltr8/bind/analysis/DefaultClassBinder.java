@@ -4,6 +4,7 @@ package io.ltr8.bind.analysis;
 import io.ltr8.annotation.Atom;
 import io.ltr8.annotation.Record;
 import io.ltr8.annotation.ToData;
+import io.ltr8.annotation.Tuple;
 import io.ltr8.annotation.Union;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
@@ -28,6 +29,7 @@ public class DefaultClassBinder {
 	private final DefaultUnionBinder unionBinder;
 	private final DefaultArrayBinder arrayBinder;
 	private final DefaultMapBinder mapBinder;
+	private final DefaultTupleBinder tupleBinder;
 
 
 	public DefaultClassBinder() {
@@ -38,6 +40,7 @@ public class DefaultClassBinder {
 		unionBinder = new DefaultUnionBinder();
 		arrayBinder = new DefaultArrayBinder();
 		mapBinder = new DefaultMapBinder();
+		tupleBinder = new DefaultTupleBinder();
 	}
 
 	public DataClass resolve(DataBindContext context,  Class<?> targetClass, Type parameterizedType)
@@ -49,7 +52,11 @@ public class DefaultClassBinder {
 		// it. If it is a code first situation then we expect this to throw an exception, and we need to
 		// first create the definition and then bind the class to that definition.
 
-		if (isRecord(targetClass)) {
+		if (isTuple(targetClass)) {
+			// Checked ahead of isRecord: a genuine Java record annotated @Tuple would otherwise be
+			// claimed by isRecord()'s own newFeatures.isRecord() check first.
+			result = tupleBinder.resolveTuple(context, targetClass);
+		} else if (isRecord(targetClass)) {
 			result = recordBinder.resolveRecord(context, targetClass);
 		} else if (isUnion(targetClass)) {
 			result = unionBinder.resolveUnion(context, targetClass, parameterizedType);
@@ -110,6 +117,10 @@ public class DefaultClassBinder {
 		}
 
 		return false;
+	}
+
+	private boolean isTuple(Class<?> targetClass) {
+		return targetClass.getAnnotation(Tuple.class) != null;
 	}
 
 	private boolean isRecord(Class<?> targetClass) {

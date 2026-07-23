@@ -224,6 +224,49 @@ class TsonMapperTest {
         assertEquals("Alice", h.owners().get(UUID.fromString("9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09")));
     }
 
+    // ── Tuples ───────────────────────────────────────────────────────────
+
+    @io.ltr8.annotation.Tuple
+    public record NameAndAge(String name, int age) {
+    }
+
+    public record PersonHolder(NameAndAge person) {
+    }
+
+    @Test
+    void tupleBindsFromAnArrayPositionally() throws DataBindException {
+        // A tuple is array-shaped on the wire, unlike an ordinary named-field record.
+        PersonHolder h = mapper.toObject("{ person: [ Alice 30 ] }", PersonHolder.class);
+        assertEquals(new NameAndAge("Alice", 30), h.person());
+    }
+
+    @Test
+    void tupleRejectsRecordSyntax() throws DataBindException {
+        // { name: ... age: ... } is a TSON record, not an array -- @Tuple binds positionally from
+        // an ArrayValue only.
+        assertThrows(DataBindException.class,
+                () -> mapper.toObject("{ person: { name: Alice age: 30 } }", PersonHolder.class));
+    }
+
+    @Test
+    void tupleRejectsWrongArity() throws DataBindException {
+        assertThrows(DataBindException.class, () -> mapper.toObject("{ person: [ Alice ] }", PersonHolder.class));
+        assertThrows(DataBindException.class,
+                () -> mapper.toObject("{ person: [ Alice 30 extra ] }", PersonHolder.class));
+    }
+
+    public record NestedTuple(NameAndAge a, NameAndAge b) {
+    }
+
+    @Test
+    void tupleElementsBindRecursively() throws DataBindException {
+        // A tuple slot's own type is bound the same way any other DataClass is -- here, nested
+        // tuples-of-tuples.
+        NestedTuple h = mapper.toObject("{ a: [ Alice 30 ] b: [ Bob 25 ] }", NestedTuple.class);
+        assertEquals(new NameAndAge("Alice", 30), h.a());
+        assertEquals(new NameAndAge("Bob", 25), h.b());
+    }
+
     // ── Atoms: strings, booleans, null ───────────────────────────────────
 
     public record Flags(boolean active, String label) {

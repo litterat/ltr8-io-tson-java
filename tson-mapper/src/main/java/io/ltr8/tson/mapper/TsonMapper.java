@@ -6,9 +6,11 @@ import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassArray;
 import io.ltr8.bind.DataClassAtom;
+import io.ltr8.bind.DataClassElement;
 import io.ltr8.bind.DataClassField;
 import io.ltr8.bind.DataClassMap;
 import io.ltr8.bind.DataClassRecord;
+import io.ltr8.bind.DataClassTuple;
 import io.ltr8.bind.DataClassUnion;
 import io.ltr8.tson.parser.Parser;
 import io.ltr8.tson.parser.ast.AbsentValue;
@@ -161,6 +163,7 @@ public final class TsonMapper {
                 case DataClassRecord record -> toRecord(value, record);
                 case DataClassArray array -> toArray(value, array);
                 case DataClassMap map -> toMap(value, map);
+                case DataClassTuple tuple -> toTuple(value, tuple);
                 case DataClassUnion union -> toUnion(value, union);
                 default -> throw new DataBindException("unsupported DataClass: " + dataClass);
             };
@@ -316,6 +319,36 @@ public final class TsonMapper {
             dataClass.put().invoke(mapData, key, boundValue);
         }
         return mapData;
+    }
+
+    // ── Tuples ───────────────────────────────────────────────────────────
+
+    /**
+     * A tuple is array-shaped on the wire, not record-shaped ({@code io.ltr8.annotation.Tuple}'s
+     * own Javadoc: the meta-kernel's {@code tuple} is a {@code product} like {@code record}, but
+     * with array's {@code INDEX} access pattern instead of {@code NAMED}) -- so unlike {@link
+     * #toRecord}, {@code {}} isn't a plausible reading here at all; only {@link ArrayValue}
+     * applies, and TSON's empty array {@code []} is unambiguous already, so there's no
+     * {@link EmptyBrace} case to special-case the way {@link #toRecord}/{@link #toMap} need.
+     */
+    private Object toTuple(DataValue value, DataClassTuple dataClass) throws Throwable {
+        CoreValue core = value.coreValue();
+        if (!(core instanceof ArrayValue av)) {
+            throw new DataBindException("expected an array for tuple " + dataClass.typeClass() + ", found " + core);
+        }
+        List<ScopedValue> elements = av.elements();
+
+        DataClassElement[] slots = dataClass.elements();
+        if (elements.size() != slots.length) {
+            throw new DataBindException("tuple " + dataClass.typeClass() + " has " + slots.length
+                    + " elements, found " + elements.size());
+        }
+
+        Object[] construct = new Object[slots.length];
+        for (int i = 0; i < slots.length; i++) {
+            construct[i] = toObject(elements.get(i).value(), slots[i].dataClass());
+        }
+        return dataClass.constructor().invoke(construct);
     }
 
     // ── Unions ───────────────────────────────────────────────────────────

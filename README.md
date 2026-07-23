@@ -46,15 +46,23 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       behaviors worth knowing about
 - [x] Object binding library (`tson-annotation` + `tson-bind`) — reflection/`MethodHandle`-based Java
       object ↔ data binding, including hand-written (pre-record) immutable class support via the
-      `java.lang.classfile` API, and `Map<K, V>` field support (`DataClassMap`/`DefaultMapBinder`,
+      `java.lang.classfile` API, `Map<K, V>` field support (`DataClassMap`/`DefaultMapBinder`,
       the same `MethodHandle`-interface shape as `DataClassArray`/`DefaultArrayBinder` but for keyed
       entries — construct-then-`put` for reading a TSON map into a Java `Map`, plus a symmetric
-      iterator/next/key/value side for a future write direction, not yet called by `tson-mapper`)
+      iterator/next/key/value side for a future write direction, not yet called by `tson-mapper`),
+      and tuple support for `@Tuple`-annotated genuine Java records (`DataClassTuple`/
+      `DefaultTupleBinder`/`DataClassElement`) — the meta-kernel's `tuple` constructor is a
+      `product` like `record` (heterogeneous, each slot has its own type) but with `array`'s
+      `INDEX` access pattern instead of `NAMED`, so a tuple binds positionally (constructor
+      argument / `RecordComponent` order) from a TSON array, not by field name from a TSON record;
+      built ahead of Part 2 schema work for alignment, `@Tuple` standing in for what a schema will
+      eventually declare instead
 - [x] `tson-mapper` — binds parsed TSON documents directly to Java objects/records, including dispatch
-      into the built-in type vocabulary and `Map<K, V>` fields (a TSON map's key is a full data-value,
+      into the built-in type vocabulary, `Map<K, V>` fields (a TSON map's key is a full data-value,
       §2.6, bound recursively the same way a value is; "last value wins" for a duplicate key falls
       out for free from repeated `put()` calls in source order, the same way record field
-      deduplication does)
+      deduplication does), and `@Tuple`-annotated records (bound from a TSON array positionally,
+      arity-checked against the record's own component count)
 
 See [CLAUDE.md](CLAUDE.md#architecture) for the current architecture and design notes.
 
