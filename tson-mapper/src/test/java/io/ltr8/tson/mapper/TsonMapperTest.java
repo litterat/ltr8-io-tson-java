@@ -14,7 +14,10 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.net.Inet4Address;
+import java.net.InetAddress;
 import java.net.URI;
+import java.net.UnknownHostException;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.OffsetTime;
@@ -454,6 +457,28 @@ class TsonMapperTest {
         // An unescaped space is not valid anywhere in a URI -- java.net.URI itself rejects it, so
         // this is really exercising the mapper wiring rather than UriType's own leniency.
         assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !uri \"http://example.com/a b\" }", UriHolder.class));
+    }
+
+    // ── IPv4 (§5.5) ──────────────────────────────────────────────────────
+
+    public record Ipv4Holder(Inet4Address value) {
+    }
+
+    @Test
+    void builtinIpv4AnnotationBindsDirectlyThroughTheMapper() throws DataBindException, UnknownHostException {
+        // Ipv4Type#read always returns Inet4Address specifically (never the broader InetAddress),
+        // and TsonMapper's default context registers exactly that class -- see defaultContext()'s
+        // Javadoc on why the field must be declared Inet4Address, not InetAddress, to bind directly.
+        Ipv4Holder h = mapper.toObject("{ value: !ipv4 192.168.0.1 }", Ipv4Holder.class);
+        assertEquals(InetAddress.getByAddress(new byte[]{(byte) 192, (byte) 168, 0, 1}), h.value());
+    }
+
+    @Test
+    void builtinIpv4AnnotationRejectsLenientFormsThroughTheMapper() throws DataBindException {
+        // InetAddress.ofLiteral itself would accept both of these -- Ipv4Type's own RFC 3986
+        // dec-octet check must not.
+        assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !ipv4 010.0.0.1 }", Ipv4Holder.class));
+        assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !ipv4 3232235521 }", Ipv4Holder.class));
     }
 
     // ── Temporal types (§5.4) ────────────────────────────────────────────

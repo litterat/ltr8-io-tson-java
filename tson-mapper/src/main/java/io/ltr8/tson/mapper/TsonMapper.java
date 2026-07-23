@@ -109,6 +109,13 @@ public final class TsonMapper {
      *
      * <p>{@code java.net.URI} (§5.5's {@code uri}) is the same story as {@code UUID}/{@code
      * LocalDate}: an ordinary JDK class, so pre-registered here rather than left to fail.
+     *
+     * <p>{@code Inet4Address} (§5.5's {@code ipv4}) is the same story again -- {@link
+     * io.ltr8.tson.parser.resolver.vocab.Ipv4Type#read} always returns exactly that subtype, so
+     * that's what's registered here. Unlike {@link AtomType#read(TokenValue, Class)}'s own
+     * target-narrowing check (which does accept a supertype, via {@code isInstance}), {@code
+     * DataBindContext}'s registry is keyed by exact {@code Class}, so a field must be declared as
+     * {@code Inet4Address} itself, not the broader {@code InetAddress}, to bind directly here.
      */
     private static DataBindContext defaultContext() {
         DataBindContext context = DataBindContext.builder().build();
@@ -119,6 +126,7 @@ public final class TsonMapper {
             context.registerAtom(OffsetTime.class);
             context.registerAtom(OffsetDateTime.class);
             context.registerAtom(java.net.URI.class);
+            context.registerAtom(java.net.Inet4Address.class);
         } catch (DataBindException e) {
             throw new IllegalStateException("failed to register default atom types on a fresh DataBindContext", e);
         }

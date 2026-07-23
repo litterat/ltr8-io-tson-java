@@ -31,7 +31,9 @@ import java.util.Optional;
  * family (§5.4) -- {@code date_type} ({@code date}), {@code time_type} ({@code time}), {@code
  * datetime_type} ({@code datetime}), {@code duration_type} ({@code duration}). And with {@code
  * uri_type} ({@code uri}, §5.5) -- see {@link UriType}'s Javadoc for why it's the one atom here that
- * doesn't validate its own shape ahead of the JDK type it delegates to.
+ * doesn't validate its own shape ahead of the JDK type it delegates to. And with {@code ipv4_type}
+ * ({@code ipv4}, §5.5) -- see {@link Ipv4Type}'s Javadoc for why its JDK leniency gap is a real
+ * SSRF-adjacent concern, not just a spec-fidelity one, and how that's handled.
  */
 public final class BuiltinTypeVocabulary {
 
@@ -76,6 +78,8 @@ public final class BuiltinTypeVocabulary {
         types.put("duration", DurationType.UNCONSTRAINED);
 
         types.put("uri", UriType.UNCONSTRAINED);
+
+        types.put("ipv4", Ipv4Type.UNCONSTRAINED);
 
         return Map.copyOf(types);
     }

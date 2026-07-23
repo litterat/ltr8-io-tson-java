@@ -33,6 +33,8 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.net.Inet4Address;
+import java.net.InetAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -496,6 +498,10 @@ class ConformanceSuiteTest {
             case "uri" -> {
                 URI actual = (URI) atomType.read(token, URI.class);
                 assertEquals(URI.create(fieldText(sidecar, "value")), actual, "vocabulary value");
+            }
+            case "ipv4" -> {
+                Inet4Address actual = (Inet4Address) atomType.read(token, Inet4Address.class);
+                assertEquals(InetAddress.ofLiteral(fieldText(sidecar, "value")), actual, "vocabulary value");
             }
             default -> {
                 BigDecimal actual = (BigDecimal) atomType.read(token, BigDecimal.class);

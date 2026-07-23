@@ -66,8 +66,13 @@ class BuiltinTypeVocabularyTest {
         assertTrue(BuiltinTypeVocabulary.lookup("uri").isPresent());
     }
 
+    @org.junit.jupiter.api.Test
+    void ipv4AtomIsRegistered() {
+        assertTrue(BuiltinTypeVocabulary.lookup("ipv4").isPresent());
+    }
+
     @ParameterizedTest
-    @ValueSource(strings = {"ipv4", "ipv6", "cidr4", "cidr6", "mac", "not_a_type", "binary"})
+    @ValueSource(strings = {"ipv6", "cidr4", "cidr6", "mac", "not_a_type", "binary"})
     void namesFromFamiliesNotYetImplementedAreNotRegistered(String name) {
         assertFalse(BuiltinTypeVocabulary.lookup(name).isPresent());
     }
