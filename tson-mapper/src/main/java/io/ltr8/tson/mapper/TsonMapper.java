@@ -297,6 +297,13 @@ public final class TsonMapper {
      * container an empty {@code {}} denotes is a deferred resolver-layer concern (§2.8), the same
      * reason {@link #toRecord} special-cases it. Treated as zero entries here, the same reasonable
      * default {@code toRecord} uses for zero fields.
+     *
+     * <p>§2.9: the absent sentinel {@code _} "MUST NOT appear as a map key -- a resolver-layer
+     * constraint, not a grammar constraint: the map-entry production accepts any value in key
+     * position, and the resolver rejects absent keys." The structural parser correctly allows
+     * {@code { _ => 1 } } through (confirmed by {@code ParserTest}) since that's a grammar-level
+     * permission, not a resolver one -- this is the one place that resolver-layer rejection
+     * actually happens, since nothing between the parser and here is positioned to enforce it.
      */
     private Object toMap(DataValue value, DataClassMap dataClass) throws Throwable {
         CoreValue core = value.coreValue();
@@ -314,6 +321,10 @@ public final class TsonMapper {
         DataClass valueClass = dataClass.valueDataClass();
 
         for (MapValue.MapEntry entry : entries) {
+            if (entry.key().coreValue() instanceof AbsentValue) {
+                throw new DataBindException(
+                        "the absent sentinel '_' must not appear as a map key (§2.9) for " + dataClass.typeClass());
+            }
             Object key = toObject(entry.key(), keyClass);
             Object boundValue = toObject(entry.value().value(), valueClass);
             dataClass.put().invoke(mapData, key, boundValue);

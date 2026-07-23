@@ -59,10 +59,17 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       eventually declare instead
 - [x] `tson-mapper` — binds parsed TSON documents directly to Java objects/records, including dispatch
       into the built-in type vocabulary, `Map<K, V>` fields (a TSON map's key is a full data-value,
-      §2.6, bound recursively the same way a value is; "last value wins" for a duplicate key falls
-      out for free from repeated `put()` calls in source order, the same way record field
-      deduplication does), and `@Tuple`-annotated records (bound from a TSON array positionally,
-      arity-checked against the record's own component count)
+      §2.6, bound recursively the same way a value is), and `@Tuple`-annotated records (bound from a
+      TSON array positionally, arity-checked against the record's own component count). "Last value
+      wins" for a duplicate record field (§2.5) or map key (§2.6) falls out of `toRecord`/`toMap`'s
+      own binding order — both collect entries into a temporary `Map` first (`byName.put()` /
+      `DataClassMap.put()`), so a later duplicate simply overwrites the earlier one in source order,
+      no explicit dedup step needed. Not a general resolver-layer primitive other `Document`/
+      `DataValue` consumers could reuse (see the checklist below), and not the most efficient way to
+      do it (a full temporary map per record, not a single pass) — good enough for now. The Absent
+      Sentinel's (§2.9) one MUST-NOT rule — `_` is never valid in map-key position — is enforced in
+      `toMap` too: the grammar itself permits `{ _ => 1 }` (confirmed in `ParserTest`, since that's
+      a resolver-layer restriction, not a parse error), so `toMap` is where it's actually rejected
 
 See [CLAUDE.md](CLAUDE.md#architecture) for the current architecture and design notes.
 
@@ -70,8 +77,12 @@ See [CLAUDE.md](CLAUDE.md#architecture) for the current architecture and design 
 
 - [ ] Built-in type vocabulary (§5), remaining families:
   - [ ] Network/identifier types — `cidr4`/`cidr6`/`mac` (§5.5, `uuid`/`uri`/`ipv4`/`ipv6` done)
-- [ ] Resolver-layer structural rules: record/map "last value wins" deduplication (§2.5/§2.6), `EmptyBrace`
-      resolution (§2.8), Absent Sentinel semantics (§2.9)
+- [ ] Resolver-layer structural rules as general, reusable primitives (today "last value wins"
+      dedup and the Absent Sentinel's map-key restriction only exist as `tson-mapper`'s own
+      binding-time behavior, not exposed for other `Document`/`DataValue` consumers) — a DOM-style
+      tree over the AST is the natural home for these once there's a second consumer, not before:
+      `EmptyBrace` resolution (§2.8), and (§2.9) whether "missing" and "explicitly `_`" should ever
+      be distinguished rather than deliberately collapsed the way `TsonMapper.isAbsent` does today
 - [ ] Auto-detect plain Java `enum`s in `tson-bind` the way real records/arrays already are — today
       `DefaultAtomBinder` only wires `EnumStringBridge` when the enum type itself carries `@Atom`;
       a bare `enum` with no annotation fails to bind at all

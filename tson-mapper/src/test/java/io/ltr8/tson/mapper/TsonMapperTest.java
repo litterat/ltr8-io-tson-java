@@ -198,6 +198,23 @@ class TsonMapperTest {
         assertEquals(7, h.counts().get("apples"));
     }
 
+    @Test
+    void mapRejectsAbsentSentinelAsKey() {
+        // §2.9: "_" MUST NOT appear as a map key -- a resolver-layer constraint, not a grammar
+        // one, so the parser itself accepts { _ => 1 } (see ParserTest); toMap is where it's
+        // actually rejected.
+        assertThrows(DataBindException.class, () -> mapper.toObject("{ counts: { _ => 3 } }", CountsHolder.class));
+    }
+
+    @Test
+    void mapAllowsAbsentSentinelAsValue() throws DataBindException {
+        // §2.9 only restricts the key position -- a value of "_" is legitimately "present with
+        // an absent value" (distinct from the entry not existing at all), so this must still bind.
+        CountsHolder h = mapper.toObject("{ counts: { apples => _ } }", CountsHolder.class);
+        assertEquals(1, h.counts().size());
+        assertNull(h.counts().get("apples"));
+    }
+
     public record ByIdHolder(Map<Integer, String> names) {
     }
 
