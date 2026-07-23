@@ -33,7 +33,7 @@ public record UriParser(UriType constraints) implements AtomType<URI> {
     /** {@code uri => !uri_type {}} -- the unconstrained URI, §5.5's {@code !uri}. */
     public static final UriParser UNCONSTRAINED = new UriParser(UriType.UNCONSTRAINED);
 
-    public UriParser(Optional<Integer> minLength, Optional<Integer> maxLength, Optional<Pattern> pattern,
+    public UriParser(Optional<Integer> minLength, Optional<Integer> maxLength, Optional<String> pattern,
                       Optional<String> scheme) {
         // "specification" (§5.5's atom_specification mixin, citing RFC 3986) is fixed per
         // constructor, not a per-instance parameter -- every UriParser cites the same one.
@@ -72,7 +72,7 @@ public record UriParser(UriType constraints) implements AtomType<URI> {
             }
         });
         constraints.pattern().ifPresent(p -> {
-            if (!p.matcher(text).matches()) {
+            if (!Pattern.compile(p).matcher(text).matches()) {
                 throw new AtomValidationException("'" + text + "' does not match the required pattern " + p);
             }
         });

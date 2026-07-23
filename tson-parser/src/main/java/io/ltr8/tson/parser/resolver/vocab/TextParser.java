@@ -25,7 +25,7 @@ public record TextParser(TextType constraints) implements AtomType<String> {
     public static final TextParser UNCONSTRAINED = new TextParser(TextType.UNCONSTRAINED);
 
     public TextParser(Optional<Integer> minLength, Optional<Integer> maxLength, Optional<Integer> length,
-                       Optional<Pattern> pattern) {
+                       Optional<String> pattern) {
         this(new TextType(minLength, maxLength, length, pattern));
     }
 
@@ -61,7 +61,7 @@ public record TextParser(TextType constraints) implements AtomType<String> {
             }
         });
         constraints.pattern().ifPresent(p -> {
-            if (!p.matcher(text).matches()) {
+            if (!Pattern.compile(p).matcher(text).matches()) {
                 throw new AtomValidationException("'" + text + "' does not match the required pattern " + p);
             }
         });

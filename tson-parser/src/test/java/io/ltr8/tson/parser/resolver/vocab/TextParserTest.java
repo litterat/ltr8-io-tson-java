@@ -5,7 +5,6 @@ import io.ltr8.tson.parser.ast.TokenValue;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
-import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -45,7 +44,7 @@ class TextParserTest {
 
     @Test
     void patternRejectsNonMatchingText() {
-        TextParser type = new TextParser(Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(Pattern.compile("[a-z]+")));
+        TextParser type = new TextParser(Optional.empty(), Optional.empty(), Optional.empty(), Optional.of("[a-z]+"));
         assertEquals("abc", type.read(token("abc")));
         assertThrows(AtomValidationException.class, () -> type.read(token("ABC")));
     }

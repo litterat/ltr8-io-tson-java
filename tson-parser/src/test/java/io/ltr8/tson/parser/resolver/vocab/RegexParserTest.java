@@ -21,8 +21,9 @@ class RegexParserTest {
 
     @Test
     void acceptsAValidJavaRegex() {
-        Pattern p = RegexParser.UNCONSTRAINED.read(token("[a-z]+"));
-        assertTrue(p.matcher("abc").matches());
+        String text = RegexParser.UNCONSTRAINED.read(token("[a-z]+"));
+        assertEquals("[a-z]+", text);
+        assertTrue(Pattern.compile(text).matcher("abc").matches());
     }
 
     @Test
@@ -37,8 +38,8 @@ class RegexParserTest {
         // A named group is valid java.util.regex syntax but not part of RFC 9485 -- accepted here
         // regardless, since this atom's contract is "compiles under java.util.regex", not "is a
         // conformant I-Regexp pattern".
-        Pattern p = RegexParser.UNCONSTRAINED.read(token("(?<year>[0-9]{4})"));
-        Matcher m = p.matcher("2026");
+        String text = RegexParser.UNCONSTRAINED.read(token("(?<year>[0-9]{4})"));
+        Matcher m = Pattern.compile(text).matcher("2026");
         assertTrue(m.matches());
         assertEquals("2026", m.group("year"));
     }

@@ -245,6 +245,27 @@ literal `32`/`64`/etc. spelling; the `minValue`/`maxValue`/`hostType` *behavior*
 on `vocab`'s copy moved into `IntegerParser` as private static helpers taking a `schema.meta.
 IntegerSize`, since `schema.meta` stays pure data, no behavior.
 
+**`RegexParser` returns `String`, not `java.util.regex.Pattern`, and `TextType.pattern`/
+`UriType.pattern` are `Optional<String>`, not `Optional<Pattern>` (corrected 2026-07-23, on the
+user's own observation).** `regex_type` composes with `text_type` (§5.7) -- a `regex` value IS-A
+piece of text, so `AtomType<T>`'s "the atom's own natural host value" contract (above) means `T`
+should be `String` here too, the same as every other text-composing atom; `RegexParser.read` still
+compiles the text via `Pattern.compile` to validate it's well-formed, but discards the compiled
+object rather than returning it. This also made `TextType`/`UriType`'s own `pattern` constraint
+field a pure, equatable `String` value (matching every other field in those "pure constraint
+values" records) instead of a compiled host object -- `TextParser`/`UriParser` compile it at
+validation time instead of storing the compiled form. A useful side effect: this is what let
+`text`/`uri`/`regex` (§5.5's `Instance` declarations, see "Meta-kernel bootstrap" below) actually
+serialize via `TsonMapper.toTson` at all -- before this change, `TextType.pattern`/`UriType.pattern`
+being `Optional<Pattern>` made `MetaKernelParser`'s `text`/`uri`/`regex` entries throw
+`DataBindException` (`tson-bind` has no built-in `Pattern` conversion), even with the field empty,
+since record binding resolves every field's descriptor up front regardless of whether a value is
+actually present. `tson-bind` separately gained `io.ltr8.bind.bridge.PatternStringBridge` (mirroring
+`EnumStringBridge`'s shape, opt-in via `context.registerAtom(Pattern.class, new
+PatternStringBridge())`) as a general capability for a caller who *does* want to keep `Pattern` as
+their own field type -- not needed by this fix, but added and unit-tested (`PatternStringBridgeTest`)
+regardless; see `tson-bind/README.md`'s "Under development" section for the full note.
+
 **Why the split needed a dependency-direction flip.** `schema.meta` (§8's resolved-schema value
 model, previously `tson-schema` depending on `tson-parser` for its own grammar-layer `SchemaMap`)
 had to stop depending on `tson-parser` at all for a vocab class here to hold one of its records

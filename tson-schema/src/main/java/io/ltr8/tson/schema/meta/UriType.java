@@ -5,7 +5,6 @@ import io.ltr8.annotation.Typename;
 
 import java.net.URI;
 import java.util.Optional;
-import java.util.regex.Pattern;
 
 /**
  * The meta-kernel's {@code uri_type} constructor (§5.5's {@code uri} atom), composing {@code
@@ -15,6 +14,9 @@ import java.util.regex.Pattern;
  * constraint values, no parsing/validation behavior -- {@code tson-parser}'s {@code UriParser}
  * holds one of these and does the actual reading/writing.
  *
+ * <p>{@code pattern} is the regex's own source text ({@link String}), not a compiled {@link
+ * java.util.regex.Pattern} -- see {@link TextType#pattern()}'s own Javadoc for why.
+ *
  * <p>Also a {@link TypeBody}/{@link Atom} variant (added 2026-07-23, alongside {@code text_type}
  * above/{@code regex_type} below): {@code uri => !uri_type {}} is a constructor-application
  * instance (§5.5) whose resolved body is exactly {@link #UNCONSTRAINED}.
@@ -23,7 +25,7 @@ import java.util.regex.Pattern;
 public record UriType(
         @Field("min_length") Optional<Integer> minLength,
         @Field("max_length") Optional<Integer> maxLength,
-        Optional<Pattern> pattern,
+        Optional<String> pattern,
         AtomSpecification specification,
         Optional<String> scheme) implements TypeBody, Atom {
 

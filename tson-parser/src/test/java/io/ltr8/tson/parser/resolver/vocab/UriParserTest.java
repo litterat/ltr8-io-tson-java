@@ -6,7 +6,6 @@ import org.junit.jupiter.api.Test;
 
 import java.net.URI;
 import java.util.Optional;
-import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -55,7 +54,7 @@ class UriParserTest {
 
     @Test
     void patternRejectsNonMatchingUri() {
-        UriParser type = new UriParser(Optional.empty(), Optional.empty(), Optional.of(Pattern.compile("https://.*")), Optional.empty());
+        UriParser type = new UriParser(Optional.empty(), Optional.empty(), Optional.of("https://.*"), Optional.empty());
         assertEquals(URI.create("https://example.com/"), type.read(token("https://example.com/")));
         assertThrows(AtomValidationException.class, () -> type.read(token("http://example.com/")));
     }
