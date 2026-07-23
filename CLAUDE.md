@@ -247,16 +247,32 @@ string, §4.5) for `TokenValue`s produced by the parser. `NumberGrammar.tryParse
 
 `SchemaResolver` turns `tson-parser`'s grammar-layer `SchemaMap` into resolved `TypeDefinition`s (Part 2
 §4, §8) -- the module reserved for the *produced* schema (see "Schema grammar" above). Started
-2026-07-23, `SchemaResolver` itself is deliberately narrow: it resolves exactly one construct, a fresh
-(no `~`, no supertypes, no type parameters) record whose fields are all plain, unmodified, REQUIRED,
-simple type-refs -- `integer_size`'s own shape (`integer_size => { bits: integer  signed: boolean }`).
-Every other construct (elided field types, modifiers, groups, composition, refinement, atom
-instances/refinements, generic type-refs, templates) throws `UnsupportedOperationException` rather than
-silently mis-resolving -- `SchemaResolver`'s own Javadoc lists exactly what's in scope. This is
-intentionally the first of several incremental passes toward the full two-pass resolver of §3.4.1
-(namespace population, then body resolution and validation), not an attempt at it yet -- no namespace
-lookup happens at all so far: a field's type-ref is carried through as a bare name without checking it
-resolves to anything.
+2026-07-23, deliberately narrow, incrementally widened the same day to a second construct:
+
+- **Fresh record construction** -- a plain (no `~`, no supertypes, no type parameters) record whose
+  fields are all unmodified, REQUIRED, simple type-refs -- `integer_size`'s own shape.
+- **Non-constructor composition** (`A & B & { ... }`, §5.8) -- copies each already-resolved
+  supertype's own fields into the result, left to right, checked for name overlap across
+  supertypes; a trailing-body field with no name collision is appended as new (a collision --
+  tightening an inherited field, §5.7 -- isn't supported yet, reported explicitly rather than
+  mishandled). `type_definition.supertypes` (the transitive IS-A chain) falls out by induction:
+  each already-resolved supertype's own `supertypes()` is already *its* full transitive chain, so
+  `direct-supertype + that supertype's own supertypes()`, deduplicated, is the new chain -- no
+  separate graph walk needed. **Kind determination** (§4.1) checks the transitive chain for the
+  kernel's three literal, fixed base-kind names (`atom`/`product`/`sum`, `top` never counts) --
+  deliberately *not* "inherit the nearest ancestor's own resolved kind", which would be wrong:
+  `atom` the entry is itself `kind: PRODUCT` (its own chain is just `[top]`, containing none of the
+  three), so composing with `atom` correctly yields `ATOM` only via the literal-name check, not by
+  copying atom's own (PRODUCT) kind. Verified by resolving `top`/`atom`/`product`/`sum`/`reference`
+  straight from the real `meta-kernel.tn1` fixture, in file order (composition only sees supertypes
+  the caller has already resolved and handed back in -- real forward references and namespace
+  population, §3.3.2/§3.4.1's Pass 1, are later work, not attempted yet). `subtypes` (the reverse
+  index) is never populated -- it needs a whole-schema pass, not a per-declaration one.
+
+Every other construct (elided field types, modifiers, groups, refinement, subtraction, `~`-marked
+constructor composition, atom instances/refinements, generic type-refs, templates) throws
+`UnsupportedOperationException` rather than silently mis-resolving -- `SchemaResolver`'s own Javadoc
+lists exactly what's in scope.
 
 - **`io.ltr8.tson.schema.meta`** holds the resolved-value model -- one Java type per meta-kernel
   vocabulary record/enum, named to match: `TypeDefinition`, `TypeKind`, `FieldState`, `ElementState`,

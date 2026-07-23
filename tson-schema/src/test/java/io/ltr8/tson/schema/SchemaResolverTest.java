@@ -20,10 +20,13 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Writes resolved values through plain {@code TsonMapper.toTson} -- no hand-written schema-model
@@ -184,6 +187,79 @@ class SchemaResolverTest {
                         + "{ element_type: { name: \"number\" arguments: [] } state: \"REQUIRED\" } "
                         + "{ element_type: { name: \"number\" arguments: [] } state: \"REQUIRED\" } ] } }",
                 write(point));
+    }
+
+    // ── Composition (§5.8): top, atom, product, sum, reference ────────────
+    //    All five compose with (or, for top, are) the kernel's own base kinds --
+    //    resolved straight from the real fixture, in the dependency order the
+    //    schema map itself declares them, since forward references aren't
+    //    supported yet (see SchemaResolver's own Javadoc).
+
+    @Test
+    void resolvesTopAsAFreshEmptyRecord() throws IOException, DataBindException {
+        SchemaMap schemaMap = new SchemaParser(readFixture()).parseSchemaDocument().body();
+
+        TypeDefinition top = resolver.resolve(schemaMap.declarations().get("top"));
+
+        assertEquals(TypeKind.PRODUCT, top.kind());
+        assertEquals(List.of(), top.supertypes());
+        assertEquals("{ kind: \"PRODUCT\" parameters: [] constructor: false supertypes: [] subtypes: [] "
+                + "body: !record { supertypes: [] fields: [] groups: [] } }", write(top));
+    }
+
+    @Test
+    void resolvesAtomProductSumAndReferenceByComposingWithTop() throws IOException, DataBindException {
+        SchemaMap schemaMap = new SchemaParser(readFixture()).parseSchemaDocument().body();
+        Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
+        resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
+
+        TypeDefinition atom = resolver.resolve(schemaMap.declarations().get("atom"), resolved);
+        resolved.put("atom", atom);
+        TypeDefinition product = resolver.resolve(schemaMap.declarations().get("product"), resolved);
+        resolved.put("product", product);
+        TypeDefinition sum = resolver.resolve(schemaMap.declarations().get("sum"), resolved);
+        resolved.put("sum", sum);
+        TypeDefinition reference = resolver.resolve(schemaMap.declarations().get("reference"), resolved);
+        resolved.put("reference", reference);
+
+        // §4.1: atom/product/sum are each kind PRODUCT -- their own transitive chain is just
+        // [top], which contains none of the three literal base-kind names, so the structural
+        // default applies even to the base kinds' own entries.
+        assertEquals(TypeKind.PRODUCT, atom.kind());
+        assertEquals(TypeKind.PRODUCT, product.kind());
+        assertEquals(TypeKind.PRODUCT, sum.kind());
+        assertEquals(TypeKind.PRODUCT, reference.kind());
+        assertEquals(List.of("top"), atom.supertypes());
+        assertEquals(List.of("top"), product.supertypes());
+        assertEquals(List.of("top"), sum.supertypes());
+        assertEquals(List.of("top"), reference.supertypes());
+
+        // atom, sum: empty trailing body, no fields inherited from top (which has none) -- just the composition itself.
+        assertEquals("{ kind: \"PRODUCT\" parameters: [] constructor: false supertypes: [ \"top\" ] subtypes: [] "
+                + "body: !record { supertypes: [ \"top\" ] fields: [] groups: [] } }", write(atom));
+        assertEquals("{ kind: \"PRODUCT\" parameters: [] constructor: false supertypes: [ \"top\" ] subtypes: [] "
+                + "body: !record { supertypes: [ \"top\" ] fields: [] groups: [] } }", write(sum));
+
+        // product: two brand-new fields added by the trailing body (top contributes none).
+        assertEquals("{ kind: \"PRODUCT\" parameters: [] constructor: false supertypes: [ \"top\" ] subtypes: [] "
+                + "body: !record { supertypes: [ \"top\" ] fields: [ "
+                + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } state: \"REQUIRED\" } "
+                + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } state: \"REQUIRED\" } "
+                + "] groups: [] } }", write(product));
+
+        // reference: one brand-new field.
+        assertEquals("{ kind: \"PRODUCT\" parameters: [] constructor: false supertypes: [ \"top\" ] subtypes: [] "
+                + "body: !record { supertypes: [ \"top\" ] fields: [ "
+                + "{ name: \"target\" type: { name: \"type_name\" arguments: [] } state: \"REQUIRED\" } "
+                + "] groups: [] } }", write(reference));
+    }
+
+    @Test
+    void compositionRejectsAnUnresolvedSupertype() throws IOException {
+        SchemaMap schemaMap = new SchemaParser(readFixture()).parseSchemaDocument().body();
+        // "top" deliberately left out of the resolved map -- atom's supertype isn't visible yet.
+        assertThrows(UnsupportedOperationException.class,
+                () -> resolver.resolve(schemaMap.declarations().get("atom"), Map.of()));
     }
 
     private static String readFixture() throws IOException {
