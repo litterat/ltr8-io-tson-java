@@ -10,7 +10,8 @@ Published under the [litterat](https://github.com/litterat) org, group id `io.lt
 
 ## Status
 
-Built against TSON Part 1 (lexer + data format), a working draft: https://tson.io/raw/2026/32/tson-part1-data.md
+Built against TSON Part 1 (lexer + data format), a working draft: https://tson.io/raw/2026/32/tson-part1-data.md,
+and Part 2 (schema grammar + type system), also a working draft: https://tson.io/raw/2026/32/tson-part2-schema.md
 
 This is the spec's first implementation. Issues and ambiguities found in the spec while implementing are
 tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
@@ -32,6 +33,13 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
 - [x] Full document binding — TSON text straight to Java objects, dispatching into all of the above,
       and back again (`toTson`) — mainly a debugging tool, not a guaranteed-lossless round trip
       (e.g. the integer family's exact width isn't recoverable schemaless; see [Conformance](#conformance))
+- [x] Part 2 schema grammar — full schema document parsing into a faithful AST (records, compositions,
+      refinements, generic/array-sugar type-refs, field groups, and more), verified end-to-end against
+      the spec's own real `meta-kernel.tn1`/`meta.tn1`/`core.tn1` fixtures
+- [x] Part 2 schema resolution (partial) — resolves fresh records, composition (`&`), refinement
+      (`^`) including tightening, bare and generic type references, field modifiers/defaults/fixed
+      values, type parameters, and array sugar; 36 of `meta-kernel.tn1`'s 49 declarations resolve
+      end-to-end today (see [Not yet implemented](#not-yet-implemented) below for the rest)
 
 **Not yet implemented:**
 
@@ -44,7 +52,13 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
 - [ ] Multi-error reporting — currently fail-fast on the first lex/parse error
 - [ ] Security hardening — numeric-literal length limits, confusable-character and
   bidi-formatting-character warnings
-- [ ] Anything from Part 2 (schema grammar, type system)
+- [ ] Part 2: constructor application / atom instances (`!C value`) — the largest remaining schema
+  resolution gap, needed to fully resolve the kernel's own bootstrap types (`value`, `integer`,
+  `boolean`, ...)
+- [ ] Part 2: subtraction, templates/instantiation entries, real namespace resolution across a
+  whole schema (forward references, imports), and the `subtypes` reverse index
+- [ ] A schema-validating data parser (Class 2) that consults a resolved schema while parsing —
+  the built-in vocabulary's value/behavior split is groundwork for this, not this itself
 
 See [CLAUDE.md](CLAUDE.md#architecture) for architecture and design notes, and
 [Conformance](#conformance) below for edge-case behavior worth knowing about.
@@ -112,7 +126,7 @@ empirically before deciding this — is still far more lenient than RFC 3986's `
 grammar: it accepts a leading zero (`"0177.0.0.1"`), the legacy BSD short/class-based form (`"1.2.3"`
 → `1.2.0.3`), and even a bare 32-bit integer literal (`"3232235521"` → `192.168.0.1`). That's not merely
 looser than the cited RFC, it's the same leniency class behind real-world SSRF-filter-bypass techniques
-(a validator and the actual network stack disagreeing about what address a string denotes). `Ipv4Type`
+(a validator and the actual network stack disagreeing about what address a string denotes). `Ipv4Parser`
 validates the token against the RFC 3986 grammar itself, extracts the four octets directly from the
 regex match, and constructs the address from raw bytes via `InetAddress.getByAddress(byte[])` — a pure
 bytes-to-object call, never handing the original text to any JDK parser.
@@ -120,13 +134,13 @@ bytes-to-object call, never handing the original text to any JDK parser.
 **`!ipv6` parses RFC 4291 §2.2's text representation itself too, for the same reason, plus a second,
 unrelated JDK quirk.** Handing the token text to a JDK parser would reintroduce `!ipv4`'s exact
 leniency gap through RFC 4291's IPv4-mapped alternative form (`x:x:x:x:x:x:d.d.d.d`, e.g.
-`"::ffff:192.0.2.1"`), which embeds a dotted-quad tail. So `Ipv6Type` parses the full grammar itself
+`"::ffff:192.0.2.1"`), which embeds a dotted-quad tail. So `Ipv6Parser` parses the full grammar itself
 — the 8-group preferred form, at most one `::` compression, and a dotted-quad tail checked against
 the same strict `dec-octet` grammar `!ipv4` uses — and builds the address from raw bytes. Separately:
 `InetAddress.getByAddress(byte[16])` itself was confirmed empirically to silently return an
 `Inet4Address`, not an `Inet6Address`, for any 16-byte value in the IPv4-mapped range — the same
 value ending up as a different, mutually non-`equals` Java type depending on which narrow sub-range
-it falls in. `Ipv6Type` uses `Inet6Address.getByAddress(String, byte[], int)` with `scope_id = -1`
+it falls in. `Ipv6Parser` uses `Inet6Address.getByAddress(String, byte[], int)` with `scope_id = -1`
 instead (confirmed to behave like "no scope" and match the generic method's result for every
 non-mapped address tried) to guarantee `!ipv6` always returns `Inet6Address`, regardless of the
 address's value.
@@ -134,7 +148,7 @@ address's value.
 **One accepted, unfixable gap.** RFC 3339's grammar permits `time-second` up to `60` (leap-second
 accommodation), but `java.time` has no leap-second concept at all — `!time`/`!datetime` reject a
 spec-legal leap-second token as a parse error. There's no reasonable fix short of a from-scratch time
-representation built solely for this one case, so it's documented (`TimeType`'s Javadoc) rather than
+representation built solely for this one case, so it's documented (`TimeParser`'s Javadoc) rather than
 solved.
 
 **One accepted, different-revision gap.** `!uri` (§5.5) is the one atom here that does *not* get an
@@ -143,15 +157,15 @@ extra shape check ahead of the JDK type it delegates to — the opposite situati
 2732), an older revision of the same standard, not a looser/stricter variant of the same grammar. There's
 no simple shape to shim in front of `URI`'s constructor the way a four-group hex pattern works for UUID,
 and writing an RFC 3986 validator from scratch isn't worth it at this stage, so `java.net.URI`'s behavior
-is accepted as `!uri`'s actual contract for now. See `UriType`'s Javadoc.
+is accepted as `!uri`'s actual contract for now. See `UriParser`'s Javadoc.
 
-**`RegexType` accepts `java.util.regex.Pattern`'s own syntax, not a real RFC 9485 (I-Regexp) validator.**
-Not part of Part 1's published built-in vocabulary (`TextType`/`RegexType` are groundwork for Part 2,
+**`RegexParser` accepts `java.util.regex.Pattern`'s own syntax, not a real RFC 9485 (I-Regexp) validator.**
+Not part of Part 1's published built-in vocabulary (`TextParser`/`RegexParser` are groundwork for Part 2,
 which doesn't yet have anything that consumes a `regex` constraint), but the same kind of conformance
 call as the `!uri` gap below: I-Regexp is a deliberately restricted, interoperable subset of a
 different regex dialect (roughly ECMA-262) than `java.util.regex`'s own Perl-derived syntax, and
 neither is a subset of the other. Writing an RFC 9485 validator from scratch is real, standalone work,
-not worth doing before anything actually needs it. See `RegexType`'s Javadoc.
+not worth doing before anything actually needs it. See `RegexParser`'s Javadoc.
 
 **One open question.** Whether `!duration` accepts ISO 8601's alternative `PnW` week form is genuinely
 ambiguous — §5.4's table shows only `PnYnMnDTnHnMnS`. This implementation rejects `PnW` as the more
