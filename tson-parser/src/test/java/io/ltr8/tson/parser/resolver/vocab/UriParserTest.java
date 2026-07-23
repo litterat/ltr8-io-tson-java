@@ -78,4 +78,13 @@ class UriParserTest {
         String text = "https://example.com/a/b?x=1#frag";
         assertEquals(text, UriParser.UNCONSTRAINED.write(UriParser.UNCONSTRAINED.read(token(text))));
     }
+
+    @Test
+    void citesRfc3986ViaTheComposedAtomSpecification() {
+        // uri_type => ~text_type & atom_specification & { spec: = "https://.../rfc3986" ... } --
+        // the composed atom_specification's own spec field, not RegexParser's RFC 9485 (§5.5 vs.
+        // the I-Regexp citation RegexParser composes the same mixin for).
+        assertEquals(URI.create("https://www.rfc-editor.org/rfc/rfc3986"),
+                UriParser.UNCONSTRAINED.constraints().specification().spec());
+    }
 }

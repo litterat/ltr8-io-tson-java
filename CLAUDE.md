@@ -218,16 +218,22 @@ tracked in `SPEC-FEEDBACK.md`).
 **Each constructor is split into two classes, one per module, not one flat class** (widened to all
 implementations 2026-07-23, alongside the `tson-schema`/`tson-parser` dependency inversion below):
 a pure constraint-*values* record in `io.ltr8.tson.schema.meta` (`IntegerType`, `TextType`,
-`DecimalType`, `FloatType`, `RationalType`, `UuidType`, `BinaryType`, `DateType`, `TimeType`,
-`DateTimeType`, `DurationType`, `UriType` — no parsing/validation, matching the kernel's own
-`*_type` constructor shape exactly, the same modeling `io.ltr8.tson.schema.meta` uses everywhere
+`RegexType`, `DecimalType`, `FloatType`, `RationalType`, `UuidType`, `BinaryType`, `DateType`,
+`TimeType`, `DateTimeType`, `DurationType`, `UriType` — no parsing/validation, matching the kernel's
+own `*_type` constructor shape exactly, the same modeling `io.ltr8.tson.schema.meta` uses everywhere
 else), and a same-named-but-suffixed `*Parser` class here in `resolver.vocab` (`IntegerParser`,
-`TextParser`, ...) holding one as `constraints` and doing the actual `read`/`write`/validate work.
-`RegexParser`/`ComplexParser`/`Ipv4Parser`/`Ipv6Parser` have no separate `schema.meta` class at all
-— their constructors declare no constraint fields of their own (`regex_type` inherits `text_type`'s
-wholesale, via composition; `complex_type`/`ipv4_type`/`ipv6_type` have none beyond a fixed
-component/RFC pin) — so there's nothing to split out; `RegexParser` holds a `TextType` directly
-instead. Each `*Parser` keeps convenience constructors/static factories mirroring its pre-split
+`TextParser`, `RegexParser`, ...) holding one as `constraints` and doing the actual
+`read`/`write`/validate work. `RegexType` (added 2026-07-23, after the initial split) is itself a
+*composition*, not a flat record: `RegexType(TextType constraints, AtomSpecification specification)`
+-- `regex_type` declares no field of its own beyond these two composed values (`text_type`'s
+constraint vocabulary, held as a nested `TextType` rather than flattened field-by-field the way
+`UriType` flattens it, plus `atom_specification`'s `spec`, fixed to RFC 9485, distinct from
+`UriType`'s own RFC 3986 citation via the same mixin -- see `AtomSpecification`'s own Javadoc for
+why `spec` is kept as real data rather than dropped as always-implied). `ComplexParser`/
+`Ipv4Parser`/`Ipv6Parser` still have no separate `schema.meta` class at all — their constructors
+declare no constraint fields of their own at all (`complex_type`/`ipv4_type`/`ipv6_type` have none
+beyond a fixed component/RFC pin) — so there's nothing to split out. Each `*Parser` keeps
+convenience constructors/static factories mirroring its pre-split
 shape (e.g. `new IntegerParser(new IntegerSize(32, true))`, `IntegerParser.ofMin(...)`) so call
 sites barely changed. `Rational`/`IsoDuration` (host *values*, not constraints, referenced by
 `RationalType`/`DurationType`'s own bound fields) moved to `schema.meta` alongside them; `Complex`
@@ -508,6 +514,16 @@ is tempted to "fix" this back to a plain record, re-read `TypeArgument`'s Javado
     instanceof Product)` doesn't need asserting at all: `Product`'s own `permits` list not naming
     `Unit` (a `final` record) makes the compiler reject that `instanceof` as provably impossible at
     compile time, a stronger guarantee than a runtime assertion.
+  - **`AtomSpecification`** (added 2026-07-23) covers `atom_specification => { spec: uri }`, the
+    mixin composed into `uri_type`/`regex_type` (`uri_type => ~text_type & atom_specification & {
+    spec: = "https://www.rfc-editor.org/rfc/rfc3986" ... }`, `regex_type => ~text_type &
+    atom_specification & { spec: = "https://www.rfc-editor.org/rfc/rfc9485" }`). Unlike `access_pattern`/
+    `size_type` (fixed per constructor *and* carrying no distinguishing information, so omitted
+    entirely from `RecordBody`/`ArrayBody`/etc.), `spec`'s fixed value genuinely differs between the
+    two composing constructors (RFC 3986 vs. RFC 9485), so it's kept as real, explicit data: `UriType`
+    gained a `specification: AtomSpecification` field, and the newly-added `RegexType` (see "Built-in
+    type vocabulary" above) holds one alongside its own `TextType constraints`. Verified in
+    `UriParserTest`/`RegexParserTest` that the two cite the correct, different RFC.
 - **No hand-written writer -- resolved values go through plain `TsonMapper.toTson` (`tson-mapper`)
   directly**, deliberately, to validate the model is built from ordinary, idiomatic Java that `tson-bind`'s
   generic introspection already knows how to bind, not a shape that only worked because a bespoke writer

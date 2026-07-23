@@ -1,7 +1,7 @@
 package io.ltr8.tson.parser.resolver.vocab;
 
 import io.ltr8.tson.parser.ast.TokenValue;
-import io.ltr8.tson.schema.meta.TextType;
+import io.ltr8.tson.schema.meta.RegexType;
 
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -11,13 +11,11 @@ import java.util.regex.PatternSyntaxException;
  * atom_specification & { spec: = "https://www.rfc-editor.org/rfc/rfc9485" }}) -- reuses {@link
  * TextParser}'s length/pattern constraint checks (applied to the regex's own source text, not what
  * it matches) via composition rather than duplicating them, and additionally requires that text to
- * actually compile as a regular expression. {@code regex_type} declares no constraint fields of its
- * own beyond what it inherits from {@code text_type} (§5.7's composition), so there is no separate
- * {@code schema.meta.RegexType} values class -- this holds a {@link TextType} directly, the same
- * constraint values {@link TextParser} holds. Like {@link TextParser}, not part of Part 1's
- * published built-in vocabulary (§5) and never registered in {@link BuiltinTypeVocabulary} -- this
- * is groundwork for Part 2, which doesn't yet have anything that consumes a {@code regex} value as
- * a constraint.
+ * actually compile as a regular expression. Holds a {@link RegexType} -- the pure constraint
+ * values, unchanged by this split -- rather than declaring those fields itself. Not part of Part
+ * 1's published built-in vocabulary (§5) and never registered in {@link BuiltinTypeVocabulary} --
+ * this is groundwork for Part 2, which doesn't yet have anything that consumes a {@code regex}
+ * value as a constraint.
  *
  * <p><b>Accepts {@code java.util.regex.Pattern}'s own syntax, not a real RFC 9485 validator -- a
  * conformance decision, not a shape-check gap the way the rest of this package's JDK leniency notes
@@ -35,14 +33,14 @@ import java.util.regex.PatternSyntaxException;
  * is accepted as this atom's actual contract for now; see {@code README.md}'s Conformance section for
  * the one-line version of this note.
  */
-public record RegexParser(TextType constraints) implements AtomType<Pattern> {
+public record RegexParser(RegexType constraints) implements AtomType<Pattern> {
 
     /** {@code regex => !regex_type {}} -- the unconstrained regex type. */
-    public static final RegexParser UNCONSTRAINED = new RegexParser(TextType.UNCONSTRAINED);
+    public static final RegexParser UNCONSTRAINED = new RegexParser(RegexType.UNCONSTRAINED);
 
     @Override
     public Pattern read(TokenValue token) {
-        String text = new TextParser(constraints).read(token);
+        String text = new TextParser(constraints.constraints()).read(token);
         try {
             return Pattern.compile(text);
         } catch (PatternSyntaxException e) {

@@ -4,6 +4,7 @@ import io.ltr8.tson.parser.ast.TokenForm;
 import io.ltr8.tson.parser.ast.TokenValue;
 import org.junit.jupiter.api.Test;
 
+import java.net.URI;
 import java.util.regex.Pattern;
 
 import java.util.regex.Matcher;
@@ -46,5 +47,13 @@ class RegexParserTest {
     void writeRoundTripsThroughRead() {
         String written = RegexParser.UNCONSTRAINED.write(RegexParser.UNCONSTRAINED.read(token("[a-z]+")));
         assertEquals("[a-z]+", written);
+    }
+
+    @Test
+    void citesRfc9485ViaTheComposedAtomSpecificationNotRfc3986() {
+        // regex_type => ~text_type & atom_specification & { spec: = "https://.../rfc9485" } --
+        // the same atom_specification mixin UriParser composes, but a different cited RFC.
+        assertEquals(URI.create("https://www.rfc-editor.org/rfc/rfc9485"),
+                RegexParser.UNCONSTRAINED.constraints().specification().spec());
     }
 }

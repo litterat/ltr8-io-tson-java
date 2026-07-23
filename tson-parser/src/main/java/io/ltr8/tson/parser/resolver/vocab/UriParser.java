@@ -35,7 +35,9 @@ public record UriParser(UriType constraints) implements AtomType<URI> {
 
     public UriParser(Optional<Integer> minLength, Optional<Integer> maxLength, Optional<Pattern> pattern,
                       Optional<String> scheme) {
-        this(new UriType(minLength, maxLength, pattern, scheme));
+        // "specification" (§5.5's atom_specification mixin, citing RFC 3986) is fixed per
+        // constructor, not a per-instance parameter -- every UriParser cites the same one.
+        this(new UriType(minLength, maxLength, pattern, UriType.UNCONSTRAINED.specification(), scheme));
     }
 
     @Override
