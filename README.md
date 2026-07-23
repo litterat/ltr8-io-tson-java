@@ -145,6 +145,14 @@ no simple shape to shim in front of `URI`'s constructor the way a four-group hex
 and writing an RFC 3986 validator from scratch isn't worth it at this stage, so `java.net.URI`'s behavior
 is accepted as `!uri`'s actual contract for now. See `UriType`'s Javadoc.
 
+**`RegexType` accepts `java.util.regex.Pattern`'s own syntax, not a real RFC 9485 (I-Regexp) validator.**
+Not part of Part 1's published built-in vocabulary (`TextType`/`RegexType` are groundwork for Part 2,
+which doesn't yet have anything that consumes a `regex` constraint), but the same kind of conformance
+call as the `!uri` gap below: I-Regexp is a deliberately restricted, interoperable subset of a
+different regex dialect (roughly ECMA-262) than `java.util.regex`'s own Perl-derived syntax, and
+neither is a subset of the other. Writing an RFC 9485 validator from scratch is real, standalone work,
+not worth doing before anything actually needs it. See `RegexType`'s Javadoc.
+
 **One open question.** Whether `!duration` accepts ISO 8601's alternative `PnW` week form is genuinely
 ambiguous — §5.4's table shows only `PnYnMnDTnHnMnS`. This implementation rejects `PnW` as the more
 conservative of the two readings, not a confident call — see [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #12.

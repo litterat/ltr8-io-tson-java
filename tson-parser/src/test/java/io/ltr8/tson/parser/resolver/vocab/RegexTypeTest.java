@@ -1,0 +1,50 @@
+package io.ltr8.tson.parser.resolver.vocab;
+
+import io.ltr8.tson.parser.ast.TokenForm;
+import io.ltr8.tson.parser.ast.TokenValue;
+import org.junit.jupiter.api.Test;
+
+import java.util.regex.Pattern;
+
+import java.util.regex.Matcher;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class RegexTypeTest {
+
+    private static TokenValue token(String text) {
+        return new TokenValue(text, TokenForm.UNQUOTED);
+    }
+
+    @Test
+    void acceptsAValidJavaRegex() {
+        Pattern p = RegexType.UNCONSTRAINED.read(token("[a-z]+"));
+        assertTrue(p.matcher("abc").matches());
+    }
+
+    @Test
+    void rejectsSyntacticallyInvalidRegex() {
+        // Unbalanced group -- invalid under java.util.regex, which is this atom's accepted contract
+        // (see RegexType's own Javadoc on why that's not the same as RFC 9485 I-Regexp).
+        assertThrows(AtomParseException.class, () -> RegexType.UNCONSTRAINED.read(token("[a-z")));
+    }
+
+    @Test
+    void acceptsJavaRegexConstructsThatAreNotValidIRegexpEitherWay() {
+        // A named group is valid java.util.regex syntax but not part of RFC 9485 -- accepted here
+        // regardless, since this atom's contract is "compiles under java.util.regex", not "is a
+        // conformant I-Regexp pattern".
+        Pattern p = RegexType.UNCONSTRAINED.read(token("(?<year>[0-9]{4})"));
+        Matcher m = p.matcher("2026");
+        assertTrue(m.matches());
+        assertEquals("2026", m.group("year"));
+    }
+
+    @Test
+    void writeRoundTripsThroughRead() {
+        String written = RegexType.UNCONSTRAINED.write(RegexType.UNCONSTRAINED.read(token("[a-z]+")));
+        assertEquals("[a-z]+", written);
+    }
+}
