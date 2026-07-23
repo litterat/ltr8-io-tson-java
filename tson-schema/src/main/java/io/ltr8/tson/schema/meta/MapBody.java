@@ -16,7 +16,7 @@ import java.util.Optional;
 @Typename(name = "map")
 public record MapBody(@Field("key_type") TypeRef keyType, @Field("value_type") TypeRef valueType,
                        @Field("min_items") Optional<BigInteger> minItems,
-                       @Field("max_items") Optional<BigInteger> maxItems) implements TypeBody {
+                       @Field("max_items") Optional<BigInteger> maxItems) implements TypeBody, Product {
 
     /** An unconstrained map: no size bounds. */
     public static MapBody of(TypeRef keyType, TypeRef valueType) {

@@ -22,7 +22,7 @@ import java.util.List;
  */
 @Typename(name = "record")
 public record RecordBody(List<String> supertypes, List<RecordField> fields, List<FieldGroup> groups)
-        implements TypeBody {
+        implements TypeBody, Product {
 
     public RecordBody {
         supertypes = List.copyOf(supertypes);

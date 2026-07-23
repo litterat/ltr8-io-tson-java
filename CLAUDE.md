@@ -492,6 +492,22 @@ is tempted to "fix" this back to a plain record, re-read `TypeArgument`'s Javado
     declaration*, which `FieldGroup` already covers) needs real design thought, and `SchemaResolver`
     doesn't resolve anything to one of these yet either, so modeling them now would be scaffolding with
     nothing to verify it against.
+  - **`Top`/`Atom`/`Product`/`Sum`** (added 2026-07-23) replicate the kernel's own composition chain
+    (`atom => top & {}`, `product => top & { ... }`, `sum => top & {}`, `reference => top & { target:
+    type_name }`, §4.1) as real Java subtyping: `Atom`/`Product`/`Sum` each `extends Top`, and every
+    `TypeBody` variant additionally implements whichever it IS-A (`Unit`/`EnumBody` → `Atom`;
+    `RecordBody`/`ArrayBody`/`MapBody`/`TupleBody` → `Product`; `ChoiceBody` → `Sum`; `Reference` →
+    `Top` directly, since `reference` composes with `top` only, not through one of the three base
+    kinds). Lets a consumer test kind ancestry with `instanceof Product`/`instanceof Atom` instead of
+    switching on `TypeKind` by hand. **Deliberately a second, separate sealed hierarchy from
+    `TypeBody`** (not folded into it, even though `TypeBody`'s own Javadoc already describes it as
+    "typed `top` in the kernel") — a considered choice, not an oversight, made when asked directly:
+    keeping the two apart lets this one mirror the kernel's own four names exactly without disturbing
+    `TypeBody`'s established role or its own `permits` list. Every leaf record implements both
+    interfaces. Verified in `TypeBodyKindHierarchyTest` — note that a *negative* check like `!(unit
+    instanceof Product)` doesn't need asserting at all: `Product`'s own `permits` list not naming
+    `Unit` (a `final` record) makes the compiler reject that `instanceof` as provably impossible at
+    compile time, a stronger guarantee than a runtime assertion.
 - **No hand-written writer -- resolved values go through plain `TsonMapper.toTson` (`tson-mapper`)
   directly**, deliberately, to validate the model is built from ordinary, idiomatic Java that `tson-bind`'s
   generic introspection already knows how to bind, not a shape that only worked because a bespoke writer

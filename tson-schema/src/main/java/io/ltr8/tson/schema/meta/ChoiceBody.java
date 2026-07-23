@@ -10,7 +10,7 @@ import java.util.List;
  * (`contact_method => (email | phone | address)` and similar).
  */
 @Typename(name = "choice")
-public record ChoiceBody(List<TypeRef> variants) implements TypeBody {
+public record ChoiceBody(List<TypeRef> variants) implements TypeBody, Sum {
 
     public ChoiceBody {
         variants = List.copyOf(variants);

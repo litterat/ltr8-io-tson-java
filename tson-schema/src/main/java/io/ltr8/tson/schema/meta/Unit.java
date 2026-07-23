@@ -8,5 +8,5 @@ import io.ltr8.annotation.Typename;
  * (and core's own {@code void} sibling), the "atom with no constraint vocabulary" (§4.2).
  */
 @Typename(name = "unit")
-public record Unit() implements TypeBody {
+public record Unit() implements TypeBody, Atom {
 }
