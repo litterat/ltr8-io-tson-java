@@ -434,6 +434,27 @@ class SchemaResolverTest {
         assertThrows(UnsupportedOperationException.class, () -> resolveSnippet("id_list => [text]"));
     }
 
+    // ── Top-level constructor application (§5.6): map<K, V> ───────────────
+    //    schema => map<type_name, type_definition> -- a fully-bound application of the map
+    //    constructor resolves as a construction (kind PRODUCT, no supertypes), not a reference.
+
+    @Test
+    void resolvesSchemasOwnMapApplicationFromTheRealMetaKernelFixture() throws IOException, DataBindException {
+        SchemaMap schemaMap = new SchemaParser(readFixture()).parseSchemaDocument().body();
+
+        TypeDefinition schema = resolver.resolve(schemaMap.declarations().get("schema"));
+
+        assertEquals(TypeKind.PRODUCT, schema.kind());
+        assertEquals(List.of(), schema.supertypes());
+        assertEquals("{ source: { name: \"map\" arguments: [ "
+                        + "!ref { ref: { name: \"type_name\" arguments: [] } } "
+                        + "!ref { ref: { name: \"type_definition\" arguments: [] } } ] } "
+                        + "kind: \"PRODUCT\" parameters: [] constructor: false supertypes: [] subtypes: [] "
+                        + "body: !map { key_type: { name: \"type_name\" arguments: [] } "
+                        + "value_type: { name: \"type_definition\" arguments: [] } } }",
+                write(schema));
+    }
+
     private TypeDefinition resolveSnippet(String declaration) {
         SchemaMap schemaMap = new SchemaParser("""
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"

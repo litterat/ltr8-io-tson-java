@@ -8,6 +8,7 @@ import io.ltr8.tson.parser.ast.schema.ContainerDef;
 import io.ltr8.tson.parser.ast.schema.ContainerTypeDef;
 import io.ltr8.tson.parser.ast.schema.ElementType;
 import io.ltr8.tson.parser.ast.schema.FieldDef;
+import io.ltr8.tson.parser.ast.schema.GenericRef;
 import io.ltr8.tson.parser.ast.schema.GroupDef;
 import io.ltr8.tson.parser.ast.schema.InlineArrayRef;
 import io.ltr8.tson.parser.ast.schema.RecordDef;
@@ -17,11 +18,13 @@ import io.ltr8.tson.parser.ast.schema.SchemaMap;
 import io.ltr8.tson.parser.ast.schema.SimpleRef;
 import io.ltr8.tson.parser.ast.schema.SizeSpec;
 import io.ltr8.tson.parser.ast.schema.StructuralTypeDef;
+import io.ltr8.tson.parser.ast.schema.TypeArg;
 import io.ltr8.tson.parser.ast.schema.TypeDef;
 import io.ltr8.tson.parser.ast.schema.TypeRef;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldState;
+import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeArgument;
@@ -40,7 +43,7 @@ import java.util.Set;
  * Resolves declarations from a {@link SchemaMap} (the grammar-layer AST, {@code tson-parser}) into
  * {@link TypeDefinition}s (Part 2 §8's resolved schema-value shape, {@code io.ltr8.tson.schema.meta})
  * -- an incremental, deliberately narrow resolver, not the full two-pass resolver of §3.4.1. It
- * handles four constructs so far:
+ * handles five constructs so far:
  *
  * <ul>
  *   <li>A record (no supertypes, no type parameters), optionally {@code ~}-marked (the {@code
@@ -69,12 +72,18 @@ import java.util.Set;
  *   ({@code [T; N..]}/{@code [T; ..M]}/{@code [T; N..M]}/{@code [T; N]}, §5.3) desugars to a
  *   {@code REFERENCE}-kind entry targeting {@code array_min}/{@code array_max}/{@code array_ranged}
  *   (§5.10) -- see {@link #resolveContainerTypeDef}.</li>
+ *   <li>A declaration's own fully-bound top-level application of the {@code map} constructor
+ *   (§5.6) -- {@code schema => map<type_name, type_definition>}'s own shape -- resolves as a
+ *   construction, not a reference: {@code kind: PRODUCT} (map's family), {@code source} the
+ *   applied form, {@code body: !map { key_type: ... value_type: ... }}, no supertypes -- see
+ *   {@link #resolveGenericConstructorApplication}. Only {@code map} with two simple type
+ *   arguments is handled so far; other constructors and nested/value arguments are not.</li>
  * </ul>
  *
  * Everything else -- elided field types, field modifiers (default/fixed values), refinement,
- * subtraction, generic type-refs (including a reference declaration's own, e.g. {@code schema =>
- * map<type_name, type_definition>}), templates, tightening an inherited field or group in a
- * composition body -- is explicitly out of scope for now and reported via {@link
+ * subtraction, generic type-refs other than a bare two-argument {@code map<K, V>} application
+ * (other constructors, templates, nested or value arguments), tightening an inherited field or
+ * group in a composition body -- is explicitly out of scope for now and reported via {@link
  * UnsupportedOperationException} rather than silently mis-resolved; each is a later, separate pass.
  *
  * <p><b>No namespace, only an accumulating "resolved so far" map.</b> A composition's supertypes
@@ -146,9 +155,13 @@ public final class SchemaResolver {
                 return resolveComposition(name, construction, resolved, constructor);
             }
         }
-        if (typeDef instanceof ReferenceTypeDef referenceTypeDef && referenceTypeDef.typeParams().isEmpty()
-                && referenceTypeDef.ref() instanceof SimpleRef simple) {
-            return TypeDefinition.reference(simple.name());
+        if (typeDef instanceof ReferenceTypeDef referenceTypeDef && referenceTypeDef.typeParams().isEmpty()) {
+            if (referenceTypeDef.ref() instanceof SimpleRef simple) {
+                return TypeDefinition.reference(simple.name());
+            }
+            if (referenceTypeDef.ref() instanceof GenericRef generic) {
+                return resolveGenericConstructorApplication(name, generic);
+            }
         }
         if (typeDef instanceof ContainerTypeDef containerTypeDef && containerTypeDef.typeParams().isEmpty()) {
             return resolveContainerTypeDef(name, containerTypeDef.container());
@@ -156,6 +169,46 @@ public final class SchemaResolver {
         throw new UnsupportedOperationException(
                 "'" + name + "': only fresh record constructions, composition, simple type references, and "
                         + "declaration-level sized arrays are resolved so far, got " + typeDef.getClass().getSimpleName());
+    }
+
+    // ── Top-level constructor application (§5.6) ──────────────────────────
+
+    /**
+     * A fully-bound top-level application of the {@code map} constructor -- {@code schema =>
+     * map<type_name, type_definition>}'s own shape -- resolves as a construction, not a reference
+     * (§5.6: "a declaration whose body is a fully-bound application of a constructor... resolves as
+     * a construction"): {@code kind} from the constructor's family ({@code map} composes with
+     * {@code product}, so {@code PRODUCT}), the applied form recorded as {@code source}, the binding
+     * record ({@code !map { key_type: ... value_type: ... }}) as {@code body}, and no supertypes
+     * (construction transfers kind only, §5.5) -- unlike a non-constructor *template* application
+     * (e.g. {@code array_min<T, N>}), which resolves to a {@code REFERENCE} instead (see {@link
+     * #resolveContainerTypeDef}). Only {@code map} with exactly two simple (non-generic) type
+     * arguments is resolved so far; other constructors (record/array/set/tuple/enum/choice) and
+     * nested/value arguments are not attempted yet. The {@code @alias:type_name}-style annotation
+     * §8.3 would add for an aliased argument (here, {@code type_name} itself aliasing {@code token})
+     * is deliberately not produced, same deferral as {@link #resolveTypeRef}.
+     */
+    private TypeDefinition resolveGenericConstructorApplication(String name, GenericRef generic) {
+        if (!generic.name().equals("map") || generic.args().size() != 2) {
+            throw new UnsupportedOperationException("'" + name + "': only a fully-bound 'map<K, V>' "
+                    + "application is resolved so far, got " + generic);
+        }
+        io.ltr8.tson.schema.meta.TypeRef keyType = resolveSimpleTypeArg(name, generic.args().get(0));
+        io.ltr8.tson.schema.meta.TypeRef valueType = resolveSimpleTypeArg(name, generic.args().get(1));
+
+        io.ltr8.tson.schema.meta.TypeRef source = new io.ltr8.tson.schema.meta.TypeRef("map",
+                List.of(new TypeArgument.Ref(keyType), new TypeArgument.Ref(valueType)));
+
+        return new TypeDefinition(Optional.of(source), TypeKind.PRODUCT, List.of(), false, List.of(),
+                List.of(), Optional.empty(), MapBody.of(keyType, valueType));
+    }
+
+    private static io.ltr8.tson.schema.meta.TypeRef resolveSimpleTypeArg(String name, TypeArg arg) {
+        if (arg instanceof TypeArg.Ref(SimpleRef simple)) {
+            return io.ltr8.tson.schema.meta.TypeRef.of(simple.name());
+        }
+        throw new UnsupportedOperationException(
+                "'" + name + "': only simple (non-generic) type arguments are resolved so far, got " + arg);
     }
 
     // ── Declaration-level array size sugar (§5.3, §5.10) ──────────────────

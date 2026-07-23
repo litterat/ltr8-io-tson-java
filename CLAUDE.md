@@ -300,11 +300,24 @@ string, §4.5) for `TokenValue`s produced by the parser. `NumberGrammar.tryParse
   not-yet-resolved case, rejected explicitly rather than mishandled. No real `meta-kernel.tn1`
   declaration uses this sugar; verified against §5.3's own worked examples
   (`score_list`/`order_batch`/`matrix9`) and §5.10's `string_triple` example directly.
+- **A declaration's own fully-bound top-level application of the `map` constructor** (§5.6) --
+  `schema => map<type_name, type_definition>`'s own shape -- resolves as a *construction*, not a
+  reference: `kind: PRODUCT` (map's family), `source` the applied form (`{ name: map  arguments: [
+  { name: type_name } { name: type_definition } ] }`), `body: !map { key_type: ...  value_type: ...
+  }`, no supertypes (a constructor application transfers kind only, §5.5) -- unlike a
+  non-constructor *template* application (`array_min<T, N>`), which resolves to `REFERENCE` instead
+  (see above). Only `map` with exactly two simple type arguments is resolved so far; other
+  constructors (`record`/`array`/`set`/`tuple`/`enum`/`choice`) and nested/value arguments aren't
+  attempted yet, and a size-less declaration-level array (`id_list => [text]`, a top-level
+  application of the `array` constructor) remains a separate, not-yet-resolved case. The
+  `@alias:type_name`-style annotation §8.3 would add for `type_name` aliasing `token` is
+  deliberately not produced, same deferral as the array-sugar cases above. Verified against
+  `schema` itself from the real fixture.
 
 Every other construct (elided field types, field modifiers/default-fixed values, refinement,
-subtraction, generic type-refs elsewhere, templates, tightening) throws
-`UnsupportedOperationException` rather than silently mis-resolving -- `SchemaResolver`'s own
-Javadoc lists exactly what's in scope.
+subtraction, generic type-refs other than a bare two-argument `map<K, V>` application, templates,
+tightening) throws `UnsupportedOperationException` rather than silently mis-resolving --
+`SchemaResolver`'s own Javadoc lists exactly what's in scope.
 
 **A real recursion trap, found and fixed along the way -- read before touching `TypeArgument`.**
 `TypeRef`/`TypeArgument` are mutually recursive (`TypeRef.arguments: List<TypeArgument>`, and a
