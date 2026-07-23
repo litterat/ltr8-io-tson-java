@@ -17,7 +17,8 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
 
 **Implemented:**
 
-- [x] Lexer and structural parser — records, maps, arrays, annotations, directives
+- [x] Lexer and structural parser — records, maps, arrays, annotations, directives (`!!id`/
+      `!!schema`/`!!meta` arguments are validated as URIs, not just single-line tokens)
 - [x] Base types — null, boolean, string, numbers (integer, float, hex-float, based-integer)
 - [x] Integer types — `int8`–`int256`, `uint8`–`uint256`, `positive_integer` and siblings
 - [x] Decimal/float types — `number`, `float32`, `float64`, `rational`, `complex`

@@ -16,6 +16,8 @@ import io.ltr8.tson.parser.lexer.Lexer;
 import io.ltr8.tson.parser.lexer.Position;
 import io.ltr8.tson.parser.lexer.Token;
 import io.ltr8.tson.parser.lexer.TokenType;
+import io.ltr8.tson.parser.resolver.vocab.AtomParseException;
+import io.ltr8.tson.parser.resolver.vocab.UriType;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -53,7 +55,14 @@ public final class Parser {
         }
 
         if (check(TokenType.DIRECTIVE) && "meta".equals(peekDirectiveName())) {
-            throw new SchemaDocumentException(peek().start());
+            // Parse (and URI-validate) the directive itself before rejecting the document as an
+            // unsupported-but-well-formed schema document -- a malformed !!meta argument is a
+            // genuine ParseException, not merely "a kind of document we don't implement" (see
+            // SchemaDocumentException's own Javadoc on that distinction). Position is captured
+            // before parsing so the diagnostic still points at the directive, not past it.
+            Position metaStart = peek().start();
+            parseNamedDirective("meta");
+            throw new SchemaDocumentException(metaStart);
         }
 
         Optional<String> schema = Optional.empty();
@@ -174,7 +183,22 @@ public final class Parser {
         return name.text();
     }
 
-    /** {@code "!!" name ":" single-line-token}, requiring the directive name to equal {@code expectedName}. */
+    /**
+     * {@code "!!" name ":" single-line-token}, requiring the directive name to equal {@code
+     * expectedName}. §3.3: "in every directive of this series the argument is a URI or file
+     * reference (RFC 3986)" -- checked here by routing the argument through {@link UriType}
+     * itself (the same class §5.5's {@code !uri} atom binds through), rather than duplicating a
+     * second, independent {@code new URI(text)} call here. One shared implementation means a
+     * directive argument and a typed {@code !uri} value are held to the identical standard by
+     * construction, not just by coincidence today -- if {@code UriType}'s own validation is ever
+     * tightened (e.g. a from-scratch RFC 3986 check replacing its current reliance on {@code
+     * java.net.URI}, see its Javadoc), directive arguments inherit the improvement automatically.
+     * This does reach from the structural parser into the resolver's vocabulary package, unlike
+     * every other check in this class -- deliberately: §3.3's URI requirement is part of a
+     * directive's own grammar ("a Class 1 processor... enforces directive grammar in full"), not
+     * base type resolution (§4) applied to an arbitrary core-value, which is what {@code Parser}
+     * otherwise stays out of.
+     */
     private String parseNamedDirective(String expectedName) {
         Token bangbang = expect(TokenType.DIRECTIVE, "directive");
         Token name = peek();
@@ -206,6 +230,17 @@ public final class Parser {
                     + expectedName + "', found " + describe(arg));
         }
         advance();
+
+        try {
+            UriType.UNCONSTRAINED.read(new TokenValue(arg.text(), TokenForm.SINGLE_LINE_QUOTED));
+        } catch (AtomParseException e) {
+            // Deliberately not propagating e.getMessage() verbatim -- it cites §5.5 (UriType's own
+            // section, about the !uri atom), which would be a misleading citation here: this
+            // check's requirement comes from §3.3 (directive grammar), even though the mechanism
+            // checking it is shared with !uri.
+            throw new ParseException(
+                    "'!!" + expectedName + "' argument '" + arg.text() + "' is not a valid URI (§3.3)", arg.start());
+        }
         return arg.text();
     }
 

@@ -130,6 +130,35 @@ class ParserTest {
         assertThrows(ParseException.class, () -> parse("Alice Bob"));
     }
 
+    // ── Directive arguments must be valid URIs (§3.3) ────────────────────
+    // "in every directive of this series the argument is a URI or file reference (RFC 3986)" --
+    // checked via java.net.URI's own constructor, the same JDK type (and the same accepted
+    // RFC-2396-vs-3986 gap) UriType binds !uri through.
+
+    @Test
+    void idDirectiveArgumentMustBeAValidUri() {
+        // An unescaped space is not valid anywhere in a URI.
+        assertThrows(ParseException.class, () -> parse("!!id:\"not a uri\"\n_"));
+    }
+
+    @Test
+    void schemaDirectiveArgumentInHeaderMustBeAValidUri() {
+        assertThrows(ParseException.class, () -> parse("!!schema:\"not a uri\" Alice"));
+    }
+
+    @Test
+    void schemaDirectiveArgumentOnFieldValueMustBeAValidUri() {
+        assertThrows(ParseException.class, () -> parse("{ x: !!schema:\"not a uri\" 1 }"));
+    }
+
+    @Test
+    void metaDirectiveArgumentMustBeAValidUriEvenThoughTheDocumentIsRejectedEitherWay() {
+        // A malformed !!meta argument is a genuine ParseException, not merely "a well-formed
+        // schema document this processor doesn't support" -- SchemaDocumentException requires the
+        // directive itself to actually be well-formed first.
+        assertThrows(ParseException.class, () -> parse("!!meta:\"not a uri\" { }"));
+    }
+
     // ── Records ──────────────────────────────────────────────────────────
 
     @Test
