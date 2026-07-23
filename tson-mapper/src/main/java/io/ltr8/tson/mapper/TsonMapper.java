@@ -28,21 +28,21 @@ import io.ltr8.tson.parser.resolver.BaseTypeResolver;
 import io.ltr8.tson.parser.resolver.BaseValue;
 import io.ltr8.tson.parser.resolver.vocab.AtomType;
 import io.ltr8.tson.parser.resolver.vocab.AtomTypeException;
-import io.ltr8.tson.parser.resolver.vocab.BinaryType;
+import io.ltr8.tson.parser.resolver.vocab.BinaryParser;
 import io.ltr8.tson.parser.resolver.vocab.BuiltinTypeVocabulary;
 import io.ltr8.tson.parser.resolver.vocab.Complex;
-import io.ltr8.tson.parser.resolver.vocab.ComplexType;
-import io.ltr8.tson.parser.resolver.vocab.DateTimeType;
-import io.ltr8.tson.parser.resolver.vocab.DateType;
-import io.ltr8.tson.parser.resolver.vocab.DurationType;
-import io.ltr8.tson.parser.resolver.vocab.Ipv4Type;
-import io.ltr8.tson.parser.resolver.vocab.Ipv6Type;
-import io.ltr8.tson.parser.resolver.vocab.IsoDuration;
-import io.ltr8.tson.parser.resolver.vocab.Rational;
-import io.ltr8.tson.parser.resolver.vocab.RationalType;
-import io.ltr8.tson.parser.resolver.vocab.TimeType;
-import io.ltr8.tson.parser.resolver.vocab.UriType;
-import io.ltr8.tson.parser.resolver.vocab.UuidType;
+import io.ltr8.tson.parser.resolver.vocab.ComplexParser;
+import io.ltr8.tson.parser.resolver.vocab.DateParser;
+import io.ltr8.tson.parser.resolver.vocab.DateTimeParser;
+import io.ltr8.tson.parser.resolver.vocab.DurationParser;
+import io.ltr8.tson.parser.resolver.vocab.Ipv4Parser;
+import io.ltr8.tson.parser.resolver.vocab.Ipv6Parser;
+import io.ltr8.tson.parser.resolver.vocab.RationalParser;
+import io.ltr8.tson.parser.resolver.vocab.TimeParser;
+import io.ltr8.tson.parser.resolver.vocab.UriParser;
+import io.ltr8.tson.parser.resolver.vocab.UuidParser;
+import io.ltr8.tson.schema.meta.IsoDuration;
+import io.ltr8.tson.schema.meta.Rational;
 
 import java.net.Inet4Address;
 import java.net.Inet6Address;
@@ -124,20 +124,20 @@ public final class TsonMapper {
 
     private static Map<Class<?>, VocabularyAtom> defaultVocabularyAtoms() {
         Map<Class<?>, VocabularyAtom> atoms = new HashMap<>();
-        atoms.put(UUID.class, new VocabularyAtom(UuidType.TYPENAME, UuidType.UNCONSTRAINED));
-        atoms.put(URI.class, new VocabularyAtom(UriType.TYPENAME, UriType.UNCONSTRAINED));
-        atoms.put(Inet4Address.class, new VocabularyAtom(Ipv4Type.TYPENAME, Ipv4Type.UNCONSTRAINED));
-        atoms.put(Inet6Address.class, new VocabularyAtom(Ipv6Type.TYPENAME, Ipv6Type.UNCONSTRAINED));
-        atoms.put(LocalDate.class, new VocabularyAtom(DateType.TYPENAME, DateType.UNCONSTRAINED));
-        atoms.put(OffsetTime.class, new VocabularyAtom(TimeType.TYPENAME, TimeType.UNCONSTRAINED));
-        atoms.put(OffsetDateTime.class, new VocabularyAtom(DateTimeType.TYPENAME, DateTimeType.UNCONSTRAINED));
+        atoms.put(UUID.class, new VocabularyAtom(UuidParser.TYPENAME, UuidParser.UNCONSTRAINED));
+        atoms.put(URI.class, new VocabularyAtom(UriParser.TYPENAME, UriParser.UNCONSTRAINED));
+        atoms.put(Inet4Address.class, new VocabularyAtom(Ipv4Parser.TYPENAME, Ipv4Parser.UNCONSTRAINED));
+        atoms.put(Inet6Address.class, new VocabularyAtom(Ipv6Parser.TYPENAME, Ipv6Parser.UNCONSTRAINED));
+        atoms.put(LocalDate.class, new VocabularyAtom(DateParser.TYPENAME, DateParser.UNCONSTRAINED));
+        atoms.put(OffsetTime.class, new VocabularyAtom(TimeParser.TYPENAME, TimeParser.UNCONSTRAINED));
+        atoms.put(OffsetDateTime.class, new VocabularyAtom(DateTimeParser.TYPENAME, DateTimeParser.UNCONSTRAINED));
         // base64 is an arbitrary but reasonable default -- no way to recover which of
         // base64/base64url/base32/hex a byte[] was originally decoded from, that information
         // doesn't survive decoding (see #toTson's own Javadoc).
-        atoms.put(byte[].class, new VocabularyAtom(BinaryType.BASE64.typeName(), BinaryType.BASE64));
-        atoms.put(Rational.class, new VocabularyAtom(RationalType.TYPENAME, RationalType.UNCONSTRAINED));
-        atoms.put(Complex.class, new VocabularyAtom(ComplexType.TYPENAME, ComplexType.UNCONSTRAINED));
-        atoms.put(IsoDuration.class, new VocabularyAtom(DurationType.TYPENAME, DurationType.UNCONSTRAINED));
+        atoms.put(byte[].class, new VocabularyAtom(BinaryParser.BASE64.typeName(), BinaryParser.BASE64));
+        atoms.put(Rational.class, new VocabularyAtom(RationalParser.TYPENAME, RationalParser.UNCONSTRAINED));
+        atoms.put(Complex.class, new VocabularyAtom(ComplexParser.TYPENAME, ComplexParser.UNCONSTRAINED));
+        atoms.put(IsoDuration.class, new VocabularyAtom(DurationParser.TYPENAME, DurationParser.UNCONSTRAINED));
         return atoms;
     }
 
@@ -156,7 +156,7 @@ public final class TsonMapper {
      * host type for all four §5.3 binary atoms ({@code base64}/{@code base64url}/{@code base32}/
      * {@code hex}), but {@code byte[].isArray()} is {@code true}, so {@code DefaultClassBinder}'s
      * array auto-detection claims it ahead of the atom/vocabulary path the same way real records
-     * claim {@link io.ltr8.tson.parser.resolver.vocab.Rational}/{@link
+     * claim {@link io.ltr8.tson.schema.meta.Rational}/{@link
      * io.ltr8.tson.parser.resolver.vocab.Complex} -- but unlike those two, there's no competing
      * richer type a caller would plausibly want to defer to instead (§5.3's host value is
      * unconditionally "byte array"), so pre-registering it by default is the right call here, not
@@ -177,13 +177,13 @@ public final class TsonMapper {
      * LocalDate}: an ordinary JDK class, so pre-registered here rather than left to fail.
      *
      * <p>{@code Inet4Address} (§5.5's {@code ipv4}) is the same story again -- {@link
-     * io.ltr8.tson.parser.resolver.vocab.Ipv4Type#read} always returns exactly that subtype, so
+     * io.ltr8.tson.parser.resolver.vocab.Ipv4Parser#read} always returns exactly that subtype, so
      * that's what's registered here. Unlike {@link AtomType#read(TokenValue, Class)}'s own
      * target-narrowing check (which does accept a supertype, via {@code isInstance}), {@code
      * DataBindContext}'s registry is keyed by exact {@code Class}, so a field must be declared as
      * {@code Inet4Address} itself, not the broader {@code InetAddress}, to bind directly here.
      * {@code Inet6Address} (§5.5's {@code ipv6}) is registered for the identical reason -- {@link
-     * io.ltr8.tson.parser.resolver.vocab.Ipv6Type#read} always returns exactly that subtype too,
+     * io.ltr8.tson.parser.resolver.vocab.Ipv6Parser#read} always returns exactly that subtype too,
      * including for IPv4-mapped input text (see its Javadoc on why that needs its own care).
      */
     private static DataBindContext defaultContext() {

@@ -17,7 +17,7 @@ import io.ltr8.tson.parser.lexer.Position;
 import io.ltr8.tson.parser.lexer.Token;
 import io.ltr8.tson.parser.lexer.TokenType;
 import io.ltr8.tson.parser.resolver.vocab.AtomParseException;
-import io.ltr8.tson.parser.resolver.vocab.UriType;
+import io.ltr8.tson.parser.resolver.vocab.UriParser;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -196,11 +196,11 @@ public class Parser {
     /**
      * {@code "!!" name ":" single-line-token}, requiring the directive name to equal {@code
      * expectedName}. §3.3: "in every directive of this series the argument is a URI or file
-     * reference (RFC 3986)" -- checked here by routing the argument through {@link UriType}
+     * reference (RFC 3986)" -- checked here by routing the argument through {@link UriParser}
      * itself (the same class §5.5's {@code !uri} atom binds through), rather than duplicating a
      * second, independent {@code new URI(text)} call here. One shared implementation means a
      * directive argument and a typed {@code !uri} value are held to the identical standard by
-     * construction, not just by coincidence today -- if {@code UriType}'s own validation is ever
+     * construction, not just by coincidence today -- if {@code UriParser}'s own validation is ever
      * tightened (e.g. a from-scratch RFC 3986 check replacing its current reliance on {@code
      * java.net.URI}, see its Javadoc), directive arguments inherit the improvement automatically.
      * This does reach from the structural parser into the resolver's vocabulary package, unlike
@@ -242,9 +242,9 @@ public class Parser {
         advance();
 
         try {
-            UriType.UNCONSTRAINED.read(new TokenValue(arg.text(), TokenForm.SINGLE_LINE_QUOTED));
+            UriParser.UNCONSTRAINED.read(new TokenValue(arg.text(), TokenForm.SINGLE_LINE_QUOTED));
         } catch (AtomParseException e) {
-            // Deliberately not propagating e.getMessage() verbatim -- it cites §5.5 (UriType's own
+            // Deliberately not propagating e.getMessage() verbatim -- it cites §5.5 (UriParser's own
             // section, about the !uri atom), which would be a misleading citation here: this
             // check's requirement comes from §3.3 (directive grammar), even though the mechanism
             // checking it is shared with !uri.

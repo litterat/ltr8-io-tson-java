@@ -57,18 +57,27 @@ written down. This applies to every layer as it gets built, not just the lexer.
 ## Architecture
 
 `tson-parser` holds the lexer, the data-grammar structural parser, base type resolution, the built-in
-type vocabulary, *and* the Part 2 schema grammar (`SchemaParser`, `ast.schema`) under one module — every
-one of these is tightly coupled to the shared lexer/token-stream machinery (the schema grammar reuses
-the data grammar's own `annotation`/`data-value`/directive-parsing code directly, per Part 2 §12.1), so
-splitting them into separate Gradle modules was judged not worth the build-graph overhead, the same
-reasoning that already keeps the lexer and structural parser together. The module boundary that *is*
-worth drawing is the one between grammar (parsing text into an AST, no interpretation) and semantics
-(resolving, validating, producing a schema's or a document's actual meaning): `tson-parser.resolver` is
-Class 1's semantic layer; `tson-schema` is Class 2's — the *produced* schema (§8 resolver output:
-`TypeDefinition` et al. in `io.ltr8.tson.schema.meta`, built by `SchemaResolver` from `tson-parser`'s
-grammar-layer `SchemaMap`), not its grammar. See "Schema resolution" below. `tson-bind`/`tson-mapper`/
-`tson-annotation` are the separate Java-object-binding layer (see their own package Javadoc; not detailed
-in this file yet).
+type vocabulary, the Part 2 schema grammar (`SchemaParser`, `ast.schema`), *and* the schema resolver
+(`io.ltr8.tson.parser.resolver.schema.SchemaResolver`, producing Class 2's resolved schema value) under
+one module — every one of these is tightly coupled to the shared lexer/token-stream machinery (the
+schema grammar reuses the data grammar's own `annotation`/`data-value`/directive-parsing code directly,
+per Part 2 §12.1; the resolver consumes the grammar's own `SchemaMap`/`TypeDef` AST directly), so
+splitting any of them into separate Gradle modules was judged not worth the build-graph overhead, the
+same reasoning that already keeps the lexer and structural parser together.
+
+**`tson-schema` holds exactly one thing: `io.ltr8.tson.schema.meta`, the resolved-schema *value* model**
+(§8's `TypeDefinition` et al.) — pure data (records, sealed interfaces, enums), no parsing, no
+resolution logic, and (deliberately) no dependency on `tson-parser` at all. This is the reverse of the
+dependency direction the module names might suggest: `tson-parser` depends on `tson-schema`, not the
+other way around, precisely so that `tson-parser`'s own resolver (and, later, a schema-validating data
+parser) can hold and consult `schema.meta` types directly. `schema.meta.Token` is the one place this
+shows concretely: it structurally mirrors `tson-parser`'s own `TokenValue`/`TokenForm` (same field
+names, same enum members) but is declared locally rather than imported, specifically so `schema.meta`
+never needs to reference `tson-parser` at all; `SchemaResolver` converts field-by-field at the one spot
+that needs it (`resolveField`'s `toMetaToken`). `tson-bind`/`tson-mapper`/`tson-annotation` are the
+separate Java-object-binding layer (see their own package Javadoc; not detailed in this file yet) —
+`tson-schema`'s own `schema.meta` classes depend on `tson-annotation` only (for `@Typename`/`@Field`),
+never on `tson-bind`/`tson-mapper`.
 
 Package: `io.ltr8.tson.parser.lexer` (group `io.ltr8`). The group is `io.ltr8`, not `io.tson`: reverse-DNS
 package naming identifies who *publishes* the artifact (and is what Maven Central's domain-ownership
@@ -191,8 +200,66 @@ string, §4.5) for `TokenValue`s produced by the parser. `NumberGrammar.tryParse
 - **§9.1's numeric-literal length limit (SHOULD, default 4096 digits) is not enforced anywhere yet.** It's
   a DoS-hardening recommendation, not a grammar rule, and adding an unconfigurable limit now would be
   premature without a real configuration mechanism — noted here so it isn't mistaken for an oversight.
-- The built-in type vocabulary (§5 — `!uuid`, `!date`, `!int32`, etc.) is a separate, much larger piece of
-  work, not started. `BaseTypeResolver` only implements the *default*, untyped resolution path.
+- `BaseTypeResolver` only implements the *default*, untyped resolution path — the built-in type
+  vocabulary (§5 — `!uuid`, `!date`, `!int32`, etc.) is a separate implementation, `resolver.vocab`
+  (below), consulted only when a value actually carries a type-ref.
+
+### Built-in type vocabulary (`tson-parser/src/main/java/io/ltr8/tson/parser/resolver/vocab/`)
+
+`AtomType<T>` is a built-in vocabulary atom's parsing contract (§5.2): `read(TokenValue)` (the
+atom's own natural host value), `read(TokenValue, Class<?>)` (narrow directly to a caller-supplied
+target, overridden by the numeric family to share `NumberNarrowing` with `tson-mapper` rather than
+routing through an intermediate `Number`), and `write(T)` (the inverse). `BuiltinTypeVocabulary` is
+the name → `AtomType` lookup table (§5's fixed, closed set — see its own Javadoc for which
+`core.tn1`/`meta.tn1` instances it's seeded with, including known departures from §5's own
+published table, e.g. the full `int8`..`int256` width ladder vs. the four §5.6 explicitly lists,
+tracked in `SPEC-FEEDBACK.md`).
+
+**Each constructor is split into two classes, one per module, not one flat class** (widened to all
+implementations 2026-07-23, alongside the `tson-schema`/`tson-parser` dependency inversion below):
+a pure constraint-*values* record in `io.ltr8.tson.schema.meta` (`IntegerType`, `TextType`,
+`DecimalType`, `FloatType`, `RationalType`, `UuidType`, `BinaryType`, `DateType`, `TimeType`,
+`DateTimeType`, `DurationType`, `UriType` — no parsing/validation, matching the kernel's own
+`*_type` constructor shape exactly, the same modeling `io.ltr8.tson.schema.meta` uses everywhere
+else), and a same-named-but-suffixed `*Parser` class here in `resolver.vocab` (`IntegerParser`,
+`TextParser`, ...) holding one as `constraints` and doing the actual `read`/`write`/validate work.
+`RegexParser`/`ComplexParser`/`Ipv4Parser`/`Ipv6Parser` have no separate `schema.meta` class at all
+— their constructors declare no constraint fields of their own (`regex_type` inherits `text_type`'s
+wholesale, via composition; `complex_type`/`ipv4_type`/`ipv6_type` have none beyond a fixed
+component/RFC pin) — so there's nothing to split out; `RegexParser` holds a `TextType` directly
+instead. Each `*Parser` keeps convenience constructors/static factories mirroring its pre-split
+shape (e.g. `new IntegerParser(new IntegerSize(32, true))`, `IntegerParser.ofMin(...)`) so call
+sites barely changed. `Rational`/`IsoDuration` (host *values*, not constraints, referenced by
+`RationalType`/`DurationType`'s own bound fields) moved to `schema.meta` alongside them; `Complex`
+stayed here (`complex_type` has no constraint fields referencing it). `IntegerSize` had a pre-
+existing near-duplicate in each module (`vocab`'s used `int bits` for arithmetic; `schema.meta`'s
+used `BigInteger bits` for kernel fidelity) — consolidated onto `schema.meta.IntegerSize` alone,
+with an `int`-taking convenience constructor added so the width-ladder call sites keep their
+literal `32`/`64`/etc. spelling; the `minValue`/`maxValue`/`hostType` *behavior* that used to live
+on `vocab`'s copy moved into `IntegerParser` as private static helpers taking a `schema.meta.
+IntegerSize`, since `schema.meta` stays pure data, no behavior.
+
+**Why the split needed a dependency-direction flip.** `schema.meta` (§8's resolved-schema value
+model, previously `tson-schema` depending on `tson-parser` for its own grammar-layer `SchemaMap`)
+had to stop depending on `tson-parser` at all for a vocab class here to hold one of its records
+without a module cycle. Two consequences: `SchemaResolver`/`TsonSchema` (which *do* need
+`tson-parser`'s grammar AST) moved into this module, at `resolver.schema` (this package's own
+sibling — see "Schema resolution" below); and `schema.meta.Token` was introduced as a local,
+structurally-identical stand-in for `tson-parser.ast.TokenValue`/`TokenForm` (same `text`/`form`
+fields, same three enum members) purely so `RecordField.value`/`TypeArgument.Value` (§8.1's literal-
+value fields) don't need `tson-parser`'s own type — `SchemaResolver` converts between the two at the
+one spot that needs it (`resolveField`'s `toMetaToken`). `tson-schema`'s own module now holds
+*only* `io.ltr8.tson.schema.meta` and depends on nothing but `tson-annotation` (for `@Typename`/
+`@Field`); `tson-parser` depends on `tson-schema`, the reverse of before. This groundwork is for a
+future schema-*validating* parser (Class 2): once one exists inside `tson-parser`, it can hold and
+consult a resolved `TsonSchema`/`TypeDefinition` directly, the same way `resolver.vocab` already
+consults `schema.meta` constraint records — without `tson-schema` ever needing to import
+`tson-parser` back.
+
+**Not yet done:** the `schema.meta` constraint-values split hasn't been *used* for anything schema-
+related yet (Part 2's own atom-refinement resolution — `!I ^ { ... }` — doesn't exist; see "Schema
+resolution" below) — today it's purely an internal reshaping of the existing Class 1 vocabulary,
+done in preparation for that future use, not a new capability by itself.
 
 ### Schema grammar (`tson-parser/src/main/java/io/ltr8/tson/parser/SchemaParser.java`,
 `.../ast/schema/`)
@@ -243,11 +310,13 @@ string, §4.5) for `TokenValue`s produced by the parser. `NumberGrammar.tryParse
   repo's own `spec/` directory, not the sibling test-suite repo) end-to-end with no exceptions — real,
   full-sized schema documents, not just the spec's illustrative snippets.
 
-### Schema resolution (`tson-schema/src/main/java/io/ltr8/tson/schema/`)
+### Schema resolution (`tson-parser/src/main/java/io/ltr8/tson/parser/resolver/schema/`)
 
-`SchemaResolver` turns `tson-parser`'s grammar-layer `SchemaMap` into resolved `TypeDefinition`s (Part 2
-§4, §8) -- the module reserved for the *produced* schema (see "Schema grammar" above). Started
-2026-07-23, deliberately narrow, incrementally widened the same day to a second construct:
+`SchemaResolver` turns the grammar-layer `SchemaMap` (same module, `io.ltr8.tson.parser.ast.schema`)
+into resolved `TypeDefinition`s (Part 2 §4, §8) -- values from `tson-schema`'s `io.ltr8.tson.schema.meta`
+(see "Architecture" above for why the resolver itself lives in `tson-parser`, not `tson-schema`, despite
+producing `tson-schema` values). Started 2026-07-23, deliberately narrow, incrementally widened the same
+day to a second construct:
 
 - **Record construction** -- a record (no supertypes, no type parameters) whose fields are simple
   type-refs, each REQUIRED or OPTIONAL (a `?` suffix; field *modifiers* -- default/fixed values --
@@ -484,8 +553,12 @@ No system Gradle — always use the wrapper:
 
 ## Not yet implemented
 
-- Binding `NumberForm` to a Java numeric type (`long`/`double`/`BigInteger`/`BigDecimal`), including the
-  spec's required equivalence between different representations of the same value (§4.3).
-- The built-in type vocabulary (§5) — resolving `!uuid`/`!date`/`!int32`/etc. annotations. A separate,
-  larger piece of work from base type resolution.
-- Anything from Part 2 (schema grammar, type system) — not started.
+- Part 2 schema resolution: atom refinement (`!I ^ { ... }`), subtraction, templates/instantiation
+  entries, elided field types outside a tightening entry, restating a field group in a refinement
+  body, and generic type-refs beyond a bare two-argument `map<K, V>` application or a refinement
+  source — see `SchemaResolver`'s own Javadoc (under "Schema resolution" above) for the exact,
+  current boundary of what resolves.
+- A schema-validating data parser (Class 2) that consults a resolved `TsonSchema`/`TypeDefinition`
+  while parsing data — the built-in vocabulary's `schema.meta`/`resolver.vocab` split (see "Built-in
+  type vocabulary" above) is groundwork for this, not this itself.
+- §9.1's numeric-literal length limit (SHOULD, default 4096 digits, DoS-hardening) — not enforced.

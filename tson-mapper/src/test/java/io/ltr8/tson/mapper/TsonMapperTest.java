@@ -11,8 +11,8 @@ import io.ltr8.bind.DataBindException;
 import io.ltr8.tson.parser.ast.Annotation;
 import io.ltr8.tson.parser.ast.TokenValue;
 import io.ltr8.tson.parser.resolver.vocab.Complex;
-import io.ltr8.tson.parser.resolver.vocab.IsoDuration;
-import io.ltr8.tson.parser.resolver.vocab.Rational;
+import io.ltr8.tson.schema.meta.IsoDuration;
+import io.ltr8.tson.schema.meta.Rational;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -621,7 +621,7 @@ class TsonMapperTest {
 
     @Test
     void builtinUuidAnnotationRejectsMalformedUuidThroughTheMapper() throws DataBindException {
-        // UUID.fromString itself would accept "1-2-3-4-5" -- UuidType's own shape check must not.
+        // UUID.fromString itself would accept "1-2-3-4-5" -- UuidParser's own shape check must not.
         assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !uuid 1-2-3-4-5 }", UuidHolder.class));
     }
 
@@ -636,7 +636,7 @@ class TsonMapperTest {
         // but it also can't self-declare @Atom, being a JDK class, so TsonMapper's default context
         // pre-registers it the same way it does UUID/LocalDate. Quoted because ':' '/' '?' '=' are
         // not legal unquoted-token characters (§7.2) -- the URI value itself is unaffected by that,
-        // it's a lexer-layer constraint, not a UriType one.
+        // it's a lexer-layer constraint, not a UriParser one.
         UriHolder h = mapper.toObject("{ value: !uri \"https://example.com/a/b?x=1\" }", UriHolder.class);
         assertEquals(URI.create("https://example.com/a/b?x=1"), h.value());
     }
@@ -644,7 +644,7 @@ class TsonMapperTest {
     @Test
     void builtinUriAnnotationRejectsMalformedUriThroughTheMapper() throws DataBindException {
         // An unescaped space is not valid anywhere in a URI -- java.net.URI itself rejects it, so
-        // this is really exercising the mapper wiring rather than UriType's own leniency.
+        // this is really exercising the mapper wiring rather than UriParser's own leniency.
         assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !uri \"http://example.com/a b\" }", UriHolder.class));
     }
 
@@ -655,7 +655,7 @@ class TsonMapperTest {
 
     @Test
     void builtinIpv4AnnotationBindsDirectlyThroughTheMapper() throws DataBindException, UnknownHostException {
-        // Ipv4Type#read always returns Inet4Address specifically (never the broader InetAddress),
+        // Ipv4Parser#read always returns Inet4Address specifically (never the broader InetAddress),
         // and TsonMapper's default context registers exactly that class -- see defaultContext()'s
         // Javadoc on why the field must be declared Inet4Address, not InetAddress, to bind directly.
         Ipv4Holder h = mapper.toObject("{ value: !ipv4 192.168.0.1 }", Ipv4Holder.class);
@@ -664,7 +664,7 @@ class TsonMapperTest {
 
     @Test
     void builtinIpv4AnnotationRejectsLenientFormsThroughTheMapper() throws DataBindException {
-        // InetAddress.ofLiteral itself would accept both of these -- Ipv4Type's own RFC 3986
+        // InetAddress.ofLiteral itself would accept both of these -- Ipv4Parser's own RFC 3986
         // dec-octet check must not.
         assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !ipv4 010.0.0.1 }", Ipv4Holder.class));
         assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !ipv4 3232235521 }", Ipv4Holder.class));
@@ -677,9 +677,9 @@ class TsonMapperTest {
 
     @Test
     void builtinIpv6AnnotationBindsDirectlyThroughTheMapper() throws DataBindException, UnknownHostException {
-        // Ipv6Type#read always returns Inet6Address specifically -- including for IPv4-mapped
+        // Ipv6Parser#read always returns Inet6Address specifically -- including for IPv4-mapped
         // input text, where the generic InetAddress.getByAddress(byte[]) would otherwise silently
-        // hand back an Inet4Address instead (see Ipv6Type's Javadoc). Quoted because ':' is not a
+        // hand back an Inet4Address instead (see Ipv6Parser's Javadoc). Quoted because ':' is not a
         // legal unquoted-token character (§7.2).
         Ipv6Holder h = mapper.toObject("{ value: !ipv6 \"2001:db8::1\" }", Ipv6Holder.class);
         assertEquals(Inet6Address.getByAddress(null,
@@ -689,7 +689,7 @@ class TsonMapperTest {
     @Test
     void builtinIpv6AnnotationRejectsAmbiguousCompressionThroughTheMapper() throws DataBindException {
         // More than one "::" run is ambiguous -- how many zero groups each one represents can't be
-        // determined -- so Ipv6Type's own grammar check must reject it.
+        // determined -- so Ipv6Parser's own grammar check must reject it.
         assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !ipv6 \"1::2::3\" }", Ipv6Holder.class));
     }
 
@@ -709,7 +709,7 @@ class TsonMapperTest {
 
     @Test
     void builtinDateAnnotationRejectsExtendedYearThroughTheMapper() throws DataBindException {
-        // LocalDate.parse("+12025-03-13") would succeed on its own -- DateType's own shape check
+        // LocalDate.parse("+12025-03-13") would succeed on its own -- DateParser's own shape check
         // must not accept RFC 3339's stricter 4-digit-year requirement being violated.
         assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !date +12025-03-13 }", DateHolder.class));
     }
@@ -828,7 +828,7 @@ class TsonMapperTest {
     void directBindingToTsonsOwnRationalDoesNotWork() throws DataBindException {
         // Rational is itself a Java record (numerator, denominator) -- DefaultClassBinder auto-
         // detects real records ahead of anything atom-related, so a target of Rational.class gets
-        // treated as a 2-field record, not routed through RationalType at all. The value's core is
+        // treated as a 2-field record, not routed through RationalParser at all. The value's core is
         // a token ("2/3"), not a record, so binding fails outright. This is exactly why the
         // recommended path is a DataBridge (below), not direct binding to tson-parser's own minimal
         // Rational/Complex types.
@@ -870,7 +870,7 @@ class TsonMapperTest {
     @Test
     void directBindingToTsonsOwnComplexDoesNotWork() throws DataBindException {
         // Same reasoning as Rational: Complex is itself a Java record (real, imaginary), so it's
-        // auto-detected as a record target, not routed through ComplexType.
+        // auto-detected as a record target, not routed through ComplexParser.
         assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !complex 3+4i }", ComplexHolder.class));
     }
 

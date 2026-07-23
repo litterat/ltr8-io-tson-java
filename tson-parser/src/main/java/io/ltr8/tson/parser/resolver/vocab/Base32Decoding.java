@@ -1,7 +1,7 @@
 package io.ltr8.tson.parser.resolver.vocab;
 
 /**
- * Decode and encode logic for {@link BinaryType}'s {@code BASE32} encoding -- RFC 4648 §6, the one
+ * Decode and encode logic for {@link BinaryParser}'s {@code BASE32} encoding -- RFC 4648 §6, the one
  * binary encoding with no JDK support at all ({@link java.util.Base64} covers §4/§5, {@link
  * java.util.HexFormat} covers §8), so this is from scratch both ways: 5 bits per character against
  * the canonical uppercase alphabet {@code ABCDEFGHIJKLMNOPQRSTUVWXYZ234567}, accumulated into (or

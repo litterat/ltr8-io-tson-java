@@ -1,5 +1,7 @@
 package io.ltr8.tson.parser.resolver.vocab;
 
+import io.ltr8.tson.schema.meta.IntegerSize;
+
 import java.math.BigInteger;
 import java.util.HashMap;
 import java.util.Map;
@@ -25,17 +27,17 @@ import java.util.Optional;
  * uuid_type} ({@code uuid}, §5.5) -- deliberately *not* {@code text_type}, despite existing in
  * meta-kernel.tn1, since {@code !text} never appears in §5's published table at all (see {@code
  * SPEC-FEEDBACK.md} #9). And with the full {@code binary} family (§5.3) -- {@code base64}, {@code
- * base64url}, {@code base32}, {@code hex} -- four instances of one {@link BinaryType} constructor,
+ * base64url}, {@code base32}, {@code hex} -- four instances of one {@link BinaryParser} constructor,
  * each a distinct {@code binary_encoding} value, not one generic {@code !binary} annotation,
  * matching §5.3's own "there is no generic {@code !binary} annotation." And with the temporal
  * family (§5.4) -- {@code date_type} ({@code date}), {@code time_type} ({@code time}), {@code
  * datetime_type} ({@code datetime}), {@code duration_type} ({@code duration}). And with {@code
- * uri_type} ({@code uri}, §5.5) -- see {@link UriType}'s Javadoc for why it's the one atom here that
+ * uri_type} ({@code uri}, §5.5) -- see {@link UriParser}'s Javadoc for why it's the one atom here that
  * doesn't validate its own shape ahead of the JDK type it delegates to. And with {@code ipv4_type}
- * ({@code ipv4}, §5.5) -- see {@link Ipv4Type}'s Javadoc for why its JDK leniency gap is a real
+ * ({@code ipv4}, §5.5) -- see {@link Ipv4Parser}'s Javadoc for why its JDK leniency gap is a real
  * SSRF-adjacent concern, not just a spec-fidelity one, and how that's handled. And with {@code
  * ipv6_type} ({@code ipv6}, §5.5) -- a hand-rolled RFC 4291 §2.2 parser for the same reason, see
- * {@link Ipv6Type}'s Javadoc.
+ * {@link Ipv6Parser}'s Javadoc.
  */
 public final class BuiltinTypeVocabulary {
 
@@ -53,36 +55,36 @@ public final class BuiltinTypeVocabulary {
     private static Map<String, AtomType<?>> buildVocabulary() {
         Map<String, AtomType<?>> types = new HashMap<>();
         for (int bits : INTEGER_WIDTHS) {
-            types.put("int" + bits, new IntegerType(new IntegerSize(bits, true)));
-            types.put("uint" + bits, new IntegerType(new IntegerSize(bits, false)));
+            types.put("int" + bits, new IntegerParser(new IntegerSize(bits, true)));
+            types.put("uint" + bits, new IntegerParser(new IntegerSize(bits, false)));
         }
-        types.put("positive_integer", IntegerType.ofMin(BigInteger.ONE));
-        types.put("non_negative_integer", IntegerType.ofMin(BigInteger.ZERO));
-        types.put("negative_integer", IntegerType.ofMax(BigInteger.valueOf(-1)));
-        types.put("non_positive_integer", IntegerType.ofMax(BigInteger.ZERO));
+        types.put("positive_integer", IntegerParser.ofMin(BigInteger.ONE));
+        types.put("non_negative_integer", IntegerParser.ofMin(BigInteger.ZERO));
+        types.put("negative_integer", IntegerParser.ofMax(BigInteger.valueOf(-1)));
+        types.put("non_positive_integer", IntegerParser.ofMax(BigInteger.ZERO));
 
-        types.put(DecimalType.TYPENAME, DecimalType.UNCONSTRAINED);
-        types.put(FloatType.FLOAT32.typeName(), FloatType.FLOAT32);
-        types.put(FloatType.FLOAT64.typeName(), FloatType.FLOAT64);
-        types.put(RationalType.TYPENAME, RationalType.UNCONSTRAINED);
-        types.put(ComplexType.TYPENAME, ComplexType.UNCONSTRAINED);
+        types.put(DecimalParser.TYPENAME, DecimalParser.UNCONSTRAINED);
+        types.put(FloatParser.FLOAT32.typeName(), FloatParser.FLOAT32);
+        types.put(FloatParser.FLOAT64.typeName(), FloatParser.FLOAT64);
+        types.put(RationalParser.TYPENAME, RationalParser.UNCONSTRAINED);
+        types.put(ComplexParser.TYPENAME, ComplexParser.UNCONSTRAINED);
 
-        types.put(UuidType.TYPENAME, UuidType.UNCONSTRAINED);
+        types.put(UuidParser.TYPENAME, UuidParser.UNCONSTRAINED);
 
-        types.put(BinaryType.BASE64.typeName(), BinaryType.BASE64);
-        types.put(BinaryType.BASE64URL.typeName(), BinaryType.BASE64URL);
-        types.put(BinaryType.BASE32.typeName(), BinaryType.BASE32);
-        types.put(BinaryType.HEX.typeName(), BinaryType.HEX);
+        types.put(BinaryParser.BASE64.typeName(), BinaryParser.BASE64);
+        types.put(BinaryParser.BASE64URL.typeName(), BinaryParser.BASE64URL);
+        types.put(BinaryParser.BASE32.typeName(), BinaryParser.BASE32);
+        types.put(BinaryParser.HEX.typeName(), BinaryParser.HEX);
 
-        types.put(DateType.TYPENAME, DateType.UNCONSTRAINED);
-        types.put(TimeType.TYPENAME, TimeType.UNCONSTRAINED);
-        types.put(DateTimeType.TYPENAME, DateTimeType.UNCONSTRAINED);
-        types.put(DurationType.TYPENAME, DurationType.UNCONSTRAINED);
+        types.put(DateParser.TYPENAME, DateParser.UNCONSTRAINED);
+        types.put(TimeParser.TYPENAME, TimeParser.UNCONSTRAINED);
+        types.put(DateTimeParser.TYPENAME, DateTimeParser.UNCONSTRAINED);
+        types.put(DurationParser.TYPENAME, DurationParser.UNCONSTRAINED);
 
-        types.put(UriType.TYPENAME, UriType.UNCONSTRAINED);
+        types.put(UriParser.TYPENAME, UriParser.UNCONSTRAINED);
 
-        types.put(Ipv4Type.TYPENAME, Ipv4Type.UNCONSTRAINED);
-        types.put(Ipv6Type.TYPENAME, Ipv6Type.UNCONSTRAINED);
+        types.put(Ipv4Parser.TYPENAME, Ipv4Parser.UNCONSTRAINED);
+        types.put(Ipv6Parser.TYPENAME, Ipv6Parser.UNCONSTRAINED);
 
         return Map.copyOf(types);
     }

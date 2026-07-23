@@ -133,7 +133,7 @@ class ParserTest {
     // ── Directive arguments must be valid URIs (§3.3) ────────────────────
     // "in every directive of this series the argument is a URI or file reference (RFC 3986)" --
     // checked via java.net.URI's own constructor, the same JDK type (and the same accepted
-    // RFC-2396-vs-3986 gap) UriType binds !uri through.
+    // RFC-2396-vs-3986 gap) UriParser binds !uri through.
 
     @Test
     void idDirectiveArgumentMustBeAValidUri() {

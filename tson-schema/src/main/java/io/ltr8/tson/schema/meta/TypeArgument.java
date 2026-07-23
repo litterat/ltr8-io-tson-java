@@ -1,7 +1,5 @@
 package io.ltr8.tson.schema.meta;
 
-import io.ltr8.tson.parser.ast.TokenValue;
-
 /**
  * The meta-kernel's {@code type_argument} record (Part 2 §8.1, §9): one positional argument of a
  * resolved {@link TypeRef} -- {@code { (name: type_ref | value: value) }}, a REQUIRED field
@@ -35,6 +33,6 @@ public sealed interface TypeArgument {
     record Ref(TypeRef ref) implements TypeArgument {
     }
 
-    record Value(TokenValue value) implements TypeArgument {
+    record Value(Token value) implements TypeArgument {
     }
 }

@@ -1,5 +1,6 @@
 dependencies {
     implementation(project(":tson-parser"))
+    implementation(project(":tson-schema"))
     implementation(project(":tson-bind"))
     implementation(project(":tson-annotation"))
 

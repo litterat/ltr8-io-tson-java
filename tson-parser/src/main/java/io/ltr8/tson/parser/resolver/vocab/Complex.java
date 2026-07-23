@@ -9,19 +9,22 @@ import java.math.BigDecimal;
  * other members) -- this class only implements the default ({@code NUMBER}) case, since {@code
  * complex}'s built-in instance (§5.6's {@code !complex}) is always the unconstrained {@code
  * complex_type} instance and never refines {@code component}; a schema (Part 2) narrowing it to a
- * different component type is separate, not-yet-relevant work.
+ * different component type is separate, not-yet-relevant work. Unlike {@link
+ * io.ltr8.tson.schema.meta.Rational}, {@code complex_type} declares no constraint fields at all, so
+ * there is no separate {@code schema.meta.ComplexType} values class here -- {@link ComplexParser}
+ * holds none, since it has none to hold.
  *
- * <p>Unlike {@link Rational}, there's no meta.tn1 doc calling for value-based equality here, so this
+ * <p>Unlike {@code Rational}, there's no meta.tn1 doc calling for value-based equality here, so this
  * uses the record default (field-based, {@code BigDecimal.equals}, which is itself scale-sensitive)
  * -- each component is its own independently-exact {@code NUMBER}-typed value, preserved as written
  * the same way a bare {@code !number} is, not normalized across instances.
  *
- * <p>As with {@link Rational}, {@code tson-mapper} cannot bind directly to this class -- it's itself
+ * <p>As with {@code Rational}, {@code tson-mapper} cannot bind directly to this class -- it's itself
  * a Java record, so {@code tson-bind}'s record auto-detection claims it ahead of the vocabulary
  * path. A {@code DataBridge<Complex, TheirType>} registered via {@code
  * DataBindContext.registerAtom(TheirType.class, bridge)} is the supported (and currently only) way
  * to bind {@code !complex} to a Java field -- the natural fit for an application that already has a
- * richer complex type (e.g. Apache Commons Math's {@code Complex}) -- see {@link ComplexType}'s
+ * richer complex type (e.g. Apache Commons Math's {@code Complex}) -- see {@link ComplexParser}'s
  * Javadoc.
  */
 public record Complex(BigDecimal real, BigDecimal imaginary) {
