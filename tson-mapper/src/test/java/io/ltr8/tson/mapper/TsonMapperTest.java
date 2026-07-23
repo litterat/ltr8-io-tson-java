@@ -1,5 +1,6 @@
 package io.ltr8.tson.mapper;
 
+import io.ltr8.annotation.Annotated;
 import io.ltr8.annotation.Atom;
 import io.ltr8.annotation.DataBridge;
 import io.ltr8.annotation.Field;
@@ -7,6 +8,8 @@ import io.ltr8.annotation.Typename;
 import io.ltr8.annotation.Union;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
+import io.ltr8.tson.parser.ast.Annotation;
+import io.ltr8.tson.parser.ast.TokenValue;
 import io.ltr8.tson.parser.resolver.vocab.Complex;
 import io.ltr8.tson.parser.resolver.vocab.IsoDuration;
 import io.ltr8.tson.parser.resolver.vocab.Rational;
@@ -124,6 +127,63 @@ class TsonMapperTest {
         EmptyBraceRecord r = mapper.toObject("{}", EmptyBraceRecord.class);
         assertTrue(r.a().isEmpty());
         assertTrue(r.b().isEmpty());
+    }
+
+    // ── Annotations (§3.1) ───────────────────────────────────────────────
+
+    public record AnnotatedItem(@Annotated TsonAnnotations meta, String name) {
+    }
+
+    @Test
+    void annotatedComponentReceivesTheValuesOwnAnnotations() throws DataBindException {
+        AnnotatedItem item = mapper.toObject("@doc:\"a widget\" { name: Widget }", AnnotatedItem.class);
+        assertEquals("Widget", item.name());
+        Annotation doc = item.meta().get("doc").orElseThrow();
+        TokenValue text = (TokenValue) doc.value().orElseThrow().coreValue();
+        assertEquals("a widget", text.text());
+    }
+
+    @Test
+    void annotatedComponentIsEmptyWhenTheValueHasNoAnnotations() throws DataBindException {
+        AnnotatedItem item = mapper.toObject("{ name: Widget }", AnnotatedItem.class);
+        assertTrue(item.meta().values().isEmpty());
+    }
+
+    @Test
+    void annotatedComponentPreservesRepeatedAnnotationsInSourceOrder() throws DataBindException {
+        // §3.1: "An annotation name MAY appear any number of times on a single value; all
+        // occurrences are preserved in source order."
+        AnnotatedItem item = mapper.toObject("@tag:one @tag:two { name: Widget }", AnnotatedItem.class);
+        List<Annotation> tags = item.meta().getAll("tag");
+        assertEquals(2, tags.size());
+        assertEquals("one", ((TokenValue) tags.get(0).value().orElseThrow().coreValue()).text());
+        assertEquals("two", ((TokenValue) tags.get(1).value().orElseThrow().coreValue()).text());
+    }
+
+    @Test
+    void annotatedComponentDoesNotSeeAnnotationsOnFieldValues() throws DataBindException {
+        // Deliberate scope limit: @Annotated only recovers the enclosing value's own annotations,
+        // not a field value's -- a bare String field has nowhere in Java to carry its own
+        // annotations (see SPEC-FEEDBACK.md).
+        AnnotatedItem item = mapper.toObject("{ name: @deprecated Widget }", AnnotatedItem.class);
+        assertTrue(item.meta().values().isEmpty());
+    }
+
+    public record BadCarrierType(@Annotated String meta, String name) {
+    }
+
+    @Test
+    void annotatedComponentMustBeOfTypeTsonAnnotations() {
+        assertThrows(DataBindException.class,
+                () -> mapper.toObject("{ name: Widget meta: x }", BadCarrierType.class));
+    }
+
+    public record TwoCarriers(@Annotated TsonAnnotations a, @Annotated TsonAnnotations b, String name) {
+    }
+
+    @Test
+    void atMostOneAnnotatedComponentAllowed() {
+        assertThrows(DataBindException.class, () -> mapper.toObject("{ name: Widget }", TwoCarriers.class));
     }
 
     // ── Arrays ───────────────────────────────────────────────────────────

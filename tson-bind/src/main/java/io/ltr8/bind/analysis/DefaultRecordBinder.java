@@ -171,10 +171,19 @@ public class DefaultRecordBinder {
 
 		// Prepare the field descriptors.
 		DataClassField[] dataComponents = new DataClassField[components.size()];
+		int annotationsCarrierCount = 0;
 		for (int x = 0; x < components.size(); x++) {
 			ComponentInfo info = components.get(x);
 
 			dataComponents[x] = resolveField(context, targetClass, info, x);
+			if (dataComponents[x].isAnnotationsCarrier()) {
+				annotationsCarrierCount++;
+			}
+		}
+		if (annotationsCarrierCount > 1) {
+			throw new CodeAnalysisException(
+					"At most one component may be marked @Annotated, found " + annotationsCarrierCount
+							+ " on " + targetClass);
 		}
 
 		// get the correct data constructor method handle. Either a constructor or a
@@ -312,7 +321,11 @@ public class DefaultRecordBinder {
 
 		Field fieldAnnotation = info.getField();
 
-		if (fieldAnnotation != null && fieldAnnotation.bridge() != null
+		if (info.isAnnotated()) {
+			// @Annotated -- not bound from an authored value at all, so nothing here needs the
+			// usual context.getDescriptor() recursion. See resolveAnnotationsCarrierField.
+			component = resolveAnnotationsCarrierField(targetClass, info, index);
+		} else if (fieldAnnotation != null && fieldAnnotation.bridge() != null
 				&& fieldAnnotation.bridge() != DataBridge.class) {
 			// The field annotation has a DataBridge
 			component = resolveBridgeField(context, targetClass, info, index);
@@ -332,6 +345,26 @@ public class DefaultRecordBinder {
 		}
 
 		return component;
+	}
+
+	/**
+	 * Builds the {@code DataClassField} for a component marked {@code @Annotated}
+	 * (io.ltr8.annotation). Deliberately skips {@code context.getDescriptor()} entirely -- unlike
+	 * every other field kind, this one is never bound from an authored value at all (a binder
+	 * populates it from the *enclosing* value's own wire-format annotations instead), so there's no
+	 * {@code DataClass} to resolve and {@link DataClassField#dataClass()} is left {@code null}.
+	 * {@code tson-bind} itself has no dependency on {@code tson-mapper}, so it can't validate that
+	 * the component's declared type is actually {@code TsonAnnotations} here -- that check happens
+	 * where the type is visible, at binding time in {@code tson-mapper}.
+	 */
+	private DataClassField resolveAnnotationsCarrierField(Class<?> targetClass, ComponentInfo info, int index) {
+		MethodHandle accessor = accessor(info);
+		String fieldName = fieldName(info);
+
+		MethodHandle isPresent = MethodHandles.dropArguments(
+				MethodHandles.constant(boolean.class, true), 0, targetClass);
+
+		return new DataClassField(index, fieldName, info.getType(), null, true, isPresent, accessor, null, true);
 	}
 
 	/**

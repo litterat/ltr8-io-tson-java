@@ -15,6 +15,7 @@
  */
 package io.ltr8.bind.analysis;
 
+import io.ltr8.annotation.Annotated;
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Union;
 
@@ -32,12 +33,12 @@ import java.util.List;
  * Each record component maps directly to one canonical-constructor argument, by position, and to
  * its own accessor method. Records have no setters; they're immutable by construction.
  *
- * <p>{@code @Field}/{@code @Union} are read from the accessor method, not
- * {@code RecordComponent} itself: both annotations' {@code @Target} predates record components
- * and doesn't list {@code ElementType.RECORD_COMPONENT}, so per JLS 8.10.3 an annotation written
- * on a record header parameter propagates to the field, the constructor parameter, and (for a
- * compiler-synthesized accessor) the accessor method -- but not to the {@code RecordComponent}
- * object itself, so {@code component.getAnnotation(...)} would always return {@code null} here.
+ * <p>{@code @Field}/{@code @Union}/{@code @Annotated} are read from the accessor method, not
+ * {@code RecordComponent} itself: none of the three annotations' {@code @Target} lists {@code
+ * ElementType.RECORD_COMPONENT}, so per JLS 8.10.3 an annotation written on a record header
+ * parameter propagates to the field, the constructor parameter, and (for a compiler-synthesized
+ * accessor) the accessor method -- but not to the {@code RecordComponent} object itself, so {@code
+ * component.getAnnotation(...)} would always return {@code null} here.
  */
 public class RecordComponentFinder implements ComponentFinder {
 
@@ -80,6 +81,10 @@ public class RecordComponentFinder implements ComponentFinder {
             Union unionAnnotation = accessor.getAnnotation(Union.class);
             if (unionAnnotation != null) {
                 info.setUnion(unionAnnotation);
+            }
+
+            if (accessor.getAnnotation(Annotated.class) != null) {
+                info.setAnnotated(true);
             }
 
             fields.add(info);

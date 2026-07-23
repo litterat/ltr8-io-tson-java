@@ -231,6 +231,15 @@ public final class TsonMapper {
 
     // ── Records ──────────────────────────────────────────────────────────
 
+    /**
+     * A field marked {@code @Annotated} (io.ltr8.annotation) isn't bound from a same-named
+     * authored field at all -- it's populated directly from {@code value.annotations()}, the
+     * annotations on this record's *own* value (e.g. {@code @doc:"..." !person { name: Alice } }'s
+     * {@code @doc}), which is exactly what {@link DataClassField#isAnnotationsCarrier()} exists to
+     * flag before the ordinary by-name lookup below ever runs for it. {@code tson-bind} can't
+     * validate the component's declared type is {@link TsonAnnotations} itself (no dependency on
+     * this module), so that check happens here, at the one place both are visible.
+     */
     private Object toRecord(DataValue value, DataClassRecord dataClass) throws Throwable {
         Map<String, DataValue> byName = new HashMap<>();
         CoreValue core = value.coreValue();
@@ -247,6 +256,14 @@ public final class TsonMapper {
         DataClassField[] fields = dataClass.fields();
         Object[] construct = new Object[fields.length];
         for (DataClassField field : fields) {
+            if (field.isAnnotationsCarrier()) {
+                if (field.type() != TsonAnnotations.class) {
+                    throw new DataBindException("@Annotated component '" + field.name() + "' on "
+                            + dataClass.typeClass() + " must be of type TsonAnnotations, found " + field.type());
+                }
+                construct[field.index()] = new TsonAnnotations(value.annotations());
+                continue;
+            }
             DataValue fieldValue = byName.get(field.name());
             if (isAbsent(fieldValue)) {
                 if (field.isRequired()) {

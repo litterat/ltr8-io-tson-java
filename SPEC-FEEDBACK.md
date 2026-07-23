@@ -395,3 +395,47 @@ confident call.
 **Suggested resolution:** State explicitly whether `PnW` is part of `!duration`'s accepted format or not.
 If it is, the table's parenthetical should show it (`PnYnMnDTnHnMnS` / `PnW`) the same way §5.6's table
 spells out multiple accepted grammar forms per numeric atom explicitly rather than by implication.
+
+---
+
+## 13. §3.1's uniform annotation-attachment model has no host-language object-binding equivalent for scalar positions
+
+**Section:** §3.1.
+
+**Problem:** §3.1 lets an annotation attach to *any* `data-value` position, uniformly and recursively:
+a record field's value, an array element, a map key, either side of a map entry, and (since an
+annotation's own value is itself a full `data-value`) recursively inside all of those —
+`{ a: { b: @foo 1 } }` is legal, annotating the deeply-nested `1`. This is a coherent model at the
+data-format layer, where every value position is represented the same way regardless of shape. It has
+no equivalent in a strongly-typed host-language object-binding layer: a Java `String`, `int`, or other
+scalar-typed field has no place of its own to carry extra metadata alongside its value the way a
+composite type (a class the caller controls) could be retrofitted to. So a POJO/record-style binder can
+only ever recover annotations attached to positions that map onto a *composite* type the caller owns
+(and even then, only that value's own annotations — not, recursively, its children's, without inventing
+a separate carrier convention per container kind: field-keyed for records, index-keyed for
+arrays/tuples, twice more for map keys and values). Annotations on a scalar leaf, an array/tuple
+element, or a map key/value are structurally unreachable from a typed object-binding layer, full stop —
+not a gap this implementation failed to close, but one no fixed set of host-language carrier
+conventions closes, since the recursion is the whole shape of the problem. §3.1 doesn't address this at
+all, reasonably, since it's a binding-layer concern rather than a format one — but it's worth being on
+record about, since every implementation doing typed binding on top of TSON will hit the same wall.
+
+**Interpretation chosen:** `io.ltr8.annotation.Annotated`, a marker on one Java record component,
+opts a caller into recovering *only* the annotations on the value the whole record itself corresponds
+to (`TsonAnnotations`, in `tson-mapper`, wrapping the raw, ordered `Annotation` list) — deliberately not
+a general "child annotations" mechanism. A record-field-keyed (or array-index-keyed, or map-key-keyed)
+carrier for children's annotations was considered and rejected: it would only push the same problem down
+one level without resolving the recursive case, needs a different bespoke convention per container kind,
+and is real API surface for a capability likely rarely exercised in practice (per the meta-kernel's own
+`core.tn1`/`meta.tn1`, annotations overwhelmingly describe *the thing itself* — `@doc:"..."
+@ordered:TOTAL` on whole type definitions — not individual scalar fields). An application that needs
+full-fidelity annotation access at positions `@Annotated` can't reach still has one: the parsed AST
+directly (`DataValue.annotations()`), which is already fully general and doesn't need a schema or a
+Java type to project onto.
+
+**Suggested resolution:** Not a Part 1 defect — §3.1 correctly stays silent on host-language binding,
+that's out of scope by design. Flagging as guidance worth a note in a future implementer's guide, or a
+question for Part 2: could a schema declare that a field's annotations bind to a sibling field of a
+specific type (the way `record_field`'s `value`/`value_param` split already handles a related
+value-vs-parameter distinction), giving typed object-binding layers a real, schema-driven answer instead
+of each implementation inventing its own ad hoc partial carrier convention?

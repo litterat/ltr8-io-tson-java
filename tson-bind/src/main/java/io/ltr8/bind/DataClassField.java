@@ -67,8 +67,17 @@ public class DataClassField {
 	// setter write handle. signature object.setT( type t);
 	private final Optional<MethodHandle> setter;
 
+	// true for the one component (if any) a record marked @Annotated on -- see DataClassField's
+	// own isAnnotationsCarrier() Javadoc.
+	private final boolean annotationsCarrier;
+
 	public DataClassField(int index, String name, Class<?> type,  DataClass dataClass, boolean isRequired,
 			MethodHandle isPresent, MethodHandle readHandle, MethodHandle setter) {
+		this(index, name, type, dataClass, isRequired, isPresent, readHandle, setter, false);
+	}
+
+	public DataClassField(int index, String name, Class<?> type, DataClass dataClass, boolean isRequired,
+			MethodHandle isPresent, MethodHandle readHandle, MethodHandle setter, boolean annotationsCarrier) {
 		this.index = index;
 		this.name = name;
 		this.type = type;
@@ -77,6 +86,7 @@ public class DataClassField {
 		this.isPresent = isPresent;
 		this.accessor = readHandle;
 		this.setter = Optional.ofNullable(setter);
+		this.annotationsCarrier = annotationsCarrier;
 	}
 
 	public int index() {
@@ -148,9 +158,22 @@ public class DataClassField {
 		}
 	}
 
+	/**
+	 * @return {@code true} for the one component (if any) a record marked {@code @Annotated}
+	 *         (io.ltr8.annotation) on -- not an ordinary field bound from an authored value, but a
+	 *         reserved slot a binder populates from the *enclosing* value's own TSON wire-format
+	 *         annotations (§3.1) instead. {@code dataClass()}/{@code type()} are meaningless for
+	 *         such a field ({@code null}); a caller needs to recognize this flag before consulting
+	 *         them, the same way a caller must recognize a union/bridge field before treating its
+	 *         {@code dataClass()} as an ordinary one.
+	 */
+	public boolean isAnnotationsCarrier() {
+		return annotationsCarrier;
+	}
+
 	@Override
 	public String toString() {
 		return "DataClassField [index=" + index + ", name=" + name + ", type=" + dataClass + ", isRequired=" + isRequired
-				+ "]";
+				+ (annotationsCarrier ? ", annotationsCarrier=true" : "") + "]";
 	}
 }

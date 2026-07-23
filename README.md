@@ -26,6 +26,8 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
 - [x] Temporal types — `date`, `time`, `datetime`, `duration`
 - [x] Object binding — Java records, hand-written immutable classes, `Map<K, V>`, tuples, plain
       enums, sealed interfaces/unions
+- [x] Wire-format annotation access — a bound record's own `@name[:value]` annotations, via an
+      opt-in carrier component
 - [x] Full document binding — TSON text straight to Java objects, dispatching into all of the above
 
 See [CLAUDE.md](CLAUDE.md#architecture) for architecture and design notes, and
@@ -36,7 +38,8 @@ See [CLAUDE.md](CLAUDE.md#architecture) for architecture and design notes, and
 - [ ] Network/identifier types — `cidr4`, `cidr6`, `mac`
 - [ ] General resolver-layer structural rules as reusable primitives, rather than binding-time-only
       behavior — empty-brace resolution, absent-vs-missing distinction
-- [ ] General `@`-annotation binding to user classes (only the type annotation is consumed today)
+- [ ] Annotation access on individual fields, array/tuple elements, and map keys/values — only a
+      whole bound record's own annotations are reachable today, not its children's
 - [ ] Header/value directive interpretation — `!!id` verification, `!!schema` loading
 - [ ] Multi-error reporting — currently fail-fast on the first lex/parse error
 - [ ] Security hardening — numeric-literal length limits, confusable-character and
