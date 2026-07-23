@@ -14,6 +14,7 @@ import io.ltr8.tson.parser.ast.schema.RecordDef;
 import io.ltr8.tson.parser.ast.schema.RecordEntry;
 import io.ltr8.tson.parser.ast.schema.RefinedDef;
 import io.ltr8.tson.parser.ast.schema.ReferenceTypeDef;
+import io.ltr8.tson.parser.ast.schema.SchemaDocument;
 import io.ltr8.tson.parser.ast.schema.SchemaMap;
 import io.ltr8.tson.parser.ast.schema.SimpleRef;
 import io.ltr8.tson.parser.ast.schema.SizeSpec;
@@ -21,6 +22,7 @@ import io.ltr8.tson.parser.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.parser.ast.schema.TypeArg;
 import io.ltr8.tson.parser.ast.schema.TypeDef;
 import io.ltr8.tson.parser.ast.schema.TypeRef;
+import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldState;
@@ -188,13 +190,18 @@ public final class SchemaResolver {
         return resolveTypeDef(declaration.name(), declaration.typeDef(), resolved);
     }
 
-    /** Resolves every declaration in {@code schemaMap}, one entry at a time, in source order, each seeing every entry resolved before it. */
-    public TsonSchema resolveAll(SchemaMap schemaMap) {
+    /**
+     * Resolves every declaration in {@code document}'s body, one entry at a time, in source
+     * order, each seeing every entry resolved before it -- and carries {@code document}'s own
+     * header directives (§2.2: {@code !!id}?/{@code !!meta}/{@code !!import}*) straight into the
+     * result's {@link TsonSchema#id()}/{@link TsonSchema#meta()}/{@link TsonSchema#imports()}.
+     */
+    public TsonSchema resolveAll(SchemaDocument document) {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        for (SchemaMap.Declaration declaration : schemaMap.declarations().values()) {
+        for (SchemaMap.Declaration declaration : document.body().declarations().values()) {
             entries.put(declaration.name(), resolve(declaration, entries));
         }
-        return new TsonSchema(entries);
+        return new TsonSchema(document.id(), document.meta(), document.imports(), entries);
     }
 
     private TypeDefinition resolveTypeDef(String name, TypeDef typeDef, Map<String, TypeDefinition> resolved) {

@@ -1,5 +1,7 @@
 package io.ltr8.tson.schema.meta;
 
+import io.ltr8.annotation.Record;
+
 import java.math.BigInteger;
 
 /**
@@ -10,8 +12,16 @@ import java.math.BigInteger;
  * (8..256) fits comfortably in an {@code int}. Pure data -- range/host-type behavior derived from a
  * width (minValue/maxValue/hostType) lives on {@code tson-parser}'s {@code IntegerParser}, which
  * consumes this, not here.
+ *
+ * <p>The canonical constructor is written out explicitly (compact, empty body) purely to carry
+ * {@code @Record} -- required as soon as a second, convenience constructor exists (see {@link
+ * IntegerType}'s own Javadoc for why {@code tson-bind} needs this).
  */
 public record IntegerSize(BigInteger bits, boolean signed) {
+
+    @Record
+    public IntegerSize {
+    }
 
     /** Convenience for the built-in width ladder (8..256), where an {@code int} literal reads better than {@code BigInteger.valueOf(...)} at every call site. */
     public IntegerSize(int bits, boolean signed) {

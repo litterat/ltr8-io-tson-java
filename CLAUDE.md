@@ -492,12 +492,13 @@ is tempted to "fix" this back to a plain record, re-read `TypeArgument`'s Javado
   an explicit `@io.ltr8.annotation.Field("snake_case_name")` -- `tson-bind` otherwise writes the bare Java
   component name verbatim (camelCase), and the kernel's own field names are snake_case throughout.
   - Covers every *structurally simple* meta-kernel shape (product/sum/reference bodies, and the
-    supporting records used as field types elsewhere) but deliberately not the atom constraint-vocabulary
-    families with optional bound groups (`integer_type`, `text_type`, `uri_type`, `regex_type`) --
-    representing a field-group's mutual exclusion in a *bound instance* (as opposed to a *field
-    declaration*, which `FieldGroup` already covers) needs real design thought, and `SchemaResolver`
-    doesn't resolve anything to one of these yet either, so modeling them now would be scaffolding with
-    nothing to verify it against.
+    supporting records used as field types elsewhere), plus the four atom constraint-vocabulary
+    families with optional bound groups (`integer_type`, `text_type`, `uri_type`, `regex_type`, all
+    added 2026-07-23 -- see "Meta-kernel bootstrap" below) once it turned out each one's own fields
+    are all `Optional`, so none actually needed the harder "represent a field-group's mutual
+    exclusion in a *bound instance*" design work in the first place. `SchemaResolver` itself still
+    doesn't resolve anything to one of these four via ordinary schema-grammar resolution --
+    `MetaKernelParser` binds their one real-fixture instance (a bare `{}`) by hand instead.
   - **`Top`/`Atom`/`Product`/`Sum`** (added 2026-07-23) replicate the kernel's own composition chain
     (`atom => top & {}`, `product => top & { ... }`, `sum => top & {}`, `reference => top & { target:
     type_name }`, §4.1) as real Java subtyping: `Atom`/`Product`/`Sum` each `extends Top`, and every
@@ -541,12 +542,104 @@ is tempted to "fix" this back to a plain record, re-read `TypeArgument`'s Javado
   into the same omission an `Optional<TypeRef>`/`Optional<Boolean>` field gets for free); and `TypeRef`
   always in its full `{ name: ... arguments: [...] }` form, never §5.6's positional bare-token spelling (a
   schema-specific encoding rule a Part-1-only binder has no reason to know about).
-- **`TsonSchema`** is the resolved-schema wrapper (`Map<String, TypeDefinition>`, insertion order
-  preserved) -- the kernel's own `schema` type, `map<type_name, type_definition>` (§9), as a Java value.
-  `SchemaResolver.resolveAll` builds one from a whole `SchemaMap`, resolving each entry independently in
-  source order; most entries of a real schema (meta-kernel included) still throw today, since most
-  constructs aren't resolved yet -- `resolve(SchemaMap.Declaration)` resolves a single named entry and is
-  the one to reach for against a real fixture until more constructs are supported.
+- **`TsonSchema`** (`io.ltr8.tson.schema.TsonSchema`, in `tson-schema`'s own main package, not
+  `.meta` -- moved back there 2026-07-23; it had briefly lived alongside `SchemaResolver` in
+  `tson-parser` purely for organizational convenience, but needs no `tson-parser` dependency at
+  all) is the resolved-schema wrapper -- the kernel's own `schema` type, `map<type_name,
+  type_definition>` (§9), plus the governing-chain header directives its own document carried
+  (`id`/`meta`/`imports`, §2.2). **A plain class, not a record** -- deliberately, so `MetaSchema`
+  (below) can `extend` it directly. `SchemaResolver.resolveAll(SchemaDocument)` builds one from a
+  whole document (not just its body), resolving each entry independently in source order and
+  carrying the header straight through; most entries of an arbitrary real schema still throw via
+  this path alone, since most constructs aren't resolved yet -- `resolve(SchemaMap.Declaration)`
+  resolves a single named entry and is the one to reach for against a real fixture until more
+  constructs are supported (or use `MetaKernelParser`, below, for meta-kernel specifically).
+- **`MetaSchema`** (`io.ltr8.tson.schema.MetaSchema`, alongside `TsonSchema`) is a distinct
+  `extends TsonSchema` subtype marking, in the type system, meta-kernel's own resolved schema --
+  it adds no fields or behavior of its own. Kept separate from a plain `TsonSchema` purely for
+  identity: the value it wraps had to be pre-loaded (below), not resolved the ordinary way, and
+  a caller holding a `MetaSchema` knows that without re-deriving it.
+
+### Meta-kernel bootstrap (`tson-parser/src/main/java/io/ltr8/tson/parser/resolver/schema/MetaKernelParser.java`)
+
+Meta-kernel is special: its own `!!meta` names *itself* (§1.5's "one deliberate circularity in the
+series, closed by pre-loading rather than by resolution: implementations ship the kernel's resolved
+structure, and this document describes it"). Ordinary schema resolution can't bootstrap it from
+nothing either way: resolving a constructor-*application* instance (`!C value`, §5.5 -- e.g.
+`integer => !integer_type {}`) needs `C`'s own vocabulary already known, and every `C` meta-kernel
+uses is defined within meta-kernel itself.
+
+`MetaKernelParser` is a stateless parser/resolver -- the same shape as `SchemaParser`/
+`SchemaResolver` -- **producing a `MetaSchema` from `parse()`/`parse(String)`, not extending
+`TsonSchema` itself** (an earlier version of this class did extend it directly; corrected
+2026-07-23 once the `MetaSchema` subtype existed to hold the result properly instead). It resolves
+in two passes over meta-kernel's 49 declarations:
+
+1. Every declaration whose `TypeDef` is **not** an `Instance` goes through `SchemaResolver` exactly
+   as normal, in source order (36 of the 49, everything `SchemaResolver`'s own Javadoc already
+   documents as in scope).
+2. The 13 deferred `Instance` declarations (`value => !unit {}`, `boolean => !enum [true false]`,
+   `integer => !integer_type {}`, and friends) are resolved in a **second pass**, once every
+   constructor they reference -- including ones declared *later* in the file, e.g. `enum` itself
+   isn't declared until long after `boolean` uses it -- has an entry to transfer a kind from (§5.5:
+   "construction transfers only the constructor's kind; the result records source: C with empty
+   supertypes").
+
+**Constructor-application binding is done by hand, not through generic object binding** (revised
+2026-07-23, replacing an earlier version that used `TsonMapper.toObject`) -- deliberately, so this
+class needs nothing beyond `tson-parser`/`tson-schema` (both already main-scope dependencies of
+this module) and can live *here* rather than in `tson-mapper`, which the `TsonMapper`-based version
+needed purely to reach `TsonMapper` itself. An `Instance`'s `value` is already a parsed `DataValue`
+(the schema grammar reuses Part 1's own data-value parsing directly), and every registered target's
+shape is simple enough to check directly against the AST rather than bind generically: `unit` and
+`integer_type` are only ever instantiated as a bare `{}` in the real fixture (every field
+`IntegerType` has is `Optional`, so an empty body is exactly `IntegerType.UNCONSTRAINED`) --
+verified by requiring the value actually be an `EmptyBrace` node, not just assumed, the same
+"validate, don't just trust the shape" treatment `enum` already got. `enum` needs a small
+hand-written converter regardless of binding style: `!enum [true false]`'s value is a bare array
+(§5.6's positional form for a single-field constructor), not `{ members: [...] }`, which generic
+`tson-bind` record binding has no positional-form support for anyway. **Every `Instance` declaration
+in the real fixture is registered** (`unit`, `integer_type`, `text_type`, `uri_type`, `regex_type`,
+`enum`) -- all 49 declarations resolve; a declaration whose target isn't registered would simply be
+left out of the result entirely rather than failing the whole bootstrap, but that path is
+unexercised against the real fixture today.
+
+**`meta-kernel.tn1` is packaged as a classpath resource, not read from a filesystem path.**
+`MetaKernelParser.parse()` (no args) reads `/meta-kernel.tn1` off the classpath via
+`Class.getResourceAsStream` -- `tson-parser/build.gradle.kts` wires its `processResources` task to
+copy the file straight from the repo's own `spec/m/meta-kernel.tn1` snapshot at build time (`from
+(rootProject.layout.projectDirectory.dir("spec/m")) { include("meta-kernel.tn1") }`), so there is
+exactly one copy of the file on disk to keep in sync with the spec, but the bootstrap still works
+from a built jar (e.g. published to a repository), not only from a repo checkout. `parse(String
+source)` remains available for parsing arbitrary/custom source text.
+
+**`IntegerType`, then `TextType`/`UriType`/`RegexType`, all became real `TypeBody`/`Atom` variants
+for this (2026-07-23)** -- the four atom constraint-vocabulary families `TypeBody`'s own Javadoc
+used to list as "deliberately not modeled yet", now all modeled: `IntegerType` needed no
+field-group-in-a-bound-instance design work (mutual exclusion between `min`/`exclusiveMin` and
+`max`/`exclusiveMax` is already enforced by its own compact constructor), and `TextType`/`UriType`/
+`RegexType` needed none either -- every field across all three is `Optional`, so each already had
+(or gained) its own `UNCONSTRAINED` constant for exactly this empty-body case. Each gained
+`@Typename` (`text_type`/`uri_type`/`regex_type`) and multi-word fields gained `@Field`
+(`min_length`/`max_length`), matching the convention every other `TypeBody` variant already
+follows, even though `MetaKernelParser` itself binds none of them generically -- kept consistent in
+case something else (e.g. a future `toTson` call on one of these) needs it.
+
+**A real `tson-bind` gotcha, surfaced by the now-superseded `TsonMapper`-based version of this
+bootstrap but still true and worth knowing for any other `schema.meta` class's first use as a bind
+target:** a class with more than one public constructor needs `@io.ltr8.annotation.Field`'s sibling
+`@io.ltr8.annotation.Record` on the canonical one, or `DefaultRecordBinder.getConstructor` throws
+`CodeAnalysisException` ("Could not find constructor"). `getConstructor` only auto-picks a class's
+sole constructor when exactly one exists; with two (a canonical plus any convenience overload --
+`IntegerType`'s and `IntegerSize`'s own `IntegerSize(int, boolean)` convenience constructor both
+qualify), it looks for one annotated `@Record` and fails if none is. This isn't a `tson-bind` bug
+(the annotation and the fallback logic both exist specifically for this case) -- it's just that
+neither class had ever been a `TsonMapper` bind *target* before (every earlier use just constructed
+them directly in Java), so nothing had surfaced it. Fixed by writing out the canonical constructor
+explicitly (compact, for `IntegerType`; empty-bodied, for `IntegerSize`, which didn't have one
+written out at all before) with `@Record` attached -- both annotations stay in place even though
+`MetaKernelParser` itself no longer needs generic binding, since `SchemaResolverTest`'s own
+`toTson` verification (below) still binds through `TsonMapper`.
 - **Verified against the real fixture, not just a hand-written snippet.** `SchemaResolverTest` resolves
   `integer_size` both from a small inline schema and from the real `spec/m/meta-kernel.tn1`, and asserts
   the exact real `toTson` output -- structurally equivalent to (per the divergences above, not a content

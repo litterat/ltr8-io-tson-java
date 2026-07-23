@@ -5,6 +5,7 @@ import io.ltr8.tson.mapper.TsonMapper;
 import io.ltr8.tson.parser.SchemaParser;
 import io.ltr8.tson.parser.ast.schema.SchemaDocument;
 import io.ltr8.tson.parser.ast.schema.SchemaMap;
+import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.EnumBody;
@@ -107,7 +108,7 @@ class SchemaResolverTest {
                   point => { x: integer  y: integer }
                 }""").parseSchemaDocument();
 
-        TsonSchema schema = resolver.resolveAll(doc.body());
+        TsonSchema schema = resolver.resolveAll(doc);
 
         assertEquals(2, schema.entries().size());
         assertEquals(EXPECTED_INTEGER_SIZE, write(schema.entries().get("integer_size")));
