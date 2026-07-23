@@ -117,17 +117,6 @@ class SchemaResolverTest {
     //    diverges, structurally faithfully, from meta-kernel-resolved.tn1's own text) ──
 
     @Test
-    void writesAReferenceBody() throws DataBindException {
-        // Structurally: type_name => !type_definition { kind: REFERENCE source: token body: !reference { target: token } }
-        TypeDefinition typeName = TypeDefinition.reference("token");
-
-        assertEquals("{ source: { name: \"token\" arguments: [] } kind: \"REFERENCE\" parameters: [] "
-                        + "constructor: false supertypes: [] subtypes: [] "
-                        + "body: !reference { target: { name: \"token\" arguments: [] } } }",
-                write(typeName));
-    }
-
-    @Test
     void writesAUnitBody() throws DataBindException {
         // Structurally: value => !type_definition { kind: ATOM source: unit body: !unit {} }
         TypeDefinition value = new TypeDefinition(Optional.of(TypeRef.of("unit")), TypeKind.ATOM, List.of(), false,
@@ -285,6 +274,58 @@ class SchemaResolverTest {
                         + "{ members: [ \"max\" \"exclusive_max\" ] state: \"OPTIONAL\" } "
                         + "] } }",
                 write(integerType));
+    }
+
+    // ── Bare type references (§8.3): type_name, field_name, param_name, and
+    //    the annotation markers -- all resolve to a REFERENCE-kind entry
+    //    regardless of what the referenced name itself resolves to.
+
+    @Test
+    void resolvesBareTypeReferencesToAReferenceKindEntry() throws IOException, DataBindException {
+        SchemaMap schemaMap = new SchemaParser(readFixture()).parseSchemaDocument().body();
+
+        TypeDefinition typeName = resolver.resolve(schemaMap.declarations().get("type_name"));
+        TypeDefinition fieldName = resolver.resolve(schemaMap.declarations().get("field_name"));
+        TypeDefinition paramName = resolver.resolve(schemaMap.declarations().get("param_name"));
+        TypeDefinition annotation = resolver.resolve(schemaMap.declarations().get("annotation"));
+        TypeDefinition documentation = resolver.resolve(schemaMap.declarations().get("documentation"));
+        TypeDefinition doc = resolver.resolve(schemaMap.declarations().get("doc"));
+        TypeDefinition alias = resolver.resolve(schemaMap.declarations().get("alias"));
+
+        // type_name/field_name/param_name => token; each is its own fresh REFERENCE entry, not
+        // three views of the same one -- source/target both name "token" for all three.
+        assertEquals(TypeKind.REFERENCE, typeName.kind());
+        assertEquals(TypeKind.REFERENCE, fieldName.kind());
+        assertEquals(TypeKind.REFERENCE, paramName.kind());
+        assertEquals(TypeKind.REFERENCE, annotation.kind());
+        assertEquals(TypeKind.REFERENCE, documentation.kind());
+        assertEquals(TypeKind.REFERENCE, doc.kind());
+        assertEquals(TypeKind.REFERENCE, alias.kind());
+
+        assertEquals("{ source: { name: \"token\" arguments: [] } kind: \"REFERENCE\" parameters: [] "
+                + "constructor: false supertypes: [] subtypes: [] "
+                + "body: !reference { target: { name: \"token\" arguments: [] } } }", write(typeName));
+        assertEquals(write(typeName), write(fieldName));
+        assertEquals(write(typeName), write(paramName));
+
+        // annotation => @annotation void -- the @annotation marker is metadata on the type-def
+        // (SchemaMap.Declaration.typeDefAnnotations), not part of the TypeDef this resolves, so it
+        // plays no role here; resolution is identical to any other bare reference.
+        assertEquals("{ source: { name: \"void\" arguments: [] } kind: \"REFERENCE\" parameters: [] "
+                + "constructor: false supertypes: [] subtypes: [] "
+                + "body: !reference { target: { name: \"void\" arguments: [] } } }", write(annotation));
+
+        // doc => @annotation documentation => @annotation text -- a chain of references, each
+        // resolved independently (no following the chain here, just the immediate target).
+        assertEquals("{ source: { name: \"text\" arguments: [] } kind: \"REFERENCE\" parameters: [] "
+                + "constructor: false supertypes: [] subtypes: [] "
+                + "body: !reference { target: { name: \"text\" arguments: [] } } }", write(documentation));
+        assertEquals("{ source: { name: \"documentation\" arguments: [] } kind: \"REFERENCE\" parameters: [] "
+                + "constructor: false supertypes: [] subtypes: [] "
+                + "body: !reference { target: { name: \"documentation\" arguments: [] } } }", write(doc));
+
+        // alias => @annotation text -- same shape as documentation (both target "text").
+        assertEquals(write(documentation), write(alias));
     }
 
     @Test

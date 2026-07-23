@@ -278,10 +278,18 @@ string, §4.5) for `TokenValue`s produced by the parser. `NumberGrammar.tryParse
   supertypes the caller has already resolved and handed back in -- real forward references and
   namespace population, §3.3.2/§3.4.1's Pass 1, are later work, not attempted yet). `subtypes` (the
   reverse index) is never populated -- it needs a whole-schema pass, not a per-declaration one.
+- **Bare type references** (`name => other_name`, §8.3) -- always resolve to a `REFERENCE`-kind
+  entry regardless of what the referenced name itself resolves to (`type_name => token` is `kind:
+  REFERENCE` even though `token` itself is `kind: ATOM`) -- no namespace lookup here either, the
+  referenced name is carried through as a bare, unverified string, same as an ordinary field's
+  type-ref. Verified against `type_name`/`field_name`/`param_name`/`annotation`/`documentation`/
+  `doc`/`alias` from the real fixture -- `@annotation` on `annotation`'s own declaration is metadata
+  on the type-def (`SchemaMap.Declaration.typeDefAnnotations`), not part of what this resolves, so
+  it plays no role.
 
 Every other construct (elided field types, field modifiers/default-fixed values, refinement,
-subtraction, atom instances/refinements, generic type-refs, templates, tightening) throws
-`UnsupportedOperationException` rather than silently mis-resolving -- `SchemaResolver`'s own Javadoc
+subtraction, generic type-refs, templates, tightening) throws `UnsupportedOperationException`
+rather than silently mis-resolving -- `SchemaResolver`'s own Javadoc
 lists exactly what's in scope.
 
 - **`io.ltr8.tson.schema.meta`** holds the resolved-value model -- one Java type per meta-kernel

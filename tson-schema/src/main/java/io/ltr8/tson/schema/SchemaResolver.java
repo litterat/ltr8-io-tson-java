@@ -5,6 +5,7 @@ import io.ltr8.tson.parser.ast.schema.FieldDef;
 import io.ltr8.tson.parser.ast.schema.GroupDef;
 import io.ltr8.tson.parser.ast.schema.RecordDef;
 import io.ltr8.tson.parser.ast.schema.RecordEntry;
+import io.ltr8.tson.parser.ast.schema.ReferenceTypeDef;
 import io.ltr8.tson.parser.ast.schema.SchemaMap;
 import io.ltr8.tson.parser.ast.schema.SimpleRef;
 import io.ltr8.tson.parser.ast.schema.StructuralTypeDef;
@@ -30,23 +31,32 @@ import java.util.Set;
  * Resolves declarations from a {@link SchemaMap} (the grammar-layer AST, {@code tson-parser}) into
  * {@link TypeDefinition}s (Part 2 §8's resolved schema-value shape, {@code io.ltr8.tson.schema.meta})
  * -- an incremental, deliberately narrow resolver, not the full two-pass resolver of §3.4.1. It
- * handles two constructs so far, each optionally {@code ~}-marked (the {@code constructor} flag is
- * threaded straight from {@code StructuralTypeDef.constructor()} into the result either way):
+ * handles three constructs so far:
  *
  * <ul>
- *   <li>A record (no supertypes, no type parameters) whose fields are plain simple type-refs, each
- *   REQUIRED or OPTIONAL (a {@code ?} suffix), and whose entries may include field groups (§5.11) --
- *   {@code integer_size}'s own shape, and (via a {@code ~atom & {...}} composition body, see below)
- *   {@code integer_type}'s.</li>
- *   <li>Composition ({@code A & B & { ... }}, §5.8) over supertypes that are themselves already
- *   resolved, simple (non-generic) references, whose own body is a {@link RecordBody} -- {@code
- *   atom => top & {}}, {@code product => top & { access_pattern: ... size_type: ... }}, {@code sum
- *   => top & {}}, {@code reference => top & { target: type_name } }, and {@code integer_type =>
- *   ~atom & { size: integer_size? ( min: integer | exclusive_min: integer )? ... }}'s own shapes.</li>
+ *   <li>A record (no supertypes, no type parameters), optionally {@code ~}-marked (the {@code
+ *   constructor} flag threads straight from {@code StructuralTypeDef.constructor()} into the
+ *   result), whose fields are plain simple type-refs, each REQUIRED or OPTIONAL (a {@code ?}
+ *   suffix), and whose entries may include field groups (§5.11) -- {@code integer_size}'s own
+ *   shape, and (via a {@code ~atom & {...}} composition body, see below) {@code integer_type}'s.</li>
+ *   <li>Composition ({@code A & B & { ... }}, §5.8), also optionally {@code ~}-marked, over
+ *   supertypes that are themselves already resolved, simple (non-generic) references, whose own
+ *   body is a {@link RecordBody} -- {@code atom => top & {}}, {@code product => top & {
+ *   access_pattern: ... size_type: ... }}, {@code sum => top & {}}, {@code reference => top & {
+ *   target: type_name } }, and {@code integer_type => ~atom & { size: integer_size? ( min: integer
+ *   | exclusive_min: integer )? ... }}'s own shapes.</li>
+ *   <li>A bare, argument-free type reference ({@code name => other_name}, §8.3) -- always resolves
+ *   to a {@code REFERENCE}-kind entry regardless of what the referenced name itself resolves to
+ *   (e.g. {@code type_name => token} is {@code kind: REFERENCE} even though {@code token} itself
+ *   is {@code kind: ATOM}) -- {@code type_name}/{@code field_name}/{@code param_name}/{@code
+ *   annotation}/{@code documentation}/{@code doc}/{@code alias}'s own shape. No namespace lookup
+ *   happens here either: the referenced name is carried through as a bare string, unverified,
+ *   exactly like an ordinary field's type-ref.</li>
  * </ul>
  *
  * Everything else -- elided field types, field modifiers (default/fixed values), refinement,
- * subtraction, generic type-refs, templates, tightening an inherited field or group in a
+ * subtraction, generic type-refs (including a reference declaration's own, e.g. {@code schema =>
+ * map<type_name, type_definition>}), templates, tightening an inherited field or group in a
  * composition body -- is explicitly out of scope for now and reported via {@link
  * UnsupportedOperationException} rather than silently mis-resolved; each is a later, separate pass.
  *
@@ -119,8 +129,12 @@ public final class SchemaResolver {
                 return resolveComposition(name, construction, resolved, constructor);
             }
         }
+        if (typeDef instanceof ReferenceTypeDef referenceTypeDef && referenceTypeDef.typeParams().isEmpty()
+                && referenceTypeDef.ref() instanceof SimpleRef simple) {
+            return TypeDefinition.reference(simple.name());
+        }
         throw new UnsupportedOperationException(
-                "'" + name + "': only fresh record constructions and composition are resolved so far, got "
+                "'" + name + "': only fresh record constructions, composition, and simple type references are resolved so far, got "
                         + typeDef.getClass().getSimpleName());
     }
 
