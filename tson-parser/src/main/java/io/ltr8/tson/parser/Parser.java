@@ -37,11 +37,21 @@ import java.util.Optional;
  *
  * <p>Rejects schema documents (header containing {@code !!meta}) with {@link SchemaDocumentException}
  * rather than attempting to parse them -- this is a Class 1 (data-format-only) processor (§1.5).
+ *
+ * <p><b>Not {@code final}, deliberately.</b> {@link SchemaParser} (Part 2's schema-document parser,
+ * same package) extends this class to reuse the machinery [TSON-SCHEMA] itself says it imports
+ * from [TSON-DATA] §7.4 -- {@code annotation}, {@code data-value}, directive parsing (identical
+ * shape for {@code !!id}/{@code !!meta}/{@code !!import}), and the separator/adjacency primitives
+ * -- rather than re-implementing identical grammar a second time. The fields and helper methods
+ * {@link SchemaParser} needs are package-private (not {@code private}); everything else (record/
+ * map/array parsing, the data-grammar's own {@code !type} handling) stays {@code private}, since
+ * the schema grammar has its own, different rules at those points and never calls into this
+ * class's versions of them.
  */
-public final class Parser {
+public class Parser {
 
-    private final List<Token> tokens;
-    private int pos;
+    final List<Token> tokens;
+    int pos;
 
     public Parser(String source) {
         this.tokens = new Lexer(source).tokenize();
@@ -99,7 +109,7 @@ public final class Parser {
         return new ScopedValue(schemaRef, parseDataValue());
     }
 
-    private DataValue parseDataValue() {
+    DataValue parseDataValue() {
         List<Annotation> annotations = new ArrayList<>();
         while (check(TokenType.AT)) {
             annotations.add(parseAnnotation());
@@ -140,7 +150,7 @@ public final class Parser {
 
     // ── Augmentation (§3) ────────────────────────────────────────────────
 
-    private Annotation parseAnnotation() {
+    Annotation parseAnnotation() {
         Token at = expect(TokenType.AT, "annotation");
         Token name = peek();
         if (name.type() != TokenType.UNQUOTED) {
@@ -199,7 +209,7 @@ public final class Parser {
      * base type resolution (§4) applied to an arbitrary core-value, which is what {@code Parser}
      * otherwise stays out of.
      */
-    private String parseNamedDirective(String expectedName) {
+    String parseNamedDirective(String expectedName) {
         Token bangbang = expect(TokenType.DIRECTIVE, "directive");
         Token name = peek();
         if (name.type() != TokenType.UNQUOTED) {
@@ -245,7 +255,7 @@ public final class Parser {
     }
 
     /** Looks ahead at an upcoming {@code !!name} directive's name without consuming anything. */
-    private String peekDirectiveName() {
+    String peekDirectiveName() {
         Token name = peek(1);
         return name.type() == TokenType.UNQUOTED ? name.text() : null;
     }
@@ -294,14 +304,25 @@ public final class Parser {
     }
 
     private RecordValue.Field parseField() {
+        Token name = expectFieldNameToken("a record field");
+        expect(TokenType.COLON, "record field");
+        return new RecordValue.Field(name.text(), parseScopedValue());
+    }
+
+    /**
+     * {@code field-name = token} ([TSON-DATA] §7.4): any of the three token forms, unquoted or
+     * quoted -- the same acceptance rule for a record field's name here and for {@code
+     * tson-schema}'s {@code field-def}/{@code group-member}/{@code removal-set}, which import this
+     * exact production (§12.1).
+     */
+    Token expectFieldNameToken(String context) {
         Token name = peek();
         if (name.type() != TokenType.UNQUOTED && name.type() != TokenType.SINGLE_LINE_STRING
                 && name.type() != TokenType.MULTI_LINE_STRING) {
-            throw parseError("expected a field name (a token), found " + describe(name));
+            throw parseError("expected a field name (a token) for " + context + ", found " + describe(name));
         }
         advance();
-        expect(TokenType.COLON, "record field");
-        return new RecordValue.Field(name.text(), parseScopedValue());
+        return name;
     }
 
     private MapValue.MapEntry parseMapEntry() {
@@ -331,7 +352,7 @@ public final class Parser {
      * by the closing delimiter is a trailing separator, also a parse error. Both are detected via
      * {@link Position} gaps, since whitespace itself leaves no token.
      */
-    private boolean consumeSeparatorOrCloseCheck(TokenType closing) {
+    boolean consumeSeparatorOrCloseCheck(TokenType closing) {
         if (check(closing)) {
             return false;
         }
@@ -359,16 +380,16 @@ public final class Parser {
 
     // ── Cursor primitives ────────────────────────────────────────────────
 
-    private Token peek() {
+    Token peek() {
         return peek(0);
     }
 
-    private Token peek(int offset) {
+    Token peek(int offset) {
         int idx = Math.min(pos + offset, tokens.size() - 1);
         return tokens.get(idx);
     }
 
-    private Token advance() {
+    Token advance() {
         Token t = peek();
         if (pos < tokens.size() - 1) {
             pos++;
@@ -376,22 +397,22 @@ public final class Parser {
         return t;
     }
 
-    private boolean check(TokenType type) {
+    boolean check(TokenType type) {
         return peek().type() == type;
     }
 
-    private Token expect(TokenType type, String context) {
+    Token expect(TokenType type, String context) {
         if (!check(type)) {
             throw parseError("expected " + type + " (" + context + "), found " + describe(peek()));
         }
         return advance();
     }
 
-    private ParseException parseError(String message) {
+    ParseException parseError(String message) {
         return new ParseException(message, peek().start());
     }
 
-    private static String describe(Token t) {
+    static String describe(Token t) {
         if (t.type() == TokenType.EOF) {
             return "end of input";
         }

@@ -1,0 +1,422 @@
+!!id:"https://tson.io/2026/32/m/core-resolved.tn1"
+!!schema:"https://tson.io/2026/32/m/meta.tn1"
+@doc:"""
+  Resolver-output fixture for core.tn1 (2026 Revision 32 draft).
+  Parse the source schema, run the resolver, canonicalise, compare.
+  Conventions as in meta-kernel-resolved.tn1.
+
+  This document is governed by the meta-schema: the structural
+  vocabulary (`type_definition`, `record`, `enum`, ...) reaches it
+  through meta's kernel import. As a data document, this header
+  cannot carry `!!import`: the namespace in which this map's
+  type-name tokens resolve (core.tn1's locals; core imports nothing)
+  is declared by the source schema's header and supplied at ingest
+  ([TSON-SCHEMA] Section 8.1), never by this document. The
+  annotation types used here
+  (`doc` from the kernel via that import; `ordered`, `bounded`,
+  `exact`, `numeric` from meta itself) resolve one hop against meta's
+  namespace. Constructor names in `source` fields and bodies
+  (`integer_type`, `decimal_type`, `float_type`, `complex_type`, ...)
+  likewise name meta- and kernel-level entries. Source @doc strings
+  are carried abbreviated; a conforming resolver preserves them
+  verbatim.
+  """
+!schema {
+  @doc:"Void primitive — a fresh sibling of the meta-kernel's `void`: same construction and contract, distinct type entity. Admits only the absent sentinel `_`."
+  void => !type_definition {
+    kind: ATOM
+    source: unit
+    body: !unit {}
+  }
+
+  @doc:"Two-value boolean enumeration."
+  boolean => !type_definition {
+    kind: ATOM
+    source: enum
+    body: !enum { members: [true false] }
+  }
+
+  @doc:"Arbitrary-precision signed integer. Decimal, hex, octal, and binary forms; [TSON-DATA] Section 7.6."
+  @ordered:TOTAL @bounded:false @exact:true @numeric
+  integer => !type_definition {
+    kind: ATOM
+    source: integer_type
+    subtypes: [int128 int16 int256 int32 int64 int8 negative_integer non_negative_integer non_positive_integer positive_integer uint128 uint16 uint256 uint32 uint64 uint8]
+    body: !integer_type {}
+  }
+
+  @doc:"Exact number of arbitrary magnitude and precision, finite, no special values (SQL exact tier; ISO/IEC 11404 scaled, radix 10). JSON Schema `number` mapping."
+  @ordered:TOTAL @bounded:false @exact:true @numeric
+  number => !type_definition {
+    kind: ATOM
+    source: decimal_type
+    body: !decimal_type {}
+  }
+
+  @doc:"""
+    Exact fraction a/b; positive nonzero denominator by grammar. Not
+    normalized: the token is preserved as written and 2/4 round-trips
+    as 2/4. Equality and constraints operate on the value (2/4 equals
+    1/2); receivers reduce if their representation needs it. Contains
+    `/`, so data values must be quoted.
+    """ 
+  @ordered:TOTAL @bounded:false @exact:true @numeric
+  rational => !type_definition {
+    kind: ATOM
+    source: rational_type
+    body: !rational_type {}
+  }
+
+  @doc:"Complex number, a pair of components. `component` defaults to NUMBER; exactness follows the component type."
+  @ordered:NONE @bounded:false @numeric
+  complex => !type_definition {
+    kind: ATOM
+    source: complex_type
+    body: !complex_type {}
+  }
+
+  @doc:"Signed 8-bit integer (-128 to 127)."
+  @ordered:TOTAL @bounded:true @exact:true @numeric
+  int8 => !type_definition {
+    kind: ATOM
+    source: integer_type
+    supertypes: [integer]
+    body: !integer_type { size: { bits: 8  signed: true } }
+  }
+
+  @doc:"Signed 16-bit integer."
+  @ordered:TOTAL @bounded:true @exact:true @numeric
+  int16 => !type_definition {
+    kind: ATOM
+    source: integer_type
+    supertypes: [integer]
+    body: !integer_type { size: { bits: 16  signed: true } }
+  }
+
+  @doc:"Signed 32-bit integer."
+  @ordered:TOTAL @bounded:true @exact:true @numeric
+  int32 => !type_definition {
+    kind: ATOM
+    source: integer_type
+    supertypes: [integer]
+    body: !integer_type { size: { bits: 32  signed: true } }
+  }
+
+  @doc:"Signed 64-bit integer."
+  @ordered:TOTAL @bounded:true @exact:true @numeric
+  int64 => !type_definition {
+    kind: ATOM
+    source: integer_type
+    supertypes: [integer]
+    body: !integer_type { size: { bits: 64  signed: true } }
+  }
+
+  @doc:"Signed 128-bit integer."
+  @ordered:TOTAL @bounded:true @exact:true @numeric
+  int128 => !type_definition {
+    kind: ATOM
+    source: integer_type
+    supertypes: [integer]
+    body: !integer_type { size: { bits: 128  signed: true } }
+  }
+
+  @doc:"Signed 256-bit integer."
+  @ordered:TOTAL @bounded:true @exact:true @numeric
+  int256 => !type_definition {
+    kind: ATOM
+    source: integer_type
+    supertypes: [integer]
+    body: !integer_type { size: { bits: 256  signed: true } }
+  }
+
+  @doc:"Unsigned 8-bit integer (0 to 255)."
+  @ordered:TOTAL @bounded:true @exact:true @numeric
+  uint8 => !type_definition {
+    kind: ATOM
+    source: integer_type
+    supertypes: [integer]
+    body: !integer_type { size: { bits: 8  signed: false } }
+  }
+
+  @doc:"Unsigned 16-bit integer."
+  @ordered:TOTAL @bounded:true @exact:true @numeric
+  uint16 => !type_definition {
+    kind: ATOM
+    source: integer_type
+    supertypes: [integer]
+    body: !integer_type { size: { bits: 16  signed: false } }
+  }
+
+  @doc:"Unsigned 32-bit integer."
+  @ordered:TOTAL @bounded:true @exact:true @numeric
+  uint32 => !type_definition {
+    kind: ATOM
+    source: integer_type
+    supertypes: [integer]
+    body: !integer_type { size: { bits: 32  signed: false } }
+  }
+
+  @doc:"Unsigned 64-bit integer."
+  @ordered:TOTAL @bounded:true @exact:true @numeric
+  uint64 => !type_definition {
+    kind: ATOM
+    source: integer_type
+    supertypes: [integer]
+    body: !integer_type { size: { bits: 64  signed: false } }
+  }
+
+  @doc:"Unsigned 128-bit integer."
+  @ordered:TOTAL @bounded:true @exact:true @numeric
+  uint128 => !type_definition {
+    kind: ATOM
+    source: integer_type
+    supertypes: [integer]
+    body: !integer_type { size: { bits: 128  signed: false } }
+  }
+
+  @doc:"Unsigned 256-bit integer."
+  @ordered:TOTAL @bounded:true @exact:true @numeric
+  uint256 => !type_definition {
+    kind: ATOM
+    source: integer_type
+    supertypes: [integer]
+    body: !integer_type { size: { bits: 256  signed: false } }
+  }
+
+  @doc:"Integer greater than zero."
+  @ordered:TOTAL @bounded:false @exact:true @numeric
+  positive_integer => !type_definition {
+    kind: ATOM
+    source: integer_type
+    supertypes: [integer]
+    body: !integer_type { min: 1 }
+  }
+
+  @doc:"Integer zero or greater."
+  @ordered:TOTAL @bounded:false @exact:true @numeric
+  non_negative_integer => !type_definition {
+    kind: ATOM
+    source: integer_type
+    supertypes: [integer]
+    body: !integer_type { min: 0 }
+  }
+
+  @doc:"Integer less than zero."
+  @ordered:TOTAL @bounded:false @exact:true @numeric
+  negative_integer => !type_definition {
+    kind: ATOM
+    source: integer_type
+    supertypes: [integer]
+    body: !integer_type { max: -1 }
+  }
+
+  @doc:"Integer zero or less."
+  @ordered:TOTAL @bounded:false @exact:true @numeric
+  non_positive_integer => !type_definition {
+    kind: ATOM
+    source: integer_type
+    supertypes: [integer]
+    body: !integer_type { max: 0 }
+  }
+
+  @doc:"IEEE 754 binary32. Value set is the binary32 grid plus signed zeros, subnormals, both infinities, and quiet NaN."
+  @ordered:PARTIAL @bounded:false @exact:false @numeric
+  float32 => !type_definition {
+    kind: ATOM
+    source: float_type
+    body: !float_type { format: BINARY32 }
+  }
+
+  @doc:"IEEE 754 binary64. Value set is the binary64 grid plus signed zeros, subnormals, both infinities, and quiet NaN."
+  @ordered:PARTIAL @bounded:false @exact:false @numeric
+  float64 => !type_definition {
+    kind: ATOM
+    source: float_type
+    body: !float_type { format: BINARY64 }
+  }
+
+  @doc:"Unicode code point sequence. The universal text type."
+  @ordered:NONE @bounded:false
+  text => !type_definition {
+    kind: ATOM
+    source: text_type
+    subtypes: [non_empty_text]
+    body: !text_type {}
+  }
+
+  @doc:"Text with at least one character."
+  non_empty_text => !type_definition {
+    kind: ATOM
+    source: text_type
+    supertypes: [text]
+    body: !text_type { min_length: 1 }
+  }
+
+  @doc:"Interoperable regular expression pattern per RFC 9485 (I-Regexp)."
+  @ordered:NONE @bounded:false
+  regex => !type_definition {
+    kind: ATOM
+    source: regex_type
+    body: !regex_type {}
+  }
+
+  @doc:"Uniform Resource Identifier per RFC 3986."
+  @ordered:NONE @bounded:false
+  uri => !type_definition {
+    kind: ATOM
+    source: uri_type
+    body: !uri_type {}
+  }
+
+  @doc:"Base64-encoded binary (RFC 4648)."
+  base64 => !type_definition {
+    kind: ATOM
+    source: binary
+    body: !binary { encoding: BASE64 }
+  }
+
+  @doc:"URL-safe base64-encoded binary (RFC 4648 Section 5)."
+  base64url => !type_definition {
+    kind: ATOM
+    source: binary
+    body: !binary { encoding: BASE64URL }
+  }
+
+  @doc:"Base32-encoded binary (RFC 4648)."
+  base32 => !type_definition {
+    kind: ATOM
+    source: binary
+    body: !binary { encoding: BASE32 }
+  }
+
+  @doc:"Hex-encoded binary."
+  hex => !type_definition {
+    kind: ATOM
+    source: binary
+    body: !binary { encoding: HEX }
+  }
+
+  @doc:"Calendar date. RFC 3339 full-date YYYY-MM-DD."
+  @ordered:TOTAL @bounded:false
+  date => !type_definition {
+    kind: ATOM
+    source: date_type
+    body: !date_type {}
+  }
+
+  @doc:"Time of day. RFC 3339 full-time. PARTIAL ordering across timezone offsets."
+  @ordered:PARTIAL @bounded:true
+  time => !type_definition {
+    kind: ATOM
+    source: time_type
+    body: !time_type {}
+  }
+
+  @doc:"Date and time. RFC 3339 date-time. PARTIAL ordering across timezone offsets."
+  @ordered:PARTIAL @bounded:false
+  datetime => !type_definition {
+    kind: ATOM
+    source: datetime_type
+    body: !datetime_type {}
+  }
+
+  @doc:"Time duration. ISO 8601 PnYnMnDTnHnMnS. PARTIAL ordering: calendar units have no fixed length."
+  @ordered:PARTIAL @bounded:false
+  duration => !type_definition {
+    kind: ATOM
+    source: duration_type
+    body: !duration_type {}
+  }
+
+  @doc:"128-bit identifier per RFC 9562."
+  @ordered:NONE @bounded:true
+  uuid => !type_definition {
+    kind: ATOM
+    source: uuid_type
+    body: !uuid_type {}
+  }
+
+  @doc:"Email address per RFC 5322."
+  @ordered:NONE @bounded:false
+  email => !type_definition {
+    kind: ATOM
+    source: email_type
+    body: !email_type {}
+  }
+
+  @doc:"IPv4 address, dotted-quad per the RFC 3986 IPv4address production."
+  @ordered:TOTAL @bounded:true
+  ipv4 => !type_definition {
+    kind: ATOM
+    source: ipv4_type
+    body: !ipv4_type {}
+  }
+
+  @doc:"IPv6 address, RFC 4291 text representation. Contains colons, so data values must be quoted."
+  @ordered:TOTAL @bounded:true
+  ipv6 => !type_definition {
+    kind: ATOM
+    source: ipv6_type
+    body: !ipv6_type {}
+  }
+
+  @doc:"IPv4 network, address/prefix (RFC 4632). PARTIAL ordering by containment. Must be quoted."
+  @ordered:PARTIAL @bounded:true
+  cidr4 => !type_definition {
+    kind: ATOM
+    source: cidr4_type
+    body: !cidr4_type {}
+  }
+
+  @doc:"IPv6 network, address/prefix (RFC 4291). PARTIAL ordering by containment. Must be quoted."
+  @ordered:PARTIAL @bounded:true
+  cidr6 => !type_definition {
+    kind: ATOM
+    source: cidr6_type
+    body: !cidr6_type {}
+  }
+
+  @doc:"MAC address, EUI-48 (RFC 9542). Colon form must be quoted; hyphen form may be unquoted."
+  @ordered:NONE @bounded:true
+  mac => !type_definition {
+    kind: ATOM
+    source: mac_type
+    body: !mac_type {}
+  }
+
+  @doc:"Value whose type is unconstrained. The validator accepts any well-formed value of any type."
+  @ordered:NONE @bounded:false
+  unknown => !type_definition {
+    kind: SUM
+    source: unknown_type
+    body: !unknown_type {}
+  }
+
+  @doc:"Marker annotation."
+  annotation => @annotation !type_definition {
+    kind: REFERENCE
+    source: void
+    body: !reference { target: void }
+  }
+
+  @doc:"Text-valued documentation annotation."
+  documentation => @annotation !type_definition {
+    kind: REFERENCE
+    source: text
+    body: !reference { target: text }
+  }
+
+  @doc:"Short alias for documentation annotation."
+  doc => @annotation !type_definition {
+    kind: REFERENCE
+    source: documentation
+    body: !reference { target: documentation }
+  }
+
+  @doc:"Source-level alias name preserved on a resolved type reference."
+  alias => @annotation !type_definition {
+    kind: REFERENCE
+    source: text
+    body: !reference { target: text }
+  }
+}

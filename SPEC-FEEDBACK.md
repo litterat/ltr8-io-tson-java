@@ -439,3 +439,69 @@ question for Part 2: could a schema declare that a field's annotations bind to a
 specific type (the way `record_field`'s `value`/`value_param` split already handles a related
 value-vs-parameter distinction), giving typed object-binding layers a real, schema-driven answer instead
 of each implementation inventing its own ad hoc partial carrier convention?
+
+---
+
+## 14. `construction-def`'s ABNF (§12.1) can't parse its own worked example from §5.8
+
+**Section:** §12.1 (grammar), cross-referenced against §5.8 and §12.2.
+
+**Problem:** The ABNF is:
+
+```
+construction-def = type-ref 1*(ws "&" ws type-ref)
+                   [ws record-def] [ws removal-set]
+                 / type-ref ws "&" ws record-def [ws removal-set]
+                 / type-ref ws removal-set
+```
+
+Alternative 1's trailing `record-def` has no leading `"&"` in front of it — only `1*(ws "&" ws
+type-ref)` does. But §5.8's own worked example is `customer => address & contact & { loyalty_tier: text
+}`, which has a `&` immediately before the `{`. Under alternative 1 as literally written, `type-ref` binds
+`address`, the `1*("&" type-ref)` repetition consumes `& contact` (one repetition — `record-def` can't
+itself satisfy `type-ref`, since `type-ref`'s four alternatives never start with `{`), and the repetition
+then cannot continue because the next token is `&` followed by `{`, not `&` followed by a `type-ref`. The
+remaining `& { loyalty_tier: text }` has nothing left in alternative 1 to consume it: the next slot is a
+*bare* `record-def` with no `&` in front. Alternative 2 doesn't rescue this either — it's fixed at exactly
+one leading `type-ref` before its own single `"&" record-def`, so it only covers a two-item case
+(`address & { ... }`), not the three-or-more-supertype chain the example shows. §12.2's disambiguation
+notes assume the intended behavior directly: "When a `{` follows a `&`-chain, it always belongs to the
+construction's record-def" — describing exactly the `& {` shape the ABNF's alternative 1 fails to admit.
+
+**Interpretation chosen:** Implemented per the clear intent (the worked example plus the §12.2 note),
+not the literal alternative-1 production: a construction's supertype list is `type-ref (ws "&" ws
+type-ref)*`, and on each `&` the parser checks one token ahead — `{` means the trailing `record-def`
+(terminating the supertype list), anything else means another `type-ref` supertype. This is equivalent to
+alternative 1 with an implicit `"&" ws` inserted directly before its `[record-def]` slot. Implemented in
+`tson-parser`'s `SchemaParser.parseConstructionDefContinuation`.
+
+**Suggested resolution:** Add the missing `"&" ws` before `record-def` in alternative 1, i.e.:
+`type-ref 1*(ws "&" ws type-ref) [ws "&" ws record-def] [ws removal-set]` — at which point alternative 2
+becomes redundant (a single-supertype instance of the same shape) and could be dropped.
+
+---
+
+## 15. §12.1's own summary claims `field-modifier` reuses `data-value`, but its ABNF restricts it to `token`/`absent`
+
+**Section:** §12.1 (introductory prose) vs. its own ABNF, cross-referenced against §5.2.
+
+**Problem:** §12.1's lead paragraph states: "`data-value` appears at exactly three points —
+constructor-application values and atom-refinement values, and field-modifier values." But the ABNF two
+lines later gives `field-modifier = ws ("~" / "=") ws ( token / absent )` — not `data-value`. The two are
+materially different productions: `data-value` is `*annotation [type-ref] core-value` (annotations, an
+optional type-ref, and any core-value, including nested records/maps/arrays), while `token / absent` is a
+single unannotated, untyped leaf. This isn't just loose wording — §5.2 itself independently confirms the
+narrower ABNF is the intended rule: "Value modifiers are restricted to scalar tokens — quoted or
+unquoted — covering strings, numbers, booleans, and null; complex modifier values (arrays, records,
+maps) are not supported in v1." So the summary sentence overstates what the grammar and §5.2's own prose
+both agree `field-modifier` actually accepts.
+
+**Interpretation chosen:** Implemented per the ABNF and §5.2 (the two mutually-consistent sources): a
+field modifier's value is a bare token or the absent sentinel — no annotations, no type-ref, never a
+container. `tson-parser`'s `FieldDef.Modifier` models this as a plain `TokenValue`/`AbsentValue` (reusing
+`io.ltr8.tson.parser.ast`'s existing leaf types), not a full `DataValue`.
+
+**Suggested resolution:** Fix the summary sentence in §12.1's lead paragraph to read "...and
+field-modifier values, which are restricted to a bare token or the absent sentinel (§5.2), not full
+`data-value`s" — or simply drop `field-modifier` from that sentence's list, since it isn't actually an
+instance of the `data-value` import the sentence is introducing.

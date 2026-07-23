@@ -9,21 +9,24 @@ TSON spec series:
 
 - Part 1 (lexer, structural grammar, base type resolution, built-in type vocabulary):
   https://tson.io/raw/2026/32/tson-part1-data.md
-- Part 2 (schema grammar, type system) — not yet started: https://tson.io/2026/32/tson-part2-schema
+- Part 2 (schema grammar, type system) — grammar layer in progress (see `SchemaParser` below;
+  resolution/validation not started): https://tson.io/raw/2026/32/tson-part2-schema.md
 
 The spec is a *working revision* (2026 series) and changes between revisions without compatibility
 guarantees — re-fetch the current URL rather than trusting a cached copy of the text when in doubt, and
 check the revision number at the top of the document.
 
-`spec/` holds local snapshots fetched 2026-07-22, revision 32, for quick reference without re-fetching
-every session: `spec/tson-part1-data.md` (Part 1, verbatim) and `spec/m/{core,meta,meta-kernel}.tn1` — the
-pre-loaded meta-kernel bootstrap layer, the canonical meta-schema built on it, and the core type library
-built on that (Part 2 schema documents, reachable via `!!meta`/`!!import` chaining from `core.tn1`). These
-three `.tn1` files are what §5's built-in type vocabulary formally resolves to when a schema *is* in
-scope — useful ground truth for constraint details (e.g. `integer_type`'s bit-width bounds formula) even
-though a Class 1 (schemaless) processor never parses or executes them. Treat this directory as a cache,
-not a source of truth: if a revision bump is suspected, re-fetch from the URLs above rather than trusting
-these files.
+`spec/` holds local snapshots fetched 2026-07-22 (Part 1) and 2026-07-23 (Part 2), revision 32, for quick
+reference without re-fetching every session: `spec/tson-part1-data.md` (Part 1, verbatim),
+`spec/tson-part2-schema.md` (Part 2, verbatim), and `spec/m/{core,meta,meta-kernel}.tn1` — the pre-loaded
+meta-kernel bootstrap layer, the canonical meta-schema built on it, and the core type library built on
+that (Part 2 schema documents, reachable via `!!meta`/`!!import` chaining from `core.tn1`) — plus their
+non-normative resolver-output fixtures `spec/m/{core,meta,meta-kernel}-resolved.tn1` (Part 2 §1.5), the
+target shape for the resolution layer once it exists. The three source `.tn1` files are what §5's
+built-in type vocabulary formally resolves to when a schema *is* in scope — useful ground truth for
+constraint details (e.g. `integer_type`'s bit-width bounds formula) even though a Class 1 (schemaless)
+processor never parses or executes them. Treat this directory as a cache, not a source of truth: if a
+revision bump is suspected, re-fetch from the URLs above rather than trusting these files.
 
 **Hard constraints for this codebase:**
 - Java 25 only.
@@ -53,12 +56,17 @@ written down. This applies to every layer as it gets built, not just the lexer.
 
 ## Architecture
 
-Single Gradle module so far: `tson-parser`, holding both the lexer and (eventually) the structural
-parser under one module — they're tightly coupled (the parser consumes the lexer's token stream
-directly and nothing else depends on the lexer alone), so splitting them into separate Gradle modules
-was judged not worth the build-graph overhead. Layers with real independent conformance meaning — e.g.
-resolver + base-type/built-in-vocabulary resolution (spec's "Class 1 processor") vs. the schema layer
-(spec's "Class 2 processor", Part 2) — are the natural points for future module boundaries.
+`tson-parser` holds the lexer, the data-grammar structural parser, base type resolution, the built-in
+type vocabulary, *and* the Part 2 schema grammar (`SchemaParser`, `ast.schema`) under one module — every
+one of these is tightly coupled to the shared lexer/token-stream machinery (the schema grammar reuses
+the data grammar's own `annotation`/`data-value`/directive-parsing code directly, per Part 2 §12.1), so
+splitting them into separate Gradle modules was judged not worth the build-graph overhead, the same
+reasoning that already keeps the lexer and structural parser together. The module boundary that *is*
+worth drawing is the one between grammar (parsing text into an AST, no interpretation) and semantics
+(resolving, validating, producing a schema's or a document's actual meaning): `tson-parser.resolver` is
+Class 1's semantic layer; `tson-schema` (not started) is reserved for Class 2's — the *produced* schema
+(§8 resolver output), not its grammar. `tson-bind`/`tson-mapper`/`tson-annotation` are the separate
+Java-object-binding layer (see their own package Javadoc; not detailed in this file yet).
 
 Package: `io.ltr8.tson.parser.lexer` (group `io.ltr8`). The group is `io.ltr8`, not `io.tson`: reverse-DNS
 package naming identifies who *publishes* the artifact (and is what Maven Central's domain-ownership
@@ -183,6 +191,51 @@ string, §4.5) for `TokenValue`s produced by the parser. `NumberGrammar.tryParse
   premature without a real configuration mechanism — noted here so it isn't mistaken for an oversight.
 - The built-in type vocabulary (§5 — `!uuid`, `!date`, `!int32`, etc.) is a separate, much larger piece of
   work, not started. `BaseTypeResolver` only implements the *default*, untyped resolution path.
+
+### Schema grammar (`tson-parser/src/main/java/io/ltr8/tson/parser/SchemaParser.java`,
+`.../ast/schema/`)
+
+`SchemaParser` parses a schema document's body (Part 2 §2.1, §5, ABNF at §12.1) into a
+`SchemaDocument`, the schema-grammar analogue of `Document`/`CoreValue`. AST types live in the
+`ast.schema` subpackage (`TypeDef`, `TypeRef`, `RecordDef`, `ContainerDef`, etc.) alongside
+`tson-parser.ast`'s data-grammar types, one sealed hierarchy per ABNF production family, mirroring
+`ast`'s own shape.
+
+- **Grammar-only, deliberately.** `SchemaParser` builds a faithful AST from a schema document's source
+  text and does nothing else yet — no namespace resolution (§3), no `type_definition` materialisation or
+  desugaring (§8), no validation. "Building the schema" (as opposed to "using" it) means this layer
+  alone; a resolver consuming `SchemaDocument` and producing the actual *resolved* schema (§8's
+  `type_definition` values) is later, separate work, reserved for a future `tson-schema` module — kept
+  out of `tson-parser` on purpose, since that resolution layer has real independent conformance meaning
+  (Class 2 proper) the way `tson-parser.resolver` does for Class 1, unlike the grammar layer itself.
+- **`SchemaParser extends Parser`, same package.** Part 2 §12.1 says the schema grammar imports
+  `annotation`, `data-value`, and directive parsing directly from Part 1 §7.4 — the same tokens, the same
+  adjacency/separator rules, the same `!!name:"..."` directive shape for `!!id`/`!!meta`/`!!import` as
+  data documents use for `!!id`/`!!schema`. Rather than re-implementing that grammar a second time,
+  `Parser`'s relevant fields and helper methods are package-private, not `private` (see its own Javadoc
+  on why it isn't `final`), and `SchemaParser` calls straight into them — `parseDataValue()` for
+  constructor-application/atom-refinement values, `parseAnnotation()`, `parseNamedDirective()` for all
+  three header directives, `expectFieldNameToken()`, and the cursor/separator primitives. `Parser` itself
+  is untouched in behavior — it still rejects `!!meta` documents exactly as before; only its own
+  private-vs-package visibility changed, and only because `SchemaParser` needed it, not because either
+  class became part of a different module.
+- **`construction-def`'s ABNF doesn't parse its own worked example** (`address & contact & { ... }` needs
+  an implicit `&` before the trailing `record-def` that alternative 1 as literally written doesn't admit)
+  — implemented per the documented intent, not the letter; see `SPEC-FEEDBACK.md` #14 and
+  `ConstructionDef`'s own Javadoc before touching `SchemaParser.parseConstructionDefContinuation`.
+- **`field-modifier`'s value is a bare token or the absent sentinel, not a full `data-value`** — §12.1's
+  own introductory prose claims otherwise, but its ABNF and §5.2's prose agree on the narrower rule; see
+  `SPEC-FEEDBACK.md` #15. `FieldDef.Modifier.Value` models exactly `token | absent`, reusing
+  `tson-parser.ast`'s `TokenValue` rather than the full `DataValue`.
+- **An unquoted, non-numeric type-argument always parses as a type reference, never a value literal** —
+  `SchemaParser.parseTypeArg`'s Javadoc explains why this is the grammar's own deliberate deferral (§12.1,
+  §5.10: "settled against the applied signature's parameter kinds... not by the grammar"), not an
+  implementation gap; classifying an enum-member-shaped argument as a value happens at a later, semantic
+  layer not built yet.
+- **Verified against the real fixtures, not just the spec's own short examples.** `SchemaParserTest`
+  parses `spec/m/meta-kernel.tn1`, `spec/m/meta.tn1`, and `spec/m/core.tn1` (read directly from this
+  repo's own `spec/` directory, not the sibling test-suite repo) end-to-end with no exceptions — real,
+  full-sized schema documents, not just the spec's illustrative snippets.
 
 ### Conformance suite integration (`ConformanceSuiteTest`)
 

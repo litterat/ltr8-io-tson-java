@@ -1,0 +1,365 @@
+!!id:"https://tson.io/2026/32/m/meta-resolved.tn1"
+!!schema:"https://tson.io/2026/32/m/meta-kernel.tn1"
+@doc:"""
+  Resolver-output fixture for meta.tn1 (2026 Revision 32 draft).
+  Parse the source schema, run the resolver, canonicalise, compare.
+  Conventions as in meta-kernel-resolved.tn1.
+
+  As a data document, this header cannot carry `!!import`; its
+  `!!schema` names this document's own governing chain, not the
+  schema it describes. The namespace in which this map's type-name
+  tokens resolve — meta.tn1's locals plus its import of
+  meta-kernel.tn1 — is declared by the source schema's header and
+  supplied at ingest ([TSON-SCHEMA] Section 8.1), never by this
+  document. Supertype names in this map (`atom`, `sum`, `text_type`,
+  `atom_specification`, `top`) resolve through that kernel import; `subtypes` lists entries of this map only, and none
+  of this map's entries narrows or composes with another, so every
+  `subtypes` list here is empty and omitted.
+  """
+!schema {
+  @doc:"Binary encoding formats per RFC 4648."
+  binary_encoding => !type_definition {
+    kind: ATOM
+    source: enum
+    body: !enum { members: [BASE64 BASE64URL BASE32 HEX] }
+  }
+
+  @doc:"Binary data constructor."
+  binary => !type_definition {
+    kind: ATOM
+    constructor: true
+    supertypes: [atom atom_specification top]
+    body: !record { supertypes: [atom atom_specification]  fields: [
+      !record_field { name: spec        type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc4648" }
+      !record_field { name: encoding    type: binary_encoding }
+      !record_field { name: min_length  type: integer  state: OPTIONAL }
+      !record_field { name: max_length  type: integer  state: OPTIONAL }
+    ] }
+  }
+
+  @doc:"Constructor for sum types whose members belong to a named external schema."
+  extern => !type_definition {
+    kind: SUM
+    constructor: true
+    supertypes: [sum top]
+    body: !record { supertypes: [sum]  fields: [
+      !record_field { name: schema  type: uri }
+      !record_field { name: types   type: { name: array  arguments: [ { name: @alias:type_name token } ] }  state: OPTIONAL }
+    ] }
+  }
+
+  @doc:"Unknown sum constructor. Its instance `unknown` (core) accepts any well-formed value of any type."
+  unknown_type => !type_definition {
+    kind: SUM
+    constructor: true
+    supertypes: [sum top]
+    body: !record { supertypes: [sum]  fields: [] }
+  }
+
+  @doc:"Fixed-size array constructor — a ~ constructor parallel to set; applications are structural and closed declarations carry !vector bodies. Not a desugar target (Part 2 Section 5.3)."
+  vector => !type_definition {
+    kind: PRODUCT
+    constructor: true
+    source: { name: array  arguments: [ { name: T } ] }
+    parameters: [T S]
+    supertypes: [array product top]
+    body: !record { fields: [
+      !record_field { name: access_pattern  type: product_access_type  state: REQUIRED_FIXED  value: INDEX }
+      !record_field { name: size_type       type: product_size_type    state: REQUIRED_FIXED  value: VARIABLE }
+      !record_field { name: element_type    type: type_ref  value_param: T }
+      !record_field { name: state           type: element_state  state: REQUIRED_DEFAULT  value: REQUIRED }
+      !record_field { name: unordered       type: boolean  state: REQUIRED_DEFAULT  value: false }
+      !record_field { name: unique_items    type: boolean  state: REQUIRED_DEFAULT  value: false }
+      !record_field { name: min_items       type: integer  value_param: S }
+      !record_field { name: max_items       type: integer  value_param: S }
+    ] }
+  }
+
+  @doc:"IEEE 754-2019 interchange formats, both radices. Selects the representable grid of an approximate (float_type) value."
+  ieee_format => !type_definition {
+    kind: ATOM
+    source: enum
+    body: !enum { members: [BINARY16 BINARY32 BINARY64 BINARY128 BINARY256 DECIMAL32 DECIMAL64 DECIMAL128] }
+  }
+
+  @doc:"Approximate-numeric constraint vocabulary (SQL approximate tier; ISO/IEC 11404 approximate real). Instances are `float32` and `float64` in core. Pinned to IEEE 754-2019."
+  float_type => !type_definition {
+    kind: ATOM
+    constructor: true
+    supertypes: [atom atom_specification top]
+    body: !record { supertypes: [atom atom_specification]  fields: [
+      !record_field { name: spec                 type: uri      state: REQUIRED_FIXED  value: "https://ieeexplore.ieee.org/document/8766229" }
+      !record_field { name: format               type: ieee_format }
+      !record_field { name: min                  type: value    state: OPTIONAL }
+      !record_field { name: exclusive_min        type: value    state: OPTIONAL }
+      !record_field { name: max                  type: value    state: OPTIONAL }
+      !record_field { name: exclusive_max        type: value    state: OPTIONAL }
+      !record_field { name: allow_nan            type: boolean  state: REQUIRED_DEFAULT  value: true }
+      !record_field { name: allow_infinity       type: boolean  state: REQUIRED_DEFAULT  value: true }
+      !record_field { name: allow_subnormal      type: boolean  state: REQUIRED_DEFAULT  value: true }
+      !record_field { name: allow_negative_zero  type: boolean  state: REQUIRED_DEFAULT  value: true }
+    ]
+    groups: [
+      !field_group { members: [min exclusive_min]  state: OPTIONAL }
+      !field_group { members: [max exclusive_max]  state: OPTIONAL }
+    ] }
+  }
+
+  @doc:"Exact-numeric constraint vocabulary (SQL exact tier; ISO/IEC 11404 scaled, radix 10). Instance is `number` in core."
+  decimal_type => !type_definition {
+    kind: ATOM
+    constructor: true
+    supertypes: [atom top]
+    body: !record { supertypes: [atom]  fields: [
+      !record_field { name: min              type: value    state: OPTIONAL }
+      !record_field { name: exclusive_min    type: value    state: OPTIONAL }
+      !record_field { name: max              type: value    state: OPTIONAL }
+      !record_field { name: exclusive_max    type: value    state: OPTIONAL }
+      !record_field { name: multiple_of      type: value    state: OPTIONAL }
+      !record_field { name: total_digits     type: integer  state: OPTIONAL }
+      !record_field { name: fraction_digits  type: integer  state: OPTIONAL }
+    ]
+    groups: [
+      !field_group { members: [min exclusive_min]  state: OPTIONAL }
+      !field_group { members: [max exclusive_max]  state: OPTIONAL }
+    ] }
+  }
+
+  @doc:"Rational constraint vocabulary. Instance is `rational` in core. Exact (ℚ; ISO/IEC 11404 rational)."
+  rational_type => !type_definition {
+    kind: ATOM
+    constructor: true
+    supertypes: [atom top]
+    body: !record { supertypes: [atom]  fields: [
+      !record_field { name: min            type: value  state: OPTIONAL }
+      !record_field { name: exclusive_min  type: value  state: OPTIONAL }
+      !record_field { name: max            type: value  state: OPTIONAL }
+      !record_field { name: exclusive_max  type: value  state: OPTIONAL }
+      !record_field { name: multiple_of    type: value  state: OPTIONAL }
+    ]
+    groups: [
+      !field_group { members: [min exclusive_min]  state: OPTIONAL }
+      !field_group { members: [max exclusive_max]  state: OPTIONAL }
+    ] }
+  }
+
+  @doc:"Allowed component types for a complex value. Closed vocabulary of numeric types."
+  complex_component => !type_definition {
+    kind: ATOM
+    source: enum
+    body: !enum { members: [INTEGER NUMBER RATIONAL FLOAT32 FLOAT64] }
+  }
+
+  @doc:"Complex constraint vocabulary. Instance is `complex` in core. `component` selects the parts' type from complex_component, default NUMBER."
+  complex_type => !type_definition {
+    kind: ATOM
+    constructor: true
+    supertypes: [atom top]
+    body: !record { supertypes: [atom]  fields: [
+      !record_field { name: component  type: complex_component  state: REQUIRED_DEFAULT  value: NUMBER }
+    ] }
+  }
+
+  @doc:"Date constraint vocabulary. Instance is `date` in core."
+  date_type => !type_definition {
+    kind: ATOM
+    constructor: true
+    supertypes: [atom atom_specification top]
+    body: !record { supertypes: [atom atom_specification]  fields: [
+      !record_field { name: spec  type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339" }
+      !record_field { name: min   type: value  state: OPTIONAL }
+      !record_field { name: max   type: value  state: OPTIONAL }
+    ] }
+  }
+
+  @doc:"Time constraint vocabulary. Instance is `time` in core."
+  time_type => !type_definition {
+    kind: ATOM
+    constructor: true
+    supertypes: [atom atom_specification top]
+    body: !record { supertypes: [atom atom_specification]  fields: [
+      !record_field { name: spec              type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339" }
+      !record_field { name: min               type: value    state: OPTIONAL }
+      !record_field { name: max               type: value    state: OPTIONAL }
+      !record_field { name: precision         type: integer  state: OPTIONAL }
+      !record_field { name: require_timezone  type: boolean  state: OPTIONAL }
+    ] }
+  }
+
+  @doc:"Datetime constraint vocabulary. Instance is `datetime` in core."
+  datetime_type => !type_definition {
+    kind: ATOM
+    constructor: true
+    supertypes: [atom atom_specification top]
+    body: !record { supertypes: [atom atom_specification]  fields: [
+      !record_field { name: spec              type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339" }
+      !record_field { name: min               type: value    state: OPTIONAL }
+      !record_field { name: max               type: value    state: OPTIONAL }
+      !record_field { name: precision         type: integer  state: OPTIONAL }
+      !record_field { name: require_timezone  type: boolean  state: OPTIONAL }
+    ] }
+  }
+
+  @doc:"Duration constraint vocabulary. Instance is `duration` in core."
+  duration_type => !type_definition {
+    kind: ATOM
+    constructor: true
+    supertypes: [atom atom_specification top]
+    body: !record { supertypes: [atom atom_specification]  fields: [
+      !record_field { name: spec  type: uri  state: REQUIRED_FIXED  value: "https://www.iso.org/standard/70907.html" }
+      !record_field { name: min   type: value  state: OPTIONAL }
+      !record_field { name: max   type: value  state: OPTIONAL }
+    ] }
+  }
+
+  @doc:"UUID constraint vocabulary. Instance is `uuid` in core."
+  uuid_type => !type_definition {
+    kind: ATOM
+    constructor: true
+    supertypes: [atom atom_specification top]
+    body: !record { supertypes: [atom atom_specification]  fields: [
+      !record_field { name: spec     type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc9562" }
+      !record_field { name: version  type: integer  state: OPTIONAL }
+    ] }
+  }
+
+  @doc:"Email constraint vocabulary. Instance is `email` in core."
+  email_type => !type_definition {
+    kind: ATOM
+    constructor: true
+    supertypes: [atom atom_specification text_type top]
+    body: !record { supertypes: [text_type atom_specification]  fields: [
+      !record_field { name: min_length  type: integer  state: OPTIONAL }
+      !record_field { name: max_length  type: integer  state: OPTIONAL }
+      !record_field { name: length      type: integer  state: OPTIONAL }
+      !record_field { name: pattern     type: regex    state: OPTIONAL }
+      !record_field { name: spec        type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc5322" }
+    ] }
+  }
+
+  @doc:"IPv4 address constraint vocabulary. Instance is `ipv4` in core."
+  ipv4_type => !type_definition {
+    kind: ATOM
+    constructor: true
+    supertypes: [atom atom_specification top]
+    body: !record { supertypes: [atom atom_specification]  fields: [
+      !record_field { name: spec       type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc3986" }
+      !record_field { name: within     type: { name: array  arguments: [ { name: value } ] }  state: OPTIONAL }
+      !record_field { name: excluding  type: { name: array  arguments: [ { name: value } ] }  state: OPTIONAL }
+    ] }
+  }
+
+  @doc:"IPv6 address constraint vocabulary. Instance is `ipv6` in core."
+  ipv6_type => !type_definition {
+    kind: ATOM
+    constructor: true
+    supertypes: [atom atom_specification top]
+    body: !record { supertypes: [atom atom_specification]  fields: [
+      !record_field { name: spec       type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc4291" }
+      !record_field { name: within     type: { name: array  arguments: [ { name: value } ] }  state: OPTIONAL }
+      !record_field { name: excluding  type: { name: array  arguments: [ { name: value } ] }  state: OPTIONAL }
+    ] }
+  }
+
+  @doc:"IPv4 network constraint vocabulary. Instance is `cidr4` in core."
+  cidr4_type => !type_definition {
+    kind: ATOM
+    constructor: true
+    supertypes: [atom atom_specification top]
+    body: !record { supertypes: [atom atom_specification]  fields: [
+      !record_field { name: spec        type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc4632" }
+      !record_field { name: min_prefix  type: integer  state: OPTIONAL }
+      !record_field { name: max_prefix  type: integer  state: OPTIONAL }
+      !record_field { name: within      type: { name: array  arguments: [ { name: value } ] }  state: OPTIONAL }
+      !record_field { name: excluding   type: { name: array  arguments: [ { name: value } ] }  state: OPTIONAL }
+    ] }
+  }
+
+  @doc:"IPv6 network constraint vocabulary. Instance is `cidr6` in core."
+  cidr6_type => !type_definition {
+    kind: ATOM
+    constructor: true
+    supertypes: [atom atom_specification top]
+    body: !record { supertypes: [atom atom_specification]  fields: [
+      !record_field { name: spec        type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc4291" }
+      !record_field { name: min_prefix  type: integer  state: OPTIONAL }
+      !record_field { name: max_prefix  type: integer  state: OPTIONAL }
+      !record_field { name: within      type: { name: array  arguments: [ { name: value } ] }  state: OPTIONAL }
+      !record_field { name: excluding   type: { name: array  arguments: [ { name: value } ] }  state: OPTIONAL }
+    ] }
+  }
+
+  @doc:"MAC address (EUI-48) constraint vocabulary. Instance is `mac` in core."
+  mac_type => !type_definition {
+    kind: ATOM
+    constructor: true
+    supertypes: [atom atom_specification top]
+    body: !record { supertypes: [atom atom_specification]  fields: [
+      !record_field { name: spec  type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc9542" }
+    ] }
+  }
+
+  @doc:"Ordering classification (ISO/IEC 11404 / XSD fundamental facet)."
+  ordered => @annotation !type_definition {
+    kind: ATOM
+    source: enum
+    body: !enum { members: [NONE PARTIAL TOTAL] }
+  }
+
+  @doc:"Boundedness annotation."
+  bounded => @annotation !type_definition {
+    kind: REFERENCE
+    source: boolean
+    body: !reference { target: boolean }
+  }
+
+  @doc:"Exactness classification (ISO/IEC 11404 characterizing property)."
+  exact => @annotation !type_definition {
+    kind: REFERENCE
+    source: boolean
+    body: !reference { target: boolean }
+  }
+
+  @doc:"Numeric type marker annotation."
+  numeric => @annotation !type_definition {
+    kind: REFERENCE
+    source: void
+    body: !reference { target: void }
+  }
+
+  @doc:"Author's assertion that a choice's variants are pairwise disjoint as value sets — advisory, checked against derived `type_definition.disjoint` (Part 2 Section 5.4). Void-targeted presence marker; written bare."
+  disjoint => @annotation !type_definition {
+    kind: REFERENCE
+    source: void
+    body: !reference { target: void }
+  }
+
+  @doc:"Marks a definition or field as deprecated."
+  deprecated => @annotation !type_definition {
+    kind: REFERENCE
+    source: text
+    body: !reference { target: text }
+  }
+
+  @doc:"Records when a definition or field was introduced."
+  since => @annotation !type_definition {
+    kind: REFERENCE
+    source: text
+    body: !reference { target: text }
+  }
+
+  @doc:"Marks incomplete work requiring attention."
+  todo => @annotation !type_definition {
+    kind: REFERENCE
+    source: text
+    body: !reference { target: text }
+  }
+
+  @doc:"BCP 47 language tag (RFC 5646)."
+  lang => @annotation !type_definition {
+    kind: REFERENCE
+    source: text
+    body: !reference { target: text }
+  }
+
+}
