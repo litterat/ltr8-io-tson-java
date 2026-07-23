@@ -7,6 +7,7 @@ import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassArray;
 import io.ltr8.bind.DataClassAtom;
 import io.ltr8.bind.DataClassField;
+import io.ltr8.bind.DataClassMap;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassUnion;
 import io.ltr8.tson.parser.Parser;
@@ -16,6 +17,7 @@ import io.ltr8.tson.parser.ast.CoreValue;
 import io.ltr8.tson.parser.ast.DataValue;
 import io.ltr8.tson.parser.ast.Document;
 import io.ltr8.tson.parser.ast.EmptyBrace;
+import io.ltr8.tson.parser.ast.MapValue;
 import io.ltr8.tson.parser.ast.RecordValue;
 import io.ltr8.tson.parser.ast.ScopedValue;
 import io.ltr8.tson.parser.ast.TokenValue;
@@ -158,6 +160,7 @@ public final class TsonMapper {
                 case DataClassAtom atom -> toAtom(value, atom);
                 case DataClassRecord record -> toRecord(value, record);
                 case DataClassArray array -> toArray(value, array);
+                case DataClassMap map -> toMap(value, map);
                 case DataClassUnion union -> toUnion(value, union);
                 default -> throw new DataBindException("unsupported DataClass: " + dataClass);
             };
@@ -273,6 +276,46 @@ public final class TsonMapper {
             dataClass.put().invoke(arrayData, iterator, bound);
         }
         return arrayData;
+    }
+
+    // ── Maps ─────────────────────────────────────────────────────────────
+
+    /**
+     * A map key is a full {@code data-value} (§2.6), not just a token, so it's bound recursively
+     * through {@link #toObject(DataValue, DataClass)} exactly like a value is -- there's nothing
+     * map-specific about interpreting a key beyond that. "Last value wins" for a duplicate key
+     * falls out for free from repeated {@code put()} calls in source order, the same way {@link
+     * #toRecord} gets record field deduplication for free (§2.5/§2.6) -- key *equality* here is
+     * whatever the bound key type's own {@code equals()}/{@code hashCode()} say it is, which for a
+     * plain {@code String} key naturally matches the resolver-layer's textual comparison, but isn't
+     * guaranteed to for an arbitrary bound key type.
+     *
+     * <p>{@code {}} parses as {@link EmptyBrace}, not {@link MapValue} -- resolving which typed
+     * container an empty {@code {}} denotes is a deferred resolver-layer concern (§2.8), the same
+     * reason {@link #toRecord} special-cases it. Treated as zero entries here, the same reasonable
+     * default {@code toRecord} uses for zero fields.
+     */
+    private Object toMap(DataValue value, DataClassMap dataClass) throws Throwable {
+        CoreValue core = value.coreValue();
+        List<MapValue.MapEntry> entries;
+        if (core instanceof MapValue mv) {
+            entries = mv.entries();
+        } else if (core instanceof EmptyBrace) {
+            entries = List.of();
+        } else {
+            throw new DataBindException("expected a map for " + dataClass.typeClass() + ", found " + core);
+        }
+
+        Object mapData = dataClass.constructor().invoke(entries.size());
+        DataClass keyClass = dataClass.keyDataClass();
+        DataClass valueClass = dataClass.valueDataClass();
+
+        for (MapValue.MapEntry entry : entries) {
+            Object key = toObject(entry.key(), keyClass);
+            Object boundValue = toObject(entry.value().value(), valueClass);
+            dataClass.put().invoke(mapData, key, boundValue);
+        }
+        return mapData;
     }
 
     // ── Unions ───────────────────────────────────────────────────────────

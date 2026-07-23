@@ -24,6 +24,7 @@ import java.time.OffsetDateTime;
 import java.time.OffsetTime;
 import java.time.Period;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -155,6 +156,72 @@ class TsonMapperTest {
     void emptyArray() throws DataBindException {
         StringListHolder h = mapper.toObject("{ tags: [] }", StringListHolder.class);
         assertTrue(h.tags().isEmpty());
+    }
+
+    // ── Maps ─────────────────────────────────────────────────────────────
+
+    public record CountsHolder(Map<String, Integer> counts) {
+    }
+
+    @Test
+    void mapOfStringToInt() throws DataBindException {
+        CountsHolder h = mapper.toObject("{ counts: { apples => 3 pears => 5 } }", CountsHolder.class);
+        assertEquals(2, h.counts().size());
+        assertEquals(3, h.counts().get("apples"));
+        assertEquals(5, h.counts().get("pears"));
+    }
+
+    public record LocationsHolder(Map<String, Point> locations) {
+    }
+
+    @Test
+    void mapOfStringToRecord() throws DataBindException {
+        LocationsHolder h = mapper.toObject(
+                "{ locations: { origin => { x: 0 y: 0 } target => { x: 3 y: 4 } } }", LocationsHolder.class);
+        assertEquals(2, h.locations().size());
+        assertEquals(new Point(0, 0), h.locations().get("origin"));
+        assertEquals(new Point(3, 4), h.locations().get("target"));
+    }
+
+    @Test
+    void emptyMap() throws DataBindException {
+        CountsHolder h = mapper.toObject("{ counts: {} }", CountsHolder.class);
+        assertTrue(h.counts().isEmpty());
+    }
+
+    @Test
+    void mapDuplicateKeyLastValueWins() throws DataBindException {
+        // §2.6: "last value wins" for a duplicate map key, the same rule §2.5 gives record fields --
+        // falls out for free here from repeated put() calls in source order.
+        CountsHolder h = mapper.toObject("{ counts: { apples => 3 apples => 7 } }", CountsHolder.class);
+        assertEquals(1, h.counts().size());
+        assertEquals(7, h.counts().get("apples"));
+    }
+
+    public record ByIdHolder(Map<Integer, String> names) {
+    }
+
+    @Test
+    void mapOfIntegerToString() throws DataBindException {
+        // §2.6: a map key is a full data-value, not just a string token -- bound recursively the
+        // same way a value is, so a non-string key works with no map-specific code at all.
+        ByIdHolder h = mapper.toObject("{ names: { 1 => Alice 2 => Bob } }", ByIdHolder.class);
+        assertEquals(2, h.names().size());
+        assertEquals("Alice", h.names().get(1));
+        assertEquals("Bob", h.names().get(2));
+    }
+
+    public record ByUuidHolder(Map<UUID, String> owners) {
+    }
+
+    @Test
+    void mapOfUuidToString() throws DataBindException {
+        // A key type that itself needs a type-ref to resolve (!uuid isn't the default token
+        // resolution) still binds correctly -- the key's own DataValue carries its own annotation.
+        ByUuidHolder h = mapper.toObject(
+                "{ owners: { !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09 => \"Alice\" } }", ByUuidHolder.class);
+        assertEquals(1, h.owners().size());
+        assertEquals("Alice", h.owners().get(UUID.fromString("9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09")));
     }
 
     // ── Atoms: strings, booleans, null ───────────────────────────────────

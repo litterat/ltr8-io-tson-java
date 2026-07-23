@@ -46,9 +46,15 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       behaviors worth knowing about
 - [x] Object binding library (`tson-annotation` + `tson-bind`) — reflection/`MethodHandle`-based Java
       object ↔ data binding, including hand-written (pre-record) immutable class support via the
-      `java.lang.classfile` API
+      `java.lang.classfile` API, and `Map<K, V>` field support (`DataClassMap`/`DefaultMapBinder`,
+      the same `MethodHandle`-interface shape as `DataClassArray`/`DefaultArrayBinder` but for keyed
+      entries — construct-then-`put` for reading a TSON map into a Java `Map`, plus a symmetric
+      iterator/next/key/value side for a future write direction, not yet called by `tson-mapper`)
 - [x] `tson-mapper` — binds parsed TSON documents directly to Java objects/records, including dispatch
-      into the built-in type vocabulary
+      into the built-in type vocabulary and `Map<K, V>` fields (a TSON map's key is a full data-value,
+      §2.6, bound recursively the same way a value is; "last value wins" for a duplicate key falls
+      out for free from repeated `put()` calls in source order, the same way record field
+      deduplication does)
 
 See [CLAUDE.md](CLAUDE.md#architecture) for the current architecture and design notes.
 
@@ -58,7 +64,6 @@ See [CLAUDE.md](CLAUDE.md#architecture) for the current architecture and design 
   - [ ] Network/identifier types — `cidr4`/`cidr6`/`mac` (§5.5, `uuid`/`uri`/`ipv4`/`ipv6` done)
 - [ ] Resolver-layer structural rules: record/map "last value wins" deduplication (§2.5/§2.6), `EmptyBrace`
       resolution (§2.8), Absent Sentinel semantics (§2.9)
-- [ ] `Map<K, V>` support in `tson-bind` (no `DataClass` currently recognizes a map target)
 - [ ] Auto-detect plain Java `enum`s in `tson-bind` the way real records/arrays already are — today
       `DefaultAtomBinder` only wires `EnumStringBridge` when the enum type itself carries `@Atom`;
       a bare `enum` with no annotation fails to bind at all

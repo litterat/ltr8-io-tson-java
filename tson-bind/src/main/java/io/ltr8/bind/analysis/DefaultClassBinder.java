@@ -14,6 +14,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.Collection;
+import java.util.Map;
 
 public class DefaultClassBinder {
 
@@ -26,6 +27,7 @@ public class DefaultClassBinder {
 	private final DefaultAtomBinder atomBinder;
 	private final DefaultUnionBinder unionBinder;
 	private final DefaultArrayBinder arrayBinder;
+	private final DefaultMapBinder mapBinder;
 
 
 	public DefaultClassBinder() {
@@ -35,6 +37,7 @@ public class DefaultClassBinder {
 		atomBinder = new DefaultAtomBinder();
 		unionBinder = new DefaultUnionBinder();
 		arrayBinder = new DefaultArrayBinder();
+		mapBinder = new DefaultMapBinder();
 	}
 
 	public DataClass resolve(DataBindContext context,  Class<?> targetClass, Type parameterizedType)
@@ -52,6 +55,10 @@ public class DefaultClassBinder {
 			result = unionBinder.resolveUnion(context, targetClass, parameterizedType);
 		} else if (isAtom(targetClass)) {
 			result = atomBinder.resolveAtom(context, targetClass);
+		} else if (isMap(targetClass)) {
+			// Checked ahead of isArray: Map is not a Collection, so there's no auto-detection
+			// collision between the two -- this ordering just keeps the more specific check first.
+			result = mapBinder.resolveMap(context, targetClass, parameterizedType);
 		} else if (isArray(targetClass)) {
 			result = arrayBinder.resolveArray(context, targetClass, parameterizedType);
 		} else {
@@ -148,6 +155,10 @@ public class DefaultClassBinder {
 		}
 
 		return false;
+	}
+
+	private boolean isMap(Class<?> targetClass) {
+		return Map.class.isAssignableFrom(targetClass);
 	}
 
 	private boolean isAtom(Class<?> targetClass) {
