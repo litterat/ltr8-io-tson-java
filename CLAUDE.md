@@ -321,11 +321,28 @@ string, §4.5) for `TokenValue`s produced by the parser. `NumberGrammar.tryParse
   `@alias:type_name`-style annotation §8.3 would add for `type_name` aliasing `token` is
   deliberately not produced, same deferral as the array-sugar cases above. Verified against
   `schema` itself from the real fixture.
+- **Field modifiers** (`~`/`=`, §5.2, §5.10) on a REQUIRED field split two ways: a modifier token
+  that names one of the *declaration's own* type parameters (`array`'s `element_type: type_ref = T`,
+  `T` declared by `array => <T> ...`) is a parameter reference, recorded as `value_param` rather than
+  `value` (§5.10's "labelled form", used uniformly whether the routed field is scalar or
+  `type_ref`-typed) -- a parametric `=` leaves the field's state at its unmarked `REQUIRED` (nothing
+  is actually fixed at declaration; the argument arrives at application), a parametric `~` still
+  promotes to `REQUIRED_DEFAULT`, same as a literal default. Any other modifier token is an ordinary
+  literal, recorded as `value` with state promoted to `REQUIRED_DEFAULT` (`~`) or `REQUIRED_FIXED`
+  (`=`). An `Absent` modifier value (`= _`) and a modifier on an OPTIONAL field are both not resolved
+  yet. Verified against the real fixture's `tuple_element`/`field_group` (both fresh records, so
+  untangled from tightening -- see below) plus small hand-built snippets mirroring `array`'s own
+  field shapes for the fixed/parametric cases in isolation.
 
-Every other construct (elided field types, field modifiers/default-fixed values, refinement,
-subtraction, generic type-refs other than a bare two-argument `map<K, V>` application, templates,
-tightening) throws `UnsupportedOperationException` rather than silently mis-resolving --
-`SchemaResolver`'s own Javadoc lists exactly what's in scope.
+Every other construct (elided field types, an `Absent` modifier value or a modifier on an OPTIONAL
+field, refinement, subtraction, generic type-refs other than a bare two-argument `map<K, V>`
+application, templates, tightening) throws `UnsupportedOperationException` rather than silently
+mis-resolving -- `SchemaResolver`'s own Javadoc lists exactly what's in scope. Notably, `array`/`map`
+(the kernel's own parameterized constructors) still don't resolve end-to-end even with both field
+modifiers and type parameters handled: both compose with `product` and then re-declare its
+`access_pattern`/`size_type` fields with fixed values -- tightening (§5.7), a separate,
+still-unresolved gap that fires before a modifier is ever inspected (composition rejects the
+duplicate field name first).
 
 **A real recursion trap, found and fixed along the way -- read before touching `TypeArgument`.**
 `TypeRef`/`TypeArgument` are mutually recursive (`TypeRef.arguments: List<TypeArgument>`, and a

@@ -495,6 +495,88 @@ class SchemaResolverTest {
                 write(box));
     }
 
+    // ── Field modifiers (§5.2, §5.10): default (~) and fixed (=) values ───
+
+    @Test
+    void resolvesTupleElementFromTheRealMetaKernelFixture() throws IOException, DataBindException {
+        // tuple_element => { element_type: type_ref  state: element_state ~ REQUIRED } -- a fresh
+        // record (no supertypes, so no tightening involved), exercising an ordinary literal default.
+        SchemaMap schemaMap = new SchemaParser(readFixture()).parseSchemaDocument().body();
+
+        TypeDefinition tupleElement = resolver.resolve(schemaMap.declarations().get("tuple_element"));
+
+        assertEquals("{ kind: \"PRODUCT\" parameters: [] constructor: false supertypes: [] subtypes: [] "
+                        + "body: !record { supertypes: [] fields: [ "
+                        + "{ name: \"element_type\" type: { name: \"type_ref\" arguments: [] } state: \"REQUIRED\" } "
+                        + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } state: \"REQUIRED_DEFAULT\" "
+                        + "value: { text: \"REQUIRED\" form: \"UNQUOTED\" } } "
+                        + "] groups: [] } }",
+                write(tupleElement));
+    }
+
+    @Test
+    void resolvesFieldGroupFromTheRealMetaKernelFixture() throws IOException, DataBindException {
+        // field_group => { members: [field_name]  state: element_state ~ REQUIRED } -- a fresh
+        // record combining the inline array sugar with an ordinary literal default modifier.
+        SchemaMap schemaMap = new SchemaParser(readFixture()).parseSchemaDocument().body();
+
+        TypeDefinition fieldGroup = resolver.resolve(schemaMap.declarations().get("field_group"));
+
+        assertEquals("{ kind: \"PRODUCT\" parameters: [] constructor: false supertypes: [] subtypes: [] "
+                        + "body: !record { supertypes: [] fields: [ "
+                        + "{ name: \"members\" type: { name: \"array\" "
+                        + "arguments: [ !ref { ref: { name: \"field_name\" arguments: [] } } ] } state: \"REQUIRED\" } "
+                        + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } state: \"REQUIRED_DEFAULT\" "
+                        + "value: { text: \"REQUIRED\" form: \"UNQUOTED\" } } "
+                        + "] groups: [] } }",
+                write(fieldGroup));
+    }
+
+    @Test
+    void resolvesAnOrdinaryLiteralFixedValue() throws DataBindException {
+        // Mirrors array's own "access_pattern: product_access_type = INDEX" without the surrounding
+        // composition, so it isn't also blocked by tightening -- an ordinary (non-parameter) fixed value.
+        TypeDefinition pinned = resolveSnippet("pinned => { access_pattern: product_access_type = INDEX }");
+
+        assertEquals("{ kind: \"PRODUCT\" parameters: [] constructor: false supertypes: [] subtypes: [] "
+                        + "body: !record { supertypes: [] fields: [ "
+                        + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
+                        + "state: \"REQUIRED_FIXED\" value: { text: \"INDEX\" form: \"UNQUOTED\" } } "
+                        + "] groups: [] } }",
+                write(pinned));
+    }
+
+    @Test
+    void resolvesAParametricFixedValueAsAValueParamNotALiteral() throws DataBindException {
+        // Mirrors array's own "element_type: type_ref = T" without the surrounding composition --
+        // T is one of the declaration's own type parameters, so it's a parameter reference (routed,
+        // not fixed): state stays at its unmarked REQUIRED, and the modifier's token is recorded as
+        // value_param, not value.
+        TypeDefinition sized = resolveSnippet("sized => <T> { value: type_ref = T }");
+
+        assertEquals(List.of("T"), sized.parameters());
+        assertEquals("{ kind: \"PRODUCT\" parameters: [ \"T\" ] constructor: false supertypes: [] subtypes: [] "
+                        + "body: !record { supertypes: [] fields: [ "
+                        + "{ name: \"value\" type: { name: \"type_ref\" arguments: [] } state: \"REQUIRED\" "
+                        + "value_param: \"T\" } "
+                        + "] groups: [] } }",
+                write(sized));
+    }
+
+    @Test
+    void resolvesAParametricDefaultValueAsAValueParamPromotedToRequiredDefault() throws DataBindException {
+        // "~ P" (default routed by parameter) still promotes to REQUIRED_DEFAULT, identically to a
+        // literal default (§5.10) -- only the value/value_param label differs.
+        TypeDefinition retry = resolveSnippet("retry_policy => <N> { attempts: integer ~ N }");
+
+        assertEquals("{ kind: \"PRODUCT\" parameters: [ \"N\" ] constructor: false supertypes: [] subtypes: [] "
+                        + "body: !record { supertypes: [] fields: [ "
+                        + "{ name: \"attempts\" type: { name: \"integer\" arguments: [] } state: \"REQUIRED_DEFAULT\" "
+                        + "value_param: \"N\" } "
+                        + "] groups: [] } }",
+                write(retry));
+    }
+
     @Test
     void arrayFromTheRealFixtureIsBlockedByTighteningNotByItsOwnTypeParameter() throws IOException {
         // array => <T> ~product & { access_pattern: product_access_type = INDEX ... } -- the <T>

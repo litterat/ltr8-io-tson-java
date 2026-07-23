@@ -43,7 +43,7 @@ import java.util.Set;
  * Resolves declarations from a {@link SchemaMap} (the grammar-layer AST, {@code tson-parser}) into
  * {@link TypeDefinition}s (Part 2 §8's resolved schema-value shape, {@code io.ltr8.tson.schema.meta})
  * -- an incremental, deliberately narrow resolver, not the full two-pass resolver of §3.4.1. It
- * handles five constructs so far:
+ * handles six constructs so far:
  *
  * <ul>
  *   <li>A record (no supertypes), optionally {@code ~}-marked (the {@code constructor} flag
@@ -82,13 +82,26 @@ import java.util.Set;
  *   applied form, {@code body: !map { key_type: ... value_type: ... }}, no supertypes -- see
  *   {@link #resolveGenericConstructorApplication}. Only {@code map} with two simple type
  *   arguments is handled so far; other constructors and nested/value arguments are not.</li>
+ *   <li>A field's default ({@code ~}) or fixed ({@code =}) modifier value (§5.2, §5.10) on a
+ *   REQUIRED (non-{@code ?}) field -- see {@link #resolveField} for the full literal-vs-parameter
+ *   split ({@code product_access_type = INDEX} vs. {@code type_ref = T}). Verified against the real
+ *   fixture's {@code tuple_element}/{@code field_group} (both fresh records, so untangled from
+ *   tightening) and, since no real fixture entry exercises the fixed/parametric cases in isolation
+ *   from a tightening composition, small hand-built snippets mirroring {@code array}'s own field
+ *   shapes ({@code product_access_type = INDEX}, {@code type_ref = T}, {@code integer ~ N}).</li>
  * </ul>
  *
- * Everything else -- elided field types, field modifiers (default/fixed values), refinement,
- * subtraction, generic type-refs other than a bare two-argument {@code map<K, V>} application
- * (other constructors, templates, nested or value arguments), tightening an inherited field or
- * group in a composition body -- is explicitly out of scope for now and reported via {@link
- * UnsupportedOperationException} rather than silently mis-resolved; each is a later, separate pass.
+ * Everything else -- elided field types, an {@code Absent} modifier value ({@code = _}) or any
+ * modifier on an OPTIONAL field, refinement, subtraction, generic type-refs other than a bare
+ * two-argument {@code map<K, V>} application (other constructors, templates, nested or value
+ * arguments), tightening an inherited field or group in a composition body -- is explicitly out of
+ * scope for now and reported via {@link UnsupportedOperationException} rather than silently
+ * mis-resolved; each is a later, separate pass. Notably, {@code array}/{@code map} (the kernel's own
+ * parameterized constructors) still don't resolve end-to-end even with field modifiers and type
+ * parameters both handled: both compose with {@code product} and then re-declare its
+ * {@code access_pattern}/{@code size_type} fields with fixed values -- tightening (§5.7), a separate,
+ * still-unresolved gap that fires before a modifier is ever inspected (composition rejects the
+ * duplicate field name first).
  *
  * <p><b>No namespace, only an accumulating "resolved so far" map.</b> A composition's supertypes
  * must already be present in the {@code resolved} map passed to {@link #resolve(SchemaMap.Declaration,
@@ -159,7 +172,7 @@ public final class SchemaResolver {
             List<String> parameters = structural.typeParams();
             boolean constructor = structural.constructor();
             if (structural.body() instanceof RecordDef recordDef) {
-                RecordBody body = resolveRecordBody(recordDef.entries());
+                RecordBody body = resolveRecordBody(recordDef.entries(), parameters);
                 return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, parameters, constructor,
                         List.of(), List.of(), Optional.empty(), body);
             }
@@ -337,7 +350,7 @@ public final class SchemaResolver {
 
         if (construction.body().isPresent()) {
             for (RecordEntry entry : construction.body().get().entries()) {
-                resolveEntry(name, entry, fields, groups, seenFieldNames);
+                resolveEntry(name, entry, fields, groups, seenFieldNames, parameters);
             }
         }
 
@@ -385,12 +398,12 @@ public final class SchemaResolver {
 
     // ── Record bodies, fields, and field groups (§5.2, §5.11) ─────────────
 
-    private RecordBody resolveRecordBody(List<RecordEntry> entries) {
+    private RecordBody resolveRecordBody(List<RecordEntry> entries, List<String> parameters) {
         List<RecordField> fields = new ArrayList<>();
         List<FieldGroup> groups = new ArrayList<>();
         Set<String> seenFieldNames = new HashSet<>();
         for (RecordEntry entry : entries) {
-            resolveEntry(null, entry, fields, groups, seenFieldNames);
+            resolveEntry(null, entry, fields, groups, seenFieldNames, parameters);
         }
         return new RecordBody(List.of(), fields, groups);
     }
@@ -402,11 +415,11 @@ public final class SchemaResolver {
      * (also unsupported, same message either way).
      */
     private void resolveEntry(String declarationName, RecordEntry entry, List<RecordField> fields,
-                               List<FieldGroup> groups, Set<String> seenFieldNames) {
+                               List<FieldGroup> groups, Set<String> seenFieldNames, List<String> parameters) {
         switch (entry) {
             case FieldDef fieldDef -> {
                 requireFieldNameNotSeen(declarationName, fieldDef.name(), seenFieldNames);
-                RecordField field = resolveField(fieldDef);
+                RecordField field = resolveField(fieldDef, parameters);
                 seenFieldNames.add(field.name());
                 fields.add(field);
             }
@@ -431,16 +444,49 @@ public final class SchemaResolver {
         }
     }
 
-    private RecordField resolveField(FieldDef field) {
+    /**
+     * A field's default (`{@code ~}`) or fixed (`{@code =}`) modifier value (§5.2, §5.10) resolves
+     * one of two ways: when the modifier's token names one of the *declaration's own* type
+     * parameters (e.g. {@code array}'s {@code element_type: type_ref = T}, {@code T} declared by
+     * {@code array => <T> ...}), it is a parameter reference, not a literal -- recorded as {@code
+     * value_param} rather than {@code value} (§5.10's "labelled form", used uniformly whether the
+     * routed field is a scalar or {@code type_ref}-typed). A parametric {@code =} leaves the field's
+     * state at its unmarked {@code REQUIRED} (nothing is actually fixed at declaration -- the
+     * argument arrives at application, §5.10 -- so {@code array}'s own {@code element_type} omits
+     * {@code state} entirely in output); a parametric {@code ~} still promotes to {@link
+     * FieldState#REQUIRED_DEFAULT}, identically to a literal default. Any other modifier token is an
+     * ordinary literal, recorded as {@code value} with {@code state} promoted to {@link
+     * FieldState#REQUIRED_DEFAULT} ({@code ~}) or {@link FieldState#REQUIRED_FIXED} ({@code =}). An
+     * {@code Absent} modifier value ({@code = _}, valid only on an OPTIONAL field) and a modifier on
+     * an OPTIONAL field at all ({@link FieldState#OPTIONAL_FIXED}) are not resolved yet -- no real
+     * fixture declaration needs either so far.
+     */
+    private RecordField resolveField(FieldDef field, List<String> parameters) {
         if (field.type().isEmpty()) {
             throw new UnsupportedOperationException("an elided field type is not resolved yet: " + field);
         }
-        if (field.modifier().isPresent()) {
-            throw new UnsupportedOperationException("field modifiers (~/=) are not resolved yet: " + field);
-        }
         io.ltr8.tson.schema.meta.TypeRef type = resolveTypeRef(field.type().get().typeRef());
-        FieldState state = field.type().get().optional() ? FieldState.OPTIONAL : FieldState.REQUIRED;
-        return new RecordField(field.name(), type, state, Optional.empty(), Optional.empty());
+        boolean optional = field.type().get().optional();
+
+        if (field.modifier().isEmpty()) {
+            FieldState state = optional ? FieldState.OPTIONAL : FieldState.REQUIRED;
+            return new RecordField(field.name(), type, state, Optional.empty(), Optional.empty());
+        }
+        FieldDef.Modifier modifier = field.modifier().get();
+        if (!(modifier.value() instanceof FieldDef.Modifier.Value.Literal literal)) {
+            throw new UnsupportedOperationException("an absent field-modifier value ('= _') is not resolved yet: " + field);
+        }
+        if (optional) {
+            throw new UnsupportedOperationException("a default/fixed value on an OPTIONAL field is not resolved yet: " + field);
+        }
+        boolean isParameterReference = parameters.contains(literal.token().text());
+        if (isParameterReference) {
+            FieldState state = modifier.kind() == FieldDef.Modifier.Kind.DEFAULT ? FieldState.REQUIRED_DEFAULT : FieldState.REQUIRED;
+            return new RecordField(field.name(), type, state, Optional.empty(), Optional.of(literal.token().text()));
+        }
+        FieldState state = modifier.kind() == FieldDef.Modifier.Kind.DEFAULT
+                ? FieldState.REQUIRED_DEFAULT : FieldState.REQUIRED_FIXED;
+        return new RecordField(field.name(), type, state, Optional.of(literal.token()), Optional.empty());
     }
 
     private RecordField resolveGroupMember(GroupDef.Member member) {
