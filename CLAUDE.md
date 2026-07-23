@@ -278,6 +278,14 @@ string, §4.5) for `TokenValue`s produced by the parser. `NumberGrammar.tryParse
   supertypes the caller has already resolved and handed back in -- real forward references and
   namespace population, §3.3.2/§3.4.1's Pass 1, are later work, not attempted yet). `subtypes` (the
   reverse index) is never populated -- it needs a whole-schema pass, not a per-declaration one.
+  **Type parameters** (`<T, ...>`, §5.10) thread straight from `StructuralTypeDef.typeParams()` into
+  `TypeDefinition.parameters` for both a fresh record and a composition -- no substitution into
+  field types and no validation that a parameter is actually used anywhere in the body. `array`'s
+  own `<T> ~product & {...}` shape resolves its `[T]` parameter fine but still throws overall, on a
+  separate, still-unresolved gap: its body re-declares `access_pattern` (already inherited from
+  `product`) with a fixed value, i.e. tightening (§5.7), not type parameters or field modifiers in
+  isolation. A reference declaration's own type parameters (`text_keyed_map => <V> map<text, V>`, an
+  open template application) are a different, not-yet-resolved case.
 - **Bare type references** (`name => other_name`, §8.3) -- always resolve to a `REFERENCE`-kind
   entry regardless of what the referenced name itself resolves to (`type_name => token` is `kind:
   REFERENCE` even though `token` itself is `kind: ATOM`) -- no namespace lookup here either, the

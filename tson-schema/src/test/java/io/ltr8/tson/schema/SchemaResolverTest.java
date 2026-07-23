@@ -455,6 +455,64 @@ class SchemaResolverTest {
                 write(schema));
     }
 
+    // ── Type parameters (§5.10): a template's own <T, ...> list ───────────
+    //    Threaded straight into TypeDefinition.parameters, with no substitution or
+    //    validation that a field actually uses each parameter.
+
+    @Test
+    void resolvesAFreshRecordsTypeParameters() throws DataBindException {
+        TypeDefinition pair = resolveSnippet("pair => <A, B> { first: A  second: B }");
+
+        assertEquals(List.of("A", "B"), pair.parameters());
+        assertEquals("{ kind: \"PRODUCT\" parameters: [ \"A\" \"B\" ] constructor: false supertypes: [] subtypes: [] "
+                        + "body: !record { supertypes: [] fields: [ "
+                        + "{ name: \"first\" type: { name: \"A\" arguments: [] } state: \"REQUIRED\" } "
+                        + "{ name: \"second\" type: { name: \"B\" arguments: [] } state: \"REQUIRED\" } "
+                        + "] groups: [] } }",
+                write(pair));
+    }
+
+    @Test
+    void resolvesACompositionsTypeParameters() throws DataBindException {
+        SchemaMap schemaMap = new SchemaParser("""
+                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
+                {
+                  base => {}
+                  box => <T> ~base & { value: T }
+                }""").parseSchemaDocument().body();
+        Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
+        resolved.put("base", resolver.resolve(schemaMap.declarations().get("base")));
+
+        TypeDefinition box = resolver.resolve(schemaMap.declarations().get("box"), resolved);
+
+        assertEquals(List.of("T"), box.parameters());
+        assertTrue(box.constructor());
+        assertEquals(List.of("base"), box.supertypes());
+        assertEquals("{ kind: \"PRODUCT\" parameters: [ \"T\" ] constructor: true supertypes: [ \"base\" ] subtypes: [] "
+                        + "body: !record { supertypes: [ \"base\" ] fields: [ "
+                        + "{ name: \"value\" type: { name: \"T\" arguments: [] } state: \"REQUIRED\" } "
+                        + "] groups: [] } }",
+                write(box));
+    }
+
+    @Test
+    void arrayFromTheRealFixtureIsBlockedByTighteningNotByItsOwnTypeParameter() throws IOException {
+        // array => <T> ~product & { access_pattern: product_access_type = INDEX ... } -- the <T>
+        // itself resolves fine now; what still blocks this declaration end-to-end is that its body
+        // re-declares "access_pattern" (already inherited from "product") with a fixed value --
+        // tightening an inherited field (§5.7), not yet resolved, and a distinct gap from either
+        // type parameters or field modifiers in isolation.
+        SchemaMap schemaMap = new SchemaParser(readFixture()).parseSchemaDocument().body();
+        Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
+        resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
+        resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom"), resolved));
+        resolved.put("product", resolver.resolve(schemaMap.declarations().get("product"), resolved));
+
+        UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
+                () -> resolver.resolve(schemaMap.declarations().get("array"), resolved));
+        assertTrue(thrown.getMessage().contains("tightening"), thrown.getMessage());
+    }
+
     private TypeDefinition resolveSnippet(String declaration) {
         SchemaMap schemaMap = new SchemaParser("""
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"

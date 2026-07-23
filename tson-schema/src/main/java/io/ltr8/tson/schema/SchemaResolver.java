@@ -46,18 +46,22 @@ import java.util.Set;
  * handles five constructs so far:
  *
  * <ul>
- *   <li>A record (no supertypes, no type parameters), optionally {@code ~}-marked (the {@code
- *   constructor} flag threads straight from {@code StructuralTypeDef.constructor()} into the
- *   result), whose fields are simple type-refs or the inline array sugar {@code [T]} (see below),
- *   each REQUIRED or OPTIONAL (a {@code ?} suffix), and whose entries may include field groups
- *   (§5.11) -- {@code integer_size}'s own shape, and (via a {@code ~atom & {...}} composition
- *   body, see below) {@code integer_type}'s.</li>
- *   <li>Composition ({@code A & B & { ... }}, §5.8), also optionally {@code ~}-marked, over
- *   supertypes that are themselves already resolved, simple (non-generic) references, whose own
- *   body is a {@link RecordBody} -- {@code atom => top & {}}, {@code product => top & {
- *   access_pattern: ... size_type: ... }}, {@code sum => top & {}}, {@code reference => top & {
- *   target: type_name } }, and {@code integer_type => ~atom & { size: integer_size? ( min: integer
- *   | exclusive_min: integer )? ... }}'s own shapes.</li>
+ *   <li>A record (no supertypes), optionally {@code ~}-marked (the {@code constructor} flag
+ *   threads straight from {@code StructuralTypeDef.constructor()} into the result) and optionally
+ *   parameterized ({@code <T, ...>}, threaded straight into {@code TypeDefinition.parameters} with
+ *   no substitution or usage validation, see below), whose fields are simple type-refs or the
+ *   inline array sugar {@code [T]} (see below), each REQUIRED or OPTIONAL (a {@code ?} suffix), and
+ *   whose entries may include field groups (§5.11) -- {@code integer_size}'s own shape, and (via a
+ *   {@code ~atom & {...}} composition body, see below) {@code integer_type}'s.</li>
+ *   <li>Composition ({@code A & B & { ... }}, §5.8), also optionally {@code ~}-marked and
+ *   optionally parameterized, over supertypes that are themselves already resolved, simple
+ *   (non-generic) references, whose own body is a {@link RecordBody} -- {@code atom => top & {}},
+ *   {@code product => top & { access_pattern: ... size_type: ... }}, {@code sum => top & {}},
+ *   {@code reference => top & { target: type_name } }, and {@code integer_type => ~atom & { size:
+ *   integer_size? ( min: integer | exclusive_min: integer )? ... }}'s own shapes -- {@code array}'s
+ *   own {@code <T> ~product & {...}} shape resolves its type parameter but still throws overall, on
+ *   a separate, still-unresolved gap (tightening the inherited {@code access_pattern} field with a
+ *   fixed value, §5.7).</li>
  *   <li>A bare, argument-free type reference ({@code name => other_name}, §8.3) -- always resolves
  *   to a {@code REFERENCE}-kind entry regardless of what the referenced name itself resolves to
  *   (e.g. {@code type_name => token} is {@code kind: REFERENCE} even though {@code token} itself
@@ -115,6 +119,13 @@ import java.util.Set;
  * *whole* resolved schema (who lists me as a supertype, transitively), a global pass over every
  * entry, not a per-declaration concern; deliberately deferred, not forgotten.
  *
+ * <p><b>{@code parameters} (§5.10) threads straight through</b> from a fresh record's or a
+ * composition's own {@code StructuralTypeDef.typeParams()} -- {@code array => <T> ~product & {
+ * ... }}'s own {@code [T]} -- with no substitution into field types and no validation that a
+ * parameter is actually used anywhere in the body; a reference-declaration's own type parameters
+ * ({@code text_keyed_map => <V> map<text, V>}, an open template application) are a separate,
+ * not-yet-resolved case.
+ *
  * <p>Note the two {@code TypeRef}s in play: this class imports {@code tson-parser}'s grammar-layer
  * {@link TypeRef} (a source-text reference) for reading the AST, and refers to {@code
  * io.ltr8.tson.schema.meta.TypeRef} (the resolved reference it produces) by its fully-qualified
@@ -144,15 +155,16 @@ public final class SchemaResolver {
     }
 
     private TypeDefinition resolveTypeDef(String name, TypeDef typeDef, Map<String, TypeDefinition> resolved) {
-        if (typeDef instanceof StructuralTypeDef structural && structural.typeParams().isEmpty()) {
+        if (typeDef instanceof StructuralTypeDef structural) {
+            List<String> parameters = structural.typeParams();
             boolean constructor = structural.constructor();
             if (structural.body() instanceof RecordDef recordDef) {
                 RecordBody body = resolveRecordBody(recordDef.entries());
-                return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of(), constructor,
+                return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, parameters, constructor,
                         List.of(), List.of(), Optional.empty(), body);
             }
             if (structural.body() instanceof ConstructionDef construction) {
-                return resolveComposition(name, construction, resolved, constructor);
+                return resolveComposition(name, construction, resolved, constructor, parameters);
             }
         }
         if (typeDef instanceof ReferenceTypeDef referenceTypeDef && referenceTypeDef.typeParams().isEmpty()) {
@@ -274,10 +286,14 @@ public final class SchemaResolver {
      * accumulates by induction: each supertype's own {@code supertypes()} is already its full
      * transitive chain (by the same induction, computed when *that* entry was resolved), so {@code
      * direct + parent.supertypes()} for every direct supertype, deduplicated, is the complete
-     * transitive chain -- no separate graph walk needed.
+     * transitive chain -- no separate graph walk needed. {@code parameters} (a template's own
+     * {@code <T, ...>} list, §5.10) threads straight through from the declaration's {@code
+     * typeParams} into the result -- {@code array}'s own shape ({@code array => <T> ~product & {
+     * ... } }) -- with no substitution or validation that a field actually uses each parameter.
      */
     private TypeDefinition resolveComposition(String name, ConstructionDef construction,
-                                               Map<String, TypeDefinition> resolved, boolean constructor) {
+                                               Map<String, TypeDefinition> resolved, boolean constructor,
+                                               List<String> parameters) {
         if (construction.removal().isPresent()) {
             throw new UnsupportedOperationException("'" + name + "': subtraction is not resolved yet");
         }
@@ -327,7 +343,7 @@ public final class SchemaResolver {
 
         TypeKind kind = determineKind(name, transitiveSupertypes);
         RecordBody body = new RecordBody(directSupertypes, fields, groups);
-        return new TypeDefinition(Optional.empty(), kind, List.of(), constructor, transitiveSupertypes, List.of(),
+        return new TypeDefinition(Optional.empty(), kind, parameters, constructor, transitiveSupertypes, List.of(),
                 Optional.empty(), body);
     }
 
