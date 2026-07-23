@@ -75,10 +75,13 @@ import java.util.Set;
  *   <li>A field's inline array sugar {@code [T]} (§5.3) resolves in place to the {@code type_ref}
  *   value {@code { name: array  arguments: [ { name: T } ] } } -- the {@code @alias:field_name}-style
  *   annotation §8.3 would add when {@code T} is itself an aliased reference is not produced yet, so
- *   the bare form is used instead (see {@link #resolveTypeRef}). Declaration-level sized-array sugar
- *   ({@code [T; N..]}/{@code [T; ..M]}/{@code [T; N..M]}/{@code [T; N]}, §5.3) desugars to a
- *   {@code REFERENCE}-kind entry targeting {@code array_min}/{@code array_max}/{@code array_ranged}
- *   (§5.10) -- see {@link #resolveContainerTypeDef}.</li>
+ *   the bare form is used instead (see {@link #resolveTypeRef}). A field's type-ref may also be an
+ *   ordinary generic application ({@code enum}'s own {@code members: set<token>}), resolved the same
+ *   way a refinement source's arguments are ({@link #resolveSimpleTypeArg(TypeArg)}, a simple
+ *   argument only). Declaration-level sized-array sugar ({@code [T; N..]}/{@code [T; ..M]}/{@code
+ *   [T; N..M]}/{@code [T; N]}, §5.3) desugars to a {@code REFERENCE}-kind entry targeting {@code
+ *   array_min}/{@code array_max}/{@code array_ranged} (§5.10) -- see {@link
+ *   #resolveContainerTypeDef}.</li>
  *   <li>A declaration's own fully-bound top-level application of the {@code map} constructor
  *   (§5.6) -- {@code schema => map<type_name, type_definition>}'s own shape -- resolves as a
  *   construction, not a reference: {@code kind: PRODUCT} (map's family), {@code source} the
@@ -122,9 +125,11 @@ import java.util.Set;
  * Everything else -- elided field types outside a tightening entry, an {@code Absent} modifier
  * value ({@code = _}) or any modifier on an OPTIONAL field, the identity-diagonal value-invariant
  * for a restated FIXED field, atom refinement ({@code !I ^ { ... }}, a distinct grammar form from
- * {@code RefinedDef}), restating a field group in a refinement body, subtraction, generic type-refs
- * other than a bare two-argument {@code map<K, V>} application or a refinement source (other
- * constructors, templates, nested or value arguments), and an inter-supertype field collision -- is
+ * {@code RefinedDef}), constructor application / atom instances ({@code !C value}, {@code Instance}
+ * -- {@code value => !unit {}}, {@code boolean => !enum [true false]}, and every other atom-family
+ * bootstrap instance in the real fixture use this and are not dispatched at all yet in {@link
+ * #resolveTypeDef}), restating a field group in a refinement body, subtraction, a generic type-ref
+ * with a nested or value (non-simple) argument, and an inter-supertype field collision -- is
  * explicitly out of scope for now and reported via {@link UnsupportedOperationException} rather
  * than silently mis-resolved; each is a later, separate pass.
  *
@@ -257,11 +262,18 @@ public final class SchemaResolver {
     }
 
     private static io.ltr8.tson.schema.meta.TypeRef resolveSimpleTypeArg(String name, TypeArg arg) {
+        try {
+            return resolveSimpleTypeArg(arg);
+        } catch (UnsupportedOperationException e) {
+            throw new UnsupportedOperationException("'" + name + "': " + e.getMessage());
+        }
+    }
+
+    private static io.ltr8.tson.schema.meta.TypeRef resolveSimpleTypeArg(TypeArg arg) {
         if (arg instanceof TypeArg.Ref(SimpleRef simple)) {
             return io.ltr8.tson.schema.meta.TypeRef.of(simple.name());
         }
-        throw new UnsupportedOperationException(
-                "'" + name + "': only simple (non-generic) type arguments are resolved so far, got " + arg);
+        throw new UnsupportedOperationException("only simple (non-generic) type arguments are resolved so far, got " + arg);
     }
 
     // ── Declaration-level array size sugar (§5.3, §5.10) ──────────────────
@@ -688,10 +700,13 @@ public final class SchemaResolver {
     }
 
     /**
-     * A field/group-member's type-ref: a bare simple reference, or the inline array sugar {@code
-     * [T]} (§5.3), which desugars to the constructor application {@code !array { element_type: T }}
-     * -- represented in place as a {@code type_ref} value, {@code { name: array  arguments: [ {
-     * name: T } ] } }, exactly like any other generic application (§5.3: "An inline constructor
+     * A field/group-member's type-ref: a bare simple reference, a generic application ({@code
+     * enum}'s own {@code members: set<token>}, resolved the same way a refinement source's
+     * arguments are, via {@link #resolveSimpleTypeArg(TypeArg)} -- only a simple, non-nested
+     * argument is supported so far, same limit as elsewhere), or the inline array sugar {@code [T]}
+     * (§5.3), which desugars to the constructor application {@code !array { element_type: T }} --
+     * represented in place as a {@code type_ref} value, {@code { name: array  arguments: [ { name:
+     * T } ] } }, exactly like any other generic application (§5.3: "An inline constructor
      * application does not materialise a schema entry"). Per the same section this would carry
      * {@code @alias:field_name} when {@code T} is itself an aliased reference (§8.3's reference
      * flattening) -- not implemented yet, so the bare, unaliased form is produced instead.
@@ -700,11 +715,19 @@ public final class SchemaResolver {
         if (ref instanceof SimpleRef simple) {
             return io.ltr8.tson.schema.meta.TypeRef.of(simple.name());
         }
+        if (ref instanceof GenericRef generic) {
+            List<TypeArgument> args = new ArrayList<>();
+            for (TypeArg arg : generic.args()) {
+                args.add(new TypeArgument.Ref(resolveSimpleTypeArg(arg)));
+            }
+            return new io.ltr8.tson.schema.meta.TypeRef(generic.name(), args);
+        }
         if (ref instanceof InlineArrayRef inlineArray && inlineArray.elementType() instanceof SimpleRef elementSimple) {
             return new io.ltr8.tson.schema.meta.TypeRef("array",
                     List.of(new TypeArgument.Ref(io.ltr8.tson.schema.meta.TypeRef.of(elementSimple.name()))));
         }
         throw new UnsupportedOperationException(
-                "only simple (non-generic) type-refs and inline arrays of one are resolved so far: " + ref);
+                "only simple (non-generic) type-refs, generic applications of one, and inline arrays of one "
+                        + "are resolved so far: " + ref);
     }
 }

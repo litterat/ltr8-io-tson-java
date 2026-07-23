@@ -298,7 +298,10 @@ string, §4.5) for `TokenValue`s produced by the parser. `NumberGrammar.tryParse
   array  arguments: [ { name: T } ] } }` -- verified against `type_ref => { name: type_name
   arguments: [type_argument]? }` from the real fixture. The `@alias:field_name`-style annotation
   §8.3 would add when `T` is itself an aliased reference isn't produced yet, so the bare form is
-  used instead. **Declaration-level sized-array sugar** (`[T; N..]`/`[T; ..M]`/`[T; N..M]`/`[T; N]`,
+  used instead. **A field's type-ref may also be an ordinary generic application** (`enum`'s own
+  `members: set<token>`), resolved the same way a refinement source's arguments are -- only a
+  simple (non-nested, non-value) argument is supported so far. **Declaration-level sized-array sugar**
+  (`[T; N..]`/`[T; ..M]`/`[T; N..M]`/`[T; N]`,
   §5.3, §5.10) desugars to a `REFERENCE`-kind entry targeting `array_min`/`array_max`/
   `array_ranged` respectively (the bare-`N` form to `array_ranged<T, N, N>`, "two spellings of the
   same application") -- per §5.10/§8.2 `body.target` should point at a *materialised instantiation
@@ -369,11 +372,19 @@ string, §4.5) for `TokenValue`s produced by the parser. `NumberGrammar.tryParse
 
 Every other construct (elided field types outside a tightening entry, an `Absent` modifier value or
 a modifier on an OPTIONAL field, the identity-diagonal FIXED-value invariant, atom refinement
-(`!I ^ { ... }`, a distinct grammar form from `RefinedDef`), restating a field group in a refinement
-body, subtraction, generic type-refs other than a bare two-argument `map<K, V>` application or a
-refinement source, templates, and an inter-supertype field collision) throws
-`UnsupportedOperationException` rather than silently mis-resolving -- `SchemaResolver`'s own Javadoc
-lists exactly what's in scope.
+(`!I ^ { ... }`, a distinct grammar form from `RefinedDef`), **constructor application / atom
+instances** (`!C value`, `Instance` -- `value => !unit {}`, `boolean => !enum [true false]`, and
+every other atom-family bootstrap instance in the real fixture use this and are not dispatched at
+all yet in `resolveTypeDef` -- see below), restating a field group in a refinement body, subtraction,
+a generic type-ref with a nested or value (non-simple) argument, and an inter-supertype field
+collision) throws `UnsupportedOperationException` rather than silently mis-resolving --
+`SchemaResolver`'s own Javadoc lists exactly what's in scope.
+
+**Status against the real `meta-kernel.tn1` fixture: 36 of its 49 declarations resolve via
+`resolveAll` as of this writing; every one of the remaining 13 fails for the exact same reason** --
+each is `Instance` (constructor application, above), the one remaining construct standing between
+here and loading the whole file. Re-check with a throwaway `resolveAll` probe before assuming this
+count is still current -- it changes every time resolver coverage widens.
 
 **A real recursion trap, found and fixed along the way -- read before touching `TypeArgument`.**
 `TypeRef`/`TypeArgument` are mutually recursive (`TypeRef.arguments: List<TypeArgument>`, and a

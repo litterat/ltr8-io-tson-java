@@ -818,6 +818,30 @@ class SchemaResolverTest {
         assertTrue(thrown.getMessage().contains("adding a field"), thrown.getMessage());
     }
 
+    // ── A field's generic type-ref (e.g. `set<token>`) ────────────────────
+
+    @Test
+    void resolvesEnumFromTheRealMetaKernelFixtureWithAGenericFieldType() throws IOException, DataBindException {
+        // enum => ~atom & { members: set<token> } -- "members" is typed with a generic
+        // application, not a bare reference or the [T] array sugar.
+        SchemaMap schemaMap = schemaMapFromFixture();
+        Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
+        resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
+        resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom"), resolved));
+
+        TypeDefinition enumDef = resolver.resolve(schemaMap.declarations().get("enum"), resolved);
+
+        assertEquals(TypeKind.ATOM, enumDef.kind());
+        assertTrue(enumDef.constructor());
+        assertEquals(List.of("atom", "top"), enumDef.supertypes());
+        assertEquals("{ kind: \"ATOM\" parameters: [] constructor: true supertypes: [ \"atom\" \"top\" ] subtypes: [] "
+                        + "body: !record { supertypes: [ \"atom\" ] fields: [ "
+                        + "{ name: \"members\" type: { name: \"set\" "
+                        + "arguments: [ !ref { ref: { name: \"token\" arguments: [] } } ] } state: \"REQUIRED\" } "
+                        + "] groups: [] } }",
+                write(enumDef));
+    }
+
     private Map<String, TypeDefinition> resolveUpToArray() throws IOException {
         SchemaMap schemaMap = schemaMapFromFixture();
         Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
