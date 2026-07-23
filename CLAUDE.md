@@ -348,16 +348,32 @@ string, §4.5) for `TokenValue`s produced by the parser. `NumberGrammar.tryParse
   real fixture declaration restates an already-fixed field. Verified against the real fixture's
   `array`/`map` end-to-end, plus hand-built snippets for a rejected invalid transition and an
   elided-type-ref tightening (adapting §5.7's own `production => config ^ { host: =
-  "prod.example.com" } }` worked example to a composition body, since `^` itself isn't resolved).
+  "prod.example.com" } }` worked example to a composition body).
+- **The `^` refinement operator** (§5.7, `RefinedDef`) -- `source ^ { ... }`, optionally
+  `~`-marked and/or parameterized: `set`'s own `<T> ~array<T> ^ { state: = REQUIRED  unordered: =
+  true  unique_items: = true }`. Unlike composition, a refinement copies the source's **entire**
+  field set and admits **no new fields** -- every body entry MUST tighten an inherited field
+  (reusing the same tightening machinery above), or it's a resolver error ("adding fields is a
+  resolver error", §5.7). `source` is recorded verbatim as the result's own `source` field (a
+  refinement always sets it, unlike composition, which never does) -- a bare name or, as in `set`'s
+  case, a generic application (`array<T>`, `T` shadowing `set`'s own declared parameter of the same
+  name) resolved the same way a top-level constructor application's arguments are. `supertypes`
+  accumulates by the same induction as composition (`[sourceName] + source.supertypes()`); the
+  body's own `record.supertypes` stays empty (that field records only direct `&` compositions as
+  written, and a refinement has none). Verified end-to-end against the real fixture's `set`
+  (refining `array`, tightening its `REQUIRED_DEFAULT` fields `state`/`unordered`/`unique_items` to
+  `REQUIRED_FIXED`) and `array_min`/`array_ranged` (each routing an inherited OPTIONAL field --
+  `min_items`/`max_items` -- to `REQUIRED` via its own value parameter, an `OPTIONAL` -> `REQUIRED`
+  tightening per §5.7's table). Restating a field group in a refinement body, and a non-record
+  refinement source, remain unresolved.
 
 Every other construct (elided field types outside a tightening entry, an `Absent` modifier value or
-a modifier on an OPTIONAL field, the identity-diagonal FIXED-value invariant, **the `^` refinement
-operator itself** -- a declaration whose body is `source ^ { ... }`, i.e. `RefinedDef` -- `set`,
-`vector`, and the `array_min`/`array_max`/`array_ranged` size-refinement templates in the real
-fixture all use it and are still unresolved, not dispatched at all yet in `resolveTypeDef` --
-subtraction, generic type-refs other than a bare two-argument `map<K, V>` application, templates,
-and an inter-supertype field collision) throws `UnsupportedOperationException` rather than silently
-mis-resolving -- `SchemaResolver`'s own Javadoc lists exactly what's in scope.
+a modifier on an OPTIONAL field, the identity-diagonal FIXED-value invariant, atom refinement
+(`!I ^ { ... }`, a distinct grammar form from `RefinedDef`), restating a field group in a refinement
+body, subtraction, generic type-refs other than a bare two-argument `map<K, V>` application or a
+refinement source, templates, and an inter-supertype field collision) throws
+`UnsupportedOperationException` rather than silently mis-resolving -- `SchemaResolver`'s own Javadoc
+lists exactly what's in scope.
 
 **A real recursion trap, found and fixed along the way -- read before touching `TypeArgument`.**
 `TypeRef`/`TypeArgument` are mutually recursive (`TypeRef.arguments: List<TypeArgument>`, and a

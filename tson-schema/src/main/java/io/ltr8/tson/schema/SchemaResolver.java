@@ -13,6 +13,7 @@ import io.ltr8.tson.parser.ast.schema.GroupDef;
 import io.ltr8.tson.parser.ast.schema.InlineArrayRef;
 import io.ltr8.tson.parser.ast.schema.RecordDef;
 import io.ltr8.tson.parser.ast.schema.RecordEntry;
+import io.ltr8.tson.parser.ast.schema.RefinedDef;
 import io.ltr8.tson.parser.ast.schema.ReferenceTypeDef;
 import io.ltr8.tson.parser.ast.schema.SchemaMap;
 import io.ltr8.tson.parser.ast.schema.SimpleRef;
@@ -43,7 +44,7 @@ import java.util.Set;
  * Resolves declarations from a {@link SchemaMap} (the grammar-layer AST, {@code tson-parser}) into
  * {@link TypeDefinition}s (Part 2 §8's resolved schema-value shape, {@code io.ltr8.tson.schema.meta})
  * -- an incremental, deliberately narrow resolver, not the full two-pass resolver of §3.4.1. It
- * handles seven constructs so far:
+ * handles eight constructs so far:
  *
  * <ul>
  *   <li>A record (no supertypes), optionally {@code ~}-marked (the {@code constructor} flag
@@ -100,20 +101,32 @@ import java.util.Set;
  *   {@code map} -- both tighten {@code product}'s {@code access_pattern}/{@code size_type} to
  *   {@code REQUIRED_FIXED} -- plus hand-built snippets for a rejected invalid transition and an
  *   elided-type-ref tightening (mirroring §5.7's own {@code production => config ^ { host: =
- *   "prod.example.com" } } worked example, adapted to a composition body since the {@code ^}
- *   refinement operator itself is not resolved -- see below).</li>
+ *   "prod.example.com" } } worked example, adapted to a composition body).</li>
+ *   <li>The {@code ^} refinement operator (§5.7, {@code RefinedDef}, via {@link
+ *   #resolveRefinement}) -- {@code source ^ { ... }}, optionally {@code ~}-marked and/or
+ *   parameterized: {@code set}'s own {@code <T> ~array<T> ^ { state: = REQUIRED ... }}. Unlike
+ *   composition, a refinement copies the source's *entire* field set and admits no new fields --
+ *   every body entry MUST tighten an inherited field (reusing {@link #resolveTighteningField}) or
+ *   the declaration is a resolver error. {@code source} is recorded verbatim as the result's own
+ *   {@code source} (unlike composition, which never sets it); {@code supertypes} accumulates by the
+ *   same induction as composition ({@code [sourceName] + source.supertypes()}); the body's own
+ *   {@code record.supertypes} stays empty (that field records only direct {@code &} compositions,
+ *   §8.1, and a refinement has none). Verified end-to-end against the real fixture's {@code set}
+ *   (refining {@code array}, tightening {@code REQUIRED_DEFAULT} fields to {@code REQUIRED_FIXED})
+ *   and {@code array_min}/{@code array_ranged} (each routing an inherited OPTIONAL field to
+ *   {@code REQUIRED} by its own value parameter -- an {@code OPTIONAL -&gt; REQUIRED} tightening,
+ *   §5.7's table). Restating a field group in a refinement body, and a non-record refinement
+ *   source, are not resolved yet.</li>
  * </ul>
  *
  * Everything else -- elided field types outside a tightening entry, an {@code Absent} modifier
  * value ({@code = _}) or any modifier on an OPTIONAL field, the identity-diagonal value-invariant
- * for a restated FIXED field, the {@code ^} refinement operator itself (a declaration whose body is
- * {@code source ^ { ... }} -- {@code set}, {@code vector}, {@code array_min}/{@code array_max}/
- * {@code array_ranged} in the real fixture -- is a distinct grammar shape, {@code RefinedDef}, not
- * yet dispatched at all in {@link #resolveTypeDef}), subtraction, generic type-refs other than a
- * bare two-argument {@code map<K, V>} application (other constructors, templates, nested or value
- * arguments), and an inter-supertype field collision -- is explicitly out of scope for now and
- * reported via {@link UnsupportedOperationException} rather than silently mis-resolved; each is a
- * later, separate pass.
+ * for a restated FIXED field, atom refinement ({@code !I ^ { ... }}, a distinct grammar form from
+ * {@code RefinedDef}), restating a field group in a refinement body, subtraction, generic type-refs
+ * other than a bare two-argument {@code map<K, V>} application or a refinement source (other
+ * constructors, templates, nested or value arguments), and an inter-supertype field collision -- is
+ * explicitly out of scope for now and reported via {@link UnsupportedOperationException} rather
+ * than silently mis-resolved; each is a later, separate pass.
  *
  * <p><b>No namespace, only an accumulating "resolved so far" map.</b> A composition's supertypes
  * must already be present in the {@code resolved} map passed to {@link #resolve(SchemaMap.Declaration,
@@ -190,6 +203,9 @@ public final class SchemaResolver {
             }
             if (structural.body() instanceof ConstructionDef construction) {
                 return resolveComposition(name, construction, resolved, constructor, parameters);
+            }
+            if (structural.body() instanceof RefinedDef refined) {
+                return resolveRefinement(name, refined, resolved, constructor, parameters);
             }
         }
         if (typeDef instanceof ReferenceTypeDef referenceTypeDef && referenceTypeDef.typeParams().isEmpty()) {
@@ -413,6 +429,96 @@ public final class SchemaResolver {
             case "sum" -> TypeKind.SUM;
             default -> throw new IllegalStateException(baseKindsFound.get(0));
         };
+    }
+
+    // ── Refinement (§5.7): T ^ { ... } ─────────────────────────────────────
+
+    /**
+     * {@code source ^ { ... }} (optionally {@code ~}-marked and/or parameterized, e.g. {@code
+     * set => <T> ~array<T> ^ { state: = REQUIRED ... }}): copies the *entire* inherited field set
+     * and any groups from the (already-resolved) source's own {@link RecordBody} -- unlike
+     * composition, refinement never adds fields, so every body entry MUST tighten one of them
+     * ({@link #resolveTighteningField}, the same machinery composition-body tightening uses); a
+     * body field naming nothing inherited is a resolver error (§5.7: "adding fields is a resolver
+     * error"), and restating a field group in a refinement body is not resolved yet. {@code source}
+     * itself -- a bare name or, as here, a generic application ({@code array<T>}) -- is recorded
+     * verbatim as the result's {@code source} (§8.1's "a `^` refinement records the source name");
+     * unlike composition (which never sets {@code source}), a refinement always does. {@code
+     * supertypes} accumulates by the same induction composition uses: {@code [sourceName] +
+     * source.supertypes()}, deduplicated -- {@code set}'s own {@code [array, product, top]}. The
+     * body's own {@code record.supertypes} stays empty: that field records only direct {@code &}
+     * compositions as written (§8.1), and a refinement has no {@code &} list. {@code kind} is
+     * determined the same way composition determines it (the transitive chain's literal
+     * atom/product/sum name, not the source's own resolved kind).
+     */
+    private TypeDefinition resolveRefinement(String name, RefinedDef refined, Map<String, TypeDefinition> resolved,
+                                              boolean constructor, List<String> parameters) {
+        io.ltr8.tson.schema.meta.TypeRef sourceRef = resolveRefinementSource(name, refined.target());
+        String sourceName = sourceRef.name();
+        TypeDefinition sourceDef = resolved.get(sourceName);
+        if (sourceDef == null) {
+            throw new UnsupportedOperationException("'" + name + "': refinement source '" + sourceName
+                    + "' is not resolved yet (only a source declared earlier in the same schema map is visible so far)");
+        }
+        if (!(sourceDef.body() instanceof RecordBody sourceBody)) {
+            throw new UnsupportedOperationException("'" + name + "': refinement source '" + sourceName
+                    + "' does not have a record body -- refining a non-record source is not resolved yet");
+        }
+
+        List<String> transitiveSupertypes = new ArrayList<>();
+        Set<String> seenTransitive = new HashSet<>();
+        addIfAbsent(transitiveSupertypes, seenTransitive, sourceName);
+        for (String ancestor : sourceDef.supertypes()) {
+            addIfAbsent(transitiveSupertypes, seenTransitive, ancestor);
+        }
+
+        List<RecordField> fields = new ArrayList<>(sourceBody.fields());
+        List<FieldGroup> groups = new ArrayList<>(sourceBody.groups());
+        Map<String, Integer> inheritedFieldIndex = new LinkedHashMap<>();
+        for (int i = 0; i < fields.size(); i++) {
+            inheritedFieldIndex.put(fields.get(i).name(), i);
+        }
+
+        for (RecordEntry entry : refined.body().entries()) {
+            if (!(entry instanceof FieldDef fieldDef)) {
+                throw new UnsupportedOperationException(
+                        "'" + name + "': restating a field group in a refinement body is not resolved yet");
+            }
+            Integer index = inheritedFieldIndex.get(fieldDef.name());
+            if (index == null) {
+                throw new UnsupportedOperationException("'" + name + "': refinement body field '" + fieldDef.name()
+                        + "' names no inherited field -- adding a field in a refinement is a resolver error (§5.7)");
+            }
+            fields.set(index, resolveTighteningField(name, fieldDef, fields.get(index), parameters));
+        }
+
+        TypeKind kind = determineKind(name, transitiveSupertypes);
+        RecordBody body = new RecordBody(List.of(), fields, groups);
+        return new TypeDefinition(Optional.of(sourceRef), kind, parameters, constructor, transitiveSupertypes,
+                List.of(), Optional.empty(), body);
+    }
+
+    /**
+     * A refinement's source ({@code target}) is always a {@link SimpleRef} or a {@link
+     * GenericRef} by grammar (see {@code RefinedDef}'s own Javadoc) -- a bare name resolves to a
+     * bare {@code type_ref}; a generic application (e.g. {@code array<T>}, {@code T} shadowing the
+     * refining declaration's own parameter) resolves each argument the same way a top-level
+     * constructor application does ({@link #resolveSimpleTypeArg}), since only a simple
+     * (non-nested, non-value) type argument is supported so far.
+     */
+    private io.ltr8.tson.schema.meta.TypeRef resolveRefinementSource(String name, TypeRef target) {
+        if (target instanceof SimpleRef simple) {
+            return io.ltr8.tson.schema.meta.TypeRef.of(simple.name());
+        }
+        if (target instanceof GenericRef generic) {
+            List<TypeArgument> args = new ArrayList<>();
+            for (TypeArg arg : generic.args()) {
+                args.add(new TypeArgument.Ref(resolveSimpleTypeArg(name, arg)));
+            }
+            return new io.ltr8.tson.schema.meta.TypeRef(generic.name(), args);
+        }
+        throw new UnsupportedOperationException(
+                "'" + name + "': a refinement source is always a simple or generic type-ref by grammar, got " + target);
     }
 
     // ── Record bodies, fields, and field groups (§5.2, §5.11) ─────────────

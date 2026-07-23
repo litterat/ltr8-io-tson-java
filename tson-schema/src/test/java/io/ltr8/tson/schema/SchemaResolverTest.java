@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -688,6 +689,147 @@ class SchemaResolverTest {
                         + "{ name: \"port\" type: { name: \"integer\" arguments: [] } state: \"REQUIRED\" } "
                         + "] groups: [] } }",
                 write(production));
+    }
+
+    // ── The ^ refinement operator (§5.7): set, array_min, array_max, array_ranged ──
+    //    A refinement re-emits the ENTIRE inherited field set (no new fields), tightening
+    //    only the fields the body actually names -- verified end-to-end against the real
+    //    fixture, resolving "array" first so each refinement's own source is visible.
+
+    @Test
+    void resolvesSetFromTheRealMetaKernelFixtureRefiningArray() throws IOException, DataBindException {
+        // set => <T> ~array<T> ^ { state: = REQUIRED  unordered: = true  unique_items: = true } --
+        // array's own state/unordered/unique_items were REQUIRED_DEFAULT; set's body fixes them,
+        // an allowed REQUIRED_DEFAULT -> REQUIRED_FIXED transition (§5.7's table).
+        Map<String, TypeDefinition> resolved = resolveUpToArray();
+
+        TypeDefinition set = resolver.resolve(schemaMapFromFixture().declarations().get("set"), resolved);
+
+        assertEquals(TypeKind.PRODUCT, set.kind());
+        assertEquals(List.of("T"), set.parameters());
+        assertTrue(set.constructor());
+        assertEquals(List.of("array", "product", "top"), set.supertypes());
+        assertEquals("{ source: { name: \"array\" arguments: [ !ref { ref: { name: \"T\" arguments: [] } } ] } "
+                        + "kind: \"PRODUCT\" parameters: [ \"T\" ] constructor: true "
+                        + "supertypes: [ \"array\" \"product\" \"top\" ] subtypes: [] "
+                        + "body: !record { supertypes: [] fields: [ "
+                        + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
+                        + "state: \"REQUIRED_FIXED\" value: { text: \"INDEX\" form: \"UNQUOTED\" } } "
+                        + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
+                        + "state: \"REQUIRED_FIXED\" value: { text: \"VARIABLE\" form: \"UNQUOTED\" } } "
+                        + "{ name: \"element_type\" type: { name: \"type_ref\" arguments: [] } "
+                        + "state: \"REQUIRED\" value_param: \"T\" } "
+                        + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } "
+                        + "state: \"REQUIRED_FIXED\" value: { text: \"REQUIRED\" form: \"UNQUOTED\" } } "
+                        + "{ name: \"unordered\" type: { name: \"boolean\" arguments: [] } "
+                        + "state: \"REQUIRED_FIXED\" value: { text: \"true\" form: \"UNQUOTED\" } } "
+                        + "{ name: \"unique_items\" type: { name: \"boolean\" arguments: [] } "
+                        + "state: \"REQUIRED_FIXED\" value: { text: \"true\" form: \"UNQUOTED\" } } "
+                        + "{ name: \"min_items\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
+                        + "{ name: \"max_items\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
+                        + "] groups: [] } }",
+                write(set));
+    }
+
+    @Test
+    void resolvesArrayMinFromTheRealMetaKernelFixtureRoutingMinItemsByParameter() throws IOException, DataBindException {
+        // array_min => <T, MIN> array<T> ^ { min_items: = MIN } -- array's own min_items was
+        // OPTIONAL; MIN is array_min's own parameter, so this is an OPTIONAL -> REQUIRED
+        // (value_param) tightening, not a literal fixed value.
+        Map<String, TypeDefinition> resolved = resolveUpToArray();
+
+        TypeDefinition arrayMin = resolver.resolve(schemaMapFromFixture().declarations().get("array_min"), resolved);
+
+        assertEquals(List.of("T", "MIN"), arrayMin.parameters());
+        assertFalse(arrayMin.constructor());
+        assertEquals(List.of("array", "product", "top"), arrayMin.supertypes());
+        assertEquals("{ source: { name: \"array\" arguments: [ !ref { ref: { name: \"T\" arguments: [] } } ] } "
+                        + "kind: \"PRODUCT\" parameters: [ \"T\" \"MIN\" ] constructor: false "
+                        + "supertypes: [ \"array\" \"product\" \"top\" ] subtypes: [] "
+                        + "body: !record { supertypes: [] fields: [ "
+                        + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
+                        + "state: \"REQUIRED_FIXED\" value: { text: \"INDEX\" form: \"UNQUOTED\" } } "
+                        + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
+                        + "state: \"REQUIRED_FIXED\" value: { text: \"VARIABLE\" form: \"UNQUOTED\" } } "
+                        + "{ name: \"element_type\" type: { name: \"type_ref\" arguments: [] } "
+                        + "state: \"REQUIRED\" value_param: \"T\" } "
+                        + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } "
+                        + "state: \"REQUIRED_DEFAULT\" value: { text: \"REQUIRED\" form: \"UNQUOTED\" } } "
+                        + "{ name: \"unordered\" type: { name: \"boolean\" arguments: [] } "
+                        + "state: \"REQUIRED_DEFAULT\" value: { text: \"false\" form: \"UNQUOTED\" } } "
+                        + "{ name: \"unique_items\" type: { name: \"boolean\" arguments: [] } "
+                        + "state: \"REQUIRED_DEFAULT\" value: { text: \"false\" form: \"UNQUOTED\" } } "
+                        + "{ name: \"min_items\" type: { name: \"integer\" arguments: [] } "
+                        + "state: \"REQUIRED\" value_param: \"MIN\" } "
+                        + "{ name: \"max_items\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
+                        + "] groups: [] } }",
+                write(arrayMin));
+    }
+
+    @Test
+    void resolvesArrayRangedFromTheRealMetaKernelFixtureRoutingBothBoundsByParameter() throws IOException, DataBindException {
+        // array_ranged => <T, MIN, MAX> array<T> ^ { min_items: = MIN  max_items: = MAX } -- both
+        // OPTIONAL fields tighten to REQUIRED via parameter routing.
+        Map<String, TypeDefinition> resolved = resolveUpToArray();
+
+        TypeDefinition arrayRanged = resolver.resolve(schemaMapFromFixture().declarations().get("array_ranged"), resolved);
+
+        assertEquals(List.of("T", "MIN", "MAX"), arrayRanged.parameters());
+        assertEquals("{ source: { name: \"array\" arguments: [ !ref { ref: { name: \"T\" arguments: [] } } ] } "
+                        + "kind: \"PRODUCT\" parameters: [ \"T\" \"MIN\" \"MAX\" ] constructor: false "
+                        + "supertypes: [ \"array\" \"product\" \"top\" ] subtypes: [] "
+                        + "body: !record { supertypes: [] fields: [ "
+                        + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
+                        + "state: \"REQUIRED_FIXED\" value: { text: \"INDEX\" form: \"UNQUOTED\" } } "
+                        + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
+                        + "state: \"REQUIRED_FIXED\" value: { text: \"VARIABLE\" form: \"UNQUOTED\" } } "
+                        + "{ name: \"element_type\" type: { name: \"type_ref\" arguments: [] } "
+                        + "state: \"REQUIRED\" value_param: \"T\" } "
+                        + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } "
+                        + "state: \"REQUIRED_DEFAULT\" value: { text: \"REQUIRED\" form: \"UNQUOTED\" } } "
+                        + "{ name: \"unordered\" type: { name: \"boolean\" arguments: [] } "
+                        + "state: \"REQUIRED_DEFAULT\" value: { text: \"false\" form: \"UNQUOTED\" } } "
+                        + "{ name: \"unique_items\" type: { name: \"boolean\" arguments: [] } "
+                        + "state: \"REQUIRED_DEFAULT\" value: { text: \"false\" form: \"UNQUOTED\" } } "
+                        + "{ name: \"min_items\" type: { name: \"integer\" arguments: [] } "
+                        + "state: \"REQUIRED\" value_param: \"MIN\" } "
+                        + "{ name: \"max_items\" type: { name: \"integer\" arguments: [] } "
+                        + "state: \"REQUIRED\" value_param: \"MAX\" } "
+                        + "] groups: [] } }",
+                write(arrayRanged));
+    }
+
+    @Test
+    void refinementRejectsABodyFieldThatAddsRatherThanTightens() throws IOException {
+        // A refinement body field naming nothing inherited is a resolver error (§5.7: "adding
+        // fields is a resolver error") -- distinct from composition, where a non-matching name is
+        // simply a new field.
+        SchemaMap schemaMap = new SchemaParser("""
+                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
+                {
+                  base => { count: integer }
+                  refined => base ^ { extra: text }
+                }""").parseSchemaDocument().body();
+        Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
+        resolved.put("base", resolver.resolve(schemaMap.declarations().get("base")));
+
+        UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
+                () -> resolver.resolve(schemaMap.declarations().get("refined"), resolved));
+        assertTrue(thrown.getMessage().contains("adding a field"), thrown.getMessage());
+    }
+
+    private Map<String, TypeDefinition> resolveUpToArray() throws IOException {
+        SchemaMap schemaMap = schemaMapFromFixture();
+        Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
+        resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
+        resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom"), resolved));
+        resolved.put("product", resolver.resolve(schemaMap.declarations().get("product"), resolved));
+        resolved.put("array", resolver.resolve(schemaMap.declarations().get("array"), resolved));
+        return resolved;
+    }
+
+    private SchemaMap schemaMapFromFixture() throws IOException {
+        return new SchemaParser(readFixture()).parseSchemaDocument().body();
     }
 
     private TypeDefinition resolveSnippet(String declaration) {
