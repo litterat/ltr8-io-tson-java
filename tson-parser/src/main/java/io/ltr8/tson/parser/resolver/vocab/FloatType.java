@@ -46,7 +46,20 @@ public record FloatType(
         boolean allowNegativeZero) implements AtomType<Number> {
 
     /** {@code ieee_format}'s two members §5.6 actually promotes to built-in annotations; meta.tn1 also defines BINARY16/128/256 and the decimal128-family formats, unused until a schema (Part 2) refines float_type with one of them. */
-    public enum Format { BINARY32, BINARY64 }
+    public enum Format {
+        BINARY32("float32"), BINARY64("float64");
+
+        private final String typeName;
+
+        Format(String typeName) {
+            this.typeName = typeName;
+        }
+
+        /** §5.6's built-in annotation name for this format, e.g. {@code !float32}. */
+        public String typeName() {
+            return typeName;
+        }
+    }
 
     /** {@code float32 => !float_type { format: BINARY32 } }; {@code float64} is the BINARY64 twin -- every other field left at its default ({@code ~ true} / absent). */
     public static final FloatType FLOAT32 = unconstrained(Format.BINARY32);
@@ -55,6 +68,11 @@ public record FloatType(
     private static FloatType unconstrained(Format format) {
         return new FloatType(format, Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 true, true, true, true);
+    }
+
+    /** §5.6's built-in annotation name for this instance's {@link #format}, e.g. {@code !float32}. */
+    public String typeName() {
+        return format.typeName();
     }
 
     public FloatType {
@@ -77,6 +95,34 @@ public record FloatType(
         double value = parseAtFormatPrecision(token.text());
         validate(value, token.text());
         return NumberNarrowing.narrowApproximate(value, target);
+    }
+
+    /**
+     * §7.6's {@code special-value} spelling ({@code .nan}/{@code +.inf}/{@code -.inf}) -- nothing
+     * like {@code Double#toString()}'s own {@code NaN}/{@code Infinity}/{@code -Infinity}. A {@code
+     * Float} is formatted via {@link Float#toString()} directly, not widened to {@code double}
+     * first -- widening can introduce extra noise digits {@code Double#toString()} would then
+     * (correctly, for the widened value, but not for the original float) print.
+     */
+    @Override
+    public String write(Number value) {
+        if (value instanceof Float f) {
+            if (Float.isNaN(f)) {
+                return ".nan";
+            }
+            if (Float.isInfinite(f)) {
+                return f > 0 ? "+.inf" : "-.inf";
+            }
+            return Float.toString(f);
+        }
+        double d = value.doubleValue();
+        if (Double.isNaN(d)) {
+            return ".nan";
+        }
+        if (Double.isInfinite(d)) {
+            return d > 0 ? "+.inf" : "-.inf";
+        }
+        return Double.toString(d);
     }
 
     private double parseAtFormatPrecision(String text) {

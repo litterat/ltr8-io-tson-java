@@ -31,6 +31,9 @@ public record UriType(
         Optional<Pattern> pattern,
         Optional<String> scheme) implements AtomType<URI> {
 
+    /** §5.5's built-in annotation name -- {@code !uri}. */
+    public static final String TYPENAME = "uri";
+
     /** {@code uri => !uri_type {}} -- the unconstrained URI, §5.5's {@code !uri}. */
     public static final UriType UNCONSTRAINED =
             new UriType(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
@@ -46,6 +49,11 @@ public record UriType(
         }
         validate(value, text);
         return value;
+    }
+
+    @Override
+    public String write(URI value) {
+        return value.toString();
     }
 
     private void validate(URI value, String text) {

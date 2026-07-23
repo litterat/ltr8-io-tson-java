@@ -96,4 +96,49 @@ class DurationTypeTest {
     void nonDurationTokenIsAParseError() {
         assertThrows(AtomParseException.class, () -> DurationType.UNCONSTRAINED.read(token("not-a-duration")));
     }
+
+    // ── write() ──────────────────────────────────────────────────────────
+
+    @Test
+    void writeRoundTripsThroughRead() {
+        assertEquals("P1Y2M3DT4H5M6S",
+                DurationType.UNCONSTRAINED.write(DurationType.UNCONSTRAINED.read(token("P1Y2M3DT4H5M6S"))));
+    }
+
+    @Test
+    void writeOmitsZeroDesignators() {
+        assertEquals("P1D", DurationType.UNCONSTRAINED.write(DurationType.UNCONSTRAINED.read(token("P1D"))));
+        assertEquals("PT1H", DurationType.UNCONSTRAINED.write(DurationType.UNCONSTRAINED.read(token("PT1H"))));
+    }
+
+    @Test
+    void writeAllZeroStillEmitsAtLeastOneDesignator() {
+        // read() itself rejects a bare "P"/"PT" -- but an IsoDuration constructed directly (not
+        // via read()) could still be all-zero, and write() must still produce something read()
+        // accepts back rather than an incomplete "P".
+        IsoDuration allZero = new IsoDuration(Period.ZERO, Duration.ZERO);
+        String written = DurationType.UNCONSTRAINED.write(allZero);
+        assertEquals(allZero, DurationType.UNCONSTRAINED.read(token(written)));
+    }
+
+    @Test
+    void writePreservesFractionalSeconds() {
+        IsoDuration value = DurationType.UNCONSTRAINED.read(token("PT1.5S"));
+        assertEquals("PT1.5S", DurationType.UNCONSTRAINED.write(value));
+    }
+
+    @Test
+    void writeStripsTrailingZerosFromTheFraction() {
+        IsoDuration value = new IsoDuration(Period.ZERO, Duration.ofSeconds(1, 500_000_000));
+        assertEquals("PT1.5S", DurationType.UNCONSTRAINED.write(value));
+    }
+
+    @Test
+    void writeDoesNotDayNormalizeAnUnrolledClockPart() {
+        // A 30-hour Duration must write as "PT30H", not silently wrap to "PT6H" the way
+        // toHoursPart() (day-normalized) would -- the regression case this method's Javadoc
+        // documents explicitly.
+        IsoDuration thirtyHours = new IsoDuration(Period.ZERO, Duration.ofHours(30));
+        assertEquals("PT30H", DurationType.UNCONSTRAINED.write(thirtyHours));
+    }
 }

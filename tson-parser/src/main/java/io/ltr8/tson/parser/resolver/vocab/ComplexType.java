@@ -28,6 +28,9 @@ import java.util.Optional;
  */
 public record ComplexType() implements AtomType<Complex> {
 
+    /** §5.6's built-in annotation name -- {@code !complex}. */
+    public static final String TYPENAME = "complex";
+
     public static final ComplexType UNCONSTRAINED = new ComplexType();
 
     @Override
@@ -49,6 +52,19 @@ public record ComplexType() implements AtomType<Complex> {
                 .orElseThrow(() -> new AtomParseException("'" + text + "' is not a valid complex number -- "
                         + "only complex, integer, and float forms are accepted (§5.6)"));
         return new Complex(toBigDecimal(form), BigDecimal.ZERO);
+    }
+
+    /**
+     * {@code [sign] magnitude sign magnitude i} -- the middle sign is always written explicitly
+     * (§7.6 requires it on read too), the real part's own leading sign only when negative ({@link
+     * BigDecimal#toPlainString()} already supplies it). {@code toPlainString()}, not {@code
+     * toString()}, to avoid landing an {@code E}-notation form inside a grammar that permits it but
+     * doesn't need it here.
+     */
+    @Override
+    public String write(Complex value) {
+        String sign = value.imaginary().signum() < 0 ? "-" : "+";
+        return value.real().toPlainString() + sign + value.imaginary().abs().toPlainString() + "i";
     }
 
     /** {@link ComplexForm}'s magnitude substrings are unsigned integer/float text -- re-parsed via {@link NumberGrammar#tryParse} rather than duplicating digit extraction (see {@code ComplexForm}'s Javadoc). */

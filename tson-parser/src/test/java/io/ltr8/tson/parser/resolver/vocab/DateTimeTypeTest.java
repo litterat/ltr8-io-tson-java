@@ -70,4 +70,10 @@ class DateTimeTypeTest {
         assertEquals(OffsetDateTime.parse("2025-01-01T00:00:00Z"), type.read(token("2025-01-01T00:00:00Z")));
         assertThrows(AtomValidationException.class, () -> type.read(token("2025-01-01T00:00:01Z")));
     }
+
+    @Test
+    void writeRoundTripsThroughRead() {
+        assertEquals("2025-03-13T10:15:30Z",
+                DateTimeType.UNCONSTRAINED.write(DateTimeType.UNCONSTRAINED.read(token("2025-03-13T10:15:30Z"))));
+    }
 }

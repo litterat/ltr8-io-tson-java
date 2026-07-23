@@ -11,6 +11,7 @@ import java.util.Base64;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class BinaryTypeTest {
@@ -176,5 +177,44 @@ class BinaryTypeTest {
         BinaryType type = new BinaryType(BinaryType.Encoding.HEX, Optional.empty(), Optional.of(2));
         assertArrayEquals(new byte[]{(byte) 0xDE, (byte) 0xAD}, type.read(token("dead")));
         assertThrows(AtomValidationException.class, () -> type.read(token("deadbeef")));
+    }
+
+    // ── write() ──────────────────────────────────────────────────────────
+
+    @Test
+    void writeBase64AlwaysPads() {
+        byte[] value = {0, 1, 2, (byte) 0xFF, (byte) 0x80, 127, -128};
+        String written = BinaryType.BASE64.write(value);
+        assertArrayEquals(value, BinaryType.BASE64.read(token(written)));
+        assertEquals(0, written.length() % 4);
+    }
+
+    @Test
+    void writeBase64UrlUsesTheUrlSafeAlphabet() {
+        byte[] value = {(byte) 0xFB, (byte) 0xFF, (byte) 0xBE};
+        String written = BinaryType.BASE64URL.write(value);
+        assertArrayEquals(value, BinaryType.BASE64URL.read(token(written)));
+    }
+
+    @Test
+    void writeHexRoundTrips() {
+        byte[] value = {(byte) 0xDE, (byte) 0xAD, (byte) 0xBE, (byte) 0xEF};
+        assertArrayEquals(value, BinaryType.HEX.read(token(BinaryType.HEX.write(value))));
+    }
+
+    // Same RFC 4648 §10 test vectors as the decode side, exercised in the encode direction --
+    // Base32Decoding#encode has no JDK equivalent to cross-check against either.
+    @ParameterizedTest
+    @CsvSource({
+            "'', ''",
+            "f, MY======",
+            "fo, MZXQ====",
+            "foo, MZXW6===",
+            "foob, MZXW6YQ=",
+            "fooba, MZXW6YTB",
+            "foobar, MZXW6YTBOI======"
+    })
+    void writeBase32Rfc4648TestVectors(String decoded, String encoded) {
+        assertEquals(encoded, BinaryType.BASE32.write(decoded.getBytes(StandardCharsets.UTF_8)));
     }
 }

@@ -101,4 +101,12 @@ class RationalTypeTest {
         assertEquals(of(1, 3), type.read(token("2/6"))); // 2/6 = 1/3 = 2 * (1/6)
         assertThrows(AtomValidationException.class, () -> type.read(token("1/4")));
     }
+
+    @Test
+    void writeGivesNumeratorSlashDenominator() {
+        // Not normalized: "2/4" round-trips as "2/4", per Rational's own equals-by-value/
+        // written-as-preserved distinction (see Rational's Javadoc).
+        assertEquals("2/4", RationalType.UNCONSTRAINED.write(RationalType.UNCONSTRAINED.read(token("2/4"))));
+        assertEquals("-1/3", RationalType.UNCONSTRAINED.write(RationalType.UNCONSTRAINED.read(token("-1/3"))));
+    }
 }

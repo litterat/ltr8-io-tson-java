@@ -137,4 +137,30 @@ class FloatTypeTest {
                 Optional.empty(), Optional.empty(), true, true, true, false);
         assertEquals(0.0, strict.read(token("0.0"), double.class));
     }
+
+    // ── write() ──────────────────────────────────────────────────────────
+
+    @Test
+    void writeSpecialValuesUsesGrammarSpellingNotJavaSpelling() {
+        // §7.6's special-value spelling (.nan/+.inf/-.inf) is nothing like Double#toString()'s own
+        // NaN/Infinity/-Infinity.
+        assertEquals(".nan", FloatType.FLOAT64.write(Double.NaN));
+        assertEquals("+.inf", FloatType.FLOAT64.write(Double.POSITIVE_INFINITY));
+        assertEquals("-.inf", FloatType.FLOAT64.write(Double.NEGATIVE_INFINITY));
+    }
+
+    @Test
+    void writeFloatFormatsAtFloatPrecisionNotWidenedToDouble() {
+        // Formatted from the float itself, not float->double widened first -- widening can
+        // introduce extra noise digits for a value like 0.1f that isn't exactly representable.
+        float value = (float) FloatType.FLOAT32.read(token("0.1"), float.class);
+        assertEquals(Float.toString(value), FloatType.FLOAT32.write(value));
+        assertEquals("0.1", FloatType.FLOAT32.write(value));
+    }
+
+    @Test
+    void writeDoubleRoundTripsThroughRead() {
+        double value = (double) FloatType.FLOAT64.read(token("12.5"), double.class);
+        assertEquals("12.5", FloatType.FLOAT64.write(value));
+    }
 }

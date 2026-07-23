@@ -27,7 +27,20 @@ import java.util.Optional;
 public record BinaryType(Encoding encoding, Optional<Integer> minLength, Optional<Integer> maxLength)
         implements AtomType<byte[]> {
 
-    public enum Encoding { BASE64, BASE64URL, BASE32, HEX }
+    public enum Encoding {
+        BASE64("base64"), BASE64URL("base64url"), BASE32("base32"), HEX("hex");
+
+        private final String typeName;
+
+        Encoding(String typeName) {
+            this.typeName = typeName;
+        }
+
+        /** §5.3's built-in annotation name for this encoding, e.g. {@code !base64}. */
+        public String typeName() {
+            return typeName;
+        }
+    }
 
     /** {@code base64 => !binary BASE64}, and so on for the other three -- §5.3's four built-in annotations, all unconstrained beyond {@code encoding}. */
     public static final BinaryType BASE64 = new BinaryType(Encoding.BASE64, Optional.empty(), Optional.empty());
@@ -37,12 +50,17 @@ public record BinaryType(Encoding encoding, Optional<Integer> minLength, Optiona
 
     private static final HexFormat HEX_FORMAT = HexFormat.of();
 
+    /** §5.3's built-in annotation name for this instance's {@link #encoding}, e.g. {@code !base64}. */
+    public String typeName() {
+        return encoding.typeName();
+    }
+
     @Override
     public byte[] read(TokenValue token) {
         String text = token.text();
         byte[] value = switch (encoding) {
-            case BASE64 -> Base64Decoding.decode(text, Base64.getDecoder(), "base64");
-            case BASE64URL -> Base64Decoding.decode(text, Base64.getUrlDecoder(), "base64url");
+            case BASE64 -> Base64Decoding.decode(text, Base64.getDecoder(), encoding.typeName());
+            case BASE64URL -> Base64Decoding.decode(text, Base64.getUrlDecoder(), encoding.typeName());
             case BASE32 -> Base32Decoding.decode(text);
             case HEX -> decodeHex(text);
         };
@@ -56,6 +74,21 @@ public record BinaryType(Encoding encoding, Optional<Integer> minLength, Optiona
         } catch (IllegalArgumentException e) {
             throw new AtomParseException("'" + text + "' is not valid hex (RFC 4648 §8, §5.3): " + e.getMessage());
         }
+    }
+
+    /**
+     * Encodes with padding, always -- the inverse of {@link #read}'s own padding requirement (see
+     * this package's Conformance notes on {@code !base64}/{@code !base64url} being stricter than
+     * {@code java.util.Base64}'s own decoder about it).
+     */
+    @Override
+    public String write(byte[] value) {
+        return switch (encoding) {
+            case BASE64 -> Base64.getEncoder().encodeToString(value);
+            case BASE64URL -> Base64.getUrlEncoder().encodeToString(value);
+            case BASE32 -> Base32Decoding.encode(value);
+            case HEX -> HEX_FORMAT.formatHex(value);
+        };
     }
 
     private void validate(byte[] value, String text) {

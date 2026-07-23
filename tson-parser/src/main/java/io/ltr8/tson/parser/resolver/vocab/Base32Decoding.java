@@ -1,11 +1,11 @@
 package io.ltr8.tson.parser.resolver.vocab;
 
 /**
- * Decode logic for {@link BinaryType}'s {@code BASE32} encoding -- RFC 4648 §6, the one binary
- * encoding with no JDK support at all ({@link java.util.Base64} covers §4/§5, {@link
- * java.util.HexFormat} covers §8), so this is a from-scratch decoder: 5 bits per character against
- * the canonical uppercase alphabet {@code ABCDEFGHIJKLMNOPQRSTUVWXYZ234567}, accumulated into an
- * 8-bit-aligned byte stream.
+ * Decode and encode logic for {@link BinaryType}'s {@code BASE32} encoding -- RFC 4648 §6, the one
+ * binary encoding with no JDK support at all ({@link java.util.Base64} covers §4/§5, {@link
+ * java.util.HexFormat} covers §8), so this is from scratch both ways: 5 bits per character against
+ * the canonical uppercase alphabet {@code ABCDEFGHIJKLMNOPQRSTUVWXYZ234567}, accumulated into (or
+ * out of) an 8-bit-aligned byte stream.
  *
  * <p>Case-sensitive (uppercase only) -- unlike hex, RFC 4648 doesn't establish case-insensitivity as
  * a universal decode convention for base32's alphabet, and meta.tn1 says only that "encoding
@@ -66,5 +66,28 @@ final class Base32Decoding {
             }
         }
         return output;
+    }
+
+    /** The exact inverse of {@link #decode}: pads to a length-multiple-of-8 with {@code =}. */
+    static String encode(byte[] data) {
+        StringBuilder sb = new StringBuilder();
+        long buffer = 0;
+        int bitsInBuffer = 0;
+        for (byte b : data) {
+            buffer = (buffer << 8) | (b & 0xFF);
+            bitsInBuffer += 8;
+            while (bitsInBuffer >= 5) {
+                bitsInBuffer -= 5;
+                sb.append(ALPHABET.charAt((int) ((buffer >> bitsInBuffer) & 0x1F)));
+            }
+        }
+        if (bitsInBuffer > 0) {
+            int value = (int) ((buffer << (5 - bitsInBuffer)) & 0x1F);
+            sb.append(ALPHABET.charAt(value));
+        }
+        while (sb.length() % 8 != 0) {
+            sb.append('=');
+        }
+        return sb.toString();
     }
 }

@@ -30,6 +30,9 @@ public record DecimalType(
         Optional<Integer> totalDigits,
         Optional<Integer> fractionDigits) implements AtomType<BigDecimal> {
 
+    /** §5.6's built-in annotation name -- {@code !number}. */
+    public static final String TYPENAME = "number";
+
     /** {@code number => !decimal_type {}} -- the unconstrained exact number, §5.6's {@code !number}. */
     public static final DecimalType UNCONSTRAINED = new DecimalType(
             Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
@@ -52,6 +55,11 @@ public record DecimalType(
     @Override
     public Object read(TokenValue token, Class<?> target) {
         return NumberNarrowing.narrowDecimal(readExact(token), target);
+    }
+
+    @Override
+    public String write(BigDecimal value) {
+        return value.toString();
     }
 
     private BigDecimal readExact(TokenValue token) {

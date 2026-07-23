@@ -31,6 +31,9 @@ import java.util.regex.Pattern;
  */
 public record Ipv4Type() implements AtomType<Inet4Address> {
 
+    /** §5.5's built-in annotation name -- {@code !ipv4}. */
+    public static final String TYPENAME = "ipv4";
+
     /** {@code ipv4 => !ipv4_type {}} -- the unconstrained IPv4 address, §5.5's {@code !ipv4}. */
     public static final Ipv4Type UNCONSTRAINED = new Ipv4Type();
 
@@ -54,6 +57,16 @@ public record Ipv4Type() implements AtomType<Inet4Address> {
                             + "production, no leading zeros or non-canonical forms (§5.5)");
         }
         return (Inet4Address) toInetAddress(octets);
+    }
+
+    /**
+     * {@code getHostAddress()}, not {@code toString()} -- confirmed empirically that {@code
+     * Inet4Address#toString()} prepends a stray {@code /} (a leftover from {@code InetAddress}'s
+     * combined hostname-plus-address design), which {@code getHostAddress()} doesn't.
+     */
+    @Override
+    public String write(Inet4Address value) {
+        return value.getHostAddress();
     }
 
     /** Returns the 4 decoded octets, or {@code null} if {@code text} doesn't match the grammar. */

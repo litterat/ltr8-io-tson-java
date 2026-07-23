@@ -19,6 +19,9 @@ import java.util.regex.Pattern;
  */
 public record DateType(Optional<LocalDate> min, Optional<LocalDate> max) implements AtomType<LocalDate> {
 
+    /** §5.4's built-in annotation name -- {@code !date}. */
+    public static final String TYPENAME = "date";
+
     /** {@code date => !date_type {}} -- the unconstrained date, §5.4's {@code !date}. */
     public static final DateType UNCONSTRAINED = new DateType(Optional.empty(), Optional.empty());
 
@@ -39,6 +42,12 @@ public record DateType(Optional<LocalDate> min, Optional<LocalDate> max) impleme
         }
         validate(value, text);
         return value;
+    }
+
+    /** {@link LocalDate#toString()} already gives RFC 3339's exact {@code full-date} form. */
+    @Override
+    public String write(LocalDate value) {
+        return value.toString();
     }
 
     private void validate(LocalDate value, String text) {

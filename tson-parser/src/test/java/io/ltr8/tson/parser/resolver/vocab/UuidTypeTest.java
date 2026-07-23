@@ -96,4 +96,10 @@ class UuidTypeTest {
         String text = "9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09";
         assertThrows(AtomValidationException.class, () -> UuidType.UNCONSTRAINED.read(token(text), String.class));
     }
+
+    @Test
+    void writeRoundTripsThroughRead() {
+        String text = "9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09";
+        assertEquals(text, UuidType.UNCONSTRAINED.write(UuidType.UNCONSTRAINED.read(token(text))));
+    }
 }

@@ -22,6 +22,9 @@ import java.util.regex.Pattern;
  */
 public record DateTimeType(Optional<OffsetDateTime> min, Optional<OffsetDateTime> max) implements AtomType<OffsetDateTime> {
 
+    /** §5.4's built-in annotation name -- {@code !datetime}. */
+    public static final String TYPENAME = "datetime";
+
     /** {@code datetime => !datetime_type {}} -- the unconstrained datetime, §5.4's {@code !datetime}. */
     public static final DateTimeType UNCONSTRAINED = new DateTimeType(Optional.empty(), Optional.empty());
 
@@ -43,6 +46,12 @@ public record DateTimeType(Optional<OffsetDateTime> min, Optional<OffsetDateTime
         }
         validate(value, text);
         return value;
+    }
+
+    /** {@link OffsetDateTime#toString()} already gives RFC 3339's exact {@code date-time} form. */
+    @Override
+    public String write(OffsetDateTime value) {
+        return value.toString();
     }
 
     private void validate(OffsetDateTime value, String text) {

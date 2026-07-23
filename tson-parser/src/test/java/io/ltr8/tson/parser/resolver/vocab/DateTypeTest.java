@@ -72,4 +72,9 @@ class DateTypeTest {
         assertEquals(LocalDate.of(2025, 1, 1), type.read(token("2025-01-01")));
         assertThrows(AtomValidationException.class, () -> type.read(token("2025-01-02")));
     }
+
+    @Test
+    void writeRoundTripsThroughRead() {
+        assertEquals("2025-03-13", DateType.UNCONSTRAINED.write(DateType.UNCONSTRAINED.read(token("2025-03-13"))));
+    }
 }

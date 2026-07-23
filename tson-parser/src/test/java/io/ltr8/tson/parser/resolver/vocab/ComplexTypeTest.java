@@ -77,4 +77,19 @@ class ComplexTypeTest {
     void readWithMismatchedTargetThrows() {
         assertThrows(AtomValidationException.class, () -> ComplexType.UNCONSTRAINED.read(token("3+4i"), double.class));
     }
+
+    // ── write() ──────────────────────────────────────────────────────────
+
+    @Test
+    void writeAlwaysUsesTheFullTwoPartFormWithAnExplicitMiddleSign() {
+        assertEquals("3+4i", ComplexType.UNCONSTRAINED.write(new Complex(new BigDecimal("3"), new BigDecimal("4"))));
+        assertEquals("3-4i", ComplexType.UNCONSTRAINED.write(new Complex(new BigDecimal("3"), new BigDecimal("-4"))));
+        assertEquals("-3+4i", ComplexType.UNCONSTRAINED.write(new Complex(new BigDecimal("-3"), new BigDecimal("4"))));
+    }
+
+    @Test
+    void writeUsesPlainStringNotScientificNotation() {
+        Complex value = new Complex(new BigDecimal("0.0001"), new BigDecimal("2000000"));
+        assertEquals("0.0001+2000000i", ComplexType.UNCONSTRAINED.write(value));
+    }
 }

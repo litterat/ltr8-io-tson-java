@@ -29,6 +29,9 @@ public record RationalType(
         Optional<Rational> exclusiveMax,
         Optional<Rational> multipleOf) implements AtomType<Rational> {
 
+    /** §5.6's built-in annotation name -- {@code !rational}. */
+    public static final String TYPENAME = "rational";
+
     /** {@code rational => !rational_type {}} -- the unconstrained rational, §5.6's {@code !rational}. */
     public static final RationalType UNCONSTRAINED = new RationalType(
             Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
@@ -56,6 +59,12 @@ public record RationalType(
         Rational value = new Rational(numerator, denominator);
         validate(value, text);
         return value;
+    }
+
+    /** {@link Rational#toString()} already gives exactly {@code numerator/denominator}. */
+    @Override
+    public String write(Rational value) {
+        return value.toString();
     }
 
     private void validate(Rational value, String text) {

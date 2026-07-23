@@ -146,4 +146,14 @@ class Ipv6TypeTest {
     void rejectsIpv4Text() {
         assertThrows(AtomParseException.class, () -> Ipv6Type.UNCONSTRAINED.read(token("192.168.0.1")));
     }
+
+    @Test
+    void writeUsesGetHostAddressNotToString() throws UnknownHostException {
+        // Regression check: Inet6Address#toString() prepends a stray "/". Writes the uncompressed
+        // form (getHostAddress() doesn't apply RFC 5952's "::" canonicalization) -- still valid
+        // per Ipv6Type's own read() grammar, just not the shortest legal spelling.
+        String written = Ipv6Type.UNCONSTRAINED.write(Ipv6Type.UNCONSTRAINED.read(token("2001:db8::1")));
+        assertEquals("2001:db8:0:0:0:0:0:1", written);
+        assertEquals(literal("20010db8000000000000000000000001"), Ipv6Type.UNCONSTRAINED.read(token(written)));
+    }
 }

@@ -30,6 +30,9 @@ import java.util.regex.Pattern;
  */
 public record UuidType(Optional<Integer> version) implements AtomType<UUID> {
 
+    /** §5.5's built-in annotation name -- {@code !uuid}. */
+    public static final String TYPENAME = "uuid";
+
     /** {@code uuid => !uuid_type {}} -- the unconstrained UUID, §5.5's {@code !uuid}. */
     public static final UuidType UNCONSTRAINED = new UuidType(Optional.empty());
 
@@ -51,5 +54,10 @@ public record UuidType(Optional<Integer> version) implements AtomType<UUID> {
             }
         });
         return value;
+    }
+
+    @Override
+    public String write(UUID value) {
+        return value.toString();
     }
 }

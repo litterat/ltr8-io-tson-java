@@ -203,4 +203,21 @@ class IntegerTypeTest {
         assertEquals(5, int32.read(token("5"), int.class));
         assertEquals(5, int32.read(token("5"), Integer.class));
     }
+
+    // ── write() ──────────────────────────────────────────────────────────
+
+    @Test
+    void writeRoundTripsThroughRead() {
+        IntegerType int32 = new IntegerType(new IntegerSize(32, true));
+        assertEquals("42", int32.write(int32.read(token("42"))));
+        assertEquals("-42", int32.write(int32.read(token("-42"))));
+    }
+
+    @Test
+    void writeIgnoresOriginalBasedForm() {
+        // §5.6's own equivalence rule: 0xFF and 255 bind to the same value, and write() has no way
+        // (or need) to recover which form the token was originally written in.
+        IntegerType uint32 = new IntegerType(new IntegerSize(32, false));
+        assertEquals("255", uint32.write(uint32.read(token("0xFF"))));
+    }
 }

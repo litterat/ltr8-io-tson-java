@@ -64,4 +64,11 @@ class Ipv4TypeTest {
     void rejectsIpv6Text() {
         assertThrows(AtomParseException.class, () -> Ipv4Type.UNCONSTRAINED.read(token("::1")));
     }
+
+    @Test
+    void writeUsesGetHostAddressNotToString() {
+        // Regression check: Inet4Address#toString() prepends a stray "/".
+        String written = Ipv4Type.UNCONSTRAINED.write(Ipv4Type.UNCONSTRAINED.read(token("192.168.0.1")));
+        assertEquals("192.168.0.1", written);
+    }
 }

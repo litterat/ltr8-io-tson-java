@@ -96,4 +96,10 @@ class DecimalTypeTest {
         assertEquals(199.90, DecimalType.UNCONSTRAINED.read(token("199.90"), double.class));
         assertEquals(199.90f, DecimalType.UNCONSTRAINED.read(token("199.90"), float.class));
     }
+
+    @Test
+    void writeRoundTripsThroughRead() {
+        BigDecimal value = DecimalType.UNCONSTRAINED.read(token("199.90"));
+        assertEquals("199.90", DecimalType.UNCONSTRAINED.write(value));
+    }
 }

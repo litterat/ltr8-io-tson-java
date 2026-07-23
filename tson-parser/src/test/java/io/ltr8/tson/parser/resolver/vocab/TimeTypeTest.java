@@ -73,4 +73,10 @@ class TimeTypeTest {
         assertEquals(OffsetTime.parse("09:00:00Z"), type.read(token("09:00:00Z")));
         assertThrows(AtomValidationException.class, () -> type.read(token("09:00:01Z")));
     }
+
+    @Test
+    void writeRoundTripsThroughRead() {
+        assertEquals("10:15:30+01:00",
+                TimeType.UNCONSTRAINED.write(TimeType.UNCONSTRAINED.read(token("10:15:30+01:00"))));
+    }
 }

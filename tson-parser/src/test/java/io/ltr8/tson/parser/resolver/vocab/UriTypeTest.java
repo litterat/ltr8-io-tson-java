@@ -72,4 +72,10 @@ class UriTypeTest {
         UriType type = new UriType(Optional.empty(), Optional.empty(), Optional.empty(), Optional.of("https"));
         assertThrows(AtomValidationException.class, () -> type.read(token("foo/bar")));
     }
+
+    @Test
+    void writeRoundTripsThroughRead() {
+        String text = "https://example.com/a/b?x=1#frag";
+        assertEquals(text, UriType.UNCONSTRAINED.write(UriType.UNCONSTRAINED.read(token(text))));
+    }
 }

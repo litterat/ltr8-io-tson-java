@@ -30,6 +30,9 @@ import java.util.regex.Pattern;
  */
 public record TimeType(Optional<OffsetTime> min, Optional<OffsetTime> max) implements AtomType<OffsetTime> {
 
+    /** §5.4's built-in annotation name -- {@code !time}. */
+    public static final String TYPENAME = "time";
+
     /** {@code time => !time_type {}} -- the unconstrained time, §5.4's {@code !time}. */
     public static final TimeType UNCONSTRAINED = new TimeType(Optional.empty(), Optional.empty());
 
@@ -50,6 +53,12 @@ public record TimeType(Optional<OffsetTime> min, Optional<OffsetTime> max) imple
         }
         validate(value, text);
         return value;
+    }
+
+    /** {@link OffsetTime#toString()} already gives RFC 3339's exact {@code full-time} form. */
+    @Override
+    public String write(OffsetTime value) {
+        return value.toString();
     }
 
     private void validate(OffsetTime value, String text) {

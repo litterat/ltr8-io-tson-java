@@ -29,7 +29,9 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       enums, sealed interfaces/unions
 - [x] Wire-format annotation access — a bound record's own `@name[:value]` annotations, via an
       opt-in carrier component
-- [x] Full document binding — TSON text straight to Java objects, dispatching into all of the above
+- [x] Full document binding — TSON text straight to Java objects, dispatching into all of the above,
+      and back again (`toTson`) — mainly a debugging tool, not a guaranteed-lossless round trip
+      (e.g. the integer family's exact width isn't recoverable schemaless; see [Conformance](#conformance))
 
 See [CLAUDE.md](CLAUDE.md#architecture) for architecture and design notes, and
 [Conformance](#conformance) below for edge-case behavior worth knowing about.
@@ -111,6 +113,18 @@ is accepted as `!uri`'s actual contract for now. See `UriType`'s Javadoc.
 **One open question.** Whether `!duration` accepts ISO 8601's alternative `PnW` week form is genuinely
 ambiguous — §5.4's table shows only `PnYnMnDTnHnMnS`. This implementation rejects `PnW` as the more
 conservative of the two readings, not a confident call — see [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #12.
+
+**`toTson`'s round trip is intentionally lossy in a few specific, documented ways.** It's a debugging
+tool, not a guaranteed-lossless serializer: a `!typeName` type-ref is only re-emitted where a value
+wouldn't read back correctly without one (the built-in vocabulary's JDK-backed host types); anything
+default value resolution (§4) already recovers on its own — the whole integer family, plain
+`number`/`float32`/`float64` — is written bare, so a field bound from `!uint8 42` writes back as plain
+`42`, indistinguishable from one that was never `!uint8`-typed at all. A schemaless writer has no
+annotation to reach for any more than a schemaless reader has one to validate against. `byte[]` values
+always write back as `!base64`, regardless of which of `base64`/`base64url`/`base32`/`hex` they were
+originally decoded from — that information doesn't survive decoding, so `!base64` is an arbitrary but
+reasonable default. Tuples write as plain arrays, with nothing marking them as tuples at all. Wire-format
+annotations captured via `@Annotated` (see above) aren't re-emitted yet.
 
 Ambiguities, inconsistencies, and errors in the spec text itself — as opposed to this implementation's own
 behavior at the edges — are tracked separately in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).

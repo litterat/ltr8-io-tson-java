@@ -88,6 +88,12 @@ public record IntegerType(
         return NumberNarrowing.narrowIntegral(readBigInteger(token), target);
     }
 
+    /** Plain decimal digits -- no width-dependent formatting quirk the way {@link FloatType} has. */
+    @Override
+    public String write(Number value) {
+        return value.toString();
+    }
+
     private BigInteger readBigInteger(TokenValue token) {
         String text = token.text();
         NumberForm form = NumberGrammar.tryParse(text)

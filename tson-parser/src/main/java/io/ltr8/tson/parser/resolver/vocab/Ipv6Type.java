@@ -49,6 +49,9 @@ import java.util.regex.Pattern;
  */
 public record Ipv6Type() implements AtomType<Inet6Address> {
 
+    /** §5.5's built-in annotation name -- {@code !ipv6}. */
+    public static final String TYPENAME = "ipv6";
+
     /** {@code ipv6 => !ipv6_type {}} -- the unconstrained IPv6 address, §5.5's {@code !ipv6}. */
     public static final Ipv6Type UNCONSTRAINED = new Ipv6Type();
 
@@ -64,6 +67,17 @@ public record Ipv6Type() implements AtomType<Inet6Address> {
             // Unreachable: getByAddress(host, byte[16], scope) only throws for the wrong length.
             throw new IllegalStateException(e);
         }
+    }
+
+    /**
+     * {@code getHostAddress()}, not {@code toString()} -- same reason as {@link Ipv4Type#write}.
+     * Writes the uncompressed, full 8-group form ({@code getHostAddress()} doesn't apply RFC 5952's
+     * {@code ::} canonicalization) -- still valid per {@link #read}'s own grammar, just not the
+     * shortest legal spelling; canonicalizing isn't needed for round-tripping to work.
+     */
+    @Override
+    public String write(Inet6Address value) {
+        return value.getHostAddress();
     }
 
     private static byte[] parse(String text) {

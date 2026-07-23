@@ -31,6 +31,9 @@ import java.util.regex.Pattern;
  */
 public record DurationType(Optional<IsoDuration> min, Optional<IsoDuration> max) implements AtomType<IsoDuration> {
 
+    /** §5.4's built-in annotation name -- {@code !duration}. */
+    public static final String TYPENAME = "duration";
+
     /** {@code duration => !duration_type {}} -- the unconstrained duration, §5.4's {@code !duration}. */
     public static final DurationType UNCONSTRAINED = new DurationType(Optional.empty(), Optional.empty());
 
@@ -76,6 +79,71 @@ public record DurationType(Optional<IsoDuration> min, Optional<IsoDuration> max)
         }
 
         return new IsoDuration(calendarPart, clockPart);
+    }
+
+    /**
+     * §5.4's {@code PnYnMnDTnHnMnS}, unsigned only -- matching {@link #read}'s own grammar exactly,
+     * including its fractional-seconds handling (nanoseconds only ever enter {@code clockPart}
+     * through the seconds designator via {@link #secondsToDuration}, so they're read back out
+     * through it too). {@code clockPart} is never day-normalized ({@link #read} accumulates it via
+     * {@code plusHours}/{@code plusMinutes}/{@code plus} with no rollover), so this uses {@link
+     * Duration#getSeconds()} (the running total) with its own hour/minute/second decomposition, not
+     * {@code toHoursPart()}/{@code toMinutesPart()} (which assume a day-normalized value and would
+     * silently wrap a duration of, say, 30 hours down to 6 -- confirmed empirically, not assumed).
+     */
+    @Override
+    public String write(IsoDuration value) {
+        Period period = value.calendarPart();
+        Duration clock = value.clockPart();
+
+        StringBuilder sb = new StringBuilder("P");
+        if (period.getYears() != 0) {
+            sb.append(period.getYears()).append('Y');
+        }
+        if (period.getMonths() != 0) {
+            sb.append(period.getMonths()).append('M');
+        }
+        if (period.getDays() != 0) {
+            sb.append(period.getDays()).append('D');
+        }
+
+        long totalSeconds = clock.getSeconds();
+        int nanos = clock.getNano();
+        long hours = totalSeconds / 3600;
+        long minutes = (totalSeconds % 3600) / 60;
+        long seconds = totalSeconds % 60;
+
+        if (hours != 0 || minutes != 0 || seconds != 0 || nanos != 0) {
+            sb.append('T');
+            if (hours != 0) {
+                sb.append(hours).append('H');
+            }
+            if (minutes != 0) {
+                sb.append(minutes).append('M');
+            }
+            if (seconds != 0 || nanos != 0) {
+                sb.append(seconds);
+                if (nanos != 0) {
+                    sb.append('.').append(fractionDigits(nanos));
+                }
+                sb.append('S');
+            }
+        }
+
+        if (sb.length() == 1) {
+            // At least one designator is required (read() rejects a bare "P"/"PT").
+            sb.append("T0S");
+        }
+        return sb.toString();
+    }
+
+    private static String fractionDigits(int nanos) {
+        String nineDigits = String.format("%09d", nanos);
+        int end = nineDigits.length();
+        while (end > 1 && nineDigits.charAt(end - 1) == '0') {
+            end--;
+        }
+        return nineDigits.substring(0, end);
     }
 
     private static Duration secondsToDuration(String secondsText) {

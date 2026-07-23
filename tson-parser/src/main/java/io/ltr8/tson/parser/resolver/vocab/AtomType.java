@@ -28,6 +28,13 @@ import io.ltr8.tson.parser.ast.TokenValue;
  * io.ltr8.tson.parser.resolver.NumberNarrowing} with {@code tson-mapper}'s untyped-number binding
  * rather than duplicating it -- this interface still has no dependency on any binding library;
  * {@code Class<?>} is a bare JDK type, not {@code tson-bind}'s {@code DataClassAtom}.
+ *
+ * <p>{@link #write(Object)} is {@link #read(TokenValue)}'s inverse: given a natural host value,
+ * the token text that would read back to an equivalent value (never quoted, never carrying a
+ * type-ref -- both are a caller's structural concern, not this atom's). Lives here rather than in
+ * whichever binding library happens to be writing TSON text today so that a caller extending the
+ * vocabulary with its own {@code AtomType} gets both directions from one implementation, the same
+ * way every built-in one already does.
  */
 public interface AtomType<T> {
 
@@ -40,6 +47,8 @@ public interface AtomType<T> {
         }
         return value;
     }
+
+    String write(T value);
 
     private static Class<?> wrap(Class<?> type) {
         if (type == int.class) {

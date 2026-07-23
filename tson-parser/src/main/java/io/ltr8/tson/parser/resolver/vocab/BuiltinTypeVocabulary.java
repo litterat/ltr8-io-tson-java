@@ -61,28 +61,28 @@ public final class BuiltinTypeVocabulary {
         types.put("negative_integer", IntegerType.ofMax(BigInteger.valueOf(-1)));
         types.put("non_positive_integer", IntegerType.ofMax(BigInteger.ZERO));
 
-        types.put("number", DecimalType.UNCONSTRAINED);
-        types.put("float32", FloatType.FLOAT32);
-        types.put("float64", FloatType.FLOAT64);
-        types.put("rational", RationalType.UNCONSTRAINED);
-        types.put("complex", ComplexType.UNCONSTRAINED);
+        types.put(DecimalType.TYPENAME, DecimalType.UNCONSTRAINED);
+        types.put(FloatType.FLOAT32.typeName(), FloatType.FLOAT32);
+        types.put(FloatType.FLOAT64.typeName(), FloatType.FLOAT64);
+        types.put(RationalType.TYPENAME, RationalType.UNCONSTRAINED);
+        types.put(ComplexType.TYPENAME, ComplexType.UNCONSTRAINED);
 
-        types.put("uuid", UuidType.UNCONSTRAINED);
+        types.put(UuidType.TYPENAME, UuidType.UNCONSTRAINED);
 
-        types.put("base64", BinaryType.BASE64);
-        types.put("base64url", BinaryType.BASE64URL);
-        types.put("base32", BinaryType.BASE32);
-        types.put("hex", BinaryType.HEX);
+        types.put(BinaryType.BASE64.typeName(), BinaryType.BASE64);
+        types.put(BinaryType.BASE64URL.typeName(), BinaryType.BASE64URL);
+        types.put(BinaryType.BASE32.typeName(), BinaryType.BASE32);
+        types.put(BinaryType.HEX.typeName(), BinaryType.HEX);
 
-        types.put("date", DateType.UNCONSTRAINED);
-        types.put("time", TimeType.UNCONSTRAINED);
-        types.put("datetime", DateTimeType.UNCONSTRAINED);
-        types.put("duration", DurationType.UNCONSTRAINED);
+        types.put(DateType.TYPENAME, DateType.UNCONSTRAINED);
+        types.put(TimeType.TYPENAME, TimeType.UNCONSTRAINED);
+        types.put(DateTimeType.TYPENAME, DateTimeType.UNCONSTRAINED);
+        types.put(DurationType.TYPENAME, DurationType.UNCONSTRAINED);
 
-        types.put("uri", UriType.UNCONSTRAINED);
+        types.put(UriType.TYPENAME, UriType.UNCONSTRAINED);
 
-        types.put("ipv4", Ipv4Type.UNCONSTRAINED);
-        types.put("ipv6", Ipv6Type.UNCONSTRAINED);
+        types.put(Ipv4Type.TYPENAME, Ipv4Type.UNCONSTRAINED);
+        types.put(Ipv6Type.TYPENAME, Ipv6Type.UNCONSTRAINED);
 
         return Map.copyOf(types);
     }
