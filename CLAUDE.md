@@ -9,8 +9,8 @@ TSON spec series:
 
 - Part 1 (lexer, structural grammar, base type resolution, built-in type vocabulary):
   https://tson.io/raw/2026/32/tson-part1-data.md
-- Part 2 (schema grammar, type system) — grammar layer in progress (see `SchemaParser` below;
-  resolution/validation not started): https://tson.io/raw/2026/32/tson-part2-schema.md
+- Part 2 (schema grammar, type system) — grammar layer in progress (see `SchemaParser` below); resolution
+  just started, one construct so far (see `SchemaResolver` below): https://tson.io/raw/2026/32/tson-part2-schema.md
 
 The spec is a *working revision* (2026 series) and changes between revisions without compatibility
 guarantees — re-fetch the current URL rather than trusting a cached copy of the text when in doubt, and
@@ -64,9 +64,11 @@ splitting them into separate Gradle modules was judged not worth the build-graph
 reasoning that already keeps the lexer and structural parser together. The module boundary that *is*
 worth drawing is the one between grammar (parsing text into an AST, no interpretation) and semantics
 (resolving, validating, producing a schema's or a document's actual meaning): `tson-parser.resolver` is
-Class 1's semantic layer; `tson-schema` (not started) is reserved for Class 2's — the *produced* schema
-(§8 resolver output), not its grammar. `tson-bind`/`tson-mapper`/`tson-annotation` are the separate
-Java-object-binding layer (see their own package Javadoc; not detailed in this file yet).
+Class 1's semantic layer; `tson-schema` is Class 2's — the *produced* schema (§8 resolver output:
+`TypeDefinition` et al. in `io.ltr8.tson.schema.meta`, built by `SchemaResolver` from `tson-parser`'s
+grammar-layer `SchemaMap`), not its grammar. See "Schema resolution" below. `tson-bind`/`tson-mapper`/
+`tson-annotation` are the separate Java-object-binding layer (see their own package Javadoc; not detailed
+in this file yet).
 
 Package: `io.ltr8.tson.parser.lexer` (group `io.ltr8`). The group is `io.ltr8`, not `io.tson`: reverse-DNS
 package naming identifies who *publishes* the artifact (and is what Maven Central's domain-ownership
@@ -202,12 +204,16 @@ string, §4.5) for `TokenValue`s produced by the parser. `NumberGrammar.tryParse
 `ast`'s own shape.
 
 - **Grammar-only, deliberately.** `SchemaParser` builds a faithful AST from a schema document's source
-  text and does nothing else yet — no namespace resolution (§3), no `type_definition` materialisation or
-  desugaring (§8), no validation. "Building the schema" (as opposed to "using" it) means this layer
-  alone; a resolver consuming `SchemaDocument` and producing the actual *resolved* schema (§8's
-  `type_definition` values) is later, separate work, reserved for a future `tson-schema` module — kept
-  out of `tson-parser` on purpose, since that resolution layer has real independent conformance meaning
-  (Class 2 proper) the way `tson-parser.resolver` does for Class 1, unlike the grammar layer itself.
+  text and does nothing else itself — no namespace resolution (§3), no `type_definition`
+  materialisation or desugaring (§8), no validation; see "Schema resolution" below for the module
+  (`tson-schema`) that consumes this AST and does that work, kept out of `tson-parser` on purpose since
+  it has real independent conformance meaning (Class 2 proper) the grammar layer itself doesn't.
+- **`SchemaMap.declarations` is a `Map<String, Declaration>`, not a `List`** — keyed by name, insertion
+  order preserved (a `LinkedHashMap`), exactly the shape §3.4.1's Pass 1 needs ("populated with skeleton
+  `type_definition` records keyed by name") and the schema's own target type, `map<type_name,
+  type_definition>`. A duplicate declaration name isn't rejected here (the later one overwrites the
+  earlier map entry) — the same "grammar layer doesn't dedupe, resolver does" treatment [TSON-DATA]
+  §2.5/§2.6 already give ordinary duplicate record fields and map keys.
 - **`SchemaParser extends Parser`, same package.** Part 2 §12.1 says the schema grammar imports
   `annotation`, `data-value`, and directive parsing directly from Part 1 §7.4 — the same tokens, the same
   adjacency/separator rules, the same `!!name:"..."` directive shape for `!!id`/`!!meta`/`!!import` as
@@ -236,6 +242,70 @@ string, §4.5) for `TokenValue`s produced by the parser. `NumberGrammar.tryParse
   parses `spec/m/meta-kernel.tn1`, `spec/m/meta.tn1`, and `spec/m/core.tn1` (read directly from this
   repo's own `spec/` directory, not the sibling test-suite repo) end-to-end with no exceptions — real,
   full-sized schema documents, not just the spec's illustrative snippets.
+
+### Schema resolution (`tson-schema/src/main/java/io/ltr8/tson/schema/`)
+
+`SchemaResolver` turns `tson-parser`'s grammar-layer `SchemaMap` into resolved `TypeDefinition`s (Part 2
+§4, §8) -- the module reserved for the *produced* schema (see "Schema grammar" above). Started
+2026-07-23, `SchemaResolver` itself is deliberately narrow: it resolves exactly one construct, a fresh
+(no `~`, no supertypes, no type parameters) record whose fields are all plain, unmodified, REQUIRED,
+simple type-refs -- `integer_size`'s own shape (`integer_size => { bits: integer  signed: boolean }`).
+Every other construct (elided field types, modifiers, groups, composition, refinement, atom
+instances/refinements, generic type-refs, templates) throws `UnsupportedOperationException` rather than
+silently mis-resolving -- `SchemaResolver`'s own Javadoc lists exactly what's in scope. This is
+intentionally the first of several incremental passes toward the full two-pass resolver of §3.4.1
+(namespace population, then body resolution and validation), not an attempt at it yet -- no namespace
+lookup happens at all so far: a field's type-ref is carried through as a bare name without checking it
+resolves to anything.
+
+- **`io.ltr8.tson.schema.meta`** holds the resolved-value model -- one Java type per meta-kernel
+  vocabulary record/enum, named to match: `TypeDefinition`, `TypeKind`, `FieldState`, `ElementState`,
+  `ProductAccessType`, `ProductSizeType`, `RecordField`, `FieldGroup`, `IntegerSize`, `TupleElement`,
+  `TypeRef`/`TypeArgument`, and the `TypeBody` variants `RecordBody`, `Reference`, `Unit`, `EnumBody`,
+  `ChoiceBody`, `ArrayBody`, `MapBody`, `TupleBody`. Not called `RecordBody.Record` or similar to match the
+  kernel's own `record` constructor name exactly -- a Java class literally named `Record` would collide,
+  confusingly, with `java.lang.Record` (the language feature every type in this model is built from); see
+  `RecordBody`'s own Javadoc. `TypeRef` here shares a name with (but is a different package and a different
+  concept from) `tson-parser`'s grammar-layer `io.ltr8.tson.parser.ast.schema.TypeRef` -- a source-text
+  reference vs. a resolved one, the same overload the kernel itself makes. Every multi-word field carries
+  an explicit `@io.ltr8.annotation.Field("snake_case_name")` -- `tson-bind` otherwise writes the bare Java
+  component name verbatim (camelCase), and the kernel's own field names are snake_case throughout.
+  - Covers every *structurally simple* meta-kernel shape (product/sum/reference bodies, and the
+    supporting records used as field types elsewhere) but deliberately not the atom constraint-vocabulary
+    families with optional bound groups (`integer_type`, `text_type`, `uri_type`, `regex_type`) --
+    representing a field-group's mutual exclusion in a *bound instance* (as opposed to a *field
+    declaration*, which `FieldGroup` already covers) needs real design thought, and `SchemaResolver`
+    doesn't resolve anything to one of these yet either, so modeling them now would be scaffolding with
+    nothing to verify it against.
+- **No hand-written writer -- resolved values go through plain `TsonMapper.toTson` (`tson-mapper`)
+  directly**, deliberately, to validate the model is built from ordinary, idiomatic Java that `tson-bind`'s
+  generic introspection already knows how to bind, not a shape that only worked because a bespoke writer
+  papered over it. This confirmed the `TypeBody` sealed-interface design is exactly right: each variant's
+  own `@Typename` plus `tson-bind`'s automatic sealed-interface-as-union detection is *all* it takes to get
+  `!record`/`!reference`/`!unit`/`!enum`/`!choice`/`!array`/`!map`/`!tuple` written correctly -- no special
+  casing anywhere, for precisely the "body: top" polymorphism the kernel itself describes. It also
+  surfaced concrete, worth-knowing limits of generic binding versus the fixture's own hand-authored
+  style -- none of them wrong, all textual, and all documented in `SchemaResolverTest`'s own class Javadoc:
+  no outer `!type_definition` tag (plain records, unlike union members, never self-announce a type-ref);
+  quoted strings where the fixture uses bare tokens (an enum's bridge yields a `String`, and `TsonMapper`
+  always quotes strings -- pre-existing, already-documented behavior, not new); every empty-list/`false`/
+  at-default-enum field written out rather than omitted (`Optional.empty()`/`null` are the only things
+  generic binding omits -- `tson-bind` doesn't support `Optional<List<T>>` yet, so an empty list can't opt
+  into the same omission an `Optional<TypeRef>`/`Optional<Boolean>` field gets for free); and `TypeRef`
+  always in its full `{ name: ... arguments: [...] }` form, never §5.6's positional bare-token spelling (a
+  schema-specific encoding rule a Part-1-only binder has no reason to know about).
+- **`TsonSchema`** is the resolved-schema wrapper (`Map<String, TypeDefinition>`, insertion order
+  preserved) -- the kernel's own `schema` type, `map<type_name, type_definition>` (§9), as a Java value.
+  `SchemaResolver.resolveAll` builds one from a whole `SchemaMap`, resolving each entry independently in
+  source order; most entries of a real schema (meta-kernel included) still throw today, since most
+  constructs aren't resolved yet -- `resolve(SchemaMap.Declaration)` resolves a single named entry and is
+  the one to reach for against a real fixture until more constructs are supported.
+- **Verified against the real fixture, not just a hand-written snippet.** `SchemaResolverTest` resolves
+  `integer_size` both from a small inline schema and from the real `spec/m/meta-kernel.tn1`, and asserts
+  the exact real `toTson` output -- structurally equivalent to (per the divergences above, not a content
+  difference from) `meta-kernel-resolved.tn1`'s own `integer_size` entry, and, via hand-built `Reference`/
+  `Unit`/`EnumBody`/etc. values exercising shapes `SchemaResolver` doesn't produce yet, `type_name`'s/
+  `value`'s/`boolean`'s own entries too.
 
 ### Conformance suite integration (`ConformanceSuiteTest`)
 

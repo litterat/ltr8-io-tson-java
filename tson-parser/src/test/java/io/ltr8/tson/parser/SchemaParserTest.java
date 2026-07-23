@@ -29,7 +29,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -41,11 +40,6 @@ class SchemaParserTest {
 
     private static SchemaDocument parse(String source) {
         return new SchemaParser(source).parseSchemaDocument();
-    }
-
-    private static Map<String, SchemaMap.Declaration> byName(SchemaDocument doc) {
-        return doc.body().declarations().stream()
-                .collect(Collectors.toMap(SchemaMap.Declaration::name, d -> d));
     }
 
     // ── Header (§2.1, §2.2) ──────────────────────────────────────────────
@@ -118,9 +112,21 @@ class SchemaParserTest {
         SchemaDocument doc = parse("""
                 !!meta:"https://tson.io/2026/32/m/meta.tn1"
                 { @since:2025 a => @doc:"a field" text }""");
-        SchemaMap.Declaration decl = doc.body().declarations().get(0);
+        SchemaMap.Declaration decl = doc.body().declarations().get("a");
         assertEquals("since", decl.nameAnnotations().get(0).name());
         assertEquals("doc", decl.typeDefAnnotations().get(0).name());
+    }
+
+    @Test
+    void declarationsIsKeyedByNameInSourceOrderWithLastDuplicateWinning() {
+        // Genuine duplicate-name detection is deferred to schema resolution's Pass 1 (§3.4.1),
+        // the same "grammar layer doesn't dedupe" treatment as ordinary data maps/records.
+        SchemaDocument doc = parse("""
+                !!meta:"https://tson.io/2026/32/m/meta.tn1"
+                { a => text  b => integer  a => uuid }""");
+        assertEquals(List.of("a", "b"), List.copyOf(doc.body().declarations().keySet()));
+        assertEquals(new SimpleRef("uuid"),
+                ((ReferenceTypeDef) doc.body().declarations().get("a").typeDef()).ref());
     }
 
     // ── §5.1's own worked examples ────────────────────────────────────────
@@ -399,7 +405,7 @@ class SchemaParserTest {
                     history:  [flagged<status, 2>]?
                   }
                 }""");
-        Map<String, SchemaMap.Declaration> decls = byName(doc);
+        Map<String, SchemaMap.Declaration> decls = doc.body().declarations();
         assertEquals(4, decls.size());
         assertInstanceOf(AtomRefinement.class, decls.get("priority").typeDef());
         assertInstanceOf(Instance.class, decls.get("status").typeDef());
@@ -447,6 +453,6 @@ class SchemaParserTest {
         SchemaDocument doc = parse("""
                 !!meta:"https://tson.io/2026/32/m/meta.tn1"
                 { %s }""".formatted(declaration));
-        return doc.body().declarations().get(0);
+        return doc.body().declarations().values().iterator().next();
     }
 }

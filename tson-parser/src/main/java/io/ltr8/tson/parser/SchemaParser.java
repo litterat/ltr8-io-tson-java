@@ -38,7 +38,9 @@ import io.ltr8.tson.parser.lexer.TokenType;
 import io.ltr8.tson.parser.resolver.NumberGrammar;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -102,13 +104,17 @@ public final class SchemaParser extends Parser {
         if (check(TokenType.RBRACE)) {
             throw parseError("a schema map requires at least one declaration; '{}' is not permitted here (§2.1)");
         }
-        List<SchemaMap.Declaration> declarations = new ArrayList<>();
-        declarations.add(parseDeclaration());
+        Map<String, SchemaMap.Declaration> declarations = new LinkedHashMap<>();
+        putDeclaration(declarations, parseDeclaration());
         while (consumeSeparatorOrCloseCheck(TokenType.RBRACE)) {
-            declarations.add(parseDeclaration());
+            putDeclaration(declarations, parseDeclaration());
         }
         expect(TokenType.RBRACE, "schema map");
         return new SchemaMap(annotations, declarations);
+    }
+
+    private void putDeclaration(Map<String, SchemaMap.Declaration> declarations, SchemaMap.Declaration declaration) {
+        declarations.put(declaration.name(), declaration);
     }
 
     private SchemaMap.Declaration parseDeclaration() {
