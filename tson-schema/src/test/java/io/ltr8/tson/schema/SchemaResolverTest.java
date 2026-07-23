@@ -27,6 +27,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Writes resolved values through plain {@code TsonMapper.toTson} -- no hand-written schema-model
@@ -252,6 +253,38 @@ class SchemaResolverTest {
                 + "body: !record { supertypes: [ \"top\" ] fields: [ "
                 + "{ name: \"target\" type: { name: \"type_name\" arguments: [] } state: \"REQUIRED\" } "
                 + "] groups: [] } }", write(reference));
+    }
+
+    // ── Field groups (§5.11) + constructor flag + OPTIONAL fields: integer_type ──
+
+    @Test
+    void resolvesIntegerTypeWithFieldGroupsAndOptionalFields() throws IOException, DataBindException {
+        SchemaMap schemaMap = new SchemaParser(readFixture()).parseSchemaDocument().body();
+        Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
+        resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
+        resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom"), resolved));
+
+        TypeDefinition integerType = resolver.resolve(schemaMap.declarations().get("integer_type"), resolved);
+
+        // ~atom & {...} -- constructor: true propagates straight from the "~" marker; kind: ATOM
+        // because "atom" (the literal base-kind name) is in integer_type's own transitive chain.
+        assertTrue(integerType.constructor());
+        assertEquals(TypeKind.ATOM, integerType.kind());
+        assertEquals(List.of("atom", "top"), integerType.supertypes());
+
+        assertEquals("{ kind: \"ATOM\" parameters: [] constructor: true supertypes: [ \"atom\" \"top\" ] subtypes: [] "
+                        + "body: !record { supertypes: [ \"atom\" ] fields: [ "
+                        + "{ name: \"size\" type: { name: \"integer_size\" arguments: [] } state: \"OPTIONAL\" } "
+                        + "{ name: \"min\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
+                        + "{ name: \"exclusive_min\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
+                        + "{ name: \"max\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
+                        + "{ name: \"exclusive_max\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
+                        + "{ name: \"multiple_of\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } ] "
+                        + "groups: [ "
+                        + "{ members: [ \"min\" \"exclusive_min\" ] state: \"OPTIONAL\" } "
+                        + "{ members: [ \"max\" \"exclusive_max\" ] state: \"OPTIONAL\" } "
+                        + "] } }",
+                write(integerType));
     }
 
     @Test

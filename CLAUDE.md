@@ -249,12 +249,14 @@ string, §4.5) for `TokenValue`s produced by the parser. `NumberGrammar.tryParse
 §4, §8) -- the module reserved for the *produced* schema (see "Schema grammar" above). Started
 2026-07-23, deliberately narrow, incrementally widened the same day to a second construct:
 
-- **Fresh record construction** -- a plain (no `~`, no supertypes, no type parameters) record whose
-  fields are all unmodified, REQUIRED, simple type-refs -- `integer_size`'s own shape.
-- **Non-constructor composition** (`A & B & { ... }`, §5.8) -- copies each already-resolved
-  supertype's own fields into the result, left to right, checked for name overlap across
-  supertypes; a trailing-body field with no name collision is appended as new (a collision --
-  tightening an inherited field, §5.7 -- isn't supported yet, reported explicitly rather than
+- **Record construction** -- a record (no supertypes, no type parameters) whose fields are simple
+  type-refs, each REQUIRED or OPTIONAL (a `?` suffix; field *modifiers* -- default/fixed values --
+  still aren't resolved) -- `integer_size`'s own shape, and, via a composition body (below),
+  `integer_type`'s.
+- **Composition** (`A & B & { ... }`, §5.8) -- copies each already-resolved supertype's own fields
+  and groups into the result, left to right, checked for name overlap across supertypes; a
+  trailing-body entry with no name collision is appended as new (a collision -- tightening an
+  inherited field or group member, §5.7 -- isn't supported yet, reported explicitly rather than
   mishandled). `type_definition.supertypes` (the transitive IS-A chain) falls out by induction:
   each already-resolved supertype's own `supertypes()` is already *its* full transitive chain, so
   `direct-supertype + that supertype's own supertypes()`, deduplicated, is the new chain -- no
@@ -263,14 +265,22 @@ string, §4.5) for `TokenValue`s produced by the parser. `NumberGrammar.tryParse
   deliberately *not* "inherit the nearest ancestor's own resolved kind", which would be wrong:
   `atom` the entry is itself `kind: PRODUCT` (its own chain is just `[top]`, containing none of the
   three), so composing with `atom` correctly yields `ATOM` only via the literal-name check, not by
-  copying atom's own (PRODUCT) kind. Verified by resolving `top`/`atom`/`product`/`sum`/`reference`
-  straight from the real `meta-kernel.tn1` fixture, in file order (composition only sees supertypes
-  the caller has already resolved and handed back in -- real forward references and namespace
-  population, §3.3.2/§3.4.1's Pass 1, are later work, not attempted yet). `subtypes` (the reverse
-  index) is never populated -- it needs a whole-schema pass, not a per-declaration one.
+  copying atom's own (PRODUCT) kind. **`constructor`** is threaded straight from the source's own
+  `~` marker (`StructuralTypeDef.constructor()`) into the result either way, fresh record or
+  composition. **Field groups** (§5.11) flatten: each member becomes an ordinary field, state
+  OPTIONAL regardless of the group's own state (a REQUIRED group still only guarantees *at most
+  one* member, not which), and the group itself is recorded separately (state REQUIRED/OPTIONAL
+  from the group's own `?`) -- modeled with `ElementState` (the two-member enum), not `FieldState`
+  (five members), matching a modeling bug fix along the way (`FieldGroup.state` was wrongly typed
+  `FieldState` before this). Verified by resolving `top`/`atom`/`product`/`sum`/`reference` (plain
+  composition) and `integer_type` (`~`-marked composition with two OPTIONAL fields and two field
+  groups) straight from the real `meta-kernel.tn1` fixture, in file order (composition only sees
+  supertypes the caller has already resolved and handed back in -- real forward references and
+  namespace population, §3.3.2/§3.4.1's Pass 1, are later work, not attempted yet). `subtypes` (the
+  reverse index) is never populated -- it needs a whole-schema pass, not a per-declaration one.
 
-Every other construct (elided field types, modifiers, groups, refinement, subtraction, `~`-marked
-constructor composition, atom instances/refinements, generic type-refs, templates) throws
+Every other construct (elided field types, field modifiers/default-fixed values, refinement,
+subtraction, atom instances/refinements, generic type-refs, templates, tightening) throws
 `UnsupportedOperationException` rather than silently mis-resolving -- `SchemaResolver`'s own Javadoc
 lists exactly what's in scope.
 
