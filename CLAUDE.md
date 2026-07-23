@@ -333,16 +333,31 @@ string, §4.5) for `TokenValue`s produced by the parser. `NumberGrammar.tryParse
   yet. Verified against the real fixture's `tuple_element`/`field_group` (both fresh records, so
   untangled from tightening -- see below) plus small hand-built snippets mirroring `array`'s own
   field shapes for the fixed/parametric cases in isolation.
+- **Tightening** (§5.7), inside a composition's trailing body -- a body field naming an
+  already-inherited field is no longer an automatic error: it's resolved and **replaces the
+  inherited field in place** (§5.8's field-ordering rule; new fields still append after all
+  inherited ones), gated by §5.7's own state-transition table (`REQUIRED` -> itself/`REQUIRED_DEFAULT`/
+  `REQUIRED_FIXED`; `OPTIONAL` -> anything; `REQUIRED_DEFAULT` -> itself/`REQUIRED_FIXED`;
+  `REQUIRED_FIXED`/`OPTIONAL_FIXED` -> only themselves) -- an invalid transition (e.g. `REQUIRED` ->
+  `OPTIONAL`) is a resolver error. An elided type-ref in a tightening entry (`field: = value`, no
+  type-ref restated) inherits the source field's type, per §5.7's own "Elided type-refs" rule. This
+  is exactly what unblocks `array`/`map`: both compose with `product` and re-declare its
+  `access_pattern`/`size_type` fields with fixed values, which now resolves as tightening
+  (`REQUIRED` -> `REQUIRED_FIXED`) instead of throwing. The identity-diagonal value-invariant (a
+  restated `REQUIRED_FIXED`/`OPTIONAL_FIXED` field's value MUST NOT change) isn't checked yet -- no
+  real fixture declaration restates an already-fixed field. Verified against the real fixture's
+  `array`/`map` end-to-end, plus hand-built snippets for a rejected invalid transition and an
+  elided-type-ref tightening (adapting §5.7's own `production => config ^ { host: =
+  "prod.example.com" } }` worked example to a composition body, since `^` itself isn't resolved).
 
-Every other construct (elided field types, an `Absent` modifier value or a modifier on an OPTIONAL
-field, refinement, subtraction, generic type-refs other than a bare two-argument `map<K, V>`
-application, templates, tightening) throws `UnsupportedOperationException` rather than silently
-mis-resolving -- `SchemaResolver`'s own Javadoc lists exactly what's in scope. Notably, `array`/`map`
-(the kernel's own parameterized constructors) still don't resolve end-to-end even with both field
-modifiers and type parameters handled: both compose with `product` and then re-declare its
-`access_pattern`/`size_type` fields with fixed values -- tightening (§5.7), a separate,
-still-unresolved gap that fires before a modifier is ever inspected (composition rejects the
-duplicate field name first).
+Every other construct (elided field types outside a tightening entry, an `Absent` modifier value or
+a modifier on an OPTIONAL field, the identity-diagonal FIXED-value invariant, **the `^` refinement
+operator itself** -- a declaration whose body is `source ^ { ... }`, i.e. `RefinedDef` -- `set`,
+`vector`, and the `array_min`/`array_max`/`array_ranged` size-refinement templates in the real
+fixture all use it and are still unresolved, not dispatched at all yet in `resolveTypeDef` --
+subtraction, generic type-refs other than a bare two-argument `map<K, V>` application, templates,
+and an inter-supertype field collision) throws `UnsupportedOperationException` rather than silently
+mis-resolving -- `SchemaResolver`'s own Javadoc lists exactly what's in scope.
 
 **A real recursion trap, found and fixed along the way -- read before touching `TypeArgument`.**
 `TypeRef`/`TypeArgument` are mutually recursive (`TypeRef.arguments: List<TypeArgument>`, and a

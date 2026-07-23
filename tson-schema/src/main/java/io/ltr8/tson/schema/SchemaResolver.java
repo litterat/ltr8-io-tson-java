@@ -43,7 +43,7 @@ import java.util.Set;
  * Resolves declarations from a {@link SchemaMap} (the grammar-layer AST, {@code tson-parser}) into
  * {@link TypeDefinition}s (Part 2 §8's resolved schema-value shape, {@code io.ltr8.tson.schema.meta})
  * -- an incremental, deliberately narrow resolver, not the full two-pass resolver of §3.4.1. It
- * handles six constructs so far:
+ * handles seven constructs so far:
  *
  * <ul>
  *   <li>A record (no supertypes), optionally {@code ~}-marked (the {@code constructor} flag
@@ -58,10 +58,12 @@ import java.util.Set;
  *   (non-generic) references, whose own body is a {@link RecordBody} -- {@code atom => top & {}},
  *   {@code product => top & { access_pattern: ... size_type: ... }}, {@code sum => top & {}},
  *   {@code reference => top & { target: type_name } }, and {@code integer_type => ~atom & { size:
- *   integer_size? ( min: integer | exclusive_min: integer )? ... }}'s own shapes -- {@code array}'s
- *   own {@code <T> ~product & {...}} shape resolves its type parameter but still throws overall, on
- *   a separate, still-unresolved gap (tightening the inherited {@code access_pattern} field with a
- *   fixed value, §5.7).</li>
+ *   integer_size? ( min: integer | exclusive_min: integer )? ... }}'s own shapes -- a trailing-body
+ *   field naming an inherited field is now a *tightening* entry (§5.7, see below and {@link
+ *   #resolveTighteningField}) rather than an automatic error, which is what lets {@code array}'s and
+ *   {@code map}'s own {@code <T> ~product & {...}}/{@code <K, V> ~product & {...}} shapes -- each
+ *   re-declaring {@code product}'s {@code access_pattern}/{@code size_type} with a fixed value --
+ *   resolve end-to-end.</li>
  *   <li>A bare, argument-free type reference ({@code name => other_name}, §8.3) -- always resolves
  *   to a {@code REFERENCE}-kind entry regardless of what the referenced name itself resolves to
  *   (e.g. {@code type_name => token} is {@code kind: REFERENCE} even though {@code token} itself
@@ -89,19 +91,29 @@ import java.util.Set;
  *   tightening) and, since no real fixture entry exercises the fixed/parametric cases in isolation
  *   from a tightening composition, small hand-built snippets mirroring {@code array}'s own field
  *   shapes ({@code product_access_type = INDEX}, {@code type_ref = T}, {@code integer ~ N}).</li>
+ *   <li>Tightening a composition-body field against an already-inherited one (§5.7, via {@code
+ *   inheritedFieldIndex} in {@link #resolveEntry} and {@link #resolveTighteningField}) -- the
+ *   tightened field replaces the inherited one in place (§5.8's field-ordering rule), its target
+ *   state is checked against §5.7's transition table ({@link #isValidTighteningTransition}), and an
+ *   elided type-ref (a modifier-only entry, {@code field: = value}) inherits the source field's type
+ *   (§5.7's "Elided type-refs"). Verified end-to-end against the real fixture's {@code array} and
+ *   {@code map} -- both tighten {@code product}'s {@code access_pattern}/{@code size_type} to
+ *   {@code REQUIRED_FIXED} -- plus hand-built snippets for a rejected invalid transition and an
+ *   elided-type-ref tightening (mirroring §5.7's own {@code production => config ^ { host: =
+ *   "prod.example.com" } } worked example, adapted to a composition body since the {@code ^}
+ *   refinement operator itself is not resolved -- see below).</li>
  * </ul>
  *
- * Everything else -- elided field types, an {@code Absent} modifier value ({@code = _}) or any
- * modifier on an OPTIONAL field, refinement, subtraction, generic type-refs other than a bare
- * two-argument {@code map<K, V>} application (other constructors, templates, nested or value
- * arguments), tightening an inherited field or group in a composition body -- is explicitly out of
- * scope for now and reported via {@link UnsupportedOperationException} rather than silently
- * mis-resolved; each is a later, separate pass. Notably, {@code array}/{@code map} (the kernel's own
- * parameterized constructors) still don't resolve end-to-end even with field modifiers and type
- * parameters both handled: both compose with {@code product} and then re-declare its
- * {@code access_pattern}/{@code size_type} fields with fixed values -- tightening (§5.7), a separate,
- * still-unresolved gap that fires before a modifier is ever inspected (composition rejects the
- * duplicate field name first).
+ * Everything else -- elided field types outside a tightening entry, an {@code Absent} modifier
+ * value ({@code = _}) or any modifier on an OPTIONAL field, the identity-diagonal value-invariant
+ * for a restated FIXED field, the {@code ^} refinement operator itself (a declaration whose body is
+ * {@code source ^ { ... }} -- {@code set}, {@code vector}, {@code array_min}/{@code array_max}/
+ * {@code array_ranged} in the real fixture -- is a distinct grammar shape, {@code RefinedDef}, not
+ * yet dispatched at all in {@link #resolveTypeDef}), subtraction, generic type-refs other than a
+ * bare two-argument {@code map<K, V>} application (other constructors, templates, nested or value
+ * arguments), and an inter-supertype field collision -- is explicitly out of scope for now and
+ * reported via {@link UnsupportedOperationException} rather than silently mis-resolved; each is a
+ * later, separate pass.
  *
  * <p><b>No namespace, only an accumulating "resolved so far" map.</b> A composition's supertypes
  * must already be present in the {@code resolved} map passed to {@link #resolve(SchemaMap.Declaration,
@@ -293,16 +305,21 @@ public final class SchemaResolver {
     /**
      * {@code A & B & { ... }}: each supertype's fields and groups are copied into the result, left
      * to right (§5.8's field-ordering rule, §5.11's "supertypes contribute their groups whole"),
-     * checked for name overlap across supertypes; the trailing body's own entries are appended
-     * after, but only when genuinely new -- a body field or group member naming an inherited field
-     * would be a tightening entry (§5.7), not supported here yet. {@code type_definition.supertypes}
-     * accumulates by induction: each supertype's own {@code supertypes()} is already its full
-     * transitive chain (by the same induction, computed when *that* entry was resolved), so {@code
-     * direct + parent.supertypes()} for every direct supertype, deduplicated, is the complete
-     * transitive chain -- no separate graph walk needed. {@code parameters} (a template's own
-     * {@code <T, ...>} list, §5.10) threads straight through from the declaration's {@code
-     * typeParams} into the result -- {@code array}'s own shape ({@code array => <T> ~product & {
-     * ... } }) -- with no substitution or validation that a field actually uses each parameter.
+     * checked for name overlap across supertypes; the trailing body's own entries are then resolved
+     * against {@code inheritedFieldIndex} (name -&gt; position in {@code fields}, populated by the
+     * supertype loop above) -- a body field naming an inherited field is a *tightening* entry
+     * (§5.7, via {@link #resolveTighteningField}) and replaces that field in place; a body field
+     * naming nothing inherited is genuinely new and is appended, same as before (§5.8's "new fields
+     * are permitted; existing fields may be tightened" and "tightening entries replace inherited
+     * fields in place; new fields are appended after all inherited fields"). {@code
+     * type_definition.supertypes} accumulates by induction: each supertype's own {@code
+     * supertypes()} is already its full transitive chain (by the same induction, computed when
+     * *that* entry was resolved), so {@code direct + parent.supertypes()} for every direct
+     * supertype, deduplicated, is the complete transitive chain -- no separate graph walk needed.
+     * {@code parameters} (a template's own {@code <T, ...>} list, §5.10) threads straight through
+     * from the declaration's {@code typeParams} into the result -- {@code array}'s own shape
+     * ({@code array => <T> ~product & { ... } }) -- with no substitution or validation that a field
+     * actually uses each parameter.
      */
     private TypeDefinition resolveComposition(String name, ConstructionDef construction,
                                                Map<String, TypeDefinition> resolved, boolean constructor,
@@ -317,6 +334,7 @@ public final class SchemaResolver {
         List<RecordField> fields = new ArrayList<>();
         List<FieldGroup> groups = new ArrayList<>();
         Set<String> seenFieldNames = new HashSet<>();
+        Map<String, Integer> inheritedFieldIndex = new LinkedHashMap<>();
 
         for (TypeRef supertypeRef : construction.supertypes()) {
             if (!(supertypeRef instanceof SimpleRef simple)) {
@@ -343,6 +361,7 @@ public final class SchemaResolver {
             for (RecordField field : supertypeBody.fields()) {
                 requireFieldNameNotSeen(name, field.name(), seenFieldNames);
                 seenFieldNames.add(field.name());
+                inheritedFieldIndex.put(field.name(), fields.size());
                 fields.add(field);
             }
             groups.addAll(supertypeBody.groups());
@@ -350,7 +369,7 @@ public final class SchemaResolver {
 
         if (construction.body().isPresent()) {
             for (RecordEntry entry : construction.body().get().entries()) {
-                resolveEntry(name, entry, fields, groups, seenFieldNames, parameters);
+                resolveEntry(name, entry, fields, groups, seenFieldNames, inheritedFieldIndex, parameters);
             }
         }
 
@@ -403,25 +422,33 @@ public final class SchemaResolver {
         List<FieldGroup> groups = new ArrayList<>();
         Set<String> seenFieldNames = new HashSet<>();
         for (RecordEntry entry : entries) {
-            resolveEntry(null, entry, fields, groups, seenFieldNames, parameters);
+            resolveEntry(null, entry, fields, groups, seenFieldNames, Map.of(), parameters);
         }
         return new RecordBody(List.of(), fields, groups);
     }
 
     /**
-     * {@code declarationName} is only used to word an error message for a composition-body
-     * collision (tightening, §5.7) -- {@code null} for a fresh record, where no supertype means no
-     * inherited name could ever collide in the first place, only a genuine duplicate declaration
-     * (also unsupported, same message either way).
+     * {@code declarationName} is only used to word error messages -- {@code null} for a fresh
+     * record, where {@code inheritedFieldIndex} is always empty (no supertype means no field could
+     * ever be inherited, so every entry is either genuinely new or a genuine duplicate declaration,
+     * the latter still unsupported). A {@link FieldDef} whose name is a key of {@code
+     * inheritedFieldIndex} is a *tightening* entry (§5.7): it's resolved against, and replaces in
+     * place, the already-inherited field at that index, rather than being appended as new.
      */
     private void resolveEntry(String declarationName, RecordEntry entry, List<RecordField> fields,
-                               List<FieldGroup> groups, Set<String> seenFieldNames, List<String> parameters) {
+                               List<FieldGroup> groups, Set<String> seenFieldNames,
+                               Map<String, Integer> inheritedFieldIndex, List<String> parameters) {
         switch (entry) {
             case FieldDef fieldDef -> {
-                requireFieldNameNotSeen(declarationName, fieldDef.name(), seenFieldNames);
-                RecordField field = resolveField(fieldDef, parameters);
-                seenFieldNames.add(field.name());
-                fields.add(field);
+                Integer index = inheritedFieldIndex.get(fieldDef.name());
+                if (index != null) {
+                    fields.set(index, resolveTighteningField(declarationName, fieldDef, fields.get(index), parameters));
+                } else {
+                    requireFieldNameNotSeen(declarationName, fieldDef.name(), seenFieldNames);
+                    RecordField field = resolveField(fieldDef, parameters, Optional.empty());
+                    seenFieldNames.add(field.name());
+                    fields.add(field);
+                }
             }
             case GroupDef groupDef -> {
                 List<String> memberNames = new ArrayList<>();
@@ -437,10 +464,58 @@ public final class SchemaResolver {
         }
     }
 
+    /**
+     * §5.7's refinement/tightening rules, applied to one composition-body field that names an
+     * already-inherited field: resolved the same way as any field ({@link #resolveField}), except
+     * an elided type-ref (a modifier-only entry, {@code field: = value}) inherits {@code
+     * inherited.type()} rather than failing, and the resulting state MUST be a permitted transition
+     * from {@code inherited.state()} per §5.7's transition table ({@link
+     * #isValidTighteningTransition}) -- e.g. {@code array}'s own {@code access_pattern:
+     * product_access_type = INDEX} tightens {@code product}'s {@code REQUIRED} to {@code
+     * REQUIRED_FIXED}, an allowed transition. The identity-diagonal rule (a {@code REQUIRED_FIXED}/
+     * {@code OPTIONAL_FIXED} restatement MUST NOT change the pinned value) is not checked yet -- no
+     * real fixture declaration restates an already-fixed field, so there's nothing to verify it
+     * against.
+     */
+    private RecordField resolveTighteningField(String declarationName, FieldDef fieldDef, RecordField inherited,
+                                                List<String> parameters) {
+        RecordField tightened = resolveField(fieldDef, parameters, Optional.of(inherited.type()));
+        if (!isValidTighteningTransition(inherited.state(), tightened.state())) {
+            throw new UnsupportedOperationException("'" + declarationName + "': tightening '" + fieldDef.name()
+                    + "' from " + inherited.state() + " to " + tightened.state() + " is not a permitted state "
+                    + "transition (§5.7)");
+        }
+        return tightened;
+    }
+
+    /**
+     * §5.7's refinement state-transition table, read row by row (from → permitted targets):
+     * {@code REQUIRED} → itself, {@code REQUIRED_DEFAULT}, {@code REQUIRED_FIXED}; {@code OPTIONAL}
+     * → any state; {@code REQUIRED_DEFAULT} → itself or {@code REQUIRED_FIXED}; {@code
+     * REQUIRED_FIXED} → itself only; {@code OPTIONAL_FIXED} → itself only. Tightening only ever
+     * restricts (FIXED states are terminal; OPTIONAL → REQUIRED is the only direction, never back).
+     */
+    private static boolean isValidTighteningTransition(FieldState from, FieldState to) {
+        return switch (from) {
+            case REQUIRED -> to == FieldState.REQUIRED || to == FieldState.REQUIRED_DEFAULT || to == FieldState.REQUIRED_FIXED;
+            case OPTIONAL -> true;
+            case REQUIRED_DEFAULT -> to == FieldState.REQUIRED_DEFAULT || to == FieldState.REQUIRED_FIXED;
+            case REQUIRED_FIXED -> to == FieldState.REQUIRED_FIXED;
+            case OPTIONAL_FIXED -> to == FieldState.OPTIONAL_FIXED;
+        };
+    }
+
+    /**
+     * Rejects an inter-supertype field collision (§5.8: "supertypes MUST contribute disjoint field
+     * sets") and a genuine duplicate field/group-member name within one body -- neither is
+     * tightening (tightening a *body* field against an *inherited* one is handled separately, via
+     * {@code inheritedFieldIndex} in {@link #resolveEntry}, before this is ever consulted for that
+     * name) and neither is resolved here.
+     */
     private static void requireFieldNameNotSeen(String declarationName, String fieldName, Set<String> seenFieldNames) {
         if (seenFieldNames.contains(fieldName)) {
-            throw new UnsupportedOperationException("'" + declarationName + "': tightening an inherited field or "
-                    + "group member ('" + fieldName + "'), or a duplicate field/member name, is not resolved yet");
+            throw new UnsupportedOperationException("'" + declarationName + "': an inter-supertype field collision, "
+                    + "or a duplicate field/group-member name ('" + fieldName + "'), is not resolved yet");
         }
     }
 
@@ -460,13 +535,25 @@ public final class SchemaResolver {
      * {@code Absent} modifier value ({@code = _}, valid only on an OPTIONAL field) and a modifier on
      * an OPTIONAL field at all ({@link FieldState#OPTIONAL_FIXED}) are not resolved yet -- no real
      * fixture declaration needs either so far.
+     *
+     * <p>{@code inheritedType}, supplied only from {@link #resolveTighteningField}, is used when
+     * {@code field.type()} is elided ({@code field: = value}, a modifier-only entry, §5.7's own
+     * "Elided type-refs": the field's type is inherited from the source declaration and only the
+     * value state changes); a fresh (non-tightening) field always passes {@code Optional.empty()}
+     * and an elided type there is still a resolver error (a fresh record has no source to elide
+     * toward, per §5.7).
      */
-    private RecordField resolveField(FieldDef field, List<String> parameters) {
-        if (field.type().isEmpty()) {
-            throw new UnsupportedOperationException("an elided field type is not resolved yet: " + field);
+    private RecordField resolveField(FieldDef field, List<String> parameters,
+                                      Optional<io.ltr8.tson.schema.meta.TypeRef> inheritedType) {
+        io.ltr8.tson.schema.meta.TypeRef type;
+        if (field.type().isPresent()) {
+            type = resolveTypeRef(field.type().get().typeRef());
+        } else if (inheritedType.isPresent()) {
+            type = inheritedType.get();
+        } else {
+            throw new UnsupportedOperationException("an elided field type outside a tightening entry is not resolved yet: " + field);
         }
-        io.ltr8.tson.schema.meta.TypeRef type = resolveTypeRef(field.type().get().typeRef());
-        boolean optional = field.type().get().optional();
+        boolean optional = field.type().map(FieldDef.FieldType::optional).orElse(false);
 
         if (field.modifier().isEmpty()) {
             FieldState state = optional ? FieldState.OPTIONAL : FieldState.REQUIRED;

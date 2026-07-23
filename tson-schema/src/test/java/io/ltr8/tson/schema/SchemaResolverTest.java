@@ -577,22 +577,117 @@ class SchemaResolverTest {
                 write(retry));
     }
 
+    // ── Tightening (§5.7), via composition bodies: array, map ─────────────
+    //    array/map both compose with "product" and re-declare its access_pattern/size_type
+    //    fields with fixed values -- a genuine tightening entry, replacing the inherited
+    //    field in place rather than being rejected as a duplicate name.
+
     @Test
-    void arrayFromTheRealFixtureIsBlockedByTighteningNotByItsOwnTypeParameter() throws IOException {
-        // array => <T> ~product & { access_pattern: product_access_type = INDEX ... } -- the <T>
-        // itself resolves fine now; what still blocks this declaration end-to-end is that its body
-        // re-declares "access_pattern" (already inherited from "product") with a fixed value --
-        // tightening an inherited field (§5.7), not yet resolved, and a distinct gap from either
-        // type parameters or field modifiers in isolation.
+    void resolvesArrayFromTheRealMetaKernelFixtureTighteningProductsInheritedFields() throws IOException, DataBindException {
         SchemaMap schemaMap = new SchemaParser(readFixture()).parseSchemaDocument().body();
         Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
         resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom"), resolved));
         resolved.put("product", resolver.resolve(schemaMap.declarations().get("product"), resolved));
 
+        TypeDefinition array = resolver.resolve(schemaMap.declarations().get("array"), resolved);
+
+        assertEquals(TypeKind.PRODUCT, array.kind());
+        assertEquals(List.of("T"), array.parameters());
+        assertTrue(array.constructor());
+        assertEquals(List.of("product", "top"), array.supertypes());
+        assertEquals("{ kind: \"PRODUCT\" parameters: [ \"T\" ] constructor: true "
+                        + "supertypes: [ \"product\" \"top\" ] subtypes: [] "
+                        + "body: !record { supertypes: [ \"product\" ] fields: [ "
+                        + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
+                        + "state: \"REQUIRED_FIXED\" value: { text: \"INDEX\" form: \"UNQUOTED\" } } "
+                        + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
+                        + "state: \"REQUIRED_FIXED\" value: { text: \"VARIABLE\" form: \"UNQUOTED\" } } "
+                        + "{ name: \"element_type\" type: { name: \"type_ref\" arguments: [] } "
+                        + "state: \"REQUIRED\" value_param: \"T\" } "
+                        + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } "
+                        + "state: \"REQUIRED_DEFAULT\" value: { text: \"REQUIRED\" form: \"UNQUOTED\" } } "
+                        + "{ name: \"unordered\" type: { name: \"boolean\" arguments: [] } "
+                        + "state: \"REQUIRED_DEFAULT\" value: { text: \"false\" form: \"UNQUOTED\" } } "
+                        + "{ name: \"unique_items\" type: { name: \"boolean\" arguments: [] } "
+                        + "state: \"REQUIRED_DEFAULT\" value: { text: \"false\" form: \"UNQUOTED\" } } "
+                        + "{ name: \"min_items\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
+                        + "{ name: \"max_items\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
+                        + "] groups: [] } }",
+                write(array));
+    }
+
+    @Test
+    void resolvesMapFromTheRealMetaKernelFixtureTighteningProductsInheritedFields() throws IOException, DataBindException {
+        SchemaMap schemaMap = new SchemaParser(readFixture()).parseSchemaDocument().body();
+        Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
+        resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
+        resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom"), resolved));
+        resolved.put("product", resolver.resolve(schemaMap.declarations().get("product"), resolved));
+
+        TypeDefinition map = resolver.resolve(schemaMap.declarations().get("map"), resolved);
+
+        assertEquals(TypeKind.PRODUCT, map.kind());
+        assertEquals(List.of("K", "V"), map.parameters());
+        assertTrue(map.constructor());
+        assertEquals(List.of("product", "top"), map.supertypes());
+        assertEquals("{ kind: \"PRODUCT\" parameters: [ \"K\" \"V\" ] constructor: true "
+                        + "supertypes: [ \"product\" \"top\" ] subtypes: [] "
+                        + "body: !record { supertypes: [ \"product\" ] fields: [ "
+                        + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
+                        + "state: \"REQUIRED_FIXED\" value: { text: \"NAMED\" form: \"UNQUOTED\" } } "
+                        + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
+                        + "state: \"REQUIRED_FIXED\" value: { text: \"VARIABLE\" form: \"UNQUOTED\" } } "
+                        + "{ name: \"key_type\" type: { name: \"type_ref\" arguments: [] } "
+                        + "state: \"REQUIRED\" value_param: \"K\" } "
+                        + "{ name: \"value_type\" type: { name: \"type_ref\" arguments: [] } "
+                        + "state: \"REQUIRED\" value_param: \"V\" } "
+                        + "{ name: \"min_items\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
+                        + "{ name: \"max_items\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
+                        + "] groups: [] } }",
+                write(map));
+    }
+
+    @Test
+    void tighteningRejectsAnInvalidStateTransition() {
+        // "count" is inherited REQUIRED; tightening it to OPTIONAL is not a permitted transition
+        // (§5.7's table: REQUIRED -> OPTIONAL is an error).
+        SchemaMap schemaMap = new SchemaParser("""
+                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
+                {
+                  base => { count: integer }
+                  loosened => base & { count: integer? }
+                }""").parseSchemaDocument().body();
+        Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
+        resolved.put("base", resolver.resolve(schemaMap.declarations().get("base")));
+
         UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
-                () -> resolver.resolve(schemaMap.declarations().get("array"), resolved));
-        assertTrue(thrown.getMessage().contains("tightening"), thrown.getMessage());
+                () -> resolver.resolve(schemaMap.declarations().get("loosened"), resolved));
+        assertTrue(thrown.getMessage().contains("permitted"), thrown.getMessage());
+    }
+
+    @Test
+    void resolvesAnElidedTypeRefInATighteningEntryByInheritingTheSourcesType() throws DataBindException {
+        // "field: = value" with no type-ref restated inherits the source declaration's type
+        // (§5.7's "Elided type-refs"), tightening only the value/state.
+        SchemaMap schemaMap = new SchemaParser("""
+                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
+                {
+                  config => { host: text  port: integer }
+                  production => config & { host: = "prod.example.com" }
+                }""").parseSchemaDocument().body();
+        Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
+        resolved.put("config", resolver.resolve(schemaMap.declarations().get("config")));
+
+        TypeDefinition production = resolver.resolve(schemaMap.declarations().get("production"), resolved);
+
+        assertEquals("{ kind: \"PRODUCT\" parameters: [] constructor: false supertypes: [ \"config\" ] subtypes: [] "
+                        + "body: !record { supertypes: [ \"config\" ] fields: [ "
+                        + "{ name: \"host\" type: { name: \"text\" arguments: [] } state: \"REQUIRED_FIXED\" "
+                        + "value: { text: \"prod.example.com\" form: \"SINGLE_LINE_QUOTED\" } } "
+                        + "{ name: \"port\" type: { name: \"integer\" arguments: [] } state: \"REQUIRED\" } "
+                        + "] groups: [] } }",
+                write(production));
     }
 
     private TypeDefinition resolveSnippet(String declaration) {
