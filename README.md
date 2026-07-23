@@ -33,21 +33,56 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       and back again (`toTson`) — mainly a debugging tool, not a guaranteed-lossless round trip
       (e.g. the integer family's exact width isn't recoverable schemaless; see [Conformance](#conformance))
 
-See [CLAUDE.md](CLAUDE.md#architecture) for architecture and design notes, and
-[Conformance](#conformance) below for edge-case behavior worth knowing about.
-
 **Not yet implemented:**
 
 - [ ] Network/identifier types — `cidr4`, `cidr6`, `mac`
 - [ ] General resolver-layer structural rules as reusable primitives, rather than binding-time-only
-      behavior — empty-brace resolution, absent-vs-missing distinction
+  behavior — empty-brace resolution, absent-vs-missing distinction
 - [ ] Annotation access on individual fields, array/tuple elements, and map keys/values — only a
-      whole bound record's own annotations are reachable today, not its children's
+  whole bound record's own annotations are reachable today, not its children's
 - [ ] Header/value directive interpretation — `!!id` verification, `!!schema` loading
 - [ ] Multi-error reporting — currently fail-fast on the first lex/parse error
 - [ ] Security hardening — numeric-literal length limits, confusable-character and
-      bidi-formatting-character warnings
+  bidi-formatting-character warnings
 - [ ] Anything from Part 2 (schema grammar, type system)
+
+See [CLAUDE.md](CLAUDE.md#architecture) for architecture and design notes, and
+[Conformance](#conformance) below for edge-case behavior worth knowing about.
+
+## Quickstart
+
+`TsonMapper` binds TSON text straight to plain Java records — including the built-in vocabulary types
+(§5), which is where TSON goes beyond what JSON alone can express. `!uuid` and `!ipv4` below bind to
+`java.util.UUID` and `java.net.Inet4Address` directly, with no custom code:
+
+```java
+import io.ltr8.tson.mapper.TsonMapper;
+
+import java.net.Inet4Address;
+import java.time.LocalDate;
+import java.util.UUID;
+
+record Server(String hostname, Inet4Address address, UUID id, LocalDate deployedOn) {
+}
+
+TsonMapper mapper = new TsonMapper();
+
+String tson = """
+        {
+            hostname: "web-01"
+            address: !ipv4 192.0.2.10
+            id: !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09
+            deployedOn: !date 2026-01-15
+        }""";
+
+Server server = mapper.toObject(tson, Server.class);
+// Server[hostname=web-01, address=/192.0.2.10, id=9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09, deployedOn=2026-01-15]
+
+String written = mapper.toTson(server);
+// { hostname: "web-01" address: !ipv4 "192.0.2.10" id: !uuid "9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09" deployedOn: !date "2026-01-15" }
+```
+
+`toTson` is not a lossless serializer — see [Conformance](#conformance) below for exactly where it's lossy.
 
 ## Conformance
 
