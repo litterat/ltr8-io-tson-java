@@ -20,8 +20,6 @@ import java.util.Map;
 public class DefaultClassBinder {
 
 
-    private final NewFeatures newFeatures;
-
 	// private final TypeContextNameBinder nameBinder;
 
 	private final DefaultRecordBinder recordBinder;
@@ -34,7 +32,6 @@ public class DefaultClassBinder {
 
 	public DefaultClassBinder() {
 
-        newFeatures = new NewFeatures();
 		recordBinder = new DefaultRecordBinder();
 		atomBinder = new DefaultAtomBinder();
 		unionBinder = new DefaultUnionBinder();
@@ -54,7 +51,7 @@ public class DefaultClassBinder {
 
 		if (isTuple(targetClass)) {
 			// Checked ahead of isRecord: a genuine Java record annotated @Tuple would otherwise be
-			// claimed by isRecord()'s own newFeatures.isRecord() check first.
+			// claimed by isRecord()'s own isRecord() check first.
 			result = tupleBinder.resolveTuple(context, targetClass);
 		} else if (isRecord(targetClass)) {
 			result = recordBinder.resolveRecord(context, targetClass);
@@ -82,9 +79,8 @@ public class DefaultClassBinder {
 			return false;
 		}
 
-		// If the targetClass is using Java 16 sealed interfaces then it provides
-		// the union type.
-		if (newFeatures.isSealed(targetClass)) {
+		// If the targetClass is using sealed interfaces then it provides the union type.
+		if (targetClass.isSealed()) {
 			return true;
 		}
 
@@ -126,7 +122,7 @@ public class DefaultClassBinder {
 	private boolean isRecord(Class<?> targetClass) {
 
 		// A genuine Java record needs no annotation -- RecordComponentFinder reads it directly.
-		if (newFeatures.isRecord(targetClass)) {
+		if (targetClass.isRecord()) {
 			return true;
 		}
 

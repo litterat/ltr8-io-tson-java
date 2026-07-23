@@ -45,10 +45,7 @@ public class DefaultRecordBinder {
 	private static final String TODATA_METHOD = "toData";
 	private static final String TOOBJECT_METHOD = "toObject";
 
-	private final NewFeatures newFeatures;
-
 	public DefaultRecordBinder() {
-		this.newFeatures = new NewFeatures();
 	}
 
 
@@ -152,7 +149,7 @@ public class DefaultRecordBinder {
 		// get the constructor.
 		Constructor<?> ctor = getConstructor(targetClass);
 
-		if (newFeatures.isRecord(targetClass)) {
+		if (targetClass.isRecord()) {
 			// A genuine Java record's components come straight from the JDK's own
 			// RecordComponent API -- authoritative, no guessing needed, and a record can't have
 			// setters, so there's nothing for GetSetFinder to add.
@@ -218,7 +215,7 @@ public class DefaultRecordBinder {
 					Union union = superClass
 							.getAnnotation(Union.class);
 					if (union != null && (union.value() == null || union.value().length == 0)
-							&& !newFeatures.isSealed(superClass)) {
+							&& !superClass.isSealed()) {
 						DataClassUnion targetUnion = (DataClassUnion) context.getDescriptor(superClass);
 
 						if (!targetUnion.isMemberType(targetClass)) {
@@ -248,7 +245,7 @@ public class DefaultRecordBinder {
 				Union union = targetInterface
 						.getAnnotation(Union.class);
 				if (union != null && (union.value() == null || union.value().length == 0)
-						&& !newFeatures.isSealed(targetInterface)) {
+						&& !targetInterface.isSealed()) {
 					DataClassUnion targetUnion = (DataClassUnion) context.getDescriptor(targetInterface);
 
 					if (!targetUnion.isMemberType(targetClass)) {

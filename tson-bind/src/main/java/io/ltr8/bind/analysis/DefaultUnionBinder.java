@@ -10,16 +10,13 @@ import java.lang.reflect.Type;
 
 public class DefaultUnionBinder {
 
-	private final NewFeatures newFeatures;
-
 	public DefaultUnionBinder() {
-		this.newFeatures = new NewFeatures();
 	}
 
 	public DataClassUnion resolveUnion(DataBindContext context, Class<?> targetClass, Type parameterizedType)
 			throws DataBindException {
-		if (newFeatures.isSealed(targetClass)) {
-			Class<?>[] members = newFeatures.getPermittedSubclasses(targetClass);
+		if (targetClass.isSealed()) {
+			Class<?>[] members = targetClass.getPermittedSubclasses();
 
 			Class<?>[] unionMembers = new Class[members.length];
 			for (int x = 0; x < members.length; x++) {
