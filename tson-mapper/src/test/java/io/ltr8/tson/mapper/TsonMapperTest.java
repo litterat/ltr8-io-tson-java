@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.Inet4Address;
+import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
@@ -479,6 +480,29 @@ class TsonMapperTest {
         // dec-octet check must not.
         assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !ipv4 010.0.0.1 }", Ipv4Holder.class));
         assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !ipv4 3232235521 }", Ipv4Holder.class));
+    }
+
+    // ── IPv6 (§5.5) ──────────────────────────────────────────────────────
+
+    public record Ipv6Holder(Inet6Address value) {
+    }
+
+    @Test
+    void builtinIpv6AnnotationBindsDirectlyThroughTheMapper() throws DataBindException, UnknownHostException {
+        // Ipv6Type#read always returns Inet6Address specifically -- including for IPv4-mapped
+        // input text, where the generic InetAddress.getByAddress(byte[]) would otherwise silently
+        // hand back an Inet4Address instead (see Ipv6Type's Javadoc). Quoted because ':' is not a
+        // legal unquoted-token character (§7.2).
+        Ipv6Holder h = mapper.toObject("{ value: !ipv6 \"2001:db8::1\" }", Ipv6Holder.class);
+        assertEquals(Inet6Address.getByAddress(null,
+                new byte[]{0x20, 0x01, 0x0d, (byte) 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}, -1), h.value());
+    }
+
+    @Test
+    void builtinIpv6AnnotationRejectsAmbiguousCompressionThroughTheMapper() throws DataBindException {
+        // More than one "::" run is ambiguous -- how many zero groups each one represents can't be
+        // determined -- so Ipv6Type's own grammar check must reject it.
+        assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !ipv6 \"1::2::3\" }", Ipv6Holder.class));
     }
 
     // ── Temporal types (§5.4) ────────────────────────────────────────────

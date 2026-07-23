@@ -25,24 +25,25 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       — `tson-mapper`'s `AtomBinder`
 - [x] Built-in type vocabulary (§5), `integer_type`/`decimal_type`/`float_type`/`rational_type`/
       `complex_type`/`uuid_type`/`binary`/`date_type`/`time_type`/`datetime_type`/`duration_type`/
-      `uri_type`/`ipv4_type` families — `int8`..`int256`, `uint8`..`uint256`, `positive_integer` and
-      siblings (§5.6, extended beyond the four currently published — see
+      `uri_type`/`ipv4_type`/`ipv6_type` families — `int8`..`int256`, `uint8`..`uint256`,
+      `positive_integer` and siblings (§5.6, extended beyond the four currently published — see
       [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #6), `number`, `float32`/`float64` (including
       `hex-float`), `rational`, `complex` (§7.6's `hex-float`/`rational`/`complex` extended grammar
-      forms, only reachable through these atoms), `uuid`/`uri`/`ipv4` (§5.5),
+      forms, only reachable through these atoms), `uuid`/`uri`/`ipv4`/`ipv6` (§5.5),
       `base64`/`base64url`/`base32`/`hex` (§5.3), `date`/`time`/`datetime`/`duration` (§5.4) —
       `tson-parser`'s `resolver.vocab` package. Binding `!rational`/`!complex`/`!duration` to a Java
       field requires a `DataBridge` registered on the `DataBindContext` (`Rational`/`Complex`/
       `IsoDuration` are themselves Java records, so `tson-bind`'s record auto-detection claims them
       ahead of the vocabulary path — direct binding to them doesn't work, by design; see their
-      Javadoc). `!uuid`, `!uri`, `!ipv4`, the binary atoms, and `!date`/`!time`/`!datetime` bind
-      directly to `java.util.UUID`/`java.net.URI`/`java.net.Inet4Address`/`byte[]`/`LocalDate`/
-      `OffsetTime`/`OffsetDateTime` — `TsonMapper`'s default `DataBindContext` pre-registers all of
-      them (none can self-declare `@Atom`, being JDK classes; `byte[].isArray()` is `true`, so array
-      auto-detection would otherwise claim it the same way records claim `Rational`/`Complex`, but
-      unlike those there's no competing richer type to defer to), TSON-specific defaults kept out
-      of `tson-bind` itself deliberately (see `TsonMapper.defaultContext()`) — see
-      [Conformance](#conformance) below for a few edge-case behaviors worth knowing about
+      Javadoc). `!uuid`, `!uri`, `!ipv4`, `!ipv6`, the binary atoms, and `!date`/`!time`/`!datetime`
+      bind directly to `java.util.UUID`/`java.net.URI`/`java.net.Inet4Address`/
+      `java.net.Inet6Address`/`byte[]`/`LocalDate`/`OffsetTime`/`OffsetDateTime` — `TsonMapper`'s
+      default `DataBindContext` pre-registers all of them (none can self-declare `@Atom`, being JDK
+      classes; `byte[].isArray()` is `true`, so array auto-detection would otherwise claim it the
+      same way records claim `Rational`/`Complex`, but unlike those there's no competing richer type
+      to defer to), TSON-specific defaults kept out of `tson-bind` itself deliberately (see
+      `TsonMapper.defaultContext()`) — see [Conformance](#conformance) below for a few edge-case
+      behaviors worth knowing about
 - [x] Object binding library (`tson-annotation` + `tson-bind`) — reflection/`MethodHandle`-based Java
       object ↔ data binding, including hand-written (pre-record) immutable class support via the
       `java.lang.classfile` API
@@ -54,7 +55,7 @@ See [CLAUDE.md](CLAUDE.md#architecture) for the current architecture and design 
 **Not yet implemented:**
 
 - [ ] Built-in type vocabulary (§5), remaining families:
-  - [ ] Network/identifier types — `ipv6`/`cidr4`/`cidr6`/`mac` (§5.5, `uuid`/`uri`/`ipv4` done)
+  - [ ] Network/identifier types — `cidr4`/`cidr6`/`mac` (§5.5, `uuid`/`uri`/`ipv4`/`ipv6` done)
 - [ ] Resolver-layer structural rules: record/map "last value wins" deduplication (§2.5/§2.6), `EmptyBrace`
       resolution (§2.8), Absent Sentinel semantics (§2.9)
 - [ ] `Map<K, V>` support in `tson-bind` (no `DataClass` currently recognizes a map target)
@@ -101,6 +102,20 @@ looser than the cited RFC, it's the same leniency class behind real-world SSRF-f
 validates the token against the RFC 3986 grammar itself, extracts the four octets directly from the
 regex match, and constructs the address from raw bytes via `InetAddress.getByAddress(byte[])` — a pure
 bytes-to-object call, never handing the original text to any JDK parser.
+
+**`!ipv6` parses RFC 4291 §2.2's text representation itself too, for the same reason, plus a second,
+unrelated JDK quirk.** Handing the token text to a JDK parser would reintroduce `!ipv4`'s exact
+leniency gap through RFC 4291's IPv4-mapped alternative form (`x:x:x:x:x:x:d.d.d.d`, e.g.
+`"::ffff:192.0.2.1"`), which embeds a dotted-quad tail. So `Ipv6Type` parses the full grammar itself
+— the 8-group preferred form, at most one `::` compression, and a dotted-quad tail checked against
+the same strict `dec-octet` grammar `!ipv4` uses — and builds the address from raw bytes. Separately:
+`InetAddress.getByAddress(byte[16])` itself was confirmed empirically to silently return an
+`Inet4Address`, not an `Inet6Address`, for any 16-byte value in the IPv4-mapped range — the same
+value ending up as a different, mutually non-`equals` Java type depending on which narrow sub-range
+it falls in. `Ipv6Type` uses `Inet6Address.getByAddress(String, byte[], int)` with `scope_id = -1`
+instead (confirmed to behave like "no scope" and match the generic method's result for every
+non-mapped address tried) to guarantee `!ipv6` always returns `Inet6Address`, regardless of the
+address's value.
 
 **One accepted, unfixable gap.** RFC 3339's grammar permits `time-second` up to `60` (leap-second
 accommodation), but `java.time` has no leap-second concept at all — `!time`/`!datetime` reject a

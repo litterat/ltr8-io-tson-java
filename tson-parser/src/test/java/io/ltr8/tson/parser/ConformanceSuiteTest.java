@@ -34,6 +34,7 @@ import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.Inet4Address;
+import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -502,6 +503,15 @@ class ConformanceSuiteTest {
             case "ipv4" -> {
                 Inet4Address actual = (Inet4Address) atomType.read(token, Inet4Address.class);
                 assertEquals(InetAddress.ofLiteral(fieldText(sidecar, "value")), actual, "vocabulary value");
+            }
+            case "ipv6" -> {
+                // Unlike ipv4, value is the plain hex string of the 16 raw address bytes (the same
+                // convention as the binary family), not a textual IPv6 literal -- InetAddress
+                // itself silently collapses an IPv4-mapped 16-byte pattern to an Inet4Address, so
+                // there's no single JDK parse this suite could trust as a neutral oracle here.
+                Inet6Address actual = (Inet6Address) atomType.read(token, Inet6Address.class);
+                assertArrayEquals(HexFormat.of().parseHex(fieldText(sidecar, "value")), actual.getAddress(),
+                        "vocabulary value");
             }
             default -> {
                 BigDecimal actual = (BigDecimal) atomType.read(token, BigDecimal.class);

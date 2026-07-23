@@ -36,24 +36,42 @@ public record Ipv4Type() implements AtomType<Inet4Address> {
 
     private static final String DEC_OCTET = "(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]|[0-9])";
 
-    private static final Pattern IPV4_ADDRESS = Pattern.compile(
+    /**
+     * Package-visible, not {@code private}: {@link Ipv6Type} reuses this exact grammar for RFC
+     * 4291 §2.2's embedded IPv4-tail form ({@code x:x:x:x:x:x:d.d.d.d}) -- the same strict
+     * dec-octet check, not a second, potentially-drifting copy of it.
+     */
+    static final Pattern IPV4_ADDRESS = Pattern.compile(
             DEC_OCTET + "\\." + DEC_OCTET + "\\." + DEC_OCTET + "\\." + DEC_OCTET);
 
     @Override
     public Inet4Address read(TokenValue token) {
         String text = token.text();
-        Matcher matcher = IPV4_ADDRESS.matcher(text);
-        if (!matcher.matches()) {
+        byte[] octets = tryParseOctets(text);
+        if (octets == null) {
             throw new AtomParseException(
                     "'" + text + "' is not a valid IPv4 address -- expected RFC 3986's dotted-quad IPv4address "
                             + "production, no leading zeros or non-canonical forms (§5.5)");
+        }
+        return (Inet4Address) toInetAddress(octets);
+    }
+
+    /** Returns the 4 decoded octets, or {@code null} if {@code text} doesn't match the grammar. */
+    static byte[] tryParseOctets(String text) {
+        Matcher matcher = IPV4_ADDRESS.matcher(text);
+        if (!matcher.matches()) {
+            return null;
         }
         byte[] octets = new byte[4];
         for (int i = 0; i < 4; i++) {
             octets[i] = (byte) Integer.parseInt(matcher.group(i + 1));
         }
+        return octets;
+    }
+
+    static java.net.InetAddress toInetAddress(byte[] addressBytes) {
         try {
-            return (Inet4Address) java.net.InetAddress.getByAddress(octets);
+            return java.net.InetAddress.getByAddress(addressBytes);
         } catch (UnknownHostException e) {
             // Unreachable: getByAddress(byte[]) only throws for an address of the wrong length.
             throw new IllegalStateException(e);

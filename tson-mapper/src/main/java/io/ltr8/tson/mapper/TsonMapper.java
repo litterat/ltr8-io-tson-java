@@ -116,6 +116,9 @@ public final class TsonMapper {
      * target-narrowing check (which does accept a supertype, via {@code isInstance}), {@code
      * DataBindContext}'s registry is keyed by exact {@code Class}, so a field must be declared as
      * {@code Inet4Address} itself, not the broader {@code InetAddress}, to bind directly here.
+     * {@code Inet6Address} (§5.5's {@code ipv6}) is registered for the identical reason -- {@link
+     * io.ltr8.tson.parser.resolver.vocab.Ipv6Type#read} always returns exactly that subtype too,
+     * including for IPv4-mapped input text (see its Javadoc on why that needs its own care).
      */
     private static DataBindContext defaultContext() {
         DataBindContext context = DataBindContext.builder().build();
@@ -127,6 +130,7 @@ public final class TsonMapper {
             context.registerAtom(OffsetDateTime.class);
             context.registerAtom(java.net.URI.class);
             context.registerAtom(java.net.Inet4Address.class);
+            context.registerAtom(java.net.Inet6Address.class);
         } catch (DataBindException e) {
             throw new IllegalStateException("failed to register default atom types on a fresh DataBindContext", e);
         }
