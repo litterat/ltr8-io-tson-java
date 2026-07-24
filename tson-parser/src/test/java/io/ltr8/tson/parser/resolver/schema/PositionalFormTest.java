@@ -25,11 +25,15 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
- * {@link PositionalForm#normalizeToRecordForm} on its own, isolated from any {@code Instance}/
- * {@code SchemaResolver} wiring (that comes later, Phase B steps 4-6) -- exercises the field-name
- * lookup (§5.6's "exactly one bare REQUIRED field" rule) and the wrap-vs-pass-through decision
- * against hand-built {@link RecordBody} values, then confirms the same logic against {@code enum}'s
- * own real resolved shape ({@code enum => ~atom & { members: set<token> }}).
+ * {@link PositionalForm#normalizeToRecordForm} on its own, isolated from {@code Instance}/{@code
+ * SchemaResolver} wiring -- exercises both of its jobs against hand-built {@link RecordBody}
+ * values: the positional-form field-name lookup (§5.6's "exactly one bare REQUIRED field" rule)
+ * and the wrap-vs-pass-through decision, then schema-composed default-filling (§5.2/§5.7's {@code
+ * ~}/{@code =} field modifiers, added once {@code float32}/{@code float64} surfaced a real gap --
+ * see this class's own Javadoc). Also confirms both against real resolved shapes: {@code enum}'s
+ * own ({@code enum => ~atom & { members: set<token> }}) for wrapping, and a hand-built mirror of
+ * {@code float_type}'s real shape for defaulting (the real end-to-end case lives in
+ * {@code SchemaResolverTest.resolvesFloat32AndFloat64FromTheRealCoreTypeLibraryFixture}).
  */
 class PositionalFormTest {
 
@@ -125,6 +129,105 @@ class PositionalFormTest {
 
         assertThrows(UnsupportedOperationException.class,
                 () -> PositionalForm.normalizeToRecordForm(bareToken("HEX"), requiredDefaultOnly));
+    }
+
+    // ── Schema-composed defaults (REQUIRED_DEFAULT / REQUIRED_FIXED) ───────
+
+    private static RecordField requiredDefault(String name, String tokenText) {
+        return new RecordField(name, TypeRef.of("token"), FieldState.REQUIRED_DEFAULT,
+                Optional.of(new Token(tokenText, Token.Form.UNQUOTED)), Optional.empty());
+    }
+
+    private static RecordField requiredFixed(String name, String tokenText) {
+        return new RecordField(name, TypeRef.of("token"), FieldState.REQUIRED_FIXED,
+                Optional.of(new Token(tokenText, Token.Form.UNQUOTED)), Optional.empty());
+    }
+
+    @Test
+    void fillsInAMissingRequiredDefaultField() {
+        RecordBody body = RecordBody.of(List.of(
+                RecordField.required("format", TypeRef.of("token")), requiredDefault("allow_nan", "true")));
+        DataValue value = new DataValue(List.of(), Optional.empty(),
+                new RecordValue(List.of(new RecordValue.Field("format",
+                        new ScopedValue(Optional.empty(), bareToken("BINARY32"))))));
+
+        DataValue result = PositionalForm.normalizeToRecordForm(value, body);
+
+        RecordValue record = (RecordValue) result.coreValue();
+        assertEquals(2, record.fields().size());
+        assertEquals("format", record.fields().get(0).name());
+        assertEquals("allow_nan", record.fields().get(1).name());
+        assertEquals(new TokenValue("true", TokenForm.UNQUOTED),
+                record.fields().get(1).value().value().coreValue());
+    }
+
+    @Test
+    void fillsInAMissingRequiredFixedField() {
+        RecordBody body = RecordBody.of(List.of(requiredFixed("spec", "https://example.com/rfc")));
+        DataValue value = new DataValue(List.of(), Optional.empty(), new EmptyBrace());
+
+        DataValue result = PositionalForm.normalizeToRecordForm(value, body);
+
+        RecordValue record = (RecordValue) result.coreValue();
+        assertEquals(1, record.fields().size());
+        assertEquals("spec", record.fields().get(0).name());
+        assertEquals(new TokenValue("https://example.com/rfc", TokenForm.UNQUOTED),
+                record.fields().get(0).value().value().coreValue());
+    }
+
+    @Test
+    void doesNotOverrideAFieldTheInstanceAlreadySpecifies() {
+        RecordBody body = RecordBody.of(List.of(requiredDefault("allow_nan", "true")));
+        DataValue value = new DataValue(List.of(), Optional.empty(),
+                new RecordValue(List.of(new RecordValue.Field("allow_nan",
+                        new ScopedValue(Optional.empty(), bareToken("false"))))));
+
+        DataValue result = PositionalForm.normalizeToRecordForm(value, body);
+
+        // An instance is free to override its own default -- the schema's own "true" must not
+        // clobber the explicit "false" actually written.
+        RecordValue record = (RecordValue) result.coreValue();
+        assertEquals(1, record.fields().size());
+        assertEquals(new TokenValue("false", TokenForm.UNQUOTED), record.fields().get(0).value().value().coreValue());
+    }
+
+    @Test
+    void leavesAParameterRoutedDefaultFieldAbsentRatherThanGuessing() {
+        // A defaulted field routed through a type parameter (value_param, §5.10) has no literal
+        // Token to fill in with here -- left absent, not an error; a template's own value parameter
+        // is settled at application time, which this resolver doesn't have yet.
+        RecordField parameterRouted = new RecordField("size", TypeRef.of("integer_size"),
+                FieldState.REQUIRED_DEFAULT, Optional.empty(), Optional.of("N"));
+        RecordBody body = RecordBody.of(List.of(parameterRouted));
+        DataValue value = new DataValue(List.of(), Optional.empty(), new EmptyBrace());
+
+        DataValue result = PositionalForm.normalizeToRecordForm(value, body);
+
+        assertSame(value, result);
+    }
+
+    @Test
+    void fillsMultipleDefaultsAgainstAnAlreadyRecordShapedValueLikeTheRealFloat32Case() {
+        // Mirrors meta.tn1's real float_type shape: float32 => !float_type { format: BINARY32 }
+        // never mentions allow_nan/allow_infinity/allow_subnormal/allow_negative_zero (all
+        // `boolean ~ true`) -- this value never touches the wrapping step at all (it already
+        // arrives as a one-field RecordValue), so defaulting must run on the pass-through path too.
+        RecordBody body = RecordBody.of(List.of(
+                RecordField.required("format", TypeRef.of("token")),
+                requiredDefault("allow_nan", "true"),
+                requiredDefault("allow_infinity", "true"),
+                requiredDefault("allow_subnormal", "true"),
+                requiredDefault("allow_negative_zero", "true")));
+        DataValue value = new DataValue(List.of(), Optional.of("float_type"),
+                new RecordValue(List.of(new RecordValue.Field("format",
+                        new ScopedValue(Optional.empty(), bareToken("BINARY32"))))));
+
+        DataValue result = PositionalForm.normalizeToRecordForm(value, body);
+
+        RecordValue record = (RecordValue) result.coreValue();
+        assertEquals(5, record.fields().size());
+        List<String> names = record.fields().stream().map(RecordValue.Field::name).toList();
+        assertEquals(List.of("format", "allow_nan", "allow_infinity", "allow_subnormal", "allow_negative_zero"), names);
     }
 
     // ── Against enum's own real resolved shape ─────────────────────────────

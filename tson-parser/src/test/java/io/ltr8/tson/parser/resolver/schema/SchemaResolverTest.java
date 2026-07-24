@@ -7,8 +7,19 @@ import io.ltr8.tson.parser.ast.schema.SchemaMap;
 import io.ltr8.tson.parser.mapper.TsonMapperWriter;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
+import io.ltr8.tson.schema.meta.BinaryType;
 import io.ltr8.tson.schema.meta.ChoiceBody;
+import io.ltr8.tson.schema.meta.Cidr4Type;
+import io.ltr8.tson.schema.meta.Cidr6Type;
+import io.ltr8.tson.schema.meta.ComplexType;
+import io.ltr8.tson.schema.meta.EmailType;
 import io.ltr8.tson.schema.meta.EnumBody;
+import io.ltr8.tson.schema.meta.FloatType;
+import io.ltr8.tson.schema.meta.Ipv4Type;
+import io.ltr8.tson.schema.meta.Ipv6Type;
+import io.ltr8.tson.schema.meta.MacType;
+import io.ltr8.tson.schema.meta.IntegerSize;
+import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TupleElement;
@@ -16,9 +27,11 @@ import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Unit;
+import io.ltr8.tson.schema.meta.UnknownType;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
@@ -926,7 +939,7 @@ class SchemaResolverTest {
 
         UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
                 () -> resolver.resolve(schemaMap.declarations().get("boolean"), resolved));
-        assertTrue(thrown.getMessage().contains("failed to bind constructor application"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("failed to bind against Top.class"), thrown.getMessage());
     }
 
     /**
@@ -965,6 +978,210 @@ class SchemaResolverTest {
         UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
                 () -> resolver.resolve(schemaMap.declarations().get("bad"), Map.of(), metaKernelEntries));
         assertTrue(thrown.getMessage().contains("does not resolve to a constructor"), thrown.getMessage());
+    }
+
+    // ── Atom refinement (§5.5, §5.7, Phase B step 5) ───────────────────────
+
+    @Test
+    void resolvesInt32FromTheRealCoreTypeLibraryFixture() throws IOException {
+        // int32 => !integer ^ { size: { bits: 32  signed: true } } -- the concrete worked case
+        // this whole phase started from. `integer` is core.tn1's own local redeclaration (`integer
+        // => !integer_type {}`, an Instance reaching `integer_type` through the structure
+        // namespace, since core.tn1 has no !!import of its own -- meta-kernel's entries stand in
+        // for core.tn1's real structure namespace here, meta.tn1's own merged namespace, which
+        // meta-kernel's entries are a subset of for this specific name; confirmed separately that
+        // meta.tn1 doesn't locally redeclare integer_type). `int32`'s own refinement then resolves
+        // `integer` purely through the type-name namespace (§3.3.1 -- atom refinement never
+        // touches the structure namespace), which is exactly `resolved` here since `integer` was
+        // just added to it.
+        Map<String, TypeDefinition> metaKernelEntries = MetaKernelParser.parse().entries();
+        SchemaMap schemaMap = schemaMapFromCoreFixture();
+        Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
+        resolved.put("integer",
+                resolver.resolve(schemaMap.declarations().get("integer"), Map.of(), metaKernelEntries));
+
+        TypeDefinition int32 = resolver.resolve(schemaMap.declarations().get("int32"), resolved);
+
+        assertEquals(TypeKind.ATOM, int32.kind());
+        assertFalse(int32.constructor());
+        assertEquals(List.of("integer"), int32.supertypes());
+        assertEquals(Optional.of(TypeRef.of("integer_type")), int32.source());
+        assertEquals(new IntegerType(new IntegerSize(32, true)), int32.body());
+    }
+
+    @Test
+    void resolvesPositiveIntegerFromTheRealCoreTypeLibraryFixture() throws IOException {
+        // positive_integer => !integer ^ { min: 1 } -- a scalar (not nested-record) refinement
+        // value, confirming the binder isn't only exercised by int32's own nested-IntegerSize case.
+        Map<String, TypeDefinition> metaKernelEntries = MetaKernelParser.parse().entries();
+        SchemaMap schemaMap = schemaMapFromCoreFixture();
+        Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
+        resolved.put("integer",
+                resolver.resolve(schemaMap.declarations().get("integer"), Map.of(), metaKernelEntries));
+
+        TypeDefinition positiveInteger = resolver.resolve(schemaMap.declarations().get("positive_integer"), resolved);
+
+        assertEquals(IntegerType.ofMin(BigInteger.ONE), positiveInteger.body());
+    }
+
+    @Test
+    void resolvesHexFromTheRealCoreTypeLibraryFixtureAsAPositionalFormInstance() throws IOException {
+        // hex => !binary HEX -- an Instance (constructor application), not an atom refinement:
+        // `binary` itself is the constructor, applied positionally. Included alongside the
+        // refinement cases above to confirm the positional-form path (step 3) also works against a
+        // real core.tn1 declaration, not just meta-kernel's own `enum` case. Unlike `integer_type`,
+        // `binary`'s own constructor is declared in meta.tn1, not meta-kernel.tn1 (SPEC-FEEDBACK.md
+        // #11), so this needs the fuller meta.tn1-merged namespace, not just meta-kernel's entries.
+        SchemaMap schemaMap = schemaMapFromCoreFixture();
+
+        TypeDefinition hex = resolver.resolve(schemaMap.declarations().get("hex"), Map.of(), metaTn1RegisteredEntries());
+
+        assertEquals(BinaryType.HEX, hex.body());
+    }
+
+    @Test
+    void resolvesFloat32AndFloat64FromTheRealCoreTypeLibraryFixture() throws IOException {
+        // float32 => !float_type { format: BINARY32 } -- never mentions allow_nan/allow_infinity/
+        // allow_subnormal/allow_negative_zero (all `boolean ~ true` in meta.tn1's real float_type),
+        // so this only resolves at all once PositionalForm fills in REQUIRED_DEFAULT fields from
+        // the schema itself; previously failed with "missing required field 'allow_nan'".
+        SchemaMap schemaMap = schemaMapFromCoreFixture();
+        Map<String, TypeDefinition> metaNamespace = metaTn1RegisteredEntries();
+
+        TypeDefinition float32 = resolver.resolve(schemaMap.declarations().get("float32"), Map.of(), metaNamespace);
+        TypeDefinition float64 = resolver.resolve(schemaMap.declarations().get("float64"), Map.of(), metaNamespace);
+
+        assertEquals(FloatType.FLOAT32, float32.body());
+        assertEquals(FloatType.FLOAT64, float64.body());
+    }
+
+    @Test
+    void resolvesCidrEmailAndMacInstancesFromTheRealCoreTypeLibraryFixture() throws IOException {
+        // cidr4 => !cidr4_type {}, cidr6 => !cidr6_type {}, email => !email_type {}, mac => !mac_type
+        // {} -- all four constructors are record-only additions (Cidr4Type/Cidr6Type/EmailType/
+        // MacType), no tson-parser vocab parser, added specifically so these real declarations
+        // resolve; previously failed with "no member of union ... matches type name 'cidr4_type'"
+        // (and friends) since Atom had no member for any of them at all. Each one's own `spec`
+        // field is filled in by PositionalForm from the schema's REQUIRED_FIXED default, the same
+        // mechanism float32/float64 above rely on.
+        SchemaMap schemaMap = schemaMapFromCoreFixture();
+        Map<String, TypeDefinition> metaNamespace = metaTn1RegisteredEntries();
+
+        TypeDefinition cidr4 = resolver.resolve(schemaMap.declarations().get("cidr4"), Map.of(), metaNamespace);
+        TypeDefinition cidr6 = resolver.resolve(schemaMap.declarations().get("cidr6"), Map.of(), metaNamespace);
+        TypeDefinition email = resolver.resolve(schemaMap.declarations().get("email"), Map.of(), metaNamespace);
+        TypeDefinition mac = resolver.resolve(schemaMap.declarations().get("mac"), Map.of(), metaNamespace);
+
+        assertEquals(Cidr4Type.UNCONSTRAINED, cidr4.body());
+        assertEquals(Cidr6Type.UNCONSTRAINED, cidr6.body());
+        assertEquals(EmailType.UNCONSTRAINED, email.body());
+        assertEquals(MacType.UNCONSTRAINED, mac.body());
+    }
+
+    @Test
+    void resolvesIpv4AndIpv6InstancesFromTheRealCoreTypeLibraryFixture() throws IOException {
+        // ipv4 => !ipv4_type {}, ipv6 => !ipv6_type {} -- Ipv4Type/Ipv6Type, same treatment as
+        // Cidr4Type/Cidr6Type above (record-only, no vocab parser, flat String spec).
+        SchemaMap schemaMap = schemaMapFromCoreFixture();
+        Map<String, TypeDefinition> metaNamespace = metaTn1RegisteredEntries();
+
+        TypeDefinition ipv4 = resolver.resolve(schemaMap.declarations().get("ipv4"), Map.of(), metaNamespace);
+        TypeDefinition ipv6 = resolver.resolve(schemaMap.declarations().get("ipv6"), Map.of(), metaNamespace);
+
+        assertEquals(Ipv4Type.UNCONSTRAINED, ipv4.body());
+        assertEquals(Ipv6Type.UNCONSTRAINED, ipv6.body());
+    }
+
+    @Test
+    void resolvesComplexAndUnknownInstancesFromTheRealCoreTypeLibraryFixture() throws IOException {
+        // complex => !complex_type {} -- ComplexType, same record-only/no-parser treatment as the
+        // other atom families above.
+        //
+        // unknown => !unknown_type {} -- UnknownType is the first real case whose constructor
+        // (unknown_type => ~sum & {}) composes with `sum`, not `atom`; this only resolves at all
+        // once SchemaResolver's own Instance binding widened from Atom.class to Top.class.
+        SchemaMap schemaMap = schemaMapFromCoreFixture();
+        Map<String, TypeDefinition> metaNamespace = metaTn1RegisteredEntries();
+
+        TypeDefinition complex = resolver.resolve(schemaMap.declarations().get("complex"), Map.of(), metaNamespace);
+        TypeDefinition unknown = resolver.resolve(schemaMap.declarations().get("unknown"), Map.of(), metaNamespace);
+
+        assertEquals(ComplexType.UNCONSTRAINED, complex.body());
+        assertEquals(TypeKind.SUM, unknown.kind());
+        assertEquals(new UnknownType(), unknown.body());
+    }
+
+    @Test
+    void atomRefinementRejectsRefiningAConstructorInsteadOfAnInstance() {
+        // integer_type itself is a constructor (constructor: true) -- refining it directly
+        // ("!integer_type ^ {...}") is a resolver error; the diagnostic should point at
+        // constructor application instead (§3.3.1).
+        Map<String, TypeDefinition> metaKernelEntries = MetaKernelParser.parse().entries();
+        SchemaMap schemaMap = new SchemaParser("""
+                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
+                { bad => !integer_type ^ { min: 1 } }""").parseSchemaDocument().body();
+
+        UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
+                () -> resolver.resolve(schemaMap.declarations().get("bad"), metaKernelEntries));
+        assertTrue(thrown.getMessage().contains("refines a constructor, not an instance"), thrown.getMessage());
+    }
+
+    @Test
+    void atomRefinementRejectsANonAtomFamilySource() {
+        // top resolves fine (a fresh record, kind PRODUCT by the structural default) but isn't
+        // atom-family -- !top ^ {...} must be rejected (§5.5).
+        Map<String, TypeDefinition> metaKernelEntries = MetaKernelParser.parse().entries();
+        SchemaMap schemaMap = new SchemaParser("""
+                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
+                { bad => !top ^ { x: integer } }""").parseSchemaDocument().body();
+
+        UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
+                () -> resolver.resolve(schemaMap.declarations().get("bad"), metaKernelEntries));
+        assertTrue(thrown.getMessage().contains("is not an atom-family instance"), thrown.getMessage());
+    }
+
+    @Test
+    void atomRefinementNeverConsultsTheStructureNamespace() {
+        // integer_type is real and present in `metaKernelEntries` -- an Instance target would find
+        // it there via the structure-namespace fallback (§3.3.1, proven by
+        // instanceResolvesViaTheStructureNamespaceWhenNotLocallyAvailable above). An atom
+        // refinement's source MUST NOT get that same fallback: with `resolved` empty and
+        // `integer_type` supplied only as structureNamespace (never consulted for `^`), "!integer_type
+        // ^ {...}" still fails to resolve `I` at all -- a different failure from "resolves but isn't
+        // an instance" (the constructor-rejection test above), which requires `I` to resolve first.
+        Map<String, TypeDefinition> metaKernelEntries = MetaKernelParser.parse().entries();
+        SchemaMap schemaMap = new SchemaParser("""
+                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
+                { bad => !integer_type ^ { min: 1 } }""").parseSchemaDocument().body();
+
+        UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
+                () -> resolver.resolve(schemaMap.declarations().get("bad"), Map.of(), metaKernelEntries));
+        assertTrue(thrown.getMessage().contains("does not resolve against the type-name namespace"), thrown.getMessage());
+    }
+
+    private SchemaMap schemaMapFromCoreFixture() throws IOException {
+        String source = Files.readString(Path.of("").toAbsolutePath().resolve("../spec/m/core.tn1").normalize());
+        return new SchemaParser(source).parseSchemaDocument().body();
+    }
+
+    /** Meta-kernel registered, then meta.tn1 resolved and registered on top -- see {@code MetaSchemaImportTest} for the same, fully-verified pattern (31/31 declarations, validated). */
+    private static Map<String, TypeDefinition> metaTn1RegisteredEntries() throws IOException {
+        io.ltr8.tson.schema.MetaSchema metaKernel = MetaKernelParser.parse();
+        io.ltr8.tson.schema.SchemaRegistry registry = new io.ltr8.tson.schema.SchemaRegistry();
+        registry.register(metaKernel);
+
+        String source = Files.readString(Path.of("").toAbsolutePath().resolve("../spec/m/meta.tn1").normalize());
+        SchemaDocument metaDoc = new SchemaParser(source).parseSchemaDocument();
+        SchemaResolver metaResolver = new SchemaResolver();
+        Map<String, TypeDefinition> namespace = new LinkedHashMap<>(metaKernel.entries());
+        Map<String, TypeDefinition> localOnly = new LinkedHashMap<>();
+        for (SchemaMap.Declaration declaration : metaDoc.body().declarations().values()) {
+            TypeDefinition resolved = metaResolver.resolve(declaration, namespace);
+            namespace.put(declaration.name(), resolved);
+            localOnly.put(declaration.name(), resolved);
+        }
+        TsonSchema meta = new TsonSchema(metaDoc.id(), metaDoc.meta(), metaDoc.imports(), localOnly);
+        return registry.register(meta).entries();
     }
 
     private Map<String, TypeDefinition> resolveUpToArray() throws IOException {

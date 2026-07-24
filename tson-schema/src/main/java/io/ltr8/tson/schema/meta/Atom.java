@@ -6,10 +6,15 @@ package io.ltr8.tson.schema.meta;
  * "atom with no constraint vocabulary"), {@link EnumBody} (backing {@code boolean} and the
  * kernel's other internal enumerations), {@link IntegerType} (backing {@code integer}), {@link
  * TextType}/{@link UriType}/{@link RegexType} (backing {@code text}/{@code uri}/{@code regex} --
- * all four added 2026-07-23), and {@link DecimalType}/{@link FloatType}/{@link RationalType}/
+ * all four added 2026-07-23), {@link DecimalType}/{@link FloatType}/{@link RationalType}/
  * {@link UuidType}/{@link BinaryType}/{@link DateType}/{@link TimeType}/{@link DateTimeType}/
- * {@link DurationType} (the remaining atom constraint-vocabulary families, joined 2026-07-24).
+ * {@link DurationType} (the remaining atom constraint-vocabulary families, joined 2026-07-24),
+ * {@link Cidr4Type}/{@link Cidr6Type}/{@link EmailType}/{@link MacType}/{@link Ipv4Type}/{@link
+ * Ipv6Type}/{@link ComplexType} (record-only, no parser -- added 2026-07-24 so their own
+ * real-fixture instances resolve; see each one's own Javadoc). {@link UnknownType} is the sibling
+ * SUM-kind case -- see {@link Sum}, not here.
  */
 public sealed interface Atom extends Top permits Unit, EnumBody, IntegerType, TextType, UriType, RegexType,
-        DecimalType, FloatType, RationalType, UuidType, BinaryType, DateType, TimeType, DateTimeType, DurationType {
+        DecimalType, FloatType, RationalType, UuidType, BinaryType, DateType, TimeType, DateTimeType, DurationType,
+        Cidr4Type, Cidr6Type, EmailType, MacType, Ipv4Type, Ipv6Type, ComplexType {
 }

@@ -6,14 +6,21 @@ import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.BinaryType;
 import io.ltr8.tson.schema.meta.ChoiceBody;
+import io.ltr8.tson.schema.meta.Cidr4Type;
+import io.ltr8.tson.schema.meta.Cidr6Type;
+import io.ltr8.tson.schema.meta.ComplexType;
 import io.ltr8.tson.schema.meta.DateTimeType;
 import io.ltr8.tson.schema.meta.DateType;
 import io.ltr8.tson.schema.meta.DecimalType;
 import io.ltr8.tson.schema.meta.DurationType;
+import io.ltr8.tson.schema.meta.EmailType;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FloatType;
 import io.ltr8.tson.schema.meta.IntegerType;
+import io.ltr8.tson.schema.meta.Ipv4Type;
+import io.ltr8.tson.schema.meta.Ipv6Type;
+import io.ltr8.tson.schema.meta.MacType;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.RationalType;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -29,6 +36,7 @@ import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Unit;
+import io.ltr8.tson.schema.meta.UnknownType;
 import io.ltr8.tson.schema.meta.UriType;
 import io.ltr8.tson.schema.meta.UuidType;
 
@@ -184,6 +192,14 @@ public final class SchemaValidator {
             case TimeType t -> t;
             case DateTimeType d -> d;
             case DurationType d -> d;
+            case Cidr4Type c -> c;
+            case Cidr6Type c -> c;
+            case EmailType e -> e;
+            case MacType m -> m;
+            case Ipv4Type i -> i;
+            case Ipv6Type i -> i;
+            case ComplexType c -> c;
+            case UnknownType u -> u;
         };
     }
 
@@ -323,6 +339,22 @@ public final class SchemaValidator {
             case DateTimeType ignored -> {
             }
             case DurationType ignored -> {
+            }
+            case Cidr4Type ignored -> {
+            }
+            case Cidr6Type ignored -> {
+            }
+            case EmailType ignored -> {
+            }
+            case MacType ignored -> {
+            }
+            case Ipv4Type ignored -> {
+            }
+            case Ipv6Type ignored -> {
+            }
+            case ComplexType ignored -> {
+            }
+            case UnknownType ignored -> {
             }
         }
     }

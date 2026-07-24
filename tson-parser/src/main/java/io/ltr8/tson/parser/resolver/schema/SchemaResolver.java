@@ -4,6 +4,7 @@ import io.ltr8.bind.DataBindException;
 import io.ltr8.tson.parser.ast.DataValue;
 import io.ltr8.tson.parser.ast.TokenValue;
 import io.ltr8.tson.parser.ast.schema.ArrayContainerDef;
+import io.ltr8.tson.parser.ast.schema.AtomRefinement;
 import io.ltr8.tson.parser.ast.schema.ConstructionDef;
 import io.ltr8.tson.parser.ast.schema.ContainerDef;
 import io.ltr8.tson.parser.ast.schema.ContainerTypeDef;
@@ -27,7 +28,6 @@ import io.ltr8.tson.parser.ast.schema.TypeDef;
 import io.ltr8.tson.parser.ast.schema.TypeRef;
 import io.ltr8.tson.parser.mapper.TsonMapperReader;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldState;
@@ -195,7 +195,7 @@ import java.util.Set;
  */
 public final class SchemaResolver {
 
-    /** Binds a constructor-application instance's normalized value against {@link Atom} -- see {@link #resolveInstance}. */
+    /** Binds a constructor-application/atom-refinement's normalized value against {@link Top} -- see {@link #resolveInstance}/{@link #resolveAtomRefinement}. */
     private final TsonMapperReader reader = new TsonMapperReader();
 
     /** Resolves a single declaration with no supertypes visible -- fine for a fresh record like {@code integer_size}, not for a composition. */
@@ -278,34 +278,39 @@ public final class SchemaResolver {
         if (typeDef instanceof Instance instance) {
             return resolveInstance(name, instance, resolved, structureNamespace);
         }
+        if (typeDef instanceof AtomRefinement refinement) {
+            return resolveAtomRefinement(name, refinement, resolved);
+        }
         throw new UnsupportedOperationException(
                 "'" + name + "': only fresh record constructions, composition, simple type references, "
-                        + "declaration-level sized arrays, and constructor application are resolved so far, got "
-                        + typeDef.getClass().getSimpleName());
+                        + "declaration-level sized arrays, constructor application, and atom refinement are "
+                        + "resolved so far, got " + typeDef.getClass().getSimpleName());
     }
 
     // ── Constructor application (§5.5, §5.6) ────────────────────────────────
 
     /**
-     * {@code !C value} (constructor application, no {@code ^}) -- produces a fresh atom-family
-     * instance filled with {@code value}. Per §3.3.1, {@code C} resolves first against the
-     * type-name namespace ({@code resolved}), then against the structure namespace; the found
-     * entry MUST be a constructor ({@code constructor: true}) or this is a resolver error (the
-     * spec's own suggested diagnostic: "did you mean atom refinement?"). {@code value} is
-     * normalized to record form ({@link PositionalForm}, using {@code C}'s own resolved field
-     * list to find its positionally-fillable field, if any), then bound generically via {@code
-     * TsonMapperReader.toObject(normalized, Atom.class)} -- {@code instance.value().typeRef()}
+     * {@code !C value} (constructor application, no {@code ^}) -- produces a fresh instance
+     * filled with {@code value}. Per §3.3.1, {@code C} resolves first against the type-name
+     * namespace ({@code resolved}), then against the structure namespace; the found entry MUST be
+     * a constructor ({@code constructor: true}) or this is a resolver error (the spec's own
+     * suggested diagnostic: "did you mean atom refinement?"). {@code value} is normalized to
+     * record form ({@link PositionalForm}, using {@code C}'s own resolved field list to find its
+     * positionally-fillable field, if any), then bound generically via {@code
+     * TsonMapperReader.toObject(normalized, Top.class)} -- {@code instance.value().typeRef()}
      * already names {@code C} (per {@code Instance}'s own reshape, {@code SPEC-FEEDBACK.md} #16),
-     * so {@code tson-bind}'s own union-member resolution finds the matching {@link Atom} leaf with
+     * so {@code tson-bind}'s own union-member resolution finds the matching {@link Top} leaf with
      * no separate name→class table anywhere. Construction transfers only {@code C}'s {@code kind}
      * (§5.5): no supertypes, no parameters, {@code constructor: false} on the result.
      *
-     * <p>Scoped to {@code Atom.class}, not {@code Top.class} -- every real {@code Instance} in
-     * {@code core.tn1}/{@code meta.tn1} targets an atom-family constructor; a hypothetical
-     * product/sum-kind instance fails here with a clear "no member of union" error rather than
-     * being silently mis-bound. {@code C}'s own body must also already be a {@link RecordBody} --
-     * true for every real constructor (an atom-family constructor's own declared vocabulary is
-     * always record-shaped, whatever the resulting instance's bound Java class looks like).
+     * <p>Binds against {@code Top.class}, not {@code Atom.class} -- widened 2026-07-24 once {@link
+     * UnknownType} (composing with {@code sum}, not {@code atom}) became the first real constructor
+     * outside the atom family: {@code unknown => !unknown_type {}}. Originally scoped narrower
+     * ("every real Instance in core.tn1/meta.tn1 targets an atom-family constructor... a one-word
+     * change if it's ever needed" -- and it was). {@code C}'s own body must also already be a
+     * {@link RecordBody} -- true for every real constructor (a constructor's own declared
+     * vocabulary is always record-shaped, whatever the resulting instance's bound Java class looks
+     * like, atom-family or not).
      */
     private TypeDefinition resolveInstance(String name, Instance instance, Map<String, TypeDefinition> resolved,
                                             Map<String, TypeDefinition> structureNamespace) {
@@ -320,9 +325,75 @@ public final class SchemaResolver {
                     + "' has a non-record body, not resolved yet");
         }
         DataValue normalized = PositionalForm.normalizeToRecordForm(instance.value(), constructorFields);
-        Top body = bindConstructorApplication(name, normalized);
+        Top body = bindAtomInstance(name, normalized);
         return new TypeDefinition(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of(target)), constructor.kind(),
                 List.of(), false, List.of(), List.of(), Optional.empty(), body);
+    }
+
+    // ── Atom refinement (§5.5, §5.7) ─────────────────────────────────────────
+
+    /**
+     * {@code !I ^ { values }} -- refines an atom-family instance by tightening its constructor's
+     * constraint fields. Per §3.3.1, {@code I} resolves against the type-name namespace *only*
+     * (never the structure namespace -- unlike {@link #resolveInstance}'s {@code C}) and MUST be a
+     * non-constructor instance of an atom family (kind {@code ATOM}, {@code constructor: false}).
+     * The constructor {@code I} was built from is reached through {@code I}'s own {@code source}
+     * field -- never a further name lookup, so refinement works even where the constructor itself
+     * isn't name-visible (e.g. a governed schema that can't name {@code integer_type} directly, only
+     * {@code integer}).
+     *
+     * <p>Unlike {@link #resolveInstance}, {@code refinement.bindings()}'s own {@code typeRef} is
+     * NOT pre-set by the grammar -- {@code atom-refinement}'s own grammar defect ({@code
+     * SPEC-FEEDBACK.md} #16) was deliberately left unfixed, since narrowing it needs {@link
+     * AtomRefinement#bindings} retyped to a real {@code RecordDef}, a bigger change better done once
+     * this method's own shape is proven out. So this attaches {@code I}'s constructor name as the
+     * value's type-ref itself, then binds through the same {@link #bindAtomInstance} both
+     * constructs share. No positional-form wrapping (unlike {@code Instance}) -- §5.5 guarantees a
+     * refinement body is always a braced record; if it isn't, {@code TsonMapperReader.toRecord}'s
+     * own "expected a record" check catches it.
+     *
+     * <p><b>No copy-from-{@code I} step</b> -- binding {@code values} directly onto the constructor
+     * (treating any field {@code values} doesn't mention as absent, exactly how {@code
+     * Optional}-typed record binding already works) gives the identical result to "copy {@code I}'s
+     * own bindings, then override" for every real fixture declaration, since every real atom
+     * refinement targets a *fresh*, {@code UNCONSTRAINED} source. This is a known, deliberately
+     * accepted gap for a *chained* refinement (refining an already-refined, non-fresh instance) --
+     * see this class's own outer Javadoc/the project's `SPEC-FEEDBACK.md`/plan notes; no real
+     * declaration exercises that case.
+     *
+     * <p>Per §5.5's own text (not the general composition/refinement induction of §5.7/§5.8):
+     * {@code source} is {@code I}'s own constructor ({@code I.source()}, e.g. {@code integer_type}
+     * for {@code I = integer}), and {@code supertypes} is the literal single-element {@code [I]} --
+     * not transitively chained with {@code I}'s own supertypes (which is empty for every real,
+     * non-chained case anyway, since a fresh {@code Instance} always resolves with empty {@code
+     * supertypes}).
+     */
+    private TypeDefinition resolveAtomRefinement(String name, AtomRefinement refinement, Map<String, TypeDefinition> resolved) {
+        String sourceName = refinement.target();
+        TypeDefinition source = resolved.get(sourceName);
+        if (source == null) {
+            throw new UnsupportedOperationException("'" + name + "': '!" + sourceName
+                    + "' does not resolve against the type-name namespace (§3.3.1)");
+        }
+        if (source.constructor()) {
+            throw new UnsupportedOperationException("'" + name + "': '!" + sourceName + " ^ { ... }' refines a "
+                    + "constructor, not an instance (§3.3.1) -- did you mean constructor application ('!"
+                    + sourceName + " { ... }')?");
+        }
+        if (source.kind() != TypeKind.ATOM) {
+            throw new UnsupportedOperationException("'" + name + "': '!" + sourceName
+                    + "' is not an atom-family instance (§5.5), kind=" + source.kind());
+        }
+        io.ltr8.tson.schema.meta.TypeRef constructorRef = source.source().orElseThrow(() ->
+                new UnsupportedOperationException("'" + name + "': '!" + sourceName
+                        + "' has no recorded constructor to refine through"));
+
+        DataValue bindings = refinement.bindings();
+        DataValue typed = new DataValue(bindings.annotations(), Optional.of(constructorRef.name()), bindings.coreValue());
+        Top body = bindAtomInstance(name, typed);
+
+        return new TypeDefinition(Optional.of(constructorRef), source.kind(), List.of(), false,
+                List.of(sourceName), List.of(), Optional.empty(), body);
     }
 
     /** §3.3.1's lookup rule for a bare {@code !} target: the type-name namespace first, then the structure namespace. */
@@ -340,12 +411,13 @@ public final class SchemaResolver {
                 + "either the type-name namespace or the structure namespace (§3.3.1)");
     }
 
-    private Top bindConstructorApplication(String name, DataValue normalized) {
+    /** Shared by {@link #resolveInstance} and {@link #resolveAtomRefinement} -- both ultimately need the same "bind a type-ref-carrying value against {@code Top.class}" operation. */
+    private Top bindAtomInstance(String name, DataValue value) {
         try {
-            return reader.toObject(normalized, Atom.class);
+            return reader.toObject(value, Top.class);
         } catch (DataBindException e) {
             throw new UnsupportedOperationException(
-                    "'" + name + "': failed to bind constructor application: " + e.getMessage(), e);
+                    "'" + name + "': failed to bind against Top.class: " + e.getMessage(), e);
         }
     }
 
