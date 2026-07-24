@@ -32,6 +32,14 @@ import java.util.regex.Pattern;
  * table gives the accepted format as literally {@code PnYnMnDTnHnMnS}, with no {@code W}, so this
  * reads that as exhaustive rather than illustrative; see {@code SPEC-FEEDBACK.md} #12 for why that's
  * a real ambiguity, not a confident call.
+ *
+ * <p>{@link DurationType#min}/{@link DurationType#max} are raw {@code String} text, not {@link
+ * IsoDuration} (matching the {@code TextType.pattern}/{@code UriType.pattern} precedent, so the
+ * field binds generically with no {@code DataBridge}) -- {@link #parseDuration} is the one place the
+ * {@code PnYnMnDTnHnMnS} grammar is recognized, reused by both {@link #read} (the instance value)
+ * and, on demand, by anything needing the parsed form of a constraint string. No min/max bound
+ * validation is performed yet -- {@link IsoDuration}'s own Javadoc explains why (not {@code
+ * Comparable}: a calendar-based duration has no fixed length to compare against a clock-based one).
  */
 public record DurationParser(DurationType constraints) implements AtomType<IsoDuration> {
 
@@ -41,7 +49,7 @@ public record DurationParser(DurationType constraints) implements AtomType<IsoDu
     /** {@code duration => !duration_type {}} -- the unconstrained duration, §5.4's {@code !duration}. */
     public static final DurationParser UNCONSTRAINED = new DurationParser(DurationType.UNCONSTRAINED);
 
-    public DurationParser(Optional<IsoDuration> min, Optional<IsoDuration> max) {
+    public DurationParser(Optional<String> min, Optional<String> max) {
         this(new DurationType(min, max));
     }
 
@@ -51,7 +59,11 @@ public record DurationParser(DurationType constraints) implements AtomType<IsoDu
 
     @Override
     public IsoDuration read(TokenValue token) {
-        String text = token.text();
+        return parseDuration(token.text());
+    }
+
+    /** The {@code PnYnMnDTnHnMnS} grammar itself, shared by {@link #read} and constraint parsing. */
+    private static IsoDuration parseDuration(String text) {
         Matcher m = DURATION.matcher(text);
         if (!m.matches()) {
             throw new AtomParseException(

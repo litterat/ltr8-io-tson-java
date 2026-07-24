@@ -11,8 +11,8 @@ TSON spec series:
   https://tson.io/raw/2026/32/tson-part1-data.md
 - Part 2 (schema grammar, type system) — grammar layer complete (see `SchemaParser` below);
   resolution well underway (see `SchemaResolver` below) — `meta-kernel.tn1` and `meta.tn1` both
-  resolve and register in full, `core.tn1` resolves 46 of 48 declarations, the 2 remainders being
-  permanent limits of generic binding, not open gaps: https://tson.io/raw/2026/32/tson-part2-schema.md
+  resolve and register in full, `core.tn1` resolves 47 of 48 declarations, the 1 remainder being
+  a permanent limit of generic binding, not an open gap: https://tson.io/raw/2026/32/tson-part2-schema.md
 
 The spec is a *working revision* (2026 series) and changes between revisions without compatibility
 guarantees — re-fetch the current URL rather than trusting a cached copy of the text when in doubt, and
@@ -623,7 +623,7 @@ day to a second construct:
   own `values` (explicit values win; anything only `I` had survives). A fresh/`UNCONSTRAINED` source
   serializes to an empty record, so the merge is a no-op there -- this recovers the previous,
   already-verified non-chained behavior exactly, not a separate code path (confirmed: `core.tn1`'s
-  own 46/48 count is unchanged by this fix). Verified directly, not just reasoned about:
+  own resolution count was unchanged by this fix). Verified directly, not just reasoned about:
   `SchemaResolverTest.chainedAtomRefinementMergesWithIntermediateBindingsInsteadOfDiscardingThem`
   chains two refinements deep (`int8` → `big` → `veryBig`) and confirms `size` survives both hops,
   `min` survives the second hop, and each level's own explicit override still wins over what it
@@ -644,15 +644,20 @@ they change every time resolver coverage widens): `meta-kernel.tn1` resolves in 
 `MetaKernelParser`'s own two-pass ordering -- `SchemaResolver.resolveAll` alone, single-pass,
 strict source order, still can't handle `boolean => !enum [...]` preceding `enum`'s own
 declaration); `meta.tn1` resolves and registers in full (31/31, `MetaSchemaImportTest`, up from
-24/31 before generic `Instance` resolution existed); `core.tn1` resolves 46 of 48 declarations in a
+24/31 before generic `Instance` resolution existed); `core.tn1` resolves 47 of 48 declarations in a
 single source-order pass, seeded with meta.tn1's own registered namespace as the structure
-namespace.** The 2 remaining `core.tn1` failures are both real, permanent limits of generic
-binding, not open gaps: `boolean` (`!enum [true false]` -- `"true"`/`"false"` collide with TSON's
-own boolean-literal shape and get identified as actual booleans by `BaseTypeResolver` before
+namespace.** The 1 remaining `core.tn1` failure is a real, permanent limit of generic binding, not
+an open gap: `boolean` (`!enum [true false]` -- `"true"`/`"false"` collide with TSON's own
+boolean-literal shape and get identified as actual booleans by `BaseTypeResolver` before
 `EnumBody.members: List<String>` ever sees them; every *other* real enum instance across both
-fixtures has ordinary identifier members that never collide) and `duration` (`IsoDuration`'s
-`Period`/`Duration` pairing isn't force-bound by the default `TsonMapperContext`, matching
-`Rational`/`Complex`'s identical treatment).
+fixtures has ordinary identifier members that never collide). `duration` was a second such failure
+until 2026-07-24, when `DurationType.min`/`max` were retyped from `Optional<IsoDuration>` to
+`Optional<String>` (matching the `TextType.pattern`/`UriType.pattern` precedent) specifically so
+the field binds generically with no `DataBridge` -- `DurationParser`'s own `parseDuration` is the
+one place that text is turned into an `IsoDuration`, on demand, not `DurationType` itself. (An
+earlier abandoned attempt at this same fix tried registering an explicit
+`DataBridge<String, IsoDuration>` on a custom `DataBindContext`; the flat-`String`-field approach
+below was simpler and is what actually landed.)
 
 **A real recursion trap, found and fixed along the way -- read before touching `TypeArgument`.**
 `TypeRef`/`TypeArgument` are mutually recursive (`TypeRef.arguments: List<TypeArgument>`, and a
@@ -1060,12 +1065,13 @@ No system Gradle — always use the wrapper:
   "Schema registry" above — just not per §8.2's precise constructor-vs-template split;
   materialization is uniform. Constructor-application `Instance` and atom-refinement resolution are
   both now generalized — see "Schema resolution" above — not listed here anymore.)
-- Two permanent, already-diagnosed limits of generic binding, not open gaps: `boolean => !enum
-  [true false]` (its members collide with TSON's own boolean-literal shape) and `duration`
-  (`IsoDuration`'s `Period`/`Duration` pairing isn't force-bound by the default `TsonMapperContext`)
-  — see "Schema resolution" above's status paragraph. `complex_type`'s own `component` field binds
-  fine (`ComplexType`, added 2026-07-24); `unknown_type` too (`UnknownType`). No real fixture
-  declaration remains unresolved in `meta-kernel.tn1`/`meta.tn1` at all.
+- One permanent, already-diagnosed limit of generic binding, not an open gap: `boolean => !enum
+  [true false]` (its members collide with TSON's own boolean-literal shape) — see "Schema
+  resolution" above's status paragraph. `duration` no longer fails (`DurationType.min`/`max` retyped
+  to `Optional<String>`, 2026-07-24 — see "Schema resolution" above). `complex_type`'s own
+  `component` field binds fine (`ComplexType`, added 2026-07-24); `unknown_type` too
+  (`UnknownType`). No real fixture declaration remains unresolved in `meta-kernel.tn1`/`meta.tn1` at
+  all.
 - A schema-validating data parser (Class 2) that consults a resolved `TsonSchema`/`TypeDefinition`
   while parsing data — the built-in vocabulary's `schema.meta`/`resolver.vocab` split (see "Built-in
   type vocabulary" above) is groundwork for this, not this itself.
