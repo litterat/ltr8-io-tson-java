@@ -197,7 +197,11 @@ public final class SchemaParser extends Parser {
             advance();
             return new AtomRefinement(target, parseDataValue());
         }
-        return new Instance(target, parseDataValue());
+        // instance = "!" type-name ws core-value, not the spec's own literal "data-value" -- see
+        // Instance's own Javadoc and SPEC-FEEDBACK.md. The constructor name goes straight into the
+        // wrapping DataValue's own typeRef; there's no room in this corrected grammar for the
+        // payload to carry further annotations or a second, competing type-ref.
+        return new Instance(new DataValue(List.of(), Optional.of(target), parseCoreValue()));
     }
 
     /**

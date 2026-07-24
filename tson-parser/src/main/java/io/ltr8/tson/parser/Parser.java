@@ -44,9 +44,13 @@ import java.util.Optional;
  * shape for {@code !!id}/{@code !!meta}/{@code !!import}), and the separator/adjacency primitives
  * -- rather than re-implementing identical grammar a second time. The fields and helper methods
  * {@link SchemaParser} needs are package-private (not {@code private}); everything else (record/
- * map/array parsing, the data-grammar's own {@code !type} handling) stays {@code private}, since
- * the schema grammar has its own, different rules at those points and never calls into this
- * class's versions of them.
+ * map parsing, the data-grammar's own {@code !type} handling) stays {@code private}, since the
+ * schema grammar has its own, different rules at those points and never calls into this class's
+ * versions of them. {@code parseCoreValue} is the one exception widened for {@code instance =
+ * "!" type-name ws core-value} (§12.1, §5.5, corrected -- see {@code SPEC-FEEDBACK.md}):
+ * {@code SchemaParser} needs the bare {@code core-value} production directly, not the wider
+ * {@code data-value} ({@code parseDataValue}'s own annotations/type-ref layer would let a
+ * constructor-application payload carry a second, nonsensical type-ref).
  */
 public class Parser {
 
@@ -122,7 +126,7 @@ public class Parser {
         return new DataValue(annotations, typeRef, core);
     }
 
-    private CoreValue parseCoreValue() {
+    CoreValue parseCoreValue() {
         Token t = peek();
         return switch (t.type()) {
             case LBRACE -> parseBraceValue();

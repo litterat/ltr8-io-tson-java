@@ -365,11 +365,29 @@ positional-form value generically; wrapping the bare value into an equivalent on
   data documents use for `!!id`/`!!schema`. Rather than re-implementing that grammar a second time,
   `Parser`'s relevant fields and helper methods are package-private, not `private` (see its own Javadoc
   on why it isn't `final`), and `SchemaParser` calls straight into them — `parseDataValue()` for
-  constructor-application/atom-refinement values, `parseAnnotation()`, `parseNamedDirective()` for all
-  three header directives, `expectFieldNameToken()`, and the cursor/separator primitives. `Parser` itself
-  is untouched in behavior — it still rejects `!!meta` documents exactly as before; only its own
-  private-vs-package visibility changed, and only because `SchemaParser` needed it, not because either
-  class became part of a different module.
+  atom-refinement values, `parseCoreValue()` for constructor-application (`instance`) values (see the
+  next bullet for why these two aren't the same production), `parseAnnotation()`,
+  `parseNamedDirective()` for all three header directives, `expectFieldNameToken()`, and the
+  cursor/separator primitives. `Parser` itself is untouched in behavior — it still rejects `!!meta`
+  documents exactly as before; only its own private-vs-package visibility changed, and only because
+  `SchemaParser` needed it, not because either class became part of a different module.
+- **`instance`'s ABNF says `data-value`, but the intended production is the narrower `core-value`** —
+  the literal grammar (`instance = "!" type-name ws data-value`) lets a constructor-application payload
+  carry its own further annotations and a second, competing type-ref (`data-value = *annotation
+  [type-ref] core-value`), which no real fixture ever does and which §5.5's own prose never implies;
+  `refined-def` (the sibling `^`-operator production one level up, for record/map/array refinement)
+  already uses the narrower `record-def` for the identical shape, corroborating this is a slip, not
+  intentional. See `SPEC-FEEDBACK.md` #16. `ast.schema.Instance` was reshaped accordingly — no
+  separate `target: String` field alongside a full `value: DataValue` (redundant: `DataValue` already
+  has an `Optional<String> typeRef` that can carry the constructor name directly); `Instance(DataValue
+  value)` wraps a `DataValue` built from the parsed `core-value` with `typeRef` pre-set and
+  `annotations` always empty, and `target()` is a thin accessor over `value.typeRef()`. This is also
+  exactly the shape `SchemaResolver`'s generalized constructor-application resolution needs — `value`
+  can go straight to `TsonMapperReader.toObject(value, Atom.class)` with no separate step to attach a
+  type-ref. `atom-refinement` has the identical defect (its own ABNF also says `data-value`, and its
+  own prose says the payload "MUST be a braced record") but is deliberately left unfixed for now — see
+  `SPEC-FEEDBACK.md` #16's own note on why, and revisit alongside `SchemaResolver`'s not-yet-built
+  atom-refinement resolution.
 - **`construction-def`'s ABNF doesn't parse its own worked example** (`address & contact & { ... }` needs
   an implicit `&` before the trailing `record-def` that alternative 1 as literally written doesn't admit)
   — implemented per the documented intent, not the letter; see `SPEC-FEEDBACK.md` #14 and

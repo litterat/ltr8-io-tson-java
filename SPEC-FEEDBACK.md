@@ -505,3 +505,68 @@ container. `tson-parser`'s `FieldDef.Modifier` models this as a plain `TokenValu
 field-modifier values, which are restricted to a bare token or the absent sentinel (§5.2), not full
 `data-value`s" — or simply drop `field-modifier` from that sentence's list, since it isn't actually an
 instance of the `data-value` import the sentence is introducing.
+
+---
+
+## 16. `instance`/`atom-refinement`'s ABNF uses the full `data-value`, letting a constructor-application or refinement payload carry a nonsensical second annotation/type-ref layer
+
+**Section:** §12.1's ABNF for `instance` and `atom-refinement`, cross-referenced against [TSON-DATA]
+§2.3's `data-value` production and against §12.1's own `refined-def` (the schema-level `^` refinement,
+a different construct from `atom-refinement` but the same operator).
+
+**Problem:** The ABNF is:
+
+```
+atom-refinement = "!" type-name ws "^" ws data-value
+instance        = "!" type-name ws data-value
+```
+
+and [TSON-DATA] §2.3 defines `data-value = *annotation [type-ref] core-value`, with `type-ref = "!"
+unquoted-token`. Expanding `data-value` inline, `instance` literally admits `"!" type-name ws
+*annotation ["!" unquoted-token] core-value` — i.e. after the constructor's own `"!" type-name` prefix,
+the grammar as written still permits *further* annotations and a *second*, entirely separate type-ref
+before the actual payload (e.g. `!integer_type @foo !other_type {}` parses under the literal ABNF).
+Neither §5.5's prose nor any real fixture (`meta-kernel.tn1`/`meta.tn1`/`core.tn1`) ever uses or implies
+this — every real `instance`/`atom-refinement` payload is a bare core value (`{}`, an array, or a single
+token), never annotated and never separately typed. `atom-refinement` additionally has its own prose
+directly contradicting the wider grammar it's given: "the data-value MUST be a braced record of
+constraint bindings" (§12.1's own comment) — i.e. `atom-refinement`'s payload isn't just "some
+core-value", it's specifically a record, which `core-value`'s six-way alternation (record / map / array
+/ empty-brace / absent / token) doesn't capture either.
+
+The grammar contains its own corroborating evidence that this is a genuine slip, not intentional: the
+sibling schema-level refinement production, `refined-def = type-name [ws "<" type-args ">"] ws "^" ws
+record-def` (§12.1), already uses `record-def` directly for the identical `^` operator applied one level
+up (record/map/array refinement, §5.7) — exactly the correction `atom-refinement` itself needs, sitting
+right there in the same ABNF block.
+
+**Interpretation chosen:** Implemented per the narrower, evidently-intended productions: `instance = "!"
+type-name ws core-value` (dropping the `*annotation [type-ref]` prefix `data-value` would otherwise
+contribute, since the constructor name is already fully supplied by `"!" type-name`, and `core-value`
+already covers every real positional/braced/bare-array shape `instance` needs). `tson-parser`'s
+`ast.schema.Instance` was reshaped accordingly: it no longer carries a separate `target: String`
+field alongside a full-generality `value: DataValue` (the redundancy that surfaced this while designing
+`SchemaResolver`'s generalized constructor-application resolution — `target` and `DataValue.typeRef()`
+were two fields saying the same thing). Instead `Instance(DataValue value)` wraps a `DataValue`
+constructed directly from the parsed `core-value`, with `typeRef` pre-set to the constructor name and
+`annotations` always empty; `target()` is a thin accessor over `value.typeRef()`. `SchemaParser` widened
+`Parser.parseCoreValue()` from `private` to package-private (the same treatment every other grammar
+primitive `SchemaParser` reuses from `Parser` already has) to reach the bare production directly instead
+of going through `parseDataValue()`.
+
+`atom-refinement` is left as `DataValue` (not narrowed to `record-def`) for now — a real, still-open
+gap, deliberately not fixed in the same pass: correcting it properly needs `AtomRefinement.bindings` to
+carry a `RecordDef` (schema-grammar AST) rather than a `DataValue` (data-grammar AST) directly, a larger
+type change than `Instance`'s, and `SchemaResolver`'s own atom-refinement resolution (Part 2 §5.7's `!I ^
+{ values }`) doesn't exist yet regardless (see `CLAUDE.md`'s "Not yet implemented"). Revisit alongside
+that work.
+
+**Suggested resolution:** Change §12.1's ABNF to:
+
+```
+atom-refinement = "!" type-name ws "^" ws record-def
+instance        = "!" type-name ws core-value
+```
+
+matching `refined-def`'s own already-correct pattern for `atom-refinement`, and dropping the
+unused-in-practice `*annotation [type-ref]` layer for `instance`.
