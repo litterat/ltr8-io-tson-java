@@ -554,7 +554,7 @@ is tempted to "fix" this back to a plain record, re-read `TypeArgument`'s Javado
 - **`io.ltr8.tson.schema.meta`** holds the resolved-value model -- one Java type per meta-kernel
   vocabulary record/enum, named to match: `TypeDefinition`, `TypeKind`, `FieldState`, `ElementState`,
   `ProductAccessType`, `ProductSizeType`, `RecordField`, `FieldGroup`, `IntegerSize`, `TupleElement`,
-  `TypeRef`/`TypeArgument`, and the `TypeBody` variants `RecordBody`, `Reference`, `Unit`, `EnumBody`,
+  `TypeRef`/`TypeArgument`, and the `Top` variants `RecordBody`, `Reference`, `Unit`, `EnumBody`,
   `ChoiceBody`, `ArrayBody`, `MapBody`, `TupleBody`. Not called `RecordBody.Record` or similar to match the
   kernel's own `record` constructor name exactly -- a Java class literally named `Record` would collide,
   confusingly, with `java.lang.Record` (the language feature every type in this model is built from); see
@@ -564,29 +564,45 @@ is tempted to "fix" this back to a plain record, re-read `TypeArgument`'s Javado
   an explicit `@io.ltr8.annotation.Field("snake_case_name")` -- `tson-bind` otherwise writes the bare Java
   component name verbatim (camelCase), and the kernel's own field names are snake_case throughout.
   - Covers every *structurally simple* meta-kernel shape (product/sum/reference bodies, and the
-    supporting records used as field types elsewhere), plus the four atom constraint-vocabulary
-    families with optional bound groups (`integer_type`, `text_type`, `uri_type`, `regex_type`, all
-    added 2026-07-23 -- see "Meta-kernel bootstrap" below) once it turned out each one's own fields
-    are all `Optional`, so none actually needed the harder "represent a field-group's mutual
-    exclusion in a *bound instance*" design work in the first place. `SchemaResolver` itself still
-    doesn't resolve anything to one of these four via ordinary schema-grammar resolution --
-    `MetaKernelParser` binds their one real-fixture instance (a bare `{}`) by hand instead.
-  - **`Top`/`Atom`/`Product`/`Sum`** (added 2026-07-23) replicate the kernel's own composition chain
-    (`atom => top & {}`, `product => top & { ... }`, `sum => top & {}`, `reference => top & { target:
-    type_name }`, §4.1) as real Java subtyping: `Atom`/`Product`/`Sum` each `extends Top`, and every
-    `TypeBody` variant additionally implements whichever it IS-A (`Unit`/`EnumBody` → `Atom`;
-    `RecordBody`/`ArrayBody`/`MapBody`/`TupleBody` → `Product`; `ChoiceBody` → `Sum`; `Reference` →
-    `Top` directly, since `reference` composes with `top` only, not through one of the three base
-    kinds). Lets a consumer test kind ancestry with `instanceof Product`/`instanceof Atom` instead of
-    switching on `TypeKind` by hand. **Deliberately a second, separate sealed hierarchy from
-    `TypeBody`** (not folded into it, even though `TypeBody`'s own Javadoc already describes it as
-    "typed `top` in the kernel") — a considered choice, not an oversight, made when asked directly:
-    keeping the two apart lets this one mirror the kernel's own four names exactly without disturbing
-    `TypeBody`'s established role or its own `permits` list. Every leaf record implements both
-    interfaces. Verified in `TypeBodyKindHierarchyTest` — note that a *negative* check like `!(unit
-    instanceof Product)` doesn't need asserting at all: `Product`'s own `permits` list not naming
-    `Unit` (a `final` record) makes the compiler reject that `instanceof` as provably impossible at
-    compile time, a stronger guarantee than a runtime assertion.
+    supporting records used as field types elsewhere), plus every atom constraint-vocabulary family
+    with optional bound groups (`integer_type`/`text_type`/`uri_type`/`regex_type`, added 2026-07-23;
+    `decimal_type`/`float_type`/`rational_type`/`uuid_type`/`binary`/`date_type`/`time_type`/
+    `datetime_type`/`duration_type`, the remaining nine, added 2026-07-24) once it turned out each
+    one's own fields are all `Optional`, so none actually needed the harder "represent a field-group's
+    mutual exclusion in a *bound instance*" design work in the first place. `SchemaResolver` itself
+    still doesn't resolve anything to one of these thirteen via ordinary schema-grammar resolution --
+    `MetaKernelParser` binds its five real-fixture instances (all bare `{}`) by hand instead; the
+    other eight (`decimal_type` and friends) aren't instantiated anywhere in meta-kernel itself, only
+    in `core.tn1`, which no resolver reaches yet (see "Not yet implemented" below). Verified each new
+    class actually round-trips through `TsonMapperReader`/`TsonMapperWriter` bound against `Atom`
+    (not just that it compiles) -- eight of the nine do; `DurationType` doesn't, by design, not a
+    regression: its `IsoDuration` field pairs `java.time.Period`/`java.time.Duration`, and
+    `TsonMapperContext`'s own Javadoc already documents why that pairing isn't force-bound by the
+    *default* context, matching `Rational`/`Complex`'s identical treatment -- a caller needing it
+    registers their own `DataBridge` rather than the library assuming one opinionated wire shape.
+  - **`Top`/`Atom`/`Product`/`Sum`** (added 2026-07-23, `Top` promoted to `TypeDefinition.body`'s own
+    declared type and the separate `TypeBody` interface deleted 2026-07-24) replicate the kernel's own
+    composition chain (`atom => top & {}`, `product => top & { ... }`, `sum => top & {}`, `reference
+    => top & { target: type_name }`, §4.1) as real Java subtyping: `Atom`/`Product`/`Sum` each
+    `extends Top`, and every resolved-body leaf record implements whichever it IS-A (`Unit`/`EnumBody`/
+    the atom constraint-vocabulary families → `Atom`; `RecordBody`/`ArrayBody`/`MapBody`/`TupleBody` →
+    `Product`; `ChoiceBody` → `Sum`; `Reference` → `Top` directly, since `reference` composes with
+    `top` only, not through one of the three base kinds). Lets a consumer test kind ancestry with
+    `instanceof Product`/`instanceof Atom` instead of switching on `TypeKind` by hand.
+    **`Top` used to sit alongside a second, separate single-level sealed union (`TypeBody`)** that
+    `TypeDefinition.body`/`tson-bind`'s generic writer actually bound against -- kept apart only
+    because `tson-bind`'s `DefaultUnionBinder` didn't recurse into a permitted subclass that was
+    itself sealed, so binding directly against a multi-level hierarchy like `Top` didn't work; `Top`
+    existed purely for `instanceof`-based kind checks on the side. Once that binder bug was fixed
+    (2026-07-24, `812a73f` -- flattens a multi-level sealed hierarchy to its concrete leaves,
+    verified against a hand-built two-level fixture in `tson-bind`'s `NestedSealedUnionTest` before
+    being relied on here), the separation no longer bought anything: `TypeBody` was deleted outright
+    and `TypeDefinition.body`/`TypeDefinition.product` retyped to `Top` directly. Verified in
+    `TopKindHierarchyTest` (renamed from `TypeBodyKindHierarchyTest`, its old "every variant is both
+    a TypeBody and a Top" case dropped since there's only one hierarchy now) -- note that a
+    *negative* check like `!(unit instanceof Product)` doesn't need asserting at all: `Product`'s own
+    `permits` list not naming `Unit` (a `final` record) makes the compiler reject that `instanceof` as
+    provably impossible at compile time, a stronger guarantee than a runtime assertion.
   - **`AtomSpecification`** (added 2026-07-23) covers `atom_specification => { spec: uri }`, the
     mixin composed into `uri_type`/`regex_type` (`uri_type => ~text_type & atom_specification & {
     spec: = "https://www.rfc-editor.org/rfc/rfc3986" ... }`, `regex_type => ~text_type &
@@ -600,7 +616,7 @@ is tempted to "fix" this back to a plain record, re-read `TypeArgument`'s Javado
 - **No hand-written writer -- resolved values go through plain `TsonMapperWriter.toTson`
   (`io.ltr8.tson.parser.mapper`) directly**, deliberately, to validate the model is built from
   ordinary, idiomatic Java that `tson-bind`'s generic introspection already knows how to bind, not
-  a shape that only worked because a bespoke writer papered over it. This confirmed the `TypeBody`
+  a shape that only worked because a bespoke writer papered over it. This confirmed the `Top`
   sealed-interface design is exactly right: each variant's own `@Typename` plus `tson-bind`'s
   automatic sealed-interface-as-union detection is *all* it takes to get
   `!record`/`!reference`/`!unit`/`!enum`/`!choice`/`!array`/`!map`/`!tuple` written correctly -- no special
@@ -686,17 +702,21 @@ exactly one copy of the file on disk to keep in sync with the spec, but the boot
 from a built jar (e.g. published to a repository), not only from a repo checkout. `parse(String
 source)` remains available for parsing arbitrary/custom source text.
 
-**`IntegerType`, then `TextType`/`UriType`/`RegexType`, all became real `TypeBody`/`Atom` variants
-for this (2026-07-23)** -- the four atom constraint-vocabulary families `TypeBody`'s own Javadoc
-used to list as "deliberately not modeled yet", now all modeled: `IntegerType` needed no
+**`IntegerType`, then `TextType`/`UriType`/`RegexType`, all became real `Atom` variants for this
+(2026-07-23)** -- the four atom constraint-vocabulary families the old `TypeBody`'s own Javadoc used
+to list as "deliberately not modeled yet", now all modeled: `IntegerType` needed no
 field-group-in-a-bound-instance design work (mutual exclusion between `min`/`exclusiveMin` and
 `max`/`exclusiveMax` is already enforced by its own compact constructor), and `TextType`/`UriType`/
 `RegexType` needed none either -- every field across all three is `Optional`, so each already had
 (or gained) its own `UNCONSTRAINED` constant for exactly this empty-body case. Each gained
 `@Typename` (`text_type`/`uri_type`/`regex_type`) and multi-word fields gained `@Field`
-(`min_length`/`max_length`), matching the convention every other `TypeBody` variant already
+(`min_length`/`max_length`), matching the convention every other `Atom` variant already
 follows, even though `MetaKernelParser` itself binds none of them generically -- kept consistent in
-case something else (e.g. a future `toTson` call on one of these) needs it.
+case something else (e.g. a future `toTson` call on one of these) needs it. The remaining nine atom
+constraint-vocabulary families (`DecimalType`/`FloatType`/`RationalType`/`UuidType`/`BinaryType`/
+`DateType`/`TimeType`/`DateTimeType`/`DurationType`) joined the same way on 2026-07-24 -- see
+"Schema resolution" above's `io.ltr8.tson.schema.meta` bullet for what does/doesn't actually bind
+by default among them.
 
 **A real `tson-bind` gotcha, surfaced by the now-superseded `TsonMapper`-based version of this
 bootstrap but still true and worth knowing for any other `schema.meta` class's first use as a bind
@@ -769,7 +789,7 @@ confirmed tradeoff rather than adding a module descriptor now.
      whose identity isn't found via `loader` is a `SchemaValidationException` (e.g. the importer
      needs to have been registered into the *same* `SchemaRegistry` first — the default loader is
      registered-only).
-  2. **Materialize** — walks every entry's `TypeBody` (deliberately *not* `TypeDefinition.source` —
+  2. **Materialize** — walks every entry's `Top` body (deliberately *not* `TypeDefinition.source` —
      see below) for any `TypeRef` with non-empty `arguments`, bottom-up (a nested argument that's
      itself argument-bearing materializes first, so an outer synthesized name is built from an
      already-flattened application). **Uniform** — *any* argument-bearing `type_ref` gets a
@@ -783,12 +803,17 @@ confirmed tradeoff rather than adding a module descriptor now.
      `TypeDefinition.reference(TypeRef)`'s existing shape (that method's own Javadoc already flagged
      this gap: "this resolver doesn't materialise instantiation entries yet ... until that exists").
      A synthesized name is `head_arg1..._hash` (§8.2's own non-normative "readable head plus
-     structural hash" guidance; not conformance-relevant, free to refine). Every `TypeBody` variant
-     has its own rewrite case, written as an **exhaustive switch over the sealed interface** (no
-     `default`) so a future new variant is a compile error here, not a silent miss.
+     structural hash" guidance; not conformance-relevant, free to refine). Every `Top` variant
+     has its own rewrite case, written as an **exhaustive switch over the (multi-level) sealed
+     interface** (no `default`) so a future new variant is a compile error here, not a silent miss --
+     `switch`/pattern matching checks exhaustiveness across the whole `permits` graph transitively, so
+     switching directly on `Top`'s own concrete leaves (rather than needing a case per intermediate
+     `Atom`/`Product`/`Sum` level) is exhaustive the same way it was when this switched over the old,
+     single-level `TypeBody` (deleted 2026-07-24 in favor of switching on `Top` directly — see
+     "Schema resolution" above's `io.ltr8.tson.schema.meta` bullet).
   3. **Validate** — over the now-expanded map (originals + synthesized), every reference must
      resolve: `TypeDefinition.source`/`supertypes`/`subtypes`, and every `TypeRef` reachable through
-     the same exhaustive `TypeBody` switch (`RecordBody.fields`, `Reference.target`,
+     the same exhaustive `Top` switch (`RecordBody.fields`, `Reference.target`,
      `MapBody.keyType`/`valueType`, `ArrayBody.elementType`, `TupleBody.elements`,
      `ChoiceBody.variants`). **Type-parameter exception** (load-bearing for every parameterized
      declaration — `array`, `set`, `map`, `array_min`, `array_max`, `array_ranged`): a bare name is

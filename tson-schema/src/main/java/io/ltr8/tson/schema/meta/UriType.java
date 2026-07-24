@@ -17,9 +17,9 @@ import java.util.Optional;
  * <p>{@code pattern} is the regex's own source text ({@link String}), not a compiled {@link
  * java.util.regex.Pattern} -- see {@link TextType#pattern()}'s own Javadoc for why.
  *
- * <p>Also a {@link TypeBody}/{@link Atom} variant (added 2026-07-23, alongside {@code text_type}
- * above/{@code regex_type} below): {@code uri => !uri_type {}} is a constructor-application
- * instance (§5.5) whose resolved body is exactly {@link #UNCONSTRAINED}.
+ * <p>Also an {@link Atom} variant (added 2026-07-23, alongside {@code text_type} above/{@code
+ * regex_type} below): {@code uri => !uri_type {}} is a constructor-application instance (§5.5)
+ * whose resolved body is exactly {@link #UNCONSTRAINED}.
  */
 @Typename(name = "uri_type")
 public record UriType(
@@ -27,7 +27,7 @@ public record UriType(
         @Field("max_length") Optional<Integer> maxLength,
         Optional<String> pattern,
         AtomSpecification specification,
-        Optional<String> scheme) implements TypeBody, Atom {
+        Optional<String> scheme) implements Atom {
 
     private static final URI RFC_3986 = URI.create("https://www.rfc-editor.org/rfc/rfc3986");
 

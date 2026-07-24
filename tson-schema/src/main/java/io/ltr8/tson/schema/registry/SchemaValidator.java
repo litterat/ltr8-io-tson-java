@@ -4,24 +4,33 @@ import io.ltr8.tson.schema.SchemaLoader;
 import io.ltr8.tson.schema.SchemaValidationException;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
+import io.ltr8.tson.schema.meta.BinaryType;
 import io.ltr8.tson.schema.meta.ChoiceBody;
+import io.ltr8.tson.schema.meta.DateTimeType;
+import io.ltr8.tson.schema.meta.DateType;
+import io.ltr8.tson.schema.meta.DecimalType;
+import io.ltr8.tson.schema.meta.DurationType;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.FieldGroup;
+import io.ltr8.tson.schema.meta.FloatType;
 import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.MapBody;
+import io.ltr8.tson.schema.meta.RationalType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.RegexType;
 import io.ltr8.tson.schema.meta.TextType;
+import io.ltr8.tson.schema.meta.TimeType;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TupleElement;
 import io.ltr8.tson.schema.meta.TypeArgument;
-import io.ltr8.tson.schema.meta.TypeBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Unit;
 import io.ltr8.tson.schema.meta.UriType;
+import io.ltr8.tson.schema.meta.UuidType;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -90,7 +99,7 @@ public final class SchemaValidator {
                         "'" + entry.getKey() + "' collides with an entry of the same name brought in by !!import");
             }
             TypeDefinition def = entry.getValue();
-            TypeBody rewrittenBody = rewriteBody(def.body(), materializedNames, synthesized);
+            Top rewrittenBody = rewriteBody(def.body(), materializedNames, synthesized);
             merged.put(entry.getKey(), new TypeDefinition(def.source(), def.kind(), def.parameters(),
                     def.constructor(), def.supertypes(), def.subtypes(), def.disjoint(), rewrittenBody));
         }
@@ -126,8 +135,8 @@ public final class SchemaValidator {
 
     // ── Materialization ──────────────────────────────────────────────────
 
-    private static TypeBody rewriteBody(TypeBody body, Map<TypeRef, String> materializedNames,
-                                         Map<String, TypeDefinition> synthesized) {
+    private static Top rewriteBody(Top body, Map<TypeRef, String> materializedNames,
+                                    Map<String, TypeDefinition> synthesized) {
         return switch (body) {
             case RecordBody r -> {
                 List<RecordField> fields = new ArrayList<>(r.fields().size());
@@ -166,6 +175,15 @@ public final class SchemaValidator {
             case TextType t -> t;
             case UriType u -> u;
             case RegexType r -> r;
+            case DecimalType d -> d;
+            case FloatType f -> f;
+            case RationalType r -> r;
+            case UuidType u -> u;
+            case BinaryType b -> b;
+            case DateType d -> d;
+            case TimeType t -> t;
+            case DateTimeType d -> d;
+            case DurationType d -> d;
         };
     }
 
@@ -231,7 +249,7 @@ public final class SchemaValidator {
         validateBody(name, def.body(), namespace, def.parameters());
     }
 
-    private static void validateBody(String entryName, TypeBody body, Map<String, TypeDefinition> namespace,
+    private static void validateBody(String entryName, Top body, Map<String, TypeDefinition> namespace,
                                       List<String> ownParameters) {
         switch (body) {
             case RecordBody r -> {
@@ -287,6 +305,24 @@ public final class SchemaValidator {
             case UriType ignored -> {
             }
             case RegexType ignored -> {
+            }
+            case DecimalType ignored -> {
+            }
+            case FloatType ignored -> {
+            }
+            case RationalType ignored -> {
+            }
+            case UuidType ignored -> {
+            }
+            case BinaryType ignored -> {
+            }
+            case DateType ignored -> {
+            }
+            case TimeType ignored -> {
+            }
+            case DateTimeType ignored -> {
+            }
+            case DurationType ignored -> {
             }
         }
     }

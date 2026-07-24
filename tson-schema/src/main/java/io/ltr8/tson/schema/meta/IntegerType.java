@@ -13,16 +13,15 @@ import java.util.Optional;
  * multiple-of constraint. Pure constraint values, no parsing or validation behavior -- {@code
  * tson-parser}'s {@code IntegerParser} holds one of these and does the actual reading/writing.
  *
- * <p>Also a {@link TypeBody}/{@link Atom} variant (added 2026-07-23, alongside {@code
- * MetaKernelParser}): {@code integer => !integer_type {}} is a constructor-application instance
- * (§5.5) whose resolved body is exactly this shape, bound via plain {@code TsonMapper.toObject}
- * the same way every other {@code TypeBody} variant round-trips through generic binding -- see
- * {@code TypeBody}'s own Javadoc, which used to list {@code integer_type} among the atom
- * constraint-vocabulary families "deliberately not modeled yet"; it's the first of those four
- * to actually be modeled, since its fields (unlike {@code text_type}/{@code uri_type}/{@code
- * regex_type}'s) already needed no field-group-in-a-bound-instance design work -- mutual
- * exclusion between {@code min}/{@code exclusiveMin} and between {@code max}/{@code exclusiveMax}
- * is already enforced by this record's own compact constructor, not a separate wrapper.
+ * <p>Also an {@link Atom} variant (added 2026-07-23, alongside {@code MetaKernelParser}): {@code
+ * integer => !integer_type {}} is a constructor-application instance (§5.5) whose resolved body is
+ * exactly this shape, bound via plain {@code TsonMapper.toObject} the same way every other {@link
+ * Top} variant round-trips through generic binding -- it's the first of the atom
+ * constraint-vocabulary families to be modeled this way, since its fields (unlike {@code
+ * text_type}/{@code uri_type}/{@code regex_type}'s) already needed no field-group-in-a-bound-
+ * instance design work -- mutual exclusion between {@code min}/{@code exclusiveMin} and between
+ * {@code max}/{@code exclusiveMax} is already enforced by this record's own compact constructor,
+ * not a separate wrapper.
  *
  * <p>The canonical (compact) constructor carries an explicit {@code @Record} -- required as soon
  * as a record has more than one public constructor (the convenience {@link
@@ -41,7 +40,7 @@ public record IntegerType(
         @Field("exclusive_min") Optional<BigInteger> exclusiveMin,
         Optional<BigInteger> max,
         @Field("exclusive_max") Optional<BigInteger> exclusiveMax,
-        @Field("multiple_of") Optional<BigInteger> multipleOf) implements TypeBody, Atom {
+        @Field("multiple_of") Optional<BigInteger> multipleOf) implements Atom {
 
     /** The kernel's unconstrained, arbitrary-precision {@code integer}. */
     public static final IntegerType UNCONSTRAINED = new IntegerType(

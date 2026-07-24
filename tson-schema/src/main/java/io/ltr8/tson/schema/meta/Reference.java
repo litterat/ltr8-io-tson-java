@@ -11,5 +11,5 @@ import io.ltr8.annotation.Typename;
  * {@code target} equals the entry's own {@code source}; see {@link TypeDefinition#reference}.
  */
 @Typename(name = "reference")
-public record Reference(TypeRef target) implements TypeBody, Top {
+public record Reference(TypeRef target) implements Top {
 }

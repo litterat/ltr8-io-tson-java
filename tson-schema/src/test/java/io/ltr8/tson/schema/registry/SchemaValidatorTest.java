@@ -7,7 +7,6 @@ import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeArgument;
-import io.ltr8.tson.schema.meta.TypeBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;

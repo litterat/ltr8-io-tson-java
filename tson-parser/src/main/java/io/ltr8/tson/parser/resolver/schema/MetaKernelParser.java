@@ -14,7 +14,7 @@ import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.RegexType;
 import io.ltr8.tson.schema.meta.TextType;
-import io.ltr8.tson.schema.meta.TypeBody;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Unit;
@@ -127,7 +127,7 @@ public final class MetaKernelParser {
             if (target == null) {
                 continue;
             }
-            Optional<TypeBody> body = bindInstanceBody(instance);
+            Optional<Top> body = bindInstanceBody(instance);
             if (body.isEmpty()) {
                 continue;
             }
@@ -140,7 +140,7 @@ public final class MetaKernelParser {
         return entries;
     }
 
-    private static Optional<TypeBody> bindInstanceBody(Instance instance) {
+    private static Optional<Top> bindInstanceBody(Instance instance) {
         return switch (instance.target()) {
             case "unit" -> {
                 requireEmptyBody(instance);

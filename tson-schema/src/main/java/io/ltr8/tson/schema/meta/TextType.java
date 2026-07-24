@@ -18,18 +18,18 @@ import java.util.Optional;
  * TextParser}/{@code UriParser} compile it at validation time instead of storing the compiled
  * form.
  *
- * <p>Also a {@link TypeBody}/{@link Atom} variant (added 2026-07-23, alongside {@code uri_type}/
- * {@code regex_type} below): {@code text => !text_type {}} is a constructor-application instance
- * (§5.5) whose resolved body is exactly {@link #UNCONSTRAINED} -- every field here is {@code
- * Optional}, so an empty {@code {}} body needs no design work beyond what {@link IntegerType}
- * already established for the same shape.
+ * <p>Also an {@link Atom} variant (added 2026-07-23, alongside {@code uri_type}/{@code regex_type}
+ * below): {@code text => !text_type {}} is a constructor-application instance (§5.5) whose resolved
+ * body is exactly {@link #UNCONSTRAINED} -- every field here is {@code Optional}, so an empty
+ * {@code {}} body needs no design work beyond what {@link IntegerType} already established for the
+ * same shape.
  */
 @Typename(name = "text_type")
 public record TextType(
         @Field("min_length") Optional<Integer> minLength,
         @Field("max_length") Optional<Integer> maxLength,
         Optional<Integer> length,
-        Optional<String> pattern) implements TypeBody, Atom {
+        Optional<String> pattern) implements Atom {
 
     /** {@code text => !text_type {}} -- the unconstrained text type. */
     public static final TextType UNCONSTRAINED =

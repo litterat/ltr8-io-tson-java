@@ -12,7 +12,7 @@ import java.util.List;
  * supertype-style lists.
  */
 @Typename(name = "tuple")
-public record TupleBody(List<TupleElement> elements) implements TypeBody, Product {
+public record TupleBody(List<TupleElement> elements) implements Product {
 
     public TupleBody {
         elements = List.copyOf(elements);

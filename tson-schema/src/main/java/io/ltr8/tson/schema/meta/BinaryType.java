@@ -1,5 +1,8 @@
 package io.ltr8.tson.schema.meta;
 
+import io.ltr8.annotation.Field;
+import io.ltr8.annotation.Typename;
+
 import java.util.Optional;
 
 /**
@@ -11,14 +14,23 @@ import java.util.Optional;
  * tson-parser}'s {@code BinaryParser} holds one of these and does the actual reading/writing.
  *
  * <p>Named {@code BinaryType} here despite meta.tn1's constructor being spelled {@code binary}, not
- * {@code binary_type} like every other constructor -- see {@code SPEC-FEEDBACK.md} #11.
+ * {@code binary_type} like every other constructor -- see {@code SPEC-FEEDBACK.md} #11. The
+ * {@code @Typename} below is {@code "binary"} to match, not {@code "binary_type"}.
  *
  * <p>{@code minLength}/{@code maxLength} are modeled for structural fidelity (meta.tn1 defines
  * them on the constructor) but unexercised by any built-in instance, the same as {@link
  * FloatType}'s bounds -- {@code base64 => !binary BASE64} and its three siblings in core.tn1 are all
  * unconstrained beyond {@code encoding}.
+ *
+ * <p>Also an {@link Atom} variant (joined 2026-07-24): {@code base64 => !binary BASE64} and its
+ * three siblings are constructor-application instances (§5.5) whose resolved bodies are exactly
+ * {@link #BASE64}/{@link #BASE64URL}/{@link #BASE32}/{@link #HEX} -- each a positional-form
+ * instance (§5.6: a bare token filling {@code binary}'s sole {@code REQUIRED} field, {@code
+ * encoding}), not a braced body.
  */
-public record BinaryType(Encoding encoding, Optional<Integer> minLength, Optional<Integer> maxLength) {
+@Typename(name = "binary")
+public record BinaryType(Encoding encoding, @Field("min_length") Optional<Integer> minLength,
+                          @Field("max_length") Optional<Integer> maxLength) implements Atom {
 
     public enum Encoding {
         BASE64("base64"), BASE64URL("base64url"), BASE32("base32"), HEX("hex");

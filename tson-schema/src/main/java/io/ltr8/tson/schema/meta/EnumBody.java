@@ -13,7 +13,7 @@ import java.util.List;
  * sets -- member order is preserved for deterministic output, not semantically significant.
  */
 @Typename(name = "enum")
-public record EnumBody(List<String> members) implements TypeBody, Atom {
+public record EnumBody(List<String> members) implements Atom {
 
     public EnumBody {
         members = List.copyOf(members);

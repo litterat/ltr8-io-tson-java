@@ -21,7 +21,7 @@ import java.util.Optional;
 public record ArrayBody(@Field("element_type") TypeRef elementType, ElementState state, boolean unordered,
                          @Field("unique_items") boolean uniqueItems,
                          @Field("min_items") Optional<BigInteger> minItems,
-                         @Field("max_items") Optional<BigInteger> maxItems) implements TypeBody, Product {
+                         @Field("max_items") Optional<BigInteger> maxItems) implements Product {
 
     /** The unconstrained shape every built-in array uses before size refinement: REQUIRED, ordered, non-unique, unbounded. */
     public static ArrayBody of(TypeRef elementType) {

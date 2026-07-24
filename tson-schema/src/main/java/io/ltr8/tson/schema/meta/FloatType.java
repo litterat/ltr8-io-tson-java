@@ -1,5 +1,8 @@
 package io.ltr8.tson.schema.meta;
 
+import io.ltr8.annotation.Field;
+import io.ltr8.annotation.Typename;
+
 import java.math.BigDecimal;
 import java.util.Optional;
 
@@ -8,17 +11,22 @@ import java.util.Optional;
  * -- SQL's approximate tier, IEEE 754-2019). Pure constraint values, no parsing/validation behavior
  * -- {@code tson-parser}'s {@code FloatParser} holds one of these and does the actual
  * reading/writing.
+ *
+ * <p>Also an {@link Atom} variant (joined 2026-07-24): {@code float32 => !float_type { format:
+ * BINARY32 } }/{@code float64} are constructor-application instances (§5.5) whose resolved bodies
+ * are exactly {@link #FLOAT32}/{@link #FLOAT64}.
  */
+@Typename(name = "float_type")
 public record FloatType(
         Format format,
         Optional<BigDecimal> min,
-        Optional<BigDecimal> exclusiveMin,
+        @Field("exclusive_min") Optional<BigDecimal> exclusiveMin,
         Optional<BigDecimal> max,
-        Optional<BigDecimal> exclusiveMax,
-        boolean allowNan,
-        boolean allowInfinity,
-        boolean allowSubnormal,
-        boolean allowNegativeZero) {
+        @Field("exclusive_max") Optional<BigDecimal> exclusiveMax,
+        @Field("allow_nan") boolean allowNan,
+        @Field("allow_infinity") boolean allowInfinity,
+        @Field("allow_subnormal") boolean allowSubnormal,
+        @Field("allow_negative_zero") boolean allowNegativeZero) implements Atom {
 
     /** {@code ieee_format}'s two members §5.6 actually promotes to built-in annotations; meta.tn1 also defines BINARY16/128/256 and the decimal128-family formats, unused until a schema (Part 2) refines float_type with one of them. */
     public enum Format {

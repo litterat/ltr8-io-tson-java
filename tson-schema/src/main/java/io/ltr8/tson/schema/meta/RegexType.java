@@ -15,12 +15,12 @@ import java.net.URI;
  * {@link UriType}). Pure constraint values, no parsing/validation behavior -- {@code tson-parser}'s
  * {@code RegexParser} holds one of these and does the actual reading/writing.
  *
- * <p>Also a {@link TypeBody}/{@link Atom} variant (added 2026-07-23, alongside {@code text_type}/
- * {@code uri_type} above): {@code regex => !regex_type {}} is a constructor-application instance
- * (§5.5) whose resolved body is exactly {@link #UNCONSTRAINED}.
+ * <p>Also an {@link Atom} variant (added 2026-07-23, alongside {@code text_type}/{@code uri_type}
+ * above): {@code regex => !regex_type {}} is a constructor-application instance (§5.5) whose
+ * resolved body is exactly {@link #UNCONSTRAINED}.
  */
 @Typename(name = "regex_type")
-public record RegexType(TextType constraints, AtomSpecification specification) implements TypeBody, Atom {
+public record RegexType(TextType constraints, AtomSpecification specification) implements Atom {
 
     private static final URI RFC_9485 = URI.create("https://www.rfc-editor.org/rfc/rfc9485");
 

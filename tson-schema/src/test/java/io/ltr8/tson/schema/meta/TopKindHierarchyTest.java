@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Verifies the {@link Top}/{@link Atom}/{@link Product}/{@link Sum} hierarchy actually replicates
@@ -17,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * already rejects that check as provably impossible at compile time, a stronger guarantee than a
  * runtime assertion would give.
  */
-class TypeBodyKindHierarchyTest {
+class TopKindHierarchyTest {
 
     @Test
     void atomFamilyVariantsAreAtomAndTop() {
@@ -36,7 +35,7 @@ class TypeBodyKindHierarchyTest {
         MapBody map = MapBody.of(TypeRef.of("text"), TypeRef.of("text"));
         TupleBody tuple = new TupleBody(List.of());
 
-        for (TypeBody body : List.of(record, array, map, tuple)) {
+        for (Top body : List.of(record, array, map, tuple)) {
             assertInstanceOf(Product.class, body);
             assertInstanceOf(Top.class, body);
         }
@@ -56,23 +55,5 @@ class TypeBodyKindHierarchyTest {
         // (Reference isn't in Atom's/Product's/Sum's own permits lists).
         Reference reference = new Reference(TypeRef.of("token"));
         assertInstanceOf(Top.class, reference);
-    }
-
-    @Test
-    void everyVariantIsBothATypeBodyAndATop() {
-        // The two hierarchies are deliberately separate (see Top's own Javadoc) but every leaf
-        // variant implements both.
-        List<TypeBody> allVariants = List.of(
-                RecordBody.of(List.of()),
-                new Reference(TypeRef.of("token")),
-                new Unit(),
-                new EnumBody(List.of("a", "b")),
-                new ChoiceBody(List.of(TypeRef.of("a"), TypeRef.of("b"))),
-                ArrayBody.of(TypeRef.of("integer")),
-                MapBody.of(TypeRef.of("text"), TypeRef.of("text")),
-                new TupleBody(List.of()));
-        for (TypeBody body : allVariants) {
-            assertTrue(body instanceof Top, body.getClass().getSimpleName() + " should be a Top");
-        }
     }
 }

@@ -23,7 +23,7 @@ import java.util.Optional;
  */
 public record TypeDefinition(Optional<TypeRef> source, TypeKind kind, List<String> parameters,
                               boolean constructor, List<String> supertypes, List<String> subtypes,
-                              Optional<Boolean> disjoint, TypeBody body) {
+                              Optional<Boolean> disjoint, Top body) {
 
     public TypeDefinition {
         parameters = List.copyOf(parameters);
@@ -32,7 +32,7 @@ public record TypeDefinition(Optional<TypeRef> source, TypeKind kind, List<Strin
     }
 
     /** A fresh (non-constructor, no source/supertypes/parameters) PRODUCT definition -- {@code integer_size}'s own shape. */
-    public static TypeDefinition product(TypeBody body) {
+    public static TypeDefinition product(Top body) {
         return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of(), false, List.of(), List.of(),
                 Optional.empty(), body);
     }

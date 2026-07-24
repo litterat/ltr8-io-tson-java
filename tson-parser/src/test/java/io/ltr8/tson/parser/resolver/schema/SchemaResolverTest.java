@@ -38,7 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Optional}) that {@code tson-bind}'s generic introspection already knows how to bind, rather than
  * a shape that happens to work only because a bespoke writer papered over it.
  *
- * <p>What this confirms works with zero extra code: {@code TypeBody}'s sealed-interface variants
+ * <p>What this confirms works with zero extra code: {@code Top}'s sealed-interface variants
  * each get their own {@code !record}/{@code !reference}/{@code !unit}/{@code !enum}/{@code
  * !choice}/{@code !array}/{@code !map}/{@code !tuple} type-ref purely from {@code
  * DataClassUnion} auto-detection plus a {@code @Typename} on each variant -- exactly the "body:
@@ -114,7 +114,7 @@ class SchemaResolverTest {
         assertEquals(EXPECTED_INTEGER_SIZE, write(schema.entries().get("integer_size")));
     }
 
-    // ── TypeBody variants SchemaResolver doesn't produce yet: hand-built,
+    // ── Top variants SchemaResolver doesn't produce yet: hand-built,
     //    checked against the real toTson output (see class Javadoc for why it
     //    diverges, structurally faithfully, from meta-kernel-resolved.tn1's own text) ──
 
