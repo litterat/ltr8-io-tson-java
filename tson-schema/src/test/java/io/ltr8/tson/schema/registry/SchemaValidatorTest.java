@@ -1,5 +1,6 @@
 package io.ltr8.tson.schema.registry;
 
+import io.ltr8.tson.schema.SchemaLoader;
 import io.ltr8.tson.schema.SchemaValidationException;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.FieldGroup;
@@ -133,10 +134,57 @@ class SchemaValidatorTest {
     }
 
     @Test
-    void rejectsASchemaWithImports() {
-        TsonSchema withImports = new TsonSchema(Optional.of("https://example.test/s.tn1"),
-                "https://example.test/meta.tn1", List.of("https://example.test/other.tn1"), Map.of());
+    void mergesImportedEntriesBeforeLocalOnesAndValidatesTheWhole() {
+        TsonSchema imported = schemaOf(Map.of("imported_a", emptyRecord()));
+        Map<String, TsonSchema> byIdentity = Map.of(CanonicalIdentity.of("https://example.test/import.tn1"), imported);
+        SchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
 
-        assertThrows(SchemaValidationException.class, () -> SchemaValidator.validate(withImports, null));
+        Map<String, TypeDefinition> localEntries = new LinkedHashMap<>();
+        localEntries.put("local_a", TypeDefinition.product(
+                RecordBody.of(List.of(RecordField.required("field", TypeRef.of("imported_a"))))));
+        TsonSchema local = new TsonSchema(Optional.of("https://example.test/importer.tn1"),
+                "https://example.test/meta.tn1", List.of("https://example.test/import.tn1"), localEntries);
+
+        TsonSchema result = SchemaValidator.validate(local, loader);
+
+        assertEquals(Set.of("imported_a", "local_a"), result.entries().keySet());
+    }
+
+    @Test
+    void rejectsAnImportThatIsNotRegistered() {
+        SchemaLoader loader = id -> Optional.empty();
+        TsonSchema local = new TsonSchema(Optional.of("https://example.test/importer.tn1"),
+                "https://example.test/meta.tn1", List.of("https://example.test/missing.tn1"), Map.of());
+
+        assertThrows(SchemaValidationException.class, () -> SchemaValidator.validate(local, loader));
+    }
+
+    @Test
+    void rejectsACollisionBetweenALocalEntryAndAnImportedEntry() {
+        TsonSchema imported = schemaOf(Map.of("shared_name", emptyRecord()));
+        Map<String, TsonSchema> byIdentity = Map.of(CanonicalIdentity.of("https://example.test/import.tn1"), imported);
+        SchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
+
+        TsonSchema local = new TsonSchema(Optional.of("https://example.test/importer.tn1"),
+                "https://example.test/meta.tn1", List.of("https://example.test/import.tn1"),
+                Map.of("shared_name", emptyRecord()));
+
+        assertThrows(SchemaValidationException.class, () -> SchemaValidator.validate(local, loader));
+    }
+
+    @Test
+    void rejectsACollisionBetweenTwoImports() {
+        TsonSchema importedOne = schemaOf(Map.of("shared_name", emptyRecord()));
+        TsonSchema importedTwo = schemaOf(Map.of("shared_name", emptyRecord()));
+        Map<String, TsonSchema> byIdentity = Map.of(
+                CanonicalIdentity.of("https://example.test/import-one.tn1"), importedOne,
+                CanonicalIdentity.of("https://example.test/import-two.tn1"), importedTwo);
+        SchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
+
+        TsonSchema local = new TsonSchema(Optional.of("https://example.test/importer.tn1"),
+                "https://example.test/meta.tn1",
+                List.of("https://example.test/import-one.tn1", "https://example.test/import-two.tn1"), Map.of());
+
+        assertThrows(SchemaValidationException.class, () -> SchemaValidator.validate(local, loader));
     }
 }

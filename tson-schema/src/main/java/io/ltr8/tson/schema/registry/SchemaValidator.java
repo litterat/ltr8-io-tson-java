@@ -58,10 +58,20 @@ import java.util.Map;
  * `array_ranged`), whose own {@code source}/body positions reference their own type parameter by
  * bare name (`array<T>`), not a real other entry.
  *
- * <p><b>{@code !!import} is not yet handled</b> -- a schema declaring one is rejected outright
- * rather than mishandled, matching this project's established convention for every other
- * not-yet-built construct. The {@code loader} parameter exists so this signature doesn't need to
- * change once import merging is built; it isn't consulted yet.
+ * <p><b>{@code !!import} merging (Part 2 §2.2.3).</b> The final namespace a schema is checked
+ * against is built in three stages, in this order: (1) every {@code !!import}'s own entries, in
+ * declaration order, looked up via {@code loader} by canonical identity -- shallow, per §2.2.3
+ * ("only the entries declared in the imported schema's own body are imported... entries the
+ * imported schema itself brought in via its own {@code !!import} directives are not transitively
+ * included"), which falls out for free here since {@code loader} hands back an already-registered,
+ * already-flattened {@code TsonSchema} and only *its* {@code entries()} are read, never its own
+ * {@code imports()}; (2) this schema's own entries, resolved/materialized exactly as with no
+ * imports; (3) every newly synthesized entry from step 2. A name collision -- between two imports,
+ * or between an import and a local declaration -- is a resolver error (§2.2.3), checked as each
+ * stage is merged in, not after the fact. <b>Merged entries keep their home namespace</b>: an
+ * imported {@code TypeDefinition} is carried in exactly as the imported schema resolved it, never
+ * re-validated or re-materialized against the importer's own namespace -- only the *importer's own*
+ * new material (stage 2 and 3) gets resolved/validated here.
  */
 public final class SchemaValidator {
 
@@ -69,28 +79,49 @@ public final class SchemaValidator {
     }
 
     public static TsonSchema validate(TsonSchema schema, SchemaLoader loader) {
-        if (!schema.imports().isEmpty()) {
-            throw new SchemaValidationException(
-                    "import merging not yet implemented (schema declares " + schema.imports().size() + " !!import)");
-        }
+        Map<String, TypeDefinition> merged = mergeImports(schema.imports(), loader);
 
         Map<TypeRef, String> materializedNames = new LinkedHashMap<>();
         Map<String, TypeDefinition> synthesized = new LinkedHashMap<>();
-        Map<String, TypeDefinition> rewritten = new LinkedHashMap<>();
 
         for (Map.Entry<String, TypeDefinition> entry : schema.entries().entrySet()) {
+            if (merged.containsKey(entry.getKey())) {
+                throw new SchemaValidationException(
+                        "'" + entry.getKey() + "' collides with an entry of the same name brought in by !!import");
+            }
             TypeDefinition def = entry.getValue();
             TypeBody rewrittenBody = rewriteBody(def.body(), materializedNames, synthesized);
-            rewritten.put(entry.getKey(), new TypeDefinition(def.source(), def.kind(), def.parameters(),
+            merged.put(entry.getKey(), new TypeDefinition(def.source(), def.kind(), def.parameters(),
                     def.constructor(), def.supertypes(), def.subtypes(), def.disjoint(), rewrittenBody));
         }
-        rewritten.putAll(synthesized);
+        merged.putAll(synthesized);
 
-        for (Map.Entry<String, TypeDefinition> entry : rewritten.entrySet()) {
-            validateEntry(entry.getKey(), entry.getValue(), rewritten);
+        for (Map.Entry<String, TypeDefinition> entry : merged.entrySet()) {
+            validateEntry(entry.getKey(), entry.getValue(), merged);
         }
 
-        return new TsonSchema(schema.id(), schema.meta(), schema.imports(), rewritten);
+        return new TsonSchema(schema.id(), schema.meta(), schema.imports(), merged);
+    }
+
+    /**
+     * Stage 1: every {@code !!import}'s own entries, in declaration order, brought in as-is
+     * (§2.2.3's "merged entries keep their home namespace" -- no re-resolution here).
+     */
+    private static Map<String, TypeDefinition> mergeImports(List<String> imports, SchemaLoader loader) {
+        Map<String, TypeDefinition> merged = new LinkedHashMap<>();
+        for (String importUri : imports) {
+            String importIdentity = CanonicalIdentity.of(importUri);
+            TsonSchema imported = loader.load(importIdentity).orElseThrow(() -> new SchemaValidationException(
+                    "!!import '" + importUri + "' is not registered"));
+            for (Map.Entry<String, TypeDefinition> entry : imported.entries().entrySet()) {
+                if (merged.containsKey(entry.getKey())) {
+                    throw new SchemaValidationException(
+                            "'" + entry.getKey() + "' is declared by more than one !!import");
+                }
+                merged.put(entry.getKey(), entry.getValue());
+            }
+        }
+        return merged;
     }
 
     // ── Materialization ──────────────────────────────────────────────────

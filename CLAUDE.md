@@ -702,13 +702,21 @@ confirmed tradeoff rather than adding a module descriptor now.
   the pluggable-with-a-default hook for resolving a `!!import` target, matching Part 2 §10.1's
   precedence order (pre-loaded/registered authoritative, "fetched" opt-in and disabled by default).
   `SchemaRegistry`'s own no-arg constructor supplies a default that only ever finds an
-  *already-registered* schema — nothing is fetched from anywhere. Not consulted yet (see below);
-  exists now so a caller building against this API doesn't need an API change once import merging
-  lands.
+  *already-registered* schema — nothing is fetched from anywhere.
 - **`SchemaValidator.validate(TsonSchema, SchemaLoader)`** — the actual pass-2 engine:
-  1. **Import guard** — a schema declaring any `!!import` is rejected outright
-     (`SchemaValidationException`) rather than mishandled, matching this project's established
-     convention for every not-yet-built construct.
+  1. **Merge `!!import`s** (Part 2 §2.2.3, added 2026-07-24) — every import, in declaration order,
+     looked up via `loader` by canonical identity, its entries copied in *as-is* ("merged entries
+     keep their home namespace" — an imported `TypeDefinition` is never re-resolved or
+     re-materialized against the importer; only the importer's own new material gets that
+     treatment). **Shallow** — only the imported schema's own `entries()` are read, never its own
+     `imports()` — falls out for free here since `loader` always hands back an already-registered,
+     already-flattened `TsonSchema`. A name collision — between two imports, or between an import
+     and a local declaration — is a resolver error, checked as each stage merges in, not after the
+     fact: import entries first, then the importer's own resolved/synthesized entries (checked
+     against what's already merged), matching the exact ordering the user specified. An import
+     whose identity isn't found via `loader` is a `SchemaValidationException` (e.g. the importer
+     needs to have been registered into the *same* `SchemaRegistry` first — the default loader is
+     registered-only).
   2. **Materialize** — walks every entry's `TypeBody` (deliberately *not* `TypeDefinition.source` —
      see below) for any `TypeRef` with non-empty `arguments`, bottom-up (a nested argument that's
      itself argument-bearing materializes first, so an outer synthesized name is built from an
@@ -767,6 +775,21 @@ applications too (§5.3) — three separate `[type_name]?` uses across different
 correctly dedup to a single `array_type_name_*` entry, confirmed against the real data, not just a
 hand-built case.
 
+**`!!import` merging verified against the real `meta.tn1` fixture too, with an honest limit.**
+`MetaSchemaImportTest` (`tson-parser`, same reasoning as above for why it lives there) registers the
+real meta-kernel schema first, then meta.tn1's own declarations (`!!import:"...meta-kernel.tn1"`),
+confirming meta-kernel's own entries (`atom`, `text_type`, ...) are visible and correctly referenced
+from meta.tn1's own composition-based declarations (`date_type => ~atom & atom_specification &
+{...}`). **meta.tn1 can't be registered in full yet** — 4 of its 31 declarations (`binary_encoding`,
+`ieee_format`, `complex_component`, `ordered`) are `!enum [...]` constructor-application `Instance`s,
+a construct `SchemaResolver` doesn't resolve generically outside `MetaKernelParser`'s own hand-rolled
+meta-kernel bootstrap — a separate, pre-existing gap, unrelated to import merging itself. Three more
+declarations (`binary`, `float_type`, `complex_type`) reference one of those four as a field type, so
+attempting to register them too correctly *fails* reference validation — the test proves this
+directly (a dedicated assertion registering just `binary` and catching the expected
+`SchemaValidationException`), rather than silently working around it. The other 24 declarations,
+whose own dependency closure is otherwise complete, register cleanly.
+
 ### Conformance suite integration (`ConformanceSuiteTest`)
 
 Separate from `LexerTest`/`ParserTest` (fine-grained unit tests) is `ConformanceSuiteTest`, which runs
@@ -797,6 +820,7 @@ No system Gradle — always use the wrapper:
 ./gradlew :tson-schema:test --tests "io.ltr8.tson.schema.SchemaRegistryTest"
 ./gradlew :tson-schema:test --tests "io.ltr8.tson.schema.registry.SchemaValidatorTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.MetaKernelSchemaRegistryTest"
+./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.MetaSchemaImportTest"
 ```
 
 ## Not yet implemented
@@ -807,10 +831,14 @@ No system Gradle — always use the wrapper:
   own Javadoc (under "Schema resolution" above) for the exact, current boundary of what resolves.
   (Template/instantiation-entry *materialization* itself is now handled — see "Schema registry"
   above — just not per §8.2's precise constructor-vs-template split; materialization is uniform.)
-- `!!import` merging — `SchemaRegistry`/`SchemaValidator` (see "Schema registry" above) reject a
-  schema declaring any `!!import` outright rather than merging the imported schema's entries into
-  the importer's namespace; the `SchemaLoader` hook is wired but not yet consulted. Next real step
-  once `meta.tn1` (which imports meta-kernel) is tackled.
+- **Constructor-application `Instance` generalization** (`!C value`, §5.5) — `SchemaResolver` still
+  only dispatches this for `MetaKernelParser`'s own hand-rolled meta-kernel bootstrap targets
+  (`unit`/`integer_type`/`text_type`/`uri_type`/`regex_type`/`enum`), not generically for an
+  arbitrary schema. This is the actual blocker keeping `meta.tn1` from registering in full today —
+  see "Schema registry" above's `MetaSchemaImportTest`: 4 of its 31 declarations are `!enum [...]`
+  Instances (`binary_encoding`/`ieee_format`/`complex_component`/`ordered`), and 3 more
+  (`binary`/`float_type`/`complex_type`) reference one of those as a field type, so registering
+  them too correctly fails reference validation until this generalizes.
 - A schema-validating data parser (Class 2) that consults a resolved `TsonSchema`/`TypeDefinition`
   while parsing data — the built-in vocabulary's `schema.meta`/`resolver.vocab` split (see "Built-in
   type vocabulary" above) is groundwork for this, not this itself.
