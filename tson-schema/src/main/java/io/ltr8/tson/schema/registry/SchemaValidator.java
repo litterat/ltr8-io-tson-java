@@ -42,14 +42,20 @@ import io.ltr8.tson.schema.meta.UuidType;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * The private "pass 2" {@code SchemaRegistry#register} runs before a schema is admitted: flattens
- * every {@code type_ref} with arguments into a real, named entry, then checks that every reference
- * anywhere in the schema actually resolves. Not part of the public API -- see this package's own
- * Javadoc note (on {@link CanonicalIdentity}) for why this class is nonetheless {@code public}.
+ * every {@code type_ref} with arguments into a real, named entry, populates {@code
+ * TypeDefinition.subtypes} (the reverse of {@code supertypes}, for *this schema's own merged view*
+ * of every entry it can see, imported or local -- see {@link #computeSubtypes}'s own Javadoc for
+ * why crediting a subtype onto an imported entry's copy here never touches the imported schema's
+ * own separately-registered original), then checks that every reference anywhere in the schema
+ * actually resolves. Not part of the public API -- see this package's own Javadoc note (on {@link
+ * CanonicalIdentity}) for why this class is nonetheless {@code public}.
  *
  * <p><b>Materialization is uniform</b> (a deliberate simplification confirmed with the user, not
  * Part 2 §8.2's literal text): *every* {@code type_ref} with a non-empty {@code arguments} list
@@ -100,6 +106,7 @@ public final class SchemaValidator {
 
         Map<TypeRef, String> materializedNames = new LinkedHashMap<>();
         Map<String, TypeDefinition> synthesized = new LinkedHashMap<>();
+        Set<String> localNames = new LinkedHashSet<>();
 
         for (Map.Entry<String, TypeDefinition> entry : schema.entries().entrySet()) {
             if (merged.containsKey(entry.getKey())) {
@@ -110,14 +117,74 @@ public final class SchemaValidator {
             Top rewrittenBody = rewriteBody(def.body(), materializedNames, synthesized);
             merged.put(entry.getKey(), new TypeDefinition(def.source(), def.kind(), def.parameters(),
                     def.constructor(), def.supertypes(), def.subtypes(), def.disjoint(), rewrittenBody));
+            localNames.add(entry.getKey());
         }
         merged.putAll(synthesized);
+        localNames.addAll(synthesized.keySet());
+
+        merged = computeSubtypes(merged, localNames);
 
         for (Map.Entry<String, TypeDefinition> entry : merged.entrySet()) {
             validateEntry(entry.getKey(), entry.getValue(), merged);
         }
 
         return new TsonSchema(schema.id(), schema.meta(), schema.imports(), merged);
+    }
+
+    // ── Subtypes (reverse index) ─────────────────────────────────────────
+
+    /**
+     * Populates {@link TypeDefinition#subtypes}, the reverse of {@link TypeDefinition#supertypes}
+     * -- never done anywhere before this (see {@code SchemaResolver}'s own Javadoc: "subtypes...
+     * is never populated -- it needs a whole-schema pass, not a per-declaration one"). Since {@code
+     * supertypes} is already the full *transitive* IS-A chain (by the induction {@code
+     * SchemaResolver}'s composition/refinement resolution already performs), the reverse index
+     * falls out just as transitively for free: if {@code success_response}'s own {@code
+     * supertypes} includes both {@code response} and (transitively) {@code top}, then both gain
+     * {@code success_response} as a subtype here, with no separate transitive-closure step needed.
+     *
+     * <p><b>Only {@code localNames} entries are walked as potential subtypes -- but the supertype
+     * being credited may be anywhere in {@code merged}, imported or local.</b> An import's own
+     * already-registered {@link TsonSchema} is never mutated -- {@code mergeImports} only reads its
+     * {@code entries()} (an unmodifiable map) and copies {@code TypeDefinition} *references* into a
+     * brand-new {@code merged} map built fresh for *this* validation; replacing one of those
+     * references in {@code merged} (via {@link #withAddedSubtypes}) changes only this schema's own
+     * result, never the imported schema's own frozen copy sitting wherever {@code loader} found it.
+     * So when a local entry composes with an imported supertype, crediting the subtype onto *this
+     * schema's own view* of that supertype is safe, and correct: from this schema's own perspective
+     * the supertype genuinely does have that subtype, even though the imported schema, examined on
+     * its own, correctly doesn't know about it. {@link #withAddedSubtypes} unions with whatever
+     * subtypes the target already had (e.g. other subtypes declared within its own home schema)
+     * rather than replacing them, so an import contributes its own existing subtypes plus whatever
+     * new ones this importer adds -- both survive in this schema's own merged result.
+     */
+    private static Map<String, TypeDefinition> computeSubtypes(Map<String, TypeDefinition> merged,
+                                                                 Set<String> localNames) {
+        Map<String, Set<String>> newSubtypesByName = new LinkedHashMap<>();
+        for (String localName : localNames) {
+            for (String supertype : merged.get(localName).supertypes()) {
+                if (merged.containsKey(supertype)) {
+                    newSubtypesByName.computeIfAbsent(supertype, ignored -> new LinkedHashSet<>()).add(localName);
+                }
+            }
+        }
+        if (newSubtypesByName.isEmpty()) {
+            return merged;
+        }
+
+        Map<String, TypeDefinition> result = new LinkedHashMap<>(merged);
+        for (Map.Entry<String, Set<String>> entry : newSubtypesByName.entrySet()) {
+            result.put(entry.getKey(), withAddedSubtypes(result.get(entry.getKey()), entry.getValue()));
+        }
+        return result;
+    }
+
+    /** {@code def} plus {@code newSubtypes}, unioned with whatever subtypes it already had -- a new {@link TypeDefinition}, {@code def} itself untouched. */
+    private static TypeDefinition withAddedSubtypes(TypeDefinition def, Set<String> newSubtypes) {
+        Set<String> combined = new LinkedHashSet<>(def.subtypes());
+        combined.addAll(newSubtypes);
+        return new TypeDefinition(def.source(), def.kind(), def.parameters(), def.constructor(),
+                def.supertypes(), List.copyOf(combined), def.disjoint(), def.body());
     }
 
     /**
