@@ -18,14 +18,14 @@ import io.ltr8.tson.parser.ast.TokenValue;
  * etc.) for a caller with no specific target in mind.
  *
  * <p>{@link #read(TokenValue, Class)} is for a caller that *does* know its target representation
- * (e.g. {@code tson-mapper} binding to a field declared {@code int}) and wants it directly, without
+ * (e.g. {@code io.ltr8.tson.parser.mapper} binding to a field declared {@code int}) and wants it directly, without
  * a caller-side table of which method name produces which primitive for which atom type -- that
  * knowledge stays inside each {@code AtomType} implementation instead of leaking into every caller.
  * The default here covers atoms with exactly one legitimate host representation (most of them --
  * {@code uuid}, {@code date}, ...): read the natural value and require the target to accept it.
  * Atoms with more than one legitimate representation (the numeric family) override it to narrow
  * directly, sharing the target-matching logic in {@link
- * io.ltr8.tson.parser.resolver.NumberNarrowing} with {@code tson-mapper}'s untyped-number binding
+ * io.ltr8.tson.parser.resolver.NumberNarrowing} with {@code io.ltr8.tson.parser.mapper}'s untyped-number binding
  * rather than duplicating it -- this interface still has no dependency on any binding library;
  * {@code Class<?>} is a bare JDK type, not {@code tson-bind}'s {@code DataClassAtom}.
  *

@@ -21,8 +21,9 @@ import java.util.Objects;
  * it (e.g. re-serializing back to TSON text).
  *
  * <p>This is deliberately a minimal value type, not a full arithmetic library (no {@code plus}/
- * {@code times}/reduction methods). <b>{@code tson-mapper}'s {@code TsonMapper} cannot bind directly
- * to this class at all</b> -- it's itself a Java record, so {@code tson-bind}'s record
+ * {@code times}/reduction methods). <b>{@code io.ltr8.tson.parser.mapper}'s {@code
+ * TsonMapperReader} cannot bind directly to this class at all</b> -- it's itself a Java record, so
+ * {@code tson-bind}'s record
  * auto-detection claims it ahead of anything atom/vocabulary-related, and a {@code !rational}
  * value's token content (not a record) fails to satisfy a record target. The supported way to bind
  * {@code !rational} to a Java field, including to this class's own shape if that's genuinely what's

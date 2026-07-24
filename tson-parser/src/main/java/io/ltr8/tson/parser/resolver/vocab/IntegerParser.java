@@ -39,7 +39,7 @@ import java.math.BigInteger;
  * always against *this atom's own* declared constraint regardless of which entry point is used -- if
  * the target is narrower than what the atom actually guarantees (binding {@code !int32} to a {@code
  * short}), {@code NumberNarrowing} itself throws {@code ArithmeticException}, which is the caller's
- * problem to translate (mirroring how {@code tson-mapper}'s {@code AtomBinder} already handles the
+ * problem to translate (mirroring how {@code io.ltr8.tson.parser.mapper}'s {@code AtomBinder} already handles the
  * same failure mode for untyped numbers, via the same shared narrowing code).
  */
 public record IntegerParser(IntegerType constraints) implements AtomType<Number> {

@@ -34,7 +34,7 @@ import java.lang.annotation.Target;
  * there's no plan to add a per-field/per-element equivalent; see {@code SPEC-FEEDBACK.md} for why.
  *
  * <p>At most one component per record may carry this annotation, and its declared type must be
- * {@code io.ltr8.tson.mapper.TsonAnnotations}.
+ * {@code io.ltr8.tson.parser.mapper.TsonAnnotations}.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ ElementType.METHOD, ElementType.PARAMETER })

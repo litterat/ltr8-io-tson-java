@@ -51,9 +51,14 @@ import java.util.Optional;
  *
  * <p><b>Constructor-application binding is done by hand, not through generic object binding</b> --
  * deliberately, so this class needs nothing beyond {@code tson-parser}/{@code tson-schema} (both
- * already main-scope dependencies of this module) and can live here rather than in {@code
- * tson-mapper} (an earlier version of this class used {@code TsonMapper.toObject} and lived there
- * for exactly that reason; moved back once the generic-binding step turned out to be unnecessary).
+ * already main-scope dependencies of this module) and can live here rather than needing the
+ * generic reflective binding {@code io.ltr8.tson.parser.mapper}'s {@code TsonMapperReader} offers
+ * (an earlier version of this class used {@code TsonMapper.toObject} and lived in a separate {@code
+ * tson-mapper} module for exactly that reason; moved into this module once the generic-binding step
+ * turned out to be unnecessary for meta-kernel's own narrow bootstrap set -- that module no longer
+ * exists at all today, since {@code TsonMapperReader}/{@code TsonMapperWriter} themselves moved
+ * here too, for the *opposite* reason: {@code SchemaResolver}'s generalized constructor-application/
+ * atom-refinement resolution genuinely does need generic binding).
  * An {@code Instance}'s {@code value} is already a parsed {@link DataValue} (the schema grammar
  * reuses Part 1's own data-value parsing directly, per {@code SchemaParser}'s own Javadoc), and
  * every registered target's shape is simple enough to check directly against the AST: {@code

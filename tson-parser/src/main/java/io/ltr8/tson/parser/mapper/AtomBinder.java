@@ -1,4 +1,4 @@
-package io.ltr8.tson.mapper;
+package io.ltr8.tson.parser.mapper;
 
 import io.ltr8.bind.DataBindException;
 import io.ltr8.tson.parser.resolver.BaseValue;

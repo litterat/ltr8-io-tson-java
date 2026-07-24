@@ -353,9 +353,9 @@ public class DefaultRecordBinder {
 	 * every other field kind, this one is never bound from an authored value at all (a binder
 	 * populates it from the *enclosing* value's own wire-format annotations instead), so there's no
 	 * {@code DataClass} to resolve and {@link DataClassField#dataClass()} is left {@code null}.
-	 * {@code tson-bind} itself has no dependency on {@code tson-mapper}, so it can't validate that
-	 * the component's declared type is actually {@code TsonAnnotations} here -- that check happens
-	 * where the type is visible, at binding time in {@code tson-mapper}.
+	 * {@code tson-bind} itself has no dependency on the mapper layer above it, so it can't validate
+	 * that the component's declared type is actually {@code TsonAnnotations} here -- that check
+	 * happens where the type is visible, at binding time in {@code io.ltr8.tson.parser.mapper}.
 	 */
 	private DataClassField resolveAnnotationsCarrierField(Class<?> targetClass, ComponentInfo info, int index) {
 		MethodHandle accessor = accessor(info);

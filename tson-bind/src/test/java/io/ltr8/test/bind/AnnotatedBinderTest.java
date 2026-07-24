@@ -27,8 +27,8 @@ import io.ltr8.bind.DataClassRecord;
 
 public class AnnotatedBinderTest {
 
-	// Deliberately not a resolvable atom/record/etc. -- tson-bind has no dependency on
-	// tson-mapper's real TsonAnnotations carrier type, and DefaultRecordBinder never calls
+	// Deliberately not a resolvable atom/record/etc. -- tson-bind has no dependency on the
+	// mapper layer's real TsonAnnotations carrier type, and DefaultRecordBinder never calls
 	// context.getDescriptor() for an @Annotated component in the first place, so there's nothing
 	// for this class to need to resolve to.
 	public static class OpaqueCarrier {

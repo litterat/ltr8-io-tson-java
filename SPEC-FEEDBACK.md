@@ -118,7 +118,7 @@ application-level consumer that wants to use `type-ref` for host-language type d
 resolving a Java union member from `!Circle`) has zero spec guidance today, and no way to know whether the
 eventual Part 2 rule will be case-sensitive-only (as §5.1 is, for the built-in set) or something looser.
 
-**Interpretation chosen:** `TsonMapper.resolveUnionMember` (tson-mapper) treats this as purely an
+**Interpretation chosen:** `TsonMapperReader.resolveUnionMember` (`io.ltr8.tson.parser.mapper`) treats this as purely an
 application-binding decision, not a spec-conformance one — the Class 1/Class 2 preservation requirement is
 satisfied upstream (the parser hands the type-ref through as an uninterpreted string), and everything
 downstream of that is this implementation's own policy: try an exact match against a member class's
@@ -288,7 +288,7 @@ essentially nothing beyond what's already the default), but the spec doesn't say
 **Interpretation chosen:** `!text` is not implemented as a built-in annotation in this implementation's
 Class 1 resolver, matching the letter of §5's tables. An unannotated string-shaped token, or one under an
 unrecognized `!text` annotation, is handled the same as any other non-vocabulary name (§5.1: preserved as
-an uninterpreted marker at the Class 1 layer; a binding error at `tson-mapper`'s layer per entry #7).
+an uninterpreted marker at the Class 1 layer; a binding error at the mapper layer's per entry #7).
 
 **Suggested resolution:** Either add a `!text` row somewhere in §5 (there's no obviously-correct
 subsection for it among the four existing family headings, which is itself a small structural
@@ -422,7 +422,7 @@ record about, since every implementation doing typed binding on top of TSON will
 
 **Interpretation chosen:** `io.ltr8.annotation.Annotated`, a marker on one Java record component,
 opts a caller into recovering *only* the annotations on the value the whole record itself corresponds
-to (`TsonAnnotations`, in `tson-mapper`, wrapping the raw, ordered `Annotation` list) — deliberately not
+to (`TsonAnnotations`, in `io.ltr8.tson.parser.mapper`, wrapping the raw, ordered `Annotation` list) — deliberately not
 a general "child annotations" mechanism. A record-field-keyed (or array-index-keyed, or map-key-keyed)
 carrier for children's annotations was considered and rejected: it would only push the same problem down
 one level without resolving the recursive case, needs a different bespoke convention per container kind,

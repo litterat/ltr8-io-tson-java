@@ -1,4 +1,4 @@
-package io.ltr8.tson.mapper;
+package io.ltr8.tson.parser.mapper;
 
 import io.ltr8.tson.parser.ast.Annotation;
 

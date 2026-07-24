@@ -1,4 +1,4 @@
-package io.ltr8.tson.mapper;
+package io.ltr8.tson.parser.mapper;
 
 import io.ltr8.annotation.Annotated;
 import io.ltr8.annotation.Atom;
@@ -33,15 +33,14 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class TsonMapperTest {
+class TsonMapperReaderTest {
 
-    private final TsonMapper mapper = new TsonMapper();
+    private final TsonMapperReader mapper = new TsonMapperReader();
 
     // ── Records ──────────────────────────────────────────────────────────
 
@@ -613,8 +612,8 @@ class TsonMapperTest {
     void builtinUuidAnnotationBindsDirectlyThroughTheMapper() throws DataBindException {
         // Unlike Rational/Complex, UUID isn't a Java record, so it doesn't collide with
         // tson-bind's record auto-detection -- but it also can't self-declare @Atom (it's a JDK
-        // class), so TsonMapper's default DataBindContext pre-registers it (see TsonMapper's
-        // defaultContext()) rather than requiring every caller to do so themselves.
+        // class), so TsonMapperReader's default DataBindContext pre-registers it (see
+        // TsonMapperContext.defaultContext()) rather than requiring every caller to do so themselves.
         UuidHolder h = mapper.toObject("{ value: !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09 }", UuidHolder.class);
         assertEquals(UUID.fromString("9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09"), h.value());
     }
@@ -633,10 +632,10 @@ class TsonMapperTest {
     @Test
     void builtinUriAnnotationBindsDirectlyThroughTheMapper() throws DataBindException {
         // Like UUID, java.net.URI isn't a record or an array, so no auto-detection collision --
-        // but it also can't self-declare @Atom, being a JDK class, so TsonMapper's default context
-        // pre-registers it the same way it does UUID/LocalDate. Quoted because ':' '/' '?' '=' are
-        // not legal unquoted-token characters (§7.2) -- the URI value itself is unaffected by that,
-        // it's a lexer-layer constraint, not a UriParser one.
+        // but it also can't self-declare @Atom, being a JDK class, so TsonMapperReader's default
+        // context pre-registers it the same way it does UUID/LocalDate. Quoted because ':' '/' '?'
+        // '=' are not legal unquoted-token characters (§7.2) -- the URI value itself is unaffected
+        // by that, it's a lexer-layer constraint, not a UriParser one.
         UriHolder h = mapper.toObject("{ value: !uri \"https://example.com/a/b?x=1\" }", UriHolder.class);
         assertEquals(URI.create("https://example.com/a/b?x=1"), h.value());
     }
@@ -656,8 +655,9 @@ class TsonMapperTest {
     @Test
     void builtinIpv4AnnotationBindsDirectlyThroughTheMapper() throws DataBindException, UnknownHostException {
         // Ipv4Parser#read always returns Inet4Address specifically (never the broader InetAddress),
-        // and TsonMapper's default context registers exactly that class -- see defaultContext()'s
-        // Javadoc on why the field must be declared Inet4Address, not InetAddress, to bind directly.
+        // and TsonMapperReader's default context registers exactly that class -- see
+        // TsonMapperContext's Javadoc on why the field must be declared Inet4Address, not
+        // InetAddress, to bind directly.
         Ipv4Holder h = mapper.toObject("{ value: !ipv4 192.168.0.1 }", Ipv4Holder.class);
         assertEquals(InetAddress.getByAddress(new byte[]{(byte) 192, (byte) 168, 0, 1}), h.value());
     }
@@ -701,7 +701,7 @@ class TsonMapperTest {
     @Test
     void builtinDateAnnotationBindsDirectlyThroughTheMapper() throws DataBindException {
         // LocalDate isn't a record or an array, so no auto-detection collision -- but it also
-        // can't self-declare @Atom, being a JDK class, so TsonMapper's default context
+        // can't self-declare @Atom, being a JDK class, so TsonMapperReader's default context
         // pre-registers it the same way it does UUID.
         DateHolder h = mapper.toObject("{ value: !date 2025-03-13 }", DateHolder.class);
         assertEquals(LocalDate.of(2025, 3, 13), h.value());
@@ -768,7 +768,7 @@ class TsonMapperTest {
     void durationBindsToAThirdPartyTypeViaRegisteredDataBridge() throws DataBindException {
         DataBindContext context = DataBindContext.builder().build();
         context.registerAtom(UserDuration.class, new UserDurationBridge());
-        TsonMapper bridgedMapper = new TsonMapper(context);
+        TsonMapperReader bridgedMapper = new TsonMapperReader(context);
 
         UserDurationHolder h = bridgedMapper.toObject("{ value: !duration P1Y2M3DT4H5M6S }", UserDurationHolder.class);
         assertEquals(new UserDuration(1, 2, 3, 4 * 3600L + 5 * 60L + 6L), h.value());
@@ -784,9 +784,10 @@ class TsonMapperTest {
         // byte[].isArray() is true, so DefaultClassBinder's array auto-detection would claim it
         // ahead of the atom/vocabulary path -- the same shape of collision Rational/Complex have
         // with record auto-detection, just against arrays instead of records -- on a bare context
-        // that hasn't pre-registered byte[].class the way TsonMapper's own default constructor does
-        // (see TsonMapper.defaultContext()). This documents *why* that pre-registration exists.
-        TsonMapper bareMapper = new TsonMapper(DataBindContext.builder().build());
+        // that hasn't pre-registered byte[].class the way TsonMapperReader's own default
+        // constructor does (see TsonMapperContext.defaultContext()). This documents *why* that
+        // pre-registration exists.
+        TsonMapperReader bareMapper = new TsonMapperReader(DataBindContext.builder().build());
         assertThrows(DataBindException.class, () -> bareMapper.toObject("{ value: !base64 TWFu }", BytesHolder.class));
     }
 
@@ -858,7 +859,7 @@ class TsonMapperTest {
     void rationalBindsToAThirdPartyTypeViaRegisteredDataBridge() throws DataBindException {
         DataBindContext context = DataBindContext.builder().build();
         context.registerAtom(UserFraction.class, new UserFractionBridge());
-        TsonMapper bridgedMapper = new TsonMapper(context);
+        TsonMapperReader bridgedMapper = new TsonMapperReader(context);
 
         UserFractionHolder h = bridgedMapper.toObject("{ value: !rational \"2/3\" }", UserFractionHolder.class);
         assertEquals(new UserFraction(2, 3), h.value());
@@ -897,7 +898,7 @@ class TsonMapperTest {
     void complexBindsToAThirdPartyTypeViaRegisteredDataBridge() throws DataBindException {
         DataBindContext context = DataBindContext.builder().build();
         context.registerAtom(UserComplex.class, new UserComplexBridge());
-        TsonMapper bridgedMapper = new TsonMapper(context);
+        TsonMapperReader bridgedMapper = new TsonMapperReader(context);
 
         UserComplexHolder h = bridgedMapper.toObject("{ value: !complex 3+4i }", UserComplexHolder.class);
         assertEquals(new UserComplex(3.0, 4.0), h.value());
@@ -957,215 +958,5 @@ class TsonMapperTest {
     void unionWithUnknownTypeNameThrows() throws DataBindException {
         assertThrows(DataBindException.class,
                 () -> mapper.toObject("{ shape: !triangle { a: 1 } }", ShapeHolder.class));
-    }
-
-    // ── toTson (write direction) ──────────────────────────────────────────
-
-    @Test
-    void writeSimpleRecord() throws DataBindException {
-        assertEquals("{ x: 1 y: 2 }", mapper.toTson(new Point(1, 2)));
-    }
-
-    @Test
-    void writeNestedRecordRoundTrips() throws DataBindException {
-        Order original = mapper.toObject(
-                "{ orderId: 1042 customer: { name: \"Ada Lovelace\" email: \"ada@example.com\" } }", Order.class);
-        Order roundTripped = mapper.toObject(mapper.toTson(original), Order.class);
-        assertEquals(original, roundTripped);
-    }
-
-    @Test
-    void writeArrayOfRecordsRoundTrips() throws DataBindException {
-        Items original = mapper.toObject("{ points: [ { x: 1 y: 2 } { x: 3 y: 4 } ] }", Items.class);
-        Items roundTripped = mapper.toObject(mapper.toTson(original), Items.class);
-        assertEquals(original, roundTripped);
-    }
-
-    @Test
-    void writeEmptyArray() throws DataBindException {
-        assertEquals("{ tags: [] }", mapper.toTson(mapper.toObject("{ tags: [] }", StringListHolder.class)));
-    }
-
-    @Test
-    void writeMapRoundTrips() throws DataBindException {
-        CountsHolder original = mapper.toObject("{ counts: { apples => 3 pears => 5 } }", CountsHolder.class);
-        CountsHolder roundTripped = mapper.toObject(mapper.toTson(original), CountsHolder.class);
-        assertEquals(original.counts(), roundTripped.counts());
-    }
-
-    @Test
-    void writeTupleIsArrayShapedWithNoTypeInformation() throws DataBindException {
-        // Schemaless output has no way to say "this array is really a tuple" -- see toTson's own
-        // Javadoc, the same accepted loss as an integer's exact width.
-        NameAndAge original = new NameAndAge("Alice", 30);
-        String tson = mapper.toTson(original);
-        assertEquals("[ \"Alice\" 30 ]", tson);
-
-        PersonHolder roundTripped = mapper.toObject("{ person: " + tson + " }", PersonHolder.class);
-        assertEquals(original, roundTripped.person());
-    }
-
-    @Test
-    void writeEnumGoesThroughItsBridgeAsAQuotedStringAndRoundTrips() throws DataBindException {
-        // EnumStringBridge.toData() produces a plain String ("RED"), which then writes through the
-        // ordinary string path (quoted) -- no enum-specific special case in TsonMapper.write().
-        Paint original = mapper.toObject("{ color: RED }", Paint.class);
-        String tson = mapper.toTson(original);
-        assertEquals("{ color: \"RED\" }", tson);
-        assertEquals(original, mapper.toObject(tson, Paint.class));
-    }
-
-    @Test
-    void writeUnionEmitsTypeRefAndRoundTrips() throws DataBindException {
-        ShapeHolder original = mapper.toObject("{ shape: !circle { radius: 5 } }", ShapeHolder.class);
-        String tson = mapper.toTson(original);
-        assertEquals("{ shape: !circle { radius: 5 } }", tson);
-        assertEquals(original, mapper.toObject(tson, ShapeHolder.class));
-    }
-
-    @Test
-    void writeUnionMemberWithExplicitTypenameUsesItVerbatim() throws DataBindException {
-        NamedShapeHolder original = mapper.toObject("{ shape: !sq { side: 2 } }", NamedShapeHolder.class);
-        assertEquals("{ shape: !sq { side: 2 } }", mapper.toTson(original));
-    }
-
-    @Test
-    void writeUuidEmitsTypeRefAndRoundTrips() throws DataBindException {
-        UuidHolder original = mapper.toObject("{ value: !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09 }", UuidHolder.class);
-        String tson = mapper.toTson(original);
-        assertEquals("{ value: !uuid \"9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09\" }", tson);
-        assertEquals(original, mapper.toObject(tson, UuidHolder.class));
-    }
-
-    @Test
-    void writeIpv4UsesHostAddressNotToString() throws DataBindException, UnknownHostException {
-        // Inet4Address#toString() prepends "/" -- confirmed empirically before writing AtomWriter;
-        // this is the regression test for that exact gotcha.
-        Ipv4Holder original = mapper.toObject("{ value: !ipv4 192.168.0.1 }", Ipv4Holder.class);
-        String tson = mapper.toTson(original);
-        assertEquals("{ value: !ipv4 \"192.168.0.1\" }", tson);
-        assertEquals(original, mapper.toObject(tson, Ipv4Holder.class));
-    }
-
-    @Test
-    void writeIpv6UsesHostAddressNotToString() throws DataBindException {
-        Ipv6Holder original = mapper.toObject("{ value: !ipv6 \"2001:db8::1\" }", Ipv6Holder.class);
-        String tson = mapper.toTson(original);
-        assertEquals(original, mapper.toObject(tson, Ipv6Holder.class));
-        assertTrue(tson.contains("!ipv6 \""), "expected a quoted !ipv6 value, got: " + tson);
-        assertFalse(tson.contains("/"), "Inet6Address#toString()'s leading '/' must not leak through: " + tson);
-    }
-
-    @Test
-    void writeBinaryEmitsBase64TypeRefRegardlessOfOriginalEncoding() throws DataBindException {
-        // No way to recover which of base64/base64url/base32/hex a byte[] came from -- base64 is
-        // the writer's arbitrary but reasonable default (see AtomWriter's own Javadoc).
-        BytesHolder original = mapper.toObject("{ value: !hex deadbeef }", BytesHolder.class);
-        String tson = mapper.toTson(original);
-        assertEquals("{ value: !base64 \"3q2+7w==\" }", tson);
-        assertArrayEquals(original.value(), mapper.toObject(tson, BytesHolder.class).value());
-    }
-
-    public record Uint8Holder(int value) {
-    }
-
-    @Test
-    void writeIntegerFamilyLosesItsExactWidthByDesign() throws DataBindException {
-        // §5.6's !uint8 constrains the *range*, not the host representation -- once bound to a
-        // plain int, nothing records that it was ever narrower than "some integer". A schemaless
-        // writer has no annotation to reach for, the same reason a schemaless reader can't validate
-        // a bare 42 against any width at all. Documented in toTson's own Javadoc, not just here.
-        Uint8Holder h = mapper.toObject("{ value: !uint8 42 }", Uint8Holder.class);
-        assertEquals("{ value: 42 }", mapper.toTson(h));
-    }
-
-    public record OptionalHolder(int required, Optional<String> nickname) {
-    }
-
-    @Test
-    void writeOmitsAbsentOptionalFieldEntirely() throws DataBindException {
-        OptionalHolder h = mapper.toObject("{ required: 1 }", OptionalHolder.class);
-        assertEquals("{ required: 1 }", mapper.toTson(h));
-    }
-
-    @Test
-    void writePresentOptionalFieldWritesTheUnwrappedValue() throws DataBindException {
-        OptionalHolder h = mapper.toObject("{ required: 1 nickname: \"Ada\" }", OptionalHolder.class);
-        assertEquals("{ required: 1 nickname: \"Ada\" }", mapper.toTson(h));
-    }
-
-    public record StringHolder(String value) {
-    }
-
-    @Test
-    void writeStringEscapesQuotesAndBackslashes() throws DataBindException {
-        StringHolder h = new StringHolder("a\"b\\c");
-        String tson = mapper.toTson(h);
-        assertEquals("{ value: \"a\\\"b\\\\c\" }", tson);
-        assertEquals(h, mapper.toObject(tson, StringHolder.class));
-    }
-
-    @Test
-    void writeNaNAndInfinityUseSpecialValueTokensNotJavaSpelling() throws DataBindException {
-        // NumberGrammar's special-value form is spelled .nan/.inf/-.inf -- nothing like Java's own
-        // Double.toString() (NaN/Infinity/-Infinity); confirmed empirically before writing this.
-        assertEquals("{ value: .nan }", mapper.toTson(new DoubleHolder(Double.NaN)));
-        assertEquals("{ value: +.inf }", mapper.toTson(new DoubleHolder(Double.POSITIVE_INFINITY)));
-        assertEquals("{ value: -.inf }", mapper.toTson(new DoubleHolder(Double.NEGATIVE_INFINITY)));
-
-        DoubleHolder h = mapper.toObject(mapper.toTson(new DoubleHolder(Double.NaN)), DoubleHolder.class);
-        assertTrue(Double.isNaN(h.value()));
-    }
-
-    @Test
-    void writeRationalComplexDurationRoundTripThroughDataBridges() throws DataBindException {
-        DataBindContext fractionContext = DataBindContext.builder().build();
-        fractionContext.registerAtom(UserFraction.class, new UserFractionBridge());
-        TsonMapper fractionMapper = new TsonMapper(fractionContext);
-        UserFractionHolder fraction = fractionMapper.toObject("{ value: !rational \"2/3\" }", UserFractionHolder.class);
-        String fractionTson = fractionMapper.toTson(fraction);
-        assertEquals("{ value: !rational \"2/3\" }", fractionTson);
-        assertEquals(fraction, fractionMapper.toObject(fractionTson, UserFractionHolder.class));
-
-        DataBindContext complexContext = DataBindContext.builder().build();
-        complexContext.registerAtom(UserComplex.class, new UserComplexBridge());
-        TsonMapper complexMapper = new TsonMapper(complexContext);
-        UserComplexHolder complex = complexMapper.toObject("{ value: !complex 3+4i }", UserComplexHolder.class);
-        // UserComplexBridge.toData() goes through BigDecimal.valueOf(double), which reflects
-        // Double.toString()'s own canonical form -- "3.0", not "3" -- for a whole-number double.
-        assertEquals("{ value: !complex \"3.0+4.0i\" }", complexMapper.toTson(complex));
-
-        DataBindContext durationContext = DataBindContext.builder().build();
-        durationContext.registerAtom(UserDuration.class, new UserDurationBridge());
-        TsonMapper durationMapper = new TsonMapper(durationContext);
-        UserDurationHolder duration =
-                durationMapper.toObject("{ value: !duration P1Y2M3DT4H5M6S }", UserDurationHolder.class);
-        assertEquals("{ value: !duration \"P1Y2M3DT4H5M6S\" }", durationMapper.toTson(duration));
-    }
-
-    // ── Full example, adapted from spec §2.1 ─────────────────────────────
-
-    public record Address(String street, String city) {
-    }
-
-    public record FullOrder(int orderId, Customer customer, List<Point> items, Optional<Address> shipping) {
-    }
-
-    @Test
-    void reasonablyFullDocument() throws DataBindException {
-        FullOrder order = mapper.toObject("""
-                {
-                  orderId: 1042
-                  customer: { name: "Ada Lovelace" email: "ada@example.com" }
-                  items: [ { x: 1 y: 2 } { x: 3 y: 4 } ]
-                  shipping: { street: "12 Byron Rd" city: London }
-                }
-                """, FullOrder.class);
-
-        assertEquals(1042, order.orderId());
-        assertEquals("Ada Lovelace", order.customer().name());
-        assertEquals(2, order.items().size());
-        assertEquals("12 Byron Rd", order.shipping().orElseThrow().street());
-        assertEquals("London", order.shipping().orElseThrow().city());
     }
 }

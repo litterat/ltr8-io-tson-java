@@ -57,13 +57,15 @@ written down. This applies to every layer as it gets built, not just the lexer.
 ## Architecture
 
 `tson-parser` holds the lexer, the data-grammar structural parser, base type resolution, the built-in
-type vocabulary, the Part 2 schema grammar (`SchemaParser`, `ast.schema`), *and* the schema resolver
-(`io.ltr8.tson.parser.resolver.schema.SchemaResolver`, producing Class 2's resolved schema value) under
-one module — every one of these is tightly coupled to the shared lexer/token-stream machinery (the
-schema grammar reuses the data grammar's own `annotation`/`data-value`/directive-parsing code directly,
-per Part 2 §12.1; the resolver consumes the grammar's own `SchemaMap`/`TypeDef` AST directly), so
-splitting any of them into separate Gradle modules was judged not worth the build-graph overhead, the
-same reasoning that already keeps the lexer and structural parser together.
+type vocabulary, the Part 2 schema grammar (`SchemaParser`, `ast.schema`), the schema resolver
+(`io.ltr8.tson.parser.resolver.schema.SchemaResolver`, producing Class 2's resolved schema value), *and*
+(moved here 2026-07-24, see "Mapper" below) the generic `DataValue`&lt;-&gt;Java-object binding layer
+(`io.ltr8.tson.parser.mapper`) — every one of these is tightly coupled to the shared lexer/token-stream
+machinery (the schema grammar reuses the data grammar's own `annotation`/`data-value`/directive-parsing
+code directly, per Part 2 §12.1; the resolver consumes the grammar's own `SchemaMap`/`TypeDef` AST
+directly; the mapper binds that same AST to Java objects), so splitting any of them into separate
+Gradle modules was judged not worth the build-graph overhead, the same reasoning that already keeps
+the lexer and structural parser together.
 
 **`tson-schema` holds exactly one thing: `io.ltr8.tson.schema.meta`, the resolved-schema *value* model**
 (§8's `TypeDefinition` et al.) — pure data (records, sealed interfaces, enums), no parsing, no
@@ -74,10 +76,20 @@ parser) can hold and consult `schema.meta` types directly. `schema.meta.Token` i
 shows concretely: it structurally mirrors `tson-parser`'s own `TokenValue`/`TokenForm` (same field
 names, same enum members) but is declared locally rather than imported, specifically so `schema.meta`
 never needs to reference `tson-parser` at all; `SchemaResolver` converts field-by-field at the one spot
-that needs it (`resolveField`'s `toMetaToken`). `tson-bind`/`tson-mapper`/`tson-annotation` are the
-separate Java-object-binding layer (see their own package Javadoc; not detailed in this file yet) —
+that needs it (`resolveField`'s `toMetaToken`). `tson-bind`/`tson-annotation` are the separate
+Java-object-binding layer (see their own package Javadoc; not detailed in this file yet) —
 `tson-schema`'s own `schema.meta` classes depend on `tson-annotation` only (for `@Typename`/`@Field`),
-never on `tson-bind`/`tson-mapper`.
+never on `tson-bind`.
+
+**There is no `tson-mapper` module anymore.** It originally held the `DataValue`&lt;-&gt;Java-object
+mapper (`TsonMapper`, plus `AtomBinder`/`AtomWriter`/`TsonAnnotations`), depending on `tson-parser` +
+`tson-schema` + `tson-bind`. Moved into `tson-parser` itself (2026-07-24) — split into
+`TsonMapperReader`/`TsonMapperWriter` along the way (see "Mapper" below) — once `SchemaResolver`'s own
+generalized constructor-application/atom-refinement resolution needed exactly this generic binding
+directly, which `tson-mapper`'s own dependency *on* `tson-parser` made impossible without a module
+cycle. `tson-bind` itself has no dependency on `tson-parser`/`tson-schema` (a leaf module), so
+`tson-parser` depending on it directly, in main scope, is clean — the `tson-mapper` module had nothing
+left in it afterward and was deleted outright, not just deprecated.
 
 Package: `io.ltr8.tson.parser.lexer` (group `io.ltr8`). The group is `io.ltr8`, not `io.tson`: reverse-DNS
 package naming identifies who *publishes* the artifact (and is what Maven Central's domain-ownership
@@ -208,7 +220,7 @@ string, §4.5) for `TokenValue`s produced by the parser. `NumberGrammar.tryParse
 
 `AtomType<T>` is a built-in vocabulary atom's parsing contract (§5.2): `read(TokenValue)` (the
 atom's own natural host value), `read(TokenValue, Class<?>)` (narrow directly to a caller-supplied
-target, overridden by the numeric family to share `NumberNarrowing` with `tson-mapper` rather than
+target, overridden by the numeric family to share `NumberNarrowing` with `io.ltr8.tson.parser.mapper` rather than
 routing through an intermediate `Number`), and `write(T)` (the inverse). `BuiltinTypeVocabulary` is
 the name → `AtomType` lookup table (§5's fixed, closed set — see its own Javadoc for which
 `core.tn1`/`meta.tn1` instances it's seeded with, including known departures from §5's own
@@ -256,7 +268,7 @@ field a pure, equatable `String` value (matching every other field in those "pur
 values" records) instead of a compiled host object -- `TextParser`/`UriParser` compile it at
 validation time instead of storing the compiled form. A useful side effect: this is what let
 `text`/`uri`/`regex` (§5.5's `Instance` declarations, see "Meta-kernel bootstrap" below) actually
-serialize via `TsonMapper.toTson` at all -- before this change, `TextType.pattern`/`UriType.pattern`
+serialize via `TsonMapperWriter.toTson` at all -- before this change, `TextType.pattern`/`UriType.pattern`
 being `Optional<Pattern>` made `MetaKernelParser`'s `text`/`uri`/`regex` entries throw
 `DataBindException` (`tson-bind` has no built-in `Pattern` conversion), even with the field empty,
 since record binding resolves every field's descriptor up front regardless of whether a value is
@@ -287,6 +299,45 @@ consults `schema.meta` constraint records — without `tson-schema` ever needing
 related yet (Part 2's own atom-refinement resolution — `!I ^ { ... }` — doesn't exist; see "Schema
 resolution" below) — today it's purely an internal reshaping of the existing Class 1 vocabulary,
 done in preparation for that future use, not a new capability by itself.
+
+### Mapper (`tson-parser/src/main/java/io/ltr8/tson/parser/mapper/`)
+
+Binds a parsed `DataValue` tree to a Java object given its `DataClass` descriptor from `tson-bind`,
+and back — `TsonMapperReader`/`TsonMapperWriter`. Moved here from a separate `tson-mapper` module
+(2026-07-24; see "Architecture" above for the module-cycle reasoning) once `SchemaResolver`'s own
+generalized constructor-application/atom-refinement resolution needed exactly this generic binding
+directly, which the old module's own dependency *on* `tson-parser` made impossible to reach from
+here without a cycle.
+
+**Split into `TsonMapperReader`/`TsonMapperWriter`, not one `TsonMapper` class**, for readability —
+the original already internally paired one `to*` method with one `write*` method per `DataClass`
+kind (`toAtom`/`writeAtom`, `toRecord`/`writeRecord`, `toArray`/`writeArray`, `toMap`/`writeMap`,
+`toTuple`/`writeTuple`, `toUnion`/`writeUnion`), so the split follows an already-present internal
+seam rather than inventing a new one. `AtomBinder`/`AtomWriter` (the read/write pair `toAtom`/
+`writeAtom` delegate to for values never bound through the built-in vocabulary at all) already had
+this shape from the start. Both new classes' own no-arg constructors share one `DataBindContext`
+factory (`TsonMapperContext.defaultContext()`) rather than duplicating the built-in-vocabulary atom
+registration list (`UUID`/`byte[]`/`LocalDate`/`OffsetTime`/`OffsetDateTime`/`URI`/`Inet4Address`/
+`Inet6Address`) across two classes that could drift apart.
+
+`TsonMapperReader.toObject(DataValue, Class)`/`toObject(String, Class)` bind a parsed value onto a
+target class via `tson-bind`'s `DataClass` descriptor; `TsonMapperWriter.toTson(Object)` is the
+reverse, mainly useful as a debugging tool rather than a guaranteed-lossless serializer (the integer
+family's exact width, a tuple's tuple-ness, and `@Annotated`-captured wire-format annotations are
+all documented, deliberate write-side losses — see `toTson`'s own Javadoc). Atom binding checks for
+a type-ref first (`BuiltinTypeVocabulary`, §5) before falling through to plain `BaseTypeResolver`
+identification + `AtomBinder` binding for an untyped value — both paths share the same final
+narrowing step (`NumberNarrowing`, in `resolver`) so a plain `42` and a `!uint8 42` bind identically
+regardless of which path found them.
+
+**No positional-form support** (§5.6: a record with exactly one `REQUIRED` field can be filled by a
+bare, non-braced value at any schema-backed data position) — `toRecord` only accepts a `RecordValue`
+or `EmptyBrace`, never a bare token/array. This is why `MetaKernelParser`'s own `!enum [...]`
+handling (see "Meta-kernel bootstrap" below) stays hand-written rather than routing through
+`TsonMapperReader` generically — a real, currently-unclosed gap for any future caller (e.g.
+`SchemaResolver`'s own generalized constructor-application resolution) that needs to bind a
+positional-form value generically; wrapping the bare value into an equivalent one-field
+`RecordValue` before delegating to ordinary record binding is the natural fix, not yet built.
 
 ### Schema grammar (`tson-parser/src/main/java/io/ltr8/tson/parser/SchemaParser.java`,
 `.../ast/schema/`)
@@ -546,17 +597,18 @@ is tempted to "fix" this back to a plain record, re-read `TypeArgument`'s Javado
     gained a `specification: AtomSpecification` field, and the newly-added `RegexType` (see "Built-in
     type vocabulary" above) holds one alongside its own `TextType constraints`. Verified in
     `UriParserTest`/`RegexParserTest` that the two cite the correct, different RFC.
-- **No hand-written writer -- resolved values go through plain `TsonMapper.toTson` (`tson-mapper`)
-  directly**, deliberately, to validate the model is built from ordinary, idiomatic Java that `tson-bind`'s
-  generic introspection already knows how to bind, not a shape that only worked because a bespoke writer
-  papered over it. This confirmed the `TypeBody` sealed-interface design is exactly right: each variant's
-  own `@Typename` plus `tson-bind`'s automatic sealed-interface-as-union detection is *all* it takes to get
+- **No hand-written writer -- resolved values go through plain `TsonMapperWriter.toTson`
+  (`io.ltr8.tson.parser.mapper`) directly**, deliberately, to validate the model is built from
+  ordinary, idiomatic Java that `tson-bind`'s generic introspection already knows how to bind, not
+  a shape that only worked because a bespoke writer papered over it. This confirmed the `TypeBody`
+  sealed-interface design is exactly right: each variant's own `@Typename` plus `tson-bind`'s
+  automatic sealed-interface-as-union detection is *all* it takes to get
   `!record`/`!reference`/`!unit`/`!enum`/`!choice`/`!array`/`!map`/`!tuple` written correctly -- no special
   casing anywhere, for precisely the "body: top" polymorphism the kernel itself describes. It also
   surfaced concrete, worth-knowing limits of generic binding versus the fixture's own hand-authored
   style -- none of them wrong, all textual, and all documented in `SchemaResolverTest`'s own class Javadoc:
   no outer `!type_definition` tag (plain records, unlike union members, never self-announce a type-ref);
-  quoted strings where the fixture uses bare tokens (an enum's bridge yields a `String`, and `TsonMapper`
+  quoted strings where the fixture uses bare tokens (an enum's bridge yields a `String`, and `TsonMapperWriter`
   always quotes strings -- pre-existing, already-documented behavior, not new); every empty-list/`false`/
   at-default-enum field written out rather than omitted (`Optional.empty()`/`null` are the only things
   generic binding omits -- `tson-bind` doesn't support `Optional<List<T>>` yet, so an empty list can't opt
@@ -607,10 +659,10 @@ in two passes over meta-kernel's 49 declarations:
    supertypes").
 
 **Constructor-application binding is done by hand, not through generic object binding** (revised
-2026-07-23, replacing an earlier version that used `TsonMapper.toObject`) -- deliberately, so this
-class needs nothing beyond `tson-parser`/`tson-schema` (both already main-scope dependencies of
-this module) and can live *here* rather than in `tson-mapper`, which the `TsonMapper`-based version
-needed purely to reach `TsonMapper` itself. An `Instance`'s `value` is already a parsed `DataValue`
+2026-07-23, replacing an earlier version that used `TsonMapper.toObject` and lived in the separate
+`tson-mapper` module purely to reach it -- that module no longer exists at all today; see "Mapper"
+below for why) -- deliberately, so this class needs nothing beyond `tson-parser`/`tson-schema`
+(both already main-scope dependencies of this module). An `Instance`'s `value` is already a parsed `DataValue`
 (the schema grammar reuses Part 1's own data-value parsing directly), and every registered target's
 shape is simple enough to check directly against the AST rather than bind generically: `unit` and
 `integer_type` are only ever instantiated as a bare `{}` in the real fixture (every field
@@ -655,12 +707,12 @@ sole constructor when exactly one exists; with two (a canonical plus any conveni
 `IntegerType`'s and `IntegerSize`'s own `IntegerSize(int, boolean)` convenience constructor both
 qualify), it looks for one annotated `@Record` and fails if none is. This isn't a `tson-bind` bug
 (the annotation and the fallback logic both exist specifically for this case) -- it's just that
-neither class had ever been a `TsonMapper` bind *target* before (every earlier use just constructed
-them directly in Java), so nothing had surfaced it. Fixed by writing out the canonical constructor
+neither class had ever been a bind *target* before (every earlier use just constructed them
+directly in Java), so nothing had surfaced it. Fixed by writing out the canonical constructor
 explicitly (compact, for `IntegerType`; empty-bodied, for `IntegerSize`, which didn't have one
 written out at all before) with `@Record` attached -- both annotations stay in place even though
 `MetaKernelParser` itself no longer needs generic binding, since `SchemaResolverTest`'s own
-`toTson` verification (below) still binds through `TsonMapper`.
+`toTson` verification (below) still binds through `TsonMapperWriter`.
 - **Verified against the real fixture, not just a hand-written snippet.** `SchemaResolverTest` resolves
   `integer_size` both from a small inline schema and from the real `spec/m/meta-kernel.tn1`, and asserts
   the exact real `toTson` output -- structurally equivalent to (per the divergences above, not a content
@@ -821,6 +873,8 @@ No system Gradle — always use the wrapper:
 ./gradlew :tson-schema:test --tests "io.ltr8.tson.schema.registry.SchemaValidatorTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.MetaKernelSchemaRegistryTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.MetaSchemaImportTest"
+./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.mapper.TsonMapperReaderTest"
+./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.mapper.TsonMapperWriterTest"
 ```
 
 ## Not yet implemented

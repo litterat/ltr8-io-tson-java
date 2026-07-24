@@ -1,10 +1,10 @@
 package io.ltr8.tson.parser.resolver.schema;
 
 import io.ltr8.bind.DataBindException;
-import io.ltr8.tson.mapper.TsonMapper;
 import io.ltr8.tson.parser.SchemaParser;
 import io.ltr8.tson.parser.ast.schema.SchemaDocument;
 import io.ltr8.tson.parser.ast.schema.SchemaMap;
+import io.ltr8.tson.parser.mapper.TsonMapperWriter;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.ChoiceBody;
@@ -32,11 +32,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Writes resolved values through plain {@code TsonMapper.toTson} -- no hand-written schema-model
- * writer at all -- deliberately, to validate the {@code io.ltr8.tson.schema.meta} model is built
- * from ordinary, idiomatic Java (records, sealed interfaces, enums, {@code Optional}) that {@code
- * tson-bind}'s generic introspection already knows how to bind, rather than a shape that happens
- * to work only because a bespoke writer papered over it.
+ * Writes resolved values through plain {@code TsonMapperWriter.toTson} -- no hand-written
+ * schema-model writer at all -- deliberately, to validate the {@code io.ltr8.tson.schema.meta}
+ * model is built from ordinary, idiomatic Java (records, sealed interfaces, enums, {@code
+ * Optional}) that {@code tson-bind}'s generic introspection already knows how to bind, rather than
+ * a shape that happens to work only because a bespoke writer papered over it.
  *
  * <p>What this confirms works with zero extra code: {@code TypeBody}'s sealed-interface variants
  * each get their own {@code !record}/{@code !reference}/{@code !unit}/{@code !enum}/{@code
@@ -49,12 +49,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * equivalent to, but textually more verbose than, {@code meta-kernel-resolved.tn1}'s own
  * hand-authored style -- no outer {@code !type_definition} tag (plain records, unlike union
  * members, never self-announce a type-ref), quoted strings where the fixture writes bare tokens
- * (an enum's bridge produces a {@code String}, and {@code TsonMapper} always quotes strings --
+ * (an enum's bridge produces a {@code String}, and {@code TsonMapperWriter} always quotes strings --
  * already true, and already documented, for every other enum this codebase binds), every
  * empty-list/false/{@code REQUIRED}-at-default field written out rather than omitted ({@code
  * Optional.empty()}/{@code null} are the only things generic binding omits), and {@code TypeRef}
  * always in its full {@code { name: ... arguments: [...] } } form, never Part 2 §5.6's positional
- * bare-token spelling (a schema-specific encoding convention plain {@code tson-mapper}, a
+ * bare-token spelling (a schema-specific encoding convention plain {@code tson-parser.mapper}, a
  * Part-1-only binder, has no reason to know about). None of these are wrong -- same value, just a
  * different spelling -- so the assertions below check the real, current {@code toTson} output
  * exactly, not a hand-massaged approximation of the fixture's own terser conventions.
@@ -69,7 +69,7 @@ class SchemaResolverTest {
                     + "] groups: [] } }";
 
     private final SchemaResolver resolver = new SchemaResolver();
-    private final TsonMapper mapper = new TsonMapper();
+    private final TsonMapperWriter mapper = new TsonMapperWriter();
 
     private String write(TypeDefinition value) throws DataBindException {
         return mapper.toTson(value);

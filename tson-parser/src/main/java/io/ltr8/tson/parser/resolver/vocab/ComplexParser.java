@@ -25,8 +25,8 @@ import java.util.Optional;
  *
  * <p>Has exactly one legitimate host representation ({@link Complex} itself), so like {@link
  * RationalParser} this doesn't override {@link #read(TokenValue, Class)} -- {@link AtomType}'s
- * default already covers the {@code target == Complex.class} case a {@code tson-mapper} {@code
- * DataBridge} registration relies on (see {@link Complex}'s Javadoc).
+ * default already covers the {@code target == Complex.class} case a {@code io.ltr8.tson.parser.mapper}
+ * {@code DataBridge} registration relies on (see {@link Complex}'s Javadoc).
  */
 public record ComplexParser() implements AtomType<Complex> {
 

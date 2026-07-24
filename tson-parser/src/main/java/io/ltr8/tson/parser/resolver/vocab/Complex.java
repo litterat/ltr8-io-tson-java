@@ -19,7 +19,7 @@ import java.math.BigDecimal;
  * -- each component is its own independently-exact {@code NUMBER}-typed value, preserved as written
  * the same way a bare {@code !number} is, not normalized across instances.
  *
- * <p>As with {@code Rational}, {@code tson-mapper} cannot bind directly to this class -- it's itself
+ * <p>As with {@code Rational}, {@code io.ltr8.tson.parser.mapper} cannot bind directly to this class -- it's itself
  * a Java record, so {@code tson-bind}'s record auto-detection claims it ahead of the vocabulary
  * path. A {@code DataBridge<Complex, TheirType>} registered via {@code
  * DataBindContext.registerAtom(TheirType.class, bridge)} is the supported (and currently only) way

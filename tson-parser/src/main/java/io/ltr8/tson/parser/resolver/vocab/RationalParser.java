@@ -23,7 +23,7 @@ import java.util.Optional;
  * IntegerParser}/{@link DecimalParser}/{@link FloatParser} this doesn't override {@link
  * #read(TokenValue, Class)} -- {@link AtomType}'s default (read the natural value, require the
  * target to accept it) already gives the right behavior, including the {@code target ==
- * Rational.class} case a {@code tson-mapper} bridge registration relies on (see {@link Rational}'s
+ * Rational.class} case a {@code io.ltr8.tson.parser.mapper} bridge registration relies on (see {@link Rational}'s
  * Javadoc for the recommended way to bind {@code !rational} to a richer third-party type instead
  * of this minimal one).
  */

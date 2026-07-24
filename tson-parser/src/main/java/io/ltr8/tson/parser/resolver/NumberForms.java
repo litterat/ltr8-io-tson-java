@@ -9,8 +9,9 @@ import java.math.BigInteger;
  * needs regardless of what host type it eventually binds to (§4.3's required equivalence between
  * representations, {@code 255}/{@code 0xFF}, holds at this exact-intermediate step and nowhere
  * else). Still not a Java numeric type in the narrowed sense ({@code int}/{@code long}/{@code
- * float}/{@code double}) -- that choice stays with each consumer (e.g. {@code tson-mapper}'s
- * {@code AtomBinder} narrowing to a target class, or this package's {@code vocab} atom types
+ * float}/{@code double}) -- that choice stays with each consumer (e.g. {@code
+ * io.ltr8.tson.parser.mapper}'s {@code AtomBinder} narrowing to a target class, or this package's
+ * {@code vocab} atom types
  * range-checking against a built-in vocabulary constraint) -- but unlike {@link NumberForm} itself,
  * this class does combine digit groups into one exact value, since every consumer needs that same
  * value and duplicating the combination logic per consumer was the alternative.

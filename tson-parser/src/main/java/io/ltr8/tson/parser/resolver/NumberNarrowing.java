@@ -6,7 +6,7 @@ import java.math.BigInteger;
 /**
  * Narrows an exact intermediate value ({@link BigInteger}/{@link BigDecimal}, from {@link
  * NumberForms}) to a caller-supplied target representation. The one place this decision is made --
- * both {@code tson-mapper}'s {@code AtomBinder} (untyped §4 numbers, where the target field is the
+ * both {@code io.ltr8.tson.parser.mapper}'s {@code AtomBinder} (untyped §4 numbers, where the target field is the
  * only source of width information) and {@code resolver.vocab}'s numeric atom types (§5 built-in
  * vocabulary, e.g. {@link io.ltr8.tson.parser.resolver.vocab.IntegerParser}, where the atom's own
  * declared width narrows first and this only adapts the already-validated value to whatever
