@@ -13,6 +13,7 @@ import io.ltr8.tson.schema.meta.DateTimeType;
 import io.ltr8.tson.schema.meta.DateType;
 import io.ltr8.tson.schema.meta.DecimalType;
 import io.ltr8.tson.schema.meta.DurationType;
+import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.EmailType;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.FieldGroup;
@@ -40,11 +41,13 @@ import io.ltr8.tson.schema.meta.UnknownType;
 import io.ltr8.tson.schema.meta.UriType;
 import io.ltr8.tson.schema.meta.UuidType;
 
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -104,6 +107,15 @@ public final class SchemaValidator {
     public static TsonSchema validate(TsonSchema schema, SchemaLoader loader) {
         Map<String, TypeDefinition> merged = mergeImports(schema.imports(), loader);
 
+        // Full lookup namespace for materialization's own constructor lookups (see #instantiate) --
+        // imports plus this schema's own already-resolved (pre-rewrite) entries. Deliberately built
+        // once, up front, rather than relying on materialization order within `merged`: a
+        // constructor like `array` needs to be found regardless of whether *its own* declaration
+        // has been reached yet in the loop below (it usually hasn't -- real fixtures apply array
+        // sugar on fields declared well before `array` itself).
+        Map<String, TypeDefinition> namespace = new LinkedHashMap<>(merged);
+        namespace.putAll(schema.entries());
+
         Map<TypeRef, String> materializedNames = new LinkedHashMap<>();
         Map<String, TypeDefinition> synthesized = new LinkedHashMap<>();
         Set<String> localNames = new LinkedHashSet<>();
@@ -114,7 +126,7 @@ public final class SchemaValidator {
                         "'" + entry.getKey() + "' collides with an entry of the same name brought in by !!import");
             }
             TypeDefinition def = entry.getValue();
-            Top rewrittenBody = rewriteBody(def.body(), materializedNames, synthesized);
+            Top rewrittenBody = rewriteBody(def.body(), materializedNames, synthesized, namespace);
             merged.put(entry.getKey(), new TypeDefinition(def.source(), def.kind(), def.parameters(),
                     def.constructor(), def.supertypes(), def.subtypes(), def.disjoint(), rewrittenBody));
             localNames.add(entry.getKey());
@@ -211,28 +223,30 @@ public final class SchemaValidator {
     // ── Materialization ──────────────────────────────────────────────────
 
     private static Top rewriteBody(Top body, Map<TypeRef, String> materializedNames,
-                                    Map<String, TypeDefinition> synthesized) {
+                                    Map<String, TypeDefinition> synthesized, Map<String, TypeDefinition> namespace) {
         return switch (body) {
             case RecordBody r -> {
                 List<RecordField> fields = new ArrayList<>(r.fields().size());
                 for (RecordField field : r.fields()) {
-                    fields.add(new RecordField(field.name(), materialize(field.type(), materializedNames, synthesized),
+                    fields.add(new RecordField(field.name(),
+                            materialize(field.type(), materializedNames, synthesized, namespace),
                             field.state(), field.value(), field.valueParam()));
                 }
                 yield new RecordBody(r.supertypes(), fields, r.groups());
             }
-            case Reference ref -> new Reference(materialize(ref.target(), materializedNames, synthesized));
+            case Reference ref -> new Reference(materialize(ref.target(), materializedNames, synthesized, namespace));
             case MapBody m -> new MapBody(
-                    materialize(m.keyType(), materializedNames, synthesized),
-                    materialize(m.valueType(), materializedNames, synthesized),
+                    materialize(m.keyType(), materializedNames, synthesized, namespace),
+                    materialize(m.valueType(), materializedNames, synthesized, namespace),
                     m.minItems(), m.maxItems());
             case ArrayBody a -> new ArrayBody(
-                    materialize(a.elementType(), materializedNames, synthesized),
+                    materialize(a.elementType(), materializedNames, synthesized, namespace),
                     a.state(), a.unordered(), a.uniqueItems(), a.minItems(), a.maxItems());
             case TupleBody t -> {
                 List<TupleElement> elements = new ArrayList<>(t.elements().size());
                 for (TupleElement element : t.elements()) {
-                    elements.add(new TupleElement(materialize(element.elementType(), materializedNames, synthesized),
+                    elements.add(new TupleElement(
+                            materialize(element.elementType(), materializedNames, synthesized, namespace),
                             element.state()));
                 }
                 yield new TupleBody(elements);
@@ -240,7 +254,7 @@ public final class SchemaValidator {
             case ChoiceBody c -> {
                 List<TypeRef> variants = new ArrayList<>(c.variants().size());
                 for (TypeRef variant : c.variants()) {
-                    variants.add(materialize(variant, materializedNames, synthesized));
+                    variants.add(materialize(variant, materializedNames, synthesized, namespace));
                 }
                 yield new ChoiceBody(variants);
             }
@@ -272,11 +286,11 @@ public final class SchemaValidator {
 
     /** Bottom-up: rewrites {@code ref}'s own arguments first, then materializes {@code ref} itself if it still has any. */
     private static TypeRef materialize(TypeRef ref, Map<TypeRef, String> materializedNames,
-                                        Map<String, TypeDefinition> synthesized) {
+                                        Map<String, TypeDefinition> synthesized, Map<String, TypeDefinition> namespace) {
         List<TypeArgument> rewrittenArgs = new ArrayList<>(ref.arguments().size());
         for (TypeArgument arg : ref.arguments()) {
             if (arg instanceof TypeArgument.Ref nested) {
-                rewrittenArgs.add(new TypeArgument.Ref(materialize(nested.ref(), materializedNames, synthesized)));
+                rewrittenArgs.add(new TypeArgument.Ref(materialize(nested.ref(), materializedNames, synthesized, namespace)));
             } else {
                 rewrittenArgs.add(arg);
             }
@@ -293,8 +307,115 @@ public final class SchemaValidator {
 
         String syntheticName = syntheticName(flattened);
         materializedNames.put(flattened, syntheticName);
-        synthesized.put(syntheticName, TypeDefinition.reference(flattened));
+        synthesized.put(syntheticName, instantiate(flattened, namespace));
         return TypeRef.of(syntheticName);
+    }
+
+    /**
+     * Real instantiation for an argument-bearing application of a real constructor -- e.g. {@code
+     * array<field_name>} (from {@code [field_name]} sugar, §5.3) should materialize to a genuine
+     * {@code !array { element_type: field_name }} body, not a self-referential placeholder pointing
+     * back at the very application being materialized. Falls back to the old placeholder shape
+     * ({@link TypeDefinition#reference}) for everything this doesn't (yet) know how to build: {@code
+     * application.name()} not resolving to a real constructor in {@code namespace}, an arity
+     * mismatch between the constructor's own declared {@code parameters} and the arguments actually
+     * applied, or (see {@link #instantiateBody}) a constructor this method has no per-shape
+     * assembler for yet.
+     *
+     * <p><b>Deliberately hand-written per target shape, not routed through generic {@code tson-bind}
+     * binding</b> -- {@code tson-schema} has no dependency on {@code tson-parser} (where {@code
+     * SchemaResolver}'s own {@code resolveInstance}/{@code PositionalForm} already do the general
+     * version of this for an explicit {@code !C value} instance), and every field a materializable
+     * shape like {@link ArrayBody} needs is a plain {@code boolean}/{@code BigInteger}/{@code
+     * TypeRef} -- not worth a new cross-module dependency to bind generically. {@code source} on the
+     * result mirrors {@code resolveInstance}'s own convention exactly: the bare constructor name
+     * (§5.5's "construction transfers only the constructor's kind"), never the full application with
+     * its arguments.
+     */
+    private static TypeDefinition instantiate(TypeRef application, Map<String, TypeDefinition> namespace) {
+        TypeDefinition constructor = namespace.get(application.name());
+        if (constructor == null || !constructor.constructor() || !(constructor.body() instanceof RecordBody vocabulary)) {
+            return TypeDefinition.reference(application);
+        }
+        Map<String, TypeArgument> argumentsByParameter = zipParameters(constructor.parameters(), application.arguments());
+        if (argumentsByParameter == null) {
+            return TypeDefinition.reference(application);
+        }
+        Top body = instantiateBody(application.name(), vocabulary, argumentsByParameter);
+        if (body == null) {
+            return TypeDefinition.reference(application);
+        }
+        return new TypeDefinition(Optional.of(TypeRef.of(application.name())), constructor.kind(), List.of(), false,
+                List.of(), List.of(), Optional.empty(), body);
+    }
+
+    /** Positionally zips a constructor's own declared parameters to the arguments an application supplies; {@code null} on an arity mismatch. */
+    private static Map<String, TypeArgument> zipParameters(List<String> parameters, List<TypeArgument> arguments) {
+        if (parameters.size() != arguments.size()) {
+            return null;
+        }
+        Map<String, TypeArgument> byParameter = new LinkedHashMap<>();
+        for (int i = 0; i < parameters.size(); i++) {
+            byParameter.put(parameters.get(i), arguments.get(i));
+        }
+        return byParameter;
+    }
+
+    /**
+     * Per-target-shape assembly -- {@code null} means "not supported yet", handled by {@link
+     * #instantiate}'s own fallback. Only {@code array} today: every synthesized entry any real
+     * fixture actually needs (`meta-kernel.tn1`/`meta.tn1`/`core.tn1`) is an application of {@code
+     * array} (§5.3's {@code [X]}/{@code [X]?} field-type sugar desugars to exactly this) -- {@code
+     * map}/{@code tuple}/{@code record}/{@code choice}/any atom-family constructor aren't wired up,
+     * a known, explicit gap, not a silent wrong answer.
+     */
+    private static Top instantiateBody(String constructorName, RecordBody vocabulary,
+                                        Map<String, TypeArgument> argumentsByParameter) {
+        return switch (constructorName) {
+            case "array" -> instantiateArray(vocabulary, argumentsByParameter);
+            default -> null;
+        };
+    }
+
+    /**
+     * {@code array}'s own vocabulary, read field by field: {@code element_type} MUST route to a
+     * type-ref argument (§5.10's labelled-form parameter routing, {@code value_param}) -- anything
+     * else (no routing, or a literal-value argument where a type is expected) means this can't be
+     * built, {@code null} rather than a wrong guess. {@code state}/{@code unordered}/{@code
+     * unique_items} take array's own schema-composed default {@link RecordField#value} when present
+     * (mirroring, in miniature, {@code PositionalForm}'s own schema-composed defaulting one layer up
+     * in {@code tson-parser}). {@code min_items}/{@code max_items} have no default in array's own
+     * vocabulary and stay absent -- nothing here ever needs to fill them (only {@code set}/{@code
+     * array_min}/etc. tighten them, and those aren't applied via {@code <...>} sugar in any real
+     * fixture).
+     */
+    private static ArrayBody instantiateArray(RecordBody vocabulary, Map<String, TypeArgument> argumentsByParameter) {
+        TypeRef elementType = null;
+        ElementState state = ElementState.REQUIRED;
+        boolean unordered = false;
+        boolean uniqueItems = false;
+        Optional<BigInteger> minItems = Optional.empty();
+        Optional<BigInteger> maxItems = Optional.empty();
+
+        for (RecordField field : vocabulary.fields()) {
+            TypeArgument routed = field.valueParam().map(argumentsByParameter::get).orElse(null);
+            switch (field.name()) {
+                case "element_type" -> {
+                    if (!(routed instanceof TypeArgument.Ref ref)) {
+                        return null;
+                    }
+                    elementType = ref.ref();
+                }
+                case "state" -> state = field.value().map(t -> ElementState.valueOf(t.text())).orElse(state);
+                case "unordered" -> unordered = field.value().map(t -> Boolean.parseBoolean(t.text())).orElse(unordered);
+                case "unique_items" -> uniqueItems = field.value().map(t -> Boolean.parseBoolean(t.text())).orElse(uniqueItems);
+                default -> {
+                    // min_items/max_items (no default to apply here) and anything else array's own
+                    // vocabulary might grow later -- left at the unconstrained default above.
+                }
+            }
+        }
+        return elementType == null ? null : new ArrayBody(elementType, state, unordered, uniqueItems, minItems, maxItems);
     }
 
     /**

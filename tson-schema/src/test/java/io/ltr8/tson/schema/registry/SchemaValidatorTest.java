@@ -3,9 +3,13 @@ package io.ltr8.tson.schema.registry;
 import io.ltr8.tson.schema.SchemaLoader;
 import io.ltr8.tson.schema.SchemaValidationException;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.meta.ArrayBody;
+import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
+import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
+import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
@@ -20,6 +24,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -42,6 +47,32 @@ class SchemaValidatorTest {
     private static TsonSchema schemaOf(Map<String, TypeDefinition> entries) {
         return new TsonSchema(Optional.of("https://example.test/s.tn1"), "https://example.test/meta.tn1",
                 List.of(), entries);
+    }
+
+    /**
+     * A minimal stand-in for meta-kernel's own real {@code array} constructor -- just enough
+     * vocabulary (one value_param-routed field, plus schema-composed defaults) to exercise {@code
+     * instantiateArray}. Every field's own {@code type} is a bare {@code token} reference, not the
+     * real {@code type_ref}/{@code element_state}/{@code boolean}/{@code integer} meta-kernel would
+     * use -- irrelevant to {@code instantiateArray} itself (which reads {@code name}/{@code value}/
+     * {@code valueParam} only), and using a name this minimal test schema doesn't otherwise declare
+     * would fail {@code SchemaValidator}'s own reference check for no reason relevant to what's
+     * being tested here.
+     */
+    private static TypeDefinition arrayConstructorEntry() {
+        RecordBody vocabulary = new RecordBody(List.of(), List.of(
+                new RecordField("element_type", TypeRef.of("token"), FieldState.REQUIRED, Optional.empty(), Optional.of("T")),
+                new RecordField("state", TypeRef.of("token"), FieldState.REQUIRED_DEFAULT,
+                        Optional.of(new Token("REQUIRED", Token.Form.UNQUOTED)), Optional.empty()),
+                new RecordField("unordered", TypeRef.of("token"), FieldState.REQUIRED_DEFAULT,
+                        Optional.of(new Token("false", Token.Form.UNQUOTED)), Optional.empty()),
+                new RecordField("unique_items", TypeRef.of("token"), FieldState.REQUIRED_DEFAULT,
+                        Optional.of(new Token("false", Token.Form.UNQUOTED)), Optional.empty()),
+                new RecordField("min_items", TypeRef.of("token"), FieldState.OPTIONAL, Optional.empty(), Optional.empty()),
+                new RecordField("max_items", TypeRef.of("token"), FieldState.OPTIONAL, Optional.empty(), Optional.empty())),
+                List.of());
+        return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of("T"), true, List.of(), List.of(),
+                Optional.empty(), vocabulary);
     }
 
     @Test
@@ -67,6 +98,55 @@ class SchemaValidatorTest {
 
         RecordBody containerBody = (RecordBody) result.entries().get("container").body();
         assertEquals(TypeRef.of(syntheticName), containerBody.fields().get(0).type());
+    }
+
+    @Test
+    void materializesAnArrayApplicationIntoARealArrayBodyNotAPlaceholderReference() {
+        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        entries.put("token", unitEntry());
+        entries.put("array", arrayConstructorEntry());
+        entries.put("container", TypeDefinition.product(RecordBody.of(List.of(
+                RecordField.required("items", new TypeRef("array", List.of(new TypeArgument.Ref(TypeRef.of("token")))))))));
+
+        TsonSchema result = SchemaValidator.validate(schemaOf(entries), null);
+
+        String syntheticName = result.entries().keySet().stream()
+                .filter(name -> !Set.of("token", "array", "container").contains(name))
+                .findFirst().orElseThrow();
+        assertTrue(syntheticName.startsWith("array_token_"), "readable head: " + syntheticName);
+
+        TypeDefinition synthetic = result.entries().get(syntheticName);
+        assertEquals(TypeKind.PRODUCT, synthetic.kind());
+        assertEquals(TypeRef.of("array"), synthetic.source().orElseThrow(),
+                "source is the bare constructor name, matching SchemaResolver.resolveInstance's own convention");
+
+        ArrayBody body = (ArrayBody) synthetic.body();
+        assertEquals(TypeRef.of("token"), body.elementType());
+        assertEquals(ElementState.REQUIRED, body.state());
+        assertFalse(body.unordered());
+        assertFalse(body.uniqueItems());
+        assertTrue(body.minItems().isEmpty());
+        assertTrue(body.maxItems().isEmpty());
+
+        RecordBody containerBody = (RecordBody) result.entries().get("container").body();
+        assertEquals(TypeRef.of(syntheticName), containerBody.fields().get(0).type());
+    }
+
+    @Test
+    void fallsBackToThePlaceholderReferenceWhenTheAppliedNameIsNotARealConstructor() {
+        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        entries.put("token", unitEntry());
+        entries.put("array", emptyRecord()); // constructor: false -- not actually applicable
+        entries.put("container", TypeDefinition.product(RecordBody.of(List.of(
+                RecordField.required("items", new TypeRef("array", List.of(new TypeArgument.Ref(TypeRef.of("token")))))))));
+
+        TsonSchema result = SchemaValidator.validate(schemaOf(entries), null);
+
+        String syntheticName = result.entries().keySet().stream()
+                .filter(name -> !Set.of("token", "array", "container").contains(name))
+                .findFirst().orElseThrow();
+        TypeDefinition synthetic = result.entries().get(syntheticName);
+        assertEquals(TypeKind.REFERENCE, synthetic.kind(), "no real array constructor to instantiate from -- old placeholder shape");
     }
 
     @Test
