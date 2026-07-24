@@ -1140,6 +1140,53 @@ class SchemaResolverTest {
         assertTrue(thrown.getMessage().contains("is not an atom-family instance"), thrown.getMessage());
     }
 
+    /**
+     * §5.7's "Body materialisation" rule, applied to atom refinement (§5.6, {@code
+     * SPEC-FEEDBACK.md} #17): a chained refinement (refining an already-refined instance -- not
+     * exercised by any real fixture declaration, but not left ambiguous by the spec either -- §5.5's
+     * own worked example says an atom refinement's result "can be refined further") MUST merge with
+     * the intermediate instance's own already-bound fields, not discard them -- an earlier version
+     * of {@code resolveAtomRefinement} read §5.6's "desugars by retargeting" wording as a full
+     * replace, which is wrong: {@code big}'s own `size` (inherited from `int8`, untouched by `big`'s
+     * own refinement) MUST survive, and {@code veryBig}'s own explicit `max` MUST override the
+     * `max` `big` itself set, while `big`'s own `min` (untouched by `veryBig`) survives through yet
+     * another hop.
+     */
+    @Test
+    void chainedAtomRefinementMergesWithIntermediateBindingsInsteadOfDiscardingThem() {
+        Map<String, TypeDefinition> metaKernelEntries = MetaKernelParser.parse().entries();
+        SchemaMap schemaMap = new SchemaParser("""
+                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
+                {
+                  int8    => !integer ^ { size: { bits: 8  signed: true } }
+                  big     => !int8 ^ { min: -500  max: 5000 }
+                  veryBig => !big ^ { max: 10000 }
+                }""").parseSchemaDocument().body();
+        Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
+        resolved.put("int8", resolver.resolve(schemaMap.declarations().get("int8"), metaKernelEntries));
+        resolved.put("big", resolver.resolve(schemaMap.declarations().get("big"), resolved));
+
+        TypeDefinition big = resolved.get("big");
+        TypeDefinition veryBig = resolver.resolve(schemaMap.declarations().get("veryBig"), resolved);
+
+        // big keeps int8's own size (untouched by big's own refinement) alongside its new bounds.
+        assertEquals(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of("integer_type")), big.source());
+        assertEquals(List.of("int8"), big.supertypes());
+        assertEquals(new IntegerType(Optional.of(new IntegerSize(8, true)),
+                Optional.of(java.math.BigInteger.valueOf(-500)), Optional.empty(),
+                Optional.of(java.math.BigInteger.valueOf(5000)), Optional.empty(), Optional.empty()),
+                big.body());
+
+        // veryBig keeps int8's size AND big's min (neither touched by veryBig's own refinement),
+        // but overrides big's own max with its own.
+        assertEquals(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of("integer_type")), veryBig.source());
+        assertEquals(List.of("big"), veryBig.supertypes());
+        assertEquals(new IntegerType(Optional.of(new IntegerSize(8, true)),
+                Optional.of(java.math.BigInteger.valueOf(-500)), Optional.empty(),
+                Optional.of(java.math.BigInteger.valueOf(10000)), Optional.empty(), Optional.empty()),
+                veryBig.body());
+    }
+
     @Test
     void atomRefinementNeverConsultsTheStructureNamespace() {
         // integer_type is real and present in `metaKernelEntries` -- an Instance target would find

@@ -1,7 +1,11 @@
 package io.ltr8.tson.parser.resolver.schema;
 
 import io.ltr8.bind.DataBindException;
+import io.ltr8.tson.parser.Parser;
+import io.ltr8.tson.parser.ast.CoreValue;
 import io.ltr8.tson.parser.ast.DataValue;
+import io.ltr8.tson.parser.ast.EmptyBrace;
+import io.ltr8.tson.parser.ast.RecordValue;
 import io.ltr8.tson.parser.ast.TokenValue;
 import io.ltr8.tson.parser.ast.schema.ArrayContainerDef;
 import io.ltr8.tson.parser.ast.schema.AtomRefinement;
@@ -27,6 +31,7 @@ import io.ltr8.tson.parser.ast.schema.TypeArg;
 import io.ltr8.tson.parser.ast.schema.TypeDef;
 import io.ltr8.tson.parser.ast.schema.TypeRef;
 import io.ltr8.tson.parser.mapper.TsonMapperReader;
+import io.ltr8.tson.parser.mapper.TsonMapperWriter;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
@@ -198,6 +203,9 @@ public final class SchemaResolver {
     /** Binds a constructor-application/atom-refinement's normalized value against {@link Top} -- see {@link #resolveInstance}/{@link #resolveAtomRefinement}. */
     private final TsonMapperReader reader = new TsonMapperReader();
 
+    /** Re-serializes an atom refinement's source back to wire form for {@link #mergeWithSource} -- see {@link #resolveAtomRefinement}. */
+    private final TsonMapperWriter writer = new TsonMapperWriter();
+
     /** Resolves a single declaration with no supertypes visible -- fine for a fresh record like {@code integer_size}, not for a composition. */
     public TypeDefinition resolve(SchemaMap.Declaration declaration) {
         return resolve(declaration, Map.of());
@@ -352,14 +360,23 @@ public final class SchemaResolver {
      * refinement body is always a braced record; if it isn't, {@code TsonMapperReader.toRecord}'s
      * own "expected a record" check catches it.
      *
-     * <p><b>No copy-from-{@code I} step</b> -- binding {@code values} directly onto the constructor
-     * (treating any field {@code values} doesn't mention as absent, exactly how {@code
-     * Optional}-typed record binding already works) gives the identical result to "copy {@code I}'s
-     * own bindings, then override" for every real fixture declaration, since every real atom
-     * refinement targets a *fresh*, {@code UNCONSTRAINED} source. This is a known, deliberately
-     * accepted gap for a *chained* refinement (refining an already-refined, non-fresh instance) --
-     * see this class's own outer Javadoc/the project's `SPEC-FEEDBACK.md`/plan notes; no real
-     * declaration exercises that case.
+     * <p><b>Merges with {@code I}'s own already-bound value; does not replace it</b> (corrected
+     * 2026-07-24, {@code SPEC-FEEDBACK.md} #17 -- an earlier version of this method, and its own
+     * Javadoc, took §5.6's "desugars by retargeting" wording as "replace `I`'s own bindings
+     * entirely," which produces a semantically wrong result for a *chained* refinement: given
+     * {@code int8 => !integer ^ { size: {...} } }, {@code big => !int8 ^ { min: -500 } } MUST still
+     * carry {@code int8}'s own {@code size}, not lose it, since {@code big} is declared as a
+     * refinement -- a narrowing -- of {@code int8}, and §5.7's own "Body materialisation" rule for
+     * the structurally analogous record-refinement case is explicit that inherited fields survive a
+     * refinement that doesn't mention them). {@link #mergeWithSource} does the actual merge: {@code
+     * I}'s own bound value is re-serialized back to wire form via {@code TsonMapperWriter} (no
+     * hand-written per-type merge needed for any of the many atom-constraint classes this needs to
+     * work for), then merged field-by-field with the new refinement's own {@code values} -- a field
+     * named in {@code values} overrides {@code I}'s own value for it; a field {@code I} itself bound
+     * that {@code values} doesn't mention keeps {@code I}'s own value. A fresh/{@code UNCONSTRAINED}
+     * source (every real, non-chained fixture case) serializes to an empty record, so the merge is a
+     * no-op there -- this recovers the previous, already-verified non-chained behavior exactly, not
+     * a separate code path.
      *
      * <p>Per §5.5's own text (not the general composition/refinement induction of §5.7/§5.8):
      * {@code source} is {@code I}'s own constructor ({@code I.source()}, e.g. {@code integer_type}
@@ -388,12 +405,50 @@ public final class SchemaResolver {
                 new UnsupportedOperationException("'" + name + "': '!" + sourceName
                         + "' has no recorded constructor to refine through"));
 
-        DataValue bindings = refinement.bindings();
-        DataValue typed = new DataValue(bindings.annotations(), Optional.of(constructorRef.name()), bindings.coreValue());
-        Top body = bindAtomInstance(name, typed);
+        DataValue merged = mergeWithSource(name, source.body(), refinement.bindings(), constructorRef.name());
+        Top body = bindAtomInstance(name, merged);
 
         return new TypeDefinition(Optional.of(constructorRef), source.kind(), List.of(), false,
                 List.of(sourceName), List.of(), Optional.empty(), body);
+    }
+
+    /**
+     * §5.7's "Body materialisation" rule, applied to atom refinement (§5.6, {@code
+     * SPEC-FEEDBACK.md} #17): {@code newBindings} merged *over* {@code sourceBody}'s own
+     * already-bound fields, not replacing them. {@code sourceBody} is re-serialized back to plain
+     * record wire form via {@code TsonMapperWriter.toTson} (writing a {@code Top}-typed value by its
+     * own runtime class never emits a type-ref -- exactly the plain-record shape wanted here) and
+     * re-parsed, so this needs no per-atom-class merge logic -- it works generically for every
+     * current and future atom-constraint class the same way. Field merge is by name at the
+     * `RecordValue` level: `newBindings`'s own fields win; anything only `sourceBody` had survives
+     * untouched.
+     */
+    private DataValue mergeWithSource(String name, Top sourceBody, DataValue newBindings, String constructorName) {
+        Map<String, RecordValue.Field> merged = new LinkedHashMap<>();
+        if (sourceSerializedFields(name, sourceBody) instanceof RecordValue sourceRecord) {
+            for (RecordValue.Field field : sourceRecord.fields()) {
+                merged.put(field.name(), field);
+            }
+        }
+        if (newBindings.coreValue() instanceof RecordValue newRecord) {
+            for (RecordValue.Field field : newRecord.fields()) {
+                merged.put(field.name(), field);
+            }
+        } else if (!(newBindings.coreValue() instanceof EmptyBrace)) {
+            throw new UnsupportedOperationException("'" + name + "': expected a braced record of constraint "
+                    + "bindings (§5.5), found " + newBindings.coreValue());
+        }
+        return new DataValue(newBindings.annotations(), Optional.of(constructorName), new RecordValue(List.copyOf(merged.values())));
+    }
+
+    private CoreValue sourceSerializedFields(String name, Top sourceBody) {
+        try {
+            String sourceText = writer.toTson(sourceBody);
+            return new Parser(sourceText).parseDocument().root().coreValue();
+        } catch (DataBindException e) {
+            throw new UnsupportedOperationException(
+                    "'" + name + "': failed to re-serialize the refinement source: " + e.getMessage(), e);
+        }
     }
 
     /** §3.3.1's lookup rule for a bare {@code !} target: the type-name namespace first, then the structure namespace. */

@@ -570,3 +570,60 @@ instance        = "!" type-name ws core-value
 
 matching `refined-def`'s own already-correct pattern for `atom-refinement`, and dropping the
 unused-in-practice `*annotation [type-ref]` layer for `instance`.
+
+---
+
+## 17. Atom refinement's own desugaring rule ("retargeting") produces the wrong value for a chained refinement, contradicting §5.7's own materialization rule for the analogous record case
+
+**Section:** §5.6 ("Atom refinement" -- the desugaring rule), cross-referenced against §5.5 (`age`'s
+own worked example, which explicitly says a refined instance "can be refined further") and §5.7
+("Body materialisation" -- record refinement's own, structurally analogous rule).
+
+**Problem:** §5.6 states: "`!I ^ { values }` desugars by retargeting to the instance's source
+constructor," with two worked examples, both single-hop (`!integer ^ { min: 0 max: 150 }` →
+`!integer_type { min: 0 max: 150 }`). Read literally, "retargeting" means only the *head* changes
+(`!I ^` → `!I.source`) while `values` carries over verbatim, unchanged -- so for a *chained*
+refinement, where `I` is itself already the result of a prior refinement, the desugared form
+contains only the new refinement's own `values`, with none of `I`'s own previously-bound fields.
+
+Concretely: given
+
+```
+int8      => !integer ^ { size: { bits: 8  signed: true } }
+bigNumber => !int8 ^ { min: -500  max: 5000 }
+```
+
+the literal "retargeting" rule gives `bigNumber`'s `I.source` as `integer_type` (not `int8` --
+`int8`'s own `source` is already the base constructor, per §5.5's own rule that refinement always
+records `source: I.source`), and desugars `bigNumber` to `!integer_type { min: -500  max: 5000 }`
+-- `size` is gone entirely. `bigNumber` ends up an *unconstrained-width* integer with bounds, not
+an 8-bit signed integer with bounds, even though it is declared as a refinement of `int8` and
+nothing in the source text ever removes `int8`'s own `size` constraint.
+
+This is a genuine internal inconsistency, not just an underspecified corner case: §5.7's own "Body
+materialisation" rule, for the *structurally analogous* record-refinement case, is explicit that
+inherited constraints survive a refinement that doesn't mention them -- "the refined body re-emits
+the *complete* inherited field set... **Inherited REQUIRED_FIXED and REQUIRED_DEFAULT fields appear
+with their pinned values even when the refinement did not refer to them**." There is no stated
+reason atom refinement -- called "refinement," the same word, immediately adjacent in the same
+section family, and explicitly said to support further chaining (§5.5: "`age`... can be refined
+further") -- should behave in the *opposite* way (full replacement) rather than the same way
+(tightening: explicit values override, everything else survives).
+
+**Interpretation chosen:** Merge, not replace. `tson-parser`'s `SchemaResolver.resolveAtomRefinement`
+re-serializes `I`'s own already-bound value back to wire form (reusing `TsonMapperWriter`, so no
+hand-written per-type merge logic is needed for any of the many atom-constraint classes), merges it
+field-by-field with the new refinement's own `values` (explicit values in `values` win; every field
+`I` itself already bound but the new refinement doesn't mention keeps `I`'s own value), and binds
+the merged record generically against the resolved constructor -- the same generic binding path
+used for the non-chained case, since a fresh/`UNCONSTRAINED` source's own serialized form
+contributes nothing (every field absent) and the merge is then a no-op, recovering exactly the
+previous (correct) non-chained behavior as a special case.
+
+**Suggested resolution:** Reword §5.6's "Atom refinement" paragraph to state a merge explicitly,
+analogous to §5.7's own "Body materialisation" wording, e.g.: "`!I ^ { values }` desugars by
+retargeting to the instance's source constructor, with `values` merged over `I`'s own already-bound
+field values -- a field named in `values` overrides `I`'s own value for it; every field `I` itself
+bound that `values` does not mention keeps `I`'s own value." Add a chained worked example (something
+like the `int8`/`bigNumber` case above) alongside the existing two, since neither current example
+exercises chaining at all and the ambiguity only surfaces there.

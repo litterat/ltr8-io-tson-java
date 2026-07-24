@@ -9,8 +9,10 @@ TSON spec series:
 
 - Part 1 (lexer, structural grammar, base type resolution, built-in type vocabulary):
   https://tson.io/raw/2026/32/tson-part1-data.md
-- Part 2 (schema grammar, type system) — grammar layer in progress (see `SchemaParser` below); resolution
-  just started, one construct so far (see `SchemaResolver` below): https://tson.io/raw/2026/32/tson-part2-schema.md
+- Part 2 (schema grammar, type system) — grammar layer complete (see `SchemaParser` below);
+  resolution well underway (see `SchemaResolver` below) — `meta-kernel.tn1` and `meta.tn1` both
+  resolve and register in full, `core.tn1` resolves 46 of 48 declarations, the 2 remainders being
+  permanent limits of generic binding, not open gaps: https://tson.io/raw/2026/32/tson-part2-schema.md
 
 The spec is a *working revision* (2026 series) and changes between revisions without compatibility
 guarantees — re-fetch the current URL rather than trusting a cached copy of the text when in doubt, and
@@ -22,7 +24,8 @@ reference without re-fetching every session: `spec/tson-part1-data.md` (Part 1, 
 meta-kernel bootstrap layer, the canonical meta-schema built on it, and the core type library built on
 that (Part 2 schema documents, reachable via `!!meta`/`!!import` chaining from `core.tn1`) — plus their
 non-normative resolver-output fixtures `spec/m/{core,meta,meta-kernel}-resolved.tn1` (Part 2 §1.5), the
-target shape for the resolution layer once it exists. The three source `.tn1` files are what §5's
+target shape the resolution layer (`SchemaResolver`, `MetaKernelParser`) now largely produces. The
+three source `.tn1` files are what §5's
 built-in type vocabulary formally resolves to when a schema *is* in scope — useful ground truth for
 constraint details (e.g. `integer_type`'s bit-width bounds formula) even though a Class 1 (schemaless)
 processor never parses or executes them. Treat this directory as a cache, not a source of truth: if a
@@ -295,10 +298,12 @@ consult a resolved `TsonSchema`/`TypeDefinition` directly, the same way `resolve
 consults `schema.meta` constraint records — without `tson-schema` ever needing to import
 `tson-parser` back.
 
-**Not yet done:** the `schema.meta` constraint-values split hasn't been *used* for anything schema-
-related yet (Part 2's own atom-refinement resolution — `!I ^ { ... }` — doesn't exist; see "Schema
-resolution" below) — today it's purely an internal reshaping of the existing Class 1 vocabulary,
-done in preparation for that future use, not a new capability by itself.
+**Now genuinely used, not just prepared for.** Part 2's own atom-refinement resolution (`!I ^ {
+... }`, `SchemaResolver.resolveAtomRefinement`, added 2026-07-24) binds a refinement's own values
+straight onto one of these split-out classes (e.g. `int32 => !integer ^ { size: { bits: 32 signed:
+true } } }` produces a real `IntegerType`) — see "Schema resolution" below. What was "purely an
+internal reshaping of the existing Class 1 vocabulary, done in preparation for future use" is now
+that future use.
 
 ### Mapper (`tson-parser/src/main/java/io/ltr8/tson/parser/mapper/`)
 
@@ -535,21 +540,119 @@ day to a second construct:
   tightening per §5.7's table). Restating a field group in a refinement body, and a non-record
   refinement source, remain unresolved.
 
-Every other construct (elided field types outside a tightening entry, an `Absent` modifier value or
-a modifier on an OPTIONAL field, the identity-diagonal FIXED-value invariant, atom refinement
-(`!I ^ { ... }`, a distinct grammar form from `RefinedDef`), **constructor application / atom
-instances** (`!C value`, `Instance` -- `value => !unit {}`, `boolean => !enum [true false]`, and
-every other atom-family bootstrap instance in the real fixture use this and are not dispatched at
-all yet in `resolveTypeDef` -- see below), restating a field group in a refinement body, subtraction,
-a generic type-ref with a nested or value (non-simple) argument, and an inter-supertype field
-collision) throws `UnsupportedOperationException` rather than silently mis-resolving --
-`SchemaResolver`'s own Javadoc lists exactly what's in scope.
+- **Structure-namespace threading** (added 2026-07-24, Phase B step 2) -- `resolve`/`resolveAll`
+  each gained a `structureNamespace` overload (`Map<String, TypeDefinition>`, defaulting to `Map.of()`
+  on the existing overloads, so every pre-existing call site is unaffected). Per §3.3.1: a
+  constructor-application target (`!C value`) resolves first against the type-name namespace
+  (`resolved`, the entries already resolved so far in the *current* schema), then against the
+  structure namespace (the governing meta-schema's own namespace, one hop via its own `!!meta`) --
+  an atom-refinement source (`!I ^ {...}`) never consults the structure namespace at all. Pure
+  plumbing on its own (nothing consumed it until step 4 below); confirmed inert with a dedicated
+  test (`SchemaResolverTest.structureNamespaceOverloadsAreInertUntilInstanceAtomRefinementDispatchExists`)
+  before anything used it.
+- **Constructor application** (`!C value`, `Instance`, §5.5/§5.6, `resolveInstance`, added
+  2026-07-24, Phase B step 4) -- resolves `C` per the two-namespace lookup above, rejects a
+  non-constructor target (`constructor: false`) with the spec's own suggested diagnostic ("did you
+  mean atom refinement?"), normalizes `instance.value()` to record form (`PositionalForm`, below,
+  using `C`'s own resolved field list), then binds generically via `TsonMapperReader.toObject(normalized,
+  Top.class)` -- `instance.value().typeRef()` already names `C` (`Instance` itself was reshaped for
+  exactly this, `SPEC-FEEDBACK.md` #16: no separate `target: String` field, since `DataValue.typeRef`
+  already carries it), so `tson-bind`'s own union-member resolution finds the matching `Top` leaf by
+  `@Typename` with no hand-rolled name→class table anywhere (the originally-planned
+  `ConstructorVocabulary` class was never built, once `tson-bind`'s own sealed-union flattening bug
+  was fixed first, `812a73f` -- see `Top`'s own Javadoc). **Binds against `Top.class`, not
+  `Atom.class`** -- widened from an initially narrower scope once `UnknownType` (`unknown_type => ~sum
+  & {}`) turned up as the first real constructor outside the atom family; confirmed safe, since
+  `Top`'s union is a strict superset of `Atom`'s and union resolution is exact-`@Typename` matching,
+  so no existing atom-family resolution changed behavior. Construction transfers only `C`'s `kind`
+  (§5.5): no supertypes, no parameters, `constructor: false` on the result.
+- **Positional form and schema-composed defaults** (`PositionalForm`, a small standalone,
+  package-private helper class, added 2026-07-24 as Phase B step 3, widened the same day once
+  `float32`/`float64` surfaced a second real need) -- normalizes an `Instance`'s value into the
+  exact record shape its constructor implies, before binding, so nothing downstream needs any
+  schema awareness at all. Two independent jobs, both needing the *resolved schema* (plain Java
+  reflection on the bound class can't recover either):
+  - **Positional form** (§5.6: "a record with exactly one REQUIRED field can be filled by a bare,
+    non-braced value") -- `!enum [true false]` standing in for `!enum { members: [true false] } }`.
+    Finds the constructor's sole bare-`REQUIRED` field (only bare `REQUIRED` counts -- `REQUIRED_DEFAULT`/
+    `REQUIRED_FIXED`/`OPTIONAL`/`OPTIONAL_FIXED` never are, even if it's the only field present) and
+    wraps the bare value into a synthetic one-field `RecordValue`; `EmptyBrace`/`RecordValue` pass
+    through unchanged.
+  - **Schema-composed defaults** (§5.2/§5.7's `~`/`=` field modifiers) -- fills in any
+    `REQUIRED_DEFAULT`/`REQUIRED_FIXED` field the instance doesn't itself mention, using the literal
+    `Token` value the schema modifier already carries, without overriding a field the instance *does*
+    specify. Found empirically, not designed up front: `float32 => !float_type { format: BINARY32 }`
+    never mentions `allow_nan`/`allow_infinity`/`allow_subnormal`/`allow_negative_zero` (all `boolean
+    ~ true` in meta.tn1's real `float_type`), so this only resolves at all once defaulting exists --
+    previously failed loudly ("missing required field 'allow_nan'"), not silently. **Runs on both the
+    wrap and pass-through paths** -- neither `float32`'s nor `uri_type`'s own `{}` case ever touches
+    the wrapping branch at all (both arrive already record-shaped), which is exactly why defaulting
+    couldn't live *inside* the wrap-only code path the way it was first attempted.
+  - **Does not fix `uri_type`/`regex_type`**, despite their own `spec` field being exactly this
+    shape (`REQUIRED_FIXED`) -- their Java shape keeps it nested inside `specification:
+    AtomSpecification`, not flat, so a synthesized flat `spec` entry matches nothing and is silently
+    ignored. Every *new* atom-constraint class added since (below) deliberately keeps its own RFC
+    citation as a flat `String spec` field instead, specifically so it *can* receive this defaulting
+    -- see `Cidr4Type`'s own Javadoc for the two corrections that took (nested → flat, then
+    `java.net.URI` → `String`, since an untyped string can't bind into `URI` without a `!uri`
+    type-ref -- the same reason `TextType`/`UriType.pattern` are `String`, not a compiled `Pattern`).
+- **Atom refinement** (`!I ^ { values }`, `AtomRefinement`, §5.5/§5.7, `resolveAtomRefinement`,
+  added 2026-07-24, Phase B step 5) -- resolves `I` against the type-name namespace *only* (never
+  the structure namespace, unlike `C` above), rejects a constructor source and a non-atom-family
+  source (`kind != ATOM`); the constructor `I` was built from is reached via `I`'s own `source`
+  field, never a further name lookup, so refinement works even where the constructor itself isn't
+  name-visible. Unlike `Instance`, `AtomRefinement.bindings`'s own `typeRef` is *not* pre-set --
+  that grammar defect (`SPEC-FEEDBACK.md` #16) was deliberately left unfixed (narrowing it needs
+  `AtomRefinement.bindings` retyped to a real `RecordDef`, a bigger change than `Instance`'s own
+  reshape) -- so this attaches `I`'s constructor name as the value's type-ref itself, then binds
+  through the same `Top.class` path `Instance` resolution uses. No positional-form wrapping needed
+  (§5.5 guarantees a refinement body is always a braced record). **Merges with `I`'s own
+  already-bound value; does not replace it** (`mergeWithSource`, corrected 2026-07-24 after the
+  user caught a real spec-reading mistake, `SPEC-FEEDBACK.md` #17) -- an earlier version of this
+  method read §5.6's "`!I ^ { values }` desugars by retargeting to the instance's source
+  constructor" as a full replace (values carry over verbatim, nothing of `I`'s own binding
+  survives), which is wrong for a *chained* refinement: given `int8 => !integer ^ { size: {...} }`,
+  `big => !int8 ^ { min: -500 } }` MUST still carry `int8`'s own `size` -- `big` is declared as a
+  *refinement*, a narrowing, of `int8`, and §5.7's own "Body materialisation" rule for the
+  structurally analogous record-refinement case is explicit that inherited fields survive
+  untouched ("appear with their pinned values even when the refinement did not refer to them").
+  `mergeWithSource` re-serializes `I`'s own bound value back to wire form via `TsonMapperWriter`
+  (writing a `Top`-typed value by its own runtime class never emits a type-ref, giving exactly the
+  plain-record shape wanted -- no hand-written per-atom-class merge logic needed for any of the many
+  constraint classes this has to work for) and merges it field-by-field with the new refinement's
+  own `values` (explicit values win; anything only `I` had survives). A fresh/`UNCONSTRAINED` source
+  serializes to an empty record, so the merge is a no-op there -- this recovers the previous,
+  already-verified non-chained behavior exactly, not a separate code path (confirmed: `core.tn1`'s
+  own 46/48 count is unchanged by this fix). Verified directly, not just reasoned about:
+  `SchemaResolverTest.chainedAtomRefinementMergesWithIntermediateBindingsInsteadOfDiscardingThem`
+  chains two refinements deep (`int8` → `big` → `veryBig`) and confirms `size` survives both hops,
+  `min` survives the second hop, and each level's own explicit override still wins over what it
+  inherited. Per §5.5's own
+  text (not the general composition/refinement induction of §5.7/§5.8): `source` is `I`'s own
+  constructor, `supertypes` is the literal single-element `[I]`, not transitively chained. Verified
+  against the concrete case the whole phase started from: `int32 => !integer ^ { size: { bits: 32
+  signed: true } }`, resolved from the real `core.tn1` fixture, producing the exact `IntegerType`.
 
-**Status against the real `meta-kernel.tn1` fixture: 36 of its 49 declarations resolve via
-`resolveAll` as of this writing; every one of the remaining 13 fails for the exact same reason** --
-each is `Instance` (constructor application, above), the one remaining construct standing between
-here and loading the whole file. Re-check with a throwaway `resolveAll` probe before assuming this
-count is still current -- it changes every time resolver coverage widens.
+Every other construct (elided field types outside a tightening entry, an `Absent` modifier value or
+a modifier on an OPTIONAL field, the identity-diagonal FIXED-value invariant, restating a field
+group in a refinement body, subtraction, a generic type-ref with a nested or value (non-simple)
+argument, and an inter-supertype field collision) throws `UnsupportedOperationException` rather
+than silently mis-resolving -- `SchemaResolver`'s own Javadoc lists exactly what's in scope.
+
+**Status against the real fixtures (re-check with a throwaway probe before trusting these counts --
+they change every time resolver coverage widens): `meta-kernel.tn1` resolves in full (49/49, via
+`MetaKernelParser`'s own two-pass ordering -- `SchemaResolver.resolveAll` alone, single-pass,
+strict source order, still can't handle `boolean => !enum [...]` preceding `enum`'s own
+declaration); `meta.tn1` resolves and registers in full (31/31, `MetaSchemaImportTest`, up from
+24/31 before generic `Instance` resolution existed); `core.tn1` resolves 46 of 48 declarations in a
+single source-order pass, seeded with meta.tn1's own registered namespace as the structure
+namespace.** The 2 remaining `core.tn1` failures are both real, permanent limits of generic
+binding, not open gaps: `boolean` (`!enum [true false]` -- `"true"`/`"false"` collide with TSON's
+own boolean-literal shape and get identified as actual booleans by `BaseTypeResolver` before
+`EnumBody.members: List<String>` ever sees them; every *other* real enum instance across both
+fixtures has ordinary identifier members that never collide) and `duration` (`IsoDuration`'s
+`Period`/`Duration` pairing isn't force-bound by the default `TsonMapperContext`, matching
+`Rational`/`Complex`'s identical treatment).
 
 **A real recursion trap, found and fixed along the way -- read before touching `TypeArgument`.**
 `TypeRef`/`TypeArgument` are mutually recursive (`TypeRef.arguments: List<TypeArgument>`, and a
@@ -585,16 +688,25 @@ is tempted to "fix" this back to a plain record, re-read `TypeArgument`'s Javado
     supporting records used as field types elsewhere), plus every atom constraint-vocabulary family
     with optional bound groups (`integer_type`/`text_type`/`uri_type`/`regex_type`, added 2026-07-23;
     `decimal_type`/`float_type`/`rational_type`/`uuid_type`/`binary`/`date_type`/`time_type`/
-    `datetime_type`/`duration_type`, the remaining nine, added 2026-07-24) once it turned out each
-    one's own fields are all `Optional`, so none actually needed the harder "represent a field-group's
-    mutual exclusion in a *bound instance*" design work in the first place. `SchemaResolver` itself
-    still doesn't resolve anything to one of these thirteen via ordinary schema-grammar resolution --
-    `MetaKernelParser` binds its five real-fixture instances (all bare `{}`) by hand instead; the
-    other eight (`decimal_type` and friends) aren't instantiated anywhere in meta-kernel itself, only
-    in `core.tn1`, which no resolver reaches yet (see "Not yet implemented" below). Verified each new
-    class actually round-trips through `TsonMapperReader`/`TsonMapperWriter` bound against `Atom`
-    (not just that it compiles) -- eight of the nine do; `DurationType` doesn't, by design, not a
-    regression: its `IsoDuration` field pairs `java.time.Period`/`java.time.Duration`, and
+    `datetime_type`/`duration_type`, the remaining nine constraint-bearing families, added
+    2026-07-24) once it turned out each one's own fields are all `Optional`, so none actually needed
+    the harder "represent a field-group's mutual exclusion in a *bound instance*" design work in the
+    first place. **`Cidr4Type`/`Cidr6Type`/`EmailType`/`MacType`/`Ipv4Type`/`Ipv6Type`/`ComplexType`
+    (all `Atom`) and `UnknownType` (`Sum`, not `Atom` -- `unknown_type => ~sum & {}`, the first real
+    constructor found outside the atom family) joined the same day, record-only, deliberately with
+    no `resolver.vocab` parser at all** -- added specifically so their own real `core.tn1` instances
+    resolve (`cidr4`, `email`, `unknown`, ...), not to add real CIDR/email/MAC/complex-number
+    validation; each one's own Javadoc says so explicitly. Their RFC-citation field is a flat
+    `String spec`, not nested `AtomSpecification` and not `java.net.URI` -- see `Cidr4Type`'s own
+    Javadoc for the two corrections that took to get there (both explained in "Schema resolution"
+    above's `PositionalForm` bullet). `SchemaResolver` now resolves most atom-constraint-family
+    instances directly via its own generic `Instance`/`AtomRefinement` resolution (see "Schema
+    resolution" above) -- `MetaKernelParser` only still hand-binds three of meta-kernel's own six
+    real instances (`uri_type`, `regex_type`, `enum`; see "Meta-kernel bootstrap" below for exactly
+    why each one can't retire). Verified each constraint-bearing class actually round-trips through
+    `TsonMapperReader`/`TsonMapperWriter` bound against `Top` (not just that it compiles) -- all of
+    the above do except `DurationType`, by design, not a regression: its `IsoDuration` field pairs
+    `java.time.Period`/`java.time.Duration`, and
     `TsonMapperContext`'s own Javadoc already documents why that pairing isn't force-bound by the
     *default* context, matching `Rational`/`Complex`'s identical treatment -- a caller needing it
     registers their own `DataBridge` rather than the library assuming one opinionated wire shape.
@@ -690,26 +802,43 @@ in two passes over meta-kernel's 49 declarations:
    constructor they reference -- including ones declared *later* in the file, e.g. `enum` itself
    isn't declared until long after `boolean` uses it -- has an entry to transfer a kind from (§5.5:
    "construction transfers only the constructor's kind; the result records source: C with empty
-   supertypes").
+   supertypes"). This two-pass ordering is still needed and still lives here, not in
+   `SchemaResolver` itself -- `SchemaResolver.resolveAll` alone is single-pass, strict source order,
+   and still can't handle a forward reference like `boolean` preceding `enum`.
 
-**Constructor-application binding is done by hand, not through generic object binding** (revised
-2026-07-23, replacing an earlier version that used `TsonMapper.toObject` and lived in the separate
-`tson-mapper` module purely to reach it -- that module no longer exists at all today; see "Mapper"
-below for why) -- deliberately, so this class needs nothing beyond `tson-parser`/`tson-schema`
-(both already main-scope dependencies of this module). An `Instance`'s `value` is already a parsed `DataValue`
-(the schema grammar reuses Part 1's own data-value parsing directly), and every registered target's
-shape is simple enough to check directly against the AST rather than bind generically: `unit` and
-`integer_type` are only ever instantiated as a bare `{}` in the real fixture (every field
-`IntegerType` has is `Optional`, so an empty body is exactly `IntegerType.UNCONSTRAINED`) --
-verified by requiring the value actually be an `EmptyBrace` node, not just assumed, the same
-"validate, don't just trust the shape" treatment `enum` already got. `enum` needs a small
-hand-written converter regardless of binding style: `!enum [true false]`'s value is a bare array
-(§5.6's positional form for a single-field constructor), not `{ members: [...] }`, which generic
-`tson-bind` record binding has no positional-form support for anyway. **Every `Instance` declaration
-in the real fixture is registered** (`unit`, `integer_type`, `text_type`, `uri_type`, `regex_type`,
-`enum`) -- all 49 declarations resolve; a declaration whose target isn't registered would simply be
-left out of the result entirely rather than failing the whole bootstrap, but that path is
-unexercised against the real fixture today.
+**Constructor-application binding delegates to `SchemaResolver.resolve` for most targets now**
+(revised 2026-07-24, Phase B step 6, once `SchemaResolver` itself gained generic `Instance`
+resolution -- see "Schema resolution" above) -- `unit`, `integer_type`, and `text_type` all route
+through the ordinary `resolve(declaration, entries)` overload (meta-kernel is exactly the
+self-hosted case §3.3.1 describes: its own constructors are its own locals, so the type-name
+namespace alone suffices, no separate structure namespace needed). This retired the class's own
+former duplicate binding plumbing (a hand-rolled `bindAtom`/`TsonMapperReader` pair, doing exactly
+what `SchemaResolver.resolveInstance` now does canonically) entirely.
+
+**Three targets still stay hand-picked, not because retiring them wasn't tried, but because generic
+binding is demonstrably wrong or incomplete for each specific one** (`MetaKernelParser`'s own
+`handPickedBody` method, and its own Javadoc, spell out exactly why):
+- `uri_type`/`regex_type` -- their `specification: AtomSpecification`/`constraints: TextType`
+  fields aren't `Optional` (correctly: every instance genuinely always has exactly one RFC
+  citation), but the RFC citation is a *schema-composed* fixed default, never literally present in
+  any instance's own `{}` body -- generic binding silently leaves the field `null` instead of the
+  real RFC URI (this is the reason every atom-constraint class added *after* this was discovered
+  keeps its own RFC citation as a flat `String spec` field instead -- see "Schema resolution"
+  above's `PositionalForm` bullet).
+- `enum` -- tried routing this through `SchemaResolver` too once `PositionalForm`'s own
+  generalized positional-form support existed, and it broke the real fixture: `boolean => !enum
+  [true false]` fails, since `"true"`/`"false"` collide with TSON's own boolean-literal shape and
+  get identified as actual booleans by `BaseTypeResolver` before ever reaching `EnumBody.members:
+  List<String>`. `boolean` is one of meta-kernel's real 49 declarations this class MUST resolve
+  correctly -- unlike a resolver-level test, which can document a known gap and move on, the
+  bootstrap itself can't silently produce a wrong or missing `boolean`. A small hand-written
+  converter (reading `TokenValue.text()` directly, bypassing base-type identification entirely)
+  handles it instead, correct for every enum member regardless of what it happens to look like.
+
+**Every `Instance` declaration in the real fixture is registered** (`unit`, `integer_type`, `text_type`,
+`uri_type`, `regex_type`, `enum`) -- all 49 declarations resolve; a declaration whose target isn't
+registered would simply be left out of the result entirely rather than failing the whole bootstrap,
+but that path is unexercised against the real fixture today.
 
 **`meta-kernel.tn1` is packaged as a classpath resource, not read from a filesystem path.**
 `MetaKernelParser.parse()` (no args) reads `/meta-kernel.tn1` off the classpath via
@@ -729,9 +858,10 @@ field-group-in-a-bound-instance design work (mutual exclusion between `min`/`exc
 (or gained) its own `UNCONSTRAINED` constant for exactly this empty-body case. Each gained
 `@Typename` (`text_type`/`uri_type`/`regex_type`) and multi-word fields gained `@Field`
 (`min_length`/`max_length`), matching the convention every other `Atom` variant already
-follows, even though `MetaKernelParser` itself binds none of them generically -- kept consistent in
-case something else (e.g. a future `toTson` call on one of these) needs it. The remaining nine atom
-constraint-vocabulary families (`DecimalType`/`FloatType`/`RationalType`/`UuidType`/`BinaryType`/
+follows -- `IntegerType`/`TextType` now bind generically via `SchemaResolver` (see above);
+`UriType`/`RegexType` don't (still hand-picked, above), but keep the same annotations for
+consistency and in case something else (e.g. a `toTson` call on one of these) needs them. The
+remaining nine atom constraint-vocabulary families (`DecimalType`/`FloatType`/`RationalType`/`UuidType`/`BinaryType`/
 `DateType`/`TimeType`/`DateTimeType`/`DurationType`) joined the same way on 2026-07-24 -- see
 "Schema resolution" above's `io.ltr8.tson.schema.meta` bullet for what does/doesn't actually bind
 by default among them.
@@ -870,20 +1000,20 @@ applications too (§5.3) — three separate `[type_name]?` uses across different
 correctly dedup to a single `array_type_name_*` entry, confirmed against the real data, not just a
 hand-built case.
 
-**`!!import` merging verified against the real `meta.tn1` fixture too, with an honest limit.**
+**`!!import` merging verified against the real `meta.tn1` fixture too — now registers in full.**
 `MetaSchemaImportTest` (`tson-parser`, same reasoning as above for why it lives there) registers the
 real meta-kernel schema first, then meta.tn1's own declarations (`!!import:"...meta-kernel.tn1"`),
 confirming meta-kernel's own entries (`atom`, `text_type`, ...) are visible and correctly referenced
 from meta.tn1's own composition-based declarations (`date_type => ~atom & atom_specification &
-{...}`). **meta.tn1 can't be registered in full yet** — 4 of its 31 declarations (`binary_encoding`,
-`ieee_format`, `complex_component`, `ordered`) are `!enum [...]` constructor-application `Instance`s,
-a construct `SchemaResolver` doesn't resolve generically outside `MetaKernelParser`'s own hand-rolled
-meta-kernel bootstrap — a separate, pre-existing gap, unrelated to import merging itself. Three more
-declarations (`binary`, `float_type`, `complex_type`) reference one of those four as a field type, so
-attempting to register them too correctly *fails* reference validation — the test proves this
-directly (a dedicated assertion registering just `binary` and catching the expected
-`SchemaValidationException`), rather than silently working around it. The other 24 declarations,
-whose own dependency closure is otherwise complete, register cleanly.
+{...}`). **meta.tn1 now registers in full, all 31 declarations** (2026-07-24, once `SchemaResolver`
+gained generic `Instance` resolution — Phase B step 4) — previously 4 of its 31 declarations
+(`binary_encoding`, `ieee_format`, `complex_component`, `ordered`, all `!enum [...]`) had to be
+skipped, and 3 more (`binary`, `float_type`, `complex_type`) that reference one of those four as a
+field type had to be excluded too (registering them without their dependency present correctly
+failed validation, proven directly by a dedicated test rather than worked around). With generic
+`Instance` resolution in place, every one of the 31 resolves in a single source-order pass (meta.tn1's
+own declaration order already has each dependency before its use), and the merged, validated
+registration succeeds outright.
 
 ### Conformance suite integration (`ConformanceSuiteTest`)
 
@@ -922,20 +1052,20 @@ No system Gradle — always use the wrapper:
 
 ## Not yet implemented
 
-- Part 2 schema resolution: atom refinement (`!I ^ { ... }`), subtraction, elided field types
-  outside a tightening entry, restating a field group in a refinement body, and generic type-refs
-  beyond a bare two-argument `map<K, V>` application or a refinement source — see `SchemaResolver`'s
-  own Javadoc (under "Schema resolution" above) for the exact, current boundary of what resolves.
-  (Template/instantiation-entry *materialization* itself is now handled — see "Schema registry"
-  above — just not per §8.2's precise constructor-vs-template split; materialization is uniform.)
-- **Constructor-application `Instance` generalization** (`!C value`, §5.5) — `SchemaResolver` still
-  only dispatches this for `MetaKernelParser`'s own hand-rolled meta-kernel bootstrap targets
-  (`unit`/`integer_type`/`text_type`/`uri_type`/`regex_type`/`enum`), not generically for an
-  arbitrary schema. This is the actual blocker keeping `meta.tn1` from registering in full today —
-  see "Schema registry" above's `MetaSchemaImportTest`: 4 of its 31 declarations are `!enum [...]`
-  Instances (`binary_encoding`/`ieee_format`/`complex_component`/`ordered`), and 3 more
-  (`binary`/`float_type`/`complex_type`) reference one of those as a field type, so registering
-  them too correctly fails reference validation until this generalizes.
+- Part 2 schema resolution: subtraction, elided field types outside a tightening entry, restating a
+  field group in a refinement body, the identity-diagonal FIXED-value invariant, and generic
+  type-refs beyond a bare two-argument `map<K, V>` application or a refinement source — see
+  `SchemaResolver`'s own Javadoc (under "Schema resolution" above) for the exact, current boundary
+  of what resolves. (Template/instantiation-entry *materialization* itself is now handled — see
+  "Schema registry" above — just not per §8.2's precise constructor-vs-template split;
+  materialization is uniform. Constructor-application `Instance` and atom-refinement resolution are
+  both now generalized — see "Schema resolution" above — not listed here anymore.)
+- Two permanent, already-diagnosed limits of generic binding, not open gaps: `boolean => !enum
+  [true false]` (its members collide with TSON's own boolean-literal shape) and `duration`
+  (`IsoDuration`'s `Period`/`Duration` pairing isn't force-bound by the default `TsonMapperContext`)
+  — see "Schema resolution" above's status paragraph. `complex_type`'s own `component` field binds
+  fine (`ComplexType`, added 2026-07-24); `unknown_type` too (`UnknownType`). No real fixture
+  declaration remains unresolved in `meta-kernel.tn1`/`meta.tn1` at all.
 - A schema-validating data parser (Class 2) that consults a resolved `TsonSchema`/`TypeDefinition`
   while parsing data — the built-in vocabulary's `schema.meta`/`resolver.vocab` split (see "Built-in
   type vocabulary" above) is groundwork for this, not this itself.
