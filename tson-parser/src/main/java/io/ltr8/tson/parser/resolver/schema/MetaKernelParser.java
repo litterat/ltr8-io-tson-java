@@ -1,5 +1,6 @@
 package io.ltr8.tson.parser.resolver.schema;
 
+import io.ltr8.bind.DataBindException;
 import io.ltr8.tson.parser.SchemaParser;
 import io.ltr8.tson.parser.ast.ArrayValue;
 import io.ltr8.tson.parser.ast.DataValue;
@@ -9,15 +10,14 @@ import io.ltr8.tson.parser.ast.TokenValue;
 import io.ltr8.tson.parser.ast.schema.Instance;
 import io.ltr8.tson.parser.ast.schema.SchemaDocument;
 import io.ltr8.tson.parser.ast.schema.SchemaMap;
+import io.ltr8.tson.parser.mapper.TsonMapperReader;
 import io.ltr8.tson.schema.MetaSchema;
+import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.EnumBody;
-import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.RegexType;
-import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.schema.meta.Unit;
 import io.ltr8.tson.schema.meta.UriType;
 
 import java.io.IOException;
@@ -49,28 +49,40 @@ import java.util.Optional;
  * {@link #parse(String)} and {@link #parse()} each return a freshly-built {@link MetaSchema}
  * value rather than being one themselves.
  *
- * <p><b>Constructor-application binding is done by hand, not through generic object binding</b> --
- * deliberately, so this class needs nothing beyond {@code tson-parser}/{@code tson-schema} (both
- * already main-scope dependencies of this module) and can live here rather than needing the
- * generic reflective binding {@code io.ltr8.tson.parser.mapper}'s {@code TsonMapperReader} offers
- * (an earlier version of this class used {@code TsonMapper.toObject} and lived in a separate {@code
- * tson-mapper} module for exactly that reason; moved into this module once the generic-binding step
- * turned out to be unnecessary for meta-kernel's own narrow bootstrap set -- that module no longer
- * exists at all today, since {@code TsonMapperReader}/{@code TsonMapperWriter} themselves moved
- * here too, for the *opposite* reason: {@code SchemaResolver}'s generalized constructor-application/
- * atom-refinement resolution genuinely does need generic binding).
- * An {@code Instance}'s {@code value} is already a parsed {@link DataValue} (the schema grammar
- * reuses Part 1's own data-value parsing directly, per {@code SchemaParser}'s own Javadoc), and
- * every registered target's shape is simple enough to check directly against the AST: {@code
- * unit}/{@code integer_type}/{@code text_type}/{@code uri_type}/{@code regex_type} are all always
- * instantiated as a bare {@code {}} in the real fixture (every field each of the latter four has is
- * {@code Optional}, so an empty body is exactly that type's own {@code UNCONSTRAINED} constant) --
- * verified by requiring the value actually be an {@link EmptyBrace}, not just assumed -- and {@code
- * enum}'s value is a bare array (§5.6's positional form for a single-field constructor), read
- * directly into an {@link EnumBody}. Every {@code Instance} in the real fixture is registered this
- * way (§5.5's other constructor-application forms -- a non-empty body -- don't occur in
- * meta-kernel itself, so aren't handled); a declaration whose target isn't registered is simply
- * left out of the result entirely rather than failing the whole bootstrap.
+ * <p><b>Constructor-application binding for fully data-representable targets goes through generic
+ * binding (2026-07-24), not hand construction.</b> {@code unit}/{@code integer_type}/{@code
+ * text_type} instances bind via a single call, {@code TsonMapperReader.toObject(instance.value(),
+ * Atom.class)} -- {@code instance.value()} already carries the constructor's own name as its {@code
+ * DataValue.typeRef} (per {@code Instance}'s own reshape, {@code SPEC-FEEDBACK.md} #16), so {@code
+ * tson-bind}'s own union-member resolution (matching that name against each {@link Atom} leaf's
+ * {@code @Typename}, no hand-rolled name→class table anywhere) finds {@code IntegerType}/{@code
+ * TextType}/etc. and binds it generically -- record binding naturally produces the same result as
+ * the old hand-picked {@code UNCONSTRAINED} constants for an empty {@code {}} body (every field on
+ * these three is {@code Optional}), and, as a genuine capability gain over the old hand-rolled
+ * switch, now also handles a non-empty body correctly instead of rejecting it.
+ *
+ * <p><b>{@code uri_type}/{@code regex_type} deliberately stay hand-picked constants</b> -- tried
+ * generic binding for these too and it silently produced the wrong value: their own {@code
+ * specification: AtomSpecification}/{@code constraints: TextType} fields aren't {@code Optional}
+ * (correctly -- every {@code uri_type}/{@code regex_type} instance genuinely always has exactly one
+ * RFC citation, never an absent one), but the RFC citation is a *schema-composed* fixed default
+ * (meta-kernel.tn1: {@code uri_type => ~text_type & atom_specification & { spec: =
+ * "https://www.rfc-editor.org/rfc/rfc3986" ... } }), never literally present in any instance's own
+ * {@code {}} body -- so plain record binding leaves that field {@code null} instead of the real RFC
+ * URI (caught by {@code MetaKernelParserTest.textUriRegexResolveToTheirUnconstrainedTypeBodiesWithAtomKind}).
+ * Binding what's actually written in the instance body is correct as far as it goes; reconstructing
+ * a *composed* default that lives on the constructor's own declaration, not the instance, is a
+ * different problem this class doesn't attempt to solve generically -- {@link #requireEmptyBody}
+ * keeps the same defensive check the original hand-written path had.
+ *
+ * <p>{@code enum}'s value is still hand-unwrapped (see {@link #toEnumBody}) -- it's a bare array
+ * (§5.6's positional form for a single-field constructor), which {@code TsonMapperReader} can't bind
+ * directly yet (no positional-form support, see {@code CLAUDE.md}'s "Mapper" section); that gap is
+ * what {@code SchemaResolver}'s own generalized constructor-application resolution (Phase B step 3,
+ * not built yet) will close for every constructor at once, at which point this method's {@code enum}
+ * case can retire too. Every {@code Instance} in the real fixture is registered this way; a
+ * declaration whose target isn't one of these six is simply left out of the result entirely rather
+ * than failing the whole bootstrap.
  *
  * <p><b>{@link #parse()} reads meta-kernel.tn1 packaged as a classpath resource</b> (see this
  * module's {@code build.gradle.kts}, which copies it straight from the repo's own {@code
@@ -107,6 +119,7 @@ public final class MetaKernelParser {
 
     private static Map<String, TypeDefinition> resolveEntries(SchemaDocument document) {
         SchemaResolver resolver = new SchemaResolver();
+        TsonMapperReader reader = new TsonMapperReader();
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         List<SchemaMap.Declaration> instances = new ArrayList<>();
 
@@ -127,7 +140,7 @@ public final class MetaKernelParser {
             if (target == null) {
                 continue;
             }
-            Optional<Top> body = bindInstanceBody(instance);
+            Optional<Top> body = bindInstanceBody(instance, reader);
             if (body.isEmpty()) {
                 continue;
             }
@@ -140,20 +153,9 @@ public final class MetaKernelParser {
         return entries;
     }
 
-    private static Optional<Top> bindInstanceBody(Instance instance) {
+    private static Optional<Top> bindInstanceBody(Instance instance, TsonMapperReader reader) {
         return switch (instance.target()) {
-            case "unit" -> {
-                requireEmptyBody(instance);
-                yield Optional.of(new Unit());
-            }
-            case "integer_type" -> {
-                requireEmptyBody(instance);
-                yield Optional.of(IntegerType.UNCONSTRAINED);
-            }
-            case "text_type" -> {
-                requireEmptyBody(instance);
-                yield Optional.of(TextType.UNCONSTRAINED);
-            }
+            case "unit", "integer_type", "text_type" -> Optional.of(bindAtom(instance.value(), reader));
             case "uri_type" -> {
                 requireEmptyBody(instance);
                 yield Optional.of(UriType.UNCONSTRAINED);
@@ -168,9 +170,26 @@ public final class MetaKernelParser {
     }
 
     /**
-     * {@code unit}/{@code integer_type}/{@code text_type}/{@code uri_type}/{@code regex_type} are
-     * only ever instantiated as a bare {@code {}} in the real fixture -- checked rather than
-     * assumed, since none of these constructors' own vocabulary is actually consulted here.
+     * {@code instance.value()}'s own {@code typeRef} already names the constructor (e.g. {@code
+     * "integer_type"}) -- {@code tson-bind}'s union-member resolution matches that against each
+     * {@link Atom} leaf's {@code @Typename} and binds generically from there; see this class's own
+     * Javadoc for why no hand-rolled name→class table is needed anywhere. Only reached for targets
+     * whose entire vocabulary is representable from instance data alone -- see this class's own
+     * Javadoc for why {@code uri_type}/{@code regex_type} don't qualify.
+     */
+    private static Top bindAtom(DataValue value, TsonMapperReader reader) {
+        try {
+            return reader.toObject(value, Atom.class);
+        } catch (DataBindException e) {
+            throw new IllegalStateException("failed to bind constructor-application instance !"
+                    + value.typeRef().orElse("?"), e);
+        }
+    }
+
+    /**
+     * {@code uri_type}/{@code regex_type} are only ever instantiated as a bare {@code {}} in the
+     * real fixture -- checked rather than assumed, since their RFC-citation constraint is supplied
+     * as a hand-picked constant (see this class's own Javadoc), not parsed from the instance body.
      */
     private static void requireEmptyBody(Instance instance) {
         if (!(instance.value().coreValue() instanceof EmptyBrace)) {

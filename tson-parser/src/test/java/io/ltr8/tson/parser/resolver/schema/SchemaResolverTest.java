@@ -114,6 +114,33 @@ class SchemaResolverTest {
         assertEquals(EXPECTED_INTEGER_SIZE, write(schema.entries().get("integer_size")));
     }
 
+    /**
+     * The structure-namespace overloads (Phase B step 2) don't change anything about a construct
+     * this class already resolves -- {@code Instance}/{@code AtomRefinement} aren't dispatched yet
+     * (see {@code SchemaResolver}'s own Javadoc), so {@code structureNamespace} is threaded through
+     * unread. This just confirms the plumbing itself doesn't interfere: passing a (deliberately
+     * irrelevant) non-empty structure namespace produces byte-for-byte the same result as the
+     * two/one-argument overloads, for both a single declaration and a whole document.
+     */
+    @Test
+    void structureNamespaceOverloadsAreInertUntilInstanceAtomRefinementDispatchExists() throws DataBindException {
+        SchemaDocument doc = new SchemaParser("""
+                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
+                {
+                  integer_size => { bits: integer  signed: boolean }
+                  point => { x: integer  y: integer }
+                }""").parseSchemaDocument();
+        SchemaMap.Declaration declaration = doc.body().declarations().get("integer_size");
+        Map<String, TypeDefinition> irrelevantStructureNamespace = Map.of("unrelated", TypeDefinition.reference("token"));
+
+        TypeDefinition viaThreeArg = resolver.resolve(declaration, Map.of(), irrelevantStructureNamespace);
+        assertEquals(EXPECTED_INTEGER_SIZE, write(viaThreeArg));
+
+        TsonSchema schema = resolver.resolveAll(doc, irrelevantStructureNamespace);
+        assertEquals(2, schema.entries().size());
+        assertEquals(EXPECTED_INTEGER_SIZE, write(schema.entries().get("integer_size")));
+    }
+
     // ── Top variants SchemaResolver doesn't produce yet: hand-built,
     //    checked against the real toTson output (see class Javadoc for why it
     //    diverges, structurally faithfully, from meta-kernel-resolved.tn1's own text) ──
@@ -841,6 +868,103 @@ class SchemaResolverTest {
                         + "arguments: [ !ref { ref: { name: \"token\" arguments: [] } } ] } state: \"REQUIRED\" } "
                         + "] groups: [] } }",
                 write(enumDef));
+    }
+
+    // ── Constructor application (§5.5, §5.6, Phase B step 4) ──────────────
+
+    @Test
+    void resolvesProductAccessTypeInstanceFromTheRealMetaKernelFixture() throws IOException {
+        // product_access_type => !enum [INDEX NAMED] -- enum itself is declared *later* in the
+        // real file, so it's resolved into `resolved` by hand here first (SchemaResolver has no
+        // forward-reference support of its own; MetaKernelParser's own two-pass ordering is what
+        // handles that for the whole file -- see its class Javadoc).
+        SchemaMap schemaMap = schemaMapFromFixture();
+        Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
+        resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
+        resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom"), resolved));
+        resolved.put("enum", resolver.resolve(schemaMap.declarations().get("enum"), resolved));
+
+        TypeDefinition accessType = resolver.resolve(schemaMap.declarations().get("product_access_type"), resolved);
+
+        assertEquals(TypeKind.ATOM, accessType.kind());
+        assertFalse(accessType.constructor());
+        assertEquals(List.of(), accessType.supertypes());
+        assertEquals(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of("enum")), accessType.source());
+        assertEquals(new EnumBody(List.of("INDEX", "NAMED")), accessType.body());
+    }
+
+    /**
+     * {@code boolean => !enum [true false]} is the one real-fixture enum instance that does NOT
+     * resolve through generic binding, and it's worth knowing exactly why, not just that it fails:
+     * {@code EnumBody.members} is {@code List<String>}, but binding each bare array element goes
+     * through ordinary {@code TsonMapperReader.toAtom}, which -- with no type-ref on the element
+     * (positional-form arrays don't carry one) -- runs {@code BaseTypeResolver}'s default null →
+     * boolean → number → string identification (§4.5) before {@code AtomBinder} ever sees it.
+     * {@code "true"}/{@code "false"} match the boolean grammar, so they're identified as actual
+     * booleans and {@code AtomBinder} correctly refuses to coerce a recognized boolean into {@code
+     * String}. Every *other* real enum instance (meta-kernel's own {@code product_access_type}/
+     * {@code field_state}/etc., and all 31 of meta.tn1's instances, including four more {@code
+     * !enum [...]} declarations) has ordinary identifier members that never collide with a TSON
+     * literal shape, so this is narrow, not systemic.
+     *
+     * <p>Not a spec defect (`§5.6`'s `members: set<token>` unambiguously means "raw, uninterpreted
+     * token" -- {@code token} is its own atom kind, deliberately not run through null/boolean/
+     * number/string resolution) -- it's a real, narrow limit of routing an enum instance through
+     * plain {@code tson-bind} generic binding, which has no way to know a given {@code String}
+     * field wants raw token text rather than base-type-resolved text (the schema is the only place
+     * that distinction lives, and {@code tson-bind} doesn't consult it, by design). {@code
+     * MetaKernelParser}'s own hand-written {@code toEnumBody} sidesteps this by reading {@code
+     * TokenValue.text()} directly -- unaffected, since it doesn't route through this generic path.
+     */
+    @Test
+    void booleanInstanceFailsGenericBindingBecauseItsMembersCollideWithTsonBooleanLiterals() throws IOException {
+        SchemaMap schemaMap = schemaMapFromFixture();
+        Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
+        resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
+        resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom"), resolved));
+        resolved.put("enum", resolver.resolve(schemaMap.declarations().get("enum"), resolved));
+
+        UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
+                () -> resolver.resolve(schemaMap.declarations().get("boolean"), resolved));
+        assertTrue(thrown.getMessage().contains("failed to bind constructor application"), thrown.getMessage());
+    }
+
+    /**
+     * The same construct as above, but deliberately exercising the *other* half of §3.3.1's lookup
+     * rule: a schema governed by meta-kernel (its {@code !!meta} target) that does NOT import it,
+     * so {@code enum} is nowhere in this schema's own type-name namespace at all -- resolution must
+     * fall through to the structure namespace, supplied here as meta-kernel's own real,
+     * independently-resolved entries (Phase B step 2's threading, exercised for real for the first
+     * time by an actual {@code Instance} resolution rather than an inert pass-through).
+     */
+    @Test
+    void instanceResolvesViaTheStructureNamespaceWhenNotLocallyAvailable() {
+        Map<String, TypeDefinition> metaKernelEntries = MetaKernelParser.parse().entries();
+        SchemaMap schemaMap = new SchemaParser("""
+                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
+                { my_bool => !enum [YES NO] }""").parseSchemaDocument().body();
+
+        TypeDefinition resolved = resolver.resolve(schemaMap.declarations().get("my_bool"),
+                Map.of(), metaKernelEntries);
+
+        assertEquals(TypeKind.ATOM, resolved.kind());
+        assertFalse(resolved.constructor());
+        assertEquals(new EnumBody(List.of("YES", "NO")), resolved.body());
+    }
+
+    @Test
+    void instanceResolutionRejectsATargetThatIsNotAConstructor() {
+        // "token" resolves fine (kind ATOM) but constructor: false -- !token {} must be rejected,
+        // not silently treated as a valid constructor application (§3.3.1's own suggested
+        // diagnostic: "did you mean atom refinement?").
+        Map<String, TypeDefinition> metaKernelEntries = MetaKernelParser.parse().entries();
+        SchemaMap schemaMap = new SchemaParser("""
+                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
+                { bad => !token {} }""").parseSchemaDocument().body();
+
+        UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
+                () -> resolver.resolve(schemaMap.declarations().get("bad"), Map.of(), metaKernelEntries));
+        assertTrue(thrown.getMessage().contains("does not resolve to a constructor"), thrown.getMessage());
     }
 
     private Map<String, TypeDefinition> resolveUpToArray() throws IOException {

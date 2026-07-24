@@ -6,6 +6,7 @@ import io.ltr8.tson.parser.ast.schema.SchemaMap;
 import io.ltr8.tson.schema.MetaSchema;
 import io.ltr8.tson.schema.SchemaRegistry;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import org.junit.jupiter.api.Test;
 
@@ -13,8 +14,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -27,25 +28,22 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@code atom}, {@code text_type}) are visible and correctly referenced from meta.tn1's own
  * composition-based declarations (e.g. {@code date_type => ~atom & atom_specification & {...}}).
  *
- * <p><b>meta.tn1 can't be registered in full yet</b> -- 4 of its 31 declarations
- * ({@code binary_encoding}, {@code ieee_format}, {@code complex_component}, {@code ordered}) are
- * {@code !enum [...]} constructor-application {@code Instance}s, a construct {@code SchemaResolver}
- * doesn't resolve generically outside {@code MetaKernelParser}'s own hand-rolled meta-kernel
- * bootstrap (see {@code SchemaResolver}'s own Javadoc -- "Instance" is explicitly out of scope
- * there). That's a separate, pre-existing gap, not something import merging itself is blocked on.
- * Three more declarations (`binary`, `float_type`, `complex_type`) reference one of those four as
- * a field type, so registering them too correctly *fails* reference validation -- proven directly
- * below, not worked around. This test registers the 24 declarations whose own dependency closure
- * is otherwise complete, proving the merge mechanism against real content, not just hand-built
- * schemas.
+ * <p><b>meta.tn1 now registers in full, all 31 declarations</b> (2026-07-24, once {@code
+ * SchemaResolver} gained generic {@code Instance} resolution -- Phase B step 4) -- previously 4 of
+ * its 31 declarations ({@code binary_encoding}, {@code ieee_format}, {@code complex_component},
+ * {@code ordered}, all {@code !enum [...]}) had to be skipped, and 3 more ({@code binary}, {@code
+ * float_type}, {@code complex_type}) that reference one of those four as a field type had to be
+ * excluded too (registering them without their dependency present correctly failed validation).
+ * With generic {@code Instance} resolution in place, every one of the 31 resolves in a single
+ * source-order pass (meta.tn1's own declaration order already has each dependency before its use --
+ * unlike meta-kernel.tn1 itself, which needs {@code MetaKernelParser}'s own two-pass ordering for
+ * forward references like {@code boolean => !enum [...]} preceding {@code enum}'s own declaration),
+ * and the merged, validated registration succeeds outright.
  */
 class MetaSchemaImportTest {
 
-    /** Depend (directly) on one of the four unresolved Instance declarations -- see class Javadoc. */
-    private static final Set<String> EXCLUDED_TRANSITIVELY = Set.of("binary", "float_type", "complex_type");
-
     @Test
-    void mergesMetaKernelIntoMetaTn1sOwnDeclarationsThatAlreadyResolve() throws IOException {
+    void mergesMetaKernelIntoAllThirtyOneOfMetaTn1sOwnDeclarations() throws IOException {
         MetaSchema metaKernel = MetaKernelParser.parse();
         SchemaRegistry registry = new SchemaRegistry();
         registry.register(metaKernel);
@@ -54,23 +52,18 @@ class MetaSchemaImportTest {
         SchemaResolver resolver = new SchemaResolver();
 
         // Seeded with meta-kernel's own entries so composition against an imported supertype
-        // (date_type => ~atom & atom_specification & {...}) resolves -- but only meta.tn1's own new
-        // entries go into the TsonSchema handed to the registry; the import itself supplies the rest.
+        // (date_type => ~atom & atom_specification & {...}) and constructor-application targets
+        // reached through the structure namespace (binary_encoding => !enum [...], §3.3.1) both
+        // resolve -- but only meta.tn1's own new entries go into the TsonSchema handed to the
+        // registry; the import itself supplies the rest.
         Map<String, TypeDefinition> namespace = new LinkedHashMap<>(metaKernel.entries());
         Map<String, TypeDefinition> localOnly = new LinkedHashMap<>();
         for (SchemaMap.Declaration declaration : doc.body().declarations().values()) {
-            if (EXCLUDED_TRANSITIVELY.contains(declaration.name())) {
-                continue;
-            }
-            try {
-                TypeDefinition resolved = resolver.resolve(declaration, namespace);
-                namespace.put(declaration.name(), resolved);
-                localOnly.put(declaration.name(), resolved);
-            } catch (UnsupportedOperationException ignored) {
-                // !enum [...] Instance constructs -- see this class's own Javadoc.
-            }
+            TypeDefinition resolved = resolver.resolve(declaration, namespace);
+            namespace.put(declaration.name(), resolved);
+            localOnly.put(declaration.name(), resolved);
         }
-        assertEquals(24, localOnly.size(), "expected exactly the declarations with a complete dependency closure");
+        assertEquals(31, localOnly.size(), "expected every meta.tn1 declaration to resolve");
 
         TsonSchema meta = new TsonSchema(doc.id(), doc.meta(), doc.imports(), localOnly);
         TsonSchema registered = registry.register(meta);
@@ -80,6 +73,15 @@ class MetaSchemaImportTest {
         assertTrue(registered.entries().containsKey("text_type"));
         // meta.tn1's own composition against an imported supertype resolved and validated correctly.
         assertTrue(registered.entries().containsKey("date_type"));
+        // The four constructor-application (!enum [...]) declarations previously excluded now
+        // resolve too, bound generically via TsonMapperReader against Atom.class.
+        assertEquals(new EnumBody(List.of("BASE64", "BASE64URL", "BASE32", "HEX")),
+                registered.entries().get("binary_encoding").body());
+        // ...and the three declarations that reference one of those four as a field type now
+        // register successfully as well, since their dependency is present in the same schema.
+        assertTrue(registered.entries().containsKey("binary"));
+        assertTrue(registered.entries().containsKey("float_type"));
+        assertTrue(registered.entries().containsKey("complex_type"));
     }
 
     @Test

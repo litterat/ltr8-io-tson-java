@@ -1,5 +1,7 @@
 package io.ltr8.tson.parser.resolver.schema;
 
+import io.ltr8.bind.DataBindException;
+import io.ltr8.tson.parser.ast.DataValue;
 import io.ltr8.tson.parser.ast.TokenValue;
 import io.ltr8.tson.parser.ast.schema.ArrayContainerDef;
 import io.ltr8.tson.parser.ast.schema.ConstructionDef;
@@ -10,6 +12,7 @@ import io.ltr8.tson.parser.ast.schema.FieldDef;
 import io.ltr8.tson.parser.ast.schema.GenericRef;
 import io.ltr8.tson.parser.ast.schema.GroupDef;
 import io.ltr8.tson.parser.ast.schema.InlineArrayRef;
+import io.ltr8.tson.parser.ast.schema.Instance;
 import io.ltr8.tson.parser.ast.schema.RecordDef;
 import io.ltr8.tson.parser.ast.schema.RecordEntry;
 import io.ltr8.tson.parser.ast.schema.RefinedDef;
@@ -22,7 +25,9 @@ import io.ltr8.tson.parser.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.parser.ast.schema.TypeArg;
 import io.ltr8.tson.parser.ast.schema.TypeDef;
 import io.ltr8.tson.parser.ast.schema.TypeRef;
+import io.ltr8.tson.parser.mapper.TsonMapperReader;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldState;
@@ -30,6 +35,7 @@ import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Token;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
@@ -135,14 +141,23 @@ import java.util.Set;
  * explicitly out of scope for now and reported via {@link UnsupportedOperationException} rather
  * than silently mis-resolved; each is a later, separate pass.
  *
- * <p><b>No namespace, only an accumulating "resolved so far" map.</b> A composition's supertypes
- * must already be present in the {@code resolved} map passed to {@link #resolve(SchemaMap.Declaration,
- * Map)} -- {@link #resolveAll} builds this map incrementally, in source order, so a supertype must
- * be declared earlier in the same schema map than anything composing with it (true for every
- * built-in base kind: {@code top} before {@code atom}/{@code product}/{@code sum}/{@code
- * reference}, and {@code atom} before {@code integer_type}). Real forward references and
- * cross-schema imports need the full namespace population of §3.3.2/§3.4.1's Pass 1, not
- * implemented yet.
+ * <p><b>No type-name namespace population, only an accumulating "resolved so far" map.</b> A
+ * composition's supertypes must already be present in the {@code resolved} map passed to {@link
+ * #resolve(SchemaMap.Declaration, Map)} -- {@link #resolveAll} builds this map incrementally, in
+ * source order, so a supertype must be declared earlier in the same schema map than anything
+ * composing with it (true for every built-in base kind: {@code top} before {@code atom}/{@code
+ * product}/{@code sum}/{@code reference}, and {@code atom} before {@code integer_type}). Real
+ * forward references and cross-schema imports need the full namespace population of §3.3.2/§3.4.1's
+ * Pass 1, not implemented yet.
+ *
+ * <p><b>A separate structure namespace</b> (the governing meta-schema's own namespace, one hop via
+ * its own {@code !!meta}, §3.3.1) can be supplied via the three-argument {@link
+ * #resolve(SchemaMap.Declaration, Map, Map)}/two-argument {@link #resolveAll(SchemaDocument, Map)}
+ * overloads, added ahead of actually needing it: {@code !C value} (constructor application, {@code
+ * Instance}) resolves {@code C} against the type-name namespace first, then this structure
+ * namespace; {@code !I ^ { values }} (atom refinement, {@code AtomRefinement}) never consults it at
+ * all. Currently unread -- {@link #resolveTypeDef} doesn't dispatch either construct yet (see
+ * above) -- so today it only threads through; the two-namespace lookup itself is a later step.
  *
  * <p><b>Kind determination</b> (§4.1) checks the transitive supertype chain for the literal,
  * kernel-fixed names {@code atom}/{@code product}/{@code sum} -- not a general "inherit the nearest
@@ -180,31 +195,60 @@ import java.util.Set;
  */
 public final class SchemaResolver {
 
+    /** Binds a constructor-application instance's normalized value against {@link Atom} -- see {@link #resolveInstance}. */
+    private final TsonMapperReader reader = new TsonMapperReader();
+
     /** Resolves a single declaration with no supertypes visible -- fine for a fresh record like {@code integer_size}, not for a composition. */
     public TypeDefinition resolve(SchemaMap.Declaration declaration) {
         return resolve(declaration, Map.of());
     }
 
-    /** Resolves a single declaration against {@code resolved}, the entries already resolved so far (for composition's supertype lookups). */
+    /** Resolves a single declaration against {@code resolved}, the entries already resolved so far (for composition's supertype lookups). No structure namespace -- see the three-argument overload. */
     public TypeDefinition resolve(SchemaMap.Declaration declaration, Map<String, TypeDefinition> resolved) {
-        return resolveTypeDef(declaration.name(), declaration.typeDef(), resolved);
+        return resolve(declaration, resolved, Map.of());
+    }
+
+    /**
+     * Resolves a single declaration against {@code resolved} (the type-name namespace: entries
+     * already resolved so far in the current schema, for composition's supertype lookups and, per
+     * §3.3.1, tried first for a constructor-application target) and {@code structureNamespace} (the
+     * governing meta-schema's own namespace -- its local declarations plus its imports, one hop,
+     * §3.3.1 -- tried second for a constructor-application target; never consulted for an atom
+     * refinement's source, which resolves against the type-name namespace only).
+     *
+     * <p>Not yet consumed by anything: {@link #resolveTypeDef} doesn't dispatch {@code Instance}/
+     * {@code AtomRefinement} generically yet (see this class's own Javadoc), so {@code
+     * structureNamespace} currently just threads through unread. Added ahead of that dispatch
+     * existing so the two-namespace lookup rule doesn't need a second signature change once it
+     * does.
+     */
+    public TypeDefinition resolve(SchemaMap.Declaration declaration, Map<String, TypeDefinition> resolved,
+                                   Map<String, TypeDefinition> structureNamespace) {
+        return resolveTypeDef(declaration.name(), declaration.typeDef(), resolved, structureNamespace);
     }
 
     /**
      * Resolves every declaration in {@code document}'s body, one entry at a time, in source
      * order, each seeing every entry resolved before it -- and carries {@code document}'s own
      * header directives (§2.2: {@code !!id}?/{@code !!meta}/{@code !!import}*) straight into the
-     * result's {@link TsonSchema#id()}/{@link TsonSchema#meta()}/{@link TsonSchema#imports()}.
+     * result's {@link TsonSchema#id()}/{@link TsonSchema#meta()}/{@link TsonSchema#imports()}. No
+     * structure namespace -- see the two-argument overload.
      */
     public TsonSchema resolveAll(SchemaDocument document) {
+        return resolveAll(document, Map.of());
+    }
+
+    /** {@link #resolveAll(SchemaDocument)}, plus {@code structureNamespace} (see the three-argument {@link #resolve}) threaded into every declaration it resolves. */
+    public TsonSchema resolveAll(SchemaDocument document, Map<String, TypeDefinition> structureNamespace) {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         for (SchemaMap.Declaration declaration : document.body().declarations().values()) {
-            entries.put(declaration.name(), resolve(declaration, entries));
+            entries.put(declaration.name(), resolve(declaration, entries, structureNamespace));
         }
         return new TsonSchema(document.id(), document.meta(), document.imports(), entries);
     }
 
-    private TypeDefinition resolveTypeDef(String name, TypeDef typeDef, Map<String, TypeDefinition> resolved) {
+    private TypeDefinition resolveTypeDef(String name, TypeDef typeDef, Map<String, TypeDefinition> resolved,
+                                           Map<String, TypeDefinition> structureNamespace) {
         if (typeDef instanceof StructuralTypeDef structural) {
             List<String> parameters = structural.typeParams();
             boolean constructor = structural.constructor();
@@ -231,9 +275,78 @@ public final class SchemaResolver {
         if (typeDef instanceof ContainerTypeDef containerTypeDef && containerTypeDef.typeParams().isEmpty()) {
             return resolveContainerTypeDef(name, containerTypeDef.container());
         }
+        if (typeDef instanceof Instance instance) {
+            return resolveInstance(name, instance, resolved, structureNamespace);
+        }
         throw new UnsupportedOperationException(
-                "'" + name + "': only fresh record constructions, composition, simple type references, and "
-                        + "declaration-level sized arrays are resolved so far, got " + typeDef.getClass().getSimpleName());
+                "'" + name + "': only fresh record constructions, composition, simple type references, "
+                        + "declaration-level sized arrays, and constructor application are resolved so far, got "
+                        + typeDef.getClass().getSimpleName());
+    }
+
+    // ── Constructor application (§5.5, §5.6) ────────────────────────────────
+
+    /**
+     * {@code !C value} (constructor application, no {@code ^}) -- produces a fresh atom-family
+     * instance filled with {@code value}. Per §3.3.1, {@code C} resolves first against the
+     * type-name namespace ({@code resolved}), then against the structure namespace; the found
+     * entry MUST be a constructor ({@code constructor: true}) or this is a resolver error (the
+     * spec's own suggested diagnostic: "did you mean atom refinement?"). {@code value} is
+     * normalized to record form ({@link PositionalForm}, using {@code C}'s own resolved field
+     * list to find its positionally-fillable field, if any), then bound generically via {@code
+     * TsonMapperReader.toObject(normalized, Atom.class)} -- {@code instance.value().typeRef()}
+     * already names {@code C} (per {@code Instance}'s own reshape, {@code SPEC-FEEDBACK.md} #16),
+     * so {@code tson-bind}'s own union-member resolution finds the matching {@link Atom} leaf with
+     * no separate name→class table anywhere. Construction transfers only {@code C}'s {@code kind}
+     * (§5.5): no supertypes, no parameters, {@code constructor: false} on the result.
+     *
+     * <p>Scoped to {@code Atom.class}, not {@code Top.class} -- every real {@code Instance} in
+     * {@code core.tn1}/{@code meta.tn1} targets an atom-family constructor; a hypothetical
+     * product/sum-kind instance fails here with a clear "no member of union" error rather than
+     * being silently mis-bound. {@code C}'s own body must also already be a {@link RecordBody} --
+     * true for every real constructor (an atom-family constructor's own declared vocabulary is
+     * always record-shaped, whatever the resulting instance's bound Java class looks like).
+     */
+    private TypeDefinition resolveInstance(String name, Instance instance, Map<String, TypeDefinition> resolved,
+                                            Map<String, TypeDefinition> structureNamespace) {
+        String target = instance.target();
+        TypeDefinition constructor = resolveConstructorTarget(name, target, resolved, structureNamespace);
+        if (!constructor.constructor()) {
+            throw new UnsupportedOperationException("'" + name + "': '!" + target + "' does not resolve to a "
+                    + "constructor (§3.3.1) -- did you mean atom refinement ('!" + target + " ^ { ... }')?");
+        }
+        if (!(constructor.body() instanceof RecordBody constructorFields)) {
+            throw new UnsupportedOperationException("'" + name + "': constructor '" + target
+                    + "' has a non-record body, not resolved yet");
+        }
+        DataValue normalized = PositionalForm.normalizeToRecordForm(instance.value(), constructorFields);
+        Top body = bindConstructorApplication(name, normalized);
+        return new TypeDefinition(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of(target)), constructor.kind(),
+                List.of(), false, List.of(), List.of(), Optional.empty(), body);
+    }
+
+    /** §3.3.1's lookup rule for a bare {@code !} target: the type-name namespace first, then the structure namespace. */
+    private static TypeDefinition resolveConstructorTarget(String name, String target, Map<String, TypeDefinition> resolved,
+                                                             Map<String, TypeDefinition> structureNamespace) {
+        TypeDefinition local = resolved.get(target);
+        if (local != null) {
+            return local;
+        }
+        TypeDefinition structural = structureNamespace.get(target);
+        if (structural != null) {
+            return structural;
+        }
+        throw new UnsupportedOperationException("'" + name + "': '!" + target + "' does not resolve against "
+                + "either the type-name namespace or the structure namespace (§3.3.1)");
+    }
+
+    private Top bindConstructorApplication(String name, DataValue normalized) {
+        try {
+            return reader.toObject(normalized, Atom.class);
+        } catch (DataBindException e) {
+            throw new UnsupportedOperationException(
+                    "'" + name + "': failed to bind constructor application: " + e.getMessage(), e);
+        }
     }
 
     // ── Top-level constructor application (§5.6) ──────────────────────────
