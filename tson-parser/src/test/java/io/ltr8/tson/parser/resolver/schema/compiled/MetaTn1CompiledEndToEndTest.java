@@ -1,9 +1,15 @@
 package io.ltr8.tson.parser.resolver.schema.compiled;
 
+import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.parser.Parser;
+import io.ltr8.tson.parser.SchemaParser;
 import io.ltr8.tson.parser.ast.Document;
+import io.ltr8.tson.parser.ast.schema.SchemaDocument;
+import io.ltr8.tson.parser.resolver.TsonAtomContext;
+import io.ltr8.tson.parser.resolver.schema.BundledSchemaSource;
+import io.ltr8.tson.parser.resolver.schema.DefaultSchemaCoordinator;
 import io.ltr8.tson.parser.resolver.schema.MetaKernelParser;
-import io.ltr8.tson.parser.resolver.schema.MetaTn1Parser;
+import io.ltr8.tson.parser.resolver.schema.SchemaResolver;
 import io.ltr8.tson.schema.MetaSchema;
 import io.ltr8.tson.schema.SchemaRegistry;
 import io.ltr8.tson.schema.TsonSchema;
@@ -19,11 +25,31 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  */
 class MetaTn1CompiledEndToEndTest {
 
+    /**
+     * Resolving meta.tn1 itself now goes through {@code resolveAll}/{@code bindAtomInstance}, which
+     * needs an object-binding-mode compiled reader for meta-kernel (its own Instance declarations,
+     * e.g. {@code binary_encoding => !enum [...]}, go through it) -- so meta.tn1's own resolution
+     * step below is object mode internally, even though the *outer* compile this test itself
+     * exercises stays DOM mode (a separate, fresh compilation of the final, already-resolved {@code
+     * TsonSchema}, unrelated to how it got resolved).
+     */
     private static TsonSchema registerMeta() {
         MetaSchema metaKernel = MetaKernelParser.parse();
         SchemaRegistry registry = new SchemaRegistry();
         registry.register(metaKernel);
-        return registry.register(MetaTn1Parser.parse(metaKernel));
+
+        TsonSchema materializedMetaKernel = new SchemaRegistry().register(metaKernel);
+        DataBindContext context = TsonAtomContext.defaultContext();
+        ParserFactoryRegistry objectFactories = ParserFactoryRegistry.object(materializedMetaKernel, context);
+        TsonCompiledRegistry compiledRegistry = new TsonCompiledRegistry(objectFactories);
+        compiledRegistry.register(metaKernel);
+        DefaultSchemaCoordinator coordinator = new DefaultSchemaCoordinator(compiledRegistry);
+
+        String source = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_TN1_ID);
+        SchemaDocument metaDocument = new SchemaParser(source).parseSchemaDocument();
+        TsonSchema meta = new SchemaResolver(coordinator).resolveAll(metaDocument);
+
+        return registry.register(meta);
     }
 
     /**

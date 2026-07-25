@@ -5,6 +5,7 @@ import io.ltr8.tson.parser.ast.schema.SchemaDocument;
 import io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledRegistry;
 import io.ltr8.tson.parser.resolver.schema.compiled.TsonSchemaParser;
 import io.ltr8.tson.schema.MetaSchema;
+import io.ltr8.tson.schema.SchemaRegistry;
 import io.ltr8.tson.schema.TsonSchema;
 
 import java.util.Optional;
@@ -27,34 +28,37 @@ import java.util.Optional;
  *   tson-schema}, same reasoning as {@link TsonCompiledRegistry}'s own raw-id keying) -- a real,
  *   narrower guarantee, not an oversight.
  *
- *   <p><b>Deliberately a one-off, never registered/cached here</b> (on the user's own explicit
- *   direction): {@link MetaKernelParser#parse()}'s own output is compiled directly ({@code
- *   TsonSchemaParser.compile}, using this registry's own {@link
+ *   <p><b>Deliberately a one-off, never registered/cached in the *shared* registry</b> (on the
+ *   user's own explicit direction): {@link MetaKernelParser#parse()}'s own output is run through a
+ *   fresh, throwaway {@code SchemaRegistry} -- created and discarded right here, never the shared
+ *   {@link #registry} this coordinator wraps -- purely so {@code SchemaValidator}'s own
+ *   materialization/validation pass runs (synthesizing entries for argument-bearing {@code
+ *   type_ref}s, e.g. {@code enum}'s own {@code members: set<token>}) before compiling ({@code
+ *   TsonSchemaParser.compile}, using this coordinator's own {@link
  *   io.ltr8.tson.parser.resolver.schema.compiled.ParserFactoryRegistry} so it reads the same way
- *   anything else compiled here would) but never passed to {@link TsonCompiledRegistry#register}.
- *   So every call for {@link #META_KERNEL_ID} that isn't already a cache hit re-bootstraps and
- *   re-compiles from scratch -- deliberately, not an oversight: the *permanent*, shared registry
- *   entry for meta-kernel is meant to come from an explicit, deliberate "load it (from disk, or
- *   eventually a real {@link SchemaSource}) and register it" step done once, elsewhere -- not
+ *   anything else compiled here would). The *materialized* result is never passed to {@link
+ *   TsonCompiledRegistry#register} -- so every call for {@link #META_KERNEL_ID} that isn't already a
+ *   cache hit re-bootstraps, re-materializes, and re-compiles from scratch, every time -- only the
+ *   *quality* of the one-off result changed (58 entries, matching a genuinely registered meta-kernel,
+ *   not the raw 49), never its lifetime. Deliberately, not an oversight: the *permanent*, shared
+ *   registry entry for meta-kernel is meant to come from an explicit, deliberate "load it (from disk,
+ *   or eventually a real {@link SchemaSource}) and register it" step done once, elsewhere -- not
  *   implicitly, silently, the first time anything happens to ask for meta-kernel's own {@code
  *   !!meta}/{@code !!import} target. Until that explicit step exists and runs, this one-off bootstrap
  *   is what stands in for it, every time, so nothing is ever left unable to resolve at all.
  *
- *   <p><b>Two real, load-bearing consequences of never registering it here.</b> Skipping {@link
- *   TsonCompiledRegistry#register} also skips everything {@code SchemaRegistry#register} does on
- *   the way in ({@code SchemaValidator}'s own materialization/validation pass) -- so (1) this
- *   one-off reader has no synthesized entries for any argument-bearing {@code type_ref} (e.g.
- *   {@code enum}'s own {@code members: set<token>}; a real, registered meta-kernel has 58 entries,
- *   this one-off bootstrap has the raw 49), and (2) any *other* schema that {@code !!import}s
- *   meta-kernel (every real one does) will fail its own registration with "{@code !!import '...' is
- *   not registered}" unless meta-kernel has *separately* been registered first: {@code
- *   SchemaValidator}'s own import-merging (run inside {@code SchemaRegistry#register}, a step
- *   distinct from {@code SchemaResolver}'s own resolution-time import-merging above) resolves an
- *   import via {@code SchemaRegistry}'s own registered-only {@code SchemaLoader}, which knows
- *   nothing about this coordinator or its bootstrap case. In practice this means a caller resolving
- *   anything beyond meta-kernel itself needs to register meta-kernel explicitly first (e.g. {@code
- *   registry.register(MetaKernelParser.parse())}) before asking this coordinator for anything that
- *   transitively imports it.</li>
+ *   <p><b>One real, load-bearing consequence remains, even with materialization fixed.</b> Any
+ *   *other* schema that {@code !!import}s meta-kernel (every real one does) will still fail its own
+ *   registration with "{@code !!import '...' is not registered}" unless meta-kernel has *separately*
+ *   been registered in the *shared* registry first: {@code SchemaValidator}'s own import-merging
+ *   (run inside {@code SchemaRegistry#register}, a step distinct from {@code SchemaResolver}'s own
+ *   resolution-time import-merging above) resolves an import via {@code SchemaRegistry}'s own
+ *   registered-only {@code SchemaLoader}, which knows nothing about this coordinator, its bootstrap
+ *   case, or the throwaway registry used to materialize it. In practice this means a caller
+ *   resolving anything beyond meta-kernel itself still needs to register meta-kernel explicitly
+ *   first (e.g. {@code registry.register(MetaKernelParser.parse())}) before asking this coordinator
+ *   for anything that transitively imports it -- materializing the one-off bootstrap result fixes
+ *   *reading* through it correctly, not the separate *import-merge* requirement.</li>
  *   <li><b>Otherwise</b>, fetch {@code uri}'s own source text via this coordinator's own {@link
  *   SchemaSource} (default: {@link SchemaSource#registeredOnly()}, so nothing is fetched from
  *   anywhere unless a caller opts in), parse it, resolve it via a fresh {@code SchemaResolver}
@@ -90,7 +94,15 @@ public final class DefaultSchemaCoordinator implements SchemaCoordinator {
         }
         if (META_KERNEL_ID.equals(uri)) {
             MetaSchema metaKernel = MetaKernelParser.parse();
-            return TsonSchemaParser.compile(metaKernel, registry.factories());
+            // A fresh, throwaway SchemaRegistry -- never the shared one this coordinator wraps --
+            // purely so SchemaValidator's own materialization pass runs (synthesizing entries for
+            // argument-bearing type-refs like enum's own `members: set<token>`) before compiling.
+            // Materializing does NOT mean caching: this registry is discarded immediately after,
+            // never stored anywhere, so every call still re-bootstraps and re-materializes from
+            // scratch, exactly as before -- only the *quality* of the one-off result changes (58
+            // entries, not 49), not its lifetime.
+            TsonSchema materialized = new SchemaRegistry().register(metaKernel);
+            return TsonSchemaParser.compile(materialized, registry.factories());
         }
         String sourceText = source.fetch(uri);
         SchemaDocument document = new SchemaParser(sourceText).parseSchemaDocument();

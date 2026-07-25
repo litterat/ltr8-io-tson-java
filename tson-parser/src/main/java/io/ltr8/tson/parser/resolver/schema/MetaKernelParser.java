@@ -48,9 +48,8 @@ import java.util.Optional;
  * stateless parser/resolver, the same shape as {@link SchemaParser}/{@link SchemaResolver} --
  * {@link #parse(String)} and {@link #parse()} each return a freshly-built {@link MetaSchema}
  * value rather than being one themselves. Its own output is a resolved-but-not-yet-registered
- * schema, exactly {@code MetaTn1Parser}/{@code CoreTn1Parser}'s own shape one rung up the ladder --
- * a caller registers it (and, separately, compiles it -- a distinct, later stage this class has
- * nothing to do with; see {@code SchemaValidator}/{@code TsonSchemaParser}).
+ * schema -- a caller registers it (and, separately, compiles it -- a distinct, later stage this
+ * class has nothing to do with; see {@code SchemaValidator}/{@code TsonSchemaParser}).
  *
  * <p><b>Every {@code Instance} declaration resolves through {@link #instanceBody}, a closed,
  * hand-written switch -- not {@code SchemaResolver}/{@code TsonMapperReader}, and not any
@@ -201,11 +200,6 @@ public final class MetaKernelParser {
     /**
      * {@code !enum [true false]}'s value is a bare array (§5.6's positional form for a
      * single-field constructor), not {@code { members: [...] } }.
-     *
-     * <p>Package-private, not {@code private} -- {@link CoreTn1Parser} reuses this for core.tn1's
-     * own local {@code boolean} redeclaration, which hits the identical generic-binding gap this
-     * class's own Javadoc already documents for meta-kernel's {@code boolean} (see {@code
-     * SPEC-FEEDBACK.md}).
      */
     static EnumBody toEnumBody(DataValue value) {
         if (!(value.coreValue() instanceof ArrayValue array)) {

@@ -92,6 +92,24 @@ final class AtomTypeParser<T> implements TsonTypeParser<T> {
     static final TsonParserFactory ENUM = (name, definition, ctx) ->
             new AtomTypeParser<>(new EnumParser((EnumBody) definition.body()));
     /**
+     * Object-binding mode's own variant of {@link #ENUM} -- identical for every enum instance
+     * except {@code boolean} itself, which reads real {@code Boolean} values ({@link BooleanParser})
+     * instead of raw member text. Dispatch is keyed on the *declaration's own name* (this factory's
+     * {@code name} parameter), the same mechanism {@link #UNIT} already uses for {@code value}/
+     * {@code token}/{@code void} -- {@code boolean => !enum [true false]} is the one real enum
+     * instance whose members are meant to stand in for the two Java boolean values, not the strings
+     * {@code "true"}/{@code "false"}; every other enum instance falls through to ordinary {@link
+     * #ENUM} behavior. <b>Registered only in {@link ParserFactoryRegistry#object}, never {@link
+     * ParserFactoryRegistry#dom()}</b> -- DOM mode has no target Java type to reconcile against, so
+     * it keeps producing {@code String} for {@code boolean} too, matching already-established,
+     * already-tested behavior (e.g. {@code MetaKernelEndToEndTest}'s own {@code "true"} string
+     * assertion).
+     */
+    static final TsonParserFactory ENUM_OBJECT_MODE = (name, definition, ctx) ->
+            "boolean".equals(name)
+                    ? BooleanParser.INSTANCE
+                    : new AtomTypeParser<>(new EnumParser((EnumBody) definition.body()));
+    /**
      * {@code unit}'s three real instances -- {@code value}/{@code token}/{@code void} -- all
      * resolve to the identical empty body (no constraint fields to distinguish them by), so, per
      * the kernel's own doc ("distinguished by name and prose-level parsing contract, not by schema

@@ -54,7 +54,10 @@ public final class SchemaMetaTypeNameBinder implements TypeNameBinder {
             Map.entry("set", "array_body"),
             Map.entry("array_min", "array_body"),
             Map.entry("array_max", "array_body"),
-            Map.entry("array_ranged", "array_body"));
+            Map.entry("array_ranged", "array_body"),
+            Map.entry("vector", "array_body"),
+            Map.entry("binary", "binary_type"),
+            Map.entry("datetime_type", "date_time_type"));
 
     @Override
     public Class<?> resolve(String schemaTypeName) throws ClassNotFoundException {

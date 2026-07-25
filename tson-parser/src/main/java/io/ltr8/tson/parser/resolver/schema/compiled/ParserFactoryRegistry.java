@@ -63,10 +63,15 @@ public final class ParserFactoryRegistry {
 
     /**
      * Every composite kind (`array`/`map`/`tuple`/`choice`) plus every atom-family constant {@link
-     * AtomTypeParser} declares, *except* `record` -- the one entry whose factory genuinely differs
-     * by mode (DOM vs. object-binding, see {@link RecordParser.RecordShapeFactory}). Shared between
-     * {@link #dom()} and {@link #object(TsonSchema, DataBindContext)} so this ~14-entry list isn't
-     * duplicated between them; each caller appends its own `"record"` registration on top.
+     * AtomTypeParser} declares, *except* `record` and `enum` -- the two entries whose factory
+     * genuinely differs by mode. `record`: DOM vs. object-binding, see {@link
+     * RecordParser.RecordShapeFactory}. `enum`: every instance reads identically in both modes
+     * *except* `boolean` itself ({@link AtomTypeParser#ENUM_OBJECT_MODE}'s own Javadoc) -- DOM mode
+     * has no target Java type to reconcile `"true"`/`"false"` against, so it keeps producing
+     * {@code String} uniformly ({@link AtomTypeParser#ENUM}); only object mode needs the name-keyed
+     * branch. Shared between {@link #dom()} and {@link #object(TsonSchema, DataBindContext)} so this
+     * ~13-entry list isn't duplicated between them; each caller appends its own `"record"`/`"enum"`
+     * registrations on top.
      */
     private static Builder withoutRecord() {
         return builder()
@@ -87,7 +92,6 @@ public final class ParserFactoryRegistry {
                 .register("duration_type", AtomTypeParser.DURATION_TYPE)
                 .register("uri_type", AtomTypeParser.URI_TYPE)
                 .register("regex_type", AtomTypeParser.REGEX_TYPE)
-                .register("enum", AtomTypeParser.ENUM)
                 .register("unit", AtomTypeParser.UNIT);
     }
 
@@ -105,6 +109,7 @@ public final class ParserFactoryRegistry {
     public static ParserFactoryRegistry dom() {
         return withoutRecord()
                 .register("record", RecordParser.FACTORY)
+                .register("enum", AtomTypeParser.ENUM)
                 .build();
     }
 
@@ -133,6 +138,7 @@ public final class ParserFactoryRegistry {
         shapeFactory.validate(schema);
         return withoutRecord()
                 .register("record", RecordParser.factory(shapeFactory))
+                .register("enum", AtomTypeParser.ENUM_OBJECT_MODE)
                 .build();
     }
 

@@ -162,13 +162,37 @@ public final class ObjectRecordShapeFactory implements RecordShapeFactory<Object
          * NumberNarrowing}, the same utility {@code resolver.vocab}'s numeric family and {@code
          * io.ltr8.tson.parser.mapper}'s untyped-number binding already share for exactly this
          * purpose, rather than a second copy of the same logic.
+         *
+         * <p>Two more narrowings, both found the same way (a real fixture field, not anticipated up
+         * front): a schema {@code enum}-typed field (e.g. {@code complex_type}'s own {@code
+         * component: complex_component}) reads as the enum's own raw member text ({@link String}),
+         * narrowed here to the matching Java {@code enum} constant by exact name (e.g. {@link
+         * io.ltr8.tson.schema.meta.ComplexType.Component}, {@link
+         * io.ltr8.tson.schema.meta.FloatType.Format}, {@link
+         * io.ltr8.tson.schema.meta.BinaryType.Encoding} -- every schema-side member name matches its
+         * Java constant's name exactly, confirmed against the real fixture, not assumed) -- the same
+         * schema-driven-vs-reflection-driven gap {@link BooleanParser}'s own Javadoc documents for
+         * {@code boolean}, just resolved generically here instead of via a second name-keyed factory,
+         * since {@code AtomTypeParser}'s own dispatch has no visibility into a record's *own* field
+         * types the way this builder already does. A schema {@code uri}-typed field (e.g. {@code
+         * atom_specification}'s own {@code spec: uri}, composed flat into {@code cidr4_type}/{@code
+         * ipv4_type}/...) reads as a real {@link java.net.URI}, narrowed to {@link String} where the
+         * target field deliberately keeps it flat (see {@code Cidr4Type}'s own Javadoc for why that
+         * field is a bare {@code String}, not {@code URI}, in the first place).
          */
+        @SuppressWarnings({"unchecked", "rawtypes"})
         private static Object narrow(Object raw, Class<?> target) {
             if (raw instanceof BigInteger bi && target != BigInteger.class) {
                 return NumberNarrowing.narrowIntegral(bi, target);
             }
             if (raw instanceof BigDecimal bd && target != BigDecimal.class) {
                 return NumberNarrowing.narrowDecimal(bd, target);
+            }
+            if (raw instanceof String s && target.isEnum()) {
+                return Enum.valueOf((Class<Enum>) target, s);
+            }
+            if (raw instanceof java.net.URI uri && target == String.class) {
+                return uri.toString();
             }
             return raw;
         }

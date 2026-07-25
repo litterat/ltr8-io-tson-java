@@ -16,6 +16,7 @@ import io.ltr8.tson.schema.meta.DurationType;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.EmailType;
 import io.ltr8.tson.schema.meta.EnumBody;
+import io.ltr8.tson.schema.meta.Extern;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FloatType;
 import io.ltr8.tson.schema.meta.IntegerType;
@@ -301,6 +302,7 @@ public final class SchemaValidator {
             case Ipv6Type i -> i;
             case ComplexType c -> c;
             case UnknownType u -> u;
+            case Extern e -> e;
         };
     }
 
@@ -584,6 +586,8 @@ public final class SchemaValidator {
             case ComplexType ignored -> {
             }
             case UnknownType ignored -> {
+            }
+            case Extern ignored -> {
             }
         }
     }
