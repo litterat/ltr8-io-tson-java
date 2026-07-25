@@ -32,6 +32,10 @@ import io.ltr8.tson.parser.ast.schema.TypeDef;
 import io.ltr8.tson.parser.ast.schema.TypeRef;
 import io.ltr8.tson.parser.mapper.TsonMapperReader;
 import io.ltr8.tson.parser.mapper.TsonMapperWriter;
+import io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledRegistry;
+import io.ltr8.tson.parser.resolver.schema.compiled.TsonSchemaParser;
+import io.ltr8.tson.schema.SchemaRegistry;
+import io.ltr8.tson.schema.SchemaValidationException;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
@@ -206,6 +210,52 @@ public final class SchemaResolver {
     /** Re-serializes an atom refinement's source back to wire form for {@link #mergeWithSource} -- see {@link #resolveAtomRefinement}. */
     private final TsonMapperWriter writer = new TsonMapperWriter();
 
+    /** {@code null} unless constructed via {@link #SchemaResolver(TsonCompiledRegistry)} -- see {@link #compiledMetaSchema}. */
+    private final TsonCompiledRegistry compiledRegistry;
+
+    public SchemaResolver() {
+        this(null);
+    }
+
+    /**
+     * @param compiledRegistry consulted by {@link #compiledMetaSchema} to look up a document's own
+     *                         {@code !!meta} target's *compiled* form -- {@code null} (same as the
+     *                         no-arg constructor) if this resolver never needs to. Deliberately
+     *                         separate from {@code structureNamespace} (the plain {@code
+     *                         Map<String, TypeDefinition>} the three-argument {@link #resolve}
+     *                         already takes): a caller still has to extract that map itself, e.g.
+     *                         via {@code compiledRegistry.schemaRegistry().get(uri)}'s own {@code
+     *                         entries()} -- this constructor doesn't change how {@code
+     *                         structureNamespace} reaches {@link #resolve} today, it only adds a way
+     *                         to reach the *compiled* form too. {@link #bindAtomInstance} does not
+     *                         consult this yet (see its own Javadoc) -- wiring it in is deliberately
+     *                         a separate, later step from adding the capability to fetch it at all.
+     */
+    public SchemaResolver(TsonCompiledRegistry compiledRegistry) {
+        this.compiledRegistry = compiledRegistry;
+    }
+
+    /**
+     * The compiled form of {@code document}'s own governing meta-schema -- its {@code !!meta}
+     * target, looked up from the {@link TsonCompiledRegistry} this resolver was constructed with
+     * (see {@link #SchemaResolver(TsonCompiledRegistry)}). {@link Optional#empty()} if this
+     * resolver has none, or if the target isn't registered/compiled there (yet).
+     *
+     * <p>A same-module, cross-package reach from {@code resolver.schema} up into {@code
+     * resolver.schema.compiled} -- worth naming plainly, since every other layering note in this
+     * codebase describes the *opposite* direction ({@code compiled} sitting "on top of" {@code
+     * SchemaResolver}'s own resolution, per {@code TsonSchemaParser}'s own Javadoc). Not a cycle
+     * (nothing in {@code resolver.schema.compiled}'s own main code imports back from {@code
+     * resolver.schema}), and both packages live in the same module regardless, but a real, deliberate
+     * exception to that "compiled depends on schema, never the other way" framing -- made because
+     * {@link #bindAtomInstance}'s own eventual replacement (see its Javadoc) is exactly the one place
+     * lower-layer resolution genuinely needs the higher layer's own compiled output, not just its
+     * resolved one.
+     */
+    public Optional<TsonSchemaParser> compiledMetaSchema(SchemaDocument document) {
+        return compiledRegistry == null ? Optional.empty() : compiledRegistry.get(document.meta());
+    }
+
     /** Resolves a single declaration with no supertypes visible -- fine for a fresh record like {@code integer_size}, not for a composition. */
     public TypeDefinition resolve(SchemaMap.Declaration declaration) {
         return resolve(declaration, Map.of());
@@ -224,11 +274,11 @@ public final class SchemaResolver {
      * §3.3.1 -- tried second for a constructor-application target; never consulted for an atom
      * refinement's source, which resolves against the type-name namespace only).
      *
-     * <p>Not yet consumed by anything: {@link #resolveTypeDef} doesn't dispatch {@code Instance}/
-     * {@code AtomRefinement} generically yet (see this class's own Javadoc), so {@code
-     * structureNamespace} currently just threads through unread. Added ahead of that dispatch
-     * existing so the two-namespace lookup rule doesn't need a second signature change once it
-     * does.
+     * <p>Consumed by {@link #resolveInstance} (tried second, after the type-name namespace, for a
+     * constructor-application target) -- {@link #resolveAtomRefinement} never reads it, per §3.3.1
+     * (an atom refinement's own source resolves against the type-name namespace only). The class-level
+     * Javadoc above predates this dispatch and is stale on this point -- {@code Instance}/{@code
+     * AtomRefinement} are both handled now, not "not dispatched at all yet."
      */
     public TypeDefinition resolve(SchemaMap.Declaration declaration, Map<String, TypeDefinition> resolved,
                                    Map<String, TypeDefinition> structureNamespace) {
@@ -239,11 +289,111 @@ public final class SchemaResolver {
      * Resolves every declaration in {@code document}'s body, one entry at a time, in source
      * order, each seeing every entry resolved before it -- and carries {@code document}'s own
      * header directives (§2.2: {@code !!id}?/{@code !!meta}/{@code !!import}*) straight into the
-     * result's {@link TsonSchema#id()}/{@link TsonSchema#meta()}/{@link TsonSchema#imports()}. No
-     * structure namespace -- see the two-argument overload.
+     * result's {@link TsonSchema#id()}/{@link TsonSchema#meta()}/{@link TsonSchema#imports()}.
+     *
+     * <p><b>With no {@link TsonCompiledRegistry} (the no-arg constructor), unchanged from before</b>
+     * -- {@code document.meta()} is read only to be carried through into the result, never consulted
+     * for resolution; every declaration resolves against an empty structure namespace, same as the
+     * two-argument overload called with {@code Map.of()}.
+     *
+     * <p><b>With one ({@link #SchemaResolver(TsonCompiledRegistry)}), three things are validated up
+     * front, before any declaration is resolved</b>, rather than silently proceeding (or failing
+     * confusingly deep inside some unrelated declaration) the way the no-registry case does: (1)
+     * {@code document.id()} must be present -- required by policy for a publishable schema (§2.2.1:
+     * "publishing a schema... REQUIRES !!id"), and this resolver, given a registry, is about to
+     * treat {@code document} as one that's going to *be* registered; (2) that {@code !!id} must be a
+     * well-formed canonical-identity candidate ({@link SchemaRegistry#validateIdentity}) -- the same
+     * check {@link SchemaRegistry#register} would run anyway, just surfaced here, before resolution
+     * work is spent on a document that could never actually be registered; (3) {@code document.meta()}
+     * must already be registered in this resolver's own {@link TsonCompiledRegistry} (via its
+     * wrapped {@code SchemaRegistry}) -- its resolved entries become the structure namespace every
+     * declaration resolves against, same as the two-argument overload would if a caller had derived
+     * and passed that map by hand (matching exactly what {@code CoreTn1Parser} already does manually
+     * today) -- and a compiled reader for it must also exist there ({@link #compiledMetaSchema}, not
+     * read for anything yet -- {@code bindAtomInstance} still doesn't consult it, see its own
+     * Javadoc -- but validated now for the same fail-fast reason). All three throw {@link
+     * IllegalStateException} (or, for (2), {@link SchemaValidationException}, in
+     * an already-established shape) naming the actual problem.
+     *
+     * <p><b>{@code !!import} is now merged into the type-name namespace too</b> -- each import's own
+     * URI is validated the same way {@code !!id} is, then looked up in this resolver's own {@link
+     * TsonCompiledRegistry} (via its wrapped {@code SchemaRegistry}) and its entries merged in,
+     * *before* any local declaration is resolved -- exactly the pre-seeding {@code MetaTn1Parser}
+     * already does by hand for meta-kernel, now generalized to any registry-aware resolver and any
+     * number of imports. This is genuinely required, not cosmetic: unlike the structure namespace
+     * (consulted only for constructor-application targets), an import's own entries feed the
+     * *type-name* namespace -- the same {@code resolved} map {@link #resolveComposition}/{@link
+     * #resolveRefinement}/{@link #resolveAtomRefinement} look a supertype/refinement-source straight
+     * up in, with no fallback of any kind (confirmed by reading those methods directly, not assumed:
+     * each does exactly one {@code resolved.get(name)}). meta.tn1's own {@code date_type => ~atom &
+     * atom_specification & {...}}, composing with two meta-kernel entries it only has via its own
+     * {@code !!import}, would fail to resolve at all without this. Collision handling mirrors {@code
+     * SchemaValidator.mergeImports}'s own established rule exactly, not a new one: a name declared by
+     * more than one import, or by an import *and* a local declaration, is a {@link
+     * SchemaValidationException} -- checked as each import is merged in, and
+     * again as each local declaration is about to be resolved, so a collision is caught at the
+     * earliest point either side of it becomes known, before any further resolution work is spent.
+     * <b>Merged entries keep their home namespace</b>, same as {@code SchemaValidator}'s own note on
+     * this: an imported entry is copied in exactly as its own schema resolved it, never re-resolved
+     * or re-materialized against the importer. The result's own {@link TsonSchema#entries()} is
+     * local-only, same as {@code MetaTn1Parser}'s own convention -- imported entries are visible
+     * *during* resolution but are never part of what this method itself returns; a caller that wants
+     * the merged whole gets it from {@code SchemaRegistry.register}'s own eventual output instead,
+     * same as always.
      */
     public TsonSchema resolveAll(SchemaDocument document) {
-        return resolveAll(document, Map.of());
+        if (compiledRegistry == null) {
+            return resolveAll(document, Map.of());
+        }
+        String id = document.id().orElseThrow(() -> new IllegalStateException(
+                "'" + document.meta() + "': !!id is required to register this schema, but is absent"));
+        SchemaRegistry.validateIdentity(id);
+        for (String importUri : document.imports()) {
+            SchemaRegistry.validateIdentity(importUri);
+        }
+        TsonSchema governingSchema = compiledRegistry.schemaRegistry().get(document.meta()).orElseThrow(
+                () -> new IllegalStateException("'" + documentLabel(document) + "': !!meta target '"
+                        + document.meta() + "' is not registered in this resolver's own TsonCompiledRegistry"));
+        compiledMetaSchema(document).orElseThrow(
+                () -> new IllegalStateException("'" + documentLabel(document) + "': !!meta target '"
+                        + document.meta() + "' is registered but has no compiled reader in this resolver's "
+                        + "own TsonCompiledRegistry"));
+
+        Map<String, TypeDefinition> namespace = mergeImports(document);
+        Map<String, TypeDefinition> localOnly = new LinkedHashMap<>();
+        Map<String, TypeDefinition> structureNamespace = governingSchema.entries();
+        for (SchemaMap.Declaration declaration : document.body().declarations().values()) {
+            if (namespace.containsKey(declaration.name())) {
+                throw new SchemaValidationException("'" + declaration.name()
+                        + "' collides with an entry of the same name brought in by !!import");
+            }
+            TypeDefinition resolved = resolve(declaration, namespace, structureNamespace);
+            namespace.put(declaration.name(), resolved);
+            localOnly.put(declaration.name(), resolved);
+        }
+        return new TsonSchema(document.id(), document.meta(), document.imports(), localOnly);
+    }
+
+    /** Stage 1 of {@link #resolveAll(SchemaDocument)} -- every {@code !!import}'s own entries, in declaration order, merged as-is (never re-resolved against the importer). Mirrors {@code SchemaValidator.mergeImports} exactly, including its collision rule, since this is the same concept discovered one stage earlier. */
+    private Map<String, TypeDefinition> mergeImports(SchemaDocument document) {
+        Map<String, TypeDefinition> merged = new LinkedHashMap<>();
+        for (String importUri : document.imports()) {
+            TsonSchema imported = compiledRegistry.schemaRegistry().get(importUri).orElseThrow(
+                    () -> new IllegalStateException("'" + documentLabel(document) + "': !!import '" + importUri
+                            + "' is not registered in this resolver's own TsonCompiledRegistry"));
+            for (Map.Entry<String, TypeDefinition> entry : imported.entries().entrySet()) {
+                if (merged.containsKey(entry.getKey())) {
+                    throw new SchemaValidationException(
+                            "'" + entry.getKey() + "' is declared by more than one !!import");
+                }
+                merged.put(entry.getKey(), entry.getValue());
+            }
+        }
+        return merged;
+    }
+
+    private static String documentLabel(SchemaDocument document) {
+        return document.id().orElse(document.meta());
     }
 
     /** {@link #resolveAll(SchemaDocument)}, plus {@code structureNamespace} (see the three-argument {@link #resolve}) threaded into every declaration it resolves. */

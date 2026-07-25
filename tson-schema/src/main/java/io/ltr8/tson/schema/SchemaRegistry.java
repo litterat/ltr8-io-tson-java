@@ -58,6 +58,21 @@ public final class SchemaRegistry {
         return lookupByCanonicalIdentity(CanonicalIdentity.of(uri));
     }
 
+    /**
+     * Validates that {@code uri} is a well-formed canonical-identity candidate -- the same check
+     * {@link #register}/{@link #get} already run internally on every {@code !!id}/lookup URI they
+     * see, exposed on its own for a caller that wants to validate a candidate {@code !!id} up front
+     * (e.g. before attempting to resolve a whole document that will eventually need one) without
+     * triggering an actual lookup or registration. A thin wrapper, not a duplicate: {@link
+     * CanonicalIdentity} stays internal-by-convention to this module (see that class's own Javadoc)
+     * -- this is the sanctioned way for a caller outside it to run the same check.
+     *
+     * @throws SchemaValidationException if {@code uri} isn't a valid canonical-identity candidate
+     */
+    public static void validateIdentity(String uri) {
+        CanonicalIdentity.of(uri);
+    }
+
     private synchronized Optional<TsonSchema> lookupByCanonicalIdentity(String canonicalIdentity) {
         return Optional.ofNullable(schemas.get(canonicalIdentity));
     }

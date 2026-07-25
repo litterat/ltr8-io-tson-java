@@ -86,4 +86,21 @@ class SchemaRegistryTest {
 
         assertThrows(SchemaValidationException.class, () -> registry.register(sameIdentityDifferentScheme));
     }
+
+    @Test
+    void validateIdentityAcceptsAWellFormedCandidateSilently() {
+        SchemaRegistry.validateIdentity("https://example.test/registry-test.tn1");
+        // No exception -- that's the whole assertion.
+    }
+
+    @Test
+    void validateIdentityRejectsAUriWithNoScheme() {
+        assertThrows(SchemaValidationException.class, () -> SchemaRegistry.validateIdentity("registry-test.tn1"));
+    }
+
+    @Test
+    void validateIdentityRejectsAUriCarryingAPort() {
+        assertThrows(SchemaValidationException.class,
+                () -> SchemaRegistry.validateIdentity("https://example.test:8080/registry-test.tn1"));
+    }
 }

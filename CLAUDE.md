@@ -1196,9 +1196,89 @@ governed by one of these reuses whatever's already sitting in the registry.
 
 **Not yet wired into a real "load the standard library" entry point** — `TsonCompiledRegistryTest`'s
 own `loadStandardLibrary()` helper is test-local; a permanent, production version of that same
-four-line sequence (and where it should live) is still open. Also still open: `SchemaResolver.
-bindAtomInstance` itself doesn't consult this registry yet (still `TsonMapperReader`-based) — that
-swap is its own, separate piece of work (see the project's own task list).
+four-line sequence (and where it should live) is still open.
+
+**`SchemaResolver` can now *reach* a compiled `!!meta` target** — `SchemaResolver(TsonCompiledRegistry)`,
+a new constructor overload alongside the existing no-arg one, plus `compiledMetaSchema(SchemaDocument)`,
+which looks up `document.meta()` in the registry and returns its compiled `TsonSchemaParser`
+(`Optional.empty()` if this resolver has no registry, or the target isn't registered/compiled there).
+`bindAtomInstance` itself is still untouched — still `TsonMapperReader`-based, on explicit direction
+— but `resolveAll(SchemaDocument)` (the "main" entry point, previously ignoring `!!meta`/`!!import`
+entirely — see below) now *does* use this, for the one thing it currently needs: deriving
+`structureNamespace` automatically.
+
+**`resolveAll(SchemaDocument)` now validates `!!id`/`!!meta` and derives `structureNamespace` from
+the registry itself, when this resolver has one** (added 2026-07-25, same day) — previously this
+method always resolved against an empty structure namespace (`Map.of()`), regardless of what
+`!!meta` said, silently ignoring it (and never looked at `!!id` at all); a caller (`CoreTn1Parser`)
+had to derive and pass the right map by hand via the two-argument overload instead. Now, with a
+`TsonCompiledRegistry`, four things happen up front, before any declaration is resolved: (1)
+`document.id()` must be present — required by policy for a publishable schema (§2.2.1), and a
+resolver given a registry is treating `document` as one about to be registered; (2) that `!!id` must
+be a well-formed canonical-identity candidate — via the new `SchemaRegistry.validateIdentity(String)`
+(a thin, one-line public wrapper around `CanonicalIdentity.of`, added the same day specifically so a
+caller outside `tson-schema` never has to reach into the internal-by-convention `registry` package
+directly just to run this one check); (3) `document.meta()` must already be registered (via the
+registry's own wrapped `SchemaRegistry`) — its resolved `entries()` become the structure namespace,
+exactly the map a caller would have derived and passed by hand; (4) a compiled reader for it must
+*also* exist there (`compiledMetaSchema`) — not consumed for anything yet, but validated now so a
+misconfigured resolver fails immediately, naming the actual missing target, rather than producing a
+confusing "unresolved reference" deep inside some unrelated declaration later. (1)/(3)/(4) throw
+`IllegalStateException`; (2) throws `SchemaValidationException` (the same exception `SchemaRegistry
+.register` itself would eventually throw for the same reason, surfaced earlier). With no registry
+(the no-arg constructor), behavior is byte-for-byte unchanged — confirmed via `PositionalFormTest`/
+`SchemaResolverTest`'s own existing `resolveAll` usages (one of which resolves a document with no
+`!!id` at all), both of which use the no-arg constructor and needed no changes at all.
+**`!!import` is now genuinely merged into the type-name namespace, not just validated** (added
+2026-07-25, same session, in two steps -- URI validation first, then real merging once the question
+"does `SchemaResolver` need imports, or only `SchemaValidator`?" got a confirmed answer: yes, both,
+for different reasons). Unlike the structure namespace (`!!meta`, consulted only for constructor-
+application targets), an import's own entries feed the *type-name* namespace — the same `resolved`
+map `resolveComposition`/`resolveRefinement`/`resolveAtomRefinement` look a supertype/refinement-
+source straight up in, with no fallback at all (confirmed by reading those methods directly: each
+does exactly one `resolved.get(name)`). So imports are genuinely required *during resolution
+itself*, not only at `SchemaValidator`'s later, separate registration-time merge/collision-check
+pass — meta.tn1's own `date_type => ~atom & atom_specification & {...}`, composing with two
+meta-kernel entries it only has via its own `!!import`, would fail to resolve at all without them.
+
+`resolveAll(SchemaDocument)` now does exactly what `MetaTn1Parser` already did by hand for
+meta-kernel specifically, generalized to any registry-aware resolver and any number of imports:
+each import's own URI is validated (`SchemaRegistry.validateIdentity`, same check as `!!id`), then
+looked up in this resolver's own `TsonCompiledRegistry` and its entries merged into a working
+namespace *before* any local declaration is resolved (`mergeImports`, a new private helper).
+Collision handling mirrors `SchemaValidator.mergeImports`'s own established rule exactly, not a new
+one: a name declared by more than one import throws `SchemaValidationException` ("declared by more
+than one !!import") as each import is merged in; a local declaration whose name collides with an
+already-merged import throws the same exception ("collides with an entry of the same name brought
+in by !!import") as it's about to be resolved — both checked at the earliest point the collision
+becomes knowable, before further resolution work is spent. **Merged entries keep their home
+namespace** (same principle as `SchemaValidator`'s own note on this) — copied in exactly as their
+own schema resolved them, never re-resolved against the importer. **The result's own `entries()` is
+local-only**, same as `MetaTn1Parser`'s own convention — imported entries are visible *during*
+resolution but never appear in what this method itself returns; the merged whole is what
+`SchemaRegistry.register` produces later, same as always.
+
+Verified in `SchemaResolverCompiledMetaSchemaTest` against small hand-built documents — a
+composition (`my_type => unit & {}`, meta-kernel imported) proves entries are genuinely reachable
+via the type-name namespace, not merely URI-validated (a bare reference wouldn't have proven this:
+§8.3 bare references carry an unverified name through regardless of whether it exists anywhere,
+composition's `resolved.get(name)` lookup is what actually needs the merge to have happened); plus
+both collision modes (a local declaration redeclaring an already-imported name; the same name
+declared by two separate imports) and the original `!!meta`-derivation/id-validation cases from
+earlier the same day. `SchemaRegistryTest` covers `validateIdentity` directly too (accepts a
+well-formed candidate silently; rejects no-scheme and carries-a-port cases).
+
+**A real, named layering exception, not an oversight.** Every other note about these two packages
+describes `resolver.schema.compiled` sitting *on top of* `resolver.schema`'s own resolution
+(`TsonSchemaParser`'s own Javadoc: "sitting on top of `SchemaResolver`'s own per-declaration
+resolution"). `SchemaResolver` now importing `TsonCompiledRegistry`/`TsonSchemaParser` reaches the
+opposite direction — a lower layer reaching up into a higher one. Not a cycle (nothing in `resolver.
+schema.compiled`'s own *main* code imports back from `resolver.schema` — confirmed by grep, not
+assumed), and both packages are in the same module regardless (no Gradle/JPMS boundary to violate),
+but a deliberate exception to the general framing, made because `bindAtomInstance`'s own eventual
+replacement is exactly the one place lower-layer resolution genuinely needs the higher layer's own
+*compiled* output, not just its resolved one — see `SchemaResolver.compiledMetaSchema`'s own Javadoc
+for the same note in place.
 
 ### Conformance suite integration (`ConformanceSuiteTest`)
 
@@ -1238,6 +1318,7 @@ No system Gradle — always use the wrapper:
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.compiled.CoreTn1CompiledEndToEndTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.compiled.TsonDataParserTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledRegistryTest"
+./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.SchemaResolverCompiledMetaSchemaTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.mapper.TsonMapperReaderTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.mapper.TsonMapperWriterTest"
 ```
