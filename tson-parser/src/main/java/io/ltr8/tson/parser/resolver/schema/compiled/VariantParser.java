@@ -1,6 +1,5 @@
 package io.ltr8.tson.parser.resolver.schema.compiled;
 
-import io.ltr8.tson.parser.ast.DataValue;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.util.Set;
@@ -12,10 +11,12 @@ import java.util.Set;
  * one of its concrete subtypes ({@code success_response}/{@code failure_response}, discovered via
  * {@link TypeDefinition#subtypes}, populated by {@code SchemaValidator.computeSubtypes} -- already
  * the full transitive closure, so a flat name lookup here covers the whole subtype hierarchy, not
- * just direct children). The same mechanism an explicit {@code choice}/union type uses (match the
- * value's own {@code !typeName} annotation against a fixed member list), except the member list is
- * discovered from the reverse composition index instead of an explicit {@code variants: [type_ref]}
- * -- an open-ended union, not a closed one.
+ * just direct children). The same mechanism an explicit {@code choice}/union type uses ({@link
+ * ChoiceParser} -- match the value's own {@code !typeName} annotation against a fixed member list),
+ * except the member list is discovered from the reverse composition index instead of an explicit
+ * {@code variants: [type_ref]} -- an open-ended union, not a closed one. The actual dispatch (once
+ * each has its own candidate-name set) is identical between the two, factored into {@link
+ * NamedDispatchParser}.
  *
  * <p>Not registered through {@link ParserFactoryRegistry}/{@link TsonParserFactory} -- unlike every
  * other compiled parser, the trigger for building one of these isn't the resolved body's own
@@ -31,11 +32,15 @@ import java.util.Set;
  * {@link #forSubtypes} time (an earlier version of this class did) would force every subtype to be
  * buildable just because *one* of a type's several alternatives got touched -- exactly the
  * eager-building problem {@link TsonSchemaParser}'s own "lazy, not eager" note describes for the
- * whole schema, reintroduced at a smaller scale here. {@code ctx} is captured and consulted at
- * {@link #read} time instead, once per distinct subtype actually dispatched to -- cheap on repeat
- * dispatches to the same subtype, since {@code ctx}'s own underlying resolution already memoizes.
+ * whole schema, reintroduced at a smaller scale here. {@link NamedDispatchParser} captures {@code
+ * ctx} and consults it at read time instead, once per distinct subtype actually dispatched to --
+ * cheap on repeat dispatches to the same subtype, since {@code ctx}'s own underlying resolution
+ * already memoizes.
  */
-final class VariantParser implements TsonTypeParser<Object> {
+final class VariantParser {
+
+    private VariantParser() {
+    }
 
     /** @throws IllegalStateException if {@code definition} has no known subtypes to dispatch to */
     static TsonTypeParser<?> forSubtypes(String name, TypeDefinition definition, CompilationContext ctx) {
@@ -43,34 +48,9 @@ final class VariantParser implements TsonTypeParser<Object> {
             throw new IllegalStateException("'" + name + "' has open type parameters " + definition.parameters()
                     + " and no known subtypes to dispatch to -- nothing compilable here");
         }
-        return new VariantParser(name, Set.copyOf(definition.subtypes()), ctx);
-    }
-
-    private final String name;
-    private final Set<String> subtypeNames;
-    private final CompilationContext ctx;
-
-    private VariantParser(String name, Set<String> subtypeNames, CompilationContext ctx) {
-        this.name = name;
-        this.subtypeNames = subtypeNames;
-        this.ctx = ctx;
-    }
-
-    @Override
-    public Object read(DataValue value) {
-        String typeRef = value.typeRef().orElseThrow(() -> new IllegalArgumentException("'" + name
-                + "' has open type parameters -- a value at this position requires an explicit type "
-                + "annotation (!typeName) naming one of its known subtypes to disambiguate: " + subtypeNames));
-        if (!subtypeNames.contains(typeRef)) {
-            throw new IllegalArgumentException(
-                    "'" + typeRef + "' is not a known subtype of '" + name + "' -- expected one of " + subtypeNames);
-        }
-        // value passed through unchanged, typeRef included -- unlike TsonMapperReader.toUnion (which
-        // strips it before recursing, since its own toAtom *does* branch on typeRef to look up a
-        // built-in vocabulary type), no compiled parser in this package ever reads DataValue.typeRef
-        // at all: RecordParser/AtomTypeParser both go straight to coreValue(), because the schema
-        // position already fixed which parser applies at compile time -- there's nothing here for a
-        // leftover type-ref to be misread as.
-        return ctx.resolve(typeRef).read(value);
+        return new NamedDispatchParser(name,
+                "has open type parameters -- a value at this position requires an explicit type annotation "
+                        + "(!typeName) naming one of its known subtypes to disambiguate",
+                "known subtype", Set.copyOf(definition.subtypes()), ctx);
     }
 }
