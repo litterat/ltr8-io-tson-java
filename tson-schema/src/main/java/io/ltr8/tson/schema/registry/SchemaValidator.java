@@ -116,6 +116,26 @@ public final class SchemaValidator {
         Map<String, TypeDefinition> namespace = new LinkedHashMap<>(merged);
         namespace.putAll(schema.entries());
 
+        // The governing meta-schema's own namespace, one hop via !!meta -- distinct from !!import
+        // (which flattens another schema's entries into *this* schema's own returned entries()).
+        // !!meta only says "this schema's own vocabulary/constructors come from that other schema";
+        // it never merges anything in, and (§3.3.2) it's never consulted for an ordinary type-ref --
+        // only at the constructor roles §3.3.1 lists: constructor-application targets, generic-
+        // application heads, and sugar-form desugar targets. Used as a lookup fallback in exactly
+        // those two spots: here, for materialization's own constructor lookup (every argument-bearing
+        // type-ref `instantiate` sees is, by construction, one of those roles); and, narrowly, for
+        // `source` validation below (`validateEntry`'s own `sourceLookup`) -- everywhere else
+        // (field/key/value/element types, supertypes, subtypes, choice variants) stays type-name-
+        // namespace-only (`merged`/`namespace`), per §3.3.2's explicit "NOT extended by the structure
+        // namespace". Local/imported names always win on collision, and none of this schema's own
+        // entries() ever gain a structure-namespace entry as a side effect. Empty if !!meta isn't
+        // registered yet (e.g. meta-kernel's own self-referential !!meta, mid-registration) --
+        // lookups then behave exactly as before this fallback existed.
+        Map<String, TypeDefinition> structureNamespace = loader == null ? Map.of()
+                : loader.load(CanonicalIdentity.of(schema.meta())).map(TsonSchema::entries).orElse(Map.of());
+        Map<String, TypeDefinition> lookup = new LinkedHashMap<>(structureNamespace);
+        lookup.putAll(namespace);
+
         Map<TypeRef, String> materializedNames = new LinkedHashMap<>();
         Map<String, TypeDefinition> synthesized = new LinkedHashMap<>();
         Set<String> localNames = new LinkedHashSet<>();
@@ -126,7 +146,7 @@ public final class SchemaValidator {
                         "'" + entry.getKey() + "' collides with an entry of the same name brought in by !!import");
             }
             TypeDefinition def = entry.getValue();
-            Top rewrittenBody = rewriteBody(def.body(), materializedNames, synthesized, namespace);
+            Top rewrittenBody = rewriteBody(def.body(), materializedNames, synthesized, lookup);
             merged.put(entry.getKey(), new TypeDefinition(def.source(), def.kind(), def.parameters(),
                     def.constructor(), def.supertypes(), def.subtypes(), def.disjoint(), rewrittenBody));
             localNames.add(entry.getKey());
@@ -137,7 +157,7 @@ public final class SchemaValidator {
         merged = computeSubtypes(merged, localNames);
 
         for (Map.Entry<String, TypeDefinition> entry : merged.entrySet()) {
-            validateEntry(entry.getKey(), entry.getValue(), merged);
+            validateEntry(entry.getKey(), entry.getValue(), merged, structureNamespace);
         }
 
         return new TsonSchema(schema.id(), schema.meta(), schema.imports(), merged);
@@ -445,9 +465,21 @@ public final class SchemaValidator {
 
     // ── Validation ───────────────────────────────────────────────────────
 
-    private static void validateEntry(String name, TypeDefinition def, Map<String, TypeDefinition> namespace) {
+    private static void validateEntry(String name, TypeDefinition def, Map<String, TypeDefinition> namespace,
+                                       Map<String, TypeDefinition> structureNamespace) {
         if (def.source().isPresent()) {
-            validateTypeRef(def.source().get(), namespace, def.parameters(), "'" + name + "' source");
+            // Unlike every other reference below, `source` gets the structure-namespace fallback --
+            // per §3.3.1, the name it records was consumed at a *constructor role* at the point this
+            // entry was originally resolved (a constructor-application target, or (for atom
+            // refinement) the instance's own already-resolved constructor), both explicitly
+            // structure-namespace-eligible, unlike an ordinary type-ref (§3.3.2: "NOT extended by the
+            // structure namespace... field types... composition targets"). See #validate's own note
+            // on `structureNamespace` for why this matters concretely: `void => !unit {}`'s own
+            // `source: unit` is exactly this case -- `unit` lives in meta-kernel, reachable from
+            // core.tn1 only via its `!!meta` chain, never a local declaration or `!!import`.
+            Map<String, TypeDefinition> sourceLookup = structureNamespace.isEmpty() ? namespace
+                    : mergeWithFallback(namespace, structureNamespace);
+            validateTypeRef(def.source().get(), sourceLookup, def.parameters(), "'" + name + "' source");
         }
         for (String supertype : def.supertypes()) {
             if (!namespace.containsKey(supertype)) {
@@ -554,6 +586,14 @@ public final class SchemaValidator {
             case UnknownType ignored -> {
             }
         }
+    }
+
+    /** {@code fallback} entries, overridden by {@code primary} on collision -- {@code primary} isn't mutated. */
+    private static Map<String, TypeDefinition> mergeWithFallback(Map<String, TypeDefinition> primary,
+                                                                   Map<String, TypeDefinition> fallback) {
+        Map<String, TypeDefinition> combined = new LinkedHashMap<>(fallback);
+        combined.putAll(primary);
+        return combined;
     }
 
     private static void validateTypeRef(TypeRef ref, Map<String, TypeDefinition> namespace, List<String> ownParameters,

@@ -983,6 +983,31 @@ confirmed tradeoff rather than adding a module descriptor now.
   validated but never itself materialized into a further synthetic entry, even when it carries
   arguments (`set`'s own `source: array<T>` is exactly this case) — materializing it would create a
   synthetic entry with no standalone meaning, tied only to `set`'s own identity.
+
+  **`source` validation also falls back to the governing meta-schema's own namespace, one hop via
+  `!!meta` — every other reference (field/key/value/element types, supertypes, subtypes, choice
+  variants) does not** (added 2026-07-25, on the user's own correction of an initial, too-broad
+  first attempt at this fix — see below). Surfaced by `CoreTn1Parser` (below): core.tn1 declares no
+  `!!import` of its own, only `!!meta:"...meta.tn1"`, yet `void => !unit {}`'s own `source: unit`
+  names a meta-kernel constructor — perfectly valid per Part 2 §3.3.1 ("`!C value` ... `C` resolves
+  first against the type-name namespace ... and then against the structure namespace"), since a
+  `source` naming a constructor is exactly one of §3.3.1's three enumerated *constructor roles*
+  (constructor-application targets, generic-application heads, sugar-form desugar targets) — but
+  `SchemaValidator` previously only ever consulted `!!import`-merged entries, so this failed with
+  "has an unresolved reference 'unit'". **The fix is deliberately narrow, not a blanket namespace
+  merge**: an initial attempt applied the structure-namespace fallback to *every* reference check
+  uniformly, which the user caught as wrong — §3.3.2 is explicit that the structure namespace is
+  "NOT extended" to ordinary type-refs ("field types... composition targets... never as type-refs"),
+  only to the constructor roles §3.3.1 lists. `validate`'s own `structureNamespace` (loaded via
+  `loader.load(CanonicalIdentity.of(schema.meta()))`, empty if not yet registered — e.g. meta-kernel's
+  own self-referential `!!meta`, mid-registration) is used in exactly two places: materialization's
+  own constructor lookup in `instantiate` (every argument-bearing `type_ref` reaching it is, by
+  construction, a generic-application head or sugar-desugar target — both structure-namespace-
+  eligible), and `validateEntry`'s own `source` check specifically (via a small `sourceLookup`
+  merge, local/imported entries always winning on collision) — never in `validateBody`'s field-type/
+  supertype/subtype checks, which stay `merged`-only (type-name namespace, imports + locals), per
+  §3.3.2. `!!meta` itself never merges anything into a schema's own returned `entries()` — that
+  stays exactly what `!!import` produces, unchanged.
 - **`SchemaRegistry`** — `register(TsonSchema)` computes the canonical identity from the schema's
   own `!!id` (throwing if absent), rejects a duplicate identity outright (no overwrite — together
   with `TsonSchema.entries()` already being an unmodifiable map, this rejection *is* the "locked, no
