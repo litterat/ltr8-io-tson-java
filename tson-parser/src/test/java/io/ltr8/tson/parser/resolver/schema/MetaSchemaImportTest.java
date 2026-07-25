@@ -1,8 +1,5 @@
 package io.ltr8.tson.parser.resolver.schema;
 
-import io.ltr8.tson.parser.SchemaParser;
-import io.ltr8.tson.parser.ast.schema.SchemaDocument;
-import io.ltr8.tson.parser.ast.schema.SchemaMap;
 import io.ltr8.tson.schema.MetaSchema;
 import io.ltr8.tson.schema.SchemaRegistry;
 import io.ltr8.tson.schema.TsonSchema;
@@ -10,10 +7,6 @@ import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -23,10 +16,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Verifies {@code SchemaValidator}'s {@code !!import} merging (see its own Javadoc) against the
- * real {@code meta.tn1} fixture, which declares {@code !!import:"...meta-kernel.tn1"} -- register
- * meta-kernel first, then meta.tn1's own declarations, and confirm meta-kernel's names (e.g.
- * {@code atom}, {@code text_type}) are visible and correctly referenced from meta.tn1's own
- * composition-based declarations (e.g. {@code date_type => ~atom & atom_specification & {...}}).
+ * real {@code meta.tn1} fixture, through {@link MetaTn1Parser} -- the production loader, not a
+ * hand-rolled resolution loop -- register meta-kernel first, then meta.tn1's own declarations, and
+ * confirm meta-kernel's names (e.g. {@code atom}, {@code text_type}) are visible and correctly
+ * referenced from meta.tn1's own composition-based declarations (e.g. {@code date_type => ~atom &
+ * atom_specification & {...}}).
  *
  * <p><b>meta.tn1 now registers in full, all 31 declarations</b> (2026-07-24, once {@code
  * SchemaResolver} gained generic {@code Instance} resolution -- Phase B step 4) -- previously 4 of
@@ -43,29 +37,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class MetaSchemaImportTest {
 
     @Test
-    void mergesMetaKernelIntoAllThirtyOneOfMetaTn1sOwnDeclarations() throws IOException {
+    void mergesMetaKernelIntoAllThirtyOneOfMetaTn1sOwnDeclarations() {
         MetaSchema metaKernel = MetaKernelParser.parse();
         SchemaRegistry registry = new SchemaRegistry();
         registry.register(metaKernel);
 
-        SchemaDocument doc = new SchemaParser(readMetaFixture()).parseSchemaDocument();
-        SchemaResolver resolver = new SchemaResolver();
+        TsonSchema meta = MetaTn1Parser.parse(metaKernel);
+        assertEquals(31, meta.entries().size(), "expected every meta.tn1 declaration to resolve");
 
-        // Seeded with meta-kernel's own entries so composition against an imported supertype
-        // (date_type => ~atom & atom_specification & {...}) and constructor-application targets
-        // reached through the structure namespace (binary_encoding => !enum [...], §3.3.1) both
-        // resolve -- but only meta.tn1's own new entries go into the TsonSchema handed to the
-        // registry; the import itself supplies the rest.
-        Map<String, TypeDefinition> namespace = new LinkedHashMap<>(metaKernel.entries());
-        Map<String, TypeDefinition> localOnly = new LinkedHashMap<>();
-        for (SchemaMap.Declaration declaration : doc.body().declarations().values()) {
-            TypeDefinition resolved = resolver.resolve(declaration, namespace);
-            namespace.put(declaration.name(), resolved);
-            localOnly.put(declaration.name(), resolved);
-        }
-        assertEquals(31, localOnly.size(), "expected every meta.tn1 declaration to resolve");
-
-        TsonSchema meta = new TsonSchema(doc.id(), doc.meta(), doc.imports(), localOnly);
         TsonSchema registered = registry.register(meta);
 
         // Meta-kernel's own imported entries are visible in the merged, validated namespace.
@@ -85,23 +64,16 @@ class MetaSchemaImportTest {
     }
 
     @Test
-    void registeringBinaryWithoutItsUnresolvedBinaryEncodingFieldCorrectlyFailsValidation() throws IOException {
+    void registeringBinaryWithoutItsUnresolvedBinaryEncodingFieldCorrectlyFailsValidation() {
         MetaSchema metaKernel = MetaKernelParser.parse();
         SchemaRegistry registry = new SchemaRegistry();
         registry.register(metaKernel);
 
-        SchemaDocument doc = new SchemaParser(readMetaFixture()).parseSchemaDocument();
-        SchemaResolver resolver = new SchemaResolver();
-        Map<String, TypeDefinition> namespace = new LinkedHashMap<>(metaKernel.entries());
-        SchemaMap.Declaration binaryDeclaration = doc.body().declarations().get("binary");
-        TypeDefinition binary = resolver.resolve(binaryDeclaration, namespace);
+        TsonSchema meta = MetaTn1Parser.parse(metaKernel);
+        TypeDefinition binary = meta.entries().get("binary");
 
-        TsonSchema withBinaryOnly = new TsonSchema(doc.id(), doc.meta(), doc.imports(), Map.of("binary", binary));
+        TsonSchema withBinaryOnly = new TsonSchema(meta.id(), meta.meta(), meta.imports(), Map.of("binary", binary));
 
         assertThrows(io.ltr8.tson.schema.SchemaValidationException.class, () -> registry.register(withBinaryOnly));
-    }
-
-    private static String readMetaFixture() throws IOException {
-        return Files.readString(Path.of("").toAbsolutePath().resolve("../spec/m/meta.tn1").normalize());
     }
 }

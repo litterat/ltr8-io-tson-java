@@ -1068,6 +1068,71 @@ failed validation, proven directly by a dedicated test rather than worked around
 own declaration order already has each dependency before its use), and the merged, validated
 registration succeeds outright.
 
+### meta.tn1 / core.tn1 loaders (`tson-parser/src/main/java/io/ltr8/tson/parser/resolver/schema/{MetaTn1Parser,CoreTn1Parser}.java`)
+
+Added 2026-07-25, on an explicit user request: `MetaKernelParser` produces meta-kernel's own
+pre-loaded `MetaSchema`, but meta.tn1/core.tn1 — the next two rungs up the schema ladder, and the
+two documents most callers actually want — previously only existed as hand-rolled resolution loops
+duplicated across several test classes (`MetaSchemaImportTest`, `SchemaResolverTest`), with the
+source files themselves living only in the repo's own `spec/m/` directory, not packaged into the
+built library at all. `MetaTn1Parser`/`CoreTn1Parser` are the real, production, non-test loaders;
+`tson-parser/build.gradle.kts`'s `processResources` task now copies `meta.tn1`/`core.tn1` alongside
+`meta-kernel.tn1` (same one-file-to-keep-in-sync-with-the-spec reasoning), so both work from a built
+jar. Both, like `MetaKernelParser.parse()`, return **unregistered** results — registering (which
+merges `!!import`s, materializes argument-bearing type-refs, and populates `subtypes`) is a separate,
+explicit step the caller performs via `SchemaRegistry`, same as meta-kernel's own bootstrap:
+
+```java
+MetaSchema metaKernel = MetaKernelParser.parse();
+SchemaRegistry registry = new SchemaRegistry();
+registry.register(metaKernel);
+TsonSchema meta = registry.register(MetaTn1Parser.parse(metaKernel));
+TsonSchema core = registry.register(CoreTn1Parser.parse(meta));
+```
+
+- **`MetaTn1Parser.parse(MetaSchema metaKernel)`** resolves meta.tn1's own 31 declarations in a
+  single source-order pass (`SchemaResolver.resolve(declaration, namespace)`, the two-argument
+  overload) — meta.tn1's own declaration order already places each dependency before its use, unlike
+  meta-kernel itself, so no two-pass forward-reference handling is needed here the way
+  `MetaKernelParser` needs it. **Resolves against `metaKernel`'s own *unregistered* `entries()`**,
+  deliberately — meta.tn1's own resolution only ever needs meta-kernel's real, named constructors,
+  never one of the synthesized array-sugar placeholder entries registration would add, so the
+  smaller unregistered namespace is sufficient (and avoids needing a `SchemaRegistry` just to
+  resolve meta.tn1 in isolation). A caller assembling the full ladder still registers meta-kernel
+  first regardless, since `CoreTn1Parser` (one rung up) needs meta.tn1's own *registered* result.
+- **`CoreTn1Parser.parse(TsonSchema registeredMeta)`** resolves core.tn1's 48 declarations in a
+  single source-order pass too, via `SchemaResolver`'s three-argument overload
+  (`resolve(declaration, resolved, structureNamespace)`), threading `registeredMeta.entries()` as
+  the structure namespace — core.tn1 declares no `!!import` of its own at all, every declaration is
+  a constructor application or atom refinement resolved purely against its `!!meta` target. **Must
+  be meta.tn1's own already-*registered* result, not `MetaTn1Parser.parse`'s raw output** — unlike
+  meta.tn1's own resolution, core.tn1 relies on names meta.tn1 only carries *after* registration
+  merges in its own `!!import` of meta-kernel (`void => !unit {}`'s own `source: unit` is exactly
+  this case — see the `SchemaValidator` structure-namespace fallback, above, which this loader is
+  what motivated). **One declaration, `boolean`, is hand-picked**, not resolved generically — core.tn1's
+  own local `boolean => !enum [true false]` redeclaration hits the identical, permanent
+  generic-binding limitation already documented for meta-kernel's own `boolean` (`"true"`/`"false"`
+  collide with TSON's own boolean-literal shape before `EnumBody.members` ever sees them) — handled
+  the same way, reusing `MetaKernelParser.toEnumBody` (widened from `private` to package-private
+  specifically for this reuse) rather than silently dropping the entry, matching this codebase's
+  "known gap, not silently mishandled" convention. All 48 core.tn1 declarations resolve and
+  register — none are excluded.
+
+**Verified against the real fixtures, registered end-to-end.** `CoreTn1ParserTest` registers all
+three documents in the chain above and confirms 48 core.tn1 entries register (including `boolean`
+and `void`, core's own fresh `!unit {}` sibling of meta-kernel's `void`); `MetaSchemaImportTest` was
+rewritten to call `MetaTn1Parser.parse` directly rather than duplicating its own resolution loop, so
+the test now actually exercises the production loader. `MetaTn1CompiledEndToEndTest`/
+`CoreTn1CompiledEndToEndTest` (`resolver.schema.compiled`, mirroring `MetaKernelEndToEndTest`)
+additionally compile the full registered result through `TsonSchemaParser` and read real data
+against it — `core.tn1`'s own `void`/`int32` among them, the concrete end-to-end proof of the
+`VoidParser`/`ValueParser`/`TokenParser` split (see "Built-in type vocabulary" above). Eight
+core.tn1 atom entries (`complex`, `email`, `ipv4`, `ipv6`, `cidr4`, `cidr6`, `mac`, `unknown`) still
+have no compiled-parser factory at all — a pre-existing, already-documented gap (their `schema.meta`
+classes were added "record-only, deliberately with no resolver.vocab parser at all"), not something
+introduced here; `CoreTn1CompiledEndToEndTest` asserts these specifically fail to compile rather than
+silently skipping them.
+
 ### Conformance suite integration (`ConformanceSuiteTest`)
 
 Separate from `LexerTest`/`ParserTest` (fine-grained unit tests) is `ConformanceSuiteTest`, which runs
@@ -1099,6 +1164,11 @@ No system Gradle — always use the wrapper:
 ./gradlew :tson-schema:test --tests "io.ltr8.tson.schema.registry.SchemaValidatorTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.MetaKernelSchemaRegistryTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.MetaSchemaImportTest"
+./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.CoreTn1ParserTest"
+./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.compiled.MetaKernelEndToEndTest"
+./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.compiled.MetaTn1CompiledEndToEndTest"
+./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.compiled.CoreTn1CompiledEndToEndTest"
+./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.compiled.TsonDataParserTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.mapper.TsonMapperReaderTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.mapper.TsonMapperWriterTest"
 ```
@@ -1120,7 +1190,18 @@ No system Gradle — always use the wrapper:
   `component` field binds fine (`ComplexType`, added 2026-07-24); `unknown_type` too
   (`UnknownType`). No real fixture declaration remains unresolved in `meta-kernel.tn1`/`meta.tn1` at
   all.
-- A schema-validating data parser (Class 2) that consults a resolved `TsonSchema`/`TypeDefinition`
-  while parsing data — the built-in vocabulary's `schema.meta`/`resolver.vocab` split (see "Built-in
-  type vocabulary" above) is groundwork for this, not this itself.
+- A schema-validating data parser (Class 2) now substantially exists —
+  `io.ltr8.tson.parser.resolver.schema.compiled` (`TsonSchemaParser`, `TsonDataParser`,
+  `ParserFactoryRegistry`, `RecordParser`/`ArrayParser`/`MapParser`/`TupleParser`/`ChoiceParser`/
+  `VariantParser`, `AtomTypeParser` + the vocab-family parsers) — but this whole layer still has no
+  dedicated section in this file's own Architecture walkthrough above (a real documentation gap, not
+  an implementation one; "meta.tn1 / core.tn1 loaders" and the `SchemaValidator`/vocabulary notes
+  above only cover this session's own additions to it, not the layer as a whole — worth a proper
+  writeup next time substantial work touches this package). Known, still-open gaps within it: no
+  `!!schema`-header auto-selection (`TsonDataParser`'s own Javadoc explains why, deliberately
+  deferred); eight core.tn1 atom entries (`complex`/`email`/`ipv4`/`ipv6`/`cidr4`/`cidr6`/`mac`/
+  `unknown`) have no compiled-parser factory at all yet, since their `schema.meta` classes were added
+  "record-only, deliberately with no resolver.vocab parser"; `REQUIRED_FIXED`/`OPTIONAL_FIXED` value
+  validation, `value_param` real parameter substitution, and thread-safety are all still deferred
+  design questions (see this project's own task list, not tracked in this file).
 - §9.1's numeric-literal length limit (SHOULD, default 4096 digits, DoS-hardening) — not enforced.

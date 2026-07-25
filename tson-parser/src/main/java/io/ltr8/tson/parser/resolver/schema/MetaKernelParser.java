@@ -194,8 +194,13 @@ public final class MetaKernelParser {
     /**
      * {@code !enum [true false]}'s value is a bare array (§5.6's positional form for a
      * single-field constructor), not {@code { members: [...] } }.
+     *
+     * <p>Package-private, not {@code private} -- {@link CoreTn1Parser} reuses this for core.tn1's
+     * own local {@code boolean} redeclaration, which hits the identical generic-binding gap this
+     * class's own Javadoc already documents for meta-kernel's {@code boolean} (see {@code
+     * SPEC-FEEDBACK.md}).
      */
-    private static EnumBody toEnumBody(DataValue value) {
+    static EnumBody toEnumBody(DataValue value) {
         if (!(value.coreValue() instanceof ArrayValue array)) {
             throw new IllegalStateException("expected an array for !enum, found " + value.coreValue());
         }
