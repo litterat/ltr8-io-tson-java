@@ -61,6 +61,42 @@ public final class ParserFactoryRegistry {
     }
 
     /**
+     * Every DOM-mode factory this build of the library actually has -- every composite kind
+     * (`record`/`array`/`map`/`tuple`/`choice`) plus every atom-family constant {@link
+     * AtomTypeParser} declares. Previously hand-duplicated as a private {@code fullRegistry()}
+     * helper in several test classes (`MetaKernelEndToEndTest`, `TsonDataParserTest`, ...) and,
+     * as of {@code TsonCompiledRegistry}, real production code too -- factored out here once a
+     * fourth/fifth copy made the duplication worth closing. Not the *only* legitimate registry a
+     * caller might build (a caller reading only a narrow slice of a schema can still assemble a
+     * smaller one directly via {@link #builder}), just the canonical "everything this build knows
+     * how to construct in DOM mode" one.
+     */
+    public static ParserFactoryRegistry dom() {
+        return builder()
+                .register("record", RecordParser.FACTORY)
+                .register("array", ArrayParser.FACTORY)
+                .register("map", MapParser.FACTORY)
+                .register("tuple", TupleParser.FACTORY)
+                .register("choice", ChoiceParser.FACTORY)
+                .register("integer_type", AtomTypeParser.INTEGER_TYPE)
+                .register("text_type", AtomTypeParser.TEXT_TYPE)
+                .register("decimal_type", AtomTypeParser.DECIMAL_TYPE)
+                .register("float_type", AtomTypeParser.FLOAT_TYPE)
+                .register("rational_type", AtomTypeParser.RATIONAL_TYPE)
+                .register("uuid_type", AtomTypeParser.UUID_TYPE)
+                .register("binary", AtomTypeParser.BINARY)
+                .register("date_type", AtomTypeParser.DATE_TYPE)
+                .register("time_type", AtomTypeParser.TIME_TYPE)
+                .register("datetime_type", AtomTypeParser.DATETIME_TYPE)
+                .register("duration_type", AtomTypeParser.DURATION_TYPE)
+                .register("uri_type", AtomTypeParser.URI_TYPE)
+                .register("regex_type", AtomTypeParser.REGEX_TYPE)
+                .register("enum", AtomTypeParser.ENUM)
+                .register("unit", AtomTypeParser.UNIT)
+                .build();
+    }
+
+    /**
      * Scopes {@code available} (every factory this build of the library knows how to construct,
      * for one particular mode -- object-binding/DOM/validation, see {@link TsonParserFactory}'s own
      * Javadoc) down to exactly the constructors {@code metaSchema} itself declares (its own

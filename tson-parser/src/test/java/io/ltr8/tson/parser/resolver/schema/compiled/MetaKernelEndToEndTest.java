@@ -25,35 +25,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  */
 class MetaKernelEndToEndTest {
 
-    private static ParserFactoryRegistry fullRegistry() {
-        return ParserFactoryRegistry.builder()
-                .register("record", RecordParser.FACTORY)
-                .register("array", ArrayParser.FACTORY)
-                .register("map", MapParser.FACTORY)
-                .register("tuple", TupleParser.FACTORY)
-                .register("choice", ChoiceParser.FACTORY)
-                .register("integer_type", AtomTypeParser.INTEGER_TYPE)
-                .register("text_type", AtomTypeParser.TEXT_TYPE)
-                .register("decimal_type", AtomTypeParser.DECIMAL_TYPE)
-                .register("float_type", AtomTypeParser.FLOAT_TYPE)
-                .register("rational_type", AtomTypeParser.RATIONAL_TYPE)
-                .register("uuid_type", AtomTypeParser.UUID_TYPE)
-                .register("binary", AtomTypeParser.BINARY)
-                .register("date_type", AtomTypeParser.DATE_TYPE)
-                .register("time_type", AtomTypeParser.TIME_TYPE)
-                .register("datetime_type", AtomTypeParser.DATETIME_TYPE)
-                .register("duration_type", AtomTypeParser.DURATION_TYPE)
-                .register("uri_type", AtomTypeParser.URI_TYPE)
-                .register("regex_type", AtomTypeParser.REGEX_TYPE)
-                .register("enum", AtomTypeParser.ENUM)
-                .register("unit", AtomTypeParser.UNIT)
-                .build();
-    }
-
     private static TsonSchemaParser compiled() {
         MetaSchema raw = MetaKernelParser.parse();
         TsonSchema registered = new SchemaRegistry().register(raw);
-        return TsonSchemaParser.compile(registered, fullRegistry());
+        return TsonSchemaParser.compile(registered, ParserFactoryRegistry.dom());
     }
 
     /**
@@ -73,7 +48,7 @@ class MetaKernelEndToEndTest {
     void allFiftyEightRealEntriesCompileCleanly() {
         MetaSchema raw = MetaKernelParser.parse();
         TsonSchema registered = new SchemaRegistry().register(raw);
-        TsonSchemaParser compiled = TsonSchemaParser.compile(registered, fullRegistry());
+        TsonSchemaParser compiled = TsonSchemaParser.compile(registered, ParserFactoryRegistry.dom());
 
         for (String name : registered.entries().keySet()) {
             compiled.get(name);

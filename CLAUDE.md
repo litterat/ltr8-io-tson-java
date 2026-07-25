@@ -1154,6 +1154,52 @@ classes were added "record-only, deliberately with no resolver.vocab parser at a
 introduced here; `CoreTn1CompiledEndToEndTest` asserts these specifically fail to compile rather than
 silently skipping them.
 
+### Compiled schema registry (`tson-parser/src/main/java/io/ltr8/tson/parser/resolver/schema/compiled/TsonCompiledRegistry.java`)
+
+Added 2026-07-25: pairs one-to-one with `SchemaRegistry` (`tson-schema`) but stores *compiled*
+schemas (`TsonSchemaParser`) instead of resolved ones — for every schema `TsonCompiledRegistry`
+registers, it also compiles the registered result and keeps the compiled reader around, so a caller
+never recompiles the same governing chain twice. This is what an application actually wants at
+startup: register meta-kernel, compile+store it; register meta.tn1 (against meta-kernel), compile+
+store it; register core.tn1 (against meta.tn1), compile+store it — then any user-defined schema
+governed by one of these reuses whatever's already sitting in the registry.
+
+- **`register(TsonSchema)`** — registers via the wrapped `SchemaRegistry` (ordinary validation/
+  materialization/`!!import`-merging rules apply unchanged), compiles the *registered* result (never
+  the raw input — `TsonSchemaParser` needs materialization already done), stores it keyed by the
+  schema's own raw `!!id` string, and returns the compiled reader directly (so the very next schema
+  in a bootstrap chain, which needs *this* return value as an argument to its own parser, e.g.
+  `CoreTn1Parser.parse(TsonSchema)`, doesn't have to immediately call `get` right back).
+- **Keyed by raw `!!id`, not a canonicalized identity** — deliberately. `CanonicalIdentity`
+  (`tson-schema.registry`) is internal-by-convention to `SchemaRegistry` itself (confirmed via its
+  own class Javadoc: "a caller outside this module should go through `SchemaRegistry` instead of
+  depending on this class directly") — reaching into it from `tson-parser`, a different module,
+  would be exactly the cross-module layering violation this project otherwise avoids, even though
+  nothing stops it at compile time (`tson-schema` has no `module-info.java`). The cost: two
+  differently-spelled-but-equivalent URIs for the same schema won't find each other here the way
+  they would through `SchemaRegistry.get` — acceptable for the one real caller today (always
+  registers and looks up using each schema's own exact `!!id` string), a real narrower guarantee,
+  not an oversight.
+- **One shared `ParserFactoryRegistry` across every schema it compiles** — `ParserFactoryRegistry
+  .dom()` (new the same day) is the obvious default: every DOM-mode factory this build actually has
+  (composite kinds + every `AtomTypeParser` atom-family constant), factored out once it turned out to
+  be hand-duplicated, byte-for-byte identical, across four separate test classes
+  (`MetaKernelEndToEndTest`, `MetaTn1CompiledEndToEndTest`, `CoreTn1CompiledEndToEndTest`,
+  `TsonDataParserTest`) — all four now call `ParserFactoryRegistry.dom()` directly instead of their
+  own private `fullRegistry()` copy.
+- **Verified against the real three-schema chain**, not a hand-built fixture — `TsonCompiledRegistryTest`
+  loads meta-kernel → meta.tn1 → core.tn1 through a single `TsonCompiledRegistry`, then re-runs one
+  representative assertion from each of `MetaKernelEndToEndTest`/`MetaTn1CompiledEndToEndTest`/
+  `CoreTn1CompiledEndToEndTest` against readers pulled back out via `get(id)` (not the fresh
+  `register`-returned reference), confirming the *stored*, looked-up-by-id reader is the genuinely
+  reusable one.
+
+**Not yet wired into a real "load the standard library" entry point** — `TsonCompiledRegistryTest`'s
+own `loadStandardLibrary()` helper is test-local; a permanent, production version of that same
+four-line sequence (and where it should live) is still open. Also still open: `SchemaResolver.
+bindAtomInstance` itself doesn't consult this registry yet (still `TsonMapperReader`-based) — that
+swap is its own, separate piece of work (see the project's own task list).
+
 ### Conformance suite integration (`ConformanceSuiteTest`)
 
 Separate from `LexerTest`/`ParserTest` (fine-grained unit tests) is `ConformanceSuiteTest`, which runs
@@ -1191,6 +1237,7 @@ No system Gradle — always use the wrapper:
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.compiled.MetaTn1CompiledEndToEndTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.compiled.CoreTn1CompiledEndToEndTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.compiled.TsonDataParserTest"
+./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledRegistryTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.mapper.TsonMapperReaderTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.mapper.TsonMapperWriterTest"
 ```
