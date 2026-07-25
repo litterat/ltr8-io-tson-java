@@ -3,7 +3,6 @@ package io.ltr8.tson.parser.resolver.schema;
 import io.ltr8.tson.parser.SchemaParser;
 import io.ltr8.tson.parser.ast.ArrayValue;
 import io.ltr8.tson.parser.ast.DataValue;
-import io.ltr8.tson.parser.ast.EmptyBrace;
 import io.ltr8.tson.parser.ast.ScopedValue;
 import io.ltr8.tson.parser.ast.TokenValue;
 import io.ltr8.tson.parser.ast.schema.Instance;
@@ -11,11 +10,8 @@ import io.ltr8.tson.parser.ast.schema.SchemaDocument;
 import io.ltr8.tson.parser.ast.schema.SchemaMap;
 import io.ltr8.tson.schema.MetaSchema;
 import io.ltr8.tson.schema.meta.EnumBody;
-import io.ltr8.tson.schema.meta.RegexType;
-import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.schema.meta.UriType;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -46,41 +42,28 @@ import java.util.Optional;
  * {@link #parse(String)} and {@link #parse()} each return a freshly-built {@link MetaSchema}
  * value rather than being one themselves.
  *
- * <p><b>Constructor application delegates to {@code SchemaResolver.resolve} wherever that's known
- * correct (2026-07-24, Phase B step 6)</b> -- {@code unit}/{@code integer_type}/{@code text_type}
- * instances (and, transitively, anything {@link SchemaResolver#resolveInstance} itself handles)
- * route through the ordinary two-argument {@code resolve(declaration, entries)} overload (the
- * self-hosted case §3.3.1 itself calls out: meta-kernel's own constructors are its own locals, so
- * the type-name namespace alone suffices -- no separate structure namespace needed). This retired
- * this class's own duplicate {@code bindAtom}/{@code TsonMapperReader} plumbing entirely in favor of
- * the single, already-tested implementation in {@code SchemaResolver}.
- *
- * <p><b>Three targets stay hand-picked, not because retiring them wasn't tried, but because
- * generic binding is demonstrably wrong or incomplete for each</b> (see {@link #handPickedBody}):
- * <ul>
- *   <li>{@code uri_type}/{@code regex_type} -- their {@code specification: AtomSpecification}/
- *   {@code constraints: TextType} fields aren't {@code Optional} (correctly: every instance
- *   genuinely always has exactly one RFC citation), but the RFC citation is a *schema-composed*
- *   fixed default (meta-kernel.tn1: {@code uri_type => ~text_type & atom_specification & { spec: =
- *   "https://www.rfc-editor.org/rfc/rfc3986" ... } }), never literally present in any instance's
- *   own {@code {}} body -- generic binding silently leaves the field {@code null} instead of the
- *   real RFC URI.</li>
- *   <li>{@code enum} -- tried routing this through {@code SchemaResolver} too once its own
- *   generalized positional-form support (Phase B step 3, {@code PositionalForm}) existed, and it
- *   broke the real fixture: {@code boolean => !enum [true false]} fails, since {@code "true"}/
- *   {@code "false"} collide with TSON's own boolean-literal shape and get identified as actual
- *   booleans by {@code BaseTypeResolver} before ever reaching {@code EnumBody.members: List<String>}
- *   (confirmed in {@code SchemaResolverTest}'s own
- *   {@code booleanInstanceFailsGenericBindingBecauseItsMembersCollideWithTsonBooleanLiterals}).
- *   {@code boolean} is one of meta-kernel's real 49 declarations this class MUST resolve correctly
- *   -- unlike a resolver-level test, which can document a known gap and move on, the bootstrap
- *   itself can't silently produce a wrong or missing {@code boolean}. {@link #toEnumBody} reads
- *   {@code TokenValue.text()} directly, bypassing base-type identification entirely, which is
- *   correct for every enum member regardless of what it happens to look like.</li>
- * </ul>
- * Every {@code Instance} in the real fixture is registered this way; a declaration whose target
- * isn't registered at all (not even one of these three) is simply left out of the result entirely
- * rather than failing the whole bootstrap.
+ * <p><b>Every {@code Instance} declaration resolves through {@link BootstrapMetaKernelCompiler},
+ * not {@code SchemaResolver}/{@code TsonMapperReader} at all</b> (widened 2026-07-25 from an
+ * earlier version that routed {@code unit}/{@code integer_type}/{@code text_type} through ordinary
+ * generic resolution and hand-picked only {@code uri_type}/{@code regex_type}/{@code enum}).
+ * {@code SchemaResolver.resolveInstance}'s own generic path binds via {@code TsonMapperReader},
+ * which is identification-first (a token is classified null/boolean/number/string *before* the
+ * target field is consulted) -- exactly why {@code boolean => !enum [true false]} needs hand-picked
+ * handling at all ({@code "true"}/{@code "false"} misidentify as real booleans before {@code
+ * EnumBody.members} ever sees them) and why {@code uri_type}/{@code regex_type}'s own
+ * schema-composed RFC-citation default never lands (nested inside {@code specification:
+ * AtomSpecification}, past what generic defaulting fills in). Rather than deciding case by case
+ * which of meta-kernel's own instances need hand-picking and which can use the generic path,
+ * {@link BootstrapMetaKernelCompiler} hand-picks all of them uniformly -- meta-kernel only ever
+ * instantiates its own six real constructors in two known shapes (a bare {@code {}} or a bare array
+ * of tokens), confirmed directly against the real fixture, so there's no genuine need for a general
+ * mechanism here at all. See that class's own Javadoc for the full reasoning, including why even a
+ * schema-driven *compiled* reader (the eventual replacement for {@code TsonMapperReader} elsewhere,
+ * see {@code SchemaResolver}'s own notes) can't safely bootstrap meta-kernel from its own
+ * in-progress state either -- {@code enum}'s own {@code members: set<token>} field is
+ * argument-bearing, and only {@code SchemaValidator}'s materialization pass (never run over
+ * meta-kernel while meta-kernel is still being produced) makes that safe to compile a reader
+ * against.
  *
  * <p><b>{@link #parse()} reads meta-kernel.tn1 packaged as a classpath resource</b> (see this
  * module's {@code build.gradle.kts}, which copies it straight from the repo's own {@code
@@ -137,68 +120,23 @@ public final class MetaKernelParser {
             if (target == null) {
                 continue;
             }
-            entries.put(declaration.name(), resolveInstanceDeclaration(declaration, instance, target, resolver, entries));
+            // §5.5: constructor application transfers only the target's kind; no supertypes, no
+            // parameters -- this is construction, not composition or refinement.
+            BootstrapMetaKernelCompiler.compile(instance).ifPresent(body -> entries.put(declaration.name(),
+                    new TypeDefinition(Optional.of(TypeRef.of(instance.target())), target.kind(), List.of(),
+                            false, List.of(), List.of(), Optional.empty(), body)));
         }
         return entries;
-    }
-
-    /**
-     * {@code uri_type}/{@code regex_type}/{@code enum} get their hand-picked body (see this class's
-     * own Javadoc); every other target delegates straight to {@code SchemaResolver.resolve} --
-     * {@code declaration}'s own {@code typeDef()} is still the {@link Instance}, so this reaches
-     * exactly {@link SchemaResolver#resolveInstance} the same way any other caller of {@code
-     * SchemaResolver} would.
-     */
-    private static TypeDefinition resolveInstanceDeclaration(SchemaMap.Declaration declaration, Instance instance,
-                                                               TypeDefinition target, SchemaResolver resolver,
-                                                               Map<String, TypeDefinition> entries) {
-        Optional<Top> handPicked = handPickedBody(instance);
-        if (handPicked.isPresent()) {
-            // §5.5: constructor application transfers only the target's kind; no supertypes, no
-            // parameters -- this is construction, not composition or refinement. (SchemaResolver's
-            // own resolveInstance builds this identically -- duplicated here only for the three
-            // targets that never reach it.)
-            return new TypeDefinition(Optional.of(TypeRef.of(instance.target())), target.kind(), List.of(),
-                    false, List.of(), List.of(), Optional.empty(), handPicked.get());
-        }
-        return resolver.resolve(declaration, entries);
-    }
-
-    private static Optional<Top> handPickedBody(Instance instance) {
-        return switch (instance.target()) {
-            case "uri_type" -> {
-                requireEmptyBody(instance);
-                yield Optional.of(UriType.UNCONSTRAINED);
-            }
-            case "regex_type" -> {
-                requireEmptyBody(instance);
-                yield Optional.of(RegexType.UNCONSTRAINED);
-            }
-            case "enum" -> Optional.of(toEnumBody(instance.value()));
-            default -> Optional.empty();
-        };
-    }
-
-    /**
-     * {@code uri_type}/{@code regex_type} are only ever instantiated as a bare {@code {}} in the
-     * real fixture -- checked rather than assumed, since their RFC-citation constraint is supplied
-     * as a hand-picked constant (see this class's own Javadoc), not parsed from the instance body.
-     */
-    private static void requireEmptyBody(Instance instance) {
-        if (!(instance.value().coreValue() instanceof EmptyBrace)) {
-            throw new IllegalStateException(
-                    "expected {} for !" + instance.target() + ", found " + instance.value().coreValue());
-        }
     }
 
     /**
      * {@code !enum [true false]}'s value is a bare array (§5.6's positional form for a
      * single-field constructor), not {@code { members: [...] } }.
      *
-     * <p>Package-private, not {@code private} -- {@link CoreTn1Parser} reuses this for core.tn1's
-     * own local {@code boolean} redeclaration, which hits the identical generic-binding gap this
-     * class's own Javadoc already documents for meta-kernel's {@code boolean} (see {@code
-     * SPEC-FEEDBACK.md}).
+     * <p>Package-private, not {@code private} -- both {@link BootstrapMetaKernelCompiler} (this
+     * class's own {@code enum} case) and {@link CoreTn1Parser} (core.tn1's own local {@code boolean}
+     * redeclaration, the identical generic-binding gap this class's own Javadoc already documents
+     * for meta-kernel's {@code boolean} -- see {@code SPEC-FEEDBACK.md}) reuse this.
      */
     static EnumBody toEnumBody(DataValue value) {
         if (!(value.coreValue() instanceof ArrayValue array)) {

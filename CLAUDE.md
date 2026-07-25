@@ -834,39 +834,50 @@ in two passes over meta-kernel's 49 declarations:
    `SchemaResolver` itself -- `SchemaResolver.resolveAll` alone is single-pass, strict source order,
    and still can't handle a forward reference like `boolean` preceding `enum`.
 
-**Constructor-application binding delegates to `SchemaResolver.resolve` for most targets now**
-(revised 2026-07-24, Phase B step 6, once `SchemaResolver` itself gained generic `Instance`
-resolution -- see "Schema resolution" above) -- `unit`, `integer_type`, and `text_type` all route
-through the ordinary `resolve(declaration, entries)` overload (meta-kernel is exactly the
-self-hosted case §3.3.1 describes: its own constructors are its own locals, so the type-name
-namespace alone suffices, no separate structure namespace needed). This retired the class's own
-former duplicate binding plumbing (a hand-rolled `bindAtom`/`TsonMapperReader` pair, doing exactly
-what `SchemaResolver.resolveInstance` now does canonically) entirely.
+**Constructor-application binding now goes entirely through `BootstrapMetaKernelCompiler`, not
+`SchemaResolver`/`TsonMapperReader` at all** (widened 2026-07-25 -- an earlier version, "Phase B
+step 6," routed `unit`/`integer_type`/`text_type` through `SchemaResolver.resolve`'s ordinary
+`Instance` path and hand-picked only `uri_type`/`regex_type`/`enum`; that split turned out to be an
+unnecessary halfway point). The full case against letting *any* meta-kernel `Instance` reach generic
+binding: `SchemaResolver.resolveInstance`'s own path binds via `TsonMapperReader`, which is
+identification-first (a token is classified null/boolean/number/string *before* the target field is
+even consulted) -- exactly why `boolean => !enum [true false]` needs hand-picking at all
+(`"true"`/`"false"` misidentify as real booleans before `EnumBody.members` ever sees them) and why
+`uri_type`/`regex_type`'s own schema-composed RFC-citation default never lands (nested inside
+`specification: AtomSpecification`, past what generic defaulting fills in). Rather than deciding
+case by case which targets are safe for the generic path, `BootstrapMetaKernelCompiler` hand-picks
+all six of meta-kernel's own real constructor targets uniformly -- confirmed directly against the
+real fixture, meta-kernel only ever instantiates them in exactly two shapes: a bare `{}` (`unit`,
+`integer_type`, `text_type`, `uri_type`, `regex_type` -- each target's own `UNCONSTRAINED` constant,
+or a bare `new Unit()` for `unit` itself, is already exactly right) or a bare array of tokens
+(`enum` -- `MetaKernelParser.toEnumBody`, reading `TokenValue.text()` directly, bypassing base-type
+identification entirely). No `TsonSchemaParser`, no `ParserFactoryRegistry`, no materialization, no
+`TsonMapperReader` involved anywhere in meta-kernel's own bootstrap now.
 
-**Three targets still stay hand-picked, not because retiring them wasn't tried, but because generic
-binding is demonstrably wrong or incomplete for each specific one** (`MetaKernelParser`'s own
-`handPickedBody` method, and its own Javadoc, spell out exactly why):
-- `uri_type`/`regex_type` -- their `specification: AtomSpecification`/`constraints: TextType`
-  fields aren't `Optional` (correctly: every instance genuinely always has exactly one RFC
-  citation), but the RFC citation is a *schema-composed* fixed default, never literally present in
-  any instance's own `{}` body -- generic binding silently leaves the field `null` instead of the
-  real RFC URI (this is the reason every atom-constraint class added *after* this was discovered
-  keeps its own RFC citation as a flat `String spec` field instead -- see "Schema resolution"
-  above's `PositionalForm` bullet).
-- `enum` -- tried routing this through `SchemaResolver` too once `PositionalForm`'s own
-  generalized positional-form support existed, and it broke the real fixture: `boolean => !enum
-  [true false]` fails, since `"true"`/`"false"` collide with TSON's own boolean-literal shape and
-  get identified as actual booleans by `BaseTypeResolver` before ever reaching `EnumBody.members:
-  List<String>`. `boolean` is one of meta-kernel's real 49 declarations this class MUST resolve
-  correctly -- unlike a resolver-level test, which can document a known gap and move on, the
-  bootstrap itself can't silently produce a wrong or missing `boolean`. A small hand-written
-  converter (reading `TokenValue.text()` directly, bypassing base-type identification entirely)
-  handles it instead, correct for every enum member regardless of what it happens to look like.
+**Why even a *compiled*-reader-based bootstrap (the eventual replacement for `TsonMapperReader`
+elsewhere, see "Schema resolution" above's `bindAtomInstance` notes) can't safely read meta-kernel
+from its own in-progress state either -- this is why `BootstrapMetaKernelCompiler` doesn't attempt
+one:** `enum => ~atom & { members: set<token> } }`'s own field type is *argument-bearing* (`set` +
+the `token` argument), and the compiled-parser layer's own `RecordParser`/`CompilationContext`
+assume every field type is already a bare, materialized name -- true only after `SchemaValidator`'s
+own materialization pass has run, which meta-kernel (the thing that pass would normally run *over*)
+has never been through while it's still being produced. Solving that would mean either running a
+whole-schema materialization pass over a knowingly-incomplete map (checked directly: doesn't work --
+`integer_size => { bits: ... signed: boolean }` is itself a first-pass entry whose `signed` field
+already references `boolean`, unresolved until the *second* pass) or building a scoped,
+validation-free materialization step just for bootstrap's own benefit. Given meta-kernel's own
+instance shapes are this narrow and fully known in advance, that complexity buys nothing --
+`BootstrapMetaKernelCompiler`'s own Javadoc: "the bootstrap compiler can do whatever tricks it needs
+to... that includes not even compiling, just calling `new Xxx(...)`."
 
 **Every `Instance` declaration in the real fixture is registered** (`unit`, `integer_type`, `text_type`,
 `uri_type`, `regex_type`, `enum`) -- all 49 declarations resolve; a declaration whose target isn't
 registered would simply be left out of the result entirely rather than failing the whole bootstrap,
-but that path is unexercised against the real fixture today.
+but that path is unexercised against the real fixture today. Verified both end to end
+(`MetaKernelSchemaRegistryTest`/`MetaKernelEndToEndTest`, unchanged counts before/after this
+refactor -- 49/49 resolved, 58 after registration) and in isolation
+(`BootstrapMetaKernelCompilerTest`, one case per real target plus the unrecognized-target and
+wrong-shape-body error paths).
 
 **`meta-kernel.tn1` is packaged as a classpath resource, not read from a filesystem path.**
 `MetaKernelParser.parse()` (no args) reads `/meta-kernel.tn1` off the classpath via
@@ -1163,6 +1174,7 @@ No system Gradle — always use the wrapper:
 ./gradlew :tson-schema:test --tests "io.ltr8.tson.schema.SchemaRegistryTest"
 ./gradlew :tson-schema:test --tests "io.ltr8.tson.schema.registry.SchemaValidatorTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.MetaKernelSchemaRegistryTest"
+./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.BootstrapMetaKernelCompilerTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.MetaSchemaImportTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.CoreTn1ParserTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.compiled.MetaKernelEndToEndTest"
