@@ -1,56 +1,71 @@
 package io.ltr8.tson.parser.resolver.schema.compiled;
 
+import io.ltr8.tson.parser.ast.DataValue;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.util.Set;
 
 /**
- * Dispatches by declared subtype instead of reading a type's own body directly -- for a
- * declaration like {@code response} that has open type parameters (`<T>`) and therefore no
- * concrete shape of its own to read: real data never arrives typed bare {@code response}, only as
- * one of its concrete subtypes ({@code success_response}/{@code failure_response}, discovered via
- * {@link TypeDefinition#subtypes}, populated by {@code SchemaValidator.computeSubtypes} -- already
- * the full transitive closure, so a flat name lookup here covers the whole subtype hierarchy, not
- * just direct children). The same mechanism an explicit {@code choice}/union type uses ({@link
- * ChoiceParser} -- match the value's own {@code !typeName} annotation against a fixed member list),
- * except the member list is discovered from the reverse composition index instead of an explicit
- * {@code variants: [type_ref]} -- an open-ended union, not a closed one. The actual dispatch (once
- * each has its own candidate-name set) is identical between the two, factored into {@link
- * NamedDispatchParser}.
+ * Wraps a declaration's own (already-compiled) body parser with dispatch-by-{@code !typeName} over
+ * its known subtypes ({@link TypeDefinition#subtypes}, populated by {@code
+ * SchemaValidator.computeSubtypes} from the reverse composition index -- already the full
+ * transitive closure, so a flat name lookup here covers the whole subtype hierarchy, not just
+ * direct children).
  *
- * <p>Not registered through {@link ParserFactoryRegistry}/{@link TsonParserFactory} -- unlike every
- * other compiled parser, the trigger for building one of these isn't the resolved body's own
- * constructor name (a parameterized declaration's body could structurally be anything, and isn't
- * actually read at all), it's a property of the {@link TypeDefinition} itself ({@code
- * parameters().isEmpty()} being false). {@link TsonSchemaParser}'s own compiler checks this
- * directly, the same way it special-cases {@code Reference} before ever consulting the registry.
+ * <p><b>The declaration's own body is always a valid reading, not just a fallback bolted on.</b> A
+ * value with no type-ref, or one naming the declaration itself, reads directly against {@code
+ * ownParser} -- the same parser it would have gotten if it had no subtypes at all. This matters for
+ * a genuinely common shape: {@code top => top & {}} has both an empty body of its own *and* a huge
+ * subtype list (everything else in meta-kernel composes with it, directly or transitively) --
+ * {@code body: {}} at a bare {@code top}-typed position is a real, meaningful value (§4.1's own
+ * base case), not an error demanding a type annotation, and reading it that way falls out for free
+ * here rather than needing {@code top} special-cased anywhere. The same reasoning applies to any
+ * other type with a genuinely readable own shape and known subtypes (a fresh composition like
+ * {@code atom => top & {}}, or {@code array}'s own vocabulary, which {@code set}/{@code array_min}/
+ * etc. all refine) -- there's nothing {@code top}-specific in this class at all.
  *
- * <p><b>Doesn't resolve any subtype's own parser until it's actually dispatched to.</b> A record's
- * fields (see {@link RecordParser}) are all resolved up front because every one of them is read on
- * every {@code read()} call -- but a variant's subtypes are alternatives, not a fixed set that's
- * all needed together: for any given value, exactly one of them applies. Resolving all of them at
- * {@link #forSubtypes} time (an earlier version of this class did) would force every subtype to be
- * buildable just because *one* of a type's several alternatives got touched -- exactly the
- * eager-building problem {@link TsonSchemaParser}'s own "lazy, not eager" note describes for the
- * whole schema, reintroduced at a smaller scale here. {@link NamedDispatchParser} captures {@code
- * ctx} and consults it at read time instead, once per distinct subtype actually dispatched to --
- * cheap on repeat dispatches to the same subtype, since {@code ctx}'s own underlying resolution
- * already memoizes.
+ * <p>An earlier version of this class instead required an explicit type-ref unconditionally, on
+ * the theory that a type with subtypes (originally triggered by *open type parameters*, not
+ * subtypes directly) had "no concrete shape of its own to read" -- true for a genuinely open
+ * template with no useful body, but not a safe general assumption: {@code top}/{@code atom}/{@code
+ * array} all have subtypes *and* a perfectly good body of their own. Triggering on non-empty
+ * {@code subtypes} instead of non-empty {@code parameters} (see {@link TsonSchemaParser}'s own
+ * Javadoc) is what makes the "always compile the own body too" version of this class correct: the
+ * signal for "this position might need dispatch" and the signal for "this position has no
+ * meaningful body of its own" turned out to be two different things, not one.
+ *
+ * <p>Dispatch over the subtype set itself (once a type-ref is present and doesn't name the
+ * declaration) is unchanged from before -- lazy, resolving a subtype's own parser only once it's
+ * actually dispatched to (a subtype set is alternatives, not a fixed group every one of which is
+ * needed on every read, unlike {@link RecordParser}'s own fields) -- factored into {@link
+ * NamedDispatchParser}, shared with {@link ChoiceParser}'s own closed-list dispatch.
  */
-final class VariantParser {
+final class VariantParser implements TsonTypeParser<Object> {
 
-    private VariantParser() {
+    static TsonTypeParser<?> forSubtypes(String name, TypeDefinition definition, TsonTypeParser<?> ownParser,
+                                          CompilationContext ctx) {
+        NamedDispatchParser subtypeDispatch = new NamedDispatchParser(name,
+                "has known subtypes -- a value at this position with an explicit type annotation (!typeName) "
+                        + "must name one of them",
+                "known subtype", Set.copyOf(definition.subtypes()), ctx);
+        return new VariantParser(name, ownParser, subtypeDispatch);
     }
 
-    /** @throws IllegalStateException if {@code definition} has no known subtypes to dispatch to */
-    static TsonTypeParser<?> forSubtypes(String name, TypeDefinition definition, CompilationContext ctx) {
-        if (definition.subtypes().isEmpty()) {
-            throw new IllegalStateException("'" + name + "' has open type parameters " + definition.parameters()
-                    + " and no known subtypes to dispatch to -- nothing compilable here");
+    private final String name;
+    private final TsonTypeParser<?> ownParser;
+    private final TsonTypeParser<?> subtypeDispatch;
+
+    private VariantParser(String name, TsonTypeParser<?> ownParser, TsonTypeParser<?> subtypeDispatch) {
+        this.name = name;
+        this.ownParser = ownParser;
+        this.subtypeDispatch = subtypeDispatch;
+    }
+
+    @Override
+    public Object read(DataValue value) {
+        if (value == null || value.typeRef().isEmpty() || value.typeRef().get().equals(name)) {
+            return ownParser.read(value);
         }
-        return new NamedDispatchParser(name,
-                "has open type parameters -- a value at this position requires an explicit type annotation "
-                        + "(!typeName) naming one of its known subtypes to disambiguate",
-                "known subtype", Set.copyOf(definition.subtypes()), ctx);
+        return subtypeDispatch.read(value);
     }
 }

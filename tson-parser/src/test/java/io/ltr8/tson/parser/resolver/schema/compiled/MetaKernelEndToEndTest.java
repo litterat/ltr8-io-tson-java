@@ -11,7 +11,6 @@ import org.junit.jupiter.api.Test;
 import java.math.BigInteger;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -20,7 +19,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * ENTIRE real, registered {@code meta-kernel.tn1} schema (58 entries after materialization -- see
  * {@code MetaKernelSchemaRegistryTest}) with a registry covering every factory this codebase
  * currently has, then reads real TSON data text against several of its own genuinely useful record
- * types.
+ * types -- including {@code top} itself, the case that motivated {@link VariantParser}'s own
+ * redesign (subtypes-triggered dispatch, always compiling a declaration's own body too, not just
+ * its subtypes).
  */
 class MetaKernelEndToEndTest {
 
@@ -56,46 +57,53 @@ class MetaKernelEndToEndTest {
     }
 
     /**
-     * 53 of the real schema's 58 entries compile cleanly -- up from 51 once {@code
-     * SchemaValidator.instantiate} was widened to materialize {@code set<X>} applications the same
-     * way it already did {@code array<X>} ones (same field shape, just different tightened
-     * defaults -- see its own Javadoc), closing what {@code enum}'s own {@code members: set<token>}
-     * field needed. The remaining 5 are parameterized type *constructors* ({@code map}, {@code
-     * set}, {@code array_min}, {@code array_max}, {@code array_ranged} -- {@code <T>}/{@code <K,V>})
-     * with no known subtypes, so {@link VariantParser} correctly refuses to compile them at all --
-     * but that refusal never matters in practice: meta-kernel never references any of these as a
-     * bare field type anywhere (a field always references a *concrete* application, e.g. a
-     * synthesized {@code array_field_name_*} entry, never {@code "map"}/{@code "set"} themselves),
-     * so nothing legitimate ever calls {@code compiled.get("map")} directly. Confirmed, not
-     * assumed: nothing else in this same run fails as a result of any of these five failing, which
-     * it would if anything actually depended on them. {@code array} itself, despite also being
-     * parameterized, *does* compile -- {@code set}/{@code array_min}/{@code array_max}/{@code
-     * array_ranged} all compose with it, so it has real subtypes to dispatch among, unlike its own
-     * siblings.
+     * All 58 of the real schema's entries compile cleanly now -- up from 53 once {@link
+     * VariantParser} started triggering on non-empty {@code subtypes} rather than non-empty {@code
+     * parameters}, and always compiling a declaration's own body alongside any subtype dispatch
+     * rather than treating the two as mutually exclusive (see {@link VariantParser}'s own Javadoc).
+     * {@code map}/{@code set}/{@code array_min}/{@code array_max}/{@code array_ranged} -- the
+     * parameterized constructors that used to be refused outright (no subtypes to dispatch to, and
+     * under the old design that meant no compiled shape at all) -- now compile via their own
+     * ordinary body parser directly, the same as any other constructor's own vocabulary record.
+     * Nothing legitimate ever calls {@code compiled.get("map")} in practice (see the previous
+     * revision of this test for why), but there's no longer a reason for it to fail if something
+     * did.
      */
     @Test
-    void fiftyThreeOfFiftyEightRealEntriesCompileCleanly() {
+    void allFiftyEightRealEntriesCompileCleanly() {
         MetaSchema raw = MetaKernelParser.parse();
         TsonSchema registered = new SchemaRegistry().register(raw);
         TsonSchemaParser compiled = TsonSchemaParser.compile(registered, fullRegistry());
 
-        Set<String> expectedFailures = Set.of("map", "set", "array_min", "array_max", "array_ranged");
-        int ok = 0;
         for (String name : registered.entries().keySet()) {
-            boolean failed;
-            try {
-                compiled.get(name);
-                failed = false;
-            } catch (RuntimeException e) {
-                failed = true;
-            }
-            assertEquals(expectedFailures.contains(name), failed,
-                    "'" + name + "' compiled unexpectedly " + (failed ? "failed" : "succeeded"));
-            if (!failed) {
-                ok++;
-            }
+            compiled.get(name);
         }
-        assertEquals(53, ok);
+        assertEquals(58, registered.entries().size());
+    }
+
+    @Test
+    void bareTopWithNoTypeRefReadsAgainstItsOwnEmptyBody() {
+        // top => top & {} -- an empty body, but also the (transitive) supertype of everything else
+        // in the schema. A value with no type annotation at a top-typed position is a real, valid
+        // "just a top" reading, not an error demanding one of its many subtypes be named.
+        TsonSchemaParser compiled = compiled();
+        Document document = new Parser("{}").parseDocument();
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> result = (Map<String, Object>) compiled.get("top").read(document.root());
+
+        assertEquals(Map.of(), result);
+    }
+
+    @Test
+    void explicitTypeRefNamingTheDeclarationItselfAlsoUsesItsOwnBody() {
+        TsonSchemaParser compiled = compiled();
+        Document document = new Parser("!top {}").parseDocument();
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> result = (Map<String, Object>) compiled.get("top").read(document.root());
+
+        assertEquals(Map.of(), result);
     }
 
     @Test

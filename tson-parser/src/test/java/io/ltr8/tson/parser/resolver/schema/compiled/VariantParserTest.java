@@ -23,10 +23,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * End-to-end proof of {@link VariantParser}: the exact {@code response}/{@code success_response}/
- * {@code failure_response} case this class was built for -- {@code response} has open type
- * parameters and an empty body of its own, so it's never readable directly; real data always
- * arrives tagged as one of its two concrete subtypes.
+ * End-to-end proof of {@link VariantParser}: the {@code response}/{@code success_response}/{@code
+ * failure_response} case this class was originally built for (dispatch by subtype), plus the
+ * {@code top}-like case that motivated its redesign -- a value with no type annotation, or one
+ * naming the declaration itself, reads against the declaration's *own* body rather than always
+ * demanding a subtype. {@code response} here is given an intentionally empty body (mirroring
+ * {@code top => top & {}}); {@link #ownBodyFallbackStillFailsIfItsOwnRequirementsArentMet} uses a
+ * second type with a real required field of its own to prove the fallback isn't a rubber stamp --
+ * it's an ordinary read against an ordinary body, which can still fail on its own terms.
  */
 class VariantParserTest {
 
@@ -42,6 +46,13 @@ class VariantParserTest {
         entries.put("failure_response", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of(), false,
                 List.of("response"), List.of(), Optional.empty(),
                 RecordBody.of(List.of(RecordField.required("error_code", TypeRef.of("integer"))))));
+        // A second, unrelated subtypes-bearing type whose OWN body has a real required field, to
+        // prove the "no type-ref -> own body" fallback still enforces that body's own requirements.
+        entries.put("shape", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of(), false,
+                List.of(), List.of(), Optional.empty(),
+                RecordBody.of(List.of(RecordField.required("sides", TypeRef.of("integer"))))));
+        entries.put("triangle", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of(), false,
+                List.of("shape"), List.of(), Optional.empty(), RecordBody.of(List.of())));
         return new TsonSchema(Optional.of("https://example.test/s.tn1"), "https://example.test/meta.tn1",
                 List.of(), entries);
     }
@@ -59,9 +70,13 @@ class VariantParserTest {
     }
 
     @SuppressWarnings("unchecked")
-    private static Map<String, Object> read(TsonSchemaParser compiled, String source) {
+    private static Map<String, Object> read(TsonSchemaParser compiled, String rootName, String source) {
         Document document = new Parser(source).parseDocument();
-        return (Map<String, Object>) compiled.get("response").read(document.root());
+        return (Map<String, Object>) compiled.get(rootName).read(document.root());
+    }
+
+    private static Map<String, Object> read(TsonSchemaParser compiled, String source) {
+        return read(compiled, "response", source);
     }
 
     @Test
@@ -73,13 +88,27 @@ class VariantParserTest {
     }
 
     @Test
-    void missingTypeRefThrowsNamingTheKnownSubtypes() {
+    void missingTypeRefFallsBackToTheDeclarationsOwnEmptyBody() {
         TsonSchemaParser compiled = compiled();
 
-        IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class,
-                () -> read(compiled, "{ value: 42 }"));
-        assertTrue(thrown.getMessage().contains("success_response"), thrown.getMessage());
-        assertTrue(thrown.getMessage().contains("failure_response"), thrown.getMessage());
+        assertEquals(Map.of(), read(compiled, "{}"));
+    }
+
+    @Test
+    void explicitTypeRefNamingTheDeclarationItselfAlsoReadsItsOwnBody() {
+        TsonSchemaParser compiled = compiled();
+
+        assertEquals(Map.of(), read(compiled, "!response {}"));
+    }
+
+    @Test
+    void ownBodyFallbackStillFailsIfItsOwnRequirementsArentMet() {
+        TsonSchemaParser compiled = compiled();
+
+        // "shape" has subtypes ("triangle") but its own body REQUIRES "sides" -- the fallback reads
+        // against that real body, not a free pass, so a missing required field still fails.
+        assertThrows(IllegalArgumentException.class, () -> read(compiled, "shape", "{}"));
+        assertEquals(BigInteger.valueOf(3), read(compiled, "shape", "{ sides: 3 }").get("sides"));
     }
 
     @Test
