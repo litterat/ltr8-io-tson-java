@@ -1,0 +1,44 @@
+package io.ltr8.tson.parser.resolver.schema;
+
+/**
+ * Where a {@link SchemaCoordinator} gets a schema document's own raw source text from, for a URI
+ * that isn't already registered/compiled and isn't meta-kernel's own pre-loaded bootstrap case --
+ * the extension point the user asked for explicitly: "That co-ordinator will also be where we can
+ * control whitelists or blacklists for resolution. It might be that we don't allow HTTP requests
+ * and just load from disk or only HTTP requests to certain hosts." A caller wanting exactly that
+ * policy implements this interface (e.g. checking {@code uri} against an allowed-host list before
+ * ever opening a connection, or refusing any {@code http(s)} scheme outright and only reading from
+ * a local classpath/filesystem location) and hands it to {@link
+ * DefaultSchemaCoordinator#DefaultSchemaCoordinator(io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledRegistry,
+ * SchemaSource)}.
+ *
+ * <p><b>{@link #registeredOnly()} is the default -- nothing is ever fetched.</b> Mirrors {@code
+ * SchemaRegistry}'s own no-arg-constructor default ("resolves an import only if it's already
+ * registered -- nothing is ever fetched") and {@code SchemaLoader}'s own precedent for the same
+ * reason: a real disk/HTTP-backed {@code SchemaSource} is deliberately not built yet (a separate,
+ * later task -- see this project's own task list) rather than guessing at a policy shape nobody
+ * asked for.
+ */
+@FunctionalInterface
+public interface SchemaSource {
+
+    /**
+     * Returns {@code uri}'s own raw schema-document source text.
+     *
+     * @throws RuntimeException if {@code uri} can't be fetched -- not found, not permitted by
+     *                          whatever policy this implementation enforces, or any other reason;
+     *                          this interface doesn't mandate a specific exception type, since the
+     *                          right one depends on the implementation's own failure modes (a
+     *                          disk-backed source might throw for a missing file, an HTTP-backed one
+     *                          for a disallowed host or a network error).
+     */
+    String fetch(String uri);
+
+    /** Never fetches anything -- every call throws {@link IllegalStateException} naming {@code uri}. */
+    static SchemaSource registeredOnly() {
+        return uri -> {
+            throw new IllegalStateException("'" + uri + "' is not registered, and this SchemaCoordinator has no "
+                    + "fetch capability configured to load it from anywhere");
+        };
+    }
+}

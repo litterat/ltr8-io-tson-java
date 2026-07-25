@@ -32,7 +32,6 @@ import io.ltr8.tson.parser.ast.schema.TypeDef;
 import io.ltr8.tson.parser.ast.schema.TypeRef;
 import io.ltr8.tson.parser.mapper.TsonMapperReader;
 import io.ltr8.tson.parser.mapper.TsonMapperWriter;
-import io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledRegistry;
 import io.ltr8.tson.parser.resolver.schema.compiled.TsonSchemaParser;
 import io.ltr8.tson.schema.SchemaRegistry;
 import io.ltr8.tson.schema.SchemaValidationException;
@@ -210,36 +209,49 @@ public final class SchemaResolver {
     /** Re-serializes an atom refinement's source back to wire form for {@link #mergeWithSource} -- see {@link #resolveAtomRefinement}. */
     private final TsonMapperWriter writer = new TsonMapperWriter();
 
-    /** {@code null} unless constructed via {@link #SchemaResolver(TsonCompiledRegistry)} -- see {@link #compiledMetaSchema}. */
-    private final TsonCompiledRegistry compiledRegistry;
+    /** {@code null} unless constructed via {@link #SchemaResolver(SchemaCoordinator)} -- see {@link #compiledMetaSchema}. */
+    private final SchemaCoordinator coordinator;
 
     public SchemaResolver() {
         this(null);
     }
 
     /**
-     * @param compiledRegistry consulted by {@link #compiledMetaSchema} to look up a document's own
-     *                         {@code !!meta} target's *compiled* form -- {@code null} (same as the
-     *                         no-arg constructor) if this resolver never needs to. Deliberately
-     *                         separate from {@code structureNamespace} (the plain {@code
-     *                         Map<String, TypeDefinition>} the three-argument {@link #resolve}
-     *                         already takes): a caller still has to extract that map itself, e.g.
-     *                         via {@code compiledRegistry.schemaRegistry().get(uri)}'s own {@code
-     *                         entries()} -- this constructor doesn't change how {@code
-     *                         structureNamespace} reaches {@link #resolve} today, it only adds a way
-     *                         to reach the *compiled* form too. {@link #bindAtomInstance} does not
-     *                         consult this yet (see its own Javadoc) -- wiring it in is deliberately
-     *                         a separate, later step from adding the capability to fetch it at all.
+     * @param coordinator consulted by {@link #resolveAll(SchemaDocument)} to resolve a document's
+     *                     own {@code !!meta}/{@code !!import} targets -- fetching, resolving,
+     *                     registering, and compiling each as needed rather than requiring them to
+     *                     already exist somewhere. {@code null} (same as the no-arg constructor) if
+     *                     this resolver never needs to. {@link #bindAtomInstance} does not consult
+     *                     this yet (see its own Javadoc) -- wiring it in is deliberately a separate,
+     *                     later step from adding the capability to reach it at all.
+     *
+     *                     <p>Deliberately a {@link SchemaCoordinator}, not a bare {@code
+     *                     TsonCompiledRegistry} reference (an earlier version of this constructor
+     *                     took one directly) -- a plain "look it up, throw if missing" registry has
+     *                     no way to bootstrap meta-kernel's own document: resolving it means
+     *                     resolving *its own* {@code !!meta}, which names itself, so a registry-only
+     *                     resolver would need meta-kernel already registered before it could ever
+     *                     register meta-kernel. {@link SchemaCoordinator}'s own default
+     *                     implementation recognizes that one case and answers it directly (see
+     *                     {@link DefaultSchemaCoordinator}'s own Javadoc) instead of looping forever.
      */
-    public SchemaResolver(TsonCompiledRegistry compiledRegistry) {
-        this.compiledRegistry = compiledRegistry;
+    public SchemaResolver(SchemaCoordinator coordinator) {
+        this.coordinator = coordinator;
     }
 
     /**
      * The compiled form of {@code document}'s own governing meta-schema -- its {@code !!meta}
-     * target, looked up from the {@link TsonCompiledRegistry} this resolver was constructed with
-     * (see {@link #SchemaResolver(TsonCompiledRegistry)}). {@link Optional#empty()} if this
-     * resolver has none, or if the target isn't registered/compiled there (yet).
+     * target, resolved via the {@link SchemaCoordinator} this resolver was constructed with (see
+     * {@link #SchemaResolver(SchemaCoordinator)}), fetched/bootstrapped/compiled on demand if it
+     * wasn't already available, not merely a registry lookup.
+     *
+     * <p>Throws, rather than returning empty, if it can't be resolved -- unlike an earlier version
+     * of this method (a plain registry lookup, where "not registered yet" was a normal, expected
+     * outcome a caller checked for), a {@link SchemaCoordinator} is *supposed* to make its target
+     * available (fetching/bootstrapping as needed); if it still can't, that is a real, nameable
+     * failure (see {@link SchemaCoordinator#resolve}'s own Javadoc for the possible causes), not a
+     * "maybe try again later." No coordinator at all ({@link #SchemaResolver()}) is one such failure,
+     * reported the same way.
      *
      * <p>A same-module, cross-package reach from {@code resolver.schema} up into {@code
      * resolver.schema.compiled} -- worth naming plainly, since every other layering note in this
@@ -252,8 +264,13 @@ public final class SchemaResolver {
      * lower-layer resolution genuinely needs the higher layer's own compiled output, not just its
      * resolved one.
      */
-    public Optional<TsonSchemaParser> compiledMetaSchema(SchemaDocument document) {
-        return compiledRegistry == null ? Optional.empty() : compiledRegistry.get(document.meta());
+    public TsonSchemaParser compiledMetaSchema(SchemaDocument document) {
+        if (coordinator == null) {
+            throw new IllegalStateException("'" + documentLabel(document)
+                    + "': this resolver has no SchemaCoordinator, so !!meta target '" + document.meta()
+                    + "' can't be resolved");
+        }
+        return coordinator.resolve(document.meta());
     }
 
     /** Resolves a single declaration with no supertypes visible -- fine for a fresh record like {@code integer_size}, not for a composition. */
@@ -291,38 +308,34 @@ public final class SchemaResolver {
      * header directives (§2.2: {@code !!id}?/{@code !!meta}/{@code !!import}*) straight into the
      * result's {@link TsonSchema#id()}/{@link TsonSchema#meta()}/{@link TsonSchema#imports()}.
      *
-     * <p><b>With no {@link TsonCompiledRegistry} (the no-arg constructor), unchanged from before</b>
-     * -- {@code document.meta()} is read only to be carried through into the result, never consulted
+     * <p><b>With no {@link SchemaCoordinator} (the no-arg constructor), unchanged from before</b> --
+     * {@code document.meta()} is read only to be carried through into the result, never consulted
      * for resolution; every declaration resolves against an empty structure namespace, same as the
      * two-argument overload called with {@code Map.of()}.
      *
-     * <p><b>With one ({@link #SchemaResolver(TsonCompiledRegistry)}), three things are validated up
+     * <p><b>With one ({@link #SchemaResolver(SchemaCoordinator)}), two things are validated up
      * front, before any declaration is resolved</b>, rather than silently proceeding (or failing
-     * confusingly deep inside some unrelated declaration) the way the no-registry case does: (1)
+     * confusingly deep inside some unrelated declaration) the way the no-coordinator case does: (1)
      * {@code document.id()} must be present -- required by policy for a publishable schema (§2.2.1:
-     * "publishing a schema... REQUIRES !!id"), and this resolver, given a registry, is about to
+     * "publishing a schema... REQUIRES !!id"), and this resolver, given a coordinator, is about to
      * treat {@code document} as one that's going to *be* registered; (2) that {@code !!id} must be a
      * well-formed canonical-identity candidate ({@link SchemaRegistry#validateIdentity}) -- the same
      * check {@link SchemaRegistry#register} would run anyway, just surfaced here, before resolution
-     * work is spent on a document that could never actually be registered; (3) {@code document.meta()}
-     * must already be registered in this resolver's own {@link TsonCompiledRegistry} (via its
-     * wrapped {@code SchemaRegistry}) -- its resolved entries become the structure namespace every
-     * declaration resolves against, same as the two-argument overload would if a caller had derived
-     * and passed that map by hand (matching exactly what {@code CoreTn1Parser} already does manually
-     * today) -- and a compiled reader for it must also exist there ({@link #compiledMetaSchema}, not
-     * read for anything yet -- {@code bindAtomInstance} still doesn't consult it, see its own
-     * Javadoc -- but validated now for the same fail-fast reason). All three throw {@link
-     * IllegalStateException} (or, for (2), {@link SchemaValidationException}, in
-     * an already-established shape) naming the actual problem.
+     * work is spent on a document that could never actually be registered. Both throw {@link
+     * IllegalStateException} (or, for (2), {@link SchemaValidationException}, in an already-
+     * established shape) naming the actual problem. {@code document.meta()} itself is then resolved
+     * via {@link #compiledMetaSchema} -- fetched/bootstrapped/compiled by this resolver's own {@link
+     * SchemaCoordinator} if it wasn't already available, rather than requiring it to pre-exist -- and
+     * its resolved entries become the structure namespace every declaration resolves against, same
+     * as the two-argument overload would if a caller had derived and passed that map by hand.
      *
-     * <p><b>{@code !!import} is now merged into the type-name namespace too</b> -- each import's own
-     * URI is validated the same way {@code !!id} is, then looked up in this resolver's own {@link
-     * TsonCompiledRegistry} (via its wrapped {@code SchemaRegistry}) and its entries merged in,
-     * *before* any local declaration is resolved -- exactly the pre-seeding {@code MetaTn1Parser}
-     * already does by hand for meta-kernel, now generalized to any registry-aware resolver and any
-     * number of imports. This is genuinely required, not cosmetic: unlike the structure namespace
-     * (consulted only for constructor-application targets), an import's own entries feed the
-     * *type-name* namespace -- the same {@code resolved} map {@link #resolveComposition}/{@link
+     * <p><b>{@code !!import} is merged into the type-name namespace the same way</b> -- each import's
+     * own URI is validated the same way {@code !!id} is, then resolved via the same {@link
+     * SchemaCoordinator} and its entries merged in, *before* any local declaration is resolved
+     * (exactly the pre-seeding {@code MetaTn1Parser} used to do by hand for meta-kernel
+     * specifically, now generalized). This is genuinely required, not cosmetic: unlike the structure
+     * namespace (consulted only for constructor-application targets), an import's own entries feed
+     * the *type-name* namespace -- the same {@code resolved} map {@link #resolveComposition}/{@link
      * #resolveRefinement}/{@link #resolveAtomRefinement} look a supertype/refinement-source straight
      * up in, with no fallback of any kind (confirmed by reading those methods directly, not assumed:
      * each does exactly one {@code resolved.get(name)}). meta.tn1's own {@code date_type => ~atom &
@@ -342,7 +355,7 @@ public final class SchemaResolver {
      * same as always.
      */
     public TsonSchema resolveAll(SchemaDocument document) {
-        if (compiledRegistry == null) {
+        if (coordinator == null) {
             return resolveAll(document, Map.of());
         }
         String id = document.id().orElseThrow(() -> new IllegalStateException(
@@ -351,17 +364,10 @@ public final class SchemaResolver {
         for (String importUri : document.imports()) {
             SchemaRegistry.validateIdentity(importUri);
         }
-        TsonSchema governingSchema = compiledRegistry.schemaRegistry().get(document.meta()).orElseThrow(
-                () -> new IllegalStateException("'" + documentLabel(document) + "': !!meta target '"
-                        + document.meta() + "' is not registered in this resolver's own TsonCompiledRegistry"));
-        compiledMetaSchema(document).orElseThrow(
-                () -> new IllegalStateException("'" + documentLabel(document) + "': !!meta target '"
-                        + document.meta() + "' is registered but has no compiled reader in this resolver's "
-                        + "own TsonCompiledRegistry"));
+        Map<String, TypeDefinition> structureNamespace = compiledMetaSchema(document).schema().entries();
 
         Map<String, TypeDefinition> namespace = mergeImports(document);
         Map<String, TypeDefinition> localOnly = new LinkedHashMap<>();
-        Map<String, TypeDefinition> structureNamespace = governingSchema.entries();
         for (SchemaMap.Declaration declaration : document.body().declarations().values()) {
             if (namespace.containsKey(declaration.name())) {
                 throw new SchemaValidationException("'" + declaration.name()
@@ -378,9 +384,7 @@ public final class SchemaResolver {
     private Map<String, TypeDefinition> mergeImports(SchemaDocument document) {
         Map<String, TypeDefinition> merged = new LinkedHashMap<>();
         for (String importUri : document.imports()) {
-            TsonSchema imported = compiledRegistry.schemaRegistry().get(importUri).orElseThrow(
-                    () -> new IllegalStateException("'" + documentLabel(document) + "': !!import '" + importUri
-                            + "' is not registered in this resolver's own TsonCompiledRegistry"));
+            TsonSchema imported = coordinator.resolve(importUri).schema();
             for (Map.Entry<String, TypeDefinition> entry : imported.entries().entrySet()) {
                 if (merged.containsKey(entry.getKey())) {
                     throw new SchemaValidationException(

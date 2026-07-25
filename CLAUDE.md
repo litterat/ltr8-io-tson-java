@@ -1198,87 +1198,140 @@ governed by one of these reuses whatever's already sitting in the registry.
 own `loadStandardLibrary()` helper is test-local; a permanent, production version of that same
 four-line sequence (and where it should live) is still open.
 
-**`SchemaResolver` can now *reach* a compiled `!!meta` target** — `SchemaResolver(TsonCompiledRegistry)`,
-a new constructor overload alongside the existing no-arg one, plus `compiledMetaSchema(SchemaDocument)`,
-which looks up `document.meta()` in the registry and returns its compiled `TsonSchemaParser`
-(`Optional.empty()` if this resolver has no registry, or the target isn't registered/compiled there).
-`bindAtomInstance` itself is still untouched — still `TsonMapperReader`-based, on explicit direction
-— but `resolveAll(SchemaDocument)` (the "main" entry point, previously ignoring `!!meta`/`!!import`
-entirely — see below) now *does* use this, for the one thing it currently needs: deriving
-`structureNamespace` automatically.
+**`SchemaCoordinator`/`DefaultSchemaCoordinator`** (`tson-parser/src/main/java/io/ltr8/tson/parser/resolver/schema/{SchemaCoordinator,DefaultSchemaCoordinator,SchemaSource}.java`,
+added 2026-07-25, replacing an earlier version of `SchemaResolver`'s own constructor that took a bare
+`TsonCompiledRegistry` directly) — `SchemaResolver` now holds a `SchemaCoordinator`, not a registry.
+The reason a plain registry reference isn't enough: resolving *meta-kernel's own* document means
+resolving *its own* `!!meta`, which names itself (Part 2 §1.5's "one deliberate circularity"). A
+"look it up, throw if missing" registry has no way to close that loop on its own — it would need
+meta-kernel already registered before it could ever register meta-kernel. `SchemaCoordinator.resolve
+(String uri)` is the fix: given any schema's URI, it returns a *compiled* reader, fetching/resolving/
+registering/compiling on demand rather than requiring everything to pre-exist.
 
-**`resolveAll(SchemaDocument)` now validates `!!id`/`!!meta` and derives `structureNamespace` from
-the registry itself, when this resolver has one** (added 2026-07-25, same day) — previously this
-method always resolved against an empty structure namespace (`Map.of()`), regardless of what
-`!!meta` said, silently ignoring it (and never looked at `!!id` at all); a caller (`CoreTn1Parser`)
-had to derive and pass the right map by hand via the two-argument overload instead. Now, with a
-`TsonCompiledRegistry`, four things happen up front, before any declaration is resolved: (1)
-`document.id()` must be present — required by policy for a publishable schema (§2.2.1), and a
-resolver given a registry is treating `document` as one about to be registered; (2) that `!!id` must
-be a well-formed canonical-identity candidate — via the new `SchemaRegistry.validateIdentity(String)`
-(a thin, one-line public wrapper around `CanonicalIdentity.of`, added the same day specifically so a
-caller outside `tson-schema` never has to reach into the internal-by-convention `registry` package
-directly just to run this one check); (3) `document.meta()` must already be registered (via the
-registry's own wrapped `SchemaRegistry`) — its resolved `entries()` become the structure namespace,
-exactly the map a caller would have derived and passed by hand; (4) a compiled reader for it must
-*also* exist there (`compiledMetaSchema`) — not consumed for anything yet, but validated now so a
-misconfigured resolver fails immediately, naming the actual missing target, rather than producing a
-confusing "unresolved reference" deep inside some unrelated declaration later. (1)/(3)/(4) throw
-`IllegalStateException`; (2) throws `SchemaValidationException` (the same exception `SchemaRegistry
-.register` itself would eventually throw for the same reason, surfaced earlier). With no registry
-(the no-arg constructor), behavior is byte-for-byte unchanged — confirmed via `PositionalFormTest`/
-`SchemaResolverTest`'s own existing `resolveAll` usages (one of which resolves a document with no
-`!!id` at all), both of which use the no-arg constructor and needed no changes at all.
-**`!!import` is now genuinely merged into the type-name namespace, not just validated** (added
-2026-07-25, same session, in two steps -- URI validation first, then real merging once the question
-"does `SchemaResolver` need imports, or only `SchemaValidator`?" got a confirmed answer: yes, both,
-for different reasons). Unlike the structure namespace (`!!meta`, consulted only for constructor-
-application targets), an import's own entries feed the *type-name* namespace — the same `resolved`
-map `resolveComposition`/`resolveRefinement`/`resolveAtomRefinement` look a supertype/refinement-
-source straight up in, with no fallback at all (confirmed by reading those methods directly: each
-does exactly one `resolved.get(name)`). So imports are genuinely required *during resolution
-itself*, not only at `SchemaValidator`'s later, separate registration-time merge/collision-check
-pass — meta.tn1's own `date_type => ~atom & atom_specification & {...}`, composing with two
-meta-kernel entries it only has via its own `!!import`, would fail to resolve at all without them.
+- **`DefaultSchemaCoordinator.resolve(uri)`** — three cases, in order: (1) already compiled?
+  `registry.get(uri)` — a plain cache hit. (2) meta-kernel's own well-known identity
+  (`DefaultSchemaCoordinator.META_KERNEL_ID`)? Resolved via `MetaKernelParser.parse()` directly —
+  *never* through this same coordinator's own generic path in case (3), which would recurse forever
+  (that path builds a `SchemaResolver(this)` and resolves a document via `resolveAll`, which itself
+  calls back into `resolve` for *that* document's own `!!meta` target — fine for any real schema,
+  wrong for meta-kernel specifically, whose `!!meta` points at itself). Checked *before* case (3) is
+  ever reached, so the loop never starts. Compared by exact string, not canonical identity
+  (`CanonicalIdentity` stays internal-by-convention to `tson-schema`, same reasoning as
+  `TsonCompiledRegistry`'s own raw-id keying) — a real, narrower guarantee, not an oversight. (3)
+  otherwise, fetch `uri`'s own source text via this coordinator's own `SchemaSource`, parse it,
+  resolve it via a fresh `SchemaResolver(this)` (so *that* document's own `!!meta`/`!!import` targets
+  resolve the same way, recursively, cache-then-bootstrap-then-fetch all the way down), then register
+  and compile the result — *this* result genuinely is cached (`TsonCompiledRegistry.register`), so the
+  *next* request for the same non-bootstrap `uri` is a cache hit.
+  **Case (2) is deliberately the one exception — never cached, on the user's own explicit direction**
+  (added 2026-07-25, after the user asked "is it possible to return a one-off bootstrap compiled meta
+  kernel so that we validate and register the one we loaded from disk?" and, offered the choice
+  between never caching the bootstrap vs. caching it under a different key, chose "never cache the
+  bootstrap result"): `MetaKernelParser.parse()`'s output is compiled directly
+  (`TsonSchemaParser.compile(metaKernel, registry.factories())`) but never passed to
+  `TsonCompiledRegistry.register` — so every call for `META_KERNEL_ID` that isn't already a cache hit
+  re-bootstraps and re-compiles from scratch, every time. The *permanent*, shared registry entry for
+  meta-kernel is meant to come from a separate, deliberate "load it and register it" step, done once,
+  elsewhere — not implicitly, silently, the first time anything happens to ask for meta-kernel's own
+  `!!meta`/`!!import` target.
+  **Two real, load-bearing consequences, found by the test suite, not anticipated up front.** Skipping
+  `TsonCompiledRegistry.register` also skips everything `SchemaRegistry.register` does on the way in
+  (`SchemaValidator`'s own materialization/validation pass), so: (a) this one-off reader has no
+  synthesized entries for any argument-bearing `type_ref` (e.g. `enum`'s own `members: set<token>`) —
+  49 raw entries, not the 58 a genuinely registered meta-kernel has; and (b) any *other* schema that
+  `!!import`s meta-kernel (every real one does) fails its own registration with `"!!import '...' is not
+  registered"` unless meta-kernel has been registered *separately* first — `SchemaValidator`'s own
+  import-merging (run inside `SchemaRegistry.register`, distinct from `SchemaResolver`'s own
+  resolution-time merge above) resolves an import via `SchemaRegistry`'s own registered-only
+  `SchemaLoader`, which knows nothing about this coordinator or its bootstrap case. In practice, a
+  caller resolving anything beyond meta-kernel itself must register meta-kernel explicitly first
+  (`registry.register(MetaKernelParser.parse())`) before asking this coordinator for anything that
+  transitively imports it.
+- **`SchemaSource`** — the pluggable fetch hook, and the natural home for the policy the user asked
+  for explicitly: "we can control whitelists or blacklists for resolution... we don't allow HTTP
+  requests and just load from disk, or only HTTP requests to certain hosts." `SchemaSource
+  .registeredOnly()` is the default (mirrors `SchemaRegistry`'s own no-arg-constructor default and
+  `SchemaLoader`'s own precedent) — nothing is ever fetched from anywhere unless a caller opts in. A
+  real disk/HTTP-backed `SchemaSource` (with whatever whitelist/blacklist policy) is deliberately not
+  built yet — the shape exists, the concrete implementation is separate, later work.
+- **`SchemaResolver(SchemaCoordinator)`** replaces the earlier `SchemaResolver(TsonCompiledRegistry)`
+  constructor. `compiledMetaSchema(SchemaDocument)` now returns a plain `TsonSchemaParser` (not
+  `Optional<TsonSchemaParser>`) and *throws* if it can't be resolved — with a real coordinator behind
+  it, "not available" is a genuine, nameable failure (the coordinator is supposed to make it
+  available, fetching/bootstrapping as needed), not a normal "maybe try again" outcome the way a bare
+  registry miss used to be.
 
-`resolveAll(SchemaDocument)` now does exactly what `MetaTn1Parser` already did by hand for
-meta-kernel specifically, generalized to any registry-aware resolver and any number of imports:
-each import's own URI is validated (`SchemaRegistry.validateIdentity`, same check as `!!id`), then
-looked up in this resolver's own `TsonCompiledRegistry` and its entries merged into a working
-namespace *before* any local declaration is resolved (`mergeImports`, a new private helper).
-Collision handling mirrors `SchemaValidator.mergeImports`'s own established rule exactly, not a new
-one: a name declared by more than one import throws `SchemaValidationException` ("declared by more
-than one !!import") as each import is merged in; a local declaration whose name collides with an
-already-merged import throws the same exception ("collides with an entry of the same name brought
-in by !!import") as it's about to be resolved — both checked at the earliest point the collision
-becomes knowable, before further resolution work is spent. **Merged entries keep their home
-namespace** (same principle as `SchemaValidator`'s own note on this) — copied in exactly as their
-own schema resolved them, never re-resolved against the importer. **The result's own `entries()` is
-local-only**, same as `MetaTn1Parser`'s own convention — imported entries are visible *during*
-resolution but never appear in what this method itself returns; the merged whole is what
-`SchemaRegistry.register` produces later, same as always.
+**`resolveAll(SchemaDocument)` validates `!!id`/`!!meta`/`!!import` and derives `structureNamespace`
+from the coordinator, when this resolver has one** (added 2026-07-25, in stages the same day —
+registry-only, then id/meta validation, then import validation, then real import merging, then the
+coordinator rework above) — previously this method always resolved against an empty structure
+namespace, regardless of what `!!meta` said, and never looked at `!!id` at all; a caller
+(`CoreTn1Parser`) had to derive and pass the right map by hand via the two-argument overload instead.
+Now, with a `SchemaCoordinator`, up front, before any declaration is resolved: (1) `document.id()`
+must be present — required by policy for a publishable schema (§2.2.1); (2) that `!!id` must be a
+well-formed canonical-identity candidate, via `SchemaRegistry.validateIdentity(String)` (a thin,
+one-line public wrapper around `CanonicalIdentity.of`, so a caller outside `tson-schema` never has to
+reach into the internal-by-convention `registry` package directly just to run this one check); (3)
+every `!!import` URI is validated the same way; (4) `document.meta()` is resolved via
+`compiledMetaSchema` — fetched/bootstrapped/compiled by the coordinator if it wasn't already
+available — and its entries become the structure namespace. (1) throws `IllegalStateException`; (2)/
+(3) throw `SchemaValidationException` (the same exception `SchemaRegistry.register` itself would
+eventually throw for the same reason, surfaced earlier); (4) throws whatever the coordinator itself
+throws. With no coordinator (the no-arg constructor), behavior is byte-for-byte unchanged — confirmed
+via `PositionalFormTest`/`SchemaResolverTest`'s own existing `resolveAll` usages, neither of which
+needed any changes.
 
-Verified in `SchemaResolverCompiledMetaSchemaTest` against small hand-built documents — a
-composition (`my_type => unit & {}`, meta-kernel imported) proves entries are genuinely reachable
-via the type-name namespace, not merely URI-validated (a bare reference wouldn't have proven this:
-§8.3 bare references carry an unverified name through regardless of whether it exists anywhere,
-composition's `resolved.get(name)` lookup is what actually needs the merge to have happened); plus
-both collision modes (a local declaration redeclaring an already-imported name; the same name
-declared by two separate imports) and the original `!!meta`-derivation/id-validation cases from
-earlier the same day. `SchemaRegistryTest` covers `validateIdentity` directly too (accepts a
-well-formed candidate silently; rejects no-scheme and carries-a-port cases).
+**`!!import` is genuinely merged into the type-name namespace, not just validated** — unlike the
+structure namespace (`!!meta`, consulted only for constructor-application targets), an import's own
+entries feed the *type-name* namespace — the same `resolved` map `resolveComposition`/
+`resolveRefinement`/`resolveAtomRefinement` look a supertype/refinement-source straight up in, with
+no fallback at all (confirmed by reading those methods directly: each does exactly one
+`resolved.get(name)`). So imports are genuinely required *during resolution itself*, not only at
+`SchemaValidator`'s later, separate registration-time merge/collision-check pass — meta.tn1's own
+`date_type => ~atom & atom_specification & {...}`, composing with two meta-kernel entries it only has
+via its own `!!import`, would fail to resolve at all without them. `resolveAll` now does exactly what
+`MetaTn1Parser` already did by hand for meta-kernel specifically, generalized to any coordinator-aware
+resolver and any number of imports: each import is resolved via the same `SchemaCoordinator` and its
+entries merged into a working namespace *before* any local declaration is resolved (`mergeImports`, a
+private helper). Collision handling mirrors `SchemaValidator.mergeImports`'s own established rule
+exactly: a name declared by more than one import, or by an import *and* a local declaration, throws
+`SchemaValidationException` with the same wording, checked at the earliest point the collision becomes
+knowable. **Merged entries keep their home namespace** (same principle as `SchemaValidator`'s own
+note on this) — copied in exactly as their own schema resolved them, never re-resolved against the
+importer. **The result's own `entries()` is local-only**, same as `MetaTn1Parser`'s own convention —
+imported entries are visible *during* resolution but never appear in what this method itself returns;
+the merged whole is what `SchemaRegistry.register` produces later, same as always.
+
+Verified in `SchemaResolverCompiledMetaSchemaTest` — small hand-built documents cover: a composition
+(`my_type => unit & {}`, meta-kernel imported) proving entries are genuinely reachable via the
+type-name namespace, not merely URI-validated (a bare reference wouldn't have proven this: §8.3 bare
+references carry an unverified name through regardless of whether it exists anywhere, composition's
+`resolved.get(name)` lookup is what actually needs the merge to have happened); both collision modes;
+id/import validation failures; and `!!meta` resolution failures. `DefaultSchemaCoordinator`'s own
+bootstrap behavior gets its own dedicated cases: resolving meta-kernel's own well-known identity from
+a completely empty registry completes (rather than recursing forever) and produces a genuinely usable
+49-entry compiled reader (the raw, unmaterialized count — see the "never cached" note above for why
+this isn't 58); a second request for the same identity returns a genuinely *different*, freshly
+re-bootstrapped instance, confirmed never registered into either `TsonCompiledRegistry` or its own
+`SchemaRegistry`; a non-bootstrap URI with the default `SchemaSource` throws clearly; and a custom
+`SchemaSource` handing back meta.tn1's own real bundled source text — after meta-kernel is registered
+*explicitly* first, per the same note — resolves it end to end through the fully generic path (fetch →
+parse → resolve → register → compile). `SchemaRegistryTest` covers `validateIdentity` directly too
+(accepts a well-formed candidate silently; rejects no-scheme and carries-a-port cases).
 
 **A real, named layering exception, not an oversight.** Every other note about these two packages
 describes `resolver.schema.compiled` sitting *on top of* `resolver.schema`'s own resolution
 (`TsonSchemaParser`'s own Javadoc: "sitting on top of `SchemaResolver`'s own per-declaration
-resolution"). `SchemaResolver` now importing `TsonCompiledRegistry`/`TsonSchemaParser` reaches the
-opposite direction — a lower layer reaching up into a higher one. Not a cycle (nothing in `resolver.
-schema.compiled`'s own *main* code imports back from `resolver.schema` — confirmed by grep, not
-assumed), and both packages are in the same module regardless (no Gradle/JPMS boundary to violate),
-but a deliberate exception to the general framing, made because `bindAtomInstance`'s own eventual
-replacement is exactly the one place lower-layer resolution genuinely needs the higher layer's own
-*compiled* output, not just its resolved one — see `SchemaResolver.compiledMetaSchema`'s own Javadoc
-for the same note in place.
+resolution"). `SchemaCoordinator`/`DefaultSchemaCoordinator` (in `resolver.schema`, alongside
+`SchemaResolver`) reach the opposite direction, importing `TsonCompiledRegistry`/`TsonSchemaParser`/
+`ParserFactoryRegistry` from `resolver.schema.compiled` — the one place in `resolver.schema` that
+does. Not a cycle (nothing in `resolver.schema.compiled`'s own *main* code imports back from
+`resolver.schema` — confirmed by grep, not assumed), and both packages are in the same module
+regardless (no Gradle/JPMS boundary to violate), but a deliberate exception to the general framing,
+made because bootstrapping/fetching/compiling a governing schema is exactly the one place lower-layer
+resolution genuinely needs the higher layer's own compiled output, not just its resolved one.
+`TsonSchemaParser` itself gained a `schema()` accessor for this (its own resolved `TsonSchema`,
+previously private) — mirroring `TsonDataParser.schema()`'s own existing precedent.
 
 ### Conformance suite integration (`ConformanceSuiteTest`)
 

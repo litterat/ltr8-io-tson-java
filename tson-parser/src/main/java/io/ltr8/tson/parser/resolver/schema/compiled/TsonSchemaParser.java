@@ -88,6 +88,11 @@ public final class TsonSchemaParser {
         return compiler.resolve(typeName);
     }
 
+    /** The resolved {@link TsonSchema} this compiles from -- e.g. so a caller that only has a compiled reader (such as {@code SchemaCoordinator}) can still reach its own resolved {@code entries()} without a separate lookup. */
+    public TsonSchema schema() {
+        return schema;
+    }
+
     /** Wraps {@code schema}/{@code registry} for on-demand compilation -- see this class's own "Lazy, not eager" note. */
     public static TsonSchemaParser compile(TsonSchema schema, ParserFactoryRegistry registry) {
         return new TsonSchemaParser(schema, registry);
