@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-class UnitParserTest {
+class TokenParserTest {
 
     private static TokenValue token(String text) {
         return new TokenValue(text, TokenForm.UNQUOTED);
@@ -14,13 +14,13 @@ class UnitParserTest {
 
     @Test
     void readAcceptsAnyTokenUnconstrained() {
-        assertEquals("anything", UnitParser.INSTANCE.read(token("anything")));
-        assertEquals("42", UnitParser.INSTANCE.read(token("42")));
-        assertEquals("", UnitParser.INSTANCE.read(token("")));
+        assertEquals("anything", TokenParser.INSTANCE.read(token("anything")));
+        assertEquals("42", TokenParser.INSTANCE.read(token("42")));
+        assertEquals("", TokenParser.INSTANCE.read(token("")));
     }
 
     @Test
     void writeReturnsTheTextUnchanged() {
-        assertEquals("anything", UnitParser.INSTANCE.write("anything"));
+        assertEquals("anything", TokenParser.INSTANCE.write("anything"));
     }
 }

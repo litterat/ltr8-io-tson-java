@@ -305,6 +305,29 @@ true } } }` produces a real `IntegerType`) — see "Schema resolution" below. Wh
 internal reshaping of the existing Class 1 vocabulary, done in preparation for future use" is now
 that future use.
 
+**`unit`'s three real instances (`value`/`token`/`void`) are three separate parsers, not one shared
+one** (split 2026-07-25, on the user's own observation; see `SPEC-FEEDBACK.md` #18 for the
+underlying spec gap). `unit => ~atom & {}` has zero constraint fields, so every instance of it
+resolves to the byte-for-byte identical `Unit` body — nothing in the *resolved schema* distinguishes
+`value`/`token`/`void`; meta-kernel's own doc comment on `unit` says outright they're "distinguished
+by name and prose-level parsing contract, not by schema shape." The pre-split single `UnitParser`
+(renamed `TokenParser`, unchanged behavior: raw NFC-normalised token text, unconstrained — this is
+`token`'s own real contract) was silently wrong for the other two: it accepted *any* token for
+`void` (should accept only the absent sentinel `_`) and, worse, would have *rejected* `_` outright
+had it ever reached one (`AtomTypeParser`'s own adapter requires a `TokenValue` before ever calling
+an `AtomType`, and `_` — `AbsentValue` — isn't one; this bug was latent, never actually exercised,
+since nothing called compiled-parser reading against `void` before this session). Now: `ValueParser`
+(`resolver.vocab`) actually runs `BaseTypeResolver` and narrows to the natural host type (`null`/
+`Boolean`/`BigInteger`/`BigDecimal`/`Double` for `.nan`/`.inf`/`String`) — `value`'s own doc: "the
+result of base type resolution... applied to a source token." `VoidParser`
+(`resolver.schema.compiled`, not `resolver.vocab` — its contract doesn't fit `AtomType.
+read(TokenValue)` at all, since it needs to see the `DataValue`'s own `core-value` shape, not a
+token) accepts only `AbsentValue` and reads to Java `null`. Dispatch is keyed on the *declaration's
+own name* (`AtomTypeParser.UNIT`'s factory switches on its `name` parameter, not on
+`definition.body()` the way every other constant in that class does) — an unrecognized `unit`-
+constructed name falls back to `TokenParser`'s behavior (the previous, pre-split default for
+everything) rather than failing.
+
 ### Mapper (`tson-parser/src/main/java/io/ltr8/tson/parser/mapper/`)
 
 Binds a parsed `DataValue` tree to a Java object given its `DataClass` descriptor from `tson-bind`,

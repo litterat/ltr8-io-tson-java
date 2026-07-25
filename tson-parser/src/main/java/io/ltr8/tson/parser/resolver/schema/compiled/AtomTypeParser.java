@@ -16,9 +16,10 @@ import io.ltr8.tson.parser.resolver.vocab.RationalParser;
 import io.ltr8.tson.parser.resolver.vocab.RegexParser;
 import io.ltr8.tson.parser.resolver.vocab.TextParser;
 import io.ltr8.tson.parser.resolver.vocab.TimeParser;
-import io.ltr8.tson.parser.resolver.vocab.UnitParser;
+import io.ltr8.tson.parser.resolver.vocab.TokenParser;
 import io.ltr8.tson.parser.resolver.vocab.UriParser;
 import io.ltr8.tson.parser.resolver.vocab.UuidParser;
+import io.ltr8.tson.parser.resolver.vocab.ValueParser;
 import io.ltr8.tson.schema.meta.BinaryType;
 import io.ltr8.tson.schema.meta.DateTimeType;
 import io.ltr8.tson.schema.meta.DateType;
@@ -90,8 +91,24 @@ final class AtomTypeParser<T> implements TsonTypeParser<T> {
             new AtomTypeParser<>(new RegexParser((RegexType) definition.body()));
     static final TsonParserFactory ENUM = (name, definition, ctx) ->
             new AtomTypeParser<>(new EnumParser((EnumBody) definition.body()));
-    /** {@link UnitParser} is a singleton (no constraints to cast/hold) -- backs {@code value}/{@code token}/{@code void}. */
-    static final TsonParserFactory UNIT = (name, definition, ctx) -> new AtomTypeParser<>(UnitParser.INSTANCE);
+    /**
+     * {@code unit}'s three real instances -- {@code value}/{@code token}/{@code void} -- all
+     * resolve to the identical empty body (no constraint fields to distinguish them by), so, per
+     * the kernel's own doc ("distinguished by name and prose-level parsing contract, not by schema
+     * shape"), dispatch here is keyed on the *declaration's own name* (this factory's {@code name}
+     * parameter), not on {@code definition.body()} the way every other constant in this class is.
+     * {@code void} doesn't even fit {@link AtomType}'s {@code read(TokenValue)} shape (its contract
+     * is "accept only the absent sentinel `_`", which isn't a token at all) so it bypasses {@link
+     * AtomTypeParser} entirely, unlike {@code value}/{@code token}. An unrecognized {@code unit}-
+     * constructed name (a schema author's own new instance of the constructor, with its own prose
+     * contract this codebase doesn't know) falls back to {@link TokenParser}'s raw-text behavior --
+     * the same default this whole family had before the split -- rather than failing outright.
+     */
+    static final TsonParserFactory UNIT = (name, definition, ctx) -> switch (name) {
+        case "void" -> VoidParser.INSTANCE;
+        case "value" -> new AtomTypeParser<>(ValueParser.INSTANCE);
+        default -> new AtomTypeParser<>(TokenParser.INSTANCE);
+    };
 
     private final AtomType<T> delegate;
 

@@ -627,3 +627,61 @@ field values -- a field named in `values` overrides `I`'s own value for it; ever
 bound that `values` does not mention keeps `I`'s own value." Add a chained worked example (something
 like the `int8`/`bigNumber` case above) alongside the existing two, since neither current example
 exercises chaining at all and the ambiguity only surfaces there.
+
+---
+
+## 18. `unit`'s three real instances (`value`/`token`/`void`) are "distinguished by name and prose-level parsing contract, not by schema shape" -- an implementation has no mechanical way to discover the right data-parsing contract from the resolved schema alone
+
+**Section:** §4.2/§8.1 (the `unit` atom constructor), meta-kernel.tn1's own doc comments on `unit`/
+`value`/`token`/`void` (non-normative, but the only place the actual per-instance contracts are
+written down at all).
+
+**Problem:** `unit => ~atom & {}` declares an atom constructor with zero constraint fields. Every
+instance of it -- `value`, `token`, `void` (meta-kernel's own three; core.tn1 adds a fourth, its own
+`void` sibling under the same name) -- resolves to the byte-for-byte identical empty body (`Unit`).
+Nothing in the *resolved* `type_definition` distinguishes them. Yet the three have genuinely
+different, incompatible parsing contracts, stated only in prose:
+
+- `value`: "the result of base type resolution ([TSON-DATA] §4) applied to a source token... value-
+  typed fields receive whatever [TSON-DATA] §4 produces -- null, boolean, integer, float, or
+  string."
+- `token`: "the canonical NFC-normalised form of a source lexeme," taken verbatim, no further
+  interpretation.
+- `void`: "parsing contract admits only the absent sentinel `_`. The host value is absent."
+
+meta-kernel's own doc comment for `unit` states this plainly: its instances "are opaque atoms
+distinguished by name and prose-level parsing contract, not by schema shape." That is an explicit
+admission that resolving `unit`'s constructor tells an implementation nothing actionable -- the only
+way to implement `value`/`token`/`void` correctly is to special-case each by its declared *name*,
+which works for the four names this spec itself defines but gives no guidance for a schema author
+who instantiates `unit` under a new name expecting to document their own prose contract the same
+way (there is no mechanism by which such prose could be machine-readable, unlike, say, a constraint
+field on a proper atom family).
+
+A concrete implementation bug this caused: this codebase originally had a single shared parser for
+all three, which (a) accepted any token whatsoever for `void` (wrong -- should reject everything but
+`_`) and (b) rejected `_` outright for `void` (backwards -- `AtomType.read(TokenValue)`'s contract
+only ever sees a token, and the absent sentinel `_` is a distinct `core-value` variant, not a token
+at all, so `void`'s real contract doesn't even fit the shape every other atom-family parser uses).
+
+**Interpretation chosen:** Name-keyed, hand-picked parsers, matching this codebase's existing
+precedent for other cases generic/schema-shape-driven binding can't handle (`enum`'s own `boolean`
+member-collision gap, `uri_type`/`regex_type`'s schema-composed RFC defaults). `token` keeps the
+original behavior (raw NFC-normalised text, unconstrained). `value` now actually runs
+`BaseTypeResolver` and narrows to the natural host type. `void` is implemented outside the ordinary
+atom-parser shape entirely -- it inspects the `data-value`'s own `core-value` directly and accepts
+only the absent-sentinel variant, returning a host `null`. Dispatch is keyed on the *declaration's
+own name*, not on anything in the resolved schema; an unrecognized `unit`-constructed name falls
+back to `token`'s behavior (the previous, pre-split default) rather than failing, since the spec
+gives no way to know what such a hypothetical fourth instance should actually do.
+
+**Suggested resolution:** Either (a) give `unit`'s three-instance parsing-contract distinction a
+machine-readable home -- e.g. a documentation-only annotation whose value is defined to carry
+semantic weight for `unit` specifically (unusual, since annotations are elsewhere purely
+informative), or (b) split `unit` into three separate, purpose-built constructors (`value_type`/
+`token_type`/`void_type`, one 0-field atom family each) so each instance's contract is at least
+nameable in the grammar even if still prose-defined, rather than three unrelated contracts sharing
+one constructor purely by convention. Either way, state explicitly (the way §5.6's atom-refinement
+section states its own worked examples) that an implementation MUST dispatch these three by name,
+not by attempting to derive behavior from the (identical, uninformative) resolved shape -- the
+current text mentions this only in a meta-kernel source comment, not in the spec prose itself.
