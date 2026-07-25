@@ -56,14 +56,14 @@ class ParserFactoryRegistryTest {
 
         ParserFactoryRegistry available = ParserFactoryRegistry.builder()
                 .register("record", RecordParser.FACTORY)
-                .register("enum", EnumTypeParserFactory.FACTORY)
-                .register("integer_type", IntegerTypeParserFactory.FACTORY)
+                .register("enum", AtomTypeParser.ENUM)
+                .register("integer_type", AtomTypeParser.INTEGER_TYPE)
                 .build();
 
         ParserFactoryRegistry scoped = ParserFactoryRegistry.forMetaSchema(metaSchema, available);
 
         assertSame(RecordParser.FACTORY, scoped.require("record"));
-        assertSame(EnumTypeParserFactory.FACTORY, scoped.require("enum"));
+        assertSame(AtomTypeParser.ENUM, scoped.require("enum"));
         // "integer_type" is available but never declared as a constructor by this meta-schema.
         assertThrows(IllegalStateException.class, () -> scoped.require("integer_type"));
     }

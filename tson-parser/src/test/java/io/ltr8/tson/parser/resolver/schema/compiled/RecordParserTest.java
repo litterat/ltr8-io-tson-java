@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * End-to-end proof of the compiled-schema-parser sketch against the real {@link RecordParser} and
- * {@link IntegerTypeParserFactory} -- a real (hand-built, but shaped exactly like a materialized
+ * {@link AtomTypeParser#INTEGER_TYPE} -- a real (hand-built, but shaped exactly like a materialized
  * {@link TsonSchema} would be) schema compiled with a real registry, read against real TSON data
  * source text through the real {@link Parser}. Supersedes the minimal map-producing stand-in this
  * class used before {@link RecordParser} existed -- same two original cases kept (now against the
@@ -50,7 +50,7 @@ class RecordParserTest {
 
     private static ParserFactoryRegistry registry() {
         return ParserFactoryRegistry.builder()
-                .register("integer_type", IntegerTypeParserFactory.FACTORY)
+                .register("integer_type", AtomTypeParser.INTEGER_TYPE)
                 .register("record", RecordParser.FACTORY)
                 .build();
     }

@@ -46,7 +46,7 @@ class EnumTypeParserFactoryTest {
         TsonSchema registered = new SchemaRegistry().register(schema);
         ParserFactoryRegistry registry = ParserFactoryRegistry.builder()
                 .register("record", RecordParser.FACTORY)
-                .register("enum", EnumTypeParserFactory.FACTORY)
+                .register("enum", AtomTypeParser.ENUM)
                 .build();
         return TsonSchemaParser.compile(registered, registry);
     }

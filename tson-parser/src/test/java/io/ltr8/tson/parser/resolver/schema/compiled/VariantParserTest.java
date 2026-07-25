@@ -48,7 +48,7 @@ class VariantParserTest {
 
     private static ParserFactoryRegistry registry() {
         return ParserFactoryRegistry.builder()
-                .register("integer_type", IntegerTypeParserFactory.FACTORY)
+                .register("integer_type", AtomTypeParser.INTEGER_TYPE)
                 .register("record", RecordParser.FACTORY)
                 .build();
     }

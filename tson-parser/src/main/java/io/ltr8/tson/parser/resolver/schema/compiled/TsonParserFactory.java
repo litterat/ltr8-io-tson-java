@@ -15,13 +15,18 @@ import io.ltr8.tson.schema.meta.TypeDefinition;
  * rather than a fixed, closed Java interface.
  *
  * <p>Convention (not enforced by the compiler, just followed consistently so far): each
- * constructor's own compiled-parser class holds its own {@code FACTORY} as a {@code static final
- * TsonParserFactory} constant -- {@link RecordParser#FACTORY}, {@code IntegerTypeParserFactory
- * .FACTORY}, {@code EnumTypeParserFactory.FACTORY} all already follow this. Package-private, not
- * public -- nothing outside this package needs to reach a specific factory directly; callers
- * assemble a {@link ParserFactoryRegistry} instead. Keeps "how to build a parser for this shape"
- * physically next to the parser class it builds, rather than in one large central registration
- * method that has to know about every shape at once.
+ * *composite* constructor's own compiled-parser class holds its own {@code FACTORY} as a {@code
+ * static final TsonParserFactory} constant -- {@link RecordParser#FACTORY}, {@link
+ * ArrayParser#FACTORY}. Package-private, not public -- nothing outside this package needs to reach
+ * a specific factory directly; callers assemble a {@link ParserFactoryRegistry} instead. Keeps "how
+ * to build a parser for this shape" physically next to the parser class it builds, rather than in
+ * one large central registration method that has to know about every shape at once.
+ *
+ * <p>Every *atom-family* factory instead lives as one of these same {@code static final}
+ * constants directly on {@link AtomTypeParser} (e.g. {@link AtomTypeParser#INTEGER_TYPE}) -- see
+ * its own Javadoc for why one file per atom-constraint constructor turned out to be pure
+ * boilerplate once there were more than a couple of them, unlike a composite, where each one's own
+ * traversal/validation logic is substantial enough to earn its own file.
  *
  * <p>Takes the whole {@link TypeDefinition}, not just its {@code body()} -- a factory casts {@code
  * definition.body()} to whichever concrete {@code Top} leaf it knows how to handle (that's exactly
