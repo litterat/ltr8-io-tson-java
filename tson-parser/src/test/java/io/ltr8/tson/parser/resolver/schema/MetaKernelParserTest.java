@@ -1,5 +1,10 @@
 package io.ltr8.tson.parser.resolver.schema;
 
+import io.ltr8.tson.parser.ast.DataValue;
+import io.ltr8.tson.parser.ast.EmptyBrace;
+import io.ltr8.tson.parser.ast.TokenForm;
+import io.ltr8.tson.parser.ast.TokenValue;
+import io.ltr8.tson.parser.ast.schema.Instance;
 import io.ltr8.tson.schema.MetaSchema;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.IntegerType;
@@ -12,9 +17,11 @@ import io.ltr8.tson.schema.meta.UriType;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -115,5 +122,26 @@ class MetaKernelParserTest {
         MetaSchema schema = MetaKernelParser.parse();
 
         assertEquals(49, schema.entries().size());
+    }
+
+    // ── instanceBody's own defensive branches -- neither reachable through the real fixture ──
+
+    private static Instance emptyInstance(String target) {
+        return new Instance(new DataValue(List.of(), Optional.of(target), new EmptyBrace()));
+    }
+
+    @Test
+    void unrecognizedInstanceTargetCompilesToEmpty() {
+        assertEquals(Optional.empty(), MetaKernelParser.instanceBody(emptyInstance("something_else")));
+    }
+
+    @Test
+    void aNonEmptyBodyForAnEmptyBodiedTargetThrows() {
+        Instance nonEmpty = new Instance(new DataValue(List.of(), Optional.of("unit"),
+                new TokenValue("oops", TokenForm.UNQUOTED)));
+
+        IllegalStateException thrown = assertThrows(IllegalStateException.class,
+                () -> MetaKernelParser.instanceBody(nonEmpty));
+        assertTrue(thrown.getMessage().contains("unit"));
     }
 }

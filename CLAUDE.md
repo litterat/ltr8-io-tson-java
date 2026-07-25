@@ -834,50 +834,60 @@ in two passes over meta-kernel's 49 declarations:
    `SchemaResolver` itself -- `SchemaResolver.resolveAll` alone is single-pass, strict source order,
    and still can't handle a forward reference like `boolean` preceding `enum`.
 
-**Constructor-application binding now goes entirely through `BootstrapMetaKernelCompiler`, not
-`SchemaResolver`/`TsonMapperReader` at all** (widened 2026-07-25 -- an earlier version, "Phase B
-step 6," routed `unit`/`integer_type`/`text_type` through `SchemaResolver.resolve`'s ordinary
-`Instance` path and hand-picked only `uri_type`/`regex_type`/`enum`; that split turned out to be an
-unnecessary halfway point). The full case against letting *any* meta-kernel `Instance` reach generic
-binding: `SchemaResolver.resolveInstance`'s own path binds via `TsonMapperReader`, which is
+**Constructor-application binding goes entirely through `MetaKernelParser.instanceBody`, a private
+(package-private for its own defensive-path tests) closed switch -- not `SchemaResolver`/
+`TsonMapperReader`, and not any schema-driven compiled reader either.** Widened 2026-07-25 from an
+earlier version ("Phase B step 6") that routed `unit`/`integer_type`/`text_type` through
+`SchemaResolver.resolve`'s ordinary `Instance` path and hand-picked only `uri_type`/`regex_type`/
+`enum` -- that split turned out to be an unnecessary halfway point. Originally pulled out into its
+own `BootstrapMetaKernelCompiler` class the same day, then merged back into `MetaKernelParser`
+itself a few hours later, on the user's own observation: it had exactly one caller, produced a `Top`
+*value* (a resolution-stage output) rather than a compiled/`TsonSchemaParser`-shaped artifact, and
+"Compiler" in its name collided with what that word now means elsewhere in this codebase
+(`TsonSchemaParser.Compiler`, and "Schema registry" below's planned `CompiledSchemaRegistry`) --
+reserving "Compiler" for a class that actually produces a compiled reader keeps the vocabulary
+unambiguous. The full case against letting *any* meta-kernel `Instance` reach generic binding:
+`SchemaResolver.resolveInstance`'s own path binds via `TsonMapperReader`, which is
 identification-first (a token is classified null/boolean/number/string *before* the target field is
 even consulted) -- exactly why `boolean => !enum [true false]` needs hand-picking at all
 (`"true"`/`"false"` misidentify as real booleans before `EnumBody.members` ever sees them) and why
 `uri_type`/`regex_type`'s own schema-composed RFC-citation default never lands (nested inside
 `specification: AtomSpecification`, past what generic defaulting fills in). Rather than deciding
-case by case which targets are safe for the generic path, `BootstrapMetaKernelCompiler` hand-picks
-all six of meta-kernel's own real constructor targets uniformly -- confirmed directly against the
-real fixture, meta-kernel only ever instantiates them in exactly two shapes: a bare `{}` (`unit`,
-`integer_type`, `text_type`, `uri_type`, `regex_type` -- each target's own `UNCONSTRAINED` constant,
-or a bare `new Unit()` for `unit` itself, is already exactly right) or a bare array of tokens
-(`enum` -- `MetaKernelParser.toEnumBody`, reading `TokenValue.text()` directly, bypassing base-type
-identification entirely). No `TsonSchemaParser`, no `ParserFactoryRegistry`, no materialization, no
-`TsonMapperReader` involved anywhere in meta-kernel's own bootstrap now.
+case by case which targets are safe for the generic path, `instanceBody` hand-picks all six of
+meta-kernel's own real constructor targets uniformly -- confirmed directly against the real fixture,
+meta-kernel only ever instantiates them in exactly two shapes: a bare `{}` (`unit`, `integer_type`,
+`text_type`, `uri_type`, `regex_type` -- each target's own `UNCONSTRAINED` constant, or a bare `new
+Unit()` for `unit` itself, is already exactly right) or a bare array of tokens (`enum` -- this
+class's own `toEnumBody`, package-private since `CoreTn1Parser` also reuses it, reading
+`TokenValue.text()` directly, bypassing base-type identification entirely). No `TsonSchemaParser`,
+no `ParserFactoryRegistry`, no materialization, no `TsonMapperReader` involved anywhere in
+meta-kernel's own bootstrap now.
 
 **Why even a *compiled*-reader-based bootstrap (the eventual replacement for `TsonMapperReader`
 elsewhere, see "Schema resolution" above's `bindAtomInstance` notes) can't safely read meta-kernel
-from its own in-progress state either -- this is why `BootstrapMetaKernelCompiler` doesn't attempt
-one:** `enum => ~atom & { members: set<token> } }`'s own field type is *argument-bearing* (`set` +
-the `token` argument), and the compiled-parser layer's own `RecordParser`/`CompilationContext`
-assume every field type is already a bare, materialized name -- true only after `SchemaValidator`'s
-own materialization pass has run, which meta-kernel (the thing that pass would normally run *over*)
-has never been through while it's still being produced. Solving that would mean either running a
+from its own in-progress state either -- this is why `instanceBody` doesn't attempt one:** `enum =>
+~atom & { members: set<token> } }`'s own field type is *argument-bearing* (`set` + the `token`
+argument), and the compiled-parser layer's own `RecordParser`/`CompilationContext` assume every
+field type is already a bare, materialized name -- true only after `SchemaValidator`'s own
+materialization pass has run, which meta-kernel (the thing that pass would normally run *over*) has
+never been through while it's still being produced. Solving that would mean either running a
 whole-schema materialization pass over a knowingly-incomplete map (checked directly: doesn't work --
 `integer_size => { bits: ... signed: boolean }` is itself a first-pass entry whose `signed` field
 already references `boolean`, unresolved until the *second* pass) or building a scoped,
 validation-free materialization step just for bootstrap's own benefit. Given meta-kernel's own
-instance shapes are this narrow and fully known in advance, that complexity buys nothing --
-`BootstrapMetaKernelCompiler`'s own Javadoc: "the bootstrap compiler can do whatever tricks it needs
-to... that includes not even compiling, just calling `new Xxx(...)`."
+instance shapes are this narrow and fully known in advance, that complexity buys nothing -- this
+class's own guiding principle here: "the bootstrap compiler can do whatever tricks it needs to...
+that includes not even compiling, just calling `new Xxx(...)`."
 
 **Every `Instance` declaration in the real fixture is registered** (`unit`, `integer_type`, `text_type`,
 `uri_type`, `regex_type`, `enum`) -- all 49 declarations resolve; a declaration whose target isn't
 registered would simply be left out of the result entirely rather than failing the whole bootstrap,
 but that path is unexercised against the real fixture today. Verified both end to end
-(`MetaKernelSchemaRegistryTest`/`MetaKernelEndToEndTest`, unchanged counts before/after this
-refactor -- 49/49 resolved, 58 after registration) and in isolation
-(`BootstrapMetaKernelCompilerTest`, one case per real target plus the unrecognized-target and
-wrong-shape-body error paths).
+(`MetaKernelSchemaRegistryTest`/`MetaKernelEndToEndTest`, unchanged counts before/after both the
+original hand-picking widening and the later class merge -- 49/49 resolved, 58 after registration)
+and in isolation (`MetaKernelParserTest`'s own `unrecognizedInstanceTargetCompilesToEmpty`/
+`aNonEmptyBodyForAnEmptyBodiedTargetThrows`, absorbed from the deleted `BootstrapMetaKernelCompiler`
+class's own test the same way the production code was).
 
 **`meta-kernel.tn1` is packaged as a classpath resource, not read from a filesystem path.**
 `MetaKernelParser.parse()` (no args) reads `/meta-kernel.tn1` off the classpath via
@@ -1174,7 +1184,7 @@ No system Gradle — always use the wrapper:
 ./gradlew :tson-schema:test --tests "io.ltr8.tson.schema.SchemaRegistryTest"
 ./gradlew :tson-schema:test --tests "io.ltr8.tson.schema.registry.SchemaValidatorTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.MetaKernelSchemaRegistryTest"
-./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.BootstrapMetaKernelCompilerTest"
+./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.MetaKernelParserTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.MetaSchemaImportTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.CoreTn1ParserTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.compiled.MetaKernelEndToEndTest"
