@@ -1333,6 +1333,102 @@ resolution genuinely needs the higher layer's own compiled output, not just its 
 `TsonSchemaParser` itself gained a `schema()` accessor for this (its own resolved `TsonSchema`,
 previously private) — mirroring `TsonDataParser.schema()`'s own existing precedent.
 
+### Object-binding mode (`resolver/schema/compiled/{RecordParser,ObjectRecordShapeFactory,TypeNameBinder,SchemaMetaTypeNameBinder}.java`)
+
+Added 2026-07-25: a second output mode for the compiled reader, alongside DOM mode's plain
+`Map<String, Object>` — `RecordParser` can now instead produce a real, bound `schema.meta` Java
+object (a real `IntegerType`, not a map of its field names). This is what `bindAtomInstance`
+(`SchemaResolver`) will eventually need to swap onto the compiled reader instead of
+`TsonMapperReader.toObject(normalized, Top.class)` (tasks #10/#11 — not done yet, this is only the
+missing piece that makes it possible).
+
+- **`RecordParser.RecordShape<R>`/`RecordParser.RecordBuilder<R>`/`RecordParser.RecordShapeFactory<R>`**
+  — public interfaces nested inside `RecordParser` itself, not standalone top-level types (nothing
+  outside this package's own object-binding mode implements or consumes them, so keeping them
+  physically inside the one class that defines their contract keeps the package easier to scan). A
+  two-level split, not a single per-read factory: `RecordShapeFactory.shapeFor(typeName, definition,
+  body)` runs *once per compiled type*, inside `RecordParser.factory`'s own `TsonParserFactory`
+  lambda, at the same point child fields are resolved via `ctx.resolve` — this is deliberately where
+  an object-binding mode's own expensive, per-type reflective cost (resolving a `DataClassRecord`
+  descriptor: constructor `MethodHandle` + field metadata) belongs, paid once, not once per read.
+  `RecordShape.begin()` is the cheap half, called fresh per `RecordParser.read()`, returning a
+  `RecordBuilder` that accumulates one record's own field values (`field(name, value)`) and
+  finalizes them (`build()`) — DOM mode's own `DomRecordShapeFactory`/`DomRecordBuilder` (private,
+  also nested in `RecordParser`) is a trivial `LinkedHashMap` wrapper, byte-for-byte the same
+  behavior the class had before this split. `RecordParser` itself is now generic (`RecordParser<R>`)
+  — its field-iteration/
+  absence/defaulting logic (`fieldValuesByName`/`isAbsent`/`defaultOrRequire`/`readSchemaDefault`)
+  is completely unchanged, since none of it ever constructed the result directly; only the last
+  step of `read()` changed, from inline `Map` mutation to `shape.begin()`/`builder.field(...)`/
+  `builder.build()`. `RecordParser.FACTORY` (the DOM-mode constant 10+ test classes reference
+  directly, including by identity) is preserved as `factory(DomRecordShapeFactory.INSTANCE)`.
+- **`TypeNameBinder`/`SchemaMetaTypeNameBinder`** — the schema-type-name → Java-`Class` binding this
+  needed (task #9's own original framing, finally built). **Not** a scan of `Top`'s own sealed
+  union (an earlier version of this file did exactly that, keyed off `@Typename`/`DataClassUnion
+  .memberTypes()`) — corrected on the user's own direct guidance, pointing at a sibling project's
+  own `litterat-core`, `DefaultNameBinder`: there is no reflection API to enumerate "every class in
+  a package," so the only real mechanism is a name → `Class.forName` lookup with a caller-supplied
+  naming convention, the same shape `DefaultNameBinder.resolve(TypeContext, Typename)` already
+  uses. The `Top`-union-scan version was a real, discovered dead end, not just a style
+  preference — it made `integer_type` itself uncompilable in object mode at all (its own `size:
+  integer_size?` field eagerly resolves `integer_size` at compile time regardless of whether any
+  given value populates `size`, and `IntegerSize` was never a `Top` member) — `SchemaMetaTypeNameBinder`
+  has no such restriction, since it resolves by name, not by hierarchy membership.
+  `SchemaMetaTypeNameBinder`'s own convention: fixed namespace `io.ltr8.tson.schema.meta`, a
+  snake_case-to-PascalCase mangle, with one confirmed alias table (`record`/`array`/`map`/`tuple`/
+  `choice`/`enum` → their own `*Body` class, since meta-kernel's own description of a composite
+  constructor's shape is structurally identical to the class representing a *bound instance* of
+  that constructor, but that class's own `@Typename` is the bare name, not `_body`-suffixed;
+  `set`/`array_min`/`array_max`/`array_ranged` → `ArrayBody`, since refinement never adds or
+  removes fields, so their own field set is identical to `array`'s). Verified empirically against
+  the real, fully registered meta-kernel.tn1 fixture (not assumed): 0 genuine binding failures, 23
+  of 58 entries bind as real records, 5 (`atom`/`product`/`sum`/`top`/`type_argument`) resolve to a
+  real but deliberately non-record class (sealed marker interfaces) and are treated as "doesn't
+  apply," not a failure — see below.
+- **`ObjectRecordShapeFactory.validate(TsonSchema)`** — binding happens *eagerly*, walking every
+  `record`-shaped entry in the whole schema and resolving+caching a `DataClassRecord` for each,
+  rather than lazily discovering a missing binding one entry at a time as unrelated reads happen to
+  reach them (per the user's own explicit direction: "That binding should occur at schema load
+  time so any errors can be reported"). A schema with a genuinely unresolvable entry still
+  *registers* fine (`SchemaRegistry`/`SchemaValidator` are unaffected) — it just can't be *compiled*
+  for object-binding mode, and fails with every problem entry named at once. **An entry that
+  resolves to a real, existing class which isn't a record is silently skipped, not a failure** —
+  `atom`/`product`/`sum`/`top` (meta-kernel's own empty-bodied base-kind declarations) and
+  `type_argument` mangle to real `schema.meta` classes that are deliberately sealed marker
+  interfaces (`Top`'s own kind hierarchy; `TypeArgument`'s own mutual-recursion-trap workaround, see
+  its own Javadoc) — these are meta-schema machinery real application data is never actually read
+  as an instance of, so failing the whole schema's compilation over them would be a false
+  positive — confirmed by actually running validation against the real fixture and finding exactly
+  these 5, not by guessing them in advance.
+- **Narrowing** — the schema-driven child-parser recursion (`CompilationContext.resolve`) has no
+  knowledge of a target Java field's own declared width (e.g. `text_type`'s `min_length`/
+  `max_length` are the schema's own unconstrained `integer` atom, natural host type `BigInteger`,
+  but `TextType.minLength` is `Optional<Integer>`) — `ObjectRecordShapeFactory`'s own builder reuses
+  `io.ltr8.tson.parser.resolver.NumberNarrowing`, the same utility `resolver.vocab`'s numeric family
+  and `io.ltr8.tson.parser.mapper`'s untyped-number binding already share for exactly this, rather
+  than a third copy.
+- **`ParserFactoryRegistry.object(TsonSchema, DataBindContext)`** (+ a `TypeNameBinder`-taking
+  overload) is the new sibling to `.dom()` — every other factory (array/map/tuple/choice + every
+  atom-family constant) is shared via a new private `withoutRecord()` (extracted so the ~14-entry
+  list isn't duplicated), only `"record"`'s own factory differs.
+- **`TsonAtomContext`** (new, `io.ltr8.tson.parser.resolver`) — `TsonMapperContext.defaultContext()`'s
+  own built-in-vocabulary atom registrations (`UUID`/`byte[]`/`LocalDate`/`OffsetTime`/
+  `OffsetDateTime`/`URI`/`Inet4Address`/`Inet6Address`), pulled out to a public class at this shared
+  layer once a third consumer (`ObjectRecordShapeFactory`, needing `DataBindContext.getDescriptor`
+  to succeed for e.g. `AtomSpecification.spec: URI`) needed the identical list from a package with
+  no dependency on `mapper`. `TsonMapperContext` now just delegates — same reasoning as
+  `NumberNarrowing`'s own "one place, not one per caller" precedent.
+
+Verified in `ObjectRecordShapeFactoryTest` (new) against the real, registered meta-kernel.tn1
+fixture: `text_type` narrows a real `BigInteger` down to `Integer` with a genuine `equals()` match;
+`integer_type` itself now compiles (previously impossible under the `Top`-union design) and reads
+correctly with `size` left absent in the data (`IntegerSize.signed` still can't bind — a *separate*,
+already-documented, permanent `boolean => !enum [...]` gap, task #12, not a regression here); the
+whole real schema validates with zero problems; and a custom `TypeNameBinder` that always fails
+proves `validate`'s own multi-problem report names more than one offending entry at once, not just
+the first. `RecordParser.FACTORY`'s own identity and DOM-mode output are confirmed byte-for-byte
+unchanged by the whole existing suite (10+ tests reference `RecordParser.FACTORY` directly).
+
 ### Conformance suite integration (`ConformanceSuiteTest`)
 
 Separate from `LexerTest`/`ParserTest` (fine-grained unit tests) is `ConformanceSuiteTest`, which runs

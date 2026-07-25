@@ -10,6 +10,7 @@ import io.ltr8.tson.parser.ast.TokenValue;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Token;
+import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -30,12 +31,14 @@ import java.util.Optional;
  * parser is for -- see this repo's own discussion of {@code boolean => !enum [true false]} for why
  * that distinction matters at all.
  *
- * <p><b>Produces a plain {@code Map<String, Object>}, not a bound Java object</b> -- deliberately.
- * Binding into a caller-declared POJO needs a schema-type-name -> Java-{@code Class} mapping that
- * doesn't exist anywhere yet (a distinct, not-yet-designed piece; see the "object vs. DOM vs.
- * validation mode" discussion this class's own factory registration is part of). This is real
- * record-parsing behavior (state handling, defaulting, absence), not a placeholder for it -- only
- * where the result finally lands is deferred.
+ * <p><b>Generic over its own result type {@code R}, driven by a {@link RecordShapeFactory}</b> --
+ * this class's own field-iteration/absence/defaulting logic (below) has no opinion on what a
+ * record value finally becomes; only {@link RecordShape}/{@link RecordBuilder} (resolved once per
+ * compiled type, see {@link #factory}) decide that. {@link #FACTORY} keeps DOM mode's own,
+ * previously-hardcoded behavior (a plain {@code Map<String, Object>}) as a compatibility constant;
+ * an object-binding mode (a schema-type-name -> Java-{@code Class} table, producing real bound
+ * {@code schema.meta} objects) is a separate {@link RecordShapeFactory} implementation, not a
+ * change to this class at all -- see {@code ObjectRecordShapeFactory}.
  *
  * <p><b>Known gaps, not silently mishandled:</b> a {@code value_param} field modifier (a default
  * routed to one of the declaration's own type parameters, e.g. {@code array}'s {@code
@@ -51,37 +54,106 @@ import java.util.Optional;
  * already-materialized {@link io.ltr8.tson.schema.TsonSchema}, per {@link CompilationContext}'s own
  * Javadoc.
  */
-final class RecordParser implements TsonTypeParser<Map<String, Object>> {
+final class RecordParser<R> implements TsonTypeParser<R> {
 
-    static final TsonParserFactory FACTORY = (name, definition, ctx) -> {
-        RecordBody body = (RecordBody) definition.body();
-        List<CompiledField> fields = new ArrayList<>();
-        for (RecordField field : body.fields()) {
-            fields.add(new CompiledField(field, ctx.resolve(field.type().name())));
-        }
-        return new RecordParser(name, fields);
-    };
+    /**
+     * How {@link RecordParser} turns one record value's own field values into a result -- resolved
+     * once per compiled type (see {@link RecordShapeFactory}), reused across every {@link
+     * RecordParser#read} call for that type. {@link #begin()} is the cheap, per-read half: DOM
+     * mode's own shape has no real per-type state to hold at all (a fresh {@code LinkedHashMap} is
+     * just as cheap to build lazily), but an object-binding mode's shape holds an already-resolved
+     * constructor/field descriptor (reflection paid once, not once per read) and {@link #begin()}
+     * just opens a fresh accumulator against it. Nested here, not a standalone top-level type --
+     * nothing outside this package's own object-binding mode ({@code ObjectRecordShapeFactory})
+     * implements or consumes it.
+     */
+    public interface RecordShape<R> {
+
+        RecordBuilder<R> begin();
+    }
+
+    /**
+     * Accumulates one record value's own field values, in schema field-declaration order (the same
+     * order {@link RecordParser#read} already iterates in), then finalizes them into a result. One
+     * instance per {@link RecordParser#read} call -- see {@link RecordShape#begin()}.
+     */
+    public interface RecordBuilder<R> {
+
+        void field(String name, Object value);
+
+        R build();
+    }
+
+    /**
+     * Resolves a {@link RecordShape} for one compiled {@code record}-shaped entry -- called once,
+     * from inside {@link RecordParser#factory}'s own {@link TsonParserFactory} lambda, at compile
+     * time, not once per read. This is deliberately where any per-type reflective cost (an
+     * object-binding mode's own constructor/field descriptor lookup) belongs: paid once per
+     * compiled type, the same way {@link RecordParser}'s own child-field parsers are already
+     * resolved once via {@link CompilationContext#resolve} rather than per read.
+     *
+     * <p>Takes the whole {@link TypeDefinition}, not just its {@code body()}, mirroring {@link
+     * TsonParserFactory}'s own convention -- a factory that only needs {@code body} still gets the
+     * full definition for free, in case a future implementation wants more (e.g. {@code
+     * definition.source()} for a diagnostic message).
+     */
+    @FunctionalInterface
+    public interface RecordShapeFactory<R> {
+
+        RecordShape<R> shapeFor(String typeName, TypeDefinition definition, RecordBody body);
+    }
+
+    static final TsonParserFactory FACTORY = factory(DomRecordShapeFactory.INSTANCE);
+
+    /**
+     * Builds a {@link TsonParserFactory} for {@code record} that produces {@code R}-typed results
+     * via {@code shapeFactory} -- {@link RecordShapeFactory#shapeFor} runs exactly once here, at
+     * compile time (the same point child fields are resolved via {@code ctx.resolve}), not once
+     * per read; see {@link RecordShape}'s own Javadoc for why that matters.
+     */
+    static TsonParserFactory factory(RecordShapeFactory<?> shapeFactory) {
+        return (name, definition, ctx) -> {
+            RecordBody body = (RecordBody) definition.body();
+            List<CompiledField> fields = new ArrayList<>();
+            for (RecordField field : body.fields()) {
+                fields.add(new CompiledField(field, ctx.resolve(field.type().name())));
+            }
+            return build(name, fields, shapeFactory, definition, body);
+        };
+    }
+
+    // A small generic helper so the wildcard in RecordShapeFactory<?> is captured once, cleanly,
+    // rather than fought with inline in the lambda above.
+    private static <R> RecordParser<R> build(String name, List<CompiledField> fields,
+                                              RecordShapeFactory<R> shapeFactory,
+                                              TypeDefinition definition, RecordBody body) {
+        RecordShape<R> shape = shapeFactory.shapeFor(name, definition, body);
+        return new RecordParser<>(name, fields, shape);
+    }
 
     private record CompiledField(RecordField schema, TsonTypeParser<?> parser) {
     }
 
     private final String name;
     private final List<CompiledField> fields;
+    private final RecordShape<R> shape;
 
-    private RecordParser(String name, List<CompiledField> fields) {
+    private RecordParser(String name, List<CompiledField> fields, RecordShape<R> shape) {
         this.name = name;
         this.fields = fields;
+        this.shape = shape;
     }
 
     @Override
-    public Map<String, Object> read(DataValue value) {
+    public R read(DataValue value) {
         Map<String, DataValue> byName = fieldValuesByName(value);
-        Map<String, Object> result = new LinkedHashMap<>();
+        RecordBuilder<R> builder = shape.begin();
         for (CompiledField field : fields) {
             DataValue fieldValue = byName.get(field.schema().name());
-            result.put(field.schema().name(), isAbsent(fieldValue) ? defaultOrRequire(field) : field.parser().read(fieldValue));
+            builder.field(field.schema().name(),
+                    isAbsent(fieldValue) ? defaultOrRequire(field) : field.parser().read(fieldValue));
         }
-        return result;
+        return builder.build();
     }
 
     private Map<String, DataValue> fieldValuesByName(DataValue value) {
@@ -132,5 +204,36 @@ final class RecordParser implements TsonTypeParser<Map<String, Object>> {
 
     private static TokenValue toTokenValue(Token token) {
         return new TokenValue(token.text(), TokenForm.valueOf(token.form().name()));
+    }
+
+    /**
+     * DOM mode's own {@link RecordShapeFactory} -- a plain {@code LinkedHashMap} wrapper, the exact
+     * same runtime behavior this class's {@code read()} built inline before {@link RecordShape} was
+     * introduced. No real per-type work to cache (unlike an object-binding mode's own constructor
+     * lookup), so {@link #shapeFor} just returns a constant shape.
+     */
+    private static final class DomRecordShapeFactory implements RecordShapeFactory<Map<String, Object>> {
+        static final DomRecordShapeFactory INSTANCE = new DomRecordShapeFactory();
+
+        private static final RecordShape<Map<String, Object>> SHAPE = DomRecordBuilder::new;
+
+        @Override
+        public RecordShape<Map<String, Object>> shapeFor(String typeName, TypeDefinition definition, RecordBody body) {
+            return SHAPE;
+        }
+    }
+
+    private static final class DomRecordBuilder implements RecordBuilder<Map<String, Object>> {
+        private final Map<String, Object> values = new LinkedHashMap<>();
+
+        @Override
+        public void field(String name, Object value) {
+            values.put(name, value);
+        }
+
+        @Override
+        public Map<String, Object> build() {
+            return values;
+        }
     }
 }

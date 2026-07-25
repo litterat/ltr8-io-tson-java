@@ -1,6 +1,7 @@
 package io.ltr8.tson.parser.resolver.schema.compiled;
 
 import io.ltr8.annotation.Typename;
+import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -61,19 +62,14 @@ public final class ParserFactoryRegistry {
     }
 
     /**
-     * Every DOM-mode factory this build of the library actually has -- every composite kind
-     * (`record`/`array`/`map`/`tuple`/`choice`) plus every atom-family constant {@link
-     * AtomTypeParser} declares. Previously hand-duplicated as a private {@code fullRegistry()}
-     * helper in several test classes (`MetaKernelEndToEndTest`, `TsonDataParserTest`, ...) and,
-     * as of {@code TsonCompiledRegistry}, real production code too -- factored out here once a
-     * fourth/fifth copy made the duplication worth closing. Not the *only* legitimate registry a
-     * caller might build (a caller reading only a narrow slice of a schema can still assemble a
-     * smaller one directly via {@link #builder}), just the canonical "everything this build knows
-     * how to construct in DOM mode" one.
+     * Every composite kind (`array`/`map`/`tuple`/`choice`) plus every atom-family constant {@link
+     * AtomTypeParser} declares, *except* `record` -- the one entry whose factory genuinely differs
+     * by mode (DOM vs. object-binding, see {@link RecordParser.RecordShapeFactory}). Shared between
+     * {@link #dom()} and {@link #object(TsonSchema, DataBindContext)} so this ~14-entry list isn't
+     * duplicated between them; each caller appends its own `"record"` registration on top.
      */
-    public static ParserFactoryRegistry dom() {
+    private static Builder withoutRecord() {
         return builder()
-                .register("record", RecordParser.FACTORY)
                 .register("array", ArrayParser.FACTORY)
                 .register("map", MapParser.FACTORY)
                 .register("tuple", TupleParser.FACTORY)
@@ -92,7 +88,51 @@ public final class ParserFactoryRegistry {
                 .register("uri_type", AtomTypeParser.URI_TYPE)
                 .register("regex_type", AtomTypeParser.REGEX_TYPE)
                 .register("enum", AtomTypeParser.ENUM)
-                .register("unit", AtomTypeParser.UNIT)
+                .register("unit", AtomTypeParser.UNIT);
+    }
+
+    /**
+     * Every DOM-mode factory this build of the library actually has -- `record` producing a plain
+     * {@code Map<String, Object>}, same as every other composite/atom-family factory {@link
+     * #withoutRecord()} shares with {@link #object}. Previously hand-duplicated as a private
+     * {@code fullRegistry()} helper in several test classes (`MetaKernelEndToEndTest`, {@code
+     * TsonDataParserTest}, ...) and, as of {@code TsonCompiledRegistry}, real production code too --
+     * factored out here once a fourth/fifth copy made the duplication worth closing. Not the *only*
+     * legitimate registry a caller might build (a caller reading only a narrow slice of a schema can
+     * still assemble a smaller one directly via {@link #builder}), just the canonical "everything
+     * this build knows how to construct in DOM mode" one.
+     */
+    public static ParserFactoryRegistry dom() {
+        return withoutRecord()
+                .register("record", RecordParser.FACTORY)
+                .build();
+    }
+
+    /**
+     * Object-binding mode: `record` produces a real, bound {@code schema.meta} Java object (via
+     * {@link ObjectRecordShapeFactory}) instead of DOM mode's {@code Map<String, Object>} -- every
+     * other factory is identical to {@link #dom()} (see {@link #withoutRecord()}), since Array/Map/
+     * Tuple/Choice/Variant/atom-family parsers already produce mode-correct nested content purely by
+     * recursing into whichever child parser this same registry resolves.
+     *
+     * <p>Takes {@code schema} itself (unlike {@link #dom()}), not just a {@link DataBindContext} --
+     * needed so {@link ObjectRecordShapeFactory#validate} can eagerly resolve and validate a Java
+     * class for every {@code record}-shaped entry the schema actually declares, up front, rather
+     * than discovering a missing binding lazily, one entry at a time, only once something happens to
+     * read it. Uses {@link SchemaMetaTypeNameBinder}, the default {@code io.ltr8.tson.schema.meta}
+     * binder -- see {@link #object(TsonSchema, DataBindContext, TypeNameBinder)} to supply a
+     * different one (e.g. for a schema binding to a caller's own Java library instead).
+     */
+    public static ParserFactoryRegistry object(TsonSchema schema, DataBindContext context) {
+        return object(schema, context, SchemaMetaTypeNameBinder.INSTANCE);
+    }
+
+    /** As {@link #object(TsonSchema, DataBindContext)}, with an explicit {@link TypeNameBinder} rather than the {@code schema.meta} default. */
+    public static ParserFactoryRegistry object(TsonSchema schema, DataBindContext context, TypeNameBinder binder) {
+        ObjectRecordShapeFactory shapeFactory = new ObjectRecordShapeFactory(context, binder);
+        shapeFactory.validate(schema);
+        return withoutRecord()
+                .register("record", RecordParser.factory(shapeFactory))
                 .build();
     }
 
