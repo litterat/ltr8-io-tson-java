@@ -56,39 +56,30 @@ class MetaKernelEndToEndTest {
     }
 
     /**
-     * 51 of the real schema's 58 entries compile cleanly. The 7 that don't are worth understanding
-     * precisely, not just tolerating:
-     *
-     * <p>{@code map}/{@code set}/{@code array_min}/{@code array_max}/{@code array_ranged} are
-     * parameterized type *constructors* ({@code <T>}, {@code <K,V>}, ...) with no known subtypes,
-     * so {@link VariantParser} correctly refuses to compile them at all -- but that refusal never
-     * matters in practice: meta-kernel never references any of these as a bare field type anywhere
-     * (a field always references a *concrete* application, e.g. a synthesized {@code
-     * array_field_name_*} entry, never {@code "map"}/{@code "set"} themselves), so nothing
-     * legitimate ever calls {@code compiled.get("map")} directly. Confirmed, not assumed: nothing
-     * else in this same run fails as a result of any of these five failing, which it would if
-     * anything actually depended on them. {@code array} itself, despite also being parameterized,
-     * *does* compile -- {@code set}/{@code array_min}/{@code array_max}/{@code array_ranged} all
-     * compose with it, so it has real subtypes to dispatch among, unlike its own siblings.
-     *
-     * <p>{@code enum} is the one real gap: its own {@code members: set<token>} field never got a
-     * genuine materialized {@code ArrayBody} the way {@code array<X>} applications do --
-     * {@code SchemaValidator.instantiate} only builds real bodies for {@code array} applications,
-     * not {@code set} ones (see its own Javadoc), so {@code set<token>} falls back to the old
-     * placeholder {@code Reference}, which resolves down to the bare, parameterized {@code "set"}
-     * constructor -- the same unreachable case as above, except this time something real (the
-     * {@code enum} constructor's own vocabulary) actually needs it. The synthesized {@code
-     * set_token_*} entry fails for the identical reason. A real fix needs {@code
-     * SchemaValidator.instantiate} widened to cover {@code set} the same way it covers {@code
-     * array} -- tracked separately (task list), not attempted here.
+     * 53 of the real schema's 58 entries compile cleanly -- up from 51 once {@code
+     * SchemaValidator.instantiate} was widened to materialize {@code set<X>} applications the same
+     * way it already did {@code array<X>} ones (same field shape, just different tightened
+     * defaults -- see its own Javadoc), closing what {@code enum}'s own {@code members: set<token>}
+     * field needed. The remaining 5 are parameterized type *constructors* ({@code map}, {@code
+     * set}, {@code array_min}, {@code array_max}, {@code array_ranged} -- {@code <T>}/{@code <K,V>})
+     * with no known subtypes, so {@link VariantParser} correctly refuses to compile them at all --
+     * but that refusal never matters in practice: meta-kernel never references any of these as a
+     * bare field type anywhere (a field always references a *concrete* application, e.g. a
+     * synthesized {@code array_field_name_*} entry, never {@code "map"}/{@code "set"} themselves),
+     * so nothing legitimate ever calls {@code compiled.get("map")} directly. Confirmed, not
+     * assumed: nothing else in this same run fails as a result of any of these five failing, which
+     * it would if anything actually depended on them. {@code array} itself, despite also being
+     * parameterized, *does* compile -- {@code set}/{@code array_min}/{@code array_max}/{@code
+     * array_ranged} all compose with it, so it has real subtypes to dispatch among, unlike its own
+     * siblings.
      */
     @Test
-    void fiftyOneOfFiftyEightRealEntriesCompileCleanly() {
+    void fiftyThreeOfFiftyEightRealEntriesCompileCleanly() {
         MetaSchema raw = MetaKernelParser.parse();
         TsonSchema registered = new SchemaRegistry().register(raw);
         TsonSchemaParser compiled = TsonSchemaParser.compile(registered, fullRegistry());
 
-        Set<String> expectedFailures = Set.of("map", "set", "array_min", "array_max", "array_ranged", "enum");
+        Set<String> expectedFailures = Set.of("map", "set", "array_min", "array_max", "array_ranged");
         int ok = 0;
         for (String name : registered.entries().keySet()) {
             boolean failed;
@@ -98,13 +89,26 @@ class MetaKernelEndToEndTest {
             } catch (RuntimeException e) {
                 failed = true;
             }
-            boolean shouldFail = expectedFailures.contains(name) || name.startsWith("set_token_");
-            assertEquals(shouldFail, failed, "'" + name + "' compiled unexpectedly " + (failed ? "failed" : "succeeded"));
+            assertEquals(expectedFailures.contains(name), failed,
+                    "'" + name + "' compiled unexpectedly " + (failed ? "failed" : "succeeded"));
             if (!failed) {
                 ok++;
             }
         }
-        assertEquals(51, ok);
+        assertEquals(53, ok);
+    }
+
+    @Test
+    void readsEnumsOwnMembersFieldAgainstRealData() {
+        // The exact fix under test: enum => ~atom & { members: set<token> } -- previously
+        // unbuildable (set<token> fell back to an unusable placeholder), now a genuine ArrayBody.
+        TsonSchemaParser compiled = compiled();
+        Document document = new Parser("{ members: [true false] }").parseDocument();
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> result = (Map<String, Object>) compiled.get("enum").read(document.root());
+
+        assertEquals(List.of("true", "false"), result.get("members"));
     }
 
     @Test

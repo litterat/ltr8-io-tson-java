@@ -363,31 +363,40 @@ public final class SchemaValidator {
 
     /**
      * Per-target-shape assembly -- {@code null} means "not supported yet", handled by {@link
-     * #instantiate}'s own fallback. Only {@code array} today: every synthesized entry any real
-     * fixture actually needs (`meta-kernel.tn1`/`meta.tn1`/`core.tn1`) is an application of {@code
-     * array} (§5.3's {@code [X]}/{@code [X]?} field-type sugar desugars to exactly this) -- {@code
-     * map}/{@code tuple}/{@code record}/{@code choice}/any atom-family constructor aren't wired up,
-     * a known, explicit gap, not a silent wrong answer.
+     * #instantiate}'s own fallback. {@code array} and {@code set} both route through {@link
+     * #instantiateArray} -- {@code set}'s own resolved vocabulary is a {@link RecordBody} with the
+     * *identical* field shape as {@code array}'s (same field names, {@code element_type} routed via
+     * the same {@code value_param: "T"}), a structural tightening (§5.7's refinement, not a fresh
+     * composition), so the same assembler applies unmodified: it already reads {@code state}/{@code
+     * unordered}/{@code unique_items} from whatever the vocabulary's own {@link RecordField#value}
+     * actually says rather than assuming {@code array}'s own defaults, so {@code set}'s tightened
+     * {@code REQUIRED}/{@code true}/{@code true} come out correctly with no {@code set}-specific
+     * code at all. {@code map}/{@code tuple}/{@code record}/{@code choice}/any atom-family
+     * constructor still aren't wired up -- a known, explicit gap, not a silent wrong answer.
      */
     private static Top instantiateBody(String constructorName, RecordBody vocabulary,
                                         Map<String, TypeArgument> argumentsByParameter) {
         return switch (constructorName) {
-            case "array" -> instantiateArray(vocabulary, argumentsByParameter);
+            case "array", "set" -> instantiateArray(vocabulary, argumentsByParameter);
             default -> null;
         };
     }
 
     /**
-     * {@code array}'s own vocabulary, read field by field: {@code element_type} MUST route to a
-     * type-ref argument (§5.10's labelled-form parameter routing, {@code value_param}) -- anything
-     * else (no routing, or a literal-value argument where a type is expected) means this can't be
-     * built, {@code null} rather than a wrong guess. {@code state}/{@code unordered}/{@code
-     * unique_items} take array's own schema-composed default {@link RecordField#value} when present
-     * (mirroring, in miniature, {@code PositionalForm}'s own schema-composed defaulting one layer up
-     * in {@code tson-parser}). {@code min_items}/{@code max_items} have no default in array's own
-     * vocabulary and stay absent -- nothing here ever needs to fill them (only {@code set}/{@code
-     * array_min}/etc. tighten them, and those aren't applied via {@code <...>} sugar in any real
-     * fixture).
+     * {@code array}'s (and {@code set}'s -- see {@link #instantiateBody}) own vocabulary, read
+     * field by field: {@code element_type} MUST route to a type-ref argument (§5.10's labelled-form
+     * parameter routing, {@code value_param}) -- anything else (no routing, or a literal-value
+     * argument where a type is expected) means this can't be built, {@code null} rather than a
+     * wrong guess. {@code state}/{@code unordered}/{@code unique_items} take the vocabulary's own
+     * schema-composed default {@link RecordField#value} when present (mirroring, in miniature,
+     * {@code PositionalForm}'s own schema-composed defaulting one layer up in {@code tson-parser})
+     * -- this is exactly what makes {@code set}'s own tightened defaults (all three {@code
+     * REQUIRED_FIXED}, unlike {@code array}'s own {@code REQUIRED_DEFAULT}/{@code
+     * REQUIRED_DEFAULT}/{@code REQUIRED_DEFAULT}) come out correctly without this method needing to
+     * know which constructor it's assembling for. {@code min_items}/{@code max_items} have no
+     * default in either vocabulary and stay absent -- {@code array_min}/{@code array_max}/{@code
+     * array_ranged} tighten them, but aren't applied via {@code <...>} sugar in any real fixture, so
+     * that case still isn't attempted.
      */
     private static ArrayBody instantiateArray(RecordBody vocabulary, Map<String, TypeArgument> argumentsByParameter) {
         TypeRef elementType = null;

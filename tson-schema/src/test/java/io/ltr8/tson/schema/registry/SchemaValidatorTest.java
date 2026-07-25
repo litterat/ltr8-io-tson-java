@@ -75,6 +75,31 @@ class SchemaValidatorTest {
                 Optional.empty(), vocabulary);
     }
 
+    /**
+     * A minimal stand-in for meta-kernel's own real {@code set} constructor -- the identical field
+     * shape as {@link #arrayConstructorEntry()} (same names, same {@code element_type} value_param
+     * routing), but with {@code state}/{@code unordered}/{@code unique_items} tightened to {@code
+     * REQUIRED_FIXED} instead of {@code array}'s own {@code REQUIRED_DEFAULT} -- deliberately
+     * different literal values too ({@code REQUIRED}/{@code true}/{@code true}, matching the real
+     * {@code set}'s own tightening), to prove {@code instantiateArray} reads them from *this*
+     * vocabulary's own {@link RecordField#value}, not {@code array}'s.
+     */
+    private static TypeDefinition setConstructorEntry() {
+        RecordBody vocabulary = new RecordBody(List.of(), List.of(
+                new RecordField("element_type", TypeRef.of("token"), FieldState.REQUIRED, Optional.empty(), Optional.of("T")),
+                new RecordField("state", TypeRef.of("token"), FieldState.REQUIRED_FIXED,
+                        Optional.of(new Token("REQUIRED", Token.Form.UNQUOTED)), Optional.empty()),
+                new RecordField("unordered", TypeRef.of("token"), FieldState.REQUIRED_FIXED,
+                        Optional.of(new Token("true", Token.Form.UNQUOTED)), Optional.empty()),
+                new RecordField("unique_items", TypeRef.of("token"), FieldState.REQUIRED_FIXED,
+                        Optional.of(new Token("true", Token.Form.UNQUOTED)), Optional.empty()),
+                new RecordField("min_items", TypeRef.of("token"), FieldState.OPTIONAL, Optional.empty(), Optional.empty()),
+                new RecordField("max_items", TypeRef.of("token"), FieldState.OPTIONAL, Optional.empty(), Optional.empty())),
+                List.of());
+        return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of("T"), true,
+                List.of(), List.of(), Optional.empty(), vocabulary);
+    }
+
     @Test
     void materializesAFieldsGenericTypeRefIntoASyntheticEntry() {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
@@ -130,6 +155,34 @@ class SchemaValidatorTest {
 
         RecordBody containerBody = (RecordBody) result.entries().get("container").body();
         assertEquals(TypeRef.of(syntheticName), containerBody.fields().get(0).type());
+    }
+
+    @Test
+    void materializesASetApplicationTheSameWayUsingItsOwnTightenedDefaults() {
+        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        entries.put("token", unitEntry());
+        entries.put("set", setConstructorEntry());
+        entries.put("container", TypeDefinition.product(RecordBody.of(List.of(
+                RecordField.required("items", new TypeRef("set", List.of(new TypeArgument.Ref(TypeRef.of("token")))))))));
+
+        TsonSchema result = SchemaValidator.validate(schemaOf(entries), null);
+
+        String syntheticName = result.entries().keySet().stream()
+                .filter(name -> !Set.of("token", "set", "container").contains(name))
+                .findFirst().orElseThrow();
+        assertTrue(syntheticName.startsWith("set_token_"), "readable head: " + syntheticName);
+
+        TypeDefinition synthetic = result.entries().get(syntheticName);
+        assertEquals(TypeKind.PRODUCT, synthetic.kind());
+        assertEquals(TypeRef.of("set"), synthetic.source().orElseThrow());
+
+        ArrayBody body = (ArrayBody) synthetic.body();
+        assertEquals(TypeRef.of("token"), body.elementType());
+        // set's own tightened defaults -- REQUIRED/true/true -- not array's REQUIRED/false/false,
+        // confirming instantiateArray reads them from set's own vocabulary, not array's.
+        assertEquals(ElementState.REQUIRED, body.state());
+        assertTrue(body.unordered());
+        assertTrue(body.uniqueItems());
     }
 
     @Test
