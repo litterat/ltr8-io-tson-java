@@ -243,13 +243,13 @@ class PositionalFormTest {
                   atom => top & {}
                   enum => ~atom & { members: set<token> }
                 }""").parseSchemaDocument().body();
+        Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
         DefinitionResolver resolver = new DefinitionResolver((type, value) -> {
             throw new UnsupportedOperationException("not exercised by this test");
-        }, Map.of());
-        Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
+        }, Map.of(), resolved::get);
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
-        resolved.put("atom", resolver.resolveBootstrapDefinition(schemaMap.declarations().get("atom"), resolved));
-        TypeDefinition enumDef = resolver.resolveBootstrapDefinition(schemaMap.declarations().get("enum"), resolved);
+        resolved.put("atom", resolver.resolveBootstrapDefinition(schemaMap.declarations().get("atom")));
+        TypeDefinition enumDef = resolver.resolveBootstrapDefinition(schemaMap.declarations().get("enum"));
         RecordBody enumBody = (RecordBody) enumDef.body();
 
         ArrayValue booleanMembers = new ArrayValue(List.of(

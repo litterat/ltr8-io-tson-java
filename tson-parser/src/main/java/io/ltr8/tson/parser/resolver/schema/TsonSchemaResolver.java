@@ -58,6 +58,15 @@ import java.util.Objects;
  * one-line lambda over that call's {@code metaParser}, plus its already-resolved {@code
  * metaParser.schema().entries()}) is simpler than making this class track "which reader/namespace is
  * current."
+ *
+ * <p><b>The type-name namespace ({@code namespace}, this method's own local, {@code !!import}-seeded
+ * map) is built *before* the {@link DefinitionResolver} it feeds, and passed as {@code
+ * namespace::get}</b> (a further same-day follow-up, once {@link DefinitionGetter} moved {@code
+ * DefinitionResolver}'s own accumulating-namespace parameter to its constructor too) -- unlike {@code
+ * metaParser}, which is fully resolved before the resolver is even built, {@code namespace} keeps
+ * growing across the loop below (each iteration's own {@code namespace.put} call); a plain method
+ * reference onto the map, not a copy, is what lets the resolver see each newly-added entry on the
+ * very next iteration without this class threading the map through every call.
  */
 public final class TsonSchemaResolver {
 
@@ -164,17 +173,17 @@ public final class TsonSchemaResolver {
         }
 
         TsonCompiledSchema metaParser = compiledMetaSchema(document);
-        DefinitionResolver definitionResolver = new DefinitionResolver(
-                (type, value) -> (Top) metaParser.get(type).read(value), metaParser.schema().entries());
-
         Map<String, TypeDefinition> namespace = mergeImports(document);
+        DefinitionResolver definitionResolver = new DefinitionResolver(
+                (type, value) -> (Top) metaParser.get(type).read(value), metaParser.schema().entries(), namespace::get);
+
         Map<String, TypeDefinition> localOnly = new LinkedHashMap<>();
         for (SchemaMap.Declaration declaration : document.body().declarations().values()) {
             if (namespace.containsKey(declaration.name())) {
                 throw new TsonSchemaValidationException("'" + declaration.name()
                         + "' collides with an entry of the same name brought in by !!import");
             }
-            TypeDefinition resolved = definitionResolver.resolve(declaration, namespace);
+            TypeDefinition resolved = definitionResolver.resolve(declaration);
             namespace.put(declaration.name(), resolved);
             localOnly.put(declaration.name(), resolved);
         }

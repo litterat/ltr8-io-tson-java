@@ -22,7 +22,6 @@ import io.ltr8.tson.parser.ast.schema.RecordDef;
 import io.ltr8.tson.parser.ast.schema.RecordEntry;
 import io.ltr8.tson.parser.ast.schema.RefinedDef;
 import io.ltr8.tson.parser.ast.schema.ReferenceTypeDef;
-import io.ltr8.tson.parser.ast.schema.SchemaDocument;
 import io.ltr8.tson.parser.ast.schema.SchemaMap;
 import io.ltr8.tson.parser.ast.schema.SimpleRef;
 import io.ltr8.tson.parser.ast.schema.SizeSpec;
@@ -31,7 +30,6 @@ import io.ltr8.tson.parser.ast.schema.TypeArg;
 import io.ltr8.tson.parser.ast.schema.TypeDef;
 import io.ltr8.tson.parser.ast.schema.TypeRef;
 import io.ltr8.tson.parser.mapper.TsonMapperWriter;
-import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldState;
@@ -145,23 +143,24 @@ import java.util.Set;
  * explicitly out of scope for now and reported via {@link UnsupportedOperationException} rather
  * than silently mis-resolved; each is a later, separate pass.
  *
- * <p><b>No type-name namespace population, only an accumulating "resolved so far" map.</b> A
- * composition's supertypes must already be present in the {@code resolved} map passed to {@link
- * #resolveBootstrapDefinition(SchemaMap.Declaration, Map)} -- {@link
- * TsonSchemaResolver#resolveSchema(io.ltr8.tson.parser.ast.schema.SchemaDocument)} builds this map
- * incrementally, in source order, so a supertype must be declared earlier in the same schema map
- * than anything composing with it (true for every built-in base kind: {@code top} before {@code
- * atom}/{@code product}/{@code sum}/{@code reference}, and {@code atom} before {@code
- * integer_type}). Real forward references and cross-schema imports need the full namespace
+ * <p><b>No type-name namespace population, only an accumulating "resolved so far" lookup.</b> A
+ * composition's supertypes must already be resolvable through this instance's own {@link
+ * DefinitionGetter} (a required constructor parameter -- see "Fixed at construction, not threaded
+ * per call" below) -- {@link TsonSchemaResolver#resolveSchema(io.ltr8.tson.parser.ast.schema.SchemaDocument)}
+ * builds the backing map incrementally, in source order, so a supertype must be declared earlier in
+ * the same schema map than anything composing with it (true for every built-in base kind: {@code
+ * top} before {@code atom}/{@code product}/{@code sum}/{@code reference}, and {@code atom} before
+ * {@code integer_type}). Real forward references and cross-schema imports need the full namespace
  * population of §3.3.2/§3.4.1's Pass 1, not implemented yet.
  *
  * <p><b>A separate structure namespace</b> (the governing meta-schema's own namespace, one hop via
  * its own {@code !!meta}, §3.3.1) is fixed for this instance's whole lifetime, supplied once as a
  * required constructor parameter (empty, {@code Map.of()}, if none applies -- see "Fixed at
  * construction, not threaded per call" below): {@code !C value} (constructor application, {@code
- * Instance}) resolves {@code C} against the type-name namespace first, then this structure
- * namespace; {@code !I ^ { values }} (atom refinement, {@code AtomRefinement}) never consults it at
- * all.
+ * Instance}) resolves {@code C} against it -- see {@link #resolveConstructorTarget}'s own Javadoc
+ * for why the type-name namespace is no longer tried at all here; {@code !I ^ { values }} (atom
+ * refinement, {@code AtomRefinement}) never consults the structure namespace, only the type-name
+ * one, via {@link DefinitionGetter}.
  *
  * <p><b>Kind determination</b> (§4.1) checks the transitive supertype chain for the literal,
  * kernel-fixed names {@code atom}/{@code product}/{@code sum} -- not a general "inherit the nearest
@@ -229,11 +228,27 @@ import java.util.Set;
  * anywhere structureNamespace is passed into the methods"). The structure namespace stopped being a
  * per-{@code resolve}-call argument once {@link DefinitionMetaReader} already made the same move for
  * the compiled reader -- both are properties of *which meta-schema governs this resolver*, fixed for
- * its whole lifetime, not something that varies call to call the way {@code resolved} (the
- * accumulating type-name namespace) genuinely does. A resolver with nothing to offer there (every
- * caller that never reaches {@link #resolveInstance}, e.g. {@link MetaKernelBootstrapResolver}'s own
- * first pass) is constructed with {@code Map.of()}, the same way it already supplies a
- * throws-if-called {@link DefinitionMetaReader}.
+ * its whole lifetime. A resolver with nothing to offer there (every caller that never reaches {@link
+ * #resolveInstance}, e.g. {@link MetaKernelBootstrapResolver}'s own first pass) is constructed with
+ * {@code Map.of()}, the same way it already supplies a throws-if-called {@link DefinitionMetaReader}.
+ *
+ * <p><b>The accumulating type-name namespace moved to the constructor too</b> (a further same-day
+ * follow-up, on the user's own explicit direction, after independently narrowing {@link
+ * #resolveConstructorTarget} to drop its own type-name-namespace branch first: "Instead of passing
+ * the map in and passing it through, let's follow the same as previously. Create a DefinitionGetter
+ * interface with just getTypeDefinition(name) on it. Once again, make it a required constructor
+ * parameter."). Every bare {@code Map<String, TypeDefinition> resolved} parameter is gone -- {@link
+ * #resolveComposition}/{@link #resolveRefinement}/{@link #resolveAtomRefinement} all read {@code
+ * this.definitionGetter} directly instead. Unlike {@code structureNamespace}/{@code
+ * definitionMetaReader}, {@link DefinitionGetter} is NOT a snapshot -- it's typically a method
+ * reference straight onto a caller's own growing map ({@code entries::get}), so a caller resolving
+ * declarations one at a time in a loop (every real caller: {@link MetaKernelBootstrapResolver}'s own
+ * two-pass loop, {@link TsonSchemaResolver#resolveSchema}'s own per-declaration loop) still {@code
+ * put}s each result into that same map itself, immediately visible to the next {@code resolve} call
+ * through the lookup without this class needing to know the map exists at all. A resolver whose own
+ * caller genuinely has nothing resolved yet (a document's first declaration, an isolated test) is
+ * constructed with a getter that always returns {@code null} for exactly this reason -- see {@link
+ * DefinitionGetter}'s own Javadoc for why this is a lookup contract, not a data structure.
  */
 final class DefinitionResolver {
 
@@ -242,94 +257,46 @@ final class DefinitionResolver {
 
     private final DefinitionMetaReader definitionMetaReader;
     private final Map<String, TypeDefinition> structureNamespace;
+    private final DefinitionGetter definitionGetter;
 
-    DefinitionResolver(DefinitionMetaReader definitionMetaReader, Map<String, TypeDefinition> structureNamespace) {
+    DefinitionResolver(DefinitionMetaReader definitionMetaReader, Map<String, TypeDefinition> structureNamespace,
+                        DefinitionGetter definitionGetter) {
         this.definitionMetaReader = Objects.requireNonNull(definitionMetaReader, "definitionMetaReader");
         this.structureNamespace = Objects.requireNonNull(structureNamespace, "structureNamespace");
+        this.definitionGetter = Objects.requireNonNull(definitionGetter, "definitionGetter");
     }
 
     /**
-     * Resolves a single declaration with no supertypes visible -- fine for a fresh record like
-     * {@code integer_size}, not for a composition. A thin convenience over {@link
-     * #resolveBootstrapDefinition(SchemaMap.Declaration, Map)} with an empty namespace -- see that
-     * method's own Javadoc for why it carries the name it does despite this overload's own callers
-     * (below) having nothing to do with bootstrapping.
+     * Resolves a single declaration -- exactly {@link #resolveBootstrapDefinition}, the real
+     * dispatcher every other {@code resolve*} method funnels through.
      */
     TypeDefinition resolve(SchemaMap.Declaration declaration) {
-        return resolveBootstrapDefinition(declaration, Map.of());
+        return resolveTypeDef(declaration.name(), declaration.typeDef());
     }
 
     /**
-     * Resolves a single declaration against {@code resolved}, the entries already resolved so far
-     * (for composition's supertype lookups) -- exactly {@link #resolve(SchemaMap.Declaration, Map)},
-     * under a name that documents its own real production caller instead.
+     * Resolves a single declaration against this instance's own fixed type-name namespace (see
+     * {@link DefinitionGetter}) -- exactly {@link #resolve(SchemaMap.Declaration)}, under a name that
+     * documents its own real production caller instead.
      *
      * <p><b>Named for its own real production caller</b> (renamed 2026-07-27, from a bare {@code
      * resolve(declaration, resolved)}, on the user's own explicit direction, to "make it really
      * obvious" this is what {@link MetaKernelBootstrapResolver}'s own two-pass bootstrap loop calls,
-     * one declaration at a time, in source order, building up {@code entries} as its own namespace
-     * -- meta-kernel's own {@code !!meta} names itself, so it can never go through {@link
-     * TsonSchemaResolver#resolveSchema(io.ltr8.tson.parser.ast.schema.SchemaDocument)} the ordinary
-     * way (see {@link MetaKernelBootstrapResolver}'s own Javadoc). Test code exercising a hand-built
-     * declaration in isolation calls this too (see {@code DefinitionResolverTest}), for the same
-     * underlying reason bootstrap needs it -- no structure namespace available/wanted, just an
-     * accumulating type-name namespace -- not because those tests are themselves about bootstrapping.
+     * one declaration at a time, in source order, against a {@link DefinitionGetter} closing over its
+     * own growing {@code entries} map -- meta-kernel's own {@code !!meta} names itself, so it can
+     * never go through {@link TsonSchemaResolver#resolveSchema(io.ltr8.tson.parser.ast.schema.SchemaDocument)}
+     * the ordinary way (see {@link MetaKernelBootstrapResolver}'s own Javadoc). Test code exercising a
+     * hand-built declaration in isolation calls this too (see {@code DefinitionResolverTest}), for the
+     * same underlying reason bootstrap needs it, not because those tests are themselves about
+     * bootstrapping. The two methods are behaviorally identical now that neither takes a namespace
+     * argument to omit -- the name still documents *who calls it and why*, matching this codebase's
+     * established preference for self-documenting call sites over generic ones.
      */
-    TypeDefinition resolveBootstrapDefinition(SchemaMap.Declaration declaration, Map<String, TypeDefinition> resolved) {
-        return resolve(declaration, resolved);
+    TypeDefinition resolveBootstrapDefinition(SchemaMap.Declaration declaration) {
+        return resolve(declaration);
     }
 
-    /**
-     * Resolves a single declaration against {@code resolved} (the type-name namespace: entries
-     * already resolved so far in the current schema, for composition's supertype lookups and, per
-     * §3.3.1, tried first for a constructor-application target). The structure namespace (the
-     * governing meta-schema's own namespace -- its local declarations plus its imports, one hop,
-     * §3.3.1 -- tried second for a constructor-application target; never consulted for an atom
-     * refinement's source, which resolves against the type-name namespace only) is no longer a
-     * per-call argument -- it's fixed for this instance's whole lifetime, supplied once at
-     * construction (empty, {@code Map.of()}, if this resolver has nothing to offer there -- valid for
-     * any declaration that never reaches {@link #resolveInstance} at all: composition, refinement, a
-     * fresh record, atom refinement, ...); {@link #resolveConstructorTarget} throws clearly, naming
-     * both namespaces, if a constructor-application target is actually needed and not found in
-     * either.
-     *
-     * <p>This method (and everything it dispatches to) only ever needs to *look up* a {@code
-     * TypeDefinition} by name in either namespace, never to *read* a value against one; the one place
-     * this class does need to read a value against a compiled parser, {@link #bindAtomInstance}, gets
-     * it from this instance's own {@link DefinitionMetaReader} instead, likewise supplied once at
-     * construction, not threaded per call.
-     */
-    TypeDefinition resolve(SchemaMap.Declaration declaration, Map<String, TypeDefinition> resolved) {
-        return resolveTypeDef(declaration.name(), declaration.typeDef(), resolved);
-    }
-
-    /**
-     * {@code document}'s own declarations, resolved one at a time in source order via {@link
-     * #resolve(SchemaMap.Declaration, Map)}, each seeing every entry resolved before it -- against
-     * this instance's own fixed structure namespace, but none of {@link
-     * TsonSchemaResolver#resolveSchema(SchemaDocument)}'s own {@code !!id}/{@code !!import}
-     * validation or import-merging (this class never references {@code SchemaCoordinator} at all,
-     * see this class's own Javadoc). {@link TsonSchema#id()} is required, so a genuinely absent
-     * {@code !!id} falls back to {@code !!meta}'s own value here.
-     *
-     * <p>Lives here, not on {@link TsonSchemaResolver}, precisely because it needs no {@code
-     * SchemaCoordinator} -- this instance's own structure namespace already supplies the one thing a
-     * coordinator would otherwise be needed for, so tying this method to the coordinator-*requiring*
-     * class would force a caller who has a structure namespace in hand but no real coordinator to
-     * fabricate one just to call it. Its only real caller is test code exercising the
-     * structure-namespace path directly, without {@link TsonSchemaResolver}'s own validation; every
-     * real production path goes through {@link TsonSchemaResolver#resolveSchema(SchemaDocument)}
-     * instead.
-     */
-    TsonSchema resolveSchema(SchemaDocument document) {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        for (SchemaMap.Declaration declaration : document.body().declarations().values()) {
-            entries.put(declaration.name(), resolve(declaration, entries));
-        }
-        return new TsonSchema(document.id().orElse(document.meta()), document.meta(), document.imports(), entries);
-    }
-
-    private TypeDefinition resolveTypeDef(String name, TypeDef typeDef, Map<String, TypeDefinition> resolved) {
+    private TypeDefinition resolveTypeDef(String name, TypeDef typeDef) {
         if (typeDef instanceof StructuralTypeDef structural) {
             List<String> parameters = structural.typeParams();
             boolean constructor = structural.constructor();
@@ -339,10 +306,10 @@ final class DefinitionResolver {
                         List.of(), List.of(), Optional.empty(), body);
             }
             if (structural.body() instanceof ConstructionDef construction) {
-                return resolveComposition(name, construction, resolved, constructor, parameters);
+                return resolveComposition(name, construction, constructor, parameters);
             }
             if (structural.body() instanceof RefinedDef refined) {
-                return resolveRefinement(name, refined, resolved, constructor, parameters);
+                return resolveRefinement(name, refined, constructor, parameters);
             }
         }
         if (typeDef instanceof ReferenceTypeDef referenceTypeDef && referenceTypeDef.typeParams().isEmpty()) {
@@ -357,10 +324,10 @@ final class DefinitionResolver {
             return resolveContainerTypeDef(name, containerTypeDef.container());
         }
         if (typeDef instanceof Instance instance) {
-            return resolveInstance(name, instance, resolved);
+            return resolveInstance(name, instance);
         }
         if (typeDef instanceof AtomRefinement refinement) {
-            return resolveAtomRefinement(name, refinement, resolved);
+            return resolveAtomRefinement(name, refinement);
         }
         throw new UnsupportedOperationException(
                 "'" + name + "': only fresh record constructions, composition, simple type references, "
@@ -372,10 +339,10 @@ final class DefinitionResolver {
 
     /**
      * {@code !C value} (constructor application, no {@code ^}) -- produces a fresh instance
-     * filled with {@code value}. Per §3.3.1, {@code C} resolves first against the type-name
-     * namespace ({@code resolved}), then against the structure namespace; the found entry MUST be
-     * a constructor ({@code constructor: true}) or this is a resolver error (the spec's own
-     * suggested diagnostic: "did you mean atom refinement?"). {@code value} is normalized to
+     * filled with {@code value}. {@code C} resolves against the structure namespace only (see {@link
+     * #resolveConstructorTarget}'s own Javadoc for why the type-name namespace is no longer consulted
+     * here); the found entry MUST be a constructor ({@code constructor: true}) or this is a resolver
+     * error (the spec's own suggested diagnostic: "did you mean atom refinement?"). {@code value} is normalized to
      * record form ({@link PositionalForm}, using {@code C}'s own resolved field list to find its
      * positionally-fillable field, if any), then bound generically via {@code
      * TsonMapperReader.toObject(normalized, Top.class)} -- {@code instance.value().typeRef()}
@@ -393,9 +360,9 @@ final class DefinitionResolver {
      * vocabulary is always record-shaped, whatever the resulting instance's bound Java class looks
      * like, atom-family or not).
      */
-    private TypeDefinition resolveInstance(String name, Instance instance, Map<String, TypeDefinition> resolved) {
+    private TypeDefinition resolveInstance(String name, Instance instance) {
         String target = instance.target();
-        TypeDefinition constructor = resolveConstructorTarget(name, target, resolved);
+        TypeDefinition constructor = resolveConstructorTarget(name, target);
         if (!constructor.constructor()) {
             throw new UnsupportedOperationException("'" + name + "': '!" + target + "' does not resolve to a "
                     + "constructor (§3.3.1) -- did you mean atom refinement ('!" + target + " ^ { ... }')?");
@@ -457,9 +424,9 @@ final class DefinitionResolver {
      * non-chained case anyway, since a fresh {@code Instance} always resolves with empty {@code
      * supertypes}).
      */
-    private TypeDefinition resolveAtomRefinement(String name, AtomRefinement refinement, Map<String, TypeDefinition> resolved) {
+    private TypeDefinition resolveAtomRefinement(String name, AtomRefinement refinement) {
         String sourceName = refinement.target();
-        TypeDefinition source = resolved.get(sourceName);
+        TypeDefinition source = definitionGetter.getTypeDefinition(sourceName);
         if (source == null) {
             throw new UnsupportedOperationException("'" + name + "': '!" + sourceName
                     + "' does not resolve against the type-name namespace (§3.3.1)");
@@ -523,18 +490,29 @@ final class DefinitionResolver {
         }
     }
 
-    /** §3.3.1's lookup rule for a bare {@code !} target: the type-name namespace first, then this instance's own fixed structure namespace. */
-    private TypeDefinition resolveConstructorTarget(String name, String target, Map<String, TypeDefinition> resolved) {
-        TypeDefinition local = resolved.get(target);
-        if (local != null) {
-            return local;
-        }
+    /**
+     * A constructor-application target ({@code !C value}) resolves against the structure namespace
+     * only -- never the type-name namespace this instance's own {@link DefinitionGetter} exposes.
+     *
+     * <p><b>Narrowed from §3.3.1's own two-namespace lookup rule (2026-07-27, on the user's own
+     * explicit direction, dropping the {@code resolved.get(target)} branch that used to be tried
+     * first)</b> -- a constructor is meta-schema vocabulary (a {@code type_definition} with {@code
+     * constructor: true}, e.g. {@code integer_type}/{@code enum}), never something a schema
+     * legitimately defines about itself and then, in the same breath, instantiates: a target found in
+     * this instance's own type-name namespace would mean a schema declaring its own constructor and
+     * constructing an instance of it in one pass, before that declaration could plausibly have been
+     * vetted as governing vocabulary. Every real fixture case reaches its constructor through the
+     * structure namespace alone (the target is always declared in the *governing* meta-schema, one
+     * hop via {@code !!meta}) -- confirmed by the full suite staying green with the type-name branch
+     * removed, not just reasoned about.
+     */
+    private TypeDefinition resolveConstructorTarget(String name, String target) {
         TypeDefinition structural = structureNamespace.get(target);
         if (structural != null) {
             return structural;
         }
-        throw new UnsupportedOperationException("'" + name + "': '!" + target + "' does not resolve against "
-                + "either the type-name namespace or the structure namespace (§3.3.1)");
+        throw new UnsupportedOperationException("'" + name + "': '!" + target
+                + "' does not resolve against the structure namespace (§3.3.1)");
     }
 
     /**
@@ -684,8 +662,7 @@ final class DefinitionResolver {
      * ({@code array => <T> ~product & { ... } }) -- with no substitution or validation that a field
      * actually uses each parameter.
      */
-    private TypeDefinition resolveComposition(String name, ConstructionDef construction,
-                                               Map<String, TypeDefinition> resolved, boolean constructor,
+    private TypeDefinition resolveComposition(String name, ConstructionDef construction, boolean constructor,
                                                List<String> parameters) {
         if (construction.removal().isPresent()) {
             throw new UnsupportedOperationException("'" + name + "': subtraction is not resolved yet");
@@ -705,7 +682,7 @@ final class DefinitionResolver {
                         "'" + name + "': only simple supertype references are resolved so far, got " + supertypeRef);
             }
             String supertypeName = simple.name();
-            TypeDefinition supertypeDef = resolved.get(supertypeName);
+            TypeDefinition supertypeDef = definitionGetter.getTypeDefinition(supertypeName);
             if (supertypeDef == null) {
                 throw new UnsupportedOperationException("'" + name + "': supertype '" + supertypeName
                         + "' is not resolved yet (only supertypes declared earlier in the same schema map are visible so far)");
@@ -798,11 +775,11 @@ final class DefinitionResolver {
      * determined the same way composition determines it (the transitive chain's literal
      * atom/product/sum name, not the source's own resolved kind).
      */
-    private TypeDefinition resolveRefinement(String name, RefinedDef refined, Map<String, TypeDefinition> resolved,
-                                              boolean constructor, List<String> parameters) {
+    private TypeDefinition resolveRefinement(String name, RefinedDef refined, boolean constructor,
+                                              List<String> parameters) {
         io.ltr8.tson.schema.meta.TypeRef sourceRef = resolveRefinementSource(name, refined.target());
         String sourceName = sourceRef.name();
-        TypeDefinition sourceDef = resolved.get(sourceName);
+        TypeDefinition sourceDef = definitionGetter.getTypeDefinition(sourceName);
         if (sourceDef == null) {
             throw new UnsupportedOperationException("'" + name + "': refinement source '" + sourceName
                     + "' is not resolved yet (only a source declared earlier in the same schema map is visible so far)");

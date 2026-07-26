@@ -551,16 +551,74 @@ whole lifetime. `MetaKernelBootstrapResolver` (which never actually reaches `bin
 something that could silently return nonsense if that assumption is ever wrong, and `Map.of()` for
 the structure namespace it likewise never consults.
 
-Verified behavior-preserving, not just compiling, at every step of all three passes: every real caller
+**`resolveConstructorTarget` narrowed to consult the structure namespace only, dropping the
+type-name-namespace branch §3.3.1's own two-namespace lookup rule used to require (a fourth,
+same-day follow-up, on the user's own direct edit and explicit reasoning: "This would suggest that a
+schema could instantiate its own type defined by itself").** A constructor-application target
+(`!C value`) is meta-schema vocabulary -- a `type_definition` with `constructor: true` (`integer_type`,
+`enum`, ...) -- never something a schema legitimately declares about itself and, in the same pass,
+constructs an instance of; a target found in the local, still-being-resolved type-name namespace
+would mean exactly that. Every real fixture case already reached its constructor through the
+structure namespace alone (the target is always declared in the *governing* meta-schema, one hop via
+`!!meta`) -- confirmed by the full suite staying green with the local-lookup branch removed outright,
+not just reasoned about. `resolveConstructorTarget`'s own error message narrowed to match (no longer
+claims to have tried "either" namespace).
+
+**The accumulating type-name namespace (`Map<String, TypeDefinition> resolved`, threaded as a bare
+parameter through `resolveComposition`/`resolveRefinement`/`resolveAtomRefinement`/`resolve` itself)
+moved to the constructor too (a fifth, same-day follow-up, on the user's own explicit direction,
+immediately after the `resolveConstructorTarget` narrowing above: "Instead of passing the map in and
+passing it through, let's follow the same as previously. Create a DefinitionGetter interface with
+just getTypeDefinition(name) on it. Once again, make it a required constructor parameter.").** New
+package-private functional interface, **`DefinitionGetter`** (one method: `TypeDefinition
+getTypeDefinition(String name)`) -- every bare `Map<String, TypeDefinition> resolved` parameter is
+gone from every method on `DefinitionResolver`; `resolveComposition`/`resolveRefinement`/
+`resolveAtomRefinement` all read `this.definitionGetter` directly. `resolve(SchemaMap.Declaration,
+Map)` collapsed to `resolve(SchemaMap.Declaration)`; `resolveBootstrapDefinition` similarly lost its
+own `Map` parameter, keeping its established thin-delegate shape (see its own Javadoc for why the
+name survives despite the two methods now being fully identical).
+
+**Genuinely unlike `structureNamespace`/`definitionMetaReader`, a `DefinitionGetter` is NOT a
+snapshot -- it's typically a method reference straight onto a caller's own growing map** (`entries::get`,
+`namespace::get`), so a caller resolving declarations one at a time in a loop (every real caller:
+`MetaKernelBootstrapResolver`'s own two-pass loop, `TsonSchemaResolver#resolveSchema`'s own
+per-declaration loop) still `put`s each result into that same map itself, immediately visible to the
+next `resolve` call through the lookup with no map ever threaded through `DefinitionResolver`'s own
+API. `TsonSchemaResolver#resolveSchema` now builds its own local `namespace` map *before* constructing
+that call's `DefinitionResolver` (reordered from the previous pass, where `metaParser` alone was
+enough to construct it up front) specifically so `namespace::get` has something to close over.
+**`DefinitionResolver.resolveSchema(SchemaDocument)`, the batch convenience added when `structureNamespace`
+first moved to the constructor, was removed outright in this same pass** -- it needed to own a *fresh*
+map per call to build its own `entries()`/return value, which is structurally impossible once a
+resolver's own namespace lookup is fixed at construction; its two real callers (both in
+`DefinitionResolverTest`) now run the equivalent loop directly, the same shape
+`TsonSchemaResolver#resolveSchema`'s own production loop already used.
+
+**`DefinitionResolverTest` gained a shared, per-test-instance `resolved` field (paired with `resolver`,
+both now constructed together) rather than every test method declaring its own local `Map<String,
+TypeDefinition> resolved`** -- safe specifically because JUnit 5's default `PER_METHOD` lifecycle
+hands every `@Test` method a fresh instance of the test class, so the field starts empty at the top
+of every test exactly like the local variable it replaces used to; roughly twenty test methods had
+their own local `resolved` declaration deleted and their `resolve`/`resolveBootstrapDefinition` calls
+dropped a now-redundant final argument. Tests that genuinely need a *different* starting namespace
+than the shared field (a `metaKernelEntries`-seeded namespace for the chained-refinement test, an
+always-`null` `EMPTY_NAMESPACE` constant for constructor-application/atom-refinement tests with
+nothing resolved yet, a local `metaKernelBackedResolver` for the two atom-refinement rejection tests)
+construct their own locally-scoped `DefinitionResolver` instead, the same way `definitionResolverFor`
+(now taking a second `DefinitionGetter` parameter, since different callers need different namespaces
+bound to the very same compiled meta-parser) already did for `Instance`/`AtomRefinement` binding.
+
+Verified behavior-preserving, not just compiling, at every step of all five passes: every real caller
 (production and test) was traced before deciding what moved where, a clean compile succeeded across
 every module on the first attempt for each step, and the test count stayed at the established
 1131/0/0/0 bar throughout -- including the second pass, despite it touching roughly 30 call sites
 across `DefinitionResolverTest` alone (most needed a locally-scoped `DefinitionResolver`, wrapping
 that one test's own compiled meta-schema, in place of the shared no-op field the majority of other
-tests still use), and the third pass, which dropped the now-redundant third argument from roughly 20
+tests still use), the third pass, which dropped the now-redundant third argument from roughly 20
 more `.resolve(...)` call sites in the same file (several also lost a now-unused local
 `Map<String, TypeDefinition> metaNamespace`/`metaKernelNamespace` variable, since that value moved
-into `definitionResolverFor`'s own constructor call instead).
+into `definitionResolverFor`'s own constructor call instead), and the fifth pass, which touched
+essentially every test method in the file for the `resolved`-field migration.
 
 - **Record construction** -- a record (no supertypes, no type parameters) whose fields are simple
   type-refs, each REQUIRED or OPTIONAL (a `?` suffix; field *modifiers* -- default/fixed values --

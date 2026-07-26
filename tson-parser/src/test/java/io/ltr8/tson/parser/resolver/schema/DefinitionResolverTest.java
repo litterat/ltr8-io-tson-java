@@ -96,11 +96,27 @@ class DefinitionResolverTest {
         throw new UnsupportedOperationException("'" + type + "': not exercised by this test");
     };
 
-    private final DefinitionResolver resolver = new DefinitionResolver(NEVER_CALLED, Map.of());
+    /** A {@link DefinitionGetter} with nothing resolved yet -- for a resolver that only ever resolves declarations with no supertype/refinement-source lookup of their own. */
+    private static final DefinitionGetter EMPTY_NAMESPACE = name -> null;
+
+    /**
+     * The type-name namespace {@link #resolver} resolves against, accumulated by individual test
+     * methods via {@code resolved.put(...)} -- a plain instance field, not a per-test local variable,
+     * specifically so {@link #resolver} (itself a field, constructed once per test) can be bound to
+     * it at construction time via {@code resolved::get} (see {@link DefinitionGetter}'s own Javadoc)
+     * and still see whatever a test method puts into it afterward. Safe because JUnit 5's default
+     * {@code PER_METHOD} lifecycle gives every {@code @Test} method its own fresh instance of this
+     * class, so this field starts empty at the top of every test, exactly like the local variable it
+     * replaces used to.
+     */
+    private final Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
+
+    private final DefinitionResolver resolver = new DefinitionResolver(NEVER_CALLED, Map.of(), resolved::get);
     private final TsonMapperWriter mapper = new TsonMapperWriter();
 
-    private static DefinitionResolver definitionResolverFor(TsonCompiledSchema metaParser) {
-        return new DefinitionResolver((type, value) -> (Top) metaParser.get(type).read(value), metaParser.schema().entries());
+    private static DefinitionResolver definitionResolverFor(TsonCompiledSchema metaParser, DefinitionGetter definitionGetter) {
+        return new DefinitionResolver((type, value) -> (Top) metaParser.get(type).read(value),
+                metaParser.schema().entries(), definitionGetter);
     }
 
     private String write(TypeDefinition value) throws DataBindException {
@@ -133,6 +149,11 @@ class DefinitionResolverTest {
 
     @Test
     void resolveSchemaResolvesEveryDeclarationInSourceOrder() throws DataBindException {
+        // DefinitionResolver itself no longer has a resolveSchema(SchemaDocument) batch convenience
+        // (removed once the accumulating type-name namespace moved to the constructor, see
+        // DefinitionGetter's own Javadoc -- an instance-per-document convenience couldn't own a
+        // fresh map internally once it's fixed at construction) -- this loop is exactly what one
+        // used to do, and what TsonSchemaResolver#resolveSchema's own production loop still does.
         SchemaDocument doc = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 {
@@ -140,14 +161,16 @@ class DefinitionResolverTest {
                   point => { x: integer  y: integer }
                 }""").parseSchemaDocument();
 
-        TsonSchema schema = resolver.resolveSchema(doc);
+        for (SchemaMap.Declaration declaration : doc.body().declarations().values()) {
+            resolved.put(declaration.name(), resolver.resolve(declaration));
+        }
 
-        assertEquals(2, schema.entries().size());
-        assertEquals(EXPECTED_INTEGER_SIZE, write(schema.entries().get("integer_size")));
+        assertEquals(2, resolved.size());
+        assertEquals(EXPECTED_INTEGER_SIZE, write(resolved.get("integer_size")));
     }
 
     /**
-     * The structure namespace is now fixed at a resolver's own construction (see {@code
+     * The structure namespace is fixed at a resolver's own construction (see {@code
      * DefinitionResolver}'s own "Fixed at construction, not threaded per call" note), not threaded
      * per call -- this just confirms that fixing it doesn't change anything about a construct this
      * class already resolves without ever consulting it ({@code Instance}/{@code AtomRefinement}
@@ -167,14 +190,18 @@ class DefinitionResolverTest {
         SchemaMap.Declaration declaration = doc.body().declarations().get("integer_size");
         Map<String, TypeDefinition> irrelevantStructureNamespace =
                 Map.of("unrelated", TypeDefinition.reference("token"));
-        DefinitionResolver resolverWithIrrelevantNamespace = new DefinitionResolver(NEVER_CALLED, irrelevantStructureNamespace);
+        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        DefinitionResolver resolverWithIrrelevantNamespace =
+                new DefinitionResolver(NEVER_CALLED, irrelevantStructureNamespace, entries::get);
 
-        TypeDefinition viaTwoArg = resolverWithIrrelevantNamespace.resolve(declaration, Map.of());
-        assertEquals(EXPECTED_INTEGER_SIZE, write(viaTwoArg));
+        TypeDefinition viaResolve = resolverWithIrrelevantNamespace.resolve(declaration);
+        assertEquals(EXPECTED_INTEGER_SIZE, write(viaResolve));
 
-        TsonSchema schema = resolverWithIrrelevantNamespace.resolveSchema(doc);
-        assertEquals(2, schema.entries().size());
-        assertEquals(EXPECTED_INTEGER_SIZE, write(schema.entries().get("integer_size")));
+        for (SchemaMap.Declaration decl : doc.body().declarations().values()) {
+            entries.put(decl.name(), resolverWithIrrelevantNamespace.resolve(decl));
+        }
+        assertEquals(2, entries.size());
+        assertEquals(EXPECTED_INTEGER_SIZE, write(entries.get("integer_size")));
     }
 
     // ── Top variants DefinitionResolver doesn't produce yet: hand-built,
@@ -265,16 +292,15 @@ class DefinitionResolverTest {
     @Test
     void resolvesAtomProductSumAndReferenceByComposingWithTop() throws IOException, DataBindException {
         SchemaMap schemaMap = new TsonSchemaParser(readFixture()).parseSchemaDocument().body();
-        Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
 
-        TypeDefinition atom = resolver.resolveBootstrapDefinition(schemaMap.declarations().get("atom"), resolved);
+        TypeDefinition atom = resolver.resolveBootstrapDefinition(schemaMap.declarations().get("atom"));
         resolved.put("atom", atom);
-        TypeDefinition product = resolver.resolveBootstrapDefinition(schemaMap.declarations().get("product"), resolved);
+        TypeDefinition product = resolver.resolveBootstrapDefinition(schemaMap.declarations().get("product"));
         resolved.put("product", product);
-        TypeDefinition sum = resolver.resolveBootstrapDefinition(schemaMap.declarations().get("sum"), resolved);
+        TypeDefinition sum = resolver.resolveBootstrapDefinition(schemaMap.declarations().get("sum"));
         resolved.put("sum", sum);
-        TypeDefinition reference = resolver.resolveBootstrapDefinition(schemaMap.declarations().get("reference"), resolved);
+        TypeDefinition reference = resolver.resolveBootstrapDefinition(schemaMap.declarations().get("reference"));
         resolved.put("reference", reference);
 
         // §4.1: atom/product/sum are each kind PRODUCT -- their own transitive chain is just
@@ -314,11 +340,10 @@ class DefinitionResolverTest {
     @Test
     void resolvesIntegerTypeWithFieldGroupsAndOptionalFields() throws IOException, DataBindException {
         SchemaMap schemaMap = new TsonSchemaParser(readFixture()).parseSchemaDocument().body();
-        Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
-        resolved.put("atom", resolver.resolveBootstrapDefinition(schemaMap.declarations().get("atom"), resolved));
+        resolved.put("atom", resolver.resolveBootstrapDefinition(schemaMap.declarations().get("atom")));
 
-        TypeDefinition integerType = resolver.resolveBootstrapDefinition(schemaMap.declarations().get("integer_type"), resolved);
+        TypeDefinition integerType = resolver.resolveBootstrapDefinition(schemaMap.declarations().get("integer_type"));
 
         // ~atom & {...} -- constructor: true propagates straight from the "~" marker; kind: ATOM
         // because "atom" (the literal base-kind name) is in integer_type's own transitive chain.
@@ -545,10 +570,9 @@ class DefinitionResolverTest {
                   base => {}
                   box => <T> ~base & { value: T }
                 }""").parseSchemaDocument().body();
-        Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
         resolved.put("base", resolver.resolve(schemaMap.declarations().get("base")));
 
-        TypeDefinition box = resolver.resolveBootstrapDefinition(schemaMap.declarations().get("box"), resolved);
+        TypeDefinition box = resolver.resolveBootstrapDefinition(schemaMap.declarations().get("box"));
 
         assertEquals(List.of("T"), box.parameters());
         assertTrue(box.constructor());
@@ -650,12 +674,11 @@ class DefinitionResolverTest {
     @Test
     void resolvesArrayFromTheRealMetaKernelFixtureTighteningProductsInheritedFields() throws IOException, DataBindException {
         SchemaMap schemaMap = new TsonSchemaParser(readFixture()).parseSchemaDocument().body();
-        Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
-        resolved.put("atom", resolver.resolveBootstrapDefinition(schemaMap.declarations().get("atom"), resolved));
-        resolved.put("product", resolver.resolveBootstrapDefinition(schemaMap.declarations().get("product"), resolved));
+        resolved.put("atom", resolver.resolveBootstrapDefinition(schemaMap.declarations().get("atom")));
+        resolved.put("product", resolver.resolveBootstrapDefinition(schemaMap.declarations().get("product")));
 
-        TypeDefinition array = resolver.resolveBootstrapDefinition(schemaMap.declarations().get("array"), resolved);
+        TypeDefinition array = resolver.resolveBootstrapDefinition(schemaMap.declarations().get("array"));
 
         assertEquals(TypeKind.PRODUCT, array.kind());
         assertEquals(List.of("T"), array.parameters());
@@ -685,12 +708,11 @@ class DefinitionResolverTest {
     @Test
     void resolvesMapFromTheRealMetaKernelFixtureTighteningProductsInheritedFields() throws IOException, DataBindException {
         SchemaMap schemaMap = new TsonSchemaParser(readFixture()).parseSchemaDocument().body();
-        Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
-        resolved.put("atom", resolver.resolveBootstrapDefinition(schemaMap.declarations().get("atom"), resolved));
-        resolved.put("product", resolver.resolveBootstrapDefinition(schemaMap.declarations().get("product"), resolved));
+        resolved.put("atom", resolver.resolveBootstrapDefinition(schemaMap.declarations().get("atom")));
+        resolved.put("product", resolver.resolveBootstrapDefinition(schemaMap.declarations().get("product")));
 
-        TypeDefinition map = resolver.resolveBootstrapDefinition(schemaMap.declarations().get("map"), resolved);
+        TypeDefinition map = resolver.resolveBootstrapDefinition(schemaMap.declarations().get("map"));
 
         assertEquals(TypeKind.PRODUCT, map.kind());
         assertEquals(List.of("K", "V"), map.parameters());
@@ -723,11 +745,10 @@ class DefinitionResolverTest {
                   base => { count: integer }
                   loosened => base & { count: integer? }
                 }""").parseSchemaDocument().body();
-        Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
         resolved.put("base", resolver.resolve(schemaMap.declarations().get("base")));
 
         UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
-                () -> resolver.resolveBootstrapDefinition(schemaMap.declarations().get("loosened"), resolved));
+                () -> resolver.resolveBootstrapDefinition(schemaMap.declarations().get("loosened")));
         assertTrue(thrown.getMessage().contains("permitted"), thrown.getMessage());
     }
 
@@ -741,10 +762,9 @@ class DefinitionResolverTest {
                   config => { host: text  port: integer }
                   production => config & { host: = "prod.example.com" }
                 }""").parseSchemaDocument().body();
-        Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
         resolved.put("config", resolver.resolve(schemaMap.declarations().get("config")));
 
-        TypeDefinition production = resolver.resolveBootstrapDefinition(schemaMap.declarations().get("production"), resolved);
+        TypeDefinition production = resolver.resolveBootstrapDefinition(schemaMap.declarations().get("production"));
 
         assertEquals("{ kind: \"PRODUCT\" parameters: [] constructor: false supertypes: [ \"config\" ] subtypes: [] "
                         + "body: !record { supertypes: [ \"config\" ] fields: [ "
@@ -765,9 +785,9 @@ class DefinitionResolverTest {
         // set => <T> ~array<T> ^ { state: = REQUIRED  unordered: = true  unique_items: = true } --
         // array's own state/unordered/unique_items were REQUIRED_DEFAULT; set's body fixes them,
         // an allowed REQUIRED_DEFAULT -> REQUIRED_FIXED transition (§5.7's table).
-        Map<String, TypeDefinition> resolved = resolveUpToArray();
+        resolveUpToArray();
 
-        TypeDefinition set = resolver.resolveBootstrapDefinition(schemaMapFromFixture().declarations().get("set"), resolved);
+        TypeDefinition set = resolver.resolveBootstrapDefinition(schemaMapFromFixture().declarations().get("set"));
 
         assertEquals(TypeKind.PRODUCT, set.kind());
         assertEquals(List.of("T"), set.parameters());
@@ -800,9 +820,9 @@ class DefinitionResolverTest {
         // array_min => <T, MIN> array<T> ^ { min_items: = MIN } -- array's own min_items was
         // OPTIONAL; MIN is array_min's own parameter, so this is an OPTIONAL -> REQUIRED
         // (value_param) tightening, not a literal fixed value.
-        Map<String, TypeDefinition> resolved = resolveUpToArray();
+        resolveUpToArray();
 
-        TypeDefinition arrayMin = resolver.resolveBootstrapDefinition(schemaMapFromFixture().declarations().get("array_min"), resolved);
+        TypeDefinition arrayMin = resolver.resolveBootstrapDefinition(schemaMapFromFixture().declarations().get("array_min"));
 
         assertEquals(List.of("T", "MIN"), arrayMin.parameters());
         assertFalse(arrayMin.constructor());
@@ -834,9 +854,9 @@ class DefinitionResolverTest {
     void resolvesArrayRangedFromTheRealMetaKernelFixtureRoutingBothBoundsByParameter() throws IOException, DataBindException {
         // array_ranged => <T, MIN, MAX> array<T> ^ { min_items: = MIN  max_items: = MAX } -- both
         // OPTIONAL fields tighten to REQUIRED via parameter routing.
-        Map<String, TypeDefinition> resolved = resolveUpToArray();
+        resolveUpToArray();
 
-        TypeDefinition arrayRanged = resolver.resolveBootstrapDefinition(schemaMapFromFixture().declarations().get("array_ranged"), resolved);
+        TypeDefinition arrayRanged = resolver.resolveBootstrapDefinition(schemaMapFromFixture().declarations().get("array_ranged"));
 
         assertEquals(List.of("T", "MIN", "MAX"), arrayRanged.parameters());
         assertEquals("{ source: { name: \"array\" arguments: [ !ref { ref: { name: \"T\" arguments: [] } } ] } "
@@ -874,11 +894,10 @@ class DefinitionResolverTest {
                   base => { count: integer }
                   refined => base ^ { extra: text }
                 }""").parseSchemaDocument().body();
-        Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
         resolved.put("base", resolver.resolve(schemaMap.declarations().get("base")));
 
         UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
-                () -> resolver.resolveBootstrapDefinition(schemaMap.declarations().get("refined"), resolved));
+                () -> resolver.resolveBootstrapDefinition(schemaMap.declarations().get("refined")));
         assertTrue(thrown.getMessage().contains("adding a field"), thrown.getMessage());
     }
 
@@ -889,11 +908,10 @@ class DefinitionResolverTest {
         // enum => ~atom & { members: set<token> } -- "members" is typed with a generic
         // application, not a bare reference or the [T] array sugar.
         SchemaMap schemaMap = schemaMapFromFixture();
-        Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
-        resolved.put("atom", resolver.resolveBootstrapDefinition(schemaMap.declarations().get("atom"), resolved));
+        resolved.put("atom", resolver.resolveBootstrapDefinition(schemaMap.declarations().get("atom")));
 
-        TypeDefinition enumDef = resolver.resolveBootstrapDefinition(schemaMap.declarations().get("enum"), resolved);
+        TypeDefinition enumDef = resolver.resolveBootstrapDefinition(schemaMap.declarations().get("enum"));
 
         assertEquals(TypeKind.ATOM, enumDef.kind());
         assertTrue(enumDef.constructor());
@@ -915,10 +933,9 @@ class DefinitionResolverTest {
         // forward-reference support of its own; MetaKernelBootstrapResolver's own two-pass ordering is what
         // handles that for the whole file -- see its class Javadoc).
         SchemaMap schemaMap = schemaMapFromFixture();
-        Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
-        resolved.put("atom", resolver.resolveBootstrapDefinition(schemaMap.declarations().get("atom"), resolved));
-        resolved.put("enum", resolver.resolveBootstrapDefinition(schemaMap.declarations().get("enum"), resolved));
+        resolved.put("atom", resolver.resolveBootstrapDefinition(schemaMap.declarations().get("atom")));
+        resolved.put("enum", resolver.resolveBootstrapDefinition(schemaMap.declarations().get("enum")));
 
         // "enum" (the constructor bindAtomInstance needs to read against) is a real fixture
         // declaration whose own field (`members: set<token>`) is argument-bearing -- compiling a
@@ -927,8 +944,8 @@ class DefinitionResolverTest {
         // have one. The full, materialized meta-kernel resolves the identical `enum` declaration,
         // just reached a different way, so bindAtomInstance's own reader is compiled from that.
         TsonCompiledSchema metaKernelParser = metaKernelCompiled();
-        TypeDefinition accessType = definitionResolverFor(metaKernelParser).resolve(
-                schemaMap.declarations().get("product_access_type"), resolved);
+        TypeDefinition accessType = definitionResolverFor(metaKernelParser, resolved::get).resolve(
+                schemaMap.declarations().get("product_access_type"));
 
         assertEquals(TypeKind.ATOM, accessType.kind());
         assertFalse(accessType.constructor());
@@ -963,14 +980,13 @@ class DefinitionResolverTest {
     @Test
     void booleanInstanceResolvesCorrectlyViaTheCompiledReader() throws IOException {
         SchemaMap schemaMap = schemaMapFromFixture();
-        Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
-        resolved.put("atom", resolver.resolveBootstrapDefinition(schemaMap.declarations().get("atom"), resolved));
-        resolved.put("enum", resolver.resolveBootstrapDefinition(schemaMap.declarations().get("enum"), resolved));
+        resolved.put("atom", resolver.resolveBootstrapDefinition(schemaMap.declarations().get("atom")));
+        resolved.put("enum", resolver.resolveBootstrapDefinition(schemaMap.declarations().get("enum")));
 
         TsonCompiledSchema metaKernelParser = metaKernelCompiled();
-        TypeDefinition booleanDef = definitionResolverFor(metaKernelParser).resolve(
-                schemaMap.declarations().get("boolean"), resolved);
+        TypeDefinition booleanDef = definitionResolverFor(metaKernelParser, resolved::get).resolve(
+                schemaMap.declarations().get("boolean"));
 
         assertEquals(new EnumBody(List.of("true", "false")), booleanDef.body());
     }
@@ -990,12 +1006,12 @@ class DefinitionResolverTest {
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 { my_bool => !enum [YES NO] }""").parseSchemaDocument().body();
 
-        TypeDefinition resolved = definitionResolverFor(metaKernelParser).resolve(
-                schemaMap.declarations().get("my_bool"), Map.of());
+        TypeDefinition myBool = definitionResolverFor(metaKernelParser, EMPTY_NAMESPACE).resolve(
+                schemaMap.declarations().get("my_bool"));
 
-        assertEquals(TypeKind.ATOM, resolved.kind());
-        assertFalse(resolved.constructor());
-        assertEquals(new EnumBody(List.of("YES", "NO")), resolved.body());
+        assertEquals(TypeKind.ATOM, myBool.kind());
+        assertFalse(myBool.constructor());
+        assertEquals(new EnumBody(List.of("YES", "NO")), myBool.body());
     }
 
     @Test
@@ -1009,8 +1025,8 @@ class DefinitionResolverTest {
                 { bad => !token {} }""").parseSchemaDocument().body();
 
         UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
-                () -> definitionResolverFor(metaKernelParser).resolve(
-                        schemaMap.declarations().get("bad"), Map.of()));
+                () -> definitionResolverFor(metaKernelParser, EMPTY_NAMESPACE).resolve(
+                        schemaMap.declarations().get("bad")));
         assertTrue(thrown.getMessage().contains("does not resolve to a constructor"), thrown.getMessage());
     }
 
@@ -1029,12 +1045,11 @@ class DefinitionResolverTest {
         // touches the structure namespace), which is exactly `resolved` here since `integer` was
         // just added to it.
         TsonCompiledSchema metaKernelParser = metaKernelCompiled();
-        DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser);
+        DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, resolved::get);
         SchemaMap schemaMap = schemaMapFromCoreFixture();
-        Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
-        resolved.put("integer", instanceResolver.resolve(schemaMap.declarations().get("integer"), Map.of()));
+        resolved.put("integer", instanceResolver.resolve(schemaMap.declarations().get("integer")));
 
-        TypeDefinition int32 = instanceResolver.resolve(schemaMap.declarations().get("int32"), resolved);
+        TypeDefinition int32 = instanceResolver.resolve(schemaMap.declarations().get("int32"));
 
         assertEquals(TypeKind.ATOM, int32.kind());
         assertFalse(int32.constructor());
@@ -1048,13 +1063,12 @@ class DefinitionResolverTest {
         // positive_integer => !integer ^ { min: 1 } -- a scalar (not nested-record) refinement
         // value, confirming the binder isn't only exercised by int32's own nested-IntegerSize case.
         TsonCompiledSchema metaKernelParser = metaKernelCompiled();
-        DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser);
+        DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, resolved::get);
         SchemaMap schemaMap = schemaMapFromCoreFixture();
-        Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
-        resolved.put("integer", instanceResolver.resolve(schemaMap.declarations().get("integer"), Map.of()));
+        resolved.put("integer", instanceResolver.resolve(schemaMap.declarations().get("integer")));
 
         TypeDefinition positiveInteger =
-                instanceResolver.resolve(schemaMap.declarations().get("positive_integer"), resolved);
+                instanceResolver.resolve(schemaMap.declarations().get("positive_integer"));
 
         assertEquals(IntegerType.ofMin(BigInteger.ONE), positiveInteger.body());
     }
@@ -1070,8 +1084,8 @@ class DefinitionResolverTest {
         SchemaMap schemaMap = schemaMapFromCoreFixture();
         TsonCompiledSchema metaTn1Parser = metaTn1Compiled();
 
-        TypeDefinition hex = definitionResolverFor(metaTn1Parser).resolve(
-                schemaMap.declarations().get("hex"), Map.of());
+        TypeDefinition hex = definitionResolverFor(metaTn1Parser, EMPTY_NAMESPACE).resolve(
+                schemaMap.declarations().get("hex"));
 
         assertEquals(BinaryType.HEX, hex.body());
     }
@@ -1084,10 +1098,10 @@ class DefinitionResolverTest {
         // the schema itself; previously failed with "missing required field 'allow_nan'".
         SchemaMap schemaMap = schemaMapFromCoreFixture();
         TsonCompiledSchema metaTn1Parser = metaTn1Compiled();
-        DefinitionResolver instanceResolver = definitionResolverFor(metaTn1Parser);
+        DefinitionResolver instanceResolver = definitionResolverFor(metaTn1Parser, EMPTY_NAMESPACE);
 
-        TypeDefinition float32 = instanceResolver.resolve(schemaMap.declarations().get("float32"), Map.of());
-        TypeDefinition float64 = instanceResolver.resolve(schemaMap.declarations().get("float64"), Map.of());
+        TypeDefinition float32 = instanceResolver.resolve(schemaMap.declarations().get("float32"));
+        TypeDefinition float64 = instanceResolver.resolve(schemaMap.declarations().get("float64"));
 
         assertEquals(FloatType.FLOAT32, float32.body());
         assertEquals(FloatType.FLOAT64, float64.body());
@@ -1104,12 +1118,12 @@ class DefinitionResolverTest {
         // mechanism float32/float64 above rely on.
         SchemaMap schemaMap = schemaMapFromCoreFixture();
         TsonCompiledSchema metaTn1Parser = metaTn1Compiled();
-        DefinitionResolver instanceResolver = definitionResolverFor(metaTn1Parser);
+        DefinitionResolver instanceResolver = definitionResolverFor(metaTn1Parser, EMPTY_NAMESPACE);
 
-        TypeDefinition cidr4 = instanceResolver.resolve(schemaMap.declarations().get("cidr4"), Map.of());
-        TypeDefinition cidr6 = instanceResolver.resolve(schemaMap.declarations().get("cidr6"), Map.of());
-        TypeDefinition email = instanceResolver.resolve(schemaMap.declarations().get("email"), Map.of());
-        TypeDefinition mac = instanceResolver.resolve(schemaMap.declarations().get("mac"), Map.of());
+        TypeDefinition cidr4 = instanceResolver.resolve(schemaMap.declarations().get("cidr4"));
+        TypeDefinition cidr6 = instanceResolver.resolve(schemaMap.declarations().get("cidr6"));
+        TypeDefinition email = instanceResolver.resolve(schemaMap.declarations().get("email"));
+        TypeDefinition mac = instanceResolver.resolve(schemaMap.declarations().get("mac"));
 
         assertEquals(Cidr4Type.UNCONSTRAINED, cidr4.body());
         assertEquals(Cidr6Type.UNCONSTRAINED, cidr6.body());
@@ -1123,10 +1137,10 @@ class DefinitionResolverTest {
         // Cidr4Type/Cidr6Type above (record-only, no vocab parser, flat String spec).
         SchemaMap schemaMap = schemaMapFromCoreFixture();
         TsonCompiledSchema metaTn1Parser = metaTn1Compiled();
-        DefinitionResolver instanceResolver = definitionResolverFor(metaTn1Parser);
+        DefinitionResolver instanceResolver = definitionResolverFor(metaTn1Parser, EMPTY_NAMESPACE);
 
-        TypeDefinition ipv4 = instanceResolver.resolve(schemaMap.declarations().get("ipv4"), Map.of());
-        TypeDefinition ipv6 = instanceResolver.resolve(schemaMap.declarations().get("ipv6"), Map.of());
+        TypeDefinition ipv4 = instanceResolver.resolve(schemaMap.declarations().get("ipv4"));
+        TypeDefinition ipv6 = instanceResolver.resolve(schemaMap.declarations().get("ipv6"));
 
         assertEquals(Ipv4Type.UNCONSTRAINED, ipv4.body());
         assertEquals(Ipv6Type.UNCONSTRAINED, ipv6.body());
@@ -1142,10 +1156,10 @@ class DefinitionResolverTest {
         // once DefinitionResolver's own Instance binding widened from Atom.class to Top.class.
         SchemaMap schemaMap = schemaMapFromCoreFixture();
         TsonCompiledSchema metaTn1Parser = metaTn1Compiled();
-        DefinitionResolver instanceResolver = definitionResolverFor(metaTn1Parser);
+        DefinitionResolver instanceResolver = definitionResolverFor(metaTn1Parser, EMPTY_NAMESPACE);
 
-        TypeDefinition complex = instanceResolver.resolve(schemaMap.declarations().get("complex"), Map.of());
-        TypeDefinition unknown = instanceResolver.resolve(schemaMap.declarations().get("unknown"), Map.of());
+        TypeDefinition complex = instanceResolver.resolve(schemaMap.declarations().get("complex"));
+        TypeDefinition unknown = instanceResolver.resolve(schemaMap.declarations().get("unknown"));
 
         assertEquals(ComplexType.UNCONSTRAINED, complex.body());
         assertEquals(TypeKind.SUM, unknown.kind());
@@ -1158,12 +1172,13 @@ class DefinitionResolverTest {
         // ("!integer_type ^ {...}") is a resolver error; the diagnostic should point at
         // constructor application instead (§3.3.1).
         Map<String, TypeDefinition> metaKernelEntries = MetaKernelBootstrapResolver.getMetaKernelSchema().entries();
+        DefinitionResolver metaKernelBackedResolver = new DefinitionResolver(NEVER_CALLED, Map.of(), metaKernelEntries::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 { bad => !integer_type ^ { min: 1 } }""").parseSchemaDocument().body();
 
         UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
-                () -> resolver.resolveBootstrapDefinition(schemaMap.declarations().get("bad"), metaKernelEntries));
+                () -> metaKernelBackedResolver.resolveBootstrapDefinition(schemaMap.declarations().get("bad")));
         assertTrue(thrown.getMessage().contains("refines a constructor, not an instance"), thrown.getMessage());
     }
 
@@ -1172,12 +1187,13 @@ class DefinitionResolverTest {
         // top resolves fine (a fresh record, kind PRODUCT by the structural default) but isn't
         // atom-family -- !top ^ {...} must be rejected (§5.5).
         Map<String, TypeDefinition> metaKernelEntries = MetaKernelBootstrapResolver.getMetaKernelSchema().entries();
+        DefinitionResolver metaKernelBackedResolver = new DefinitionResolver(NEVER_CALLED, Map.of(), metaKernelEntries::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 { bad => !top ^ { x: integer } }""").parseSchemaDocument().body();
 
         UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
-                () -> resolver.resolveBootstrapDefinition(schemaMap.declarations().get("bad"), metaKernelEntries));
+                () -> metaKernelBackedResolver.resolveBootstrapDefinition(schemaMap.declarations().get("bad")));
         assertTrue(thrown.getMessage().contains("is not an atom-family instance"), thrown.getMessage());
     }
 
@@ -1195,14 +1211,17 @@ class DefinitionResolverTest {
      */
     @Test
     void chainedAtomRefinementMergesWithIntermediateBindingsInsteadOfDiscardingThem() {
-        // Atom refinement's own `source` lookup (finding "integer") is resolved.get(...) only, per
-        // §3.3.1 -- never metaParser -- so meta-kernel's entries are threaded as `resolved` here,
-        // same as before; metaParser is now *also* needed, separately, for bindAtomInstance itself
-        // to find and read "integer_type" (the constructor int8's own refinement source resolves
-        // through), which was never something resolved-namespace lookup alone could provide.
+        // Atom refinement's own `source` lookup (finding "integer") is a DefinitionGetter lookup
+        // only, per §3.3.1 -- never metaParser -- so meta-kernel's entries seed this test's own local
+        // `chainNamespace` (shadowing the shared `resolved` field, deliberately: this test needs a
+        // namespace pre-seeded with meta-kernel's own entries, not the shared field's empty start);
+        // metaParser is now *also* needed, separately, for bindAtomInstance itself to find and read
+        // "integer_type" (the constructor int8's own refinement source resolves through), which was
+        // never something namespace lookup alone could provide.
         TsonCompiledSchema metaKernelParser = metaKernelCompiled();
         Map<String, TypeDefinition> metaKernelEntries = metaKernelParser.schema().entries();
-        DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser);
+        Map<String, TypeDefinition> chainNamespace = new LinkedHashMap<>(metaKernelEntries);
+        DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 {
@@ -1210,12 +1229,11 @@ class DefinitionResolverTest {
                   big     => !int8 ^ { min: -500  max: 5000 }
                   veryBig => !big ^ { max: 10000 }
                 }""").parseSchemaDocument().body();
-        Map<String, TypeDefinition> resolved = new LinkedHashMap<>(metaKernelEntries);
-        resolved.put("int8", instanceResolver.resolve(schemaMap.declarations().get("int8"), resolved));
-        resolved.put("big", instanceResolver.resolve(schemaMap.declarations().get("big"), resolved));
+        chainNamespace.put("int8", instanceResolver.resolve(schemaMap.declarations().get("int8")));
+        chainNamespace.put("big", instanceResolver.resolve(schemaMap.declarations().get("big")));
 
-        TypeDefinition big = resolved.get("big");
-        TypeDefinition veryBig = instanceResolver.resolve(schemaMap.declarations().get("veryBig"), resolved);
+        TypeDefinition big = chainNamespace.get("big");
+        TypeDefinition veryBig = instanceResolver.resolve(schemaMap.declarations().get("veryBig"));
 
         // big keeps int8's own size (untouched by big's own refinement) alongside its new bounds.
         assertEquals(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of("integer_type")), big.source());
@@ -1250,8 +1268,8 @@ class DefinitionResolverTest {
                 { bad => !integer_type ^ { min: 1 } }""").parseSchemaDocument().body();
 
         UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
-                () -> definitionResolverFor(metaKernelParser).resolve(
-                        schemaMap.declarations().get("bad"), Map.of()));
+                () -> definitionResolverFor(metaKernelParser, EMPTY_NAMESPACE).resolve(
+                        schemaMap.declarations().get("bad")));
         assertTrue(thrown.getMessage().contains("does not resolve against the type-name namespace"), thrown.getMessage());
     }
 
@@ -1323,11 +1341,11 @@ class DefinitionResolverTest {
 
         String source = Files.readString(Path.of("").toAbsolutePath().resolve("../spec/m/meta.tn1").normalize());
         SchemaDocument metaDoc = new TsonSchemaParser(source).parseSchemaDocument();
-        DefinitionResolver metaResolver = definitionResolverFor(metaKernelParser);
         Map<String, TypeDefinition> namespace = new LinkedHashMap<>(metaKernel.entries());
+        DefinitionResolver metaResolver = definitionResolverFor(metaKernelParser, namespace::get);
         Map<String, TypeDefinition> localOnly = new LinkedHashMap<>();
         for (SchemaMap.Declaration declaration : metaDoc.body().declarations().values()) {
-            TypeDefinition resolved = metaResolver.resolve(declaration, namespace);
+            TypeDefinition resolved = metaResolver.resolve(declaration);
             namespace.put(declaration.name(), resolved);
             localOnly.put(declaration.name(), resolved);
         }
@@ -1336,14 +1354,13 @@ class DefinitionResolverTest {
         return compileAsMetaParser(registeredMeta.schema().entries());
     }
 
-    private Map<String, TypeDefinition> resolveUpToArray() throws IOException {
+    /** Populates the shared {@link #resolved} field up through {@code array} -- callers continue resolving against it via {@link #resolver} directly, no return value needed now that {@link #resolved} is a field, not a per-call local. */
+    private void resolveUpToArray() throws IOException {
         SchemaMap schemaMap = schemaMapFromFixture();
-        Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
-        resolved.put("atom", resolver.resolveBootstrapDefinition(schemaMap.declarations().get("atom"), resolved));
-        resolved.put("product", resolver.resolveBootstrapDefinition(schemaMap.declarations().get("product"), resolved));
-        resolved.put("array", resolver.resolveBootstrapDefinition(schemaMap.declarations().get("array"), resolved));
-        return resolved;
+        resolved.put("atom", resolver.resolveBootstrapDefinition(schemaMap.declarations().get("atom")));
+        resolved.put("product", resolver.resolveBootstrapDefinition(schemaMap.declarations().get("product")));
+        resolved.put("array", resolver.resolveBootstrapDefinition(schemaMap.declarations().get("array")));
     }
 
     private SchemaMap schemaMapFromFixture() throws IOException {
@@ -1360,9 +1377,10 @@ class DefinitionResolverTest {
     @Test
     void compositionRejectsAnUnresolvedSupertype() throws IOException {
         SchemaMap schemaMap = new TsonSchemaParser(readFixture()).parseSchemaDocument().body();
-        // "top" deliberately left out of the resolved map -- atom's supertype isn't visible yet.
+        // "top" deliberately left out of the resolved map -- atom's supertype isn't visible yet
+        // (the shared resolved field starts empty, and nothing puts "top" into it before this call).
         assertThrows(UnsupportedOperationException.class,
-                () -> resolver.resolveBootstrapDefinition(schemaMap.declarations().get("atom"), Map.of()));
+                () -> resolver.resolveBootstrapDefinition(schemaMap.declarations().get("atom")));
     }
 
     private static String readFixture() throws IOException {

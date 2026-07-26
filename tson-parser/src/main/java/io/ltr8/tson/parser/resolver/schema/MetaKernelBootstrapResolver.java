@@ -139,8 +139,8 @@ public final class MetaKernelBootstrapResolver {
     };
 
     private static Map<String, TypeDefinition> resolveEntries(SchemaDocument document) {
-        DefinitionResolver resolver = new DefinitionResolver(NEVER_CALLED, Map.of());
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        DefinitionResolver resolver = new DefinitionResolver(NEVER_CALLED, Map.of(), entries::get);
         List<SchemaMap.Declaration> instances = new ArrayList<>();
 
         for (SchemaMap.Declaration declaration : document.body().declarations().values()) {
@@ -151,7 +151,7 @@ public final class MetaKernelBootstrapResolver {
                 instances.add(declaration);
                 continue;
             }
-            entries.put(declaration.name(), resolver.resolveBootstrapDefinition(declaration, entries));
+            entries.put(declaration.name(), resolver.resolveBootstrapDefinition(declaration));
         }
 
         for (SchemaMap.Declaration declaration : instances) {
