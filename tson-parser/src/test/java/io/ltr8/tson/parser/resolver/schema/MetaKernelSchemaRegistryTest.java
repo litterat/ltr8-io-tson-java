@@ -28,7 +28,7 @@ class MetaKernelSchemaRegistryTest {
 
     @Test
     void registersTheRealMetaKernelSchemaMaterializingEveryGenericFieldTypeRef() {
-        MetaSchema raw = MetaKernelParser.parse();
+        MetaSchema raw = MetaKernelParser.getMetaKernelSchema();
         SchemaRegistry registry = new SchemaRegistry();
 
         TsonSchema registered = registry.register(raw);
@@ -63,8 +63,8 @@ class MetaKernelSchemaRegistryTest {
     @Test
     void registeringTheSameMetaKernelSchemaTwiceIntoTheSameRegistryThrows() {
         SchemaRegistry registry = new SchemaRegistry();
-        registry.register(MetaKernelParser.parse());
+        registry.register(MetaKernelParser.getMetaKernelSchema());
 
-        assertThrows(SchemaValidationException.class, () -> registry.register(MetaKernelParser.parse()));
+        assertThrows(SchemaValidationException.class, () -> registry.register(MetaKernelParser.getMetaKernelSchema()));
     }
 }

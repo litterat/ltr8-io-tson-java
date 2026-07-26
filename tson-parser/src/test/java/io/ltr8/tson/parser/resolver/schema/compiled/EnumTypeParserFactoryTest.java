@@ -37,7 +37,7 @@ class EnumTypeParserFactoryTest {
         // names "enum", "enum" composes with "atom", and so on transitively; cherry-picking just
         // "boolean" drags in most of meta-kernel anyway via SchemaValidator's own reference checks,
         // so there's nothing simpler about trying to trim it down. One extra local entry on top.
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>(MetaKernelParser.parse().entries());
+        Map<String, TypeDefinition> entries = new LinkedHashMap<>(MetaKernelParser.getMetaKernelSchema().entries());
         entries.put("flag_holder", TypeDefinition.product(
                 RecordBody.of(List.of(RecordField.required("flag", TypeRef.of("boolean"))))));
         TsonSchema schema = new TsonSchema(Optional.of("https://example.test/flag.tn1"),

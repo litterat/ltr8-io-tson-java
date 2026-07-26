@@ -70,7 +70,7 @@ class MetaSchemaImportTest {
 
     @Test
     void mergesMetaKernelIntoAllThirtyOneOfMetaTn1sOwnDeclarations() {
-        MetaSchema metaKernel = MetaKernelParser.parse();
+        MetaSchema metaKernel = MetaKernelParser.getMetaKernelSchema();
         SchemaRegistry registry = new SchemaRegistry();
         registry.register(metaKernel);
 
@@ -97,7 +97,7 @@ class MetaSchemaImportTest {
 
     @Test
     void registeringBinaryWithoutItsUnresolvedBinaryEncodingFieldCorrectlyFailsValidation() {
-        MetaSchema metaKernel = MetaKernelParser.parse();
+        MetaSchema metaKernel = MetaKernelParser.getMetaKernelSchema();
         SchemaRegistry registry = new SchemaRegistry();
         registry.register(metaKernel);
 

@@ -151,7 +151,7 @@ class AtomTypeParserFactoriesTest {
      */
     @Test
     void uriUsesTheRealMetaKernelResolvedEntryIncludingItsSchemaComposedRfcCitation() {
-        MetaSchema metaKernel = MetaKernelParser.parse();
+        MetaSchema metaKernel = MetaKernelParser.getMetaKernelSchema();
         Map<String, Object> result = readAgainstRealEntry("uri", metaKernel.entries().get("uri"),
                 "uri_type", AtomTypeParser.URI_TYPE, "{ value: \"https://example.com/a/b?x=1#frag\" }");
 
@@ -160,7 +160,7 @@ class AtomTypeParserFactoriesTest {
 
     @Test
     void regexUsesTheRealMetaKernelResolvedEntryIncludingItsSchemaComposedRfcCitation() {
-        MetaSchema metaKernel = MetaKernelParser.parse();
+        MetaSchema metaKernel = MetaKernelParser.getMetaKernelSchema();
         Map<String, Object> result = readAgainstRealEntry("regex", metaKernel.entries().get("regex"),
                 "regex_type", AtomTypeParser.REGEX_TYPE, "{ value: \"[a-z]+\" }");
 

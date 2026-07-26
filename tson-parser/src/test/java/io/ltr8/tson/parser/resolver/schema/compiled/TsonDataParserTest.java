@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class TsonDataParserTest {
 
     private static TsonDataParser dataParser() {
-        MetaSchema raw = MetaKernelParser.parse();
+        MetaSchema raw = MetaKernelParser.getMetaKernelSchema();
         TsonSchema registered = new SchemaRegistry().register(raw);
         return new TsonDataParser(TsonSchemaParser.compile(registered, ParserFactoryRegistry.dom()));
     }
@@ -59,7 +59,7 @@ class TsonDataParserTest {
     @Test
     void schemaAccessorReturnsTheWrappedCompiledSchema() {
         TsonSchemaParser compiled = TsonSchemaParser.compile(
-                new SchemaRegistry().register(MetaKernelParser.parse()), ParserFactoryRegistry.dom());
+                new SchemaRegistry().register(MetaKernelParser.getMetaKernelSchema()), ParserFactoryRegistry.dom());
         TsonDataParser parser = new TsonDataParser(compiled);
 
         assertEquals(compiled, parser.schema());

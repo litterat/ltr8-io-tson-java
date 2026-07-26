@@ -20,10 +20,6 @@ import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Unit;
 import io.ltr8.tson.schema.meta.UriType;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -46,10 +42,19 @@ import java.util.Optional;
  *
  * <p><b>Produces a {@link MetaSchema}, doesn't extend {@code TsonSchema}.</b> This class is a
  * stateless parser/resolver, the same shape as {@link SchemaParser}/{@link SchemaResolver} --
- * {@link #parse(String)} and {@link #parse()} each return a freshly-built {@link MetaSchema}
- * value rather than being one themselves. Its own output is a resolved-but-not-yet-registered
- * schema -- a caller registers it (and, separately, compiles it -- a distinct, later stage this
- * class has nothing to do with; see {@code SchemaValidator}/{@code TsonSchemaParser}).
+ * {@link #getMetaKernelSchema()} returns a freshly-built {@link MetaSchema} value rather than
+ * being one itself. Its own output is a resolved-but-not-yet-registered schema -- a caller
+ * registers it (and, separately, compiles it -- a distinct, later stage this class has nothing to
+ * do with; see {@code SchemaValidator}/{@code TsonSchemaParser}).
+ *
+ * <p><b>Deliberately locked down to exactly one public method, taking no arguments</b> (narrowed
+ * 2026-07-26, on the user's own explicit direction) -- this class exists to bootstrap *the* real
+ * meta-kernel document (see {@link BundledSchemaSource#META_KERNEL_ID}), nothing else. An earlier
+ * version also exposed {@code parse(String source)}, letting a caller resolve arbitrary
+ * meta-kernel-shaped text through this same two-pass machinery -- unused anywhere in this codebase
+ * (confirmed by grep, not assumed) and removed outright, not just deprecated, since keeping it
+ * around invites exactly the kind of "just reuse the bootstrap parser for this other thing" misuse
+ * this lock-down exists to prevent.
  *
  * <p><b>Every {@code Instance} declaration resolves through {@link #instanceBody}, a closed,
  * hand-written switch -- not {@code SchemaResolver}/{@code TsonMapperReader}, and not any
@@ -86,37 +91,26 @@ import java.util.Optional;
  * a general mechanism here at all: "the bootstrap compiler can do whatever tricks it needs to...
  * that includes not even compiling, just calling {@code new Xxx(...)}."
  *
- * <p><b>{@link #parse()} reads meta-kernel.tn1 packaged as a classpath resource</b> (see this
- * module's {@code build.gradle.kts}, which copies it straight from the repo's own {@code
- * spec/m/meta-kernel.tn1} snapshot into this module's resources at build time -- one file, not a
- * duplicated copy) rather than a filesystem path into the sibling {@code spec/} directory, so the
- * bootstrap works from a built jar, not just a repo checkout.
+ * <p><b>{@link #getMetaKernelSchema()} reads meta-kernel.tn1 packaged as a classpath resource, via
+ * {@link BundledSchemaSource}</b> (see this module's {@code build.gradle.kts}, which copies it
+ * straight from the repo's own {@code spec/m/meta-kernel.tn1} snapshot into this module's
+ * resources at build time -- one file, not a duplicated copy) rather than a filesystem path into
+ * the sibling {@code spec/} directory, so the bootstrap works from a built jar, not just a repo
+ * checkout. This class used to read that resource itself, directly -- now delegates to {@link
+ * BundledSchemaSource}, the one place this library's own bundled schema documents are fetched
+ * from, so the same classpath-reading logic isn't duplicated between the two classes.
  */
 public final class MetaKernelParser {
 
     private MetaKernelParser() {
     }
 
-    /** Parses the meta-kernel source bundled with this module (see class Javadoc). */
-    public static MetaSchema parse() {
-        return parse(readBundledSource());
-    }
-
-    public static MetaSchema parse(String source) {
+    /** Parses and resolves meta-kernel's own real, bundled source text (see class Javadoc). */
+    public static MetaSchema getMetaKernelSchema() {
+        String source = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID);
         SchemaDocument document = new SchemaParser(source).parseSchemaDocument();
         Map<String, TypeDefinition> entries = resolveEntries(document);
         return new MetaSchema(document.id(), document.meta(), document.imports(), entries);
-    }
-
-    private static String readBundledSource() {
-        try (InputStream in = MetaKernelParser.class.getResourceAsStream("/meta-kernel.tn1")) {
-            if (in == null) {
-                throw new IOException("meta-kernel.tn1 not found on the classpath");
-            }
-            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
     }
 
     private static Map<String, TypeDefinition> resolveEntries(SchemaDocument document) {

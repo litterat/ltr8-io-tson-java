@@ -34,7 +34,7 @@ class MetaTn1CompiledEndToEndTest {
      * TsonSchema}, unrelated to how it got resolved).
      */
     private static TsonSchema registerMeta() {
-        MetaSchema metaKernel = MetaKernelParser.parse();
+        MetaSchema metaKernel = MetaKernelParser.getMetaKernelSchema();
         SchemaRegistry registry = new SchemaRegistry();
         registry.register(metaKernel);
 

@@ -34,7 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ObjectRecordShapeFactoryTest {
 
     private static TsonSchemaParser compiled() {
-        MetaSchema raw = MetaKernelParser.parse();
+        MetaSchema raw = MetaKernelParser.getMetaKernelSchema();
         TsonSchema registered = new SchemaRegistry().register(raw);
         DataBindContext context = TsonAtomContext.defaultContext();
         return TsonSchemaParser.compile(registered, ParserFactoryRegistry.object(registered, context));
@@ -89,7 +89,7 @@ class ObjectRecordShapeFactoryTest {
         // registrations to resolve at all); 5 more (atom/product/sum/top/type_argument) resolve to
         // a real, deliberately non-record class and are silently skipped, not failures. Nothing
         // should throw.
-        MetaSchema raw = MetaKernelParser.parse();
+        MetaSchema raw = MetaKernelParser.getMetaKernelSchema();
         TsonSchema registered = new SchemaRegistry().register(raw);
         ObjectRecordShapeFactory shapeFactory = new ObjectRecordShapeFactory(TsonAtomContext.defaultContext());
 
@@ -98,7 +98,7 @@ class ObjectRecordShapeFactoryTest {
 
     @Test
     void validateReportsEveryUnresolvableEntryAtOnceRatherThanOneAtATime() {
-        MetaSchema raw = MetaKernelParser.parse();
+        MetaSchema raw = MetaKernelParser.getMetaKernelSchema();
         TsonSchema registered = new SchemaRegistry().register(raw);
         TypeNameBinder alwaysMissing = name -> {
             throw new ClassNotFoundException("no class for '" + name + "' under this test's own binder");

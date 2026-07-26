@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class MetaKernelEndToEndTest {
 
     private static TsonSchemaParser compiled() {
-        MetaSchema raw = MetaKernelParser.parse();
+        MetaSchema raw = MetaKernelParser.getMetaKernelSchema();
         TsonSchema registered = new SchemaRegistry().register(raw);
         return TsonSchemaParser.compile(registered, ParserFactoryRegistry.dom());
     }
@@ -46,7 +46,7 @@ class MetaKernelEndToEndTest {
      */
     @Test
     void allFiftyEightRealEntriesCompileCleanly() {
-        MetaSchema raw = MetaKernelParser.parse();
+        MetaSchema raw = MetaKernelParser.getMetaKernelSchema();
         TsonSchema registered = new SchemaRegistry().register(raw);
         TsonSchemaParser compiled = TsonSchemaParser.compile(registered, ParserFactoryRegistry.dom());
 

@@ -17,8 +17,9 @@ import java.util.Optional;
  * <ol>
  *   <li><b>Already compiled?</b> {@code registry.get(uri)} -- a plain cache hit, keyed the same
  *   (raw-{@code !!id}, not canonicalized) way {@link TsonCompiledRegistry} itself already is.</li>
- *   <li><b>Meta-kernel's own well-known identity?</b> Resolved via {@link MetaKernelParser#parse()}
- *   -- never through this coordinator's own generic path below, which would recurse forever: that
+ *   <li><b>Meta-kernel's own well-known identity?</b> Resolved via {@link
+ *   MetaKernelParser#getMetaKernelSchema()} -- never through this coordinator's own generic path
+ *   below, which would recurse forever: that
  *   path resolves a document via {@code SchemaResolver(this)}, and {@code SchemaResolver.resolveAll}
  *   itself calls back into {@link #resolve} for the document's own {@code !!meta} target -- fine for
  *   any real schema, whose {@code !!meta} points at something *other* than itself, but meta-kernel's
@@ -29,16 +30,17 @@ import java.util.Optional;
  *   narrower guarantee, not an oversight.
  *
  *   <p><b>Deliberately a one-off, never registered/cached in the *shared* registry</b> (on the
- *   user's own explicit direction): {@link MetaKernelParser#parse()}'s own output is run through a
- *   fresh, throwaway {@code SchemaRegistry} -- created and discarded right here, never the shared
- *   {@link #registry} this coordinator wraps -- purely so {@code SchemaValidator}'s own
+ *   user's own explicit direction): {@link MetaKernelParser#getMetaKernelSchema()}'s own output is
+ *   run through a fresh, throwaway {@code SchemaRegistry} -- created and discarded right here, never
+ *   the shared {@link #registry} this coordinator wraps -- purely so {@code SchemaValidator}'s own
  *   materialization/validation pass runs (synthesizing entries for argument-bearing {@code
  *   type_ref}s, e.g. {@code enum}'s own {@code members: set<token>}) before compiling ({@code
  *   TsonSchemaParser.compile}, using this coordinator's own {@link
  *   io.ltr8.tson.parser.resolver.schema.compiled.ParserFactoryRegistry} so it reads the same way
  *   anything else compiled here would). The *materialized* result is never passed to {@link
- *   TsonCompiledRegistry#register} -- so every call for {@link #META_KERNEL_ID} that isn't already a
- *   cache hit re-bootstraps, re-materializes, and re-compiles from scratch, every time -- only the
+ *   TsonCompiledRegistry#register} -- so every call for {@link BundledSchemaSource#META_KERNEL_ID}
+ *   that isn't already a cache hit re-bootstraps, re-materializes, and re-compiles from scratch,
+ *   every time -- only the
  *   *quality* of the one-off result changed (58 entries, matching a genuinely registered meta-kernel,
  *   not the raw 49), never its lifetime. Deliberately, not an oversight: the *permanent*, shared
  *   registry entry for meta-kernel is meant to come from an explicit, deliberate "load it (from disk,
@@ -56,8 +58,8 @@ import java.util.Optional;
  *   registered-only {@code SchemaLoader}, which knows nothing about this coordinator, its bootstrap
  *   case, or the throwaway registry used to materialize it. In practice this means a caller
  *   resolving anything beyond meta-kernel itself still needs to register meta-kernel explicitly
- *   first (e.g. {@code registry.register(MetaKernelParser.parse())}) before asking this coordinator
- *   for anything that transitively imports it -- materializing the one-off bootstrap result fixes
+ *   first (e.g. {@code registry.register(MetaKernelParser.getMetaKernelSchema())}) before asking
+ *   this coordinator for anything that transitively imports it -- materializing the one-off bootstrap result fixes
  *   *reading* through it correctly, not the separate *import-merge* requirement.</li>
  *   <li><b>Otherwise</b>, fetch {@code uri}'s own source text via this coordinator's own {@link
  *   SchemaSource} (default: {@link SchemaSource#registeredOnly()}, so nothing is fetched from
@@ -69,9 +71,6 @@ import java.util.Optional;
  * </ol>
  */
 public final class DefaultSchemaCoordinator implements SchemaCoordinator {
-
-    /** Meta-kernel's own real, published identity -- the one URI this coordinator never tries to fetch or resolve the ordinary way. */
-    public static final String META_KERNEL_ID = "https://tson.io/2026/32/m/meta-kernel.tn1";
 
     private final TsonCompiledRegistry registry;
     private final SchemaSource source;
@@ -92,8 +91,8 @@ public final class DefaultSchemaCoordinator implements SchemaCoordinator {
         if (cached.isPresent()) {
             return cached.get();
         }
-        if (META_KERNEL_ID.equals(uri)) {
-            MetaSchema metaKernel = MetaKernelParser.parse();
+        if (BundledSchemaSource.META_KERNEL_ID.equals(uri)) {
+            MetaSchema metaKernel = MetaKernelParser.getMetaKernelSchema();
             // A fresh, throwaway SchemaRegistry -- never the shared one this coordinator wraps --
             // purely so SchemaValidator's own materialization pass runs (synthesizing entries for
             // argument-bearing type-refs like enum's own `members: set<token>`) before compiling.

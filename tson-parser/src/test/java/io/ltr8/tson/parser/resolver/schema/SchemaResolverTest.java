@@ -1130,7 +1130,7 @@ class SchemaResolverTest {
         // integer_type itself is a constructor (constructor: true) -- refining it directly
         // ("!integer_type ^ {...}") is a resolver error; the diagnostic should point at
         // constructor application instead (§3.3.1).
-        Map<String, TypeDefinition> metaKernelEntries = MetaKernelParser.parse().entries();
+        Map<String, TypeDefinition> metaKernelEntries = MetaKernelParser.getMetaKernelSchema().entries();
         SchemaMap schemaMap = new SchemaParser("""
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 { bad => !integer_type ^ { min: 1 } }""").parseSchemaDocument().body();
@@ -1144,7 +1144,7 @@ class SchemaResolverTest {
     void atomRefinementRejectsANonAtomFamilySource() {
         // top resolves fine (a fresh record, kind PRODUCT by the structural default) but isn't
         // atom-family -- !top ^ {...} must be rejected (§5.5).
-        Map<String, TypeDefinition> metaKernelEntries = MetaKernelParser.parse().entries();
+        Map<String, TypeDefinition> metaKernelEntries = MetaKernelParser.getMetaKernelSchema().entries();
         SchemaMap schemaMap = new SchemaParser("""
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 { bad => !top ^ { x: integer } }""").parseSchemaDocument().body();
@@ -1255,14 +1255,14 @@ class SchemaResolverTest {
      * token" entry, the same bug {@code DefaultSchemaCoordinator}'s own bootstrap had), then compiled.
      */
     private static TsonSchemaParser metaKernelCompiled() {
-        io.ltr8.tson.schema.MetaSchema metaKernel = MetaKernelParser.parse();
+        io.ltr8.tson.schema.MetaSchema metaKernel = MetaKernelParser.getMetaKernelSchema();
         TsonSchema materialized = new io.ltr8.tson.schema.SchemaRegistry().register(metaKernel);
         return compileAsMetaParser(materialized.entries());
     }
 
     /** Meta-kernel registered, then meta.tn1 resolved and registered on top -- see {@code MetaSchemaImportTest} for the same, fully-verified pattern (31/31 declarations, validated). */
     private static TsonSchemaParser metaTn1Compiled() throws IOException {
-        io.ltr8.tson.schema.MetaSchema metaKernel = MetaKernelParser.parse();
+        io.ltr8.tson.schema.MetaSchema metaKernel = MetaKernelParser.getMetaKernelSchema();
         io.ltr8.tson.schema.SchemaRegistry registry = new io.ltr8.tson.schema.SchemaRegistry();
         registry.register(metaKernel);
         TsonSchemaParser metaKernelParser = metaKernelCompiled();
