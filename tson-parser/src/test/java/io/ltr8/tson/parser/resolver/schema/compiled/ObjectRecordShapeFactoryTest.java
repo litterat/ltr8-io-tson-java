@@ -1,7 +1,7 @@
 package io.ltr8.tson.parser.resolver.schema.compiled;
 
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.tson.parser.Parser;
+import io.ltr8.tson.parser.TsonDataParser;
 import io.ltr8.tson.parser.ast.Document;
 import io.ltr8.tson.parser.resolver.TsonAtomContext;
 import io.ltr8.tson.parser.resolver.schema.MetaKernelParser;
@@ -45,7 +45,7 @@ class ObjectRecordShapeFactoryTest {
         // type BigInteger), but TextType.minLength/maxLength are Optional<Integer> -- this is
         // exactly the narrowing path NumberNarrowing exists for.
         TsonCompiledSchema compiled = compiled();
-        Document document = new Parser("{ min_length: 3 max_length: 10 }").parseDocument();
+        Document document = new TsonDataParser("{ min_length: 3 max_length: 10 }").parseDocument();
 
         Object result = compiled.get("text_type").read(document.root());
 
@@ -70,7 +70,7 @@ class ObjectRecordShapeFactoryTest {
         // separately, see MetaKernelEndToEndTest's own "text, not a Java boolean" note), unrelated
         // to this change and out of scope for it.
         TsonCompiledSchema compiled = compiled();
-        Document document = new Parser("{ min: -5 max: 100 }").parseDocument();
+        Document document = new TsonDataParser("{ min: -5 max: 100 }").parseDocument();
 
         Object result = compiled.get("integer_type").read(document.root());
 

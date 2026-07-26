@@ -1,6 +1,6 @@
 package io.ltr8.tson.parser.resolver.schema.compiled;
 
-import io.ltr8.tson.parser.Parser;
+import io.ltr8.tson.parser.TsonDataParser;
 import io.ltr8.tson.parser.ast.Document;
 import io.ltr8.tson.parser.resolver.vocab.AtomValidationException;
 import io.ltr8.tson.schema.TsonSchema;
@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * End-to-end proof of the compiled-schema-parser sketch against the real {@link RecordParser} and
  * {@link AtomTypeParser#INTEGER_TYPE} -- a real (hand-built, but shaped exactly like a materialized
  * {@link TsonSchema} would be) schema compiled with a real registry, read against real TSON data
- * source text through the real {@link Parser}. Supersedes the minimal map-producing stand-in this
+ * source text through the real {@link TsonDataParser}. Supersedes the minimal map-producing stand-in this
  * class used before {@link RecordParser} existed -- same two original cases kept (now against the
  * real factory), plus new coverage for {@link RecordParser}'s own state/defaulting behavior.
  */
@@ -57,7 +57,7 @@ class RecordParserTest {
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> read(TsonCompiledSchema compiled, String source) {
-        Document document = new Parser(source).parseDocument();
+        Document document = new TsonDataParser(source).parseDocument();
         return (Map<String, Object>) compiled.get("point").read(document.root());
     }
 

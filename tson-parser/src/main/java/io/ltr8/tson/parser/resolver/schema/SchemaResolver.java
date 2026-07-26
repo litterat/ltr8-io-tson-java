@@ -1,7 +1,7 @@
 package io.ltr8.tson.parser.resolver.schema;
 
 import io.ltr8.bind.DataBindException;
-import io.ltr8.tson.parser.Parser;
+import io.ltr8.tson.parser.TsonDataParser;
 import io.ltr8.tson.parser.ast.CoreValue;
 import io.ltr8.tson.parser.ast.DataValue;
 import io.ltr8.tson.parser.ast.EmptyBrace;
@@ -617,7 +617,7 @@ public final class SchemaResolver {
     private CoreValue sourceSerializedFields(String name, Top sourceBody) {
         try {
             String sourceText = writer.toTson(sourceBody);
-            return new Parser(sourceText).parseDocument().root().coreValue();
+            return new TsonDataParser(sourceText).parseDocument().root().coreValue();
         } catch (DataBindException e) {
             throw new UnsupportedOperationException(
                     "'" + name + "': failed to re-serialize the refinement source: " + e.getMessage(), e);

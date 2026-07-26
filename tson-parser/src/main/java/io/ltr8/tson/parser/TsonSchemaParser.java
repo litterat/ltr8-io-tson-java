@@ -45,11 +45,11 @@ import java.util.Optional;
 
 /**
  * Parses a token stream into a {@link SchemaDocument} per the schema grammar of Part 2 §5 and its
- * ABNF (§12.1). Extends {@link Parser} to reuse the machinery Part 2 itself says it imports from
+ * ABNF (§12.1). Extends {@link TsonDataParser} to reuse the machinery Part 2 itself says it imports from
  * Part 1 §7.4 -- {@code annotation}, {@code data-value}, directive parsing, and the separator/
  * adjacency primitives -- rather than re-implementing identical grammar a second time (see {@link
- * Parser}'s own Javadoc on why it isn't {@code final}). Deliberately in the same package and
- * module as {@code Parser} and {@code Lexer}, not a separate module: the schema *grammar* is just
+ * TsonDataParser}'s own Javadoc on why it isn't {@code final}). Deliberately in the same package and
+ * module as {@code TsonDataParser} and {@code Lexer}, not a separate module: the schema *grammar* is just
  * as tightly coupled to the shared lexer/parser machinery as the data grammar is (§1.3: "higher
  * parts introduce no new tokens, no new lexer modes"), the same reasoning that already keeps the
  * lexer and structural parser in one module. {@code tson-schema} is reserved for the *produced*
@@ -61,9 +61,9 @@ import java.util.Optional;
  * lookups, no {@code type_definition} materialisation, no IS-A computation -- all §8 concerns).
  * "Building the schema" here means the grammar layer only.
  */
-public final class SchemaParser extends Parser {
+public final class TsonSchemaParser extends TsonDataParser {
 
-    public SchemaParser(String source) {
+    public TsonSchemaParser(String source) {
         super(source);
     }
 
@@ -324,7 +324,7 @@ public final class SchemaParser extends Parser {
         List<GroupDef.Member> members = new ArrayList<>();
         members.add(parseGroupMember());
         if (!check(TokenType.PIPE)) {
-            throw new ParseException("a field group requires at least two members separated by '|' (§5.11)", start);
+            throw new TsonParseException("a field group requires at least two members separated by '|' (§5.11)", start);
         }
         while (check(TokenType.PIPE)) {
             advance();
@@ -372,7 +372,7 @@ public final class SchemaParser extends Parser {
         List<TypeRef> variants = new ArrayList<>();
         variants.add(parseTypeRef());
         if (!check(TokenType.PIPE)) {
-            throw new ParseException("a choice type requires at least two variants separated by '|' (§5.4)", start);
+            throw new TsonParseException("a choice type requires at least two variants separated by '|' (§5.4)", start);
         }
         while (check(TokenType.PIPE)) {
             advance();
@@ -538,7 +538,7 @@ public final class SchemaParser extends Parser {
 
     private void rejectNumericTypeName(Token t) {
         if (NumberGrammar.tryParse(t.text()).isPresent()) {
-            throw new ParseException("'" + t.text() + "' is not a valid type name -- "
+            throw new TsonParseException("'" + t.text() + "' is not a valid type name -- "
                     + "names that match the number grammar are not declarable (§12.1)", t.start());
         }
     }

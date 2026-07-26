@@ -261,7 +261,7 @@ class TsonMapperReaderTest {
     @Test
     void mapRejectsAbsentSentinelAsKey() {
         // §2.9: "_" MUST NOT appear as a map key -- a resolver-layer constraint, not a grammar
-        // one, so the parser itself accepts { _ => 1 } (see ParserTest); toMap is where it's
+        // one, so the parser itself accepts { _ => 1 } (see TsonDataParserTest); toMap is where it's
         // actually rejected.
         assertThrows(DataBindException.class, () -> mapper.toObject("{ counts: { _ => 3 } }", CountsHolder.class));
     }

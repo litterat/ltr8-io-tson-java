@@ -1,6 +1,6 @@
 package io.ltr8.tson.parser.resolver.schema.compiled;
 
-import io.ltr8.tson.parser.Parser;
+import io.ltr8.tson.parser.TsonDataParser;
 import io.ltr8.tson.parser.ast.Document;
 import io.ltr8.tson.schema.SchemaRegistry;
 import io.ltr8.tson.schema.TsonSchema;
@@ -73,7 +73,7 @@ class VariantParserTest {
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> read(TsonCompiledSchema compiled, String rootName, String source) {
-        Document document = new Parser(source).parseDocument();
+        Document document = new TsonDataParser(source).parseDocument();
         return (Map<String, Object>) compiled.get(rootName).read(document.root());
     }
 

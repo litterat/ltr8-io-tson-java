@@ -12,7 +12,7 @@ import io.ltr8.bind.DataClassMap;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassTuple;
 import io.ltr8.bind.DataClassUnion;
-import io.ltr8.tson.parser.Parser;
+import io.ltr8.tson.parser.TsonDataParser;
 import io.ltr8.tson.parser.ast.AbsentValue;
 import io.ltr8.tson.parser.ast.ArrayValue;
 import io.ltr8.tson.parser.ast.CoreValue;
@@ -53,14 +53,14 @@ import java.util.Optional;
  * clean.
  *
  * <p>Unlike {@code litterat-json}'s {@code JsonMapper}, this reads from an already-parsed AST
- * (the {@code Parser} has already built the full tree) rather than a live token stream, so there's
+ * (the {@code TsonDataParser} has already built the full tree) rather than a live token stream, so there's
  * no need to buffer array elements into a temporary list first -- {@code ArrayValue.elements()}
  * is already a concrete {@code List}.
  *
  * <p>Atom binding first checks whether the value carries a type-ref at all. If it does, {@link
  * BuiltinTypeVocabulary} must resolve it (§5) -- an unrecognized type-ref is a binding error here,
  * not silently ignored, even though the Class 1 processing step underneath (§5.1) is required to
- * (and does, in {@code tson-parser}'s {@code Parser}/{@code BaseTypeResolver}) preserve an
+ * (and does, in {@code tson-parser}'s {@code TsonDataParser}/{@code BaseTypeResolver}) preserve an
  * unrecognized annotation as an uninterpreted marker rather than erroring -- that rule is about
  * passive preservation during parsing, not about what an application actively binding the value to
  * a caller-declared Java type should do with a marker it can't interpret; see SPEC-FEEDBACK.md #7.
@@ -89,7 +89,7 @@ public final class TsonMapperReader {
     // ── Entry points ─────────────────────────────────────────────────────
 
     public <T> T toObject(String tsonSource, Class<T> targetClass) throws DataBindException {
-        Document document = new Parser(tsonSource).parseDocument();
+        Document document = new TsonDataParser(tsonSource).parseDocument();
         return toObject(document.root(), targetClass);
     }
 
@@ -142,7 +142,7 @@ public final class TsonMapperReader {
 
         Optional<String> typeRef = value.typeRef();
         if (typeRef.isPresent()) {
-            // Unlike the Class 1 processing step underneath us (Parser/BaseTypeResolver, which
+            // Unlike the Class 1 processing step underneath us (TsonDataParser/BaseTypeResolver, which
             // correctly preserves an unrecognized type-ref as an uninterpreted marker per §5.1),
             // an unresolvable annotation on a value we're actively binding to a caller-declared
             // Java type is treated as an error here, not silent fallthrough -- see
@@ -263,7 +263,7 @@ public final class TsonMapperReader {
      * <p>§2.9: the absent sentinel {@code _} "MUST NOT appear as a map key -- a resolver-layer
      * constraint, not a grammar constraint: the map-entry production accepts any value in key
      * position, and the resolver rejects absent keys." The structural parser correctly allows
-     * {@code { _ => 1 } } through (confirmed by {@code ParserTest}) since that's a grammar-level
+     * {@code { _ => 1 } } through (confirmed by {@code TsonDataParserTest}) since that's a grammar-level
      * permission, not a resolver one -- this is the one place that resolver-layer rejection
      * actually happens, since nothing between the parser and here is positioned to enforce it.
      */

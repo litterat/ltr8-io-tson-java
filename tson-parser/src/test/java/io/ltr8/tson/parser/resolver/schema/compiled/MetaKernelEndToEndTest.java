@@ -1,6 +1,6 @@
 package io.ltr8.tson.parser.resolver.schema.compiled;
 
-import io.ltr8.tson.parser.Parser;
+import io.ltr8.tson.parser.TsonDataParser;
 import io.ltr8.tson.parser.ast.Document;
 import io.ltr8.tson.parser.resolver.schema.MetaKernelParser;
 import io.ltr8.tson.schema.LinkedTsonSchema;
@@ -63,7 +63,7 @@ class MetaKernelEndToEndTest {
         // in the schema. A value with no type annotation at a top-typed position is a real, valid
         // "just a top" reading, not an error demanding one of its many subtypes be named.
         TsonCompiledSchema compiled = compiled();
-        Document document = new Parser("{}").parseDocument();
+        Document document = new TsonDataParser("{}").parseDocument();
 
         @SuppressWarnings("unchecked")
         Map<String, Object> result = (Map<String, Object>) compiled.get("top").read(document.root());
@@ -74,7 +74,7 @@ class MetaKernelEndToEndTest {
     @Test
     void explicitTypeRefNamingTheDeclarationItselfAlsoUsesItsOwnBody() {
         TsonCompiledSchema compiled = compiled();
-        Document document = new Parser("!top {}").parseDocument();
+        Document document = new TsonDataParser("!top {}").parseDocument();
 
         @SuppressWarnings("unchecked")
         Map<String, Object> result = (Map<String, Object>) compiled.get("top").read(document.root());
@@ -87,7 +87,7 @@ class MetaKernelEndToEndTest {
         // The exact fix under test: enum => ~atom & { members: set<token> } -- previously
         // unbuildable (set<token> fell back to an unusable placeholder), now a genuine ArrayBody.
         TsonCompiledSchema compiled = compiled();
-        Document document = new Parser("{ members: [true false] }").parseDocument();
+        Document document = new TsonDataParser("{ members: [true false] }").parseDocument();
 
         @SuppressWarnings("unchecked")
         Map<String, Object> result = (Map<String, Object>) compiled.get("enum").read(document.root());
@@ -98,7 +98,7 @@ class MetaKernelEndToEndTest {
     @Test
     void readsIntegerSizeAgainstRealData() {
         TsonCompiledSchema compiled = compiled();
-        Document document = new Parser("{ bits: 32 signed: true }").parseDocument();
+        Document document = new TsonDataParser("{ bits: 32 signed: true }").parseDocument();
 
         @SuppressWarnings("unchecked")
         Map<String, Object> result = (Map<String, Object>) compiled.get("integer_size").read(document.root());
@@ -110,7 +110,7 @@ class MetaKernelEndToEndTest {
     @Test
     void readsFieldGroupAgainstRealData() {
         TsonCompiledSchema compiled = compiled();
-        Document document = new Parser("{ members: [foo bar] state: OPTIONAL }").parseDocument();
+        Document document = new TsonDataParser("{ members: [foo bar] state: OPTIONAL }").parseDocument();
 
         @SuppressWarnings("unchecked")
         Map<String, Object> result = (Map<String, Object>) compiled.get("field_group").read(document.root());
@@ -122,7 +122,7 @@ class MetaKernelEndToEndTest {
     @Test
     void readsTupleElementAgainstRealNestedData() {
         TsonCompiledSchema compiled = compiled();
-        Document document = new Parser("{ element_type: { name: text arguments: [] } state: REQUIRED }").parseDocument();
+        Document document = new TsonDataParser("{ element_type: { name: text arguments: [] } state: REQUIRED }").parseDocument();
 
         @SuppressWarnings("unchecked")
         Map<String, Object> result = (Map<String, Object>) compiled.get("tuple_element").read(document.root());

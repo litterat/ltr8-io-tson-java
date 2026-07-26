@@ -9,17 +9,17 @@ import io.ltr8.tson.parser.lexer.Position;
  * (§1.5: "A Class 1 processor rejects schema documents with a categorized diagnostic"; §8.1:
  * "MUST report the document as a TSON schema document that this processor does not support").
  *
- * <p>Deliberately not a {@link ParseException}: the input isn't malformed -- it may be a
+ * <p>Deliberately not a {@link TsonParseException}: the input isn't malformed -- it may be a
  * perfectly well-formed schema document per [TSON-SCHEMA] -- this processor simply doesn't
  * implement that layer.
  */
-public final class SchemaDocumentException extends RuntimeException {
+public final class TsonUnsupportedDocumentException extends RuntimeException {
 
     private static final long serialVersionUID = 1L;
 
     private final transient Position position;
 
-    public SchemaDocumentException(Position position) {
+    public TsonUnsupportedDocumentException(Position position) {
         super("this is a TSON schema document (header contains !!meta); "
                 + "a Class 1 (data-format-only) processor does not support schema documents"
                 + " at line " + position.line() + ", column " + position.column());

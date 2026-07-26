@@ -6,14 +6,14 @@ import java.util.regex.Pattern;
 
 /**
  * Builds TSON source text incrementally -- the write-side counterpart to {@link Lexer}/{@link
- * Parser}'s read side, and just as agnostic of any particular Java object model: this class knows
+ * TsonDataParser}'s read side, and just as agnostic of any particular Java object model: this class knows
  * TSON's own grammar (delimiters, separators, escaping) and nothing about {@code DataClass} or
  * any bound Java type. {@code TsonMapper} is the layer that walks a Java object graph and drives
- * this writer, the same relationship it already has with {@code Parser}'s output on the read side.
+ * this writer, the same relationship it already has with {@code TsonDataParser}'s output on the read side.
  *
  * <p><b>Separation, not commas.</b> Confirmed against §2.4 and this repo's own test literals: TSON
  * never requires a comma between sibling elements -- "zero-width separation is a parse error", not
- * "a comma is required" (`Parser.consumeSeparatorOrCloseCheck`'s own doc: "a real comma token is
+ * "a comma is required" (`TsonDataParser.consumeSeparatorOrCloseCheck`'s own doc: "a real comma token is
  * optional evidence, a position gap is the other kind of evidence"). This writer always inserts a
  * single space before every element (including the first, right after an opening delimiter) and
  * before a non-empty scope's closing delimiter -- {@code { x: 1 y: 2 }}, not {@code {x: 1, y: 2}}
@@ -21,7 +21,7 @@ import java.util.regex.Pattern;
  *
  * <p>Not thread-safe; single-use, like {@link Lexer}.
  */
-public final class TsonWriter {
+public final class TsonDataEmitter {
 
     private final StringBuilder out = new StringBuilder();
 
@@ -32,53 +32,53 @@ public final class TsonWriter {
 
     // ── Records and maps (both "{" "}", differing only in entry shape) ─────
 
-    public TsonWriter beginRecord() {
+    public TsonDataEmitter beginRecord() {
         return open('{');
     }
 
-    public TsonWriter endRecord() {
+    public TsonDataEmitter endRecord() {
         return close('}');
     }
 
-    public TsonWriter beginMap() {
+    public TsonDataEmitter beginMap() {
         return open('{');
     }
 
-    public TsonWriter endMap() {
+    public TsonDataEmitter endMap() {
         return close('}');
     }
 
     /** {@code name:} -- inserts the inter-element separator itself; the value follows directly. */
-    public TsonWriter field(String name) {
+    public TsonDataEmitter field(String name) {
         beforeElement();
         out.append(name).append(':').append(' ');
         return this;
     }
 
     /** Call before writing a map entry's key (itself a full data-value, §2.6). */
-    public TsonWriter beforeMapEntry() {
+    public TsonDataEmitter beforeMapEntry() {
         beforeElement();
         return this;
     }
 
     /** {@code =>} between a map entry's key and value, once the key has been written. */
-    public TsonWriter mapArrow() {
+    public TsonDataEmitter mapArrow() {
         out.append(" => ");
         return this;
     }
 
     // ── Arrays (also used for tuples -- same "[" "]" shape, §2.7) ───────────
 
-    public TsonWriter beginArray() {
+    public TsonDataEmitter beginArray() {
         return open('[');
     }
 
-    public TsonWriter endArray() {
+    public TsonDataEmitter endArray() {
         return close(']');
     }
 
     /** Call before writing each array/tuple element. */
-    public TsonWriter beforeArrayElement() {
+    public TsonDataEmitter beforeArrayElement() {
         beforeElement();
         return this;
     }
@@ -86,7 +86,7 @@ public final class TsonWriter {
     // ── Type annotations (§3.2) ─────────────────────────────────────────────
 
     /** {@code !name }, adjacent to {@code name} per §3.2, one trailing space before the value. */
-    public TsonWriter typeRef(String name) {
+    public TsonDataEmitter typeRef(String name) {
         out.append('!').append(name).append(' ');
         return this;
     }
@@ -94,18 +94,18 @@ public final class TsonWriter {
     // ── Leaf tokens ──────────────────────────────────────────────────────────
 
     /** {@code null}, the base type (§4.1) -- distinct from {@link #absentValue()}. */
-    public TsonWriter nullValue() {
+    public TsonDataEmitter nullValue() {
         out.append("null");
         return this;
     }
 
     /** {@code _}, the absent sentinel (§2.9) -- distinct from {@link #nullValue()}. */
-    public TsonWriter absentValue() {
+    public TsonDataEmitter absentValue() {
         out.append('_');
         return this;
     }
 
-    public TsonWriter booleanValue(boolean value) {
+    public TsonDataEmitter booleanValue(boolean value) {
         out.append(value ? "true" : "false");
         return this;
     }
@@ -115,7 +115,7 @@ public final class TsonWriter {
      * being valid unquoted-token content (a plain number's digits, an enum's {@code name()}, ...).
      * Never used for arbitrary strings; see {@link #quotedString(String)} for those.
      */
-    public TsonWriter unquotedToken(String text) {
+    public TsonDataEmitter unquotedToken(String text) {
         out.append(text);
         return this;
     }
@@ -126,7 +126,7 @@ public final class TsonWriter {
      * C0 control characters (named escapes where the lexer recognises one, {@code \\uXXXX}
      * otherwise) -- and leaves everything else, including non-ASCII text, literal.
      */
-    public TsonWriter quotedString(String text) {
+    public TsonDataEmitter quotedString(String text) {
         out.append('"');
         int length = text.length();
         for (int i = 0; i < length; i++) {
@@ -154,13 +154,13 @@ public final class TsonWriter {
 
     // ── Scope bookkeeping ────────────────────────────────────────────────────
 
-    private TsonWriter open(char delimiter) {
+    private TsonDataEmitter open(char delimiter) {
         out.append(delimiter);
         scopeElementCounts.push(0);
         return this;
     }
 
-    private TsonWriter close(char delimiter) {
+    private TsonDataEmitter close(char delimiter) {
         int count = scopeElementCounts.pop();
         if (count > 0) {
             out.append(' ');

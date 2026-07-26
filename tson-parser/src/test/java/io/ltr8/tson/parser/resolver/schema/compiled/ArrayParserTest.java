@@ -1,6 +1,6 @@
 package io.ltr8.tson.parser.resolver.schema.compiled;
 
-import io.ltr8.tson.parser.Parser;
+import io.ltr8.tson.parser.TsonDataParser;
 import io.ltr8.tson.parser.ast.Document;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
@@ -55,7 +55,7 @@ class ArrayParserTest {
 
     @SuppressWarnings("unchecked")
     private static List<Object> readArray(TsonCompiledSchema compiled, String rootName, String source) {
-        Document document = new Parser(source).parseDocument();
+        Document document = new TsonDataParser(source).parseDocument();
         return (List<Object>) compiled.get(rootName).read(document.root());
     }
 
@@ -133,7 +133,7 @@ class ArrayParserTest {
                 RecordBody.of(List.of(RecordField.required("items", TypeRef.of("numbers"))))));
         TsonCompiledSchema compiled = compile(extra);
 
-        Document document = new Parser("{ items: [1 2 3] }").parseDocument();
+        Document document = new TsonDataParser("{ items: [1 2 3] }").parseDocument();
         @SuppressWarnings("unchecked")
         Map<String, Object> result = (Map<String, Object>) compiled.get("holder").read(document.root());
 

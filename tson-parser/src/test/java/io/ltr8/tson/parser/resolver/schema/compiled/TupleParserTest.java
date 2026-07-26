@@ -1,6 +1,6 @@
 package io.ltr8.tson.parser.resolver.schema.compiled;
 
-import io.ltr8.tson.parser.Parser;
+import io.ltr8.tson.parser.TsonDataParser;
 import io.ltr8.tson.parser.ast.Document;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ElementState;
@@ -48,7 +48,7 @@ class TupleParserTest {
 
     @SuppressWarnings("unchecked")
     private static List<Object> readTuple(TsonCompiledSchema compiled, String source) {
-        Document document = new Parser(source).parseDocument();
+        Document document = new TsonDataParser(source).parseDocument();
         return (List<Object>) compiled.get("pair").read(document.root());
     }
 

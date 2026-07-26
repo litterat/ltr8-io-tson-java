@@ -35,29 +35,29 @@ import java.util.Optional;
  * via {@link Position} equality (§7.5). The inverse also comes up once: valueless annotations
  * require a whitespace <em>gap</em> to follow (§3.1), checked as positions being unequal.
  *
- * <p>Rejects schema documents (header containing {@code !!meta}) with {@link SchemaDocumentException}
+ * <p>Rejects schema documents (header containing {@code !!meta}) with {@link TsonUnsupportedDocumentException}
  * rather than attempting to parse them -- this is a Class 1 (data-format-only) processor (§1.5).
  *
- * <p><b>Not {@code final}, deliberately.</b> {@link SchemaParser} (Part 2's schema-document parser,
+ * <p><b>Not {@code final}, deliberately.</b> {@link TsonSchemaParser} (Part 2's schema-document parser,
  * same package) extends this class to reuse the machinery [TSON-SCHEMA] itself says it imports
  * from [TSON-DATA] §7.4 -- {@code annotation}, {@code data-value}, directive parsing (identical
  * shape for {@code !!id}/{@code !!meta}/{@code !!import}), and the separator/adjacency primitives
  * -- rather than re-implementing identical grammar a second time. The fields and helper methods
- * {@link SchemaParser} needs are package-private (not {@code private}); everything else (record/
+ * {@link TsonSchemaParser} needs are package-private (not {@code private}); everything else (record/
  * map parsing, the data-grammar's own {@code !type} handling) stays {@code private}, since the
  * schema grammar has its own, different rules at those points and never calls into this class's
  * versions of them. {@code parseCoreValue} is the one exception widened for {@code instance =
  * "!" type-name ws core-value} (§12.1, §5.5, corrected -- see {@code SPEC-FEEDBACK.md}):
- * {@code SchemaParser} needs the bare {@code core-value} production directly, not the wider
+ * {@code TsonSchemaParser} needs the bare {@code core-value} production directly, not the wider
  * {@code data-value} ({@code parseDataValue}'s own annotations/type-ref layer would let a
  * constructor-application payload carry a second, nonsensical type-ref).
  */
-public class Parser {
+public class TsonDataParser {
 
     final List<Token> tokens;
     int pos;
 
-    public Parser(String source) {
+    public TsonDataParser(String source) {
         this.tokens = new Lexer(source).tokenize();
         this.pos = 0;
     }
@@ -71,12 +71,12 @@ public class Parser {
         if (check(TokenType.DIRECTIVE) && "meta".equals(peekDirectiveName())) {
             // Parse (and URI-validate) the directive itself before rejecting the document as an
             // unsupported-but-well-formed schema document -- a malformed !!meta argument is a
-            // genuine ParseException, not merely "a kind of document we don't implement" (see
-            // SchemaDocumentException's own Javadoc on that distinction). Position is captured
+            // genuine TsonParseException, not merely "a kind of document we don't implement" (see
+            // TsonUnsupportedDocumentException's own Javadoc on that distinction). Position is captured
             // before parsing so the diagnostic still points at the directive, not past it.
             Position metaStart = peek().start();
             parseNamedDirective("meta");
-            throw new SchemaDocumentException(metaStart);
+            throw new TsonUnsupportedDocumentException(metaStart);
         }
 
         Optional<String> schema = Optional.empty();
@@ -210,7 +210,7 @@ public class Parser {
      * This does reach from the structural parser into the resolver's vocabulary package, unlike
      * every other check in this class -- deliberately: §3.3's URI requirement is part of a
      * directive's own grammar ("a Class 1 processor... enforces directive grammar in full"), not
-     * base type resolution (§4) applied to an arbitrary core-value, which is what {@code Parser}
+     * base type resolution (§4) applied to an arbitrary core-value, which is what {@code TsonDataParser}
      * otherwise stays out of.
      */
     String parseNamedDirective(String expectedName) {
@@ -252,7 +252,7 @@ public class Parser {
             // section, about the !uri atom), which would be a misleading citation here: this
             // check's requirement comes from §3.3 (directive grammar), even though the mechanism
             // checking it is shared with !uri.
-            throw new ParseException(
+            throw new TsonParseException(
                     "'!!" + expectedName + "' argument '" + arg.text() + "' is not a valid URI (§3.3)", arg.start());
         }
         return arg.text();
@@ -412,8 +412,8 @@ public class Parser {
         return advance();
     }
 
-    ParseException parseError(String message) {
-        return new ParseException(message, peek().start());
+    TsonParseException parseError(String message) {
+        return new TsonParseException(message, peek().start());
     }
 
     static String describe(Token t) {

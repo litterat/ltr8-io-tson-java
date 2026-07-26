@@ -1,6 +1,6 @@
 package io.ltr8.tson.parser.resolver.schema;
 
-import io.ltr8.tson.parser.SchemaParser;
+import io.ltr8.tson.parser.TsonSchemaParser;
 import io.ltr8.tson.parser.ast.schema.SchemaDocument;
 import io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledRegistry;
 import io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledSchema;
@@ -108,7 +108,7 @@ public final class DefaultSchemaCoordinator implements SchemaCoordinator {
             return TsonSchemaCompiler.compile(linked.schema(), registry.factories());
         }
         String sourceText = source.fetch(uri);
-        SchemaDocument document = new SchemaParser(sourceText).parseSchemaDocument();
+        SchemaDocument document = new TsonSchemaParser(sourceText).parseSchemaDocument();
         SchemaResolver resolver = new SchemaResolver(this);
         TsonSchema resolved = resolver.resolveAll(document);
         return registry.register(resolved);

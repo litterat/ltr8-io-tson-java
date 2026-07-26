@@ -2,7 +2,7 @@ package io.ltr8.tson.parser.resolver.schema;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
-import io.ltr8.tson.parser.SchemaParser;
+import io.ltr8.tson.parser.TsonSchemaParser;
 import io.ltr8.tson.parser.ast.schema.SchemaDocument;
 import io.ltr8.tson.parser.ast.schema.SchemaMap;
 import io.ltr8.tson.parser.mapper.TsonMapperWriter;
@@ -100,7 +100,7 @@ class SchemaResolverTest {
 
     @Test
     void resolvesAFreshRecordWithPlainRequiredFields() throws DataBindException {
-        SchemaDocument doc = new SchemaParser("""
+        SchemaDocument doc = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 { integer_size => { bits: integer  signed: boolean } }""").parseSchemaDocument();
         SchemaMap.Declaration declaration = doc.body().declarations().get("integer_size");
@@ -112,7 +112,7 @@ class SchemaResolverTest {
 
     @Test
     void resolvesIntegerSizeFromTheRealMetaKernelFixture() throws IOException, DataBindException {
-        SchemaDocument doc = new SchemaParser(readFixture()).parseSchemaDocument();
+        SchemaDocument doc = new TsonSchemaParser(readFixture()).parseSchemaDocument();
         SchemaMap.Declaration declaration = doc.body().declarations().get("integer_size");
 
         TypeDefinition resolved = resolver.resolve(declaration);
@@ -122,7 +122,7 @@ class SchemaResolverTest {
 
     @Test
     void resolveAllResolvesEveryDeclarationInSourceOrder() throws DataBindException {
-        SchemaDocument doc = new SchemaParser("""
+        SchemaDocument doc = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 {
                   integer_size => { bits: integer  signed: boolean }
@@ -145,7 +145,7 @@ class SchemaResolverTest {
      */
     @Test
     void structureNamespaceOverloadsAreInertUntilInstanceAtomRefinementDispatchExists() throws DataBindException {
-        SchemaDocument doc = new SchemaParser("""
+        SchemaDocument doc = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 {
                   integer_size => { bits: integer  signed: boolean }
@@ -238,7 +238,7 @@ class SchemaResolverTest {
 
     @Test
     void resolvesTopAsAFreshEmptyRecord() throws IOException, DataBindException {
-        SchemaMap schemaMap = new SchemaParser(readFixture()).parseSchemaDocument().body();
+        SchemaMap schemaMap = new TsonSchemaParser(readFixture()).parseSchemaDocument().body();
 
         TypeDefinition top = resolver.resolve(schemaMap.declarations().get("top"));
 
@@ -250,7 +250,7 @@ class SchemaResolverTest {
 
     @Test
     void resolvesAtomProductSumAndReferenceByComposingWithTop() throws IOException, DataBindException {
-        SchemaMap schemaMap = new SchemaParser(readFixture()).parseSchemaDocument().body();
+        SchemaMap schemaMap = new TsonSchemaParser(readFixture()).parseSchemaDocument().body();
         Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
 
@@ -299,7 +299,7 @@ class SchemaResolverTest {
 
     @Test
     void resolvesIntegerTypeWithFieldGroupsAndOptionalFields() throws IOException, DataBindException {
-        SchemaMap schemaMap = new SchemaParser(readFixture()).parseSchemaDocument().body();
+        SchemaMap schemaMap = new TsonSchemaParser(readFixture()).parseSchemaDocument().body();
         Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
         resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom"), resolved));
@@ -333,7 +333,7 @@ class SchemaResolverTest {
 
     @Test
     void resolvesBareTypeReferencesToAReferenceKindEntry() throws IOException, DataBindException {
-        SchemaMap schemaMap = new SchemaParser(readFixture()).parseSchemaDocument().body();
+        SchemaMap schemaMap = new TsonSchemaParser(readFixture()).parseSchemaDocument().body();
 
         TypeDefinition typeName = resolver.resolve(schemaMap.declarations().get("type_name"));
         TypeDefinition fieldName = resolver.resolve(schemaMap.declarations().get("field_name"));
@@ -384,7 +384,7 @@ class SchemaResolverTest {
     @Test
     void resolvesAFieldsInlineArraySugarFromTheRealMetaKernelFixture() throws IOException, DataBindException {
         // type_ref => { name: type_name  arguments: [type_argument]? }
-        SchemaMap schemaMap = new SchemaParser(readFixture()).parseSchemaDocument().body();
+        SchemaMap schemaMap = new TsonSchemaParser(readFixture()).parseSchemaDocument().body();
 
         TypeDefinition typeRefDef = resolver.resolve(schemaMap.declarations().get("type_ref"));
 
@@ -491,7 +491,7 @@ class SchemaResolverTest {
 
     @Test
     void resolvesSchemasOwnMapApplicationFromTheRealMetaKernelFixture() throws IOException, DataBindException {
-        SchemaMap schemaMap = new SchemaParser(readFixture()).parseSchemaDocument().body();
+        SchemaMap schemaMap = new TsonSchemaParser(readFixture()).parseSchemaDocument().body();
 
         TypeDefinition schema = resolver.resolve(schemaMap.declarations().get("schema"));
 
@@ -525,7 +525,7 @@ class SchemaResolverTest {
 
     @Test
     void resolvesACompositionsTypeParameters() throws DataBindException {
-        SchemaMap schemaMap = new SchemaParser("""
+        SchemaMap schemaMap = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 {
                   base => {}
@@ -552,7 +552,7 @@ class SchemaResolverTest {
     void resolvesTupleElementFromTheRealMetaKernelFixture() throws IOException, DataBindException {
         // tuple_element => { element_type: type_ref  state: element_state ~ REQUIRED } -- a fresh
         // record (no supertypes, so no tightening involved), exercising an ordinary literal default.
-        SchemaMap schemaMap = new SchemaParser(readFixture()).parseSchemaDocument().body();
+        SchemaMap schemaMap = new TsonSchemaParser(readFixture()).parseSchemaDocument().body();
 
         TypeDefinition tupleElement = resolver.resolve(schemaMap.declarations().get("tuple_element"));
 
@@ -569,7 +569,7 @@ class SchemaResolverTest {
     void resolvesFieldGroupFromTheRealMetaKernelFixture() throws IOException, DataBindException {
         // field_group => { members: [field_name]  state: element_state ~ REQUIRED } -- a fresh
         // record combining the inline array sugar with an ordinary literal default modifier.
-        SchemaMap schemaMap = new SchemaParser(readFixture()).parseSchemaDocument().body();
+        SchemaMap schemaMap = new TsonSchemaParser(readFixture()).parseSchemaDocument().body();
 
         TypeDefinition fieldGroup = resolver.resolve(schemaMap.declarations().get("field_group"));
 
@@ -635,7 +635,7 @@ class SchemaResolverTest {
 
     @Test
     void resolvesArrayFromTheRealMetaKernelFixtureTighteningProductsInheritedFields() throws IOException, DataBindException {
-        SchemaMap schemaMap = new SchemaParser(readFixture()).parseSchemaDocument().body();
+        SchemaMap schemaMap = new TsonSchemaParser(readFixture()).parseSchemaDocument().body();
         Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
         resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom"), resolved));
@@ -670,7 +670,7 @@ class SchemaResolverTest {
 
     @Test
     void resolvesMapFromTheRealMetaKernelFixtureTighteningProductsInheritedFields() throws IOException, DataBindException {
-        SchemaMap schemaMap = new SchemaParser(readFixture()).parseSchemaDocument().body();
+        SchemaMap schemaMap = new TsonSchemaParser(readFixture()).parseSchemaDocument().body();
         Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
         resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom"), resolved));
@@ -703,7 +703,7 @@ class SchemaResolverTest {
     void tighteningRejectsAnInvalidStateTransition() {
         // "count" is inherited REQUIRED; tightening it to OPTIONAL is not a permitted transition
         // (§5.7's table: REQUIRED -> OPTIONAL is an error).
-        SchemaMap schemaMap = new SchemaParser("""
+        SchemaMap schemaMap = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 {
                   base => { count: integer }
@@ -721,7 +721,7 @@ class SchemaResolverTest {
     void resolvesAnElidedTypeRefInATighteningEntryByInheritingTheSourcesType() throws DataBindException {
         // "field: = value" with no type-ref restated inherits the source declaration's type
         // (§5.7's "Elided type-refs"), tightening only the value/state.
-        SchemaMap schemaMap = new SchemaParser("""
+        SchemaMap schemaMap = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 {
                   config => { host: text  port: integer }
@@ -854,7 +854,7 @@ class SchemaResolverTest {
         // A refinement body field naming nothing inherited is a resolver error (§5.7: "adding
         // fields is a resolver error") -- distinct from composition, where a non-matching name is
         // simply a new field.
-        SchemaMap schemaMap = new SchemaParser("""
+        SchemaMap schemaMap = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 {
                   base => { count: integer }
@@ -970,7 +970,7 @@ class SchemaResolverTest {
     @Test
     void instanceResolvesViaTheStructureNamespaceWhenNotLocallyAvailable() {
         TsonCompiledSchema metaKernelParser = metaKernelCompiled();
-        SchemaMap schemaMap = new SchemaParser("""
+        SchemaMap schemaMap = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 { my_bool => !enum [YES NO] }""").parseSchemaDocument().body();
 
@@ -988,7 +988,7 @@ class SchemaResolverTest {
         // not silently treated as a valid constructor application (§3.3.1's own suggested
         // diagnostic: "did you mean atom refinement?").
         TsonCompiledSchema metaKernelParser = metaKernelCompiled();
-        SchemaMap schemaMap = new SchemaParser("""
+        SchemaMap schemaMap = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 { bad => !token {} }""").parseSchemaDocument().body();
 
@@ -1135,7 +1135,7 @@ class SchemaResolverTest {
         // ("!integer_type ^ {...}") is a resolver error; the diagnostic should point at
         // constructor application instead (§3.3.1).
         Map<String, TypeDefinition> metaKernelEntries = MetaKernelParser.getMetaKernelSchema().entries();
-        SchemaMap schemaMap = new SchemaParser("""
+        SchemaMap schemaMap = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 { bad => !integer_type ^ { min: 1 } }""").parseSchemaDocument().body();
 
@@ -1149,7 +1149,7 @@ class SchemaResolverTest {
         // top resolves fine (a fresh record, kind PRODUCT by the structural default) but isn't
         // atom-family -- !top ^ {...} must be rejected (§5.5).
         Map<String, TypeDefinition> metaKernelEntries = MetaKernelParser.getMetaKernelSchema().entries();
-        SchemaMap schemaMap = new SchemaParser("""
+        SchemaMap schemaMap = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 { bad => !top ^ { x: integer } }""").parseSchemaDocument().body();
 
@@ -1179,7 +1179,7 @@ class SchemaResolverTest {
         // through), which was never something resolved-namespace lookup alone could provide.
         TsonCompiledSchema metaKernelParser = metaKernelCompiled();
         Map<String, TypeDefinition> metaKernelEntries = metaKernelParser.schema().entries();
-        SchemaMap schemaMap = new SchemaParser("""
+        SchemaMap schemaMap = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 {
                   int8    => !integer ^ { size: { bits: 8  signed: true } }
@@ -1221,7 +1221,7 @@ class SchemaResolverTest {
         // ^ {...}" still fails to resolve `I` at all -- a different failure from "resolves but isn't
         // an instance" (the constructor-rejection test above), which requires `I` to resolve first.
         TsonCompiledSchema metaKernelParser = metaKernelCompiled();
-        SchemaMap schemaMap = new SchemaParser("""
+        SchemaMap schemaMap = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 { bad => !integer_type ^ { min: 1 } }""").parseSchemaDocument().body();
 
@@ -1232,7 +1232,7 @@ class SchemaResolverTest {
 
     private SchemaMap schemaMapFromCoreFixture() throws IOException {
         String source = Files.readString(Path.of("").toAbsolutePath().resolve("../spec/m/core.tn1").normalize());
-        return new SchemaParser(source).parseSchemaDocument().body();
+        return new TsonSchemaParser(source).parseSchemaDocument().body();
     }
 
     /**
@@ -1289,13 +1289,13 @@ class SchemaResolverTest {
                 new DefaultSchemaCoordinator(throwawayRegistry, BundledSchemaSource.INSTANCE);
 
         String metaKernelSource = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID);
-        SchemaDocument metaKernelDocument = new SchemaParser(metaKernelSource).parseSchemaDocument();
+        SchemaDocument metaKernelDocument = new TsonSchemaParser(metaKernelSource).parseSchemaDocument();
         TsonSchema metaKernel = new SchemaResolver(throwawayCoordinator).resolveAll(metaKernelDocument);
         registry.register(SchemaLinker.link(metaKernel, registry)); // permanent, so meta.tn1's own !!import finds it below
         TsonCompiledSchema metaKernelParser = metaKernelCompiled();
 
         String source = Files.readString(Path.of("").toAbsolutePath().resolve("../spec/m/meta.tn1").normalize());
-        SchemaDocument metaDoc = new SchemaParser(source).parseSchemaDocument();
+        SchemaDocument metaDoc = new TsonSchemaParser(source).parseSchemaDocument();
         SchemaResolver metaResolver = new SchemaResolver();
         Map<String, TypeDefinition> namespace = new LinkedHashMap<>(metaKernel.entries());
         Map<String, TypeDefinition> localOnly = new LinkedHashMap<>();
@@ -1320,11 +1320,11 @@ class SchemaResolverTest {
     }
 
     private SchemaMap schemaMapFromFixture() throws IOException {
-        return new SchemaParser(readFixture()).parseSchemaDocument().body();
+        return new TsonSchemaParser(readFixture()).parseSchemaDocument().body();
     }
 
     private TypeDefinition resolveSnippet(String declaration) {
-        SchemaMap schemaMap = new SchemaParser("""
+        SchemaMap schemaMap = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 { %s }""".formatted(declaration)).parseSchemaDocument().body();
         return resolver.resolve(schemaMap.declarations().values().iterator().next());
@@ -1332,7 +1332,7 @@ class SchemaResolverTest {
 
     @Test
     void compositionRejectsAnUnresolvedSupertype() throws IOException {
-        SchemaMap schemaMap = new SchemaParser(readFixture()).parseSchemaDocument().body();
+        SchemaMap schemaMap = new TsonSchemaParser(readFixture()).parseSchemaDocument().body();
         // "top" deliberately left out of the resolved map -- atom's supertype isn't visible yet.
         assertThrows(UnsupportedOperationException.class,
                 () -> resolver.resolve(schemaMap.declarations().get("atom"), Map.of()));

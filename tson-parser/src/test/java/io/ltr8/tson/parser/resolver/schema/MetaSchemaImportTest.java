@@ -1,7 +1,7 @@
 package io.ltr8.tson.parser.resolver.schema;
 
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.tson.parser.SchemaParser;
+import io.ltr8.tson.parser.TsonSchemaParser;
 import io.ltr8.tson.parser.ast.schema.SchemaDocument;
 import io.ltr8.tson.parser.resolver.TsonAtomContext;
 import io.ltr8.tson.parser.resolver.schema.compiled.TsonParserFactoryRegistry;
@@ -79,13 +79,13 @@ class MetaSchemaImportTest {
         DefaultSchemaCoordinator coordinator = new DefaultSchemaCoordinator(compiledRegistry);
 
         String metaKernelSource = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID);
-        SchemaDocument metaKernelDocument = new SchemaParser(metaKernelSource).parseSchemaDocument();
+        SchemaDocument metaKernelDocument = new TsonSchemaParser(metaKernelSource).parseSchemaDocument();
         TsonSchema metaKernel = new SchemaResolver(coordinator).resolveAll(metaKernelDocument);
         LinkedTsonSchema metaKernelMaterialized = registry.register(SchemaLinker.link(metaKernel, registry));
         compiledRegistry.register(metaKernelMaterialized.schema());
 
         String source = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_TN1_ID);
-        SchemaDocument metaDocument = new SchemaParser(source).parseSchemaDocument();
+        SchemaDocument metaDocument = new TsonSchemaParser(source).parseSchemaDocument();
         return new SchemaResolver(coordinator).resolveAll(metaDocument);
     }
 

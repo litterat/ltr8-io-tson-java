@@ -1,6 +1,6 @@
 package io.ltr8.tson.parser.resolver.schema;
 
-import io.ltr8.tson.parser.SchemaParser;
+import io.ltr8.tson.parser.TsonSchemaParser;
 import io.ltr8.tson.parser.ast.ArrayValue;
 import io.ltr8.tson.parser.ast.DataValue;
 import io.ltr8.tson.parser.ast.EmptyBrace;
@@ -234,7 +234,7 @@ class PositionalFormTest {
 
     @Test
     void wrapsAnEnumInstanceValueUsingEnumsOwnRealResolvedBody() {
-        SchemaDocument doc = new SchemaParser("""
+        SchemaDocument doc = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 {
                   top => {}

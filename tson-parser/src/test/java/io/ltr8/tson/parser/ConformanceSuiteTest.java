@@ -61,11 +61,11 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Runs every vector in the sibling {@code ltr8-io-tson-test-suite} repo (see its own README for
- * the vector/sidecar format) against this implementation's real {@link Lexer}, {@link Parser},
+ * the vector/sidecar format) against this implementation's real {@link Lexer}, {@link TsonDataParser},
  * {@link BaseTypeResolver}, and {@link BuiltinTypeVocabulary}.
  *
  * <p>This is deliberately separate from {@link io.ltr8.tson.parser.lexer.LexerTest} and
- * {@link ParserTest}: those are fine-grained unit tests of individual grammar rules with
+ * {@link TsonDataParserTest}: those are fine-grained unit tests of individual grammar rules with
  * assertion messages that point at exactly what broke. This is a conformance/integration test
  * against an external, language-agnostic, spec-derived fixture set shared with (potentially)
  * other implementations -- it exists to catch drift between this implementation and the spec,
@@ -146,12 +146,12 @@ class ConformanceSuiteTest {
         }
     }
 
-    /** The sidecar is itself TSON: a document whose root value is a record. Parsed with the real Parser. */
+    /** The sidecar is itself TSON: a document whose root value is a record. Parsed with the real TsonDataParser. */
     private static RecordValue parseSidecarBody(Path tsonPath) throws IOException {
         String text = readRaw(tsonPath);
         Document doc;
         try {
-            doc = new Parser(text).parseDocument();
+            doc = new TsonDataParser(text).parseDocument();
         } catch (RuntimeException e) {
             throw new AssertionError("sidecar " + tsonPath + " is not valid TSON: " + e.getMessage(), e);
         }
@@ -197,20 +197,20 @@ class ConformanceSuiteTest {
         };
     }
 
-    // ── Parser-layer vectors ─────────────────────────────────────────────
+    // ── TsonDataParser-layer vectors ─────────────────────────────────────────────
 
     private static void checkParserVector(String bucket, Path tn1, RecordValue sidecar) throws IOException {
         String outcome = fieldText(sidecar, "outcome");
         String raw = readRaw(tn1);
         switch (outcome) {
             case "valid" -> {
-                Document actual = new Parser(raw).parseDocument();
+                Document actual = new TsonDataParser(raw).parseDocument();
                 RecordValue expectedDoc = (RecordValue) fieldCore(sidecar, "document");
                 assertDocumentMatches(expectedDoc, actual);
             }
-            case "error" -> assertThrows(ParseException.class, () -> new Parser(raw).parseDocument());
-            case "schema-document" -> assertThrows(SchemaDocumentException.class,
-                    () -> new Parser(raw).parseDocument());
+            case "error" -> assertThrows(TsonParseException.class, () -> new TsonDataParser(raw).parseDocument());
+            case "schema-document" -> assertThrows(TsonUnsupportedDocumentException.class,
+                    () -> new TsonDataParser(raw).parseDocument());
             default -> fail("unknown parser-layer outcome: " + outcome);
         }
     }
@@ -313,7 +313,7 @@ class ConformanceSuiteTest {
             fail("unknown resolver-layer outcome: " + outcome);
             return;
         }
-        Document doc = new Parser(readRaw(tn1)).parseDocument();
+        Document doc = new TsonDataParser(readRaw(tn1)).parseDocument();
         TokenValue token = assertInstanceOf(TokenValue.class, doc.root().coreValue(),
                 "resolver vector .tn1 must be a single bare token");
         BaseValue actual = BaseTypeResolver.resolve(token);
@@ -432,7 +432,7 @@ class ConformanceSuiteTest {
      */
     private static void checkVocabularyVector(String bucket, Path tn1, RecordValue sidecar) throws IOException {
         String outcome = fieldText(sidecar, "outcome");
-        Document doc = new Parser(readRaw(tn1)).parseDocument();
+        Document doc = new TsonDataParser(readRaw(tn1)).parseDocument();
         DataValue root = doc.root();
         String typeRef = root.typeRef().orElseThrow(
                 () -> new AssertionError("vocabulary vector .tn1 must carry a type-ref"));

@@ -1,7 +1,7 @@
 package io.ltr8.tson.parser.mapper;
 
 import io.ltr8.bind.DataBindException;
-import io.ltr8.tson.parser.TsonWriter;
+import io.ltr8.tson.parser.TsonDataEmitter;
 import io.ltr8.tson.parser.resolver.vocab.FloatParser;
 
 /**
@@ -23,7 +23,7 @@ final class AtomWriter {
     private AtomWriter() {
     }
 
-    static void writeDefaultAtom(Object value, TsonWriter writer) throws DataBindException {
+    static void writeDefaultAtom(Object value, TsonDataEmitter writer) throws DataBindException {
         switch (value) {
             case Boolean b -> writer.booleanValue(b);
             case Double d -> writer.unquotedToken(FloatParser.FLOAT64.write(d));

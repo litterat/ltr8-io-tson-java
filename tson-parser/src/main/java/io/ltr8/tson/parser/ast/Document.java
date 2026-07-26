@@ -9,7 +9,7 @@ import java.util.Optional;
  * <p>Only data documents are representable here. A document whose header contains
  * {@code !!meta} is a <em>schema</em> document, which this parser does not support — a Class 1
  * processor rejects it with a categorized diagnostic (§1.5, §8.1) rather than producing a
- * {@code Document}; see {@code io.ltr8.tson.parser.SchemaDocumentException}.
+ * {@code Document}; see {@code io.ltr8.tson.parser.TsonUnsupportedDocumentException}.
  *
  * <p>{@code id} and {@code schema} are the header directives' raw URI arguments, uninterpreted.
  * {@code root} is the document's single value — itself an ordinary data-value that may carry its

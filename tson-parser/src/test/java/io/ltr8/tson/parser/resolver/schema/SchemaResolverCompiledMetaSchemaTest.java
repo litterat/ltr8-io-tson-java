@@ -1,8 +1,8 @@
 package io.ltr8.tson.parser.resolver.schema;
 
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.tson.parser.Parser;
-import io.ltr8.tson.parser.SchemaParser;
+import io.ltr8.tson.parser.TsonDataParser;
+import io.ltr8.tson.parser.TsonSchemaParser;
 import io.ltr8.tson.parser.ast.schema.SchemaDocument;
 import io.ltr8.tson.parser.resolver.TsonAtomContext;
 import io.ltr8.tson.parser.resolver.schema.compiled.TsonParserFactoryRegistry;
@@ -71,7 +71,7 @@ class SchemaResolverCompiledMetaSchemaTest {
         DefaultSchemaCoordinator coordinator = new DefaultSchemaCoordinator(registry, BundledSchemaSource.INSTANCE);
 
         String metaKernelSource = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID);
-        SchemaDocument metaKernelDocument = new SchemaParser(metaKernelSource).parseSchemaDocument();
+        SchemaDocument metaKernelDocument = new TsonSchemaParser(metaKernelSource).parseSchemaDocument();
         TsonSchema metaKernel = new SchemaResolver(coordinator).resolveAll(metaKernelDocument);
         registry.register(metaKernel);
 
@@ -99,14 +99,14 @@ class SchemaResolverCompiledMetaSchemaTest {
                 new DefaultSchemaCoordinator(throwawayRegistry, BundledSchemaSource.INSTANCE);
 
         String metaKernelSource = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID);
-        SchemaDocument metaKernelDocument = new SchemaParser(metaKernelSource).parseSchemaDocument();
+        SchemaDocument metaKernelDocument = new TsonSchemaParser(metaKernelSource).parseSchemaDocument();
         return new SchemaResolver(throwawayCoordinator).resolveAll(metaKernelDocument);
     }
 
     @Test
     void coreTn1sOwnMetaTargetResolvesToMetaTn1sCompiledReader() {
         SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
-        SchemaDocument coreDocument = new SchemaParser(BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.CORE_TN1_ID)).parseSchemaDocument();
+        SchemaDocument coreDocument = new TsonSchemaParser(BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.CORE_TN1_ID)).parseSchemaDocument();
 
         assertEquals("https://tson.io/2026/32/m/meta.tn1", coreDocument.meta());
 
@@ -118,11 +118,11 @@ class SchemaResolverCompiledMetaSchemaTest {
     @Test
     void theCompiledMetaSchemaGenuinelyReadsRealData() {
         SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
-        SchemaDocument coreDocument = new SchemaParser(BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.CORE_TN1_ID)).parseSchemaDocument();
+        SchemaDocument coreDocument = new TsonSchemaParser(BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.CORE_TN1_ID)).parseSchemaDocument();
 
         TsonCompiledSchema compiledMeta = resolver.compiledMetaSchema(coreDocument);
         Object result = compiledMeta.get("binary_encoding")
-                .read(new Parser("BASE64").parseDocument().root());
+                .read(new TsonDataParser("BASE64").parseDocument().root());
 
         assertEquals("BASE64", result);
     }
@@ -137,7 +137,7 @@ class SchemaResolverCompiledMetaSchemaTest {
     void metaTn1sOwnMetaTargetResolvesToMetaKernelsCompiledReader() {
         SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
         SchemaDocument metaDocument =
-                new SchemaParser(BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_TN1_ID)).parseSchemaDocument();
+                new TsonSchemaParser(BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_TN1_ID)).parseSchemaDocument();
 
         assertEquals(BundledSchemaSource.META_KERNEL_ID, metaDocument.meta());
 
@@ -152,11 +152,11 @@ class SchemaResolverCompiledMetaSchemaTest {
     void theCompiledMetaKernelSchemaGenuinelyReadsRealData() {
         SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
         SchemaDocument metaDocument =
-                new SchemaParser(BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_TN1_ID)).parseSchemaDocument();
+                new TsonSchemaParser(BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_TN1_ID)).parseSchemaDocument();
 
         TsonCompiledSchema compiledMetaKernel = resolver.compiledMetaSchema(metaDocument);
         Object result = compiledMetaKernel.get("product_access_type")
-                .read(new Parser("INDEX").parseDocument().root());
+                .read(new TsonDataParser("INDEX").parseDocument().root());
 
         assertEquals("INDEX", result);
     }
@@ -164,7 +164,7 @@ class SchemaResolverCompiledMetaSchemaTest {
     @Test
     void withNoCoordinatorCompiledMetaSchemaThrowsClearly() {
         SchemaResolver resolver = new SchemaResolver();
-        SchemaDocument coreDocument = new SchemaParser(BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.CORE_TN1_ID)).parseSchemaDocument();
+        SchemaDocument coreDocument = new TsonSchemaParser(BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.CORE_TN1_ID)).parseSchemaDocument();
 
         IllegalStateException thrown = assertThrows(IllegalStateException.class,
                 () -> resolver.compiledMetaSchema(coreDocument));
@@ -176,7 +176,7 @@ class SchemaResolverCompiledMetaSchemaTest {
         TsonCompiledRegistry registry = new TsonCompiledRegistry(TsonParserFactoryRegistry.dom());
         registry.register(resolveMetaKernelOrdinarily()); // meta-kernel only -- no meta.tn1
         SchemaResolver resolver = new SchemaResolver(new DefaultSchemaCoordinator(registry));
-        SchemaDocument coreDocument = new SchemaParser(BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.CORE_TN1_ID)).parseSchemaDocument();
+        SchemaDocument coreDocument = new TsonSchemaParser(BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.CORE_TN1_ID)).parseSchemaDocument();
 
         // meta.tn1 isn't meta-kernel's own well-known bootstrap case, and the default SchemaSource
         // fetches nothing -- so this is exactly SchemaSource.registeredOnly()'s own rejection.
@@ -199,7 +199,7 @@ class SchemaResolverCompiledMetaSchemaTest {
     @Test
     void resolveAllDerivesStructureNamespaceFromTheCoordinatorAutomatically() {
         SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
-        SchemaDocument miniDocument = new SchemaParser(MINI_DOCUMENT).parseSchemaDocument();
+        SchemaDocument miniDocument = new TsonSchemaParser(MINI_DOCUMENT).parseSchemaDocument();
 
         // "unit" is neither local to mini.tn1 nor imported by it -- only reachable if resolveAll
         // itself derived the structure namespace from the coordinator's own meta.tn1 entry (which in
@@ -214,7 +214,7 @@ class SchemaResolverCompiledMetaSchemaTest {
     void resolveAllThrowsClearlyWhenTheMetaTargetCantBeResolvedAtAll() {
         TsonCompiledRegistry registry = new TsonCompiledRegistry(TsonParserFactoryRegistry.dom());
         SchemaResolver resolver = new SchemaResolver(new DefaultSchemaCoordinator(registry));
-        SchemaDocument miniDocument = new SchemaParser(MINI_DOCUMENT).parseSchemaDocument();
+        SchemaDocument miniDocument = new TsonSchemaParser(MINI_DOCUMENT).parseSchemaDocument();
 
         IllegalStateException thrown = assertThrows(IllegalStateException.class, () -> resolver.resolveAll(miniDocument));
         assertTrue(thrown.getMessage().contains("meta.tn1"));
@@ -230,7 +230,7 @@ class SchemaResolverCompiledMetaSchemaTest {
     @Test
     void resolveAllThrowsClearlyWhenIdIsAbsent() {
         SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
-        SchemaDocument noIdDocument = new SchemaParser(MINI_DOCUMENT_NO_ID).parseSchemaDocument();
+        SchemaDocument noIdDocument = new TsonSchemaParser(MINI_DOCUMENT_NO_ID).parseSchemaDocument();
 
         assertTrue(noIdDocument.id().isEmpty());
         IllegalStateException thrown = assertThrows(IllegalStateException.class, () -> resolver.resolveAll(noIdDocument));
@@ -249,7 +249,7 @@ class SchemaResolverCompiledMetaSchemaTest {
     @Test
     void resolveAllThrowsClearlyWhenIdIsNotAValidCanonicalIdentity() {
         SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
-        SchemaDocument malformedIdDocument = new SchemaParser(MINI_DOCUMENT_MALFORMED_ID).parseSchemaDocument();
+        SchemaDocument malformedIdDocument = new TsonSchemaParser(MINI_DOCUMENT_MALFORMED_ID).parseSchemaDocument();
 
         // "mini.tn1" alone is a syntactically valid relative-reference URI, but has no scheme --
         // CanonicalIdentity.of's own rejection, surfaced here via SchemaRegistry.validateIdentity.
@@ -268,7 +268,7 @@ class SchemaResolverCompiledMetaSchemaTest {
     @Test
     void resolveAllThrowsClearlyWhenAnImportUriIsNotAValidCanonicalIdentity() {
         SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
-        SchemaDocument malformedImportDocument = new SchemaParser(MINI_DOCUMENT_MALFORMED_IMPORT).parseSchemaDocument();
+        SchemaDocument malformedImportDocument = new TsonSchemaParser(MINI_DOCUMENT_MALFORMED_IMPORT).parseSchemaDocument();
 
         assertEquals(1, malformedImportDocument.imports().size());
         // "meta-kernel.tn1" alone is a syntactically valid relative-reference URI, but has no scheme.
@@ -292,7 +292,7 @@ class SchemaResolverCompiledMetaSchemaTest {
         // (meta-kernel's own, zero fields) is only findable here if !!import's own entries were
         // genuinely merged into the type-name namespace, not just validated as well-formed URIs.
         SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
-        SchemaDocument miniDocument = new SchemaParser(MINI_DOCUMENT_IMPORT_MERGED).parseSchemaDocument();
+        SchemaDocument miniDocument = new TsonSchemaParser(MINI_DOCUMENT_IMPORT_MERGED).parseSchemaDocument();
 
         TsonSchema resolved = resolver.resolveAll(miniDocument);
 
@@ -317,7 +317,7 @@ class SchemaResolverCompiledMetaSchemaTest {
         // meta-kernel is exactly SchemaValidator's own "collides with an entry of the same name
         // brought in by !!import" rule, now caught here too, one stage earlier.
         SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
-        SchemaDocument miniDocument = new SchemaParser(MINI_DOCUMENT_IMPORT_COLLIDES_WITH_LOCAL).parseSchemaDocument();
+        SchemaDocument miniDocument = new TsonSchemaParser(MINI_DOCUMENT_IMPORT_COLLIDES_WITH_LOCAL).parseSchemaDocument();
 
         SchemaValidationException thrown = assertThrows(
                 SchemaValidationException.class, () -> resolver.resolveAll(miniDocument));
@@ -341,7 +341,7 @@ class SchemaResolverCompiledMetaSchemaTest {
         // (via meta.tn1's own real !!import) -- so importing both here means "unit" (among many
         // others) is declared by both imports, the "more than one !!import" case specifically.
         SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
-        SchemaDocument miniDocument = new SchemaParser(MINI_DOCUMENT_TWO_IMPORTS_COLLIDE).parseSchemaDocument();
+        SchemaDocument miniDocument = new TsonSchemaParser(MINI_DOCUMENT_TWO_IMPORTS_COLLIDE).parseSchemaDocument();
 
         SchemaValidationException thrown = assertThrows(
                 SchemaValidationException.class, () -> resolver.resolveAll(miniDocument));
@@ -369,7 +369,7 @@ class SchemaResolverCompiledMetaSchemaTest {
         // compiling. Never cached (see the next test) -- only the *quality* of the one-off result
         // changed, not its lifetime.
         assertEquals(58, compiled.schema().entries().size());
-        assertEquals(java.util.Map.of(), compiled.get("top").read(new Parser("{}").parseDocument().root()));
+        assertEquals(java.util.Map.of(), compiled.get("top").read(new TsonDataParser("{}").parseDocument().root()));
     }
 
     @Test
@@ -425,13 +425,13 @@ class SchemaResolverCompiledMetaSchemaTest {
         // SchemaRegistry#register now refuses any self-referential schema with bootstrap() == true,
         // materialized or not (see its own Javadoc); resolveAll never sets that flag.
         String metaKernelSource = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID);
-        SchemaDocument metaKernelDocument = new SchemaParser(metaKernelSource).parseSchemaDocument();
+        SchemaDocument metaKernelDocument = new TsonSchemaParser(metaKernelSource).parseSchemaDocument();
         TsonSchema metaKernel = new SchemaResolver(coordinator).resolveAll(metaKernelDocument);
         registry.register(metaKernel);
 
         TsonCompiledSchema compiled = coordinator.resolve(BundledSchemaSource.META_TN1_ID);
 
-        assertEquals("BASE64", compiled.get("binary_encoding").read(new Parser("BASE64").parseDocument().root()));
+        assertEquals("BASE64", compiled.get("binary_encoding").read(new TsonDataParser("BASE64").parseDocument().root()));
         // Still there, from the explicit pre-registration step above -- meta.tn1's own resolution
         // didn't need to (and doesn't) re-register it.
         assertTrue(registry.get(BundledSchemaSource.META_KERNEL_ID).isPresent());

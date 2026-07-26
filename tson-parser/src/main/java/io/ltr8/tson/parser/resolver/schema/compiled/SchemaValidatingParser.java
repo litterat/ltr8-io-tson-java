@@ -1,16 +1,16 @@
 package io.ltr8.tson.parser.resolver.schema.compiled;
 
-import io.ltr8.tson.parser.Parser;
+import io.ltr8.tson.parser.TsonDataParser;
 import io.ltr8.tson.parser.ast.Document;
 
 /**
  * The Class 2 (schema-validating) data parser (§1.5) this project's own groundwork has been
- * building toward -- combines the Class 1 structural parser ({@link Parser}, Part 1's own grammar/
+ * building toward -- combines the Class 1 structural parser ({@link TsonDataParser}, Part 1's own grammar/
  * base-type layer, unchanged) with a {@link TsonCompiledSchema} (a compiled schema) into one call:
  * parse TSON source text, then read the result against a named, schema-known type.
  *
  * <p><b>Doesn't (yet) consult a document's own {@code !!schema} header directive</b> (§2.2, {@link
- * Document#schema()} -- preserved, uninterpreted, by {@link Parser} itself, same as Class 1 always
+ * Document#schema()} -- preserved, uninterpreted, by {@link TsonDataParser} itself, same as Class 1 always
  * has). A caller here always names the root type explicitly, the same way {@code
  * TsonMapperReader.toObject(String, Class)} always takes an explicit target class rather than
  * inferring one from the data. This is a deliberate scope decision, not an oversight: auto-selecting
@@ -45,7 +45,7 @@ public final class SchemaValidatingParser {
      */
     @SuppressWarnings("unchecked")
     public <T> T read(String source, String rootTypeName) {
-        return (T) read(new Parser(source).parseDocument(), rootTypeName);
+        return (T) read(new TsonDataParser(source).parseDocument(), rootTypeName);
     }
 
     /** Reads an already-parsed {@code document}'s root value against {@code rootTypeName} -- for a caller that already has one, e.g. to inspect {@link Document#id()}/{@link Document#schema()} itself first. */

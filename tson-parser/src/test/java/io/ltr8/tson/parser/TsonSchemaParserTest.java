@@ -36,10 +36,10 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class SchemaParserTest {
+class TsonSchemaParserTest {
 
     private static SchemaDocument parse(String source) {
-        return new SchemaParser(source).parseSchemaDocument();
+        return new TsonSchemaParser(source).parseSchemaDocument();
     }
 
     // ── Header (§2.1, §2.2) ──────────────────────────────────────────────
@@ -76,13 +76,13 @@ class SchemaParserTest {
 
     @Test
     void missingMetaIsAParseError() {
-        assertThrows(ParseException.class, () -> parse("{ a => text }"));
+        assertThrows(TsonParseException.class, () -> parse("{ a => text }"));
     }
 
     @Test
     void schemaDirectiveInHeaderIsAParseError() {
         // !!schema belongs to data documents, not schema documents (§2.2).
-        assertThrows(ParseException.class, () -> parse("""
+        assertThrows(TsonParseException.class, () -> parse("""
                 !!meta:"https://tson.io/2026/32/m/meta.tn1"
                 !!schema:"https://example.com/x.tn1"
                 { a => text }"""));
@@ -92,7 +92,7 @@ class SchemaParserTest {
 
     @Test
     void emptySchemaMapIsAParseError() {
-        assertThrows(ParseException.class, () -> parse("""
+        assertThrows(TsonParseException.class, () -> parse("""
                 !!meta:"https://tson.io/2026/32/m/meta.tn1"
                 {}"""));
     }
@@ -320,7 +320,7 @@ class SchemaParserTest {
 
     @Test
     void groupWithOneMemberIsAParseError() {
-        assertThrows(ParseException.class, () -> parse("""
+        assertThrows(TsonParseException.class, () -> parse("""
                 !!meta:"https://tson.io/2026/32/m/meta.tn1"
                 { a => { ( x: text ) } }"""));
     }
@@ -338,14 +338,14 @@ class SchemaParserTest {
 
     @Test
     void choiceWithOneVariantIsAParseError() {
-        assertThrows(ParseException.class, () -> parse("""
+        assertThrows(TsonParseException.class, () -> parse("""
                 !!meta:"https://tson.io/2026/32/m/meta.tn1"
                 { a => (text) }"""));
     }
 
     @Test
     void bareTypeRefFollowedByBraceIsAParseError() {
-        assertThrows(ParseException.class, () -> parse("""
+        assertThrows(TsonParseException.class, () -> parse("""
                 !!meta:"https://tson.io/2026/32/m/meta.tn1"
                 { a => text { x: text } }"""));
     }
@@ -354,21 +354,21 @@ class SchemaParserTest {
 
     @Test
     void inlineSizeSpecifierIsAParseError() {
-        assertThrows(ParseException.class, () -> parse("""
+        assertThrows(TsonParseException.class, () -> parse("""
                 !!meta:"https://tson.io/2026/32/m/meta.tn1"
                 { a => { x: [text; 1] } }"""));
     }
 
     @Test
     void inlineElementOptionalityIsAParseError() {
-        assertThrows(ParseException.class, () -> parse("""
+        assertThrows(TsonParseException.class, () -> parse("""
                 !!meta:"https://tson.io/2026/32/m/meta.tn1"
                 { a => { x: [text?] } }"""));
     }
 
     @Test
     void trailingCommaInTupleIsAParseError() {
-        assertThrows(ParseException.class, () -> parse("""
+        assertThrows(TsonParseException.class, () -> parse("""
                 !!meta:"https://tson.io/2026/32/m/meta.tn1"
                 { a => [text, integer,] }"""));
     }
@@ -377,7 +377,7 @@ class SchemaParserTest {
 
     @Test
     void numericDeclarationNameIsAParseError() {
-        assertThrows(ParseException.class, () -> parse("""
+        assertThrows(TsonParseException.class, () -> parse("""
                 !!meta:"https://tson.io/2026/32/m/meta.tn1"
                 { 42 => text }"""));
     }

@@ -12,7 +12,7 @@ import io.ltr8.bind.DataClassMap;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassTuple;
 import io.ltr8.bind.DataClassUnion;
-import io.ltr8.tson.parser.TsonWriter;
+import io.ltr8.tson.parser.TsonDataEmitter;
 import io.ltr8.tson.parser.resolver.vocab.AtomType;
 import io.ltr8.tson.parser.resolver.vocab.BinaryParser;
 import io.ltr8.tson.parser.resolver.vocab.Complex;
@@ -123,7 +123,7 @@ public final class TsonMapperWriter {
      * a follow-up, not part of this first pass (values only).
      */
     public String toTson(Object value) throws DataBindException {
-        TsonWriter writer = new TsonWriter();
+        TsonDataEmitter writer = new TsonDataEmitter();
         if (value == null) {
             writer.nullValue();
             return writer.toString();
@@ -148,7 +148,7 @@ public final class TsonMapperWriter {
      * DefaultRecordBinder#resolveRecord}), not the original wrapper type. Then dispatches on
      * {@code dataClass}'s own kind.
      */
-    private void write(Object value, DataClass dataClass, TsonWriter writer) throws DataBindException {
+    private void write(Object value, DataClass dataClass, TsonDataEmitter writer) throws DataBindException {
         try {
             if (value == null) {
                 writer.nullValue();
@@ -182,7 +182,7 @@ public final class TsonMapperWriter {
      * than unquoted -- both read back identically, not worth a special case purely for that
      * formatting difference.
      */
-    private void writeAtom(Object value, TsonWriter writer) throws DataBindException {
+    private void writeAtom(Object value, TsonDataEmitter writer) throws DataBindException {
         VocabularyAtom vocab = vocabularyAtoms.get(value.getClass());
         if (vocab != null) {
             writer.typeRef(vocab.typeRef()).quotedString(vocab.write(value));
@@ -201,7 +201,7 @@ public final class TsonMapperWriter {
      * omitted from the record entirely rather than written as {@code null}, matching how the two
      * cases are already treated identically on the read side.
      */
-    private void writeRecord(Object value, DataClassRecord dataClass, TsonWriter writer) throws Throwable {
+    private void writeRecord(Object value, DataClassRecord dataClass, TsonDataEmitter writer) throws Throwable {
         writer.beginRecord();
         for (DataClassField field : dataClass.fields()) {
             if (field.isAnnotationsCarrier() || !field.isPresent(value)) {
@@ -215,7 +215,7 @@ public final class TsonMapperWriter {
 
     // ── Arrays ───────────────────────────────────────────────────────────
 
-    private void writeArray(Object value, DataClassArray dataClass, TsonWriter writer) throws Throwable {
+    private void writeArray(Object value, DataClassArray dataClass, TsonDataEmitter writer) throws Throwable {
         writer.beginArray();
         int size = (int) dataClass.size().invoke(value);
         Object iterator = dataClass.iterator().invoke(value);
@@ -230,7 +230,7 @@ public final class TsonMapperWriter {
 
     // ── Maps ─────────────────────────────────────────────────────────────
 
-    private void writeMap(Object value, DataClassMap dataClass, TsonWriter writer) throws Throwable {
+    private void writeMap(Object value, DataClassMap dataClass, TsonDataEmitter writer) throws Throwable {
         writer.beginMap();
         Object iterator = dataClass.iterator().invoke(value);
         DataClass keyClass = dataClass.keyDataClass();
@@ -252,7 +252,7 @@ public final class TsonMapperWriter {
     /** No type-ref -- a tuple is array-shaped on the wire, and (schemaless) its tuple-ness at all
      * isn't recoverable without a schema any more than an integer's exact width is (see {@link
      * #toTson}); this writes a plain array, indistinguishable on the wire from an ordinary one. */
-    private void writeTuple(Object value, DataClassTuple dataClass, TsonWriter writer) throws Throwable {
+    private void writeTuple(Object value, DataClassTuple dataClass, TsonDataEmitter writer) throws Throwable {
         writer.beginArray();
         for (DataClassElement element : dataClass.elements()) {
             writer.beforeArrayElement();
@@ -271,7 +271,7 @@ public final class TsonMapperWriter {
      * here; a reader benefiting from flexibility doesn't obligate a writer to be equally flexible
      * about its own single output.
      */
-    private void writeUnion(Object value, DataClassUnion dataClass, TsonWriter writer) throws Throwable {
+    private void writeUnion(Object value, DataClassUnion dataClass, TsonDataEmitter writer) throws Throwable {
         Class<?> memberClass = value.getClass();
         if (!dataClass.isMemberType(memberClass)) {
             throw new DataBindException(

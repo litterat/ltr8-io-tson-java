@@ -1,7 +1,7 @@
 package io.ltr8.tson.parser.resolver.schema;
 
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.tson.parser.SchemaParser;
+import io.ltr8.tson.parser.TsonSchemaParser;
 import io.ltr8.tson.parser.ast.schema.SchemaDocument;
 import io.ltr8.tson.parser.resolver.TsonAtomContext;
 import io.ltr8.tson.parser.resolver.schema.compiled.TsonParserFactoryRegistry;
@@ -144,7 +144,7 @@ class MetaKernelSchemaRegistryTest {
         DefaultSchemaCoordinator coordinator = new DefaultSchemaCoordinator(compiledRegistry);
 
         String source = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID);
-        SchemaDocument document = new SchemaParser(source).parseSchemaDocument();
+        SchemaDocument document = new TsonSchemaParser(source).parseSchemaDocument();
         TsonSchema resolved = new SchemaResolver(coordinator).resolveAll(document);
         assertFalse(resolved.bootstrap());
 

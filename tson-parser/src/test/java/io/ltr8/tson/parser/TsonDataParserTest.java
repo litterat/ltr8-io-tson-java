@@ -18,10 +18,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class ParserTest {
+class TsonDataParserTest {
 
     private static Document parse(String source) {
-        return new Parser(source).parseDocument();
+        return new TsonDataParser(source).parseDocument();
     }
 
     private static DataValue root(String source) {
@@ -97,18 +97,18 @@ class ParserTest {
 
     @Test
     void metaDirectiveIsRejectedAsSchemaDocument() {
-        assertThrows(SchemaDocumentException.class, () -> parse("!!meta:\"https://example.com/m.tn1\" { }"));
+        assertThrows(TsonUnsupportedDocumentException.class, () -> parse("!!meta:\"https://example.com/m.tn1\" { }"));
     }
 
     @Test
     void idThenMetaIsRejectedAsSchemaDocument() {
-        assertThrows(SchemaDocumentException.class,
+        assertThrows(TsonUnsupportedDocumentException.class,
                 () -> parse("!!id:\"https://example.com/x.tn1\"\n!!meta:\"https://example.com/m.tn1\" { }"));
     }
 
     @Test
     void multilineTokenAsDirectiveArgumentIsParseError() {
-        assertThrows(ParseException.class, () -> parse("!!id:\"\"\"\nx\n\"\"\"\n_"));
+        assertThrows(TsonParseException.class, () -> parse("!!id:\"\"\"\nx\n\"\"\"\n_"));
     }
 
     @Test
@@ -117,17 +117,17 @@ class ParserTest {
         // across a gap, so this actually fails as "unexpected content", which is still correct:
         // it's not a valid document header either way. Use a directly-malformed but same-shape
         // case: colon not adjacent to the directive name.
-        assertThrows(ParseException.class, () -> parse("!!id :\"https://example.com/x.tn1\"\n_"));
+        assertThrows(TsonParseException.class, () -> parse("!!id :\"https://example.com/x.tn1\"\n_"));
     }
 
     @Test
     void unknownDirectiveNameInHeaderIsParseError() {
-        assertThrows(ParseException.class, () -> parse("!!bogus:\"x\"\n_"));
+        assertThrows(TsonParseException.class, () -> parse("!!bogus:\"x\"\n_"));
     }
 
     @Test
     void extraContentAfterRootValueIsParseError() {
-        assertThrows(ParseException.class, () -> parse("Alice Bob"));
+        assertThrows(TsonParseException.class, () -> parse("Alice Bob"));
     }
 
     // ── Directive arguments must be valid URIs (§3.3) ────────────────────
@@ -138,25 +138,25 @@ class ParserTest {
     @Test
     void idDirectiveArgumentMustBeAValidUri() {
         // An unescaped space is not valid anywhere in a URI.
-        assertThrows(ParseException.class, () -> parse("!!id:\"not a uri\"\n_"));
+        assertThrows(TsonParseException.class, () -> parse("!!id:\"not a uri\"\n_"));
     }
 
     @Test
     void schemaDirectiveArgumentInHeaderMustBeAValidUri() {
-        assertThrows(ParseException.class, () -> parse("!!schema:\"not a uri\" Alice"));
+        assertThrows(TsonParseException.class, () -> parse("!!schema:\"not a uri\" Alice"));
     }
 
     @Test
     void schemaDirectiveArgumentOnFieldValueMustBeAValidUri() {
-        assertThrows(ParseException.class, () -> parse("{ x: !!schema:\"not a uri\" 1 }"));
+        assertThrows(TsonParseException.class, () -> parse("{ x: !!schema:\"not a uri\" 1 }"));
     }
 
     @Test
     void metaDirectiveArgumentMustBeAValidUriEvenThoughTheDocumentIsRejectedEitherWay() {
-        // A malformed !!meta argument is a genuine ParseException, not merely "a well-formed
-        // schema document this processor doesn't support" -- SchemaDocumentException requires the
+        // A malformed !!meta argument is a genuine TsonParseException, not merely "a well-formed
+        // schema document this processor doesn't support" -- TsonUnsupportedDocumentException requires the
         // directive itself to actually be well-formed first.
-        assertThrows(ParseException.class, () -> parse("!!meta:\"not a uri\" { }"));
+        assertThrows(TsonParseException.class, () -> parse("!!meta:\"not a uri\" { }"));
     }
 
     // ── Records ──────────────────────────────────────────────────────────
@@ -217,24 +217,24 @@ class ParserTest {
 
     @Test
     void trailingCommaInRecordIsParseError() {
-        assertThrows(ParseException.class, () -> parse("{ x: 1, }"));
+        assertThrows(TsonParseException.class, () -> parse("{ x: 1, }"));
     }
 
     @Test
     void zeroWidthSeparationBetweenFieldsIsParseError() {
         // "1" (unquoted) directly followed by "y" (unquoted) would just merge into one token, so
         // use adjacent quoted/brace values, which the lexer keeps as distinct tokens.
-        assertThrows(ParseException.class, () -> parse("{ a: \"x\"b: \"y\" }"));
+        assertThrows(TsonParseException.class, () -> parse("{ a: \"x\"b: \"y\" }"));
     }
 
     @Test
     void annotatedValueAsAttemptedFieldNameIsParseError() {
-        assertThrows(ParseException.class, () -> parse("{ @deprecated x: 1 }"));
+        assertThrows(TsonParseException.class, () -> parse("{ @deprecated x: 1 }"));
     }
 
     @Test
     void typedValueAsAttemptedFieldNameIsParseError() {
-        assertThrows(ParseException.class, () -> parse("{ !string x: 1 }"));
+        assertThrows(TsonParseException.class, () -> parse("{ !string x: 1 }"));
     }
 
     // ── Maps ─────────────────────────────────────────────────────────────
@@ -279,7 +279,7 @@ class ParserTest {
 
     @Test
     void trailingCommaInMapIsParseError() {
-        assertThrows(ParseException.class, () -> parse("{ a => 1, }"));
+        assertThrows(TsonParseException.class, () -> parse("{ a => 1, }"));
     }
 
     // ── Arrays ───────────────────────────────────────────────────────────
@@ -328,30 +328,30 @@ class ParserTest {
 
     @Test
     void trailingCommaInArrayIsParseError() {
-        assertThrows(ParseException.class, () -> parse("[1, 2, 3,]"));
+        assertThrows(TsonParseException.class, () -> parse("[1, 2, 3,]"));
     }
 
     @Test
     void unterminatedArrayIsParseErrorNotHang() {
         assertTimeoutPreemptively(java.time.Duration.ofSeconds(2),
-                () -> assertThrows(ParseException.class, () -> parse("[1, 2, 3")));
+                () -> assertThrows(TsonParseException.class, () -> parse("[1, 2, 3")));
     }
 
     @Test
     void unterminatedRecordIsParseErrorNotHang() {
         assertTimeoutPreemptively(java.time.Duration.ofSeconds(2),
-                () -> assertThrows(ParseException.class, () -> parse("{ x: 1")));
+                () -> assertThrows(TsonParseException.class, () -> parse("{ x: 1")));
     }
 
     @Test
     void unterminatedNestedStructureIsParseErrorNotHang() {
         assertTimeoutPreemptively(java.time.Duration.ofSeconds(2),
-                () -> assertThrows(ParseException.class, () -> parse("{ x: [1 2")));
+                () -> assertThrows(TsonParseException.class, () -> parse("{ x: [1 2")));
     }
 
     @Test
     void zeroWidthSeparationInArrayIsParseError() {
-        assertThrows(ParseException.class, () -> parse("[{a:1}{b:2}]"));
+        assertThrows(TsonParseException.class, () -> parse("[{a:1}{b:2}]"));
     }
 
     @Test
@@ -386,7 +386,7 @@ class ParserTest {
 
     @Test
     void typeAnnotationMissingSpaceBeforeQuotedTokenIsParseError() {
-        assertThrows(ParseException.class, () -> parse("!int32\"5\""));
+        assertThrows(TsonParseException.class, () -> parse("!int32\"5\""));
     }
 
     @Test
@@ -406,7 +406,7 @@ class ParserTest {
 
     @Test
     void bangNotAdjacentToTypeNameIsParseError() {
-        assertThrows(ParseException.class, () -> parse("! person Alice"));
+        assertThrows(TsonParseException.class, () -> parse("! person Alice"));
     }
 
     // ── Annotations (§3.1) ───────────────────────────────────────────────
@@ -458,7 +458,7 @@ class ParserTest {
     void nestedAnnotationValueScopeAloneIsIncomplete() {
         // See SPEC-FEEDBACK.md #3: the spec's example as literally written has no core-value at
         // the outermost level once @a's nested value consumes everything.
-        assertThrows(ParseException.class, () -> parse("@a:@b:val target"));
+        assertThrows(TsonParseException.class, () -> parse("@a:@b:val target"));
     }
 
     @Test
@@ -477,19 +477,19 @@ class ParserTest {
     @Test
     void annotationCannotItselfBeAValueSpecExample() {
         // Spec §3.1's own error example.
-        assertThrows(ParseException.class, () -> parse("{ x: @a:@b:val }"));
+        assertThrows(TsonParseException.class, () -> parse("{ x: @a:@b:val }"));
     }
 
     @Test
     void atNotAdjacentToAnnotationNameIsParseError() {
-        assertThrows(ParseException.class, () -> parse("@ deprecated GOLD"));
+        assertThrows(TsonParseException.class, () -> parse("@ deprecated GOLD"));
     }
 
     @Test
     void colonNotAdjacentToAnnotationNameFallsThroughToValuelessThenFails() {
         // "@foo : bar" -- no adjacent ':', so @foo is valueless (whitespace satisfies the
         // trailing-whitespace rule), leaving a bare ':' token where a core-value is expected.
-        assertThrows(ParseException.class, () -> parse("@foo : bar"));
+        assertThrows(TsonParseException.class, () -> parse("@foo : bar"));
     }
 
     @Test
@@ -497,7 +497,7 @@ class ParserTest {
         // "@foo(" -- no value (':' not adjacent... there is none at all), and no whitespace
         // before the next token either (a reserved special token, but that's a separate error;
         // this specifically must fail on the missing-whitespace rule first).
-        assertThrows(ParseException.class, () -> parse("{ x: @foo\"bar\" }"));
+        assertThrows(TsonParseException.class, () -> parse("{ x: @foo\"bar\" }"));
     }
 
     // ── !!schema on scoped values (§2.3, §3.3) ──────────────────────────
@@ -521,17 +521,17 @@ class ParserTest {
 
     @Test
     void otherDirectiveNamesInScopedValuePositionAreParseErrors() {
-        assertThrows(ParseException.class, () -> parse("{ x: !!id:\"https://example.com/x.tn1\" 1 }"));
+        assertThrows(TsonParseException.class, () -> parse("{ x: !!id:\"https://example.com/x.tn1\" 1 }"));
     }
 
     @Test
     void directivesNotPermittedBeforeMapKey() {
-        assertThrows(ParseException.class, () -> parse("{ !!schema:\"https://example.com/s.tn1\" k => 1 }"));
+        assertThrows(TsonParseException.class, () -> parse("{ !!schema:\"https://example.com/s.tn1\" k => 1 }"));
     }
 
     @Test
     void directivesNotPermittedBeforeFieldName() {
-        assertThrows(ParseException.class, () -> parse("{ !!schema:\"https://example.com/s.tn1\" x: 1 }"));
+        assertThrows(TsonParseException.class, () -> parse("{ !!schema:\"https://example.com/s.tn1\" x: 1 }"));
     }
 
     // ── Full example document (adapted from spec §2.1) ──────────────────

@@ -1,6 +1,6 @@
 package io.ltr8.tson.parser.resolver.schema;
 
-import io.ltr8.tson.parser.SchemaParser;
+import io.ltr8.tson.parser.TsonSchemaParser;
 import io.ltr8.tson.parser.ast.ArrayValue;
 import io.ltr8.tson.parser.ast.DataValue;
 import io.ltr8.tson.parser.ast.EmptyBrace;
@@ -42,7 +42,7 @@ import java.util.Optional;
  *
  * <p><b>Produces a plain, unmaterialized {@link TsonSchema}</b> ({@code materialised() == false},
  * {@code bootstrap() == true} -- see that class's own Javadoc). This class is a stateless
- * parser/resolver, the same shape as {@link SchemaParser}/{@link SchemaResolver} -- {@link
+ * parser/resolver, the same shape as {@link TsonSchemaParser}/{@link SchemaResolver} -- {@link
  * #getMetaKernelSchema()} returns a freshly-built value rather than being one itself. Its own
  * output is resolved-but-not-yet-linked -- a caller links it (via {@code
  * SchemaRegistry#linkBootstrap}, never {@code SchemaRegistry#register} directly -- see that
@@ -117,7 +117,7 @@ public final class MetaKernelParser {
      */
     public static TsonSchema getMetaKernelSchema() {
         String source = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID);
-        SchemaDocument document = new SchemaParser(source).parseSchemaDocument();
+        SchemaDocument document = new TsonSchemaParser(source).parseSchemaDocument();
         Map<String, TypeDefinition> entries = resolveEntries(document);
         String id = document.id().orElseThrow(() -> new IllegalStateException(
                 "meta-kernel.tn1 has no !!id -- this should never happen for the real, bundled fixture"));

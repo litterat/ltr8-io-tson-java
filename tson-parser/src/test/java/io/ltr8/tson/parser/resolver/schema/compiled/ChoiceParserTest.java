@@ -1,6 +1,6 @@
 package io.ltr8.tson.parser.resolver.schema.compiled;
 
-import io.ltr8.tson.parser.Parser;
+import io.ltr8.tson.parser.TsonDataParser;
 import io.ltr8.tson.parser.ast.Document;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ChoiceBody;
@@ -51,7 +51,7 @@ class ChoiceParserTest {
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> read(TsonCompiledSchema compiled, String source) {
-        Document document = new Parser(source).parseDocument();
+        Document document = new TsonDataParser(source).parseDocument();
         return (Map<String, Object>) compiled.get("contact_method").read(document.root());
     }
 

@@ -1,6 +1,6 @@
 package io.ltr8.tson.parser.resolver.schema.compiled;
 
-import io.ltr8.tson.parser.Parser;
+import io.ltr8.tson.parser.TsonDataParser;
 import io.ltr8.tson.parser.ast.Document;
 import io.ltr8.tson.parser.resolver.schema.MetaKernelParser;
 import io.ltr8.tson.parser.resolver.vocab.AtomValidationException;
@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  * package ever routes a token through {@code BaseTypeResolver} identification at all. Uses {@code
  * boolean}'s own *real*, {@code MetaKernelParser}-resolved {@link EnumBody} -- not a hand-built
  * stand-in -- as the field type of a small local record, then reads real TSON data source text
- * through the real {@link Parser}.
+ * through the real {@link TsonDataParser}.
  */
 class EnumTypeParserFactoryTest {
 
@@ -55,7 +55,7 @@ class EnumTypeParserFactoryTest {
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> read(TsonCompiledSchema compiled, String source) {
-        Document document = new Parser(source).parseDocument();
+        Document document = new TsonDataParser(source).parseDocument();
         return (Map<String, Object>) compiled.get("flag_holder").read(document.root());
     }
 

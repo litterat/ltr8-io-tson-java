@@ -9,10 +9,14 @@ TSON spec series:
 
 - Part 1 (lexer, structural grammar, base type resolution, built-in type vocabulary):
   https://tson.io/raw/2026/32/tson-part1-data.md
-- Part 2 (schema grammar, type system) — grammar layer complete (see `SchemaParser` below);
+- Part 2 (schema grammar, type system) — grammar layer complete (see `TsonSchemaParser` below);
   resolution well underway (see `SchemaResolver` below) — `meta-kernel.tn1` and `meta.tn1` both
-  resolve and register in full, `core.tn1` resolves 47 of 48 declarations, the 1 remainder being
-  a permanent limit of generic binding, not an open gap: https://tson.io/raw/2026/32/tson-part2-schema.md
+  resolve and register in full. `boolean => !enum [true false]`'s own once-permanent generic-binding
+  limitation was fixed 2026-07-26 when `bindAtomInstance` moved onto the compiled reader (verified:
+  `SchemaResolverTest.booleanInstanceResolvesCorrectlyViaTheCompiledReader`); core.tn1's own
+  end-to-end resolution no longer has a dedicated test since `CoreTn1Parser`/`CoreTn1ParserTest`
+  were retired in the same change (see "Not yet implemented" below) — re-verify its exact
+  declaration count with a throwaway probe before citing one: https://tson.io/raw/2026/32/tson-part2-schema.md
 
 The spec is a *working revision* (2026 series) and changes between revisions without compatibility
 guarantees — re-fetch the current URL rather than trusting a cached copy of the text when in doubt, and
@@ -65,7 +69,7 @@ If a class name contains `Tson` at all, `Tson` MUST be the leading word (`TsonSc
 `TsonSchemaCompiler`, `TsonDataParser`, `TsonMapperReader`) — never buried in the middle (`CompiledTsonSchema`
 is wrong; it was renamed to `TsonCompiledSchema` specifically to fix this, 2026-07-26). The prefix isn't
 applied to every class in the library, either — most of `tson-parser`/`tson-schema`'s own internal machinery
-is deliberately bare (`SchemaResolver`, `SchemaLinker`, `SchemaRegistry`, `Lexer`, `Parser`, `RecordParser`,
+is deliberately bare (`SchemaResolver`, `SchemaLinker`, `SchemaRegistry`, `Lexer`, `TsonDataParser`, `RecordParser`,
 `ParserHandle`). Reserve the `Tson` prefix for the classes a *consumer of this library* actually names in
 their own code — its value is disambiguation at the call site (`TsonSchema` vs. a domain object also called
 `Schema`, `TsonDataParser` vs. a domain-specific `DataParser`) and quick identification when skimming a
@@ -75,7 +79,7 @@ the type is meant to be used from outside this library's own internals, prefix i
 machinery a consumer never names directly, leave it bare.
 
 `tson-parser` holds the lexer, the data-grammar structural parser, base type resolution, the built-in
-type vocabulary, the Part 2 schema grammar (`SchemaParser`, `ast.schema`), the schema resolver
+type vocabulary, the Part 2 schema grammar (`TsonSchemaParser`, `ast.schema`), the schema resolver
 (`io.ltr8.tson.parser.resolver.schema.SchemaResolver`, producing Class 2's resolved schema value), *and*
 (moved here 2026-07-24, see "Mapper" below) the generic `DataValue`&lt;-&gt;Java-object binding layer
 (`io.ltr8.tson.parser.mapper`) — every one of these is tightly coupled to the shared lexer/token-stream
@@ -165,7 +169,7 @@ changes; the lexer doesn't.
 
 ### Structural parser (`tson-parser/src/main/java/io/ltr8/tson/parser/`)
 
-`Parser` (`Parser.java`) turns the lexer's token stream into a `Document` (§2, §3, §7.4). AST types live
+`TsonDataParser` (`TsonDataParser.java`) turns the lexer's token stream into a `Document` (§2, §3, §7.4). AST types live
 in the `ast` subpackage as a sealed `CoreValue` hierarchy (`RecordValue`, `MapValue`, `ArrayValue`,
 `EmptyBrace`, `AbsentValue`, `TokenValue`) built on Java 25 records, matching the grammar's own shape.
 Key design points:
@@ -180,7 +184,7 @@ Key design points:
 - **Separator detection (§2.4) works the same way.** Between record fields / map entries / array
   elements, "zero-width separation is a parse error" and "trailing separators are not permitted" are both
   implemented by comparing the end position of the previous element's last token against the start
-  position of whatever comes next (`Parser.consumeSeparatorOrCloseCheck`) — a real comma token is
+  position of whatever comes next (`TsonDataParser.consumeSeparatorOrCloseCheck`) — a real comma token is
   optional evidence, a position gap is the other kind of evidence, and at least one of the two is
   required unless the closing delimiter is immediately next (which needs no separator at all,
   §2.4: structural delimiters create their own token boundary).
@@ -191,14 +195,14 @@ Key design points:
   (explicitly deferred to the resolver, §2.8), and does not interpret `TokenValue` text as null/boolean/
   number/string (base type resolution, §4, not yet implemented). All of these are intentional gaps, not
   omissions — a resolver layer consuming `Document`/`DataValue` is the next natural piece of work.
-- **`!!meta` in the header throws `SchemaDocumentException`, not `ParseException`.** This is a Class 1
+- **`!!meta` in the header throws `TsonUnsupportedDocumentException`, not `TsonParseException`.** This is a Class 1
   (data-format-only) processor (§1.5); encountering a schema document isn't malformed input, it's a
   well-formed document of a kind this parser doesn't implement, and the spec requires that distinction be
   visible in how it's reported (§8.1: "MUST report the document as a TSON schema document that this
   processor does not support" — a categorized diagnostic, not a generic parse error).
 - **Nested annotation value-scope is right-recursive and can legitimately leave an outer data-value
   without a core-value.** `@a:@b:val` fully consumes everything as `@a`'s nested value, all the way down
-  — see `SPEC-FEEDBACK.md` #3 for the exact trace; `ParserTest.nestedAnnotationValueScopeAloneIsIncomplete`
+  — see `SPEC-FEEDBACK.md` #3 for the exact trace; `TsonDataParserTest.nestedAnnotationValueScopeAloneIsIncomplete`
   documents this as intentional, spec-derived behavior, not a bug, so don't "fix" it without re-reading
   that entry first.
 
@@ -251,7 +255,7 @@ a pure constraint-*values* record in `io.ltr8.tson.schema.meta` (`IntegerType`, 
 `RegexType`, `DecimalType`, `FloatType`, `RationalType`, `UuidType`, `BinaryType`, `DateType`,
 `TimeType`, `DateTimeType`, `DurationType`, `UriType` — no parsing/validation, matching the kernel's
 own `*_type` constructor shape exactly, the same modeling `io.ltr8.tson.schema.meta` uses everywhere
-else), and a same-named-but-suffixed `*Parser` class here in `resolver.vocab` (`IntegerParser`,
+else), and a same-named-but-suffixed `*TsonDataParser` class here in `resolver.vocab` (`IntegerParser`,
 `TextParser`, `RegexParser`, ...) holding one as `constraints` and doing the actual
 `read`/`write`/validate work. `RegexType` (added 2026-07-23, after the initial split) is itself a
 *composition*, not a flat record: `RegexType(TextType constraints, AtomSpecification specification)`
@@ -262,7 +266,7 @@ constraint vocabulary, held as a nested `TextType` rather than flattened field-b
 why `spec` is kept as real data rather than dropped as always-implied). `ComplexParser`/
 `Ipv4Parser`/`Ipv6Parser` still have no separate `schema.meta` class at all — their constructors
 declare no constraint fields of their own at all (`complex_type`/`ipv4_type`/`ipv6_type` have none
-beyond a fixed component/RFC pin) — so there's nothing to split out. Each `*Parser` keeps
+beyond a fixed component/RFC pin) — so there's nothing to split out. Each `*TsonDataParser` keeps
 convenience constructors/static factories mirroring its pre-split
 shape (e.g. `new IntegerParser(new IntegerSize(32, true))`, `IntegerParser.ofMin(...)`) so call
 sites barely changed. `Rational`/`IsoDuration` (host *values*, not constraints, referenced by
@@ -382,16 +386,16 @@ handling (see "Meta-kernel bootstrap" below) stays hand-written rather than rout
 positional-form value generically; wrapping the bare value into an equivalent one-field
 `RecordValue` before delegating to ordinary record binding is the natural fix, not yet built.
 
-### Schema grammar (`tson-parser/src/main/java/io/ltr8/tson/parser/SchemaParser.java`,
+### Schema grammar (`tson-parser/src/main/java/io/ltr8/tson/parser/TsonSchemaParser.java`,
 `.../ast/schema/`)
 
-`SchemaParser` parses a schema document's body (Part 2 §2.1, §5, ABNF at §12.1) into a
+`TsonSchemaParser` parses a schema document's body (Part 2 §2.1, §5, ABNF at §12.1) into a
 `SchemaDocument`, the schema-grammar analogue of `Document`/`CoreValue`. AST types live in the
 `ast.schema` subpackage (`TypeDef`, `TypeRef`, `RecordDef`, `ContainerDef`, etc.) alongside
 `tson-parser.ast`'s data-grammar types, one sealed hierarchy per ABNF production family, mirroring
 `ast`'s own shape.
 
-- **Grammar-only, deliberately.** `SchemaParser` builds a faithful AST from a schema document's source
+- **Grammar-only, deliberately.** `TsonSchemaParser` builds a faithful AST from a schema document's source
   text and does nothing else itself — no namespace resolution (§3), no `type_definition`
   materialisation or desugaring (§8), no validation; see "Schema resolution" below for the module
   (`tson-schema`) that consumes this AST and does that work, kept out of `tson-parser` on purpose since
@@ -402,18 +406,18 @@ positional-form value generically; wrapping the bare value into an equivalent on
   type_definition>`. A duplicate declaration name isn't rejected here (the later one overwrites the
   earlier map entry) — the same "grammar layer doesn't dedupe, resolver does" treatment [TSON-DATA]
   §2.5/§2.6 already give ordinary duplicate record fields and map keys.
-- **`SchemaParser extends Parser`, same package.** Part 2 §12.1 says the schema grammar imports
+- **`TsonSchemaParser extends TsonDataParser`, same package.** Part 2 §12.1 says the schema grammar imports
   `annotation`, `data-value`, and directive parsing directly from Part 1 §7.4 — the same tokens, the same
   adjacency/separator rules, the same `!!name:"..."` directive shape for `!!id`/`!!meta`/`!!import` as
   data documents use for `!!id`/`!!schema`. Rather than re-implementing that grammar a second time,
-  `Parser`'s relevant fields and helper methods are package-private, not `private` (see its own Javadoc
-  on why it isn't `final`), and `SchemaParser` calls straight into them — `parseDataValue()` for
+  `TsonDataParser`'s relevant fields and helper methods are package-private, not `private` (see its own Javadoc
+  on why it isn't `final`), and `TsonSchemaParser` calls straight into them — `parseDataValue()` for
   atom-refinement values, `parseCoreValue()` for constructor-application (`instance`) values (see the
   next bullet for why these two aren't the same production), `parseAnnotation()`,
   `parseNamedDirective()` for all three header directives, `expectFieldNameToken()`, and the
-  cursor/separator primitives. `Parser` itself is untouched in behavior — it still rejects `!!meta`
+  cursor/separator primitives. `TsonDataParser` itself is untouched in behavior — it still rejects `!!meta`
   documents exactly as before; only its own private-vs-package visibility changed, and only because
-  `SchemaParser` needed it, not because either class became part of a different module.
+  `TsonSchemaParser` needed it, not because either class became part of a different module.
 - **`instance`'s ABNF says `data-value`, but the intended production is the narrower `core-value`** —
   the literal grammar (`instance = "!" type-name ws data-value`) lets a constructor-application payload
   carry its own further annotations and a second, competing type-ref (`data-value = *annotation
@@ -434,17 +438,17 @@ positional-form value generically; wrapping the bare value into an equivalent on
 - **`construction-def`'s ABNF doesn't parse its own worked example** (`address & contact & { ... }` needs
   an implicit `&` before the trailing `record-def` that alternative 1 as literally written doesn't admit)
   — implemented per the documented intent, not the letter; see `SPEC-FEEDBACK.md` #14 and
-  `ConstructionDef`'s own Javadoc before touching `SchemaParser.parseConstructionDefContinuation`.
+  `ConstructionDef`'s own Javadoc before touching `TsonSchemaParser.parseConstructionDefContinuation`.
 - **`field-modifier`'s value is a bare token or the absent sentinel, not a full `data-value`** — §12.1's
   own introductory prose claims otherwise, but its ABNF and §5.2's prose agree on the narrower rule; see
   `SPEC-FEEDBACK.md` #15. `FieldDef.Modifier.Value` models exactly `token | absent`, reusing
   `tson-parser.ast`'s `TokenValue` rather than the full `DataValue`.
 - **An unquoted, non-numeric type-argument always parses as a type reference, never a value literal** —
-  `SchemaParser.parseTypeArg`'s Javadoc explains why this is the grammar's own deliberate deferral (§12.1,
+  `TsonSchemaParser.parseTypeArg`'s Javadoc explains why this is the grammar's own deliberate deferral (§12.1,
   §5.10: "settled against the applied signature's parameter kinds... not by the grammar"), not an
   implementation gap; classifying an enum-member-shaped argument as a value happens at a later, semantic
   layer not built yet.
-- **Verified against the real fixtures, not just the spec's own short examples.** `SchemaParserTest`
+- **Verified against the real fixtures, not just the spec's own short examples.** `TsonSchemaParserTest`
   parses `spec/m/meta-kernel.tn1`, `spec/m/meta.tn1`, and `spec/m/core.tn1` (read directly from this
   repo's own `spec/` directory, not the sibling test-suite repo) end-to-end with no exceptions — real,
   full-sized schema documents, not just the spec's illustrative snippets.
@@ -682,20 +686,41 @@ they change every time resolver coverage widens): `meta-kernel.tn1` resolves in 
 `MetaKernelParser`'s own two-pass ordering -- `SchemaResolver.resolveAll` alone, single-pass,
 strict source order, still can't handle `boolean => !enum [...]` preceding `enum`'s own
 declaration); `meta.tn1` resolves and registers in full (31/31, `MetaSchemaImportTest`, up from
-24/31 before generic `Instance` resolution existed); `core.tn1` resolves 47 of 48 declarations in a
-single source-order pass, seeded with meta.tn1's own registered namespace as the structure
-namespace.** The 1 remaining `core.tn1` failure is a real, permanent limit of generic binding, not
-an open gap: `boolean` (`!enum [true false]` -- `"true"`/`"false"` collide with TSON's own
-boolean-literal shape and get identified as actual booleans by `BaseTypeResolver` before
-`EnumBody.members: List<String>` ever sees them; every *other* real enum instance across both
-fixtures has ordinary identifier members that never collide). `duration` was a second such failure
-until 2026-07-24, when `DurationType.min`/`max` were retyped from `Optional<IsoDuration>` to
-`Optional<String>` (matching the `TextType.pattern`/`UriType.pattern` precedent) specifically so
-the field binds generically with no `DataBridge` -- `DurationParser`'s own `parseDuration` is the
-one place that text is turned into an `IsoDuration`, on demand, not `DurationType` itself. (An
-earlier abandoned attempt at this same fix tried registering an explicit
-`DataBridge<String, IsoDuration>` on a custom `DataBindContext`; the flat-`String`-field approach
-below was simpler and is what actually landed.)
+24/31 before generic `Instance` resolution existed).**
+
+**`boolean => !enum [true false]` used to be a real, permanent limit of generic binding -- it no
+longer is, fixed 2026-07-26 alongside the `bindAtomInstance` compiled-reader swap.** The old
+`TsonMapperReader`-based `bindAtomInstance` bound each bare array element identification-first
+(`BaseTypeResolver`'s own null → boolean → number → string check, run *before* the target field
+was ever consulted), so `"true"`/`"false"` misidentified as real Java booleans before
+`EnumBody.members: List<String>` ever saw them -- every *other* real enum instance across both
+fixtures has ordinary identifier members that never collide this way. The compiled reader's own
+atom-family dispatch is schema-driven (looked up by the constructor's own name, fixed at compile
+time via `TsonParserFactoryRegistry`), not token-identification-driven, so this collision simply
+doesn't happen there -- verified directly: `SchemaResolverTest
+.booleanInstanceResolvesCorrectlyViaTheCompiledReader` resolves `boolean` from a real-fixture-shaped
+schema and gets back `EnumBody(members=["true", "false"])`, no exception. This also retired
+`CoreTn1Parser`'s own hand-picked `boolean` bypass entirely (see "Bundled schema documents" above)
+-- core.tn1's own local `boolean => !enum [true false]` redeclaration now resolves the same
+generic way. **`core.tn1`'s own current end-to-end declaration count is not pinned down by any
+test right now** -- `CoreTn1Parser`/`CoreTn1ParserTest`/`CoreTn1CompiledEndToEndTest` were all
+deleted the same day (superseded by `DefaultSchemaCoordinator`'s own generic path, "Compiled schema
+registry" above), and nothing replaced their end-to-end coverage of resolving core.tn1's all 48
+declarations in one pass; re-verify with a throwaway probe (register meta-kernel ordinarily first,
+build object-mode factories from *its own* registered result, then `coordinator.resolve
+(BundledSchemaSource.CORE_TN1_ID)`) before relying on a specific count -- a first attempt at exactly
+this hit an `ObjectRecordShapeFactory` validation error compiling one of core.tn1's own transitively
+merged-in atom-constraint entries, not yet root-caused, and may be a genuine, currently-uncovered
+gap in the coordinator/compiled-registry path for a three-schema chain in object-binding mode, not
+just a probe-script mistake.
+
+`duration` was a second real generic-binding failure until 2026-07-24, when `DurationType.min`/
+`max` were retyped from `Optional<IsoDuration>` to `Optional<String>` (matching the
+`TextType.pattern`/`UriType.pattern` precedent) specifically so the field binds generically with no
+`DataBridge` -- `DurationParser`'s own `parseDuration` is the one place that text is turned into an
+`IsoDuration`, on demand, not `DurationType` itself. (An earlier abandoned attempt at this same fix
+tried registering an explicit `DataBridge<String, IsoDuration>` on a custom `DataBindContext`; the
+flat-`String`-field approach below was simpler and is what actually landed.)
 
 **A real recursion trap, found and fixed along the way -- read before touching `TypeArgument`.**
 `TypeRef`/`TypeArgument` are mutually recursive (`TypeRef.arguments: List<TypeArgument>`, and a
@@ -809,18 +834,20 @@ is tempted to "fix" this back to a plain record, re-read `TypeArgument`'s Javado
   `tson-parser` purely for organizational convenience, but needs no `tson-parser` dependency at
   all) is the resolved-schema wrapper -- the kernel's own `schema` type, `map<type_name,
   type_definition>` (§9), plus the governing-chain header directives its own document carried
-  (`id`/`meta`/`imports`, §2.2). **A plain class, not a record** -- deliberately, so `MetaSchema`
-  (below) can `extend` it directly. `SchemaResolver.resolveAll(SchemaDocument)` builds one from a
-  whole document (not just its body), resolving each entry independently in source order and
-  carrying the header straight through; most entries of an arbitrary real schema still throw via
-  this path alone, since most constructs aren't resolved yet -- `resolve(SchemaMap.Declaration)`
-  resolves a single named entry and is the one to reach for against a real fixture until more
-  constructs are supported (or use `MetaKernelParser`, below, for meta-kernel specifically).
-- **`MetaSchema`** (`io.ltr8.tson.schema.MetaSchema`, alongside `TsonSchema`) is a distinct
-  `extends TsonSchema` subtype marking, in the type system, meta-kernel's own resolved schema --
-  it adds no fields or behavior of its own. Kept separate from a plain `TsonSchema` purely for
-  identity: the value it wraps had to be pre-loaded (below), not resolved the ordinary way, and
-  a caller holding a `MetaSchema` knows that without re-deriving it.
+  (`id`/`meta`/`imports`, §2.2), plus a `bootstrap` flag. **A plain `record`** -- an earlier version
+  was a plain class specifically so a dedicated `MetaSchema` subtype could `extend` it directly to
+  mark, in the type system, meta-kernel's own pre-loaded result; that subtype was removed
+  2026-07-26 once `bootstrap` (a real, stored boolean -- `true` for exactly one object in the whole
+  system, `MetaKernelParser.getMetaKernelSchema()`'s own output) covered the same distinction more
+  simply, and once *linked-vs-unlinked* already needed its own type-level distinction
+  (`LinkedTsonSchema`, see "Schema registry" below) -- a second subtype for "did this come from the
+  bootstrap reader" was redundant once that existed. `SchemaResolver.resolveAll(SchemaDocument)`
+  builds one from a whole document (not just its body), resolving each entry independently in
+  source order and carrying the header straight through; most entries of an arbitrary real schema
+  still throw via this path alone, since most constructs aren't resolved yet -- `resolve
+  (SchemaMap.Declaration)` resolves a single named entry and is the one to reach for against a real
+  fixture until more constructs are supported (or use `MetaKernelParser`, below, for meta-kernel
+  specifically).
 
 ### Meta-kernel bootstrap (`tson-parser/src/main/java/io/ltr8/tson/parser/resolver/schema/MetaKernelParser.java`)
 
@@ -831,11 +858,19 @@ nothing either way: resolving a constructor-*application* instance (`!C value`, 
 `integer => !integer_type {}`) needs `C`'s own vocabulary already known, and every `C` meta-kernel
 uses is defined within meta-kernel itself.
 
-`MetaKernelParser` is a stateless parser/resolver -- the same shape as `SchemaParser`/
-`SchemaResolver` -- **producing a `MetaSchema` from `parse()`/`parse(String)`, not extending
-`TsonSchema` itself** (an earlier version of this class did extend it directly; corrected
-2026-07-23 once the `MetaSchema` subtype existed to hold the result properly instead). It resolves
-in two passes over meta-kernel's 49 declarations:
+`MetaKernelParser` is a stateless parser/resolver -- the same shape as `TsonSchemaParser`/
+`SchemaResolver` -- **producing a plain `TsonSchema` (`bootstrap() == true`) from
+`getMetaKernelSchema()`, its only public method,** rather than being one itself (an even earlier
+version of this class extended `TsonSchema` directly; then briefly held a dedicated `MetaSchema`
+subtype for the result, since removed 2026-07-26 in favor of the plain `bootstrap` flag -- see
+"Schema registry" above). **Deliberately locked down to exactly one public method, taking no
+arguments** (narrowed 2026-07-26, on the user's own explicit direction) -- this class exists to
+bootstrap *the* real meta-kernel document (`BundledSchemaSource#META_KERNEL_ID`), nothing else. An
+earlier version also exposed `parse(String source)`, letting a caller resolve arbitrary
+meta-kernel-shaped text through this same two-pass machinery -- unused anywhere in this codebase and
+removed outright, not just deprecated, since keeping it around invites exactly the kind of "just
+reuse the bootstrap parser for this other thing" misuse this lock-down exists to prevent. It
+resolves in two passes over meta-kernel's 49 declarations:
 
 1. Every declaration whose `TypeDef` is **not** an `Instance` goes through `SchemaResolver` exactly
    as normal, in source order (36 of the 49, everything `SchemaResolver`'s own Javadoc already
@@ -849,69 +884,74 @@ in two passes over meta-kernel's 49 declarations:
    `SchemaResolver` itself -- `SchemaResolver.resolveAll` alone is single-pass, strict source order,
    and still can't handle a forward reference like `boolean` preceding `enum`.
 
-**Constructor-application binding goes entirely through `MetaKernelParser.instanceBody`, a private
-(package-private for its own defensive-path tests) closed switch -- not `SchemaResolver`/
+**Constructor-application binding goes entirely through `MetaKernelParser.instanceBody`, a
+package-private (for its own defensive-path tests) closed switch -- not `SchemaResolver`/
 `TsonMapperReader`, and not any schema-driven compiled reader either.** Widened 2026-07-25 from an
 earlier version ("Phase B step 6") that routed `unit`/`integer_type`/`text_type` through
 `SchemaResolver.resolve`'s ordinary `Instance` path and hand-picked only `uri_type`/`regex_type`/
 `enum` -- that split turned out to be an unnecessary halfway point. Originally pulled out into its
 own `BootstrapMetaKernelCompiler` class the same day, then merged back into `MetaKernelParser`
 itself a few hours later, on the user's own observation: it had exactly one caller, produced a `Top`
-*value* (a resolution-stage output) rather than a compiled/`TsonSchemaParser`-shaped artifact, and
-"Compiler" in its name collided with what that word now means elsewhere in this codebase
-(`TsonSchemaParser.Compiler`, and "Schema registry" below's planned `CompiledSchemaRegistry`) --
-reserving "Compiler" for a class that actually produces a compiled reader keeps the vocabulary
-unambiguous. The full case against letting *any* meta-kernel `Instance` reach generic binding:
-`SchemaResolver.resolveInstance`'s own path binds via `TsonMapperReader`, which is
-identification-first (a token is classified null/boolean/number/string *before* the target field is
-even consulted) -- exactly why `boolean => !enum [true false]` needs hand-picking at all
-(`"true"`/`"false"` misidentify as real booleans before `EnumBody.members` ever sees them) and why
-`uri_type`/`regex_type`'s own schema-composed RFC-citation default never lands (nested inside
-`specification: AtomSpecification`, past what generic defaulting fills in). Rather than deciding
-case by case which targets are safe for the generic path, `instanceBody` hand-picks all six of
-meta-kernel's own real constructor targets uniformly -- confirmed directly against the real fixture,
-meta-kernel only ever instantiates them in exactly two shapes: a bare `{}` (`unit`, `integer_type`,
-`text_type`, `uri_type`, `regex_type` -- each target's own `UNCONSTRAINED` constant, or a bare `new
-Unit()` for `unit` itself, is already exactly right) or a bare array of tokens (`enum` -- this
-class's own `toEnumBody`, package-private since `CoreTn1Parser` also reuses it, reading
-`TokenValue.text()` directly, bypassing base-type identification entirely). No `TsonSchemaParser`,
-no `ParserFactoryRegistry`, no materialization, no `TsonMapperReader` involved anywhere in
-meta-kernel's own bootstrap now.
+*value* (a resolution-stage output) rather than a compiled/`TsonCompiledSchema`-shaped artifact, and
+"Compiler" in its name collided with what that word now means elsewhere in this codebase (now the
+real `TsonSchemaCompiler`) -- reserving "Compiler" for a class that actually produces a compiled
+reader keeps the vocabulary unambiguous. The full case against letting *any* meta-kernel `Instance`
+reach generic binding: `SchemaResolver.resolveInstance`'s own generic path binds via
+`TsonMapperReader`, which is identification-first (a token is classified null/boolean/number/string
+*before* the target field is even consulted) -- exactly why `boolean => !enum [true false]` needs
+hand-picking at all (`"true"`/`"false"` misidentify as real booleans before `EnumBody.members` ever
+sees them) and why `uri_type`/`regex_type`'s own schema-composed RFC-citation default never lands
+(nested inside `specification: AtomSpecification`, past what generic defaulting fills in). Rather
+than deciding case by case which targets are safe for the generic path, `instanceBody` hand-picks
+all six of meta-kernel's own real constructor targets uniformly -- confirmed directly against the
+real fixture, meta-kernel only ever instantiates them in exactly two shapes: a bare `{}` (`unit`,
+`integer_type`, `text_type`, `uri_type`, `regex_type` -- each target's own `UNCONSTRAINED` constant,
+or a bare `new Unit()` for `unit` itself, is already exactly right) or a bare array of tokens
+(`enum` -- this class's own `toEnumBody`, package-private for its own test accessibility, reading
+`TokenValue.text()` directly, bypassing base-type identification entirely). No compiled reader
+(`TsonSchemaCompiler`/`TsonCompiledSchema`), no `TsonParserFactoryRegistry`, no materialization, no
+`TsonMapperReader` involved anywhere in meta-kernel's own bootstrap now. (The grammar-layer
+`TsonSchemaParser` -- an unrelated class, despite the similar name, see "Naming convention" above --
+*is* used, straightforwardly, to parse meta-kernel's own source text into a `SchemaDocument` before
+any of this runs.)
 
-**Why even a *compiled*-reader-based bootstrap (the eventual replacement for `TsonMapperReader`
-elsewhere, see "Schema resolution" above's `bindAtomInstance` notes) can't safely read meta-kernel
-from its own in-progress state either -- this is why `instanceBody` doesn't attempt one:** `enum =>
-~atom & { members: set<token> } }`'s own field type is *argument-bearing* (`set` + the `token`
-argument), and the compiled-parser layer's own `RecordParser`/`CompilationContext` assume every
-field type is already a bare, materialized name -- true only after `SchemaValidator`'s own
-materialization pass has run, which meta-kernel (the thing that pass would normally run *over*) has
-never been through while it's still being produced. Solving that would mean either running a
-whole-schema materialization pass over a knowingly-incomplete map (checked directly: doesn't work --
-`integer_size => { bits: ... signed: boolean }` is itself a first-pass entry whose `signed` field
-already references `boolean`, unresolved until the *second* pass) or building a scoped,
-validation-free materialization step just for bootstrap's own benefit. Given meta-kernel's own
-instance shapes are this narrow and fully known in advance, that complexity buys nothing -- this
-class's own guiding principle here: "the bootstrap compiler can do whatever tricks it needs to...
-that includes not even compiling, just calling `new Xxx(...)`."
+**Why even a *compiled*-reader-based bootstrap can't safely read meta-kernel from its own
+in-progress state either -- this is why `instanceBody` doesn't attempt one:** `enum => ~atom & {
+members: set<token> } }`'s own field type is *argument-bearing* (`set` + the `token` argument), and
+the compiled-parser layer's own `RecordParser`/`CompilationContext` assume every field type is
+already a bare, materialized name -- true only after `SchemaLinker`'s own materialization pass has
+run, which meta-kernel (the thing that pass would normally run *over*) has never been through while
+it's still being produced. Solving that would mean either running a whole-schema materialization
+pass over a knowingly-incomplete map (checked directly: doesn't work -- `integer_size => { bits:
+... signed: boolean }` is itself a first-pass entry whose `signed` field already references
+`boolean`, unresolved until the *second* pass) or building a scoped, validation-free materialization
+step just for bootstrap's own benefit. Given meta-kernel's own instance shapes are this narrow and
+fully known in advance, that complexity buys nothing -- this class's own guiding principle here:
+"the bootstrap compiler can do whatever tricks it needs to... that includes not even compiling, just
+calling `new Xxx(...)`." (This is also why `SchemaResolver.bindAtomInstance` -- which *does* now
+bind every other meta-kernel/meta.tn1/core.tn1 `Instance` and atom refinement through a real
+compiled reader, see "Schema resolution" above -- was never a candidate for meta-kernel's own
+bootstrap specifically; the two problems look similar but aren't the same one.)
 
 **Every `Instance` declaration in the real fixture is registered** (`unit`, `integer_type`, `text_type`,
 `uri_type`, `regex_type`, `enum`) -- all 49 declarations resolve; a declaration whose target isn't
 registered would simply be left out of the result entirely rather than failing the whole bootstrap,
 but that path is unexercised against the real fixture today. Verified both end to end
 (`MetaKernelSchemaRegistryTest`/`MetaKernelEndToEndTest`, unchanged counts before/after both the
-original hand-picking widening and the later class merge -- 49/49 resolved, 58 after registration)
+original hand-picking widening and the later class merge -- 49/49 resolved, 58 once linked)
 and in isolation (`MetaKernelParserTest`'s own `unrecognizedInstanceTargetCompilesToEmpty`/
 `aNonEmptyBodyForAnEmptyBodiedTargetThrows`, absorbed from the deleted `BootstrapMetaKernelCompiler`
 class's own test the same way the production code was).
 
 **`meta-kernel.tn1` is packaged as a classpath resource, not read from a filesystem path.**
-`MetaKernelParser.parse()` (no args) reads `/meta-kernel.tn1` off the classpath via
-`Class.getResourceAsStream` -- `tson-parser/build.gradle.kts` wires its `processResources` task to
-copy the file straight from the repo's own `spec/m/meta-kernel.tn1` snapshot at build time (`from
-(rootProject.layout.projectDirectory.dir("spec/m")) { include("meta-kernel.tn1") }`), so there is
-exactly one copy of the file on disk to keep in sync with the spec, but the bootstrap still works
-from a built jar (e.g. published to a repository), not only from a repo checkout. `parse(String
-source)` remains available for parsing arbitrary/custom source text.
+`getMetaKernelSchema()` fetches its own source text via `BundledSchemaSource.INSTANCE.fetch
+(BundledSchemaSource.META_KERNEL_ID)` (see "Bundled schema documents" below) rather than reading the
+classpath resource itself directly, as an earlier version of this class did -- one place now owns
+"how this library's own bundled schema documents get their raw text," not two. `tson-parser/build
+.gradle.kts` wires its `processResources` task to copy `meta-kernel.tn1`/`meta.tn1`/`core.tn1`
+straight from the repo's own `spec/m/` snapshots at build time, so there is exactly one copy of each
+file on disk to keep in sync with the spec, but the bootstrap still works from a built jar (e.g.
+published to a repository), not only from a repo checkout.
 
 **`IntegerType`, then `TextType`/`UriType`/`RegexType`, all became real `Atom` variants for this
 (2026-07-23)** -- the four atom constraint-vocabulary families the old `TypeBody`'s own Javadoc used
@@ -958,21 +998,45 @@ written out at all before) with `@Record` attached -- both annotations stay in p
 *individually* — no whole-schema consistency checking, references carried through as bare,
 unverified strings, `!!import` parsed but never consulted, and a `type_ref` with arguments (e.g.
 `enum`'s own `members: set<token>` field, or any field using §5.3's `[X]`/`[X]?` array sugar) left
-exactly as written. `SchemaRegistry` adds the missing second stage on top: internal-consistency
-validation, flattening every argument-bearing `type_ref` into a real named entry, and — once
-satisfied — locking the schema into a registry keyed by its canonical `!!id` identity. Added
-2026-07-24, entirely in `tson-schema` (no dependency on `tson-parser`, preserving the established
-one-way direction).
+exactly as written. `SchemaLinker`/`SchemaRegistry` add the missing second stage on top:
+internal-consistency validation, flattening every argument-bearing `type_ref` into a real named
+entry, and — once satisfied — locking the schema into a registry keyed by its canonical `!!id`
+identity. Added 2026-07-24, entirely in `tson-schema` (no dependency on `tson-parser`, preserving
+the established one-way direction).
+
+**Linking and registering are two separate stages, not one** (`link` -> `register`, split
+2026-07-27 on the user's own explicit direction, borrowing standard compiler vocabulary for the
+whole pipeline: parse -> resolve -> link -> register -> compile -> read — see "Naming convention"
+above). `SchemaLinker.link(TsonSchema, SchemaLoader)` is the pass-2 engine described below,
+returning a `LinkedTsonSchema` — a thin wrapper (`record LinkedTsonSchema(TsonSchema schema)`)
+that exists purely as a compile-time proof that linking already ran, replacing an earlier runtime
+`materialised` boolean flag on `TsonSchema`. `SchemaRegistry#register` now only accepts a
+`LinkedTsonSchema`, so "has this been linked" is answered by the type system, not by a flag every
+caller has to remember to check. `TsonSchema` also carries a `bootstrap` flag (unrelated to
+linking) — `true` for exactly one object in the whole system, `MetaKernelParser`'s own pre-loaded
+output (see "Meta-kernel bootstrap" below); `SchemaRegistry#register` refuses any self-referential
+schema (its own `!!meta` names its own `!!id`) with `bootstrap() == true`, whether linked or not —
+meta-kernel's own identity can only ever be registered via a schema resolved *ordinarily*
+(`SchemaResolver.resolveAll`, which never sets `bootstrap`), never the bootstrap-produced form
+directly. There used to be a separate `MetaSchema` subtype of `TsonSchema` for marking meta-kernel's
+own pre-loaded result; replaced by the plain `bootstrap` flag (2026-07-26) once linking already
+needed its own type-level distinction, so a second one for "did this come from the bootstrap reader"
+was redundant.
 
 **Package split, user-facing vs. internal-by-convention (per explicit user direction):**
 `io.ltr8.tson.schema` holds the public surface — `SchemaRegistry`, `SchemaLoader`,
-`SchemaValidationException` — alongside `TsonSchema`/`MetaSchema`. `io.ltr8.tson.schema.registry`
-holds `CanonicalIdentity` and `SchemaValidator`, the private pass-2 machinery nothing outside this
-module calls directly. **Note on enforcement:** `tson-schema` has no `module-info.java` (unlike
-`tson-bind`/`tson-annotation`, which do), so there's no JPMS boundary to truly hide `.registry`
-behind — both classes are `public` purely because `SchemaRegistry` needs to call them
-cross-package; "private" here means internal-by-convention/package-naming only, a deliberate,
-confirmed tradeoff rather than adding a module descriptor now.
+`SchemaValidationException`, `TsonSchema`, `LinkedTsonSchema`. `io.ltr8.tson.schema.registry` holds
+`CanonicalIdentity` and `SchemaLinker`. **`SchemaLinker` is genuinely public now, unlike its
+predecessor `SchemaValidator`** (renamed alongside the `link`/`validate` rename) — a caller
+orchestrating the pipeline calls `SchemaLinker.link` directly and deliberately, same as
+`parse`/`resolve`/`compile`, including from *other* modules (e.g. `tson-parser`'s own
+`TsonCompiledRegistry`, which links a schema before registering it). `CanonicalIdentity` stays
+internal-by-convention as before — it was never a named pipeline stage. **Note on enforcement:**
+`tson-schema` has no `module-info.java` (unlike `tson-bind`/`tson-annotation`, which do), so there's
+no JPMS boundary to truly hide `.registry` behind — `CanonicalIdentity` is `public` purely because
+`SchemaRegistry`/`SchemaLinker` need to call it cross-package; "internal-by-convention" here means
+package-naming discipline only, a deliberate, confirmed tradeoff rather than adding a module
+descriptor now.
 
 - **`CanonicalIdentity.of(String)`** implements `[TSON-DATA] §2.2.1`'s canonical-identity algorithm
   exactly — **not** general URI normalization. The spec performs exactly two reductions (strip
@@ -982,25 +1046,24 @@ confirmed tradeoff rather than adding a module descriptor now.
   (`SchemaValidationException`) rather than fixing up an identifier that isn't. E.g.
   `"https://tson.io/2026/32/m/meta-kernel.tn1"` → `"tson.io/2026/32/m/meta-kernel.tn1"`; `http://`
   and `https://` resolve to the same identity; a `?sha256=...` query is dropped, not validated.
-- **`SchemaLoader`** (`@FunctionalInterface Optional<TsonSchema> load(String canonicalIdentity)`) —
-  the pluggable-with-a-default hook for resolving a `!!import` target, matching Part 2 §10.1's
-  precedence order (pre-loaded/registered authoritative, "fetched" opt-in and disabled by default).
-  `SchemaRegistry`'s own no-arg constructor supplies a default that only ever finds an
-  *already-registered* schema — nothing is fetched from anywhere.
-- **`SchemaValidator.validate(TsonSchema, SchemaLoader)`** — the actual pass-2 engine:
-  1. **Merge `!!import`s** (Part 2 §2.2.3, added 2026-07-24) — every import, in declaration order,
-     looked up via `loader` by canonical identity, its entries copied in *as-is* ("merged entries
-     keep their home namespace" — an imported `TypeDefinition` is never re-resolved or
-     re-materialized against the importer; only the importer's own new material gets that
-     treatment). **Shallow** — only the imported schema's own `entries()` are read, never its own
-     `imports()` — falls out for free here since `loader` always hands back an already-registered,
-     already-flattened `TsonSchema`. A name collision — between two imports, or between an import
-     and a local declaration — is a resolver error, checked as each stage merges in, not after the
-     fact: import entries first, then the importer's own resolved/synthesized entries (checked
-     against what's already merged), matching the exact ordering the user specified. An import
-     whose identity isn't found via `loader` is a `SchemaValidationException` (e.g. the importer
-     needs to have been registered into the *same* `SchemaRegistry` first — the default loader is
-     registered-only).
+- **`SchemaLoader`** (`@FunctionalInterface Optional<LinkedTsonSchema> load(String canonicalIdentity)`)
+  — the pluggable-with-a-default hook for resolving a `!!import`/`!!meta` target, matching Part 2
+  §10.1's precedence order (pre-loaded/registered authoritative, "fetched" opt-in and disabled by
+  default). `SchemaRegistry` implements `SchemaLoader` itself (a thin delegation to `get`), purely so
+  a caller can write `SchemaLinker.link(schema, registry)` directly, passing the registry as its own
+  lookup source. `SchemaRegistry`'s own no-arg constructor supplies a default loader that only ever
+  finds an *already-registered* schema — nothing is fetched from anywhere.
+- **`SchemaLinker.link(TsonSchema, SchemaLoader)`** — the actual pass-2 engine:
+  1. **Merge `!!import`s** (Part 2 §2.2.3) — every import, in declaration order, looked up via
+     `loader` by canonical identity, its entries copied in *as-is* ("merged entries keep their home
+     namespace" — an imported `TypeDefinition` is never re-resolved or re-materialized against the
+     importer; only the importer's own new material gets that treatment). **Shallow** — only the
+     imported schema's own `entries()` are read, never its own `imports()` — falls out for free here
+     since `loader` always hands back an already-registered, already-flattened `LinkedTsonSchema`. A
+     name collision — between two imports, or between an import and a local declaration — is a
+     resolver error, checked as each stage merges in, not after the fact. An import whose identity
+     isn't found via `loader` is a `SchemaValidationException` (e.g. the importer needs to have been
+     registered into the *same* `SchemaRegistry` first — the default loader is registered-only).
   2. **Materialize** — walks every entry's `Top` body (deliberately *not* `TypeDefinition.source` —
      see below) for any `TypeRef` with non-empty `arguments`, bottom-up (a nested argument that's
      itself argument-bearing materializes first, so an outer synthesized name is built from an
@@ -1011,19 +1074,22 @@ confirmed tradeoff rather than adding a module descriptor now.
      entries" per the spec; here they do too, uniformly). Deduped via a `Map<TypeRef, String>` keyed
      by the flattened application (`TypeRef`'s own record equality is exactly §8.2's "flattened
      applications are structurally equal" test) — first occurrence creates the entry, later
-     structurally-identical occurrences reuse it. Each synthesized entry is exactly
-     `TypeDefinition.reference(TypeRef)`'s existing shape (that method's own Javadoc already flagged
-     this gap: "this resolver doesn't materialise instantiation entries yet ... until that exists").
-     A synthesized name is `head_arg1..._hash` (§8.2's own non-normative "readable head plus
-     structural hash" guidance; not conformance-relevant, free to refine). Every `Top` variant
-     has its own rewrite case, written as an **exhaustive switch over the (multi-level) sealed
+     structurally-identical occurrences reuse it. **A synthesized entry is real construction for
+     `array`/`set`** (`instantiate`/`instantiateArray`, e.g. `array<field_name>` from `[field_name]`
+     sugar materializes to a genuine `!array { element_type: field_name }` body, not a
+     self-referential placeholder) — falls back to `TypeDefinition.reference(TypeRef)`'s own
+     placeholder shape for everything else this doesn't (yet) know how to build directly
+     (`map`/`tuple`/`record`/`choice`/any atom-family constructor, or an arity mismatch). A
+     synthesized name is `head_arg1..._hash` (§8.2's own non-normative "readable head plus
+     structural hash" guidance; not conformance-relevant, free to refine). Every `Top` variant has
+     its own rewrite case, written as an **exhaustive switch over the (multi-level) sealed
      interface** (no `default`) so a future new variant is a compile error here, not a silent miss --
-     `switch`/pattern matching checks exhaustiveness across the whole `permits` graph transitively, so
-     switching directly on `Top`'s own concrete leaves (rather than needing a case per intermediate
-     `Atom`/`Product`/`Sum` level) is exhaustive the same way it was when this switched over the old,
-     single-level `TypeBody` (deleted 2026-07-24 in favor of switching on `Top` directly — see
-     "Schema resolution" above's `io.ltr8.tson.schema.meta` bullet).
-  3. **Validate** — over the now-expanded map (originals + synthesized), every reference must
+     `switch`/pattern matching checks exhaustiveness across the whole `permits` graph transitively.
+  3. **Populate `TypeDefinition.subtypes`** — the reverse of `supertypes`, for *this schema's own
+     merged view* of every entry it can see, imported or local (`computeSubtypes`) — never done
+     anywhere before this stage; falls out transitively for free since `supertypes` is already the
+     full transitive IS-A chain.
+  4. **Validate** — over the now-expanded map (originals + synthesized), every reference must
      resolve: `TypeDefinition.source`/`supertypes`/`subtypes`, and every `TypeRef` reachable through
      the same exhaustive `Top` switch (`RecordBody.fields`, `Reference.target`,
      `MapBody.keyType`/`valueType`, `ArrayBody.elementType`, `TupleBody.elements`,
@@ -1034,8 +1100,9 @@ confirmed tradeoff rather than adding a module descriptor now.
      `T` is `set`'s own parameter, not a real entry. `RecordBody.groups[].members` gets a bonus
      check against a different namespace (sibling field names within the same record, not type
      names). Any failure throws `SchemaValidationException` naming the offending entry/reference.
-  4. Returns a new plain `TsonSchema` — even when the input was a `MetaSchema`; once
-     validated/registered, which resolver produced it no longer matters.
+  5. Returns a new `LinkedTsonSchema` wrapping a `TsonSchema` — even when the input carried
+     `bootstrap() == true`; once linked/registered, provenance no longer matters to anything
+     downstream.
 
   **Scope note on `source`:** `TypeDefinition.source` is *provenance* (how an entry was itself
   derived — composition/refinement/construction), not a field consuming another type, so it's
@@ -1045,149 +1112,81 @@ confirmed tradeoff rather than adding a module descriptor now.
 
   **`source` validation also falls back to the governing meta-schema's own namespace, one hop via
   `!!meta` — every other reference (field/key/value/element types, supertypes, subtypes, choice
-  variants) does not** (added 2026-07-25, on the user's own correction of an initial, too-broad
-  first attempt at this fix — see below). Surfaced by `CoreTn1Parser` (below): core.tn1 declares no
-  `!!import` of its own, only `!!meta:"...meta.tn1"`, yet `void => !unit {}`'s own `source: unit`
+  variants) does not.** Surfaced by core.tn1 (see "Meta-kernel bootstrap" below): core.tn1 declares
+  no `!!import` of its own, only `!!meta:"...meta.tn1"`, yet `void => !unit {}`'s own `source: unit`
   names a meta-kernel constructor — perfectly valid per Part 2 §3.3.1 ("`!C value` ... `C` resolves
   first against the type-name namespace ... and then against the structure namespace"), since a
   `source` naming a constructor is exactly one of §3.3.1's three enumerated *constructor roles*
-  (constructor-application targets, generic-application heads, sugar-form desugar targets) — but
-  `SchemaValidator` previously only ever consulted `!!import`-merged entries, so this failed with
-  "has an unresolved reference 'unit'". **The fix is deliberately narrow, not a blanket namespace
-  merge**: an initial attempt applied the structure-namespace fallback to *every* reference check
-  uniformly, which the user caught as wrong — §3.3.2 is explicit that the structure namespace is
-  "NOT extended" to ordinary type-refs ("field types... composition targets... never as type-refs"),
-  only to the constructor roles §3.3.1 lists. `validate`'s own `structureNamespace` (loaded via
-  `loader.load(CanonicalIdentity.of(schema.meta()))`, empty if not yet registered — e.g. meta-kernel's
-  own self-referential `!!meta`, mid-registration) is used in exactly two places: materialization's
-  own constructor lookup in `instantiate` (every argument-bearing `type_ref` reaching it is, by
-  construction, a generic-application head or sugar-desugar target — both structure-namespace-
-  eligible), and `validateEntry`'s own `source` check specifically (via a small `sourceLookup`
-  merge, local/imported entries always winning on collision) — never in `validateBody`'s field-type/
-  supertype/subtype checks, which stay `merged`-only (type-name namespace, imports + locals), per
-  §3.3.2. `!!meta` itself never merges anything into a schema's own returned `entries()` — that
-  stays exactly what `!!import` produces, unchanged.
-- **`SchemaRegistry`** — `register(TsonSchema)` computes the canonical identity from the schema's
-  own `!!id` (throwing if absent), rejects a duplicate identity outright (no overwrite — together
-  with `TsonSchema.entries()` already being an unmodifiable map, this rejection *is* the "locked, no
-  mutations allowed" guarantee), then runs `SchemaValidator` and stores the result. `get(String uri)`
-  takes a *raw* URI and canonicalizes internally — callers never need to call `CanonicalIdentity`
-  themselves for either method. (Its private `lookupByCanonicalIdentity` helper, which expects an
-  *already*-canonical identity, is the piece actually shared with `SchemaLoader`'s own contract, and
-  is what the default loader delegates to — `get`'s public, raw-URI-taking form can't be reused
-  directly there.)
+  (constructor-application targets, generic-application heads, sugar-form desugar targets). **The
+  fix is deliberately narrow, not a blanket namespace merge** — §3.3.2 is explicit that the
+  structure namespace is "NOT extended" to ordinary type-refs ("field types... composition
+  targets... never as type-refs"), only to the constructor roles §3.3.1 lists. `link`'s own
+  `structureNamespace` (loaded via `loader.load(CanonicalIdentity.of(schema.meta()))`, empty if not
+  yet registered — e.g. meta-kernel's own self-referential `!!meta`, mid-registration) is used in
+  exactly two places: materialization's own constructor lookup in `instantiate` (every
+  argument-bearing `type_ref` reaching it is, by construction, a generic-application head or
+  sugar-desugar target — both structure-namespace-eligible), and `validateEntry`'s own `source`
+  check specifically (via a small `sourceLookup` merge, local/imported entries always winning on
+  collision) — never in `validateBody`'s field-type/supertype/subtype checks, which stay
+  `merged`-only (type-name namespace, imports + locals), per §3.3.2. `!!meta` itself never merges
+  anything into a schema's own returned `entries()` — that stays exactly what `!!import` produces,
+  unchanged.
+- **`SchemaRegistry`** — `register(LinkedTsonSchema)` computes the canonical identity from the
+  wrapped schema's own `!!id` (throwing if absent), rejects the self-referential-bootstrap case
+  above, rejects a duplicate identity outright (no overwrite — together with `TsonSchema.entries()`
+  already being an unmodifiable map, this rejection *is* the "locked, no mutations allowed"
+  guarantee), and stores the result. `get(String uri)` takes a *raw* URI and canonicalizes
+  internally — callers never need to call `CanonicalIdentity` themselves for either method.
+  `linkBootstrap(TsonSchema)` is the one sanctioned way to turn meta-kernel's raw bootstrap output
+  into a `LinkedTsonSchema` (via `SchemaLinker.link`) without registering it — needed so a caller
+  (e.g. building an object-binding-mode `TsonParserFactoryRegistry`) can get a genuinely linked
+  result to validate against, without the self-referential-bootstrap guard getting in the way;
+  `register` still refuses the result of `linkBootstrap` itself, since it's still `bootstrap() ==
+  true` — the one way meta-kernel's own identity ever actually gets registered is resolving its
+  document a second time, ordinarily (never setting `bootstrap`), against a coordinator seeded from
+  the one-off linked bootstrap result (see "Meta-kernel bootstrap" below).
 
-**Verified against the real fixture, not just hand-built schemas.**
-`MetaKernelSchemaRegistryTest` (in `tson-parser`, not `tson-schema` — that module has no dependency
-on `tson-parser`/`MetaKernelParser` at all, so this is the one place both are available) registers
-`MetaKernelParser.parse()`'s real output end-to-end. It produces **9** synthesized entries, not the
-1 (`set_token_*`) a naive `<...>` grep of the source predicts: `[X]`/`[X]?` array-sugar field types
-elsewhere in the fixture (`arguments: [type_argument]?`, `fields: [record_field]`, `groups:
-[field_group]?`, `supertypes`/`subtypes`/`parameters: [type_name]?`/`[param_name]?`, `elements:
-[tuple_element]`, `variants: [type_ref]`, `members: [field_name]`) desugar to `array<X>`
-applications too (§5.3) — three separate `[type_name]?` uses across different declarations
-correctly dedup to a single `array_type_name_*` entry, confirmed against the real data, not just a
-hand-built case.
+**Verified against the real fixture, not just hand-built schemas.** `MetaKernelSchemaRegistryTest`
+(in `tson-parser`, not `tson-schema` — that module has no dependency on `tson-parser`/
+`MetaKernelParser` at all, so this is the one place both are available) links
+`MetaKernelParser.getMetaKernelSchema()`'s real output end-to-end: 49 raw declarations, 58 once
+linked — 9 synthesized entries, not the 1 (`set_token_*`) a naive `<...>` grep of the source
+predicts: `[X]`/`[X]?` array-sugar field types elsewhere in the fixture (`arguments:
+[type_argument]?`, `fields: [record_field]`, `groups: [field_group]?`, `supertypes`/`subtypes`/
+`parameters: [type_name]?`/`[param_name]?`, `elements: [tuple_element]`, `variants: [type_ref]`,
+`members: [field_name]`) desugar to `array<X>` applications too (§5.3) — three separate
+`[type_name]?` uses across different declarations correctly dedup to a single `array_type_name_*`
+entry, confirmed against the real data, not just a hand-built case.
 
-**`!!import` merging verified against the real `meta.tn1` fixture too — now registers in full.**
+**`!!import` merging verified against the real `meta.tn1` fixture too — registers in full.**
 `MetaSchemaImportTest` (`tson-parser`, same reasoning as above for why it lives there) registers the
 real meta-kernel schema first, then meta.tn1's own declarations (`!!import:"...meta-kernel.tn1"`),
 confirming meta-kernel's own entries (`atom`, `text_type`, ...) are visible and correctly referenced
 from meta.tn1's own composition-based declarations (`date_type => ~atom & atom_specification &
-{...}`). **meta.tn1 now registers in full, all 31 declarations** (2026-07-24, once `SchemaResolver`
-gained generic `Instance` resolution — Phase B step 4) — previously 4 of its 31 declarations
-(`binary_encoding`, `ieee_format`, `complex_component`, `ordered`, all `!enum [...]`) had to be
-skipped, and 3 more (`binary`, `float_type`, `complex_type`) that reference one of those four as a
-field type had to be excluded too (registering them without their dependency present correctly
-failed validation, proven directly by a dedicated test rather than worked around). With generic
-`Instance` resolution in place, every one of the 31 resolves in a single source-order pass (meta.tn1's
-own declaration order already has each dependency before its use), and the merged, validated
+{...}`). meta.tn1 resolves all 31 of its own declarations in a single source-order pass (its own
+declaration order already places each dependency before its use), and the merged, linked
 registration succeeds outright.
-
-### meta.tn1 / core.tn1 loaders (`tson-parser/src/main/java/io/ltr8/tson/parser/resolver/schema/{MetaTn1Parser,CoreTn1Parser}.java`)
-
-Added 2026-07-25, on an explicit user request: `MetaKernelParser` produces meta-kernel's own
-pre-loaded `MetaSchema`, but meta.tn1/core.tn1 — the next two rungs up the schema ladder, and the
-two documents most callers actually want — previously only existed as hand-rolled resolution loops
-duplicated across several test classes (`MetaSchemaImportTest`, `SchemaResolverTest`), with the
-source files themselves living only in the repo's own `spec/m/` directory, not packaged into the
-built library at all. `MetaTn1Parser`/`CoreTn1Parser` are the real, production, non-test loaders;
-`tson-parser/build.gradle.kts`'s `processResources` task now copies `meta.tn1`/`core.tn1` alongside
-`meta-kernel.tn1` (same one-file-to-keep-in-sync-with-the-spec reasoning), so both work from a built
-jar. Both, like `MetaKernelParser.parse()`, return **unregistered** results — registering (which
-merges `!!import`s, materializes argument-bearing type-refs, and populates `subtypes`) is a separate,
-explicit step the caller performs via `SchemaRegistry`, same as meta-kernel's own bootstrap:
-
-```java
-MetaSchema metaKernel = MetaKernelParser.parse();
-SchemaRegistry registry = new SchemaRegistry();
-registry.register(metaKernel);
-TsonSchema meta = registry.register(MetaTn1Parser.parse(metaKernel));
-TsonSchema core = registry.register(CoreTn1Parser.parse(meta));
-```
-
-- **`MetaTn1Parser.parse(MetaSchema metaKernel)`** resolves meta.tn1's own 31 declarations in a
-  single source-order pass (`SchemaResolver.resolve(declaration, namespace)`, the two-argument
-  overload) — meta.tn1's own declaration order already places each dependency before its use, unlike
-  meta-kernel itself, so no two-pass forward-reference handling is needed here the way
-  `MetaKernelParser` needs it. **Resolves against `metaKernel`'s own *unregistered* `entries()`**,
-  deliberately — meta.tn1's own resolution only ever needs meta-kernel's real, named constructors,
-  never one of the synthesized array-sugar placeholder entries registration would add, so the
-  smaller unregistered namespace is sufficient (and avoids needing a `SchemaRegistry` just to
-  resolve meta.tn1 in isolation). A caller assembling the full ladder still registers meta-kernel
-  first regardless, since `CoreTn1Parser` (one rung up) needs meta.tn1's own *registered* result.
-- **`CoreTn1Parser.parse(TsonSchema registeredMeta)`** resolves core.tn1's 48 declarations in a
-  single source-order pass too, via `SchemaResolver`'s three-argument overload
-  (`resolve(declaration, resolved, structureNamespace)`), threading `registeredMeta.entries()` as
-  the structure namespace — core.tn1 declares no `!!import` of its own at all, every declaration is
-  a constructor application or atom refinement resolved purely against its `!!meta` target. **Must
-  be meta.tn1's own already-*registered* result, not `MetaTn1Parser.parse`'s raw output** — unlike
-  meta.tn1's own resolution, core.tn1 relies on names meta.tn1 only carries *after* registration
-  merges in its own `!!import` of meta-kernel (`void => !unit {}`'s own `source: unit` is exactly
-  this case — see the `SchemaValidator` structure-namespace fallback, above, which this loader is
-  what motivated). **One declaration, `boolean`, is hand-picked**, not resolved generically — core.tn1's
-  own local `boolean => !enum [true false]` redeclaration hits the identical, permanent
-  generic-binding limitation already documented for meta-kernel's own `boolean` (`"true"`/`"false"`
-  collide with TSON's own boolean-literal shape before `EnumBody.members` ever sees them) — handled
-  the same way, reusing `MetaKernelParser.toEnumBody` (widened from `private` to package-private
-  specifically for this reuse) rather than silently dropping the entry, matching this codebase's
-  "known gap, not silently mishandled" convention. All 48 core.tn1 declarations resolve and
-  register — none are excluded.
-
-**Verified against the real fixtures, registered end-to-end.** `CoreTn1ParserTest` registers all
-three documents in the chain above and confirms 48 core.tn1 entries register (including `boolean`
-and `void`, core's own fresh `!unit {}` sibling of meta-kernel's `void`); `MetaSchemaImportTest` was
-rewritten to call `MetaTn1Parser.parse` directly rather than duplicating its own resolution loop, so
-the test now actually exercises the production loader. `MetaTn1CompiledEndToEndTest`/
-`CoreTn1CompiledEndToEndTest` (`resolver.schema.compiled`, mirroring `MetaKernelEndToEndTest`)
-additionally compile the full registered result through `TsonSchemaParser` and read real data
-against it — `core.tn1`'s own `void`/`int32` among them, the concrete end-to-end proof of the
-`VoidParser`/`ValueParser`/`TokenParser` split (see "Built-in type vocabulary" above). Eight
-core.tn1 atom entries (`complex`, `email`, `ipv4`, `ipv6`, `cidr4`, `cidr6`, `mac`, `unknown`) still
-have no compiled-parser factory at all — a pre-existing, already-documented gap (their `schema.meta`
-classes were added "record-only, deliberately with no resolver.vocab parser at all"), not something
-introduced here; `CoreTn1CompiledEndToEndTest` asserts these specifically fail to compile rather than
-silently skipping them.
 
 ### Compiled schema registry (`tson-parser/src/main/java/io/ltr8/tson/parser/resolver/schema/compiled/TsonCompiledRegistry.java`)
 
 Added 2026-07-25: pairs one-to-one with `SchemaRegistry` (`tson-schema`) but stores *compiled*
-schemas (`TsonSchemaParser`) instead of resolved ones — for every schema `TsonCompiledRegistry`
+schemas (`TsonCompiledSchema`) instead of resolved ones — for every schema `TsonCompiledRegistry`
 registers, it also compiles the registered result and keeps the compiled reader around, so a caller
 never recompiles the same governing chain twice. This is what an application actually wants at
 startup: register meta-kernel, compile+store it; register meta.tn1 (against meta-kernel), compile+
 store it; register core.tn1 (against meta.tn1), compile+store it — then any user-defined schema
 governed by one of these reuses whatever's already sitting in the registry.
 
-- **`register(TsonSchema)`** — registers via the wrapped `SchemaRegistry` (ordinary validation/
-  materialization/`!!import`-merging rules apply unchanged), compiles the *registered* result (never
-  the raw input — `TsonSchemaParser` needs materialization already done), stores it keyed by the
-  schema's own raw `!!id` string, and returns the compiled reader directly (so the very next schema
-  in a bootstrap chain, which needs *this* return value as an argument to its own parser, e.g.
-  `CoreTn1Parser.parse(TsonSchema)`, doesn't have to immediately call `get` right back).
+- **`register(TsonSchema)`** — links {@code schema} via `SchemaLinker.link` (using the paired
+  `SchemaRegistry` itself as the `!!import`/`!!meta` lookup source), registers the linked result via
+  `SchemaRegistry#register` (ordinary collision/reference-validation rules apply unchanged), compiles
+  the *registered* result (never the raw input — `TsonSchemaCompiler` needs linking already done),
+  stores it keyed by the schema's own raw `!!id` string, and returns the compiled reader directly (so
+  the very next schema in a bootstrap chain, which needs *this* return value as its own structure
+  namespace's compiled reader, doesn't have to immediately call `get` right back).
 - **Keyed by raw `!!id`, not a canonicalized identity** — deliberately. `CanonicalIdentity`
-  (`tson-schema.registry`) is internal-by-convention to `SchemaRegistry` itself (confirmed via its
-  own class Javadoc: "a caller outside this module should go through `SchemaRegistry` instead of
+  (`tson-schema.registry`) is internal-by-convention to `SchemaRegistry`/`SchemaLinker` (confirmed via
+  its own class Javadoc: "a caller outside this module should go through `SchemaRegistry` instead of
   depending on this class directly") — reaching into it from `tson-parser`, a different module,
   would be exactly the cross-module layering violation this project otherwise avoids, even though
   nothing stops it at compile time (`tson-schema` has no `module-info.java`). The cost: two
@@ -1195,23 +1194,20 @@ governed by one of these reuses whatever's already sitting in the registry.
   they would through `SchemaRegistry.get` — acceptable for the one real caller today (always
   registers and looks up using each schema's own exact `!!id` string), a real narrower guarantee,
   not an oversight.
-- **One shared `ParserFactoryRegistry` across every schema it compiles** — `ParserFactoryRegistry
-  .dom()` (new the same day) is the obvious default: every DOM-mode factory this build actually has
-  (composite kinds + every `AtomTypeParser` atom-family constant), factored out once it turned out to
-  be hand-duplicated, byte-for-byte identical, across four separate test classes
-  (`MetaKernelEndToEndTest`, `MetaTn1CompiledEndToEndTest`, `CoreTn1CompiledEndToEndTest`,
-  `TsonDataParserTest`) — all four now call `ParserFactoryRegistry.dom()` directly instead of their
-  own private `fullRegistry()` copy.
-- **Verified against the real three-schema chain**, not a hand-built fixture — `TsonCompiledRegistryTest`
-  loads meta-kernel → meta.tn1 → core.tn1 through a single `TsonCompiledRegistry`, then re-runs one
-  representative assertion from each of `MetaKernelEndToEndTest`/`MetaTn1CompiledEndToEndTest`/
-  `CoreTn1CompiledEndToEndTest` against readers pulled back out via `get(id)` (not the fresh
-  `register`-returned reference), confirming the *stored*, looked-up-by-id reader is the genuinely
-  reusable one.
+- **One shared `TsonParserFactoryRegistry` across every schema it compiles** — `TsonParserFactoryRegistry
+  .dom()` is the obvious default: every DOM-mode factory this build actually has (composite kinds +
+  every `AtomTypeParser` atom-family constant), factored out once it turned out to be
+  hand-duplicated, byte-for-byte identical, across several test classes — all of them now call
+  `TsonParserFactoryRegistry.dom()` directly instead of their own private `fullRegistry()` copy.
+- **Verified against real fixtures, not hand-built ones** — `MetaTn1CompiledEndToEndTest` loads
+  meta-kernel and meta.tn1 through a single `TsonCompiledRegistry`/`DefaultSchemaCoordinator` pair
+  and compiles/reads against the result; several other tests (`SchemaResolverCompiledMetaSchemaTest`,
+  `MetaKernelSchemaRegistryTest`, `MetaSchemaImportTest`) exercise `TsonCompiledRegistry` the same
+  way for their own scenarios.
 
-**Not yet wired into a real "load the standard library" entry point** — `TsonCompiledRegistryTest`'s
-own `loadStandardLibrary()` helper is test-local; a permanent, production version of that same
-four-line sequence (and where it should live) is still open.
+**Not yet wired into a real "load the standard library" entry point** — a permanent, production
+version of the register-meta-kernel/meta.tn1/core.tn1 sequence (and where it should live) is still
+open.
 
 **`SchemaCoordinator`/`DefaultSchemaCoordinator`** (`tson-parser/src/main/java/io/ltr8/tson/parser/resolver/schema/{SchemaCoordinator,DefaultSchemaCoordinator,SchemaSource}.java`,
 added 2026-07-25, replacing an earlier version of `SchemaResolver`'s own constructor that took a bare
@@ -1225,63 +1221,60 @@ registering/compiling on demand rather than requiring everything to pre-exist.
 
 - **`DefaultSchemaCoordinator.resolve(uri)`** — three cases, in order: (1) already compiled?
   `registry.get(uri)` — a plain cache hit. (2) meta-kernel's own well-known identity
-  (`DefaultSchemaCoordinator.META_KERNEL_ID`)? Resolved via `MetaKernelParser.parse()` directly —
-  *never* through this same coordinator's own generic path in case (3), which would recurse forever
-  (that path builds a `SchemaResolver(this)` and resolves a document via `resolveAll`, which itself
-  calls back into `resolve` for *that* document's own `!!meta` target — fine for any real schema,
-  wrong for meta-kernel specifically, whose `!!meta` points at itself). Checked *before* case (3) is
-  ever reached, so the loop never starts. Compared by exact string, not canonical identity
-  (`CanonicalIdentity` stays internal-by-convention to `tson-schema`, same reasoning as
-  `TsonCompiledRegistry`'s own raw-id keying) — a real, narrower guarantee, not an oversight. (3)
-  otherwise, fetch `uri`'s own source text via this coordinator's own `SchemaSource`, parse it,
-  resolve it via a fresh `SchemaResolver(this)` (so *that* document's own `!!meta`/`!!import` targets
-  resolve the same way, recursively, cache-then-bootstrap-then-fetch all the way down), then register
-  and compile the result — *this* result genuinely is cached (`TsonCompiledRegistry.register`), so the
-  *next* request for the same non-bootstrap `uri` is a cache hit.
-  **Case (2) is deliberately the one exception — never cached, on the user's own explicit direction**
-  (added 2026-07-25, after the user asked "is it possible to return a one-off bootstrap compiled meta
-  kernel so that we validate and register the one we loaded from disk?" and, offered the choice
-  between never caching the bootstrap vs. caching it under a different key, chose "never cache the
-  bootstrap result"): `MetaKernelParser.parse()`'s output is compiled directly
-  (`TsonSchemaParser.compile(metaKernel, registry.factories())`) but never passed to
-  `TsonCompiledRegistry.register` — so every call for `META_KERNEL_ID` that isn't already a cache hit
-  re-bootstraps and re-compiles from scratch, every time. The *permanent*, shared registry entry for
-  meta-kernel is meant to come from a separate, deliberate "load it and register it" step, done once,
-  elsewhere — not implicitly, silently, the first time anything happens to ask for meta-kernel's own
-  `!!meta`/`!!import` target.
-  **Two real, load-bearing consequences, found by the test suite, not anticipated up front.** Skipping
-  `TsonCompiledRegistry.register` also skips everything `SchemaRegistry.register` does on the way in
-  (`SchemaValidator`'s own materialization/validation pass), so: (a) this one-off reader has no
-  synthesized entries for any argument-bearing `type_ref` (e.g. `enum`'s own `members: set<token>`) —
-  49 raw entries, not the 58 a genuinely registered meta-kernel has; and (b) any *other* schema that
-  `!!import`s meta-kernel (every real one does) fails its own registration with `"!!import '...' is not
-  registered"` unless meta-kernel has been registered *separately* first — `SchemaValidator`'s own
-  import-merging (run inside `SchemaRegistry.register`, distinct from `SchemaResolver`'s own
-  resolution-time merge above) resolves an import via `SchemaRegistry`'s own registered-only
-  `SchemaLoader`, which knows nothing about this coordinator or its bootstrap case. In practice, a
-  caller resolving anything beyond meta-kernel itself must register meta-kernel explicitly first
-  (`registry.register(MetaKernelParser.parse())`) before asking this coordinator for anything that
-  transitively imports it.
+  (`BundledSchemaSource.META_KERNEL_ID` — moved here from `DefaultSchemaCoordinator` itself
+  2026-07-26, so `BundledSchemaSource`, not the coordinator, owns "what URI does each of this
+  library's own bundled schemas live at")? Resolved via `MetaKernelParser.getMetaKernelSchema()`,
+  linked one-off via a fresh, throwaway `SchemaRegistry#linkBootstrap` (never the shared registry
+  this coordinator wraps), then compiled directly — *never* through this same coordinator's own
+  generic path in case (3), which would recurse forever (that path builds a `SchemaResolver(this)`
+  and resolves a document via `resolveAll`, which itself calls back into `resolve` for *that*
+  document's own `!!meta` target — fine for any real schema, wrong for meta-kernel specifically,
+  whose `!!meta` points at itself). Checked *before* case (3) is ever reached, so the loop never
+  starts. Compared by exact string, not canonical identity (`CanonicalIdentity` stays
+  internal-by-convention to `tson-schema`, same reasoning as `TsonCompiledRegistry`'s own raw-id
+  keying) — a real, narrower guarantee, not an oversight. (3) otherwise, fetch `uri`'s own source
+  text via this coordinator's own `SchemaSource`, parse it, resolve it via a fresh
+  `SchemaResolver(this)` (so *that* document's own `!!meta`/`!!import` targets resolve the same way,
+  recursively, cache-then-bootstrap-then-fetch all the way down), then register and compile the
+  result — *this* result genuinely is cached (`TsonCompiledRegistry.register`), so the *next* request
+  for the same non-bootstrap `uri` is a cache hit.
+  **Case (2) is deliberately the one exception — never cached, on the user's own explicit direction**:
+  the one-off linked-and-compiled meta-kernel reader is never passed to `TsonCompiledRegistry.register`
+  — so every call for `META_KERNEL_ID` that isn't already a cache hit re-bootstraps, re-links, and
+  re-compiles from scratch, every time. (The linking itself is genuine, not skipped — the returned
+  reader has the full, materialized entry set, same as a registered meta-kernel would.) The
+  *permanent*, shared registry entry for meta-kernel is meant to come from a separate, deliberate
+  "load it and register it" step, done once, elsewhere — not implicitly, silently, the first time
+  anything happens to ask for meta-kernel's own `!!meta`/`!!import` target. **One real, load-bearing
+  consequence remains**: skipping `TsonCompiledRegistry.register` means meta-kernel is never persisted
+  under its own identity in the *shared* `SchemaRegistry`, so any *other* schema that `!!import`s
+  meta-kernel (every real one does) still fails its own registration with `"!!import '...' is not
+  registered"` unless meta-kernel has been registered *separately* first — `SchemaLinker`'s own
+  import-merging (run inside `SchemaRegistry.register`) resolves an import via `SchemaRegistry`'s own
+  registered-only `SchemaLoader`, which knows nothing about this coordinator or its one-off bootstrap
+  case. In practice, a caller resolving anything beyond meta-kernel itself must register meta-kernel
+  explicitly first — resolved *ordinarily* via `SchemaResolver.resolveAll` against a coordinator whose
+  own bootstrap branch supplies the structure namespace (never the raw/one-off bootstrap form
+  directly — `SchemaRegistry#register` refuses any self-referential schema with `bootstrap() == true`,
+  see "Schema registry" above) — before asking this coordinator for anything that transitively imports
+  it.
 - **`SchemaSource`** — the pluggable fetch hook, and the natural home for the policy the user asked
   for explicitly: "we can control whitelists or blacklists for resolution... we don't allow HTTP
   requests and just load from disk, or only HTTP requests to certain hosts." `SchemaSource
   .registeredOnly()` is the default (mirrors `SchemaRegistry`'s own no-arg-constructor default and
-  `SchemaLoader`'s own precedent) — nothing is ever fetched from anywhere unless a caller opts in. A
-  real disk/HTTP-backed `SchemaSource` (with whatever whitelist/blacklist policy) is deliberately not
-  built yet — the shape exists, the concrete implementation is separate, later work.
+  `SchemaLoader`'s own precedent) — nothing is ever fetched from anywhere unless a caller opts in.
+  `BundledSchemaSource` (below) is the one real implementation so far; a general disk/HTTP-backed
+  `SchemaSource` (with whatever whitelist/blacklist policy) is deliberately not built yet.
 - **`SchemaResolver(SchemaCoordinator)`** replaces the earlier `SchemaResolver(TsonCompiledRegistry)`
-  constructor. `compiledMetaSchema(SchemaDocument)` now returns a plain `TsonSchemaParser` (not
-  `Optional<TsonSchemaParser>`) and *throws* if it can't be resolved — with a real coordinator behind
-  it, "not available" is a genuine, nameable failure (the coordinator is supposed to make it
-  available, fetching/bootstrapping as needed), not a normal "maybe try again" outcome the way a bare
-  registry miss used to be.
+  constructor. `compiledMetaSchema(SchemaDocument)` returns a plain `TsonCompiledSchema` (not an
+  `Optional`) and *throws* if it can't be resolved — with a real coordinator behind it, "not
+  available" is a genuine, nameable failure (the coordinator is supposed to make it available,
+  fetching/bootstrapping as needed), not a normal "maybe try again" outcome the way a bare registry
+  miss used to be.
 
 **`resolveAll(SchemaDocument)` validates `!!id`/`!!meta`/`!!import` and derives `structureNamespace`
-from the coordinator, when this resolver has one** (added 2026-07-25, in stages the same day —
-registry-only, then id/meta validation, then import validation, then real import merging, then the
-coordinator rework above) — previously this method always resolved against an empty structure
-namespace, regardless of what `!!meta` said, and never looked at `!!id` at all; a caller
-(`CoreTn1Parser`) had to derive and pass the right map by hand via the two-argument overload instead.
+from the coordinator, when this resolver has one** — previously this method always resolved against
+an empty structure namespace, regardless of what `!!meta` said, and never looked at `!!id` at all.
 Now, with a `SchemaCoordinator`, up front, before any declaration is resolved: (1) `document.id()`
 must be present — required by policy for a publishable schema (§2.2.1); (2) that `!!id` must be a
 well-formed canonical-identity candidate, via `SchemaRegistry.validateIdentity(String)` (a thin,
@@ -1292,9 +1285,7 @@ every `!!import` URI is validated the same way; (4) `document.meta()` is resolve
 available — and its entries become the structure namespace. (1) throws `IllegalStateException`; (2)/
 (3) throw `SchemaValidationException` (the same exception `SchemaRegistry.register` itself would
 eventually throw for the same reason, surfaced earlier); (4) throws whatever the coordinator itself
-throws. With no coordinator (the no-arg constructor), behavior is byte-for-byte unchanged — confirmed
-via `PositionalFormTest`/`SchemaResolverTest`'s own existing `resolveAll` usages, neither of which
-needed any changes.
+throws. With no coordinator (the no-arg constructor), behavior is byte-for-byte unchanged.
 
 **`!!import` is genuinely merged into the type-name namespace, not just validated** — unlike the
 structure namespace (`!!meta`, consulted only for constructor-application targets), an import's own
@@ -1302,20 +1293,19 @@ entries feed the *type-name* namespace — the same `resolved` map `resolveCompo
 `resolveRefinement`/`resolveAtomRefinement` look a supertype/refinement-source straight up in, with
 no fallback at all (confirmed by reading those methods directly: each does exactly one
 `resolved.get(name)`). So imports are genuinely required *during resolution itself*, not only at
-`SchemaValidator`'s later, separate registration-time merge/collision-check pass — meta.tn1's own
+`SchemaLinker`'s later, separate registration-time merge/collision-check pass — meta.tn1's own
 `date_type => ~atom & atom_specification & {...}`, composing with two meta-kernel entries it only has
-via its own `!!import`, would fail to resolve at all without them. `resolveAll` now does exactly what
-`MetaTn1Parser` already did by hand for meta-kernel specifically, generalized to any coordinator-aware
-resolver and any number of imports: each import is resolved via the same `SchemaCoordinator` and its
-entries merged into a working namespace *before* any local declaration is resolved (`mergeImports`, a
-private helper). Collision handling mirrors `SchemaValidator.mergeImports`'s own established rule
-exactly: a name declared by more than one import, or by an import *and* a local declaration, throws
-`SchemaValidationException` with the same wording, checked at the earliest point the collision becomes
-knowable. **Merged entries keep their home namespace** (same principle as `SchemaValidator`'s own
-note on this) — copied in exactly as their own schema resolved them, never re-resolved against the
-importer. **The result's own `entries()` is local-only**, same as `MetaTn1Parser`'s own convention —
-imported entries are visible *during* resolution but never appear in what this method itself returns;
-the merged whole is what `SchemaRegistry.register` produces later, same as always.
+via its own `!!import`, would fail to resolve at all without them. `resolveAll` resolves each import
+via the same `SchemaCoordinator`, merging its entries into a working namespace *before* any local
+declaration is resolved (`mergeImports`, a private helper), generalized to any coordinator-aware
+resolver and any number of imports. Collision handling mirrors `SchemaLinker.mergeImports`'s own
+established rule exactly: a name declared by more than one import, or by an import *and* a local
+declaration, throws `SchemaValidationException` with the same wording, checked at the earliest point
+the collision becomes knowable. **Merged entries keep their home namespace** (same principle as
+`SchemaLinker`'s own note on this) — copied in exactly as their own schema resolved them, never
+re-resolved against the importer. **The result's own `entries()` is local-only** — imported entries
+are visible *during* resolution but never appear in what this method itself returns; the merged whole
+is what `SchemaRegistry.register` produces later, same as always.
 
 Verified in `SchemaResolverCompiledMetaSchemaTest` — small hand-built documents cover: a composition
 (`my_type => unit & {}`, meta-kernel imported) proving entries are genuinely reachable via the
@@ -1324,38 +1314,81 @@ references carry an unverified name through regardless of whether it exists anyw
 `resolved.get(name)` lookup is what actually needs the merge to have happened); both collision modes;
 id/import validation failures; and `!!meta` resolution failures. `DefaultSchemaCoordinator`'s own
 bootstrap behavior gets its own dedicated cases: resolving meta-kernel's own well-known identity from
-a completely empty registry completes (rather than recursing forever) and produces a genuinely usable
-49-entry compiled reader (the raw, unmaterialized count — see the "never cached" note above for why
-this isn't 58); a second request for the same identity returns a genuinely *different*, freshly
-re-bootstrapped instance, confirmed never registered into either `TsonCompiledRegistry` or its own
-`SchemaRegistry`; a non-bootstrap URI with the default `SchemaSource` throws clearly; and a custom
-`SchemaSource` handing back meta.tn1's own real bundled source text — after meta-kernel is registered
-*explicitly* first, per the same note — resolves it end to end through the fully generic path (fetch →
-parse → resolve → register → compile). `SchemaRegistryTest` covers `validateIdentity` directly too
-(accepts a well-formed candidate silently; rejects no-scheme and carries-a-port cases).
+a completely empty registry completes (rather than recursing forever) and produces a genuinely usable,
+fully linked 58-entry compiled reader; a second request for the same identity returns a genuinely
+*different*, freshly re-bootstrapped instance, confirmed never registered into either
+`TsonCompiledRegistry` or its own `SchemaRegistry`; a non-bootstrap URI with the default `SchemaSource`
+throws clearly; and a custom `SchemaSource` handing back meta.tn1's own real bundled source text —
+after meta-kernel is registered *explicitly* first — resolves it end to end through the fully generic
+path (fetch → parse → resolve → register → compile). `SchemaRegistryTest` covers `validateIdentity`
+directly too (accepts a well-formed candidate silently; rejects no-scheme and carries-a-port cases).
 
 **A real, named layering exception, not an oversight.** Every other note about these two packages
 describes `resolver.schema.compiled` sitting *on top of* `resolver.schema`'s own resolution
-(`TsonSchemaParser`'s own Javadoc: "sitting on top of `SchemaResolver`'s own per-declaration
+(`TsonCompiledSchema`'s own Javadoc: "sitting on top of `SchemaResolver`'s own per-declaration
 resolution"). `SchemaCoordinator`/`DefaultSchemaCoordinator` (in `resolver.schema`, alongside
-`SchemaResolver`) reach the opposite direction, importing `TsonCompiledRegistry`/`TsonSchemaParser`/
-`ParserFactoryRegistry` from `resolver.schema.compiled` — the one place in `resolver.schema` that
-does. Not a cycle (nothing in `resolver.schema.compiled`'s own *main* code imports back from
-`resolver.schema` — confirmed by grep, not assumed), and both packages are in the same module
-regardless (no Gradle/JPMS boundary to violate), but a deliberate exception to the general framing,
-made because bootstrapping/fetching/compiling a governing schema is exactly the one place lower-layer
-resolution genuinely needs the higher layer's own compiled output, not just its resolved one.
-`TsonSchemaParser` itself gained a `schema()` accessor for this (its own resolved `TsonSchema`,
-previously private) — mirroring `TsonDataParser.schema()`'s own existing precedent.
+`SchemaResolver`) reach the opposite direction, importing `TsonCompiledRegistry`/`TsonCompiledSchema`/
+`TsonSchemaCompiler`/`TsonParserFactoryRegistry` from `resolver.schema.compiled` — the one place in
+`resolver.schema` that does. Not a cycle (nothing in `resolver.schema.compiled`'s own *main* code
+imports back from `resolver.schema`), and both packages are in the same module regardless (no
+Gradle/JPMS boundary to violate), but a deliberate exception to the general framing, made because
+bootstrapping/fetching/compiling a governing schema is exactly the one place lower-layer resolution
+genuinely needs the higher layer's own compiled output, not just its resolved one. `TsonCompiledSchema`
+itself carries a `schema()` accessor for this (its own resolved `TsonSchema`) — mirroring
+`SchemaValidatingParser.schema()`'s own precedent.
 
-### Object-binding mode (`resolver/schema/compiled/{RecordParser,ObjectRecordShapeFactory,TypeNameBinder,SchemaMetaTypeNameBinder}.java`)
+### Bundled schema documents (`tson-parser/src/main/java/io/ltr8/tson/parser/resolver/schema/BundledSchemaSource.java`)
+
+A `SchemaSource` serving this library's own three bundled schema documents — meta-kernel, meta.tn1,
+core.tn1 — straight off the classpath, the same resources `tson-parser/build.gradle.kts`'s own
+`processResources` task copies in from `spec/m/` for `MetaKernelParser` (see that class's own
+one-file-to-keep-in-sync reasoning). `META_KERNEL_ID`/`META_TN1_ID`/`CORE_TN1_ID` are each schema's
+own real, published `!!id`.
+
+**Replaces two now-deleted, standalone classes, `MetaTn1Parser`/`CoreTn1Parser`** — each used to
+hand-roll its own fetch-parse-resolve-register-compile sequence for one schema specifically; the
+general version of that sequence is exactly what `DefaultSchemaCoordinator#resolve(String)`'s own
+generic branch already does for *any* URI, given a `SchemaSource` that knows how to fetch it. This
+class is that source for all three well-known identities — nothing more. A caller wanting meta.tn1's
+own compiled reader now does:
+
+```java
+TsonSchema metaKernel = MetaKernelParser.getMetaKernelSchema();
+SchemaRegistry schemaRegistry = new SchemaRegistry();
+LinkedTsonSchema linkedMetaKernel = schemaRegistry.linkBootstrap(metaKernel);
+TsonParserFactoryRegistry factories = TsonParserFactoryRegistry.object(linkedMetaKernel.schema(), context);
+TsonCompiledRegistry registry = new TsonCompiledRegistry(schemaRegistry, factories);
+DefaultSchemaCoordinator coordinator = new DefaultSchemaCoordinator(registry, BundledSchemaSource.INSTANCE);
+
+// meta.tn1's own !!import needs meta-kernel present in the *shared* registry first -- resolve it
+// ordinarily (not the raw/linked bootstrap form) and register that, per the coordinator's own note
+// above on why the one-off bootstrap case alone doesn't satisfy import merging.
+SchemaDocument metaKernelDocument = new TsonSchemaParser(
+        BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID)).parseSchemaDocument();
+TsonSchema resolvedMetaKernel = new SchemaResolver(coordinator).resolveAll(metaKernelDocument);
+registry.register(resolvedMetaKernel);
+
+TsonCompiledSchema meta = coordinator.resolve(BundledSchemaSource.META_TN1_ID);
+TsonCompiledSchema core = coordinator.resolve(BundledSchemaSource.CORE_TN1_ID); // needs meta.tn1 registered first, same reasoning
+```
+
+**That `META_KERNEL_ID` entry in `RESOURCES` is still never actually reached through
+`DefaultSchemaCoordinator#resolve`**, though — that method special-cases it and resolves it via
+`MetaKernelParser#getMetaKernelSchema()` directly, before this source's own `fetch` is ever consulted
+(see "Compiled schema registry" above for why: meta-kernel's `!!meta` names itself, and falling
+through to the generic fetch-then-`SchemaResolver(this)` path would recurse forever). It's included
+here anyway so this class is a complete, uniform "fetch any of this library's own bundled schema
+documents" utility on its own terms, and safe for any *other* `SchemaCoordinator` implementation that
+doesn't special-case meta-kernel the way `DefaultSchemaCoordinator` does.
+
+### Object-binding mode (`resolver/schema/compiled/{RecordParser,ObjectRecordShapeFactory,TsonTypeNameBinder,SchemaMetaTypeNameBinder}.java`)
 
 Added 2026-07-25: a second output mode for the compiled reader, alongside DOM mode's plain
 `Map<String, Object>` — `RecordParser` can now instead produce a real, bound `schema.meta` Java
-object (a real `IntegerType`, not a map of its field names). This is what `bindAtomInstance`
-(`SchemaResolver`) will eventually need to swap onto the compiled reader instead of
-`TsonMapperReader.toObject(normalized, Top.class)` (tasks #10/#11 — not done yet, this is only the
-missing piece that makes it possible).
+object (a real `IntegerType`, not a map of its field names). This is exactly what let
+`SchemaResolver.bindAtomInstance` swap onto the compiled reader shortly afterward (2026-07-26 —
+"Schema resolution" above), retiring the `TsonMapperReader.toObject(normalized, Top.class)` path it
+used to bind through.
 
 - **`RecordParser.RecordShape<R>`/`RecordParser.RecordBuilder<R>`/`RecordParser.RecordShapeFactory<R>`**
   — public interfaces nested inside `RecordParser` itself, not standalone top-level types (nothing
@@ -1377,8 +1410,8 @@ missing piece that makes it possible).
   step of `read()` changed, from inline `Map` mutation to `shape.begin()`/`builder.field(...)`/
   `builder.build()`. `RecordParser.FACTORY` (the DOM-mode constant 10+ test classes reference
   directly, including by identity) is preserved as `factory(DomRecordShapeFactory.INSTANCE)`.
-- **`TypeNameBinder`/`SchemaMetaTypeNameBinder`** — the schema-type-name → Java-`Class` binding this
-  needed (task #9's own original framing, finally built). **Not** a scan of `Top`'s own sealed
+- **`TsonTypeNameBinder`/`SchemaMetaTypeNameBinder`** — the schema-type-name → Java-`Class` binding
+  this needed. **Not** a scan of `Top`'s own sealed
   union (an earlier version of this file did exactly that, keyed off `@Typename`/`DataClassUnion
   .memberTypes()`) — corrected on the user's own direct guidance, pointing at a sibling project's
   own `litterat-core`, `DefaultNameBinder`: there is no reflection API to enumerate "every class in
@@ -1405,7 +1438,7 @@ missing piece that makes it possible).
   rather than lazily discovering a missing binding one entry at a time as unrelated reads happen to
   reach them (per the user's own explicit direction: "That binding should occur at schema load
   time so any errors can be reported"). A schema with a genuinely unresolvable entry still
-  *registers* fine (`SchemaRegistry`/`SchemaValidator` are unaffected) — it just can't be *compiled*
+  *registers* fine (`SchemaRegistry`/`SchemaLinker` are unaffected) — it just can't be *compiled*
   for object-binding mode, and fails with every problem entry named at once. **An entry that
   resolves to a real, existing class which isn't a record is silently skipped, not a failure** —
   `atom`/`product`/`sum`/`top` (meta-kernel's own empty-bodied base-kind declarations) and
@@ -1422,9 +1455,9 @@ missing piece that makes it possible).
   `io.ltr8.tson.parser.resolver.NumberNarrowing`, the same utility `resolver.vocab`'s numeric family
   and `io.ltr8.tson.parser.mapper`'s untyped-number binding already share for exactly this, rather
   than a third copy.
-- **`ParserFactoryRegistry.object(TsonSchema, DataBindContext)`** (+ a `TypeNameBinder`-taking
-  overload) is the new sibling to `.dom()` — every other factory (array/map/tuple/choice + every
-  atom-family constant) is shared via a new private `withoutRecord()` (extracted so the ~14-entry
+- **`TsonParserFactoryRegistry.object(TsonSchema, DataBindContext)`** (+ a `TsonTypeNameBinder`-taking
+  overload) is the sibling to `.dom()` — every other factory (array/map/tuple/choice + every
+  atom-family constant) is shared via a private `withoutRecord()` (extracted so the ~14-entry
   list isn't duplicated), only `"record"`'s own factory differs.
 - **`TsonAtomContext`** (new, `io.ltr8.tson.parser.resolver`) — `TsonMapperContext.defaultContext()`'s
   own built-in-vocabulary atom registrations (`UUID`/`byte[]`/`LocalDate`/`OffsetTime`/
@@ -1434,21 +1467,34 @@ missing piece that makes it possible).
   no dependency on `mapper`. `TsonMapperContext` now just delegates — same reasoning as
   `NumberNarrowing`'s own "one place, not one per caller" precedent.
 
-Verified in `ObjectRecordShapeFactoryTest` (new) against the real, registered meta-kernel.tn1
-fixture: `text_type` narrows a real `BigInteger` down to `Integer` with a genuine `equals()` match;
+Verified in `ObjectRecordShapeFactoryTest` against the real, registered meta-kernel.tn1 fixture:
+`text_type` narrows a real `BigInteger` down to `Integer` with a genuine `equals()` match;
 `integer_type` itself now compiles (previously impossible under the `Top`-union design) and reads
-correctly with `size` left absent in the data (`IntegerSize.signed` still can't bind — a *separate*,
-already-documented, permanent `boolean => !enum [...]` gap, task #12, not a regression here); the
-whole real schema validates with zero problems; and a custom `TypeNameBinder` that always fails
-proves `validate`'s own multi-problem report names more than one offending entry at once, not just
-the first. `RecordParser.FACTORY`'s own identity and DOM-mode output are confirmed byte-for-byte
-unchanged by the whole existing suite (10+ tests reference `RecordParser.FACTORY` directly).
+correctly with `size` left absent in the data (`IntegerSize.signed` is deliberately left
+unexercised there rather than proven either way — it's a primitive `boolean` field on a plain
+`record`-shaped entry, narrowed through `ObjectRecordShapeFactory`'s own generic, reflective binding
+path, a different mechanism than `BooleanParser`'s own name-keyed `"boolean"` dispatch below it; a
+separate, narrower, still-open question from this test's own actual scope, not a regression here);
+the whole real schema validates with zero problems; and a custom `TsonTypeNameBinder` that always
+fails proves `validate`'s own multi-problem report names more than one offending entry at once, not
+just the first. `RecordParser.FACTORY`'s own identity and DOM-mode output are confirmed byte-for-byte
+unchanged by the whole existing suite.
+
+**`AtomTypeParser.ENUM_OBJECT_MODE`/`BooleanParser`** — object mode's own `"enum"` factory
+dispatches name-keyed, not shape-keyed: every enum instance *except* the schema's own `boolean`
+entry (`product_access_type`, `field_state`, `binary_encoding`, ...) reads its member token's own
+text as a plain `String` via the ordinary `resolver.vocab.EnumParser` (through `AtomTypeParser
+.ENUM`) — exactly right for an arbitrary, user-defined enum label. `boolean` specifically
+(`boolean => !enum [true false]`) routes to `BooleanParser` instead, producing a real Java
+`Boolean` — its two members are meant to *be* the two Java boolean values, not the strings
+`"true"`/`"false"`. DOM mode is deliberately untouched (`AtomTypeParser.ENUM` keeps producing
+`String` for `boolean` there too, matching already-established, already-tested behavior).
 
 ### Conformance suite integration (`ConformanceSuiteTest`)
 
-Separate from `LexerTest`/`ParserTest` (fine-grained unit tests) is `ConformanceSuiteTest`, which runs
+Separate from `LexerTest`/`TsonDataParserTest` (fine-grained unit tests) is `ConformanceSuiteTest`, which runs
 every vector in the sibling [ltr8-io-tson-test-suite](https://github.com/litterat/ltr8-io-tson-test-suite)
-repo against the real `Lexer`/`Parser` as JUnit 5 dynamic tests (one per vector, named
+repo against the real `Lexer`/`TsonDataParser` as JUnit 5 dynamic tests (one per vector, named
 `<layer>/<bucket>/<slug>`). This is a conformance/integration test against an external, spec-derived,
 language-agnostic fixture set — it exists to catch drift against the spec, not to pinpoint which internal
 rule broke.
@@ -1466,22 +1512,19 @@ No system Gradle — always use the wrapper:
 ./gradlew build
 ./gradlew test
 ./gradlew test --tests "io.ltr8.tson.parser.lexer.LexerTest"
-./gradlew test --tests "io.ltr8.tson.parser.ParserTest"
+./gradlew test --tests "io.ltr8.tson.parser.TsonDataParserTest"
 ./gradlew test --tests "io.ltr8.tson.parser.resolver.NumberGrammarTest"
 ./gradlew test --tests "io.ltr8.tson.parser.resolver.BaseTypeResolverTest"
 ./gradlew test --tests "io.ltr8.tson.parser.ConformanceSuiteTest"   # skipped unless ../../ltr8-io-tson-test-suite exists
 ./gradlew test --tests "io.ltr8.tson.parser.lexer.LexerTest.multilineBasicIndentStripping"
 ./gradlew :tson-schema:test --tests "io.ltr8.tson.schema.SchemaRegistryTest"
-./gradlew :tson-schema:test --tests "io.ltr8.tson.schema.registry.SchemaValidatorTest"
+./gradlew :tson-schema:test --tests "io.ltr8.tson.schema.registry.SchemaLinkerTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.MetaKernelSchemaRegistryTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.MetaKernelParserTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.MetaSchemaImportTest"
-./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.CoreTn1ParserTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.compiled.MetaKernelEndToEndTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.compiled.MetaTn1CompiledEndToEndTest"
-./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.compiled.CoreTn1CompiledEndToEndTest"
-./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.compiled.TsonDataParserTest"
-./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledRegistryTest"
+./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.compiled.SchemaValidatingParserTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.SchemaResolverCompiledMetaSchemaTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.mapper.TsonMapperReaderTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.mapper.TsonMapperWriterTest"
@@ -1497,25 +1540,25 @@ No system Gradle — always use the wrapper:
   "Schema registry" above — just not per §8.2's precise constructor-vs-template split;
   materialization is uniform. Constructor-application `Instance` and atom-refinement resolution are
   both now generalized — see "Schema resolution" above — not listed here anymore.)
-- One permanent, already-diagnosed limit of generic binding, not an open gap: `boolean => !enum
-  [true false]` (its members collide with TSON's own boolean-literal shape) — see "Schema
-  resolution" above's status paragraph. `duration` no longer fails (`DurationType.min`/`max` retyped
-  to `Optional<String>`, 2026-07-24 — see "Schema resolution" above). `complex_type`'s own
-  `component` field binds fine (`ComplexType`, added 2026-07-24); `unknown_type` too
-  (`UnknownType`). No real fixture declaration remains unresolved in `meta-kernel.tn1`/`meta.tn1` at
-  all.
-- A schema-validating data parser (Class 2) now substantially exists —
-  `io.ltr8.tson.parser.resolver.schema.compiled` (`TsonSchemaParser`, `TsonDataParser`,
-  `ParserFactoryRegistry`, `RecordParser`/`ArrayParser`/`MapParser`/`TupleParser`/`ChoiceParser`/
-  `VariantParser`, `AtomTypeParser` + the vocab-family parsers) — but this whole layer still has no
-  dedicated section in this file's own Architecture walkthrough above (a real documentation gap, not
-  an implementation one; "meta.tn1 / core.tn1 loaders" and the `SchemaValidator`/vocabulary notes
-  above only cover this session's own additions to it, not the layer as a whole — worth a proper
-  writeup next time substantial work touches this package). Known, still-open gaps within it: no
-  `!!schema`-header auto-selection (`TsonDataParser`'s own Javadoc explains why, deliberately
-  deferred); eight core.tn1 atom entries (`complex`/`email`/`ipv4`/`ipv6`/`cidr4`/`cidr6`/`mac`/
-  `unknown`) have no compiled-parser factory at all yet, since their `schema.meta` classes were added
-  "record-only, deliberately with no resolver.vocab parser"; `REQUIRED_FIXED`/`OPTIONAL_FIXED` value
-  validation, `value_param` real parameter substitution, and thread-safety are all still deferred
-  design questions (see this project's own task list, not tracked in this file).
+- `boolean => !enum [true false]` used to be a permanent limit of generic binding; no longer is,
+  fixed 2026-07-26 — see "Schema resolution" above's status paragraph for what changed and why.
+  `duration` no longer fails either (`DurationType.min`/`max` retyped to `Optional<String>`,
+  2026-07-24 — see "Schema resolution" above). `complex_type`'s own `component` field binds fine
+  (`ComplexType`, added 2026-07-24); `unknown_type` too (`UnknownType`). No real fixture declaration
+  remains unresolved in `meta-kernel.tn1`/`meta.tn1`; core.tn1's own current end-to-end status isn't
+  pinned down by any test right now (see "Schema resolution" above's status paragraph).
+- The schema-validating data parser (Class 2) — `io.ltr8.tson.parser.resolver.schema.compiled`
+  (`TsonSchemaCompiler`/`TsonCompiledSchema`, `SchemaValidatingParser`, `TsonParserFactoryRegistry`,
+  `RecordParser`/`ArrayParser`/`MapParser`/`TupleParser`/`ChoiceParser`/`VariantParser`,
+  `AtomTypeParser` + the vocab-family parsers) — now has dedicated coverage above ("Compiled schema
+  registry", "Bundled schema documents", "Object-binding mode"). Known, still-open gaps within it:
+  no `!!schema`-header auto-selection (`SchemaValidatingParser`'s own Javadoc explains why,
+  deliberately deferred); eight core.tn1 atom entries (`complex`/`email`/`ipv4`/`ipv6`/`cidr4`/
+  `cidr6`/`mac`/`unknown`) have no compiled-parser factory at all yet, since their `schema.meta`
+  classes were added "record-only, deliberately with no resolver.vocab parser"; a permanent
+  standard-library "load meta-kernel/meta.tn1/core.tn1 and register them" entry point doesn't exist
+  yet (see "Compiled schema registry" above); `REQUIRED_FIXED`/`OPTIONAL_FIXED` value validation,
+  `value_param` real parameter substitution, and thread-safety are all still deferred design
+  questions; a general disk/HTTP-backed `SchemaSource` (with whitelist/blacklist policy) is
+  deliberately not built yet either (see "Bundled schema documents" above).
 - §9.1's numeric-literal length limit (SHOULD, default 4096 digits, DoS-hardening) — not enforced.

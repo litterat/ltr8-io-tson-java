@@ -1,6 +1,6 @@
 package io.ltr8.tson.parser.resolver.schema.compiled;
 
-import io.ltr8.tson.parser.Parser;
+import io.ltr8.tson.parser.TsonDataParser;
 import io.ltr8.tson.parser.ast.Document;
 import io.ltr8.tson.parser.resolver.schema.MetaKernelParser;
 import io.ltr8.tson.schema.TsonSchema;
@@ -33,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /**
  * Real data text, for each of the atom-family factory constants in {@link AtomTypeParser} -- one
  * small {@code holder} record per family, reusing the exact literal each family's own {@code
- * resolver.vocab} test already proved valid, read through the real {@link Parser} and the real
+ * resolver.vocab} test already proved valid, read through the real {@link TsonDataParser} and the real
  * compiled parser (not by constructing a {@code TokenValue} directly). Mainly a wiring check --
  * each factory itself does no new parsing/validation, just casts+adapts (see {@link
  * AtomTypeParser}'s own Javadoc) -- but a real wiring mistake (e.g. registering under the wrong
@@ -69,7 +69,7 @@ class AtomTypeParserFactoriesTest {
                 "https://example.test/meta.tn1", List.of(), entries);
         TsonCompiledSchema compiled = TsonSchemaCompiler.compile(schema, REGISTRY);
 
-        Document document = new Parser(source).parseDocument();
+        Document document = new TsonDataParser(source).parseDocument();
         @SuppressWarnings("unchecked")
         Map<String, Object> result = (Map<String, Object>) compiled.get("holder").read(document.root());
         return result.get("value");
@@ -181,7 +181,7 @@ class AtomTypeParserFactoriesTest {
                 .build();
         TsonCompiledSchema compiled = TsonSchemaCompiler.compile(schema, registry);
 
-        Document document = new Parser(source).parseDocument();
+        Document document = new TsonDataParser(source).parseDocument();
         @SuppressWarnings("unchecked")
         Map<String, Object> result = (Map<String, Object>) compiled.get("holder").read(document.root());
         return result;
