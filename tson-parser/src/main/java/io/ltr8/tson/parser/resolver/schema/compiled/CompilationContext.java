@@ -9,7 +9,7 @@ package io.ltr8.tson.parser.resolver.schema.compiled;
  *
  * <p>Takes a bare name, not a full {@code io.ltr8.tson.schema.meta.TypeRef} -- by the time a
  * {@link TsonCompiledSchema} is compiling from the registry's own materialized {@code TsonSchema}
- * (see {@link TsonSchemaCompiler#compile}'s own Javadoc), {@code SchemaLinker}'s own
+ * (see {@link TsonSchemaCompiler#compile}'s own Javadoc), {@code TsonSchemaLinker}'s own
  * materialization pass has already rewritten every argument-bearing {@code type_ref} reachable
  * from a body into a bare reference to a synthesized entry, so nothing this layer resolves should
  * ever still carry arguments of its own.

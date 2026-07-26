@@ -3,7 +3,7 @@ package io.ltr8.tson.schema;
 import java.util.Objects;
 
 /**
- * The result of {@link SchemaLinker#link} -- proof, at the type level, that a {@link TsonSchema}
+ * The result of {@link TsonSchemaLinker#link} -- proof, at the type level, that a {@link TsonSchema}
  * has been through import merging, argument-bearing {@code type_ref} synthesis, and reference
  * validation, and is therefore self-contained (no dangling references) and safe to {@link
  * TsonSchemaRegistry#register}.

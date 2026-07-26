@@ -36,7 +36,7 @@ import java.util.Objects;
  * <p><b>No {@code materialised} flag</b> (removed 2026-07-27, on the user's own explicit
  * direction, replacing an earlier version of this class that carried one) -- "has this schema been
  * through linking" is now a *type* distinction, not a runtime-checked boolean: {@link
- * SchemaLinker#link} is the only thing that produces a {@link TsonLinkedSchema}, and {@link
+ * TsonSchemaLinker#link} is the only thing that produces a {@link TsonLinkedSchema}, and {@link
  * TsonSchemaRegistry#register} only accepts one, so "you can't register something that hasn't been
  * linked" is enforced at compile time, not by a flag every caller has to remember to check. See
  * {@link TsonLinkedSchema}'s own Javadoc for why it's a deliberately separate, unrelated record

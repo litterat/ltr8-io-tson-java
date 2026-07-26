@@ -3,7 +3,7 @@ package io.ltr8.tson.parser.resolver.schema.compiled;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.registry.SchemaLinker;
+import io.ltr8.tson.schema.TsonSchemaLinker;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -64,7 +64,7 @@ public final class TsonCompiledRegistry {
     }
 
     /**
-     * Links {@code schema} (via {@link SchemaLinker#link}, using the paired {@link #schemaRegistry}
+     * Links {@code schema} (via {@link TsonSchemaLinker#link}, using the paired {@link #schemaRegistry}
      * itself as the lookup source for {@code !!import}/{@code !!meta} targets) and registers the
      * result (via {@link TsonSchemaRegistry#register}, so the usual `!!import`-merging/reference-
      * validation rules all apply exactly as they would calling that directly), compiles the
@@ -76,7 +76,7 @@ public final class TsonCompiledRegistry {
      * right back.
      */
     public synchronized TsonCompiledSchema register(TsonSchema schema) {
-        TsonLinkedSchema linked = SchemaLinker.link(schema, schemaRegistry);
+        TsonLinkedSchema linked = TsonSchemaLinker.link(schema, schemaRegistry);
         TsonLinkedSchema registered = schemaRegistry.register(linked);
         TsonCompiledSchema compiledParser = TsonSchemaCompiler.compile(registered.schema(), factories);
         compiled.put(registered.schema().id(), compiledParser);

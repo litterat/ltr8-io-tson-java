@@ -69,8 +69,8 @@ If a class name contains `Tson` at all, `Tson` MUST be the leading word (`TsonSc
 `TsonSchemaCompiler`, `TsonDataParser`, `TsonMapperReader`) — never buried in the middle (`CompiledTsonSchema`
 is wrong; it was renamed to `TsonCompiledSchema` specifically to fix this, 2026-07-26). The prefix isn't
 applied to every class in the library, either — most of `tson-parser`/`tson-schema`'s own internal machinery
-is deliberately bare (`SchemaResolver`, `SchemaLinker`, `TsonSchemaRegistry`, `Lexer`, `TsonDataParser`, `RecordParser`,
-`ParserHandle`). Reserve the `Tson` prefix for the classes a *consumer of this library* actually names in
+is deliberately bare (`SchemaResolver`, `Lexer`, `RecordParser`, `ParserHandle`, `CanonicalIdentity`).
+Reserve the `Tson` prefix for the classes a *consumer of this library* actually names in
 their own code — its value is disambiguation at the call site (`TsonSchema` vs. a domain object also called
 `Schema`, `TsonDataParser` vs. a domain-specific `DataParser`) and quick identification when skimming a
 consumer's imports, not a house style to stamp on everything. When adding a new public, developer-facing type,
@@ -919,7 +919,7 @@ any of this runs.)
 in-progress state either -- this is why `instanceBody` doesn't attempt one:** `enum => ~atom & {
 members: set<token> } }`'s own field type is *argument-bearing* (`set` + the `token` argument), and
 the compiled-parser layer's own `RecordParser`/`CompilationContext` assume every field type is
-already a bare, materialized name -- true only after `SchemaLinker`'s own materialization pass has
+already a bare, materialized name -- true only after `TsonSchemaLinker`'s own materialization pass has
 run, which meta-kernel (the thing that pass would normally run *over*) has never been through while
 it's still being produced. Solving that would mean either running a whole-schema materialization
 pass over a knowingly-incomplete map (checked directly: doesn't work -- `integer_size => { bits:
@@ -998,7 +998,7 @@ written out at all before) with `@Record` attached -- both annotations stay in p
 *individually* — no whole-schema consistency checking, references carried through as bare,
 unverified strings, `!!import` parsed but never consulted, and a `type_ref` with arguments (e.g.
 `enum`'s own `members: set<token>` field, or any field using §5.3's `[X]`/`[X]?` array sugar) left
-exactly as written. `SchemaLinker`/`TsonSchemaRegistry` add the missing second stage on top:
+exactly as written. `TsonSchemaLinker`/`TsonSchemaRegistry` add the missing second stage on top:
 internal-consistency validation, flattening every argument-bearing `type_ref` into a real named
 entry, and — once satisfied — locking the schema into a registry keyed by its canonical `!!id`
 identity. Added 2026-07-24, entirely in `tson-schema` (no dependency on `tson-parser`, preserving
@@ -1007,7 +1007,7 @@ the established one-way direction).
 **Linking and registering are two separate stages, not one** (`link` -> `register`, split
 2026-07-27 on the user's own explicit direction, borrowing standard compiler vocabulary for the
 whole pipeline: parse -> resolve -> link -> register -> compile -> read — see "Naming convention"
-above). `SchemaLinker.link(TsonSchema, TsonSchemaLoader)` is the pass-2 engine described below,
+above). `TsonSchemaLinker.link(TsonSchema, TsonSchemaLoader)` is the pass-2 engine described below,
 returning a `TsonLinkedSchema` — a thin wrapper (`record TsonLinkedSchema(TsonSchema schema)`)
 that exists purely as a compile-time proof that linking already ran, replacing an earlier runtime
 `materialised` boolean flag on `TsonSchema`. `TsonSchemaRegistry#register` now only accepts a
@@ -1025,18 +1025,20 @@ was redundant.
 
 **Package split, user-facing vs. internal-by-convention (per explicit user direction):**
 `io.ltr8.tson.schema` holds the public surface — `TsonSchemaRegistry`, `TsonSchemaLoader`,
-`TsonSchemaValidationException`, `TsonSchema`, `TsonLinkedSchema`. `io.ltr8.tson.schema.registry` holds
-`CanonicalIdentity` and `SchemaLinker`. **`SchemaLinker` is genuinely public now, unlike its
-predecessor `SchemaValidator`** (renamed alongside the `link`/`validate` rename) — a caller
-orchestrating the pipeline calls `SchemaLinker.link` directly and deliberately, same as
-`parse`/`resolve`/`compile`, including from *other* modules (e.g. `tson-parser`'s own
-`TsonCompiledRegistry`, which links a schema before registering it). `CanonicalIdentity` stays
-internal-by-convention as before — it was never a named pipeline stage. **Note on enforcement:**
-`tson-schema` has no `module-info.java` (unlike `tson-bind`/`tson-annotation`, which do), so there's
-no JPMS boundary to truly hide `.registry` behind — `CanonicalIdentity` is `public` purely because
-`TsonSchemaRegistry`/`SchemaLinker` need to call it cross-package; "internal-by-convention" here means
-package-naming discipline only, a deliberate, confirmed tradeoff rather than adding a module
-descriptor now.
+`TsonSchemaValidationException`, `TsonSchema`, `TsonLinkedSchema`, and `TsonSchemaLinker`.
+`io.ltr8.tson.schema.registry` holds only `CanonicalIdentity`, genuinely internal-by-convention --
+it was never a named pipeline stage. **`TsonSchemaLinker` was renamed from `SchemaValidator`
+(alongside the `link`/`validate` rename) and moved out of `.registry` into this package directly
+(2026-07-27), once its own publicness was settled** — a caller orchestrating the pipeline calls
+`TsonSchemaLinker.link` directly and deliberately, same as `parse`/`resolve`/`compile`, including
+from *other* modules (e.g. `tson-parser`'s own `TsonCompiledRegistry`, which links a schema before
+registering it); living inside `.registry`, a package whose own docs describe its contents as
+"private pass-2 machinery nothing outside this module calls directly," was the one thing still
+contradicting that. **Note on enforcement:** `tson-schema` has no `module-info.java` (unlike
+`tson-bind`/`tson-annotation`, which do), so there's no JPMS boundary to truly hide `.registry`
+behind — `CanonicalIdentity` is `public` purely because `TsonSchemaRegistry`/`TsonSchemaLinker` need
+to call it cross-package; "internal-by-convention" here means package-naming discipline only, a
+deliberate, confirmed tradeoff rather than adding a module descriptor now.
 
 - **`CanonicalIdentity.of(String)`** implements `[TSON-DATA] §2.2.1`'s canonical-identity algorithm
   exactly — **not** general URI normalization. The spec performs exactly two reductions (strip
@@ -1050,10 +1052,10 @@ descriptor now.
   — the pluggable-with-a-default hook for resolving a `!!import`/`!!meta` target, matching Part 2
   §10.1's precedence order (pre-loaded/registered authoritative, "fetched" opt-in and disabled by
   default). `TsonSchemaRegistry` implements `TsonSchemaLoader` itself (a thin delegation to `get`), purely so
-  a caller can write `SchemaLinker.link(schema, registry)` directly, passing the registry as its own
+  a caller can write `TsonSchemaLinker.link(schema, registry)` directly, passing the registry as its own
   lookup source. `TsonSchemaRegistry`'s own no-arg constructor supplies a default loader that only ever
   finds an *already-registered* schema — nothing is fetched from anywhere.
-- **`SchemaLinker.link(TsonSchema, TsonSchemaLoader)`** — the actual pass-2 engine:
+- **`TsonSchemaLinker.link(TsonSchema, TsonSchemaLoader)`** — the actual pass-2 engine:
   1. **Merge `!!import`s** (Part 2 §2.2.3) — every import, in declaration order, looked up via
      `loader` by canonical identity, its entries copied in *as-is* ("merged entries keep their home
      namespace" — an imported `TypeDefinition` is never re-resolved or re-materialized against the
@@ -1138,7 +1140,7 @@ descriptor now.
   guarantee), and stores the result. `get(String uri)` takes a *raw* URI and canonicalizes
   internally — callers never need to call `CanonicalIdentity` themselves for either method.
   `linkBootstrap(TsonSchema)` is the one sanctioned way to turn meta-kernel's raw bootstrap output
-  into a `TsonLinkedSchema` (via `SchemaLinker.link`) without registering it — needed so a caller
+  into a `TsonLinkedSchema` (via `TsonSchemaLinker.link`) without registering it — needed so a caller
   (e.g. building an object-binding-mode `TsonParserFactoryRegistry`) can get a genuinely linked
   result to validate against, without the self-referential-bootstrap guard getting in the way;
   `register` still refuses the result of `linkBootstrap` itself, since it's still `bootstrap() ==
@@ -1177,7 +1179,7 @@ startup: register meta-kernel, compile+store it; register meta.tn1 (against meta
 store it; register core.tn1 (against meta.tn1), compile+store it — then any user-defined schema
 governed by one of these reuses whatever's already sitting in the registry.
 
-- **`register(TsonSchema)`** — links {@code schema} via `SchemaLinker.link` (using the paired
+- **`register(TsonSchema)`** — links {@code schema} via `TsonSchemaLinker.link` (using the paired
   `TsonSchemaRegistry` itself as the `!!import`/`!!meta` lookup source), registers the linked result via
   `TsonSchemaRegistry#register` (ordinary collision/reference-validation rules apply unchanged), compiles
   the *registered* result (never the raw input — `TsonSchemaCompiler` needs linking already done),
@@ -1185,7 +1187,7 @@ governed by one of these reuses whatever's already sitting in the registry.
   the very next schema in a bootstrap chain, which needs *this* return value as its own structure
   namespace's compiled reader, doesn't have to immediately call `get` right back).
 - **Keyed by raw `!!id`, not a canonicalized identity** — deliberately. `CanonicalIdentity`
-  (`tson-schema.registry`) is internal-by-convention to `TsonSchemaRegistry`/`SchemaLinker` (confirmed via
+  (`tson-schema.registry`) is internal-by-convention to `TsonSchemaRegistry`/`TsonSchemaLinker` (confirmed via
   its own class Javadoc: "a caller outside this module should go through `TsonSchemaRegistry` instead of
   depending on this class directly") — reaching into it from `tson-parser`, a different module,
   would be exactly the cross-module layering violation this project otherwise avoids, even though
@@ -1249,7 +1251,7 @@ registering/compiling on demand rather than requiring everything to pre-exist.
   consequence remains**: skipping `TsonCompiledRegistry.register` means meta-kernel is never persisted
   under its own identity in the *shared* `TsonSchemaRegistry`, so any *other* schema that `!!import`s
   meta-kernel (every real one does) still fails its own registration with `"!!import '...' is not
-  registered"` unless meta-kernel has been registered *separately* first — `SchemaLinker`'s own
+  registered"` unless meta-kernel has been registered *separately* first — `TsonSchemaLinker`'s own
   import-merging (run inside `TsonSchemaRegistry.register`) resolves an import via `TsonSchemaRegistry`'s own
   registered-only `TsonSchemaLoader`, which knows nothing about this coordinator or its one-off bootstrap
   case. In practice, a caller resolving anything beyond meta-kernel itself must register meta-kernel
@@ -1293,16 +1295,16 @@ entries feed the *type-name* namespace — the same `resolved` map `resolveCompo
 `resolveRefinement`/`resolveAtomRefinement` look a supertype/refinement-source straight up in, with
 no fallback at all (confirmed by reading those methods directly: each does exactly one
 `resolved.get(name)`). So imports are genuinely required *during resolution itself*, not only at
-`SchemaLinker`'s later, separate registration-time merge/collision-check pass — meta.tn1's own
+`TsonSchemaLinker`'s later, separate registration-time merge/collision-check pass — meta.tn1's own
 `date_type => ~atom & atom_specification & {...}`, composing with two meta-kernel entries it only has
 via its own `!!import`, would fail to resolve at all without them. `resolveAll` resolves each import
 via the same `SchemaCoordinator`, merging its entries into a working namespace *before* any local
 declaration is resolved (`mergeImports`, a private helper), generalized to any coordinator-aware
-resolver and any number of imports. Collision handling mirrors `SchemaLinker.mergeImports`'s own
+resolver and any number of imports. Collision handling mirrors `TsonSchemaLinker.mergeImports`'s own
 established rule exactly: a name declared by more than one import, or by an import *and* a local
 declaration, throws `TsonSchemaValidationException` with the same wording, checked at the earliest point
 the collision becomes knowable. **Merged entries keep their home namespace** (same principle as
-`SchemaLinker`'s own note on this) — copied in exactly as their own schema resolved them, never
+`TsonSchemaLinker`'s own note on this) — copied in exactly as their own schema resolved them, never
 re-resolved against the importer. **The result's own `entries()` is local-only** — imported entries
 are visible *during* resolution but never appear in what this method itself returns; the merged whole
 is what `TsonSchemaRegistry.register` produces later, same as always.
@@ -1438,7 +1440,7 @@ used to bind through.
   rather than lazily discovering a missing binding one entry at a time as unrelated reads happen to
   reach them (per the user's own explicit direction: "That binding should occur at schema load
   time so any errors can be reported"). A schema with a genuinely unresolvable entry still
-  *registers* fine (`TsonSchemaRegistry`/`SchemaLinker` are unaffected) — it just can't be *compiled*
+  *registers* fine (`TsonSchemaRegistry`/`TsonSchemaLinker` are unaffected) — it just can't be *compiled*
   for object-binding mode, and fails with every problem entry named at once. **An entry that
   resolves to a real, existing class which isn't a record is silently skipped, not a failure** —
   `atom`/`product`/`sum`/`top` (meta-kernel's own empty-bodied base-kind declarations) and
@@ -1518,7 +1520,7 @@ No system Gradle — always use the wrapper:
 ./gradlew test --tests "io.ltr8.tson.parser.ConformanceSuiteTest"   # skipped unless ../../ltr8-io-tson-test-suite exists
 ./gradlew test --tests "io.ltr8.tson.parser.lexer.LexerTest.multilineBasicIndentStripping"
 ./gradlew :tson-schema:test --tests "io.ltr8.tson.schema.TsonSchemaRegistryTest"
-./gradlew :tson-schema:test --tests "io.ltr8.tson.schema.registry.SchemaLinkerTest"
+./gradlew :tson-schema:test --tests "io.ltr8.tson.schema.TsonSchemaLinkerTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.MetaKernelSchemaRegistryTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.MetaKernelParserTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.MetaSchemaImportTest"

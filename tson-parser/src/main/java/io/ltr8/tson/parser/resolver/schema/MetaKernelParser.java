@@ -47,7 +47,7 @@ import java.util.Optional;
  * output is resolved-but-not-yet-linked -- a caller links it (via {@code
  * TsonSchemaRegistry#linkBootstrap}, never {@code TsonSchemaRegistry#register} directly -- see that
  * class's own Javadoc for why) and, separately, compiles it -- a distinct, later stage this class
- * has nothing to do with; see {@code SchemaLinker}/{@code TsonCompiledSchema}.
+ * has nothing to do with; see {@code TsonSchemaLinker}/{@code TsonCompiledSchema}.
  *
  * <p><b>Deliberately locked down to exactly one public method, taking no arguments</b> (narrowed
  * 2026-07-26, on the user's own explicit direction) -- this class exists to bootstrap *the* real

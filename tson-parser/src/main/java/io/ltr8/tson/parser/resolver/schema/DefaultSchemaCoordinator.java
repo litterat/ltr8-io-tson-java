@@ -33,7 +33,7 @@ import java.util.Optional;
  *   <p><b>Deliberately a one-off, never registered/cached in the *shared* registry</b> (on the
  *   user's own explicit direction): {@link MetaKernelParser#getMetaKernelSchema()}'s own output is
  *   run through a fresh, throwaway {@code TsonSchemaRegistry} -- created and discarded right here, never
- *   the shared {@link #registry} this coordinator wraps -- purely so {@code SchemaLinker}'s own
+ *   the shared {@link #registry} this coordinator wraps -- purely so {@code TsonSchemaLinker}'s own
  *   materialization/validation pass runs (synthesizing entries for argument-bearing {@code
  *   type_ref}s, e.g. {@code enum}'s own {@code members: set<token>}) before compiling ({@code
  *   TsonSchemaCompiler.compile}, using this coordinator's own {@link
@@ -53,7 +53,7 @@ import java.util.Optional;
  *   <p><b>One real, load-bearing consequence remains, even with materialization fixed.</b> Any
  *   *other* schema that {@code !!import}s meta-kernel (every real one does) will still fail its own
  *   registration with "{@code !!import '...' is not registered}" unless meta-kernel has *separately*
- *   been registered in the *shared* registry first: {@code SchemaLinker}'s own import-merging
+ *   been registered in the *shared* registry first: {@code TsonSchemaLinker}'s own import-merging
  *   (run inside {@code TsonSchemaRegistry#register}, a step distinct from {@code SchemaResolver}'s own
  *   resolution-time import-merging above) resolves an import via {@code TsonSchemaRegistry}'s own
  *   registered-only {@code TsonSchemaLoader}, which knows nothing about this coordinator, its bootstrap
@@ -97,7 +97,7 @@ public final class DefaultSchemaCoordinator implements SchemaCoordinator {
         if (BundledSchemaSource.META_KERNEL_ID.equals(uri)) {
             TsonSchema metaKernel = MetaKernelParser.getMetaKernelSchema();
             // A fresh, throwaway TsonSchemaRegistry -- never the shared one this coordinator wraps --
-            // purely so SchemaLinker's own materialization pass runs (synthesizing entries for
+            // purely so TsonSchemaLinker's own materialization pass runs (synthesizing entries for
             // argument-bearing type-refs like enum's own `members: set<token>`) before compiling.
             // linkBootstrap (not register -- TsonSchemaRegistry now refuses a linked bootstrap schema
             // outright, always) doesn't persist anything either, so this is still discarded

@@ -1,9 +1,6 @@
-package io.ltr8.tson.schema.registry;
+package io.ltr8.tson.schema;
 
-import io.ltr8.tson.schema.TsonLinkedSchema;
-import io.ltr8.tson.schema.TsonSchemaLoader;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
-import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.registry.CanonicalIdentity;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.BinaryType;
 import io.ltr8.tson.schema.meta.ChoiceBody;
@@ -73,9 +70,12 @@ import java.util.Set;
  * purpose: {@code link} is now something a caller orchestrating the pipeline calls directly and
  * deliberately, same as {@code parse}/{@code resolve}/{@code compile} -- including from *other*
  * modules (e.g. {@code tson-parser}'s own {@code TsonCompiledRegistry}, which needs to link a
- * schema before registering it, exactly the same as any other caller). {@link CanonicalIdentity},
- * this package's other class, stays internal-by-convention as before -- it was never a named
- * pipeline stage, just an implementation detail of how registry lookups work.
+ * schema before registering it, exactly the same as any other caller). Moved out of {@code
+ * io.ltr8.tson.schema.registry} into this package directly (2026-07-27) once that publicness was
+ * settled -- living in a package whose own docs describe it as "private pass-2 machinery nothing
+ * outside this module calls directly" was the one thing still contradicting it. {@link
+ * CanonicalIdentity} stays behind in {@code .registry}, genuinely internal-by-convention -- it was
+ * never a named pipeline stage, just an implementation detail of how registry lookups work.
  *
  * <p><b>Materialization is uniform</b> (a deliberate simplification confirmed with the user, not
  * Part 2 §8.2's literal text): *every* {@code type_ref} with a non-empty {@code arguments} list
@@ -116,9 +116,9 @@ import java.util.Set;
  * re-validated or re-materialized against the importer's own namespace -- only the *importer's own*
  * new material (stage 2 and 3) gets resolved/validated here.
  */
-public final class SchemaLinker {
+public final class TsonSchemaLinker {
 
-    private SchemaLinker() {
+    private TsonSchemaLinker() {
     }
 
     public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader) {

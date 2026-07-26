@@ -347,12 +347,12 @@ public final class SchemaResolver {
      * each does exactly one {@code resolved.get(name)}). meta.tn1's own {@code date_type => ~atom &
      * atom_specification & {...}}, composing with two meta-kernel entries it only has via its own
      * {@code !!import}, would fail to resolve at all without this. Collision handling mirrors {@code
-     * SchemaLinker.mergeImports}'s own established rule exactly, not a new one: a name declared by
+     * TsonSchemaLinker.mergeImports}'s own established rule exactly, not a new one: a name declared by
      * more than one import, or by an import *and* a local declaration, is a {@link
      * TsonSchemaValidationException} -- checked as each import is merged in, and
      * again as each local declaration is about to be resolved, so a collision is caught at the
      * earliest point either side of it becomes known, before any further resolution work is spent.
-     * <b>Merged entries keep their home namespace</b>, same as {@code SchemaLinker}'s own note on
+     * <b>Merged entries keep their home namespace</b>, same as {@code TsonSchemaLinker}'s own note on
      * this: an imported entry is copied in exactly as its own schema resolved it, never re-resolved
      * or re-materialized against the importer. The result's own {@link TsonSchema#entries()} is
      * local-only, same as {@code MetaTn1Parser}'s own convention -- imported entries are visible
@@ -387,7 +387,7 @@ public final class SchemaResolver {
         return new TsonSchema(id, document.meta(), document.imports(), localOnly);
     }
 
-    /** Stage 1 of {@link #resolveAll(SchemaDocument)} -- every {@code !!import}'s own entries, in declaration order, merged as-is (never re-resolved against the importer). Mirrors {@code SchemaLinker.mergeImports} exactly, including its collision rule, since this is the same concept discovered one stage earlier. */
+    /** Stage 1 of {@link #resolveAll(SchemaDocument)} -- every {@code !!import}'s own entries, in declaration order, merged as-is (never re-resolved against the importer). Mirrors {@code TsonSchemaLinker.mergeImports} exactly, including its collision rule, since this is the same concept discovered one stage earlier. */
     private Map<String, TypeDefinition> mergeImports(SchemaDocument document) {
         Map<String, TypeDefinition> merged = new LinkedHashMap<>();
         for (String importUri : document.imports()) {

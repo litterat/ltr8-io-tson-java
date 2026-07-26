@@ -1,7 +1,7 @@
 package io.ltr8.tson.schema;
 
 import io.ltr8.tson.schema.registry.CanonicalIdentity;
-import io.ltr8.tson.schema.registry.SchemaLinker;
+import io.ltr8.tson.schema.TsonSchemaLinker;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -10,7 +10,7 @@ import java.util.Optional;
 /**
  * A store of linked schemas keyed by canonical identity ({@code [TSON-DATA] §2.2.1}), mirroring
  * Part 2 §10.1's "schema library" concept. {@link #register} only accepts a {@link
- * TsonLinkedSchema} -- proof, at the type level, that {@link SchemaLinker#link} already ran (import
+ * TsonLinkedSchema} -- proof, at the type level, that {@link TsonSchemaLinker#link} already ran (import
  * merging, argument-bearing {@code type_ref} synthesis, reference validation) -- and does nothing
  * but store it; once admitted, a schema is never overwritten or removed -- together with {@link
  * TsonSchema#entries()} already being an unmodifiable map, this registration-time rejection of
@@ -20,7 +20,7 @@ import java.util.Optional;
  * (a plain {@code TsonSchema} in, a runtime {@code materialised} flag flipped on the way out) --
  * split apart 2026-07-27, on the user's own explicit direction, borrowing standard compiler
  * vocabulary for the pipeline as a whole (parse -&gt; resolve -&gt; link -&gt; register -&gt;
- * compile -&gt; read): a caller now calls {@link SchemaLinker#link} explicitly (passing this
+ * compile -&gt; read): a caller now calls {@link TsonSchemaLinker#link} explicitly (passing this
  * registry itself as the {@link TsonSchemaLoader} it needs for {@code !!import}/{@code !!meta}
  * lookups -- see {@code implements TsonSchemaLoader} below) and only then calls {@link #register}. Two
  * consequences: {@code register} can no longer silently do the wrong thing with an unlinked
@@ -28,7 +28,7 @@ import java.util.Optional;
  * compiler, not by a flag every caller has to remember to check.
  *
  * <p>Implements {@link TsonSchemaLoader} itself (a thin delegation to {@link #get}) purely so a caller
- * can write {@code SchemaLinker.link(schema, registry)} directly, passing this registry as its own
+ * can write {@code TsonSchemaLinker.link(schema, registry)} directly, passing this registry as its own
  * lookup source, without a separate method reference.
  *
  * <p>Callers never need to compute a canonical identity themselves -- both {@link #register} (from
@@ -92,7 +92,7 @@ public final class TsonSchemaRegistry implements TsonSchemaLoader {
     /**
      * Links {@code bootstrap} -- meta-kernel's own raw, pre-loaded bootstrap output (see {@link
      * TsonSchema#bootstrap()}'s own Javadoc for why it can't be resolved the ordinary way) -- via
-     * {@link SchemaLinker#link}, but does <b>not</b> store the result under a persistent identity
+     * {@link TsonSchemaLinker#link}, but does <b>not</b> store the result under a persistent identity
      * in this registry, and {@link #register} refuses it outright regardless (see this class's own
      * Javadoc). Exists purely so a caller (e.g. building an object-binding-mode {@code
      * TsonParserFactoryRegistry}, which needs a genuinely linked {@code TsonSchema} to validate against
@@ -102,7 +102,7 @@ public final class TsonSchemaRegistry implements TsonSchemaLoader {
      * @throws TsonSchemaValidationException if {@code bootstrap.bootstrap()} is {@code false} -- this
      *                                    method exists specifically for the one self-referential
      *                                    schema, not as a general "link without registering" escape
-     *                                    hatch for ordinary schemas (call {@link SchemaLinker#link}
+     *                                    hatch for ordinary schemas (call {@link TsonSchemaLinker#link}
      *                                    directly for that)
      */
     public synchronized TsonLinkedSchema linkBootstrap(TsonSchema bootstrap) {
@@ -110,9 +110,9 @@ public final class TsonSchemaRegistry implements TsonSchemaLoader {
             throw new TsonSchemaValidationException("'" + bootstrap.id() + "' was not produced by the real "
                     + "bootstrap reader (MetaKernelParser.getMetaKernelSchema()) -- "
                     + "TsonSchemaRegistry.linkBootstrap exists specifically for that case; call "
-                    + "SchemaLinker.link directly for an ordinary schema instead");
+                    + "TsonSchemaLinker.link directly for an ordinary schema instead");
         }
-        return SchemaLinker.link(bootstrap, loader);
+        return TsonSchemaLinker.link(bootstrap, loader);
     }
 
     @Override

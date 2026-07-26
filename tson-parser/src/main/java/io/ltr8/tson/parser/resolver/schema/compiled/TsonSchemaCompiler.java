@@ -13,7 +13,7 @@ import io.ltr8.tson.schema.TsonSchema;
  * <p>A stateless utility, not an instantiable class -- one {@link TsonCompiledSchema} is a complete,
  * self-contained compilation on its own (it holds its own {@code registry}, its own {@code finished}/
  * {@code building} state), so there is nothing a {@code TsonSchemaCompiler} instance would hold that
- * a static method call doesn't already cover, matching {@code SchemaLinker.link}'s own precedent.
+ * a static method call doesn't already cover, matching {@code TsonSchemaLinker.link}'s own precedent.
  */
 public final class TsonSchemaCompiler {
 

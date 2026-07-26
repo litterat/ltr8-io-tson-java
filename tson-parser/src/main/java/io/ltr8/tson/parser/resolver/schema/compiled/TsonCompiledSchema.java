@@ -123,7 +123,7 @@ public final class TsonCompiledSchema {
             TypeDefinition definition = schema.entries().get(name);
             if (definition == null) {
                 throw new IllegalStateException("'" + name + "' is referenced but not present in the schema -- "
-                        + "SchemaLinker should already have rejected this before compilation ever started");
+                        + "TsonSchemaLinker should already have rejected this before compilation ever started");
             }
             TsonSchemaTypeParser<?> built = build(name, definition);
             finished.put(name, built);

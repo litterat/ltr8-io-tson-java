@@ -14,7 +14,7 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.schema.registry.SchemaLinker;
+import io.ltr8.tson.schema.TsonSchemaLinker;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashSet;
@@ -26,13 +26,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Proves {@code TsonSchemaRegistry}/{@code SchemaLinker} (both in {@code tson-schema}) actually work
+ * Proves {@code TsonSchemaRegistry}/{@code TsonSchemaLinker} (both in {@code tson-schema}) actually work
  * end-to-end against the real {@code meta-kernel.tn1} fixture -- this test lives here, not in
  * {@code tson-schema}'s own test tree, because it's the only module with both {@link
  * MetaKernelParser} and {@code tson-schema} available (that module has no dependency on {@code
  * tson-parser} at all).
  *
- * <p>Uses {@link TsonSchemaRegistry#linkBootstrap}, not {@link SchemaLinker#link} directly, to turn
+ * <p>Uses {@link TsonSchemaRegistry#linkBootstrap}, not {@link TsonSchemaLinker#link} directly, to turn
  * the raw bootstrap output into a usable {@link TsonLinkedSchema} -- {@code register} refuses
  * <i>any</i> self-referential {@link TsonLinkedSchema} whose {@code schema().bootstrap() ==
  * true}, no matter how it got linked (tightened 2026-07-27, on the user's own explicit direction,
@@ -148,7 +148,7 @@ class MetaKernelSchemaRegistryTest {
         TsonSchema resolved = new SchemaResolver(coordinator).resolveAll(document);
         assertFalse(resolved.bootstrap());
 
-        TsonLinkedSchema registered = registry.register(SchemaLinker.link(resolved, registry));
+        TsonLinkedSchema registered = registry.register(TsonSchemaLinker.link(resolved, registry));
         assertEquals(58, registered.schema().entries().size());
         assertThrows(TsonSchemaValidationException.class, () -> registry.register(registered));
     }

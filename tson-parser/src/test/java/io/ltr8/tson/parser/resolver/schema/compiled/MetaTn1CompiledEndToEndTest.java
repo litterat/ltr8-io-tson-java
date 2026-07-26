@@ -13,7 +13,7 @@ import io.ltr8.tson.parser.resolver.schema.SchemaResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
-import io.ltr8.tson.schema.registry.SchemaLinker;
+import io.ltr8.tson.schema.TsonSchemaLinker;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -47,14 +47,14 @@ class MetaTn1CompiledEndToEndTest {
         String metaKernelSource = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID);
         SchemaDocument metaKernelDocument = new TsonSchemaParser(metaKernelSource).parseSchemaDocument();
         TsonSchema metaKernel = new SchemaResolver(coordinator).resolveAll(metaKernelDocument);
-        TsonLinkedSchema metaKernelMaterialized = registry.register(SchemaLinker.link(metaKernel, registry));
+        TsonLinkedSchema metaKernelMaterialized = registry.register(TsonSchemaLinker.link(metaKernel, registry));
         compiledRegistry.register(metaKernelMaterialized.schema());
 
         String source = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_TN1_ID);
         SchemaDocument metaDocument = new TsonSchemaParser(source).parseSchemaDocument();
         TsonSchema meta = new SchemaResolver(coordinator).resolveAll(metaDocument);
 
-        return registry.register(SchemaLinker.link(meta, registry)).schema();
+        return registry.register(TsonSchemaLinker.link(meta, registry)).schema();
     }
 
     /**

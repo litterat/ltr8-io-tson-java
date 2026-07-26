@@ -11,7 +11,7 @@ import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
-import io.ltr8.tson.schema.registry.SchemaLinker;
+import io.ltr8.tson.schema.TsonSchemaLinker;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -81,7 +81,7 @@ class MetaSchemaImportTest {
         String metaKernelSource = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID);
         SchemaDocument metaKernelDocument = new TsonSchemaParser(metaKernelSource).parseSchemaDocument();
         TsonSchema metaKernel = new SchemaResolver(coordinator).resolveAll(metaKernelDocument);
-        TsonLinkedSchema metaKernelMaterialized = registry.register(SchemaLinker.link(metaKernel, registry));
+        TsonLinkedSchema metaKernelMaterialized = registry.register(TsonSchemaLinker.link(metaKernel, registry));
         compiledRegistry.register(metaKernelMaterialized.schema());
 
         String source = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_TN1_ID);
@@ -96,7 +96,7 @@ class MetaSchemaImportTest {
         TsonSchema meta = parseMetaTn1(registry);
         assertEquals(31, meta.entries().size(), "expected every meta.tn1 declaration to resolve");
 
-        TsonLinkedSchema registered = registry.register(SchemaLinker.link(meta, registry));
+        TsonLinkedSchema registered = registry.register(TsonSchemaLinker.link(meta, registry));
 
         // Meta-kernel's own imported entries are visible in the merged, validated namespace.
         assertTrue(registered.schema().entries().containsKey("atom"));
@@ -124,6 +124,6 @@ class MetaSchemaImportTest {
         TsonSchema withBinaryOnly = new TsonSchema(meta.id(), meta.meta(), meta.imports(), Map.of("binary", binary));
 
         assertThrows(io.ltr8.tson.schema.TsonSchemaValidationException.class,
-                () -> registry.register(SchemaLinker.link(withBinaryOnly, registry)));
+                () -> registry.register(TsonSchemaLinker.link(withBinaryOnly, registry)));
     }
 }

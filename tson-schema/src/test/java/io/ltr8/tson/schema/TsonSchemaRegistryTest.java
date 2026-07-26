@@ -7,7 +7,7 @@ import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Unit;
-import io.ltr8.tson.schema.registry.SchemaLinker;
+import io.ltr8.tson.schema.TsonSchemaLinker;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -35,7 +35,7 @@ class TsonSchemaRegistryTest {
 
     /** Every {@code register} call site needs a linked schema now -- see {@code TsonSchemaRegistry}'s own Javadoc. */
     private static TsonLinkedSchema linkedSchemaWithGenericField(TsonSchemaRegistry registry) {
-        return SchemaLinker.link(schemaWithGenericField(), registry);
+        return TsonSchemaLinker.link(schemaWithGenericField(), registry);
     }
 
     @Test
@@ -43,7 +43,7 @@ class TsonSchemaRegistryTest {
         TsonSchemaRegistry registry = new TsonSchemaRegistry();
         TsonLinkedSchema registered = registry.register(linkedSchemaWithGenericField(registry));
 
-        // The generic field got materialized by SchemaLinker.link, before register was ever called.
+        // The generic field got materialized by TsonSchemaLinker.link, before register was ever called.
         assertEquals(4, registered.schema().entries().size(), "one synthetic entry beyond the original three");
 
         Optional<TsonLinkedSchema> found = registry.get("https://example.test/registry-test.tn1");
@@ -94,7 +94,7 @@ class TsonSchemaRegistryTest {
         TsonSchema sameIdentityDifferentScheme = new TsonSchema(
                 "http://example.test/registry-test.tn1", "https://example.test/meta.tn1",
                 List.of(), Map.of());
-        TsonLinkedSchema linked = SchemaLinker.link(sameIdentityDifferentScheme, registry);
+        TsonLinkedSchema linked = TsonSchemaLinker.link(sameIdentityDifferentScheme, registry);
 
         assertThrows(TsonSchemaValidationException.class, () -> registry.register(linked));
     }

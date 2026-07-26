@@ -13,7 +13,7 @@ import io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledSchema;
 import io.ltr8.tson.parser.resolver.schema.compiled.TsonSchemaCompiler;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.registry.SchemaLinker;
+import io.ltr8.tson.schema.TsonSchemaLinker;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.BinaryType;
 import io.ltr8.tson.schema.meta.ChoiceBody;
@@ -1291,7 +1291,7 @@ class SchemaResolverTest {
         String metaKernelSource = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID);
         SchemaDocument metaKernelDocument = new TsonSchemaParser(metaKernelSource).parseSchemaDocument();
         TsonSchema metaKernel = new SchemaResolver(throwawayCoordinator).resolveAll(metaKernelDocument);
-        registry.register(SchemaLinker.link(metaKernel, registry)); // permanent, so meta.tn1's own !!import finds it below
+        registry.register(TsonSchemaLinker.link(metaKernel, registry)); // permanent, so meta.tn1's own !!import finds it below
         TsonCompiledSchema metaKernelParser = metaKernelCompiled();
 
         String source = Files.readString(Path.of("").toAbsolutePath().resolve("../spec/m/meta.tn1").normalize());
@@ -1305,7 +1305,7 @@ class SchemaResolverTest {
             localOnly.put(declaration.name(), resolved);
         }
         TsonSchema meta = new TsonSchema(metaDoc.id().orElseThrow(), metaDoc.meta(), metaDoc.imports(), localOnly);
-        TsonLinkedSchema registeredMeta = registry.register(SchemaLinker.link(meta, registry));
+        TsonLinkedSchema registeredMeta = registry.register(TsonSchemaLinker.link(meta, registry));
         return compileAsMetaParser(registeredMeta.schema().entries());
     }
 
