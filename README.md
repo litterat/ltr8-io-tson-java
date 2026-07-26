@@ -36,41 +36,51 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
 - [x] Part 2 schema grammar — full schema document parsing into a faithful AST (records, compositions,
       refinements, generic/array-sugar type-refs, field groups, and more), verified end-to-end against
       the spec's own real `meta-kernel.tn1`/`meta.tn1`/`core.tn1` fixtures
-- [x] Part 2 schema resolution (partial) — resolves fresh records, composition (`&`), refinement
-      (`^`) including tightening, bare and generic type references, field modifiers/defaults/fixed
-      values, type parameters, and array sugar; 36 of `meta-kernel.tn1`'s 49 declarations resolve
-      end-to-end today (see [Not yet implemented](#not-yet-implemented) below for the rest)
+- [x] Part 2 schema resolution — composition (`&`), refinement (`^`) including tightening, bare and
+      generic type references, field modifiers/defaults/fixed values, type parameters, array sugar,
+      and generalized constructor-application/atom-refinement resolution (`!C value`); `meta-kernel.tn1`
+      resolves all 49 of its own declarations and `meta.tn1` all 31 of its own, both end-to-end (see
+      [Not yet implemented](#not-yet-implemented) below for the specific constructs still out of scope)
+- [x] Part 2 schema linking and registration — flattens argument-bearing type references into real
+      named entries, merges `!!import`s, validates every reference in a schema actually resolves, and
+      locks a schema into a registry keyed by its canonical `!!id`
+- [x] A compiled, schema-validating data reader (Class 2, §1.5) — compiles a linked schema into real
+      Java object references between per-type parsers (DOM or object-binding mode) for fast repeated
+      reads against real TSON data documents (see [Schema pipeline](#schema-pipeline) below)
 
 **Not yet implemented:**
 
-- [ ] Network/identifier types — `cidr4`, `cidr6`, `mac`
+- [ ] Network/identifier types — `cidr4`, `cidr6`, `mac` (Part 1 built-in vocabulary; the Part 2
+  `schema.meta` shapes for these exist, but no `resolver.vocab` atom parser does yet)
 - [ ] General resolver-layer structural rules as reusable primitives, rather than binding-time-only
   behavior — empty-brace resolution, absent-vs-missing distinction
 - [ ] Annotation access on individual fields, array/tuple elements, and map keys/values — only a
   whole bound record's own annotations are reachable today, not its children's
-- [ ] Header/value directive interpretation — `!!id` verification, `!!schema` loading
+- [ ] Header/value directive interpretation — `!!id` verification, a data document's own `!!schema`
+  auto-selecting which compiled schema to validate against
 - [ ] Multi-error reporting — currently fail-fast on the first lex/parse error
 - [ ] Security hardening — numeric-literal length limits, confusable-character and
   bidi-formatting-character warnings
-- [ ] Part 2: constructor application / atom instances (`!C value`) — the largest remaining schema
-  resolution gap, needed to fully resolve the kernel's own bootstrap types (`value`, `integer`,
-  `boolean`, ...)
-- [ ] Part 2: subtraction, templates/instantiation entries, real namespace resolution across a
-  whole schema (forward references, imports), and the `subtypes` reverse index
-- [ ] A schema-validating data parser (Class 2) that consults a resolved schema while parsing —
-  the built-in vocabulary's value/behavior split is groundwork for this, not this itself
+- [ ] Part 2: subtraction, elided field types outside a tightening entry, restating a field group in
+  a refinement body, the identity-diagonal FIXED-value invariant, and generic type-refs beyond a bare
+  two-argument `map<K, V>` application or a refinement source
+- [ ] A permanent "load the standard schema library" entry point — bootstrapping/registering/compiling
+  `meta-kernel.tn1`/`meta.tn1`/`core.tn1` currently has to be assembled by hand (see
+  [Schema pipeline](#schema-pipeline)); `value_param` real parameter substitution and
+  `REQUIRED_FIXED`/`OPTIONAL_FIXED` value validation are also still open
 
 See [CLAUDE.md](CLAUDE.md#architecture) for architecture and design notes, and
 [Conformance](#conformance) below for edge-case behavior worth knowing about.
 
 ## Quickstart
 
-`TsonMapper` binds TSON text straight to plain Java records — including the built-in vocabulary types
-(§5), which is where TSON goes beyond what JSON alone can express. `!uuid` and `!ipv4` below bind to
-`java.util.UUID` and `java.net.Inet4Address` directly, with no custom code:
+`TsonMapperReader`/`TsonMapperWriter` bind TSON text straight to plain Java records — including the
+built-in vocabulary types (§5), which is where TSON goes beyond what JSON alone can express. `!uuid` and
+`!ipv4` below bind to `java.util.UUID` and `java.net.Inet4Address` directly, with no custom code:
 
 ```java
-import io.ltr8.tson.mapper.TsonMapper;
+import io.ltr8.tson.parser.mapper.TsonMapperReader;
+import io.ltr8.tson.parser.mapper.TsonMapperWriter;
 
 import java.net.Inet4Address;
 import java.time.LocalDate;
@@ -79,7 +89,8 @@ import java.util.UUID;
 record Server(String hostname, Inet4Address address, UUID id, LocalDate deployedOn) {
 }
 
-TsonMapper mapper = new TsonMapper();
+TsonMapperReader reader = new TsonMapperReader();
+TsonMapperWriter writer = new TsonMapperWriter();
 
 String tson = """
         {
@@ -89,14 +100,59 @@ String tson = """
             deployedOn: !date 2026-01-15
         }""";
 
-Server server = mapper.toObject(tson, Server.class);
+Server server = reader.toObject(tson, Server.class);
 // Server[hostname=web-01, address=/192.0.2.10, id=9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09, deployedOn=2026-01-15]
 
-String written = mapper.toTson(server);
+String written = writer.toTson(server);
 // { hostname: "web-01" address: !ipv4 "192.0.2.10" id: !uuid "9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09" deployedOn: !date "2026-01-15" }
 ```
 
 `toTson` is not a lossless serializer — see [Conformance](#conformance) below for exactly where it's lossy.
+
+## Schema pipeline
+
+The Quickstart above binds data against a plain Java class with no schema involved — that's Class 1
+(§1.5), TSON's schemaless mode. Part 2 layers a schema *system* on top: a governing document that
+declares types, which a data document can then be validated against. Turning schema source text into
+something a data reader can actually use goes through a handful of well-defined stages, each with its
+own class, deliberately named after standard compiler vocabulary — parse → resolve → link → register →
+compile → read:
+
+1. **Parse** (`TsonSchemaParser`) — schema document text into a faithful AST (`SchemaDocument`):
+   records, compositions (`&`), refinements (`^`), type references, and so on. No interpretation yet —
+   a name is still just a name.
+2. **Resolve** (`TsonSchemaResolver`) — one declaration at a time, the AST becomes a concrete
+   `TypeDefinition`: composition induces supertypes and flattens fields, refinement tightens an
+   inherited field against a state-transition table, a constructor application (`!C value`) transfers
+   its constructor's own kind, and so on. A reference to another declaration is still a bare, unverified
+   name at this point.
+3. **Link** (`TsonSchemaLinker`) — the whole-schema pass: merges `!!import`s, flattens every
+   argument-bearing type reference (e.g. an `array<token>` application) into a real, synthesized entry,
+   and validates that every reference in the schema actually resolves to something. Produces a
+   `TsonLinkedSchema` — proof, in the type system, that this pass has run, not a runtime flag to
+   remember to check.
+4. **Register** (`TsonSchemaRegistry`) — stores a linked schema under its own canonical `!!id` (only
+   ever accepts a `TsonLinkedSchema` — there's no way to register something that skipped linking), so a
+   later schema can find it via its own `!!import`/`!!meta`. Once registered, a schema is locked: never
+   mutated or removed.
+5. **Compile** (`TsonSchemaCompiler`) — turns a registered schema's `Map<String, TypeDefinition>` into
+   a `TsonCompiledSchema`: real Java object references between per-type parsers rather than further
+   name lookups, built once, reused for every document read against it.
+6. **Read** — the compiled schema validates and binds actual TSON *data* documents against one of its
+   own types — the schema-validating reader (Class 2) that Part 1's plain `TsonMapperReader`/
+   `TsonDataParser` don't attempt on their own.
+
+Resolving and linking a schema both need its own *governing* schema already compiled, to resolve
+constructor names like `!enum`/`!integer_type` against — including meta-kernel itself, whose own
+`!!meta` names *itself* (§1.5's "one deliberate circularity in the series"), closed by pre-loading a
+hand-written bootstrap (`MetaKernelBootstrapResolver`) rather than resolving it the ordinary way.
+Fetching/registering/compiling a governing schema on demand is what `SchemaCoordinator` exists for —
+still evolving, so not detailed here; see [CLAUDE.md](CLAUDE.md#architecture) for the full pipeline
+walkthrough, including how meta-kernel/meta.tn1/core.tn1 are loaded and registered together today.
+
+There's no polished, single-call "load the standard schema library" entry point yet (see
+[Not yet implemented](#not-yet-implemented)) — assembling meta-kernel/meta.tn1/core.tn1 through these
+stages currently has to be done by hand, the way the test suite itself does it.
 
 ## Conformance
 
