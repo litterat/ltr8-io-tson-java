@@ -3,25 +3,24 @@ package io.ltr8.tson.parser.resolver.schema;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 /**
- * The type-name namespace lookup {@link DefinitionResolver#resolveComposition}/{@link
- * DefinitionResolver#resolveRefinement}/{@link DefinitionResolver#resolveAtomRefinement} need to
- * find an already-resolved supertype/refinement-source/atom-refinement-source by name -- {@code
- * null} if {@code name} isn't resolved (yet or at all), matching {@code Map.get}'s own contract,
- * since every real implementation of this interface today is a method reference straight onto a
- * caller's own {@code Map<String, TypeDefinition>} (typically {@code entries::get}, where {@code
- * entries} is the very map that same caller is incrementally filling in as it resolves one
- * declaration at a time).
+ * A single-name {@code TypeDefinition} lookup, {@code null} if {@code name} isn't resolved (yet or
+ * at all), matching {@code Map.get}'s own contract -- {@link DefinitionResolver} holds two of these,
+ * one per namespace §3.3.1 distinguishes: {@code namespaceDefinitions} (the type-name namespace
+ * {@link DefinitionResolver#resolveComposition}/{@link DefinitionResolver#resolveRefinement}/{@link
+ * DefinitionResolver#resolveAtomRefinement} look a supertype/refinement-source/atom-refinement-source
+ * up in) and {@code metaDefinitions} (the structure namespace {@link
+ * DefinitionResolver#resolveConstructorTarget} looks a constructor-application target up in) --
+ * genuinely different namespaces that happen to share this same lookup shape, not two names for the
+ * same thing.
  *
- * <p>Replaces a bare {@code Map<String, TypeDefinition> resolved} parameter threaded through every
- * declaration-level method (a required constructor parameter of {@link DefinitionResolver} instead,
- * 2026-07-27, on the user's own explicit direction, mirroring {@link DefinitionMetaReader}'s own
- * "required constructor parameter" precedent) -- a caller who already owns a growing namespace map
- * (a hand-built {@code resolved} map in a test, {@link MetaKernelBootstrapResolver}'s own two-pass
- * {@code entries}, {@link TsonSchemaResolver#resolveSchema}'s own {@code namespace}) constructs the
- * resolver with a lookup closing over that exact map, typically a one-line method reference. The map
- * itself stays entirely caller-owned -- {@link DefinitionResolver} never mutates it, only reads
- * through this interface, so a caller resolving declarations one at a time in a loop still has to
- * {@code put} each result in themselves, same as before this interface existed.
+ * <p>Every real implementation is a method reference straight onto some caller's own {@code
+ * Map<String, TypeDefinition>} -- {@code entries::get}/{@code namespace::get} for a namespace that's
+ * still growing one declaration at a time, or {@code someCompiledSchema.schema().entries()::get} for
+ * one that's already fully resolved and fixed (true of the structure namespace always, since a
+ * governing meta-schema is compiled before anything ever asks it a constructor-target question). The
+ * map stays entirely caller-owned -- {@link DefinitionResolver} never mutates it, only reads through
+ * this interface, so a caller resolving declarations one at a time in a loop still has to {@code put}
+ * each result in themselves.
  */
 @FunctionalInterface
 interface DefinitionGetter {

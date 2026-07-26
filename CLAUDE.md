@@ -63,6 +63,26 @@ written down. This applies to every layer as it gets built, not just the lexer.
 
 ## Architecture
 
+### Javadoc conventions: current form only, no change history
+
+Javadoc (on a class, field, or method, in the actual `.java` source) documents that element's
+*current* contract and behavior — not how it got there. Do not write dates, "renamed from X",
+"used to do Y, now does Z", "on the user's own direction", "an earlier version of this method",
+"widened/narrowed on <date>", or similar changelog framing into source Javadoc. If a design choice
+needs a WHY (and many genuinely do — e.g. why a namespace lookup is a `null`-returning interface
+rather than a `Map`), state the current invariant and its rationale directly, not the sequence of
+edits that produced it. A reader six months from now needs to understand the code as it stands, not
+relive its editing history.
+
+This is specific to Java source Javadoc — it does *not* apply to this file (`CLAUDE.md`), which is a
+deliberately historical project log for future sessions and keeps its own dated,
+decision-by-decision narrative style throughout.
+
+**Whenever you edit a class, clean up its Javadoc as part of that edit** — remove stale historical
+narrative you find along the way (even if you didn't write it), fix anything that no longer matches
+the code (a Javadoc claim that's gone stale is worse than no comment at all), and tighten anything
+left. Don't defer this to a separate pass; do it in the same edit that touches the class.
+
 ### Naming convention: `Tson` is a prefix, never an infix
 
 If a class name contains `Tson` at all, `Tson` MUST be the leading word (`TsonSchema`, `TsonCompiledSchema`,
@@ -608,7 +628,30 @@ construct their own locally-scoped `DefinitionResolver` instead, the same way `d
 (now taking a second `DefinitionGetter` parameter, since different callers need different namespaces
 bound to the very same compiled meta-parser) already did for `Instance`/`AtomRefinement` binding.
 
-Verified behavior-preserving, not just compiling, at every step of all five passes: every real caller
+**`structureNamespace` itself became a `DefinitionGetter` too (a sixth, same-day follow-up, on the
+user's own explicit direction, immediately after independently renaming the earlier `definitionGetter`
+field to `namespaceDefinitions`: "I just renamed definitionGetter to namespaceDefinitions in
+DefinitionResolver. Now we've got the DefinitionGetter we should also use it to replace
+structureNamespace. Replace it with DefinitionGetter metaDefinitions.").** The last bare `Map<String,
+TypeDefinition>` field on `DefinitionResolver` is gone -- `resolveConstructorTarget` only ever needed
+a single-name lookup in the first place (see its own Javadoc, and "Narrowed from §3.3.1's own
+two-namespace lookup rule" above), the identical shape `DefinitionGetter` already existed to cover.
+Two distinct `DefinitionGetter` fields now sit side by side on every instance -- `metaDefinitions`
+(the structure namespace, consulted only by `resolveConstructorTarget`) and `namespaceDefinitions`
+(the type-name namespace, the user's own rename once a second `DefinitionGetter` field existed and
+the original bare name stopped being specific enough) -- genuinely different namespaces sharing one
+lookup shape, not two names for the same thing (see `DefinitionGetter`'s own Javadoc for the full
+namespace-by-namespace breakdown). Every caller that used to pass a fixed `Map<String, TypeDefinition>`
+(always an already-fully-resolved compiled schema's own `entries()` -- unlike the type-name namespace,
+the structure namespace is never still-growing when a resolver is constructed, since a governing
+meta-schema is always compiled in full first) now passes `entries()::get` instead -- `TsonSchemaResolver`'s
+own `metaParser.schema().entries()::get`, `DefinitionResolverTest`'s own `definitionResolverFor`
+likewise, `MetaKernelBootstrapResolver`'s own `Map.of()` becoming a new shared `EMPTY_META_DEFINITIONS`
+constant (`name -> null`, mirroring `NEVER_CALLED`'s own always-throws shape but for a lookup instead
+of a reader -- meta-kernel governs itself, so its own bootstrap resolver never has a real structure
+namespace to offer).
+
+Verified behavior-preserving, not just compiling, at every step of all six passes: every real caller
 (production and test) was traced before deciding what moved where, a clean compile succeeded across
 every module on the first attempt for each step, and the test count stayed at the established
 1131/0/0/0 bar throughout -- including the second pass, despite it touching roughly 30 call sites
@@ -617,8 +660,36 @@ that one test's own compiled meta-schema, in place of the shared no-op field the
 tests still use), the third pass, which dropped the now-redundant third argument from roughly 20
 more `.resolve(...)` call sites in the same file (several also lost a now-unused local
 `Map<String, TypeDefinition> metaNamespace`/`metaKernelNamespace` variable, since that value moved
-into `definitionResolverFor`'s own constructor call instead), and the fifth pass, which touched
-essentially every test method in the file for the `resolved`-field migration.
+into `definitionResolverFor`'s own constructor call instead), the fifth pass, which touched
+essentially every test method in the file for the `resolved`-field migration, and the sixth pass,
+a small, targeted set of call sites (every `new DefinitionResolver(...)` construction, main and
+test) once `structureNamespace`'s own type changed underneath them.
+
+**`resolveBootstrapDefinition` removed outright (a seventh, same-day pass, on the user's own explicit
+direction: "Now that is all cleaned up the resolveBootstrapDefinition method can be removed as
+resolve does the same thing.").** Once `resolveBootstrapDefinition` became a pure one-line delegate
+to `resolve(SchemaMap.Declaration)` (the previous pass's own end state), keeping both names bought
+nothing further -- `resolve` is now the sole entry point every real caller (`MetaKernelBootstrapResolver`'s
+own two-pass loop, every isolated-declaration test) uses directly. Every reference to
+`resolveBootstrapDefinition` above, in this file's own narrative of how the class got here, is
+historical -- the method itself no longer exists.
+
+**Same-day, separately: a source-level Javadoc cleanup pass across every file this whole `DefinitionResolver`/
+`DefinitionGetter`/`DefinitionMetaReader` refactor touched** (`DefinitionResolver`, `DefinitionGetter`,
+`DefinitionMetaReader`, `TsonSchemaResolver`, `MetaKernelBootstrapResolver`, `DefinitionResolverTest`,
+`PositionalFormTest`), on the user's own explicit direction, establishing a new, permanent convention
+for this codebase — see "Javadoc conventions" under "Architecture" above. Every dated/"renamed from"/
+"earlier version of this method" passage this whole refactor had accumulated in actual `.java` source
+Javadoc was rewritten to describe only the code's current form; two genuinely stale factual claims
+surfaced and got fixed in the process, not just reworded — `resolveInstance`'s own Javadoc still said
+binding went through `TsonMapperReader.toObject(normalized, Top.class)` (it goes through
+`bindAtomInstance`/`DefinitionMetaReader` now, since the 2026-07-26 compiled-reader swap), and
+`MetaKernelBootstrapResolver`'s own class Javadoc still gave "`DefinitionResolver.resolveInstance`'s
+own generic path binds via `TsonMapperReader`, identification-first" as a reason `instanceBody` hand-picks
+meta-kernel's own instances -- also no longer true post-swap, leaving only the still-valid reason
+(a compiled reader can't safely bootstrap meta-kernel from its own in-progress state). This file
+(`CLAUDE.md`) is explicitly exempted from the new convention and keeps its own dated narrative style,
+per that same "Javadoc conventions" note.
 
 - **Record construction** -- a record (no supertypes, no type parameters) whose fields are simple
   type-refs, each REQUIRED or OPTIONAL (a `?` suffix; field *modifiers* -- default/fixed values --

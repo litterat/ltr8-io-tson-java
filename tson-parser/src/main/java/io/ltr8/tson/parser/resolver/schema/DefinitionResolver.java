@@ -143,24 +143,25 @@ import java.util.Set;
  * explicitly out of scope for now and reported via {@link UnsupportedOperationException} rather
  * than silently mis-resolved; each is a later, separate pass.
  *
- * <p><b>No type-name namespace population, only an accumulating "resolved so far" lookup.</b> A
- * composition's supertypes must already be resolvable through this instance's own {@link
- * DefinitionGetter} (a required constructor parameter -- see "Fixed at construction, not threaded
- * per call" below) -- {@link TsonSchemaResolver#resolveSchema(io.ltr8.tson.parser.ast.schema.SchemaDocument)}
- * builds the backing map incrementally, in source order, so a supertype must be declared earlier in
- * the same schema map than anything composing with it (true for every built-in base kind: {@code
- * top} before {@code atom}/{@code product}/{@code sum}/{@code reference}, and {@code atom} before
- * {@code integer_type}). Real forward references and cross-schema imports need the full namespace
- * population of §3.3.2/§3.4.1's Pass 1, not implemented yet.
- *
- * <p><b>A separate structure namespace</b> (the governing meta-schema's own namespace, one hop via
- * its own {@code !!meta}, §3.3.1) is fixed for this instance's whole lifetime, supplied once as a
- * required constructor parameter (empty, {@code Map.of()}, if none applies -- see "Fixed at
- * construction, not threaded per call" below): {@code !C value} (constructor application, {@code
- * Instance}) resolves {@code C} against it -- see {@link #resolveConstructorTarget}'s own Javadoc
- * for why the type-name namespace is no longer tried at all here; {@code !I ^ { values }} (atom
- * refinement, {@code AtomRefinement}) never consults the structure namespace, only the type-name
- * one, via {@link DefinitionGetter}.
+ * <p>Declarations are resolved against two separate namespaces (§3.3.1), each exposed through a
+ * required constructor parameter rather than threaded through individual method calls, since both
+ * are fixed for as long as this resolver is used:
+ * <ul>
+ *   <li>{@code namespaceDefinitions} -- the type-name namespace: entries already resolved earlier in
+ *   the same schema map, consulted by composition's supertype lookup (§5.8), refinement's source
+ *   lookup (§5.7), and atom refinement's source lookup (§5.5). Never populated by this class itself
+ *   -- a caller supplies a {@link DefinitionGetter} closing over its own growing map (typically
+ *   {@code entries::get}), putting each result into that map itself as it resolves one declaration
+ *   at a time. A supertype/source must therefore already be declared earlier in the same schema map
+ *   than anything referencing it; real forward references and cross-schema imports need the full
+ *   namespace population of §3.3.2/§3.4.1's Pass 1, not implemented here.</li>
+ *   <li>{@code metaDefinitions} -- the structure namespace: the governing meta-schema's own entries,
+ *   one hop via {@code !!meta}, consulted only by {@link #resolveConstructorTarget} for a
+ *   constructor-application target ({@code !C value}). Atom refinement ({@code !I ^ { ... }}) never
+ *   consults it.</li>
+ * </ul>
+ * Either getter can be an always-{@code null} lookup for a resolver that never needs it (e.g. {@link
+ * MetaKernelBootstrapResolver}'s own first pass, which never reaches {@link #resolveInstance}).
  *
  * <p><b>Kind determination</b> (§4.1) checks the transitive supertype chain for the literal,
  * kernel-fixed names {@code atom}/{@code product}/{@code sum} -- not a general "inherit the nearest
@@ -196,59 +197,18 @@ import java.util.Set;
  * but live in different packages and are different concepts, so only one can be the unqualified
  * import here.
  *
- * <p><b>Renamed from {@code TsonSchemaResolver}, internal, package-private now</b> (2026-07-27, on
- * the user's own explicit direction). What used to be one class had two things mixed into it: this
- * one, resolving individual {@link SchemaMap.Declaration}s in isolation (no document, no {@code
- * SchemaCoordinator}, no {@code !!id}/{@code !!import} concerns at all -- everything on this class
- * still takes a bare declaration or an already-parsed {@code SchemaMap} entry), and document-level
- * orchestration (directive validation, {@code !!import} merging, deriving a structure namespace
- * from a coordinator). The tell: {@code SchemaCoordinator} was only ever used by two methods, both
- * reached from the old class's own {@code resolveSchema(SchemaDocument)} -- meaning that method,
- * not this class as a whole, was the thing that actually needed a coordinator. The document-level
- * half moved to a new, genuinely public {@link TsonSchemaResolver}, which holds one of these
- * internally and delegates every per-declaration call to it; this class never references {@code
- * SchemaCoordinator} or {@code SchemaDocument} at all now. No {@code Tson} prefix -- this is
- * exactly the kind of internal machinery a consumer of this library never names directly (see
- * "Naming convention" in this project's own CLAUDE.md); {@link TsonSchemaResolver} is the
- * consumer-facing type.
+ * <p>Package-private, no {@code Tson} prefix -- internal machinery a consumer of this library never
+ * names directly (see "Naming convention" in this project's own CLAUDE.md). {@link TsonSchemaResolver}
+ * is the public, document-level counterpart: it validates a document's own header directives ({@code
+ * !!id}/{@code !!import}), merges {@code !!import} entries, derives the structure namespace from a
+ * {@code SchemaCoordinator}, and holds one instance of this class to do the actual per-declaration
+ * work. This class never references {@code SchemaCoordinator} or {@code SchemaDocument} at all --
+ * everything here takes a bare declaration or an already-parsed {@code SchemaMap} entry.
  *
- * <p><b>No dependency on {@code resolver.schema.compiled} at all now</b> (2026-07-27, same
- * direction, a follow-up pass) -- {@code TsonCompiledSchema} is gone from every method parameter,
- * replaced by two narrower things: a plain {@code Map<String, TypeDefinition>} for the structure
- * namespace (what {@link #resolveConstructorTarget} actually needs -- a {@code TypeDefinition}
- * lookup, not a compiled reader), and {@link DefinitionMetaReader} (a compiled reader, for the one
- * thing that genuinely needs one: {@link #bindAtomInstance}'s own binding step). This closes the one
- * place this class used to reach past {@code resolver.schema} into {@code resolver.schema.compiled}
- * -- see {@link TsonSchemaResolver#compiledMetaSchema}'s own Javadoc for why that reach still
- * exists, just one layer up now, in the class that actually needs the full {@code
- * TsonCompiledSchema} (to derive both the structure namespace and the reader).
- *
- * <p><b>Fixed at construction, not threaded per call</b> (a further same-day follow-up, same
- * direction: "the structureNamespace ... should also be passed in on the constructor ... remove
- * anywhere structureNamespace is passed into the methods"). The structure namespace stopped being a
- * per-{@code resolve}-call argument once {@link DefinitionMetaReader} already made the same move for
- * the compiled reader -- both are properties of *which meta-schema governs this resolver*, fixed for
- * its whole lifetime. A resolver with nothing to offer there (every caller that never reaches {@link
- * #resolveInstance}, e.g. {@link MetaKernelBootstrapResolver}'s own first pass) is constructed with
- * {@code Map.of()}, the same way it already supplies a throws-if-called {@link DefinitionMetaReader}.
- *
- * <p><b>The accumulating type-name namespace moved to the constructor too</b> (a further same-day
- * follow-up, on the user's own explicit direction, after independently narrowing {@link
- * #resolveConstructorTarget} to drop its own type-name-namespace branch first: "Instead of passing
- * the map in and passing it through, let's follow the same as previously. Create a DefinitionGetter
- * interface with just getTypeDefinition(name) on it. Once again, make it a required constructor
- * parameter."). Every bare {@code Map<String, TypeDefinition> resolved} parameter is gone -- {@link
- * #resolveComposition}/{@link #resolveRefinement}/{@link #resolveAtomRefinement} all read {@code
- * this.definitionGetter} directly instead. Unlike {@code structureNamespace}/{@code
- * definitionMetaReader}, {@link DefinitionGetter} is NOT a snapshot -- it's typically a method
- * reference straight onto a caller's own growing map ({@code entries::get}), so a caller resolving
- * declarations one at a time in a loop (every real caller: {@link MetaKernelBootstrapResolver}'s own
- * two-pass loop, {@link TsonSchemaResolver#resolveSchema}'s own per-declaration loop) still {@code
- * put}s each result into that same map itself, immediately visible to the next {@code resolve} call
- * through the lookup without this class needing to know the map exists at all. A resolver whose own
- * caller genuinely has nothing resolved yet (a document's first declaration, an isolated test) is
- * constructed with a getter that always returns {@code null} for exactly this reason -- see {@link
- * DefinitionGetter}'s own Javadoc for why this is a lookup contract, not a data structure.
+ * <p>Has no dependency on {@code resolver.schema.compiled} -- {@link #bindAtomInstance}'s own binding
+ * step goes through {@link DefinitionMetaReader} (a required constructor parameter), a narrow read
+ * contract rather than the full {@code TsonCompiledSchema}; see {@link
+ * TsonSchemaResolver#compiledMetaSchema}'s own Javadoc for where that fuller reach actually lives.
  */
 final class DefinitionResolver {
 
@@ -256,44 +216,23 @@ final class DefinitionResolver {
     private final TsonMapperWriter writer = new TsonMapperWriter();
 
     private final DefinitionMetaReader definitionMetaReader;
-    private final Map<String, TypeDefinition> structureNamespace;
-    private final DefinitionGetter definitionGetter;
+    private final DefinitionGetter metaDefinitions;
+    private final DefinitionGetter namespaceDefinitions;
 
-    DefinitionResolver(DefinitionMetaReader definitionMetaReader, Map<String, TypeDefinition> structureNamespace,
-                        DefinitionGetter definitionGetter) {
+    DefinitionResolver(DefinitionMetaReader definitionMetaReader, DefinitionGetter metaDefinitions,
+                        DefinitionGetter namespaceDefinitions) {
         this.definitionMetaReader = Objects.requireNonNull(definitionMetaReader, "definitionMetaReader");
-        this.structureNamespace = Objects.requireNonNull(structureNamespace, "structureNamespace");
-        this.definitionGetter = Objects.requireNonNull(definitionGetter, "definitionGetter");
+        this.metaDefinitions = Objects.requireNonNull(metaDefinitions, "metaDefinitions");
+        this.namespaceDefinitions = Objects.requireNonNull(namespaceDefinitions, "namespaceDefinitions");
     }
 
     /**
-     * Resolves a single declaration -- exactly {@link #resolveBootstrapDefinition}, the real
-     * dispatcher every other {@code resolve*} method funnels through.
+     * Resolves a single declaration against this instance's own type-name/structure namespaces --
+     * the sole entry point; every other {@code resolve*} method is a private dispatch target reached
+     * from here.
      */
     TypeDefinition resolve(SchemaMap.Declaration declaration) {
         return resolveTypeDef(declaration.name(), declaration.typeDef());
-    }
-
-    /**
-     * Resolves a single declaration against this instance's own fixed type-name namespace (see
-     * {@link DefinitionGetter}) -- exactly {@link #resolve(SchemaMap.Declaration)}, under a name that
-     * documents its own real production caller instead.
-     *
-     * <p><b>Named for its own real production caller</b> (renamed 2026-07-27, from a bare {@code
-     * resolve(declaration, resolved)}, on the user's own explicit direction, to "make it really
-     * obvious" this is what {@link MetaKernelBootstrapResolver}'s own two-pass bootstrap loop calls,
-     * one declaration at a time, in source order, against a {@link DefinitionGetter} closing over its
-     * own growing {@code entries} map -- meta-kernel's own {@code !!meta} names itself, so it can
-     * never go through {@link TsonSchemaResolver#resolveSchema(io.ltr8.tson.parser.ast.schema.SchemaDocument)}
-     * the ordinary way (see {@link MetaKernelBootstrapResolver}'s own Javadoc). Test code exercising a
-     * hand-built declaration in isolation calls this too (see {@code DefinitionResolverTest}), for the
-     * same underlying reason bootstrap needs it, not because those tests are themselves about
-     * bootstrapping. The two methods are behaviorally identical now that neither takes a namespace
-     * argument to omit -- the name still documents *who calls it and why*, matching this codebase's
-     * established preference for self-documenting call sites over generic ones.
-     */
-    TypeDefinition resolveBootstrapDefinition(SchemaMap.Declaration declaration) {
-        return resolve(declaration);
     }
 
     private TypeDefinition resolveTypeDef(String name, TypeDef typeDef) {
@@ -338,27 +277,22 @@ final class DefinitionResolver {
     // ── Constructor application (§5.5, §5.6) ────────────────────────────────
 
     /**
-     * {@code !C value} (constructor application, no {@code ^}) -- produces a fresh instance
-     * filled with {@code value}. {@code C} resolves against the structure namespace only (see {@link
-     * #resolveConstructorTarget}'s own Javadoc for why the type-name namespace is no longer consulted
-     * here); the found entry MUST be a constructor ({@code constructor: true}) or this is a resolver
-     * error (the spec's own suggested diagnostic: "did you mean atom refinement?"). {@code value} is normalized to
-     * record form ({@link PositionalForm}, using {@code C}'s own resolved field list to find its
-     * positionally-fillable field, if any), then bound generically via {@code
-     * TsonMapperReader.toObject(normalized, Top.class)} -- {@code instance.value().typeRef()}
-     * already names {@code C} (per {@code Instance}'s own reshape, {@code SPEC-FEEDBACK.md} #16),
-     * so {@code tson-bind}'s own union-member resolution finds the matching {@link Top} leaf with
-     * no separate name→class table anywhere. Construction transfers only {@code C}'s {@code kind}
-     * (§5.5): no supertypes, no parameters, {@code constructor: false} on the result.
+     * {@code !C value} (constructor application, no {@code ^}) -- produces a fresh instance filled
+     * with {@code value}. {@code C} resolves against the structure namespace only (see {@link
+     * #resolveConstructorTarget}); the found entry MUST be a constructor ({@code constructor: true})
+     * or this is a resolver error (the spec's own suggested diagnostic: "did you mean atom
+     * refinement?"). {@code value} is normalized to record form ({@link PositionalForm}, using
+     * {@code C}'s own resolved field list to find its positionally-fillable field, if any) and bound
+     * via {@link #bindAtomInstance} -- {@code instance.value().typeRef()} already names {@code C}
+     * (per {@code Instance}'s own reshape, {@code SPEC-FEEDBACK.md} #16). Construction transfers only
+     * {@code C}'s {@code kind} (§5.5): no supertypes, no parameters, {@code constructor: false} on
+     * the result.
      *
-     * <p>Binds against {@code Top.class}, not {@code Atom.class} -- widened 2026-07-24 once {@link
-     * UnknownType} (composing with {@code sum}, not {@code atom}) became the first real constructor
-     * outside the atom family: {@code unknown => !unknown_type {}}. Originally scoped narrower
-     * ("every real Instance in core.tn1/meta.tn1 targets an atom-family constructor... a one-word
-     * change if it's ever needed" -- and it was). {@code C}'s own body must also already be a
-     * {@link RecordBody} -- true for every real constructor (a constructor's own declared
-     * vocabulary is always record-shaped, whatever the resulting instance's bound Java class looks
-     * like, atom-family or not).
+     * <p>Binds against {@link Top}, not the narrower {@code Atom} -- some constructors (e.g. {@code
+     * unknown_type => ~sum & {}}) compose with {@code sum}, not {@code atom}. {@code C}'s own body
+     * must also already be a {@link RecordBody} -- true for every real constructor (a constructor's
+     * own declared vocabulary is always record-shaped, whatever the resulting instance's bound Java
+     * class looks like, atom-family or not).
      */
     private TypeDefinition resolveInstance(String name, Instance instance) {
         String target = instance.target();
@@ -389,44 +323,32 @@ final class DefinitionResolver {
      * isn't name-visible (e.g. a governed schema that can't name {@code integer_type} directly, only
      * {@code integer}).
      *
-     * <p>Unlike {@link #resolveInstance}, {@code refinement.bindings()}'s own {@code typeRef} is
-     * NOT pre-set by the grammar -- {@code atom-refinement}'s own grammar defect ({@code
-     * SPEC-FEEDBACK.md} #16) was deliberately left unfixed, since narrowing it needs {@link
-     * AtomRefinement#bindings} retyped to a real {@code RecordDef}, a bigger change better done once
-     * this method's own shape is proven out. So this attaches {@code I}'s constructor name as the
-     * value's type-ref itself, then binds through the same {@link #bindAtomInstance} both
-     * constructs share. No positional-form wrapping (unlike {@code Instance}) -- §5.5 guarantees a
-     * refinement body is always a braced record; if it isn't, {@code TsonMapperReader.toRecord}'s
-     * own "expected a record" check catches it.
+     * <p>Unlike {@link #resolveInstance}, {@code refinement.bindings()}'s own {@code typeRef} is not
+     * pre-set by the grammar ({@code atom-refinement}'s own grammar defect, {@code
+     * SPEC-FEEDBACK.md} #16), so this attaches {@code I}'s constructor name to the value's type-ref
+     * itself before binding through {@link #bindAtomInstance}. No positional-form wrapping (unlike
+     * {@code Instance}) -- §5.5 guarantees a refinement body is always a braced record; {@link
+     * #mergeWithSource} rejects anything else.
      *
-     * <p><b>Merges with {@code I}'s own already-bound value; does not replace it</b> (corrected
-     * 2026-07-24, {@code SPEC-FEEDBACK.md} #17 -- an earlier version of this method, and its own
-     * Javadoc, took §5.6's "desugars by retargeting" wording as "replace `I`'s own bindings
-     * entirely," which produces a semantically wrong result for a *chained* refinement: given
-     * {@code int8 => !integer ^ { size: {...} } }, {@code big => !int8 ^ { min: -500 } } MUST still
-     * carry {@code int8}'s own {@code size}, not lose it, since {@code big} is declared as a
-     * refinement -- a narrowing -- of {@code int8}, and §5.7's own "Body materialisation" rule for
-     * the structurally analogous record-refinement case is explicit that inherited fields survive a
-     * refinement that doesn't mention them). {@link #mergeWithSource} does the actual merge: {@code
-     * I}'s own bound value is re-serialized back to wire form via {@code TsonMapperWriter} (no
-     * hand-written per-type merge needed for any of the many atom-constraint classes this needs to
-     * work for), then merged field-by-field with the new refinement's own {@code values} -- a field
-     * named in {@code values} overrides {@code I}'s own value for it; a field {@code I} itself bound
-     * that {@code values} doesn't mention keeps {@code I}'s own value. A fresh/{@code UNCONSTRAINED}
-     * source (every real, non-chained fixture case) serializes to an empty record, so the merge is a
-     * no-op there -- this recovers the previous, already-verified non-chained behavior exactly, not
-     * a separate code path.
+     * <p><b>Merges with {@code I}'s own already-bound value; does not replace it</b> ({@link
+     * #mergeWithSource}) -- required for a *chained* refinement to behave correctly: given {@code
+     * int8 => !integer ^ { size: {...} } }, {@code big => !int8 ^ { min: -500 } } MUST still carry
+     * {@code int8}'s own {@code size}, since {@code big} is declared as a refinement -- a narrowing --
+     * of {@code int8}, and §5.7's own "Body materialisation" rule for the structurally analogous
+     * record-refinement case is explicit that inherited fields survive a refinement that doesn't
+     * mention them. A field named in the new refinement's own {@code values} overrides {@code I}'s
+     * own value for it; any field {@code I} itself bound that {@code values} doesn't mention keeps
+     * {@code I}'s own value.
      *
      * <p>Per §5.5's own text (not the general composition/refinement induction of §5.7/§5.8):
      * {@code source} is {@code I}'s own constructor ({@code I.source()}, e.g. {@code integer_type}
      * for {@code I = integer}), and {@code supertypes} is the literal single-element {@code [I]} --
-     * not transitively chained with {@code I}'s own supertypes (which is empty for every real,
-     * non-chained case anyway, since a fresh {@code Instance} always resolves with empty {@code
-     * supertypes}).
+     * not transitively chained with {@code I}'s own supertypes (empty for every fresh {@code
+     * Instance}).
      */
     private TypeDefinition resolveAtomRefinement(String name, AtomRefinement refinement) {
         String sourceName = refinement.target();
-        TypeDefinition source = definitionGetter.getTypeDefinition(sourceName);
+        TypeDefinition source = namespaceDefinitions.getTypeDefinition(sourceName);
         if (source == null) {
             throw new UnsupportedOperationException("'" + name + "': '!" + sourceName
                     + "' does not resolve against the type-name namespace (§3.3.1)");
@@ -458,9 +380,8 @@ final class DefinitionResolver {
      * record wire form via {@code TsonMapperWriter.toTson} (writing a {@code Top}-typed value by its
      * own runtime class never emits a type-ref -- exactly the plain-record shape wanted here) and
      * re-parsed, so this needs no per-atom-class merge logic -- it works generically for every
-     * current and future atom-constraint class the same way. Field merge is by name at the
-     * `RecordValue` level: `newBindings`'s own fields win; anything only `sourceBody` had survives
-     * untouched.
+     * atom-constraint class the same way. Field merge is by name at the {@link RecordValue} level:
+     * {@code newBindings}'s own fields win; anything only {@code sourceBody} had survives untouched.
      */
     private DataValue mergeWithSource(String name, Top sourceBody, DataValue newBindings, String constructorName) {
         Map<String, RecordValue.Field> merged = new LinkedHashMap<>();
@@ -491,23 +412,16 @@ final class DefinitionResolver {
     }
 
     /**
-     * A constructor-application target ({@code !C value}) resolves against the structure namespace
-     * only -- never the type-name namespace this instance's own {@link DefinitionGetter} exposes.
-     *
-     * <p><b>Narrowed from §3.3.1's own two-namespace lookup rule (2026-07-27, on the user's own
-     * explicit direction, dropping the {@code resolved.get(target)} branch that used to be tried
-     * first)</b> -- a constructor is meta-schema vocabulary (a {@code type_definition} with {@code
+     * A constructor-application target ({@code !C value}) resolves against {@code metaDefinitions}
+     * (the structure namespace) only -- never {@code namespaceDefinitions} (the type-name namespace).
+     * A constructor is always meta-schema vocabulary (a {@code type_definition} with {@code
      * constructor: true}, e.g. {@code integer_type}/{@code enum}), never something a schema
-     * legitimately defines about itself and then, in the same breath, instantiates: a target found in
-     * this instance's own type-name namespace would mean a schema declaring its own constructor and
-     * constructing an instance of it in one pass, before that declaration could plausibly have been
-     * vetted as governing vocabulary. Every real fixture case reaches its constructor through the
-     * structure namespace alone (the target is always declared in the *governing* meta-schema, one
-     * hop via {@code !!meta}) -- confirmed by the full suite staying green with the type-name branch
-     * removed, not just reasoned about.
+     * legitimately defines about itself and, in the same pass, instantiates -- the target is always
+     * declared in the *governing* meta-schema, one hop via {@code !!meta}, so the structure namespace
+     * alone is enough.
      */
     private TypeDefinition resolveConstructorTarget(String name, String target) {
-        TypeDefinition structural = structureNamespace.get(target);
+        TypeDefinition structural = metaDefinitions.getTypeDefinition(target);
         if (structural != null) {
             return structural;
         }
@@ -516,18 +430,11 @@ final class DefinitionResolver {
     }
 
     /**
-     * Shared by {@link #resolveInstance} and {@link #resolveAtomRefinement} -- both ultimately need
-     * to read a type-ref-carrying value against its own constructor's compiled parser. {@code value}
-     * already names its own constructor via {@link DataValue#typeRef()} (per {@code Instance}'s own
-     * reshape and {@link #resolveAtomRefinement}'s own attachment of {@code I}'s constructor name),
-     * so {@code definitionMetaReader.read(constructorName, value)} finds and reads the right compiled
-     * parser directly -- no separate name→class table, no union-member scan. Never {@code null} --
-     * this instance's own {@link DefinitionMetaReader} is a required constructor parameter, so unlike
-     * an earlier version of this method (which took a nullable {@code TsonCompiledSchema} and threw
-     * here if it was absent), there's no "not supplied" case to guard against anymore; a caller with
-     * nothing real to bind against (e.g. {@link MetaKernelBootstrapResolver}, which never actually
-     * reaches this method at all) supplies a reader that itself throws if ever invoked, rather than
-     * this method having to check for {@code null}.
+     * Shared by {@link #resolveInstance} and {@link #resolveAtomRefinement} -- both need to read a
+     * type-ref-carrying value against its own constructor's compiled parser. {@code value} already
+     * names its own constructor via {@link DataValue#typeRef()}, so {@code
+     * definitionMetaReader.read(constructorName, value)} finds and reads the right compiled parser
+     * directly -- no separate name→class table, no union-member scan.
      */
     private Top bindAtomInstance(String name, DataValue value) {
         String constructorName = value.typeRef().orElseThrow(() -> new IllegalStateException(
@@ -682,7 +589,7 @@ final class DefinitionResolver {
                         "'" + name + "': only simple supertype references are resolved so far, got " + supertypeRef);
             }
             String supertypeName = simple.name();
-            TypeDefinition supertypeDef = definitionGetter.getTypeDefinition(supertypeName);
+            TypeDefinition supertypeDef = namespaceDefinitions.getTypeDefinition(supertypeName);
             if (supertypeDef == null) {
                 throw new UnsupportedOperationException("'" + name + "': supertype '" + supertypeName
                         + "' is not resolved yet (only supertypes declared earlier in the same schema map are visible so far)");
@@ -779,7 +686,7 @@ final class DefinitionResolver {
                                               List<String> parameters) {
         io.ltr8.tson.schema.meta.TypeRef sourceRef = resolveRefinementSource(name, refined.target());
         String sourceName = sourceRef.name();
-        TypeDefinition sourceDef = definitionGetter.getTypeDefinition(sourceName);
+        TypeDefinition sourceDef = namespaceDefinitions.getTypeDefinition(sourceName);
         if (sourceDef == null) {
             throw new UnsupportedOperationException("'" + name + "': refinement source '" + sourceName
                     + "' is not resolved yet (only a source declared earlier in the same schema map is visible so far)");

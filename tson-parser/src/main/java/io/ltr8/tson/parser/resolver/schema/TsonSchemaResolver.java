@@ -14,59 +14,24 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Resolves a whole {@link SchemaDocument} into a {@link TsonSchema} -- the document-level half of
- * what used to be one class (see "Split from {@code DefinitionResolver}" below): header-directive
- * validation ({@code !!id}/{@code !!import}), deriving the structure namespace from this resolver's
- * own {@link SchemaCoordinator}, merging {@code !!import} entries into the type-name namespace, and
- * handing each local declaration off to an internal {@link DefinitionResolver} for the actual,
- * per-declaration resolution work (Part 2 §4, §8's {@code type_definition} shape).
+ * Resolves a whole {@link SchemaDocument} into a {@link TsonSchema}: header-directive validation
+ * ({@code !!id}/{@code !!import}), deriving the structure namespace from this resolver's own {@link
+ * SchemaCoordinator}, merging {@code !!import} entries into the type-name namespace, and handing each
+ * local declaration off to a {@link DefinitionResolver} for the actual, per-declaration resolution
+ * work (Part 2 §4, §8's {@code type_definition} shape).
  *
- * <p><b>Split from {@code DefinitionResolver}</b> (2026-07-27, on the user's own explicit
- * direction: "remove the SchemaCoordinator out of TsonSchemaResolver all together... rename
- * TsonSchemaResolver to DefinitionResolver... create a new TsonSchemaResolver which requires a
- * SchemaCoordinator"). The old, single class's own {@link SchemaCoordinator} field was consulted by
- * exactly two methods, {@code compiledMetaSchema} and {@code mergeImports}, and both of those were
- * only ever reached from that class's own {@code resolveSchema(SchemaDocument)} -- a real, concrete
- * sign that "resolve one declaration" and "resolve a whole document, given a way to fetch its
- * governing meta-schema and imports" were two different jobs living in one file. This class holds
- * the {@link SchemaCoordinator} and performs the validation/import-merging; {@link
- * DefinitionResolver} (now internal, package-private, no {@code Tson} prefix) never references
- * {@code SchemaCoordinator} at all -- it does still have its own batch {@code
- * resolveSchema(SchemaDocument)} convenience (looping every declaration, no validation, no
- * import-merging), since that one needs no coordinator either, only an already-derived structure
- * namespace, supplied once at construction; see its own Javadoc for why that keeps it off this
- * class.
+ * <p>A {@link SchemaCoordinator} is required: a document-level resolution that can't validate its own
+ * {@code !!id} or reach its own {@code !!meta} isn't a degraded version of this job, it's a different
+ * one -- per-declaration resolution against a hand-built namespace, which is exactly what {@link
+ * DefinitionResolver} is for directly.
  *
- * <p><b>A {@link SchemaCoordinator} is required now, not optional</b> -- the old class's own no-arg
- * constructor (and the "coordinator may be {@code null}" branch every coordinator-touching method
- * used to carry) is gone. A document-level resolution that can't validate its own {@code !!id} or
- * reach its own {@code !!meta} isn't a degraded version of this job, it's a different one --
- * per-declaration resolution against a hand-built namespace, which is exactly what {@link
- * DefinitionResolver} is for directly (see its own Javadoc, and {@code DefinitionResolverTest}/
- * {@code PositionalFormTest}, which construct one directly for isolated-declaration cases that used
- * to route through this class's own coordinator-less constructor).
- *
- * <p><b>Builds a fresh {@link DefinitionResolver} per {@link #resolveSchema(SchemaDocument)} call,
- * not a reused field</b> (2026-07-27, same direction, two follow-up passes once {@code
- * DefinitionResolver} stopped taking {@code TsonCompiledSchema} as a per-call parameter and started
- * taking a {@link DefinitionMetaReader} *and* the structure namespace at construction instead -- see
- * that interface's own Javadoc and {@code DefinitionResolver}'s own "Fixed at construction, not
- * threaded per call" note). A single resolver instance can resolve documents with *different*
- * governing meta-schemas across separate {@link #resolveSchema} calls, so both the reader and the
- * structure namespace have to be bound to *that call's* own {@code metaParser}, not fixed for this
- * object's whole lifetime; constructing a cheap {@link DefinitionResolver} per call (wrapping a
- * one-line lambda over that call's {@code metaParser}, plus its already-resolved {@code
- * metaParser.schema().entries()}) is simpler than making this class track "which reader/namespace is
- * current."
- *
- * <p><b>The type-name namespace ({@code namespace}, this method's own local, {@code !!import}-seeded
- * map) is built *before* the {@link DefinitionResolver} it feeds, and passed as {@code
- * namespace::get}</b> (a further same-day follow-up, once {@link DefinitionGetter} moved {@code
- * DefinitionResolver}'s own accumulating-namespace parameter to its constructor too) -- unlike {@code
- * metaParser}, which is fully resolved before the resolver is even built, {@code namespace} keeps
- * growing across the loop below (each iteration's own {@code namespace.put} call); a plain method
- * reference onto the map, not a copy, is what lets the resolver see each newly-added entry on the
- * very next iteration without this class threading the map through every call.
+ * <p>{@link #resolveSchema(SchemaDocument)} builds a fresh {@link DefinitionResolver} per call, not a
+ * reused field, since a single instance of this class can resolve documents governed by *different*
+ * meta-schemas across separate calls -- both the compiled reader and the structure namespace have to
+ * be bound to that call's own {@code metaParser}. The type-name namespace ({@code namespace}, this
+ * method's own local, {@code !!import}-seeded map) is built before the {@link DefinitionResolver} it
+ * feeds and passed as {@code namespace::get} -- a plain method reference onto the map, not a copy, so
+ * the resolver sees each newly-added entry on the very next loop iteration.
  */
 public final class TsonSchemaResolver {
 
@@ -76,13 +41,11 @@ public final class TsonSchemaResolver {
      * @param coordinator consulted by {@link #resolveSchema(SchemaDocument)} to resolve a document's
      *                     own {@code !!meta}/{@code !!import} targets -- fetching, resolving,
      *                     registering, and compiling each as needed rather than requiring them to
-     *                     already exist somewhere. Required -- see this class's own "A
-     *                     SchemaCoordinator is required now" note.
+     *                     already exist somewhere. Required.
      *
      *                     <p>Deliberately a {@link SchemaCoordinator}, not a bare {@code
-     *                     TsonCompiledRegistry} reference (an earlier version of this constructor
-     *                     took one directly) -- a plain "look it up, throw if missing" registry has
-     *                     no way to bootstrap meta-kernel's own document: resolving it means
+     *                     TsonCompiledRegistry} -- a plain "look it up, throw if missing" registry
+     *                     has no way to bootstrap meta-kernel's own document: resolving it means
      *                     resolving *its own* {@code !!meta}, which names itself, so a registry-only
      *                     resolver would need meta-kernel already registered before it could ever
      *                     register meta-kernel. {@link SchemaCoordinator}'s own default
@@ -142,27 +105,24 @@ public final class TsonSchemaResolver {
      *
      * <p><b>{@code !!import} is merged into the type-name namespace the same way</b> -- each import's
      * own URI is validated the same way {@code !!id} is, then resolved via the same {@link
-     * SchemaCoordinator} and its entries merged in, *before* any local declaration is resolved
-     * (exactly the pre-seeding {@code MetaTn1Parser} used to do by hand for meta-kernel
-     * specifically, now generalized). This is genuinely required, not cosmetic: unlike the structure
-     * namespace (consulted only for constructor-application targets), an import's own entries feed
-     * the *type-name* namespace -- the same {@code resolved} map {@link DefinitionResolver}'s own
-     * composition/refinement/atom-refinement resolution looks a supertype/refinement-source straight
-     * up in, with no fallback of any kind. meta.tn1's own {@code date_type => ~atom &
-     * atom_specification & {...}}, composing with two meta-kernel entries it only has via its own
-     * {@code !!import}, would fail to resolve at all without this. Collision handling mirrors {@code
-     * TsonSchemaLinker.mergeImports}'s own established rule exactly, not a new one: a name declared by
+     * SchemaCoordinator} and its entries merged in, *before* any local declaration is resolved. This
+     * is genuinely required, not cosmetic: unlike the structure namespace (consulted only for
+     * constructor-application targets), an import's own entries feed the *type-name* namespace --
+     * the same {@code namespace} map (exposed to {@link DefinitionResolver} as {@code
+     * namespace::get}) its own composition/refinement/atom-refinement resolution looks a
+     * supertype/refinement-source straight up in, with no fallback of any kind. meta.tn1's own {@code
+     * date_type => ~atom & atom_specification & {...}}, composing with two meta-kernel entries it
+     * only has via its own {@code !!import}, would fail to resolve at all without this. Collision
+     * handling mirrors {@code TsonSchemaLinker.mergeImports}'s own rule exactly: a name declared by
      * more than one import, or by an import *and* a local declaration, is a {@link
-     * TsonSchemaValidationException} -- checked as each import is merged in, and
-     * again as each local declaration is about to be resolved, so a collision is caught at the
-     * earliest point either side of it becomes known, before any further resolution work is spent.
-     * <b>Merged entries keep their home namespace</b>, same as {@code TsonSchemaLinker}'s own note on
-     * this: an imported entry is copied in exactly as its own schema resolved it, never re-resolved
-     * or re-materialized against the importer. The result's own {@link TsonSchema#entries()} is
-     * local-only, same as {@code MetaTn1Parser}'s own convention -- imported entries are visible
-     * *during* resolution but are never part of what this method itself returns; a caller that wants
-     * the merged whole gets it from {@code TsonSchemaRegistry.register}'s own eventual output instead,
-     * same as always.
+     * TsonSchemaValidationException} -- checked as each import is merged in, and again as each local
+     * declaration is about to be resolved, so a collision is caught at the earliest point either side
+     * of it becomes known. <b>Merged entries keep their home namespace</b>, same as {@code
+     * TsonSchemaLinker}'s own note on this: an imported entry is copied in exactly as its own schema
+     * resolved it, never re-resolved or re-materialized against the importer. The result's own {@link
+     * TsonSchema#entries()} is local-only -- imported entries are visible *during* resolution but are
+     * never part of what this method itself returns; a caller that wants the merged whole gets it
+     * from {@code TsonSchemaRegistry.register}'s own eventual output instead.
      */
     public TsonSchema resolveSchema(SchemaDocument document) {
         String id = document.id().orElseThrow(() -> new IllegalStateException(
@@ -175,7 +135,7 @@ public final class TsonSchemaResolver {
         TsonCompiledSchema metaParser = compiledMetaSchema(document);
         Map<String, TypeDefinition> namespace = mergeImports(document);
         DefinitionResolver definitionResolver = new DefinitionResolver(
-                (type, value) -> (Top) metaParser.get(type).read(value), metaParser.schema().entries(), namespace::get);
+                (type, value) -> (Top) metaParser.get(type).read(value), metaParser.schema().entries()::get, namespace::get);
 
         Map<String, TypeDefinition> localOnly = new LinkedHashMap<>();
         for (SchemaMap.Declaration declaration : document.body().declarations().values()) {

@@ -34,73 +34,39 @@ import java.util.Optional;
  * meta-kernel from nothing -- resolving a constructor-*application* instance ({@code !C value},
  * §5.5, e.g. {@code integer => !integer_type {}}) needs {@code C}'s own vocabulary already known,
  * and for meta-kernel, every {@code C} it uses is defined *within the same file* -- so this class
- * resolves what {@link DefinitionResolver} already can (36 of the real fixture's 49 declarations, in
- * one source-order pass), then makes a second pass over the deferred {@code Instance} declarations
- * now that every constructor they reference (including ones declared *later* in the file, e.g.
- * {@code boolean => !enum [true false]} comes before {@code enum}'s own declaration) has a
- * resolved entry to transfer a kind from.
+ * resolves what {@link DefinitionResolver} already can in one source-order pass, then makes a second
+ * pass over the deferred {@code Instance} declarations now that every constructor they reference
+ * (including ones declared *later* in the file, e.g. {@code boolean => !enum [true false]} comes
+ * before {@code enum}'s own declaration) has a resolved entry to transfer a kind from.
  *
- * <p><b>Produces a plain, unmaterialized {@link TsonSchema}</b> ({@code materialised() == false},
- * {@code bootstrap() == true} -- see that class's own Javadoc). This class is a stateless
- * parser/resolver, the same shape as {@link TsonSchemaParser}/{@link DefinitionResolver} -- {@link
- * #getMetaKernelSchema()} returns a freshly-built value rather than being one itself. Its own
- * output is resolved-but-not-yet-linked -- a caller links it (via {@code
- * TsonSchemaLinker#linkBootstrap}, never {@code TsonSchemaRegistry#register} directly -- see that
- * class's own Javadoc for why) and, separately, compiles it -- a distinct, later stage this class
- * has nothing to do with; see {@code TsonSchemaLinker}/{@code TsonCompiledSchema}.
+ * <p>Produces a plain, unmaterialized {@link TsonSchema} ({@code materialised() == false}, {@code
+ * bootstrap() == true} -- see that class's own Javadoc). This class is a stateless parser/resolver,
+ * the same shape as {@link TsonSchemaParser}/{@link DefinitionResolver} -- {@link
+ * #getMetaKernelSchema()} returns a freshly-built value rather than being one itself. Its own output
+ * is resolved-but-not-yet-linked -- a caller links it (via {@code TsonSchemaLinker#linkBootstrap},
+ * never {@code TsonSchemaRegistry#register} directly -- see that class's own Javadoc for why) and,
+ * separately, compiles it -- a distinct, later stage this class has nothing to do with.
  *
- * <p><b>Deliberately locked down to exactly one public method, taking no arguments</b> (narrowed
- * 2026-07-26, on the user's own explicit direction) -- this class exists to bootstrap *the* real
- * meta-kernel document (see {@link BundledSchemaSource#META_KERNEL_ID}), nothing else. An earlier
- * version also exposed {@code parse(String source)}, letting a caller resolve arbitrary
- * meta-kernel-shaped text through this same two-pass machinery -- unused anywhere in this codebase
- * (confirmed by grep, not assumed) and removed outright, not just deprecated, since keeping it
- * around invites exactly the kind of "just reuse the bootstrap parser for this other thing" misuse
- * this lock-down exists to prevent.
+ * <p>Deliberately locked down to exactly one public method, taking no arguments -- this class exists
+ * to bootstrap *the* real meta-kernel document (see {@link BundledSchemaSource#META_KERNEL_ID}),
+ * nothing else.
  *
  * <p><b>Every {@code Instance} declaration resolves through {@link #instanceBody}, a closed,
- * hand-written switch -- not {@code DefinitionResolver}/{@code TsonMapperReader}, and not any
- * schema-driven compiled reader either</b> (widened 2026-07-25 from an earlier version that routed
- * {@code unit}/{@code integer_type}/{@code text_type} through ordinary generic resolution and
- * hand-picked only {@code uri_type}/{@code regex_type}/{@code enum}; merged from a separate
- * {@code BootstrapMetaKernelCompiler} class the same day -- it had exactly one caller, produced a
- * {@link Top} *value* rather than a compiled reader, and "Compiler" in its name collided with what
- * that word means for a class that actually produces a {@code TsonCompiledSchema}-shaped artifact,
- * once that became a real, distinct concept in this codebase). Two things rule out both of the more
- * "general" mechanisms this could otherwise reach for:
- * <ul>
- *   <li>{@code DefinitionResolver.resolveInstance}'s own generic path binds via {@code TsonMapperReader},
- *   which is identification-first (a token is classified null/boolean/number/string *before* the
- *   target field is consulted) -- exactly why {@code boolean => !enum [true false]} needs
- *   hand-picked handling at all ({@code "true"}/{@code "false"} misidentify as real booleans before
- *   {@code EnumBody.members} ever sees them) and why {@code uri_type}/{@code regex_type}'s own
- *   schema-composed RFC-citation default never lands (nested inside {@code specification:
- *   AtomSpecification}, past what generic defaulting fills in).</li>
- *   <li>A schema-driven *compiled* reader (the eventual replacement for {@code TsonMapperReader}
- *   elsewhere, see {@code DefinitionResolver}'s own notes) can't safely bootstrap meta-kernel from its
- *   own in-progress state either -- {@code enum}'s own {@code members: set<token>} field is
- *   argument-bearing, and only {@code SchemaValidator}'s materialization pass (never run over
- *   meta-kernel while meta-kernel is still being produced) makes that safe to compile a reader
- *   against. Checked directly, not assumed: running materialization over the first-pass-only state
- *   doesn't work either -- {@code integer_size => { bits: ... signed: boolean }} is itself a
- *   first-pass entry whose {@code signed} field already references {@code boolean}, unresolved
- *   until the second pass.</li>
- * </ul>
- * Rather than deciding case by case which of meta-kernel's own instances need hand-picking and
- * which can use one of those, {@link #instanceBody} hand-picks all of them uniformly -- meta-kernel
- * only ever instantiates its own six real constructors in two known shapes (a bare {@code {}} or a
- * bare array of tokens), confirmed directly against the real fixture, so there's no genuine need for
- * a general mechanism here at all: "the bootstrap compiler can do whatever tricks it needs to...
- * that includes not even compiling, just calling {@code new Xxx(...)}."
+ * hand-written switch</b> -- a schema-driven compiled reader can't safely bootstrap meta-kernel from
+ * its own in-progress state: {@code enum}'s own {@code members: set<token>} field is
+ * argument-bearing, and only a materialization pass over the *whole* schema (never run over
+ * meta-kernel while meta-kernel is still being produced) makes that safe to compile a reader
+ * against -- running materialization over the first-pass-only state doesn't work either, since
+ * {@code integer_size => { bits: ... signed: boolean }} is itself a first-pass entry whose {@code
+ * signed} field already references {@code boolean}, unresolved until the second pass. Rather than
+ * deciding case by case which of meta-kernel's own instances need hand-picking, {@link
+ * #instanceBody} hand-picks all of them uniformly -- meta-kernel only ever instantiates its own six
+ * real constructors in two known shapes (a bare {@code {}} or a bare array of tokens).
  *
- * <p><b>{@link #getMetaKernelSchema()} reads meta-kernel.tn1 packaged as a classpath resource, via
- * {@link BundledSchemaSource}</b> (see this module's {@code build.gradle.kts}, which copies it
- * straight from the repo's own {@code spec/m/meta-kernel.tn1} snapshot into this module's
- * resources at build time -- one file, not a duplicated copy) rather than a filesystem path into
- * the sibling {@code spec/} directory, so the bootstrap works from a built jar, not just a repo
- * checkout. This class used to read that resource itself, directly -- now delegates to {@link
- * BundledSchemaSource}, the one place this library's own bundled schema documents are fetched
- * from, so the same classpath-reading logic isn't duplicated between the two classes.
+ * <p>{@link #getMetaKernelSchema()} reads meta-kernel.tn1 packaged as a classpath resource, via
+ * {@link BundledSchemaSource} (see this module's {@code build.gradle.kts}, which copies it straight
+ * from the repo's own {@code spec/m/meta-kernel.tn1} snapshot into this module's resources at build
+ * time), so the bootstrap works from a built jar, not just a repo checkout.
  */
 public final class MetaKernelBootstrapResolver {
 
@@ -126,7 +92,7 @@ public final class MetaKernelBootstrapResolver {
 
     /**
      * A {@link DefinitionMetaReader} that always throws -- this class's own first pass only ever
-     * calls {@link DefinitionResolver#resolveBootstrapDefinition}, and never on an {@code Instance}
+     * calls {@link DefinitionResolver#resolve}, and never on an {@code Instance}
      * declaration (those are filtered out below, deferred to the second pass, which resolves them
      * through {@link #instanceBody} directly, never through {@code DefinitionResolver} at all -- see
      * this class's own Javadoc), so {@code DefinitionResolver#bindAtomInstance} can never actually be
@@ -138,9 +104,12 @@ public final class MetaKernelBootstrapResolver {
                 + "Instance declaration through instanceBody directly -- this reader should never be called");
     };
 
+    /** Meta-kernel governs itself, so it has no separate structure namespace to fall back to -- this class's own first pass never reaches {@link DefinitionResolver#resolveInstance} at all, the one place a structure namespace is ever consulted. */
+    private static final DefinitionGetter EMPTY_META_DEFINITIONS = name -> null;
+
     private static Map<String, TypeDefinition> resolveEntries(SchemaDocument document) {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        DefinitionResolver resolver = new DefinitionResolver(NEVER_CALLED, Map.of(), entries::get);
+        DefinitionResolver resolver = new DefinitionResolver(NEVER_CALLED, EMPTY_META_DEFINITIONS, entries::get);
         List<SchemaMap.Declaration> instances = new ArrayList<>();
 
         for (SchemaMap.Declaration declaration : document.body().declarations().values()) {
@@ -151,7 +120,7 @@ public final class MetaKernelBootstrapResolver {
                 instances.add(declaration);
                 continue;
             }
-            entries.put(declaration.name(), resolver.resolveBootstrapDefinition(declaration));
+            entries.put(declaration.name(), resolver.resolve(declaration));
         }
 
         for (SchemaMap.Declaration declaration : instances) {
