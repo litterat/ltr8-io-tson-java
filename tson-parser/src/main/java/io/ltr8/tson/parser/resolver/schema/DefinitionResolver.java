@@ -201,8 +201,9 @@ import java.util.Set;
  * names directly (see "Naming convention" in this project's own CLAUDE.md). {@link TsonSchemaResolver}
  * is the public, document-level counterpart: it validates a document's own header directives ({@code
  * !!id}/{@code !!import}), merges {@code !!import} entries, derives the structure namespace from a
- * {@code SchemaCoordinator}, and holds one instance of this class to do the actual per-declaration
- * work. This class never references {@code SchemaCoordinator} or {@code SchemaDocument} at all --
+ * {@code TsonCompiledSchemaLoader}, and holds one instance of this class to do the actual
+ * per-declaration work. This class never references {@code TsonCompiledSchemaLoader} or {@code
+ * SchemaDocument} at all --
  * everything here takes a bare declaration or an already-parsed {@code SchemaMap} entry.
  *
  * <p>Has no dependency on {@code resolver.schema.compiled} -- {@link #bindAtomInstance}'s own binding

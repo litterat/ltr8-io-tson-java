@@ -8,7 +8,7 @@ import io.ltr8.tson.parser.ast.schema.SchemaDocument;
 import io.ltr8.tson.parser.bind.TsonObjectBinding;
 import io.ltr8.tson.parser.resolver.TsonAtomContext;
 import io.ltr8.tson.parser.resolver.schema.BundledSchemaSource;
-import io.ltr8.tson.parser.resolver.schema.DefaultSchemaCoordinator;
+import io.ltr8.tson.parser.resolver.schema.DefaultTsonCompiledSchemaLoader;
 import io.ltr8.tson.parser.resolver.schema.MetaKernelBootstrapResolver;
 import io.ltr8.tson.parser.resolver.schema.TsonSchemaResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -43,17 +43,17 @@ class MetaTn1CompiledEndToEndTest {
         DataBindContext context = TsonAtomContext.defaultContext();
         TsonParserFactoryRegistry objectFactories = TsonObjectBinding.factoryRegistry(materializedMetaKernelBootstrap.schema(), context);
         TsonCompiledRegistry compiledRegistry = new TsonCompiledRegistry(objectFactories);
-        DefaultSchemaCoordinator coordinator = new DefaultSchemaCoordinator(compiledRegistry);
+        DefaultTsonCompiledSchemaLoader loader = new DefaultTsonCompiledSchemaLoader(compiledRegistry);
 
         String metaKernelSource = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID);
         SchemaDocument metaKernelDocument = new TsonSchemaParser(metaKernelSource).parseSchemaDocument();
-        TsonSchema metaKernel = new TsonSchemaResolver(coordinator).resolveSchema(metaKernelDocument);
+        TsonSchema metaKernel = new TsonSchemaResolver(loader).resolveSchema(metaKernelDocument);
         TsonLinkedSchema metaKernelMaterialized = registry.register(TsonSchemaLinker.link(metaKernel, registry));
         compiledRegistry.register(metaKernelMaterialized.schema());
 
         String source = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_TN1_ID);
         SchemaDocument metaDocument = new TsonSchemaParser(source).parseSchemaDocument();
-        TsonSchema meta = new TsonSchemaResolver(coordinator).resolveSchema(metaDocument);
+        TsonSchema meta = new TsonSchemaResolver(loader).resolveSchema(metaDocument);
 
         return registry.register(TsonSchemaLinker.link(meta, registry)).schema();
     }

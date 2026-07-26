@@ -42,7 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * neitherRawNorLinkedBootstrapFormCanEverBeRegistered} below cover that rejection in both forms;
  * {@code registeringTheOrdinarilyResolvedNonBootstrapMetaKernelSucceeds} covers the one way
  * meta-kernel's own identity can actually end up registered -- resolved via ordinary {@code
- * TsonSchemaResolver.resolveSchema} (which never sets {@code bootstrap}), using the coordinator's own
+ * TsonSchemaResolver.resolveSchema} (which never sets {@code bootstrap}), using the loader's own
  * bootstrap branch as the structure-namespace ground truth, mirroring {@code
  * MetaTn1CompiledEndToEndTest#registerMeta}'s own pattern.
  */
@@ -124,7 +124,7 @@ class MetaKernelSchemaRegistryTest {
 
     /**
      * The one way meta-kernel's own identity can actually end up registered: resolved via ordinary
-     * {@code TsonSchemaResolver.resolveSchema} against a coordinator whose own bootstrap branch supplies the
+     * {@code TsonSchemaResolver.resolveSchema} against a loader whose own bootstrap branch supplies the
      * complete structure namespace (so even a forward-referencing declaration like {@code boolean =>
      * !enum [...]} resolves correctly, the same as {@code MetaKernelBootstrapResolver}'s own two-pass logic
      * achieves, just via the generic mechanism instead) -- {@code resolveSchema} never sets {@code
@@ -141,11 +141,11 @@ class MetaKernelSchemaRegistryTest {
         DataBindContext context = TsonAtomContext.defaultContext();
         TsonParserFactoryRegistry objectFactories = TsonObjectBinding.factoryRegistry(linkedBootstrap.schema(), context);
         TsonCompiledRegistry compiledRegistry = new TsonCompiledRegistry(objectFactories);
-        DefaultSchemaCoordinator coordinator = new DefaultSchemaCoordinator(compiledRegistry);
+        DefaultTsonCompiledSchemaLoader loader = new DefaultTsonCompiledSchemaLoader(compiledRegistry);
 
         String source = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID);
         SchemaDocument document = new TsonSchemaParser(source).parseSchemaDocument();
-        TsonSchema resolved = new TsonSchemaResolver(coordinator).resolveSchema(document);
+        TsonSchema resolved = new TsonSchemaResolver(loader).resolveSchema(document);
         assertFalse(resolved.bootstrap());
 
         TsonLinkedSchema registered = registry.register(TsonSchemaLinker.link(resolved, registry));

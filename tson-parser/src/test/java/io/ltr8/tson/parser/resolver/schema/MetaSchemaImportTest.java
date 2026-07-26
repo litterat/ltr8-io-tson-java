@@ -46,10 +46,10 @@ class MetaSchemaImportTest {
 
     /**
      * Deliberately still resolves via a bare {@link TsonSchemaResolver#resolveSchema(SchemaDocument)} call
-     * rather than {@link DefaultSchemaCoordinator#resolve(String)} -- this test wants meta.tn1's own
+     * rather than {@link DefaultTsonCompiledSchemaLoader#load(String)} -- this test wants meta.tn1's own
      * *raw, unregistered, local-only* result (31 entries, no merged imports) to exercise {@code
      * TsonSchemaRegistry#register}'s own import-merge itself, one stage later; {@code
-     * DefaultSchemaCoordinator#resolve} would register (and materialize/merge) it immediately as
+     * DefaultTsonCompiledSchemaLoader#load} would register (and materialize/merge) it immediately as
      * part of the same call, collapsing the two stages this test means to keep separate. {@link
      * BundledSchemaSource} is still reused here, just for the raw fetch, so this doesn't duplicate
      * its own classpath-reading logic -- the same reasoning that replaced the old, now-deleted
@@ -62,12 +62,12 @@ class MetaSchemaImportTest {
      * not -- see that method's own Javadoc). {@code registry.materializeBootstrap(...)} still runs
      * once, purely to get a genuinely materialized shape to build {@code
      * TsonObjectBinding.factoryRegistry(...)} against -- that value is never itself registered anywhere.
-     * The coordinator built from it then resolves meta-kernel's own document the ordinary way (its
+     * The loader built from it then resolves meta-kernel's own document the ordinary way (its
      * own bootstrap branch supplies the structure namespace, so even {@code boolean => !enum [...]}
      * resolves correctly despite the forward reference) -- that result carries no {@code bootstrap}
      * flag, so {@link TsonSchemaRegistry#register} accepts it, both into {@code registry} (permanently,
      * so meta.tn1's own {@code !!import} finds it below) and into {@code compiledRegistry} (so this
-     * coordinator's own cache has it too). Mirrors {@code MetaTn1CompiledEndToEndTest#registerMeta}'s
+     * loader's own cache has it too). Mirrors {@code MetaTn1CompiledEndToEndTest#registerMeta}'s
      * own pattern exactly.
      */
     private static TsonSchema parseMetaTn1(TsonSchemaRegistry registry) {
@@ -77,17 +77,17 @@ class MetaSchemaImportTest {
         DataBindContext context = TsonAtomContext.defaultContext();
         TsonParserFactoryRegistry objectFactories = TsonObjectBinding.factoryRegistry(materializedMetaKernelBootstrap.schema(), context);
         TsonCompiledRegistry compiledRegistry = new TsonCompiledRegistry(objectFactories);
-        DefaultSchemaCoordinator coordinator = new DefaultSchemaCoordinator(compiledRegistry);
+        DefaultTsonCompiledSchemaLoader loader = new DefaultTsonCompiledSchemaLoader(compiledRegistry);
 
         String metaKernelSource = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID);
         SchemaDocument metaKernelDocument = new TsonSchemaParser(metaKernelSource).parseSchemaDocument();
-        TsonSchema metaKernel = new TsonSchemaResolver(coordinator).resolveSchema(metaKernelDocument);
+        TsonSchema metaKernel = new TsonSchemaResolver(loader).resolveSchema(metaKernelDocument);
         TsonLinkedSchema metaKernelMaterialized = registry.register(TsonSchemaLinker.link(metaKernel, registry));
         compiledRegistry.register(metaKernelMaterialized.schema());
 
         String source = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_TN1_ID);
         SchemaDocument metaDocument = new TsonSchemaParser(source).parseSchemaDocument();
-        return new TsonSchemaResolver(coordinator).resolveSchema(metaDocument);
+        return new TsonSchemaResolver(loader).resolveSchema(metaDocument);
     }
 
     @Test

@@ -494,23 +494,23 @@ class's own `resolveSchema(SchemaDocument)`. That's a concrete sign "resolve one
 "resolve a whole document, given a way to fetch its governing meta-schema and imports" were two
 different jobs sharing one file, not one job with an optional dependency.
 
-- **`TsonSchemaResolver`** (public) now holds the `SchemaCoordinator` -- **required** in its
-  constructor, not optional (the old no-arg constructor, and the "coordinator may be `null`" branch
-  every coordinator-touching method used to carry, are both gone: a document-level resolution that
+- **`TsonSchemaResolver`** (public) now holds the `TsonCompiledSchemaLoader` -- **required** in its
+  constructor, not optional (the old no-arg constructor, and the "loader may be `null`" branch
+  every loader-touching method used to carry, are both gone: a document-level resolution that
   can't validate its own `!!id` or reach its own `!!meta` isn't a degraded version of this job, it's
   a different one). `resolveSchema(SchemaDocument)` -- header-directive validation (`!!id`/`!!import`),
   deriving the structure namespace via `compiledMetaSchema`, merging `!!import` entries via
-  `mergeImports` -- and the two-argument `compiledMetaSchema`/package-private `SchemaCoordinator`-
+  `mergeImports` -- and the two-argument `compiledMetaSchema`/package-private `TsonCompiledSchemaLoader`-
   consuming machinery are the only things left on it.
 - **`DefinitionResolver`** (package-private now, no `Tson` prefix -- internal machinery a consumer of
   this library never names directly, per "Naming convention" above) never references
-  `SchemaCoordinator` at all. Holds `resolve(SchemaMap.Declaration)`/`resolveBootstrapDefinition
+  `TsonCompiledSchemaLoader` at all. Holds `resolve(SchemaMap.Declaration)`/`resolveBootstrapDefinition
   (SchemaMap.Declaration, Map)`/`resolve(SchemaMap.Declaration, Map, Map)` (the declaration-level
   primitives) plus a batch `resolveSchema(SchemaDocument, Map)` convenience -- looping every
   declaration in a document with no validation and no import-merging, kept *here* rather than on
-  `TsonSchemaResolver` specifically because it needs no coordinator: tying it to the coordinator-
+  `TsonSchemaResolver` specifically because it needs no loader: tying it to the loader-
   *requiring* class would force a caller who already has a structure namespace in hand, but no real
-  coordinator, to fabricate one just to call it. `resolveBootstrapDefinition`'s own name still
+  loader, to fabricate one just to call it. `resolveBootstrapDefinition`'s own name still
   describes its real production caller (`MetaKernelBootstrapResolver`'s two-pass loop, one
   declaration at a time, in source order -- meta-kernel's own `!!meta` names itself, so it can never
   go through `resolveSchema` the ordinary way); test code resolving one hand-built declaration in
@@ -934,14 +934,14 @@ schema and gets back `EnumBody(members=["true", "false"])`, no exception. This a
 -- core.tn1's own local `boolean => !enum [true false]` redeclaration now resolves the same
 generic way. **`core.tn1`'s own current end-to-end declaration count is not pinned down by any
 test right now** -- `CoreTn1Parser`/`CoreTn1ParserTest`/`CoreTn1CompiledEndToEndTest` were all
-deleted the same day (superseded by `DefaultSchemaCoordinator`'s own generic path, "Compiled schema
+deleted the same day (superseded by `DefaultTsonCompiledSchemaLoader`'s own generic path, "Compiled schema
 registry" above), and nothing replaced their end-to-end coverage of resolving core.tn1's all 48
 declarations in one pass; re-verify with a throwaway probe (register meta-kernel ordinarily first,
-build object-mode factories from *its own* registered result, then `coordinator.resolve
+build object-mode factories from *its own* registered result, then `loader.load
 (BundledSchemaSource.CORE_TN1_ID)`) before relying on a specific count -- a first attempt at exactly
 this hit an `ObjectRecordShapeFactory` validation error compiling one of core.tn1's own transitively
 merged-in atom-constraint entries, not yet root-caused, and may be a genuine, currently-uncovered
-gap in the coordinator/compiled-registry path for a three-schema chain in object-binding mode, not
+gap in the loader/compiled-registry path for a three-schema chain in object-binding mode, not
 just a probe-script mistake.
 
 `duration` was a second real generic-binding failure until 2026-07-24, when `DurationType.min`/
@@ -1375,7 +1375,7 @@ deliberate, confirmed tradeoff rather than adding a module descriptor now.
   `mergeImports` is never reached for an empty `imports()` list regardless. `TsonSchemaRegistry
   #register` still refuses the result outright, since it's still `bootstrap() == true` — the one way
   meta-kernel's own identity ever actually gets registered is resolving its document a second time,
-  ordinarily (never setting `bootstrap`), against a coordinator seeded from the one-off linked
+  ordinarily (never setting `bootstrap`), against a loader seeded from the one-off linked
   bootstrap result (see "Meta-kernel bootstrap" below).
 - **`TsonSchemaRegistry`** — `register(TsonLinkedSchema)` computes the canonical identity from the
   wrapped schema's own `!!id` (throwing if absent), rejects the self-referential-bootstrap case
@@ -1386,7 +1386,7 @@ deliberate, confirmed tradeoff rather than adding a module descriptor now.
   store now — no linking convenience method of its own; see `TsonSchemaLinker.linkBootstrap` above
   for meta-kernel's own one-off case, which `register` still refuses regardless (still `bootstrap()
   == true`) — the one way meta-kernel's own identity ever actually gets registered is resolving its
-  document a second time, ordinarily (never setting `bootstrap`), against a coordinator seeded from
+  document a second time, ordinarily (never setting `bootstrap`), against a loader seeded from
   the one-off linked bootstrap result (see "Meta-kernel bootstrap" below).
 
 **Verified against the real fixture, not just hand-built schemas.** `MetaKernelSchemaRegistryTest`
@@ -1521,7 +1521,7 @@ governed by one of these reuses whatever's already sitting in the registry.
   hand-duplicated, byte-for-byte identical, across several test classes — all of them now call
   `TsonParserFactoryRegistry.dom()` directly instead of their own private `fullRegistry()` copy.
 - **Verified against real fixtures, not hand-built ones** — `MetaTn1CompiledEndToEndTest` loads
-  meta-kernel and meta.tn1 through a single `TsonCompiledRegistry`/`DefaultSchemaCoordinator` pair
+  meta-kernel and meta.tn1 through a single `TsonCompiledRegistry`/`DefaultTsonCompiledSchemaLoader` pair
   and compiles/reads against the result; several other tests (`TsonSchemaResolverCompiledMetaSchemaTest`,
   `MetaKernelSchemaRegistryTest`, `MetaSchemaImportTest`) exercise `TsonCompiledRegistry` the same
   way for their own scenarios.
@@ -1530,23 +1530,36 @@ governed by one of these reuses whatever's already sitting in the registry.
 version of the register-meta-kernel/meta.tn1/core.tn1 sequence (and where it should live) is still
 open.
 
-**`SchemaCoordinator`/`DefaultSchemaCoordinator`** (`tson-parser/src/main/java/io/ltr8/tson/parser/resolver/schema/{SchemaCoordinator,DefaultSchemaCoordinator,TsonSchemaSource}.java`,
+**`TsonCompiledSchemaLoader`/`DefaultTsonCompiledSchemaLoader`** (`tson-parser/src/main/java/io/ltr8/tson/parser/resolver/schema/{TsonCompiledSchemaLoader,DefaultTsonCompiledSchemaLoader,TsonSchemaSource}.java`,
 added 2026-07-25, replacing an earlier version of `TsonSchemaResolver`'s own constructor that took a bare
-`TsonCompiledRegistry` directly) — `TsonSchemaResolver` now holds a `SchemaCoordinator`, not a registry.
+`TsonCompiledRegistry` directly) — `TsonSchemaResolver` now holds a `TsonCompiledSchemaLoader`, not a registry.
 The reason a plain registry reference isn't enough: resolving *meta-kernel's own* document means
 resolving *its own* `!!meta`, which names itself (Part 2 §1.5's "one deliberate circularity"). A
 "look it up, throw if missing" registry has no way to close that loop on its own — it would need
-meta-kernel already registered before it could ever register meta-kernel. `SchemaCoordinator.resolve
+meta-kernel already registered before it could ever register meta-kernel. `TsonCompiledSchemaLoader.load
 (String uri)` is the fix: given any schema's URI, it returns a *compiled* reader, fetching/resolving/
 registering/compiling on demand rather than requiring everything to pre-exist.
 
-- **`DefaultSchemaCoordinator.resolve(uri)`** — three cases, in order: (1) already compiled?
+**Renamed from `SchemaCoordinator`/`DefaultSchemaCoordinator` (same-day follow-up, on the user's own
+explicit direction, after independently confirming the rename target from an earlier analysis:
+"Yes, rename to TsonCompiledSchemaLoader").** The old name didn't say what the interface actually
+returns (a compiled schema, given a URI) or read like anything else in this codebase's own
+`*Loader`/`*Source` vocabulary (`TsonSchemaLoader`, `TsonSchemaSource`). Every field/parameter/local
+previously named `coordinator` is now `loader`, matching `TsonSchemaLoader`'s own established
+variable-naming convention throughout this codebase.
+
+**The method itself, `resolve(String uri)`, was renamed to `load(String uri)` in a further same-day
+follow-up (the user's own direct edit)** -- once the interface itself was `*Loader`-named, `resolve`
+was the one thing left that didn't match `TsonSchemaLoader.load(String canonicalIdentity)`'s own
+sibling shape.
+
+- **`DefaultTsonCompiledSchemaLoader.load(uri)`** — three cases, in order: (1) already compiled?
   `registry.get(uri)` — a plain cache hit. (2) meta-kernel's own well-known identity
-  (`BundledSchemaSource.META_KERNEL_ID` — moved here from `DefaultSchemaCoordinator` itself
-  2026-07-26, so `BundledSchemaSource`, not the coordinator, owns "what URI does each of this
+  (`BundledSchemaSource.META_KERNEL_ID` — moved here from `DefaultTsonCompiledSchemaLoader` itself
+  2026-07-26, so `BundledSchemaSource`, not the loader, owns "what URI does each of this
   library's own bundled schemas live at")? Resolved via `MetaKernelBootstrapResolver.getMetaKernelSchema()`,
   linked one-off via `TsonSchemaLinker#linkBootstrap` (no registry involved at all), then compiled
-  directly — *never* through this same coordinator's own
+  directly — *never* through this same loader's own
   generic path in case (3), which would recurse forever (that path builds a `TsonSchemaResolver(this)`
   and resolves a document via `resolveSchema`, which itself calls back into `resolve` for *that*
   document's own `!!meta` target — fine for any real schema, wrong for meta-kernel specifically,
@@ -1554,7 +1567,7 @@ registering/compiling on demand rather than requiring everything to pre-exist.
   starts. Compared by exact string, not canonical identity (`CanonicalIdentity` stays
   internal-by-convention to `tson-schema`, same reasoning as `TsonCompiledRegistry`'s own raw-id
   keying) — a real, narrower guarantee, not an oversight. (3) otherwise, fetch `uri`'s own source
-  text via this coordinator's own `TsonSchemaSource`, parse it, resolve it via a fresh
+  text via this loader's own `TsonSchemaSource`, parse it, resolve it via a fresh
   `TsonSchemaResolver(this)` (so *that* document's own `!!meta`/`!!import` targets resolve the same way,
   recursively, cache-then-bootstrap-then-fetch all the way down), then register and compile the
   result — *this* result genuinely is cached (`TsonCompiledRegistry.register`), so the *next* request
@@ -1572,12 +1585,12 @@ registering/compiling on demand rather than requiring everything to pre-exist.
   meta-kernel (every real one does) still fails its own registration with `"!!import '...' is not
   registered"` unless meta-kernel has been registered *separately* first — `TsonSchemaLinker`'s own
   import-merging (run inside `TsonSchemaRegistry.register`) resolves an import via `TsonSchemaRegistry`'s own
-  registered-only `TsonSchemaLoader`, which knows nothing about this coordinator or its one-off bootstrap
+  registered-only `TsonSchemaLoader`, which knows nothing about this loader or its one-off bootstrap
   case. In practice, a caller resolving anything beyond meta-kernel itself must register meta-kernel
-  explicitly first — resolved *ordinarily* via `TsonSchemaResolver.resolveSchema` against a coordinator whose
+  explicitly first — resolved *ordinarily* via `TsonSchemaResolver.resolveSchema` against a loader whose
   own bootstrap branch supplies the structure namespace (never the raw/one-off bootstrap form
   directly — `TsonSchemaRegistry#register` refuses any self-referential schema with `bootstrap() == true`,
-  see "Schema registry" above) — before asking this coordinator for anything that transitively imports
+  see "Schema registry" above) — before asking this loader for anything that transitively imports
   it.
 - **`TsonSchemaSource`** — the pluggable fetch hook, and the natural home for the policy the user asked
   for explicitly: "we can control whitelists or blacklists for resolution... we don't allow HTTP
@@ -1586,27 +1599,27 @@ registering/compiling on demand rather than requiring everything to pre-exist.
   `TsonSchemaLoader`'s own precedent) — nothing is ever fetched from anywhere unless a caller opts in.
   `BundledSchemaSource` (below) is the one real implementation so far; a general disk/HTTP-backed
   `TsonSchemaSource` (with whatever whitelist/blacklist policy) is deliberately not built yet.
-- **`TsonSchemaResolver(SchemaCoordinator)`** replaces the earlier `TsonSchemaResolver(TsonCompiledRegistry)`
+- **`TsonSchemaResolver(TsonCompiledSchemaLoader)`** replaces the earlier `TsonSchemaResolver(TsonCompiledRegistry)`
   constructor. `compiledMetaSchema(SchemaDocument)` returns a plain `TsonCompiledSchema` (not an
-  `Optional`) and *throws* if it can't be resolved — with a real coordinator behind it, "not
-  available" is a genuine, nameable failure (the coordinator is supposed to make it available,
+  `Optional`) and *throws* if it can't be resolved — with a real loader behind it, "not
+  available" is a genuine, nameable failure (the loader is supposed to make it available,
   fetching/bootstrapping as needed), not a normal "maybe try again" outcome the way a bare registry
   miss used to be.
 
 **`resolveSchema(SchemaDocument)` validates `!!id`/`!!meta`/`!!import` and derives `structureNamespace`
-from the coordinator, when this resolver has one** — previously this method always resolved against
+from the loader, when this resolver has one** — previously this method always resolved against
 an empty structure namespace, regardless of what `!!meta` said, and never looked at `!!id` at all.
-Now, with a `SchemaCoordinator`, up front, before any declaration is resolved: (1) `document.id()`
+Now, with a `TsonCompiledSchemaLoader`, up front, before any declaration is resolved: (1) `document.id()`
 must be present — required by policy for a publishable schema (§2.2.1); (2) that `!!id` must be a
 well-formed canonical-identity candidate, via `TsonSchemaRegistry.validateIdentity(String)` (a thin,
 one-line public wrapper around `CanonicalIdentity.of`, so a caller outside `tson-schema` never has to
 reach into the internal-by-convention `registry` package directly just to run this one check); (3)
 every `!!import` URI is validated the same way; (4) `document.meta()` is resolved via
-`compiledMetaSchema` — fetched/bootstrapped/compiled by the coordinator if it wasn't already
+`compiledMetaSchema` — fetched/bootstrapped/compiled by the loader if it wasn't already
 available — and its entries become the structure namespace. (1) throws `IllegalStateException`; (2)/
 (3) throw `TsonSchemaValidationException` (the same exception `TsonSchemaRegistry.register` itself would
-eventually throw for the same reason, surfaced earlier); (4) throws whatever the coordinator itself
-throws. With no coordinator (the no-arg constructor), behavior is byte-for-byte unchanged.
+eventually throw for the same reason, surfaced earlier); (4) throws whatever the loader itself
+throws. With no loader (the no-arg constructor), behavior is byte-for-byte unchanged.
 
 **`!!import` is genuinely merged into the type-name namespace, not just validated** — unlike the
 structure namespace (`!!meta`, consulted only for constructor-application targets), an import's own
@@ -1617,8 +1630,8 @@ no fallback at all (confirmed by reading those methods directly: each does exact
 `TsonSchemaLinker`'s later, separate registration-time merge/collision-check pass — meta.tn1's own
 `date_type => ~atom & atom_specification & {...}`, composing with two meta-kernel entries it only has
 via its own `!!import`, would fail to resolve at all without them. `resolveSchema` resolves each import
-via the same `SchemaCoordinator`, merging its entries into a working namespace *before* any local
-declaration is resolved (`mergeImports`, a private helper), generalized to any coordinator-aware
+via the same `TsonCompiledSchemaLoader`, merging its entries into a working namespace *before* any local
+declaration is resolved (`mergeImports`, a private helper), generalized to any loader-aware
 resolver and any number of imports. Collision handling mirrors `TsonSchemaLinker.mergeImports`'s own
 established rule exactly: a name declared by more than one import, or by an import *and* a local
 declaration, throws `TsonSchemaValidationException` with the same wording, checked at the earliest point
@@ -1633,7 +1646,7 @@ Verified in `TsonSchemaResolverCompiledMetaSchemaTest` — small hand-built docu
 type-name namespace, not merely URI-validated (a bare reference wouldn't have proven this: §8.3 bare
 references carry an unverified name through regardless of whether it exists anywhere, composition's
 `resolved.get(name)` lookup is what actually needs the merge to have happened); both collision modes;
-id/import validation failures; and `!!meta` resolution failures. `DefaultSchemaCoordinator`'s own
+id/import validation failures; and `!!meta` resolution failures. `DefaultTsonCompiledSchemaLoader`'s own
 bootstrap behavior gets its own dedicated cases: resolving meta-kernel's own well-known identity from
 a completely empty registry completes (rather than recursing forever) and produces a genuinely usable,
 fully linked 58-entry compiled reader; a second request for the same identity returns a genuinely
@@ -1647,7 +1660,7 @@ directly too (accepts a well-formed candidate silently; rejects no-scheme and ca
 **A real, named layering exception, not an oversight.** Every other note about these two packages
 describes `resolver.schema.compiled` sitting *on top of* `resolver.schema`'s own resolution
 (`TsonCompiledSchema`'s own Javadoc: "sitting on top of `DefinitionResolver`'s own per-declaration
-resolution"). `SchemaCoordinator`/`DefaultSchemaCoordinator` (in `resolver.schema`, alongside
+resolution"). `TsonCompiledSchemaLoader`/`DefaultTsonCompiledSchemaLoader` (in `resolver.schema`, alongside
 `TsonSchemaResolver`) reach the opposite direction, importing `TsonCompiledRegistry`/`TsonCompiledSchema`/
 `TsonSchemaCompiler`/`TsonParserFactoryRegistry` from `resolver.schema.compiled` — the one place in
 `resolver.schema` that does. Not a cycle (nothing in `resolver.schema.compiled`'s own *main* code
@@ -1668,7 +1681,7 @@ own real, published `!!id`.
 
 **Replaces two now-deleted, standalone classes, `MetaTn1Parser`/`CoreTn1Parser`** — each used to
 hand-roll its own fetch-parse-resolve-register-compile sequence for one schema specifically; the
-general version of that sequence is exactly what `DefaultSchemaCoordinator#resolve(String)`'s own
+general version of that sequence is exactly what `DefaultTsonCompiledSchemaLoader#load(String)`'s own
 generic branch already does for *any* URI, given a `TsonSchemaSource` that knows how to fetch it. This
 class is that source for all three well-known identities — nothing more. A caller wanting meta.tn1's
 own compiled reader now does:
@@ -1679,28 +1692,28 @@ TsonSchemaRegistry schemaRegistry = new TsonSchemaRegistry();
 TsonLinkedSchema linkedMetaKernel = TsonSchemaLinker.linkBootstrap(metaKernel);
 TsonParserFactoryRegistry factories = TsonObjectBinding.factoryRegistry(linkedMetaKernel.schema(), context);
 TsonCompiledRegistry registry = new TsonCompiledRegistry(schemaRegistry, factories);
-DefaultSchemaCoordinator coordinator = new DefaultSchemaCoordinator(registry, BundledSchemaSource.INSTANCE);
+DefaultTsonCompiledSchemaLoader loader = new DefaultTsonCompiledSchemaLoader(registry, BundledSchemaSource.INSTANCE);
 
 // meta.tn1's own !!import needs meta-kernel present in the *shared* registry first -- resolve it
-// ordinarily (not the raw/linked bootstrap form) and register that, per the coordinator's own note
+// ordinarily (not the raw/linked bootstrap form) and register that, per the loader's own note
 // above on why the one-off bootstrap case alone doesn't satisfy import merging.
 SchemaDocument metaKernelDocument = new TsonSchemaParser(
         BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID)).parseSchemaDocument();
-TsonSchema resolvedMetaKernel = new TsonSchemaResolver(coordinator).resolveSchema(metaKernelDocument);
+TsonSchema resolvedMetaKernel = new TsonSchemaResolver(loader).resolveSchema(metaKernelDocument);
 registry.register(resolvedMetaKernel);
 
-TsonCompiledSchema meta = coordinator.resolve(BundledSchemaSource.META_TN1_ID);
-TsonCompiledSchema core = coordinator.resolve(BundledSchemaSource.CORE_TN1_ID); // needs meta.tn1 registered first, same reasoning
+TsonCompiledSchema meta = loader.load(BundledSchemaSource.META_TN1_ID);
+TsonCompiledSchema core = loader.load(BundledSchemaSource.CORE_TN1_ID); // needs meta.tn1 registered first, same reasoning
 ```
 
 **That `META_KERNEL_ID` entry in `RESOURCES` is still never actually reached through
-`DefaultSchemaCoordinator#resolve`**, though — that method special-cases it and resolves it via
+`DefaultTsonCompiledSchemaLoader#load`**, though — that method special-cases it and resolves it via
 `MetaKernelBootstrapResolver#getMetaKernelSchema()` directly, before this source's own `fetch` is ever consulted
 (see "Compiled schema registry" above for why: meta-kernel's `!!meta` names itself, and falling
 through to the generic fetch-then-`TsonSchemaResolver(this)` path would recurse forever). It's included
 here anyway so this class is a complete, uniform "fetch any of this library's own bundled schema
-documents" utility on its own terms, and safe for any *other* `SchemaCoordinator` implementation that
-doesn't special-case meta-kernel the way `DefaultSchemaCoordinator` does.
+documents" utility on its own terms, and safe for any *other* `TsonCompiledSchemaLoader` implementation that
+doesn't special-case meta-kernel the way `DefaultTsonCompiledSchemaLoader` does.
 
 ### Object-binding mode (`resolver/schema/compiled/RecordParser.java` + `parser/bind/{TsonObjectBinding,ObjectRecordShapeFactory,TsonTypeNameBinder,SchemaMetaTypeNameBinder}.java`)
 

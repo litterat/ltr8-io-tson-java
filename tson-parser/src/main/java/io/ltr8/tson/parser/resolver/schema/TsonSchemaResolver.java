@@ -16,14 +16,14 @@ import java.util.Objects;
 /**
  * Resolves a whole {@link SchemaDocument} into a {@link TsonSchema}: header-directive validation
  * ({@code !!id}/{@code !!import}), deriving the structure namespace from this resolver's own {@link
- * SchemaCoordinator}, merging {@code !!import} entries into the type-name namespace, and handing each
- * local declaration off to a {@link DefinitionResolver} for the actual, per-declaration resolution
- * work (Part 2 §4, §8's {@code type_definition} shape).
+ * TsonCompiledSchemaLoader}, merging {@code !!import} entries into the type-name namespace, and
+ * handing each local declaration off to a {@link DefinitionResolver} for the actual, per-declaration
+ * resolution work (Part 2 §4, §8's {@code type_definition} shape).
  *
- * <p>A {@link SchemaCoordinator} is required: a document-level resolution that can't validate its own
- * {@code !!id} or reach its own {@code !!meta} isn't a degraded version of this job, it's a different
- * one -- per-declaration resolution against a hand-built namespace, which is exactly what {@link
- * DefinitionResolver} is for directly.
+ * <p>A {@link TsonCompiledSchemaLoader} is required: a document-level resolution that can't validate
+ * its own {@code !!id} or reach its own {@code !!meta} isn't a degraded version of this job, it's a
+ * different one -- per-declaration resolution against a hand-built namespace, which is exactly what
+ * {@link DefinitionResolver} is for directly.
  *
  * <p>{@link #resolveSchema(SchemaDocument)} builds a fresh {@link DefinitionResolver} per call, not a
  * reused field, since a single instance of this class can resolve documents governed by *different*
@@ -35,36 +35,37 @@ import java.util.Objects;
  */
 public final class TsonSchemaResolver {
 
-    private final SchemaCoordinator coordinator;
+    private final TsonCompiledSchemaLoader loader;
 
     /**
-     * @param coordinator consulted by {@link #resolveSchema(SchemaDocument)} to resolve a document's
-     *                     own {@code !!meta}/{@code !!import} targets -- fetching, resolving,
-     *                     registering, and compiling each as needed rather than requiring them to
-     *                     already exist somewhere. Required.
+     * @param loader consulted by {@link #resolveSchema(SchemaDocument)} to resolve a document's own
+     *               {@code !!meta}/{@code !!import} targets -- fetching, resolving, registering, and
+     *               compiling each as needed rather than requiring them to already exist somewhere.
+     *               Required.
      *
-     *                     <p>Deliberately a {@link SchemaCoordinator}, not a bare {@code
-     *                     TsonCompiledRegistry} -- a plain "look it up, throw if missing" registry
-     *                     has no way to bootstrap meta-kernel's own document: resolving it means
-     *                     resolving *its own* {@code !!meta}, which names itself, so a registry-only
-     *                     resolver would need meta-kernel already registered before it could ever
-     *                     register meta-kernel. {@link SchemaCoordinator}'s own default
-     *                     implementation recognizes that one case and answers it directly (see
-     *                     {@link DefaultSchemaCoordinator}'s own Javadoc) instead of looping forever.
+     *               <p>Deliberately a {@link TsonCompiledSchemaLoader}, not a bare {@code
+     *               TsonCompiledRegistry} -- a plain "look it up, throw if missing" registry has no
+     *               way to bootstrap meta-kernel's own document: resolving it means resolving *its
+     *               own* {@code !!meta}, which names itself, so a registry-only resolver would need
+     *               meta-kernel already registered before it could ever register meta-kernel. {@link
+     *               TsonCompiledSchemaLoader}'s own default implementation recognizes that one case
+     *               and answers it directly (see {@link DefaultTsonCompiledSchemaLoader}'s own
+     *               Javadoc) instead of looping forever.
      */
-    public TsonSchemaResolver(SchemaCoordinator coordinator) {
-        this.coordinator = Objects.requireNonNull(coordinator, "coordinator");
+    public TsonSchemaResolver(TsonCompiledSchemaLoader loader) {
+        this.loader = Objects.requireNonNull(loader, "loader");
     }
 
     /**
      * The compiled form of {@code document}'s own governing meta-schema -- its {@code !!meta}
-     * target, resolved via this resolver's own {@link SchemaCoordinator}, fetched/bootstrapped/
+     * target, resolved via this resolver's own {@link TsonCompiledSchemaLoader}, fetched/bootstrapped/
      * compiled on demand if it wasn't already available, not merely a registry lookup.
      *
-     * <p>Throws, rather than returning empty, if it can't be resolved -- a {@link SchemaCoordinator}
-     * is *supposed* to make its target available (fetching/bootstrapping as needed); if it still
-     * can't, that is a real, nameable failure (see {@link SchemaCoordinator#resolve}'s own Javadoc
-     * for the possible causes), not a "maybe try again later."
+     * <p>Throws, rather than returning empty, if it can't be resolved -- a {@link
+     * TsonCompiledSchemaLoader} is *supposed* to make its target available (fetching/bootstrapping
+     * as needed); if it still can't, that is a real, nameable failure (see {@link
+     * TsonCompiledSchemaLoader#load}'s own Javadoc for the possible causes), not a "maybe try
+     * again later."
      *
      * <p>A same-module, cross-package reach from {@code resolver.schema} up into {@code
      * resolver.schema.compiled} -- worth naming plainly, since every other layering note in this
@@ -80,7 +81,7 @@ public final class TsonSchemaResolver {
      * DefinitionResolver}'s own Javadoc).
      */
     TsonCompiledSchema compiledMetaSchema(SchemaDocument document) {
-        return coordinator.resolve(document.meta());
+        return loader.load(document.meta());
     }
 
     /**
@@ -100,15 +101,15 @@ public final class TsonSchemaResolver {
      * IllegalStateException} (or, for (2), {@link TsonSchemaValidationException}, in an already-
      * established shape) naming the actual problem. {@code document.meta()} itself is then resolved
      * via {@link #compiledMetaSchema} -- fetched/bootstrapped/compiled by this resolver's own {@link
-     * SchemaCoordinator} if it wasn't already available, rather than requiring it to pre-exist --
-     * and its resolved entries become the structure namespace every declaration resolves against.
+     * TsonCompiledSchemaLoader} if it wasn't already available, rather than requiring it to pre-exist
+     * -- and its resolved entries become the structure namespace every declaration resolves against.
      *
      * <p><b>{@code !!import} is merged into the type-name namespace the same way</b> -- each import's
      * own URI is validated the same way {@code !!id} is, then resolved via the same {@link
-     * SchemaCoordinator} and its entries merged in, *before* any local declaration is resolved. This
-     * is genuinely required, not cosmetic: unlike the structure namespace (consulted only for
-     * constructor-application targets), an import's own entries feed the *type-name* namespace --
-     * the same {@code namespace} map (exposed to {@link DefinitionResolver} as {@code
+     * TsonCompiledSchemaLoader} and its entries merged in, *before* any local declaration is
+     * resolved. This is genuinely required, not cosmetic: unlike the structure namespace (consulted
+     * only for constructor-application targets), an import's own entries feed the *type-name*
+     * namespace -- the same {@code namespace} map (exposed to {@link DefinitionResolver} as {@code
      * namespace::get}) its own composition/refinement/atom-refinement resolution looks a
      * supertype/refinement-source straight up in, with no fallback of any kind. meta.tn1's own {@code
      * date_type => ~atom & atom_specification & {...}}, composing with two meta-kernel entries it
@@ -154,7 +155,7 @@ public final class TsonSchemaResolver {
     private Map<String, TypeDefinition> mergeImports(SchemaDocument document) {
         Map<String, TypeDefinition> merged = new LinkedHashMap<>();
         for (String importUri : document.imports()) {
-            TsonSchema imported = coordinator.resolve(importUri).schema();
+            TsonSchema imported = loader.load(importUri).schema();
             for (Map.Entry<String, TypeDefinition> entry : imported.entries().entrySet()) {
                 if (merged.containsKey(entry.getKey())) {
                     throw new TsonSchemaValidationException(

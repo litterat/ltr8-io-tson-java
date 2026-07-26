@@ -1,15 +1,14 @@
 package io.ltr8.tson.parser.resolver.schema;
 
 /**
- * Where a {@link SchemaCoordinator} gets a schema document's own raw source text from, for a URI
- * that isn't already registered/compiled and isn't meta-kernel's own pre-loaded bootstrap case --
- * the extension point the user asked for explicitly: "That co-ordinator will also be where we can
- * control whitelists or blacklists for resolution. It might be that we don't allow HTTP requests
- * and just load from disk or only HTTP requests to certain hosts." A caller wanting exactly that
- * policy implements this interface (e.g. checking {@code uri} against an allowed-host list before
- * ever opening a connection, or refusing any {@code http(s)} scheme outright and only reading from
- * a local classpath/filesystem location) and hands it to {@link
- * DefaultSchemaCoordinator#DefaultSchemaCoordinator(io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledRegistry,
+ * Where a {@link TsonCompiledSchemaLoader} gets a schema document's own raw source text from, for a
+ * URI that isn't already registered/compiled and isn't meta-kernel's own pre-loaded bootstrap case --
+ * the extension point for enforcing policy over what gets fetched from where (e.g. whitelisting/
+ * blacklisting hosts, or disk-only resolution). A caller wanting a specific policy implements this
+ * interface (e.g. checking {@code uri} against an allowed-host list before ever opening a
+ * connection, or refusing any {@code http(s)} scheme outright and only reading from a local
+ * classpath/filesystem location) and hands it to {@link
+ * DefaultTsonCompiledSchemaLoader#DefaultTsonCompiledSchemaLoader(io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledRegistry,
  * TsonSchemaSource)}.
  *
  * <p><b>{@link #registeredOnly()} is the default -- nothing is ever fetched.</b> Mirrors {@code
@@ -37,7 +36,7 @@ public interface TsonSchemaSource {
     /** Never fetches anything -- every call throws {@link IllegalStateException} naming {@code uri}. */
     static TsonSchemaSource registeredOnly() {
         return uri -> {
-            throw new IllegalStateException("'" + uri + "' is not registered, and this SchemaCoordinator has no "
+            throw new IllegalStateException("'" + uri + "' is not registered, and this loader has no "
                     + "fetch capability configured to load it from anywhere");
         };
     }

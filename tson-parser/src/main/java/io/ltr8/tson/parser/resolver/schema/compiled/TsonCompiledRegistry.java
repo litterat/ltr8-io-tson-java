@@ -58,7 +58,7 @@ public final class TsonCompiledRegistry {
         return schemaRegistry;
     }
 
-    /** The {@link TsonParserFactoryRegistry} every schema here is compiled with -- e.g. so a caller (such as {@code DefaultSchemaCoordinator}'s own meta-kernel bootstrap case) can compile a one-off reader with the same factories, without registering or caching it here. */
+    /** The {@link TsonParserFactoryRegistry} every schema here is compiled with -- e.g. so a caller (such as {@code DefaultTsonCompiledSchemaLoader}'s own meta-kernel bootstrap case) can compile a one-off reader with the same factories, without registering or caching it here. */
     public TsonParserFactoryRegistry factories() {
         return factories;
     }

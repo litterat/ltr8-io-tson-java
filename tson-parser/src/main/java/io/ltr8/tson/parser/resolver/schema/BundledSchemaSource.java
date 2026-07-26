@@ -16,7 +16,7 @@ import java.util.Map;
  * <p><b>Replaces the old, standalone {@code MetaTn1Parser}/{@code CoreTn1Parser} classes</b>
  * (deleted once this existed) -- each hand-rolled its own fetch-parse-resolve-register-compile
  * sequence for one schema specifically; the general version of that sequence is exactly what
- * {@link DefaultSchemaCoordinator#resolve(String)}'s own generic branch already does for *any*
+ * {@link DefaultTsonCompiledSchemaLoader#load(String)}'s own generic branch already does for *any*
  * URI, given a {@link TsonSchemaSource} that knows how to fetch it. This class is that source for all
  * three well-known identities -- nothing more. A caller wanting meta.tn1's own compiled reader now
  * does:
@@ -28,36 +28,34 @@ import java.util.Map;
  * TsonParserFactoryRegistry factories = TsonObjectBinding.factoryRegistry(materializedMetaKernel, context);
  * TsonCompiledRegistry registry = new TsonCompiledRegistry(schemaRegistry, factories);
  * registry.register(materializedMetaKernel); // meta.tn1's own !!import needs this present first --
- *                                             // see DefaultSchemaCoordinator's own Javadoc on why
- *                                             // the bootstrap case alone doesn't satisfy
+ *                                             // see DefaultTsonCompiledSchemaLoader's own Javadoc on
+ *                                             // why the bootstrap case alone doesn't satisfy
  *                                             // SchemaValidator's import merge. Registering the
  *                                             // already-materialized result, not the raw metaKernel
  *                                             // itself -- TsonSchemaRegistry.register refuses an
  *                                             // unmaterialized bootstrap schema outright (see its
  *                                             // own Javadoc).
- * DefaultSchemaCoordinator coordinator = new DefaultSchemaCoordinator(registry, BundledSchemaSource.INSTANCE);
- * TsonCompiledSchema meta = coordinator.resolve(BundledSchemaSource.META_TN1_ID);
- * TsonCompiledSchema core = coordinator.resolve(BundledSchemaSource.CORE_TN1_ID); // needs meta.tn1 registered first, same reasoning
+ * DefaultTsonCompiledSchemaLoader loader = new DefaultTsonCompiledSchemaLoader(registry, BundledSchemaSource.INSTANCE);
+ * TsonCompiledSchema meta = loader.load(BundledSchemaSource.META_TN1_ID);
+ * TsonCompiledSchema core = loader.load(BundledSchemaSource.CORE_TN1_ID); // needs meta.tn1 registered first, same reasoning
  * }</pre>
  *
- * <p><b>{@link #META_KERNEL_ID} is meta-kernel's own well-known identity -- the canonical
- * definition, moved here from {@code DefaultSchemaCoordinator} (2026-07-26, on the user's own
- * explicit direction)</b> so this class, not the coordinator, is the one place that owns "what URI
- * does each of this library's own bundled schemas live at." {@code DefaultSchemaCoordinator} no
- * longer declares its own copy -- it references this constant directly.
+ * <p><b>{@link #META_KERNEL_ID} is meta-kernel's own well-known identity</b> -- the canonical
+ * definition; {@code DefaultTsonCompiledSchemaLoader} references this constant directly rather than
+ * declaring its own copy.
  *
  * <p><b>That entry in {@link #RESOURCES} is still never actually reached through {@link
- * DefaultSchemaCoordinator#resolve(String)}</b>, though -- that method special-cases it and
- * resolves it via {@link MetaKernelBootstrapResolver#getMetaKernelSchema()} directly, before this source's
- * own {@link #fetch} is ever consulted (see that method's own Javadoc for why: meta-kernel's
+ * DefaultTsonCompiledSchemaLoader#load(String)}</b>, though -- that method special-cases it and
+ * resolves it via {@link MetaKernelBootstrapResolver#getMetaKernelSchema()} directly, before this
+ * source's own {@link #fetch} is ever consulted (see that method's own Javadoc for why: meta-kernel's
  * {@code !!meta} names itself, and falling through to the generic fetch-then-{@code
  * TsonSchemaResolver(this)} path would recurse forever). It's included here anyway so this class is a
  * complete, uniform "fetch any of this library's own bundled schema documents" utility on its own
  * terms -- useful directly (e.g. {@code BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource
  * .META_KERNEL_ID)}, to get meta-kernel's raw source text the same way {@link #META_TN1_ID}/
  * {@link #CORE_TN1_ID} already can be -- {@link MetaKernelBootstrapResolver#getMetaKernelSchema()} does
- * exactly this internally), and safe for any *other* {@link SchemaCoordinator} implementation that
- * doesn't special-case meta-kernel the way {@link DefaultSchemaCoordinator} does.
+ * exactly this internally), and safe for any *other* {@link TsonCompiledSchemaLoader} implementation
+ * that doesn't special-case meta-kernel the way {@link DefaultTsonCompiledSchemaLoader} does.
  */
 public final class BundledSchemaSource implements TsonSchemaSource {
 

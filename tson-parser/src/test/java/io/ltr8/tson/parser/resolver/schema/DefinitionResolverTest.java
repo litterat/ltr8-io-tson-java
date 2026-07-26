@@ -1286,7 +1286,7 @@ class DefinitionResolverTest {
      * {@code TsonParserFactoryRegistry} has a real, synthesized-entries-included schema to validate
      * against -- an unlinked meta-kernel would resolve {@code enum}'s own {@code members:
      * set<token>} field to the raw, wrong {@code set} declaration instead of a synthesized "array of
-     * token" entry, the same bug {@code DefaultSchemaCoordinator}'s own bootstrap had), then compiled.
+     * token" entry, the same bug {@code DefaultTsonCompiledSchemaLoader}'s own bootstrap had), then compiled.
      */
     private static TsonCompiledSchema metaKernelCompiled() {
         TsonSchema metaKernel = MetaKernelBootstrapResolver.getMetaKernelSchema();
@@ -1302,7 +1302,7 @@ class DefinitionResolverTest {
      * the raw bootstrap output ({@code TsonSchemaRegistry#register} refuses any self-referential
      * schema with {@code bootstrap() == true}, materialized or not -- see that method's own Javadoc)
      * -- mirrors {@code MetaTn1CompiledEndToEndTest#registerMeta}'s own pattern: a throwaway
-     * coordinator, built from the (never-persisted) materialized bootstrap
+     * loader, built from the (never-persisted) materialized bootstrap
      * output, resolves meta-kernel's own document the ordinary way (its own bootstrap branch
      * supplies the structure namespace, so even {@code boolean => !enum [...]} resolves correctly
      * despite the forward reference); that result carries no {@code bootstrap} flag, so it can
@@ -1315,12 +1315,12 @@ class DefinitionResolverTest {
         DataBindContext context = TsonAtomContext.defaultContext();
         TsonParserFactoryRegistry objectFactories = TsonObjectBinding.factoryRegistry(materializedMetaKernelBootstrap.schema(), context);
         TsonCompiledRegistry throwawayRegistry = new TsonCompiledRegistry(objectFactories);
-        DefaultSchemaCoordinator throwawayCoordinator =
-                new DefaultSchemaCoordinator(throwawayRegistry, BundledSchemaSource.INSTANCE);
+        DefaultTsonCompiledSchemaLoader throwawayLoader =
+                new DefaultTsonCompiledSchemaLoader(throwawayRegistry, BundledSchemaSource.INSTANCE);
 
         String metaKernelSource = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID);
         SchemaDocument metaKernelDocument = new TsonSchemaParser(metaKernelSource).parseSchemaDocument();
-        TsonSchema metaKernel = new TsonSchemaResolver(throwawayCoordinator).resolveSchema(metaKernelDocument);
+        TsonSchema metaKernel = new TsonSchemaResolver(throwawayLoader).resolveSchema(metaKernelDocument);
         registry.register(TsonSchemaLinker.link(metaKernel, registry)); // permanent, so meta.tn1's own !!import finds it below
         TsonCompiledSchema metaKernelParser = metaKernelCompiled();
 

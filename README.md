@@ -146,7 +146,7 @@ Resolving and linking a schema both need its own *governing* schema already comp
 constructor names like `!enum`/`!integer_type` against — including meta-kernel itself, whose own
 `!!meta` names *itself* (§1.5's "one deliberate circularity in the series"), closed by pre-loading a
 hand-written bootstrap (`MetaKernelBootstrapResolver`) rather than resolving it the ordinary way.
-Fetching/registering/compiling a governing schema on demand is what `SchemaCoordinator` exists for —
+Fetching/registering/compiling a governing schema on demand is what `TsonCompiledSchemaLoader` exists for —
 still evolving, so not detailed here; see [CLAUDE.md](CLAUDE.md#architecture) for the full pipeline
 walkthrough, including how meta-kernel/meta.tn1/core.tn1 are loaded and registered together today.
 

@@ -39,7 +39,7 @@ public final class TsonCompiledSchema {
         return parser;
     }
 
-    /** The resolved {@link TsonSchema} this was compiled from -- e.g. so a caller that only has a compiled reader (such as {@code SchemaCoordinator}) can still reach its own resolved {@code entries()} without a separate lookup. */
+    /** The resolved {@link TsonSchema} this was compiled from -- e.g. so a caller that only has a compiled reader (such as {@code TsonCompiledSchemaLoader}) can still reach its own resolved {@code entries()} without a separate lookup. */
     public TsonSchema schema() {
         return schema;
     }
