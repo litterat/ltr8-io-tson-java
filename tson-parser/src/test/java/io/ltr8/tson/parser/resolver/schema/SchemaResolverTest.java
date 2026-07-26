@@ -11,7 +11,7 @@ import io.ltr8.tson.parser.resolver.schema.compiled.TsonParserFactoryRegistry;
 import io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledRegistry;
 import io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledSchema;
 import io.ltr8.tson.parser.resolver.schema.compiled.TsonSchemaCompiler;
-import io.ltr8.tson.schema.LinkedTsonSchema;
+import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.registry.SchemaLinker;
 import io.ltr8.tson.schema.meta.ArrayBody;
@@ -1252,7 +1252,7 @@ class SchemaResolverTest {
     }
 
     /**
-     * Meta-kernel, *materialized* (a throwaway {@code SchemaRegistry}, purely so object mode's own
+     * Meta-kernel, *materialized* (a throwaway {@code TsonSchemaRegistry}, purely so object mode's own
      * {@code TsonParserFactoryRegistry} has a real, synthesized-entries-included schema to validate
      * against -- an unmaterialized meta-kernel would resolve {@code enum}'s own {@code members:
      * set<token>} field to the raw, wrong {@code set} declaration instead of a synthesized "array of
@@ -1260,7 +1260,7 @@ class SchemaResolverTest {
      */
     private static TsonCompiledSchema metaKernelCompiled() {
         TsonSchema metaKernel = MetaKernelParser.getMetaKernelSchema();
-        LinkedTsonSchema linked = new io.ltr8.tson.schema.SchemaRegistry().linkBootstrap(metaKernel);
+        TsonLinkedSchema linked = new io.ltr8.tson.schema.TsonSchemaRegistry().linkBootstrap(metaKernel);
         return compileAsMetaParser(linked.schema().entries());
     }
 
@@ -1269,7 +1269,7 @@ class SchemaResolverTest {
      * MetaSchemaImportTest} for the same, fully-verified pattern (31/31 declarations, validated).
      *
      * <p>Meta-kernel itself is registered via ordinary {@code SchemaResolver.resolveAll}, not the
-     * raw bootstrap output (2026-07-26, {@code SchemaRegistry#register} now refuses <i>any</i>
+     * raw bootstrap output (2026-07-26, {@code TsonSchemaRegistry#register} now refuses <i>any</i>
      * self-referential schema with {@code bootstrap() == true}, materialized or not -- see that
      * method's own Javadoc) -- mirrors {@code MetaTn1CompiledEndToEndTest#registerMeta}'s own
      * pattern: a throwaway coordinator, built from the (never-persisted) materialized bootstrap
@@ -1280,8 +1280,8 @@ class SchemaResolverTest {
      */
     private static TsonCompiledSchema metaTn1Compiled() throws IOException {
         TsonSchema metaKernelBootstrap = MetaKernelParser.getMetaKernelSchema();
-        io.ltr8.tson.schema.SchemaRegistry registry = new io.ltr8.tson.schema.SchemaRegistry();
-        LinkedTsonSchema materializedMetaKernelBootstrap = registry.linkBootstrap(metaKernelBootstrap);
+        io.ltr8.tson.schema.TsonSchemaRegistry registry = new io.ltr8.tson.schema.TsonSchemaRegistry();
+        TsonLinkedSchema materializedMetaKernelBootstrap = registry.linkBootstrap(metaKernelBootstrap);
         DataBindContext context = TsonAtomContext.defaultContext();
         TsonParserFactoryRegistry objectFactories = TsonParserFactoryRegistry.object(materializedMetaKernelBootstrap.schema(), context);
         TsonCompiledRegistry throwawayRegistry = new TsonCompiledRegistry(objectFactories);
@@ -1305,7 +1305,7 @@ class SchemaResolverTest {
             localOnly.put(declaration.name(), resolved);
         }
         TsonSchema meta = new TsonSchema(metaDoc.id().orElseThrow(), metaDoc.meta(), metaDoc.imports(), localOnly);
-        LinkedTsonSchema registeredMeta = registry.register(SchemaLinker.link(meta, registry));
+        TsonLinkedSchema registeredMeta = registry.register(SchemaLinker.link(meta, registry));
         return compileAsMetaParser(registeredMeta.schema().entries());
     }
 

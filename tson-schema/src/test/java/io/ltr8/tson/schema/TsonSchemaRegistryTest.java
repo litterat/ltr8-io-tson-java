@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class SchemaRegistryTest {
+class TsonSchemaRegistryTest {
 
     private static TsonSchema schemaWithGenericField() {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
@@ -33,27 +33,27 @@ class SchemaRegistryTest {
                 "https://example.test/meta.tn1", List.of(), entries);
     }
 
-    /** Every {@code register} call site needs a linked schema now -- see {@code SchemaRegistry}'s own Javadoc. */
-    private static LinkedTsonSchema linkedSchemaWithGenericField(SchemaRegistry registry) {
+    /** Every {@code register} call site needs a linked schema now -- see {@code TsonSchemaRegistry}'s own Javadoc. */
+    private static TsonLinkedSchema linkedSchemaWithGenericField(TsonSchemaRegistry registry) {
         return SchemaLinker.link(schemaWithGenericField(), registry);
     }
 
     @Test
     void registerRunsLinkingAndTheResultIsFindableByItsRawId() {
-        SchemaRegistry registry = new SchemaRegistry();
-        LinkedTsonSchema registered = registry.register(linkedSchemaWithGenericField(registry));
+        TsonSchemaRegistry registry = new TsonSchemaRegistry();
+        TsonLinkedSchema registered = registry.register(linkedSchemaWithGenericField(registry));
 
         // The generic field got materialized by SchemaLinker.link, before register was ever called.
         assertEquals(4, registered.schema().entries().size(), "one synthetic entry beyond the original three");
 
-        Optional<LinkedTsonSchema> found = registry.get("https://example.test/registry-test.tn1");
+        Optional<TsonLinkedSchema> found = registry.get("https://example.test/registry-test.tn1");
         assertTrue(found.isPresent());
         assertEquals(registered.schema().entries().keySet(), found.get().schema().entries().keySet());
     }
 
     @Test
     void aDifferentSchemeFindsTheSameRegisteredSchema() {
-        SchemaRegistry registry = new SchemaRegistry();
+        TsonSchemaRegistry registry = new TsonSchemaRegistry();
         registry.register(linkedSchemaWithGenericField(registry));
 
         assertTrue(registry.get("http://example.test/registry-test.tn1").isPresent());
@@ -61,7 +61,7 @@ class SchemaRegistryTest {
 
     @Test
     void getReturnsEmptyForAnUnregisteredIdentity() {
-        SchemaRegistry registry = new SchemaRegistry();
+        TsonSchemaRegistry registry = new TsonSchemaRegistry();
         assertFalse(registry.get("https://example.test/never-registered.tn1").isPresent());
     }
 
@@ -79,40 +79,40 @@ class SchemaRegistryTest {
 
     @Test
     void rejectsRegisteringTheSameIdentityTwice() {
-        SchemaRegistry registry = new SchemaRegistry();
+        TsonSchemaRegistry registry = new TsonSchemaRegistry();
         registry.register(linkedSchemaWithGenericField(registry));
 
-        assertThrows(SchemaValidationException.class,
+        assertThrows(TsonSchemaValidationException.class,
                 () -> registry.register(linkedSchemaWithGenericField(registry)));
     }
 
     @Test
     void rejectsRegisteringTheSameIdentityTwiceEvenUnderADifferentScheme() {
-        SchemaRegistry registry = new SchemaRegistry();
+        TsonSchemaRegistry registry = new TsonSchemaRegistry();
         registry.register(linkedSchemaWithGenericField(registry));
 
         TsonSchema sameIdentityDifferentScheme = new TsonSchema(
                 "http://example.test/registry-test.tn1", "https://example.test/meta.tn1",
                 List.of(), Map.of());
-        LinkedTsonSchema linked = SchemaLinker.link(sameIdentityDifferentScheme, registry);
+        TsonLinkedSchema linked = SchemaLinker.link(sameIdentityDifferentScheme, registry);
 
-        assertThrows(SchemaValidationException.class, () -> registry.register(linked));
+        assertThrows(TsonSchemaValidationException.class, () -> registry.register(linked));
     }
 
     @Test
     void validateIdentityAcceptsAWellFormedCandidateSilently() {
-        SchemaRegistry.validateIdentity("https://example.test/registry-test.tn1");
+        TsonSchemaRegistry.validateIdentity("https://example.test/registry-test.tn1");
         // No exception -- that's the whole assertion.
     }
 
     @Test
     void validateIdentityRejectsAUriWithNoScheme() {
-        assertThrows(SchemaValidationException.class, () -> SchemaRegistry.validateIdentity("registry-test.tn1"));
+        assertThrows(TsonSchemaValidationException.class, () -> TsonSchemaRegistry.validateIdentity("registry-test.tn1"));
     }
 
     @Test
     void validateIdentityRejectsAUriCarryingAPort() {
-        assertThrows(SchemaValidationException.class,
-                () -> SchemaRegistry.validateIdentity("https://example.test:8080/registry-test.tn1"));
+        assertThrows(TsonSchemaValidationException.class,
+                () -> TsonSchemaRegistry.validateIdentity("https://example.test:8080/registry-test.tn1"));
     }
 }

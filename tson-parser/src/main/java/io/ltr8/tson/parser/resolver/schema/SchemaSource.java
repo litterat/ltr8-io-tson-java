@@ -13,8 +13,8 @@ package io.ltr8.tson.parser.resolver.schema;
  * SchemaSource)}.
  *
  * <p><b>{@link #registeredOnly()} is the default -- nothing is ever fetched.</b> Mirrors {@code
- * SchemaRegistry}'s own no-arg-constructor default ("resolves an import only if it's already
- * registered -- nothing is ever fetched") and {@code SchemaLoader}'s own precedent for the same
+ * TsonSchemaRegistry}'s own no-arg-constructor default ("resolves an import only if it's already
+ * registered -- nothing is ever fetched") and {@code TsonSchemaLoader}'s own precedent for the same
  * reason: a real disk/HTTP-backed {@code SchemaSource} is deliberately not built yet (a separate,
  * later task -- see this project's own task list) rather than guessing at a policy shape nobody
  * asked for.

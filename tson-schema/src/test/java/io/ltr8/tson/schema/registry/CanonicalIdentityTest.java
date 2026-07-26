@@ -1,6 +1,6 @@
 package io.ltr8.tson.schema.registry;
 
-import io.ltr8.tson.schema.SchemaValidationException;
+import io.ltr8.tson.schema.TsonSchemaValidationException;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -28,38 +28,38 @@ class CanonicalIdentityTest {
 
     @Test
     void rejectsNonLowercaseHost() {
-        assertThrows(SchemaValidationException.class,
+        assertThrows(TsonSchemaValidationException.class,
                 () -> CanonicalIdentity.of("https://Tson.io/2026/32/m/meta-kernel.tn1"));
     }
 
     @Test
     void rejectsDotSegmentInPath() {
-        assertThrows(SchemaValidationException.class,
+        assertThrows(TsonSchemaValidationException.class,
                 () -> CanonicalIdentity.of("https://tson.io/2026/../m/meta-kernel.tn1"));
     }
 
     @Test
     void rejectsUserinfo() {
-        assertThrows(SchemaValidationException.class,
+        assertThrows(TsonSchemaValidationException.class,
                 () -> CanonicalIdentity.of("https://user@tson.io/2026/32/m/meta-kernel.tn1"));
     }
 
     @Test
     void rejectsExplicitPort() {
-        assertThrows(SchemaValidationException.class,
+        assertThrows(TsonSchemaValidationException.class,
                 () -> CanonicalIdentity.of("https://tson.io:443/2026/32/m/meta-kernel.tn1"));
     }
 
     @Test
     void rejectsFragment() {
-        assertThrows(SchemaValidationException.class,
+        assertThrows(TsonSchemaValidationException.class,
                 () -> CanonicalIdentity.of("https://tson.io/2026/32/m/meta-kernel.tn1#section"));
     }
 
     @Test
     void rejectsPercentEncodedUnreservedCharacter() {
         // %7E decodes to '~', an unreserved character -- MUST NOT be percent-encoded.
-        assertThrows(SchemaValidationException.class,
+        assertThrows(TsonSchemaValidationException.class,
                 () -> CanonicalIdentity.of("https://tson.io/2026/32/m/meta-kernel%7E.tn1"));
     }
 
@@ -72,13 +72,13 @@ class CanonicalIdentityTest {
 
     @Test
     void rejectsMissingScheme() {
-        assertThrows(SchemaValidationException.class,
+        assertThrows(TsonSchemaValidationException.class,
                 () -> CanonicalIdentity.of("tson.io/2026/32/m/meta-kernel.tn1"));
     }
 
     @Test
     void rejectsMissingHost() {
-        assertThrows(SchemaValidationException.class,
+        assertThrows(TsonSchemaValidationException.class,
                 () -> CanonicalIdentity.of("mailto:someone@example.com"));
     }
 }

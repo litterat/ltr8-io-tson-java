@@ -45,7 +45,7 @@ import java.util.Optional;
  * parser/resolver, the same shape as {@link TsonSchemaParser}/{@link SchemaResolver} -- {@link
  * #getMetaKernelSchema()} returns a freshly-built value rather than being one itself. Its own
  * output is resolved-but-not-yet-linked -- a caller links it (via {@code
- * SchemaRegistry#linkBootstrap}, never {@code SchemaRegistry#register} directly -- see that
+ * TsonSchemaRegistry#linkBootstrap}, never {@code TsonSchemaRegistry#register} directly -- see that
  * class's own Javadoc for why) and, separately, compiles it -- a distinct, later stage this class
  * has nothing to do with; see {@code SchemaLinker}/{@code TsonCompiledSchema}.
  *
@@ -111,7 +111,7 @@ public final class MetaKernelParser {
      * Parses and resolves meta-kernel's own real, bundled source text (see class Javadoc). The one
      * and only place in this codebase that ever constructs a {@link TsonSchema} with {@code
      * bootstrap: true} -- {@link TsonSchema#bootstrap()}'s own Javadoc explains why that matters:
-     * {@code SchemaRegistry.register}/{@code materializeBootstrap} both gate on it specifically so
+     * {@code TsonSchemaRegistry.register}/{@code materializeBootstrap} both gate on it specifically so
      * meta-kernel's own identity can only ever be registered by something that genuinely came from
      * here, not merely something shaped like it.
      */

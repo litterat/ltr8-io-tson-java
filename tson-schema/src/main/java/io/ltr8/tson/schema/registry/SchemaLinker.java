@@ -1,8 +1,8 @@
 package io.ltr8.tson.schema.registry;
 
-import io.ltr8.tson.schema.LinkedTsonSchema;
-import io.ltr8.tson.schema.SchemaLoader;
-import io.ltr8.tson.schema.SchemaValidationException;
+import io.ltr8.tson.schema.TsonLinkedSchema;
+import io.ltr8.tson.schema.TsonSchemaLoader;
+import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.BinaryType;
@@ -53,8 +53,8 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Turns a resolved-but-unlinked {@link TsonSchema} into a {@link LinkedTsonSchema} -- the "pass 2"
- * a schema goes through before {@code SchemaRegistry#register} will accept it (2026-07-27, renamed
+ * Turns a resolved-but-unlinked {@link TsonSchema} into a {@link TsonLinkedSchema} -- the "pass 2"
+ * a schema goes through before {@code TsonSchemaRegistry#register} will accept it (2026-07-27, renamed
  * from {@code SchemaValidator}/{@code validate} on the user's own explicit direction, borrowing
  * standard compiler vocabulary for the whole pipeline: parse -&gt; resolve -&gt; link -&gt; register
  * -&gt; compile -&gt; read). What it does hasn't changed, only what it's called and what it returns:
@@ -68,7 +68,7 @@ import java.util.Set;
  * actually resolves.
  *
  * <p><b>Genuinely public now, unlike its predecessor</b> -- {@code SchemaValidator} was "not part
- * of the public API," an implementation detail {@code SchemaRegistry#register} ran internally and
+ * of the public API," an implementation detail {@code TsonSchemaRegistry#register} ran internally and
  * nothing else was meant to call. Renaming it to a real pipeline-stage name changes that on
  * purpose: {@code link} is now something a caller orchestrating the pipeline calls directly and
  * deliberately, same as {@code parse}/{@code resolve}/{@code compile} -- including from *other*
@@ -121,7 +121,7 @@ public final class SchemaLinker {
     private SchemaLinker() {
     }
 
-    public static LinkedTsonSchema link(TsonSchema schema, SchemaLoader loader) {
+    public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader) {
         Map<String, TypeDefinition> merged = mergeImports(schema.imports(), loader);
 
         // Full lookup namespace for materialization's own constructor lookups (see #instantiate) --
@@ -160,7 +160,7 @@ public final class SchemaLinker {
 
         for (Map.Entry<String, TypeDefinition> entry : schema.entries().entrySet()) {
             if (merged.containsKey(entry.getKey())) {
-                throw new SchemaValidationException(
+                throw new TsonSchemaValidationException(
                         "'" + entry.getKey() + "' collides with an entry of the same name brought in by !!import");
             }
             TypeDefinition def = entry.getValue();
@@ -178,7 +178,7 @@ public final class SchemaLinker {
             validateEntry(entry.getKey(), entry.getValue(), merged, structureNamespace);
         }
 
-        return new LinkedTsonSchema(new TsonSchema(schema.id(), schema.meta(), schema.imports(), merged, schema.bootstrap()));
+        return new TsonLinkedSchema(new TsonSchema(schema.id(), schema.meta(), schema.imports(), merged, schema.bootstrap()));
     }
 
     // ── Subtypes (reverse index) ─────────────────────────────────────────
@@ -241,15 +241,15 @@ public final class SchemaLinker {
      * Stage 1: every {@code !!import}'s own entries, in declaration order, brought in as-is
      * (§2.2.3's "merged entries keep their home namespace" -- no re-resolution here).
      */
-    private static Map<String, TypeDefinition> mergeImports(List<String> imports, SchemaLoader loader) {
+    private static Map<String, TypeDefinition> mergeImports(List<String> imports, TsonSchemaLoader loader) {
         Map<String, TypeDefinition> merged = new LinkedHashMap<>();
         for (String importUri : imports) {
             String importIdentity = CanonicalIdentity.of(importUri);
-            LinkedTsonSchema imported = loader.load(importIdentity).orElseThrow(() -> new SchemaValidationException(
+            TsonLinkedSchema imported = loader.load(importIdentity).orElseThrow(() -> new TsonSchemaValidationException(
                     "!!import '" + importUri + "' is not registered"));
             for (Map.Entry<String, TypeDefinition> entry : imported.schema().entries().entrySet()) {
                 if (merged.containsKey(entry.getKey())) {
-                    throw new SchemaValidationException(
+                    throw new TsonSchemaValidationException(
                             "'" + entry.getKey() + "' is declared by more than one !!import");
                 }
                 merged.put(entry.getKey(), entry.getValue());
@@ -502,12 +502,12 @@ public final class SchemaLinker {
         }
         for (String supertype : def.supertypes()) {
             if (!namespace.containsKey(supertype)) {
-                throw new SchemaValidationException("'" + name + "' has an unresolved supertype '" + supertype + "'");
+                throw new TsonSchemaValidationException("'" + name + "' has an unresolved supertype '" + supertype + "'");
             }
         }
         for (String subtype : def.subtypes()) {
             if (!namespace.containsKey(subtype)) {
-                throw new SchemaValidationException("'" + name + "' has an unresolved subtype '" + subtype + "'");
+                throw new TsonSchemaValidationException("'" + name + "' has an unresolved subtype '" + subtype + "'");
             }
         }
         validateBody(name, def.body(), namespace, def.parameters());
@@ -519,7 +519,7 @@ public final class SchemaLinker {
             case RecordBody r -> {
                 for (String supertype : r.supertypes()) {
                     if (!namespace.containsKey(supertype)) {
-                        throw new SchemaValidationException(
+                        throw new TsonSchemaValidationException(
                                 "'" + entryName + "' has an unresolved supertype '" + supertype + "'");
                     }
                 }
@@ -530,7 +530,7 @@ public final class SchemaLinker {
                 for (FieldGroup group : r.groups()) {
                     for (String member : group.members()) {
                         if (r.fields().stream().noneMatch(f -> f.name().equals(member))) {
-                            throw new SchemaValidationException(
+                            throw new TsonSchemaValidationException(
                                     "'" + entryName + "' has a field group referencing unknown field '" + member + "'");
                         }
                     }
@@ -620,7 +620,7 @@ public final class SchemaLinker {
     private static void validateTypeRef(TypeRef ref, Map<String, TypeDefinition> namespace, List<String> ownParameters,
                                          String context) {
         if (!namespace.containsKey(ref.name()) && !ownParameters.contains(ref.name())) {
-            throw new SchemaValidationException(context + " has an unresolved reference '" + ref.name() + "'");
+            throw new TsonSchemaValidationException(context + " has an unresolved reference '" + ref.name() + "'");
         }
         for (TypeArgument arg : ref.arguments()) {
             if (arg instanceof TypeArgument.Ref nested) {

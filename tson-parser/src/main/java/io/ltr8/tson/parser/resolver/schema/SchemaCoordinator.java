@@ -31,7 +31,7 @@ public interface SchemaCoordinator {
      *                          bootstrap case, and either not fetchable or invalid once fetched (a
      *                          malformed {@code !!id}, an unresolvable reference, ...). The specific
      *                          type depends on where resolution failed -- {@code
-     *                          SchemaValidationException}, an {@code IllegalStateException} from
+     *                          TsonSchemaValidationException}, an {@code IllegalStateException} from
      *                          {@link SchemaSource#registeredOnly()}, or whatever a caller-supplied
      *                          {@link SchemaSource} itself throws.
      */

@@ -6,10 +6,10 @@ import io.ltr8.tson.parser.ast.schema.SchemaDocument;
 import io.ltr8.tson.parser.resolver.TsonAtomContext;
 import io.ltr8.tson.parser.resolver.schema.compiled.TsonParserFactoryRegistry;
 import io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledRegistry;
-import io.ltr8.tson.schema.LinkedTsonSchema;
+import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.SchemaRegistry;
-import io.ltr8.tson.schema.SchemaValidationException;
+import io.ltr8.tson.schema.TsonSchemaRegistry;
+import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -26,17 +26,17 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Proves {@code SchemaRegistry}/{@code SchemaLinker} (both in {@code tson-schema}) actually work
+ * Proves {@code TsonSchemaRegistry}/{@code SchemaLinker} (both in {@code tson-schema}) actually work
  * end-to-end against the real {@code meta-kernel.tn1} fixture -- this test lives here, not in
  * {@code tson-schema}'s own test tree, because it's the only module with both {@link
  * MetaKernelParser} and {@code tson-schema} available (that module has no dependency on {@code
  * tson-parser} at all).
  *
- * <p>Uses {@link SchemaRegistry#linkBootstrap}, not {@link SchemaLinker#link} directly, to turn
- * the raw bootstrap output into a usable {@link LinkedTsonSchema} -- {@code register} refuses
- * <i>any</i> self-referential {@link LinkedTsonSchema} whose {@code schema().bootstrap() ==
+ * <p>Uses {@link TsonSchemaRegistry#linkBootstrap}, not {@link SchemaLinker#link} directly, to turn
+ * the raw bootstrap output into a usable {@link TsonLinkedSchema} -- {@code register} refuses
+ * <i>any</i> self-referential {@link TsonLinkedSchema} whose {@code schema().bootstrap() ==
  * true}, no matter how it got linked (tightened 2026-07-27, on the user's own explicit direction,
- * from an earlier version that only rejected the unlinked form -- see {@code SchemaRegistry}'s own
+ * from an earlier version that only rejected the unlinked form -- see {@code TsonSchemaRegistry}'s own
  * Javadoc). {@code registeringTheRawBootstrapMetaKernelDirectlyIsRejected} and {@code
  * neitherRawNorLinkedBootstrapFormCanEverBeRegistered} below cover that rejection in both forms;
  * {@code registeringTheOrdinarilyResolvedNonBootstrapMetaKernelSucceeds} covers the one way
@@ -50,9 +50,9 @@ class MetaKernelSchemaRegistryTest {
     @Test
     void linksTheRealMetaKernelSchemaSynthesizingEveryGenericFieldTypeRef() {
         TsonSchema raw = MetaKernelParser.getMetaKernelSchema();
-        SchemaRegistry registry = new SchemaRegistry();
+        TsonSchemaRegistry registry = new TsonSchemaRegistry();
 
-        LinkedTsonSchema linked = registry.linkBootstrap(raw);
+        TsonLinkedSchema linked = registry.linkBootstrap(raw);
 
         // 49 real declarations + one synthetic entry per distinct argument-bearing application:
         // enum's own `members: set<token>`, plus one `array<X>` per distinct X used through §5.3's
@@ -83,24 +83,24 @@ class MetaKernelSchemaRegistryTest {
 
     /**
      * The raw bootstrap output, wrapped (not genuinely linked -- {@code register} only takes a
-     * {@link LinkedTsonSchema} now, so there's no other way to even attempt this) is refused --
+     * {@link TsonLinkedSchema} now, so there's no other way to even attempt this) is refused --
      * meta-kernel's own {@code !!meta} names itself, so nothing can resolve it the ordinary way,
      * and this form specifically is still 49 entries, not the 58 a genuinely linked meta-kernel
      * needs.
      */
     @Test
     void registeringTheRawBootstrapMetaKernelDirectlyIsRejected() {
-        SchemaRegistry registry = new SchemaRegistry();
-        LinkedTsonSchema unlinked = new LinkedTsonSchema(MetaKernelParser.getMetaKernelSchema());
+        TsonSchemaRegistry registry = new TsonSchemaRegistry();
+        TsonLinkedSchema unlinked = new TsonLinkedSchema(MetaKernelParser.getMetaKernelSchema());
 
-        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
                 () -> registry.register(unlinked));
         assertTrue(thrown.getMessage().contains("bootstrap"));
     }
 
     /**
      * {@code linked-ness} alone used to be what let a bootstrap-flagged schema through {@link
-     * SchemaRegistry#register} (back when it was a runtime {@code materialised} flag) -- no
+     * TsonSchemaRegistry#register} (back when it was a runtime {@code materialised} flag) -- no
      * longer: the guard now rejects *any* self-referential schema with {@code bootstrap() ==
      * true}, genuinely linked or not. Confirmed directly here, not just implied by {@code
      * registeringTheRawBootstrapMetaKernelDirectlyIsRejected}'s own (unlinked-only) case.
@@ -108,8 +108,8 @@ class MetaKernelSchemaRegistryTest {
     @Test
     void neitherRawNorLinkedBootstrapFormCanEverBeRegistered() {
         TsonSchema raw = MetaKernelParser.getMetaKernelSchema();
-        SchemaRegistry registry = new SchemaRegistry();
-        LinkedTsonSchema linked = registry.linkBootstrap(raw);
+        TsonSchemaRegistry registry = new TsonSchemaRegistry();
+        TsonLinkedSchema linked = registry.linkBootstrap(raw);
 
         assertTrue(raw.bootstrap());
         assertTrue(linked.schema().bootstrap());
@@ -118,8 +118,8 @@ class MetaKernelSchemaRegistryTest {
         assertEquals(49, raw.entries().size());
         assertEquals(58, linked.schema().entries().size(), "genuinely linked -- synthesized entries present");
 
-        assertThrows(SchemaValidationException.class, () -> registry.register(new LinkedTsonSchema(raw)));
-        assertThrows(SchemaValidationException.class, () -> registry.register(linked));
+        assertThrows(TsonSchemaValidationException.class, () -> registry.register(new TsonLinkedSchema(raw)));
+        assertThrows(TsonSchemaValidationException.class, () -> registry.register(linked));
     }
 
     /**
@@ -128,15 +128,15 @@ class MetaKernelSchemaRegistryTest {
      * complete structure namespace (so even a forward-referencing declaration like {@code boolean =>
      * !enum [...]} resolves correctly, the same as {@code MetaKernelParser}'s own two-pass logic
      * achieves, just via the generic mechanism instead) -- {@code resolveAll} never sets {@code
-     * bootstrap}, so the result passes {@link SchemaRegistry#register}'s guard even though its own
+     * bootstrap}, so the result passes {@link TsonSchemaRegistry#register}'s guard even though its own
      * entries are identical to the real, linked meta-kernel. Mirrors {@code
      * MetaTn1CompiledEndToEndTest#registerMeta}'s own pattern, scoped down to meta-kernel alone.
      */
     @Test
     void registeringTheOrdinarilyResolvedNonBootstrapMetaKernelSucceeds() {
         TsonSchema metaKernelBootstrap = MetaKernelParser.getMetaKernelSchema();
-        SchemaRegistry registry = new SchemaRegistry();
-        LinkedTsonSchema linkedBootstrap = registry.linkBootstrap(metaKernelBootstrap);
+        TsonSchemaRegistry registry = new TsonSchemaRegistry();
+        TsonLinkedSchema linkedBootstrap = registry.linkBootstrap(metaKernelBootstrap);
 
         DataBindContext context = TsonAtomContext.defaultContext();
         TsonParserFactoryRegistry objectFactories = TsonParserFactoryRegistry.object(linkedBootstrap.schema(), context);
@@ -148,8 +148,8 @@ class MetaKernelSchemaRegistryTest {
         TsonSchema resolved = new SchemaResolver(coordinator).resolveAll(document);
         assertFalse(resolved.bootstrap());
 
-        LinkedTsonSchema registered = registry.register(SchemaLinker.link(resolved, registry));
+        TsonLinkedSchema registered = registry.register(SchemaLinker.link(resolved, registry));
         assertEquals(58, registered.schema().entries().size());
-        assertThrows(SchemaValidationException.class, () -> registry.register(registered));
+        assertThrows(TsonSchemaValidationException.class, () -> registry.register(registered));
     }
 }

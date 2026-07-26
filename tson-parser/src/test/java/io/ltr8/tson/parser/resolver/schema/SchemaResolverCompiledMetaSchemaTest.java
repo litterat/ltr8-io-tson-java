@@ -8,10 +8,10 @@ import io.ltr8.tson.parser.resolver.TsonAtomContext;
 import io.ltr8.tson.parser.resolver.schema.compiled.TsonParserFactoryRegistry;
 import io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledRegistry;
 import io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledSchema;
-import io.ltr8.tson.schema.LinkedTsonSchema;
+import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.SchemaRegistry;
-import io.ltr8.tson.schema.SchemaValidationException;
+import io.ltr8.tson.schema.TsonSchemaRegistry;
+import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.Unit;
 import org.junit.jupiter.api.Test;
@@ -43,7 +43,7 @@ class SchemaResolverCompiledMetaSchemaTest {
      * longer be loaded via a bare DOM-mode registry -- its own Instance declarations (e.g. {@code
      * binary_encoding => !enum [...]}) go through {@code resolveInstance}/{@code bindAtomInstance}
      * just like any other schema's. Materialize meta-kernel through a throwaway {@code
-     * SchemaRegistry} first (object mode's own {@code TsonParserFactoryRegistry} needs a materialized
+     * TsonSchemaRegistry} first (object mode's own {@code TsonParserFactoryRegistry} needs a materialized
      * schema to validate against up front), build the object-mode registry from it, pre-register
      * meta-kernel so the coordinator's own bootstrap special-case is never reached, then resolve
      * meta.tn1 itself via {@link BundledSchemaSource} -- {@link DefaultSchemaCoordinator#resolve}'s
@@ -51,19 +51,19 @@ class SchemaResolverCompiledMetaSchemaTest {
      * now-deleted {@code MetaTn1Parser} was exactly that duplicate; this is what replaced it).
      *
      * <p><b>Meta-kernel itself is pre-registered via ordinary {@code SchemaResolver.resolveAll}, not
-     * the raw bootstrap output</b> (2026-07-26, {@code SchemaRegistry#register} now refuses <i>any</i>
+     * the raw bootstrap output</b> (2026-07-26, {@code TsonSchemaRegistry#register} now refuses <i>any</i>
      * self-referential schema with {@code bootstrap() == true}, materialized or not -- see that
      * method's own Javadoc). {@code linkBootstrap(...)} still runs once, purely to get a
      * genuinely materialized shape to build {@code TsonParserFactoryRegistry.object(...)} against -- that
      * value itself is never registered. The coordinator built from it then resolves meta-kernel's own
      * document the ordinary way (its own bootstrap branch supplies the structure namespace, so even
      * {@code boolean => !enum [...]} resolves correctly despite the forward reference); that result
-     * carries no {@code bootstrap} flag, so {@link SchemaRegistry#register} accepts it. Mirrors
+     * carries no {@code bootstrap} flag, so {@link TsonSchemaRegistry#register} accepts it. Mirrors
      * {@code MetaTn1CompiledEndToEndTest#registerMeta}'s own pattern.
      */
     private static DefaultSchemaCoordinator loadMetaKernelAndMeta() {
         TsonSchema metaKernelBootstrap = MetaKernelParser.getMetaKernelSchema();
-        LinkedTsonSchema materializedMetaKernelBootstrap = new SchemaRegistry().linkBootstrap(metaKernelBootstrap);
+        TsonLinkedSchema materializedMetaKernelBootstrap = new TsonSchemaRegistry().linkBootstrap(metaKernelBootstrap);
         DataBindContext context = TsonAtomContext.defaultContext();
         TsonParserFactoryRegistry objectFactories = TsonParserFactoryRegistry.object(materializedMetaKernelBootstrap.schema(), context);
 
@@ -91,7 +91,7 @@ class SchemaResolverCompiledMetaSchemaTest {
      */
     private static TsonSchema resolveMetaKernelOrdinarily() {
         TsonSchema metaKernelBootstrap = MetaKernelParser.getMetaKernelSchema();
-        LinkedTsonSchema materializedMetaKernelBootstrap = new SchemaRegistry().linkBootstrap(metaKernelBootstrap);
+        TsonLinkedSchema materializedMetaKernelBootstrap = new TsonSchemaRegistry().linkBootstrap(metaKernelBootstrap);
         DataBindContext context = TsonAtomContext.defaultContext();
         TsonParserFactoryRegistry objectFactories = TsonParserFactoryRegistry.object(materializedMetaKernelBootstrap.schema(), context);
         TsonCompiledRegistry throwawayRegistry = new TsonCompiledRegistry(objectFactories);
@@ -252,8 +252,8 @@ class SchemaResolverCompiledMetaSchemaTest {
         SchemaDocument malformedIdDocument = new TsonSchemaParser(MINI_DOCUMENT_MALFORMED_ID).parseSchemaDocument();
 
         // "mini.tn1" alone is a syntactically valid relative-reference URI, but has no scheme --
-        // CanonicalIdentity.of's own rejection, surfaced here via SchemaRegistry.validateIdentity.
-        assertThrows(SchemaValidationException.class, () -> resolver.resolveAll(malformedIdDocument));
+        // CanonicalIdentity.of's own rejection, surfaced here via TsonSchemaRegistry.validateIdentity.
+        assertThrows(TsonSchemaValidationException.class, () -> resolver.resolveAll(malformedIdDocument));
     }
 
     private static final String MINI_DOCUMENT_MALFORMED_IMPORT = """
@@ -272,7 +272,7 @@ class SchemaResolverCompiledMetaSchemaTest {
 
         assertEquals(1, malformedImportDocument.imports().size());
         // "meta-kernel.tn1" alone is a syntactically valid relative-reference URI, but has no scheme.
-        assertThrows(SchemaValidationException.class, () -> resolver.resolveAll(malformedImportDocument));
+        assertThrows(TsonSchemaValidationException.class, () -> resolver.resolveAll(malformedImportDocument));
     }
 
     private static final String MINI_DOCUMENT_IMPORT_MERGED = """
@@ -319,8 +319,8 @@ class SchemaResolverCompiledMetaSchemaTest {
         SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
         SchemaDocument miniDocument = new TsonSchemaParser(MINI_DOCUMENT_IMPORT_COLLIDES_WITH_LOCAL).parseSchemaDocument();
 
-        SchemaValidationException thrown = assertThrows(
-                SchemaValidationException.class, () -> resolver.resolveAll(miniDocument));
+        TsonSchemaValidationException thrown = assertThrows(
+                TsonSchemaValidationException.class, () -> resolver.resolveAll(miniDocument));
         assertTrue(thrown.getMessage().contains("void"));
         assertTrue(thrown.getMessage().contains("!!import"));
     }
@@ -343,8 +343,8 @@ class SchemaResolverCompiledMetaSchemaTest {
         SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
         SchemaDocument miniDocument = new TsonSchemaParser(MINI_DOCUMENT_TWO_IMPORTS_COLLIDE).parseSchemaDocument();
 
-        SchemaValidationException thrown = assertThrows(
-                SchemaValidationException.class, () -> resolver.resolveAll(miniDocument));
+        TsonSchemaValidationException thrown = assertThrows(
+                TsonSchemaValidationException.class, () -> resolver.resolveAll(miniDocument));
         assertTrue(thrown.getMessage().contains("more than one !!import"));
     }
 
@@ -362,7 +362,7 @@ class SchemaResolverCompiledMetaSchemaTest {
         TsonCompiledSchema compiled = coordinator.resolve(BundledSchemaSource.META_KERNEL_ID);
 
         // 58, matching a genuinely registered meta-kernel: the one-off bootstrap runs
-        // MetaKernelParser's own raw output through a fresh, throwaway SchemaRegistry (discarded
+        // MetaKernelParser's own raw output through a fresh, throwaway TsonSchemaRegistry (discarded
         // immediately after, never the shared registry this coordinator wraps) purely so
         // SchemaValidator's own materialization step -- which synthesizes 9 extra entries for
         // argument-bearing type-refs, e.g. enum's own "members: set<token>" -- runs before
@@ -409,20 +409,20 @@ class SchemaResolverCompiledMetaSchemaTest {
         // own !!import of meta-kernel is merged twice over, by two different mechanisms --
         // SchemaResolver's own resolution-time merge (which goes through this coordinator, so the
         // one-off bootstrap alone would satisfy it) *and* SchemaValidator's own registration-time
-        // merge (run inside SchemaRegistry#register, via its own registered-only SchemaLoader,
+        // merge (run inside TsonSchemaRegistry#register, via its own registered-only TsonSchemaLoader,
         // which knows nothing about this coordinator or its bootstrap case). The one-off bootstrap
-        // is never registered into SchemaRegistry (see the "never caches" test above), so without
+        // is never registered into TsonSchemaRegistry (see the "never caches" test above), so without
         // this explicit step, registering meta.tn1 would fail validation with "!!import '...' is
         // not registered" even though resolution itself succeeded.
         TsonSchema metaKernelBootstrap = MetaKernelParser.getMetaKernelSchema();
-        LinkedTsonSchema materializedMetaKernelBootstrap = new SchemaRegistry().linkBootstrap(metaKernelBootstrap);
+        TsonLinkedSchema materializedMetaKernelBootstrap = new TsonSchemaRegistry().linkBootstrap(metaKernelBootstrap);
         TsonParserFactoryRegistry objectFactories =
                 TsonParserFactoryRegistry.object(materializedMetaKernelBootstrap.schema(), TsonAtomContext.defaultContext());
         TsonCompiledRegistry registry = new TsonCompiledRegistry(objectFactories);
         DefaultSchemaCoordinator coordinator = new DefaultSchemaCoordinator(registry, BundledSchemaSource.INSTANCE);
 
         // Registered via ordinary SchemaResolver.resolveAll, not the raw bootstrap output --
-        // SchemaRegistry#register now refuses any self-referential schema with bootstrap() == true,
+        // TsonSchemaRegistry#register now refuses any self-referential schema with bootstrap() == true,
         // materialized or not (see its own Javadoc); resolveAll never sets that flag.
         String metaKernelSource = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID);
         SchemaDocument metaKernelDocument = new TsonSchemaParser(metaKernelSource).parseSchemaDocument();

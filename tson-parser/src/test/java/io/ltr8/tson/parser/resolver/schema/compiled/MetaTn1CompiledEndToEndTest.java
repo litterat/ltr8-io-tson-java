@@ -10,9 +10,9 @@ import io.ltr8.tson.parser.resolver.schema.BundledSchemaSource;
 import io.ltr8.tson.parser.resolver.schema.DefaultSchemaCoordinator;
 import io.ltr8.tson.parser.resolver.schema.MetaKernelParser;
 import io.ltr8.tson.parser.resolver.schema.SchemaResolver;
-import io.ltr8.tson.schema.LinkedTsonSchema;
+import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.SchemaRegistry;
+import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.schema.registry.SchemaLinker;
 import org.junit.jupiter.api.Test;
 
@@ -36,8 +36,8 @@ class MetaTn1CompiledEndToEndTest {
      */
     private static TsonSchema registerMeta() {
         TsonSchema metaKernelBootstrap = MetaKernelParser.getMetaKernelSchema();
-        SchemaRegistry registry = new SchemaRegistry();
-        LinkedTsonSchema materializedMetaKernelBootstrap = registry.linkBootstrap(metaKernelBootstrap);
+        TsonSchemaRegistry registry = new TsonSchemaRegistry();
+        TsonLinkedSchema materializedMetaKernelBootstrap = registry.linkBootstrap(metaKernelBootstrap);
 
         DataBindContext context = TsonAtomContext.defaultContext();
         TsonParserFactoryRegistry objectFactories = TsonParserFactoryRegistry.object(materializedMetaKernelBootstrap.schema(), context);
@@ -47,7 +47,7 @@ class MetaTn1CompiledEndToEndTest {
         String metaKernelSource = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID);
         SchemaDocument metaKernelDocument = new TsonSchemaParser(metaKernelSource).parseSchemaDocument();
         TsonSchema metaKernel = new SchemaResolver(coordinator).resolveAll(metaKernelDocument);
-        LinkedTsonSchema metaKernelMaterialized = registry.register(SchemaLinker.link(metaKernel, registry));
+        TsonLinkedSchema metaKernelMaterialized = registry.register(SchemaLinker.link(metaKernel, registry));
         compiledRegistry.register(metaKernelMaterialized.schema());
 
         String source = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_TN1_ID);

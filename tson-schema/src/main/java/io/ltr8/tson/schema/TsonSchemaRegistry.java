@@ -10,7 +10,7 @@ import java.util.Optional;
 /**
  * A store of linked schemas keyed by canonical identity ({@code [TSON-DATA] §2.2.1}), mirroring
  * Part 2 §10.1's "schema library" concept. {@link #register} only accepts a {@link
- * LinkedTsonSchema} -- proof, at the type level, that {@link SchemaLinker#link} already ran (import
+ * TsonLinkedSchema} -- proof, at the type level, that {@link SchemaLinker#link} already ran (import
  * merging, argument-bearing {@code type_ref} synthesis, reference validation) -- and does nothing
  * but store it; once admitted, a schema is never overwritten or removed -- together with {@link
  * TsonSchema#entries()} already being an unmodifiable map, this registration-time rejection of
@@ -21,13 +21,13 @@ import java.util.Optional;
  * split apart 2026-07-27, on the user's own explicit direction, borrowing standard compiler
  * vocabulary for the pipeline as a whole (parse -&gt; resolve -&gt; link -&gt; register -&gt;
  * compile -&gt; read): a caller now calls {@link SchemaLinker#link} explicitly (passing this
- * registry itself as the {@link SchemaLoader} it needs for {@code !!import}/{@code !!meta}
- * lookups -- see {@code implements SchemaLoader} below) and only then calls {@link #register}. Two
+ * registry itself as the {@link TsonSchemaLoader} it needs for {@code !!import}/{@code !!meta}
+ * lookups -- see {@code implements TsonSchemaLoader} below) and only then calls {@link #register}. Two
  * consequences: {@code register} can no longer silently do the wrong thing with an unlinked
  * schema (there's no overload that accepts one), and "has this been linked" is answered by the
  * compiler, not by a flag every caller has to remember to check.
  *
- * <p>Implements {@link SchemaLoader} itself (a thin delegation to {@link #get}) purely so a caller
+ * <p>Implements {@link TsonSchemaLoader} itself (a thin delegation to {@link #get}) purely so a caller
  * can write {@code SchemaLinker.link(schema, registry)} directly, passing this registry as its own
  * lookup source, without a separate method reference.
  *
@@ -42,20 +42,20 @@ import java.util.Optional;
  * MetaKernelParser.getMetaKernelSchema()} ever sets, so this guard keeps proving, continuously,
  * that meta-kernel's own identity can only ever be registered by something that genuinely came
  * from the real bootstrap reader -- not just something shaped like it. {@link #linkBootstrap} is
- * the one sanctioned way to turn the raw bootstrap form into a {@link LinkedTsonSchema} without
+ * the one sanctioned way to turn the raw bootstrap form into a {@link TsonLinkedSchema} without
  * this rejection -- a caller that also needs it *persisted* under its own identity still can't
  * register that result directly (it's still {@code bootstrap() == true}); the one way meta-kernel's
  * own identity can actually be registered is resolving its document a second time, ordinarily
  * (never setting {@code bootstrap}), against a coordinator seeded from the one-off linked
  * bootstrap result.
  */
-public final class SchemaRegistry implements SchemaLoader {
+public final class TsonSchemaRegistry implements TsonSchemaLoader {
 
-    private final Map<String, LinkedTsonSchema> schemas = new LinkedHashMap<>();
-    private final SchemaLoader loader;
+    private final Map<String, TsonLinkedSchema> schemas = new LinkedHashMap<>();
+    private final TsonSchemaLoader loader;
 
     /** Default loader: resolves an import only if it's already registered -- nothing is ever fetched. */
-    public SchemaRegistry() {
+    public TsonSchemaRegistry() {
         this(null);
     }
 
@@ -63,14 +63,14 @@ public final class SchemaRegistry implements SchemaLoader {
      * @param loader consulted for a {@code !!import}/{@code !!meta} target not already registered;
      *               {@code null} falls back to the registered-only default (this registry itself).
      */
-    public SchemaRegistry(SchemaLoader loader) {
+    public TsonSchemaRegistry(TsonSchemaLoader loader) {
         this.loader = loader != null ? loader : this::lookupByCanonicalIdentity;
     }
 
-    public synchronized LinkedTsonSchema register(LinkedTsonSchema schema) {
+    public synchronized TsonLinkedSchema register(TsonLinkedSchema schema) {
         TsonSchema unwrapped = schema.schema();
         if (selfReferential(unwrapped) && unwrapped.bootstrap()) {
-            throw new SchemaValidationException("'" + unwrapped.id() + "' is self-referential (its own "
+            throw new TsonSchemaValidationException("'" + unwrapped.id() + "' is self-referential (its own "
                     + "!!meta names its own !!id) and bootstrap() == true -- meta-kernel's own identity "
                     + "must be registered via a schema resolved ordinarily (SchemaResolver.resolveAll,"
                     + " which never sets bootstrap), never the bootstrap-produced form directly, "
@@ -78,7 +78,7 @@ public final class SchemaRegistry implements SchemaLoader {
         }
         String identity = CanonicalIdentity.of(unwrapped.id());
         if (schemas.containsKey(identity)) {
-            throw new SchemaValidationException("a schema is already registered under '" + identity + "'");
+            throw new TsonSchemaValidationException("a schema is already registered under '" + identity + "'");
         }
         schemas.put(identity, schema);
         return schema;
@@ -97,30 +97,30 @@ public final class SchemaRegistry implements SchemaLoader {
      * Javadoc). Exists purely so a caller (e.g. building an object-binding-mode {@code
      * TsonParserFactoryRegistry}, which needs a genuinely linked {@code TsonSchema} to validate against
      * up front) can get a usable result straight from the raw bootstrap object, without separately
-     * wiring a {@link SchemaLoader}.
+     * wiring a {@link TsonSchemaLoader}.
      *
-     * @throws SchemaValidationException if {@code bootstrap.bootstrap()} is {@code false} -- this
+     * @throws TsonSchemaValidationException if {@code bootstrap.bootstrap()} is {@code false} -- this
      *                                    method exists specifically for the one self-referential
      *                                    schema, not as a general "link without registering" escape
      *                                    hatch for ordinary schemas (call {@link SchemaLinker#link}
      *                                    directly for that)
      */
-    public synchronized LinkedTsonSchema linkBootstrap(TsonSchema bootstrap) {
+    public synchronized TsonLinkedSchema linkBootstrap(TsonSchema bootstrap) {
         if (!bootstrap.bootstrap()) {
-            throw new SchemaValidationException("'" + bootstrap.id() + "' was not produced by the real "
+            throw new TsonSchemaValidationException("'" + bootstrap.id() + "' was not produced by the real "
                     + "bootstrap reader (MetaKernelParser.getMetaKernelSchema()) -- "
-                    + "SchemaRegistry.linkBootstrap exists specifically for that case; call "
+                    + "TsonSchemaRegistry.linkBootstrap exists specifically for that case; call "
                     + "SchemaLinker.link directly for an ordinary schema instead");
         }
         return SchemaLinker.link(bootstrap, loader);
     }
 
     @Override
-    public synchronized Optional<LinkedTsonSchema> load(String canonicalIdentity) {
+    public synchronized Optional<TsonLinkedSchema> load(String canonicalIdentity) {
         return lookupByCanonicalIdentity(canonicalIdentity);
     }
 
-    public synchronized Optional<LinkedTsonSchema> get(String uri) {
+    public synchronized Optional<TsonLinkedSchema> get(String uri) {
         return lookupByCanonicalIdentity(CanonicalIdentity.of(uri));
     }
 
@@ -133,13 +133,13 @@ public final class SchemaRegistry implements SchemaLoader {
      * CanonicalIdentity} stays internal-by-convention to this module (see that class's own Javadoc)
      * -- this is the sanctioned way for a caller outside it to run the same check.
      *
-     * @throws SchemaValidationException if {@code uri} isn't a valid canonical-identity candidate
+     * @throws TsonSchemaValidationException if {@code uri} isn't a valid canonical-identity candidate
      */
     public static void validateIdentity(String uri) {
         CanonicalIdentity.of(uri);
     }
 
-    private synchronized Optional<LinkedTsonSchema> lookupByCanonicalIdentity(String canonicalIdentity) {
+    private synchronized Optional<TsonLinkedSchema> lookupByCanonicalIdentity(String canonicalIdentity) {
         return Optional.ofNullable(schemas.get(canonicalIdentity));
     }
 }

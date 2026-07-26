@@ -4,7 +4,7 @@ import io.ltr8.tson.parser.TsonDataParser;
 import io.ltr8.tson.parser.ast.Document;
 import io.ltr8.tson.parser.resolver.schema.MetaKernelParser;
 import io.ltr8.tson.parser.resolver.vocab.AtomValidationException;
-import io.ltr8.tson.schema.SchemaRegistry;
+import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.registry.SchemaLinker;
 import io.ltr8.tson.schema.meta.EnumBody;
@@ -44,7 +44,7 @@ class EnumTypeParserFactoryTest {
         TsonSchema schema = new TsonSchema("https://example.test/flag.tn1",
                 "https://example.test/meta.tn1", List.of(), entries);
 
-        SchemaRegistry schemaRegistry = new SchemaRegistry();
+        TsonSchemaRegistry schemaRegistry = new TsonSchemaRegistry();
         TsonSchema registered = schemaRegistry.register(SchemaLinker.link(schema, schemaRegistry)).schema();
         TsonParserFactoryRegistry registry = TsonParserFactoryRegistry.builder()
                 .register("record", RecordParser.FACTORY)

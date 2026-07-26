@@ -32,8 +32,8 @@ import io.ltr8.tson.parser.ast.schema.TypeDef;
 import io.ltr8.tson.parser.ast.schema.TypeRef;
 import io.ltr8.tson.parser.mapper.TsonMapperWriter;
 import io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledSchema;
-import io.ltr8.tson.schema.SchemaRegistry;
-import io.ltr8.tson.schema.SchemaValidationException;
+import io.ltr8.tson.schema.TsonSchemaRegistry;
+import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
@@ -325,10 +325,10 @@ public final class SchemaResolver {
      * {@code document.id()} must be present -- required by policy for a publishable schema (§2.2.1:
      * "publishing a schema... REQUIRES !!id"), and this resolver, given a coordinator, is about to
      * treat {@code document} as one that's going to *be* registered; (2) that {@code !!id} must be a
-     * well-formed canonical-identity candidate ({@link SchemaRegistry#validateIdentity}) -- the same
-     * check {@link SchemaRegistry#register} would run anyway, just surfaced here, before resolution
+     * well-formed canonical-identity candidate ({@link TsonSchemaRegistry#validateIdentity}) -- the same
+     * check {@link TsonSchemaRegistry#register} would run anyway, just surfaced here, before resolution
      * work is spent on a document that could never actually be registered. Both throw {@link
-     * IllegalStateException} (or, for (2), {@link SchemaValidationException}, in an already-
+     * IllegalStateException} (or, for (2), {@link TsonSchemaValidationException}, in an already-
      * established shape) naming the actual problem. {@code document.meta()} itself is then resolved
      * via {@link #compiledMetaSchema} -- fetched/bootstrapped/compiled by this resolver's own {@link
      * SchemaCoordinator} if it wasn't already available, rather than requiring it to pre-exist -- and
@@ -349,7 +349,7 @@ public final class SchemaResolver {
      * {@code !!import}, would fail to resolve at all without this. Collision handling mirrors {@code
      * SchemaLinker.mergeImports}'s own established rule exactly, not a new one: a name declared by
      * more than one import, or by an import *and* a local declaration, is a {@link
-     * SchemaValidationException} -- checked as each import is merged in, and
+     * TsonSchemaValidationException} -- checked as each import is merged in, and
      * again as each local declaration is about to be resolved, so a collision is caught at the
      * earliest point either side of it becomes known, before any further resolution work is spent.
      * <b>Merged entries keep their home namespace</b>, same as {@code SchemaLinker}'s own note on
@@ -357,7 +357,7 @@ public final class SchemaResolver {
      * or re-materialized against the importer. The result's own {@link TsonSchema#entries()} is
      * local-only, same as {@code MetaTn1Parser}'s own convention -- imported entries are visible
      * *during* resolution but are never part of what this method itself returns; a caller that wants
-     * the merged whole gets it from {@code SchemaRegistry.register}'s own eventual output instead,
+     * the merged whole gets it from {@code TsonSchemaRegistry.register}'s own eventual output instead,
      * same as always.
      */
     public TsonSchema resolveAll(SchemaDocument document) {
@@ -366,9 +366,9 @@ public final class SchemaResolver {
         }
         String id = document.id().orElseThrow(() -> new IllegalStateException(
                 "'" + document.meta() + "': !!id is required to register this schema, but is absent"));
-        SchemaRegistry.validateIdentity(id);
+        TsonSchemaRegistry.validateIdentity(id);
         for (String importUri : document.imports()) {
-            SchemaRegistry.validateIdentity(importUri);
+            TsonSchemaRegistry.validateIdentity(importUri);
         }
 
         TsonCompiledSchema metaParser = compiledMetaSchema(document);
@@ -377,7 +377,7 @@ public final class SchemaResolver {
         Map<String, TypeDefinition> localOnly = new LinkedHashMap<>();
         for (SchemaMap.Declaration declaration : document.body().declarations().values()) {
             if (namespace.containsKey(declaration.name())) {
-                throw new SchemaValidationException("'" + declaration.name()
+                throw new TsonSchemaValidationException("'" + declaration.name()
                         + "' collides with an entry of the same name brought in by !!import");
             }
             TypeDefinition resolved = resolve(declaration, namespace, metaParser);
@@ -394,7 +394,7 @@ public final class SchemaResolver {
             TsonSchema imported = coordinator.resolve(importUri).schema();
             for (Map.Entry<String, TypeDefinition> entry : imported.entries().entrySet()) {
                 if (merged.containsKey(entry.getKey())) {
-                    throw new SchemaValidationException(
+                    throw new TsonSchemaValidationException(
                             "'" + entry.getKey() + "' is declared by more than one !!import");
                 }
                 merged.put(entry.getKey(), entry.getValue());

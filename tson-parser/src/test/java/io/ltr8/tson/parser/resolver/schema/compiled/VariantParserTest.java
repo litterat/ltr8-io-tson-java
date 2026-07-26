@@ -2,7 +2,7 @@ package io.ltr8.tson.parser.resolver.schema.compiled;
 
 import io.ltr8.tson.parser.TsonDataParser;
 import io.ltr8.tson.parser.ast.Document;
-import io.ltr8.tson.schema.SchemaRegistry;
+import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.registry.SchemaLinker;
 import io.ltr8.tson.schema.meta.IntegerType;
@@ -66,7 +66,7 @@ class VariantParserTest {
     }
 
     private static TsonCompiledSchema compiled() {
-        SchemaRegistry schemaRegistry = new SchemaRegistry();
+        TsonSchemaRegistry schemaRegistry = new TsonSchemaRegistry();
         TsonSchema registered = schemaRegistry.register(SchemaLinker.link(compileableSchema(), schemaRegistry)).schema();
         return TsonSchemaCompiler.compile(registered, registry());
     }

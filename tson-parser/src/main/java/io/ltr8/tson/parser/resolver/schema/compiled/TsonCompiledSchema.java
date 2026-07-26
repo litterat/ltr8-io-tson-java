@@ -15,7 +15,7 @@ import java.util.Set;
  * TsonSchemaTypeParser<?>>}, where every parser's own references to other entries are real Java object
  * references (a {@link ParserHandle}), not further name lookups. This is the "compile the schema
  * once, read many data documents against it fast" layer sitting on top of {@code SchemaResolver}'s
- * own per-declaration resolution and {@code SchemaRegistry}'s whole-schema materialization/
+ * own per-declaration resolution and {@code TsonSchemaRegistry}'s whole-schema materialization/
  * validation -- {@link SchemaValidatingParser}, the actual Class 2 (schema-validating) data parser, is built
  * on top of a {@code TsonCompiledSchema}, not directly on {@code TsonSchema}.
  *
@@ -26,10 +26,10 @@ import java.util.Set;
  * own package-private constructor exists only for {@code TsonSchemaCompiler} to call.
  *
  * <p><b>Must be compiled from an already-materialized, already-validated {@link TsonSchema}</b> --
- * i.e. {@code SchemaRegistry}'s own output, never a raw {@code SchemaResolver.resolveAll} result
+ * i.e. {@code TsonSchemaRegistry}'s own output, never a raw {@code SchemaResolver.resolveAll} result
  * directly. Two reasons: every {@code type_ref} reachable from a body needs to already be
  * argument-free (materialization already flattened any {@code <...>} application into a reference
- * to a synthesized entry -- see {@code SchemaRegistry}'s own Javadoc), since nothing here
+ * to a synthesized entry -- see {@code TsonSchemaRegistry}'s own Javadoc), since nothing here
  * re-implements that; and every name a body refers to needs to actually be present in {@code
  * schema.entries()} (validation already confirmed this), since {@link #resolve} (reached through
  * {@link #get}) treats a referenced-but-missing name as a bug, not a normal failure to report.

@@ -5,8 +5,8 @@ import io.ltr8.tson.parser.ast.schema.SchemaDocument;
 import io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledRegistry;
 import io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledSchema;
 import io.ltr8.tson.parser.resolver.schema.compiled.TsonSchemaCompiler;
-import io.ltr8.tson.schema.LinkedTsonSchema;
-import io.ltr8.tson.schema.SchemaRegistry;
+import io.ltr8.tson.schema.TsonLinkedSchema;
+import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.schema.TsonSchema;
 
 import java.util.Optional;
@@ -32,7 +32,7 @@ import java.util.Optional;
  *
  *   <p><b>Deliberately a one-off, never registered/cached in the *shared* registry</b> (on the
  *   user's own explicit direction): {@link MetaKernelParser#getMetaKernelSchema()}'s own output is
- *   run through a fresh, throwaway {@code SchemaRegistry} -- created and discarded right here, never
+ *   run through a fresh, throwaway {@code TsonSchemaRegistry} -- created and discarded right here, never
  *   the shared {@link #registry} this coordinator wraps -- purely so {@code SchemaLinker}'s own
  *   materialization/validation pass runs (synthesizing entries for argument-bearing {@code
  *   type_ref}s, e.g. {@code enum}'s own {@code members: set<token>}) before compiling ({@code
@@ -54,13 +54,13 @@ import java.util.Optional;
  *   *other* schema that {@code !!import}s meta-kernel (every real one does) will still fail its own
  *   registration with "{@code !!import '...' is not registered}" unless meta-kernel has *separately*
  *   been registered in the *shared* registry first: {@code SchemaLinker}'s own import-merging
- *   (run inside {@code SchemaRegistry#register}, a step distinct from {@code SchemaResolver}'s own
- *   resolution-time import-merging above) resolves an import via {@code SchemaRegistry}'s own
- *   registered-only {@code SchemaLoader}, which knows nothing about this coordinator, its bootstrap
+ *   (run inside {@code TsonSchemaRegistry#register}, a step distinct from {@code SchemaResolver}'s own
+ *   resolution-time import-merging above) resolves an import via {@code TsonSchemaRegistry}'s own
+ *   registered-only {@code TsonSchemaLoader}, which knows nothing about this coordinator, its bootstrap
  *   case, or the throwaway registry used to materialize it. In practice this means a caller
  *   resolving anything beyond meta-kernel itself still needs to register meta-kernel explicitly
  *   first (e.g. {@code registry.register(registry.schemaRegistry().materializeBootstrap(
- *   MetaKernelParser.getMetaKernelSchema()))} -- {@code SchemaRegistry#register} itself now refuses
+ *   MetaKernelParser.getMetaKernelSchema()))} -- {@code TsonSchemaRegistry#register} itself now refuses
  *   the raw, unmaterialized bootstrap form outright, see its own Javadoc) before asking this
  *   coordinator for anything that transitively imports it -- materializing the one-off bootstrap result fixes
  *   *reading* through it correctly, not the separate *import-merge* requirement.</li>
@@ -96,15 +96,15 @@ public final class DefaultSchemaCoordinator implements SchemaCoordinator {
         }
         if (BundledSchemaSource.META_KERNEL_ID.equals(uri)) {
             TsonSchema metaKernel = MetaKernelParser.getMetaKernelSchema();
-            // A fresh, throwaway SchemaRegistry -- never the shared one this coordinator wraps --
+            // A fresh, throwaway TsonSchemaRegistry -- never the shared one this coordinator wraps --
             // purely so SchemaLinker's own materialization pass runs (synthesizing entries for
             // argument-bearing type-refs like enum's own `members: set<token>`) before compiling.
-            // linkBootstrap (not register -- SchemaRegistry now refuses a linked bootstrap schema
+            // linkBootstrap (not register -- TsonSchemaRegistry now refuses a linked bootstrap schema
             // outright, always) doesn't persist anything either, so this is still discarded
             // immediately after: every call still re-bootstraps and re-links from scratch, exactly
             // as before -- only the *quality* of the one-off result changes (58 entries, not 49),
             // not its lifetime.
-            LinkedTsonSchema linked = new SchemaRegistry().linkBootstrap(metaKernel);
+            TsonLinkedSchema linked = new TsonSchemaRegistry().linkBootstrap(metaKernel);
             return TsonSchemaCompiler.compile(linked.schema(), registry.factories());
         }
         String sourceText = source.fetch(uri);

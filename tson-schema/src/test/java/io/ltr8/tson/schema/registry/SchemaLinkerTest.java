@@ -1,8 +1,8 @@
 package io.ltr8.tson.schema.registry;
 
-import io.ltr8.tson.schema.LinkedTsonSchema;
-import io.ltr8.tson.schema.SchemaLoader;
-import io.ltr8.tson.schema.SchemaValidationException;
+import io.ltr8.tson.schema.TsonLinkedSchema;
+import io.ltr8.tson.schema.TsonSchemaLoader;
+import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.ElementState;
@@ -36,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>Renamed from {@code SchemaValidatorTest} (2026-07-27, alongside {@code SchemaValidator}
  * itself becoming {@link SchemaLinker}) -- what's tested hasn't changed, only the class/method
- * under test and the fact that {@link SchemaLinker#link} now returns a {@link LinkedTsonSchema}.
+ * under test and the fact that {@link SchemaLinker#link} now returns a {@link TsonLinkedSchema}.
  */
 class SchemaLinkerTest {
 
@@ -113,7 +113,7 @@ class SchemaLinkerTest {
         entries.put("container", TypeDefinition.product(RecordBody.of(List.of(
                 RecordField.required("members", new TypeRef("set", List.of(new TypeArgument.Ref(TypeRef.of("token")))))))));
 
-        LinkedTsonSchema result = SchemaLinker.link(schemaOf(entries), null);
+        TsonLinkedSchema result = SchemaLinker.link(schemaOf(entries), null);
 
         assertEquals(4, result.schema().entries().size(), "one synthetic entry beyond the original three");
         String syntheticName = result.schema().entries().keySet().stream()
@@ -138,7 +138,7 @@ class SchemaLinkerTest {
         entries.put("container", TypeDefinition.product(RecordBody.of(List.of(
                 RecordField.required("items", new TypeRef("array", List.of(new TypeArgument.Ref(TypeRef.of("token")))))))));
 
-        LinkedTsonSchema result = SchemaLinker.link(schemaOf(entries), null);
+        TsonLinkedSchema result = SchemaLinker.link(schemaOf(entries), null);
 
         String syntheticName = result.schema().entries().keySet().stream()
                 .filter(name -> !Set.of("token", "array", "container").contains(name))
@@ -170,7 +170,7 @@ class SchemaLinkerTest {
         entries.put("container", TypeDefinition.product(RecordBody.of(List.of(
                 RecordField.required("items", new TypeRef("set", List.of(new TypeArgument.Ref(TypeRef.of("token")))))))));
 
-        LinkedTsonSchema result = SchemaLinker.link(schemaOf(entries), null);
+        TsonLinkedSchema result = SchemaLinker.link(schemaOf(entries), null);
 
         String syntheticName = result.schema().entries().keySet().stream()
                 .filter(name -> !Set.of("token", "set", "container").contains(name))
@@ -198,7 +198,7 @@ class SchemaLinkerTest {
         entries.put("container", TypeDefinition.product(RecordBody.of(List.of(
                 RecordField.required("items", new TypeRef("array", List.of(new TypeArgument.Ref(TypeRef.of("token")))))))));
 
-        LinkedTsonSchema result = SchemaLinker.link(schemaOf(entries), null);
+        TsonLinkedSchema result = SchemaLinker.link(schemaOf(entries), null);
 
         String syntheticName = result.schema().entries().keySet().stream()
                 .filter(name -> !Set.of("token", "array", "container").contains(name))
@@ -216,7 +216,7 @@ class SchemaLinkerTest {
         entries.put("first", TypeDefinition.product(RecordBody.of(List.of(RecordField.required("members", setOfToken)))));
         entries.put("second", TypeDefinition.product(RecordBody.of(List.of(RecordField.required("members", setOfToken)))));
 
-        LinkedTsonSchema result = SchemaLinker.link(schemaOf(entries), null);
+        TsonLinkedSchema result = SchemaLinker.link(schemaOf(entries), null);
 
         assertEquals(5, result.schema().entries().size(), "still only one synthetic entry, shared by both use sites");
         TypeRef firstFieldType = ((RecordBody) result.schema().entries().get("first").body()).fields().get(0).type();
@@ -233,7 +233,7 @@ class SchemaLinkerTest {
         entries.put("generic", new TypeDefinition(Optional.of(otherOfT), TypeKind.PRODUCT, List.of("T"), false,
                 List.of(), List.of(), Optional.empty(), RecordBody.of(List.of())));
 
-        LinkedTsonSchema result = SchemaLinker.link(schemaOf(entries), null);
+        TsonLinkedSchema result = SchemaLinker.link(schemaOf(entries), null);
 
         // source is validated (T accepted via the parameter exception) but never materialized.
         assertEquals(otherOfT, result.schema().entries().get("generic").source().orElseThrow());
@@ -246,7 +246,7 @@ class SchemaLinkerTest {
         entries.put("container", TypeDefinition.product(RecordBody.of(List.of(
                 RecordField.required("field", TypeRef.of("no_such_type"))))));
 
-        SchemaValidationException ex = assertThrows(SchemaValidationException.class,
+        TsonSchemaValidationException ex = assertThrows(TsonSchemaValidationException.class,
                 () -> SchemaLinker.link(schemaOf(entries), null));
         assertTrue(ex.getMessage().contains("no_such_type"));
     }
@@ -257,7 +257,7 @@ class SchemaLinkerTest {
         entries.put("child", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of(), false,
                 List.of("no_such_supertype"), List.of(), Optional.empty(), RecordBody.of(List.of())));
 
-        assertThrows(SchemaValidationException.class, () -> SchemaLinker.link(schemaOf(entries), null));
+        assertThrows(TsonSchemaValidationException.class, () -> SchemaLinker.link(schemaOf(entries), null));
     }
 
     @Test
@@ -267,14 +267,14 @@ class SchemaLinkerTest {
                 List.of(RecordField.required("a", TypeRef.of("thing"))),
                 List.of(new FieldGroup(List.of("not_a_real_field"), io.ltr8.tson.schema.meta.ElementState.OPTIONAL)))));
 
-        assertThrows(SchemaValidationException.class, () -> SchemaLinker.link(schemaOf(entries), null));
+        assertThrows(TsonSchemaValidationException.class, () -> SchemaLinker.link(schemaOf(entries), null));
     }
 
     @Test
     void mergesImportedEntriesBeforeLocalOnesAndValidatesTheWhole() {
-        LinkedTsonSchema imported = new LinkedTsonSchema(schemaOf(Map.of("imported_a", emptyRecord())));
-        Map<String, LinkedTsonSchema> byIdentity = Map.of(CanonicalIdentity.of("https://example.test/import.tn1"), imported);
-        SchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
+        TsonLinkedSchema imported = new TsonLinkedSchema(schemaOf(Map.of("imported_a", emptyRecord())));
+        Map<String, TsonLinkedSchema> byIdentity = Map.of(CanonicalIdentity.of("https://example.test/import.tn1"), imported);
+        TsonSchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
 
         Map<String, TypeDefinition> localEntries = new LinkedHashMap<>();
         localEntries.put("local_a", TypeDefinition.product(
@@ -282,31 +282,31 @@ class SchemaLinkerTest {
         TsonSchema local = new TsonSchema("https://example.test/importer.tn1",
                 "https://example.test/meta.tn1", List.of("https://example.test/import.tn1"), localEntries);
 
-        LinkedTsonSchema result = SchemaLinker.link(local, loader);
+        TsonLinkedSchema result = SchemaLinker.link(local, loader);
 
         assertEquals(Set.of("imported_a", "local_a"), result.schema().entries().keySet());
     }
 
     @Test
     void rejectsAnImportThatIsNotRegistered() {
-        SchemaLoader loader = id -> Optional.empty();
+        TsonSchemaLoader loader = id -> Optional.empty();
         TsonSchema local = new TsonSchema("https://example.test/importer.tn1",
                 "https://example.test/meta.tn1", List.of("https://example.test/missing.tn1"), Map.of());
 
-        assertThrows(SchemaValidationException.class, () -> SchemaLinker.link(local, loader));
+        assertThrows(TsonSchemaValidationException.class, () -> SchemaLinker.link(local, loader));
     }
 
     @Test
     void rejectsACollisionBetweenALocalEntryAndAnImportedEntry() {
-        LinkedTsonSchema imported = new LinkedTsonSchema(schemaOf(Map.of("shared_name", emptyRecord())));
-        Map<String, LinkedTsonSchema> byIdentity = Map.of(CanonicalIdentity.of("https://example.test/import.tn1"), imported);
-        SchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
+        TsonLinkedSchema imported = new TsonLinkedSchema(schemaOf(Map.of("shared_name", emptyRecord())));
+        Map<String, TsonLinkedSchema> byIdentity = Map.of(CanonicalIdentity.of("https://example.test/import.tn1"), imported);
+        TsonSchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
 
         TsonSchema local = new TsonSchema("https://example.test/importer.tn1",
                 "https://example.test/meta.tn1", List.of("https://example.test/import.tn1"),
                 Map.of("shared_name", emptyRecord()));
 
-        assertThrows(SchemaValidationException.class, () -> SchemaLinker.link(local, loader));
+        assertThrows(TsonSchemaValidationException.class, () -> SchemaLinker.link(local, loader));
     }
 
     @Test
@@ -322,7 +322,7 @@ class SchemaLinkerTest {
                 List.of("response"), List.of(), Optional.empty(),
                 RecordBody.of(List.of(RecordField.required("error", TypeRef.of("token"))))));
 
-        LinkedTsonSchema result = SchemaLinker.link(schemaOf(entries), null);
+        TsonLinkedSchema result = SchemaLinker.link(schemaOf(entries), null);
 
         assertEquals(Set.of("success_response", "failure_response"),
                 Set.copyOf(result.schema().entries().get("response").subtypes()));
@@ -341,7 +341,7 @@ class SchemaLinkerTest {
         entries.put("leaf", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of(), false,
                 List.of("mid", "top"), List.of(), Optional.empty(), RecordBody.of(List.of())));
 
-        LinkedTsonSchema result = SchemaLinker.link(schemaOf(entries), null);
+        TsonLinkedSchema result = SchemaLinker.link(schemaOf(entries), null);
 
         assertEquals(Set.of("mid", "leaf"), Set.copyOf(result.schema().entries().get("top").subtypes()));
         assertEquals(Set.of("leaf"), Set.copyOf(result.schema().entries().get("mid").subtypes()));
@@ -357,9 +357,9 @@ class SchemaLinkerTest {
         importedEntries.put("imported_child", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of(), false,
                 List.of("imported_base"), List.of(), Optional.empty(), RecordBody.of(List.of())));
         TsonSchema imported = schemaOf(importedEntries);
-        Map<String, LinkedTsonSchema> byIdentity =
-                Map.of(CanonicalIdentity.of("https://example.test/import.tn1"), new LinkedTsonSchema(imported));
-        SchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
+        Map<String, TsonLinkedSchema> byIdentity =
+                Map.of(CanonicalIdentity.of("https://example.test/import.tn1"), new TsonLinkedSchema(imported));
+        TsonSchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
 
         Map<String, TypeDefinition> localEntries = new LinkedHashMap<>();
         localEntries.put("local_child", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of(), false,
@@ -367,7 +367,7 @@ class SchemaLinkerTest {
         TsonSchema local = new TsonSchema("https://example.test/importer.tn1",
                 "https://example.test/meta.tn1", List.of("https://example.test/import.tn1"), localEntries);
 
-        LinkedTsonSchema result = SchemaLinker.link(local, loader);
+        TsonLinkedSchema result = SchemaLinker.link(local, loader);
 
         // This importer's own merged view: the pre-existing subtype plus the newly-local one.
         assertEquals(Set.of("imported_child", "local_child"),
@@ -379,17 +379,17 @@ class SchemaLinkerTest {
 
     @Test
     void rejectsACollisionBetweenTwoImports() {
-        LinkedTsonSchema importedOne = new LinkedTsonSchema(schemaOf(Map.of("shared_name", emptyRecord())));
-        LinkedTsonSchema importedTwo = new LinkedTsonSchema(schemaOf(Map.of("shared_name", emptyRecord())));
-        Map<String, LinkedTsonSchema> byIdentity = Map.of(
+        TsonLinkedSchema importedOne = new TsonLinkedSchema(schemaOf(Map.of("shared_name", emptyRecord())));
+        TsonLinkedSchema importedTwo = new TsonLinkedSchema(schemaOf(Map.of("shared_name", emptyRecord())));
+        Map<String, TsonLinkedSchema> byIdentity = Map.of(
                 CanonicalIdentity.of("https://example.test/import-one.tn1"), importedOne,
                 CanonicalIdentity.of("https://example.test/import-two.tn1"), importedTwo);
-        SchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
+        TsonSchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
 
         TsonSchema local = new TsonSchema("https://example.test/importer.tn1",
                 "https://example.test/meta.tn1",
                 List.of("https://example.test/import-one.tn1", "https://example.test/import-two.tn1"), Map.of());
 
-        assertThrows(SchemaValidationException.class, () -> SchemaLinker.link(local, loader));
+        assertThrows(TsonSchemaValidationException.class, () -> SchemaLinker.link(local, loader));
     }
 }

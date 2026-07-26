@@ -1,6 +1,6 @@
 package io.ltr8.tson.schema.registry;
 
-import io.ltr8.tson.schema.SchemaValidationException;
+import io.ltr8.tson.schema.TsonSchemaValidationException;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -21,11 +21,11 @@ import java.util.Locale;
  * every other check is a rejection, never a rewrite.
  *
  * <p><b>Not part of the public API</b> -- {@code io.ltr8.tson.schema.registry} is this module's
- * internal-by-convention package (`SchemaRegistry`/`SchemaLoader`/`SchemaValidationException` are
+ * internal-by-convention package (`TsonSchemaRegistry`/`TsonSchemaLoader`/`TsonSchemaValidationException` are
  * the user-facing surface, in `io.ltr8.tson.schema` proper). This class is `public` only because
  * `tson-schema` has no `module-info.java` yet, so there's no compiler-enforced way to hide it from
- * a cross-package caller (`SchemaRegistry`) without also hiding it from `SchemaRegistry` itself --
- * a caller outside this module should go through {@code SchemaRegistry} instead of depending on this
+ * a cross-package caller (`TsonSchemaRegistry`) without also hiding it from `TsonSchemaRegistry` itself --
+ * a caller outside this module should go through {@code TsonSchemaRegistry} instead of depending on this
  * class directly.
  */
 public final class CanonicalIdentity {
@@ -40,37 +40,37 @@ public final class CanonicalIdentity {
         try {
             uri = new URI(uriString);
         } catch (URISyntaxException e) {
-            throw new SchemaValidationException("'" + uriString + "' is not a valid URI: " + e.getReason());
+            throw new TsonSchemaValidationException("'" + uriString + "' is not a valid URI: " + e.getReason());
         }
 
         if (uri.getScheme() == null) {
-            throw new SchemaValidationException("'" + uriString + "' has no scheme");
+            throw new TsonSchemaValidationException("'" + uriString + "' has no scheme");
         }
         if (uri.getHost() == null) {
-            throw new SchemaValidationException("'" + uriString + "' has no host");
+            throw new TsonSchemaValidationException("'" + uriString + "' has no host");
         }
         if (uri.getUserInfo() != null) {
-            throw new SchemaValidationException(
+            throw new TsonSchemaValidationException(
                     "'" + uriString + "' carries userinfo, not permitted in an identifying URI");
         }
         if (uri.getPort() != -1) {
-            throw new SchemaValidationException(
+            throw new TsonSchemaValidationException(
                     "'" + uriString + "' carries a port, not permitted in an identifying URI");
         }
         if (uri.getRawFragment() != null) {
-            throw new SchemaValidationException(
+            throw new TsonSchemaValidationException(
                     "'" + uriString + "' carries a fragment, not permitted in an identifying URI");
         }
 
         String host = uri.getHost();
         if (!host.equals(host.toLowerCase(Locale.ROOT))) {
-            throw new SchemaValidationException("'" + uriString + "' has a non-lowercase host '" + host + "'");
+            throw new TsonSchemaValidationException("'" + uriString + "' has a non-lowercase host '" + host + "'");
         }
 
         String rawPath = uri.getRawPath() == null ? "" : uri.getRawPath();
         for (String segment : rawPath.split("/", -1)) {
             if (segment.equals(".") || segment.equals("..")) {
-                throw new SchemaValidationException("'" + uriString + "' contains a dot-segment in its path");
+                throw new TsonSchemaValidationException("'" + uriString + "' contains a dot-segment in its path");
             }
         }
 
@@ -87,16 +87,16 @@ public final class CanonicalIdentity {
                 continue;
             }
             if (i + 2 >= component.length()) {
-                throw new SchemaValidationException("'" + uriString + "' has a malformed percent-encoding");
+                throw new TsonSchemaValidationException("'" + uriString + "' has a malformed percent-encoding");
             }
             int decoded;
             try {
                 decoded = Integer.parseInt(component.substring(i + 1, i + 3), 16);
             } catch (NumberFormatException e) {
-                throw new SchemaValidationException("'" + uriString + "' has a malformed percent-encoding");
+                throw new TsonSchemaValidationException("'" + uriString + "' has a malformed percent-encoding");
             }
             if (decoded < 128 && UNRESERVED.indexOf((char) decoded) >= 0) {
-                throw new SchemaValidationException(
+                throw new TsonSchemaValidationException(
                         "'" + uriString + "' percent-encodes the unreserved character '" + (char) decoded + "'");
             }
             i += 2;

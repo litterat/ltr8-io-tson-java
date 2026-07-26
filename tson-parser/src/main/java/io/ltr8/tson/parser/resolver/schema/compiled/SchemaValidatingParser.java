@@ -16,10 +16,10 @@ import io.ltr8.tson.parser.ast.Document;
  * inferring one from the data. This is a deliberate scope decision, not an oversight: auto-selecting
  * a compiled schema from a document's own declared {@code !!schema} URI needs a schema-identity {@code ->}
  * {@link TsonCompiledSchema} registry that doesn't exist yet (a distinct, separate piece -- {@code
- * SchemaRegistry} maps identity to {@code TsonSchema}, not to a *compiled* parser); and even a
+ * TsonSchemaRegistry} maps identity to {@code TsonSchema}, not to a *compiled* parser); and even a
  * narrower "does the document's own claim match this parser's own schema" consistency check would
  * need canonical-identity comparison ({@code CanonicalIdentity}, in {@code tson-schema.registry})
- * that package deliberately keeps internal to {@code SchemaRegistry} itself (see that package's own
+ * that package deliberately keeps internal to {@code TsonSchemaRegistry} itself (see that package's own
  * Javadoc) -- reaching into it directly from here, rather than through a proper public entry point
  * {@code tson-schema} doesn't offer yet, would be exactly the kind of cross-module layering
  * violation this project has otherwise been careful to avoid. Left as an explicit, tracked gap

@@ -36,14 +36,14 @@ import java.util.Objects;
  * <p><b>No {@code materialised} flag</b> (removed 2026-07-27, on the user's own explicit
  * direction, replacing an earlier version of this class that carried one) -- "has this schema been
  * through linking" is now a *type* distinction, not a runtime-checked boolean: {@link
- * SchemaLinker#link} is the only thing that produces a {@link LinkedTsonSchema}, and {@link
- * SchemaRegistry#register} only accepts one, so "you can't register something that hasn't been
+ * SchemaLinker#link} is the only thing that produces a {@link TsonLinkedSchema}, and {@link
+ * TsonSchemaRegistry#register} only accepts one, so "you can't register something that hasn't been
  * linked" is enforced at compile time, not by a flag every caller has to remember to check. See
- * {@link LinkedTsonSchema}'s own Javadoc for why it's a deliberately separate, unrelated record
+ * {@link TsonLinkedSchema}'s own Javadoc for why it's a deliberately separate, unrelated record
  * with the identical shape, not a subtype (records are implicitly final -- couldn't be one anyway)
- * and not interchangeable with this class, even though {@link SchemaRegistry}'s own storage stays
- * plain {@code TsonSchema} (a {@code LinkedTsonSchema} is unwrapped back into one the moment it's
- * actually stored -- see {@link SchemaRegistry#register}'s own Javadoc for why linked-ness stops
+ * and not interchangeable with this class, even though {@link TsonSchemaRegistry}'s own storage stays
+ * plain {@code TsonSchema} (a {@code TsonLinkedSchema} is unwrapped back into one the moment it's
+ * actually stored -- see {@link TsonSchemaRegistry#register}'s own Javadoc for why linked-ness stops
  * mattering once a schema is safely registered).
  *
  * <p><b>{@link #bootstrap()}</b> -- {@code true} <i>only</i> for a schema {@code MetaKernelParser}
@@ -52,12 +52,12 @@ import java.util.Objects;
  * not derived from {@code id().equals(meta())} -- a *derived* check can't tell "this schema really
  * was produced by reading meta-kernel.tn1 through the real two-pass bootstrap reader" apart from
  * "this schema merely happens to have matching {@code id}/{@code meta} fields," and the whole point
- * of gating {@link SchemaRegistry#register}/{@link SchemaRegistry#linkBootstrap} on it is to keep
+ * of gating {@link TsonSchemaRegistry#register}/{@link TsonSchemaRegistry#linkBootstrap} on it is to keep
  * proving, continuously, that the real reader is what produces whatever ever gets registered under
  * meta-kernel's own identity -- not just that something of the right shape did. Unlike {@code
  * materialised}, this one stays a flag rather than becoming a type: it's true for exactly one
  * object in the entire system, ever, so a dedicated type would only relocate the flag (it would
- * still need to survive linking, so {@link LinkedTsonSchema} would need to carry it too) without
+ * still need to survive linking, so {@link TsonLinkedSchema} would need to carry it too) without
  * buying any safety a universal property like linked-ness actually needs.
  */
 public record TsonSchema(String id, String meta, List<String> imports, Map<String, TypeDefinition> entries,

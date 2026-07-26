@@ -23,7 +23,7 @@ import java.util.Map;
  *
  * <pre>{@code
  * TsonSchema metaKernel = MetaKernelParser.getMetaKernelSchema();
- * SchemaRegistry schemaRegistry = new SchemaRegistry();
+ * TsonSchemaRegistry schemaRegistry = new TsonSchemaRegistry();
  * TsonSchema materializedMetaKernel = schemaRegistry.materializeBootstrap(metaKernel);
  * TsonParserFactoryRegistry factories = TsonParserFactoryRegistry.object(materializedMetaKernel, context);
  * TsonCompiledRegistry registry = new TsonCompiledRegistry(schemaRegistry, factories);
@@ -32,7 +32,7 @@ import java.util.Map;
  *                                             // the bootstrap case alone doesn't satisfy
  *                                             // SchemaValidator's import merge. Registering the
  *                                             // already-materialized result, not the raw metaKernel
- *                                             // itself -- SchemaRegistry.register refuses an
+ *                                             // itself -- TsonSchemaRegistry.register refuses an
  *                                             // unmaterialized bootstrap schema outright (see its
  *                                             // own Javadoc).
  * DefaultSchemaCoordinator coordinator = new DefaultSchemaCoordinator(registry, BundledSchemaSource.INSTANCE);

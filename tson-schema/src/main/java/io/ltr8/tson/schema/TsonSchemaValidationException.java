@@ -1,18 +1,18 @@
 package io.ltr8.tson.schema;
 
 /**
- * A resolved schema failed the consistency checks {@link SchemaRegistry#register} runs before a
+ * A resolved schema failed the consistency checks {@link TsonSchemaRegistry#register} runs before a
  * schema is admitted (Part 2 §3.4.1's Pass 2 validation, and the canonical-identity profile of
  * {@code [TSON-DATA] §2.2.1}) -- an unresolved reference, a malformed/non-canonical {@code !!id},
  * an {@code !!import} list (not yet supported), or a duplicate registration under an already-used
  * identity. Unchecked, matching {@code LexException}/{@code TsonParseException}'s own established
  * shape elsewhere in this codebase.
  */
-public final class SchemaValidationException extends RuntimeException {
+public final class TsonSchemaValidationException extends RuntimeException {
 
     private static final long serialVersionUID = 1L;
 
-    public SchemaValidationException(String message) {
+    public TsonSchemaValidationException(String message) {
         super(message);
     }
 }

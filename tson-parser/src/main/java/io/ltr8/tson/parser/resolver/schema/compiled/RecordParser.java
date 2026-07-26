@@ -45,7 +45,7 @@ import java.util.Optional;
  * element_type: type_ref = T}) throws rather than resolving -- meaningless before generic type-
  * parameter *substitution* exists anywhere in this codebase, which it doesn't yet (materialization
  * only gives an argument-bearing {@code type_ref} a flat synthesized name, see {@code
- * SchemaRegistry}'s own Javadoc -- it never actually substitutes a parameter through a template
+ * TsonSchemaRegistry}'s own Javadoc -- it never actually substitutes a parameter through a template
  * body). {@link RecordBody#groups}'s own "at most one member present" constraint is not enforced --
  * group members already arrive as ordinary {@code OPTIONAL} fields in {@link RecordBody#fields}
  * (flattened there during resolution, see {@code SchemaResolver}'s own Javadoc), so they read
