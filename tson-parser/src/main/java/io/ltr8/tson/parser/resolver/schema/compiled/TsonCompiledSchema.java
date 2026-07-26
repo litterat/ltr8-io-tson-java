@@ -8,7 +8,7 @@ import java.util.Map;
  * A compiled {@link TsonSchema} -- {@code Map<String, TypeDefinition>} lifted to {@code Map<String,
  * TsonSchemaTypeParser<?>>}, where every parser's own references to other entries are real Java object
  * references (a {@link ParserHandle}), not further name lookups. This is the "compile the schema
- * once, read many data documents against it fast" layer sitting on top of {@code TsonSchemaResolver}'s
+ * once, read many data documents against it fast" layer sitting on top of {@code DefinitionResolver}'s
  * own per-declaration resolution and {@code TsonSchemaRegistry}'s whole-schema materialization/
  * validation -- {@link SchemaValidatingParser}, the actual Class 2 (schema-validating) data parser, is built
  * on top of a {@code TsonCompiledSchema}, not directly on {@code TsonSchema}.

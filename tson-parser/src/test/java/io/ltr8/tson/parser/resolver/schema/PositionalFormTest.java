@@ -8,16 +8,18 @@ import io.ltr8.tson.parser.ast.RecordValue;
 import io.ltr8.tson.parser.ast.ScopedValue;
 import io.ltr8.tson.parser.ast.TokenForm;
 import io.ltr8.tson.parser.ast.TokenValue;
-import io.ltr8.tson.parser.ast.schema.SchemaDocument;
-import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.parser.ast.schema.SchemaMap;
 import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Token;
+import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeRef;
 import org.junit.jupiter.api.Test;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -26,14 +28,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * {@link PositionalForm#normalizeToRecordForm} on its own, isolated from {@code Instance}/{@code
- * TsonSchemaResolver} wiring -- exercises both of its jobs against hand-built {@link RecordBody}
+ * DefinitionResolver} wiring -- exercises both of its jobs against hand-built {@link RecordBody}
  * values: the positional-form field-name lookup (§5.6's "exactly one bare REQUIRED field" rule)
  * and the wrap-vs-pass-through decision, then schema-composed default-filling (§5.2/§5.7's {@code
  * ~}/{@code =} field modifiers, added once {@code float32}/{@code float64} surfaced a real gap --
  * see this class's own Javadoc). Also confirms both against real resolved shapes: {@code enum}'s
  * own ({@code enum => ~atom & { members: set<token> }}) for wrapping, and a hand-built mirror of
  * {@code float_type}'s real shape for defaulting (the real end-to-end case lives in
- * {@code TsonSchemaResolverTest.resolvesFloat32AndFloat64FromTheRealCoreTypeLibraryFixture}).
+ * {@code DefinitionResolverTest.resolvesFloat32AndFloat64FromTheRealCoreTypeLibraryFixture}).
  */
 class PositionalFormTest {
 
@@ -234,15 +236,19 @@ class PositionalFormTest {
 
     @Test
     void wrapsAnEnumInstanceValueUsingEnumsOwnRealResolvedBody() {
-        SchemaDocument doc = new TsonSchemaParser("""
+        SchemaMap schemaMap = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 {
                   top => {}
                   atom => top & {}
                   enum => ~atom & { members: set<token> }
-                }""").parseSchemaDocument();
-        TsonSchema schema = new TsonSchemaResolver().resolveSchema(doc);
-        RecordBody enumBody = (RecordBody) schema.entries().get("enum").body();
+                }""").parseSchemaDocument().body();
+        DefinitionResolver resolver = new DefinitionResolver();
+        Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
+        resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
+        resolved.put("atom", resolver.resolveBootstrapDefinition(schemaMap.declarations().get("atom"), resolved));
+        TypeDefinition enumDef = resolver.resolveBootstrapDefinition(schemaMap.declarations().get("enum"), resolved);
+        RecordBody enumBody = (RecordBody) enumDef.body();
 
         ArrayValue booleanMembers = new ArrayValue(List.of(
                 new ScopedValue(Optional.empty(), bareToken("true")),

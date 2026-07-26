@@ -51,7 +51,7 @@ import java.util.Set;
  * method or parameter.</b> Keeps the mapper itself free of any {@code schema.meta} dependency --
  * its own class Javadoc already scopes it to operating against a plain {@code DataBindContext}, not
  * "any bigger schema/type-registry layer." A caller (an {@code Instance}'s resolution, in {@code
- * TsonSchemaResolver}/{@code MetaKernelBootstrapResolver}) runs this normalization first; the result is handed to
+ * DefinitionResolver}/{@code MetaKernelBootstrapResolver}) runs this normalization first; the result is handed to
  * an entirely unmodified {@code TsonMapperReader.toObject}, which binds the now-ordinary,
  * now-complete record shape exactly like any other. A field's own schema-level *type* (e.g.
  * {@code enum}'s {@code members: set<token>}) plays no further role past finding its name/default
@@ -116,7 +116,7 @@ final class PositionalForm {
      * resolver has anywhere to get from yet), and isn't already present in {@code value}'s own
      * fields -- an instance is always free to write an explicit value for a defaulted field (only
      * {@code REQUIRED_FIXED} disallows changing it, and validating that identity-diagonal invariant
-     * isn't attempted here, matching {@code TsonSchemaResolver}'s own tightening logic, which doesn't
+     * isn't attempted here, matching {@code DefinitionResolver}'s own tightening logic, which doesn't
      * check it either), so an already-present field is left completely alone, whatever it says.
      * Returns {@code value} itself, unchanged, if there's nothing to add.
      *

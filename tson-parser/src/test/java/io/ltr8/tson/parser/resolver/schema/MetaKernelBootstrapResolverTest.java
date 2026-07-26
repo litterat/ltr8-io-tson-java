@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Verifies the bootstrap against meta-kernel.tn1 as packaged on the classpath (see this module's
  * {@code build.gradle.kts}): the header directives carry straight through, the 36 declarations
- * {@code TsonSchemaResolver} already resolves via ordinary schema-grammar resolution are all present,
+ * {@code DefinitionResolver} already resolves via ordinary schema-grammar resolution are all present,
  * and all 13 {@code Instance} declarations the second pass covers (three {@code unit} instances,
  * {@code integer}, {@code text}/{@code uri}/{@code regex}, and six {@code enum} instances,
  * including one -- {@code boolean} -- declared *before* {@code enum} itself in source order)
@@ -51,10 +51,10 @@ class MetaKernelBootstrapResolverTest {
     void resolvesAllThirtySixOrdinarilyResolvableDeclarations() {
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
-        // A sample spanning every construct TsonSchemaResolver already handles on its own.
+        // A sample spanning every construct DefinitionResolver already handles on its own.
         for (String name : List.of("top", "atom", "product", "sum", "reference", "integer_size",
                 "integer_type", "record", "array", "map", "tuple", "choice", "schema")) {
-            assertTrue(schema.entries().containsKey(name), name + " should resolve via TsonSchemaResolver alone");
+            assertTrue(schema.entries().containsKey(name), name + " should resolve via DefinitionResolver alone");
         }
     }
 

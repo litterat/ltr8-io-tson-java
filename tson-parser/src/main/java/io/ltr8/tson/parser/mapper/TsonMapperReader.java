@@ -40,7 +40,7 @@ import java.util.Optional;
  * level {@code MapMapper}/{@code ArrayMapper} in {@code tson-bind} operate at), not against any
  * bigger schema/type-registry layer -- except where {@code resolver.schema} itself is the caller,
  * binding a resolved constructor's own {@code DataValue} bindings onto its {@code schema.meta}
- * class (see {@code TsonSchemaResolver}'s own Javadoc for that use).
+ * class (see {@code DefinitionResolver}'s own Javadoc for that use).
  *
  * <p>Read/write split from what was originally one class ({@code TsonMapper}) into {@link
  * TsonMapperReader}/{@link TsonMapperWriter} -- each already paired one {@code to*} method per

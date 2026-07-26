@@ -13,7 +13,7 @@ TSON spec series:
   resolution well underway (see `TsonSchemaResolver` below) — `meta-kernel.tn1` and `meta.tn1` both
   resolve and register in full. `boolean => !enum [true false]`'s own once-permanent generic-binding
   limitation was fixed 2026-07-26 when `bindAtomInstance` moved onto the compiled reader (verified:
-  `TsonSchemaResolverTest.booleanInstanceResolvesCorrectlyViaTheCompiledReader`); core.tn1's own
+  `DefinitionResolverTest.booleanInstanceResolvesCorrectlyViaTheCompiledReader`); core.tn1's own
   end-to-end resolution no longer has a dedicated test since `CoreTn1Parser`/`CoreTn1ParserTest`
   were retired in the same change (see "Not yet implemented" below) — re-verify its exact
   declaration count with a throwaway probe before citing one: https://tson.io/raw/2026/32/tson-part2-schema.md
@@ -455,28 +455,55 @@ positional-form value generically; wrapping the bare value into an equivalent on
 
 ### Schema resolution (`tson-parser/src/main/java/io/ltr8/tson/parser/resolver/schema/`)
 
-`TsonSchemaResolver` turns the grammar-layer `SchemaMap` (same module, `io.ltr8.tson.parser.ast.schema`)
+`DefinitionResolver` turns the grammar-layer `SchemaMap` (same module, `io.ltr8.tson.parser.ast.schema`)
 into resolved `TypeDefinition`s (Part 2 §4, §8) -- values from `tson-schema`'s `io.ltr8.tson.schema.meta`
 (see "Architecture" above for why the resolver itself lives in `tson-parser`, not `tson-schema`, despite
 producing `tson-schema` values). Started 2026-07-23, deliberately narrow, incrementally widened the same
 day to a second construct:
 
-**Public surface cut from seven members to two (2026-07-27, on the user's own explicit direction,
-as part of the same push that put `TsonSchemaCompiler`/`TsonCompiledSchema` "on the good list" --
-narrowing focus onto this class next).** The document-level entry point,
-`resolveAll(SchemaDocument)`, is renamed `resolveSchema(SchemaDocument)` -- clearer against this
-project's own parse -> resolve -> link -> register -> compile -> read vocabulary, and no longer
-collides in spirit with the *other* `resolveAll` (the now-package-private two-argument overload
-threading a `metaParser` through, also renamed `resolveSchema` for the same reason). Every other
-public member -- the no-arg constructor, all three `resolve(SchemaMap.Declaration, ...)` overloads,
-and the two-argument `resolveSchema(SchemaDocument, TsonCompiledSchema)` overload -- is now
-package-private: tracing every real caller (production and test) found each one is either same-
-package already, or reachable through the two members that must stay public (`TsonSchemaResolver
-(SchemaCoordinator)`, needed by `MetaTn1CompiledEndToEndTest` in `resolver.schema.compiled`; and
-`resolveSchema(SchemaDocument)` itself, needed by `DefaultSchemaCoordinator` and that same
-cross-package test). Nothing about this changed behavior -- confirmed by a clean compile across
-every module on the first attempt and an unchanged 1131/0/0/0 test count -- it only closes off entry
-points nothing outside this package actually used.
+**Split into `TsonSchemaResolver` (document-level, public) and `DefinitionResolver` (declaration-level,
+internal) on 2026-07-27, on the user's own explicit direction: "remove the SchemaCoordinator out of
+TsonSchemaResolver all together... rename TsonSchemaResolver to DefinitionResolver... create a new
+TsonSchemaResolver which requires a SchemaCoordinator."** Two prior narrowing passes the same day
+already cut the old, unified class's public surface from seven members to two (`resolveAll` renamed
+`resolveSchema`; the two-argument declaration-level overload renamed `resolveBootstrapDefinition` to
+name its own real caller, `MetaKernelBootstrapResolver`'s two-pass loop) -- but tracing exactly *why*
+`SchemaCoordinator` was even a field on this class surfaced the real problem: it was consulted by
+only two methods, `compiledMetaSchema` and `mergeImports`, and both were only ever reached from the
+class's own `resolveSchema(SchemaDocument)`. That's a concrete sign "resolve one declaration" and
+"resolve a whole document, given a way to fetch its governing meta-schema and imports" were two
+different jobs sharing one file, not one job with an optional dependency.
+
+- **`TsonSchemaResolver`** (public) now holds the `SchemaCoordinator` -- **required** in its
+  constructor, not optional (the old no-arg constructor, and the "coordinator may be `null`" branch
+  every coordinator-touching method used to carry, are both gone: a document-level resolution that
+  can't validate its own `!!id` or reach its own `!!meta` isn't a degraded version of this job, it's
+  a different one). Holds one internal `DefinitionResolver` instance and delegates every
+  per-declaration call to it. `resolveSchema(SchemaDocument)` -- header-directive validation
+  (`!!id`/`!!import`), deriving the structure namespace via `compiledMetaSchema`, merging `!!import`
+  entries via `mergeImports` -- and the two-argument `compiledMetaSchema`/package-private
+  `SchemaCoordinator`-consuming machinery are the only things left on it.
+- **`DefinitionResolver`** (package-private now, no `Tson` prefix -- internal machinery a consumer of
+  this library never names directly, per "Naming convention" above) never references
+  `SchemaCoordinator` at all. Holds `resolve(SchemaMap.Declaration)`/`resolveBootstrapDefinition
+  (SchemaMap.Declaration, Map)`/`resolve(SchemaMap.Declaration, Map, TsonCompiledSchema)` (the
+  declaration-level primitives) plus a batch `resolveSchema(SchemaDocument, TsonCompiledSchema)`
+  convenience -- looping every declaration in a document with no validation and no import-merging,
+  kept *here* rather than on `TsonSchemaResolver` specifically because it needs no coordinator: tying
+  it to the coordinator-*requiring* class would force a caller who already has a structure namespace
+  in hand, but no real coordinator, to fabricate one just to call it. `resolveBootstrapDefinition`'s
+  own name still describes its real production caller (`MetaKernelBootstrapResolver`'s two-pass
+  loop, one declaration at a time, in source order -- meta-kernel's own `!!meta` names itself, so it
+  can never go through `resolveSchema` the ordinary way); test code resolving one hand-built
+  declaration in isolation calls it too, for the identical underlying reason (no structure namespace
+  available/wanted), not because those tests are themselves "about" bootstrapping.
+
+Verified behavior-preserving, not just compiling: every real caller (production and test) was traced
+before deciding what moved where, a clean compile succeeded across every module on the first attempt
+for each step, and the test count stayed at the established 1131/0/0/0 bar throughout. `DefinitionResolverTest`
+itself is now almost entirely a `DefinitionResolver` test in practice (nearly every one of its own
+cases constructs one directly) -- not renamed/split yet, flagged as a natural next step rather than
+done silently mid-refactor.
 
 - **Record construction** -- a record (no supertypes, no type parameters) whose fields are simple
   type-refs, each REQUIRED or OPTIONAL (a `?` suffix; field *modifiers* -- default/fixed values --
@@ -607,7 +634,7 @@ points nothing outside this package actually used.
   structure namespace (the governing meta-schema's own namespace, one hop via its own `!!meta`) --
   an atom-refinement source (`!I ^ {...}`) never consults the structure namespace at all. Pure
   plumbing on its own (nothing consumed it until step 4 below); confirmed inert with a dedicated
-  test (`TsonSchemaResolverTest.structureNamespaceOverloadsAreInertUntilInstanceAtomRefinementDispatchExists`)
+  test (`DefinitionResolverTest.structureNamespaceOverloadsAreInertUntilInstanceAtomRefinementDispatchExists`)
   before anything used it.
 - **Constructor application** (`!C value`, `Instance`, §5.5/§5.6, `resolveInstance`, added
   2026-07-24, Phase B step 4) -- resolves `C` per the two-namespace lookup above, rejects a
@@ -683,7 +710,7 @@ points nothing outside this package actually used.
   serializes to an empty record, so the merge is a no-op there -- this recovers the previous,
   already-verified non-chained behavior exactly, not a separate code path (confirmed: `core.tn1`'s
   own resolution count was unchanged by this fix). Verified directly, not just reasoned about:
-  `TsonSchemaResolverTest.chainedAtomRefinementMergesWithIntermediateBindingsInsteadOfDiscardingThem`
+  `DefinitionResolverTest.chainedAtomRefinementMergesWithIntermediateBindingsInsteadOfDiscardingThem`
   chains two refinements deep (`int8` → `big` → `veryBig`) and confirms `size` survives both hops,
   `min` survives the second hop, and each level's own explicit override still wins over what it
   inherited. Per §5.5's own
@@ -696,7 +723,7 @@ Every other construct (elided field types outside a tightening entry, an `Absent
 a modifier on an OPTIONAL field, the identity-diagonal FIXED-value invariant, restating a field
 group in a refinement body, subtraction, a generic type-ref with a nested or value (non-simple)
 argument, and an inter-supertype field collision) throws `UnsupportedOperationException` rather
-than silently mis-resolving -- `TsonSchemaResolver`'s own Javadoc lists exactly what's in scope.
+than silently mis-resolving -- `DefinitionResolver`'s own Javadoc lists exactly what's in scope.
 
 **Status against the real fixtures (re-check with a throwaway probe before trusting these counts --
 they change every time resolver coverage widens): `meta-kernel.tn1` resolves in full (49/49, via
@@ -714,7 +741,7 @@ was ever consulted), so `"true"`/`"false"` misidentified as real Java booleans b
 fixtures has ordinary identifier members that never collide this way. The compiled reader's own
 atom-family dispatch is schema-driven (looked up by the constructor's own name, fixed at compile
 time via `TsonParserFactoryRegistry`), not token-identification-driven, so this collision simply
-doesn't happen there -- verified directly: `TsonSchemaResolverTest
+doesn't happen there -- verified directly: `DefinitionResolverTest
 .booleanInstanceResolvesCorrectlyViaTheCompiledReader` resolves `boolean` from a real-fixture-shaped
 schema and gets back `EnumBody(members=["true", "false"])`, no exception. This also retired
 `CoreTn1Parser`'s own hand-picked `boolean` bypass entirely (see "Bundled schema documents" above)
@@ -754,7 +781,7 @@ avoid this -- its own code comment says it deliberately does not resolve member 
 interface (`Ref`/`Value`) instead, not a stylistic choice but the one shape that lets a
 mutually-recursive pair like this bind at all today -- at the cost of a spurious `!ref`/`!value`
 type-ref `toTson` writes that the kernel's own tag-less form doesn't have (documented in
-`TypeArgument`'s own Javadoc and `TsonSchemaResolverTest`'s array-sugar assertions). If a future session
+`TypeArgument`'s own Javadoc and `DefinitionResolverTest`'s array-sugar assertions). If a future session
 is tempted to "fix" this back to a plain record, re-read `TypeArgument`'s Javadoc first.
 
 - **`io.ltr8.tson.schema.meta`** holds the resolved-value model -- one Java type per meta-kernel
@@ -784,7 +811,7 @@ is tempted to "fix" this back to a plain record, re-read `TypeArgument`'s Javado
     validation; each one's own Javadoc says so explicitly. Their RFC-citation field is a flat
     `String spec`, not nested `AtomSpecification` and not `java.net.URI` -- see `Cidr4Type`'s own
     Javadoc for the two corrections that took to get there (both explained in "Schema resolution"
-    above's `PositionalForm` bullet). `TsonSchemaResolver` now resolves most atom-constraint-family
+    above's `PositionalForm` bullet). `DefinitionResolver` now resolves most atom-constraint-family
     instances directly via its own generic `Instance`/`AtomRefinement` resolution (see "Schema
     resolution" above) -- `MetaKernelBootstrapResolver` only still hand-binds three of meta-kernel's own six
     real instances (`uri_type`, `regex_type`, `enum`; see "Meta-kernel bootstrap" below for exactly
@@ -837,7 +864,7 @@ is tempted to "fix" this back to a plain record, re-read `TypeArgument`'s Javado
   `!record`/`!reference`/`!unit`/`!enum`/`!choice`/`!array`/`!map`/`!tuple` written correctly -- no special
   casing anywhere, for precisely the "body: top" polymorphism the kernel itself describes. It also
   surfaced concrete, worth-knowing limits of generic binding versus the fixture's own hand-authored
-  style -- none of them wrong, all textual, and all documented in `TsonSchemaResolverTest`'s own class Javadoc:
+  style -- none of them wrong, all textual, and all documented in `DefinitionResolverTest`'s own class Javadoc:
   no outer `!type_definition` tag (plain records, unlike union members, never self-announce a type-ref);
   quoted strings where the fixture uses bare tokens (an enum's bridge yields a `String`, and `TsonMapperWriter`
   always quotes strings -- pre-existing, already-documented behavior, not new); every empty-list/`false`/
@@ -861,10 +888,10 @@ is tempted to "fix" this back to a plain record, re-read `TypeArgument`'s Javado
   bootstrap reader" was redundant once that existed. `TsonSchemaResolver.resolveSchema(SchemaDocument)`
   builds one from a whole document (not just its body), resolving each entry independently in
   source order and carrying the header straight through; most entries of an arbitrary real schema
-  still throw via this path alone, since most constructs aren't resolved yet -- `resolve
-  (SchemaMap.Declaration)` resolves a single named entry and is the one to reach for against a real
-  fixture until more constructs are supported (or use `MetaKernelBootstrapResolver`, below, for meta-kernel
-  specifically).
+  still throw via this path alone, since most constructs aren't resolved yet -- `DefinitionResolver
+  .resolve(SchemaMap.Declaration)` resolves a single named entry and is the one to reach for against
+  a real fixture until more constructs are supported (or use `MetaKernelBootstrapResolver`, below, for
+  meta-kernel specifically).
 
 ### Meta-kernel bootstrap (`tson-parser/src/main/java/io/ltr8/tson/parser/resolver/schema/MetaKernelBootstrapResolver.java`)
 
@@ -876,7 +903,7 @@ nothing either way: resolving a constructor-*application* instance (`!C value`, 
 uses is defined within meta-kernel itself.
 
 `MetaKernelBootstrapResolver` is a stateless parser/resolver -- the same shape as `TsonSchemaParser`/
-`TsonSchemaResolver` -- **producing a plain `TsonSchema` (`bootstrap() == true`) from
+`DefinitionResolver` -- **producing a plain `TsonSchema` (`bootstrap() == true`) from
 `getMetaKernelSchema()`, its only public method,** rather than being one itself (an even earlier
 version of this class extended `TsonSchema` directly; then briefly held a dedicated `MetaSchema`
 subtype for the result, since removed 2026-07-26 in favor of the plain `bootstrap` flag -- see
@@ -889,8 +916,8 @@ removed outright, not just deprecated, since keeping it around invites exactly t
 reuse the bootstrap parser for this other thing" misuse this lock-down exists to prevent. It
 resolves in two passes over meta-kernel's 49 declarations:
 
-1. Every declaration whose `TypeDef` is **not** an `Instance` goes through `TsonSchemaResolver` exactly
-   as normal, in source order (36 of the 49, everything `TsonSchemaResolver`'s own Javadoc already
+1. Every declaration whose `TypeDef` is **not** an `Instance` goes through `DefinitionResolver` exactly
+   as normal, in source order (36 of the 49, everything `DefinitionResolver`'s own Javadoc already
    documents as in scope).
 2. The 13 deferred `Instance` declarations (`value => !unit {}`, `boolean => !enum [true false]`,
    `integer => !integer_type {}`, and friends) are resolved in a **second pass**, once every
@@ -902,10 +929,10 @@ resolves in two passes over meta-kernel's 49 declarations:
    and still can't handle a forward reference like `boolean` preceding `enum`.
 
 **Constructor-application binding goes entirely through `MetaKernelBootstrapResolver.instanceBody`, a
-package-private (for its own defensive-path tests) closed switch -- not `TsonSchemaResolver`/
+package-private (for its own defensive-path tests) closed switch -- not `DefinitionResolver`/
 `TsonMapperReader`, and not any schema-driven compiled reader either.** Widened 2026-07-25 from an
 earlier version ("Phase B step 6") that routed `unit`/`integer_type`/`text_type` through
-`TsonSchemaResolver.resolve`'s ordinary `Instance` path and hand-picked only `uri_type`/`regex_type`/
+`DefinitionResolver.resolve`'s ordinary `Instance` path and hand-picked only `uri_type`/`regex_type`/
 `enum` -- that split turned out to be an unnecessary halfway point. Originally pulled out into its
 own `BootstrapMetaKernelCompiler` class the same day, then merged back into `MetaKernelBootstrapResolver`
 itself a few hours later, on the user's own observation: it had exactly one caller, produced a `Top`
@@ -913,7 +940,7 @@ itself a few hours later, on the user's own observation: it had exactly one call
 "Compiler" in its name collided with what that word now means elsewhere in this codebase (now the
 real `TsonSchemaCompiler`) -- reserving "Compiler" for a class that actually produces a compiled
 reader keeps the vocabulary unambiguous. The full case against letting *any* meta-kernel `Instance`
-reach generic binding: `TsonSchemaResolver.resolveInstance`'s own generic path binds via
+reach generic binding: `DefinitionResolver.resolveInstance`'s own generic path binds via
 `TsonMapperReader`, which is identification-first (a token is classified null/boolean/number/string
 *before* the target field is even consulted) -- exactly why `boolean => !enum [true false]` needs
 hand-picking at all (`"true"`/`"false"` misidentify as real booleans before `EnumBody.members` ever
@@ -945,7 +972,7 @@ pass over a knowingly-incomplete map (checked directly: doesn't work -- `integer
 step just for bootstrap's own benefit. Given meta-kernel's own instance shapes are this narrow and
 fully known in advance, that complexity buys nothing -- this class's own guiding principle here:
 "the bootstrap compiler can do whatever tricks it needs to... that includes not even compiling, just
-calling `new Xxx(...)`." (This is also why `TsonSchemaResolver.bindAtomInstance` -- which *does* now
+calling `new Xxx(...)`." (This is also why `DefinitionResolver.bindAtomInstance` -- which *does* now
 bind every other meta-kernel/meta.tn1/core.tn1 `Instance` and atom refinement through a real
 compiled reader, see "Schema resolution" above -- was never a candidate for meta-kernel's own
 bootstrap specifically; the two problems look similar but aren't the same one.)
@@ -979,7 +1006,7 @@ field-group-in-a-bound-instance design work (mutual exclusion between `min`/`exc
 (or gained) its own `UNCONSTRAINED` constant for exactly this empty-body case. Each gained
 `@Typename` (`text_type`/`uri_type`/`regex_type`) and multi-word fields gained `@Field`
 (`min_length`/`max_length`), matching the convention every other `Atom` variant already
-follows -- `IntegerType`/`TextType` now bind generically via `TsonSchemaResolver` (see above);
+follows -- `IntegerType`/`TextType` now bind generically via `DefinitionResolver` (see above);
 `UriType`/`RegexType` don't (still hand-picked, above), but keep the same annotations for
 consistency and in case something else (e.g. a `toTson` call on one of these) needs them. The
 remaining nine atom constraint-vocabulary families (`DecimalType`/`FloatType`/`RationalType`/`UuidType`/`BinaryType`/
@@ -1000,18 +1027,18 @@ neither class had ever been a bind *target* before (every earlier use just const
 directly in Java), so nothing had surfaced it. Fixed by writing out the canonical constructor
 explicitly (compact, for `IntegerType`; empty-bodied, for `IntegerSize`, which didn't have one
 written out at all before) with `@Record` attached -- both annotations stay in place even though
-`MetaKernelBootstrapResolver` itself no longer needs generic binding, since `TsonSchemaResolverTest`'s own
+`MetaKernelBootstrapResolver` itself no longer needs generic binding, since `DefinitionResolverTest`'s own
 `toTson` verification (below) still binds through `TsonMapperWriter`.
-- **Verified against the real fixture, not just a hand-written snippet.** `TsonSchemaResolverTest` resolves
+- **Verified against the real fixture, not just a hand-written snippet.** `DefinitionResolverTest` resolves
   `integer_size` both from a small inline schema and from the real `spec/m/meta-kernel.tn1`, and asserts
   the exact real `toTson` output -- structurally equivalent to (per the divergences above, not a content
   difference from) `meta-kernel-resolved.tn1`'s own `integer_size` entry, and, via hand-built `Reference`/
-  `Unit`/`EnumBody`/etc. values exercising shapes `TsonSchemaResolver` doesn't produce yet, `type_name`'s/
+  `Unit`/`EnumBody`/etc. values exercising shapes `DefinitionResolver` doesn't produce yet, `type_name`'s/
   `value`'s/`boolean`'s own entries too.
 
 ### Schema registry (`tson-schema/src/main/java/io/ltr8/tson/schema/`, `.../registry/`)
 
-`TsonSchemaResolver`/`MetaKernelBootstrapResolver` (both in `tson-parser`) resolve each declaration
+`DefinitionResolver`/`MetaKernelBootstrapResolver` (both in `tson-parser`) resolve each declaration
 *individually* — no whole-schema consistency checking, references carried through as bare,
 unverified strings, `!!import` parsed but never consulted, and a `type_ref` with arguments (e.g.
 `enum`'s own `members: set<token>` field, or any field using §5.3's `[X]`/`[X]?` array sugar) left
@@ -1433,7 +1460,7 @@ directly too (accepts a well-formed candidate silently; rejects no-scheme and ca
 
 **A real, named layering exception, not an oversight.** Every other note about these two packages
 describes `resolver.schema.compiled` sitting *on top of* `resolver.schema`'s own resolution
-(`TsonCompiledSchema`'s own Javadoc: "sitting on top of `TsonSchemaResolver`'s own per-declaration
+(`TsonCompiledSchema`'s own Javadoc: "sitting on top of `DefinitionResolver`'s own per-declaration
 resolution"). `SchemaCoordinator`/`DefaultSchemaCoordinator` (in `resolver.schema`, alongside
 `TsonSchemaResolver`) reach the opposite direction, importing `TsonCompiledRegistry`/`TsonCompiledSchema`/
 `TsonSchemaCompiler`/`TsonParserFactoryRegistry` from `resolver.schema.compiled` — the one place in
@@ -1675,7 +1702,7 @@ No system Gradle — always use the wrapper:
 - Part 2 schema resolution: subtraction, elided field types outside a tightening entry, restating a
   field group in a refinement body, the identity-diagonal FIXED-value invariant, and generic
   type-refs beyond a bare two-argument `map<K, V>` application or a refinement source — see
-  `TsonSchemaResolver`'s own Javadoc (under "Schema resolution" above) for the exact, current boundary
+  `DefinitionResolver`'s own Javadoc (under "Schema resolution" above) for the exact, current boundary
   of what resolves. (Template/instantiation-entry *materialization* itself is now handled — see
   "Schema registry" above — just not per §8.2's precise constructor-vs-template split;
   materialization is uniform. Constructor-application `Instance` and atom-refinement resolution are

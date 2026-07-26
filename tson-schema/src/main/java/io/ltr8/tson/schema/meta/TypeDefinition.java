@@ -17,7 +17,7 @@ import java.util.Optional;
  * constructor}, a bare {@code boolean}, always appears (as {@code false}) rather than being omitted
  * at its nominal default -- a hand-written writer could special-case "omit when at default" for
  * these; plain generic binding has no such concept beyond {@code Optional.empty()}/{@code null}.
- * See {@code TsonSchema}'s and {@code TsonSchemaResolverTest}'s own notes for what this means in
+ * See {@code TsonSchema}'s and {@code DefinitionResolverTest}'s own notes for what this means in
  * practice: written output is structurally faithful but more verbose than the non-normative
  * {@code meta-kernel-resolved.tn1} fixture's own hand-authored, terser conventions.
  */

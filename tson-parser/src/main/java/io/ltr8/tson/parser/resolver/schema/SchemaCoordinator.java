@@ -15,7 +15,7 @@ import io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledSchema;
  * !!meta}, which names itself. A plain "look it up, fail if missing" registry has no way to close
  * that loop -- it would need meta-kernel to already be registered before it can register meta-kernel.
  * A coordinator can recognize the request as the one genuinely circular case in the whole series
- * (Part 2 §1.5) and answer it directly, via {@link MetaKernelBootstrapResolver#parse()}'s own hand-written
+ * (Part 2 §1.5) and answer it directly, via {@link MetaKernelBootstrapResolver#getMetaKernelSchema()}'s own hand-written
  * bootstrap, instead of trying (and failing) to resolve it the ordinary way.
  *
  * <p>This is also the natural, single place to enforce policy over *what* gets resolved from

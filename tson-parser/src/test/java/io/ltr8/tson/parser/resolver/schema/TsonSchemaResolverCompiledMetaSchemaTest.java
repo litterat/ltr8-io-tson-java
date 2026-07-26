@@ -163,14 +163,15 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         assertEquals("INDEX", result);
     }
 
+    /**
+     * A {@link SchemaCoordinator} is required now, not optional (2026-07-27, on the user's own
+     * explicit direction, alongside splitting {@code DefinitionResolver} out of this class) -- the
+     * old "no coordinator at all" state this test used to construct via a bare no-arg constructor no
+     * longer exists; the constructor rejects a {@code null} coordinator outright instead.
+     */
     @Test
-    void withNoCoordinatorCompiledMetaSchemaThrowsClearly() {
-        TsonSchemaResolver resolver = new TsonSchemaResolver();
-        SchemaDocument coreDocument = new TsonSchemaParser(BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.CORE_TN1_ID)).parseSchemaDocument();
-
-        IllegalStateException thrown = assertThrows(IllegalStateException.class,
-                () -> resolver.compiledMetaSchema(coreDocument));
-        assertTrue(thrown.getMessage().contains("SchemaCoordinator"));
+    void constructingWithoutACoordinatorThrowsClearly() {
+        assertThrows(NullPointerException.class, () -> new TsonSchemaResolver(null));
     }
 
     @Test

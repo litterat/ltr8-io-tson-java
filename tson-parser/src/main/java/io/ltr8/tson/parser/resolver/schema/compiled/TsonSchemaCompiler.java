@@ -69,7 +69,7 @@ import java.util.Set;
  * though {@code top} is also the supertype of everything else in the schema); a type-ref naming a
  * known subtype dispatches there instead, lazily. Schema-driven, not Java-driven -- this is
  * deliberately *not* implemented by leaning on {@code tson-bind}'s own sealed-interface/{@code
- * @Typename} union matching the way {@code TsonSchemaResolver}'s generic constructor-application
+ * @Typename} union matching the way {@code DefinitionResolver}'s generic constructor-application
  * binding does one layer down: {@code subtypes} is the schema's own, language-agnostic
  * representation of "who composes with this," and using it here rather than Java class hierarchy
  * details is what makes this layer's own polymorphism handling portable to a from-scratch

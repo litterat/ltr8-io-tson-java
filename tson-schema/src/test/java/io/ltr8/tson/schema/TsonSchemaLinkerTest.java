@@ -145,7 +145,7 @@ class TsonSchemaLinkerTest {
         TypeDefinition synthetic = result.schema().entries().get(syntheticName);
         assertEquals(TypeKind.PRODUCT, synthetic.kind());
         assertEquals(TypeRef.of("array"), synthetic.source().orElseThrow(),
-                "source is the bare constructor name, matching TsonSchemaResolver.resolveInstance's own convention");
+                "source is the bare constructor name, matching DefinitionResolver.resolveInstance's own convention");
 
         ArrayBody body = (ArrayBody) synthetic.body();
         assertEquals(TypeRef.of("token"), body.elementType());
@@ -329,7 +329,7 @@ class TsonSchemaLinkerTest {
 
     @Test
     void subtypesPropagateTransitivelyThroughAnAlreadyTransitiveSupertypeChain() {
-        // supertypes is already the full transitive chain by the time this runs (TsonSchemaResolver's
+        // supertypes is already the full transitive chain by the time this runs (DefinitionResolver's
         // own induction), so the reverse index falls out the same way with no extra closure step.
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("top", emptyRecord());
