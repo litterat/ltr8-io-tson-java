@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Proves {@code TsonSchemaRegistry}/{@code TsonSchemaLinker} (both in {@code tson-schema}) actually work
  * end-to-end against the real {@code meta-kernel.tn1} fixture -- this test lives here, not in
  * {@code tson-schema}'s own test tree, because it's the only module with both {@link
- * MetaKernelParser} and {@code tson-schema} available (that module has no dependency on {@code
+ * MetaKernelBootstrapResolver} and {@code tson-schema} available (that module has no dependency on {@code
  * tson-parser} at all).
  *
  * <p>Uses {@link TsonSchemaRegistry#linkBootstrap}, not {@link TsonSchemaLinker#link} directly, to turn
@@ -41,7 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * neitherRawNorLinkedBootstrapFormCanEverBeRegistered} below cover that rejection in both forms;
  * {@code registeringTheOrdinarilyResolvedNonBootstrapMetaKernelSucceeds} covers the one way
  * meta-kernel's own identity can actually end up registered -- resolved via ordinary {@code
- * SchemaResolver.resolveAll} (which never sets {@code bootstrap}), using the coordinator's own
+ * TsonSchemaResolver.resolveAll} (which never sets {@code bootstrap}), using the coordinator's own
  * bootstrap branch as the structure-namespace ground truth, mirroring {@code
  * MetaTn1CompiledEndToEndTest#registerMeta}'s own pattern.
  */
@@ -49,7 +49,7 @@ class MetaKernelSchemaRegistryTest {
 
     @Test
     void linksTheRealMetaKernelSchemaSynthesizingEveryGenericFieldTypeRef() {
-        TsonSchema raw = MetaKernelParser.getMetaKernelSchema();
+        TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
         TsonSchemaRegistry registry = new TsonSchemaRegistry();
 
         TsonLinkedSchema linked = registry.linkBootstrap(raw);
@@ -91,7 +91,7 @@ class MetaKernelSchemaRegistryTest {
     @Test
     void registeringTheRawBootstrapMetaKernelDirectlyIsRejected() {
         TsonSchemaRegistry registry = new TsonSchemaRegistry();
-        TsonLinkedSchema unlinked = new TsonLinkedSchema(MetaKernelParser.getMetaKernelSchema());
+        TsonLinkedSchema unlinked = new TsonLinkedSchema(MetaKernelBootstrapResolver.getMetaKernelSchema());
 
         TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
                 () -> registry.register(unlinked));
@@ -107,7 +107,7 @@ class MetaKernelSchemaRegistryTest {
      */
     @Test
     void neitherRawNorLinkedBootstrapFormCanEverBeRegistered() {
-        TsonSchema raw = MetaKernelParser.getMetaKernelSchema();
+        TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
         TsonSchemaRegistry registry = new TsonSchemaRegistry();
         TsonLinkedSchema linked = registry.linkBootstrap(raw);
 
@@ -124,9 +124,9 @@ class MetaKernelSchemaRegistryTest {
 
     /**
      * The one way meta-kernel's own identity can actually end up registered: resolved via ordinary
-     * {@code SchemaResolver.resolveAll} against a coordinator whose own bootstrap branch supplies the
+     * {@code TsonSchemaResolver.resolveAll} against a coordinator whose own bootstrap branch supplies the
      * complete structure namespace (so even a forward-referencing declaration like {@code boolean =>
-     * !enum [...]} resolves correctly, the same as {@code MetaKernelParser}'s own two-pass logic
+     * !enum [...]} resolves correctly, the same as {@code MetaKernelBootstrapResolver}'s own two-pass logic
      * achieves, just via the generic mechanism instead) -- {@code resolveAll} never sets {@code
      * bootstrap}, so the result passes {@link TsonSchemaRegistry#register}'s guard even though its own
      * entries are identical to the real, linked meta-kernel. Mirrors {@code
@@ -134,7 +134,7 @@ class MetaKernelSchemaRegistryTest {
      */
     @Test
     void registeringTheOrdinarilyResolvedNonBootstrapMetaKernelSucceeds() {
-        TsonSchema metaKernelBootstrap = MetaKernelParser.getMetaKernelSchema();
+        TsonSchema metaKernelBootstrap = MetaKernelBootstrapResolver.getMetaKernelSchema();
         TsonSchemaRegistry registry = new TsonSchemaRegistry();
         TsonLinkedSchema linkedBootstrap = registry.linkBootstrap(metaKernelBootstrap);
 
@@ -145,7 +145,7 @@ class MetaKernelSchemaRegistryTest {
 
         String source = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID);
         SchemaDocument document = new TsonSchemaParser(source).parseSchemaDocument();
-        TsonSchema resolved = new SchemaResolver(coordinator).resolveAll(document);
+        TsonSchema resolved = new TsonSchemaResolver(coordinator).resolveAll(document);
         assertFalse(resolved.bootstrap());
 
         TsonLinkedSchema registered = registry.register(TsonSchemaLinker.link(resolved, registry));

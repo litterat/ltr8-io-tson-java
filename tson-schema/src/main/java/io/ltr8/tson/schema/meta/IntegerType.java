@@ -13,7 +13,7 @@ import java.util.Optional;
  * multiple-of constraint. Pure constraint values, no parsing or validation behavior -- {@code
  * tson-parser}'s {@code IntegerParser} holds one of these and does the actual reading/writing.
  *
- * <p>Also an {@link Atom} variant (added 2026-07-23, alongside {@code MetaKernelParser}): {@code
+ * <p>Also an {@link Atom} variant (added 2026-07-23, alongside {@code MetaKernelBootstrapResolver}): {@code
  * integer => !integer_type {}} is a constructor-application instance (§5.5) whose resolved body is
  * exactly this shape, bound via plain {@code TsonMapper.toObject} the same way every other {@link
  * Top} variant round-trips through generic binding -- it's the first of the atom
@@ -28,7 +28,7 @@ import java.util.Optional;
  * #IntegerType(IntegerSize)} one below is the second): {@code tson-bind}'s {@code
  * DefaultRecordBinder.getConstructor} only auto-picks a bare class's sole constructor when exactly
  * one exists, and throws {@code CodeAnalysisException} ("Could not find constructor") otherwise
- * unless one is explicitly marked. Confirmed empirically -- {@code MetaKernelParser} binding {@code
+ * unless one is explicitly marked. Confirmed empirically -- {@code MetaKernelBootstrapResolver} binding {@code
  * integer => !integer_type {}} via plain {@code TsonMapper.toObject} was the first real use of
  * this class as a bind *target* (every earlier use just constructed it directly in Java), and
  * surfaced this immediately.

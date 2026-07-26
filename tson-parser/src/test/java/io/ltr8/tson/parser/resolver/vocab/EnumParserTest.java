@@ -30,7 +30,7 @@ class EnumParserTest {
 
     @Test
     void matchesByTextRegardlessOfTokenForm() {
-        // The same form-agnostic behavior MetaKernelParser's own hand-written enum converter uses --
+        // The same form-agnostic behavior MetaKernelBootstrapResolver's own hand-written enum converter uses --
         // a quoted "true" is still the member "true".
         EnumParser type = new EnumParser(List.of("true", "false"));
         assertEquals("true", type.read(token("true", TokenForm.SINGLE_LINE_QUOTED)));

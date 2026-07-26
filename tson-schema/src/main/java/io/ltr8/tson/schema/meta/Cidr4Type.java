@@ -21,7 +21,7 @@ import java.util.Optional;
  * atom_specification}'s own {@code spec} field composes into {@code cidr4_type} flat too
  * (composition always flattens, §5.8) -- {@code UriType}/{@code RegexType}'s own nested {@code
  * specification: AtomSpecification} field predates this mechanism and still doesn't bind correctly
- * for exactly this reason (see {@code MetaKernelParser}'s own Javadoc), not retrofitted here to
+ * for exactly this reason (see {@code MetaKernelBootstrapResolver}'s own Javadoc), not retrofitted here to
  * avoid a breaking change to those two already-tested classes; (2) a bare, untyped string value
  * (no {@code !uri} type-ref -- the schema modifier is just {@code spec: = "https://..."}, no
  * annotation) can't bind directly into a {@code java.net.URI}-typed field at all -- {@code

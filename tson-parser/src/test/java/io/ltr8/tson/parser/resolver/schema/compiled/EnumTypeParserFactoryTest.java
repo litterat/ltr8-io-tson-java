@@ -2,7 +2,7 @@ package io.ltr8.tson.parser.resolver.schema.compiled;
 
 import io.ltr8.tson.parser.TsonDataParser;
 import io.ltr8.tson.parser.ast.Document;
-import io.ltr8.tson.parser.resolver.schema.MetaKernelParser;
+import io.ltr8.tson.parser.resolver.schema.MetaKernelBootstrapResolver;
 import io.ltr8.tson.parser.resolver.vocab.AtomValidationException;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.schema.TsonSchema;
@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  * -- broken for generic Java-object binding (its members collide with TSON's own boolean-literal
  * shape, see {@code EnumParser}'s own Javadoc), but read correctly here, since nothing in this
  * package ever routes a token through {@code BaseTypeResolver} identification at all. Uses {@code
- * boolean}'s own *real*, {@code MetaKernelParser}-resolved {@link EnumBody} -- not a hand-built
+ * boolean}'s own *real*, {@code MetaKernelBootstrapResolver}-resolved {@link EnumBody} -- not a hand-built
  * stand-in -- as the field type of a small local record, then reads real TSON data source text
  * through the real {@link TsonDataParser}.
  */
@@ -38,7 +38,7 @@ class EnumTypeParserFactoryTest {
         // names "enum", "enum" composes with "atom", and so on transitively; cherry-picking just
         // "boolean" drags in most of meta-kernel anyway via SchemaValidator's own reference checks,
         // so there's nothing simpler about trying to trim it down. One extra local entry on top.
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>(MetaKernelParser.getMetaKernelSchema().entries());
+        Map<String, TypeDefinition> entries = new LinkedHashMap<>(MetaKernelBootstrapResolver.getMetaKernelSchema().entries());
         entries.put("flag_holder", TypeDefinition.product(
                 RecordBody.of(List.of(RecordField.required("flag", TypeRef.of("boolean"))))));
         TsonSchema schema = new TsonSchema("https://example.test/flag.tn1",

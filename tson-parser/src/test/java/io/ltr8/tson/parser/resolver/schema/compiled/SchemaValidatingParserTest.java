@@ -1,6 +1,6 @@
 package io.ltr8.tson.parser.resolver.schema.compiled;
 
-import io.ltr8.tson.parser.resolver.schema.MetaKernelParser;
+import io.ltr8.tson.parser.resolver.schema.MetaKernelBootstrapResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class SchemaValidatingParserTest {
 
     private static SchemaValidatingParser dataParser() {
-        TsonSchema raw = MetaKernelParser.getMetaKernelSchema();
+        TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
         TsonLinkedSchema linked = new TsonSchemaRegistry().linkBootstrap(raw);
         return new SchemaValidatingParser(TsonSchemaCompiler.compile(linked.schema(), TsonParserFactoryRegistry.dom()));
     }
@@ -59,7 +59,7 @@ class SchemaValidatingParserTest {
     @Test
     void schemaAccessorReturnsTheWrappedCompiledSchema() {
         TsonCompiledSchema compiled = TsonSchemaCompiler.compile(
-                new TsonSchemaRegistry().linkBootstrap(MetaKernelParser.getMetaKernelSchema()).schema(), TsonParserFactoryRegistry.dom());
+                new TsonSchemaRegistry().linkBootstrap(MetaKernelBootstrapResolver.getMetaKernelSchema()).schema(), TsonParserFactoryRegistry.dom());
         SchemaValidatingParser parser = new SchemaValidatingParser(compiled);
 
         assertEquals(compiled, parser.schema());

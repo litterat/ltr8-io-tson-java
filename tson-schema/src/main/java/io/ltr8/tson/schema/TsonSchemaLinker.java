@@ -185,10 +185,10 @@ public final class TsonSchemaLinker {
 
     /**
      * Populates {@link TypeDefinition#subtypes}, the reverse of {@link TypeDefinition#supertypes}
-     * -- never done anywhere before this (see {@code SchemaResolver}'s own Javadoc: "subtypes...
+     * -- never done anywhere before this (see {@code TsonSchemaResolver}'s own Javadoc: "subtypes...
      * is never populated -- it needs a whole-schema pass, not a per-declaration one"). Since {@code
      * supertypes} is already the full *transitive* IS-A chain (by the induction {@code
-     * SchemaResolver}'s composition/refinement resolution already performs), the reverse index
+     * TsonSchemaResolver}'s composition/refinement resolution already performs), the reverse index
      * falls out just as transitively for free: if {@code success_response}'s own {@code
      * supertypes} includes both {@code response} and (transitively) {@code top}, then both gain
      * {@code success_response} as a subtype here, with no separate transitive-closure step needed.
@@ -363,7 +363,7 @@ public final class TsonSchemaLinker {
      *
      * <p><b>Deliberately hand-written per target shape, not routed through generic {@code tson-bind}
      * binding</b> -- {@code tson-schema} has no dependency on {@code tson-parser} (where {@code
-     * SchemaResolver}'s own {@code resolveInstance}/{@code PositionalForm} already do the general
+     * TsonSchemaResolver}'s own {@code resolveInstance}/{@code PositionalForm} already do the general
      * version of this for an explicit {@code !C value} instance), and every field a materializable
      * shape like {@link ArrayBody} needs is a plain {@code boolean}/{@code BigInteger}/{@code
      * TypeRef} -- not worth a new cross-module dependency to bind generically. {@code source} on the

@@ -54,9 +54,9 @@ import io.ltr8.tson.schema.meta.UuidType;
  * .register("integer_type", AtomTypeParser.INTEGER_TYPE)}. {@link #URI_TYPE}/{@link #REGEX_TYPE}
  * were initially left out of this package, mistakenly grouped with a real, separate gap
  * ({@code UriType}/{@code RegexType}'s own *schema-resolution*-time defaulting, see {@code
- * MetaKernelParser}'s own Javadoc) that has nothing to do with reading data against an
+ * MetaKernelBootstrapResolver}'s own Javadoc) that has nothing to do with reading data against an
  * already-correctly-resolved schema -- by the time a real {@code uri}/{@code regex} entry reaches
- * this layer, {@code MetaKernelParser}'s own hand-picked binding has already filled in {@code
+ * this layer, {@code MetaKernelBootstrapResolver}'s own hand-picked binding has already filled in {@code
  * specification}/{@code constraints} correctly, so these two work exactly like every other family;
  * confirmed against the real resolved entries, not just reasoned about.
  */

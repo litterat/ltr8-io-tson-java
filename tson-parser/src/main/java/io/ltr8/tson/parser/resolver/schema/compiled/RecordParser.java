@@ -48,7 +48,7 @@ import java.util.Optional;
  * TsonSchemaRegistry}'s own Javadoc -- it never actually substitutes a parameter through a template
  * body). {@link RecordBody#groups}'s own "at most one member present" constraint is not enforced --
  * group members already arrive as ordinary {@code OPTIONAL} fields in {@link RecordBody#fields}
- * (flattened there during resolution, see {@code SchemaResolver}'s own Javadoc), so they read
+ * (flattened there during resolution, see {@code TsonSchemaResolver}'s own Javadoc), so they read
  * correctly as individual fields; only the cross-field exclusivity check is missing. Every field's
  * own {@code type: type_ref} is assumed argument-free (bare name) -- true for anything read from an
  * already-materialized {@link io.ltr8.tson.schema.TsonSchema}, per {@link CompilationContext}'s own
@@ -197,7 +197,7 @@ final class RecordParser<R> implements TsonSchemaTypeParser<R> {
         }
         Token token = schema.value().orElseThrow(() -> new IllegalStateException("'" + schema.name() + "' on '"
                 + name + "' is " + schema.state() + " but the schema carries neither a literal value nor a "
-                + "value parameter for it -- SchemaResolver should never produce this"));
+                + "value parameter for it -- TsonSchemaResolver should never produce this"));
         DataValue synthetic = new DataValue(List.of(), Optional.empty(), toTokenValue(token));
         return field.parser().read(synthetic);
     }

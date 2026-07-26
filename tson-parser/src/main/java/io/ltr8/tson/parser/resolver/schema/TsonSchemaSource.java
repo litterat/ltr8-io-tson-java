@@ -10,17 +10,17 @@ package io.ltr8.tson.parser.resolver.schema;
  * ever opening a connection, or refusing any {@code http(s)} scheme outright and only reading from
  * a local classpath/filesystem location) and hands it to {@link
  * DefaultSchemaCoordinator#DefaultSchemaCoordinator(io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledRegistry,
- * SchemaSource)}.
+ * TsonSchemaSource)}.
  *
  * <p><b>{@link #registeredOnly()} is the default -- nothing is ever fetched.</b> Mirrors {@code
  * TsonSchemaRegistry}'s own no-arg-constructor default ("resolves an import only if it's already
  * registered -- nothing is ever fetched") and {@code TsonSchemaLoader}'s own precedent for the same
- * reason: a real disk/HTTP-backed {@code SchemaSource} is deliberately not built yet (a separate,
+ * reason: a real disk/HTTP-backed {@code TsonSchemaSource} is deliberately not built yet (a separate,
  * later task -- see this project's own task list) rather than guessing at a policy shape nobody
  * asked for.
  */
 @FunctionalInterface
-public interface SchemaSource {
+public interface TsonSchemaSource {
 
     /**
      * Returns {@code uri}'s own raw schema-document source text.
@@ -35,7 +35,7 @@ public interface SchemaSource {
     String fetch(String uri);
 
     /** Never fetches anything -- every call throws {@link IllegalStateException} naming {@code uri}. */
-    static SchemaSource registeredOnly() {
+    static TsonSchemaSource registeredOnly() {
         return uri -> {
             throw new IllegalStateException("'" + uri + "' is not registered, and this SchemaCoordinator has no "
                     + "fetch capability configured to load it from anywhere");

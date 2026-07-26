@@ -34,7 +34,7 @@ import java.util.Optional;
  * meta-kernel from nothing -- resolving a constructor-*application* instance ({@code !C value},
  * §5.5, e.g. {@code integer => !integer_type {}}) needs {@code C}'s own vocabulary already known,
  * and for meta-kernel, every {@code C} it uses is defined *within the same file* -- so this class
- * resolves what {@link SchemaResolver} already can (36 of the real fixture's 49 declarations, in
+ * resolves what {@link TsonSchemaResolver} already can (36 of the real fixture's 49 declarations, in
  * one source-order pass), then makes a second pass over the deferred {@code Instance} declarations
  * now that every constructor they reference (including ones declared *later* in the file, e.g.
  * {@code boolean => !enum [true false]} comes before {@code enum}'s own declaration) has a
@@ -42,7 +42,7 @@ import java.util.Optional;
  *
  * <p><b>Produces a plain, unmaterialized {@link TsonSchema}</b> ({@code materialised() == false},
  * {@code bootstrap() == true} -- see that class's own Javadoc). This class is a stateless
- * parser/resolver, the same shape as {@link TsonSchemaParser}/{@link SchemaResolver} -- {@link
+ * parser/resolver, the same shape as {@link TsonSchemaParser}/{@link TsonSchemaResolver} -- {@link
  * #getMetaKernelSchema()} returns a freshly-built value rather than being one itself. Its own
  * output is resolved-but-not-yet-linked -- a caller links it (via {@code
  * TsonSchemaRegistry#linkBootstrap}, never {@code TsonSchemaRegistry#register} directly -- see that
@@ -59,7 +59,7 @@ import java.util.Optional;
  * this lock-down exists to prevent.
  *
  * <p><b>Every {@code Instance} declaration resolves through {@link #instanceBody}, a closed,
- * hand-written switch -- not {@code SchemaResolver}/{@code TsonMapperReader}, and not any
+ * hand-written switch -- not {@code TsonSchemaResolver}/{@code TsonMapperReader}, and not any
  * schema-driven compiled reader either</b> (widened 2026-07-25 from an earlier version that routed
  * {@code unit}/{@code integer_type}/{@code text_type} through ordinary generic resolution and
  * hand-picked only {@code uri_type}/{@code regex_type}/{@code enum}; merged from a separate
@@ -69,7 +69,7 @@ import java.util.Optional;
  * once that became a real, distinct concept in this codebase). Two things rule out both of the more
  * "general" mechanisms this could otherwise reach for:
  * <ul>
- *   <li>{@code SchemaResolver.resolveInstance}'s own generic path binds via {@code TsonMapperReader},
+ *   <li>{@code TsonSchemaResolver.resolveInstance}'s own generic path binds via {@code TsonMapperReader},
  *   which is identification-first (a token is classified null/boolean/number/string *before* the
  *   target field is consulted) -- exactly why {@code boolean => !enum [true false]} needs
  *   hand-picked handling at all ({@code "true"}/{@code "false"} misidentify as real booleans before
@@ -77,7 +77,7 @@ import java.util.Optional;
  *   schema-composed RFC-citation default never lands (nested inside {@code specification:
  *   AtomSpecification}, past what generic defaulting fills in).</li>
  *   <li>A schema-driven *compiled* reader (the eventual replacement for {@code TsonMapperReader}
- *   elsewhere, see {@code SchemaResolver}'s own notes) can't safely bootstrap meta-kernel from its
+ *   elsewhere, see {@code TsonSchemaResolver}'s own notes) can't safely bootstrap meta-kernel from its
  *   own in-progress state either -- {@code enum}'s own {@code members: set<token>} field is
  *   argument-bearing, and only {@code SchemaValidator}'s materialization pass (never run over
  *   meta-kernel while meta-kernel is still being produced) makes that safe to compile a reader
@@ -102,9 +102,9 @@ import java.util.Optional;
  * BundledSchemaSource}, the one place this library's own bundled schema documents are fetched
  * from, so the same classpath-reading logic isn't duplicated between the two classes.
  */
-public final class MetaKernelParser {
+public final class MetaKernelBootstrapResolver {
 
-    private MetaKernelParser() {
+    private MetaKernelBootstrapResolver() {
     }
 
     /**
@@ -125,7 +125,7 @@ public final class MetaKernelParser {
     }
 
     private static Map<String, TypeDefinition> resolveEntries(SchemaDocument document) {
-        SchemaResolver resolver = new SchemaResolver();
+        TsonSchemaResolver resolver = new TsonSchemaResolver();
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         List<SchemaMap.Declaration> instances = new ArrayList<>();
 
@@ -162,7 +162,7 @@ public final class MetaKernelParser {
      * result, rather than failing the whole bootstrap; unexercised against the real fixture, since
      * all six real targets are covered).
      *
-     * <p>Package-private, not {@code private} -- {@code MetaKernelParserTest} exercises the
+     * <p>Package-private, not {@code private} -- {@code MetaKernelBootstrapResolverTest} exercises the
      * unrecognized-target and wrong-shape-body branches directly, since neither is reachable through
      * the real fixture (every real target is one of the six, and every empty-bodied one really is
      * empty).

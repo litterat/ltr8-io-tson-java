@@ -14,7 +14,7 @@ import io.ltr8.tson.parser.ast.DataValue;
  * carry the constructor name: its own {@code typeRef}, an {@code Optional<String>}. {@link #target()}
  * is a thin accessor over {@code value.typeRef()} (always present, since it's populated from the
  * {@code "!" type-name} prefix at parse time), and {@code value.annotations()} is always empty (the
- * corrected grammar has no room for any). This is also exactly the shape {@code SchemaResolver}'s
+ * corrected grammar has no room for any). This is also exactly the shape {@code TsonSchemaResolver}'s
  * generalized constructor-application resolution needs: {@code value} can be handed straight to
  * {@code TsonMapperReader.toObject(value, Atom.class)} with no separate wrapping step to attach a
  * type-ref, since it's already there.

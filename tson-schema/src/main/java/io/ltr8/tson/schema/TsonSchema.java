@@ -20,7 +20,7 @@ import java.util.Objects;
  * direction) -- the grammar itself marks {@code !!id} optional (a raw parsed {@code SchemaDocument}
  * can genuinely lack one), but a {@code TsonSchema} value -- the *resolved*, actually-usable thing
  * this module represents -- always needs a real identity. A document with no {@code !!id} simply
- * never becomes a {@code TsonSchema} at all -- {@code SchemaResolver}'s own document-level
+ * never becomes a {@code TsonSchema} at all -- {@code TsonSchemaResolver}'s own document-level
  * resolution enforces this before ever constructing one (see its own Javadoc on {@code
  * resolveAll}'s {@code !!id} validation).
  *
@@ -46,7 +46,7 @@ import java.util.Objects;
  * actually stored -- see {@link TsonSchemaRegistry#register}'s own Javadoc for why linked-ness stops
  * mattering once a schema is safely registered).
  *
- * <p><b>{@link #bootstrap()}</b> -- {@code true} <i>only</i> for a schema {@code MetaKernelParser}
+ * <p><b>{@link #bootstrap()}</b> -- {@code true} <i>only</i> for a schema {@code MetaKernelBootstrapResolver}
  * itself produced (Part 2 §1.5's "one deliberate circularity in the series": meta-kernel's own
  * {@code !!meta} names its own {@code !!id}, and nothing else is allowed to). A real, stored flag,
  * not derived from {@code id().equals(meta())} -- a *derived* check can't tell "this schema really

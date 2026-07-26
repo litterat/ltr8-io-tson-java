@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Hand-built schemas only -- {@code tson-schema} has no dependency on {@code tson-parser}, so it
- * can't reach {@code MetaKernelParser} for a real fixture (see {@code MetaKernelSchemaRegistryTest}
+ * can't reach {@code MetaKernelBootstrapResolver} for a real fixture (see {@code MetaKernelSchemaRegistryTest}
  * in {@code tson-parser} for the real end-to-end check against meta-kernel.tn1 itself).
  *
  * <p>Renamed from {@code SchemaValidatorTest} (2026-07-27, alongside {@code SchemaValidator}
@@ -145,7 +145,7 @@ class TsonSchemaLinkerTest {
         TypeDefinition synthetic = result.schema().entries().get(syntheticName);
         assertEquals(TypeKind.PRODUCT, synthetic.kind());
         assertEquals(TypeRef.of("array"), synthetic.source().orElseThrow(),
-                "source is the bare constructor name, matching SchemaResolver.resolveInstance's own convention");
+                "source is the bare constructor name, matching TsonSchemaResolver.resolveInstance's own convention");
 
         ArrayBody body = (ArrayBody) synthetic.body();
         assertEquals(TypeRef.of("token"), body.elementType());
@@ -329,7 +329,7 @@ class TsonSchemaLinkerTest {
 
     @Test
     void subtypesPropagateTransitivelyThroughAnAlreadyTransitiveSupertypeChain() {
-        // supertypes is already the full transitive chain by the time this runs (SchemaResolver's
+        // supertypes is already the full transitive chain by the time this runs (TsonSchemaResolver's
         // own induction), so the reverse index falls out the same way with no extra closure step.
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("top", emptyRecord());

@@ -27,17 +27,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Verifies the bootstrap against meta-kernel.tn1 as packaged on the classpath (see this module's
  * {@code build.gradle.kts}): the header directives carry straight through, the 36 declarations
- * {@code SchemaResolver} already resolves via ordinary schema-grammar resolution are all present,
+ * {@code TsonSchemaResolver} already resolves via ordinary schema-grammar resolution are all present,
  * and all 13 {@code Instance} declarations the second pass covers (three {@code unit} instances,
  * {@code integer}, {@code text}/{@code uri}/{@code regex}, and six {@code enum} instances,
  * including one -- {@code boolean} -- declared *before* {@code enum} itself in source order)
  * resolve to the expected kind/body -- all 49 of the real fixture's declarations resolve.
  */
-class MetaKernelParserTest {
+class MetaKernelBootstrapResolverTest {
 
     @Test
     void headerDirectivesCarryThroughFromTheDocument() {
-        TsonSchema schema = MetaKernelParser.getMetaKernelSchema();
+        TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
         // §1.5: meta-kernel's own !!meta names itself -- the one deliberate circularity.
         assertEquals(schema.id(), schema.meta());
@@ -49,18 +49,18 @@ class MetaKernelParserTest {
 
     @Test
     void resolvesAllThirtySixOrdinarilyResolvableDeclarations() {
-        TsonSchema schema = MetaKernelParser.getMetaKernelSchema();
+        TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
-        // A sample spanning every construct SchemaResolver already handles on its own.
+        // A sample spanning every construct TsonSchemaResolver already handles on its own.
         for (String name : List.of("top", "atom", "product", "sum", "reference", "integer_size",
                 "integer_type", "record", "array", "map", "tuple", "choice", "schema")) {
-            assertTrue(schema.entries().containsKey(name), name + " should resolve via SchemaResolver alone");
+            assertTrue(schema.entries().containsKey(name), name + " should resolve via TsonSchemaResolver alone");
         }
     }
 
     @Test
     void unitInstancesResolveToAnEmptyUnitBodyWithAtomKindTransferredFromUnit() {
-        TsonSchema schema = MetaKernelParser.getMetaKernelSchema();
+        TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
         for (String name : List.of("value", "token", "void")) {
             TypeDefinition resolved = schema.entries().get(name);
@@ -73,7 +73,7 @@ class MetaKernelParserTest {
 
     @Test
     void integerResolvesToAnUnconstrainedIntegerTypeBodyWithAtomKind() {
-        TsonSchema schema = MetaKernelParser.getMetaKernelSchema();
+        TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
         TypeDefinition integer = schema.entries().get("integer");
         assertEquals(TypeKind.ATOM, integer.kind());
@@ -84,7 +84,7 @@ class MetaKernelParserTest {
     void booleanResolvesEvenThoughEnumItselfIsDeclaredLaterInTheFile() {
         // boolean => !enum [true false] appears near the top of the file; enum => ~atom & {...}
         // isn't declared until much later -- the two-pass design exists precisely for this.
-        TsonSchema schema = MetaKernelParser.getMetaKernelSchema();
+        TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
         TypeDefinition booleanDef = schema.entries().get("boolean");
         assertEquals(TypeKind.ATOM, booleanDef.kind());
@@ -93,7 +93,7 @@ class MetaKernelParserTest {
 
     @Test
     void everyEnumInstanceInTheFixtureResolves() {
-        TsonSchema schema = MetaKernelParser.getMetaKernelSchema();
+        TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
         assertEquals(new EnumBody(List.of("INDEX", "NAMED")), schema.entries().get("product_access_type").body());
         assertEquals(new EnumBody(List.of("FIXED", "VARIABLE")), schema.entries().get("product_size_type").body());
@@ -104,7 +104,7 @@ class MetaKernelParserTest {
 
     @Test
     void textUriRegexResolveToTheirUnconstrainedTypeBodiesWithAtomKind() {
-        TsonSchema schema = MetaKernelParser.getMetaKernelSchema();
+        TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
         TypeDefinition text = schema.entries().get("text");
         assertEquals(TypeKind.ATOM, text.kind());
@@ -121,7 +121,7 @@ class MetaKernelParserTest {
 
     @Test
     void allFortyNineRealFixtureDeclarationsNowResolve() {
-        TsonSchema schema = MetaKernelParser.getMetaKernelSchema();
+        TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
         assertEquals(49, schema.entries().size());
     }
@@ -134,7 +134,7 @@ class MetaKernelParserTest {
 
     @Test
     void unrecognizedInstanceTargetCompilesToEmpty() {
-        assertEquals(Optional.empty(), MetaKernelParser.instanceBody(emptyInstance("something_else")));
+        assertEquals(Optional.empty(), MetaKernelBootstrapResolver.instanceBody(emptyInstance("something_else")));
     }
 
     @Test
@@ -143,7 +143,7 @@ class MetaKernelParserTest {
                 new TokenValue("oops", TokenForm.UNQUOTED)));
 
         IllegalStateException thrown = assertThrows(IllegalStateException.class,
-                () -> MetaKernelParser.instanceBody(nonEmpty));
+                () -> MetaKernelBootstrapResolver.instanceBody(nonEmpty));
         assertTrue(thrown.getMessage().contains("unit"));
     }
 }

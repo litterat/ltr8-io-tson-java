@@ -14,7 +14,7 @@ import java.util.Set;
  * A compiled {@link TsonSchema} -- {@code Map<String, TypeDefinition>} lifted to {@code Map<String,
  * TsonSchemaTypeParser<?>>}, where every parser's own references to other entries are real Java object
  * references (a {@link ParserHandle}), not further name lookups. This is the "compile the schema
- * once, read many data documents against it fast" layer sitting on top of {@code SchemaResolver}'s
+ * once, read many data documents against it fast" layer sitting on top of {@code TsonSchemaResolver}'s
  * own per-declaration resolution and {@code TsonSchemaRegistry}'s whole-schema materialization/
  * validation -- {@link SchemaValidatingParser}, the actual Class 2 (schema-validating) data parser, is built
  * on top of a {@code TsonCompiledSchema}, not directly on {@code TsonSchema}.
@@ -26,7 +26,7 @@ import java.util.Set;
  * own package-private constructor exists only for {@code TsonSchemaCompiler} to call.
  *
  * <p><b>Must be compiled from an already-materialized, already-validated {@link TsonSchema}</b> --
- * i.e. {@code TsonSchemaRegistry}'s own output, never a raw {@code SchemaResolver.resolveAll} result
+ * i.e. {@code TsonSchemaRegistry}'s own output, never a raw {@code TsonSchemaResolver.resolveAll} result
  * directly. Two reasons: every {@code type_ref} reachable from a body needs to already be
  * argument-free (materialization already flattened any {@code <...>} application into a reference
  * to a synthesized entry -- see {@code TsonSchemaRegistry}'s own Javadoc), since nothing here
@@ -52,7 +52,7 @@ import java.util.Set;
  * though {@code top} is also the supertype of everything else in the schema); a type-ref naming a
  * known subtype dispatches there instead, lazily. Schema-driven, not Java-driven -- this is
  * deliberately *not* implemented by leaning on {@code tson-bind}'s own sealed-interface/{@code
- * @Typename} union matching the way {@code SchemaResolver}'s generic constructor-application
+ * @Typename} union matching the way {@code TsonSchemaResolver}'s generic constructor-application
  * binding does one layer down: {@code subtypes} is the schema's own, language-agnostic
  * representation of "who composes with this," and using it here rather than Java class hierarchy
  * details is what makes this layer's own polymorphism handling portable to a from-scratch

@@ -200,15 +200,15 @@ import java.util.Set;
  * but live in different packages and are different concepts, so only one can be the unqualified
  * import here.
  */
-public final class SchemaResolver {
+public final class TsonSchemaResolver {
 
     /** Re-serializes an atom refinement's source back to wire form for {@link #mergeWithSource} -- see {@link #resolveAtomRefinement}. */
     private final TsonMapperWriter writer = new TsonMapperWriter();
 
-    /** {@code null} unless constructed via {@link #SchemaResolver(SchemaCoordinator)} -- see {@link #compiledMetaSchema}. */
+    /** {@code null} unless constructed via {@link #TsonSchemaResolver(SchemaCoordinator)} -- see {@link #compiledMetaSchema}. */
     private final SchemaCoordinator coordinator;
 
-    public SchemaResolver() {
+    public TsonSchemaResolver() {
         this(null);
     }
 
@@ -231,14 +231,14 @@ public final class SchemaResolver {
      *                     implementation recognizes that one case and answers it directly (see
      *                     {@link DefaultSchemaCoordinator}'s own Javadoc) instead of looping forever.
      */
-    public SchemaResolver(SchemaCoordinator coordinator) {
+    public TsonSchemaResolver(SchemaCoordinator coordinator) {
         this.coordinator = coordinator;
     }
 
     /**
      * The compiled form of {@code document}'s own governing meta-schema -- its {@code !!meta}
      * target, resolved via the {@link SchemaCoordinator} this resolver was constructed with (see
-     * {@link #SchemaResolver(SchemaCoordinator)}), fetched/bootstrapped/compiled on demand if it
+     * {@link #TsonSchemaResolver(SchemaCoordinator)}), fetched/bootstrapped/compiled on demand if it
      * wasn't already available, not merely a registry lookup.
      *
      * <p>Throws, rather than returning empty, if it can't be resolved -- unlike an earlier version
@@ -246,13 +246,13 @@ public final class SchemaResolver {
      * outcome a caller checked for), a {@link SchemaCoordinator} is *supposed* to make its target
      * available (fetching/bootstrapping as needed); if it still can't, that is a real, nameable
      * failure (see {@link SchemaCoordinator#resolve}'s own Javadoc for the possible causes), not a
-     * "maybe try again later." No coordinator at all ({@link #SchemaResolver()}) is one such failure,
+     * "maybe try again later." No coordinator at all ({@link #TsonSchemaResolver()}) is one such failure,
      * reported the same way.
      *
      * <p>A same-module, cross-package reach from {@code resolver.schema} up into {@code
      * resolver.schema.compiled} -- worth naming plainly, since every other layering note in this
      * codebase describes the *opposite* direction ({@code compiled} sitting "on top of" {@code
-     * SchemaResolver}'s own resolution, per {@code TsonCompiledSchema}'s own Javadoc). Not a cycle
+     * TsonSchemaResolver}'s own resolution, per {@code TsonCompiledSchema}'s own Javadoc). Not a cycle
      * (nothing in {@code resolver.schema.compiled}'s own main code imports back from {@code
      * resolver.schema}), and both packages live in the same module regardless, but a real, deliberate
      * exception to that "compiled depends on schema, never the other way" framing -- made because
@@ -319,7 +319,7 @@ public final class SchemaResolver {
      * for resolution; every declaration resolves against an empty structure namespace, same as the
      * two-argument overload called with {@code Map.of()}.
      *
-     * <p><b>With one ({@link #SchemaResolver(SchemaCoordinator)}), two things are validated up
+     * <p><b>With one ({@link #TsonSchemaResolver(SchemaCoordinator)}), two things are validated up
      * front, before any declaration is resolved</b>, rather than silently proceeding (or failing
      * confusingly deep inside some unrelated declaration) the way the no-coordinator case does: (1)
      * {@code document.id()} must be present -- required by policy for a publishable schema (§2.2.1:
@@ -413,7 +413,7 @@ public final class SchemaResolver {
      * with none of the one-argument overload's own {@code !!id}/{@code !!import} validation (see
      * that method's own Javadoc; {@code
      * structureNamespaceOverloadsAreInertUntilInstanceAtomRefinementDispatchExists} in {@code
-     * SchemaResolverTest} exercises this on a document with no {@code !!id} at all, on purpose).
+     * TsonSchemaResolverTest} exercises this on a document with no {@code !!id} at all, on purpose).
      * {@link TsonSchema#id()} is required now (2026-07-26), though, so a genuinely absent {@code
      * !!id} falls back to {@code !!meta}'s own value here -- the same fallback {@link
      * #documentLabel} already uses for error messages -- rather than failing a call site that was
@@ -652,7 +652,7 @@ public final class SchemaResolver {
     private Top bindAtomInstance(String name, DataValue value, TsonCompiledSchema metaParser) {
         String constructorName = value.typeRef().orElseThrow(() -> new IllegalStateException(
                 "'" + name + "': normalized value has no type-ref naming its own constructor -- "
-                        + "SchemaResolver should never produce this"));
+                        + "TsonSchemaResolver should never produce this"));
         if (metaParser == null) {
             throw new UnsupportedOperationException("'" + name + "': needs a compiled meta-schema reader to bind '"
                     + constructorName + "' against, but none was supplied");

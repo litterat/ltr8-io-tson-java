@@ -39,7 +39,7 @@ import java.util.Optional;
  * own {@code !!id}) whose {@link TsonSchema#bootstrap()} is {@code true}</b> -- meta-kernel's own
  * defining trait (Part 2 §1.5's "one deliberate circularity"), and the only schema ever allowed to
  * have that shape. {@code bootstrap()} is a real, stored flag that only {@code
- * MetaKernelParser.getMetaKernelSchema()} ever sets, so this guard keeps proving, continuously,
+ * MetaKernelBootstrapResolver.getMetaKernelSchema()} ever sets, so this guard keeps proving, continuously,
  * that meta-kernel's own identity can only ever be registered by something that genuinely came
  * from the real bootstrap reader -- not just something shaped like it. {@link #linkBootstrap} is
  * the one sanctioned way to turn the raw bootstrap form into a {@link TsonLinkedSchema} without
@@ -72,7 +72,7 @@ public final class TsonSchemaRegistry implements TsonSchemaLoader {
         if (selfReferential(unwrapped) && unwrapped.bootstrap()) {
             throw new TsonSchemaValidationException("'" + unwrapped.id() + "' is self-referential (its own "
                     + "!!meta names its own !!id) and bootstrap() == true -- meta-kernel's own identity "
-                    + "must be registered via a schema resolved ordinarily (SchemaResolver.resolveAll,"
+                    + "must be registered via a schema resolved ordinarily (TsonSchemaResolver.resolveAll,"
                     + " which never sets bootstrap), never the bootstrap-produced form directly, "
                     + "materialized or not");
         }
@@ -108,7 +108,7 @@ public final class TsonSchemaRegistry implements TsonSchemaLoader {
     public synchronized TsonLinkedSchema linkBootstrap(TsonSchema bootstrap) {
         if (!bootstrap.bootstrap()) {
             throw new TsonSchemaValidationException("'" + bootstrap.id() + "' was not produced by the real "
-                    + "bootstrap reader (MetaKernelParser.getMetaKernelSchema()) -- "
+                    + "bootstrap reader (MetaKernelBootstrapResolver.getMetaKernelSchema()) -- "
                     + "TsonSchemaRegistry.linkBootstrap exists specifically for that case; call "
                     + "TsonSchemaLinker.link directly for an ordinary schema instead");
         }

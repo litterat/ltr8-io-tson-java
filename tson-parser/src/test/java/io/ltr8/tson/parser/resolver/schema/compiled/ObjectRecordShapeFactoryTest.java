@@ -4,7 +4,7 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.parser.TsonDataParser;
 import io.ltr8.tson.parser.ast.Document;
 import io.ltr8.tson.parser.resolver.TsonAtomContext;
-import io.ltr8.tson.parser.resolver.schema.MetaKernelParser;
+import io.ltr8.tson.parser.resolver.schema.MetaKernelBootstrapResolver;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.schema.meta.IntegerType;
@@ -33,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ObjectRecordShapeFactoryTest {
 
     private static TsonCompiledSchema compiled() {
-        TsonSchema raw = MetaKernelParser.getMetaKernelSchema();
+        TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
         TsonSchema registered = new TsonSchemaRegistry().linkBootstrap(raw).schema();
         DataBindContext context = TsonAtomContext.defaultContext();
         return TsonSchemaCompiler.compile(registered, TsonParserFactoryRegistry.object(registered, context));
@@ -88,7 +88,7 @@ class ObjectRecordShapeFactoryTest {
         // registrations to resolve at all); 5 more (atom/product/sum/top/type_argument) resolve to
         // a real, deliberately non-record class and are silently skipped, not failures. Nothing
         // should throw.
-        TsonSchema raw = MetaKernelParser.getMetaKernelSchema();
+        TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
         TsonSchema registered = new TsonSchemaRegistry().linkBootstrap(raw).schema();
         ObjectRecordShapeFactory shapeFactory = new ObjectRecordShapeFactory(TsonAtomContext.defaultContext());
 
@@ -97,7 +97,7 @@ class ObjectRecordShapeFactoryTest {
 
     @Test
     void validateReportsEveryUnresolvableEntryAtOnceRatherThanOneAtATime() {
-        TsonSchema raw = MetaKernelParser.getMetaKernelSchema();
+        TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
         TsonSchema registered = new TsonSchemaRegistry().linkBootstrap(raw).schema();
         TsonTypeNameBinder alwaysMissing = name -> {
             throw new ClassNotFoundException("no class for '" + name + "' under this test's own binder");

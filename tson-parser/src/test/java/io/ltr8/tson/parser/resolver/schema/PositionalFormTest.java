@@ -26,14 +26,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * {@link PositionalForm#normalizeToRecordForm} on its own, isolated from {@code Instance}/{@code
- * SchemaResolver} wiring -- exercises both of its jobs against hand-built {@link RecordBody}
+ * TsonSchemaResolver} wiring -- exercises both of its jobs against hand-built {@link RecordBody}
  * values: the positional-form field-name lookup (§5.6's "exactly one bare REQUIRED field" rule)
  * and the wrap-vs-pass-through decision, then schema-composed default-filling (§5.2/§5.7's {@code
  * ~}/{@code =} field modifiers, added once {@code float32}/{@code float64} surfaced a real gap --
  * see this class's own Javadoc). Also confirms both against real resolved shapes: {@code enum}'s
  * own ({@code enum => ~atom & { members: set<token> }}) for wrapping, and a hand-built mirror of
  * {@code float_type}'s real shape for defaulting (the real end-to-end case lives in
- * {@code SchemaResolverTest.resolvesFloat32AndFloat64FromTheRealCoreTypeLibraryFixture}).
+ * {@code TsonSchemaResolverTest.resolvesFloat32AndFloat64FromTheRealCoreTypeLibraryFixture}).
  */
 class PositionalFormTest {
 
@@ -241,7 +241,7 @@ class PositionalFormTest {
                   atom => top & {}
                   enum => ~atom & { members: set<token> }
                 }""").parseSchemaDocument();
-        TsonSchema schema = new SchemaResolver().resolveAll(doc);
+        TsonSchema schema = new TsonSchemaResolver().resolveAll(doc);
         RecordBody enumBody = (RecordBody) schema.entries().get("enum").body();
 
         ArrayValue booleanMembers = new ArrayValue(List.of(

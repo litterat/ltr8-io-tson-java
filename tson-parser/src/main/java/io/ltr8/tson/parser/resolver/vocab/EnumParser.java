@@ -14,7 +14,7 @@ import java.util.List;
  * <p><b>Matches on {@link TokenValue#text()} directly, never through {@link BaseTypeResolver}'s
  * null/boolean/number/string identification.</b> This is the one thing that makes {@code boolean
  * => !enum [true false]} readable at all: routed through generic identification (as {@code
- * MetaKernelParser}'s own binding of the *schema* {@code !enum [true false]} instance necessarily
+ * MetaKernelBootstrapResolver}'s own binding of the *schema* {@code !enum [true false]} instance necessarily
  * is, since it binds via {@code TsonMapperReader}'s ordinary array/atom path), {@code "true"}/
  * {@code "false"} get identified as actual TSON booleans before {@code EnumBody.members: List
  * <String>} ever sees them -- a real, permanent limit of generic binding (see this repo's own
@@ -24,7 +24,7 @@ import java.util.List;
  * {@link TokenValue#text()} straight off the token and checking it against {@link
  * EnumBody#members} directly never invokes identification at all, so the collision simply doesn't
  * arise. Matches by text only, regardless of {@link io.ltr8.tson.parser.ast.TokenForm} -- the same
- * form-agnostic behavior {@code MetaKernelParser}'s own hand-written enum converter already uses,
+ * form-agnostic behavior {@code MetaKernelBootstrapResolver}'s own hand-written enum converter already uses,
  * "correct for every enum member regardless of what it happens to look like".
  *
  * <p>Not part of Part 1's published built-in vocabulary (§5) -- like {@link TextParser}, never

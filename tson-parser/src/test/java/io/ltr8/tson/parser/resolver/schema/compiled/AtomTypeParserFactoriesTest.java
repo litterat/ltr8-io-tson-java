@@ -2,7 +2,7 @@ package io.ltr8.tson.parser.resolver.schema.compiled;
 
 import io.ltr8.tson.parser.TsonDataParser;
 import io.ltr8.tson.parser.ast.Document;
-import io.ltr8.tson.parser.resolver.schema.MetaKernelParser;
+import io.ltr8.tson.parser.resolver.schema.MetaKernelBootstrapResolver;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.BinaryType;
 import io.ltr8.tson.schema.meta.DateTimeType;
@@ -142,7 +142,7 @@ class AtomTypeParserFactoriesTest {
     /**
      * {@code uri_type}/{@code regex_type} are the one known exception discussed in {@link
      * AtomTypeParser}'s own Javadoc -- their RFC citation is a *schema-composed* default that
-     * generic binding can't fill in during schema *resolution*, so {@code MetaKernelParser} hand-
+     * generic binding can't fill in during schema *resolution*, so {@code MetaKernelBootstrapResolver} hand-
      * picks their binding instead. That gap is upstream of this layer entirely: by the time the
      * real {@code uri}/{@code regex} entries reach here, their constraints are already correctly
      * filled in, so reading real *data* against them works exactly like every other family --
@@ -150,7 +150,7 @@ class AtomTypeParserFactoriesTest {
      */
     @Test
     void uriUsesTheRealMetaKernelResolvedEntryIncludingItsSchemaComposedRfcCitation() {
-        TsonSchema metaKernel = MetaKernelParser.getMetaKernelSchema();
+        TsonSchema metaKernel = MetaKernelBootstrapResolver.getMetaKernelSchema();
         Map<String, Object> result = readAgainstRealEntry("uri", metaKernel.entries().get("uri"),
                 "uri_type", AtomTypeParser.URI_TYPE, "{ value: \"https://example.com/a/b?x=1#frag\" }");
 
@@ -159,7 +159,7 @@ class AtomTypeParserFactoriesTest {
 
     @Test
     void regexUsesTheRealMetaKernelResolvedEntryIncludingItsSchemaComposedRfcCitation() {
-        TsonSchema metaKernel = MetaKernelParser.getMetaKernelSchema();
+        TsonSchema metaKernel = MetaKernelBootstrapResolver.getMetaKernelSchema();
         Map<String, Object> result = readAgainstRealEntry("regex", metaKernel.entries().get("regex"),
                 "regex_type", AtomTypeParser.REGEX_TYPE, "{ value: \"[a-z]+\" }");
 
