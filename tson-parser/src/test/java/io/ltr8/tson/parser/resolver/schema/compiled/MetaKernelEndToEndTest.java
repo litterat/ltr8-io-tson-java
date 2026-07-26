@@ -3,9 +3,8 @@ package io.ltr8.tson.parser.resolver.schema.compiled;
 import io.ltr8.tson.parser.Parser;
 import io.ltr8.tson.parser.ast.Document;
 import io.ltr8.tson.parser.resolver.schema.MetaKernelParser;
-import io.ltr8.tson.schema.MetaSchema;
-import io.ltr8.tson.schema.SchemaRegistry;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.SchemaRegistry;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
@@ -26,8 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class MetaKernelEndToEndTest {
 
     private static TsonSchemaParser compiled() {
-        MetaSchema raw = MetaKernelParser.getMetaKernelSchema();
-        TsonSchema registered = new SchemaRegistry().register(raw);
+        TsonSchema raw = MetaKernelParser.getMetaKernelSchema();
+        TsonSchema registered = new SchemaRegistry().materializeBootstrap(raw);
         return TsonSchemaParser.compile(registered, ParserFactoryRegistry.dom());
     }
 
@@ -46,8 +45,8 @@ class MetaKernelEndToEndTest {
      */
     @Test
     void allFiftyEightRealEntriesCompileCleanly() {
-        MetaSchema raw = MetaKernelParser.getMetaKernelSchema();
-        TsonSchema registered = new SchemaRegistry().register(raw);
+        TsonSchema raw = MetaKernelParser.getMetaKernelSchema();
+        TsonSchema registered = new SchemaRegistry().materializeBootstrap(raw);
         TsonSchemaParser compiled = TsonSchemaParser.compile(registered, ParserFactoryRegistry.dom());
 
         for (String name : registered.entries().keySet()) {

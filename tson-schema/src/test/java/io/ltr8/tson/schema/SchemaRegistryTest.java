@@ -28,7 +28,7 @@ class SchemaRegistryTest {
         entries.put("set", TypeDefinition.product(RecordBody.of(List.of())));
         entries.put("container", TypeDefinition.product(RecordBody.of(List.of(
                 RecordField.required("members", new TypeRef("set", List.of(new TypeArgument.Ref(TypeRef.of("token")))))))));
-        return new TsonSchema(Optional.of("https://example.test/registry-test.tn1"),
+        return new TsonSchema("https://example.test/registry-test.tn1",
                 "https://example.test/meta.tn1", List.of(), entries);
     }
 
@@ -59,12 +59,16 @@ class SchemaRegistryTest {
         assertFalse(registry.get("https://example.test/never-registered.tn1").isPresent());
     }
 
+    /**
+     * {@code id} is required now (2026-07-26, on the user's own explicit direction) -- a schema with
+     * no {@code !!id} can no longer be constructed at all, so the rejection this test used to prove
+     * at {@code register}-time is now a construction-time {@link NullPointerException} instead; see
+     * {@code TsonSchema}'s own Javadoc for why.
+     */
     @Test
-    void rejectsRegisteringASchemaWithNoId() {
-        TsonSchema noId = new TsonSchema(Optional.empty(), "https://example.test/meta.tn1", List.of(), Map.of());
-        SchemaRegistry registry = new SchemaRegistry();
-
-        assertThrows(SchemaValidationException.class, () -> registry.register(noId));
+    void constructingASchemaWithNoIdIsRejected() {
+        assertThrows(NullPointerException.class,
+                () -> new TsonSchema(null, "https://example.test/meta.tn1", List.of(), Map.of()));
     }
 
     @Test
@@ -81,7 +85,7 @@ class SchemaRegistryTest {
         registry.register(schemaWithGenericField());
 
         TsonSchema sameIdentityDifferentScheme = new TsonSchema(
-                Optional.of("http://example.test/registry-test.tn1"), "https://example.test/meta.tn1",
+                "http://example.test/registry-test.tn1", "https://example.test/meta.tn1",
                 List.of(), Map.of());
 
         assertThrows(SchemaValidationException.class, () -> registry.register(sameIdentityDifferentScheme));

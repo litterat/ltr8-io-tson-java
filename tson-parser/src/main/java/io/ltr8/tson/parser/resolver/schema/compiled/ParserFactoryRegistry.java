@@ -160,7 +160,7 @@ public final class ParserFactoryRegistry {
             try {
                 scoped.register(constructorName, available.require(constructorName));
             } catch (IllegalStateException e) {
-                throw new IllegalStateException("'" + metaSchema.id().orElse("<unnamed meta-schema>")
+                throw new IllegalStateException("'" + metaSchema.id()
                         + "' declares constructor '" + entry.getKey() + "' (shape '" + constructorName
                         + "') but no TsonParserFactory is available for it", e);
             }

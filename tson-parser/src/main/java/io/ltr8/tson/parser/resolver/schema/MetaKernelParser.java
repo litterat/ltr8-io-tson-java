@@ -9,7 +9,7 @@ import io.ltr8.tson.parser.ast.TokenValue;
 import io.ltr8.tson.parser.ast.schema.Instance;
 import io.ltr8.tson.parser.ast.schema.SchemaDocument;
 import io.ltr8.tson.parser.ast.schema.SchemaMap;
-import io.ltr8.tson.schema.MetaSchema;
+import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.RegexType;
@@ -27,7 +27,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Parses meta-kernel's own source text into its pre-loaded {@link MetaSchema} (Part 2 §1.5): "The
+ * Parses meta-kernel's own source text into its pre-loaded {@link TsonSchema} (Part 2 §1.5): "The
  * {@code !!meta} directive names this file itself -- the one deliberate circularity in the series,
  * closed by pre-loading rather than by resolution: implementations ship the kernel's resolved
  * structure, and this document describes it." Ordinary schema resolution can't bootstrap
@@ -40,12 +40,14 @@ import java.util.Optional;
  * {@code boolean => !enum [true false]} comes before {@code enum}'s own declaration) has a
  * resolved entry to transfer a kind from.
  *
- * <p><b>Produces a {@link MetaSchema}, doesn't extend {@code TsonSchema}.</b> This class is a
- * stateless parser/resolver, the same shape as {@link SchemaParser}/{@link SchemaResolver} --
- * {@link #getMetaKernelSchema()} returns a freshly-built {@link MetaSchema} value rather than
- * being one itself. Its own output is a resolved-but-not-yet-registered schema -- a caller
- * registers it (and, separately, compiles it -- a distinct, later stage this class has nothing to
- * do with; see {@code SchemaValidator}/{@code TsonSchemaParser}).
+ * <p><b>Produces a plain, unmaterialized {@link TsonSchema}</b> ({@code materialised() == false},
+ * {@code bootstrap() == true} -- see that class's own Javadoc). This class is a stateless
+ * parser/resolver, the same shape as {@link SchemaParser}/{@link SchemaResolver} -- {@link
+ * #getMetaKernelSchema()} returns a freshly-built value rather than being one itself. Its own
+ * output is resolved-but-not-yet-materialized -- a caller materializes it (via {@code
+ * SchemaRegistry#materializeBootstrap}, never {@code SchemaRegistry#register} directly -- see that
+ * class's own Javadoc for why) and, separately, compiles it -- a distinct, later stage this class
+ * has nothing to do with; see {@code SchemaValidator}/{@code TsonSchemaParser}.
  *
  * <p><b>Deliberately locked down to exactly one public method, taking no arguments</b> (narrowed
  * 2026-07-26, on the user's own explicit direction) -- this class exists to bootstrap *the* real
@@ -105,12 +107,21 @@ public final class MetaKernelParser {
     private MetaKernelParser() {
     }
 
-    /** Parses and resolves meta-kernel's own real, bundled source text (see class Javadoc). */
-    public static MetaSchema getMetaKernelSchema() {
+    /**
+     * Parses and resolves meta-kernel's own real, bundled source text (see class Javadoc). The one
+     * and only place in this codebase that ever constructs a {@link TsonSchema} with {@code
+     * bootstrap: true} -- {@link TsonSchema#bootstrap()}'s own Javadoc explains why that matters:
+     * {@code SchemaRegistry.register}/{@code materializeBootstrap} both gate on it specifically so
+     * meta-kernel's own identity can only ever be registered by something that genuinely came from
+     * here, not merely something shaped like it.
+     */
+    public static TsonSchema getMetaKernelSchema() {
         String source = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID);
         SchemaDocument document = new SchemaParser(source).parseSchemaDocument();
         Map<String, TypeDefinition> entries = resolveEntries(document);
-        return new MetaSchema(document.id(), document.meta(), document.imports(), entries);
+        String id = document.id().orElseThrow(() -> new IllegalStateException(
+                "meta-kernel.tn1 has no !!id -- this should never happen for the real, bundled fixture"));
+        return new TsonSchema(id, document.meta(), document.imports(), entries, false, true);
     }
 
     private static Map<String, TypeDefinition> resolveEntries(SchemaDocument document) {

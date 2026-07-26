@@ -10,9 +10,8 @@ import io.ltr8.tson.parser.resolver.schema.BundledSchemaSource;
 import io.ltr8.tson.parser.resolver.schema.DefaultSchemaCoordinator;
 import io.ltr8.tson.parser.resolver.schema.MetaKernelParser;
 import io.ltr8.tson.parser.resolver.schema.SchemaResolver;
-import io.ltr8.tson.schema.MetaSchema;
-import io.ltr8.tson.schema.SchemaRegistry;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.SchemaRegistry;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -34,16 +33,20 @@ class MetaTn1CompiledEndToEndTest {
      * TsonSchema}, unrelated to how it got resolved).
      */
     private static TsonSchema registerMeta() {
-        MetaSchema metaKernel = MetaKernelParser.getMetaKernelSchema();
+        TsonSchema metaKernelBootstrap = MetaKernelParser.getMetaKernelSchema();
         SchemaRegistry registry = new SchemaRegistry();
-        registry.register(metaKernel);
+        TsonSchema materializedMetaKernelBootstrap = registry.materializeBootstrap(metaKernelBootstrap);
 
-        TsonSchema materializedMetaKernel = new SchemaRegistry().register(metaKernel);
         DataBindContext context = TsonAtomContext.defaultContext();
-        ParserFactoryRegistry objectFactories = ParserFactoryRegistry.object(materializedMetaKernel, context);
+        ParserFactoryRegistry objectFactories = ParserFactoryRegistry.object(materializedMetaKernelBootstrap, context);
         TsonCompiledRegistry compiledRegistry = new TsonCompiledRegistry(objectFactories);
-        compiledRegistry.register(metaKernel);
         DefaultSchemaCoordinator coordinator = new DefaultSchemaCoordinator(compiledRegistry);
+
+        String metaKernelSource = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID);
+        SchemaDocument metaKernelDocument = new SchemaParser(metaKernelSource).parseSchemaDocument();
+        TsonSchema metaKernel = new SchemaResolver(coordinator).resolveAll(metaKernelDocument);
+        TsonSchema metaKernelMaterialized = registry.register(metaKernel);
+        compiledRegistry.register(metaKernelMaterialized);
 
         String source = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_TN1_ID);
         SchemaDocument metaDocument = new SchemaParser(source).parseSchemaDocument();

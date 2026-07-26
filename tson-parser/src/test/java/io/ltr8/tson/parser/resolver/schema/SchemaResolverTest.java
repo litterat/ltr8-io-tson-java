@@ -8,6 +8,7 @@ import io.ltr8.tson.parser.ast.schema.SchemaMap;
 import io.ltr8.tson.parser.mapper.TsonMapperWriter;
 import io.ltr8.tson.parser.resolver.TsonAtomContext;
 import io.ltr8.tson.parser.resolver.schema.compiled.ParserFactoryRegistry;
+import io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledRegistry;
 import io.ltr8.tson.parser.resolver.schema.compiled.TsonSchemaParser;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
@@ -1241,7 +1242,7 @@ class SchemaResolverTest {
      * TsonSchemaParser}'s own {@code Compiler} never reads them, only {@code entries()}.
      */
     private static TsonSchemaParser compileAsMetaParser(Map<String, TypeDefinition> entries) {
-        TsonSchema synthetic = new TsonSchema(Optional.empty(), "", List.of(), entries);
+        TsonSchema synthetic = new TsonSchema("test", "", List.of(), entries);
         DataBindContext context = TsonAtomContext.defaultContext();
         ParserFactoryRegistry objectFactories = ParserFactoryRegistry.object(synthetic, context);
         return TsonSchemaParser.compile(synthetic, objectFactories);
@@ -1255,16 +1256,39 @@ class SchemaResolverTest {
      * token" entry, the same bug {@code DefaultSchemaCoordinator}'s own bootstrap had), then compiled.
      */
     private static TsonSchemaParser metaKernelCompiled() {
-        io.ltr8.tson.schema.MetaSchema metaKernel = MetaKernelParser.getMetaKernelSchema();
-        TsonSchema materialized = new io.ltr8.tson.schema.SchemaRegistry().register(metaKernel);
+        TsonSchema metaKernel = MetaKernelParser.getMetaKernelSchema();
+        TsonSchema materialized = new io.ltr8.tson.schema.SchemaRegistry().materializeBootstrap(metaKernel);
         return compileAsMetaParser(materialized.entries());
     }
 
-    /** Meta-kernel registered, then meta.tn1 resolved and registered on top -- see {@code MetaSchemaImportTest} for the same, fully-verified pattern (31/31 declarations, validated). */
+    /**
+     * Meta-kernel registered, then meta.tn1 resolved and registered on top -- see {@code
+     * MetaSchemaImportTest} for the same, fully-verified pattern (31/31 declarations, validated).
+     *
+     * <p>Meta-kernel itself is registered via ordinary {@code SchemaResolver.resolveAll}, not the
+     * raw bootstrap output (2026-07-26, {@code SchemaRegistry#register} now refuses <i>any</i>
+     * self-referential schema with {@code bootstrap() == true}, materialized or not -- see that
+     * method's own Javadoc) -- mirrors {@code MetaTn1CompiledEndToEndTest#registerMeta}'s own
+     * pattern: a throwaway coordinator, built from the (never-persisted) materialized bootstrap
+     * output, resolves meta-kernel's own document the ordinary way (its own bootstrap branch
+     * supplies the structure namespace, so even {@code boolean => !enum [...]} resolves correctly
+     * despite the forward reference); that result carries no {@code bootstrap} flag, so it can
+     * actually be registered.
+     */
     private static TsonSchemaParser metaTn1Compiled() throws IOException {
-        io.ltr8.tson.schema.MetaSchema metaKernel = MetaKernelParser.getMetaKernelSchema();
+        TsonSchema metaKernelBootstrap = MetaKernelParser.getMetaKernelSchema();
         io.ltr8.tson.schema.SchemaRegistry registry = new io.ltr8.tson.schema.SchemaRegistry();
-        registry.register(metaKernel);
+        TsonSchema materializedMetaKernelBootstrap = registry.materializeBootstrap(metaKernelBootstrap);
+        DataBindContext context = TsonAtomContext.defaultContext();
+        ParserFactoryRegistry objectFactories = ParserFactoryRegistry.object(materializedMetaKernelBootstrap, context);
+        TsonCompiledRegistry throwawayRegistry = new TsonCompiledRegistry(objectFactories);
+        DefaultSchemaCoordinator throwawayCoordinator =
+                new DefaultSchemaCoordinator(throwawayRegistry, BundledSchemaSource.INSTANCE);
+
+        String metaKernelSource = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID);
+        SchemaDocument metaKernelDocument = new SchemaParser(metaKernelSource).parseSchemaDocument();
+        TsonSchema metaKernel = new SchemaResolver(throwawayCoordinator).resolveAll(metaKernelDocument);
+        registry.register(metaKernel); // permanent, so meta.tn1's own !!import finds it below
         TsonSchemaParser metaKernelParser = metaKernelCompiled();
 
         String source = Files.readString(Path.of("").toAbsolutePath().resolve("../spec/m/meta.tn1").normalize());
@@ -1277,7 +1301,7 @@ class SchemaResolverTest {
             namespace.put(declaration.name(), resolved);
             localOnly.put(declaration.name(), resolved);
         }
-        TsonSchema meta = new TsonSchema(metaDoc.id(), metaDoc.meta(), metaDoc.imports(), localOnly);
+        TsonSchema meta = new TsonSchema(metaDoc.id().orElseThrow(), metaDoc.meta(), metaDoc.imports(), localOnly);
         TsonSchema registeredMeta = registry.register(meta);
         return compileAsMetaParser(registeredMeta.entries());
     }

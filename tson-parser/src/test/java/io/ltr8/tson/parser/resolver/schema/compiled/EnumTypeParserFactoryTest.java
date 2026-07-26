@@ -40,7 +40,7 @@ class EnumTypeParserFactoryTest {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>(MetaKernelParser.getMetaKernelSchema().entries());
         entries.put("flag_holder", TypeDefinition.product(
                 RecordBody.of(List.of(RecordField.required("flag", TypeRef.of("boolean"))))));
-        TsonSchema schema = new TsonSchema(Optional.of("https://example.test/flag.tn1"),
+        TsonSchema schema = new TsonSchema("https://example.test/flag.tn1",
                 "https://example.test/meta.tn1", List.of(), entries);
 
         TsonSchema registered = new SchemaRegistry().register(schema);

@@ -45,7 +45,7 @@ class SchemaValidatorTest {
     }
 
     private static TsonSchema schemaOf(Map<String, TypeDefinition> entries) {
-        return new TsonSchema(Optional.of("https://example.test/s.tn1"), "https://example.test/meta.tn1",
+        return new TsonSchema("https://example.test/s.tn1", "https://example.test/meta.tn1",
                 List.of(), entries);
     }
 
@@ -274,7 +274,7 @@ class SchemaValidatorTest {
         Map<String, TypeDefinition> localEntries = new LinkedHashMap<>();
         localEntries.put("local_a", TypeDefinition.product(
                 RecordBody.of(List.of(RecordField.required("field", TypeRef.of("imported_a"))))));
-        TsonSchema local = new TsonSchema(Optional.of("https://example.test/importer.tn1"),
+        TsonSchema local = new TsonSchema("https://example.test/importer.tn1",
                 "https://example.test/meta.tn1", List.of("https://example.test/import.tn1"), localEntries);
 
         TsonSchema result = SchemaValidator.validate(local, loader);
@@ -285,7 +285,7 @@ class SchemaValidatorTest {
     @Test
     void rejectsAnImportThatIsNotRegistered() {
         SchemaLoader loader = id -> Optional.empty();
-        TsonSchema local = new TsonSchema(Optional.of("https://example.test/importer.tn1"),
+        TsonSchema local = new TsonSchema("https://example.test/importer.tn1",
                 "https://example.test/meta.tn1", List.of("https://example.test/missing.tn1"), Map.of());
 
         assertThrows(SchemaValidationException.class, () -> SchemaValidator.validate(local, loader));
@@ -297,7 +297,7 @@ class SchemaValidatorTest {
         Map<String, TsonSchema> byIdentity = Map.of(CanonicalIdentity.of("https://example.test/import.tn1"), imported);
         SchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
 
-        TsonSchema local = new TsonSchema(Optional.of("https://example.test/importer.tn1"),
+        TsonSchema local = new TsonSchema("https://example.test/importer.tn1",
                 "https://example.test/meta.tn1", List.of("https://example.test/import.tn1"),
                 Map.of("shared_name", emptyRecord()));
 
@@ -357,7 +357,7 @@ class SchemaValidatorTest {
         Map<String, TypeDefinition> localEntries = new LinkedHashMap<>();
         localEntries.put("local_child", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of(), false,
                 List.of("imported_base"), List.of(), Optional.empty(), RecordBody.of(List.of())));
-        TsonSchema local = new TsonSchema(Optional.of("https://example.test/importer.tn1"),
+        TsonSchema local = new TsonSchema("https://example.test/importer.tn1",
                 "https://example.test/meta.tn1", List.of("https://example.test/import.tn1"), localEntries);
 
         TsonSchema result = SchemaValidator.validate(local, loader);
@@ -379,7 +379,7 @@ class SchemaValidatorTest {
                 CanonicalIdentity.of("https://example.test/import-two.tn1"), importedTwo);
         SchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
 
-        TsonSchema local = new TsonSchema(Optional.of("https://example.test/importer.tn1"),
+        TsonSchema local = new TsonSchema("https://example.test/importer.tn1",
                 "https://example.test/meta.tn1",
                 List.of("https://example.test/import-one.tn1", "https://example.test/import-two.tn1"), Map.of());
 

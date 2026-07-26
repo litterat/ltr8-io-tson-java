@@ -51,7 +51,7 @@ class ParserFactoryRegistryTest {
         metaEntries.put("enum", constructorEntry(TypeKind.ATOM, new EnumBody(List.of())));
         // Not a constructor -- must be excluded from the scoped registry even though it's present.
         metaEntries.put("integer_size", TypeDefinition.product(RecordBody.of(List.of())));
-        TsonSchema metaSchema = new TsonSchema(Optional.of("https://example.test/meta.tn1"),
+        TsonSchema metaSchema = new TsonSchema("https://example.test/meta.tn1",
                 "https://example.test/meta-kernel.tn1", List.of(), metaEntries);
 
         ParserFactoryRegistry available = ParserFactoryRegistry.builder()
@@ -72,7 +72,7 @@ class ParserFactoryRegistryTest {
     void forMetaSchemaErrorsImmediatelyNamingTheEntryWithNoMatchingFactory() {
         Map<String, TypeDefinition> metaEntries = new LinkedHashMap<>();
         metaEntries.put("text_type", constructorEntry(TypeKind.ATOM, RecordBody.of(List.of())));
-        TsonSchema metaSchema = new TsonSchema(Optional.of("https://example.test/meta.tn1"),
+        TsonSchema metaSchema = new TsonSchema("https://example.test/meta.tn1",
                 "https://example.test/meta-kernel.tn1", List.of(), metaEntries);
 
         ParserFactoryRegistry available = ParserFactoryRegistry.builder().build();

@@ -384,7 +384,7 @@ public final class SchemaResolver {
             namespace.put(declaration.name(), resolved);
             localOnly.put(declaration.name(), resolved);
         }
-        return new TsonSchema(document.id(), document.meta(), document.imports(), localOnly);
+        return new TsonSchema(id, document.meta(), document.imports(), localOnly);
     }
 
     /** Stage 1 of {@link #resolveAll(SchemaDocument)} -- every {@code !!import}'s own entries, in declaration order, merged as-is (never re-resolved against the importer). Mirrors {@code SchemaValidator.mergeImports} exactly, including its collision rule, since this is the same concept discovered one stage earlier. */
@@ -407,13 +407,24 @@ public final class SchemaResolver {
         return document.id().orElse(document.meta());
     }
 
-    /** {@link #resolveAll(SchemaDocument)}, plus {@code metaParser} (see the three-argument {@link #resolve}) threaded into every declaration it resolves. */
+    /**
+     * {@link #resolveAll(SchemaDocument)}, plus {@code metaParser} (see the three-argument {@link
+     * #resolve}) threaded into every declaration it resolves -- the low-level overload, deliberately
+     * with none of the one-argument overload's own {@code !!id}/{@code !!import} validation (see
+     * that method's own Javadoc; {@code
+     * structureNamespaceOverloadsAreInertUntilInstanceAtomRefinementDispatchExists} in {@code
+     * SchemaResolverTest} exercises this on a document with no {@code !!id} at all, on purpose).
+     * {@link TsonSchema#id()} is required now (2026-07-26), though, so a genuinely absent {@code
+     * !!id} falls back to {@code !!meta}'s own value here -- the same fallback {@link
+     * #documentLabel} already uses for error messages -- rather than failing a call site that was
+     * never validating {@code !!id} in the first place.
+     */
     public TsonSchema resolveAll(SchemaDocument document, TsonSchemaParser metaParser) {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         for (SchemaMap.Declaration declaration : document.body().declarations().values()) {
             entries.put(declaration.name(), resolve(declaration, entries, metaParser));
         }
-        return new TsonSchema(document.id(), document.meta(), document.imports(), entries);
+        return new TsonSchema(document.id().orElse(document.meta()), document.meta(), document.imports(), entries);
     }
 
     private TypeDefinition resolveTypeDef(String name, TypeDef typeDef, Map<String, TypeDefinition> resolved,

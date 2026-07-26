@@ -41,7 +41,7 @@ class TupleParserTest {
         entries.put("text", new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), false, List.of(),
                 List.of(), Optional.empty(), TextType.UNCONSTRAINED));
         entries.put("pair", TypeDefinition.product(body));
-        TsonSchema schema = new TsonSchema(Optional.of("https://example.test/s.tn1"),
+        TsonSchema schema = new TsonSchema("https://example.test/s.tn1",
                 "https://example.test/meta.tn1", List.of(), entries);
         return TsonSchemaParser.compile(schema, registry());
     }

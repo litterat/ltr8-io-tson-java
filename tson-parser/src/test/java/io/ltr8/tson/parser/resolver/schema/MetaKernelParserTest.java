@@ -5,7 +5,7 @@ import io.ltr8.tson.parser.ast.EmptyBrace;
 import io.ltr8.tson.parser.ast.TokenForm;
 import io.ltr8.tson.parser.ast.TokenValue;
 import io.ltr8.tson.parser.ast.schema.Instance;
-import io.ltr8.tson.schema.MetaSchema;
+import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.RegexType;
@@ -37,17 +37,20 @@ class MetaKernelParserTest {
 
     @Test
     void headerDirectivesCarryThroughFromTheDocument() {
-        MetaSchema schema = MetaKernelParser.getMetaKernelSchema();
+        TsonSchema schema = MetaKernelParser.getMetaKernelSchema();
 
         // §1.5: meta-kernel's own !!meta names itself -- the one deliberate circularity.
-        assertEquals(schema.id(), java.util.Optional.of(schema.meta()));
+        assertEquals(schema.id(), schema.meta());
         assertTrue(schema.meta().endsWith("meta-kernel.tn1"));
         assertEquals(List.of(), schema.imports());
+        // getMetaKernelSchema() is the one and only place that ever sets this -- see TsonSchema's own Javadoc.
+        assertTrue(schema.bootstrap());
+        assertTrue(!schema.materialised());
     }
 
     @Test
     void resolvesAllThirtySixOrdinarilyResolvableDeclarations() {
-        MetaSchema schema = MetaKernelParser.getMetaKernelSchema();
+        TsonSchema schema = MetaKernelParser.getMetaKernelSchema();
 
         // A sample spanning every construct SchemaResolver already handles on its own.
         for (String name : List.of("top", "atom", "product", "sum", "reference", "integer_size",
@@ -58,7 +61,7 @@ class MetaKernelParserTest {
 
     @Test
     void unitInstancesResolveToAnEmptyUnitBodyWithAtomKindTransferredFromUnit() {
-        MetaSchema schema = MetaKernelParser.getMetaKernelSchema();
+        TsonSchema schema = MetaKernelParser.getMetaKernelSchema();
 
         for (String name : List.of("value", "token", "void")) {
             TypeDefinition resolved = schema.entries().get(name);
@@ -71,7 +74,7 @@ class MetaKernelParserTest {
 
     @Test
     void integerResolvesToAnUnconstrainedIntegerTypeBodyWithAtomKind() {
-        MetaSchema schema = MetaKernelParser.getMetaKernelSchema();
+        TsonSchema schema = MetaKernelParser.getMetaKernelSchema();
 
         TypeDefinition integer = schema.entries().get("integer");
         assertEquals(TypeKind.ATOM, integer.kind());
@@ -82,7 +85,7 @@ class MetaKernelParserTest {
     void booleanResolvesEvenThoughEnumItselfIsDeclaredLaterInTheFile() {
         // boolean => !enum [true false] appears near the top of the file; enum => ~atom & {...}
         // isn't declared until much later -- the two-pass design exists precisely for this.
-        MetaSchema schema = MetaKernelParser.getMetaKernelSchema();
+        TsonSchema schema = MetaKernelParser.getMetaKernelSchema();
 
         TypeDefinition booleanDef = schema.entries().get("boolean");
         assertEquals(TypeKind.ATOM, booleanDef.kind());
@@ -91,7 +94,7 @@ class MetaKernelParserTest {
 
     @Test
     void everyEnumInstanceInTheFixtureResolves() {
-        MetaSchema schema = MetaKernelParser.getMetaKernelSchema();
+        TsonSchema schema = MetaKernelParser.getMetaKernelSchema();
 
         assertEquals(new EnumBody(List.of("INDEX", "NAMED")), schema.entries().get("product_access_type").body());
         assertEquals(new EnumBody(List.of("FIXED", "VARIABLE")), schema.entries().get("product_size_type").body());
@@ -102,7 +105,7 @@ class MetaKernelParserTest {
 
     @Test
     void textUriRegexResolveToTheirUnconstrainedTypeBodiesWithAtomKind() {
-        MetaSchema schema = MetaKernelParser.getMetaKernelSchema();
+        TsonSchema schema = MetaKernelParser.getMetaKernelSchema();
 
         TypeDefinition text = schema.entries().get("text");
         assertEquals(TypeKind.ATOM, text.kind());
@@ -119,7 +122,7 @@ class MetaKernelParserTest {
 
     @Test
     void allFortyNineRealFixtureDeclarationsNowResolve() {
-        MetaSchema schema = MetaKernelParser.getMetaKernelSchema();
+        TsonSchema schema = MetaKernelParser.getMetaKernelSchema();
 
         assertEquals(49, schema.entries().size());
     }

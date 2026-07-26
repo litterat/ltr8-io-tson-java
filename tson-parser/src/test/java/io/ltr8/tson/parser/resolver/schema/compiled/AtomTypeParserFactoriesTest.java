@@ -3,7 +3,6 @@ package io.ltr8.tson.parser.resolver.schema.compiled;
 import io.ltr8.tson.parser.Parser;
 import io.ltr8.tson.parser.ast.Document;
 import io.ltr8.tson.parser.resolver.schema.MetaKernelParser;
-import io.ltr8.tson.schema.MetaSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.BinaryType;
 import io.ltr8.tson.schema.meta.DateTimeType;
@@ -66,7 +65,7 @@ class AtomTypeParserFactoriesTest {
         entries.put("field", atomEntry);
         entries.put("holder", TypeDefinition.product(
                 RecordBody.of(List.of(RecordField.required("value", TypeRef.of("field"))))));
-        TsonSchema schema = new TsonSchema(Optional.of("https://example.test/s.tn1"),
+        TsonSchema schema = new TsonSchema("https://example.test/s.tn1",
                 "https://example.test/meta.tn1", List.of(), entries);
         TsonSchemaParser compiled = TsonSchemaParser.compile(schema, REGISTRY);
 
@@ -151,7 +150,7 @@ class AtomTypeParserFactoriesTest {
      */
     @Test
     void uriUsesTheRealMetaKernelResolvedEntryIncludingItsSchemaComposedRfcCitation() {
-        MetaSchema metaKernel = MetaKernelParser.getMetaKernelSchema();
+        TsonSchema metaKernel = MetaKernelParser.getMetaKernelSchema();
         Map<String, Object> result = readAgainstRealEntry("uri", metaKernel.entries().get("uri"),
                 "uri_type", AtomTypeParser.URI_TYPE, "{ value: \"https://example.com/a/b?x=1#frag\" }");
 
@@ -160,7 +159,7 @@ class AtomTypeParserFactoriesTest {
 
     @Test
     void regexUsesTheRealMetaKernelResolvedEntryIncludingItsSchemaComposedRfcCitation() {
-        MetaSchema metaKernel = MetaKernelParser.getMetaKernelSchema();
+        TsonSchema metaKernel = MetaKernelParser.getMetaKernelSchema();
         Map<String, Object> result = readAgainstRealEntry("regex", metaKernel.entries().get("regex"),
                 "regex_type", AtomTypeParser.REGEX_TYPE, "{ value: \"[a-z]+\" }");
 
@@ -174,7 +173,7 @@ class AtomTypeParserFactoriesTest {
         entries.put(typeName, realEntry);
         entries.put("holder", TypeDefinition.product(
                 RecordBody.of(List.of(RecordField.required("value", TypeRef.of(typeName))))));
-        TsonSchema schema = new TsonSchema(Optional.of("https://example.test/s.tn1"),
+        TsonSchema schema = new TsonSchema("https://example.test/s.tn1",
                 "https://example.test/meta.tn1", List.of(), entries);
         ParserFactoryRegistry registry = ParserFactoryRegistry.builder()
                 .register("record", RecordParser.FACTORY)

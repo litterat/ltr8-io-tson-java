@@ -22,13 +22,19 @@ import java.util.Map;
  * does:
  *
  * <pre>{@code
- * MetaSchema metaKernel = MetaKernelParser.getMetaKernelSchema();
- * TsonSchema materializedMetaKernel = new SchemaRegistry().register(metaKernel);
+ * TsonSchema metaKernel = MetaKernelParser.getMetaKernelSchema();
+ * SchemaRegistry schemaRegistry = new SchemaRegistry();
+ * TsonSchema materializedMetaKernel = schemaRegistry.materializeBootstrap(metaKernel);
  * ParserFactoryRegistry factories = ParserFactoryRegistry.object(materializedMetaKernel, context);
- * TsonCompiledRegistry registry = new TsonCompiledRegistry(factories);
- * registry.register(metaKernel); // meta.tn1's own !!import needs this present first -- see
- *                                 // DefaultSchemaCoordinator's own Javadoc on why the bootstrap
- *                                 // case alone doesn't satisfy SchemaValidator's import merge.
+ * TsonCompiledRegistry registry = new TsonCompiledRegistry(schemaRegistry, factories);
+ * registry.register(materializedMetaKernel); // meta.tn1's own !!import needs this present first --
+ *                                             // see DefaultSchemaCoordinator's own Javadoc on why
+ *                                             // the bootstrap case alone doesn't satisfy
+ *                                             // SchemaValidator's import merge. Registering the
+ *                                             // already-materialized result, not the raw metaKernel
+ *                                             // itself -- SchemaRegistry.register refuses an
+ *                                             // unmaterialized bootstrap schema outright (see its
+ *                                             // own Javadoc).
  * DefaultSchemaCoordinator coordinator = new DefaultSchemaCoordinator(registry, BundledSchemaSource.INSTANCE);
  * TsonSchemaParser meta = coordinator.resolve(BundledSchemaSource.META_TN1_ID);
  * TsonSchemaParser core = coordinator.resolve(BundledSchemaSource.CORE_TN1_ID); // needs meta.tn1 registered first, same reasoning

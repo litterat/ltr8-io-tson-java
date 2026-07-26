@@ -45,7 +45,7 @@ class TsonSchemaParserTest {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("A", TypeDefinition.product(bodyA));
         entries.put("B", TypeDefinition.product(bodyB));
-        TsonSchema schema = new TsonSchema(Optional.empty(), "test", List.of(), entries);
+        TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), entries);
 
         TsonSchemaParser compiled = TsonSchemaParser.compile(schema, RECORD_ONLY);
 
@@ -59,7 +59,7 @@ class TsonSchemaParserTest {
         RecordBody selfReferencing = RecordBody.of(List.of(RecordField.required("child", TypeRef.of("Node"))));
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("Node", TypeDefinition.product(selfReferencing));
-        TsonSchema schema = new TsonSchema(Optional.empty(), "test", List.of(), entries);
+        TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), entries);
 
         TsonSchemaParser compiled = TsonSchemaParser.compile(schema, RECORD_ONLY);
 
@@ -75,7 +75,7 @@ class TsonSchemaParserTest {
         entries.put("used", TypeDefinition.product(RecordBody.of(List.of())));
         entries.put("orphan", new TypeDefinition(Optional.empty(), TypeKind.ATOM,
                 List.of(), false, List.of(), List.of(), Optional.empty(), new Unit()));
-        TsonSchema schema = new TsonSchema(Optional.empty(), "test", List.of(), entries);
+        TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), entries);
 
         TsonSchemaParser compiled = TsonSchemaParser.compile(schema, RECORD_ONLY);
 
@@ -89,7 +89,7 @@ class TsonSchemaParserTest {
 
     @Test
     void getOnAnUnknownNameThrowsBeforeAnyCompilationHappens() {
-        TsonSchema schema = new TsonSchema(Optional.empty(), "test", List.of(), Map.of());
+        TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), Map.of());
         TsonSchemaParser compiled = TsonSchemaParser.compile(schema, RECORD_ONLY);
 
         IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class, () -> compiled.get("nope"));

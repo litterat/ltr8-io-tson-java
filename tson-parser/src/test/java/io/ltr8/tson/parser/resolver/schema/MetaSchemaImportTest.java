@@ -6,9 +6,8 @@ import io.ltr8.tson.parser.ast.schema.SchemaDocument;
 import io.ltr8.tson.parser.resolver.TsonAtomContext;
 import io.ltr8.tson.parser.resolver.schema.compiled.ParserFactoryRegistry;
 import io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledRegistry;
-import io.ltr8.tson.schema.MetaSchema;
-import io.ltr8.tson.schema.SchemaRegistry;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.SchemaRegistry;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import org.junit.jupiter.api.Test;
@@ -53,15 +52,35 @@ class MetaSchemaImportTest {
      * its own classpath-reading logic -- the same reasoning that replaced the old, now-deleted
      * {@code MetaTn1Parser} everywhere else that only wants the *fully* resolved-and-registered
      * result (see {@code SchemaResolverCompiledMetaSchemaTest#loadMetaKernelAndMeta}).
+     *
+     * <p><b>Meta-kernel itself is resolved via ordinary {@code SchemaResolver.resolveAll}, not
+     * registered as the raw bootstrap output</b> (2026-07-26, {@code SchemaRegistry#register} now
+     * refuses <i>any</i> self-referential schema with {@code bootstrap() == true}, materialized or
+     * not -- see that method's own Javadoc). {@code registry.materializeBootstrap(...)} still runs
+     * once, purely to get a genuinely materialized shape to build {@code
+     * ParserFactoryRegistry.object(...)} against -- that value is never itself registered anywhere.
+     * The coordinator built from it then resolves meta-kernel's own document the ordinary way (its
+     * own bootstrap branch supplies the structure namespace, so even {@code boolean => !enum [...]}
+     * resolves correctly despite the forward reference) -- that result carries no {@code bootstrap}
+     * flag, so {@link SchemaRegistry#register} accepts it, both into {@code registry} (permanently,
+     * so meta.tn1's own {@code !!import} finds it below) and into {@code compiledRegistry} (so this
+     * coordinator's own cache has it too). Mirrors {@code MetaTn1CompiledEndToEndTest#registerMeta}'s
+     * own pattern exactly.
      */
-    private static TsonSchema parseMetaTn1(MetaSchema metaKernel) {
-        TsonSchema materializedMetaKernel = new SchemaRegistry().register(metaKernel);
-        DataBindContext context = TsonAtomContext.defaultContext();
-        ParserFactoryRegistry objectFactories = ParserFactoryRegistry.object(materializedMetaKernel, context);
+    private static TsonSchema parseMetaTn1(SchemaRegistry registry) {
+        TsonSchema metaKernelBootstrap = MetaKernelParser.getMetaKernelSchema();
+        TsonSchema materializedMetaKernelBootstrap = registry.materializeBootstrap(metaKernelBootstrap);
 
+        DataBindContext context = TsonAtomContext.defaultContext();
+        ParserFactoryRegistry objectFactories = ParserFactoryRegistry.object(materializedMetaKernelBootstrap, context);
         TsonCompiledRegistry compiledRegistry = new TsonCompiledRegistry(objectFactories);
-        compiledRegistry.register(metaKernel);
         DefaultSchemaCoordinator coordinator = new DefaultSchemaCoordinator(compiledRegistry);
+
+        String metaKernelSource = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID);
+        SchemaDocument metaKernelDocument = new SchemaParser(metaKernelSource).parseSchemaDocument();
+        TsonSchema metaKernel = new SchemaResolver(coordinator).resolveAll(metaKernelDocument);
+        TsonSchema metaKernelMaterialized = registry.register(metaKernel);
+        compiledRegistry.register(metaKernelMaterialized);
 
         String source = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_TN1_ID);
         SchemaDocument metaDocument = new SchemaParser(source).parseSchemaDocument();
@@ -70,11 +89,9 @@ class MetaSchemaImportTest {
 
     @Test
     void mergesMetaKernelIntoAllThirtyOneOfMetaTn1sOwnDeclarations() {
-        MetaSchema metaKernel = MetaKernelParser.getMetaKernelSchema();
         SchemaRegistry registry = new SchemaRegistry();
-        registry.register(metaKernel);
 
-        TsonSchema meta = parseMetaTn1(metaKernel);
+        TsonSchema meta = parseMetaTn1(registry);
         assertEquals(31, meta.entries().size(), "expected every meta.tn1 declaration to resolve");
 
         TsonSchema registered = registry.register(meta);
@@ -97,11 +114,9 @@ class MetaSchemaImportTest {
 
     @Test
     void registeringBinaryWithoutItsUnresolvedBinaryEncodingFieldCorrectlyFailsValidation() {
-        MetaSchema metaKernel = MetaKernelParser.getMetaKernelSchema();
         SchemaRegistry registry = new SchemaRegistry();
-        registry.register(metaKernel);
 
-        TsonSchema meta = parseMetaTn1(metaKernel);
+        TsonSchema meta = parseMetaTn1(registry);
         TypeDefinition binary = meta.entries().get("binary");
 
         TsonSchema withBinaryOnly = new TsonSchema(meta.id(), meta.meta(), meta.imports(), Map.of("binary", binary));

@@ -40,7 +40,7 @@ class RecordParserTest {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("integer", integerEntry);
         entries.put("point", TypeDefinition.product(RecordBody.of(List.of(valueField))));
-        return new TsonSchema(Optional.empty(), "test", List.of(), entries);
+        return new TsonSchema("test-schema", "test-meta", List.of(), entries);
     }
 
     private static TypeDefinition atomEntry(IntegerType body) {

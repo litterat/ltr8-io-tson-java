@@ -4,7 +4,6 @@ import io.ltr8.tson.parser.SchemaParser;
 import io.ltr8.tson.parser.ast.schema.SchemaDocument;
 import io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledRegistry;
 import io.ltr8.tson.parser.resolver.schema.compiled.TsonSchemaParser;
-import io.ltr8.tson.schema.MetaSchema;
 import io.ltr8.tson.schema.SchemaRegistry;
 import io.ltr8.tson.schema.TsonSchema;
 
@@ -58,8 +57,10 @@ import java.util.Optional;
  *   registered-only {@code SchemaLoader}, which knows nothing about this coordinator, its bootstrap
  *   case, or the throwaway registry used to materialize it. In practice this means a caller
  *   resolving anything beyond meta-kernel itself still needs to register meta-kernel explicitly
- *   first (e.g. {@code registry.register(MetaKernelParser.getMetaKernelSchema())}) before asking
- *   this coordinator for anything that transitively imports it -- materializing the one-off bootstrap result fixes
+ *   first (e.g. {@code registry.register(registry.schemaRegistry().materializeBootstrap(
+ *   MetaKernelParser.getMetaKernelSchema()))} -- {@code SchemaRegistry#register} itself now refuses
+ *   the raw, unmaterialized bootstrap form outright, see its own Javadoc) before asking this
+ *   coordinator for anything that transitively imports it -- materializing the one-off bootstrap result fixes
  *   *reading* through it correctly, not the separate *import-merge* requirement.</li>
  *   <li><b>Otherwise</b>, fetch {@code uri}'s own source text via this coordinator's own {@link
  *   SchemaSource} (default: {@link SchemaSource#registeredOnly()}, so nothing is fetched from
@@ -92,15 +93,16 @@ public final class DefaultSchemaCoordinator implements SchemaCoordinator {
             return cached.get();
         }
         if (BundledSchemaSource.META_KERNEL_ID.equals(uri)) {
-            MetaSchema metaKernel = MetaKernelParser.getMetaKernelSchema();
+            TsonSchema metaKernel = MetaKernelParser.getMetaKernelSchema();
             // A fresh, throwaway SchemaRegistry -- never the shared one this coordinator wraps --
             // purely so SchemaValidator's own materialization pass runs (synthesizing entries for
             // argument-bearing type-refs like enum's own `members: set<token>`) before compiling.
-            // Materializing does NOT mean caching: this registry is discarded immediately after,
-            // never stored anywhere, so every call still re-bootstraps and re-materializes from
+            // materializeBootstrap (not register -- SchemaRegistry now refuses a raw, unmaterialized
+            // bootstrap schema there outright) doesn't persist anything either, so this is still
+            // discarded immediately after: every call still re-bootstraps and re-materializes from
             // scratch, exactly as before -- only the *quality* of the one-off result changes (58
             // entries, not 49), not its lifetime.
-            TsonSchema materialized = new SchemaRegistry().register(metaKernel);
+            TsonSchema materialized = new SchemaRegistry().materializeBootstrap(metaKernel);
             return TsonSchemaParser.compile(materialized, registry.factories());
         }
         String sourceText = source.fetch(uri);

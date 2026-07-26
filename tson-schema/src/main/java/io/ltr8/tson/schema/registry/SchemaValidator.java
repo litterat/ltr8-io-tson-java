@@ -161,7 +161,7 @@ public final class SchemaValidator {
             validateEntry(entry.getKey(), entry.getValue(), merged, structureNamespace);
         }
 
-        return new TsonSchema(schema.id(), schema.meta(), schema.imports(), merged);
+        return new TsonSchema(schema.id(), schema.meta(), schema.imports(), merged, true, schema.bootstrap());
     }
 
     // ── Subtypes (reverse index) ─────────────────────────────────────────
