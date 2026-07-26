@@ -28,14 +28,18 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Proves {@link TsonSchemaResolver#compiledMetaSchema}/{@link TsonSchemaResolver#resolveSchema(SchemaDocument)}
- * -- a new resolver, given a {@link TsonCompiledSchemaLoader} that already has meta-kernel and meta.tn1
- * registered and compiled, can look up a document's own real {@code !!meta} target and get back its
- * *compiled* reader, genuinely usable to read real data -- not merely present. Proven in both
- * directions of the real governing chain: core.tn1's own {@code !!meta} target (meta.tn1) and
- * meta.tn1's own {@code !!meta} target (meta-kernel itself). Deliberately doesn't touch {@code
- * bindAtomInstance} at all (see that method's own Javadoc for why that's a separate, later step);
- * this only proves the wiring to *reach* a compiled governing schema works.
+ * Proves the guarantee {@code TsonSchemaResolver}'s own private {@code compiledMetaSchema} relies on
+ * -- a {@link TsonCompiledSchemaLoader} that already has meta-kernel and meta.tn1 registered and
+ * compiled can, given a document's own real {@code !!meta} target (just {@code
+ * document.meta()}, a URI), {@link TsonCompiledSchemaLoader#load} it and get back a *compiled*
+ * reader genuinely usable to read real data -- not merely present. Exercised directly against the
+ * loader itself, not through the resolver, since {@code compiledMetaSchema} is a private
+ * pass-through with no logic of its own beyond that one call. Proven in both directions of the real
+ * governing chain: core.tn1's own {@code !!meta} target (meta.tn1) and meta.tn1's own {@code !!meta}
+ * target (meta-kernel itself). Also covers {@link TsonSchemaResolver#resolveSchema(SchemaDocument)}
+ * itself, separately, below. Deliberately doesn't touch {@code bindAtomInstance} at all (see that
+ * method's own Javadoc for why that's a separate, later step); this only proves the wiring to
+ * *reach* a compiled governing schema works.
  */
 class TsonSchemaResolverCompiledMetaSchemaTest {
 
@@ -107,22 +111,22 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     @Test
     void coreTn1sOwnMetaTargetResolvesToMetaTn1sCompiledReader() {
-        TsonSchemaResolver resolver = new TsonSchemaResolver(loadMetaKernelAndMeta());
+        DefaultTsonCompiledSchemaLoader loader = loadMetaKernelAndMeta();
         SchemaDocument coreDocument = new TsonSchemaParser(BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.CORE_TN1_ID)).parseSchemaDocument();
 
         assertEquals("https://tson.io/2026/32/m/meta.tn1", coreDocument.meta());
 
-        TsonCompiledSchema compiledMeta = resolver.compiledMetaSchema(coreDocument);
+        TsonCompiledSchema compiledMeta = loader.load(coreDocument.meta());
 
         assertTrue(compiledMeta.schema().entries().containsKey("binary_encoding"));
     }
 
     @Test
     void theCompiledMetaSchemaGenuinelyReadsRealData() {
-        TsonSchemaResolver resolver = new TsonSchemaResolver(loadMetaKernelAndMeta());
+        DefaultTsonCompiledSchemaLoader loader = loadMetaKernelAndMeta();
         SchemaDocument coreDocument = new TsonSchemaParser(BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.CORE_TN1_ID)).parseSchemaDocument();
 
-        TsonCompiledSchema compiledMeta = resolver.compiledMetaSchema(coreDocument);
+        TsonCompiledSchema compiledMeta = loader.load(coreDocument.meta());
         Object result = compiledMeta.get("binary_encoding")
                 .read(new TsonDataParser("BASE64").parseDocument().root());
 
@@ -131,19 +135,17 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     /**
      * The other direction of the same governing chain: meta.tn1's own {@code !!meta} names
-     * meta-kernel itself, not meta.tn1's own compiled reader -- {@code compiledMetaSchema} had no
-     * direct test proving this specific hop until now (only exercised indirectly, as a side effect
-     * of {@code loadMetaKernelAndMeta}'s own {@code resolveSchema} call resolving meta.tn1's document).
+     * meta-kernel itself, not meta.tn1's own compiled reader.
      */
     @Test
     void metaTn1sOwnMetaTargetResolvesToMetaKernelsCompiledReader() {
-        TsonSchemaResolver resolver = new TsonSchemaResolver(loadMetaKernelAndMeta());
+        DefaultTsonCompiledSchemaLoader loader = loadMetaKernelAndMeta();
         SchemaDocument metaDocument =
                 new TsonSchemaParser(BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_TN1_ID)).parseSchemaDocument();
 
         assertEquals(BundledSchemaSource.META_KERNEL_ID, metaDocument.meta());
 
-        TsonCompiledSchema compiledMetaKernel = resolver.compiledMetaSchema(metaDocument);
+        TsonCompiledSchema compiledMetaKernel = loader.load(metaDocument.meta());
 
         // "integer_type" is meta-kernel's own -- not one of meta.tn1's own 31 declarations -- so its
         // presence confirms this genuinely reached meta-kernel's compiled reader, not meta.tn1's own.
@@ -152,11 +154,11 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     @Test
     void theCompiledMetaKernelSchemaGenuinelyReadsRealData() {
-        TsonSchemaResolver resolver = new TsonSchemaResolver(loadMetaKernelAndMeta());
+        DefaultTsonCompiledSchemaLoader loader = loadMetaKernelAndMeta();
         SchemaDocument metaDocument =
                 new TsonSchemaParser(BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_TN1_ID)).parseSchemaDocument();
 
-        TsonCompiledSchema compiledMetaKernel = resolver.compiledMetaSchema(metaDocument);
+        TsonCompiledSchema compiledMetaKernel = loader.load(metaDocument.meta());
         Object result = compiledMetaKernel.get("product_access_type")
                 .read(new TsonDataParser("INDEX").parseDocument().root());
 
@@ -178,13 +180,13 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
     void aLoaderThatNeverGotMetaTn1RegisteredThrowsClearly() {
         TsonCompiledRegistry registry = new TsonCompiledRegistry(TsonParserFactoryRegistry.dom());
         registry.register(resolveMetaKernelOrdinarily()); // meta-kernel only -- no meta.tn1
-        TsonSchemaResolver resolver = new TsonSchemaResolver(new DefaultTsonCompiledSchemaLoader(registry));
+        DefaultTsonCompiledSchemaLoader loader = new DefaultTsonCompiledSchemaLoader(registry);
         SchemaDocument coreDocument = new TsonSchemaParser(BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.CORE_TN1_ID)).parseSchemaDocument();
 
         // meta.tn1 isn't meta-kernel's own well-known bootstrap case, and the default TsonSchemaSource
         // fetches nothing -- so this is exactly TsonSchemaSource.registeredOnly()'s own rejection.
         IllegalStateException thrown = assertThrows(IllegalStateException.class,
-                () -> resolver.compiledMetaSchema(coreDocument));
+                () -> loader.load(coreDocument.meta()));
         assertTrue(thrown.getMessage().contains("meta.tn1"));
         assertTrue(thrown.getMessage().contains("no fetch capability"));
     }

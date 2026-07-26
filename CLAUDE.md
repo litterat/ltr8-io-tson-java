@@ -517,6 +517,18 @@ different jobs sharing one file, not one job with an optional dependency.
   isolation calls it too, for the identical underlying reason (no structure namespace
   available/wanted), not because those tests are themselves "about" bootstrapping.
 
+**`compiledMetaSchema` made `private` and moved to the bottom of the class (same-day follow-up, on
+the user's own explicit direction, once both `DefinitionResolver` and `TsonSchemaResolver` had each
+settled on exactly one public method -- `resolve(SchemaMap.Declaration)` and
+`resolveSchema(SchemaDocument)` respectively).** It was already a pure pass-through
+(`return loader.load(document.meta())`), package-private only because nothing had tightened it
+further; nothing outside `TsonSchemaResolver` ever legitimately needs to call it directly, since a
+caller with its own `TsonCompiledSchemaLoader` in hand can just call `loader.load(uri)` itself.
+`TsonSchemaResolverCompiledMetaSchemaTest`'s own tests that used to call `resolver.compiledMetaSchema(document)`
+directly now hold onto the `loader` they built the resolver from and call `loader.load(document.meta())`
+instead -- the identical operation `compiledMetaSchema` performs internally, since it was never
+anything more than that one line.
+
 **`TsonCompiledSchema` removed from every `DefinitionResolver` method parameter (same day, a
 follow-up pass, on the user's own explicit direction: "remove TsonCompiledSchema metaParser from
 DefinitionResolver... create an interface DefinitionMetaReader with one method read(String type,
