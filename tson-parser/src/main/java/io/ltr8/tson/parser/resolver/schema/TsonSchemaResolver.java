@@ -150,16 +150,16 @@ import java.util.Set;
  *
  * <p><b>No type-name namespace population, only an accumulating "resolved so far" map.</b> A
  * composition's supertypes must already be present in the {@code resolved} map passed to {@link
- * #resolve(SchemaMap.Declaration, Map)} -- {@link #resolveAll} builds this map incrementally, in
- * source order, so a supertype must be declared earlier in the same schema map than anything
- * composing with it (true for every built-in base kind: {@code top} before {@code atom}/{@code
- * product}/{@code sum}/{@code reference}, and {@code atom} before {@code integer_type}). Real
- * forward references and cross-schema imports need the full namespace population of §3.3.2/§3.4.1's
- * Pass 1, not implemented yet.
+ * #resolve(SchemaMap.Declaration, Map)} -- {@link #resolveSchema(SchemaDocument)} builds this map
+ * incrementally, in source order, so a supertype must be declared earlier in the same schema map
+ * than anything composing with it (true for every built-in base kind: {@code top} before {@code
+ * atom}/{@code product}/{@code sum}/{@code reference}, and {@code atom} before {@code
+ * integer_type}). Real forward references and cross-schema imports need the full namespace
+ * population of §3.3.2/§3.4.1's Pass 1, not implemented yet.
  *
  * <p><b>A separate structure namespace</b> (the governing meta-schema's own namespace, one hop via
  * its own {@code !!meta}, §3.3.1) can be supplied via the three-argument {@link
- * #resolve(SchemaMap.Declaration, Map, Map)}/two-argument {@link #resolveAll(SchemaDocument, Map)}
+ * #resolve(SchemaMap.Declaration, Map, Map)}/two-argument {@link #resolveSchema(SchemaDocument, Map)}
  * overloads, added ahead of actually needing it: {@code !C value} (constructor application, {@code
  * Instance}) resolves {@code C} against the type-name namespace first, then this structure
  * namespace; {@code !I ^ { values }} (atom refinement, {@code AtomRefinement}) never consults it at
@@ -208,12 +208,19 @@ public final class TsonSchemaResolver {
     /** {@code null} unless constructed via {@link #TsonSchemaResolver(SchemaCoordinator)} -- see {@link #compiledMetaSchema}. */
     private final SchemaCoordinator coordinator;
 
-    public TsonSchemaResolver() {
+    /**
+     * Package-private (narrowed 2026-07-27, on the user's own explicit direction, alongside a wider
+     * pass over this class's own public surface -- see {@link #resolve(SchemaMap.Declaration)}'s own
+     * note) -- every real caller, production or test, is in this same package; a caller elsewhere in
+     * this module that needs a resolver reaches {@link #TsonSchemaResolver(SchemaCoordinator)}
+     * instead (the one constructor with a genuine cross-package caller).
+     */
+    TsonSchemaResolver() {
         this(null);
     }
 
     /**
-     * @param coordinator consulted by {@link #resolveAll(SchemaDocument)} to resolve a document's
+     * @param coordinator consulted by {@link #resolveSchema(SchemaDocument)} to resolve a document's
      *                     own {@code !!meta}/{@code !!import} targets -- fetching, resolving,
      *                     registering, and compiling each as needed rather than requiring them to
      *                     already exist somewhere. {@code null} (same as the no-arg constructor) if
@@ -269,13 +276,24 @@ public final class TsonSchemaResolver {
         return coordinator.resolve(document.meta());
     }
 
-    /** Resolves a single declaration with no supertypes visible -- fine for a fresh record like {@code integer_size}, not for a composition. */
-    public TypeDefinition resolve(SchemaMap.Declaration declaration) {
+    /**
+     * Resolves a single declaration with no supertypes visible -- fine for a fresh record like
+     * {@code integer_size}, not for a composition.
+     *
+     * <p>Package-private (narrowed 2026-07-27, on the user's own explicit direction) -- every real
+     * caller of this and the other two {@code resolve} overloads below is test code exercising one
+     * declaration in isolation (see {@code TsonSchemaResolverTest}'s own class Javadoc), all in this
+     * same package; production code always goes through a whole document, via {@link
+     * #resolveSchema(SchemaDocument)} (which itself calls the three-argument overload internally,
+     * needing no public access to do so) or {@link MetaKernelBootstrapResolver}'s own two-pass
+     * bootstrap (the two-argument overload, also same-package).
+     */
+    TypeDefinition resolve(SchemaMap.Declaration declaration) {
         return resolve(declaration, Map.of());
     }
 
     /** Resolves a single declaration against {@code resolved}, the entries already resolved so far (for composition's supertype lookups). No compiled meta-schema reader -- see the three-argument overload. */
-    public TypeDefinition resolve(SchemaMap.Declaration declaration, Map<String, TypeDefinition> resolved) {
+    TypeDefinition resolve(SchemaMap.Declaration declaration, Map<String, TypeDefinition> resolved) {
         return resolve(declaration, resolved, (TsonCompiledSchema) null);
     }
 
@@ -301,10 +319,10 @@ public final class TsonSchemaResolver {
      * per call -- rather than this class holding one as mutable instance state (an earlier,
      * rejected version of this design), which broke down for any caller of the lower-level {@link
      * #resolve(SchemaMap.Declaration, Map, TsonCompiledSchema)} overloads directly (never going
-     * through {@link #resolveAll(SchemaDocument)}, so the field was simply never populated).
+     * through {@link #resolveSchema(SchemaDocument)}, so the field was simply never populated).
      */
-    public TypeDefinition resolve(SchemaMap.Declaration declaration, Map<String, TypeDefinition> resolved,
-                                   TsonCompiledSchema metaParser) {
+    TypeDefinition resolve(SchemaMap.Declaration declaration, Map<String, TypeDefinition> resolved,
+                            TsonCompiledSchema metaParser) {
         return resolveTypeDef(declaration.name(), declaration.typeDef(), resolved, metaParser);
     }
 
@@ -360,9 +378,9 @@ public final class TsonSchemaResolver {
      * the merged whole gets it from {@code TsonSchemaRegistry.register}'s own eventual output instead,
      * same as always.
      */
-    public TsonSchema resolveAll(SchemaDocument document) {
+    public TsonSchema resolveSchema(SchemaDocument document) {
         if (coordinator == null) {
-            return resolveAll(document, (TsonCompiledSchema) null);
+            return resolveSchema(document, (TsonCompiledSchema) null);
         }
         String id = document.id().orElseThrow(() -> new IllegalStateException(
                 "'" + document.meta() + "': !!id is required to register this schema, but is absent"));
@@ -387,7 +405,7 @@ public final class TsonSchemaResolver {
         return new TsonSchema(id, document.meta(), document.imports(), localOnly);
     }
 
-    /** Stage 1 of {@link #resolveAll(SchemaDocument)} -- every {@code !!import}'s own entries, in declaration order, merged as-is (never re-resolved against the importer). Mirrors {@code TsonSchemaLinker.mergeImports} exactly, including its collision rule, since this is the same concept discovered one stage earlier. */
+    /** Stage 1 of {@link #resolveSchema(SchemaDocument)} -- every {@code !!import}'s own entries, in declaration order, merged as-is (never re-resolved against the importer). Mirrors {@code TsonSchemaLinker.mergeImports} exactly, including its collision rule, since this is the same concept discovered one stage earlier. */
     private Map<String, TypeDefinition> mergeImports(SchemaDocument document) {
         Map<String, TypeDefinition> merged = new LinkedHashMap<>();
         for (String importUri : document.imports()) {
@@ -408,7 +426,7 @@ public final class TsonSchemaResolver {
     }
 
     /**
-     * {@link #resolveAll(SchemaDocument)}, plus {@code metaParser} (see the three-argument {@link
+     * {@link #resolveSchema(SchemaDocument)}, plus {@code metaParser} (see the three-argument {@link
      * #resolve}) threaded into every declaration it resolves -- the low-level overload, deliberately
      * with none of the one-argument overload's own {@code !!id}/{@code !!import} validation (see
      * that method's own Javadoc; {@code
@@ -418,8 +436,13 @@ public final class TsonSchemaResolver {
      * !!id} falls back to {@code !!meta}'s own value here -- the same fallback {@link
      * #documentLabel} already uses for error messages -- rather than failing a call site that was
      * never validating {@code !!id} in the first place.
+     *
+     * <p>Package-private (narrowed 2026-07-27, on the user's own explicit direction) -- its only real
+     * caller is test code exercising the structure-namespace/{@code metaParser} path directly,
+     * without the one-argument overload's own coordinator-driven validation; every real production
+     * path goes through {@link #resolveSchema(SchemaDocument)} instead.
      */
-    public TsonSchema resolveAll(SchemaDocument document, TsonCompiledSchema metaParser) {
+    TsonSchema resolveSchema(SchemaDocument document, TsonCompiledSchema metaParser) {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         for (SchemaMap.Declaration declaration : document.body().declarations().values()) {
             entries.put(declaration.name(), resolve(declaration, entries, metaParser));

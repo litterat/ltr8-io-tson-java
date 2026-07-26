@@ -21,7 +21,7 @@ import java.util.Optional;
  *   <li><b>Meta-kernel's own well-known identity?</b> Resolved via {@link
  *   MetaKernelBootstrapResolver#getMetaKernelSchema()} -- never through this coordinator's own generic path
  *   below, which would recurse forever: that
- *   path resolves a document via {@code TsonSchemaResolver(this)}, and {@code TsonSchemaResolver.resolveAll}
+ *   path resolves a document via {@code TsonSchemaResolver(this)}, and {@code TsonSchemaResolver.resolveSchema}
  *   itself calls back into {@link #resolve} for the document's own {@code !!meta} target -- fine for
  *   any real schema, whose {@code !!meta} points at something *other* than itself, but meta-kernel's
  *   own {@code !!meta} names itself (Part 2 §1.5's "one deliberate circularity"). This check runs
@@ -58,7 +58,7 @@ import java.util.Optional;
  *   registered-only {@code TsonSchemaLoader}, which knows nothing about this coordinator or its
  *   one-off bootstrap case. In practice this means a caller resolving anything beyond meta-kernel
  *   itself still needs to register meta-kernel explicitly first -- resolved *ordinarily* via {@code
- *   TsonSchemaResolver.resolveAll} against a coordinator whose own bootstrap branch supplies the
+ *   TsonSchemaResolver.resolveSchema} against a coordinator whose own bootstrap branch supplies the
  *   structure namespace (never the raw/one-off linked bootstrap form directly -- {@code
  *   TsonSchemaRegistry#register} refuses any self-referential schema with {@code bootstrap() ==
  *   true}, see its own Javadoc) -- before asking this coordinator for anything that transitively
@@ -108,7 +108,7 @@ public final class DefaultSchemaCoordinator implements SchemaCoordinator {
         String sourceText = source.fetch(uri);
         SchemaDocument document = new TsonSchemaParser(sourceText).parseSchemaDocument();
         TsonSchemaResolver resolver = new TsonSchemaResolver(this);
-        TsonSchema resolved = resolver.resolveAll(document);
+        TsonSchema resolved = resolver.resolveSchema(document);
         return registry.register(resolved);
     }
 }

@@ -22,7 +22,7 @@ import java.util.Objects;
  * this module represents -- always needs a real identity. A document with no {@code !!id} simply
  * never becomes a {@code TsonSchema} at all -- {@code TsonSchemaResolver}'s own document-level
  * resolution enforces this before ever constructing one (see its own Javadoc on {@code
- * resolveAll}'s {@code !!id} validation).
+ * resolveSchema}'s {@code !!id} validation).
  *
  * <p><b>A record, not a plain class</b> (2026-07-26, on the user's own explicit direction) --
  * previously kept as a plain class specifically so a bootstrap subclass ({@code MetaSchema}) could

@@ -461,6 +461,23 @@ into resolved `TypeDefinition`s (Part 2 §4, §8) -- values from `tson-schema`'s
 producing `tson-schema` values). Started 2026-07-23, deliberately narrow, incrementally widened the same
 day to a second construct:
 
+**Public surface cut from seven members to two (2026-07-27, on the user's own explicit direction,
+as part of the same push that put `TsonSchemaCompiler`/`TsonCompiledSchema` "on the good list" --
+narrowing focus onto this class next).** The document-level entry point,
+`resolveAll(SchemaDocument)`, is renamed `resolveSchema(SchemaDocument)` -- clearer against this
+project's own parse -> resolve -> link -> register -> compile -> read vocabulary, and no longer
+collides in spirit with the *other* `resolveAll` (the now-package-private two-argument overload
+threading a `metaParser` through, also renamed `resolveSchema` for the same reason). Every other
+public member -- the no-arg constructor, all three `resolve(SchemaMap.Declaration, ...)` overloads,
+and the two-argument `resolveSchema(SchemaDocument, TsonCompiledSchema)` overload -- is now
+package-private: tracing every real caller (production and test) found each one is either same-
+package already, or reachable through the two members that must stay public (`TsonSchemaResolver
+(SchemaCoordinator)`, needed by `MetaTn1CompiledEndToEndTest` in `resolver.schema.compiled`; and
+`resolveSchema(SchemaDocument)` itself, needed by `DefaultSchemaCoordinator` and that same
+cross-package test). Nothing about this changed behavior -- confirmed by a clean compile across
+every module on the first attempt and an unchanged 1131/0/0/0 test count -- it only closes off entry
+points nothing outside this package actually used.
+
 - **Record construction** -- a record (no supertypes, no type parameters) whose fields are simple
   type-refs, each REQUIRED or OPTIONAL (a `?` suffix; field *modifiers* -- default/fixed values --
   still aren't resolved) -- `integer_size`'s own shape, and, via a composition body (below),
@@ -582,7 +599,7 @@ day to a second construct:
   tightening per §5.7's table). Restating a field group in a refinement body, and a non-record
   refinement source, remain unresolved.
 
-- **Structure-namespace threading** (added 2026-07-24, Phase B step 2) -- `resolve`/`resolveAll`
+- **Structure-namespace threading** (added 2026-07-24, Phase B step 2) -- `resolve`/`resolveSchema`
   each gained a `structureNamespace` overload (`Map<String, TypeDefinition>`, defaulting to `Map.of()`
   on the existing overloads, so every pre-existing call site is unaffected). Per §3.3.1: a
   constructor-application target (`!C value`) resolves first against the type-name namespace
@@ -683,7 +700,7 @@ than silently mis-resolving -- `TsonSchemaResolver`'s own Javadoc lists exactly 
 
 **Status against the real fixtures (re-check with a throwaway probe before trusting these counts --
 they change every time resolver coverage widens): `meta-kernel.tn1` resolves in full (49/49, via
-`MetaKernelBootstrapResolver`'s own two-pass ordering -- `TsonSchemaResolver.resolveAll` alone, single-pass,
+`MetaKernelBootstrapResolver`'s own two-pass ordering -- `TsonSchemaResolver.resolveSchema` alone, single-pass,
 strict source order, still can't handle `boolean => !enum [...]` preceding `enum`'s own
 declaration); `meta.tn1` resolves and registers in full (31/31, `MetaSchemaImportTest`, up from
 24/31 before generic `Instance` resolution existed).**
@@ -841,7 +858,7 @@ is tempted to "fix" this back to a plain record, re-read `TypeArgument`'s Javado
   system, `MetaKernelBootstrapResolver.getMetaKernelSchema()`'s own output) covered the same distinction more
   simply, and once *linked-vs-unlinked* already needed its own type-level distinction
   (`TsonLinkedSchema`, see "Schema registry" below) -- a second subtype for "did this come from the
-  bootstrap reader" was redundant once that existed. `TsonSchemaResolver.resolveAll(SchemaDocument)`
+  bootstrap reader" was redundant once that existed. `TsonSchemaResolver.resolveSchema(SchemaDocument)`
   builds one from a whole document (not just its body), resolving each entry independently in
   source order and carrying the header straight through; most entries of an arbitrary real schema
   still throw via this path alone, since most constructs aren't resolved yet -- `resolve
@@ -881,7 +898,7 @@ resolves in two passes over meta-kernel's 49 declarations:
    isn't declared until long after `boolean` uses it -- has an entry to transfer a kind from (§5.5:
    "construction transfers only the constructor's kind; the result records source: C with empty
    supertypes"). This two-pass ordering is still needed and still lives here, not in
-   `TsonSchemaResolver` itself -- `TsonSchemaResolver.resolveAll` alone is single-pass, strict source order,
+   `TsonSchemaResolver` itself -- `TsonSchemaResolver.resolveSchema` alone is single-pass, strict source order,
    and still can't handle a forward reference like `boolean` preceding `enum`.
 
 **Constructor-application binding goes entirely through `MetaKernelBootstrapResolver.instanceBody`, a
@@ -1017,7 +1034,7 @@ linking) — `true` for exactly one object in the whole system, `MetaKernelBoots
 output (see "Meta-kernel bootstrap" below); `TsonSchemaRegistry#register` refuses any self-referential
 schema (its own `!!meta` names its own `!!id`) with `bootstrap() == true`, whether linked or not —
 meta-kernel's own identity can only ever be registered via a schema resolved *ordinarily*
-(`TsonSchemaResolver.resolveAll`, which never sets `bootstrap`), never the bootstrap-produced form
+(`TsonSchemaResolver.resolveSchema`, which never sets `bootstrap`), never the bootstrap-produced form
 directly. There used to be a separate `MetaSchema` subtype of `TsonSchema` for marking meta-kernel's
 own pre-loaded result; replaced by the plain `bootstrap` flag (2026-07-26) once linking already
 needed its own type-level distinction, so a second one for "did this come from the bootstrap reader"
@@ -1318,7 +1335,7 @@ registering/compiling on demand rather than requiring everything to pre-exist.
   linked one-off via `TsonSchemaLinker#linkBootstrap` (no registry involved at all), then compiled
   directly — *never* through this same coordinator's own
   generic path in case (3), which would recurse forever (that path builds a `TsonSchemaResolver(this)`
-  and resolves a document via `resolveAll`, which itself calls back into `resolve` for *that*
+  and resolves a document via `resolveSchema`, which itself calls back into `resolve` for *that*
   document's own `!!meta` target — fine for any real schema, wrong for meta-kernel specifically,
   whose `!!meta` points at itself). Checked *before* case (3) is ever reached, so the loop never
   starts. Compared by exact string, not canonical identity (`CanonicalIdentity` stays
@@ -1344,7 +1361,7 @@ registering/compiling on demand rather than requiring everything to pre-exist.
   import-merging (run inside `TsonSchemaRegistry.register`) resolves an import via `TsonSchemaRegistry`'s own
   registered-only `TsonSchemaLoader`, which knows nothing about this coordinator or its one-off bootstrap
   case. In practice, a caller resolving anything beyond meta-kernel itself must register meta-kernel
-  explicitly first — resolved *ordinarily* via `TsonSchemaResolver.resolveAll` against a coordinator whose
+  explicitly first — resolved *ordinarily* via `TsonSchemaResolver.resolveSchema` against a coordinator whose
   own bootstrap branch supplies the structure namespace (never the raw/one-off bootstrap form
   directly — `TsonSchemaRegistry#register` refuses any self-referential schema with `bootstrap() == true`,
   see "Schema registry" above) — before asking this coordinator for anything that transitively imports
@@ -1363,7 +1380,7 @@ registering/compiling on demand rather than requiring everything to pre-exist.
   fetching/bootstrapping as needed), not a normal "maybe try again" outcome the way a bare registry
   miss used to be.
 
-**`resolveAll(SchemaDocument)` validates `!!id`/`!!meta`/`!!import` and derives `structureNamespace`
+**`resolveSchema(SchemaDocument)` validates `!!id`/`!!meta`/`!!import` and derives `structureNamespace`
 from the coordinator, when this resolver has one** — previously this method always resolved against
 an empty structure namespace, regardless of what `!!meta` said, and never looked at `!!id` at all.
 Now, with a `SchemaCoordinator`, up front, before any declaration is resolved: (1) `document.id()`
@@ -1386,7 +1403,7 @@ no fallback at all (confirmed by reading those methods directly: each does exact
 `resolved.get(name)`). So imports are genuinely required *during resolution itself*, not only at
 `TsonSchemaLinker`'s later, separate registration-time merge/collision-check pass — meta.tn1's own
 `date_type => ~atom & atom_specification & {...}`, composing with two meta-kernel entries it only has
-via its own `!!import`, would fail to resolve at all without them. `resolveAll` resolves each import
+via its own `!!import`, would fail to resolve at all without them. `resolveSchema` resolves each import
 via the same `SchemaCoordinator`, merging its entries into a working namespace *before* any local
 declaration is resolved (`mergeImports`, a private helper), generalized to any coordinator-aware
 resolver and any number of imports. Collision handling mirrors `TsonSchemaLinker.mergeImports`'s own
@@ -1456,7 +1473,7 @@ DefaultSchemaCoordinator coordinator = new DefaultSchemaCoordinator(registry, Bu
 // above on why the one-off bootstrap case alone doesn't satisfy import merging.
 SchemaDocument metaKernelDocument = new TsonSchemaParser(
         BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID)).parseSchemaDocument();
-TsonSchema resolvedMetaKernel = new TsonSchemaResolver(coordinator).resolveAll(metaKernelDocument);
+TsonSchema resolvedMetaKernel = new TsonSchemaResolver(coordinator).resolveSchema(metaKernelDocument);
 registry.register(resolvedMetaKernel);
 
 TsonCompiledSchema meta = coordinator.resolve(BundledSchemaSource.META_TN1_ID);

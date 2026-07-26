@@ -241,7 +241,7 @@ class PositionalFormTest {
                   atom => top & {}
                   enum => ~atom & { members: set<token> }
                 }""").parseSchemaDocument();
-        TsonSchema schema = new TsonSchemaResolver().resolveAll(doc);
+        TsonSchema schema = new TsonSchemaResolver().resolveSchema(doc);
         RecordBody enumBody = (RecordBody) schema.entries().get("enum").body();
 
         ArrayValue booleanMembers = new ArrayValue(List.of(

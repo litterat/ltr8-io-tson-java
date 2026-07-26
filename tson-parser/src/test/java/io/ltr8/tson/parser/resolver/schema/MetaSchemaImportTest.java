@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Verifies {@code SchemaValidator}'s {@code !!import} merging (see its own Javadoc) against the
  * real {@code meta.tn1} fixture -- register meta-kernel first, then meta.tn1's own declarations
- * (resolved via {@link TsonSchemaResolver#resolveAll}, mirroring the now-deleted {@code MetaTn1Parser}'s
+ * (resolved via {@link TsonSchemaResolver#resolveSchema}, mirroring the now-deleted {@code MetaTn1Parser}'s
  * own bootstrap steps -- see {@link #parseMetaTn1}), and confirm meta-kernel's names (e.g. {@code
  * atom}, {@code text_type}) are visible and correctly referenced from meta.tn1's own
  * composition-based declarations (e.g. {@code date_type => ~atom & atom_specification & {...}}).
@@ -45,7 +45,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class MetaSchemaImportTest {
 
     /**
-     * Deliberately still resolves via a bare {@link TsonSchemaResolver#resolveAll(SchemaDocument)} call
+     * Deliberately still resolves via a bare {@link TsonSchemaResolver#resolveSchema(SchemaDocument)} call
      * rather than {@link DefaultSchemaCoordinator#resolve(String)} -- this test wants meta.tn1's own
      * *raw, unregistered, local-only* result (31 entries, no merged imports) to exercise {@code
      * TsonSchemaRegistry#register}'s own import-merge itself, one stage later; {@code
@@ -56,7 +56,7 @@ class MetaSchemaImportTest {
      * {@code MetaTn1Parser} everywhere else that only wants the *fully* resolved-and-registered
      * result (see {@code TsonSchemaResolverCompiledMetaSchemaTest#loadMetaKernelAndMeta}).
      *
-     * <p><b>Meta-kernel itself is resolved via ordinary {@code TsonSchemaResolver.resolveAll}, not
+     * <p><b>Meta-kernel itself is resolved via ordinary {@code TsonSchemaResolver.resolveSchema}, not
      * registered as the raw bootstrap output</b> (2026-07-26, {@code TsonSchemaRegistry#register} now
      * refuses <i>any</i> self-referential schema with {@code bootstrap() == true}, materialized or
      * not -- see that method's own Javadoc). {@code registry.materializeBootstrap(...)} still runs
@@ -81,13 +81,13 @@ class MetaSchemaImportTest {
 
         String metaKernelSource = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID);
         SchemaDocument metaKernelDocument = new TsonSchemaParser(metaKernelSource).parseSchemaDocument();
-        TsonSchema metaKernel = new TsonSchemaResolver(coordinator).resolveAll(metaKernelDocument);
+        TsonSchema metaKernel = new TsonSchemaResolver(coordinator).resolveSchema(metaKernelDocument);
         TsonLinkedSchema metaKernelMaterialized = registry.register(TsonSchemaLinker.link(metaKernel, registry));
         compiledRegistry.register(metaKernelMaterialized.schema());
 
         String source = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_TN1_ID);
         SchemaDocument metaDocument = new TsonSchemaParser(source).parseSchemaDocument();
-        return new TsonSchemaResolver(coordinator).resolveAll(metaDocument);
+        return new TsonSchemaResolver(coordinator).resolveSchema(metaDocument);
     }
 
     @Test

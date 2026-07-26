@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class MetaTn1CompiledEndToEndTest {
 
     /**
-     * Resolving meta.tn1 itself now goes through {@code resolveAll}/{@code bindAtomInstance}, which
+     * Resolving meta.tn1 itself now goes through {@code resolveSchema}/{@code bindAtomInstance}, which
      * needs an object-binding-mode compiled reader for meta-kernel (its own Instance declarations,
      * e.g. {@code binary_encoding => !enum [...]}, go through it) -- so meta.tn1's own resolution
      * step below is object mode internally, even though the *outer* compile this test itself
@@ -47,13 +47,13 @@ class MetaTn1CompiledEndToEndTest {
 
         String metaKernelSource = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID);
         SchemaDocument metaKernelDocument = new TsonSchemaParser(metaKernelSource).parseSchemaDocument();
-        TsonSchema metaKernel = new TsonSchemaResolver(coordinator).resolveAll(metaKernelDocument);
+        TsonSchema metaKernel = new TsonSchemaResolver(coordinator).resolveSchema(metaKernelDocument);
         TsonLinkedSchema metaKernelMaterialized = registry.register(TsonSchemaLinker.link(metaKernel, registry));
         compiledRegistry.register(metaKernelMaterialized.schema());
 
         String source = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_TN1_ID);
         SchemaDocument metaDocument = new TsonSchemaParser(source).parseSchemaDocument();
-        TsonSchema meta = new TsonSchemaResolver(coordinator).resolveAll(metaDocument);
+        TsonSchema meta = new TsonSchemaResolver(coordinator).resolveSchema(metaDocument);
 
         return registry.register(TsonSchemaLinker.link(meta, registry)).schema();
     }

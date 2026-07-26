@@ -89,7 +89,7 @@ public final class TsonSchemaCompiler {
      * against one constructor.
      *
      * <p><b>Must be compiled from an already-materialized, already-validated {@link TsonSchema}</b>
-     * -- i.e. {@code TsonSchemaRegistry}'s own output, never a raw {@code TsonSchemaResolver.resolveAll}
+     * -- i.e. {@code TsonSchemaRegistry}'s own output, never a raw {@code TsonSchemaResolver.resolveSchema}
      * result directly. Two reasons: every {@code type_ref} reachable from a body needs to already be
      * argument-free (materialization already flattened any {@code <...>} application into a
      * reference to a synthesized entry -- see {@code TsonSchemaRegistry}'s own Javadoc), since

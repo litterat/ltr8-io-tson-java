@@ -122,7 +122,7 @@ class TsonSchemaResolverTest {
     }
 
     @Test
-    void resolveAllResolvesEveryDeclarationInSourceOrder() throws DataBindException {
+    void resolveSchemaResolvesEveryDeclarationInSourceOrder() throws DataBindException {
         SchemaDocument doc = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 {
@@ -130,7 +130,7 @@ class TsonSchemaResolverTest {
                   point => { x: integer  y: integer }
                 }""").parseSchemaDocument();
 
-        TsonSchema schema = resolver.resolveAll(doc);
+        TsonSchema schema = resolver.resolveSchema(doc);
 
         assertEquals(2, schema.entries().size());
         assertEquals(EXPECTED_INTEGER_SIZE, write(schema.entries().get("integer_size")));
@@ -159,7 +159,7 @@ class TsonSchemaResolverTest {
         TypeDefinition viaThreeArg = resolver.resolve(declaration, Map.of(), irrelevantMetaParser);
         assertEquals(EXPECTED_INTEGER_SIZE, write(viaThreeArg));
 
-        TsonSchema schema = resolver.resolveAll(doc, irrelevantMetaParser);
+        TsonSchema schema = resolver.resolveSchema(doc, irrelevantMetaParser);
         assertEquals(2, schema.entries().size());
         assertEquals(EXPECTED_INTEGER_SIZE, write(schema.entries().get("integer_size")));
     }
@@ -1269,7 +1269,7 @@ class TsonSchemaResolverTest {
      * Meta-kernel registered, then meta.tn1 resolved and registered on top -- see {@code
      * MetaSchemaImportTest} for the same, fully-verified pattern (31/31 declarations, validated).
      *
-     * <p>Meta-kernel itself is registered via ordinary {@code TsonSchemaResolver.resolveAll}, not the
+     * <p>Meta-kernel itself is registered via ordinary {@code TsonSchemaResolver.resolveSchema}, not the
      * raw bootstrap output (2026-07-26, {@code TsonSchemaRegistry#register} now refuses <i>any</i>
      * self-referential schema with {@code bootstrap() == true}, materialized or not -- see that
      * method's own Javadoc) -- mirrors {@code MetaTn1CompiledEndToEndTest#registerMeta}'s own
@@ -1291,7 +1291,7 @@ class TsonSchemaResolverTest {
 
         String metaKernelSource = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID);
         SchemaDocument metaKernelDocument = new TsonSchemaParser(metaKernelSource).parseSchemaDocument();
-        TsonSchema metaKernel = new TsonSchemaResolver(throwawayCoordinator).resolveAll(metaKernelDocument);
+        TsonSchema metaKernel = new TsonSchemaResolver(throwawayCoordinator).resolveSchema(metaKernelDocument);
         registry.register(TsonSchemaLinker.link(metaKernel, registry)); // permanent, so meta.tn1's own !!import finds it below
         TsonCompiledSchema metaKernelParser = metaKernelCompiled();
 

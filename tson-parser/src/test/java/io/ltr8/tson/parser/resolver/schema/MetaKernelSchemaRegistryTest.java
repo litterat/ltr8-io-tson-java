@@ -42,7 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * neitherRawNorLinkedBootstrapFormCanEverBeRegistered} below cover that rejection in both forms;
  * {@code registeringTheOrdinarilyResolvedNonBootstrapMetaKernelSucceeds} covers the one way
  * meta-kernel's own identity can actually end up registered -- resolved via ordinary {@code
- * TsonSchemaResolver.resolveAll} (which never sets {@code bootstrap}), using the coordinator's own
+ * TsonSchemaResolver.resolveSchema} (which never sets {@code bootstrap}), using the coordinator's own
  * bootstrap branch as the structure-namespace ground truth, mirroring {@code
  * MetaTn1CompiledEndToEndTest#registerMeta}'s own pattern.
  */
@@ -124,10 +124,10 @@ class MetaKernelSchemaRegistryTest {
 
     /**
      * The one way meta-kernel's own identity can actually end up registered: resolved via ordinary
-     * {@code TsonSchemaResolver.resolveAll} against a coordinator whose own bootstrap branch supplies the
+     * {@code TsonSchemaResolver.resolveSchema} against a coordinator whose own bootstrap branch supplies the
      * complete structure namespace (so even a forward-referencing declaration like {@code boolean =>
      * !enum [...]} resolves correctly, the same as {@code MetaKernelBootstrapResolver}'s own two-pass logic
-     * achieves, just via the generic mechanism instead) -- {@code resolveAll} never sets {@code
+     * achieves, just via the generic mechanism instead) -- {@code resolveSchema} never sets {@code
      * bootstrap}, so the result passes {@link TsonSchemaRegistry#register}'s guard even though its own
      * entries are identical to the real, linked meta-kernel. Mirrors {@code
      * MetaTn1CompiledEndToEndTest#registerMeta}'s own pattern, scoped down to meta-kernel alone.
@@ -145,7 +145,7 @@ class MetaKernelSchemaRegistryTest {
 
         String source = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID);
         SchemaDocument document = new TsonSchemaParser(source).parseSchemaDocument();
-        TsonSchema resolved = new TsonSchemaResolver(coordinator).resolveAll(document);
+        TsonSchema resolved = new TsonSchemaResolver(coordinator).resolveSchema(document);
         assertFalse(resolved.bootstrap());
 
         TsonLinkedSchema registered = registry.register(TsonSchemaLinker.link(resolved, registry));

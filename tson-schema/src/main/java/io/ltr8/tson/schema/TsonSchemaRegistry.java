@@ -72,7 +72,7 @@ public final class TsonSchemaRegistry implements TsonSchemaLoader {
         if (selfReferential(unwrapped) && unwrapped.bootstrap()) {
             throw new TsonSchemaValidationException("'" + unwrapped.id() + "' is self-referential (its own "
                     + "!!meta names its own !!id) and bootstrap() == true -- meta-kernel's own identity "
-                    + "must be registered via a schema resolved ordinarily (TsonSchemaResolver.resolveAll,"
+                    + "must be registered via a schema resolved ordinarily (TsonSchemaResolver.resolveSchema,"
                     + " which never sets bootstrap), never the bootstrap-produced form directly, "
                     + "materialized or not");
         }
