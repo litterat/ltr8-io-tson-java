@@ -478,32 +478,89 @@ different jobs sharing one file, not one job with an optional dependency.
   constructor, not optional (the old no-arg constructor, and the "coordinator may be `null`" branch
   every coordinator-touching method used to carry, are both gone: a document-level resolution that
   can't validate its own `!!id` or reach its own `!!meta` isn't a degraded version of this job, it's
-  a different one). Holds one internal `DefinitionResolver` instance and delegates every
-  per-declaration call to it. `resolveSchema(SchemaDocument)` -- header-directive validation
-  (`!!id`/`!!import`), deriving the structure namespace via `compiledMetaSchema`, merging `!!import`
-  entries via `mergeImports` -- and the two-argument `compiledMetaSchema`/package-private
-  `SchemaCoordinator`-consuming machinery are the only things left on it.
+  a different one). `resolveSchema(SchemaDocument)` -- header-directive validation (`!!id`/`!!import`),
+  deriving the structure namespace via `compiledMetaSchema`, merging `!!import` entries via
+  `mergeImports` -- and the two-argument `compiledMetaSchema`/package-private `SchemaCoordinator`-
+  consuming machinery are the only things left on it.
 - **`DefinitionResolver`** (package-private now, no `Tson` prefix -- internal machinery a consumer of
   this library never names directly, per "Naming convention" above) never references
   `SchemaCoordinator` at all. Holds `resolve(SchemaMap.Declaration)`/`resolveBootstrapDefinition
-  (SchemaMap.Declaration, Map)`/`resolve(SchemaMap.Declaration, Map, TsonCompiledSchema)` (the
-  declaration-level primitives) plus a batch `resolveSchema(SchemaDocument, TsonCompiledSchema)`
-  convenience -- looping every declaration in a document with no validation and no import-merging,
-  kept *here* rather than on `TsonSchemaResolver` specifically because it needs no coordinator: tying
-  it to the coordinator-*requiring* class would force a caller who already has a structure namespace
-  in hand, but no real coordinator, to fabricate one just to call it. `resolveBootstrapDefinition`'s
-  own name still describes its real production caller (`MetaKernelBootstrapResolver`'s two-pass
-  loop, one declaration at a time, in source order -- meta-kernel's own `!!meta` names itself, so it
-  can never go through `resolveSchema` the ordinary way); test code resolving one hand-built
-  declaration in isolation calls it too, for the identical underlying reason (no structure namespace
+  (SchemaMap.Declaration, Map)`/`resolve(SchemaMap.Declaration, Map, Map)` (the declaration-level
+  primitives) plus a batch `resolveSchema(SchemaDocument, Map)` convenience -- looping every
+  declaration in a document with no validation and no import-merging, kept *here* rather than on
+  `TsonSchemaResolver` specifically because it needs no coordinator: tying it to the coordinator-
+  *requiring* class would force a caller who already has a structure namespace in hand, but no real
+  coordinator, to fabricate one just to call it. `resolveBootstrapDefinition`'s own name still
+  describes its real production caller (`MetaKernelBootstrapResolver`'s two-pass loop, one
+  declaration at a time, in source order -- meta-kernel's own `!!meta` names itself, so it can never
+  go through `resolveSchema` the ordinary way); test code resolving one hand-built declaration in
+  isolation calls it too, for the identical underlying reason (no structure namespace
   available/wanted), not because those tests are themselves "about" bootstrapping.
 
-Verified behavior-preserving, not just compiling: every real caller (production and test) was traced
-before deciding what moved where, a clean compile succeeded across every module on the first attempt
-for each step, and the test count stayed at the established 1131/0/0/0 bar throughout. `DefinitionResolverTest`
-itself is now almost entirely a `DefinitionResolver` test in practice (nearly every one of its own
-cases constructs one directly) -- not renamed/split yet, flagged as a natural next step rather than
-done silently mid-refactor.
+**`TsonCompiledSchema` removed from every `DefinitionResolver` method parameter (same day, a
+follow-up pass, on the user's own explicit direction: "remove TsonCompiledSchema metaParser from
+DefinitionResolver... create an interface DefinitionMetaReader with one method read(String type,
+DataValue value)... a required constructor parameter").** Splits what `TsonCompiledSchema` used to
+provide into the two genuinely different things `DefinitionResolver` actually needed from it:
+
+- A plain `Map<String, TypeDefinition>` for the structure namespace (what `resolveConstructorTarget`
+  needs -- a `TypeDefinition` *lookup*, never a value read) -- at this point still threaded as an
+  ordinary per-call parameter everywhere `metaParser` used to be (e.g. `resolve(SchemaMap.Declaration,
+  Map, Map)`); moved to the constructor too in a same-day follow-up, see below.
+- **`DefinitionMetaReader`** (new, one method: `Top read(String type, DataValue value)`) -- what
+  `bindAtomInstance` uses to actually *bind* a constructor-application/atom-refinement value, now a
+  **required constructor parameter** rather than threaded per call. `DefinitionResolver` has zero
+  dependency on `resolver.schema.compiled` now -- the one place this class used to reach into that
+  package is gone; `TsonSchemaResolver` (which still needs the full `TsonCompiledSchema`, to derive
+  *both* the structure namespace and the reader) is where that reach now lives instead, one layer up
+  (see `compiledMetaSchema`'s own Javadoc).
+
+**The structure namespace moved to the constructor too (same day, a further follow-up, on the
+user's own explicit direction: "The Map<String, TypeDefinition> structureNamespace is fixed to the
+meta definitions so should also be passed in on the constructor. Required, but empty map if not
+being tested. Then remove anywhere structureNamespace is passed into the methods.").** Both of a
+`DefinitionResolver`'s two real dependencies -- which compiled reader to bind an `Instance`/
+`AtomRefinement` value against, and which structure namespace to fall back to for a
+constructor-application target -- are properties of *which meta-schema governs this resolver*,
+fixed for its whole lifetime, not something that legitimately varies call to call the way `resolved`
+(the accumulating type-name namespace, still a per-call argument) genuinely does; once
+`DefinitionMetaReader` had already made that move, leaving `structureNamespace` threaded separately
+was the odd one out. `resolve(SchemaMap.Declaration, Map, Map)` collapsed to `resolve(SchemaMap.Declaration,
+Map)`; `resolveSchema(SchemaDocument, Map)` collapsed to `resolveSchema(SchemaDocument)`;
+`resolveConstructorTarget` (now a genuine instance method, not `static`) reads the field directly.
+`resolveBootstrapDefinition` keeps its own distinct name (still describing its real production
+caller, `MetaKernelBootstrapResolver`'s two-pass loop) even though its body is now a one-line
+delegate to the two-argument `resolve` -- the two methods are behaviorally identical now that there's
+no separate structure-namespace argument left to omit, but the name still documents *who calls it
+and why*, matching this codebase's established preference for self-documenting call sites over
+generic ones. A resolver with nothing to offer there (every caller that never reaches
+`resolveInstance`, e.g. `MetaKernelBootstrapResolver`'s own first pass, or a test exercising an
+unrelated construct) is constructed with `Map.of()`, the same way it already supplies a
+throws-if-called `DefinitionMetaReader`. `TsonSchemaResolver.resolveSchema` passes
+`metaParser.schema().entries()` as the second constructor argument alongside the reader lambda, both
+now sourced from that call's own `metaParser`.
+
+Since a single `TsonSchemaResolver` can resolve documents governed by *different* meta-schemas
+across separate `resolveSchema` calls, it builds a fresh, cheap `DefinitionResolver` per call
+(`new DefinitionResolver((type, value) -> (Top) metaParser.get(type).read(value),
+metaParser.schema().entries())`) rather than holding one as a reused field -- both the reader and the
+structure namespace have to be bound to *that call's* own `metaParser`, not fixed for the object's
+whole lifetime. `MetaKernelBootstrapResolver` (which never actually reaches `bindAtomInstance` at all
+-- every real `Instance` in meta-kernel's own document goes through `instanceBody` directly, see
+"Meta-kernel bootstrap" below) supplies a reader that throws if ever invoked, rather than passing
+something that could silently return nonsense if that assumption is ever wrong, and `Map.of()` for
+the structure namespace it likewise never consults.
+
+Verified behavior-preserving, not just compiling, at every step of all three passes: every real caller
+(production and test) was traced before deciding what moved where, a clean compile succeeded across
+every module on the first attempt for each step, and the test count stayed at the established
+1131/0/0/0 bar throughout -- including the second pass, despite it touching roughly 30 call sites
+across `DefinitionResolverTest` alone (most needed a locally-scoped `DefinitionResolver`, wrapping
+that one test's own compiled meta-schema, in place of the shared no-op field the majority of other
+tests still use), and the third pass, which dropped the now-redundant third argument from roughly 20
+more `.resolve(...)` call sites in the same file (several also lost a now-unused local
+`Map<String, TypeDefinition> metaNamespace`/`metaKernelNamespace` variable, since that value moved
+into `definitionResolverFor`'s own constructor call instead).
 
 - **Record construction** -- a record (no supertypes, no type parameters) whose fields are simple
   type-refs, each REQUIRED or OPTIONAL (a `?` suffix; field *modifiers* -- default/fixed values --

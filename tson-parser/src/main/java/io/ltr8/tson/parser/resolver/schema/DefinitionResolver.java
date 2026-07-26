@@ -31,7 +31,6 @@ import io.ltr8.tson.parser.ast.schema.TypeArg;
 import io.ltr8.tson.parser.ast.schema.TypeDef;
 import io.ltr8.tson.parser.ast.schema.TypeRef;
 import io.ltr8.tson.parser.mapper.TsonMapperWriter;
-import io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
@@ -50,6 +49,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
@@ -156,11 +156,12 @@ import java.util.Set;
  * population of §3.3.2/§3.4.1's Pass 1, not implemented yet.
  *
  * <p><b>A separate structure namespace</b> (the governing meta-schema's own namespace, one hop via
- * its own {@code !!meta}, §3.3.1) can be supplied via the three-argument {@link
- * #resolve(SchemaMap.Declaration, Map, TsonCompiledSchema)} overload: {@code !C value} (constructor
- * application, {@code Instance}) resolves {@code C} against the type-name namespace first, then
- * this structure namespace; {@code !I ^ { values }} (atom refinement, {@code AtomRefinement}) never
- * consults it at all.
+ * its own {@code !!meta}, §3.3.1) is fixed for this instance's whole lifetime, supplied once as a
+ * required constructor parameter (empty, {@code Map.of()}, if none applies -- see "Fixed at
+ * construction, not threaded per call" below): {@code !C value} (constructor application, {@code
+ * Instance}) resolves {@code C} against the type-name namespace first, then this structure
+ * namespace; {@code !I ^ { values }} (atom refinement, {@code AtomRefinement}) never consults it at
+ * all.
  *
  * <p><b>Kind determination</b> (§4.1) checks the transitive supertype chain for the literal,
  * kernel-fixed names {@code atom}/{@code product}/{@code sum} -- not a general "inherit the nearest
@@ -211,11 +212,41 @@ import java.util.Set;
  * exactly the kind of internal machinery a consumer of this library never names directly (see
  * "Naming convention" in this project's own CLAUDE.md); {@link TsonSchemaResolver} is the
  * consumer-facing type.
+ *
+ * <p><b>No dependency on {@code resolver.schema.compiled} at all now</b> (2026-07-27, same
+ * direction, a follow-up pass) -- {@code TsonCompiledSchema} is gone from every method parameter,
+ * replaced by two narrower things: a plain {@code Map<String, TypeDefinition>} for the structure
+ * namespace (what {@link #resolveConstructorTarget} actually needs -- a {@code TypeDefinition}
+ * lookup, not a compiled reader), and {@link DefinitionMetaReader} (a compiled reader, for the one
+ * thing that genuinely needs one: {@link #bindAtomInstance}'s own binding step). This closes the one
+ * place this class used to reach past {@code resolver.schema} into {@code resolver.schema.compiled}
+ * -- see {@link TsonSchemaResolver#compiledMetaSchema}'s own Javadoc for why that reach still
+ * exists, just one layer up now, in the class that actually needs the full {@code
+ * TsonCompiledSchema} (to derive both the structure namespace and the reader).
+ *
+ * <p><b>Fixed at construction, not threaded per call</b> (a further same-day follow-up, same
+ * direction: "the structureNamespace ... should also be passed in on the constructor ... remove
+ * anywhere structureNamespace is passed into the methods"). The structure namespace stopped being a
+ * per-{@code resolve}-call argument once {@link DefinitionMetaReader} already made the same move for
+ * the compiled reader -- both are properties of *which meta-schema governs this resolver*, fixed for
+ * its whole lifetime, not something that varies call to call the way {@code resolved} (the
+ * accumulating type-name namespace) genuinely does. A resolver with nothing to offer there (every
+ * caller that never reaches {@link #resolveInstance}, e.g. {@link MetaKernelBootstrapResolver}'s own
+ * first pass) is constructed with {@code Map.of()}, the same way it already supplies a
+ * throws-if-called {@link DefinitionMetaReader}.
  */
 final class DefinitionResolver {
 
     /** Re-serializes an atom refinement's source back to wire form for {@link #mergeWithSource} -- see {@link #resolveAtomRefinement}. */
     private final TsonMapperWriter writer = new TsonMapperWriter();
+
+    private final DefinitionMetaReader definitionMetaReader;
+    private final Map<String, TypeDefinition> structureNamespace;
+
+    DefinitionResolver(DefinitionMetaReader definitionMetaReader, Map<String, TypeDefinition> structureNamespace) {
+        this.definitionMetaReader = Objects.requireNonNull(definitionMetaReader, "definitionMetaReader");
+        this.structureNamespace = Objects.requireNonNull(structureNamespace, "structureNamespace");
+    }
 
     /**
      * Resolves a single declaration with no supertypes visible -- fine for a fresh record like
@@ -230,8 +261,8 @@ final class DefinitionResolver {
 
     /**
      * Resolves a single declaration against {@code resolved}, the entries already resolved so far
-     * (for composition's supertype lookups). No compiled meta-schema reader -- see the
-     * three-argument {@link #resolve(SchemaMap.Declaration, Map, TsonCompiledSchema)} overload.
+     * (for composition's supertype lookups) -- exactly {@link #resolve(SchemaMap.Declaration, Map)},
+     * under a name that documents its own real production caller instead.
      *
      * <p><b>Named for its own real production caller</b> (renamed 2026-07-27, from a bare {@code
      * resolve(declaration, resolved)}, on the user's own explicit direction, to "make it really
@@ -245,61 +276,60 @@ final class DefinitionResolver {
      * accumulating type-name namespace -- not because those tests are themselves about bootstrapping.
      */
     TypeDefinition resolveBootstrapDefinition(SchemaMap.Declaration declaration, Map<String, TypeDefinition> resolved) {
-        return resolve(declaration, resolved, (TsonCompiledSchema) null);
+        return resolve(declaration, resolved);
     }
 
     /**
      * Resolves a single declaration against {@code resolved} (the type-name namespace: entries
      * already resolved so far in the current schema, for composition's supertype lookups and, per
-     * §3.3.1, tried first for a constructor-application target) and {@code metaParser} (the
-     * *compiled* reader for the governing meta-schema's own namespace -- its local declarations plus
-     * its imports, one hop, §3.3.1 -- tried second for a constructor-application target, and what
-     * {@link #bindAtomInstance} itself reads a constructor's own compiled parser from; never
-     * consulted for an atom refinement's source, which resolves against the type-name namespace
-     * only). {@code null} if this resolver has nothing to offer there -- valid for any declaration
-     * that never reaches {@link #resolveInstance}/{@link #resolveAtomRefinement} at all (composition,
-     * refinement, a fresh record, ...); {@link #bindAtomInstance} throws clearly if it's actually
-     * needed and absent, rather than a bare {@code NullPointerException}.
+     * §3.3.1, tried first for a constructor-application target). The structure namespace (the
+     * governing meta-schema's own namespace -- its local declarations plus its imports, one hop,
+     * §3.3.1 -- tried second for a constructor-application target; never consulted for an atom
+     * refinement's source, which resolves against the type-name namespace only) is no longer a
+     * per-call argument -- it's fixed for this instance's whole lifetime, supplied once at
+     * construction (empty, {@code Map.of()}, if this resolver has nothing to offer there -- valid for
+     * any declaration that never reaches {@link #resolveInstance} at all: composition, refinement, a
+     * fresh record, atom refinement, ...); {@link #resolveConstructorTarget} throws clearly, naming
+     * both namespaces, if a constructor-application target is actually needed and not found in
+     * either.
      *
-     * <p>Deliberately a compiled {@link TsonCompiledSchema}, not a bare {@code Map<String,
-     * TypeDefinition>} the way an earlier version of this parameter worked -- {@link
-     * #bindAtomInstance} needs an actual compiled parser to read a constructor-application/
-     * refinement value *against* (the resolved {@code TypeDefinition} map alone isn't itself
-     * readable), and threading the already-compiled reader through here means a caller who already
-     * has one doesn't pay to rebuild an equivalent one per call.
+     * <p>This method (and everything it dispatches to) only ever needs to *look up* a {@code
+     * TypeDefinition} by name in either namespace, never to *read* a value against one; the one place
+     * this class does need to read a value against a compiled parser, {@link #bindAtomInstance}, gets
+     * it from this instance's own {@link DefinitionMetaReader} instead, likewise supplied once at
+     * construction, not threaded per call.
      */
-    TypeDefinition resolve(SchemaMap.Declaration declaration, Map<String, TypeDefinition> resolved,
-                            TsonCompiledSchema metaParser) {
-        return resolveTypeDef(declaration.name(), declaration.typeDef(), resolved, metaParser);
+    TypeDefinition resolve(SchemaMap.Declaration declaration, Map<String, TypeDefinition> resolved) {
+        return resolveTypeDef(declaration.name(), declaration.typeDef(), resolved);
     }
 
     /**
      * {@code document}'s own declarations, resolved one at a time in source order via {@link
-     * #resolve(SchemaMap.Declaration, Map, TsonCompiledSchema)}, each seeing every entry resolved
-     * before it -- with {@code metaParser} threaded into every one of them, but none of {@link
+     * #resolve(SchemaMap.Declaration, Map)}, each seeing every entry resolved before it -- against
+     * this instance's own fixed structure namespace, but none of {@link
      * TsonSchemaResolver#resolveSchema(SchemaDocument)}'s own {@code !!id}/{@code !!import}
      * validation or import-merging (this class never references {@code SchemaCoordinator} at all,
      * see this class's own Javadoc). {@link TsonSchema#id()} is required, so a genuinely absent
      * {@code !!id} falls back to {@code !!meta}'s own value here.
      *
      * <p>Lives here, not on {@link TsonSchemaResolver}, precisely because it needs no {@code
-     * SchemaCoordinator} -- {@code metaParser} already supplies the one thing a coordinator would
-     * otherwise be needed for, so tying this method to the coordinator-*requiring* class would force
-     * a caller who has a structure namespace in hand but no real coordinator to fabricate one just to
-     * call it. Its only real caller is test code exercising the structure-namespace/{@code
-     * metaParser} path directly, without {@link TsonSchemaResolver}'s own validation; every real
-     * production path goes through {@link TsonSchemaResolver#resolveSchema(SchemaDocument)} instead.
+     * SchemaCoordinator} -- this instance's own structure namespace already supplies the one thing a
+     * coordinator would otherwise be needed for, so tying this method to the coordinator-*requiring*
+     * class would force a caller who has a structure namespace in hand but no real coordinator to
+     * fabricate one just to call it. Its only real caller is test code exercising the
+     * structure-namespace path directly, without {@link TsonSchemaResolver}'s own validation; every
+     * real production path goes through {@link TsonSchemaResolver#resolveSchema(SchemaDocument)}
+     * instead.
      */
-    TsonSchema resolveSchema(SchemaDocument document, TsonCompiledSchema metaParser) {
+    TsonSchema resolveSchema(SchemaDocument document) {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         for (SchemaMap.Declaration declaration : document.body().declarations().values()) {
-            entries.put(declaration.name(), resolve(declaration, entries, metaParser));
+            entries.put(declaration.name(), resolve(declaration, entries));
         }
         return new TsonSchema(document.id().orElse(document.meta()), document.meta(), document.imports(), entries);
     }
 
-    private TypeDefinition resolveTypeDef(String name, TypeDef typeDef, Map<String, TypeDefinition> resolved,
-                                           TsonCompiledSchema metaParser) {
+    private TypeDefinition resolveTypeDef(String name, TypeDef typeDef, Map<String, TypeDefinition> resolved) {
         if (typeDef instanceof StructuralTypeDef structural) {
             List<String> parameters = structural.typeParams();
             boolean constructor = structural.constructor();
@@ -327,10 +357,10 @@ final class DefinitionResolver {
             return resolveContainerTypeDef(name, containerTypeDef.container());
         }
         if (typeDef instanceof Instance instance) {
-            return resolveInstance(name, instance, resolved, metaParser);
+            return resolveInstance(name, instance, resolved);
         }
         if (typeDef instanceof AtomRefinement refinement) {
-            return resolveAtomRefinement(name, refinement, resolved, metaParser);
+            return resolveAtomRefinement(name, refinement, resolved);
         }
         throw new UnsupportedOperationException(
                 "'" + name + "': only fresh record constructions, composition, simple type references, "
@@ -363,10 +393,9 @@ final class DefinitionResolver {
      * vocabulary is always record-shaped, whatever the resulting instance's bound Java class looks
      * like, atom-family or not).
      */
-    private TypeDefinition resolveInstance(String name, Instance instance, Map<String, TypeDefinition> resolved,
-                                            TsonCompiledSchema metaParser) {
+    private TypeDefinition resolveInstance(String name, Instance instance, Map<String, TypeDefinition> resolved) {
         String target = instance.target();
-        TypeDefinition constructor = resolveConstructorTarget(name, target, resolved, metaParser);
+        TypeDefinition constructor = resolveConstructorTarget(name, target, resolved);
         if (!constructor.constructor()) {
             throw new UnsupportedOperationException("'" + name + "': '!" + target + "' does not resolve to a "
                     + "constructor (§3.3.1) -- did you mean atom refinement ('!" + target + " ^ { ... }')?");
@@ -376,7 +405,7 @@ final class DefinitionResolver {
                     + "' has a non-record body, not resolved yet");
         }
         DataValue normalized = PositionalForm.normalizeToRecordForm(instance.value(), constructorFields);
-        Top body = bindAtomInstance(name, normalized, metaParser);
+        Top body = bindAtomInstance(name, normalized);
         return new TypeDefinition(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of(target)), constructor.kind(),
                 List.of(), false, List.of(), List.of(), Optional.empty(), body);
     }
@@ -428,8 +457,7 @@ final class DefinitionResolver {
      * non-chained case anyway, since a fresh {@code Instance} always resolves with empty {@code
      * supertypes}).
      */
-    private TypeDefinition resolveAtomRefinement(String name, AtomRefinement refinement, Map<String, TypeDefinition> resolved,
-                                                  TsonCompiledSchema metaParser) {
+    private TypeDefinition resolveAtomRefinement(String name, AtomRefinement refinement, Map<String, TypeDefinition> resolved) {
         String sourceName = refinement.target();
         TypeDefinition source = resolved.get(sourceName);
         if (source == null) {
@@ -450,7 +478,7 @@ final class DefinitionResolver {
                         + "' has no recorded constructor to refine through"));
 
         DataValue merged = mergeWithSource(name, source.body(), refinement.bindings(), constructorRef.name());
-        Top body = bindAtomInstance(name, merged, metaParser);
+        Top body = bindAtomInstance(name, merged);
 
         return new TypeDefinition(Optional.of(constructorRef), source.kind(), List.of(), false,
                 List.of(sourceName), List.of(), Optional.empty(), body);
@@ -495,18 +523,15 @@ final class DefinitionResolver {
         }
     }
 
-    /** §3.3.1's lookup rule for a bare {@code !} target: the type-name namespace first, then the compiled meta-schema reader's own namespace. */
-    private static TypeDefinition resolveConstructorTarget(String name, String target, Map<String, TypeDefinition> resolved,
-                                                             TsonCompiledSchema metaParser) {
+    /** §3.3.1's lookup rule for a bare {@code !} target: the type-name namespace first, then this instance's own fixed structure namespace. */
+    private TypeDefinition resolveConstructorTarget(String name, String target, Map<String, TypeDefinition> resolved) {
         TypeDefinition local = resolved.get(target);
         if (local != null) {
             return local;
         }
-        if (metaParser != null) {
-            TypeDefinition structural = metaParser.schema().entries().get(target);
-            if (structural != null) {
-                return structural;
-            }
+        TypeDefinition structural = structureNamespace.get(target);
+        if (structural != null) {
+            return structural;
         }
         throw new UnsupportedOperationException("'" + name + "': '!" + target + "' does not resolve against "
                 + "either the type-name namespace or the structure namespace (§3.3.1)");
@@ -517,19 +542,21 @@ final class DefinitionResolver {
      * to read a type-ref-carrying value against its own constructor's compiled parser. {@code value}
      * already names its own constructor via {@link DataValue#typeRef()} (per {@code Instance}'s own
      * reshape and {@link #resolveAtomRefinement}'s own attachment of {@code I}'s constructor name),
-     * so {@code metaParser.get(constructorName)} finds the right compiled parser directly -- no
-     * separate name→class table, no union-member scan.
+     * so {@code definitionMetaReader.read(constructorName, value)} finds and reads the right compiled
+     * parser directly -- no separate name→class table, no union-member scan. Never {@code null} --
+     * this instance's own {@link DefinitionMetaReader} is a required constructor parameter, so unlike
+     * an earlier version of this method (which took a nullable {@code TsonCompiledSchema} and threw
+     * here if it was absent), there's no "not supplied" case to guard against anymore; a caller with
+     * nothing real to bind against (e.g. {@link MetaKernelBootstrapResolver}, which never actually
+     * reaches this method at all) supplies a reader that itself throws if ever invoked, rather than
+     * this method having to check for {@code null}.
      */
-    private Top bindAtomInstance(String name, DataValue value, TsonCompiledSchema metaParser) {
+    private Top bindAtomInstance(String name, DataValue value) {
         String constructorName = value.typeRef().orElseThrow(() -> new IllegalStateException(
                 "'" + name + "': normalized value has no type-ref naming its own constructor -- "
                         + "DefinitionResolver should never produce this"));
-        if (metaParser == null) {
-            throw new UnsupportedOperationException("'" + name + "': needs a compiled meta-schema reader to bind '"
-                    + constructorName + "' against, but none was supplied");
-        }
         try {
-            return (Top) metaParser.get(constructorName).read(value);
+            return definitionMetaReader.read(constructorName, value);
         } catch (RuntimeException e) {
             throw new UnsupportedOperationException(
                     "'" + name + "': failed to bind '" + constructorName + "' via the compiled meta-schema reader: "

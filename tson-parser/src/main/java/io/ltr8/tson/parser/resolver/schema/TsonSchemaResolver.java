@@ -6,6 +6,7 @@ import io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.util.LinkedHashMap;
@@ -31,9 +32,10 @@ import java.util.Objects;
  * the {@link SchemaCoordinator} and performs the validation/import-merging; {@link
  * DefinitionResolver} (now internal, package-private, no {@code Tson} prefix) never references
  * {@code SchemaCoordinator} at all -- it does still have its own batch {@code
- * resolveSchema(SchemaDocument, TsonCompiledSchema)} convenience (looping every declaration, no
- * validation, no import-merging), since that one needs no coordinator either, only an
- * already-derived structure namespace; see its own Javadoc for why that keeps it off this class.
+ * resolveSchema(SchemaDocument)} convenience (looping every declaration, no validation, no
+ * import-merging), since that one needs no coordinator either, only an already-derived structure
+ * namespace, supplied once at construction; see its own Javadoc for why that keeps it off this
+ * class.
  *
  * <p><b>A {@link SchemaCoordinator} is required now, not optional</b> -- the old class's own no-arg
  * constructor (and the "coordinator may be {@code null}" branch every coordinator-touching method
@@ -43,11 +45,23 @@ import java.util.Objects;
  * DefinitionResolver} is for directly (see its own Javadoc, and {@code DefinitionResolverTest}/
  * {@code PositionalFormTest}, which construct one directly for isolated-declaration cases that used
  * to route through this class's own coordinator-less constructor).
+ *
+ * <p><b>Builds a fresh {@link DefinitionResolver} per {@link #resolveSchema(SchemaDocument)} call,
+ * not a reused field</b> (2026-07-27, same direction, two follow-up passes once {@code
+ * DefinitionResolver} stopped taking {@code TsonCompiledSchema} as a per-call parameter and started
+ * taking a {@link DefinitionMetaReader} *and* the structure namespace at construction instead -- see
+ * that interface's own Javadoc and {@code DefinitionResolver}'s own "Fixed at construction, not
+ * threaded per call" note). A single resolver instance can resolve documents with *different*
+ * governing meta-schemas across separate {@link #resolveSchema} calls, so both the reader and the
+ * structure namespace have to be bound to *that call's* own {@code metaParser}, not fixed for this
+ * object's whole lifetime; constructing a cheap {@link DefinitionResolver} per call (wrapping a
+ * one-line lambda over that call's {@code metaParser}, plus its already-resolved {@code
+ * metaParser.schema().entries()}) is simpler than making this class track "which reader/namespace is
+ * current."
  */
 public final class TsonSchemaResolver {
 
     private final SchemaCoordinator coordinator;
-    private final DefinitionResolver definitionResolver = new DefinitionResolver();
 
     /**
      * @param coordinator consulted by {@link #resolveSchema(SchemaDocument)} to resolve a document's
@@ -87,9 +101,11 @@ public final class TsonSchemaResolver {
      * cycle (nothing in {@code resolver.schema.compiled}'s own main code imports back from {@code
      * resolver.schema}), and both packages live in the same module regardless, but a real,
      * deliberate exception to that "compiled depends on schema, never the other way" framing --
-     * made because {@code DefinitionResolver#bindAtomInstance} genuinely needs the higher layer's
-     * own compiled output, not just its resolved one, to bind a constructor-application/refinement
-     * value against.
+     * made because {@link #resolveSchema(SchemaDocument)} genuinely needs the higher layer's own
+     * compiled output, not just its resolved one, to build the {@link DefinitionMetaReader} {@code
+     * DefinitionResolver#bindAtomInstance} binds a constructor-application/refinement value against
+     * (that method itself no longer touches {@code resolver.schema.compiled} at all -- see {@link
+     * DefinitionResolver}'s own Javadoc).
      */
     TsonCompiledSchema compiledMetaSchema(SchemaDocument document) {
         return coordinator.resolve(document.meta());
@@ -148,6 +164,8 @@ public final class TsonSchemaResolver {
         }
 
         TsonCompiledSchema metaParser = compiledMetaSchema(document);
+        DefinitionResolver definitionResolver = new DefinitionResolver(
+                (type, value) -> (Top) metaParser.get(type).read(value), metaParser.schema().entries());
 
         Map<String, TypeDefinition> namespace = mergeImports(document);
         Map<String, TypeDefinition> localOnly = new LinkedHashMap<>();
@@ -156,7 +174,7 @@ public final class TsonSchemaResolver {
                 throw new TsonSchemaValidationException("'" + declaration.name()
                         + "' collides with an entry of the same name brought in by !!import");
             }
-            TypeDefinition resolved = definitionResolver.resolve(declaration, namespace, metaParser);
+            TypeDefinition resolved = definitionResolver.resolve(declaration, namespace);
             namespace.put(declaration.name(), resolved);
             localOnly.put(declaration.name(), resolved);
         }

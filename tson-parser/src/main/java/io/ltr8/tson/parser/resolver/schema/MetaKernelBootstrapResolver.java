@@ -124,8 +124,22 @@ public final class MetaKernelBootstrapResolver {
         return new TsonSchema(id, document.meta(), document.imports(), entries, true);
     }
 
+    /**
+     * A {@link DefinitionMetaReader} that always throws -- this class's own first pass only ever
+     * calls {@link DefinitionResolver#resolveBootstrapDefinition}, and never on an {@code Instance}
+     * declaration (those are filtered out below, deferred to the second pass, which resolves them
+     * through {@link #instanceBody} directly, never through {@code DefinitionResolver} at all -- see
+     * this class's own Javadoc), so {@code DefinitionResolver#bindAtomInstance} can never actually be
+     * reached from here. A loud failure if that assumption is ever wrong is safer than silently
+     * handing {@code DefinitionResolver} a reader that could return something meaningless.
+     */
+    private static final DefinitionMetaReader NEVER_CALLED = (type, value) -> {
+        throw new UnsupportedOperationException("'" + type + "': meta-kernel's own bootstrap resolves every "
+                + "Instance declaration through instanceBody directly -- this reader should never be called");
+    };
+
     private static Map<String, TypeDefinition> resolveEntries(SchemaDocument document) {
-        DefinitionResolver resolver = new DefinitionResolver();
+        DefinitionResolver resolver = new DefinitionResolver(NEVER_CALLED, Map.of());
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         List<SchemaMap.Declaration> instances = new ArrayList<>();
 
