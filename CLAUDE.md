@@ -529,6 +529,16 @@ directly now hold onto the `loader` they built the resolver from and call `loade
 instead -- the identical operation `compiledMetaSchema` performs internally, since it was never
 anything more than that one line.
 
+**`compiledMetaSchema` removed outright (a further same-day follow-up, on the user's own explicit
+direction: "I just deleted compiledMetaSchema because I realise it wasn't used by TsonSchemaResolver").**
+Once it was `private` and a pure one-line pass-through, keeping it as a named method bought nothing
+over inlining -- `resolveSchema`'s own `TsonCompiledSchema metaParser = compiledMetaSchema(document);`
+became `TsonCompiledSchema metaParser = loader.load(document.meta());` directly. The method's own
+Javadoc (the "same-module, cross-package reach from `resolver.schema` up into `resolver.schema.compiled`"
+note, explaining *why* this class needs the full `TsonCompiledSchema` rather than the narrower
+`DefinitionMetaReader` `DefinitionResolver` gets by with) was dropped along with it -- that reasoning
+is still true of `resolveSchema` as a whole, just no longer anchored to a now-nonexistent method name.
+
 **`TsonCompiledSchema` removed from every `DefinitionResolver` method parameter (same day, a
 follow-up pass, on the user's own explicit direction: "remove TsonCompiledSchema metaParser from
 DefinitionResolver... create an interface DefinitionMetaReader with one method read(String type,
@@ -1612,11 +1622,11 @@ sibling shape.
   `BundledSchemaSource` (below) is the one real implementation so far; a general disk/HTTP-backed
   `TsonSchemaSource` (with whatever whitelist/blacklist policy) is deliberately not built yet.
 - **`TsonSchemaResolver(TsonCompiledSchemaLoader)`** replaces the earlier `TsonSchemaResolver(TsonCompiledRegistry)`
-  constructor. `compiledMetaSchema(SchemaDocument)` returns a plain `TsonCompiledSchema` (not an
-  `Optional`) and *throws* if it can't be resolved — with a real loader behind it, "not
-  available" is a genuine, nameable failure (the loader is supposed to make it available,
-  fetching/bootstrapping as needed), not a normal "maybe try again" outcome the way a bare registry
-  miss used to be.
+  constructor. `loader.load(document.meta())` (inlined directly into `resolveSchema`, not a separate
+  method) returns a plain `TsonCompiledSchema` (not an `Optional`) and *throws* if it can't be
+  resolved — with a real loader behind it, "not available" is a genuine, nameable failure (the
+  loader is supposed to make it available, fetching/bootstrapping as needed), not a normal "maybe
+  try again" outcome the way a bare registry miss used to be.
 
 **`resolveSchema(SchemaDocument)` validates `!!id`/`!!meta`/`!!import` and derives `structureNamespace`
 from the loader, when this resolver has one** — previously this method always resolved against
@@ -1627,7 +1637,7 @@ well-formed canonical-identity candidate, via `TsonSchemaRegistry.validateIdenti
 one-line public wrapper around `CanonicalIdentity.of`, so a caller outside `tson-schema` never has to
 reach into the internal-by-convention `registry` package directly just to run this one check); (3)
 every `!!import` URI is validated the same way; (4) `document.meta()` is resolved via
-`compiledMetaSchema` — fetched/bootstrapped/compiled by the loader if it wasn't already
+`loader.load(...)` — fetched/bootstrapped/compiled by the loader if it wasn't already
 available — and its entries become the structure namespace. (1) throws `IllegalStateException`; (2)/
 (3) throw `TsonSchemaValidationException` (the same exception `TsonSchemaRegistry.register` itself would
 eventually throw for the same reason, surfaced earlier); (4) throws whatever the loader itself

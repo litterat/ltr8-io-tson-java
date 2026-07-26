@@ -28,16 +28,16 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Proves the guarantee {@code TsonSchemaResolver}'s own private {@code compiledMetaSchema} relies on
- * -- a {@link TsonCompiledSchemaLoader} that already has meta-kernel and meta.tn1 registered and
- * compiled can, given a document's own real {@code !!meta} target (just {@code
- * document.meta()}, a URI), {@link TsonCompiledSchemaLoader#load} it and get back a *compiled*
- * reader genuinely usable to read real data -- not merely present. Exercised directly against the
- * loader itself, not through the resolver, since {@code compiledMetaSchema} is a private
- * pass-through with no logic of its own beyond that one call. Proven in both directions of the real
- * governing chain: core.tn1's own {@code !!meta} target (meta.tn1) and meta.tn1's own {@code !!meta}
- * target (meta-kernel itself). Also covers {@link TsonSchemaResolver#resolveSchema(SchemaDocument)}
- * itself, separately, below. Deliberately doesn't touch {@code bindAtomInstance} at all (see that
+ * Proves the guarantee {@link TsonSchemaResolver#resolveSchema(SchemaDocument)} relies on to derive
+ * its own structure namespace -- a {@link TsonCompiledSchemaLoader} that already has meta-kernel and
+ * meta.tn1 registered and compiled can, given a document's own real {@code !!meta} target (just
+ * {@code document.meta()}, a URI), {@link TsonCompiledSchemaLoader#load} it and get back a
+ * *compiled* reader genuinely usable to read real data -- not merely present. Exercised directly
+ * against the loader itself, not through the resolver, since that's exactly what {@code
+ * resolveSchema} does internally with no further logic of its own. Proven in both directions of the
+ * real governing chain: core.tn1's own {@code !!meta} target (meta.tn1) and meta.tn1's own {@code
+ * !!meta} target (meta-kernel itself). Also covers {@code resolveSchema} itself, separately, below.
+ * Deliberately doesn't touch {@code bindAtomInstance} at all (see that
  * method's own Javadoc for why that's a separate, later step); this only proves the wiring to
  * *reach* a compiled governing schema works.
  */
@@ -362,7 +362,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
         // Meta-kernel's own !!meta names itself -- if resolve() ever fell through to the generic
         // fetch-and-resolve-via-TsonSchemaResolver(this) path for this URI, this call would recurse
-        // forever (resolveSchema -> compiledMetaSchema -> loader.load(sameUri) -> ...).
+        // forever (resolveSchema -> loader.load(sameUri) -> ...).
         // Completing at all is the proof; the assertions below just confirm it's genuinely usable.
         TsonCompiledSchema compiled = loader.load(BundledSchemaSource.META_KERNEL_ID);
 

@@ -72,9 +72,9 @@ public final class TsonSchemaResolver {
      * work is spent on a document that could never actually be registered. Both throw {@link
      * IllegalStateException} (or, for (2), {@link TsonSchemaValidationException}, in an already-
      * established shape) naming the actual problem. {@code document.meta()} itself is then resolved
-     * via {@link #compiledMetaSchema} -- fetched/bootstrapped/compiled by this resolver's own {@link
-     * TsonCompiledSchemaLoader} if it wasn't already available, rather than requiring it to pre-exist
-     * -- and its resolved entries become the structure namespace every declaration resolves against.
+     * via this resolver's own {@link TsonCompiledSchemaLoader} (fetched/bootstrapped/compiled on
+     * demand if it wasn't already available, rather than requiring it to pre-exist) -- and its
+     * resolved entries become the structure namespace every declaration resolves against.
      *
      * <p><b>{@code !!import} is merged into the type-name namespace the same way</b> -- each import's
      * own URI is validated the same way {@code !!id} is, then resolved via the same {@link
@@ -105,7 +105,7 @@ public final class TsonSchemaResolver {
             TsonSchemaRegistry.validateIdentity(importUri);
         }
 
-        TsonCompiledSchema metaParser = compiledMetaSchema(document);
+        TsonCompiledSchema metaParser = loader.load(document.meta());
         Map<String, TypeDefinition> namespace = mergeImports(document);
         DefinitionResolver definitionResolver = new DefinitionResolver(
                 (type, value) -> (Top) metaParser.get(type).read(value), metaParser.schema().entries()::get, namespace::get);
@@ -137,33 +137,5 @@ public final class TsonSchemaResolver {
             }
         }
         return merged;
-    }
-
-    /**
-     * The compiled form of {@code document}'s own governing meta-schema -- its {@code !!meta}
-     * target, resolved via this resolver's own {@link TsonCompiledSchemaLoader}, fetched/bootstrapped/
-     * compiled on demand if it wasn't already available, not merely a registry lookup.
-     *
-     * <p>Throws, rather than returning empty, if it can't be resolved -- a {@link
-     * TsonCompiledSchemaLoader} is *supposed* to make its target available (fetching/bootstrapping
-     * as needed); if it still can't, that is a real, nameable failure (see {@link
-     * TsonCompiledSchemaLoader#load}'s own Javadoc for the possible causes), not a "maybe try
-     * again later."
-     *
-     * <p>A same-module, cross-package reach from {@code resolver.schema} up into {@code
-     * resolver.schema.compiled} -- worth naming plainly, since every other layering note in this
-     * codebase describes the *opposite* direction ({@code compiled} sitting "on top of" {@code
-     * DefinitionResolver}'s own resolution, per {@code TsonCompiledSchema}'s own Javadoc). Not a
-     * cycle (nothing in {@code resolver.schema.compiled}'s own main code imports back from {@code
-     * resolver.schema}), and both packages live in the same module regardless, but a real,
-     * deliberate exception to that "compiled depends on schema, never the other way" framing --
-     * made because {@link #resolveSchema(SchemaDocument)} genuinely needs the higher layer's own
-     * compiled output, not just its resolved one, to build the {@link DefinitionMetaReader} {@code
-     * DefinitionResolver#bindAtomInstance} binds a constructor-application/refinement value against
-     * (that method itself no longer touches {@code resolver.schema.compiled} at all -- see {@link
-     * DefinitionResolver}'s own Javadoc).
-     */
-    private TsonCompiledSchema compiledMetaSchema(SchemaDocument document) {
-        return loader.load(document.meta());
     }
 }

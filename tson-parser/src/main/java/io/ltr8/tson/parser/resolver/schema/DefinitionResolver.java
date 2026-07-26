@@ -208,9 +208,8 @@ import java.util.Set;
  *
  * <p>Has no dependency on {@code resolver.schema.compiled} -- {@link #bindAtomInstance}'s own binding
  * step goes through {@link DefinitionMetaReader} (a required constructor parameter), a narrow read
- * contract rather than the full {@code TsonCompiledSchema}; see {@code
- * TsonSchemaResolver}'s own private {@code compiledMetaSchema} for where that fuller reach actually
- * lives.
+ * contract rather than the full {@code TsonCompiledSchema}; see {@code TsonSchemaResolver#resolveSchema}'s
+ * own Javadoc for where that fuller reach actually lives.
  */
 final class DefinitionResolver {
 
