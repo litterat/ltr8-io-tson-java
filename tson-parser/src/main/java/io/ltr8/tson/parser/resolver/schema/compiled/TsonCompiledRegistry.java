@@ -1,7 +1,9 @@
 package io.ltr8.tson.parser.resolver.schema.compiled;
 
+import io.ltr8.tson.schema.LinkedTsonSchema;
 import io.ltr8.tson.schema.SchemaRegistry;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.registry.SchemaLinker;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -62,19 +64,22 @@ public final class TsonCompiledRegistry {
     }
 
     /**
-     * Registers {@code schema} (via {@link SchemaRegistry#register}, so the usual validation/
-     * materialization/`!!import`-merging rules all apply exactly as they would calling that
-     * directly), compiles the *registered* result (never the raw input -- a compiled reader needs
-     * materialization already done, per {@link TsonSchemaParser}'s own Javadoc), and stores it here
-     * keyed by {@code schema}'s own {@code !!id}. Returns the compiled reader, so a caller with no
-     * further need to look it up again later (e.g. the immediate next schema in a bootstrap chain,
-     * which needs *this* return value as its own structure namespace's compiled reader) doesn't have
-     * to call {@link #get} right back.
+     * Links {@code schema} (via {@link SchemaLinker#link}, using the paired {@link #schemaRegistry}
+     * itself as the lookup source for {@code !!import}/{@code !!meta} targets) and registers the
+     * result (via {@link SchemaRegistry#register}, so the usual `!!import`-merging/reference-
+     * validation rules all apply exactly as they would calling that directly), compiles the
+     * *registered* result (never the raw input -- a compiled reader needs linking already done, per
+     * {@link TsonSchemaParser}'s own Javadoc), and stores it here keyed by {@code schema}'s own
+     * {@code !!id}. Returns the compiled reader, so a caller with no further need to look it up
+     * again later (e.g. the immediate next schema in a bootstrap chain, which needs *this* return
+     * value as its own structure namespace's compiled reader) doesn't have to call {@link #get}
+     * right back.
      */
     public synchronized TsonSchemaParser register(TsonSchema schema) {
-        TsonSchema registered = schemaRegistry.register(schema);
-        TsonSchemaParser compiledParser = TsonSchemaParser.compile(registered, factories);
-        compiled.put(registered.id(), compiledParser);
+        LinkedTsonSchema linked = SchemaLinker.link(schema, schemaRegistry);
+        LinkedTsonSchema registered = schemaRegistry.register(linked);
+        TsonSchemaParser compiledParser = TsonSchemaParser.compile(registered.schema(), factories);
+        compiled.put(registered.schema().id(), compiledParser);
         return compiledParser;
     }
 

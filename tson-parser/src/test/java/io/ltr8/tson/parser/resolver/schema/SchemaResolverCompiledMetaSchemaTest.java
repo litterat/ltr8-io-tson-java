@@ -8,6 +8,7 @@ import io.ltr8.tson.parser.resolver.TsonAtomContext;
 import io.ltr8.tson.parser.resolver.schema.compiled.ParserFactoryRegistry;
 import io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledRegistry;
 import io.ltr8.tson.parser.resolver.schema.compiled.TsonSchemaParser;
+import io.ltr8.tson.schema.LinkedTsonSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.SchemaRegistry;
 import io.ltr8.tson.schema.SchemaValidationException;
@@ -52,7 +53,7 @@ class SchemaResolverCompiledMetaSchemaTest {
      * <p><b>Meta-kernel itself is pre-registered via ordinary {@code SchemaResolver.resolveAll}, not
      * the raw bootstrap output</b> (2026-07-26, {@code SchemaRegistry#register} now refuses <i>any</i>
      * self-referential schema with {@code bootstrap() == true}, materialized or not -- see that
-     * method's own Javadoc). {@code materializeBootstrap(...)} still runs once, purely to get a
+     * method's own Javadoc). {@code linkBootstrap(...)} still runs once, purely to get a
      * genuinely materialized shape to build {@code ParserFactoryRegistry.object(...)} against -- that
      * value itself is never registered. The coordinator built from it then resolves meta-kernel's own
      * document the ordinary way (its own bootstrap branch supplies the structure namespace, so even
@@ -62,9 +63,9 @@ class SchemaResolverCompiledMetaSchemaTest {
      */
     private static DefaultSchemaCoordinator loadMetaKernelAndMeta() {
         TsonSchema metaKernelBootstrap = MetaKernelParser.getMetaKernelSchema();
-        TsonSchema materializedMetaKernelBootstrap = new SchemaRegistry().materializeBootstrap(metaKernelBootstrap);
+        LinkedTsonSchema materializedMetaKernelBootstrap = new SchemaRegistry().linkBootstrap(metaKernelBootstrap);
         DataBindContext context = TsonAtomContext.defaultContext();
-        ParserFactoryRegistry objectFactories = ParserFactoryRegistry.object(materializedMetaKernelBootstrap, context);
+        ParserFactoryRegistry objectFactories = ParserFactoryRegistry.object(materializedMetaKernelBootstrap.schema(), context);
 
         TsonCompiledRegistry registry = new TsonCompiledRegistry(objectFactories);
         DefaultSchemaCoordinator coordinator = new DefaultSchemaCoordinator(registry, BundledSchemaSource.INSTANCE);
@@ -90,9 +91,9 @@ class SchemaResolverCompiledMetaSchemaTest {
      */
     private static TsonSchema resolveMetaKernelOrdinarily() {
         TsonSchema metaKernelBootstrap = MetaKernelParser.getMetaKernelSchema();
-        TsonSchema materializedMetaKernelBootstrap = new SchemaRegistry().materializeBootstrap(metaKernelBootstrap);
+        LinkedTsonSchema materializedMetaKernelBootstrap = new SchemaRegistry().linkBootstrap(metaKernelBootstrap);
         DataBindContext context = TsonAtomContext.defaultContext();
-        ParserFactoryRegistry objectFactories = ParserFactoryRegistry.object(materializedMetaKernelBootstrap, context);
+        ParserFactoryRegistry objectFactories = ParserFactoryRegistry.object(materializedMetaKernelBootstrap.schema(), context);
         TsonCompiledRegistry throwawayRegistry = new TsonCompiledRegistry(objectFactories);
         DefaultSchemaCoordinator throwawayCoordinator =
                 new DefaultSchemaCoordinator(throwawayRegistry, BundledSchemaSource.INSTANCE);
@@ -414,9 +415,9 @@ class SchemaResolverCompiledMetaSchemaTest {
         // this explicit step, registering meta.tn1 would fail validation with "!!import '...' is
         // not registered" even though resolution itself succeeded.
         TsonSchema metaKernelBootstrap = MetaKernelParser.getMetaKernelSchema();
-        TsonSchema materializedMetaKernelBootstrap = new SchemaRegistry().materializeBootstrap(metaKernelBootstrap);
+        LinkedTsonSchema materializedMetaKernelBootstrap = new SchemaRegistry().linkBootstrap(metaKernelBootstrap);
         ParserFactoryRegistry objectFactories =
-                ParserFactoryRegistry.object(materializedMetaKernelBootstrap, TsonAtomContext.defaultContext());
+                ParserFactoryRegistry.object(materializedMetaKernelBootstrap.schema(), TsonAtomContext.defaultContext());
         TsonCompiledRegistry registry = new TsonCompiledRegistry(objectFactories);
         DefaultSchemaCoordinator coordinator = new DefaultSchemaCoordinator(registry, BundledSchemaSource.INSTANCE);
 

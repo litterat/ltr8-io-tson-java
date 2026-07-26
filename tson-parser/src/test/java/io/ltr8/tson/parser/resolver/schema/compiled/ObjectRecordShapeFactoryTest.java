@@ -34,7 +34,7 @@ class ObjectRecordShapeFactoryTest {
 
     private static TsonSchemaParser compiled() {
         TsonSchema raw = MetaKernelParser.getMetaKernelSchema();
-        TsonSchema registered = new SchemaRegistry().materializeBootstrap(raw);
+        TsonSchema registered = new SchemaRegistry().linkBootstrap(raw).schema();
         DataBindContext context = TsonAtomContext.defaultContext();
         return TsonSchemaParser.compile(registered, ParserFactoryRegistry.object(registered, context));
     }
@@ -89,7 +89,7 @@ class ObjectRecordShapeFactoryTest {
         // a real, deliberately non-record class and are silently skipped, not failures. Nothing
         // should throw.
         TsonSchema raw = MetaKernelParser.getMetaKernelSchema();
-        TsonSchema registered = new SchemaRegistry().materializeBootstrap(raw);
+        TsonSchema registered = new SchemaRegistry().linkBootstrap(raw).schema();
         ObjectRecordShapeFactory shapeFactory = new ObjectRecordShapeFactory(TsonAtomContext.defaultContext());
 
         shapeFactory.validate(registered);
@@ -98,7 +98,7 @@ class ObjectRecordShapeFactoryTest {
     @Test
     void validateReportsEveryUnresolvableEntryAtOnceRatherThanOneAtATime() {
         TsonSchema raw = MetaKernelParser.getMetaKernelSchema();
-        TsonSchema registered = new SchemaRegistry().materializeBootstrap(raw);
+        TsonSchema registered = new SchemaRegistry().linkBootstrap(raw).schema();
         TypeNameBinder alwaysMissing = name -> {
             throw new ClassNotFoundException("no class for '" + name + "' under this test's own binder");
         };

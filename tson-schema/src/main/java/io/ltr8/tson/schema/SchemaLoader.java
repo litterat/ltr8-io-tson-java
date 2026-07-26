@@ -3,10 +3,12 @@ package io.ltr8.tson.schema;
 import java.util.Optional;
 
 /**
- * Resolves a {@code !!import} target to an already-resolved {@link TsonSchema}, keyed by canonical
- * identity ({@code [TSON-DATA] §2.2.1}) rather than the raw URI a document wrote -- the same
- * identity {@link SchemaRegistry#register} keys its own entries under, so a loader and the registry
- * it's attached to always agree on what "the same schema" means.
+ * Resolves a {@code !!import} target to an already-registered {@link LinkedTsonSchema}, keyed by
+ * canonical identity ({@code [TSON-DATA] §2.2.1}) rather than the raw URI a document wrote -- the
+ * same identity {@link SchemaRegistry#register} keys its own entries under, so a loader and the
+ * registry it's attached to always agree on what "the same schema" means. Returns a {@link
+ * LinkedTsonSchema}, not a plain {@link TsonSchema}, because {@link SchemaRegistry} only ever
+ * stores linked schemas -- there's no other kind of thing a lookup by identity could find.
  *
  * <p>{@link SchemaRegistry}'s own no-arg constructor uses a default implementation that only ever
  * finds an *already-registered* schema (nothing is fetched from anywhere) -- matching Part 2
@@ -20,5 +22,5 @@ import java.util.Optional;
 @FunctionalInterface
 public interface SchemaLoader {
 
-    Optional<TsonSchema> load(String canonicalIdentity);
+    Optional<LinkedTsonSchema> load(String canonicalIdentity);
 }

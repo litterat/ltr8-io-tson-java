@@ -45,7 +45,6 @@ class MetaKernelParserTest {
         assertEquals(List.of(), schema.imports());
         // getMetaKernelSchema() is the one and only place that ever sets this -- see TsonSchema's own Javadoc.
         assertTrue(schema.bootstrap());
-        assertTrue(!schema.materialised());
     }
 
     @Test

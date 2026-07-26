@@ -1,6 +1,7 @@
 package io.ltr8.tson.parser.resolver.schema.compiled;
 
 import io.ltr8.tson.parser.resolver.schema.MetaKernelParser;
+import io.ltr8.tson.schema.LinkedTsonSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.SchemaRegistry;
 import org.junit.jupiter.api.Test;
@@ -23,8 +24,8 @@ class TsonDataParserTest {
 
     private static TsonDataParser dataParser() {
         TsonSchema raw = MetaKernelParser.getMetaKernelSchema();
-        TsonSchema registered = new SchemaRegistry().materializeBootstrap(raw);
-        return new TsonDataParser(TsonSchemaParser.compile(registered, ParserFactoryRegistry.dom()));
+        LinkedTsonSchema linked = new SchemaRegistry().linkBootstrap(raw);
+        return new TsonDataParser(TsonSchemaParser.compile(linked.schema(), ParserFactoryRegistry.dom()));
     }
 
     @Test
@@ -58,7 +59,7 @@ class TsonDataParserTest {
     @Test
     void schemaAccessorReturnsTheWrappedCompiledSchema() {
         TsonSchemaParser compiled = TsonSchemaParser.compile(
-                new SchemaRegistry().materializeBootstrap(MetaKernelParser.getMetaKernelSchema()), ParserFactoryRegistry.dom());
+                new SchemaRegistry().linkBootstrap(MetaKernelParser.getMetaKernelSchema()).schema(), ParserFactoryRegistry.dom());
         TsonDataParser parser = new TsonDataParser(compiled);
 
         assertEquals(compiled, parser.schema());

@@ -260,7 +260,7 @@ public final class SchemaResolver {
      * lower-layer resolution genuinely needs the higher layer's own compiled output, not just its
      * resolved one.
      */
-    public TsonSchemaParser compiledMetaSchema(SchemaDocument document) {
+    TsonSchemaParser compiledMetaSchema(SchemaDocument document) {
         if (coordinator == null) {
             throw new IllegalStateException("'" + documentLabel(document)
                     + "': this resolver has no SchemaCoordinator, so !!meta target '" + document.meta()

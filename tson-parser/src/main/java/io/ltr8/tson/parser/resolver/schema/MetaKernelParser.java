@@ -121,7 +121,7 @@ public final class MetaKernelParser {
         Map<String, TypeDefinition> entries = resolveEntries(document);
         String id = document.id().orElseThrow(() -> new IllegalStateException(
                 "meta-kernel.tn1 has no !!id -- this should never happen for the real, bundled fixture"));
-        return new TsonSchema(id, document.meta(), document.imports(), entries, false, true);
+        return new TsonSchema(id, document.meta(), document.imports(), entries, true);
     }
 
     private static Map<String, TypeDefinition> resolveEntries(SchemaDocument document) {

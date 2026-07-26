@@ -4,6 +4,7 @@ import io.ltr8.tson.parser.SchemaParser;
 import io.ltr8.tson.parser.ast.schema.SchemaDocument;
 import io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledRegistry;
 import io.ltr8.tson.parser.resolver.schema.compiled.TsonSchemaParser;
+import io.ltr8.tson.schema.LinkedTsonSchema;
 import io.ltr8.tson.schema.SchemaRegistry;
 import io.ltr8.tson.schema.TsonSchema;
 
@@ -95,15 +96,15 @@ public final class DefaultSchemaCoordinator implements SchemaCoordinator {
         if (BundledSchemaSource.META_KERNEL_ID.equals(uri)) {
             TsonSchema metaKernel = MetaKernelParser.getMetaKernelSchema();
             // A fresh, throwaway SchemaRegistry -- never the shared one this coordinator wraps --
-            // purely so SchemaValidator's own materialization pass runs (synthesizing entries for
+            // purely so SchemaLinker's own materialization pass runs (synthesizing entries for
             // argument-bearing type-refs like enum's own `members: set<token>`) before compiling.
-            // materializeBootstrap (not register -- SchemaRegistry now refuses a raw, unmaterialized
-            // bootstrap schema there outright) doesn't persist anything either, so this is still
-            // discarded immediately after: every call still re-bootstraps and re-materializes from
-            // scratch, exactly as before -- only the *quality* of the one-off result changes (58
-            // entries, not 49), not its lifetime.
-            TsonSchema materialized = new SchemaRegistry().materializeBootstrap(metaKernel);
-            return TsonSchemaParser.compile(materialized, registry.factories());
+            // linkBootstrap (not register -- SchemaRegistry now refuses a linked bootstrap schema
+            // outright, always) doesn't persist anything either, so this is still discarded
+            // immediately after: every call still re-bootstraps and re-links from scratch, exactly
+            // as before -- only the *quality* of the one-off result changes (58 entries, not 49),
+            // not its lifetime.
+            LinkedTsonSchema linked = new SchemaRegistry().linkBootstrap(metaKernel);
+            return TsonSchemaParser.compile(linked.schema(), registry.factories());
         }
         String sourceText = source.fetch(uri);
         SchemaDocument document = new SchemaParser(sourceText).parseSchemaDocument();

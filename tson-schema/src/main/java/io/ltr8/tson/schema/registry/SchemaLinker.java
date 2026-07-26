@@ -1,5 +1,6 @@
 package io.ltr8.tson.schema.registry;
 
+import io.ltr8.tson.schema.LinkedTsonSchema;
 import io.ltr8.tson.schema.SchemaLoader;
 import io.ltr8.tson.schema.SchemaValidationException;
 import io.ltr8.tson.schema.TsonSchema;
@@ -52,14 +53,29 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * The private "pass 2" {@code SchemaRegistry#register} runs before a schema is admitted: flattens
- * every {@code type_ref} with arguments into a real, named entry, populates {@code
+ * Turns a resolved-but-unlinked {@link TsonSchema} into a {@link LinkedTsonSchema} -- the "pass 2"
+ * a schema goes through before {@code SchemaRegistry#register} will accept it (2026-07-27, renamed
+ * from {@code SchemaValidator}/{@code validate} on the user's own explicit direction, borrowing
+ * standard compiler vocabulary for the whole pipeline: parse -&gt; resolve -&gt; link -&gt; register
+ * -&gt; compile -&gt; read). What it does hasn't changed, only what it's called and what it returns:
+ * flattens every {@code type_ref} with arguments into a real, named entry (so the result has no
+ * dangling/unexpanded references -- the defining trait of a linked schema, same as a linker
+ * resolving external symbols and instantiating templates), populates {@code
  * TypeDefinition.subtypes} (the reverse of {@code supertypes}, for *this schema's own merged view*
  * of every entry it can see, imported or local -- see {@link #computeSubtypes}'s own Javadoc for
  * why crediting a subtype onto an imported entry's copy here never touches the imported schema's
  * own separately-registered original), then checks that every reference anywhere in the schema
- * actually resolves. Not part of the public API -- see this package's own Javadoc note (on {@link
- * CanonicalIdentity}) for why this class is nonetheless {@code public}.
+ * actually resolves.
+ *
+ * <p><b>Genuinely public now, unlike its predecessor</b> -- {@code SchemaValidator} was "not part
+ * of the public API," an implementation detail {@code SchemaRegistry#register} ran internally and
+ * nothing else was meant to call. Renaming it to a real pipeline-stage name changes that on
+ * purpose: {@code link} is now something a caller orchestrating the pipeline calls directly and
+ * deliberately, same as {@code parse}/{@code resolve}/{@code compile} -- including from *other*
+ * modules (e.g. {@code tson-parser}'s own {@code TsonCompiledRegistry}, which needs to link a
+ * schema before registering it, exactly the same as any other caller). {@link CanonicalIdentity},
+ * this package's other class, stays internal-by-convention as before -- it was never a named
+ * pipeline stage, just an implementation detail of how registry lookups work.
  *
  * <p><b>Materialization is uniform</b> (a deliberate simplification confirmed with the user, not
  * Part 2 §8.2's literal text): *every* {@code type_ref} with a non-empty {@code arguments} list
@@ -100,12 +116,12 @@ import java.util.Set;
  * re-validated or re-materialized against the importer's own namespace -- only the *importer's own*
  * new material (stage 2 and 3) gets resolved/validated here.
  */
-public final class SchemaValidator {
+public final class SchemaLinker {
 
-    private SchemaValidator() {
+    private SchemaLinker() {
     }
 
-    public static TsonSchema validate(TsonSchema schema, SchemaLoader loader) {
+    public static LinkedTsonSchema link(TsonSchema schema, SchemaLoader loader) {
         Map<String, TypeDefinition> merged = mergeImports(schema.imports(), loader);
 
         // Full lookup namespace for materialization's own constructor lookups (see #instantiate) --
@@ -133,7 +149,8 @@ public final class SchemaValidator {
         // registered yet (e.g. meta-kernel's own self-referential !!meta, mid-registration) --
         // lookups then behave exactly as before this fallback existed.
         Map<String, TypeDefinition> structureNamespace = loader == null ? Map.of()
-                : loader.load(CanonicalIdentity.of(schema.meta())).map(TsonSchema::entries).orElse(Map.of());
+                : loader.load(CanonicalIdentity.of(schema.meta()))
+                        .map(linked -> linked.schema().entries()).orElse(Map.of());
         Map<String, TypeDefinition> lookup = new LinkedHashMap<>(structureNamespace);
         lookup.putAll(namespace);
 
@@ -161,7 +178,7 @@ public final class SchemaValidator {
             validateEntry(entry.getKey(), entry.getValue(), merged, structureNamespace);
         }
 
-        return new TsonSchema(schema.id(), schema.meta(), schema.imports(), merged, true, schema.bootstrap());
+        return new LinkedTsonSchema(new TsonSchema(schema.id(), schema.meta(), schema.imports(), merged, schema.bootstrap()));
     }
 
     // ── Subtypes (reverse index) ─────────────────────────────────────────
@@ -228,9 +245,9 @@ public final class SchemaValidator {
         Map<String, TypeDefinition> merged = new LinkedHashMap<>();
         for (String importUri : imports) {
             String importIdentity = CanonicalIdentity.of(importUri);
-            TsonSchema imported = loader.load(importIdentity).orElseThrow(() -> new SchemaValidationException(
+            LinkedTsonSchema imported = loader.load(importIdentity).orElseThrow(() -> new SchemaValidationException(
                     "!!import '" + importUri + "' is not registered"));
-            for (Map.Entry<String, TypeDefinition> entry : imported.entries().entrySet()) {
+            for (Map.Entry<String, TypeDefinition> entry : imported.schema().entries().entrySet()) {
                 if (merged.containsKey(entry.getKey())) {
                     throw new SchemaValidationException(
                             "'" + entry.getKey() + "' is declared by more than one !!import");
@@ -475,7 +492,7 @@ public final class SchemaValidator {
             // entry was originally resolved (a constructor-application target, or (for atom
             // refinement) the instance's own already-resolved constructor), both explicitly
             // structure-namespace-eligible, unlike an ordinary type-ref (§3.3.2: "NOT extended by the
-            // structure namespace... field types... composition targets"). See #validate's own note
+            // structure namespace... field types... composition targets"). See #link's own note
             // on `structureNamespace` for why this matters concretely: `void => !unit {}`'s own
             // `source: unit` is exactly this case -- `unit` lives in meta-kernel, reachable from
             // core.tn1 only via its `!!meta` chain, never a local declaration or `!!import`.

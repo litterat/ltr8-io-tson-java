@@ -6,10 +6,12 @@ import io.ltr8.tson.parser.ast.schema.SchemaDocument;
 import io.ltr8.tson.parser.resolver.TsonAtomContext;
 import io.ltr8.tson.parser.resolver.schema.compiled.ParserFactoryRegistry;
 import io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledRegistry;
+import io.ltr8.tson.schema.LinkedTsonSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.SchemaRegistry;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.registry.SchemaLinker;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -69,18 +71,18 @@ class MetaSchemaImportTest {
      */
     private static TsonSchema parseMetaTn1(SchemaRegistry registry) {
         TsonSchema metaKernelBootstrap = MetaKernelParser.getMetaKernelSchema();
-        TsonSchema materializedMetaKernelBootstrap = registry.materializeBootstrap(metaKernelBootstrap);
+        LinkedTsonSchema materializedMetaKernelBootstrap = registry.linkBootstrap(metaKernelBootstrap);
 
         DataBindContext context = TsonAtomContext.defaultContext();
-        ParserFactoryRegistry objectFactories = ParserFactoryRegistry.object(materializedMetaKernelBootstrap, context);
+        ParserFactoryRegistry objectFactories = ParserFactoryRegistry.object(materializedMetaKernelBootstrap.schema(), context);
         TsonCompiledRegistry compiledRegistry = new TsonCompiledRegistry(objectFactories);
         DefaultSchemaCoordinator coordinator = new DefaultSchemaCoordinator(compiledRegistry);
 
         String metaKernelSource = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID);
         SchemaDocument metaKernelDocument = new SchemaParser(metaKernelSource).parseSchemaDocument();
         TsonSchema metaKernel = new SchemaResolver(coordinator).resolveAll(metaKernelDocument);
-        TsonSchema metaKernelMaterialized = registry.register(metaKernel);
-        compiledRegistry.register(metaKernelMaterialized);
+        LinkedTsonSchema metaKernelMaterialized = registry.register(SchemaLinker.link(metaKernel, registry));
+        compiledRegistry.register(metaKernelMaterialized.schema());
 
         String source = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_TN1_ID);
         SchemaDocument metaDocument = new SchemaParser(source).parseSchemaDocument();
@@ -94,22 +96,22 @@ class MetaSchemaImportTest {
         TsonSchema meta = parseMetaTn1(registry);
         assertEquals(31, meta.entries().size(), "expected every meta.tn1 declaration to resolve");
 
-        TsonSchema registered = registry.register(meta);
+        LinkedTsonSchema registered = registry.register(SchemaLinker.link(meta, registry));
 
         // Meta-kernel's own imported entries are visible in the merged, validated namespace.
-        assertTrue(registered.entries().containsKey("atom"));
-        assertTrue(registered.entries().containsKey("text_type"));
+        assertTrue(registered.schema().entries().containsKey("atom"));
+        assertTrue(registered.schema().entries().containsKey("text_type"));
         // meta.tn1's own composition against an imported supertype resolved and validated correctly.
-        assertTrue(registered.entries().containsKey("date_type"));
+        assertTrue(registered.schema().entries().containsKey("date_type"));
         // The four constructor-application (!enum [...]) declarations previously excluded now
         // resolve too, bound generically via TsonMapperReader against Atom.class.
         assertEquals(new EnumBody(List.of("BASE64", "BASE64URL", "BASE32", "HEX")),
-                registered.entries().get("binary_encoding").body());
+                registered.schema().entries().get("binary_encoding").body());
         // ...and the three declarations that reference one of those four as a field type now
         // register successfully as well, since their dependency is present in the same schema.
-        assertTrue(registered.entries().containsKey("binary"));
-        assertTrue(registered.entries().containsKey("float_type"));
-        assertTrue(registered.entries().containsKey("complex_type"));
+        assertTrue(registered.schema().entries().containsKey("binary"));
+        assertTrue(registered.schema().entries().containsKey("float_type"));
+        assertTrue(registered.schema().entries().containsKey("complex_type"));
     }
 
     @Test
@@ -121,6 +123,7 @@ class MetaSchemaImportTest {
 
         TsonSchema withBinaryOnly = new TsonSchema(meta.id(), meta.meta(), meta.imports(), Map.of("binary", binary));
 
-        assertThrows(io.ltr8.tson.schema.SchemaValidationException.class, () -> registry.register(withBinaryOnly));
+        assertThrows(io.ltr8.tson.schema.SchemaValidationException.class,
+                () -> registry.register(SchemaLinker.link(withBinaryOnly, registry)));
     }
 }

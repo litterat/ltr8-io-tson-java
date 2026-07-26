@@ -7,6 +7,7 @@ import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Unit;
+import io.ltr8.tson.schema.registry.SchemaLinker;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -32,23 +33,28 @@ class SchemaRegistryTest {
                 "https://example.test/meta.tn1", List.of(), entries);
     }
 
+    /** Every {@code register} call site needs a linked schema now -- see {@code SchemaRegistry}'s own Javadoc. */
+    private static LinkedTsonSchema linkedSchemaWithGenericField(SchemaRegistry registry) {
+        return SchemaLinker.link(schemaWithGenericField(), registry);
+    }
+
     @Test
-    void registerRunsValidationAndTheResultIsFindableByItsRawId() {
+    void registerRunsLinkingAndTheResultIsFindableByItsRawId() {
         SchemaRegistry registry = new SchemaRegistry();
-        TsonSchema registered = registry.register(schemaWithGenericField());
+        LinkedTsonSchema registered = registry.register(linkedSchemaWithGenericField(registry));
 
-        // register() actually ran SchemaValidator -- the generic field got materialized.
-        assertEquals(4, registered.entries().size(), "one synthetic entry beyond the original three");
+        // The generic field got materialized by SchemaLinker.link, before register was ever called.
+        assertEquals(4, registered.schema().entries().size(), "one synthetic entry beyond the original three");
 
-        Optional<TsonSchema> found = registry.get("https://example.test/registry-test.tn1");
+        Optional<LinkedTsonSchema> found = registry.get("https://example.test/registry-test.tn1");
         assertTrue(found.isPresent());
-        assertEquals(registered.entries().keySet(), found.get().entries().keySet());
+        assertEquals(registered.schema().entries().keySet(), found.get().schema().entries().keySet());
     }
 
     @Test
     void aDifferentSchemeFindsTheSameRegisteredSchema() {
         SchemaRegistry registry = new SchemaRegistry();
-        registry.register(schemaWithGenericField());
+        registry.register(linkedSchemaWithGenericField(registry));
 
         assertTrue(registry.get("http://example.test/registry-test.tn1").isPresent());
     }
@@ -74,21 +80,23 @@ class SchemaRegistryTest {
     @Test
     void rejectsRegisteringTheSameIdentityTwice() {
         SchemaRegistry registry = new SchemaRegistry();
-        registry.register(schemaWithGenericField());
+        registry.register(linkedSchemaWithGenericField(registry));
 
-        assertThrows(SchemaValidationException.class, () -> registry.register(schemaWithGenericField()));
+        assertThrows(SchemaValidationException.class,
+                () -> registry.register(linkedSchemaWithGenericField(registry)));
     }
 
     @Test
     void rejectsRegisteringTheSameIdentityTwiceEvenUnderADifferentScheme() {
         SchemaRegistry registry = new SchemaRegistry();
-        registry.register(schemaWithGenericField());
+        registry.register(linkedSchemaWithGenericField(registry));
 
         TsonSchema sameIdentityDifferentScheme = new TsonSchema(
                 "http://example.test/registry-test.tn1", "https://example.test/meta.tn1",
                 List.of(), Map.of());
+        LinkedTsonSchema linked = SchemaLinker.link(sameIdentityDifferentScheme, registry);
 
-        assertThrows(SchemaValidationException.class, () -> registry.register(sameIdentityDifferentScheme));
+        assertThrows(SchemaValidationException.class, () -> registry.register(linked));
     }
 
     @Test

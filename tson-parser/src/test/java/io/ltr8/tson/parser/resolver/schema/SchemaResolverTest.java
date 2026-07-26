@@ -10,7 +10,9 @@ import io.ltr8.tson.parser.resolver.TsonAtomContext;
 import io.ltr8.tson.parser.resolver.schema.compiled.ParserFactoryRegistry;
 import io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledRegistry;
 import io.ltr8.tson.parser.resolver.schema.compiled.TsonSchemaParser;
+import io.ltr8.tson.schema.LinkedTsonSchema;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.registry.SchemaLinker;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.BinaryType;
 import io.ltr8.tson.schema.meta.ChoiceBody;
@@ -1257,8 +1259,8 @@ class SchemaResolverTest {
      */
     private static TsonSchemaParser metaKernelCompiled() {
         TsonSchema metaKernel = MetaKernelParser.getMetaKernelSchema();
-        TsonSchema materialized = new io.ltr8.tson.schema.SchemaRegistry().materializeBootstrap(metaKernel);
-        return compileAsMetaParser(materialized.entries());
+        LinkedTsonSchema linked = new io.ltr8.tson.schema.SchemaRegistry().linkBootstrap(metaKernel);
+        return compileAsMetaParser(linked.schema().entries());
     }
 
     /**
@@ -1278,9 +1280,9 @@ class SchemaResolverTest {
     private static TsonSchemaParser metaTn1Compiled() throws IOException {
         TsonSchema metaKernelBootstrap = MetaKernelParser.getMetaKernelSchema();
         io.ltr8.tson.schema.SchemaRegistry registry = new io.ltr8.tson.schema.SchemaRegistry();
-        TsonSchema materializedMetaKernelBootstrap = registry.materializeBootstrap(metaKernelBootstrap);
+        LinkedTsonSchema materializedMetaKernelBootstrap = registry.linkBootstrap(metaKernelBootstrap);
         DataBindContext context = TsonAtomContext.defaultContext();
-        ParserFactoryRegistry objectFactories = ParserFactoryRegistry.object(materializedMetaKernelBootstrap, context);
+        ParserFactoryRegistry objectFactories = ParserFactoryRegistry.object(materializedMetaKernelBootstrap.schema(), context);
         TsonCompiledRegistry throwawayRegistry = new TsonCompiledRegistry(objectFactories);
         DefaultSchemaCoordinator throwawayCoordinator =
                 new DefaultSchemaCoordinator(throwawayRegistry, BundledSchemaSource.INSTANCE);
@@ -1288,7 +1290,7 @@ class SchemaResolverTest {
         String metaKernelSource = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID);
         SchemaDocument metaKernelDocument = new SchemaParser(metaKernelSource).parseSchemaDocument();
         TsonSchema metaKernel = new SchemaResolver(throwawayCoordinator).resolveAll(metaKernelDocument);
-        registry.register(metaKernel); // permanent, so meta.tn1's own !!import finds it below
+        registry.register(SchemaLinker.link(metaKernel, registry)); // permanent, so meta.tn1's own !!import finds it below
         TsonSchemaParser metaKernelParser = metaKernelCompiled();
 
         String source = Files.readString(Path.of("").toAbsolutePath().resolve("../spec/m/meta.tn1").normalize());
@@ -1302,8 +1304,8 @@ class SchemaResolverTest {
             localOnly.put(declaration.name(), resolved);
         }
         TsonSchema meta = new TsonSchema(metaDoc.id().orElseThrow(), metaDoc.meta(), metaDoc.imports(), localOnly);
-        TsonSchema registeredMeta = registry.register(meta);
-        return compileAsMetaParser(registeredMeta.entries());
+        LinkedTsonSchema registeredMeta = registry.register(SchemaLinker.link(meta, registry));
+        return compileAsMetaParser(registeredMeta.schema().entries());
     }
 
     private Map<String, TypeDefinition> resolveUpToArray() throws IOException {
