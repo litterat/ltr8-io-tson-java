@@ -32,7 +32,7 @@ import java.util.List;
  */
 final class TupleParser implements TsonSchemaTypeParser<List<Object>> {
 
-    static final TsonParserFactory FACTORY = (name, definition, ctx) -> {
+    static final TsonParserFactory FACTORY = (_, name, definition, ctx) -> {
         TupleBody body = (TupleBody) definition.body();
         List<CompiledSlot> slots = new ArrayList<>(body.elements().size());
         for (TupleElement element : body.elements()) {

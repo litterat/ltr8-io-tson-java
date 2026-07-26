@@ -20,7 +20,7 @@ final class ChoiceParser {
     private ChoiceParser() {
     }
 
-    static final TsonParserFactory FACTORY = (name, definition, ctx) -> {
+    static final TsonParserFactory FACTORY = (_, name, definition, ctx) -> {
         ChoiceBody body = (ChoiceBody) definition.body();
         if (body.variants().isEmpty()) {
             throw new IllegalStateException("'" + name + "' declares no variants -- nothing compilable here");

@@ -1180,6 +1180,84 @@ from meta.tn1's own composition-based declarations (`date_type => ~atom & atom_s
 declaration order already places each dependency before its use), and the merged, linked
 registration succeeds outright.
 
+### Class 2 compilation (`resolver/schema/compiled/{TsonSchemaCompiler,TsonCompiledSchema,TsonParserFactory,TsonParserFactoryRegistry,ErrorParser}.java`)
+
+`TsonSchemaCompiler.compile(TsonSchema, TsonParserFactory)` is the "compile" stage of
+parse -> resolve -> link -> register -> compile -> read; `TsonCompiledSchema` is the noun it
+produces, one `TsonSchemaTypeParser` per resolved entry, wired together as real Java object
+references (`ParserHandle`) rather than further name lookups at read time.
+
+**All the actual compile-time work — the eager walk, cycle detection, per-entry build-failure
+deferral — lives in `TsonSchemaCompiler`, not `TsonCompiledSchema` (moved 2026-07-27, on the user's
+own explicit direction: "the compile step still lives in TsonCompiledSchema.. move the compiler
+code into TsonSchemaCompiler").** `TsonCompiledSchema` is now a plain, already-built value: two
+final fields (`schema`, an immutable `Map<String, TsonSchemaTypeParser<?>>`), no build logic, no
+`finished`/`building` bookkeeping at all — matching the same verb/noun split this project's own
+pipeline vocabulary already uses everywhere else (`TsonSchemaLinker`/`TsonLinkedSchema`,
+`TsonSchemaResolver`/its own resolved `TsonSchema`). The actual recursion (`resolve`/`build`, cycle
+detection via a `building` name-set, the try/catch around `build` that substitutes an `ErrorParser`)
+now lives in a private nested `TsonSchemaCompiler.Compilation` helper — one instance per `compile`
+call, holding that call's own mutable state, discarded once `compile` returns and hands back an
+immutable snapshot.
+
+**`TsonParserFactory.create` takes `typeName` as its own first argument now, and
+`TsonParserFactoryRegistry` implements `TsonParserFactory` itself** (both 2026-07-27, on the user's
+own explicit direction: "modify the TsonParserFactory to include typename and pass in the
+implementation which does the lookup... get a proper single method call out from the compiler").
+Previously `Compilation#build` did two steps — `registry.require(typenameOf(body))` to find the
+right factory, then `factory.create(name, definition, ctx)` to run it — which meant `Compilation`
+had to reference `TsonParserFactoryRegistry` as a concrete type just to make that lookup call. Now
+it's one call: `factory.create(TsonParserFactoryRegistry.typenameOf(body), name, definition,
+this::resolve)`. `TsonParserFactoryRegistry#create` does exactly what that two-step call used to do
+by hand — `require(typeName).create(typeName, name, definition, ctx)` — so `Compilation`'s own
+`factory` field is typed `TsonParserFactory`, not `TsonParserFactoryRegistry`: it can hold a full
+registry (the common case) or any narrower single-shape implementation (useful for a test that only
+wants to compile against one constructor) with no code difference at the call site. Every
+individual leaf factory (`RecordParser.FACTORY`, `ArrayParser.FACTORY`, every constant on
+`AtomTypeParser`, ...) picked up the same new leading parameter too, unused in every one of them —
+spelled `_` (Java's unnamed-variable syntax, finalized since JDK 22) rather than a name nothing
+reads, to make "yes this exists in the signature, no this implementation cares" visually obvious at
+each of the ~17 call sites.
+
+**Eager, not lazy (flipped 2026-07-27, on the user's own explicit direction).** An earlier version
+built nothing until `TsonCompiledSchema#get` first asked for a given name — the stated reason wasn't
+performance, it was registry coverage: a real schema like meta-kernel declares more constructors
+than any one `TsonParserFactoryRegistry` necessarily has factories for, so eagerly building
+everything seemed to demand a factory for all of them. The user pushed back directly: these are
+schemas with tens or hundreds of entries, not millions, so the performance argument doesn't hold —
+and building the graph upfront is exactly what lets every entry's buildability be validated at
+compile time, not discovered piecemeal whenever some future caller happens to `get` an entry nobody
+tried before. `TsonSchemaCompiler.compile` now walks every one of `schema.entries()` and calls
+`Compilation#resolve` for each before returning `TsonCompiledSchema` its already-finished result.
+
+**`ErrorParser`** (package-private) is what makes eager building survive the coverage gap that
+motivated staying lazy in the first place, without weakening the guarantee: `Compilation#resolve`
+catches any `RuntimeException` thrown while `build`ing one specific entry and substitutes an
+`ErrorParser` wrapping it, rather than letting one bad entry abort the whole eager walk. The schema
+as a whole still compiles in full; only actually `read`ing a value against that specific entry
+fails, and only then, with the original exception's message preserved (a deferral, not a swallow).
+Two real causes confirmed against real fixtures, not just imagined: no `TsonParserFactory`
+registered for a constructor at all (`TsonParserFactoryRegistry#require` throwing — e.g. core.tn1's
+own `cidr4`/`email`/... atom families, which have no `resolver.vocab` parser yet), and — found
+empirically, once
+eager building actually ran against the real, registered meta-kernel/meta.tn1 fixtures in
+object-binding mode — a factory that *is* registered still rejecting one particular entry
+(`ObjectRecordShapeFactory` deliberately never caches meta-kernel's own non-record-bound marker
+entries like `top`/`atom`; building the ordinary `"record"` factory against those specific entries
+throws even though the same factory works fine for every genuinely record-shaped one). Both surface
+identically through `ErrorParser`. A missing/absent *referenced* name (`build`'s own target not
+present in `schema.entries()` at all) is a different, stricter case — a genuine `TsonSchemaLinker`
+invariant violation, not "this build doesn't support constructor X yet" — and still propagates
+immediately, uncaught, not deferred into an `ErrorParser`.
+
+**The `top`/`atom`/... case specifically is flagged by the user as needing its own review later** —
+`ErrorParser` deferring it is accepted as the right behavior for now (these five entries are
+meta-schema machinery real application data is never actually read as an instance of, so a caller
+in object-binding mode was never going to `get`/`read` them anyway), but *why* eager building reaches
+a factory built to reject them at all, rather than the two eager-validation mechanisms
+(`ObjectRecordShapeFactory#validate`'s own skip-list and this compiler's own eager walk) agreeing on
+which entries are exempt in the first place, hasn't been revisited — noted here so it isn't lost.
+
 ### Compiled schema registry (`tson-parser/src/main/java/io/ltr8/tson/parser/resolver/schema/compiled/TsonCompiledRegistry.java`)
 
 Added 2026-07-25: pairs one-to-one with `TsonSchemaRegistry` (`tson-schema`) but stores *compiled*

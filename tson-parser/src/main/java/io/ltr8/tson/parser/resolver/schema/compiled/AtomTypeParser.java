@@ -62,34 +62,34 @@ import io.ltr8.tson.schema.meta.UuidType;
  */
 public final class AtomTypeParser<T> implements TsonSchemaTypeParser<T> {
 
-    static final TsonParserFactory INTEGER_TYPE = (name, definition, ctx) ->
+    static final TsonParserFactory INTEGER_TYPE = (_, name, definition, ctx) ->
             new AtomTypeParser<>(new IntegerParser((IntegerType) definition.body()));
-    static final TsonParserFactory TEXT_TYPE = (name, definition, ctx) ->
+    static final TsonParserFactory TEXT_TYPE = (_, name, definition, ctx) ->
             new AtomTypeParser<>(new TextParser((TextType) definition.body()));
-    static final TsonParserFactory DECIMAL_TYPE = (name, definition, ctx) ->
+    static final TsonParserFactory DECIMAL_TYPE = (_, name, definition, ctx) ->
             new AtomTypeParser<>(new DecimalParser((DecimalType) definition.body()));
-    static final TsonParserFactory FLOAT_TYPE = (name, definition, ctx) ->
+    static final TsonParserFactory FLOAT_TYPE = (_, name, definition, ctx) ->
             new AtomTypeParser<>(new FloatParser((FloatType) definition.body()));
-    static final TsonParserFactory RATIONAL_TYPE = (name, definition, ctx) ->
+    static final TsonParserFactory RATIONAL_TYPE = (_, name, definition, ctx) ->
             new AtomTypeParser<>(new RationalParser((RationalType) definition.body()));
-    static final TsonParserFactory UUID_TYPE = (name, definition, ctx) ->
+    static final TsonParserFactory UUID_TYPE = (_, name, definition, ctx) ->
             new AtomTypeParser<>(new UuidParser((UuidType) definition.body()));
     /** Registered under {@code "binary"}, not {@code "binary_type"} -- {@link BinaryType}'s own {@code @Typename} matches the real spec constructor name; see its own Javadoc. */
-    static final TsonParserFactory BINARY = (name, definition, ctx) ->
+    static final TsonParserFactory BINARY = (_, name, definition, ctx) ->
             new AtomTypeParser<>(new BinaryParser((BinaryType) definition.body()));
-    static final TsonParserFactory DATE_TYPE = (name, definition, ctx) ->
+    static final TsonParserFactory DATE_TYPE = (_, name, definition, ctx) ->
             new AtomTypeParser<>(new DateParser((DateType) definition.body()));
-    static final TsonParserFactory TIME_TYPE = (name, definition, ctx) ->
+    static final TsonParserFactory TIME_TYPE = (_, name, definition, ctx) ->
             new AtomTypeParser<>(new TimeParser((TimeType) definition.body()));
-    static final TsonParserFactory DATETIME_TYPE = (name, definition, ctx) ->
+    static final TsonParserFactory DATETIME_TYPE = (_, name, definition, ctx) ->
             new AtomTypeParser<>(new DateTimeParser((DateTimeType) definition.body()));
-    static final TsonParserFactory DURATION_TYPE = (name, definition, ctx) ->
+    static final TsonParserFactory DURATION_TYPE = (_, name, definition, ctx) ->
             new AtomTypeParser<>(new DurationParser((DurationType) definition.body()));
-    static final TsonParserFactory URI_TYPE = (name, definition, ctx) ->
+    static final TsonParserFactory URI_TYPE = (_, name, definition, ctx) ->
             new AtomTypeParser<>(new UriParser((UriType) definition.body()));
-    static final TsonParserFactory REGEX_TYPE = (name, definition, ctx) ->
+    static final TsonParserFactory REGEX_TYPE = (_, name, definition, ctx) ->
             new AtomTypeParser<>(new RegexParser((RegexType) definition.body()));
-    static final TsonParserFactory ENUM = (name, definition, ctx) ->
+    static final TsonParserFactory ENUM = (_, name, definition, ctx) ->
             new AtomTypeParser<>(new EnumParser((EnumBody) definition.body()));
     /**
      * Object-binding mode's own variant of {@link #ENUM} -- identical for every enum instance
@@ -107,7 +107,7 @@ public final class AtomTypeParser<T> implements TsonSchemaTypeParser<T> {
      * class's other factory constants, specifically so {@code io.ltr8.tson.parser.bind} can reach it
      * (moved out of this package 2026-07-27).
      */
-    public static final TsonParserFactory ENUM_OBJECT_MODE = (name, definition, ctx) ->
+    public static final TsonParserFactory ENUM_OBJECT_MODE = (_, name, definition, ctx) ->
             "boolean".equals(name)
                     ? BooleanParser.INSTANCE
                     : new AtomTypeParser<>(new EnumParser((EnumBody) definition.body()));
@@ -124,7 +124,7 @@ public final class AtomTypeParser<T> implements TsonSchemaTypeParser<T> {
      * contract this codebase doesn't know) falls back to {@link TokenParser}'s raw-text behavior --
      * the same default this whole family had before the split -- rather than failing outright.
      */
-    static final TsonParserFactory UNIT = (name, definition, ctx) -> switch (name) {
+    static final TsonParserFactory UNIT = (_, name, definition, ctx) -> switch (name) {
         case "void" -> VoidParser.INSTANCE;
         case "value" -> new AtomTypeParser<>(ValueParser.INSTANCE);
         default -> new AtomTypeParser<>(TokenParser.INSTANCE);

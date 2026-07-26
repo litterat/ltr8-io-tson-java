@@ -28,7 +28,7 @@ import java.util.Map;
  */
 final class MapParser implements TsonSchemaTypeParser<Map<Object, Object>> {
 
-    static final TsonParserFactory FACTORY = (name, definition, ctx) -> {
+    static final TsonParserFactory FACTORY = (_, name, definition, ctx) -> {
         MapBody body = (MapBody) definition.body();
         TsonSchemaTypeParser<?> keyParser = ctx.resolve(body.keyType().name());
         TsonSchemaTypeParser<?> valueParser = ctx.resolve(body.valueType().name());

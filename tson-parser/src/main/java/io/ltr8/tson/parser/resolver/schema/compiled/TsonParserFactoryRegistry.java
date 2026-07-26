@@ -9,16 +9,23 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * A {@code constructor name -> TsonParserFactory} table -- what {@link TsonCompiledSchema} actually
- * consults to turn a resolved entry's own shape into a compiled parser, keyed by the same name a
- * meta-schema itself uses for that constructor (§4.1/§5.5's {@code record}/{@code array}/{@code
- * integer_type}/... vocabulary), recovered from the resolved body's own {@code @Typename} via
- * {@link #typenameOf} -- not from whatever name a *particular* declaration happened to construct
- * through. That distinction matters: {@code set}, {@code array_min}, {@code array_max}, and {@code
- * array_ranged} all resolve to an {@link io.ltr8.tson.schema.meta.ArrayBody} body regardless of
- * which of them produced a given instance, so they all correctly share the exact same {@code
- * "array"} factory entry -- there is no separate {@code "set"} entry to register at all, since
- * {@code set} was never a distinct resolved *shape*, only a distinct declared *name*.
+ * A {@code constructor name -> TsonParserFactory} table, itself a {@link TsonParserFactory} --
+ * what {@link TsonSchemaCompiler} actually consults to turn a resolved entry's own shape into a
+ * compiled parser, keyed by the same name a meta-schema itself uses for that constructor (§4.1/
+ * §5.5's {@code record}/{@code array}/{@code integer_type}/... vocabulary), recovered from the
+ * resolved body's own {@code @Typename} via {@link #typenameOf} -- not from whatever name a
+ * *particular* declaration happened to construct through. That distinction matters: {@code set},
+ * {@code array_min}, {@code array_max}, and {@code array_ranged} all resolve to an {@link
+ * io.ltr8.tson.schema.meta.ArrayBody} body regardless of which of them produced a given instance,
+ * so they all correctly share the exact same {@code "array"} factory entry -- there is no separate
+ * {@code "set"} entry to register at all, since {@code set} was never a distinct resolved *shape*,
+ * only a distinct declared *name*.
+ *
+ * <p><b>Implements {@link TsonParserFactory} itself</b> (2026-07-27, on the user's own explicit
+ * direction) -- {@link #create} does exactly what a caller used to do by hand (look the right
+ * factory up via {@link #require}, then call it), so {@link TsonSchemaCompiler} makes one uniform
+ * call regardless of whether it's holding a full registry or a single-shape implementation; see
+ * {@link TsonParserFactory}'s own Javadoc for the fuller reasoning.
  *
  * <p>Keyed by name (not by {@code Class<? extends Top>}) specifically so this can grow past today's
  * fixed, closed set without a code change to this class -- meta-kernel and a governing meta-schema
@@ -38,7 +45,7 @@ import java.util.Map;
  * needed it, rather than a generic "no factory for X" surfacing arbitrarily later during
  * compilation of some unrelated schema that happens to use it.
  */
-public final class TsonParserFactoryRegistry {
+public final class TsonParserFactoryRegistry implements TsonParserFactory {
 
     private final Map<String, TsonParserFactory> factories;
 
@@ -54,6 +61,12 @@ public final class TsonParserFactoryRegistry {
                     + constructorName + "'");
         }
         return factory;
+    }
+
+    /** Looks {@code typeName} up via {@link #require} and delegates straight to it. */
+    @Override
+    public TsonSchemaTypeParser<?> create(String typeName, String name, TypeDefinition definition, CompilationContext ctx) {
+        return require(typeName).create(typeName, name, definition, ctx);
     }
 
     public static Builder builder() {

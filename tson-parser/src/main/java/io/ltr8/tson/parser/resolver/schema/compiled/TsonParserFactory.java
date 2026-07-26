@@ -8,11 +8,22 @@ import io.ltr8.tson.schema.meta.TypeDefinition;
  * with one fixed Java method per composite kind), there is exactly one of these per *meta-kernel/
  * meta-schema constructor name* (`record`, `array`, `map`, `tuple`, `choice`, `enum`, `unit`,
  * `integer_type`, `text_type`, ... -- every {@code ~}-marked entry meta-kernel or a meta-schema like
- * {@code meta.tn1} declares), looked up dynamically by name through a {@link TsonParserFactoryRegistry}
- * rather than called through a fixed method -- see that class's own Javadoc for why: it's what
- * lets "which constructors exist" be a property of *which meta-schema* is governing (meta-kernel's
- * own closed set today; nothing stops a caller's own extended meta-schema declaring more later)
- * rather than a fixed, closed Java interface.
+ * {@code meta.tn1} declares) -- it's what lets "which constructors exist" be a property of *which
+ * meta-schema* is governing (meta-kernel's own closed set today; nothing stops a caller's own
+ * extended meta-schema declaring more later) rather than a fixed, closed Java interface.
+ *
+ * <p><b>Takes {@code typeName} as its own first argument</b> (added 2026-07-27, on the user's own
+ * explicit direction) so {@link TsonSchemaCompiler} can make one uniform call --
+ * {@code factory.create(typeName, name, definition, ctx)} -- regardless of whether {@code factory}
+ * is a single-shape implementation (which already knows its own shape and ignores the argument, the
+ * common case: {@link RecordParser#FACTORY}, {@link ArrayParser#FACTORY}, every constant on {@link
+ * AtomTypeParser}, ...) or {@link TsonParserFactoryRegistry} itself, which *does* use it -- {@link
+ * TsonParserFactoryRegistry} implements this same interface, its own {@code create} doing the
+ * name-keyed lookup (previously a separate {@code registry.require(typeName)} call the compiler had
+ * to make itself) and delegating to whichever concrete factory is registered for it. This keeps the
+ * compiler decoupled from {@code TsonParserFactoryRegistry} as a concrete type -- it depends only on
+ * this interface, and a caller wanting single-constructor test coverage can hand {@link
+ * TsonSchemaCompiler#compile} a bare lambda instead of assembling a whole registry.
  *
  * <p>Convention (not enforced by the compiler, just followed consistently so far): each
  * *composite* constructor's own compiled-parser class holds its own {@code FACTORY} as a {@code
@@ -38,5 +49,5 @@ import io.ltr8.tson.schema.meta.TypeDefinition;
 @FunctionalInterface
 public interface TsonParserFactory {
 
-    TsonSchemaTypeParser<?> create(String name, TypeDefinition definition, CompilationContext ctx);
+    TsonSchemaTypeParser<?> create(String typeName, String name, TypeDefinition definition, CompilationContext ctx);
 }

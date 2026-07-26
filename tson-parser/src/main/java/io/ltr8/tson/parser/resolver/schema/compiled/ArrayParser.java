@@ -43,7 +43,7 @@ import java.util.Set;
  */
 final class ArrayParser implements TsonSchemaTypeParser<List<Object>> {
 
-    static final TsonParserFactory FACTORY = (name, definition, ctx) -> {
+    static final TsonParserFactory FACTORY = (_, name, definition, ctx) -> {
         ArrayBody body = (ArrayBody) definition.body();
         TsonSchemaTypeParser<?> elementParser = ctx.resolve(body.elementType().name());
         return new ArrayParser(name, body, elementParser);

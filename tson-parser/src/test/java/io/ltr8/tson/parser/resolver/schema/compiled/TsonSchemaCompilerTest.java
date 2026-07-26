@@ -22,11 +22,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Direct coverage of {@link TsonSchemaCompiler}/{@link TsonCompiledSchema}'s own cycle detection
- * (the reason {@link ParserHandle.Direct}/{@link ParserHandle.Indirect} exist at all) and laziness
- * (nothing gets built until {@link TsonCompiledSchema#get} actually asks for it). {@link
- * RecordParserTest}/{@link VariantParserTest}/{@link EnumTypeParserFactoryTest} exercise this
- * compilation machinery too, but only ever incidentally, through schemas with no real cycles --
- * this class targets it directly.
+ * (the reason {@link ParserHandle.Direct}/{@link ParserHandle.Indirect} exist at all) and eager,
+ * whole-schema build (every entry is built as soon as {@link TsonSchemaCompiler#compile} returns,
+ * not deferred to whenever {@link TsonCompiledSchema#get} first asks for a given name -- see that
+ * class's own "Eager, not lazy" note). {@link RecordParserTest}/{@link VariantParserTest}/{@link
+ * EnumTypeParserFactoryTest} exercise this compilation machinery too, but only ever incidentally,
+ * through schemas with no real cycles -- this class targets it directly.
  */
 class TsonSchemaCompilerTest {
 
@@ -68,10 +69,11 @@ class TsonSchemaCompilerTest {
     }
 
     @Test
-    void unrelatedEntryWithNoRegisteredFactoryDoesNotBlockCompilingWhatYouActuallyAskFor() {
-        // "orphan" uses a constructor ("unit") with no registered factory at all -- compiling/reading
-        // "used" (which never references "orphan") must still work, proving TsonSchemaCompiler.compile()
-        // doesn't eagerly build every entry in the schema.
+    void anEntryWithNoRegisteredFactoryDoesNotBlockCompilingTheRestOfTheSchemaButFailsOnlyWhenActuallyRead() {
+        // "orphan" uses a constructor ("unit") with no registered factory at all -- TsonSchemaCompiler
+        // .compile() still builds the whole schema eagerly, including "orphan" itself (get("orphan")
+        // succeeds, unlike the old lazy behavior where it never got attempted at all until asked for);
+        // "used" (which never references "orphan") reads normally either way.
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("used", TypeDefinition.product(RecordBody.of(List.of())));
         entries.put("orphan", new TypeDefinition(Optional.empty(), TypeKind.ATOM,
@@ -84,8 +86,11 @@ class TsonSchemaCompilerTest {
         Map<String, Object> used = (Map<String, Object>) compiled.get("used").read(EMPTY_RECORD);
         assertTrue(used.isEmpty());
 
-        // Only fails once "orphan" is actually asked for.
-        assertThrows(IllegalStateException.class, () -> compiled.get("orphan"));
+        // Compiling/getting "orphan" itself succeeds -- only reading an actual value against it fails.
+        TsonSchemaTypeParser<?> orphan = compiled.get("orphan");
+        UnsupportedOperationException thrown =
+                assertThrows(UnsupportedOperationException.class, () -> orphan.read(EMPTY_RECORD));
+        assertTrue(thrown.getMessage().contains("orphan"), thrown.getMessage());
     }
 
     @Test

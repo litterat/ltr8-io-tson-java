@@ -10,10 +10,10 @@ import java.util.Map;
  * io.ltr8.tson.schema.meta.Reference} (the unrelated, pre-existing "{@code name => other_name}"
  * resolved-schema concept). {@link Direct} is the common case: the child was already fully built
  * by the time this handle was created, so this just holds it, no indirection at all. {@link
- * Indirect} exists purely for the edges {@link TsonCompiledSchema}'s own build-stack finds still
+ * Indirect} exists purely for the edges {@code TsonSchemaCompiler}'s own build-stack finds still
  * mid-construction (a cycle back to an entry currently being compiled, directly or transitively) --
- * it defers to a name lookup in the compiler's own registry, taken once the specific {@link
- * TsonCompiledSchema#get} call that triggered this whole construction chain has returned, instead of
+ * it defers to a name lookup in the compiler's own registry, taken once the specific {@code
+ * TsonSchemaCompiler#compile} call that triggered this whole construction chain has returned, instead of
  * the object it can't hold yet.
  *
  * <p>Both variants are themselves a {@link TsonSchemaTypeParser}, so a composite parser holding a {@code
@@ -36,16 +36,17 @@ public sealed interface ParserHandle<T> extends TsonSchemaTypeParser<T> {
     /**
      * The cyclic case -- {@code typeName} was still on the compiler's own build stack when this
      * handle was created, so the real parser can't be referenced directly yet. {@code registry} is
-     * the compiler's own {@code Map<String, TsonSchemaTypeParser<?>>}, captured by reference, not copied
-     * -- by the time {@link #read} is ever actually called, the specific {@link
-     * TsonCompiledSchema#get} call whose own recursive construction created this handle in the first
-     * place has already returned (nothing outside the compiler can reach a handle embedded inside a
-     * parser before that call returns), and every {@code resolve} invocation on that call's own
-     * stack -- including the one for {@code typeName} -- has by then populated {@code registry}.
-     * This still holds under {@link TsonCompiledSchema}'s own lazy compilation: it was never "the
-     * whole schema finishes, then reads happen" so much as "this one recursive chain finishes,
-     * then whatever it produced becomes reachable" -- laziness just means other, unrelated entries
-     * may never build at all, not that this specific guarantee weakens.
+     * the compiler's own private, per-compilation {@code Map<String, TsonSchemaTypeParser<?>>}
+     * (the {@code finished} map {@code TsonSchemaCompiler}'s own {@code Compilation} helper builds
+     * up and later copies into a {@link TsonCompiledSchema}), captured by reference, not copied --
+     * by the time {@link #read} is ever actually called, the whole {@code TsonSchemaCompiler
+     * #compile} call that created this handle has already returned (nothing outside the compiler
+     * can reach a handle embedded inside a parser before that call returns), and every {@code
+     * resolve} invocation on that call's own build -- including the one for {@code typeName} -- has
+     * by then populated {@code registry}. Now that compilation is eager (every entry in the schema
+     * is resolved before {@code compile} returns, not just whichever one a caller first asked for),
+     * this is simpler than it used to be under lazy compilation: it genuinely is "the whole schema
+     * finishes, then reads happen," not merely "this one recursive chain finishes."
      */
     record Indirect<T>(String typeName, Map<String, TsonSchemaTypeParser<?>> registry) implements ParserHandle<T> {
 

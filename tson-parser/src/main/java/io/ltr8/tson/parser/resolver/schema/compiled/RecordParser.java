@@ -119,7 +119,7 @@ public final class RecordParser<R> implements TsonSchemaTypeParser<R> {
      * implementation without this package needing any awareness that caller exists.
      */
     public static TsonParserFactory factory(RecordShapeFactory<?> shapeFactory) {
-        return (name, definition, ctx) -> {
+        return (_, name, definition, ctx) -> {
             RecordBody body = (RecordBody) definition.body();
             List<CompiledField> fields = new ArrayList<>();
             for (RecordField field : body.fields()) {

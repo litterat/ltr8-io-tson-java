@@ -29,7 +29,7 @@ import java.util.Set;
  * subtypes directly) had "no concrete shape of its own to read" -- true for a genuinely open
  * template with no useful body, but not a safe general assumption: {@code top}/{@code atom}/{@code
  * array} all have subtypes *and* a perfectly good body of their own. Triggering on non-empty
- * {@code subtypes} instead of non-empty {@code parameters} (see {@link TsonCompiledSchema}'s own
+ * {@code subtypes} instead of non-empty {@code parameters} (see {@link TsonSchemaCompiler}'s own
  * Javadoc) is what makes the "always compile the own body too" version of this class correct: the
  * signal for "this position might need dispatch" and the signal for "this position has no
  * meaningful body of its own" turned out to be two different things, not one.
