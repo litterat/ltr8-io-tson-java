@@ -5,7 +5,7 @@ import io.ltr8.tson.parser.ast.Document;
 import io.ltr8.tson.parser.resolver.schema.MetaKernelBootstrapResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.TsonSchemaRegistry;
+import io.ltr8.tson.schema.TsonSchemaLinker;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
@@ -27,7 +27,7 @@ class MetaKernelEndToEndTest {
 
     private static TsonCompiledSchema compiled() {
         TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
-        TsonLinkedSchema linked = new TsonSchemaRegistry().linkBootstrap(raw);
+        TsonLinkedSchema linked = TsonSchemaLinker.linkBootstrap(raw);
         return TsonSchemaCompiler.compile(linked.schema(), TsonParserFactoryRegistry.dom());
     }
 
@@ -47,7 +47,7 @@ class MetaKernelEndToEndTest {
     @Test
     void allFiftyEightRealEntriesCompileCleanly() {
         TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
-        TsonLinkedSchema linked = new TsonSchemaRegistry().linkBootstrap(raw);
+        TsonLinkedSchema linked = TsonSchemaLinker.linkBootstrap(raw);
         TsonSchema registered = linked.schema();
         TsonCompiledSchema compiled = TsonSchemaCompiler.compile(registered, TsonParserFactoryRegistry.dom());
 

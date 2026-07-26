@@ -6,7 +6,7 @@ import io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledRegistry;
 import io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledSchema;
 import io.ltr8.tson.parser.resolver.schema.compiled.TsonSchemaCompiler;
 import io.ltr8.tson.schema.TsonLinkedSchema;
-import io.ltr8.tson.schema.TsonSchemaRegistry;
+import io.ltr8.tson.schema.TsonSchemaLinker;
 import io.ltr8.tson.schema.TsonSchema;
 
 import java.util.Optional;
@@ -31,39 +31,39 @@ import java.util.Optional;
  *   narrower guarantee, not an oversight.
  *
  *   <p><b>Deliberately a one-off, never registered/cached in the *shared* registry</b> (on the
- *   user's own explicit direction): {@link MetaKernelBootstrapResolver#getMetaKernelSchema()}'s own output is
- *   run through a fresh, throwaway {@code TsonSchemaRegistry} -- created and discarded right here, never
- *   the shared {@link #registry} this coordinator wraps -- purely so {@code TsonSchemaLinker}'s own
- *   materialization/validation pass runs (synthesizing entries for argument-bearing {@code
- *   type_ref}s, e.g. {@code enum}'s own {@code members: set<token>}) before compiling ({@code
- *   TsonSchemaCompiler.compile}, using this coordinator's own {@link
- *   io.ltr8.tson.parser.resolver.schema.compiled.TsonParserFactoryRegistry} so it reads the same way
- *   anything else compiled here would). The *materialized* result is never passed to {@link
- *   TsonCompiledRegistry#register} -- so every call for {@link BundledSchemaSource#META_KERNEL_ID}
- *   that isn't already a cache hit re-bootstraps, re-materializes, and re-compiles from scratch,
- *   every time -- only the
- *   *quality* of the one-off result changed (58 entries, matching a genuinely registered meta-kernel,
- *   not the raw 49), never its lifetime. Deliberately, not an oversight: the *permanent*, shared
- *   registry entry for meta-kernel is meant to come from an explicit, deliberate "load it (from disk,
- *   or eventually a real {@link TsonSchemaSource}) and register it" step done once, elsewhere -- not
- *   implicitly, silently, the first time anything happens to ask for meta-kernel's own {@code
- *   !!meta}/{@code !!import} target. Until that explicit step exists and runs, this one-off bootstrap
- *   is what stands in for it, every time, so nothing is ever left unable to resolve at all.
+ *   user's own explicit direction): {@link MetaKernelBootstrapResolver#getMetaKernelSchema()}'s own
+ *   output is linked via {@link TsonSchemaLinker#linkBootstrap} -- no registry involved at all, just
+ *   that one static call -- purely so {@code TsonSchemaLinker}'s own materialization/validation pass
+ *   runs (synthesizing entries for argument-bearing {@code type_ref}s, e.g. {@code enum}'s own
+ *   {@code members: set<token>}) before compiling ({@code TsonSchemaCompiler.compile}, using this
+ *   coordinator's own {@link io.ltr8.tson.parser.resolver.schema.compiled.TsonParserFactoryRegistry}
+ *   so it reads the same way anything else compiled here would). The *linked* result is never passed
+ *   to {@link TsonCompiledRegistry#register} -- so every call for {@link
+ *   BundledSchemaSource#META_KERNEL_ID} that isn't already a cache hit re-bootstraps, re-links, and
+ *   re-compiles from scratch, every time -- only the *quality* of the one-off result changed (58
+ *   entries, matching a genuinely registered meta-kernel, not the raw 49), never its lifetime.
+ *   Deliberately, not an oversight: the *permanent*, shared registry entry for meta-kernel is meant
+ *   to come from an explicit, deliberate "load it (from disk, or eventually a real {@link
+ *   TsonSchemaSource}) and register it" step done once, elsewhere -- not implicitly, silently, the
+ *   first time anything happens to ask for meta-kernel's own {@code !!meta}/{@code !!import} target.
+ *   Until that explicit step exists and runs, this one-off bootstrap is what stands in for it, every
+ *   time, so nothing is ever left unable to resolve at all.
  *
- *   <p><b>One real, load-bearing consequence remains, even with materialization fixed.</b> Any
- *   *other* schema that {@code !!import}s meta-kernel (every real one does) will still fail its own
- *   registration with "{@code !!import '...' is not registered}" unless meta-kernel has *separately*
- *   been registered in the *shared* registry first: {@code TsonSchemaLinker}'s own import-merging
- *   (run inside {@code TsonSchemaRegistry#register}, a step distinct from {@code TsonSchemaResolver}'s own
+ *   <p><b>One real, load-bearing consequence remains, even with linking fixed.</b> Any *other* schema
+ *   that {@code !!import}s meta-kernel (every real one does) will still fail its own registration
+ *   with "{@code !!import '...' is not registered}" unless meta-kernel has *separately* been
+ *   registered in the *shared* registry first: {@code TsonSchemaLinker}'s own import-merging (run
+ *   inside {@code TsonSchemaRegistry#register}, a step distinct from {@code TsonSchemaResolver}'s own
  *   resolution-time import-merging above) resolves an import via {@code TsonSchemaRegistry}'s own
- *   registered-only {@code TsonSchemaLoader}, which knows nothing about this coordinator, its bootstrap
- *   case, or the throwaway registry used to materialize it. In practice this means a caller
- *   resolving anything beyond meta-kernel itself still needs to register meta-kernel explicitly
- *   first (e.g. {@code registry.register(registry.schemaRegistry().materializeBootstrap(
- *   MetaKernelBootstrapResolver.getMetaKernelSchema()))} -- {@code TsonSchemaRegistry#register} itself now refuses
- *   the raw, unmaterialized bootstrap form outright, see its own Javadoc) before asking this
- *   coordinator for anything that transitively imports it -- materializing the one-off bootstrap result fixes
- *   *reading* through it correctly, not the separate *import-merge* requirement.</li>
+ *   registered-only {@code TsonSchemaLoader}, which knows nothing about this coordinator or its
+ *   one-off bootstrap case. In practice this means a caller resolving anything beyond meta-kernel
+ *   itself still needs to register meta-kernel explicitly first -- resolved *ordinarily* via {@code
+ *   TsonSchemaResolver.resolveAll} against a coordinator whose own bootstrap branch supplies the
+ *   structure namespace (never the raw/one-off linked bootstrap form directly -- {@code
+ *   TsonSchemaRegistry#register} refuses any self-referential schema with {@code bootstrap() ==
+ *   true}, see its own Javadoc) -- before asking this coordinator for anything that transitively
+ *   imports it. Linking the one-off bootstrap result fixes *reading* through it correctly, not the
+ *   separate *import-merge* requirement.</li>
  *   <li><b>Otherwise</b>, fetch {@code uri}'s own source text via this coordinator's own {@link
  *   TsonSchemaSource} (default: {@link TsonSchemaSource#registeredOnly()}, so nothing is fetched from
  *   anywhere unless a caller opts in), parse it, resolve it via a fresh {@code TsonSchemaResolver}
@@ -96,15 +96,13 @@ public final class DefaultSchemaCoordinator implements SchemaCoordinator {
         }
         if (BundledSchemaSource.META_KERNEL_ID.equals(uri)) {
             TsonSchema metaKernel = MetaKernelBootstrapResolver.getMetaKernelSchema();
-            // A fresh, throwaway TsonSchemaRegistry -- never the shared one this coordinator wraps --
-            // purely so TsonSchemaLinker's own materialization pass runs (synthesizing entries for
-            // argument-bearing type-refs like enum's own `members: set<token>`) before compiling.
-            // linkBootstrap (not register -- TsonSchemaRegistry now refuses a linked bootstrap schema
-            // outright, always) doesn't persist anything either, so this is still discarded
-            // immediately after: every call still re-bootstraps and re-links from scratch, exactly
-            // as before -- only the *quality* of the one-off result changes (58 entries, not 49),
-            // not its lifetime.
-            TsonLinkedSchema linked = new TsonSchemaRegistry().linkBootstrap(metaKernel);
+            // TsonSchemaLinker.linkBootstrap runs its own materialization pass (synthesizing entries
+            // for argument-bearing type-refs like enum's own `members: set<token>`) before compiling,
+            // but persists nothing (not register -- TsonSchemaRegistry refuses a linked bootstrap
+            // schema outright, always), so this is discarded immediately after: every call still
+            // re-bootstraps and re-links from scratch, every time -- only the *quality* of the
+            // one-off result changes (58 entries, not 49), not its lifetime.
+            TsonLinkedSchema linked = TsonSchemaLinker.linkBootstrap(metaKernel);
             return TsonSchemaCompiler.compile(linked.schema(), registry.factories());
         }
         String sourceText = source.fetch(uri);

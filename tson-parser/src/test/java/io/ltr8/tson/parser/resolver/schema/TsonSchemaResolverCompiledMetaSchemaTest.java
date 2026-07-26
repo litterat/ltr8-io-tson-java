@@ -10,6 +10,7 @@ import io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledRegistry;
 import io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledSchema;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.TsonSchemaLinker;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -63,7 +64,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
      */
     private static DefaultSchemaCoordinator loadMetaKernelAndMeta() {
         TsonSchema metaKernelBootstrap = MetaKernelBootstrapResolver.getMetaKernelSchema();
-        TsonLinkedSchema materializedMetaKernelBootstrap = new TsonSchemaRegistry().linkBootstrap(metaKernelBootstrap);
+        TsonLinkedSchema materializedMetaKernelBootstrap = TsonSchemaLinker.linkBootstrap(metaKernelBootstrap);
         DataBindContext context = TsonAtomContext.defaultContext();
         TsonParserFactoryRegistry objectFactories = TsonParserFactoryRegistry.object(materializedMetaKernelBootstrap.schema(), context);
 
@@ -91,7 +92,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
      */
     private static TsonSchema resolveMetaKernelOrdinarily() {
         TsonSchema metaKernelBootstrap = MetaKernelBootstrapResolver.getMetaKernelSchema();
-        TsonLinkedSchema materializedMetaKernelBootstrap = new TsonSchemaRegistry().linkBootstrap(metaKernelBootstrap);
+        TsonLinkedSchema materializedMetaKernelBootstrap = TsonSchemaLinker.linkBootstrap(metaKernelBootstrap);
         DataBindContext context = TsonAtomContext.defaultContext();
         TsonParserFactoryRegistry objectFactories = TsonParserFactoryRegistry.object(materializedMetaKernelBootstrap.schema(), context);
         TsonCompiledRegistry throwawayRegistry = new TsonCompiledRegistry(objectFactories);
@@ -362,12 +363,11 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         TsonCompiledSchema compiled = coordinator.resolve(BundledSchemaSource.META_KERNEL_ID);
 
         // 58, matching a genuinely registered meta-kernel: the one-off bootstrap runs
-        // MetaKernelBootstrapResolver's own raw output through a fresh, throwaway TsonSchemaRegistry (discarded
-        // immediately after, never the shared registry this coordinator wraps) purely so
-        // SchemaValidator's own materialization step -- which synthesizes 9 extra entries for
-        // argument-bearing type-refs, e.g. enum's own "members: set<token>" -- runs before
-        // compiling. Never cached (see the next test) -- only the *quality* of the one-off result
-        // changed, not its lifetime.
+        // MetaKernelBootstrapResolver's own raw output through TsonSchemaLinker.linkBootstrap (no
+        // registry involved at all) purely so TsonSchemaLinker's own materialization step -- which
+        // synthesizes 9 extra entries for argument-bearing type-refs, e.g. enum's own "members:
+        // set<token>" -- runs before compiling. Never cached (see the next test) -- only the
+        // *quality* of the one-off result changed, not its lifetime.
         assertEquals(58, compiled.schema().entries().size());
         assertEquals(java.util.Map.of(), compiled.get("top").read(new TsonDataParser("{}").parseDocument().root()));
     }
@@ -415,7 +415,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         // this explicit step, registering meta.tn1 would fail validation with "!!import '...' is
         // not registered" even though resolution itself succeeded.
         TsonSchema metaKernelBootstrap = MetaKernelBootstrapResolver.getMetaKernelSchema();
-        TsonLinkedSchema materializedMetaKernelBootstrap = new TsonSchemaRegistry().linkBootstrap(metaKernelBootstrap);
+        TsonLinkedSchema materializedMetaKernelBootstrap = TsonSchemaLinker.linkBootstrap(metaKernelBootstrap);
         TsonParserFactoryRegistry objectFactories =
                 TsonParserFactoryRegistry.object(materializedMetaKernelBootstrap.schema(), TsonAtomContext.defaultContext());
         TsonCompiledRegistry registry = new TsonCompiledRegistry(objectFactories);

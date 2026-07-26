@@ -1133,18 +1133,29 @@ deliberate, confirmed tradeoff rather than adding a module descriptor now.
   `merged`-only (type-name namespace, imports + locals), per §3.3.2. `!!meta` itself never merges
   anything into a schema's own returned `entries()` — that stays exactly what `!!import` produces,
   unchanged.
+- **`TsonSchemaLinker.linkBootstrap(TsonSchema)`** — the one sanctioned way to turn meta-kernel's raw
+  bootstrap output into a `TsonLinkedSchema` without registering it, needed so a caller (e.g.
+  building an object-binding-mode `TsonParserFactoryRegistry`) can get a genuinely linked result to
+  validate against, without the registry's own self-referential-bootstrap guard getting in the way.
+  Moved here from `TsonSchemaRegistry` (2026-07-27, on the user's own observation that it belonged
+  with the verb it performs, not with a registry it deliberately never stores its own result in) —
+  **takes no `TsonSchemaLoader`**, unlike `link` itself, since meta-kernel's own document (the only
+  real caller) never has any `!!import`s — it's the base of the whole governing chain — so `link`'s
+  own `loader == null` handling (an empty structure namespace) is already exactly right, and
+  `mergeImports` is never reached for an empty `imports()` list regardless. `TsonSchemaRegistry
+  #register` still refuses the result outright, since it's still `bootstrap() == true` — the one way
+  meta-kernel's own identity ever actually gets registered is resolving its document a second time,
+  ordinarily (never setting `bootstrap`), against a coordinator seeded from the one-off linked
+  bootstrap result (see "Meta-kernel bootstrap" below).
 - **`TsonSchemaRegistry`** — `register(TsonLinkedSchema)` computes the canonical identity from the
   wrapped schema's own `!!id` (throwing if absent), rejects the self-referential-bootstrap case
   above, rejects a duplicate identity outright (no overwrite — together with `TsonSchema.entries()`
   already being an unmodifiable map, this rejection *is* the "locked, no mutations allowed"
   guarantee), and stores the result. `get(String uri)` takes a *raw* URI and canonicalizes
-  internally — callers never need to call `CanonicalIdentity` themselves for either method.
-  `linkBootstrap(TsonSchema)` is the one sanctioned way to turn meta-kernel's raw bootstrap output
-  into a `TsonLinkedSchema` (via `TsonSchemaLinker.link`) without registering it — needed so a caller
-  (e.g. building an object-binding-mode `TsonParserFactoryRegistry`) can get a genuinely linked
-  result to validate against, without the self-referential-bootstrap guard getting in the way;
-  `register` still refuses the result of `linkBootstrap` itself, since it's still `bootstrap() ==
-  true` — the one way meta-kernel's own identity ever actually gets registered is resolving its
+  internally — callers never need to call `CanonicalIdentity` themselves for either method. A pure
+  store now — no linking convenience method of its own; see `TsonSchemaLinker.linkBootstrap` above
+  for meta-kernel's own one-off case, which `register` still refuses regardless (still `bootstrap()
+  == true`) — the one way meta-kernel's own identity ever actually gets registered is resolving its
   document a second time, ordinarily (never setting `bootstrap`), against a coordinator seeded from
   the one-off linked bootstrap result (see "Meta-kernel bootstrap" below).
 
@@ -1226,8 +1237,8 @@ registering/compiling on demand rather than requiring everything to pre-exist.
   (`BundledSchemaSource.META_KERNEL_ID` — moved here from `DefaultSchemaCoordinator` itself
   2026-07-26, so `BundledSchemaSource`, not the coordinator, owns "what URI does each of this
   library's own bundled schemas live at")? Resolved via `MetaKernelBootstrapResolver.getMetaKernelSchema()`,
-  linked one-off via a fresh, throwaway `TsonSchemaRegistry#linkBootstrap` (never the shared registry
-  this coordinator wraps), then compiled directly — *never* through this same coordinator's own
+  linked one-off via `TsonSchemaLinker#linkBootstrap` (no registry involved at all), then compiled
+  directly — *never* through this same coordinator's own
   generic path in case (3), which would recurse forever (that path builds a `TsonSchemaResolver(this)`
   and resolves a document via `resolveAll`, which itself calls back into `resolve` for *that*
   document's own `!!meta` target — fine for any real schema, wrong for meta-kernel specifically,
@@ -1357,7 +1368,7 @@ own compiled reader now does:
 ```java
 TsonSchema metaKernel = MetaKernelBootstrapResolver.getMetaKernelSchema();
 TsonSchemaRegistry schemaRegistry = new TsonSchemaRegistry();
-TsonLinkedSchema linkedMetaKernel = schemaRegistry.linkBootstrap(metaKernel);
+TsonLinkedSchema linkedMetaKernel = TsonSchemaLinker.linkBootstrap(metaKernel);
 TsonParserFactoryRegistry factories = TsonParserFactoryRegistry.object(linkedMetaKernel.schema(), context);
 TsonCompiledRegistry registry = new TsonCompiledRegistry(schemaRegistry, factories);
 DefaultSchemaCoordinator coordinator = new DefaultSchemaCoordinator(registry, BundledSchemaSource.INSTANCE);

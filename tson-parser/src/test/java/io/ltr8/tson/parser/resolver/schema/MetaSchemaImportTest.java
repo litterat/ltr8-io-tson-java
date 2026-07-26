@@ -71,7 +71,7 @@ class MetaSchemaImportTest {
      */
     private static TsonSchema parseMetaTn1(TsonSchemaRegistry registry) {
         TsonSchema metaKernelBootstrap = MetaKernelBootstrapResolver.getMetaKernelSchema();
-        TsonLinkedSchema materializedMetaKernelBootstrap = registry.linkBootstrap(metaKernelBootstrap);
+        TsonLinkedSchema materializedMetaKernelBootstrap = TsonSchemaLinker.linkBootstrap(metaKernelBootstrap);
 
         DataBindContext context = TsonAtomContext.defaultContext();
         TsonParserFactoryRegistry objectFactories = TsonParserFactoryRegistry.object(materializedMetaKernelBootstrap.schema(), context);

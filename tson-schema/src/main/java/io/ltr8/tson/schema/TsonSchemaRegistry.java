@@ -1,7 +1,6 @@
 package io.ltr8.tson.schema;
 
 import io.ltr8.tson.schema.registry.CanonicalIdentity;
-import io.ltr8.tson.schema.TsonSchemaLinker;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -41,13 +40,14 @@ import java.util.Optional;
  * have that shape. {@code bootstrap()} is a real, stored flag that only {@code
  * MetaKernelBootstrapResolver.getMetaKernelSchema()} ever sets, so this guard keeps proving, continuously,
  * that meta-kernel's own identity can only ever be registered by something that genuinely came
- * from the real bootstrap reader -- not just something shaped like it. {@link #linkBootstrap} is
- * the one sanctioned way to turn the raw bootstrap form into a {@link TsonLinkedSchema} without
- * this rejection -- a caller that also needs it *persisted* under its own identity still can't
- * register that result directly (it's still {@code bootstrap() == true}); the one way meta-kernel's
- * own identity can actually be registered is resolving its document a second time, ordinarily
- * (never setting {@code bootstrap}), against a coordinator seeded from the one-off linked
- * bootstrap result.
+ * from the real bootstrap reader -- not just something shaped like it. {@link
+ * TsonSchemaLinker#linkBootstrap} is the one sanctioned way to turn the raw bootstrap form into a
+ * {@link TsonLinkedSchema} without this rejection -- moved there from this class (2026-07-27), since
+ * it's a linking operation, not a storage one, and this registry never stores its own result anyway
+ * (a caller that also needs it *persisted* under its own identity still can't register that result
+ * directly -- it's still {@code bootstrap() == true}); the one way meta-kernel's own identity can
+ * actually be registered is resolving its document a second time, ordinarily (never setting {@code
+ * bootstrap}), against a coordinator seeded from the one-off linked bootstrap result.
  */
 public final class TsonSchemaRegistry implements TsonSchemaLoader {
 
@@ -87,32 +87,6 @@ public final class TsonSchemaRegistry implements TsonSchemaLoader {
     /** Part 2 §1.5's "one deliberate circularity": a schema whose own {@code !!meta} names its own {@code !!id}. */
     private static boolean selfReferential(TsonSchema schema) {
         return schema.id().equals(schema.meta());
-    }
-
-    /**
-     * Links {@code bootstrap} -- meta-kernel's own raw, pre-loaded bootstrap output (see {@link
-     * TsonSchema#bootstrap()}'s own Javadoc for why it can't be resolved the ordinary way) -- via
-     * {@link TsonSchemaLinker#link}, but does <b>not</b> store the result under a persistent identity
-     * in this registry, and {@link #register} refuses it outright regardless (see this class's own
-     * Javadoc). Exists purely so a caller (e.g. building an object-binding-mode {@code
-     * TsonParserFactoryRegistry}, which needs a genuinely linked {@code TsonSchema} to validate against
-     * up front) can get a usable result straight from the raw bootstrap object, without separately
-     * wiring a {@link TsonSchemaLoader}.
-     *
-     * @throws TsonSchemaValidationException if {@code bootstrap.bootstrap()} is {@code false} -- this
-     *                                    method exists specifically for the one self-referential
-     *                                    schema, not as a general "link without registering" escape
-     *                                    hatch for ordinary schemas (call {@link TsonSchemaLinker#link}
-     *                                    directly for that)
-     */
-    public synchronized TsonLinkedSchema linkBootstrap(TsonSchema bootstrap) {
-        if (!bootstrap.bootstrap()) {
-            throw new TsonSchemaValidationException("'" + bootstrap.id() + "' was not produced by the real "
-                    + "bootstrap reader (MetaKernelBootstrapResolver.getMetaKernelSchema()) -- "
-                    + "TsonSchemaRegistry.linkBootstrap exists specifically for that case; call "
-                    + "TsonSchemaLinker.link directly for an ordinary schema instead");
-        }
-        return TsonSchemaLinker.link(bootstrap, loader);
     }
 
     @Override

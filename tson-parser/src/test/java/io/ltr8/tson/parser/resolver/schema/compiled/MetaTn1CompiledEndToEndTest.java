@@ -37,7 +37,7 @@ class MetaTn1CompiledEndToEndTest {
     private static TsonSchema registerMeta() {
         TsonSchema metaKernelBootstrap = MetaKernelBootstrapResolver.getMetaKernelSchema();
         TsonSchemaRegistry registry = new TsonSchemaRegistry();
-        TsonLinkedSchema materializedMetaKernelBootstrap = registry.linkBootstrap(metaKernelBootstrap);
+        TsonLinkedSchema materializedMetaKernelBootstrap = TsonSchemaLinker.linkBootstrap(metaKernelBootstrap);
 
         DataBindContext context = TsonAtomContext.defaultContext();
         TsonParserFactoryRegistry objectFactories = TsonParserFactoryRegistry.object(materializedMetaKernelBootstrap.schema(), context);

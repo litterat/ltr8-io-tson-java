@@ -1252,15 +1252,15 @@ class TsonSchemaResolverTest {
     }
 
     /**
-     * Meta-kernel, *materialized* (a throwaway {@code TsonSchemaRegistry}, purely so object mode's own
+     * Meta-kernel, *linked* (via {@link TsonSchemaLinker#linkBootstrap}, purely so object mode's own
      * {@code TsonParserFactoryRegistry} has a real, synthesized-entries-included schema to validate
-     * against -- an unmaterialized meta-kernel would resolve {@code enum}'s own {@code members:
+     * against -- an unlinked meta-kernel would resolve {@code enum}'s own {@code members:
      * set<token>} field to the raw, wrong {@code set} declaration instead of a synthesized "array of
      * token" entry, the same bug {@code DefaultSchemaCoordinator}'s own bootstrap had), then compiled.
      */
     private static TsonCompiledSchema metaKernelCompiled() {
         TsonSchema metaKernel = MetaKernelBootstrapResolver.getMetaKernelSchema();
-        TsonLinkedSchema linked = new io.ltr8.tson.schema.TsonSchemaRegistry().linkBootstrap(metaKernel);
+        TsonLinkedSchema linked = TsonSchemaLinker.linkBootstrap(metaKernel);
         return compileAsMetaParser(linked.schema().entries());
     }
 
@@ -1281,7 +1281,7 @@ class TsonSchemaResolverTest {
     private static TsonCompiledSchema metaTn1Compiled() throws IOException {
         TsonSchema metaKernelBootstrap = MetaKernelBootstrapResolver.getMetaKernelSchema();
         io.ltr8.tson.schema.TsonSchemaRegistry registry = new io.ltr8.tson.schema.TsonSchemaRegistry();
-        TsonLinkedSchema materializedMetaKernelBootstrap = registry.linkBootstrap(metaKernelBootstrap);
+        TsonLinkedSchema materializedMetaKernelBootstrap = TsonSchemaLinker.linkBootstrap(metaKernelBootstrap);
         DataBindContext context = TsonAtomContext.defaultContext();
         TsonParserFactoryRegistry objectFactories = TsonParserFactoryRegistry.object(materializedMetaKernelBootstrap.schema(), context);
         TsonCompiledRegistry throwawayRegistry = new TsonCompiledRegistry(objectFactories);

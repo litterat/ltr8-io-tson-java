@@ -121,6 +121,45 @@ public final class TsonSchemaLinker {
     private TsonSchemaLinker() {
     }
 
+    /**
+     * Links {@code bootstrap} -- meta-kernel's own raw, pre-loaded bootstrap output (see {@link
+     * TsonSchema#bootstrap()}'s own Javadoc for why it can't be resolved the ordinary way). Moved
+     * here from {@link TsonSchemaRegistry} (2026-07-27) once that class became a pure store again --
+     * this method belongs with the verb it performs, not with a registry it deliberately never
+     * stores its own result in (see below).
+     *
+     * <p>Takes no {@link TsonSchemaLoader} -- unlike {@link #link}, which always needs one for
+     * {@code !!import}/{@code !!meta} lookups -- because meta-kernel's own document, the only real
+     * caller of this method, never has any {@code !!import}s: it's the base of the whole governing
+     * chain, nothing above it to import from. {@link #link}'s own {@code loader == null} handling
+     * (an empty structure namespace) already covers the one lookup {@link #link} might otherwise
+     * attempt, and {@link #mergeImports} is only ever reached for a non-empty {@code imports()}
+     * list, which meta-kernel's own document never has -- so passing {@code null} through is safe
+     * for this specific, guaranteed-narrow case, not a general shortcut.
+     *
+     * <p>Does <b>not</b> store the result under a persistent identity anywhere, and {@code
+     * TsonSchemaRegistry#register} refuses it outright regardless (see that class's own Javadoc).
+     * Exists purely so a caller (e.g. building an object-binding-mode {@code
+     * TsonParserFactoryRegistry}, which needs a genuinely linked {@code TsonSchema} to validate
+     * against up front) can get a usable result straight from the raw bootstrap object, without
+     * separately wiring a {@link TsonSchemaLoader} or a registry at all.
+     *
+     * @throws TsonSchemaValidationException if {@code bootstrap.bootstrap()} is {@code false} -- this
+     *                                        method exists specifically for the one self-referential
+     *                                        schema, not as a general "link without registering"
+     *                                        escape hatch for ordinary schemas (call {@link #link}
+     *                                        directly for that)
+     */
+    public static TsonLinkedSchema linkBootstrap(TsonSchema bootstrap) {
+        if (!bootstrap.bootstrap()) {
+            throw new TsonSchemaValidationException("'" + bootstrap.id() + "' was not produced by the real "
+                    + "bootstrap reader (MetaKernelBootstrapResolver.getMetaKernelSchema()) -- "
+                    + "TsonSchemaLinker.linkBootstrap exists specifically for that case; call "
+                    + "link directly for an ordinary schema instead");
+        }
+        return link(bootstrap, null);
+    }
+
     public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader) {
         Map<String, TypeDefinition> merged = mergeImports(schema.imports(), loader);
 

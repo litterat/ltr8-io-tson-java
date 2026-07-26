@@ -32,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * MetaKernelBootstrapResolver} and {@code tson-schema} available (that module has no dependency on {@code
  * tson-parser} at all).
  *
- * <p>Uses {@link TsonSchemaRegistry#linkBootstrap}, not {@link TsonSchemaLinker#link} directly, to turn
+ * <p>Uses {@link TsonSchemaLinker#linkBootstrap}, not {@link TsonSchemaLinker#link} directly, to turn
  * the raw bootstrap output into a usable {@link TsonLinkedSchema} -- {@code register} refuses
  * <i>any</i> self-referential {@link TsonLinkedSchema} whose {@code schema().bootstrap() ==
  * true}, no matter how it got linked (tightened 2026-07-27, on the user's own explicit direction,
@@ -50,9 +50,8 @@ class MetaKernelSchemaRegistryTest {
     @Test
     void linksTheRealMetaKernelSchemaSynthesizingEveryGenericFieldTypeRef() {
         TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
-        TsonSchemaRegistry registry = new TsonSchemaRegistry();
 
-        TsonLinkedSchema linked = registry.linkBootstrap(raw);
+        TsonLinkedSchema linked = TsonSchemaLinker.linkBootstrap(raw);
 
         // 49 real declarations + one synthetic entry per distinct argument-bearing application:
         // enum's own `members: set<token>`, plus one `array<X>` per distinct X used through §5.3's
@@ -109,7 +108,7 @@ class MetaKernelSchemaRegistryTest {
     void neitherRawNorLinkedBootstrapFormCanEverBeRegistered() {
         TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
         TsonSchemaRegistry registry = new TsonSchemaRegistry();
-        TsonLinkedSchema linked = registry.linkBootstrap(raw);
+        TsonLinkedSchema linked = TsonSchemaLinker.linkBootstrap(raw);
 
         assertTrue(raw.bootstrap());
         assertTrue(linked.schema().bootstrap());
@@ -136,7 +135,7 @@ class MetaKernelSchemaRegistryTest {
     void registeringTheOrdinarilyResolvedNonBootstrapMetaKernelSucceeds() {
         TsonSchema metaKernelBootstrap = MetaKernelBootstrapResolver.getMetaKernelSchema();
         TsonSchemaRegistry registry = new TsonSchemaRegistry();
-        TsonLinkedSchema linkedBootstrap = registry.linkBootstrap(metaKernelBootstrap);
+        TsonLinkedSchema linkedBootstrap = TsonSchemaLinker.linkBootstrap(metaKernelBootstrap);
 
         DataBindContext context = TsonAtomContext.defaultContext();
         TsonParserFactoryRegistry objectFactories = TsonParserFactoryRegistry.object(linkedBootstrap.schema(), context);
