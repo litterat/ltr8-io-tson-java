@@ -1,7 +1,6 @@
 package io.ltr8.tson.parser.resolver.schema.compiled;
 
 import io.ltr8.annotation.Typename;
-import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -69,11 +68,15 @@ public final class TsonParserFactoryRegistry {
      * *except* `boolean` itself ({@link AtomTypeParser#ENUM_OBJECT_MODE}'s own Javadoc) -- DOM mode
      * has no target Java type to reconcile `"true"`/`"false"` against, so it keeps producing
      * {@code String} uniformly ({@link AtomTypeParser#ENUM}); only object mode needs the name-keyed
-     * branch. Shared between {@link #dom()} and {@link #object(TsonSchema, DataBindContext)} so this
-     * ~13-entry list isn't duplicated between them; each caller appends its own `"record"`/`"enum"`
-     * registrations on top.
+     * branch.
+     *
+     * <p>{@code public}, unlike the rest of this class's own internal assembly, specifically so
+     * {@code io.ltr8.tson.parser.bind} (object-binding mode, moved out of this package 2026-07-27)
+     * can build its own registry from the identical composite/atom-family baseline {@link #dom()}
+     * uses, without this package needing any awareness object-binding mode exists at all. Each
+     * caller appends its own `"record"`/`"enum"` registrations on top.
      */
-    private static Builder withoutRecord() {
+    public static Builder withoutRecordOrEnum() {
         return builder()
                 .register("array", ArrayParser.FACTORY)
                 .register("map", MapParser.FACTORY)
@@ -98,47 +101,20 @@ public final class TsonParserFactoryRegistry {
     /**
      * Every DOM-mode factory this build of the library actually has -- `record` producing a plain
      * {@code Map<String, Object>}, same as every other composite/atom-family factory {@link
-     * #withoutRecord()} shares with {@link #object}. Previously hand-duplicated as a private
+     * #withoutRecordOrEnum()} provides. Previously hand-duplicated as a private
      * {@code fullRegistry()} helper in several test classes (`MetaKernelEndToEndTest`, {@code
      * SchemaValidatingParserTest}, ...) and, as of {@code TsonCompiledRegistry}, real production code too --
      * factored out here once a fourth/fifth copy made the duplication worth closing. Not the *only*
      * legitimate registry a caller might build (a caller reading only a narrow slice of a schema can
      * still assemble a smaller one directly via {@link #builder}), just the canonical "everything
-     * this build knows how to construct in DOM mode" one.
+     * this build knows how to construct in DOM mode" one. Object-binding mode's own equivalent lives
+     * in {@code io.ltr8.tson.parser.bind} (moved out of this class 2026-07-27) -- this class has no
+     * dependency on it, and no awareness it exists.
      */
     public static TsonParserFactoryRegistry dom() {
-        return withoutRecord()
+        return withoutRecordOrEnum()
                 .register("record", RecordParser.FACTORY)
                 .register("enum", AtomTypeParser.ENUM)
-                .build();
-    }
-
-    /**
-     * Object-binding mode: `record` produces a real, bound {@code schema.meta} Java object (via
-     * {@link ObjectRecordShapeFactory}) instead of DOM mode's {@code Map<String, Object>} -- every
-     * other factory is identical to {@link #dom()} (see {@link #withoutRecord()}), since Array/Map/
-     * Tuple/Choice/Variant/atom-family parsers already produce mode-correct nested content purely by
-     * recursing into whichever child parser this same registry resolves.
-     *
-     * <p>Takes {@code schema} itself (unlike {@link #dom()}), not just a {@link DataBindContext} --
-     * needed so {@link ObjectRecordShapeFactory#validate} can eagerly resolve and validate a Java
-     * class for every {@code record}-shaped entry the schema actually declares, up front, rather
-     * than discovering a missing binding lazily, one entry at a time, only once something happens to
-     * read it. Uses {@link SchemaMetaTypeNameBinder}, the default {@code io.ltr8.tson.schema.meta}
-     * binder -- see {@link #object(TsonSchema, DataBindContext, TsonTypeNameBinder)} to supply a
-     * different one (e.g. for a schema binding to a caller's own Java library instead).
-     */
-    public static TsonParserFactoryRegistry object(TsonSchema schema, DataBindContext context) {
-        return object(schema, context, SchemaMetaTypeNameBinder.INSTANCE);
-    }
-
-    /** As {@link #object(TsonSchema, DataBindContext)}, with an explicit {@link TsonTypeNameBinder} rather than the {@code schema.meta} default. */
-    public static TsonParserFactoryRegistry object(TsonSchema schema, DataBindContext context, TsonTypeNameBinder binder) {
-        ObjectRecordShapeFactory shapeFactory = new ObjectRecordShapeFactory(context, binder);
-        shapeFactory.validate(schema);
-        return withoutRecord()
-                .register("record", RecordParser.factory(shapeFactory))
-                .register("enum", AtomTypeParser.ENUM_OBJECT_MODE)
                 .build();
     }
 

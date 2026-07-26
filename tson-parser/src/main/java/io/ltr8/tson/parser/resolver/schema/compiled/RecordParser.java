@@ -54,7 +54,7 @@ import java.util.Optional;
  * already-materialized {@link io.ltr8.tson.schema.TsonSchema}, per {@link CompilationContext}'s own
  * Javadoc.
  */
-final class RecordParser<R> implements TsonSchemaTypeParser<R> {
+public final class RecordParser<R> implements TsonSchemaTypeParser<R> {
 
     /**
      * How {@link RecordParser} turns one record value's own field values into a result -- resolved
@@ -64,8 +64,10 @@ final class RecordParser<R> implements TsonSchemaTypeParser<R> {
      * just as cheap to build lazily), but an object-binding mode's shape holds an already-resolved
      * constructor/field descriptor (reflection paid once, not once per read) and {@link #begin()}
      * just opens a fresh accumulator against it. Nested here, not a standalone top-level type --
-     * nothing outside this package's own object-binding mode ({@code ObjectRecordShapeFactory})
-     * implements or consumes it.
+     * the only implementation outside this package is object-binding mode's own {@code
+     * ObjectRecordShapeFactory} (in {@code io.ltr8.tson.parser.bind}), which is exactly why {@link
+     * RecordParser} itself, and {@link #factory}, are {@code public} despite being otherwise pure
+     * internal machinery -- see {@link #factory}'s own Javadoc.
      */
     public interface RecordShape<R> {
 
@@ -110,8 +112,13 @@ final class RecordParser<R> implements TsonSchemaTypeParser<R> {
      * via {@code shapeFactory} -- {@link RecordShapeFactory#shapeFor} runs exactly once here, at
      * compile time (the same point child fields are resolved via {@code ctx.resolve}), not once
      * per read; see {@link RecordShape}'s own Javadoc for why that matters.
+     *
+     * <p>{@code public}, unlike the rest of this package's own internal machinery, specifically so
+     * {@code io.ltr8.tson.parser.bind} (object-binding mode, moved out of this package 2026-07-27)
+     * can build its own {@code "record"} factory entry from its own {@code RecordShapeFactory}
+     * implementation without this package needing any awareness that caller exists.
      */
-    static TsonParserFactory factory(RecordShapeFactory<?> shapeFactory) {
+    public static TsonParserFactory factory(RecordShapeFactory<?> shapeFactory) {
         return (name, definition, ctx) -> {
             RecordBody body = (RecordBody) definition.body();
             List<CompiledField> fields = new ArrayList<>();

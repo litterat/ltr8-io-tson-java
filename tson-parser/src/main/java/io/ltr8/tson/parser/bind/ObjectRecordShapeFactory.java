@@ -1,4 +1,4 @@
-package io.ltr8.tson.parser.resolver.schema.compiled;
+package io.ltr8.tson.parser.bind;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
@@ -31,7 +31,7 @@ import java.util.Map;
  * ObjectRecordBuilder#narrow}).
  *
  * <p><b>Binding happens eagerly, at {@link #validate}, not lazily per read.</b> {@link
- * TsonParserFactoryRegistry#object} calls it once, up front, walking every {@code record}-shaped entry
+ * TsonObjectBinding#factoryRegistry} calls it once, up front, walking every {@code record}-shaped entry
  * in the whole schema and resolving+validating a {@link DataClassRecord} descriptor for each --
  * both "does {@code binder} know a matching class" and "can {@code tson-bind} actually build a
  * descriptor for it" (e.g. the {@code @Record}-on-canonical-constructor gotcha documented elsewhere
@@ -70,7 +70,7 @@ public final class ObjectRecordShapeFactory implements RecordShapeFactory<Object
      * Walks every {@code record}-shaped entry in {@code schema} (i.e. every entry whose {@link
      * TypeDefinition#body()} is a {@link RecordBody} -- the ones that would actually reach {@link
      * #shapeFor} once compiled), resolving and caching a {@link DataClassRecord} for each. Must run
-     * before this factory compiles anything (see {@link TsonParserFactoryRegistry#object}) -- {@link
+     * before this factory compiles anything (see {@link TsonObjectBinding#factoryRegistry}) -- {@link
      * #shapeFor} only ever consults this cache, never {@code binder} directly, so an entry this
      * method didn't already validate can't silently slip through later.
      *
@@ -119,7 +119,7 @@ public final class ObjectRecordShapeFactory implements RecordShapeFactory<Object
         if (descriptor == null) {
             throw new IllegalStateException("'" + typeName + "' was never validated -- call "
                     + "ObjectRecordShapeFactory.validate(TsonSchema) with the governing schema before "
-                    + "compiling against it (see TsonParserFactoryRegistry#object)");
+                    + "compiling against it (see TsonObjectBinding#factoryRegistry)");
         }
         return () -> new ObjectRecordBuilder(descriptor);
     }
@@ -171,7 +171,7 @@ public final class ObjectRecordShapeFactory implements RecordShapeFactory<Object
          * io.ltr8.tson.schema.meta.FloatType.Format}, {@link
          * io.ltr8.tson.schema.meta.BinaryType.Encoding} -- every schema-side member name matches its
          * Java constant's name exactly, confirmed against the real fixture, not assumed) -- the same
-         * schema-driven-vs-reflection-driven gap {@link BooleanParser}'s own Javadoc documents for
+         * schema-driven-vs-reflection-driven gap {@code BooleanParser}'s own Javadoc documents for
          * {@code boolean}, just resolved generically here instead of via a second name-keyed factory,
          * since {@code AtomTypeParser}'s own dispatch has no visibility into a record's *own* field
          * types the way this builder already does. A schema {@code uri}-typed field (e.g. {@code

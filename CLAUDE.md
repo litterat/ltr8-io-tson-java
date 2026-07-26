@@ -1369,7 +1369,7 @@ own compiled reader now does:
 TsonSchema metaKernel = MetaKernelBootstrapResolver.getMetaKernelSchema();
 TsonSchemaRegistry schemaRegistry = new TsonSchemaRegistry();
 TsonLinkedSchema linkedMetaKernel = TsonSchemaLinker.linkBootstrap(metaKernel);
-TsonParserFactoryRegistry factories = TsonParserFactoryRegistry.object(linkedMetaKernel.schema(), context);
+TsonParserFactoryRegistry factories = TsonObjectBinding.factoryRegistry(linkedMetaKernel.schema(), context);
 TsonCompiledRegistry registry = new TsonCompiledRegistry(schemaRegistry, factories);
 DefaultSchemaCoordinator coordinator = new DefaultSchemaCoordinator(registry, BundledSchemaSource.INSTANCE);
 
@@ -1394,7 +1394,7 @@ here anyway so this class is a complete, uniform "fetch any of this library's ow
 documents" utility on its own terms, and safe for any *other* `SchemaCoordinator` implementation that
 doesn't special-case meta-kernel the way `DefaultSchemaCoordinator` does.
 
-### Object-binding mode (`resolver/schema/compiled/{RecordParser,ObjectRecordShapeFactory,TsonTypeNameBinder,SchemaMetaTypeNameBinder}.java`)
+### Object-binding mode (`resolver/schema/compiled/RecordParser.java` + `parser/bind/{TsonObjectBinding,ObjectRecordShapeFactory,TsonTypeNameBinder,SchemaMetaTypeNameBinder}.java`)
 
 Added 2026-07-25: a second output mode for the compiled reader, alongside DOM mode's plain
 `Map<String, Object>` — `RecordParser` can now instead produce a real, bound `schema.meta` Java
@@ -1402,6 +1402,35 @@ object (a real `IntegerType`, not a map of its field names). This is exactly wha
 `TsonSchemaResolver.bindAtomInstance` swap onto the compiled reader shortly afterward (2026-07-26 —
 "Schema resolution" above), retiring the `TsonMapperReader.toObject(normalized, Top.class)` path it
 used to bind through.
+
+**Moved into its own `io.ltr8.tson.parser.bind` package (2026-07-26, on the user's own explicit
+direction — "`TsonSchemaResolver` and `TsonSchemaCompiler` aren't anywhere near as clean [as
+`TsonSchemaLinker`/`TsonSchemaRegistry`/`TsonDataParser`/`TsonSchemaParser`]... move out the
+`TsonTypeNameBinder` code and anything related to binding to java classes").** `TsonTypeNameBinder`,
+`SchemaMetaTypeNameBinder`, and `ObjectRecordShapeFactory` all moved verbatim (package declaration
+only) from `resolver.schema.compiled` into the new package; the registry-assembly logic that used to
+live as `TsonParserFactoryRegistry.object(TsonSchema, DataBindContext[, TsonTypeNameBinder])` moved
+too, as a new standalone class, `TsonObjectBinding.factoryRegistry(...)` — not just the three binder
+classes, so the dependency between the two packages is genuinely **one-way**:
+`io.ltr8.tson.parser.bind` depends on `resolver.schema.compiled` (for `TsonParserFactoryRegistry`,
+`RecordParser.factory`, `AtomTypeParser.ENUM_OBJECT_MODE`), but `resolver.schema.compiled` has zero
+awareness of, or dependency on, `io.ltr8.tson.parser.bind` — the actual compiler-facing package
+never needs to know Java-object-binding exists at all, mirroring the reasoning that keeps `tson-bind`
+itself a leaf module (DOM mode never touches `DataClassRecord` reflection, so nothing about
+compiling a schema should require it either).
+
+**Cost of the one-way split: `RecordParser` and `AtomTypeParser` (plus two of their members) had to
+widen from package-private to `public`.** A real, non-obvious Java rule surfaced doing this: a
+`public` nested interface of a *non-public* outer class still isn't accessible from another
+package — the outer class itself has to be resolvable first. `RecordParser.RecordShapeFactory`/
+`RecordShape`/`RecordBuilder` were already `public interface`, but `RecordParser` itself was
+package-private `final class RecordParser<R>`, so none of it was actually reachable from
+`io.ltr8.tson.parser.bind` until `RecordParser` (class) and `RecordParser.factory(...)` (the one
+static method `ObjectRecordShapeFactory` needs to plug into) were both widened to `public` —
+likewise `AtomTypeParser` (class) and `AtomTypeParser.ENUM_OBJECT_MODE` (the one constant
+`TsonObjectBinding` needs). Both classes' Javadoc now says outright why they're `public` despite
+being otherwise pure internal machinery: "the only implementation/consumer outside this package is
+object-binding mode's own class, in `io.ltr8.tson.parser.bind`."
 
 - **`RecordParser.RecordShape<R>`/`RecordParser.RecordBuilder<R>`/`RecordParser.RecordShapeFactory<R>`**
   — public interfaces nested inside `RecordParser` itself, not standalone top-level types (nothing
@@ -1468,10 +1497,13 @@ used to bind through.
   `io.ltr8.tson.parser.resolver.NumberNarrowing`, the same utility `resolver.vocab`'s numeric family
   and `io.ltr8.tson.parser.mapper`'s untyped-number binding already share for exactly this, rather
   than a third copy.
-- **`TsonParserFactoryRegistry.object(TsonSchema, DataBindContext)`** (+ a `TsonTypeNameBinder`-taking
-  overload) is the sibling to `.dom()` — every other factory (array/map/tuple/choice + every
-  atom-family constant) is shared via a private `withoutRecord()` (extracted so the ~14-entry
-  list isn't duplicated), only `"record"`'s own factory differs.
+- **`TsonObjectBinding.factoryRegistry(TsonSchema, DataBindContext)`** (+ a `TsonTypeNameBinder`-taking
+  overload; `io.ltr8.tson.parser.bind`, not `resolver.schema.compiled` — see above) is the
+  object-binding-mode sibling to `TsonParserFactoryRegistry.dom()` — every other factory
+  (array/map/tuple/choice + every atom-family constant) is shared via `TsonParserFactoryRegistry`'s
+  own public `withoutRecordOrEnum()` (widened + renamed from a private `withoutRecord()` for exactly
+  this cross-package reuse — `"enum"` also differs between the two modes, not just `"record"`, so the
+  shared base excludes both), only `"record"`/`"enum"`'s own factories differ.
 - **`TsonAtomContext`** (new, `io.ltr8.tson.parser.resolver`) — `TsonMapperContext.defaultContext()`'s
   own built-in-vocabulary atom registrations (`UUID`/`byte[]`/`LocalDate`/`OffsetTime`/
   `OffsetDateTime`/`URI`/`Inet4Address`/`Inet6Address`), pulled out to a public class at this shared

@@ -1,4 +1,4 @@
-package io.ltr8.tson.parser.resolver.schema.compiled;
+package io.ltr8.tson.parser.bind;
 
 /**
  * Resolves a schema type name (a compiled entry's own name, e.g. {@code "integer_size"}) to the

@@ -60,7 +60,7 @@ import io.ltr8.tson.schema.meta.UuidType;
  * specification}/{@code constraints} correctly, so these two work exactly like every other family;
  * confirmed against the real resolved entries, not just reasoned about.
  */
-final class AtomTypeParser<T> implements TsonSchemaTypeParser<T> {
+public final class AtomTypeParser<T> implements TsonSchemaTypeParser<T> {
 
     static final TsonParserFactory INTEGER_TYPE = (name, definition, ctx) ->
             new AtomTypeParser<>(new IntegerParser((IntegerType) definition.body()));
@@ -99,13 +99,15 @@ final class AtomTypeParser<T> implements TsonSchemaTypeParser<T> {
      * {@code token}/{@code void} -- {@code boolean => !enum [true false]} is the one real enum
      * instance whose members are meant to stand in for the two Java boolean values, not the strings
      * {@code "true"}/{@code "false"}; every other enum instance falls through to ordinary {@link
-     * #ENUM} behavior. <b>Registered only in {@link TsonParserFactoryRegistry#object}, never {@link
-     * TsonParserFactoryRegistry#dom()}</b> -- DOM mode has no target Java type to reconcile against, so
-     * it keeps producing {@code String} for {@code boolean} too, matching already-established,
-     * already-tested behavior (e.g. {@code MetaKernelEndToEndTest}'s own {@code "true"} string
-     * assertion).
+     * #ENUM} behavior. <b>Registered only for object-binding mode (see {@code
+     * io.ltr8.tson.parser.bind}), never {@link TsonParserFactoryRegistry#dom()}</b> -- DOM mode has
+     * no target Java type to reconcile against, so it keeps producing {@code String} for {@code
+     * boolean} too, matching already-established, already-tested behavior (e.g. {@code
+     * MetaKernelEndToEndTest}'s own {@code "true"} string assertion). {@code public}, unlike this
+     * class's other factory constants, specifically so {@code io.ltr8.tson.parser.bind} can reach it
+     * (moved out of this package 2026-07-27).
      */
-    static final TsonParserFactory ENUM_OBJECT_MODE = (name, definition, ctx) ->
+    public static final TsonParserFactory ENUM_OBJECT_MODE = (name, definition, ctx) ->
             "boolean".equals(name)
                     ? BooleanParser.INSTANCE
                     : new AtomTypeParser<>(new EnumParser((EnumBody) definition.body()));

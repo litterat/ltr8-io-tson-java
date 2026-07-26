@@ -5,6 +5,7 @@ import io.ltr8.tson.parser.TsonDataParser;
 import io.ltr8.tson.parser.TsonSchemaParser;
 import io.ltr8.tson.parser.ast.Document;
 import io.ltr8.tson.parser.ast.schema.SchemaDocument;
+import io.ltr8.tson.parser.bind.TsonObjectBinding;
 import io.ltr8.tson.parser.resolver.TsonAtomContext;
 import io.ltr8.tson.parser.resolver.schema.BundledSchemaSource;
 import io.ltr8.tson.parser.resolver.schema.DefaultSchemaCoordinator;
@@ -40,7 +41,7 @@ class MetaTn1CompiledEndToEndTest {
         TsonLinkedSchema materializedMetaKernelBootstrap = TsonSchemaLinker.linkBootstrap(metaKernelBootstrap);
 
         DataBindContext context = TsonAtomContext.defaultContext();
-        TsonParserFactoryRegistry objectFactories = TsonParserFactoryRegistry.object(materializedMetaKernelBootstrap.schema(), context);
+        TsonParserFactoryRegistry objectFactories = TsonObjectBinding.factoryRegistry(materializedMetaKernelBootstrap.schema(), context);
         TsonCompiledRegistry compiledRegistry = new TsonCompiledRegistry(objectFactories);
         DefaultSchemaCoordinator coordinator = new DefaultSchemaCoordinator(compiledRegistry);
 

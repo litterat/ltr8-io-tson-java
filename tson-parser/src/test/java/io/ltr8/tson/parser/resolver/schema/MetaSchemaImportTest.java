@@ -3,6 +3,7 @@ package io.ltr8.tson.parser.resolver.schema;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.parser.TsonSchemaParser;
 import io.ltr8.tson.parser.ast.schema.SchemaDocument;
+import io.ltr8.tson.parser.bind.TsonObjectBinding;
 import io.ltr8.tson.parser.resolver.TsonAtomContext;
 import io.ltr8.tson.parser.resolver.schema.compiled.TsonParserFactoryRegistry;
 import io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledRegistry;
@@ -60,7 +61,7 @@ class MetaSchemaImportTest {
      * refuses <i>any</i> self-referential schema with {@code bootstrap() == true}, materialized or
      * not -- see that method's own Javadoc). {@code registry.materializeBootstrap(...)} still runs
      * once, purely to get a genuinely materialized shape to build {@code
-     * TsonParserFactoryRegistry.object(...)} against -- that value is never itself registered anywhere.
+     * TsonObjectBinding.factoryRegistry(...)} against -- that value is never itself registered anywhere.
      * The coordinator built from it then resolves meta-kernel's own document the ordinary way (its
      * own bootstrap branch supplies the structure namespace, so even {@code boolean => !enum [...]}
      * resolves correctly despite the forward reference) -- that result carries no {@code bootstrap}
@@ -74,7 +75,7 @@ class MetaSchemaImportTest {
         TsonLinkedSchema materializedMetaKernelBootstrap = TsonSchemaLinker.linkBootstrap(metaKernelBootstrap);
 
         DataBindContext context = TsonAtomContext.defaultContext();
-        TsonParserFactoryRegistry objectFactories = TsonParserFactoryRegistry.object(materializedMetaKernelBootstrap.schema(), context);
+        TsonParserFactoryRegistry objectFactories = TsonObjectBinding.factoryRegistry(materializedMetaKernelBootstrap.schema(), context);
         TsonCompiledRegistry compiledRegistry = new TsonCompiledRegistry(objectFactories);
         DefaultSchemaCoordinator coordinator = new DefaultSchemaCoordinator(compiledRegistry);
 

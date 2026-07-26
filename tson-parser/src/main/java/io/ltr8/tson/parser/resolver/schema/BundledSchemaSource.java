@@ -25,7 +25,7 @@ import java.util.Map;
  * TsonSchema metaKernel = MetaKernelBootstrapResolver.getMetaKernelSchema();
  * TsonSchemaRegistry schemaRegistry = new TsonSchemaRegistry();
  * TsonSchema materializedMetaKernel = schemaRegistry.materializeBootstrap(metaKernel);
- * TsonParserFactoryRegistry factories = TsonParserFactoryRegistry.object(materializedMetaKernel, context);
+ * TsonParserFactoryRegistry factories = TsonObjectBinding.factoryRegistry(materializedMetaKernel, context);
  * TsonCompiledRegistry registry = new TsonCompiledRegistry(schemaRegistry, factories);
  * registry.register(materializedMetaKernel); // meta.tn1's own !!import needs this present first --
  *                                             // see DefaultSchemaCoordinator's own Javadoc on why

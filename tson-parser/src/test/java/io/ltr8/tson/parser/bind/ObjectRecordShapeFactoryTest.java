@@ -1,10 +1,12 @@
-package io.ltr8.tson.parser.resolver.schema.compiled;
+package io.ltr8.tson.parser.bind;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.parser.TsonDataParser;
 import io.ltr8.tson.parser.ast.Document;
 import io.ltr8.tson.parser.resolver.TsonAtomContext;
 import io.ltr8.tson.parser.resolver.schema.MetaKernelBootstrapResolver;
+import io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledSchema;
+import io.ltr8.tson.parser.resolver.schema.compiled.TsonSchemaCompiler;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaLinker;
 import io.ltr8.tson.schema.meta.IntegerType;
@@ -20,9 +22,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Proves object-binding mode ({@link TsonParserFactoryRegistry#object}) genuinely produces real, bound
+ * Proves object-binding mode ({@link TsonObjectBinding#factoryRegistry}) genuinely produces real, bound
  * {@code schema.meta} Java objects -- not {@code Map<String, Object>} -- reading against the real,
- * registered {@code meta-kernel.tn1} schema, mirroring {@link MetaKernelEndToEndTest}'s own
+ * registered {@code meta-kernel.tn1} schema, mirroring {@code MetaKernelEndToEndTest}'s own
  * bootstrap pattern. {@link SchemaMetaTypeNameBinder} (a {@code Class.forName}-based lookup, not a
  * scan of any sealed hierarchy) resolves every real {@code record}-shaped entry in the schema,
  * including nested helper records like {@code integer_size} -- so {@code integer_type} itself now
@@ -36,7 +38,7 @@ class ObjectRecordShapeFactoryTest {
         TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
         TsonSchema registered = TsonSchemaLinker.linkBootstrap(raw).schema();
         DataBindContext context = TsonAtomContext.defaultContext();
-        return TsonSchemaCompiler.compile(registered, TsonParserFactoryRegistry.object(registered, context));
+        return TsonSchemaCompiler.compile(registered, TsonObjectBinding.factoryRegistry(registered, context));
     }
 
     @Test
