@@ -25,10 +25,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  */
 class MetaKernelEndToEndTest {
 
-    private static TsonSchemaParser compiled() {
+    private static TsonCompiledSchema compiled() {
         TsonSchema raw = MetaKernelParser.getMetaKernelSchema();
         LinkedTsonSchema linked = new SchemaRegistry().linkBootstrap(raw);
-        return TsonSchemaParser.compile(linked.schema(), ParserFactoryRegistry.dom());
+        return TsonSchemaCompiler.compile(linked.schema(), TsonParserFactoryRegistry.dom());
     }
 
     /**
@@ -49,7 +49,7 @@ class MetaKernelEndToEndTest {
         TsonSchema raw = MetaKernelParser.getMetaKernelSchema();
         LinkedTsonSchema linked = new SchemaRegistry().linkBootstrap(raw);
         TsonSchema registered = linked.schema();
-        TsonSchemaParser compiled = TsonSchemaParser.compile(registered, ParserFactoryRegistry.dom());
+        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(registered, TsonParserFactoryRegistry.dom());
 
         for (String name : registered.entries().keySet()) {
             compiled.get(name);
@@ -62,7 +62,7 @@ class MetaKernelEndToEndTest {
         // top => top & {} -- an empty body, but also the (transitive) supertype of everything else
         // in the schema. A value with no type annotation at a top-typed position is a real, valid
         // "just a top" reading, not an error demanding one of its many subtypes be named.
-        TsonSchemaParser compiled = compiled();
+        TsonCompiledSchema compiled = compiled();
         Document document = new Parser("{}").parseDocument();
 
         @SuppressWarnings("unchecked")
@@ -73,7 +73,7 @@ class MetaKernelEndToEndTest {
 
     @Test
     void explicitTypeRefNamingTheDeclarationItselfAlsoUsesItsOwnBody() {
-        TsonSchemaParser compiled = compiled();
+        TsonCompiledSchema compiled = compiled();
         Document document = new Parser("!top {}").parseDocument();
 
         @SuppressWarnings("unchecked")
@@ -86,7 +86,7 @@ class MetaKernelEndToEndTest {
     void readsEnumsOwnMembersFieldAgainstRealData() {
         // The exact fix under test: enum => ~atom & { members: set<token> } -- previously
         // unbuildable (set<token> fell back to an unusable placeholder), now a genuine ArrayBody.
-        TsonSchemaParser compiled = compiled();
+        TsonCompiledSchema compiled = compiled();
         Document document = new Parser("{ members: [true false] }").parseDocument();
 
         @SuppressWarnings("unchecked")
@@ -97,7 +97,7 @@ class MetaKernelEndToEndTest {
 
     @Test
     void readsIntegerSizeAgainstRealData() {
-        TsonSchemaParser compiled = compiled();
+        TsonCompiledSchema compiled = compiled();
         Document document = new Parser("{ bits: 32 signed: true }").parseDocument();
 
         @SuppressWarnings("unchecked")
@@ -109,7 +109,7 @@ class MetaKernelEndToEndTest {
 
     @Test
     void readsFieldGroupAgainstRealData() {
-        TsonSchemaParser compiled = compiled();
+        TsonCompiledSchema compiled = compiled();
         Document document = new Parser("{ members: [foo bar] state: OPTIONAL }").parseDocument();
 
         @SuppressWarnings("unchecked")
@@ -121,7 +121,7 @@ class MetaKernelEndToEndTest {
 
     @Test
     void readsTupleElementAgainstRealNestedData() {
-        TsonSchemaParser compiled = compiled();
+        TsonCompiledSchema compiled = compiled();
         Document document = new Parser("{ element_type: { name: text arguments: [] } state: REQUIRED }").parseDocument();
 
         @SuppressWarnings("unchecked")

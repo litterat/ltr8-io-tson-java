@@ -48,22 +48,22 @@ class RecordParserTest {
                 Optional.empty(), body);
     }
 
-    private static ParserFactoryRegistry registry() {
-        return ParserFactoryRegistry.builder()
+    private static TsonParserFactoryRegistry registry() {
+        return TsonParserFactoryRegistry.builder()
                 .register("integer_type", AtomTypeParser.INTEGER_TYPE)
                 .register("record", RecordParser.FACTORY)
                 .build();
     }
 
     @SuppressWarnings("unchecked")
-    private static Map<String, Object> read(TsonSchemaParser compiled, String source) {
+    private static Map<String, Object> read(TsonCompiledSchema compiled, String source) {
         Document document = new Parser(source).parseDocument();
         return (Map<String, Object>) compiled.get("point").read(document.root());
     }
 
     @Test
     void unconstrainedIntegerFieldReadsFromRealDataText() {
-        TsonSchemaParser compiled = TsonSchemaParser.compile(
+        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(
                 pointSchema(atomEntry(IntegerType.UNCONSTRAINED), RecordField.required("value", TypeRef.of("integer"))),
                 registry());
 
@@ -72,7 +72,7 @@ class RecordParserTest {
 
     @Test
     void constrainedIntegerFieldValidatesAgainstItsOwnDeclaredRange() {
-        TsonSchemaParser compiled = TsonSchemaParser.compile(
+        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(
                 pointSchema(atomEntry(new IntegerType(new IntegerSize(8, true))),
                         RecordField.required("value", TypeRef.of("integer"))),
                 registry());
@@ -83,7 +83,7 @@ class RecordParserTest {
 
     @Test
     void missingRequiredFieldThrows() {
-        TsonSchemaParser compiled = TsonSchemaParser.compile(
+        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(
                 pointSchema(atomEntry(IntegerType.UNCONSTRAINED), RecordField.required("value", TypeRef.of("integer"))),
                 registry());
 
@@ -95,7 +95,7 @@ class RecordParserTest {
     void absentOptionalFieldReadsAsNull() {
         RecordField optional = new RecordField("value", TypeRef.of("integer"), FieldState.OPTIONAL,
                 Optional.empty(), Optional.empty());
-        TsonSchemaParser compiled = TsonSchemaParser.compile(
+        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(
                 pointSchema(atomEntry(IntegerType.UNCONSTRAINED), optional), registry());
 
         assertNull(read(compiled, "{}").get("value"));
@@ -106,7 +106,7 @@ class RecordParserTest {
     void requiredDefaultFieldFillsFromTheSchemaWhenAbsentButExplicitValueStillWins() {
         RecordField defaulted = new RecordField("value", TypeRef.of("integer"), FieldState.REQUIRED_DEFAULT,
                 Optional.of(new Token("7", Token.Form.UNQUOTED)), Optional.empty());
-        TsonSchemaParser compiled = TsonSchemaParser.compile(
+        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(
                 pointSchema(atomEntry(IntegerType.UNCONSTRAINED), defaulted), registry());
 
         assertEquals(BigInteger.valueOf(7), read(compiled, "{}").get("value"));

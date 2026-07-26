@@ -25,7 +25,7 @@ import java.util.Map;
  * TsonSchema metaKernel = MetaKernelParser.getMetaKernelSchema();
  * SchemaRegistry schemaRegistry = new SchemaRegistry();
  * TsonSchema materializedMetaKernel = schemaRegistry.materializeBootstrap(metaKernel);
- * ParserFactoryRegistry factories = ParserFactoryRegistry.object(materializedMetaKernel, context);
+ * TsonParserFactoryRegistry factories = TsonParserFactoryRegistry.object(materializedMetaKernel, context);
  * TsonCompiledRegistry registry = new TsonCompiledRegistry(schemaRegistry, factories);
  * registry.register(materializedMetaKernel); // meta.tn1's own !!import needs this present first --
  *                                             // see DefaultSchemaCoordinator's own Javadoc on why
@@ -36,8 +36,8 @@ import java.util.Map;
  *                                             // unmaterialized bootstrap schema outright (see its
  *                                             // own Javadoc).
  * DefaultSchemaCoordinator coordinator = new DefaultSchemaCoordinator(registry, BundledSchemaSource.INSTANCE);
- * TsonSchemaParser meta = coordinator.resolve(BundledSchemaSource.META_TN1_ID);
- * TsonSchemaParser core = coordinator.resolve(BundledSchemaSource.CORE_TN1_ID); // needs meta.tn1 registered first, same reasoning
+ * TsonCompiledSchema meta = coordinator.resolve(BundledSchemaSource.META_TN1_ID);
+ * TsonCompiledSchema core = coordinator.resolve(BundledSchemaSource.CORE_TN1_ID); // needs meta.tn1 registered first, same reasoning
  * }</pre>
  *
  * <p><b>{@link #META_KERNEL_ID} is meta-kernel's own well-known identity -- the canonical

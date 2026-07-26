@@ -28,31 +28,31 @@ class MapParserTest {
                 Optional.empty(), IntegerType.UNCONSTRAINED);
     }
 
-    private static ParserFactoryRegistry registry() {
-        return ParserFactoryRegistry.builder()
+    private static TsonParserFactoryRegistry registry() {
+        return TsonParserFactoryRegistry.builder()
                 .register("integer_type", AtomTypeParser.INTEGER_TYPE)
                 .register("map", MapParser.FACTORY)
                 .build();
     }
 
-    private static TsonSchemaParser compile(MapBody body) {
+    private static TsonCompiledSchema compile(MapBody body) {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("integer", integerEntry());
         entries.put("scores", TypeDefinition.product(body));
         TsonSchema schema = new TsonSchema("https://example.test/s.tn1",
                 "https://example.test/meta.tn1", List.of(), entries);
-        return TsonSchemaParser.compile(schema, registry());
+        return TsonSchemaCompiler.compile(schema, registry());
     }
 
     @SuppressWarnings("unchecked")
-    private static Map<Object, Object> readMap(TsonSchemaParser compiled, String source) {
+    private static Map<Object, Object> readMap(TsonCompiledSchema compiled, String source) {
         Document document = new Parser(source).parseDocument();
         return (Map<Object, Object>) compiled.get("scores").read(document.root());
     }
 
     @Test
     void readsAPlainMapOfIntegerToInteger() {
-        TsonSchemaParser compiled = compile(MapBody.of(TypeRef.of("integer"), TypeRef.of("integer")));
+        TsonCompiledSchema compiled = compile(MapBody.of(TypeRef.of("integer"), TypeRef.of("integer")));
 
         Map<Object, Object> result = readMap(compiled, "{ 1 => 10 2 => 20 }");
         assertEquals(BigInteger.TEN, result.get(BigInteger.ONE));
@@ -61,14 +61,14 @@ class MapParserTest {
 
     @Test
     void emptyBraceReadsAsEmptyMap() {
-        TsonSchemaParser compiled = compile(MapBody.of(TypeRef.of("integer"), TypeRef.of("integer")));
+        TsonCompiledSchema compiled = compile(MapBody.of(TypeRef.of("integer"), TypeRef.of("integer")));
 
         assertEquals(Map.of(), readMap(compiled, "{}"));
     }
 
     @Test
     void absentSentinelAsKeyThrows() {
-        TsonSchemaParser compiled = compile(MapBody.of(TypeRef.of("integer"), TypeRef.of("integer")));
+        TsonCompiledSchema compiled = compile(MapBody.of(TypeRef.of("integer"), TypeRef.of("integer")));
 
         IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class,
                 () -> readMap(compiled, "{ _ => 1 }"));
@@ -78,7 +78,7 @@ class MapParserTest {
     @Test
     void minItemsRejectsTooFewEntries() {
         MapBody body = new MapBody(TypeRef.of("integer"), TypeRef.of("integer"), Optional.of(BigInteger.TWO), Optional.empty());
-        TsonSchemaParser compiled = compile(body);
+        TsonCompiledSchema compiled = compile(body);
 
         assertEquals(2, readMap(compiled, "{ 1 => 1 2 => 2 }").size());
         assertThrows(IllegalArgumentException.class, () -> readMap(compiled, "{ 1 => 1 }"));
@@ -87,7 +87,7 @@ class MapParserTest {
     @Test
     void maxItemsRejectsTooManyEntries() {
         MapBody body = new MapBody(TypeRef.of("integer"), TypeRef.of("integer"), Optional.empty(), Optional.of(BigInteger.ONE));
-        TsonSchemaParser compiled = compile(body);
+        TsonCompiledSchema compiled = compile(body);
 
         assertEquals(1, readMap(compiled, "{ 1 => 1 }").size());
         assertThrows(IllegalArgumentException.class, () -> readMap(compiled, "{ 1 => 1 2 => 2 }"));

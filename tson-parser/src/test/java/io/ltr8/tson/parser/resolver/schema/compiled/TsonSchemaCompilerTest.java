@@ -21,15 +21,16 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Direct coverage of {@link TsonSchemaParser}'s own compiler -- cycle detection (the reason {@link
- * ParserHandle.Direct}/{@link ParserHandle.Indirect} exist at all) and laziness (nothing gets built
- * until {@link TsonSchemaParser#get} actually asks for it). {@link RecordParserTest}/{@link
- * VariantParserTest}/{@link EnumTypeParserFactoryTest} exercise this compiler too, but only ever
- * incidentally, through schemas with no real cycles -- this class targets the compiler itself.
+ * Direct coverage of {@link TsonSchemaCompiler}/{@link TsonCompiledSchema}'s own cycle detection
+ * (the reason {@link ParserHandle.Direct}/{@link ParserHandle.Indirect} exist at all) and laziness
+ * (nothing gets built until {@link TsonCompiledSchema#get} actually asks for it). {@link
+ * RecordParserTest}/{@link VariantParserTest}/{@link EnumTypeParserFactoryTest} exercise this
+ * compilation machinery too, but only ever incidentally, through schemas with no real cycles --
+ * this class targets it directly.
  */
-class TsonSchemaParserTest {
+class TsonSchemaCompilerTest {
 
-    private static final ParserFactoryRegistry RECORD_ONLY = ParserFactoryRegistry.builder()
+    private static final TsonParserFactoryRegistry RECORD_ONLY = TsonParserFactoryRegistry.builder()
             .register("record", RecordParser.FACTORY)
             .build();
 
@@ -47,7 +48,7 @@ class TsonSchemaParserTest {
         entries.put("B", TypeDefinition.product(bodyB));
         TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), entries);
 
-        TsonSchemaParser compiled = TsonSchemaParser.compile(schema, RECORD_ONLY);
+        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(schema, RECORD_ONLY);
 
         // Reached compilation successfully; reading an empty record against a REQUIRED field then
         // fails for the ordinary reason (missing field), not a compiler failure.
@@ -61,7 +62,7 @@ class TsonSchemaParserTest {
         entries.put("Node", TypeDefinition.product(selfReferencing));
         TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), entries);
 
-        TsonSchemaParser compiled = TsonSchemaParser.compile(schema, RECORD_ONLY);
+        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(schema, RECORD_ONLY);
 
         assertThrows(IllegalArgumentException.class, () -> compiled.get("Node").read(EMPTY_RECORD));
     }
@@ -69,7 +70,7 @@ class TsonSchemaParserTest {
     @Test
     void unrelatedEntryWithNoRegisteredFactoryDoesNotBlockCompilingWhatYouActuallyAskFor() {
         // "orphan" uses a constructor ("unit") with no registered factory at all -- compiling/reading
-        // "used" (which never references "orphan") must still work, proving TsonSchemaParser.compile()
+        // "used" (which never references "orphan") must still work, proving TsonSchemaCompiler.compile()
         // doesn't eagerly build every entry in the schema.
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("used", TypeDefinition.product(RecordBody.of(List.of())));
@@ -77,7 +78,7 @@ class TsonSchemaParserTest {
                 List.of(), false, List.of(), List.of(), Optional.empty(), new Unit()));
         TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), entries);
 
-        TsonSchemaParser compiled = TsonSchemaParser.compile(schema, RECORD_ONLY);
+        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(schema, RECORD_ONLY);
 
         @SuppressWarnings("unchecked")
         Map<String, Object> used = (Map<String, Object>) compiled.get("used").read(EMPTY_RECORD);
@@ -90,7 +91,7 @@ class TsonSchemaParserTest {
     @Test
     void getOnAnUnknownNameThrowsBeforeAnyCompilationHappens() {
         TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), Map.of());
-        TsonSchemaParser compiled = TsonSchemaParser.compile(schema, RECORD_ONLY);
+        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(schema, RECORD_ONLY);
 
         IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class, () -> compiled.get("nope"));
         assertEquals("'nope' is not in this compiled schema", thrown.getMessage());

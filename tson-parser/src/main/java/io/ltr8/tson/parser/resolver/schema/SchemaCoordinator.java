@@ -1,6 +1,6 @@
 package io.ltr8.tson.parser.resolver.schema;
 
-import io.ltr8.tson.parser.resolver.schema.compiled.TsonSchemaParser;
+import io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledSchema;
 
 /**
  * Given a schema's own URI (a document's {@code !!meta} target, or one of its {@code !!import}
@@ -35,5 +35,5 @@ public interface SchemaCoordinator {
      *                          {@link SchemaSource#registeredOnly()}, or whatever a caller-supplied
      *                          {@link SchemaSource} itself throws.
      */
-    TsonSchemaParser resolve(String uri);
+    TsonCompiledSchema resolve(String uri);
 }

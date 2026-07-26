@@ -59,6 +59,21 @@ written down. This applies to every layer as it gets built, not just the lexer.
 
 ## Architecture
 
+### Naming convention: `Tson` is a prefix, never an infix
+
+If a class name contains `Tson` at all, `Tson` MUST be the leading word (`TsonSchema`, `TsonCompiledSchema`,
+`TsonSchemaCompiler`, `TsonDataParser`, `TsonMapperReader`) — never buried in the middle (`CompiledTsonSchema`
+is wrong; it was renamed to `TsonCompiledSchema` specifically to fix this, 2026-07-26). The prefix isn't
+applied to every class in the library, either — most of `tson-parser`/`tson-schema`'s own internal machinery
+is deliberately bare (`SchemaResolver`, `SchemaLinker`, `SchemaRegistry`, `Lexer`, `Parser`, `RecordParser`,
+`ParserHandle`). Reserve the `Tson` prefix for the classes a *consumer of this library* actually names in
+their own code — its value is disambiguation at the call site (`TsonSchema` vs. a domain object also called
+`Schema`, `TsonDataParser` vs. a domain-specific `DataParser`) and quick identification when skimming a
+consumer's imports, not a house style to stamp on everything. When adding a new public, developer-facing type,
+ask "would a consumer of this library plausibly also have their own class with this bare name?" — if yes, and
+the type is meant to be used from outside this library's own internals, prefix it; if it's internal
+machinery a consumer never names directly, leave it bare.
+
 `tson-parser` holds the lexer, the data-grammar structural parser, base type resolution, the built-in
 type vocabulary, the Part 2 schema grammar (`SchemaParser`, `ast.schema`), the schema resolver
 (`io.ltr8.tson.parser.resolver.schema.SchemaResolver`, producing Class 2's resolved schema value), *and*

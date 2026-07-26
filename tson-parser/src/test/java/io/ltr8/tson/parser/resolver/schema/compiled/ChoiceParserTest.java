@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class ChoiceParserTest {
 
-    private static TsonSchemaParser compiled() {
+    private static TsonCompiledSchema compiled() {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("integer", new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), false,
                 List.of(), List.of(), Optional.empty(), IntegerType.UNCONSTRAINED));
@@ -41,23 +41,23 @@ class ChoiceParserTest {
         TsonSchema schema = new TsonSchema("https://example.test/s.tn1",
                 "https://example.test/meta.tn1", List.of(), entries);
 
-        ParserFactoryRegistry registry = ParserFactoryRegistry.builder()
+        TsonParserFactoryRegistry registry = TsonParserFactoryRegistry.builder()
                 .register("integer_type", AtomTypeParser.INTEGER_TYPE)
                 .register("record", RecordParser.FACTORY)
                 .register("choice", ChoiceParser.FACTORY)
                 .build();
-        return TsonSchemaParser.compile(schema, registry);
+        return TsonSchemaCompiler.compile(schema, registry);
     }
 
     @SuppressWarnings("unchecked")
-    private static Map<String, Object> read(TsonSchemaParser compiled, String source) {
+    private static Map<String, Object> read(TsonCompiledSchema compiled, String source) {
         Document document = new Parser(source).parseDocument();
         return (Map<String, Object>) compiled.get("contact_method").read(document.root());
     }
 
     @Test
     void dispatchesToTheVariantNamedByTheValuesOwnTypeRef() {
-        TsonSchemaParser compiled = compiled();
+        TsonCompiledSchema compiled = compiled();
 
         assertEquals(BigInteger.valueOf(1), read(compiled, "!email { address: 1 }").get("address"));
         assertEquals(BigInteger.valueOf(2), read(compiled, "!phone { number: 2 }").get("number"));
@@ -65,7 +65,7 @@ class ChoiceParserTest {
 
     @Test
     void missingTypeRefThrowsNamingTheDeclaredVariants() {
-        TsonSchemaParser compiled = compiled();
+        TsonCompiledSchema compiled = compiled();
 
         IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class,
                 () -> read(compiled, "{ address: 1 }"));
@@ -75,7 +75,7 @@ class ChoiceParserTest {
 
     @Test
     void undeclaredVariantThrows() {
-        TsonSchemaParser compiled = compiled();
+        TsonCompiledSchema compiled = compiled();
 
         assertThrows(IllegalArgumentException.class, () -> read(compiled, "!fax { address: 1 }"));
     }

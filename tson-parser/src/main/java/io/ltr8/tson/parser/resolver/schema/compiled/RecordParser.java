@@ -20,7 +20,7 @@ import java.util.Optional;
 
 /**
  * The {@link TsonParserFactory} for meta-kernel's {@code record} constructor (§5.2), and the
- * {@link TsonTypeParser} it builds -- the first real (non-test-local) composite factory, replacing
+ * {@link TsonSchemaTypeParser} it builds -- the first real (non-test-local) composite factory, replacing
  * the minimal map-producing stand-in this class's own test ({@code RecordParserTest}, then still
  * named {@code IntegerTypeParserFactoryTest}) used before this class existed. Reads a schema
  * position's own {@link RecordField#state} directly, unlike {@code
@@ -54,7 +54,7 @@ import java.util.Optional;
  * already-materialized {@link io.ltr8.tson.schema.TsonSchema}, per {@link CompilationContext}'s own
  * Javadoc.
  */
-final class RecordParser<R> implements TsonTypeParser<R> {
+final class RecordParser<R> implements TsonSchemaTypeParser<R> {
 
     /**
      * How {@link RecordParser} turns one record value's own field values into a result -- resolved
@@ -131,7 +131,7 @@ final class RecordParser<R> implements TsonTypeParser<R> {
         return new RecordParser<>(name, fields, shape);
     }
 
-    private record CompiledField(RecordField schema, TsonTypeParser<?> parser) {
+    private record CompiledField(RecordField schema, TsonSchemaTypeParser<?> parser) {
     }
 
     private final String name;

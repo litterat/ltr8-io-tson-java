@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Proves object-binding mode ({@link ParserFactoryRegistry#object}) genuinely produces real, bound
+ * Proves object-binding mode ({@link TsonParserFactoryRegistry#object}) genuinely produces real, bound
  * {@code schema.meta} Java objects -- not {@code Map<String, Object>} -- reading against the real,
  * registered {@code meta-kernel.tn1} schema, mirroring {@link MetaKernelEndToEndTest}'s own
  * bootstrap pattern. {@link SchemaMetaTypeNameBinder} (a {@code Class.forName}-based lookup, not a
@@ -32,11 +32,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class ObjectRecordShapeFactoryTest {
 
-    private static TsonSchemaParser compiled() {
+    private static TsonCompiledSchema compiled() {
         TsonSchema raw = MetaKernelParser.getMetaKernelSchema();
         TsonSchema registered = new SchemaRegistry().linkBootstrap(raw).schema();
         DataBindContext context = TsonAtomContext.defaultContext();
-        return TsonSchemaParser.compile(registered, ParserFactoryRegistry.object(registered, context));
+        return TsonSchemaCompiler.compile(registered, TsonParserFactoryRegistry.object(registered, context));
     }
 
     @Test
@@ -44,7 +44,7 @@ class ObjectRecordShapeFactoryTest {
         // min_length/max_length are the schema's own unconstrained `integer` atom (natural host
         // type BigInteger), but TextType.minLength/maxLength are Optional<Integer> -- this is
         // exactly the narrowing path NumberNarrowing exists for.
-        TsonSchemaParser compiled = compiled();
+        TsonCompiledSchema compiled = compiled();
         Document document = new Parser("{ min_length: 3 max_length: 10 }").parseDocument();
 
         Object result = compiled.get("text_type").read(document.root());
@@ -69,7 +69,7 @@ class ObjectRecordShapeFactoryTest {
         // real Java boolean -- an already-documented, permanent limit of generic binding (tracked
         // separately, see MetaKernelEndToEndTest's own "text, not a Java boolean" note), unrelated
         // to this change and out of scope for it.
-        TsonSchemaParser compiled = compiled();
+        TsonCompiledSchema compiled = compiled();
         Document document = new Parser("{ min: -5 max: 100 }").parseDocument();
 
         Object result = compiled.get("integer_type").read(document.root());
@@ -99,7 +99,7 @@ class ObjectRecordShapeFactoryTest {
     void validateReportsEveryUnresolvableEntryAtOnceRatherThanOneAtATime() {
         TsonSchema raw = MetaKernelParser.getMetaKernelSchema();
         TsonSchema registered = new SchemaRegistry().linkBootstrap(raw).schema();
-        TypeNameBinder alwaysMissing = name -> {
+        TsonTypeNameBinder alwaysMissing = name -> {
             throw new ClassNotFoundException("no class for '" + name + "' under this test's own binder");
         };
         ObjectRecordShapeFactory shapeFactory =

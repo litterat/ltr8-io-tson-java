@@ -58,32 +58,32 @@ class VariantParserTest {
                 List.of(), entries);
     }
 
-    private static ParserFactoryRegistry registry() {
-        return ParserFactoryRegistry.builder()
+    private static TsonParserFactoryRegistry registry() {
+        return TsonParserFactoryRegistry.builder()
                 .register("integer_type", AtomTypeParser.INTEGER_TYPE)
                 .register("record", RecordParser.FACTORY)
                 .build();
     }
 
-    private static TsonSchemaParser compiled() {
+    private static TsonCompiledSchema compiled() {
         SchemaRegistry schemaRegistry = new SchemaRegistry();
         TsonSchema registered = schemaRegistry.register(SchemaLinker.link(compileableSchema(), schemaRegistry)).schema();
-        return TsonSchemaParser.compile(registered, registry());
+        return TsonSchemaCompiler.compile(registered, registry());
     }
 
     @SuppressWarnings("unchecked")
-    private static Map<String, Object> read(TsonSchemaParser compiled, String rootName, String source) {
+    private static Map<String, Object> read(TsonCompiledSchema compiled, String rootName, String source) {
         Document document = new Parser(source).parseDocument();
         return (Map<String, Object>) compiled.get(rootName).read(document.root());
     }
 
-    private static Map<String, Object> read(TsonSchemaParser compiled, String source) {
+    private static Map<String, Object> read(TsonCompiledSchema compiled, String source) {
         return read(compiled, "response", source);
     }
 
     @Test
     void dispatchesToTheSubtypeNamedByTheValuesOwnTypeRef() {
-        TsonSchemaParser compiled = compiled();
+        TsonCompiledSchema compiled = compiled();
 
         assertEquals(BigInteger.valueOf(42), read(compiled, "!success_response { value: 42 }").get("value"));
         assertEquals(BigInteger.valueOf(404), read(compiled, "!failure_response { error_code: 404 }").get("error_code"));
@@ -91,21 +91,21 @@ class VariantParserTest {
 
     @Test
     void missingTypeRefFallsBackToTheDeclarationsOwnEmptyBody() {
-        TsonSchemaParser compiled = compiled();
+        TsonCompiledSchema compiled = compiled();
 
         assertEquals(Map.of(), read(compiled, "{}"));
     }
 
     @Test
     void explicitTypeRefNamingTheDeclarationItselfAlsoReadsItsOwnBody() {
-        TsonSchemaParser compiled = compiled();
+        TsonCompiledSchema compiled = compiled();
 
         assertEquals(Map.of(), read(compiled, "!response {}"));
     }
 
     @Test
     void ownBodyFallbackStillFailsIfItsOwnRequirementsArentMet() {
-        TsonSchemaParser compiled = compiled();
+        TsonCompiledSchema compiled = compiled();
 
         // "shape" has subtypes ("triangle") but its own body REQUIRES "sides" -- the fallback reads
         // against that real body, not a free pass, so a missing required field still fails.
@@ -115,7 +115,7 @@ class VariantParserTest {
 
     @Test
     void unknownTypeRefThrowsNamingTheOffendingValue() {
-        TsonSchemaParser compiled = compiled();
+        TsonCompiledSchema compiled = compiled();
 
         IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class,
                 () -> read(compiled, "!partial_response { value: 42 }"));

@@ -43,7 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  */
 class AtomTypeParserFactoriesTest {
 
-    private static final ParserFactoryRegistry REGISTRY = ParserFactoryRegistry.builder()
+    private static final TsonParserFactoryRegistry REGISTRY = TsonParserFactoryRegistry.builder()
             .register("record", RecordParser.FACTORY)
             .register("text_type", AtomTypeParser.TEXT_TYPE)
             .register("decimal_type", AtomTypeParser.DECIMAL_TYPE)
@@ -67,7 +67,7 @@ class AtomTypeParserFactoriesTest {
                 RecordBody.of(List.of(RecordField.required("value", TypeRef.of("field"))))));
         TsonSchema schema = new TsonSchema("https://example.test/s.tn1",
                 "https://example.test/meta.tn1", List.of(), entries);
-        TsonSchemaParser compiled = TsonSchemaParser.compile(schema, REGISTRY);
+        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(schema, REGISTRY);
 
         Document document = new Parser(source).parseDocument();
         @SuppressWarnings("unchecked")
@@ -175,11 +175,11 @@ class AtomTypeParserFactoriesTest {
                 RecordBody.of(List.of(RecordField.required("value", TypeRef.of(typeName))))));
         TsonSchema schema = new TsonSchema("https://example.test/s.tn1",
                 "https://example.test/meta.tn1", List.of(), entries);
-        ParserFactoryRegistry registry = ParserFactoryRegistry.builder()
+        TsonParserFactoryRegistry registry = TsonParserFactoryRegistry.builder()
                 .register("record", RecordParser.FACTORY)
                 .register(constructorKey, factory)
                 .build();
-        TsonSchemaParser compiled = TsonSchemaParser.compile(schema, registry);
+        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(schema, registry);
 
         Document document = new Parser(source).parseDocument();
         @SuppressWarnings("unchecked")

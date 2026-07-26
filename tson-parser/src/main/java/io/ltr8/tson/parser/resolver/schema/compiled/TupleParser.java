@@ -14,7 +14,7 @@ import java.util.List;
 
 /**
  * The {@link TsonParserFactory} for meta-kernel's {@code tuple} constructor (§5.3), and the {@link
- * TsonTypeParser} it builds -- {@code List<Object>}, positional like {@link ArrayParser} but with a
+ * TsonSchemaTypeParser} it builds -- {@code List<Object>}, positional like {@link ArrayParser} but with a
  * fixed, heterogeneous arity: each position has its own element type *and* its own {@link
  * ElementState}, unlike array's single shared element type/state. Every position's own parser
  * resolves eagerly at compile time -- all positions are always needed, the same reasoning as
@@ -30,7 +30,7 @@ import java.util.List;
  * way {@link ArrayParser}/{@link MapParser} have, since a tuple's own arity isn't a range to begin
  * with.
  */
-final class TupleParser implements TsonTypeParser<List<Object>> {
+final class TupleParser implements TsonSchemaTypeParser<List<Object>> {
 
     static final TsonParserFactory FACTORY = (name, definition, ctx) -> {
         TupleBody body = (TupleBody) definition.body();
@@ -41,7 +41,7 @@ final class TupleParser implements TsonTypeParser<List<Object>> {
         return new TupleParser(name, slots);
     };
 
-    private record CompiledSlot(TupleElement schema, TsonTypeParser<?> parser) {
+    private record CompiledSlot(TupleElement schema, TsonSchemaTypeParser<?> parser) {
     }
 
     private final String name;

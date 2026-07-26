@@ -26,12 +26,12 @@ import java.util.Map;
  * plain {@code Map<String, Object>}. All construction is delegated to {@code tson-bind}'s own
  * {@link DataClassRecord} descriptor (constructor selection, {@code MethodHandle} binding, {@code
  * Optional}-wrapping) -- nothing here reimplements any of that; this class only decides *which*
- * Java class a schema type name maps to (via {@link TypeNameBinder}) and narrows a schema-produced
+ * Java class a schema type name maps to (via {@link TsonTypeNameBinder}) and narrows a schema-produced
  * value to that class's own declared field width where they legitimately differ (see {@link
  * ObjectRecordBuilder#narrow}).
  *
  * <p><b>Binding happens eagerly, at {@link #validate}, not lazily per read.</b> {@link
- * ParserFactoryRegistry#object} calls it once, up front, walking every {@code record}-shaped entry
+ * TsonParserFactoryRegistry#object} calls it once, up front, walking every {@code record}-shaped entry
  * in the whole schema and resolving+validating a {@link DataClassRecord} descriptor for each --
  * both "does {@code binder} know a matching class" and "can {@code tson-bind} actually build a
  * descriptor for it" (e.g. the {@code @Record}-on-canonical-constructor gotcha documented elsewhere
@@ -54,14 +54,14 @@ import java.util.Map;
 public final class ObjectRecordShapeFactory implements RecordShapeFactory<Object> {
 
     private final DataBindContext context;
-    private final TypeNameBinder binder;
+    private final TsonTypeNameBinder binder;
     private final Map<String, DataClassRecord> validated = new LinkedHashMap<>();
 
     public ObjectRecordShapeFactory(DataBindContext context) {
         this(context, SchemaMetaTypeNameBinder.INSTANCE);
     }
 
-    public ObjectRecordShapeFactory(DataBindContext context, TypeNameBinder binder) {
+    public ObjectRecordShapeFactory(DataBindContext context, TsonTypeNameBinder binder) {
         this.context = context;
         this.binder = binder;
     }
@@ -70,7 +70,7 @@ public final class ObjectRecordShapeFactory implements RecordShapeFactory<Object
      * Walks every {@code record}-shaped entry in {@code schema} (i.e. every entry whose {@link
      * TypeDefinition#body()} is a {@link RecordBody} -- the ones that would actually reach {@link
      * #shapeFor} once compiled), resolving and caching a {@link DataClassRecord} for each. Must run
-     * before this factory compiles anything (see {@link ParserFactoryRegistry#object}) -- {@link
+     * before this factory compiles anything (see {@link TsonParserFactoryRegistry#object}) -- {@link
      * #shapeFor} only ever consults this cache, never {@code binder} directly, so an entry this
      * method didn't already validate can't silently slip through later.
      *
@@ -119,7 +119,7 @@ public final class ObjectRecordShapeFactory implements RecordShapeFactory<Object
         if (descriptor == null) {
             throw new IllegalStateException("'" + typeName + "' was never validated -- call "
                     + "ObjectRecordShapeFactory.validate(TsonSchema) with the governing schema before "
-                    + "compiling against it (see ParserFactoryRegistry#object)");
+                    + "compiling against it (see TsonParserFactoryRegistry#object)");
         }
         return () -> new ObjectRecordBuilder(descriptor);
     }

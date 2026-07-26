@@ -36,9 +36,9 @@ import io.ltr8.tson.schema.meta.UriType;
 import io.ltr8.tson.schema.meta.UuidType;
 
 /**
- * Adapts any {@code resolver.vocab} {@link AtomType} into a {@link TsonTypeParser} -- the one place
+ * Adapts any {@code resolver.vocab} {@link AtomType} into a {@link TsonSchemaTypeParser} -- the one place
  * a compiled position backed by an atom-family constructor (§5.5's {@code integer_type}, {@code
- * text_type}, ...) bridges from {@link DataValue} (what every {@link TsonTypeParser} reads) down to
+ * text_type}, ...) bridges from {@link DataValue} (what every {@link TsonSchemaTypeParser} reads) down to
  * {@link TokenValue} (what {@link AtomType} itself reads).
  *
  * <p>Deliberately kept in this package, not {@code resolver.vocab} itself -- {@code resolver.vocab}
@@ -50,7 +50,7 @@ import io.ltr8.tson.schema.meta.UuidType;
  * constant</b>, one per constructor name -- not as a separate one-class-per-constructor file the
  * way an earlier version of this package did it. Each is a one-line cast-and-adapt, identical in
  * shape (see {@link #INTEGER_TYPE} for the pattern), so a whole file per constructor was pure
- * boilerplate; a caller assembling a {@link ParserFactoryRegistry} just does {@code
+ * boilerplate; a caller assembling a {@link TsonParserFactoryRegistry} just does {@code
  * .register("integer_type", AtomTypeParser.INTEGER_TYPE)}. {@link #URI_TYPE}/{@link #REGEX_TYPE}
  * were initially left out of this package, mistakenly grouped with a real, separate gap
  * ({@code UriType}/{@code RegexType}'s own *schema-resolution*-time defaulting, see {@code
@@ -60,7 +60,7 @@ import io.ltr8.tson.schema.meta.UuidType;
  * specification}/{@code constraints} correctly, so these two work exactly like every other family;
  * confirmed against the real resolved entries, not just reasoned about.
  */
-final class AtomTypeParser<T> implements TsonTypeParser<T> {
+final class AtomTypeParser<T> implements TsonSchemaTypeParser<T> {
 
     static final TsonParserFactory INTEGER_TYPE = (name, definition, ctx) ->
             new AtomTypeParser<>(new IntegerParser((IntegerType) definition.body()));
@@ -99,8 +99,8 @@ final class AtomTypeParser<T> implements TsonTypeParser<T> {
      * {@code token}/{@code void} -- {@code boolean => !enum [true false]} is the one real enum
      * instance whose members are meant to stand in for the two Java boolean values, not the strings
      * {@code "true"}/{@code "false"}; every other enum instance falls through to ordinary {@link
-     * #ENUM} behavior. <b>Registered only in {@link ParserFactoryRegistry#object}, never {@link
-     * ParserFactoryRegistry#dom()}</b> -- DOM mode has no target Java type to reconcile against, so
+     * #ENUM} behavior. <b>Registered only in {@link TsonParserFactoryRegistry#object}, never {@link
+     * TsonParserFactoryRegistry#dom()}</b> -- DOM mode has no target Java type to reconcile against, so
      * it keeps producing {@code String} for {@code boolean} too, matching already-established,
      * already-tested behavior (e.g. {@code MetaKernelEndToEndTest}'s own {@code "true"} string
      * assertion).

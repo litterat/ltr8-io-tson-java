@@ -6,7 +6,7 @@ import io.ltr8.tson.parser.ast.Document;
 /**
  * The Class 2 (schema-validating) data parser (§1.5) this project's own groundwork has been
  * building toward -- combines the Class 1 structural parser ({@link Parser}, Part 1's own grammar/
- * base-type layer, unchanged) with a {@link TsonSchemaParser} (a compiled schema) into one call:
+ * base-type layer, unchanged) with a {@link TsonCompiledSchema} (a compiled schema) into one call:
  * parse TSON source text, then read the result against a named, schema-known type.
  *
  * <p><b>Doesn't (yet) consult a document's own {@code !!schema} header directive</b> (§2.2, {@link
@@ -15,7 +15,7 @@ import io.ltr8.tson.parser.ast.Document;
  * TsonMapperReader.toObject(String, Class)} always takes an explicit target class rather than
  * inferring one from the data. This is a deliberate scope decision, not an oversight: auto-selecting
  * a compiled schema from a document's own declared {@code !!schema} URI needs a schema-identity {@code ->}
- * {@link TsonSchemaParser} registry that doesn't exist yet (a distinct, separate piece -- {@code
+ * {@link TsonCompiledSchema} registry that doesn't exist yet (a distinct, separate piece -- {@code
  * SchemaRegistry} maps identity to {@code TsonSchema}, not to a *compiled* parser); and even a
  * narrower "does the document's own claim match this parser's own schema" consistency check would
  * need canonical-identity comparison ({@code CanonicalIdentity}, in {@code tson-schema.registry})
@@ -25,23 +25,23 @@ import io.ltr8.tson.parser.ast.Document;
  * violation this project has otherwise been careful to avoid. Left as an explicit, tracked gap
  * (task list), not implemented halfway.
  */
-public final class TsonDataParser {
+public final class SchemaValidatingParser {
 
-    private final TsonSchemaParser schema;
+    private final TsonCompiledSchema schema;
 
-    public TsonDataParser(TsonSchemaParser schema) {
+    public SchemaValidatingParser(TsonCompiledSchema schema) {
         this.schema = schema;
     }
 
     /** The compiled schema this parser reads against. */
-    public TsonSchemaParser schema() {
+    public TsonCompiledSchema schema() {
         return schema;
     }
 
     /**
      * Parses {@code source} and reads its root value against {@code rootTypeName}. {@code T} is
      * never checked -- the same unchecked cast a caller would otherwise write themselves against
-     * {@link TsonSchemaParser#get}'s own wildcarded {@link TsonTypeParser}, just done once here.
+     * {@link TsonCompiledSchema#get}'s own wildcarded {@link TsonSchemaTypeParser}, just done once here.
      */
     @SuppressWarnings("unchecked")
     public <T> T read(String source, String rootTypeName) {

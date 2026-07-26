@@ -29,7 +29,7 @@ import java.util.Set;
  * subtypes directly) had "no concrete shape of its own to read" -- true for a genuinely open
  * template with no useful body, but not a safe general assumption: {@code top}/{@code atom}/{@code
  * array} all have subtypes *and* a perfectly good body of their own. Triggering on non-empty
- * {@code subtypes} instead of non-empty {@code parameters} (see {@link TsonSchemaParser}'s own
+ * {@code subtypes} instead of non-empty {@code parameters} (see {@link TsonCompiledSchema}'s own
  * Javadoc) is what makes the "always compile the own body too" version of this class correct: the
  * signal for "this position might need dispatch" and the signal for "this position has no
  * meaningful body of its own" turned out to be two different things, not one.
@@ -40,9 +40,9 @@ import java.util.Set;
  * needed on every read, unlike {@link RecordParser}'s own fields) -- factored into {@link
  * NamedDispatchParser}, shared with {@link ChoiceParser}'s own closed-list dispatch.
  */
-final class VariantParser implements TsonTypeParser<Object> {
+final class VariantParser implements TsonSchemaTypeParser<Object> {
 
-    static TsonTypeParser<?> forSubtypes(String name, TypeDefinition definition, TsonTypeParser<?> ownParser,
+    static TsonSchemaTypeParser<?> forSubtypes(String name, TypeDefinition definition, TsonSchemaTypeParser<?> ownParser,
                                           CompilationContext ctx) {
         NamedDispatchParser subtypeDispatch = new NamedDispatchParser(name,
                 "has known subtypes -- a value at this position with an explicit type annotation (!typeName) "
@@ -52,10 +52,10 @@ final class VariantParser implements TsonTypeParser<Object> {
     }
 
     private final String name;
-    private final TsonTypeParser<?> ownParser;
-    private final TsonTypeParser<?> subtypeDispatch;
+    private final TsonSchemaTypeParser<?> ownParser;
+    private final TsonSchemaTypeParser<?> subtypeDispatch;
 
-    private VariantParser(String name, TsonTypeParser<?> ownParser, TsonTypeParser<?> subtypeDispatch) {
+    private VariantParser(String name, TsonSchemaTypeParser<?> ownParser, TsonSchemaTypeParser<?> subtypeDispatch) {
         this.name = name;
         this.ownParser = ownParser;
         this.subtypeDispatch = subtypeDispatch;

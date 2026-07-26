@@ -95,7 +95,7 @@ public final class SchemaRegistry implements SchemaLoader {
      * {@link SchemaLinker#link}, but does <b>not</b> store the result under a persistent identity
      * in this registry, and {@link #register} refuses it outright regardless (see this class's own
      * Javadoc). Exists purely so a caller (e.g. building an object-binding-mode {@code
-     * ParserFactoryRegistry}, which needs a genuinely linked {@code TsonSchema} to validate against
+     * TsonParserFactoryRegistry}, which needs a genuinely linked {@code TsonSchema} to validate against
      * up front) can get a usable result straight from the raw bootstrap object, without separately
      * wiring a {@link SchemaLoader}.
      *

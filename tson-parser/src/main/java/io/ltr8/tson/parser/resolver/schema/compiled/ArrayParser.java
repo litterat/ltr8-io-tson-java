@@ -17,7 +17,7 @@ import java.util.Set;
 
 /**
  * The {@link TsonParserFactory} for meta-kernel's {@code array} constructor (§5.3), and the {@link
- * TsonTypeParser} it builds -- same shape as {@link RecordParser} (DOM-mode, {@code List<Object>}
+ * TsonSchemaTypeParser} it builds -- same shape as {@link RecordParser} (DOM-mode, {@code List<Object>}
  * rather than {@code Map<String, Object>}), and the highest-leverage composite to have: almost
  * every real synthesized entry a materialized schema produces is an {@code array<X>} application
  * (§5.3's {@code [X]}/{@code [X]?} field-type sugar), so nothing resembling a real document reads
@@ -41,19 +41,19 @@ import java.util.Set;
  * *comparing* two arrays (e.g. {@code set}'s own equality), which reading one value at a time
  * never does. Not a gap, just out of scope for what a single {@code read()} call can mean.
  */
-final class ArrayParser implements TsonTypeParser<List<Object>> {
+final class ArrayParser implements TsonSchemaTypeParser<List<Object>> {
 
     static final TsonParserFactory FACTORY = (name, definition, ctx) -> {
         ArrayBody body = (ArrayBody) definition.body();
-        TsonTypeParser<?> elementParser = ctx.resolve(body.elementType().name());
+        TsonSchemaTypeParser<?> elementParser = ctx.resolve(body.elementType().name());
         return new ArrayParser(name, body, elementParser);
     };
 
     private final String name;
     private final ArrayBody body;
-    private final TsonTypeParser<?> elementParser;
+    private final TsonSchemaTypeParser<?> elementParser;
 
-    private ArrayParser(String name, ArrayBody body, TsonTypeParser<?> elementParser) {
+    private ArrayParser(String name, ArrayBody body, TsonSchemaTypeParser<?> elementParser) {
         this.name = name;
         this.body = body;
         this.elementParser = elementParser;

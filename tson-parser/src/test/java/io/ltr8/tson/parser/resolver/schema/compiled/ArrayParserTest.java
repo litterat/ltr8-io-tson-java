@@ -36,32 +36,32 @@ class ArrayParserTest {
                 Optional.empty(), IntegerType.UNCONSTRAINED);
     }
 
-    private static ParserFactoryRegistry registry() {
-        return ParserFactoryRegistry.builder()
+    private static TsonParserFactoryRegistry registry() {
+        return TsonParserFactoryRegistry.builder()
                 .register("integer_type", AtomTypeParser.INTEGER_TYPE)
                 .register("array", ArrayParser.FACTORY)
                 .register("record", RecordParser.FACTORY)
                 .build();
     }
 
-    private static TsonSchemaParser compile(Map<String, TypeDefinition> extraEntries) {
+    private static TsonCompiledSchema compile(Map<String, TypeDefinition> extraEntries) {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("integer", integerEntry());
         entries.putAll(extraEntries);
         TsonSchema schema = new TsonSchema("https://example.test/s.tn1",
                 "https://example.test/meta.tn1", List.of(), entries);
-        return TsonSchemaParser.compile(schema, registry());
+        return TsonSchemaCompiler.compile(schema, registry());
     }
 
     @SuppressWarnings("unchecked")
-    private static List<Object> readArray(TsonSchemaParser compiled, String rootName, String source) {
+    private static List<Object> readArray(TsonCompiledSchema compiled, String rootName, String source) {
         Document document = new Parser(source).parseDocument();
         return (List<Object>) compiled.get(rootName).read(document.root());
     }
 
     @Test
     void readsAPlainArrayOfIntegers() {
-        TsonSchemaParser compiled = compile(Map.of("numbers", TypeDefinition.product(ArrayBody.of(TypeRef.of("integer")))));
+        TsonCompiledSchema compiled = compile(Map.of("numbers", TypeDefinition.product(ArrayBody.of(TypeRef.of("integer")))));
 
         assertEquals(List.of(BigInteger.ONE, BigInteger.TWO, BigInteger.valueOf(3)),
                 readArray(compiled, "numbers", "[1 2 3]"));
@@ -69,7 +69,7 @@ class ArrayParserTest {
 
     @Test
     void emptyArrayReadsAsEmptyList() {
-        TsonSchemaParser compiled = compile(Map.of("numbers", TypeDefinition.product(ArrayBody.of(TypeRef.of("integer")))));
+        TsonCompiledSchema compiled = compile(Map.of("numbers", TypeDefinition.product(ArrayBody.of(TypeRef.of("integer")))));
 
         assertEquals(List.of(), readArray(compiled, "numbers", "[]"));
     }
@@ -78,7 +78,7 @@ class ArrayParserTest {
     void minItemsRejectsAShorterArray() {
         ArrayBody body = new ArrayBody(TypeRef.of("integer"), ElementState.REQUIRED, false, false,
                 Optional.of(BigInteger.TWO), Optional.empty());
-        TsonSchemaParser compiled = compile(Map.of("numbers", TypeDefinition.product(body)));
+        TsonCompiledSchema compiled = compile(Map.of("numbers", TypeDefinition.product(body)));
 
         assertEquals(List.of(BigInteger.ONE, BigInteger.TWO), readArray(compiled, "numbers", "[1 2]"));
         assertThrows(IllegalArgumentException.class, () -> readArray(compiled, "numbers", "[1]"));
@@ -88,7 +88,7 @@ class ArrayParserTest {
     void maxItemsRejectsALongerArray() {
         ArrayBody body = new ArrayBody(TypeRef.of("integer"), ElementState.REQUIRED, false, false,
                 Optional.empty(), Optional.of(BigInteger.TWO));
-        TsonSchemaParser compiled = compile(Map.of("numbers", TypeDefinition.product(body)));
+        TsonCompiledSchema compiled = compile(Map.of("numbers", TypeDefinition.product(body)));
 
         assertEquals(List.of(BigInteger.ONE, BigInteger.TWO), readArray(compiled, "numbers", "[1 2]"));
         assertThrows(IllegalArgumentException.class, () -> readArray(compiled, "numbers", "[1 2 3]"));
@@ -98,7 +98,7 @@ class ArrayParserTest {
     void uniqueItemsRejectsADuplicateDecodedElement() {
         ArrayBody body = new ArrayBody(TypeRef.of("integer"), ElementState.REQUIRED, false, true,
                 Optional.empty(), Optional.empty());
-        TsonSchemaParser compiled = compile(Map.of("numbers", TypeDefinition.product(body)));
+        TsonCompiledSchema compiled = compile(Map.of("numbers", TypeDefinition.product(body)));
 
         assertEquals(List.of(BigInteger.ONE, BigInteger.TWO), readArray(compiled, "numbers", "[1 2]"));
         assertThrows(IllegalArgumentException.class, () -> readArray(compiled, "numbers", "[1 2 1]"));
@@ -108,7 +108,7 @@ class ArrayParserTest {
     void optionalElementStateToleratesTheAbsentSentinel() {
         ArrayBody body = new ArrayBody(TypeRef.of("integer"), ElementState.OPTIONAL, false, false,
                 Optional.empty(), Optional.empty());
-        TsonSchemaParser compiled = compile(Map.of("numbers", TypeDefinition.product(body)));
+        TsonCompiledSchema compiled = compile(Map.of("numbers", TypeDefinition.product(body)));
 
         List<Object> result = readArray(compiled, "numbers", "[1 _ 3]");
         assertEquals(BigInteger.ONE, result.get(0));
@@ -120,7 +120,7 @@ class ArrayParserTest {
     void requiredElementStateRejectsTheAbsentSentinel() {
         ArrayBody body = new ArrayBody(TypeRef.of("integer"), ElementState.REQUIRED, false, false,
                 Optional.empty(), Optional.empty());
-        TsonSchemaParser compiled = compile(Map.of("numbers", TypeDefinition.product(body)));
+        TsonCompiledSchema compiled = compile(Map.of("numbers", TypeDefinition.product(body)));
 
         assertThrows(IllegalArgumentException.class, () -> readArray(compiled, "numbers", "[1 _ 3]"));
     }
@@ -131,7 +131,7 @@ class ArrayParserTest {
         extra.put("numbers", TypeDefinition.product(ArrayBody.of(TypeRef.of("integer"))));
         extra.put("holder", TypeDefinition.product(
                 RecordBody.of(List.of(RecordField.required("items", TypeRef.of("numbers"))))));
-        TsonSchemaParser compiled = compile(extra);
+        TsonCompiledSchema compiled = compile(extra);
 
         Document document = new Parser("{ items: [1 2 3] }").parseDocument();
         @SuppressWarnings("unchecked")

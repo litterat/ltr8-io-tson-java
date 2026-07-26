@@ -26,15 +26,15 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 /** End-to-end proof of {@link TupleParser} against real TSON data source text -- a heterogeneous (integer, text) pair. */
 class TupleParserTest {
 
-    private static ParserFactoryRegistry registry() {
-        return ParserFactoryRegistry.builder()
+    private static TsonParserFactoryRegistry registry() {
+        return TsonParserFactoryRegistry.builder()
                 .register("integer_type", AtomTypeParser.INTEGER_TYPE)
                 .register("text_type", AtomTypeParser.TEXT_TYPE)
                 .register("tuple", TupleParser.FACTORY)
                 .build();
     }
 
-    private static TsonSchemaParser compile(TupleBody body) {
+    private static TsonCompiledSchema compile(TupleBody body) {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("integer", new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), false, List.of(),
                 List.of(), Optional.empty(), IntegerType.UNCONSTRAINED));
@@ -43,11 +43,11 @@ class TupleParserTest {
         entries.put("pair", TypeDefinition.product(body));
         TsonSchema schema = new TsonSchema("https://example.test/s.tn1",
                 "https://example.test/meta.tn1", List.of(), entries);
-        return TsonSchemaParser.compile(schema, registry());
+        return TsonSchemaCompiler.compile(schema, registry());
     }
 
     @SuppressWarnings("unchecked")
-    private static List<Object> readTuple(TsonSchemaParser compiled, String source) {
+    private static List<Object> readTuple(TsonCompiledSchema compiled, String source) {
         Document document = new Parser(source).parseDocument();
         return (List<Object>) compiled.get("pair").read(document.root());
     }
@@ -60,14 +60,14 @@ class TupleParserTest {
 
     @Test
     void readsAHeterogeneousTuple() {
-        TsonSchemaParser compiled = compile(twoRequiredSlots());
+        TsonCompiledSchema compiled = compile(twoRequiredSlots());
 
         assertEquals(List.of(BigInteger.valueOf(42), "hello"), readTuple(compiled, "[42 hello]"));
     }
 
     @Test
     void wrongArityThrows() {
-        TsonSchemaParser compiled = compile(twoRequiredSlots());
+        TsonCompiledSchema compiled = compile(twoRequiredSlots());
 
         assertThrows(IllegalArgumentException.class, () -> readTuple(compiled, "[42]"));
         assertThrows(IllegalArgumentException.class, () -> readTuple(compiled, "[42 hello extra]"));
@@ -76,7 +76,7 @@ class TupleParserTest {
     @Test
     void recordShapedDataIsRejected() {
         // A tuple is array-shaped on the wire -- {} is never a plausible reading, unlike record/map.
-        TsonSchemaParser compiled = compile(twoRequiredSlots());
+        TsonCompiledSchema compiled = compile(twoRequiredSlots());
 
         assertThrows(IllegalArgumentException.class, () -> readTuple(compiled, "{}"));
     }
@@ -86,7 +86,7 @@ class TupleParserTest {
         TupleBody body = new TupleBody(List.of(
                 TupleElement.required(TypeRef.of("integer")),
                 new TupleElement(TypeRef.of("text"), ElementState.OPTIONAL)));
-        TsonSchemaParser compiled = compile(body);
+        TsonCompiledSchema compiled = compile(body);
 
         List<Object> result = readTuple(compiled, "[42 _]");
         assertEquals(BigInteger.valueOf(42), result.get(0));
@@ -95,7 +95,7 @@ class TupleParserTest {
 
     @Test
     void requiredPositionRejectsTheAbsentSentinel() {
-        TsonSchemaParser compiled = compile(twoRequiredSlots());
+        TsonCompiledSchema compiled = compile(twoRequiredSlots());
 
         assertThrows(IllegalArgumentException.class, () -> readTuple(compiled, "[42 _]"));
     }

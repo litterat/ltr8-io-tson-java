@@ -4,7 +4,7 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.parser.SchemaParser;
 import io.ltr8.tson.parser.ast.schema.SchemaDocument;
 import io.ltr8.tson.parser.resolver.TsonAtomContext;
-import io.ltr8.tson.parser.resolver.schema.compiled.ParserFactoryRegistry;
+import io.ltr8.tson.parser.resolver.schema.compiled.TsonParserFactoryRegistry;
 import io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledRegistry;
 import io.ltr8.tson.schema.LinkedTsonSchema;
 import io.ltr8.tson.schema.TsonSchema;
@@ -139,7 +139,7 @@ class MetaKernelSchemaRegistryTest {
         LinkedTsonSchema linkedBootstrap = registry.linkBootstrap(metaKernelBootstrap);
 
         DataBindContext context = TsonAtomContext.defaultContext();
-        ParserFactoryRegistry objectFactories = ParserFactoryRegistry.object(linkedBootstrap.schema(), context);
+        TsonParserFactoryRegistry objectFactories = TsonParserFactoryRegistry.object(linkedBootstrap.schema(), context);
         TsonCompiledRegistry compiledRegistry = new TsonCompiledRegistry(objectFactories);
         DefaultSchemaCoordinator coordinator = new DefaultSchemaCoordinator(compiledRegistry);
 

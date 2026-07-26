@@ -11,7 +11,7 @@ import io.ltr8.tson.parser.ast.DataValue;
  * expressed as an {@code io.ltr8.tson.parser.resolver.vocab.AtomType<T>} at all -- {@code
  * AtomType.read(TokenValue)} only ever sees a token, and {@code _} isn't one ({@link AbsentValue}
  * is a distinct {@code CoreValue} variant, a sibling of {@code TokenValue}, not a kind of it) -- so
- * this lives here, as an ordinary {@link TsonTypeParser} reading the {@link DataValue} directly,
+ * this lives here, as an ordinary {@link TsonSchemaTypeParser} reading the {@link DataValue} directly,
  * rather than being adapted through {@link AtomTypeParser} the way every other atom-family parser
  * is.
  *
@@ -20,7 +20,7 @@ import io.ltr8.tson.parser.ast.DataValue;
  * rejected outright, matching the contract exactly: {@code void} is not "any value, including
  * absent," it is "only absent."
  */
-final class VoidParser implements TsonTypeParser<Object> {
+final class VoidParser implements TsonSchemaTypeParser<Object> {
 
     static final VoidParser INSTANCE = new VoidParser();
 

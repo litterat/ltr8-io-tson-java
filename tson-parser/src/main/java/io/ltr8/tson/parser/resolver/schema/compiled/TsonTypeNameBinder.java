@@ -14,7 +14,7 @@ package io.ltr8.tson.parser.resolver.schema.compiled;
  * across arbitrary consumer code, only within this library's own, self-consistent one.
  */
 @FunctionalInterface
-public interface TypeNameBinder {
+public interface TsonTypeNameBinder {
 
     /** @throws ClassNotFoundException if {@code schemaTypeName} has no matching Java class under this binder's own convention */
     Class<?> resolve(String schemaTypeName) throws ClassNotFoundException;

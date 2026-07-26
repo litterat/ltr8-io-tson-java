@@ -44,10 +44,10 @@ import java.util.Optional;
  * {@code bootstrap() == true} -- see that class's own Javadoc). This class is a stateless
  * parser/resolver, the same shape as {@link SchemaParser}/{@link SchemaResolver} -- {@link
  * #getMetaKernelSchema()} returns a freshly-built value rather than being one itself. Its own
- * output is resolved-but-not-yet-materialized -- a caller materializes it (via {@code
- * SchemaRegistry#materializeBootstrap}, never {@code SchemaRegistry#register} directly -- see that
+ * output is resolved-but-not-yet-linked -- a caller links it (via {@code
+ * SchemaRegistry#linkBootstrap}, never {@code SchemaRegistry#register} directly -- see that
  * class's own Javadoc for why) and, separately, compiles it -- a distinct, later stage this class
- * has nothing to do with; see {@code SchemaValidator}/{@code TsonSchemaParser}.
+ * has nothing to do with; see {@code SchemaLinker}/{@code TsonCompiledSchema}.
  *
  * <p><b>Deliberately locked down to exactly one public method, taking no arguments</b> (narrowed
  * 2026-07-26, on the user's own explicit direction) -- this class exists to bootstrap *the* real
@@ -65,7 +65,7 @@ import java.util.Optional;
  * hand-picked only {@code uri_type}/{@code regex_type}/{@code enum}; merged from a separate
  * {@code BootstrapMetaKernelCompiler} class the same day -- it had exactly one caller, produced a
  * {@link Top} *value* rather than a compiled reader, and "Compiler" in its name collided with what
- * that word means for a class that actually produces a {@code TsonSchemaParser}-shaped artifact,
+ * that word means for a class that actually produces a {@code TsonCompiledSchema}-shaped artifact,
  * once that became a real, distinct concept in this codebase). Two things rule out both of the more
  * "general" mechanisms this could otherwise reach for:
  * <ul>

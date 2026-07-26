@@ -3,7 +3,7 @@ package io.ltr8.tson.parser.resolver.schema.compiled;
 import java.util.Map;
 
 /**
- * The default {@link TypeNameBinder} for {@code io.ltr8.tson.schema.meta} -- a fixed namespace
+ * The default {@link TsonTypeNameBinder} for {@code io.ltr8.tson.schema.meta} -- a fixed namespace
  * plus a snake_case-to-PascalCase mangling of the schema type name (e.g. {@code "integer_size"} ->
  * {@code IntegerSize}, {@code "atom_specification"} -> {@code AtomSpecification}), which holds
  * directly for every genuine constraint-vocabulary/helper record in that package, with one
@@ -22,7 +22,7 @@ import java.util.Map;
  * recovers it mechanically from the bare name alone. {@code set}/{@code array_min}/{@code
  * array_max}/{@code array_ranged} are parameterized template constructors that share {@code
  * array}'s own resolved shape rather than declaring one of their own (see {@code
- * ParserFactoryRegistry}'s own Javadoc: "{@code set} was never a distinct resolved shape, only a
+ * TsonParserFactoryRegistry}'s own Javadoc: "{@code set} was never a distinct resolved shape, only a
  * distinct declared name") -- their own field set is identical to {@code array}'s (refinement never
  * adds or removes fields, only tightens values), so they alias to the same {@code ArrayBody} target
  * rather than needing one of their own.
@@ -38,7 +38,7 @@ import java.util.Map;
  * class is usable as a record; see {@link ObjectRecordShapeFactory#validate} for why a non-record
  * result there is treated as "doesn't apply" rather than a binding failure.
  */
-public final class SchemaMetaTypeNameBinder implements TypeNameBinder {
+public final class SchemaMetaTypeNameBinder implements TsonTypeNameBinder {
 
     public static final SchemaMetaTypeNameBinder INSTANCE = new SchemaMetaTypeNameBinder();
 

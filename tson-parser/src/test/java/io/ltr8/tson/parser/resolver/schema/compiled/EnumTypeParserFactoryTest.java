@@ -33,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  */
 class EnumTypeParserFactoryTest {
 
-    private static TsonSchemaParser compiled() {
+    private static TsonCompiledSchema compiled() {
         // The whole real meta-kernel closure, not a hand-picked subset -- "boolean"'s own source
         // names "enum", "enum" composes with "atom", and so on transitively; cherry-picking just
         // "boolean" drags in most of meta-kernel anyway via SchemaValidator's own reference checks,
@@ -46,22 +46,22 @@ class EnumTypeParserFactoryTest {
 
         SchemaRegistry schemaRegistry = new SchemaRegistry();
         TsonSchema registered = schemaRegistry.register(SchemaLinker.link(schema, schemaRegistry)).schema();
-        ParserFactoryRegistry registry = ParserFactoryRegistry.builder()
+        TsonParserFactoryRegistry registry = TsonParserFactoryRegistry.builder()
                 .register("record", RecordParser.FACTORY)
                 .register("enum", AtomTypeParser.ENUM)
                 .build();
-        return TsonSchemaParser.compile(registered, registry);
+        return TsonSchemaCompiler.compile(registered, registry);
     }
 
     @SuppressWarnings("unchecked")
-    private static Map<String, Object> read(TsonSchemaParser compiled, String source) {
+    private static Map<String, Object> read(TsonCompiledSchema compiled, String source) {
         Document document = new Parser(source).parseDocument();
         return (Map<String, Object>) compiled.get("flag_holder").read(document.root());
     }
 
     @Test
     void realBooleanEnumMembersReadCorrectlyAsDataThroughThisLayer() {
-        TsonSchemaParser compiled = compiled();
+        TsonCompiledSchema compiled = compiled();
 
         assertEquals("true", read(compiled, "{ flag: true }").get("flag"));
         assertEquals("false", read(compiled, "{ flag: false }").get("flag"));
@@ -69,7 +69,7 @@ class EnumTypeParserFactoryTest {
 
     @Test
     void aNonMemberValueFailsValidation() {
-        TsonSchemaParser compiled = compiled();
+        TsonCompiledSchema compiled = compiled();
 
         assertThrows(AtomValidationException.class, () -> read(compiled, "{ flag: maybe }"));
     }

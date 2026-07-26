@@ -17,7 +17,7 @@ import java.util.Set;
  * accurate to which kind of union this is ("open type parameters... known subtypes" vs. "a
  * choice... declared variants") without the dispatch logic itself needing to know or care.
  */
-final class NamedDispatchParser implements TsonTypeParser<Object> {
+final class NamedDispatchParser implements TsonSchemaTypeParser<Object> {
 
     private final String positionName;
     private final String missingTypeRefMessage;

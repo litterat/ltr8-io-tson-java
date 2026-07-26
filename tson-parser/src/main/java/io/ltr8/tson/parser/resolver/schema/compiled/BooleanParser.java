@@ -21,9 +21,9 @@ import io.ltr8.tson.parser.ast.TokenValue;
  * AtomTypeParser#ENUM} keeps producing {@code String} for {@code boolean} there too, matching
  * already-established, already-tested behavior (e.g. {@code MetaKernelEndToEndTest}'s own
  * {@code "true"}, not a Java boolean" assertion) -- this class only ever gets registered under
- * {@code "enum"} in {@link ParserFactoryRegistry#object}.
+ * {@code "enum"} in {@link TsonParserFactoryRegistry#object}.
  */
-final class BooleanParser implements TsonTypeParser<Boolean> {
+final class BooleanParser implements TsonSchemaTypeParser<Boolean> {
 
     static final BooleanParser INSTANCE = new BooleanParser();
 

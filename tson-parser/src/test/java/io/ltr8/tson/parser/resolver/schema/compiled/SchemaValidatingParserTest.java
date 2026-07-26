@@ -17,20 +17,20 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  * The whole pipeline, end to end, through the one entry point a real caller would actually use --
  * everything {@link MetaKernelEndToEndTest} proved piece by piece (a real, fully-registered
  * meta-kernel schema; every composite kind; every atom family; {@code top}'s own polymorphism),
- * now exercised through {@link TsonDataParser#read(String, String)} directly, the same one-line
+ * now exercised through {@link SchemaValidatingParser#read(String, String)} directly, the same one-line
  * shape {@code TsonMapperReader.toObject(String, Class)} already offers for Class 1.
  */
-class TsonDataParserTest {
+class SchemaValidatingParserTest {
 
-    private static TsonDataParser dataParser() {
+    private static SchemaValidatingParser dataParser() {
         TsonSchema raw = MetaKernelParser.getMetaKernelSchema();
         LinkedTsonSchema linked = new SchemaRegistry().linkBootstrap(raw);
-        return new TsonDataParser(TsonSchemaParser.compile(linked.schema(), ParserFactoryRegistry.dom()));
+        return new SchemaValidatingParser(TsonSchemaCompiler.compile(linked.schema(), TsonParserFactoryRegistry.dom()));
     }
 
     @Test
     void readsARecordInOneCall() {
-        TsonDataParser parser = dataParser();
+        SchemaValidatingParser parser = dataParser();
 
         Map<String, Object> result = parser.read("{ bits: 32 signed: true }", "integer_size");
 
@@ -40,7 +40,7 @@ class TsonDataParserTest {
 
     @Test
     void readsBareTopInOneCall() {
-        TsonDataParser parser = dataParser();
+        SchemaValidatingParser parser = dataParser();
 
         Map<String, Object> result = parser.read("{}", "top");
 
@@ -49,7 +49,7 @@ class TsonDataParserTest {
 
     @Test
     void readsEnumMembersInOneCall() {
-        TsonDataParser parser = dataParser();
+        SchemaValidatingParser parser = dataParser();
 
         Map<String, Object> result = parser.read("{ members: [true false] }", "enum");
 
@@ -58,16 +58,16 @@ class TsonDataParserTest {
 
     @Test
     void schemaAccessorReturnsTheWrappedCompiledSchema() {
-        TsonSchemaParser compiled = TsonSchemaParser.compile(
-                new SchemaRegistry().linkBootstrap(MetaKernelParser.getMetaKernelSchema()).schema(), ParserFactoryRegistry.dom());
-        TsonDataParser parser = new TsonDataParser(compiled);
+        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(
+                new SchemaRegistry().linkBootstrap(MetaKernelParser.getMetaKernelSchema()).schema(), TsonParserFactoryRegistry.dom());
+        SchemaValidatingParser parser = new SchemaValidatingParser(compiled);
 
         assertEquals(compiled, parser.schema());
     }
 
     @Test
     void badDataStillFailsWithAClearError() {
-        TsonDataParser parser = dataParser();
+        SchemaValidatingParser parser = dataParser();
 
         assertThrows(IllegalArgumentException.class, () -> parser.read("{}", "integer_size"));
     }

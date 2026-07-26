@@ -14,7 +14,7 @@ import java.util.Map;
 
 /**
  * The {@link TsonParserFactory} for meta-kernel's {@code map} constructor (§4.2, backing e.g. the
- * kernel's own {@code schema => map<type_name, type_definition>}), and the {@link TsonTypeParser}
+ * kernel's own {@code schema => map<type_name, type_definition>}), and the {@link TsonSchemaTypeParser}
  * it builds -- same shape as {@link RecordParser}/{@link ArrayParser} (DOM-mode, {@code Map<Object,
  * Object>}). Both {@code key_type} and {@code value_type} resolve eagerly at compile time, the same
  * reasoning as {@link ArrayParser}'s own element type: unconditionally needed for every entry.
@@ -26,21 +26,21 @@ import java.util.Map;
  * parser and here is positioned to. {@code min_items}/{@code max_items} validate entry count,
  * matching {@link ArrayParser}'s own treatment of the identical field pair.
  */
-final class MapParser implements TsonTypeParser<Map<Object, Object>> {
+final class MapParser implements TsonSchemaTypeParser<Map<Object, Object>> {
 
     static final TsonParserFactory FACTORY = (name, definition, ctx) -> {
         MapBody body = (MapBody) definition.body();
-        TsonTypeParser<?> keyParser = ctx.resolve(body.keyType().name());
-        TsonTypeParser<?> valueParser = ctx.resolve(body.valueType().name());
+        TsonSchemaTypeParser<?> keyParser = ctx.resolve(body.keyType().name());
+        TsonSchemaTypeParser<?> valueParser = ctx.resolve(body.valueType().name());
         return new MapParser(name, body, keyParser, valueParser);
     };
 
     private final String name;
     private final MapBody body;
-    private final TsonTypeParser<?> keyParser;
-    private final TsonTypeParser<?> valueParser;
+    private final TsonSchemaTypeParser<?> keyParser;
+    private final TsonSchemaTypeParser<?> valueParser;
 
-    private MapParser(String name, MapBody body, TsonTypeParser<?> keyParser, TsonTypeParser<?> valueParser) {
+    private MapParser(String name, MapBody body, TsonSchemaTypeParser<?> keyParser, TsonSchemaTypeParser<?> valueParser) {
         this.name = name;
         this.body = body;
         this.keyParser = keyParser;

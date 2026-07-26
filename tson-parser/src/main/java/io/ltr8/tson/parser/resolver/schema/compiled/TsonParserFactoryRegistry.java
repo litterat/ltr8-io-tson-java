@@ -10,7 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * A {@code constructor name -> TsonParserFactory} table -- what {@link TsonSchemaParser} actually
+ * A {@code constructor name -> TsonParserFactory} table -- what {@link TsonCompiledSchema} actually
  * consults to turn a resolved entry's own shape into a compiled parser, keyed by the same name a
  * meta-schema itself uses for that constructor (§4.1/§5.5's {@code record}/{@code array}/{@code
  * integer_type}/... vocabulary), recovered from the resolved body's own {@code @Typename} via
@@ -39,11 +39,11 @@ import java.util.Map;
  * needed it, rather than a generic "no factory for X" surfacing arbitrarily later during
  * compilation of some unrelated schema that happens to use it.
  */
-public final class ParserFactoryRegistry {
+public final class TsonParserFactoryRegistry {
 
     private final Map<String, TsonParserFactory> factories;
 
-    private ParserFactoryRegistry(Map<String, TsonParserFactory> factories) {
+    private TsonParserFactoryRegistry(Map<String, TsonParserFactory> factories) {
         this.factories = factories;
     }
 
@@ -100,13 +100,13 @@ public final class ParserFactoryRegistry {
      * {@code Map<String, Object>}, same as every other composite/atom-family factory {@link
      * #withoutRecord()} shares with {@link #object}. Previously hand-duplicated as a private
      * {@code fullRegistry()} helper in several test classes (`MetaKernelEndToEndTest`, {@code
-     * TsonDataParserTest}, ...) and, as of {@code TsonCompiledRegistry}, real production code too --
+     * SchemaValidatingParserTest}, ...) and, as of {@code TsonCompiledRegistry}, real production code too --
      * factored out here once a fourth/fifth copy made the duplication worth closing. Not the *only*
      * legitimate registry a caller might build (a caller reading only a narrow slice of a schema can
      * still assemble a smaller one directly via {@link #builder}), just the canonical "everything
      * this build knows how to construct in DOM mode" one.
      */
-    public static ParserFactoryRegistry dom() {
+    public static TsonParserFactoryRegistry dom() {
         return withoutRecord()
                 .register("record", RecordParser.FACTORY)
                 .register("enum", AtomTypeParser.ENUM)
@@ -125,15 +125,15 @@ public final class ParserFactoryRegistry {
      * class for every {@code record}-shaped entry the schema actually declares, up front, rather
      * than discovering a missing binding lazily, one entry at a time, only once something happens to
      * read it. Uses {@link SchemaMetaTypeNameBinder}, the default {@code io.ltr8.tson.schema.meta}
-     * binder -- see {@link #object(TsonSchema, DataBindContext, TypeNameBinder)} to supply a
+     * binder -- see {@link #object(TsonSchema, DataBindContext, TsonTypeNameBinder)} to supply a
      * different one (e.g. for a schema binding to a caller's own Java library instead).
      */
-    public static ParserFactoryRegistry object(TsonSchema schema, DataBindContext context) {
+    public static TsonParserFactoryRegistry object(TsonSchema schema, DataBindContext context) {
         return object(schema, context, SchemaMetaTypeNameBinder.INSTANCE);
     }
 
-    /** As {@link #object(TsonSchema, DataBindContext)}, with an explicit {@link TypeNameBinder} rather than the {@code schema.meta} default. */
-    public static ParserFactoryRegistry object(TsonSchema schema, DataBindContext context, TypeNameBinder binder) {
+    /** As {@link #object(TsonSchema, DataBindContext)}, with an explicit {@link TsonTypeNameBinder} rather than the {@code schema.meta} default. */
+    public static TsonParserFactoryRegistry object(TsonSchema schema, DataBindContext context, TsonTypeNameBinder binder) {
         ObjectRecordShapeFactory shapeFactory = new ObjectRecordShapeFactory(context, binder);
         shapeFactory.validate(schema);
         return withoutRecord()
@@ -149,7 +149,7 @@ public final class ParserFactoryRegistry {
      * entries with {@link TypeDefinition#constructor()} true) -- erroring immediately, per entry,
      * if one of them has no matching factory in {@code available}.
      */
-    public static ParserFactoryRegistry forMetaSchema(TsonSchema metaSchema, ParserFactoryRegistry available) {
+    public static TsonParserFactoryRegistry forMetaSchema(TsonSchema metaSchema, TsonParserFactoryRegistry available) {
         Builder scoped = builder();
         for (Map.Entry<String, TypeDefinition> entry : metaSchema.entries().entrySet()) {
             TypeDefinition definition = entry.getValue();
@@ -185,8 +185,8 @@ public final class ParserFactoryRegistry {
             return this;
         }
 
-        public ParserFactoryRegistry build() {
-            return new ParserFactoryRegistry(Map.copyOf(factories));
+        public TsonParserFactoryRegistry build() {
+            return new TsonParserFactoryRegistry(Map.copyOf(factories));
         }
     }
 }

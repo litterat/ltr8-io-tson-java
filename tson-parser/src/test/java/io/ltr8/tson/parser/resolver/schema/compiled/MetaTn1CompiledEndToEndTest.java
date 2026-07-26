@@ -40,7 +40,7 @@ class MetaTn1CompiledEndToEndTest {
         LinkedTsonSchema materializedMetaKernelBootstrap = registry.linkBootstrap(metaKernelBootstrap);
 
         DataBindContext context = TsonAtomContext.defaultContext();
-        ParserFactoryRegistry objectFactories = ParserFactoryRegistry.object(materializedMetaKernelBootstrap.schema(), context);
+        TsonParserFactoryRegistry objectFactories = TsonParserFactoryRegistry.object(materializedMetaKernelBootstrap.schema(), context);
         TsonCompiledRegistry compiledRegistry = new TsonCompiledRegistry(objectFactories);
         DefaultSchemaCoordinator coordinator = new DefaultSchemaCoordinator(compiledRegistry);
 
@@ -59,7 +59,7 @@ class MetaTn1CompiledEndToEndTest {
 
     /**
      * {@code meta.tn1} declares 31 entries of its own, but the *registered* schema this compiles --
-     * the one a real reader actually needs, since it's what {@link TsonSchemaParser#compile} accepts
+     * the one a real reader actually needs, since it's what {@link TsonCompiledSchema#compile} accepts
      * -- also carries meta-kernel's own entries (merged in via meta.tn1's real {@code !!import}) plus
      * whatever array-sugar materialization synthesized, matching {@code MetaSchemaImportTest}'s own
      * counts. Every one of them still compiles cleanly with the same registry this whole atom-family
@@ -69,7 +69,7 @@ class MetaTn1CompiledEndToEndTest {
     @Test
     void everyRealMetaEntryCompilesCleanly() {
         TsonSchema meta = registerMeta();
-        TsonSchemaParser compiled = TsonSchemaParser.compile(meta, ParserFactoryRegistry.dom());
+        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(meta, TsonParserFactoryRegistry.dom());
 
         for (String name : meta.entries().keySet()) {
             compiled.get(name);
@@ -80,7 +80,7 @@ class MetaTn1CompiledEndToEndTest {
     @Test
     void readsBinaryEncodingEnumMembersAgainstRealData() {
         TsonSchema meta = registerMeta();
-        TsonSchemaParser compiled = TsonSchemaParser.compile(meta, ParserFactoryRegistry.dom());
+        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(meta, TsonParserFactoryRegistry.dom());
         Document document = new Parser("BASE64").parseDocument();
 
         Object result = compiled.get("binary_encoding").read(document.root());

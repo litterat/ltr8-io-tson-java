@@ -31,7 +31,7 @@ import io.ltr8.tson.parser.ast.schema.TypeArg;
 import io.ltr8.tson.parser.ast.schema.TypeDef;
 import io.ltr8.tson.parser.ast.schema.TypeRef;
 import io.ltr8.tson.parser.mapper.TsonMapperWriter;
-import io.ltr8.tson.parser.resolver.schema.compiled.TsonSchemaParser;
+import io.ltr8.tson.parser.resolver.schema.compiled.TsonCompiledSchema;
 import io.ltr8.tson.schema.SchemaRegistry;
 import io.ltr8.tson.schema.SchemaValidationException;
 import io.ltr8.tson.schema.TsonSchema;
@@ -252,7 +252,7 @@ public final class SchemaResolver {
      * <p>A same-module, cross-package reach from {@code resolver.schema} up into {@code
      * resolver.schema.compiled} -- worth naming plainly, since every other layering note in this
      * codebase describes the *opposite* direction ({@code compiled} sitting "on top of" {@code
-     * SchemaResolver}'s own resolution, per {@code TsonSchemaParser}'s own Javadoc). Not a cycle
+     * SchemaResolver}'s own resolution, per {@code TsonCompiledSchema}'s own Javadoc). Not a cycle
      * (nothing in {@code resolver.schema.compiled}'s own main code imports back from {@code
      * resolver.schema}), and both packages live in the same module regardless, but a real, deliberate
      * exception to that "compiled depends on schema, never the other way" framing -- made because
@@ -260,7 +260,7 @@ public final class SchemaResolver {
      * lower-layer resolution genuinely needs the higher layer's own compiled output, not just its
      * resolved one.
      */
-    TsonSchemaParser compiledMetaSchema(SchemaDocument document) {
+    TsonCompiledSchema compiledMetaSchema(SchemaDocument document) {
         if (coordinator == null) {
             throw new IllegalStateException("'" + documentLabel(document)
                     + "': this resolver has no SchemaCoordinator, so !!meta target '" + document.meta()
@@ -276,7 +276,7 @@ public final class SchemaResolver {
 
     /** Resolves a single declaration against {@code resolved}, the entries already resolved so far (for composition's supertype lookups). No compiled meta-schema reader -- see the three-argument overload. */
     public TypeDefinition resolve(SchemaMap.Declaration declaration, Map<String, TypeDefinition> resolved) {
-        return resolve(declaration, resolved, (TsonSchemaParser) null);
+        return resolve(declaration, resolved, (TsonCompiledSchema) null);
     }
 
     /**
@@ -292,7 +292,7 @@ public final class SchemaResolver {
      * refinement, a fresh record, ...); {@link #bindAtomInstance} throws clearly if it's actually
      * needed and absent, rather than a bare {@code NullPointerException}.
      *
-     * <p>Deliberately a compiled {@link TsonSchemaParser}, not a bare {@code Map<String,
+     * <p>Deliberately a compiled {@link TsonCompiledSchema}, not a bare {@code Map<String,
      * TypeDefinition>} the way an earlier version of this parameter worked -- {@link
      * #bindAtomInstance} needs an actual compiled parser to read a constructor-application/
      * refinement value *against* (the resolved {@code TypeDefinition} map alone isn't itself
@@ -300,11 +300,11 @@ public final class SchemaResolver {
      * have one (typically via {@link #compiledMetaSchema}) don't pay to rebuild an equivalent one
      * per call -- rather than this class holding one as mutable instance state (an earlier,
      * rejected version of this design), which broke down for any caller of the lower-level {@link
-     * #resolve(SchemaMap.Declaration, Map, TsonSchemaParser)} overloads directly (never going
+     * #resolve(SchemaMap.Declaration, Map, TsonCompiledSchema)} overloads directly (never going
      * through {@link #resolveAll(SchemaDocument)}, so the field was simply never populated).
      */
     public TypeDefinition resolve(SchemaMap.Declaration declaration, Map<String, TypeDefinition> resolved,
-                                   TsonSchemaParser metaParser) {
+                                   TsonCompiledSchema metaParser) {
         return resolveTypeDef(declaration.name(), declaration.typeDef(), resolved, metaParser);
     }
 
@@ -347,12 +347,12 @@ public final class SchemaResolver {
      * each does exactly one {@code resolved.get(name)}). meta.tn1's own {@code date_type => ~atom &
      * atom_specification & {...}}, composing with two meta-kernel entries it only has via its own
      * {@code !!import}, would fail to resolve at all without this. Collision handling mirrors {@code
-     * SchemaValidator.mergeImports}'s own established rule exactly, not a new one: a name declared by
+     * SchemaLinker.mergeImports}'s own established rule exactly, not a new one: a name declared by
      * more than one import, or by an import *and* a local declaration, is a {@link
      * SchemaValidationException} -- checked as each import is merged in, and
      * again as each local declaration is about to be resolved, so a collision is caught at the
      * earliest point either side of it becomes known, before any further resolution work is spent.
-     * <b>Merged entries keep their home namespace</b>, same as {@code SchemaValidator}'s own note on
+     * <b>Merged entries keep their home namespace</b>, same as {@code SchemaLinker}'s own note on
      * this: an imported entry is copied in exactly as its own schema resolved it, never re-resolved
      * or re-materialized against the importer. The result's own {@link TsonSchema#entries()} is
      * local-only, same as {@code MetaTn1Parser}'s own convention -- imported entries are visible
@@ -362,7 +362,7 @@ public final class SchemaResolver {
      */
     public TsonSchema resolveAll(SchemaDocument document) {
         if (coordinator == null) {
-            return resolveAll(document, (TsonSchemaParser) null);
+            return resolveAll(document, (TsonCompiledSchema) null);
         }
         String id = document.id().orElseThrow(() -> new IllegalStateException(
                 "'" + document.meta() + "': !!id is required to register this schema, but is absent"));
@@ -371,7 +371,7 @@ public final class SchemaResolver {
             SchemaRegistry.validateIdentity(importUri);
         }
 
-        TsonSchemaParser metaParser = compiledMetaSchema(document);
+        TsonCompiledSchema metaParser = compiledMetaSchema(document);
 
         Map<String, TypeDefinition> namespace = mergeImports(document);
         Map<String, TypeDefinition> localOnly = new LinkedHashMap<>();
@@ -387,7 +387,7 @@ public final class SchemaResolver {
         return new TsonSchema(id, document.meta(), document.imports(), localOnly);
     }
 
-    /** Stage 1 of {@link #resolveAll(SchemaDocument)} -- every {@code !!import}'s own entries, in declaration order, merged as-is (never re-resolved against the importer). Mirrors {@code SchemaValidator.mergeImports} exactly, including its collision rule, since this is the same concept discovered one stage earlier. */
+    /** Stage 1 of {@link #resolveAll(SchemaDocument)} -- every {@code !!import}'s own entries, in declaration order, merged as-is (never re-resolved against the importer). Mirrors {@code SchemaLinker.mergeImports} exactly, including its collision rule, since this is the same concept discovered one stage earlier. */
     private Map<String, TypeDefinition> mergeImports(SchemaDocument document) {
         Map<String, TypeDefinition> merged = new LinkedHashMap<>();
         for (String importUri : document.imports()) {
@@ -419,7 +419,7 @@ public final class SchemaResolver {
      * #documentLabel} already uses for error messages -- rather than failing a call site that was
      * never validating {@code !!id} in the first place.
      */
-    public TsonSchema resolveAll(SchemaDocument document, TsonSchemaParser metaParser) {
+    public TsonSchema resolveAll(SchemaDocument document, TsonCompiledSchema metaParser) {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         for (SchemaMap.Declaration declaration : document.body().declarations().values()) {
             entries.put(declaration.name(), resolve(declaration, entries, metaParser));
@@ -428,7 +428,7 @@ public final class SchemaResolver {
     }
 
     private TypeDefinition resolveTypeDef(String name, TypeDef typeDef, Map<String, TypeDefinition> resolved,
-                                           TsonSchemaParser metaParser) {
+                                           TsonCompiledSchema metaParser) {
         if (typeDef instanceof StructuralTypeDef structural) {
             List<String> parameters = structural.typeParams();
             boolean constructor = structural.constructor();
@@ -493,7 +493,7 @@ public final class SchemaResolver {
      * like, atom-family or not).
      */
     private TypeDefinition resolveInstance(String name, Instance instance, Map<String, TypeDefinition> resolved,
-                                            TsonSchemaParser metaParser) {
+                                            TsonCompiledSchema metaParser) {
         String target = instance.target();
         TypeDefinition constructor = resolveConstructorTarget(name, target, resolved, metaParser);
         if (!constructor.constructor()) {
@@ -558,7 +558,7 @@ public final class SchemaResolver {
      * supertypes}).
      */
     private TypeDefinition resolveAtomRefinement(String name, AtomRefinement refinement, Map<String, TypeDefinition> resolved,
-                                                  TsonSchemaParser metaParser) {
+                                                  TsonCompiledSchema metaParser) {
         String sourceName = refinement.target();
         TypeDefinition source = resolved.get(sourceName);
         if (source == null) {
@@ -626,7 +626,7 @@ public final class SchemaResolver {
 
     /** §3.3.1's lookup rule for a bare {@code !} target: the type-name namespace first, then the compiled meta-schema reader's own namespace. */
     private static TypeDefinition resolveConstructorTarget(String name, String target, Map<String, TypeDefinition> resolved,
-                                                             TsonSchemaParser metaParser) {
+                                                             TsonCompiledSchema metaParser) {
         TypeDefinition local = resolved.get(target);
         if (local != null) {
             return local;
@@ -649,7 +649,7 @@ public final class SchemaResolver {
      * so {@code metaParser.get(constructorName)} finds the right compiled parser directly -- no
      * separate name→class table, no union-member scan.
      */
-    private Top bindAtomInstance(String name, DataValue value, TsonSchemaParser metaParser) {
+    private Top bindAtomInstance(String name, DataValue value, TsonCompiledSchema metaParser) {
         String constructorName = value.typeRef().orElseThrow(() -> new IllegalStateException(
                 "'" + name + "': normalized value has no type-ref naming its own constructor -- "
                         + "SchemaResolver should never produce this"));

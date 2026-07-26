@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class ParserFactoryRegistryTest {
+class TsonParserFactoryRegistryTest {
 
     private static TypeDefinition constructorEntry(TypeKind kind, Top body) {
         return new TypeDefinition(Optional.empty(), kind, List.of(), true, List.of(), List.of(), Optional.empty(), body);
@@ -26,13 +26,13 @@ class ParserFactoryRegistryTest {
 
     @Test
     void requireThrowsForAnUnregisteredConstructor() {
-        ParserFactoryRegistry registry = ParserFactoryRegistry.builder().build();
+        TsonParserFactoryRegistry registry = TsonParserFactoryRegistry.builder().build();
         assertThrows(IllegalStateException.class, () -> registry.require("record"));
     }
 
     @Test
     void requireReturnsTheRegisteredFactory() {
-        ParserFactoryRegistry registry = ParserFactoryRegistry.builder()
+        TsonParserFactoryRegistry registry = TsonParserFactoryRegistry.builder()
                 .register("record", RecordParser.FACTORY)
                 .build();
         assertSame(RecordParser.FACTORY, registry.require("record"));
@@ -40,8 +40,8 @@ class ParserFactoryRegistryTest {
 
     @Test
     void typenameOfReadsTheBodysOwnAnnotation() {
-        assertEquals("record", ParserFactoryRegistry.typenameOf(RecordBody.of(List.of())));
-        assertEquals("enum", ParserFactoryRegistry.typenameOf(new EnumBody(List.of("a", "b"))));
+        assertEquals("record", TsonParserFactoryRegistry.typenameOf(RecordBody.of(List.of())));
+        assertEquals("enum", TsonParserFactoryRegistry.typenameOf(new EnumBody(List.of("a", "b"))));
     }
 
     @Test
@@ -54,13 +54,13 @@ class ParserFactoryRegistryTest {
         TsonSchema metaSchema = new TsonSchema("https://example.test/meta.tn1",
                 "https://example.test/meta-kernel.tn1", List.of(), metaEntries);
 
-        ParserFactoryRegistry available = ParserFactoryRegistry.builder()
+        TsonParserFactoryRegistry available = TsonParserFactoryRegistry.builder()
                 .register("record", RecordParser.FACTORY)
                 .register("enum", AtomTypeParser.ENUM)
                 .register("integer_type", AtomTypeParser.INTEGER_TYPE)
                 .build();
 
-        ParserFactoryRegistry scoped = ParserFactoryRegistry.forMetaSchema(metaSchema, available);
+        TsonParserFactoryRegistry scoped = TsonParserFactoryRegistry.forMetaSchema(metaSchema, available);
 
         assertSame(RecordParser.FACTORY, scoped.require("record"));
         assertSame(AtomTypeParser.ENUM, scoped.require("enum"));
@@ -75,10 +75,10 @@ class ParserFactoryRegistryTest {
         TsonSchema metaSchema = new TsonSchema("https://example.test/meta.tn1",
                 "https://example.test/meta-kernel.tn1", List.of(), metaEntries);
 
-        ParserFactoryRegistry available = ParserFactoryRegistry.builder().build();
+        TsonParserFactoryRegistry available = TsonParserFactoryRegistry.builder().build();
 
         IllegalStateException thrown = assertThrows(IllegalStateException.class,
-                () -> ParserFactoryRegistry.forMetaSchema(metaSchema, available));
+                () -> TsonParserFactoryRegistry.forMetaSchema(metaSchema, available));
         assertTrue(thrown.getMessage().contains("text_type"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("meta.tn1"), thrown.getMessage());
     }
