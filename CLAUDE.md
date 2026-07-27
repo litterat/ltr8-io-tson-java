@@ -1432,18 +1432,38 @@ from meta.tn1's own composition-based declarations (`date_type => ~atom & atom_s
 declaration order already places each dependency before its use), and the merged, linked
 registration succeeds outright.
 
-### Class 2 compilation (`compiler/{TsonSchemaCompiler,TsonCompiledSchema,TsonParserFactory,TsonParserFactoryRegistry,ErrorParser}.java`)
+### Class 2 compilation (`compiler/{TsonSchemaCompiler,TsonCompiledSchema,TsonParserFactory,TsonParserFactoryRegistry,ErrorParser}.java`, `TsonValueReader.java`)
 
 `TsonSchemaCompiler.compile(TsonSchema, TsonParserFactory)` is the "compile" stage of
 parse -> resolve -> link -> register -> compile -> read; `TsonCompiledSchema` is the noun it
-produces, one `TsonSchemaTypeParser` per resolved entry, wired together as real Java object
+produces, one `TsonValueReader` per resolved entry, wired together as real Java object
 references (`ParserHandle`) rather than further name lookups at read time.
+
+**`TsonValueReader` (renamed from `TsonSchemaTypeParser`, moved out of `compiler` to this module's
+own root package, alongside `TsonDataParser`/`TsonSchemaParser` -- 2026-07-27, on the user's own
+explicit direction, working through the compiler's own structure: "the general pattern is the
+handle is a TsonValueReader... and should be a top level interface... a user level front-door type
+interface to the library").** A caller already receives one of these directly (`TsonCompiledSchema
+#get`, `SchemaValidatingParser#read`) without ever needing to know how it was built, the same
+"front door" status `TsonDataParser`/`TsonSchemaParser` already have -- the old name/location
+described internal machinery, not what it actually is. Still a single method, `T read(DataValue
+value)`, no `throws` clause -- every exception in this whole read/parse stack is unchecked
+(`LexException`, `TsonParseException`, `TsonSchemaValidationException`, ...); the one checked
+exception anywhere in the codebase, `tson-bind`'s own `DataBindException`, is confined to
+compile/bind-time setup and never reaches a `read` call, and a checked exception here would also
+have to propagate through every functional interface this reader composes through (`TsonParserFactory`,
+`CompilationContext`, `DataNameBinder`). A second parameter, `TsonContext ctx`, for whatever
+per-read state a future need might carry (error-path tracking, a depth guard, multi-problem
+accumulation) was considered and deliberately not added -- there's no concrete consumer yet to
+design its shape against (validation mode itself isn't built), so adding it now would be guessing;
+the marginal cost of adding it later, once a real need exists, is the same as adding it now, so
+there's no cost being deferred here, only a decision.
 
 **All the actual compile-time work — the eager walk, cycle detection, per-entry build-failure
 deferral — lives in `TsonSchemaCompiler`, not `TsonCompiledSchema` (moved 2026-07-27, on the user's
 own explicit direction: "the compile step still lives in TsonCompiledSchema.. move the compiler
 code into TsonSchemaCompiler").** `TsonCompiledSchema` is now a plain, already-built value: two
-final fields (`schema`, an immutable `Map<String, TsonSchemaTypeParser<?>>`), no build logic, no
+final fields (`schema`, an immutable `Map<String, TsonValueReader<?>>`), no build logic, no
 `finished`/`building` bookkeeping at all — matching the same verb/noun split this project's own
 pipeline vocabulary already uses everywhere else (`TsonSchemaLinker`/`TsonLinkedSchema`,
 `TsonSchemaResolver`/its own resolved `TsonSchema`). The actual recursion (`resolve`/`build`, cycle

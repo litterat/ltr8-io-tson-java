@@ -1,6 +1,7 @@
 package io.ltr8.tson.parser.compiler;
 
 import io.ltr8.tson.parser.TsonDataParser;
+import io.ltr8.tson.parser.TsonValueReader;
 import io.ltr8.tson.parser.ast.Document;
 
 /**
@@ -41,7 +42,7 @@ public final class SchemaValidatingParser {
     /**
      * Parses {@code source} and reads its root value against {@code rootTypeName}. {@code T} is
      * never checked -- the same unchecked cast a caller would otherwise write themselves against
-     * {@link TsonCompiledSchema#get}'s own wildcarded {@link TsonSchemaTypeParser}, just done once here.
+     * {@link TsonCompiledSchema#get}'s own wildcarded {@link TsonValueReader}, just done once here.
      */
     @SuppressWarnings("unchecked")
     public <T> T read(String source, String rootTypeName) {

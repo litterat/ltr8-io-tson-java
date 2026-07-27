@@ -1,5 +1,6 @@
 package io.ltr8.tson.parser.compiler;
 
+import io.ltr8.tson.parser.TsonValueReader;
 import io.ltr8.tson.parser.ast.DataValue;
 
 import java.util.Set;
@@ -17,7 +18,7 @@ import java.util.Set;
  * accurate to which kind of union this is ("open type parameters... known subtypes" vs. "a
  * choice... declared variants") without the dispatch logic itself needing to know or care.
  */
-final class NamedDispatchParser implements TsonSchemaTypeParser<Object> {
+final class NamedDispatchParser implements TsonValueReader<Object> {
 
     private final String positionName;
     private final String missingTypeRefMessage;

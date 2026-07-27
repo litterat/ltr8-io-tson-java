@@ -1,6 +1,7 @@
 package io.ltr8.tson.parser.compiler;
 
 import io.ltr8.annotation.Typename;
+import io.ltr8.tson.parser.TsonValueReader;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -65,7 +66,7 @@ public final class TsonParserFactoryRegistry implements TsonParserFactory {
 
     /** Looks {@code typeName} up via {@link #require} and delegates straight to it. */
     @Override
-    public TsonSchemaTypeParser<?> create(String typeName, String name, TypeDefinition definition, CompilationContext ctx) {
+    public TsonValueReader<?> create(String typeName, String name, TypeDefinition definition, CompilationContext ctx) {
         return require(typeName).create(typeName, name, definition, ctx);
     }
 

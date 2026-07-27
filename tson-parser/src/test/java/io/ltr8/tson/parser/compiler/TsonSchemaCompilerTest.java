@@ -1,5 +1,6 @@
 package io.ltr8.tson.parser.compiler;
 
+import io.ltr8.tson.parser.TsonValueReader;
 import io.ltr8.tson.parser.ast.DataValue;
 import io.ltr8.tson.parser.ast.EmptyBrace;
 import io.ltr8.tson.schema.TsonSchema;
@@ -87,7 +88,7 @@ class TsonSchemaCompilerTest {
         assertTrue(used.isEmpty());
 
         // Compiling/getting "orphan" itself succeeds -- only reading an actual value against it fails.
-        TsonSchemaTypeParser<?> orphan = compiled.get("orphan");
+        TsonValueReader<?> orphan = compiled.get("orphan");
         UnsupportedOperationException thrown =
                 assertThrows(UnsupportedOperationException.class, () -> orphan.read(EMPTY_RECORD));
         assertTrue(thrown.getMessage().contains("orphan"), thrown.getMessage());

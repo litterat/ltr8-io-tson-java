@@ -1,5 +1,6 @@
 package io.ltr8.tson.parser.compiler;
 
+import io.ltr8.tson.parser.TsonValueReader;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.Top;
@@ -21,7 +22,7 @@ import java.util.Set;
  * compiler code into TsonSchemaCompiler") that state, and the recursive build logic that owns it,
  * live in a private nested {@link Compilation} helper -- one instance per {@link #compile} call,
  * discarded once it returns. {@link TsonCompiledSchema} itself is left holding nothing but the
- * finished result: a plain, already-built {@code Map<String, TsonSchemaTypeParser<?>>}, immutable
+ * finished result: a plain, already-built {@code Map<String, TsonValueReader<?>>}, immutable
  * from the moment it's constructed.
  *
  * <p><b>Eager, not lazy</b> (flipped 2026-07-27, on the user's own explicit direction -- an earlier
@@ -114,7 +115,7 @@ public final class TsonSchemaCompiler {
     private static final class Compilation {
         private final TsonSchema schema;
         private final TsonParserFactory factory;
-        private final Map<String, TsonSchemaTypeParser<?>> finished = new LinkedHashMap<>();
+        private final Map<String, TsonValueReader<?>> finished = new LinkedHashMap<>();
         private final Set<String> building = new LinkedHashSet<>();
 
         Compilation(TsonSchema schema, TsonParserFactory factory) {
@@ -146,7 +147,7 @@ public final class TsonSchemaCompiler {
          * propagates immediately, uncaught.
          */
         ParserHandle<?> resolve(String name) {
-            TsonSchemaTypeParser<?> done = finished.get(name);
+            TsonValueReader<?> done = finished.get(name);
             if (done != null) {
                 return new ParserHandle.Direct<>(done);
             }
@@ -159,7 +160,7 @@ public final class TsonSchemaCompiler {
                     throw new IllegalStateException("'" + name + "' is referenced but not present in the schema -- "
                             + "TsonSchemaLinker should already have rejected this before compilation ever started");
                 }
-                TsonSchemaTypeParser<?> built;
+                TsonValueReader<?> built;
                 try {
                     built = build(name, definition);
                 } catch (RuntimeException e) {
@@ -172,12 +173,12 @@ public final class TsonSchemaCompiler {
             }
         }
 
-        private TsonSchemaTypeParser<?> build(String name, TypeDefinition definition) {
+        private TsonValueReader<?> build(String name, TypeDefinition definition) {
             Top body = definition.body();
             if (body instanceof Reference r) {
                 return resolve(r.target().name());
             }
-            TsonSchemaTypeParser<?> ownParser =
+            TsonValueReader<?> ownParser =
                     factory.create(TsonParserFactoryRegistry.typenameOf(body), name, definition, this::resolve);
             if (definition.subtypes().isEmpty()) {
                 return ownParser;

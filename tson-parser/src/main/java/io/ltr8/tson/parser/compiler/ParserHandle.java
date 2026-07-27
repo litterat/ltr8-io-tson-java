@@ -1,5 +1,6 @@
 package io.ltr8.tson.parser.compiler;
 
+import io.ltr8.tson.parser.TsonValueReader;
 import io.ltr8.tson.parser.ast.DataValue;
 
 import java.util.Map;
@@ -16,16 +17,16 @@ import java.util.Map;
  * TsonSchemaCompiler#compile} call that triggered this whole construction chain has returned, instead of
  * the object it can't hold yet.
  *
- * <p>Both variants are themselves a {@link TsonSchemaTypeParser}, so a composite parser holding a {@code
+ * <p>Both variants are themselves a {@link TsonValueReader}, so a composite parser holding a {@code
  * ParserHandle<X>} field never needs to branch on which case it got -- it just calls {@code
  * read(value)} on the handle directly, same as if it held the child parser itself.
  *
  * @param <T> the child parser's own host value type.
  */
-public sealed interface ParserHandle<T> extends TsonSchemaTypeParser<T> {
+public sealed interface ParserHandle<T> extends TsonValueReader<T> {
 
     /** The non-cyclic case -- {@code parser} was already finished when this handle was created. */
-    record Direct<T>(TsonSchemaTypeParser<T> parser) implements ParserHandle<T> {
+    record Direct<T>(TsonValueReader<T> parser) implements ParserHandle<T> {
 
         @Override
         public T read(DataValue value) {
@@ -36,7 +37,7 @@ public sealed interface ParserHandle<T> extends TsonSchemaTypeParser<T> {
     /**
      * The cyclic case -- {@code typeName} was still on the compiler's own build stack when this
      * handle was created, so the real parser can't be referenced directly yet. {@code registry} is
-     * the compiler's own private, per-compilation {@code Map<String, TsonSchemaTypeParser<?>>}
+     * the compiler's own private, per-compilation {@code Map<String, TsonValueReader<?>>}
      * (the {@code finished} map {@code TsonSchemaCompiler}'s own {@code Compilation} helper builds
      * up and later copies into a {@link TsonCompiledSchema}), captured by reference, not copied --
      * by the time {@link #read} is ever actually called, the whole {@code TsonSchemaCompiler
@@ -48,12 +49,12 @@ public sealed interface ParserHandle<T> extends TsonSchemaTypeParser<T> {
      * this is simpler than it used to be under lazy compilation: it genuinely is "the whole schema
      * finishes, then reads happen," not merely "this one recursive chain finishes."
      */
-    record Indirect<T>(String typeName, Map<String, TsonSchemaTypeParser<?>> registry) implements ParserHandle<T> {
+    record Indirect<T>(String typeName, Map<String, TsonValueReader<?>> registry) implements ParserHandle<T> {
 
         @Override
         @SuppressWarnings("unchecked")
         public T read(DataValue value) {
-            TsonSchemaTypeParser<?> resolved = registry.get(typeName);
+            TsonValueReader<?> resolved = registry.get(typeName);
             if (resolved == null) {
                 throw new IllegalStateException("'" + typeName + "' has no compiled parser -- an Indirect handle "
                         + "is only ever created for a name that IS in the schema (a cycle back to an "

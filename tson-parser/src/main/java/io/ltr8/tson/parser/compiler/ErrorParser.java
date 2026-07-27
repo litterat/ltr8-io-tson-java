@@ -1,9 +1,10 @@
 package io.ltr8.tson.parser.compiler;
 
+import io.ltr8.tson.parser.TsonValueReader;
 import io.ltr8.tson.parser.ast.DataValue;
 
 /**
- * A stand-in {@link TsonSchemaTypeParser} for a resolved entry whose own compiled parser couldn't
+ * A stand-in {@link TsonValueReader} for a resolved entry whose own compiled parser couldn't
  * be built -- what {@link TsonSchemaCompiler}'s own per-entry build step falls back to, for exactly
  * one entry at a time, instead of letting a build failure anywhere in the schema abort compiling
  * the rest of it.
@@ -20,7 +21,7 @@ import io.ltr8.tson.parser.ast.DataValue;
  * <p>{@code cause}'s own message is preserved verbatim in the thrown exception -- this is a deferral,
  * not a swallow. A caller who never reads this entry never sees the failure at all.
  */
-final class ErrorParser implements TsonSchemaTypeParser<Object> {
+final class ErrorParser implements TsonValueReader<Object> {
 
     private final String name;
     private final RuntimeException cause;

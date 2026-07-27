@@ -1,12 +1,13 @@
 package io.ltr8.tson.parser.compiler;
 
+import io.ltr8.tson.parser.TsonValueReader;
 import io.ltr8.tson.schema.TsonSchema;
 
 import java.util.Map;
 
 /**
  * A compiled {@link TsonSchema} -- {@code Map<String, TypeDefinition>} lifted to {@code Map<String,
- * TsonSchemaTypeParser<?>>}, where every parser's own references to other entries are real Java object
+ * TsonValueReader<?>>}, where every parser's own references to other entries are real Java object
  * references (a {@link ParserHandle}), not further name lookups. This is the "compile the schema
  * once, read many data documents against it fast" layer sitting on top of {@code DefinitionResolver}'s
  * own per-declaration resolution and {@code TsonSchemaRegistry}'s whole-schema materialization/
@@ -17,22 +18,22 @@ import java.util.Map;
  * TsonSchemaCompiler} is the verb, this class is the noun it produces, and (2026-07-27, on the
  * user's own explicit direction) this class holds nothing else: no build logic, no cycle-detection
  * bookkeeping -- just the already-finished result of one {@link TsonSchemaCompiler#compile} call,
- * an immutable {@code Map<String, TsonSchemaTypeParser<?>>} handed in fully built. See {@link
+ * an immutable {@code Map<String, TsonValueReader<?>>} handed in fully built. See {@link
  * TsonSchemaCompiler}'s own Javadoc for how compilation itself works (eager building, cycle
  * detection, per-entry {@link ErrorParser} deferral) -- none of that lives here anymore.
  */
 public final class TsonCompiledSchema {
 
     private final TsonSchema schema;
-    private final Map<String, TsonSchemaTypeParser<?>> entries;
+    private final Map<String, TsonValueReader<?>> entries;
 
-    TsonCompiledSchema(TsonSchema schema, Map<String, TsonSchemaTypeParser<?>> entries) {
+    TsonCompiledSchema(TsonSchema schema, Map<String, TsonValueReader<?>> entries) {
         this.schema = schema;
         this.entries = entries;
     }
 
-    public TsonSchemaTypeParser<?> get(String typeName) {
-        TsonSchemaTypeParser<?> parser = entries.get(typeName);
+    public TsonValueReader<?> get(String typeName) {
+        TsonValueReader<?> parser = entries.get(typeName);
         if (parser == null) {
             throw new IllegalArgumentException("'" + typeName + "' is not in this compiled schema");
         }

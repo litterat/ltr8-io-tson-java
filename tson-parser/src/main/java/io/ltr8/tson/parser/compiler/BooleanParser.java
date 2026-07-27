@@ -1,5 +1,6 @@
 package io.ltr8.tson.parser.compiler;
 
+import io.ltr8.tson.parser.TsonValueReader;
 import io.ltr8.tson.parser.ast.CoreValue;
 import io.ltr8.tson.parser.ast.DataValue;
 import io.ltr8.tson.parser.ast.TokenValue;
@@ -24,7 +25,7 @@ import io.ltr8.tson.parser.atom.EnumParser;
  * {@code "true"}, not a Java boolean" assertion) -- this class only ever gets registered under
  * {@code "enum"} in {@link TsonParserFactoryRegistry#object}.
  */
-final class BooleanParser implements TsonSchemaTypeParser<Boolean> {
+final class BooleanParser implements TsonValueReader<Boolean> {
 
     static final BooleanParser INSTANCE = new BooleanParser();
 

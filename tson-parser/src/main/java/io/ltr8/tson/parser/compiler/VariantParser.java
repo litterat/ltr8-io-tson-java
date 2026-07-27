@@ -1,5 +1,6 @@
 package io.ltr8.tson.parser.compiler;
 
+import io.ltr8.tson.parser.TsonValueReader;
 import io.ltr8.tson.parser.ast.DataValue;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
@@ -40,9 +41,9 @@ import java.util.Set;
  * needed on every read, unlike {@link RecordParser}'s own fields) -- factored into {@link
  * NamedDispatchParser}, shared with {@link ChoiceParser}'s own closed-list dispatch.
  */
-final class VariantParser implements TsonSchemaTypeParser<Object> {
+final class VariantParser implements TsonValueReader<Object> {
 
-    static TsonSchemaTypeParser<?> forSubtypes(String name, TypeDefinition definition, TsonSchemaTypeParser<?> ownParser,
+    static TsonValueReader<?> forSubtypes(String name, TypeDefinition definition, TsonValueReader<?> ownParser,
                                           CompilationContext ctx) {
         NamedDispatchParser subtypeDispatch = new NamedDispatchParser(name,
                 "has known subtypes -- a value at this position with an explicit type annotation (!typeName) "
@@ -52,10 +53,10 @@ final class VariantParser implements TsonSchemaTypeParser<Object> {
     }
 
     private final String name;
-    private final TsonSchemaTypeParser<?> ownParser;
-    private final TsonSchemaTypeParser<?> subtypeDispatch;
+    private final TsonValueReader<?> ownParser;
+    private final TsonValueReader<?> subtypeDispatch;
 
-    private VariantParser(String name, TsonSchemaTypeParser<?> ownParser, TsonSchemaTypeParser<?> subtypeDispatch) {
+    private VariantParser(String name, TsonValueReader<?> ownParser, TsonValueReader<?> subtypeDispatch) {
         this.name = name;
         this.ownParser = ownParser;
         this.subtypeDispatch = subtypeDispatch;

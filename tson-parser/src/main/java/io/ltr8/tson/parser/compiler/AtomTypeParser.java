@@ -1,5 +1,6 @@
 package io.ltr8.tson.parser.compiler;
 
+import io.ltr8.tson.parser.TsonValueReader;
 import io.ltr8.tson.parser.ast.CoreValue;
 import io.ltr8.tson.parser.ast.DataValue;
 import io.ltr8.tson.parser.ast.TokenValue;
@@ -36,9 +37,9 @@ import io.ltr8.tson.schema.meta.UriType;
 import io.ltr8.tson.schema.meta.UuidType;
 
 /**
- * Adapts any {@code atom} {@link AtomType} into a {@link TsonSchemaTypeParser} -- the one place
+ * Adapts any {@code atom} {@link AtomType} into a {@link TsonValueReader} -- the one place
  * a compiled position backed by an atom-family constructor (§5.5's {@code integer_type}, {@code
- * text_type}, ...) bridges from {@link DataValue} (what every {@link TsonSchemaTypeParser} reads) down to
+ * text_type}, ...) bridges from {@link DataValue} (what every {@link TsonValueReader} reads) down to
  * {@link TokenValue} (what {@link AtomType} itself reads).
  *
  * <p>Deliberately kept in this package, not {@code atom} itself -- {@code atom}
@@ -60,7 +61,7 @@ import io.ltr8.tson.schema.meta.UuidType;
  * specification}/{@code constraints} correctly, so these two work exactly like every other family;
  * confirmed against the real resolved entries, not just reasoned about.
  */
-public final class AtomTypeParser<T> implements TsonSchemaTypeParser<T> {
+public final class AtomTypeParser<T> implements TsonValueReader<T> {
 
     static final TsonParserFactory INTEGER_TYPE = (_, name, definition, ctx) ->
             new AtomTypeParser<>(new IntegerParser((IntegerType) definition.body()));

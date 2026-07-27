@@ -1,9 +1,10 @@
 package io.ltr8.tson.parser.compiler;
 
+import io.ltr8.tson.parser.TsonValueReader;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 /**
- * Builds one {@link TsonSchemaTypeParser} for one resolved {@link TypeDefinition}, given a way to resolve
+ * Builds one {@link TsonValueReader} for one resolved {@link TypeDefinition}, given a way to resolve
  * its own children. Unlike an earlier sketch of this ({@code ParserFactorySet}, a single interface
  * with one fixed Java method per composite kind), there is exactly one of these per *meta-kernel/
  * meta-schema constructor name* (`record`, `array`, `map`, `tuple`, `choice`, `enum`, `unit`,
@@ -49,5 +50,5 @@ import io.ltr8.tson.schema.meta.TypeDefinition;
 @FunctionalInterface
 public interface TsonParserFactory {
 
-    TsonSchemaTypeParser<?> create(String typeName, String name, TypeDefinition definition, CompilationContext ctx);
+    TsonValueReader<?> create(String typeName, String name, TypeDefinition definition, CompilationContext ctx);
 }

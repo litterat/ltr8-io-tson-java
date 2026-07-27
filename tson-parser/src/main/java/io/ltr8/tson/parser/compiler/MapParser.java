@@ -1,5 +1,6 @@
 package io.ltr8.tson.parser.compiler;
 
+import io.ltr8.tson.parser.TsonValueReader;
 import io.ltr8.tson.parser.ast.AbsentValue;
 import io.ltr8.tson.parser.ast.CoreValue;
 import io.ltr8.tson.parser.ast.DataValue;
@@ -14,7 +15,7 @@ import java.util.Map;
 
 /**
  * The {@link TsonParserFactory} for meta-kernel's {@code map} constructor (§4.2, backing e.g. the
- * kernel's own {@code schema => map<type_name, type_definition>}), and the {@link TsonSchemaTypeParser}
+ * kernel's own {@code schema => map<type_name, type_definition>}), and the {@link TsonValueReader}
  * it builds -- same shape as {@link RecordParser}/{@link ArrayParser} (DOM-mode, {@code Map<Object,
  * Object>}). Both {@code key_type} and {@code value_type} resolve eagerly at compile time, the same
  * reasoning as {@link ArrayParser}'s own element type: unconditionally needed for every entry.
@@ -26,21 +27,21 @@ import java.util.Map;
  * parser and here is positioned to. {@code min_items}/{@code max_items} validate entry count,
  * matching {@link ArrayParser}'s own treatment of the identical field pair.
  */
-final class MapParser implements TsonSchemaTypeParser<Map<Object, Object>> {
+final class MapParser implements TsonValueReader<Map<Object, Object>> {
 
     static final TsonParserFactory FACTORY = (_, name, definition, ctx) -> {
         MapBody body = (MapBody) definition.body();
-        TsonSchemaTypeParser<?> keyParser = ctx.resolve(body.keyType().name());
-        TsonSchemaTypeParser<?> valueParser = ctx.resolve(body.valueType().name());
+        TsonValueReader<?> keyParser = ctx.resolve(body.keyType().name());
+        TsonValueReader<?> valueParser = ctx.resolve(body.valueType().name());
         return new MapParser(name, body, keyParser, valueParser);
     };
 
     private final String name;
     private final MapBody body;
-    private final TsonSchemaTypeParser<?> keyParser;
-    private final TsonSchemaTypeParser<?> valueParser;
+    private final TsonValueReader<?> keyParser;
+    private final TsonValueReader<?> valueParser;
 
-    private MapParser(String name, MapBody body, TsonSchemaTypeParser<?> keyParser, TsonSchemaTypeParser<?> valueParser) {
+    private MapParser(String name, MapBody body, TsonValueReader<?> keyParser, TsonValueReader<?> valueParser) {
         this.name = name;
         this.body = body;
         this.keyParser = keyParser;
