@@ -25,7 +25,7 @@ class SchemaValidatingParserTest {
     private static SchemaValidatingParser dataParser() {
         TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
         TsonLinkedSchema linked = TsonSchemaLinker.linkBootstrap(raw);
-        return new SchemaValidatingParser(TsonSchemaCompiler.compile(linked.schema(), TsonParserFactoryRegistry.dom()));
+        return new SchemaValidatingParser(TsonSchemaCompiler.compile(linked, TsonParserFactoryRegistry.dom()));
     }
 
     @Test
@@ -59,7 +59,7 @@ class SchemaValidatingParserTest {
     @Test
     void schemaAccessorReturnsTheWrappedCompiledSchema() {
         TsonCompiledSchema compiled = TsonSchemaCompiler.compile(
-                TsonSchemaLinker.linkBootstrap(MetaKernelBootstrapResolver.getMetaKernelSchema()).schema(), TsonParserFactoryRegistry.dom());
+                TsonSchemaLinker.linkBootstrap(MetaKernelBootstrapResolver.getMetaKernelSchema()), TsonParserFactoryRegistry.dom());
         SchemaValidatingParser parser = new SchemaValidatingParser(compiled);
 
         assertEquals(compiled, parser.schema());

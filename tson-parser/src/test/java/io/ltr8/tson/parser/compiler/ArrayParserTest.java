@@ -2,6 +2,7 @@ package io.ltr8.tson.parser.compiler;
 
 import io.ltr8.tson.parser.TsonDataParser;
 import io.ltr8.tson.parser.ast.Document;
+import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.ElementState;
@@ -50,7 +51,8 @@ class ArrayParserTest {
         entries.putAll(extraEntries);
         TsonSchema schema = new TsonSchema("https://example.test/s.tn1",
                 "https://example.test/meta.tn1", List.of(), entries);
-        return TsonSchemaCompiler.compile(schema, registry());
+        TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
+        return TsonSchemaCompiler.compile(linkedSchema, registry());
     }
 
     @SuppressWarnings("unchecked")

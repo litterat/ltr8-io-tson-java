@@ -2,6 +2,7 @@ package io.ltr8.tson.parser.compiler;
 
 import io.ltr8.tson.parser.TsonDataParser;
 import io.ltr8.tson.parser.ast.Document;
+import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaLinker;
@@ -67,7 +68,7 @@ class VariantParserTest {
 
     private static TsonCompiledSchema compiled() {
         TsonSchemaRegistry schemaRegistry = new TsonSchemaRegistry();
-        TsonSchema registered = schemaRegistry.register(TsonSchemaLinker.link(compileableSchema(), schemaRegistry)).schema();
+        TsonLinkedSchema registered = schemaRegistry.register(TsonSchemaLinker.link(compileableSchema(), schemaRegistry));
         return TsonSchemaCompiler.compile(registered, registry());
     }
 

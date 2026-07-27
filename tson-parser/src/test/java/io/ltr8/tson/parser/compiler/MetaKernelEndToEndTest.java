@@ -28,7 +28,7 @@ class MetaKernelEndToEndTest {
     private static TsonCompiledSchema compiled() {
         TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
         TsonLinkedSchema linked = TsonSchemaLinker.linkBootstrap(raw);
-        return TsonSchemaCompiler.compile(linked.schema(), TsonParserFactoryRegistry.dom());
+        return TsonSchemaCompiler.compile(linked, TsonParserFactoryRegistry.dom());
     }
 
     /**
@@ -49,7 +49,7 @@ class MetaKernelEndToEndTest {
         TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
         TsonLinkedSchema linked = TsonSchemaLinker.linkBootstrap(raw);
         TsonSchema registered = linked.schema();
-        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(registered, TsonParserFactoryRegistry.dom());
+        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(linked, TsonParserFactoryRegistry.dom());
 
         for (String name : registered.entries().keySet()) {
             compiled.get(name);

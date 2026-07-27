@@ -1278,7 +1278,7 @@ class DefinitionResolverTest {
         TsonLinkedSchema linkedSynthetic = new TsonLinkedSchema(synthetic);
         DataBindContext context = TsonObjectBinding.defaultContext();
         TsonParserFactoryRegistry objectFactories = TsonObjectBinding.factoryRegistry(linkedSynthetic, context);
-        return TsonSchemaCompiler.compile(synthetic, objectFactories);
+        return TsonSchemaCompiler.compile(linkedSynthetic, objectFactories);
     }
 
     /**

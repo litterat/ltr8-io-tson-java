@@ -78,7 +78,7 @@ public final class TsonCompiledRegistry {
     public synchronized TsonCompiledSchema register(TsonSchema schema) {
         TsonLinkedSchema linked = TsonSchemaLinker.link(schema, schemaRegistry);
         TsonLinkedSchema registered = schemaRegistry.register(linked);
-        TsonCompiledSchema compiledParser = TsonSchemaCompiler.compile(registered.schema(), factories);
+        TsonCompiledSchema compiledParser = TsonSchemaCompiler.compile(registered, factories);
         compiled.put(registered.schema().id(), compiledParser);
         return compiledParser;
     }

@@ -1434,10 +1434,24 @@ registration succeeds outright.
 
 ### Class 2 compilation (`compiler/{TsonSchemaCompiler,TsonCompiledSchema,TsonParserFactory,TsonParserFactoryRegistry,ErrorParser}.java`, `TsonValueReader.java`)
 
-`TsonSchemaCompiler.compile(TsonSchema, TsonParserFactory)` is the "compile" stage of
+`TsonSchemaCompiler.compile(TsonLinkedSchema, TsonParserFactory)` is the "compile" stage of
 parse -> resolve -> link -> register -> compile -> read; `TsonCompiledSchema` is the noun it
 produces, one `TsonValueReader` per resolved entry, wired together as real Java object
 references (`ParserHandle`) rather than further name lookups at read time.
+
+**`compile` tightened from a bare `TsonSchema` to `TsonLinkedSchema` (2026-07-27, on the user's own
+explicit direction, same session as the `TsonValueReader` rename).** Closes the exact gap flagged a
+few passes earlier: `compile`'s own Javadoc already stated "must be compiled from an
+already-materialized, already-validated `TsonSchema`... never a raw `TsonSchemaResolver.resolveSchema`
+result directly" as a caller responsibility, enforced only by convention. Now the parameter's own
+type carries that signal, matching `TsonSchemaRegistry#register`'s own precedent. `TsonCompiledSchema`
+itself now holds the `TsonLinkedSchema` it was compiled from (not just the bare `TsonSchema`) --
+`schema()` still unwraps to the bare `TsonSchema` for the common case, so no caller outside this
+package needed to change. Not a runtime-enforced guarantee, worth being honest about: `TsonLinkedSchema`'s
+own canonical constructor is public, so a caller (or a test hand-building a self-contained schema
+with no imports or argument-bearing `type_ref`s) can still wrap an unlinked `TsonSchema` in one
+directly -- every real production path just never does, always arriving via `TsonSchemaLinker.link`/
+`TsonSchemaRegistry#register`.
 
 **`TsonValueReader` (renamed from `TsonSchemaTypeParser`, moved out of `compiler` to this module's
 own root package, alongside `TsonDataParser`/`TsonSchemaParser` -- 2026-07-27, on the user's own

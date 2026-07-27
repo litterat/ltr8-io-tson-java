@@ -99,7 +99,7 @@ public final class DefaultTsonCompiledSchemaLoader implements TsonCompiledSchema
             // re-bootstraps and re-links from scratch, every time -- only the *quality* of the
             // one-off result changes (58 entries, not 49), not its lifetime.
             TsonLinkedSchema linked = TsonSchemaLinker.linkBootstrap(metaKernel);
-            return TsonSchemaCompiler.compile(linked.schema(), registry.factories());
+            return TsonSchemaCompiler.compile(linked, registry.factories());
         }
         String sourceText = source.fetch(uri);
         SchemaDocument document = new TsonSchemaParser(sourceText).parseSchemaDocument();

@@ -3,6 +3,7 @@ package io.ltr8.tson.parser.compiler;
 import io.ltr8.tson.parser.TsonDataParser;
 import io.ltr8.tson.parser.ast.Document;
 import io.ltr8.tson.parser.atom.AtomValidationException;
+import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.IntegerSize;
@@ -36,11 +37,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class RecordParserTest {
 
-    private static TsonSchema pointSchema(TypeDefinition integerEntry, RecordField valueField) {
+    private static TsonLinkedSchema pointSchema(TypeDefinition integerEntry, RecordField valueField) {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("integer", integerEntry);
         entries.put("point", TypeDefinition.product(RecordBody.of(List.of(valueField))));
-        return new TsonSchema("test-schema", "test-meta", List.of(), entries);
+        return new TsonLinkedSchema(new TsonSchema("test-schema", "test-meta", List.of(), entries));
     }
 
     private static TypeDefinition atomEntry(IntegerType body) {

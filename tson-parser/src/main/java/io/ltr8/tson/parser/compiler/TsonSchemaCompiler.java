@@ -1,6 +1,7 @@
 package io.ltr8.tson.parser.compiler;
 
 import io.ltr8.tson.parser.TsonValueReader;
+import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.Top;
@@ -12,10 +13,10 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Compiles an already-materialized, already-validated {@link TsonSchema} into a {@link
- * TsonCompiledSchema} -- the "compile" stage of this project's own parse -&gt; resolve -&gt; link
- * -&gt; register -&gt; compile -&gt; read pipeline vocabulary: this class is the verb, {@link
- * TsonCompiledSchema} is the noun it produces. Unlike {@code TsonSchemaLinker.link}, the class this
+ * Compiles a {@link TsonLinkedSchema} into a {@link TsonCompiledSchema} -- the "compile" stage of
+ * this project's own parse -&gt; resolve -&gt; link -&gt; register -&gt; compile -&gt; read pipeline
+ * vocabulary: this class is the verb, {@link TsonCompiledSchema} is the noun it produces. Unlike
+ * {@code TsonSchemaLinker.link}, the class this
  * verb belongs to genuinely needs its own private, per-compilation mutable state -- cycle-detection
  * bookkeeping (below) -- so (moved here from {@link TsonCompiledSchema} itself, 2026-07-27, on the
  * user's own explicit direction: "the compile step still lives in TsonCompiledSchema.. move the
@@ -83,27 +84,34 @@ public final class TsonSchemaCompiler {
     }
 
     /**
-     * Compiles {@code schema} against {@code factory}, eagerly -- see this class's own "Eager, not
-     * lazy" note. {@code factory} is typically a {@link TsonParserFactoryRegistry} (which is itself
+     * Compiles {@code linkedSchema} against {@code factory}, eagerly -- see this class's own "Eager,
+     * not lazy" note. {@code factory} is typically a {@link TsonParserFactoryRegistry} (which is itself
      * a {@link TsonParserFactory}, see that class's own Javadoc), but doesn't have to be -- any
      * single-shape {@link TsonParserFactory} works too, e.g. for a test that only wants to compile
      * against one constructor.
      *
-     * <p><b>Must be compiled from an already-materialized, already-validated {@link TsonSchema}</b>
-     * -- i.e. {@code TsonSchemaRegistry}'s own output, never a raw {@code TsonSchemaResolver.resolveSchema}
-     * result directly. Two reasons: every {@code type_ref} reachable from a body needs to already be
-     * argument-free (materialization already flattened any {@code <...>} application into a
-     * reference to a synthesized entry -- see {@code TsonSchemaRegistry}'s own Javadoc), since
-     * nothing here re-implements that; and every name a body refers to needs to actually be present
-     * in {@code schema.entries()} (validation already confirmed this), since {@link Compilation
-     * #resolve} treats a referenced-but-missing name as a bug, not a normal failure to report.
+     * <p><b>Requires a {@link TsonLinkedSchema}, not a bare {@link TsonSchema}</b> -- i.e. {@code
+     * TsonSchemaLinker.link}'s own output (or {@code TsonSchemaRegistry}'s, which requires one too),
+     * never a raw {@code TsonSchemaResolver.resolveSchema} result passed off as one. Two reasons this
+     * matters, both now signaled by the parameter's own type rather than left to caller discipline
+     * alone: every {@code type_ref} reachable from a body needs to already be argument-free
+     * (materialization already flattened any {@code <...>} application into a reference to a
+     * synthesized entry -- see {@code TsonSchemaLinker}'s own Javadoc), since nothing here
+     * re-implements that; and every name a body refers to needs to actually be present in {@code
+     * linkedSchema.schema().entries()} (validation already confirmed this), since {@link Compilation
+     * #resolve} treats a referenced-but-missing name as a bug, not a normal failure to report. Not a
+     * runtime-enforced guarantee -- {@link TsonLinkedSchema}'s own canonical constructor is public,
+     * so nothing stops a caller wrapping an unlinked {@code TsonSchema} in one directly (tests that
+     * hand-build a self-contained schema with no imports or argument-bearing {@code type_ref}s do
+     * exactly this) -- but every real production path only ever gets a {@link TsonLinkedSchema} via
+     * {@code TsonSchemaLinker.link}/{@code TsonSchemaRegistry#register} in the first place.
      */
-    public static TsonCompiledSchema compile(TsonSchema schema, TsonParserFactory factory) {
-        Compilation compilation = new Compilation(schema, factory);
-        for (String name : schema.entries().keySet()) {
+    public static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema, TsonParserFactory factory) {
+        Compilation compilation = new Compilation(linkedSchema.schema(), factory);
+        for (String name : linkedSchema.schema().entries().keySet()) {
             compilation.resolve(name);
         }
-        return new TsonCompiledSchema(schema, Map.copyOf(compilation.finished));
+        return new TsonCompiledSchema(linkedSchema, Map.copyOf(compilation.finished));
     }
 
     /**

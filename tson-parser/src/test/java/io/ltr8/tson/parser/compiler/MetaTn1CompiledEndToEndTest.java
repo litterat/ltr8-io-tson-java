@@ -34,7 +34,7 @@ class MetaTn1CompiledEndToEndTest {
      * exercises stays DOM mode (a separate, fresh compilation of the final, already-resolved {@code
      * TsonSchema}, unrelated to how it got resolved).
      */
-    private static TsonSchema registerMeta() {
+    private static TsonLinkedSchema registerMeta() {
         TsonSchema metaKernelBootstrap = MetaKernelBootstrapResolver.getMetaKernelSchema();
         TsonSchemaRegistry registry = new TsonSchemaRegistry();
         TsonLinkedSchema materializedMetaKernelBootstrap = TsonSchemaLinker.linkBootstrap(metaKernelBootstrap);
@@ -54,7 +54,7 @@ class MetaTn1CompiledEndToEndTest {
         SchemaDocument metaDocument = new TsonSchemaParser(source).parseSchemaDocument();
         TsonSchema meta = new TsonSchemaResolver(loader).resolveSchema(metaDocument);
 
-        return registry.register(TsonSchemaLinker.link(meta, registry)).schema();
+        return registry.register(TsonSchemaLinker.link(meta, registry));
     }
 
     /**
@@ -68,18 +68,18 @@ class MetaTn1CompiledEndToEndTest {
      */
     @Test
     void everyRealMetaEntryCompilesCleanly() {
-        TsonSchema meta = registerMeta();
+        TsonLinkedSchema meta = registerMeta();
         TsonCompiledSchema compiled = TsonSchemaCompiler.compile(meta, TsonParserFactoryRegistry.dom());
 
-        for (String name : meta.entries().keySet()) {
+        for (String name : meta.schema().entries().keySet()) {
             compiled.get(name);
         }
-        assertEquals(90, meta.entries().size());
+        assertEquals(90, meta.schema().entries().size());
     }
 
     @Test
     void readsBinaryEncodingEnumMembersAgainstRealData() {
-        TsonSchema meta = registerMeta();
+        TsonLinkedSchema meta = registerMeta();
         TsonCompiledSchema compiled = TsonSchemaCompiler.compile(meta, TsonParserFactoryRegistry.dom());
         Document document = new TsonDataParser("BASE64").parseDocument();
 

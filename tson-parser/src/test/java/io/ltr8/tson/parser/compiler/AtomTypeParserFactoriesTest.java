@@ -4,6 +4,7 @@ import io.ltr8.tson.parser.TsonDataParser;
 import io.ltr8.tson.parser.ast.Document;
 import io.ltr8.tson.parser.atom.DurationParser;
 import io.ltr8.tson.parser.resolver.MetaKernelBootstrapResolver;
+import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.BinaryType;
 import io.ltr8.tson.schema.meta.DateTimeType;
@@ -68,7 +69,8 @@ class AtomTypeParserFactoriesTest {
                 RecordBody.of(List.of(RecordField.required("value", TypeRef.of("field"))))));
         TsonSchema schema = new TsonSchema("https://example.test/s.tn1",
                 "https://example.test/meta.tn1", List.of(), entries);
-        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(schema, REGISTRY);
+        TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
+        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(linkedSchema, REGISTRY);
 
         Document document = new TsonDataParser(source).parseDocument();
         @SuppressWarnings("unchecked")
@@ -176,11 +178,12 @@ class AtomTypeParserFactoriesTest {
                 RecordBody.of(List.of(RecordField.required("value", TypeRef.of(typeName))))));
         TsonSchema schema = new TsonSchema("https://example.test/s.tn1",
                 "https://example.test/meta.tn1", List.of(), entries);
+        TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
         TsonParserFactoryRegistry registry = TsonParserFactoryRegistry.builder()
                 .register("record", RecordParser.FACTORY)
                 .register(constructorKey, factory)
                 .build();
-        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(schema, registry);
+        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(linkedSchema, registry);
 
         Document document = new TsonDataParser(source).parseDocument();
         @SuppressWarnings("unchecked")

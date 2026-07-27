@@ -2,6 +2,7 @@ package io.ltr8.tson.parser.compiler;
 
 import io.ltr8.tson.parser.TsonDataParser;
 import io.ltr8.tson.parser.ast.Document;
+import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.IntegerType;
@@ -40,13 +41,14 @@ class ChoiceParserTest {
                 new ChoiceBody(List.of(TypeRef.of("email"), TypeRef.of("phone")))));
         TsonSchema schema = new TsonSchema("https://example.test/s.tn1",
                 "https://example.test/meta.tn1", List.of(), entries);
+        TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
 
         TsonParserFactoryRegistry registry = TsonParserFactoryRegistry.builder()
                 .register("integer_type", AtomTypeParser.INTEGER_TYPE)
                 .register("record", RecordParser.FACTORY)
                 .register("choice", ChoiceParser.FACTORY)
                 .build();
-        return TsonSchemaCompiler.compile(schema, registry);
+        return TsonSchemaCompiler.compile(linkedSchema, registry);
     }
 
     @SuppressWarnings("unchecked")

@@ -3,6 +3,7 @@ package io.ltr8.tson.parser.compiler;
 import io.ltr8.tson.parser.TsonValueReader;
 import io.ltr8.tson.parser.ast.DataValue;
 import io.ltr8.tson.parser.ast.EmptyBrace;
+import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
@@ -49,8 +50,9 @@ class TsonSchemaCompilerTest {
         entries.put("A", TypeDefinition.product(bodyA));
         entries.put("B", TypeDefinition.product(bodyB));
         TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), entries);
+        TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
 
-        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(schema, RECORD_ONLY);
+        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(linkedSchema, RECORD_ONLY);
 
         // Reached compilation successfully; reading an empty record against a REQUIRED field then
         // fails for the ordinary reason (missing field), not a compiler failure.
@@ -63,8 +65,9 @@ class TsonSchemaCompilerTest {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("Node", TypeDefinition.product(selfReferencing));
         TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), entries);
+        TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
 
-        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(schema, RECORD_ONLY);
+        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(linkedSchema, RECORD_ONLY);
 
         assertThrows(IllegalArgumentException.class, () -> compiled.get("Node").read(EMPTY_RECORD));
     }
@@ -80,8 +83,9 @@ class TsonSchemaCompilerTest {
         entries.put("orphan", new TypeDefinition(Optional.empty(), TypeKind.ATOM,
                 List.of(), false, List.of(), List.of(), Optional.empty(), new Unit()));
         TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), entries);
+        TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
 
-        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(schema, RECORD_ONLY);
+        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(linkedSchema, RECORD_ONLY);
 
         @SuppressWarnings("unchecked")
         Map<String, Object> used = (Map<String, Object>) compiled.get("used").read(EMPTY_RECORD);
@@ -97,7 +101,8 @@ class TsonSchemaCompilerTest {
     @Test
     void getOnAnUnknownNameThrowsBeforeAnyCompilationHappens() {
         TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), Map.of());
-        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(schema, RECORD_ONLY);
+        TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
+        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(linkedSchema, RECORD_ONLY);
 
         IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class, () -> compiled.get("nope"));
         assertEquals("'nope' is not in this compiled schema", thrown.getMessage());

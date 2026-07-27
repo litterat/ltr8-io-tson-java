@@ -40,7 +40,7 @@ class ObjectRecordShapeFactoryTest {
         TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
         TsonLinkedSchema registered = TsonSchemaLinker.linkBootstrap(raw);
         DataBindContext context = TsonObjectBinding.defaultContext();
-        return TsonSchemaCompiler.compile(registered.schema(), TsonObjectBinding.factoryRegistry(registered, context));
+        return TsonSchemaCompiler.compile(registered, TsonObjectBinding.factoryRegistry(registered, context));
     }
 
     @Test

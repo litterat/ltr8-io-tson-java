@@ -8,10 +8,10 @@ package io.ltr8.tson.parser.compiler;
  * only implementation, handed to each factory call already bound to that one compilation.
  *
  * <p>Takes a bare name, not a full {@code io.ltr8.tson.schema.meta.TypeRef} -- by the time {@link
- * TsonSchemaCompiler#compile} is compiling from the registry's own materialized {@code TsonSchema}
- * (see that method's own Javadoc), {@code TsonSchemaLinker}'s own materialization pass has already
- * rewritten every argument-bearing {@code type_ref} reachable from a body into a bare reference to
- * a synthesized entry, so nothing this layer resolves should ever still carry arguments of its own.
+ * TsonSchemaCompiler#compile} is compiling a {@code TsonLinkedSchema} (see that method's own
+ * Javadoc), {@code TsonSchemaLinker}'s own materialization pass has already rewritten every
+ * argument-bearing {@code type_ref} reachable from a body into a bare reference to a synthesized
+ * entry, so nothing this layer resolves should ever still carry arguments of its own.
  */
 @FunctionalInterface
 public interface CompilationContext {
