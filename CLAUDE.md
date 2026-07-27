@@ -89,7 +89,7 @@ If a class name contains `Tson` at all, `Tson` MUST be the leading word (`TsonSc
 `TsonSchemaCompiler`, `TsonDataParser`, `TsonMapperReader`) — never buried in the middle (`CompiledTsonSchema`
 is wrong; it was renamed to `TsonCompiledSchema` specifically to fix this, 2026-07-26). The prefix isn't
 applied to every class in the library, either — most of `tson-parser`/`tson-schema`'s own internal machinery
-is deliberately bare (`Lexer`, `RecordParser`, `ParserHandle`, `CanonicalIdentity`).
+is deliberately bare (`Lexer`, `RecordParser`, `DeferredValueReader`, `CanonicalIdentity`).
 Reserve the `Tson` prefix for the classes a *consumer of this library* actually names in
 their own code — its value is disambiguation at the call site (`TsonSchema` vs. a domain object also called
 `Schema`, `TsonDataParser` vs. a domain-specific `DataParser`) and quick identification when skimming a
@@ -1437,7 +1437,8 @@ registration succeeds outright.
 `TsonSchemaCompiler.compile(TsonLinkedSchema, TsonParserFactory)` is the "compile" stage of
 parse -> resolve -> link -> register -> compile -> read; `TsonCompiledSchema` is the noun it
 produces, one `TsonValueReader` per resolved entry, wired together as real Java object
-references (`ParserHandle`) rather than further name lookups at read time.
+references rather than further name lookups at read time (except at the edges that close a
+cycle, where `DeferredValueReader` does one lazy lookup, see `TsonSchemaCompiler` below).
 
 **`compile` tightened from a bare `TsonSchema` to `TsonLinkedSchema` (2026-07-27, on the user's own
 explicit direction, same session as the `TsonValueReader` rename).** Closes the exact gap flagged a
@@ -1452,6 +1453,17 @@ own canonical constructor is public, so a caller (or a test hand-building a self
 with no imports or argument-bearing `type_ref`s) can still wrap an unlinked `TsonSchema` in one
 directly -- every real production path just never does, always arriving via `TsonSchemaLinker.link`/
 `TsonSchemaRegistry#register`.
+
+**`ParserHandle` (the `Direct`/`Indirect` sealed pair) deleted outright, same session.** Nothing
+outside `TsonSchemaCompiler`'s own `Compilation.resolve` ever branched on which variant it got --
+every caller (`ArrayParser`, `MapParser`, `RecordParser`, `TupleParser`, `NamedDispatchParser`)
+already stored/used the result as a plain `TsonValueReader<?>`. `Direct` was a pure pass-through
+wrapper (`read` just delegated); `Compilation.resolve`'s "already finished" and "just built" cases
+now return the `TsonValueReader<?>` directly, no wrapping. `Indirect`'s lazy, name-keyed
+cycle-breaking lookup was the only genuinely load-bearing piece -- kept as its own small,
+package-private class, `DeferredValueReader`, implementing `TsonValueReader<T>` directly (same
+shape as `ErrorParser`), no longer needing a sealed family around it. `CompilationContext.resolve`
+now returns `TsonValueReader<?>` instead of `ParserHandle<?>`.
 
 **`TsonValueReader` (renamed from `TsonSchemaTypeParser`, moved out of `compiler` to this module's
 own root package, alongside `TsonDataParser`/`TsonSchemaParser` -- 2026-07-27, on the user's own

@@ -2,7 +2,6 @@ package io.ltr8.tson.parser;
 
 import io.ltr8.tson.parser.ast.DataValue;
 import io.ltr8.tson.parser.atom.AtomType;
-import io.ltr8.tson.parser.compiler.ParserHandle;
 import io.ltr8.tson.parser.compiler.RecordParser;
 import io.ltr8.tson.parser.compiler.TsonCompiledSchema;
 import io.ltr8.tson.parser.compiler.TsonParserFactory;
@@ -19,10 +18,9 @@ import io.ltr8.tson.parser.compiler.TsonParserFactoryRegistry;
  * <p>The Class 2 analogue of {@link AtomType}, generalized from atoms to every {@link
  * io.ltr8.tson.schema.meta.Top} kind. One instance is compiled per {@link TsonCompiledSchema} entry;
  * unlike consulting the resolved schema's {@code Map<String, TypeDefinition>} directly, a compiled
- * instance already knows its own child readers as real object references (see {@link ParserHandle}),
- * so reading a value at this position never re-consults the schema's own name-keyed map at read time
- * -- except at the specific edges that close a cycle, where {@link ParserHandle.Indirect} does
- * exactly one lazy lookup.
+ * instance already knows its own child readers as real object references, so reading a value at
+ * this position never re-consults the schema's own name-keyed map at read time -- except at the
+ * specific edges that close a cycle, where a deferred, name-keyed lookup does exactly one.
  *
  * <p>Takes a {@link DataValue}, not a bare {@code CoreValue}/{@code TokenValue} -- a schema
  * position can carry its own annotations and an explicit type-ref same as any other data position

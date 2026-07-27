@@ -89,16 +89,15 @@ public final class TsonSchemaCompiler {
         }
 
         /**
-         * The one place cycles get broken. Three cases: {@code name} already has a finished parser
-         * (hand back a {@link ParserHandle.Direct} wrapping it -- no rebuilding, no rewalking);
-         * {@code name} is already on {@link #building} (this call is itself nested inside building
-         * {@code name}, directly or transitively -- recursing further would never terminate, so
-         * hand back a {@link ParserHandle.Indirect} instead, a lazy lookup against {@link
-         * #finished} that only ever actually runs once this whole {@link Compilation} -- including
-         * {@code name} itself -- has moved on); otherwise, not started yet, so build it right now,
-         * with {@code name} pushed onto {@link #building} for the duration so a cycle back to it
-         * from somewhere inside its own construction is caught by the middle case instead of
-         * recursing forever.
+         * The one place cycles get broken. Three cases: {@code name} already has a finished reader
+         * (hand it straight back -- no rebuilding, no rewalking); {@code name} is already on {@link
+         * #building} (this call is itself nested inside building {@code name}, directly or
+         * transitively -- recursing further would never terminate, so hand back a {@link
+         * DeferredValueReader} instead, a lazy lookup against {@link #finished} that only ever
+         * actually runs once this whole {@link Compilation} -- including {@code name} itself -- has
+         * moved on); otherwise, not started yet, so build it right now, with {@code name} pushed onto
+         * {@link #building} for the duration so a cycle back to it from somewhere inside its own
+         * construction is caught by the middle case instead of recursing forever.
          *
          * <p><b>A {@link #build} failure for {@code name} itself never propagates out of this
          * method</b> -- caught and replaced with an {@link ErrorParser} wrapping the original
@@ -111,13 +110,13 @@ public final class TsonSchemaCompiler {
          * have rejected it), not "this build doesn't support constructor X yet" -- and still
          * propagates immediately, uncaught.
          */
-        ParserHandle<?> resolve(String name) {
+        TsonValueReader<?> resolve(String name) {
             TsonValueReader<?> done = finished.get(name);
             if (done != null) {
-                return new ParserHandle.Direct<>(done);
+                return done;
             }
             if (!building.add(name)) {
-                return new ParserHandle.Indirect<>(name, finished);
+                return new DeferredValueReader<>(name, finished);
             }
             try {
                 TypeDefinition definition = schema.entries().get(name);
@@ -132,7 +131,7 @@ public final class TsonSchemaCompiler {
                     built = new ErrorParser(name, e);
                 }
                 finished.put(name, built);
-                return new ParserHandle.Direct<>(built);
+                return built;
             } finally {
                 building.remove(name);
             }

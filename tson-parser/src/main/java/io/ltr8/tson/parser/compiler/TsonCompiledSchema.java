@@ -9,7 +9,8 @@ import java.util.Map;
 /**
  * A compiled {@link TsonLinkedSchema} -- {@code Map<String, TypeDefinition>} lifted to {@code
  * Map<String, TsonValueReader<?>>}, where every reader already holds real Java object references to
- * its own child readers (a {@link ParserHandle}) rather than resolving names again at read time.
+ * its own child readers rather than resolving names again at read time (except at the specific edges
+ * that close a cycle, where a {@link DeferredValueReader} does exactly one lazy lookup).
  * {@link SchemaValidatingParser}, the Class 2 (schema-validating) data parser, is built on top of
  * this, not directly on a {@link TsonSchema}.
  *

@@ -1,8 +1,10 @@
 package io.ltr8.tson.parser.compiler;
 
+import io.ltr8.tson.parser.TsonValueReader;
+
 /**
  * What a {@link TsonParserFactory} uses to turn a field/element/key/value/variant's own {@code
- * type_ref} name into a {@link ParserHandle} for it, without the factory itself needing to
+ * type_ref} name into a {@link TsonValueReader} for it, without the factory itself needing to
  * know anything about {@code TsonSchemaCompiler}'s build order, its "currently building" stack, or
  * memoization -- {@code TsonSchemaCompiler}'s own private {@code Compilation.resolve} method is the
  * only implementation, handed to each factory call already bound to that one compilation.
@@ -16,5 +18,5 @@ package io.ltr8.tson.parser.compiler;
 @FunctionalInterface
 public interface CompilationContext {
 
-    ParserHandle<?> resolve(String typeName);
+    TsonValueReader<?> resolve(String typeName);
 }

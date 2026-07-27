@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Direct coverage of {@link TsonSchemaCompiler}/{@link TsonCompiledSchema}'s own cycle detection
- * (the reason {@link ParserHandle.Direct}/{@link ParserHandle.Indirect} exist at all) and eager,
+ * (the reason {@link DeferredValueReader} exists at all) and eager,
  * whole-schema build (every entry is built as soon as {@link TsonSchemaCompiler#compile} returns,
  * not deferred to whenever {@link TsonCompiledSchema#get} first asks for a given name -- see that
  * class's own "Eager, not lazy" note). {@link RecordParserTest}/{@link VariantParserTest}/{@link
@@ -43,7 +43,7 @@ class TsonSchemaCompilerTest {
     void mutualCycleCompilesWithoutStackOverflow() {
         // A -> B -> A. Compiling "A" at all (without a StackOverflowError) is what this proves --
         // B's own field circles back to A while A is still mid-construction, exactly the edge
-        // ParserHandle.Indirect exists for.
+        // DeferredValueReader exists for.
         RecordBody bodyA = RecordBody.of(List.of(RecordField.required("b", TypeRef.of("B"))));
         RecordBody bodyB = RecordBody.of(List.of(RecordField.required("a", TypeRef.of("A"))));
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
