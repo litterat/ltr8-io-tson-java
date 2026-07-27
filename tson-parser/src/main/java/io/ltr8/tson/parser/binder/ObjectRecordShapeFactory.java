@@ -1,5 +1,6 @@
-package io.ltr8.tson.parser.bind;
+package io.ltr8.tson.parser.binder;
 
+import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassField;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.tson.parser.base.NumberNarrowing;
@@ -32,18 +33,18 @@ import java.util.Map;
  */
 public final class ObjectRecordShapeFactory implements RecordShapeFactory<Object> {
 
-    private final Map<String, DataClassRecord> bound;
+    private final Map<String, DataClass> bound;
 
-    public ObjectRecordShapeFactory(Map<String, DataClassRecord> bound) {
-        this.bound = bound;
+    public ObjectRecordShapeFactory(TsonBoundSchema bound) {
+        this.bound = bound.boundMap();
     }
 
     @Override
     public RecordShape<Object> shapeFor(String typeName, TypeDefinition definition, RecordBody body) {
-        DataClassRecord descriptor = bound.get(typeName);
+        DataClassRecord descriptor = (DataClassRecord) bound.get(typeName);
         if (descriptor == null) {
             throw new IllegalStateException("'" + typeName + "' was never bound -- call "
-                    + "TsonObjectBinder.bind(TsonSchema, DataBindContext, TsonTypeNameBinder) with the "
+                    + "TsonObjectBinder.bind(TsonLinkedSchema, DataBindContext, TsonTypeNameBinder) with the "
                     + "governing schema before compiling against it (see TsonObjectBinding#factoryRegistry)");
         }
         return () -> new ObjectRecordBuilder(descriptor);

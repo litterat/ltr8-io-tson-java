@@ -1,10 +1,11 @@
-package io.ltr8.tson.parser.bind;
+package io.ltr8.tson.parser.binder;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.tson.parser.compiler.AtomTypeParser;
 import io.ltr8.tson.parser.compiler.RecordParser;
 import io.ltr8.tson.parser.compiler.TsonParserFactoryRegistry;
+import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 
 import java.util.Map;
@@ -40,20 +41,20 @@ public final class TsonObjectBinding {
      * {@code record}-shaped entry the schema actually declares, up front, rather than discovering a
      * missing binding lazily, one entry at a time, only once something happens to read it. Uses
      * {@link SchemaMetaTypeNameBinder}, the default {@code io.ltr8.tson.schema.meta} binder -- see
-     * {@link #factoryRegistry(TsonSchema, DataBindContext, TsonTypeNameBinder)} to supply a
+     * {@link #factoryRegistry(TsonLinkedSchema, DataBindContext, TsonTypeNameBinder)} to supply a
      * different one (e.g. for a schema binding to a caller's own Java library instead).
      */
-    public static TsonParserFactoryRegistry factoryRegistry(TsonSchema schema, DataBindContext context) {
+    public static TsonParserFactoryRegistry factoryRegistry(TsonLinkedSchema schema, DataBindContext context) {
         return factoryRegistry(schema, context, SchemaMetaTypeNameBinder.INSTANCE);
     }
 
     /**
-     * As {@link #factoryRegistry(TsonSchema, DataBindContext)}, with an explicit {@link
+     * As {@link #factoryRegistry(TsonLinkedSchema, DataBindContext)}, with an explicit {@link
      * TsonTypeNameBinder} rather than the {@code schema.meta} default.
      */
-    public static TsonParserFactoryRegistry factoryRegistry(TsonSchema schema, DataBindContext context,
-                                                              TsonTypeNameBinder binder) {
-        Map<String, DataClassRecord> bound = TsonObjectBinder.bind(schema, context, binder);
+    public static TsonParserFactoryRegistry factoryRegistry(TsonLinkedSchema schema, DataBindContext context,
+                                                            TsonTypeNameBinder binder) {
+        TsonBoundSchema bound = TsonObjectBinder.bind(schema, context, binder);
         ObjectRecordShapeFactory shapeFactory = new ObjectRecordShapeFactory(bound);
         return TsonParserFactoryRegistry.withoutRecordOrEnum()
                 .register("record", RecordParser.factory(shapeFactory))

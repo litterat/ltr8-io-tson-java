@@ -1,8 +1,10 @@
-package io.ltr8.tson.parser.bind;
+package io.ltr8.tson.parser.binder;
 
+import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.tson.parser.base.TsonAtomContext;
 import io.ltr8.tson.parser.resolver.MetaKernelBootstrapResolver;
+import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaLinker;
 import org.junit.jupiter.api.Test;
@@ -29,7 +31,7 @@ class TsonObjectBinderTest {
         // a real, deliberately non-record class and are silently skipped, not failures. Nothing
         // should throw.
         TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
-        TsonSchema registered = TsonSchemaLinker.linkBootstrap(raw).schema();
+        TsonLinkedSchema registered = TsonSchemaLinker.linkBootstrap(raw);
 
         TsonObjectBinder.bind(registered, TsonAtomContext.defaultContext(), SchemaMetaTypeNameBinder.INSTANCE);
     }
@@ -37,7 +39,7 @@ class TsonObjectBinderTest {
     @Test
     void bindReportsEveryUnresolvableEntryAtOnceRatherThanOneAtATime() {
         TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
-        TsonSchema registered = TsonSchemaLinker.linkBootstrap(raw).schema();
+        TsonLinkedSchema registered = TsonSchemaLinker.linkBootstrap(raw);
         TsonTypeNameBinder alwaysMissing = name -> {
             throw new ClassNotFoundException("no class for '" + name + "' under this test's own binder");
         };
@@ -54,10 +56,10 @@ class TsonObjectBinderTest {
     @Test
     void resultOmitsEntriesThatResolveToARealNonRecordClass() {
         TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
-        TsonSchema registered = TsonSchemaLinker.linkBootstrap(raw).schema();
-
-        Map<String, DataClassRecord> bound =
+        TsonLinkedSchema registered = TsonSchemaLinker.linkBootstrap(raw);
+        TsonBoundSchema boundSchema =
                 TsonObjectBinder.bind(registered, TsonAtomContext.defaultContext(), SchemaMetaTypeNameBinder.INSTANCE);
+        Map<String, DataClass> bound = boundSchema.boundMap();
 
         assertTrue(bound.containsKey("integer_type"));
         assertTrue(bound.containsKey("text_type"));

@@ -5,7 +5,7 @@ import io.ltr8.bind.DataBindException;
 import io.ltr8.tson.parser.TsonSchemaParser;
 import io.ltr8.tson.parser.ast.schema.SchemaDocument;
 import io.ltr8.tson.parser.ast.schema.SchemaMap;
-import io.ltr8.tson.parser.bind.TsonObjectBinding;
+import io.ltr8.tson.parser.binder.TsonObjectBinding;
 import io.ltr8.tson.parser.mapper.TsonMapperWriter;
 import io.ltr8.tson.parser.base.TsonAtomContext;
 import io.ltr8.tson.parser.compiler.TsonParserFactoryRegistry;
@@ -1276,8 +1276,9 @@ class DefinitionResolverTest {
      */
     private static TsonCompiledSchema compileAsMetaParser(Map<String, TypeDefinition> entries) {
         TsonSchema synthetic = new TsonSchema("test", "", List.of(), entries);
+        TsonLinkedSchema linkedSynthetic = new TsonLinkedSchema(synthetic);
         DataBindContext context = TsonAtomContext.defaultContext();
-        TsonParserFactoryRegistry objectFactories = TsonObjectBinding.factoryRegistry(synthetic, context);
+        TsonParserFactoryRegistry objectFactories = TsonObjectBinding.factoryRegistry(linkedSynthetic, context);
         return TsonSchemaCompiler.compile(synthetic, objectFactories);
     }
 
@@ -1313,7 +1314,7 @@ class DefinitionResolverTest {
         io.ltr8.tson.schema.TsonSchemaRegistry registry = new io.ltr8.tson.schema.TsonSchemaRegistry();
         TsonLinkedSchema materializedMetaKernelBootstrap = TsonSchemaLinker.linkBootstrap(metaKernelBootstrap);
         DataBindContext context = TsonAtomContext.defaultContext();
-        TsonParserFactoryRegistry objectFactories = TsonObjectBinding.factoryRegistry(materializedMetaKernelBootstrap.schema(), context);
+        TsonParserFactoryRegistry objectFactories = TsonObjectBinding.factoryRegistry(materializedMetaKernelBootstrap, context);
         TsonCompiledRegistry throwawayRegistry = new TsonCompiledRegistry(objectFactories);
         DefaultTsonCompiledSchemaLoader throwawayLoader =
                 new DefaultTsonCompiledSchemaLoader(throwawayRegistry, BundledSchemaSource.INSTANCE);

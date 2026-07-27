@@ -15,7 +15,7 @@ import java.util.UUID;
  * The default built-in-vocabulary atom registrations every {@link DataBindContext} consumer in
  * this library needs -- pulled out from {@code io.ltr8.tson.parser.mapper.TsonMapperContext} (its
  * original, sole home) once a third consumer (an object-binding
- * {@code io.ltr8.tson.parser.bind.TsonObjectBinder}, in a different package
+ * {@code io.ltr8.tson.parser.binder.TsonObjectBinder}, in a different package
  * with no dependency on {@code mapper}) needed the identical list -- see that class's own,
  * unchanged Javadoc for why each individual registration exists (UUID/byte[]/LocalDate/
  * OffsetTime/OffsetDateTime/URI/Inet4Address/Inet6Address); none of that reasoning changed by

@@ -84,7 +84,7 @@ public final class TsonParserFactoryRegistry implements TsonParserFactory {
      * branch.
      *
      * <p>{@code public}, unlike the rest of this class's own internal assembly, specifically so
-     * {@code io.ltr8.tson.parser.bind} (object-binding mode, moved out of this package 2026-07-27)
+     * {@code io.ltr8.tson.parser.binder} (object-binding mode, moved out of this package 2026-07-27)
      * can build its own registry from the identical composite/atom-family baseline {@link #dom()}
      * uses, without this package needing any awareness object-binding mode exists at all. Each
      * caller appends its own `"record"`/`"enum"` registrations on top.
@@ -121,7 +121,7 @@ public final class TsonParserFactoryRegistry implements TsonParserFactory {
      * legitimate registry a caller might build (a caller reading only a narrow slice of a schema can
      * still assemble a smaller one directly via {@link #builder}), just the canonical "everything
      * this build knows how to construct in DOM mode" one. Object-binding mode's own equivalent lives
-     * in {@code io.ltr8.tson.parser.bind} (moved out of this class 2026-07-27) -- this class has no
+     * in {@code io.ltr8.tson.parser.binder} (moved out of this class 2026-07-27) -- this class has no
      * dependency on it, and no awareness it exists.
      */
     public static TsonParserFactoryRegistry dom() {

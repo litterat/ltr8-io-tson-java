@@ -65,7 +65,7 @@ public final class RecordParser<R> implements TsonSchemaTypeParser<R> {
      * constructor/field descriptor (reflection paid once, not once per read) and {@link #begin()}
      * just opens a fresh accumulator against it. Nested here, not a standalone top-level type --
      * the only implementation outside this package is object-binding mode's own {@code
-     * ObjectRecordShapeFactory} (in {@code io.ltr8.tson.parser.bind}), which is exactly why {@link
+     * ObjectRecordShapeFactory} (in {@code io.ltr8.tson.parser.binder}), which is exactly why {@link
      * RecordParser} itself, and {@link #factory}, are {@code public} despite being otherwise pure
      * internal machinery -- see {@link #factory}'s own Javadoc.
      */
@@ -114,7 +114,7 @@ public final class RecordParser<R> implements TsonSchemaTypeParser<R> {
      * per read; see {@link RecordShape}'s own Javadoc for why that matters.
      *
      * <p>{@code public}, unlike the rest of this package's own internal machinery, specifically so
-     * {@code io.ltr8.tson.parser.bind} (object-binding mode, moved out of this package 2026-07-27)
+     * {@code io.ltr8.tson.parser.binder} (object-binding mode, moved out of this package 2026-07-27)
      * can build its own {@code "record"} factory entry from its own {@code RecordShapeFactory}
      * implementation without this package needing any awareness that caller exists.
      */

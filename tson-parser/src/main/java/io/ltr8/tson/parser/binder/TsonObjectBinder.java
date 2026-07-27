@@ -1,9 +1,10 @@
-package io.ltr8.tson.parser.bind;
+package io.ltr8.tson.parser.binder;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassRecord;
+import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -47,9 +48,10 @@ public final class TsonObjectBinder {
     /**
      * @throws IllegalStateException naming every entry that failed to resolve, if any did
      */
-    public static Map<String, DataClassRecord> bind(TsonSchema schema, DataBindContext context,
-                                                      TsonTypeNameBinder binder) {
-        Map<String, DataClassRecord> bound = new LinkedHashMap<>();
+    public static TsonBoundSchema bind(TsonLinkedSchema linkedSchema, DataBindContext context,
+                                                    TsonTypeNameBinder binder) {
+        Map<String, DataClass> bound = new LinkedHashMap<>();
+        TsonSchema schema = linkedSchema.schema();
         List<String> problems = new ArrayList<>();
         for (Map.Entry<String, TypeDefinition> entry : schema.entries().entrySet()) {
             String name = entry.getKey();
@@ -84,6 +86,6 @@ public final class TsonObjectBinder {
                     + problems.size() + (problems.size() == 1 ? " schema entry" : " schema entries") + ":\n  "
                     + String.join("\n  ", problems));
         }
-        return Map.copyOf(bound);
+        return new TsonBoundSchema(schema, Map.copyOf(bound), context);
     }
 }

@@ -1,4 +1,4 @@
-package io.ltr8.tson.parser.bind;
+package io.ltr8.tson.parser.binder;
 
 import java.util.Map;
 

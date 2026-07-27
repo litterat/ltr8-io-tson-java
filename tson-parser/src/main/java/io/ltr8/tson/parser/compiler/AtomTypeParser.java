@@ -100,11 +100,11 @@ public final class AtomTypeParser<T> implements TsonSchemaTypeParser<T> {
      * instance whose members are meant to stand in for the two Java boolean values, not the strings
      * {@code "true"}/{@code "false"}; every other enum instance falls through to ordinary {@link
      * #ENUM} behavior. <b>Registered only for object-binding mode (see {@code
-     * io.ltr8.tson.parser.bind}), never {@link TsonParserFactoryRegistry#dom()}</b> -- DOM mode has
+     * io.ltr8.tson.parser.binder}), never {@link TsonParserFactoryRegistry#dom()}</b> -- DOM mode has
      * no target Java type to reconcile against, so it keeps producing {@code String} for {@code
      * boolean} too, matching already-established, already-tested behavior (e.g. {@code
      * MetaKernelEndToEndTest}'s own {@code "true"} string assertion). {@code public}, unlike this
-     * class's other factory constants, specifically so {@code io.ltr8.tson.parser.bind} can reach it
+     * class's other factory constants, specifically so {@code io.ltr8.tson.parser.binder} can reach it
      * (moved out of this package 2026-07-27).
      */
     public static final TsonParserFactory ENUM_OBJECT_MODE = (_, name, definition, ctx) ->

@@ -1,4 +1,4 @@
-package io.ltr8.tson.parser.bind;
+package io.ltr8.tson.parser.binder;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.parser.TsonDataParser;
@@ -7,6 +7,7 @@ import io.ltr8.tson.parser.base.TsonAtomContext;
 import io.ltr8.tson.parser.resolver.MetaKernelBootstrapResolver;
 import io.ltr8.tson.parser.compiler.TsonCompiledSchema;
 import io.ltr8.tson.parser.compiler.TsonSchemaCompiler;
+import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaLinker;
 import io.ltr8.tson.schema.meta.IntegerType;
@@ -38,9 +39,9 @@ class ObjectRecordShapeFactoryTest {
 
     private static TsonCompiledSchema compiled() {
         TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
-        TsonSchema registered = TsonSchemaLinker.linkBootstrap(raw).schema();
+        TsonLinkedSchema registered = TsonSchemaLinker.linkBootstrap(raw);
         DataBindContext context = TsonAtomContext.defaultContext();
-        return TsonSchemaCompiler.compile(registered, TsonObjectBinding.factoryRegistry(registered, context));
+        return TsonSchemaCompiler.compile(registered.schema(), TsonObjectBinding.factoryRegistry(registered, context));
     }
 
     @Test

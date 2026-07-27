@@ -1746,7 +1746,7 @@ object (a real `IntegerType`, not a map of its field names). This is exactly wha
 "Schema resolution" above), retiring the `TsonMapperReader.toObject(normalized, Top.class)` path it
 used to bind through.
 
-**Moved into its own `io.ltr8.tson.parser.bind` package (2026-07-26, on the user's own explicit
+**Moved into its own `io.ltr8.tson.parser.binder` package (2026-07-26, on the user's own explicit
 direction — "`TsonSchemaResolver` and `TsonSchemaCompiler` aren't anywhere near as clean [as
 `TsonSchemaLinker`/`TsonSchemaRegistry`/`TsonDataParser`/`TsonSchemaParser`]... move out the
 `TsonTypeNameBinder` code and anything related to binding to java classes").** `TsonTypeNameBinder`,
@@ -1755,9 +1755,9 @@ only) from `compiler` into the new package; the registry-assembly logic that use
 live as `TsonParserFactoryRegistry.object(TsonSchema, DataBindContext[, TsonTypeNameBinder])` moved
 too, as a new standalone class, `TsonObjectBinding.factoryRegistry(...)` — not just the three binder
 classes, so the dependency between the two packages is genuinely **one-way**:
-`io.ltr8.tson.parser.bind` depends on `compiler` (for `TsonParserFactoryRegistry`,
+`io.ltr8.tson.parser.binder` depends on `compiler` (for `TsonParserFactoryRegistry`,
 `RecordParser.factory`, `AtomTypeParser.ENUM_OBJECT_MODE`), but `compiler` has zero
-awareness of, or dependency on, `io.ltr8.tson.parser.bind` — the actual compiler-facing package
+awareness of, or dependency on, `io.ltr8.tson.parser.binder` — the actual compiler-facing package
 never needs to know Java-object-binding exists at all, mirroring the reasoning that keeps `tson-bind`
 itself a leaf module (DOM mode never touches `DataClassRecord` reflection, so nothing about
 compiling a schema should require it either).
@@ -1768,12 +1768,12 @@ widen from package-private to `public`.** A real, non-obvious Java rule surfaced
 package — the outer class itself has to be resolvable first. `RecordParser.RecordShapeFactory`/
 `RecordShape`/`RecordBuilder` were already `public interface`, but `RecordParser` itself was
 package-private `final class RecordParser<R>`, so none of it was actually reachable from
-`io.ltr8.tson.parser.bind` until `RecordParser` (class) and `RecordParser.factory(...)` (the one
+`io.ltr8.tson.parser.binder` until `RecordParser` (class) and `RecordParser.factory(...)` (the one
 static method `ObjectRecordShapeFactory` needs to plug into) were both widened to `public` —
 likewise `AtomTypeParser` (class) and `AtomTypeParser.ENUM_OBJECT_MODE` (the one constant
 `TsonObjectBinding` needs). Both classes' Javadoc now says outright why they're `public` despite
 being otherwise pure internal machinery: "the only implementation/consumer outside this package is
-object-binding mode's own class, in `io.ltr8.tson.parser.bind`."
+object-binding mode's own class, in `io.ltr8.tson.parser.binder`."
 
 **`TsonObjectBinder`, a new class, took over the eager whole-schema walk from `ObjectRecordShapeFactory.validate`
 (2026-07-27, on the user's own explicit direction: "I think this belongs in a TsonBinder class with
@@ -1855,7 +1855,7 @@ same package and to signal it's object-binding-mode-specific, not a general sche
   and `io.ltr8.tson.parser.mapper`'s untyped-number binding already share for exactly this, rather
   than a third copy.
 - **`TsonObjectBinding.factoryRegistry(TsonSchema, DataBindContext)`** (+ a `TsonTypeNameBinder`-taking
-  overload; `io.ltr8.tson.parser.bind`, not `compiler` — see above) is the
+  overload; `io.ltr8.tson.parser.binder`, not `compiler` — see above) is the
   object-binding-mode sibling to `TsonParserFactoryRegistry.dom()` — every other factory
   (array/map/tuple/choice + every atom-family constant) is shared via `TsonParserFactoryRegistry`'s
   own public `withoutRecordOrEnum()` (widened + renamed from a private `withoutRecord()` for exactly
