@@ -1,5 +1,7 @@
 package io.ltr8.tson.parser.resolver;
 
+import io.ltr8.tson.schema.TsonSchemaLinker;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -60,8 +62,13 @@ import java.util.Map;
  */
 public final class BundledSchemaSource implements TsonSchemaSource {
 
-    /** meta-kernel's own real, published identity -- see {@code spec/m/meta-kernel.tn1}'s own {@code !!id}. */
-    public static final String META_KERNEL_ID = "https://tson.io/2026/32/m/meta-kernel.tn1";
+    /**
+     * meta-kernel's own real, published identity -- see {@code spec/m/meta-kernel.tn1}'s own {@code
+     * !!id}. Defined in terms of {@link TsonSchemaLinker#META_KERNEL_ID}, not a separate copy of the
+     * same string -- that constant is the one this library's own compiled-reader machinery is
+     * actually built against; this one is just where its raw source text can be fetched from.
+     */
+    public static final String META_KERNEL_ID = TsonSchemaLinker.META_KERNEL_ID;
 
     /** meta.tn1's own real, published identity -- see {@code spec/m/meta.tn1}'s own {@code !!id}. */
     public static final String META_TN1_ID = "https://tson.io/2026/32/m/meta.tn1";

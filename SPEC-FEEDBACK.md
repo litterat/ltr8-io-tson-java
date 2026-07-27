@@ -685,3 +685,59 @@ one constructor purely by convention. Either way, state explicitly (the way §5.
 section states its own worked examples) that an implementation MUST dispatch these three by name,
 not by attempting to derive behavior from the (identical, uninformative) resolved shape -- the
 current text mentions this only in a meta-kernel source comment, not in the spec prose itself.
+
+---
+
+## 19. Only a meta-kernel-governed schema may declare `~`-marked constructors, but this is never stated as a normative rule
+
+**Section:** §2.2.2 ("The `!!meta` Directive"), §3.3 ("Schema Layering"), §4.2 ("Type Construction"), Part 2.
+
+**Problem:** §2.2.2 draws a sharp line: "User schemas normally chain to `meta.tn1`. Chaining to
+`meta-kernel.tn1` directly is a meta-programming case — an alternative type vocabulary replacing
+meta, or an extension of the meta layer itself... The meta layer is the format's sanctioned
+extension point: new type vocabularies arrive as alternative or extended meta-schemas chaining to
+the kernel, never as grammar changes." §3.3 draws the same line from the other direction: "the
+**meta-schema** defines the structural vocabulary the type-definition grammar produces... **type
+libraries** define specific types... using that vocabulary — type libraries are ordinary schemas;
+**application schemas** import type libraries and define domain types on top of them." Both passages
+strongly imply that declaring a fresh `~`-marked constructor (§4.2: "the `~` marker prefix declares
+a constructor; it sets `constructor: true` in resolver output") is something only a schema chaining
+directly to the meta-kernel is entitled to do — an ordinary type library or application schema only
+*applies* or *refines* constructors it doesn't declare itself.
+
+But neither passage is phrased as a MUST/MUST NOT, and no other section states it as a rule the
+resolver or linker is required to enforce. The grammar itself admits `~` at any type-def body,
+regardless of the declaring document's own `!!meta` target — nothing in the ABNF (§12.1) restricts
+it. This is corroborated empirically by the real bundled fixtures, not just the prose: meta-kernel.tn1
+declares 9 constructors, meta.tn1 (governed directly by meta-kernel) declares a further 18, and
+core.tn1 (governed by meta.tn1, one hop further down the chain) declares zero — but nothing says a
+conforming implementation MUST reject a hypothetical core.tn1 that *did* declare one.
+
+**Interpretation chosen:** Enforced as a resolver/linker-level rule, and stricter than "structurally
+self-referencing": an entry with `constructor: true` is only valid if the declaring schema's own
+`!!meta` target is *exactly* `https://tson.io/2026/32/m/meta-kernel.tn1` — the one specific
+meta-kernel identity this implementation's own compiled-reader machinery is built against
+(`TsonSchemaLinker.META_KERNEL_ID`), not merely "some schema whose own `!!meta` happens to equal its
+own `!!id`." This distinction matters beyond pedantry: every resolved `TypeDefinition.body` and every
+`!instance` construction (`!enum`, `!integer_type`, ...) is interpretable only because a matching
+type constructor is declared in *this specific* meta-kernel — the Java dispatch tables
+(`TsonParserFactoryRegistry`/`AtomTypeParser`/`RecordParser`) are hard-wired to this one meta-kernel's
+own fixed vocabulary. A structurally self-referencing but otherwise unrelated schema could declare a
+completely different, incompatible `record`/`array`/... vocabulary and would pass a purely
+structural self-reference test while being meaningless to this implementation's own reader
+machinery. A library realistically supports one meta-kernel version at a time — a revision bump
+would mean rebuilding that machinery, not accepting a differently-identified substitute — so the
+check is a fixed-identity comparison, not a structural one. Implemented in
+`TsonSchemaLinker.isMetaKernelGoverned`, checked once per locally-declared constructor entry during
+`link`'s own validation pass. A schema violating this throws `TsonSchemaValidationException` naming
+the offending entry.
+
+**Suggested resolution:** State explicitly, as a MUST, that an entry with `constructor: true` is
+only valid in a schema document whose own `!!meta` names *the* meta-kernel — most naturally as a
+normative sentence in §2.2.2 or §4.2 rather than leaving it to be inferred from descriptive prose in
+two different sections. Separately, and related: the spec should clarify whether "the meta-kernel"
+is meant as a single canonical document every conforming implementation resolves against verbatim
+(one fixed identity, à la this implementation's own `TsonSchemaLinker.META_KERNEL_ID`), or whether an
+implementation is free to define its own compatible meta-kernel under a different identity — the
+"one deliberate circularity" language (§1.5) and the pre-loading requirement (§3.4, §10.1) both read
+as assuming the former, but neither says so explicitly.

@@ -2,6 +2,7 @@ package io.ltr8.tson.parser.compiler;
 
 import io.ltr8.tson.parser.TsonDataParser;
 import io.ltr8.tson.parser.ast.Document;
+import io.ltr8.tson.parser.resolver.BundledSchemaSource;
 import io.ltr8.tson.parser.resolver.MetaKernelBootstrapResolver;
 import io.ltr8.tson.parser.atom.AtomValidationException;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -41,8 +42,13 @@ class EnumTypeParserFactoryTest {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>(MetaKernelBootstrapResolver.getMetaKernelSchema().entries());
         entries.put("flag_holder", TypeDefinition.product(
                 RecordBody.of(List.of(RecordField.required("flag", TypeRef.of("boolean"))))));
+        // !!meta must be the real meta-kernel identity, not a placeholder -- this schema's own
+        // locals are meta-kernel's real constructor vocabulary verbatim, plus one extra entry, so
+        // TsonSchemaLinker's own "only a meta-kernel-governed schema may declare constructors" check
+        // requires it (the placeholder "meta.tn1" this used to point at was never registered in
+        // schemaRegistry below, so it was already functionally inert either way).
         TsonSchema schema = new TsonSchema("https://example.test/flag.tn1",
-                "https://example.test/meta.tn1", List.of(), entries);
+                BundledSchemaSource.META_KERNEL_ID, List.of(), entries);
 
         TsonSchemaRegistry schemaRegistry = new TsonSchemaRegistry();
         TsonLinkedSchema registered = schemaRegistry.register(TsonSchemaLinker.link(schema, schemaRegistry));

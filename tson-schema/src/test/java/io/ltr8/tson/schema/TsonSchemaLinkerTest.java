@@ -46,8 +46,17 @@ class TsonSchemaLinkerTest {
         return TypeDefinition.product(RecordBody.of(List.of()));
     }
 
+    /**
+     * {@code !!meta} is {@link TsonSchemaLinker#META_KERNEL_ID} itself -- every caller passes {@code
+     * null} for {@code loader}, so the structure namespace this would otherwise supply is always
+     * empty regardless of what URI it names; using the real meta-kernel identity instead lets a
+     * hand-built local entry declare its own {@code constructor: true} vocabulary (e.g. {@link
+     * #arrayConstructorEntry()}/{@link #setConstructorEntry()}) without tripping {@code
+     * TsonSchemaLinker}'s own "only the meta-kernel may declare constructors" check, which compares
+     * against that exact identity, not merely "is this schema self-referencing."
+     */
     private static TsonSchema schemaOf(Map<String, TypeDefinition> entries) {
-        return new TsonSchema("https://example.test/s.tn1", "https://example.test/meta.tn1",
+        return new TsonSchema("https://example.test/s.tn1", TsonSchemaLinker.META_KERNEL_ID,
                 List.of(), entries);
     }
 

@@ -1354,6 +1354,33 @@ deliberate, confirmed tradeoff rather than adding a module descriptor now.
      `T` is `set`'s own parameter, not a real entry. `RecordBody.groups[].members` gets a bonus
      check against a different namespace (sibling field names within the same record, not type
      names). Any failure throws `TsonSchemaValidationException` naming the offending entry/reference.
+     **Constructor eligibility** (added 2026-07-27, on the user's own explicit direction, per §2.2.2's
+     own "chaining to meta-kernel.tn1 directly is a meta-programming case" — see `SPEC-FEEDBACK.md`
+     #19 for why this isn't stated as a spec MUST): a locally-declared entry with `constructor: true`
+     is only valid if `schema`'s own `!!meta` is *exactly* `TsonSchemaLinker.META_KERNEL_ID`
+     (`https://tson.io/2026/32/m/meta-kernel.tn1`) — checked once, lazily, on the first such entry
+     found (`isMetaKernelGoverned`). **A fixed identity, not a structural "is this schema
+     self-referencing" test** (an earlier version of this check was structural, tightened the same
+     day on the user's own further direction): every resolved `TypeDefinition.body` and every
+     `!instance` construction is interpretable only because a matching constructor is declared in
+     *this specific* meta-kernel — `TsonParserFactoryRegistry`/`AtomTypeParser`/`RecordParser` (in
+     `tson-parser`) are Java code hard-wired to this one meta-kernel's own fixed vocabulary, not to
+     "whatever schema happens to be self-referencing"; a library supports one meta-kernel version at a
+     time. No loader lookup needed at all now — comparing `schema.meta()` directly against the fixed
+     constant works uniformly for meta-kernel itself (whose own `!!meta` literally is that constant)
+     and for meta.tn1 (governed one hop below it) alike. `BundledSchemaSource.META_KERNEL_ID` (in
+     `tson-parser`) is defined in terms of `TsonSchemaLinker.META_KERNEL_ID`, not a separate copy of
+     the same string. Scoped to locally-declared entries only — an imported `constructor: true` entry
+     (e.g. meta.tn1 importing meta-kernel's own `record`/`array`/...) was already validated when *its
+     own* home schema was linked, matching this class's own "merged entries keep their home namespace,
+     never re-validated against the importer" principle. Confirmed against the real fixtures, not just
+     reasoned about: meta-kernel.tn1 (9 constructors) and meta.tn1 (18, one hop below meta-kernel) both
+     link cleanly; core.tn1 (governed by meta.tn1, zero constructors of its own) was already compliant
+     before this check existed. Two test fixtures needed a real fix, not a workaround — both were
+     hand-built schemas that legitimately declare their own constructor vocabulary
+     (`EnumTypeParserFactoryTest`'s copy of meta-kernel's own entries; `TsonSchemaLinkerTest`'s
+     synthetic `array`/`set` stand-ins for testing materialization in isolation) but had a placeholder
+     `!!meta` value; pointed at the real meta-kernel identity instead, which is what they actually use.
   5. Returns a new `TsonLinkedSchema` wrapping a `TsonSchema` — even when the input carried
      `bootstrap() == true`; once linked/registered, provenance no longer matters to anything
      downstream.

@@ -118,6 +118,15 @@ import java.util.Set;
  */
 public final class TsonSchemaLinker {
 
+    /**
+     * The one meta-kernel this library's own compiled-reader machinery is built against -- see
+     * {@link #isMetaKernelGoverned}'s own Javadoc for why this has to be a specific, fixed identity
+     * rather than a structural "is this schema self-referencing" test. {@code
+     * io.ltr8.tson.parser.resolver.BundledSchemaSource#META_KERNEL_ID} (in {@code tson-parser},
+     * which depends on this module) is defined in terms of this constant, not a separate copy.
+     */
+    public static final String META_KERNEL_ID = "https://tson.io/2026/32/m/meta-kernel.tn1";
+
     private TsonSchemaLinker() {
     }
 
@@ -197,12 +206,26 @@ public final class TsonSchemaLinker {
         Map<String, TypeDefinition> synthesized = new LinkedHashMap<>();
         Set<String> localNames = new LinkedHashSet<>();
 
+        Boolean constructorsAllowed = null;
         for (Map.Entry<String, TypeDefinition> entry : schema.entries().entrySet()) {
             if (merged.containsKey(entry.getKey())) {
                 throw new TsonSchemaValidationException(
                         "'" + entry.getKey() + "' collides with an entry of the same name brought in by !!import");
             }
             TypeDefinition def = entry.getValue();
+            if (def.constructor()) {
+                if (constructorsAllowed == null) {
+                    constructorsAllowed = isMetaKernelGoverned(schema);
+                }
+                if (!constructorsAllowed) {
+                    throw new TsonSchemaValidationException("'" + entry.getKey() + "' declares a type constructor "
+                            + "(the '~' marker), but '" + schema.id() + "' is not governed directly by the "
+                            + "meta-kernel (its own !!meta is '" + schema.meta() + "') -- only a schema chaining "
+                            + "to meta-kernel.tn1 directly may declare new constructors (§2.2.2's "
+                            + "meta-programming case); an ordinary type library or application schema may only "
+                            + "apply or refine constructors it doesn't declare itself");
+                }
+            }
             Top rewrittenBody = rewriteBody(def.body(), materializedNames, synthesized, lookup);
             merged.put(entry.getKey(), new TypeDefinition(def.source(), def.kind(), def.parameters(),
                     def.constructor(), def.supertypes(), def.subtypes(), def.disjoint(), rewrittenBody));
@@ -218,6 +241,26 @@ public final class TsonSchemaLinker {
         }
 
         return new TsonLinkedSchema(new TsonSchema(schema.id(), schema.meta(), schema.imports(), merged, schema.bootstrap()));
+    }
+
+    /**
+     * Whether {@code schema} is entitled to declare its own {@code ~}-marked constructors -- true
+     * only if its own {@code !!meta} target is exactly {@link #META_KERNEL_ID}, the *specific*
+     * meta-kernel this library's own compiled-reader machinery is built against, not merely "some
+     * self-referencing schema." This is stricter than structural self-reference alone: every
+     * resolved {@code TypeDefinition.body} and every {@code !instance} construction (`!enum`,
+     * `!integer_type`, ...) is only interpretable because a matching type constructor is declared in
+     * *this* meta-kernel specifically -- {@code TsonParserFactoryRegistry}/{@code AtomTypeParser}/
+     * {@code RecordParser} (in {@code tson-parser}) are Java code hard-wired to this one meta-kernel's
+     * own fixed vocabulary, not to "whatever schema happens to be self-referencing." A library
+     * supports one meta-kernel version at a time (a new revision would mean rebuilding that
+     * machinery, not just accepting a differently-identified but structurally-similar substitute), so
+     * this checks the schema's own {@code !!meta} string directly, no lookup needed -- correct for
+     * meta-kernel itself (whose own {@code !!meta} literally is {@link #META_KERNEL_ID}) and for
+     * meta.tn1 (governed one hop below it) alike.
+     */
+    private static boolean isMetaKernelGoverned(TsonSchema schema) {
+        return CanonicalIdentity.of(schema.meta()).equals(CanonicalIdentity.of(META_KERNEL_ID));
     }
 
     // ── Subtypes (reverse index) ─────────────────────────────────────────
