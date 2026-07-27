@@ -18,8 +18,6 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Proves object-binding mode ({@link TsonObjectBinding#factoryRegistry}) genuinely produces real, bound
@@ -31,6 +29,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * *compiles* cleanly, previously blocked entirely (see {@link
  * #integerTypeCompilesAndReadsWithSizeLeftAbsent}'s own Javadoc for why its data still leaves
  * {@code size} unpopulated -- a separate, already-tracked gap, not a regression here).
+ *
+ * <p>{@link TsonObjectBinder}'s own eager, whole-schema binding behavior (reporting every
+ * unresolvable entry at once, silently skipping non-record classes) has its own dedicated coverage
+ * in {@code TsonObjectBinderTest} -- this class only exercises the end-to-end read path.
  */
 class ObjectRecordShapeFactoryTest {
 
@@ -79,39 +81,5 @@ class ObjectRecordShapeFactoryTest {
         IntegerType integerType = assertInstanceOf(IntegerType.class, result);
         assertEquals(new IntegerType(Optional.empty(), Optional.of(BigInteger.valueOf(-5)), Optional.empty(),
                 Optional.of(BigInteger.valueOf(100)), Optional.empty(), Optional.empty()), integerType);
-    }
-
-    @Test
-    void theWholeRealMetaKernelSchemaValidatesCleanly() {
-        // Confirmed empirically (not assumed): of the 58 real, registered entries, 23 are
-        // record-shaped and genuinely bind (including set/array_min/array_max/array_ranged, via
-        // SchemaMetaTypeNameBinder's own ArrayBody alias, and every atom constraint-vocabulary
-        // record like uri_type/regex_type, which need TsonAtomContext's own URI/UUID/... atom
-        // registrations to resolve at all); 5 more (atom/product/sum/top/type_argument) resolve to
-        // a real, deliberately non-record class and are silently skipped, not failures. Nothing
-        // should throw.
-        TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
-        TsonSchema registered = TsonSchemaLinker.linkBootstrap(raw).schema();
-        ObjectRecordShapeFactory shapeFactory = new ObjectRecordShapeFactory(TsonAtomContext.defaultContext());
-
-        shapeFactory.validate(registered);
-    }
-
-    @Test
-    void validateReportsEveryUnresolvableEntryAtOnceRatherThanOneAtATime() {
-        TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
-        TsonSchema registered = TsonSchemaLinker.linkBootstrap(raw).schema();
-        TsonTypeNameBinder alwaysMissing = name -> {
-            throw new ClassNotFoundException("no class for '" + name + "' under this test's own binder");
-        };
-        ObjectRecordShapeFactory shapeFactory =
-                new ObjectRecordShapeFactory(TsonAtomContext.defaultContext(), alwaysMissing);
-
-        IllegalStateException thrown = assertThrows(IllegalStateException.class, () -> shapeFactory.validate(registered));
-
-        // At least "integer_type" and "text_type" -- two real, distinct record-shaped entries --
-        // both named in the one report, not just the first one validate() happened to hit.
-        assertTrue(thrown.getMessage().contains("'integer_type'"), thrown.getMessage());
-        assertTrue(thrown.getMessage().contains("'text_type'"), thrown.getMessage());
     }
 }

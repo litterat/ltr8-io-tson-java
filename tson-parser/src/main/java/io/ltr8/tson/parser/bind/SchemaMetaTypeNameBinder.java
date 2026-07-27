@@ -35,7 +35,7 @@ import java.util.Map;
  * mangles to {@link io.ltr8.tson.schema.meta.TypeArgument}, deliberately a sealed interface, not a
  * plain record (see that class's own Javadoc on the mutual-recursion trap that forced this). This
  * binder resolves the class either way -- it isn't this class's job to decide whether a resolved
- * class is usable as a record; see {@link ObjectRecordShapeFactory#validate} for why a non-record
+ * class is usable as a record; see {@link TsonObjectBinder#bind} for why a non-record
  * result there is treated as "doesn't apply" rather than a binding failure.
  */
 public final class SchemaMetaTypeNameBinder implements TsonTypeNameBinder {

@@ -1494,7 +1494,7 @@ own `cidr4`/`email`/... atom families, which have no `atom` parser yet), and —
 empirically, once
 eager building actually ran against the real, registered meta-kernel/meta.tn1 fixtures in
 object-binding mode — a factory that *is* registered still rejecting one particular entry
-(`ObjectRecordShapeFactory` deliberately never caches meta-kernel's own non-record-bound marker
+(`TsonObjectBinder` deliberately never binds meta-kernel's own non-record-bound marker
 entries like `top`/`atom`; building the ordinary `"record"` factory against those specific entries
 throws even though the same factory works fine for every genuinely record-shaped one). Both surface
 identically through `ErrorParser`. A missing/absent *referenced* name (`build`'s own target not
@@ -1507,7 +1507,7 @@ immediately, uncaught, not deferred into an `ErrorParser`.
 meta-schema machinery real application data is never actually read as an instance of, so a caller
 in object-binding mode was never going to `get`/`read` them anyway), but *why* eager building reaches
 a factory built to reject them at all, rather than the two eager-validation mechanisms
-(`ObjectRecordShapeFactory#validate`'s own skip-list and this compiler's own eager walk) agreeing on
+(`TsonObjectBinder#bind`'s own skip-list and this compiler's own eager walk) agreeing on
 which entries are exempt in the first place, hasn't been revisited — noted here so it isn't lost.
 
 ### Compiled schema registry (`tson-parser/src/main/java/io/ltr8/tson/parser/compiler/TsonCompiledRegistry.java`)
@@ -1737,7 +1737,7 @@ here anyway so this class is a complete, uniform "fetch any of this library's ow
 documents" utility on its own terms, and safe for any *other* `TsonCompiledSchemaLoader` implementation that
 doesn't special-case meta-kernel the way `DefaultTsonCompiledSchemaLoader` does.
 
-### Object-binding mode (`compiler/RecordParser.java` + `parser/bind/{TsonObjectBinding,ObjectRecordShapeFactory,TsonTypeNameBinder,SchemaMetaTypeNameBinder}.java`)
+### Object-binding mode (`compiler/RecordParser.java` + `parser/bind/{TsonObjectBinding,TsonObjectBinder,ObjectRecordShapeFactory,TsonTypeNameBinder,SchemaMetaTypeNameBinder}.java`)
 
 Added 2026-07-25: a second output mode for the compiled reader, alongside DOM mode's plain
 `Map<String, Object>` — `RecordParser` can now instead produce a real, bound `schema.meta` Java
@@ -1774,6 +1774,20 @@ likewise `AtomTypeParser` (class) and `AtomTypeParser.ENUM_OBJECT_MODE` (the one
 `TsonObjectBinding` needs). Both classes' Javadoc now says outright why they're `public` despite
 being otherwise pure internal machinery: "the only implementation/consumer outside this package is
 object-binding mode's own class, in `io.ltr8.tson.parser.bind`."
+
+**`TsonObjectBinder`, a new class, took over the eager whole-schema walk from `ObjectRecordShapeFactory.validate`
+(2026-07-27, on the user's own explicit direction: "I think this belongs in a TsonBinder class with
+the method called .bind instead").** Same verb/noun split this project's own pipeline vocabulary
+already uses elsewhere (`TsonSchemaCompiler`/`TsonCompiledSchema`) — `TsonObjectBinder.bind(TsonSchema,
+DataBindContext, TsonTypeNameBinder)` is the verb (a static method on a private-constructor utility
+class, walking every `record`-shaped entry and resolving+validating a `DataClassRecord` for each,
+exactly as `validate` used to), returning a plain, immutable `Map<String, DataClassRecord>` — the
+noun. `ObjectRecordShapeFactory` shrank to a pure `RecordShapeFactory<Object>` adapter holding
+nothing but that already-bound map; it no longer takes a `DataBindContext`/`TsonTypeNameBinder` at
+all, only the finished result. `TsonObjectBinding.factoryRegistry` calls `TsonObjectBinder.bind` first,
+then constructs the factory from its return value. Named `TsonObjectBinder`, not the bare `TsonBinder`
+first proposed, to disambiguate from `TsonTypeNameBinder` (a single name→`Class` lookup) already in the
+same package and to signal it's object-binding-mode-specific, not a general schema-pipeline stage.
 
 - **`RecordParser.RecordShape<R>`/`RecordParser.RecordBuilder<R>`/`RecordParser.RecordShapeFactory<R>`**
   — public interfaces nested inside `RecordParser` itself, not standalone top-level types (nothing
@@ -1818,20 +1832,20 @@ object-binding mode's own class, in `io.ltr8.tson.parser.bind`."
   of 58 entries bind as real records, 5 (`atom`/`product`/`sum`/`top`/`type_argument`) resolve to a
   real but deliberately non-record class (sealed marker interfaces) and are treated as "doesn't
   apply," not a failure — see below.
-- **`ObjectRecordShapeFactory.validate(TsonSchema)`** — binding happens *eagerly*, walking every
-  `record`-shaped entry in the whole schema and resolving+caching a `DataClassRecord` for each,
-  rather than lazily discovering a missing binding one entry at a time as unrelated reads happen to
-  reach them (per the user's own explicit direction: "That binding should occur at schema load
-  time so any errors can be reported"). A schema with a genuinely unresolvable entry still
-  *registers* fine (`TsonSchemaRegistry`/`TsonSchemaLinker` are unaffected) — it just can't be *compiled*
-  for object-binding mode, and fails with every problem entry named at once. **An entry that
+- **`TsonObjectBinder.bind(TsonSchema, DataBindContext, TsonTypeNameBinder)`** — binding happens *eagerly*,
+  walking every `record`-shaped entry in the whole schema and resolving a `DataClassRecord` for each
+  into the returned map, rather than lazily discovering a missing binding one entry at a time as
+  unrelated reads happen to reach them (per the user's own explicit direction: "That binding should
+  occur at schema load time so any errors can be reported"). A schema with a genuinely unresolvable
+  entry still *registers* fine (`TsonSchemaRegistry`/`TsonSchemaLinker` are unaffected) — it just can't
+  be *bound* for object-binding mode, and fails with every problem entry named at once. **An entry that
   resolves to a real, existing class which isn't a record is silently skipped, not a failure** —
   `atom`/`product`/`sum`/`top` (meta-kernel's own empty-bodied base-kind declarations) and
   `type_argument` mangle to real `schema.meta` classes that are deliberately sealed marker
   interfaces (`Top`'s own kind hierarchy; `TypeArgument`'s own mutual-recursion-trap workaround, see
   its own Javadoc) — these are meta-schema machinery real application data is never actually read
-  as an instance of, so failing the whole schema's compilation over them would be a false
-  positive — confirmed by actually running validation against the real fixture and finding exactly
+  as an instance of, so failing the whole schema's binding over them would be a false
+  positive — confirmed by actually running this against the real fixture and finding exactly
   these 5, not by guessing them in advance.
 - **Narrowing** — the schema-driven child-parser recursion (`CompilationContext.resolve`) has no
   knowledge of a target Java field's own declared width (e.g. `text_type`'s `min_length`/
@@ -1850,7 +1864,7 @@ object-binding mode's own class, in `io.ltr8.tson.parser.bind`."
 - **`TsonAtomContext`** (new, `io.ltr8.tson.parser.base`) — `TsonMapperContext.defaultContext()`'s
   own built-in-vocabulary atom registrations (`UUID`/`byte[]`/`LocalDate`/`OffsetTime`/
   `OffsetDateTime`/`URI`/`Inet4Address`/`Inet6Address`), pulled out to a public class at this shared
-  layer once a third consumer (`ObjectRecordShapeFactory`, needing `DataBindContext.getDescriptor`
+  layer once a third consumer (`TsonObjectBinder`, needing `DataBindContext.getDescriptor`
   to succeed for e.g. `AtomSpecification.spec: URI`) needed the identical list from a package with
   no dependency on `mapper`. `TsonMapperContext` now just delegates — same reasoning as
   `NumberNarrowing`'s own "one place, not one per caller" precedent.
@@ -1862,11 +1876,13 @@ correctly with `size` left absent in the data (`IntegerSize.signed` is deliberat
 unexercised there rather than proven either way — it's a primitive `boolean` field on a plain
 `record`-shaped entry, narrowed through `ObjectRecordShapeFactory`'s own generic, reflective binding
 path, a different mechanism than `BooleanParser`'s own name-keyed `"boolean"` dispatch below it; a
-separate, narrower, still-open question from this test's own actual scope, not a regression here);
-the whole real schema validates with zero problems; and a custom `TsonTypeNameBinder` that always
-fails proves `validate`'s own multi-problem report names more than one offending entry at once, not
-just the first. `RecordParser.FACTORY`'s own identity and DOM-mode output are confirmed byte-for-byte
-unchanged by the whole existing suite.
+separate, narrower, still-open question from this test's own actual scope, not a regression here).
+`TsonObjectBinder.bind`'s own eager, whole-schema behavior has its own dedicated coverage in
+`TsonObjectBinderTest`: the whole real schema binds with zero problems; a custom `TsonTypeNameBinder`
+that always fails proves `bind`'s own multi-problem report names more than one offending entry at
+once, not just the first; and the returned map genuinely omits the 5 real, non-record-bound marker
+entries (`atom`/`top`/...) rather than including a null or placeholder for them. `RecordParser.FACTORY`'s
+own identity and DOM-mode output are confirmed byte-for-byte unchanged by the whole existing suite.
 
 **`AtomTypeParser.ENUM_OBJECT_MODE`/`BooleanParser`** — object mode's own `"enum"` factory
 dispatches name-keyed, not shape-keyed: every enum instance *except* the schema's own `boolean`

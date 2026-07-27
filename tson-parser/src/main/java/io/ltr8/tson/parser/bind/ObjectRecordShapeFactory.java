@@ -1,23 +1,17 @@
 package io.ltr8.tson.parser.bind;
 
-import io.ltr8.bind.DataBindContext;
-import io.ltr8.bind.DataBindException;
-import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassField;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.tson.parser.base.NumberNarrowing;
 import io.ltr8.tson.parser.compiler.RecordParser.RecordBuilder;
 import io.ltr8.tson.parser.compiler.RecordParser.RecordShape;
 import io.ltr8.tson.parser.compiler.RecordParser.RecordShapeFactory;
-import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -25,101 +19,32 @@ import java.util.Map;
  * Java objects (e.g. a real {@link io.ltr8.tson.schema.meta.IntegerType}) instead of DOM mode's
  * plain {@code Map<String, Object>}. All construction is delegated to {@code tson-bind}'s own
  * {@link DataClassRecord} descriptor (constructor selection, {@code MethodHandle} binding, {@code
- * Optional}-wrapping) -- nothing here reimplements any of that; this class only decides *which*
- * Java class a schema type name maps to (via {@link TsonTypeNameBinder}) and narrows a schema-produced
- * value to that class's own declared field width where they legitimately differ (see {@link
+ * Optional}-wrapping) -- nothing here reimplements any of that; this class only narrows a
+ * schema-produced value to a field's own declared width where they legitimately differ (see {@link
  * ObjectRecordBuilder#narrow}).
  *
- * <p><b>Binding happens eagerly, at {@link #validate}, not lazily per read.</b> {@link
- * TsonObjectBinding#factoryRegistry} calls it once, up front, walking every {@code record}-shaped entry
- * in the whole schema and resolving+validating a {@link DataClassRecord} descriptor for each --
- * both "does {@code binder} know a matching class" and "can {@code tson-bind} actually build a
- * descriptor for it" (e.g. the {@code @Record}-on-canonical-constructor gotcha documented elsewhere
- * in this codebase). A schema with a genuine, unresolvable entry still *registers* fine (schema
- * validation/materialization, in {@code tson-schema}, is unaffected) -- it just can't be *compiled*
- * for object-binding mode, and fails clearly, with every problem entry named at once, rather than
- * one at a time as unrelated reads happen to reach them.
- *
- * <p><b>An entry that resolves to a real, existing Java class which isn't a record is silently
- * skipped, not treated as a failure.</b> A handful of real meta-kernel entries (its own {@code
- * atom}/{@code product}/{@code sum}/{@code top} base-kind declarations, and {@code type_argument})
- * mangle to a genuine {@code schema.meta} class that's deliberately a sealed marker interface, not
- * a plain record (see {@link SchemaMetaTypeNameBinder}'s own Javadoc) -- these are meta-schema
- * machinery real application data is never actually read as an instance of, so this factory was
- * never going to be the right mechanism to construct them regardless; failing the whole schema's
- * compilation over them would be a false positive -- confirmed empirically, not assumed, by running
- * this validation against the real, fully registered meta-kernel.tn1 fixture (0 genuine problems,
- * 5 legitimately skipped, 23 bound).
+ * <p>Holds nothing but {@link TsonObjectBinder#bind}'s own already-validated result -- a plain,
+ * immutable {@code Map<String, DataClassRecord>}, one entry per {@code record}-shaped schema type
+ * (see that class's own Javadoc for how it's built, including why an entry resolving to a
+ * non-record Java class is silently absent from the map rather than a binding failure). {@link
+ * #shapeFor} only ever consults this map, never resolves a class itself, so an entry {@link
+ * TsonObjectBinder#bind} didn't already validate can't silently slip through later.
  */
 public final class ObjectRecordShapeFactory implements RecordShapeFactory<Object> {
 
-    private final DataBindContext context;
-    private final TsonTypeNameBinder binder;
-    private final Map<String, DataClassRecord> validated = new LinkedHashMap<>();
+    private final Map<String, DataClassRecord> bound;
 
-    public ObjectRecordShapeFactory(DataBindContext context) {
-        this(context, SchemaMetaTypeNameBinder.INSTANCE);
-    }
-
-    public ObjectRecordShapeFactory(DataBindContext context, TsonTypeNameBinder binder) {
-        this.context = context;
-        this.binder = binder;
-    }
-
-    /**
-     * Walks every {@code record}-shaped entry in {@code schema} (i.e. every entry whose {@link
-     * TypeDefinition#body()} is a {@link RecordBody} -- the ones that would actually reach {@link
-     * #shapeFor} once compiled), resolving and caching a {@link DataClassRecord} for each. Must run
-     * before this factory compiles anything (see {@link TsonObjectBinding#factoryRegistry}) -- {@link
-     * #shapeFor} only ever consults this cache, never {@code binder} directly, so an entry this
-     * method didn't already validate can't silently slip through later.
-     *
-     * @throws IllegalStateException naming every entry that failed to resolve, if any did
-     */
-    public void validate(TsonSchema schema) {
-        List<String> problems = new ArrayList<>();
-        for (Map.Entry<String, TypeDefinition> entry : schema.entries().entrySet()) {
-            String name = entry.getKey();
-            if (!(entry.getValue().body() instanceof RecordBody)) {
-                continue;
-            }
-            Class<?> target;
-            try {
-                target = binder.resolve(name);
-            } catch (ClassNotFoundException e) {
-                problems.add("'" + name + "': " + e.getMessage());
-                continue;
-            }
-            DataClass descriptor;
-            try {
-                descriptor = context.getDescriptor(target);
-            } catch (DataBindException e) {
-                problems.add("'" + name + "' resolved to " + target + ", but tson-bind could not build a "
-                        + "descriptor for it: " + e.getMessage());
-                continue;
-            }
-            if (!(descriptor instanceof DataClassRecord recordDescriptor)) {
-                // Not a failure -- a real class that isn't a record (e.g. Top/Atom/Product/Sum,
-                // deliberately sealed marker interfaces) is meta-schema machinery this factory was
-                // never going to construct anyway; see this class's own Javadoc.
-                continue;
-            }
-            validated.put(name, recordDescriptor);
-        }
-        if (!problems.isEmpty()) {
-            throw new IllegalStateException("object-binding mode could not resolve a Java class for "
-                    + problems.size() + (problems.size() == 1 ? " schema entry" : " schema entries") + ":\n  "
-                    + String.join("\n  ", problems));
-        }
+    public ObjectRecordShapeFactory(Map<String, DataClassRecord> bound) {
+        this.bound = bound;
     }
 
     @Override
     public RecordShape<Object> shapeFor(String typeName, TypeDefinition definition, RecordBody body) {
-        DataClassRecord descriptor = validated.get(typeName);
+        DataClassRecord descriptor = bound.get(typeName);
         if (descriptor == null) {
-            throw new IllegalStateException("'" + typeName + "' was never validated -- call "
-                    + "ObjectRecordShapeFactory.validate(TsonSchema) with the governing schema before "
-                    + "compiling against it (see TsonObjectBinding#factoryRegistry)");
+            throw new IllegalStateException("'" + typeName + "' was never bound -- call "
+                    + "TsonObjectBinder.bind(TsonSchema, DataBindContext, TsonTypeNameBinder) with the "
+                    + "governing schema before compiling against it (see TsonObjectBinding#factoryRegistry)");
         }
         return () -> new ObjectRecordBuilder(descriptor);
     }

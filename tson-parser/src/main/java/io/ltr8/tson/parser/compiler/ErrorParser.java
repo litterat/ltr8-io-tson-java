@@ -12,7 +12,7 @@ import io.ltr8.tson.parser.ast.DataValue;
  * families, which have no {@code atom} parser yet -- {@link
  * TsonParserFactoryRegistry#require} throwing {@code IllegalStateException}), and a factory that IS
  * registered but whose own eager validation rejects this particular entry (object-binding mode's
- * {@code ObjectRecordShapeFactory}, which deliberately never caches meta-kernel's own non-record-
+ * {@code TsonObjectBinder}, which deliberately never binds meta-kernel's own non-record-
  * bound marker entries like {@code top}/{@code atom} -- see that class's own Javadoc). Both surface
  * identically here: the schema as a whole still compiles; only {@link #read}ing an actual value
  * against this specific entry fails, and only then.

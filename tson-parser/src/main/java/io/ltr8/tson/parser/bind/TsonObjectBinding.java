@@ -1,10 +1,13 @@
 package io.ltr8.tson.parser.bind;
 
 import io.ltr8.bind.DataBindContext;
+import io.ltr8.bind.DataClassRecord;
 import io.ltr8.tson.parser.compiler.AtomTypeParser;
 import io.ltr8.tson.parser.compiler.RecordParser;
 import io.ltr8.tson.parser.compiler.TsonParserFactoryRegistry;
 import io.ltr8.tson.schema.TsonSchema;
+
+import java.util.Map;
 
 /**
  * Assembles a {@link TsonParserFactoryRegistry} for object-binding mode -- `record` produces a
@@ -33,7 +36,7 @@ public final class TsonObjectBinding {
     /**
      * Takes {@code schema} itself (unlike {@code TsonParserFactoryRegistry#dom()}, which needs no
      * schema at all), not just a {@link DataBindContext} -- needed so {@link
-     * ObjectRecordShapeFactory#validate} can eagerly resolve and validate a Java class for every
+     * TsonObjectBinder#bind} can eagerly resolve and validate a Java class for every
      * {@code record}-shaped entry the schema actually declares, up front, rather than discovering a
      * missing binding lazily, one entry at a time, only once something happens to read it. Uses
      * {@link SchemaMetaTypeNameBinder}, the default {@code io.ltr8.tson.schema.meta} binder -- see
@@ -50,8 +53,8 @@ public final class TsonObjectBinding {
      */
     public static TsonParserFactoryRegistry factoryRegistry(TsonSchema schema, DataBindContext context,
                                                               TsonTypeNameBinder binder) {
-        ObjectRecordShapeFactory shapeFactory = new ObjectRecordShapeFactory(context, binder);
-        shapeFactory.validate(schema);
+        Map<String, DataClassRecord> bound = TsonObjectBinder.bind(schema, context, binder);
+        ObjectRecordShapeFactory shapeFactory = new ObjectRecordShapeFactory(bound);
         return TsonParserFactoryRegistry.withoutRecordOrEnum()
                 .register("record", RecordParser.factory(shapeFactory))
                 .register("enum", AtomTypeParser.ENUM_OBJECT_MODE)

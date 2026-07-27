@@ -38,9 +38,9 @@ import java.util.Set;
  * more constructors (`unit`/`map`/`tuple`/`choice`/`text_type`/`uri_type`/...) than any one {@link
  * TsonParserFactoryRegistry} necessarily has factories for yet, and (found empirically, once this
  * actually ran against the real, registered meta-kernel/meta.tn1 fixtures in object-binding mode)
- * a factory that *is* registered can still legitimately reject one particular entry -- {@code
- * ObjectRecordShapeFactory} deliberately never caches meta-kernel's own non-record-bound marker
- * entries like {@code top}/{@code atom} (see its own Javadoc), so building the ordinary {@code
+ * a factory that *is* registered can still legitimately reject one particular entry -- object-binding
+ * mode's own {@code TsonObjectBinder} deliberately never binds meta-kernel's own non-record-bound
+ * marker entries like {@code top}/{@code atom} (see its own Javadoc), so building the ordinary {@code
  * "record"} factory against *those specific* entries throws, even though the same factory works
  * fine for every genuinely record-shaped one -- worth reviewing on its own terms later, per the
  * user's own note, not something this change tries to fix. {@link Compilation#resolve} solves both
