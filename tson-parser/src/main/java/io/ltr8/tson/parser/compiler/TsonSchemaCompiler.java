@@ -15,68 +15,35 @@ import java.util.Set;
 /**
  * Compiles a {@link TsonLinkedSchema} into a {@link TsonCompiledSchema} -- the "compile" stage of
  * this project's own parse -&gt; resolve -&gt; link -&gt; register -&gt; compile -&gt; read pipeline
- * vocabulary: this class is the verb, {@link TsonCompiledSchema} is the noun it produces. Unlike
- * {@code TsonSchemaLinker.link}, the class this
- * verb belongs to genuinely needs its own private, per-compilation mutable state -- cycle-detection
- * bookkeeping (below) -- so (moved here from {@link TsonCompiledSchema} itself, 2026-07-27, on the
- * user's own explicit direction: "the compile step still lives in TsonCompiledSchema.. move the
- * compiler code into TsonSchemaCompiler") that state, and the recursive build logic that owns it,
- * live in a private nested {@link Compilation} helper -- one instance per {@link #compile} call,
- * discarded once it returns. {@link TsonCompiledSchema} itself is left holding nothing but the
- * finished result: a plain, already-built {@code Map<String, TsonValueReader<?>>}, immutable
- * from the moment it's constructed.
+ * vocabulary: this class is the verb, {@link TsonCompiledSchema} is the noun it produces. The
+ * per-compilation mutable state (cycle-detection bookkeeping) lives in a private nested {@link
+ * Compilation} helper, one instance per {@link #compile} call, discarded once it returns --
+ * {@link TsonCompiledSchema} itself holds nothing but the finished, immutable result.
  *
- * <p><b>Eager, not lazy</b> (flipped 2026-07-27, on the user's own explicit direction -- an earlier
- * version built nothing until {@code TsonCompiledSchema#get} was first called for a given name).
- * {@link #compile} now walks every one of {@code schema.entries()} and resolves each, so the whole
- * graph is built (and every {@code type_ref} it reaches proven reachable/buildable) before this
- * method returns -- not deferred to whenever a caller happens to ask for a given name. This is what
- * "if we build the graph upfront we can validate everything is there" actually means for a compiled
- * schema: a caller that only ever reads a handful of a large schema's own types still gets, up
- * front, the same assurance that every *other* entry compiles too -- these are schemas with tens or
- * hundreds of entries, not millions, so walking all of them costs nothing worth avoiding.
+ * <p><b>Eager, not lazy.</b> {@link #compile} walks every one of {@code linkedSchema.schema()
+ * .entries()} and resolves each before returning, so a caller that only ever reads a handful of a
+ * large schema's own types still gets the same assurance that every other entry compiles too.
  *
- * <p>The real obstacle eager building used to run into: a real schema like meta-kernel declares
- * more constructors (`unit`/`map`/`tuple`/`choice`/`text_type`/`uri_type`/...) than any one {@link
- * TsonParserFactoryRegistry} necessarily has factories for yet, and (found empirically, once this
- * actually ran against the real, registered meta-kernel/meta.tn1 fixtures in object-binding mode)
- * a factory that *is* registered can still legitimately reject one particular entry -- object-binding
- * mode's own {@code TsonObjectBinder} deliberately never binds meta-kernel's own non-record-bound
- * marker entries like {@code top}/{@code atom} (see its own Javadoc), so building the ordinary {@code
- * "record"} factory against *those specific* entries throws, even though the same factory works
- * fine for every genuinely record-shaped one -- worth reviewing on its own terms later, per the
- * user's own note, not something this change tries to fix. {@link Compilation#resolve} solves both
- * the same way, not by staying lazy: any {@link RuntimeException} thrown while building one specific
- * {@code name} is caught right there and replaced with an {@link ErrorParser} wrapping it, rather
- * than aborting the whole eager walk. The schema as a whole still compiles in full; only actually
- * reading a value against one of the unsupported/rejected types fails, at that point, not before.
+ * <p>A build failure for one specific entry doesn't abort the whole walk -- {@link
+ * Compilation#resolve} catches it and substitutes an {@link ErrorParser}, so the schema as a whole
+ * still compiles; only actually reading a value against that one entry fails, at that point. This
+ * covers both a constructor with no registered {@link TsonParserFactory} at all, and a factory
+ * that's registered but rejects this particular entry.
  *
  * <p>Dispatch to a factory is uniform across every constructor -- atom and composite alike --
  * driven entirely by whatever {@link TsonParserFactory} {@link #compile} was given, keyed by the
- * resolved body's own constructor name (see {@link TsonParserFactoryRegistry#typenameOf}) and
- * passed as that single call's own first argument -- see {@link TsonParserFactory}'s own Javadoc
- * for why the interface itself carries {@code typeName} now, not just this compiler's own call
- * site. One non-factory case is checked first: {@link Reference} (a bare {@code name =>
- * other_name} entry, §8.3, never produced by a {@code !constructor {...}} application -- pure
- * delegation to the target's own handle, no factory involved).
+ * resolved body's own constructor name (see {@link TsonParserFactoryRegistry#typenameOf}). One
+ * non-factory case is checked first: {@link Reference} (a bare {@code name => other_name} entry,
+ * §8.3) delegates straight to the target's own handle.
  *
- * <p><b>A declaration's own body is always compiled, whether or not it also has subtypes.</b> A
- * type with known subtypes (non-empty {@link TypeDefinition#subtypes}, populated by {@code
- * SchemaValidator.computeSubtypes} from the reverse composition index -- deliberately *not*
- * triggered by open type parameters, an earlier version of this class's own choice; see {@link
- * VariantParser}'s own Javadoc for why that was too narrow a signal) gets its ordinary body parser
- * wrapped in a {@link VariantParser}: a value with no explicit {@code !typeName} annotation, or one
- * naming the declaration itself, reads against that ordinary body parser directly (e.g. {@code top
- * => top & {}}'s own empty body resolves {@code {}} at a bare {@code top}-typed position, even
- * though {@code top} is also the supertype of everything else in the schema); a type-ref naming a
- * known subtype dispatches there instead, lazily. Schema-driven, not Java-driven -- this is
- * deliberately *not* implemented by leaning on {@code tson-bind}'s own sealed-interface/{@code
- * @Typename} union matching the way {@code DefinitionResolver}'s generic constructor-application
- * binding does one layer down: {@code subtypes} is the schema's own, language-agnostic
- * representation of "who composes with this," and using it here rather than Java class hierarchy
- * details is what makes this layer's own polymorphism handling portable to a from-scratch
- * implementation in another language, not an artifact of how this one happens to model {@code
- * schema.meta} in Java.
+ * <p>A declaration's own body is always compiled, whether or not it also has subtypes. A type with
+ * known subtypes ({@link TypeDefinition#subtypes}, the reverse composition index) gets its ordinary
+ * body reader wrapped in a {@link VariantParser}: a value with no explicit {@code !typeName}
+ * annotation, or one naming the declaration itself, reads against the ordinary body reader
+ * directly; a type-ref naming a known subtype dispatches there instead. This is schema-driven, not
+ * Java-driven, deliberately -- {@code subtypes} is the schema's own, language-agnostic
+ * representation of "who composes with this," which is what makes this layer's polymorphism
+ * handling portable to a from-scratch implementation in another language.
  */
 public final class TsonSchemaCompiler {
 
@@ -85,26 +52,16 @@ public final class TsonSchemaCompiler {
 
     /**
      * Compiles {@code linkedSchema} against {@code factory}, eagerly -- see this class's own "Eager,
-     * not lazy" note. {@code factory} is typically a {@link TsonParserFactoryRegistry} (which is itself
-     * a {@link TsonParserFactory}, see that class's own Javadoc), but doesn't have to be -- any
-     * single-shape {@link TsonParserFactory} works too, e.g. for a test that only wants to compile
-     * against one constructor.
+     * not lazy" note. {@code factory} is typically a {@link TsonParserFactoryRegistry} (itself a
+     * {@link TsonParserFactory}), but any single-shape {@link TsonParserFactory} works too.
      *
-     * <p><b>Requires a {@link TsonLinkedSchema}, not a bare {@link TsonSchema}</b> -- i.e. {@code
-     * TsonSchemaLinker.link}'s own output (or {@code TsonSchemaRegistry}'s, which requires one too),
-     * never a raw {@code TsonSchemaResolver.resolveSchema} result passed off as one. Two reasons this
-     * matters, both now signaled by the parameter's own type rather than left to caller discipline
-     * alone: every {@code type_ref} reachable from a body needs to already be argument-free
-     * (materialization already flattened any {@code <...>} application into a reference to a
-     * synthesized entry -- see {@code TsonSchemaLinker}'s own Javadoc), since nothing here
-     * re-implements that; and every name a body refers to needs to actually be present in {@code
-     * linkedSchema.schema().entries()} (validation already confirmed this), since {@link Compilation
-     * #resolve} treats a referenced-but-missing name as a bug, not a normal failure to report. Not a
-     * runtime-enforced guarantee -- {@link TsonLinkedSchema}'s own canonical constructor is public,
-     * so nothing stops a caller wrapping an unlinked {@code TsonSchema} in one directly (tests that
-     * hand-build a self-contained schema with no imports or argument-bearing {@code type_ref}s do
-     * exactly this) -- but every real production path only ever gets a {@link TsonLinkedSchema} via
-     * {@code TsonSchemaLinker.link}/{@code TsonSchemaRegistry#register} in the first place.
+     * <p>Requires a {@link TsonLinkedSchema}, not a bare {@link TsonSchema} -- every {@code type_ref}
+     * reachable from a body must already be argument-free (materialization already flattened any
+     * {@code <...>} application into a reference to a synthesized entry) and every name a body
+     * refers to must actually be present in {@code linkedSchema.schema().entries()}; {@link
+     * Compilation#resolve} treats a referenced-but-missing name as a bug, not a normal failure. Not
+     * runtime-enforced -- {@link TsonLinkedSchema}'s canonical constructor is public -- but every
+     * real caller gets one via {@code TsonSchemaLinker.link}/{@code TsonSchemaRegistry#register}.
      */
     public static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema, TsonParserFactory factory) {
         Compilation compilation = new Compilation(linkedSchema.schema(), factory);

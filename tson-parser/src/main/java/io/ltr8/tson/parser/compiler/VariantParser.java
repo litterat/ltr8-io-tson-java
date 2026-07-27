@@ -25,21 +25,17 @@ import java.util.Set;
  * {@code atom => top & {}}, or {@code array}'s own vocabulary, which {@code set}/{@code array_min}/
  * etc. all refine) -- there's nothing {@code top}-specific in this class at all.
  *
- * <p>An earlier version of this class instead required an explicit type-ref unconditionally, on
- * the theory that a type with subtypes (originally triggered by *open type parameters*, not
- * subtypes directly) had "no concrete shape of its own to read" -- true for a genuinely open
- * template with no useful body, but not a safe general assumption: {@code top}/{@code atom}/{@code
- * array} all have subtypes *and* a perfectly good body of their own. Triggering on non-empty
- * {@code subtypes} instead of non-empty {@code parameters} (see {@link TsonSchemaCompiler}'s own
- * Javadoc) is what makes the "always compile the own body too" version of this class correct: the
- * signal for "this position might need dispatch" and the signal for "this position has no
- * meaningful body of its own" turned out to be two different things, not one.
+ * <p>Triggered by non-empty {@code subtypes}, not non-empty {@code parameters} -- a genuinely open
+ * template with no useful body of its own is a different signal from "this position might need
+ * type-ref dispatch": {@code top}/{@code atom}/{@code array} all have subtypes *and* a perfectly
+ * good body of their own, so treating "has subtypes" as "requires an explicit type-ref" would be
+ * wrong for exactly those three.
  *
  * <p>Dispatch over the subtype set itself (once a type-ref is present and doesn't name the
- * declaration) is unchanged from before -- lazy, resolving a subtype's own parser only once it's
- * actually dispatched to (a subtype set is alternatives, not a fixed group every one of which is
- * needed on every read, unlike {@link RecordParser}'s own fields) -- factored into {@link
- * NamedDispatchParser}, shared with {@link ChoiceParser}'s own closed-list dispatch.
+ * declaration) is lazy, resolving a subtype's own parser only once it's actually dispatched to (a
+ * subtype set is alternatives, not a fixed group every one of which is needed on every read, unlike
+ * {@link RecordParser}'s own fields) -- factored into {@link NamedDispatchParser}, shared with
+ * {@link ChoiceParser}'s own closed-list dispatch.
  */
 final class VariantParser implements TsonValueReader<Object> {
 

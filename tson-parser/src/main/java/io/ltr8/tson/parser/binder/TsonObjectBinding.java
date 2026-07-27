@@ -16,15 +16,11 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
  * produce mode-correct nested content purely by recursing into whichever child parser the same
  * registry resolves.
  *
- * <p>Moved here from {@code TsonParserFactoryRegistry} itself (2026-07-27, on the user's own
- * explicit direction) so that class -- the actual compiler-facing registry -- has no dependency on
- * Java-object-binding machinery at all, the same reasoning that keeps {@code tson-bind} itself a
- * leaf module: DOM mode never needs {@code tson-bind}'s own {@code DataClassRecord} reflection, so
- * nothing about compiling a schema should require it either. This package depends on {@code
- * compiler} (for {@link TsonParserFactoryRegistry} itself, {@link
- * RecordParser#factory}, and {@link AtomTypeParser#ENUM_OBJECT_MODE}, each widened to {@code public}
- * specifically for this one external caller) -- but {@code compiler} has no
- * dependency on, or awareness of, this package at all. One-way, not circular.
+ * <p>This package depends on {@code compiler} (for {@link TsonParserFactoryRegistry} itself, {@link
+ * RecordParser#factory}, and {@link AtomTypeParser#ENUM_OBJECT_MODE}) but {@code compiler} has no
+ * dependency on, or awareness of, this package -- one-way, not circular, the same reasoning that
+ * keeps {@code tson-bind} a leaf module: DOM mode never needs {@code tson-bind}'s own {@code
+ * DataClassRecord} reflection, so nothing about compiling a schema should require it either.
  */
 public final class TsonObjectBinding {
 

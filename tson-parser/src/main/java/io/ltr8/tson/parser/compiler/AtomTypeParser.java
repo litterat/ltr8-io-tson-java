@@ -48,18 +48,15 @@ import io.ltr8.tson.schema.meta.UuidType;
  * import from them.
  *
  * <p><b>Every atom-family {@link TsonParserFactory} lives here too, as a {@code static final}
- * constant</b>, one per constructor name -- not as a separate one-class-per-constructor file the
- * way an earlier version of this package did it. Each is a one-line cast-and-adapt, identical in
- * shape (see {@link #INTEGER_TYPE} for the pattern), so a whole file per constructor was pure
- * boilerplate; a caller assembling a {@link TsonParserFactoryRegistry} just does {@code
- * .register("integer_type", AtomTypeParser.INTEGER_TYPE)}. {@link #URI_TYPE}/{@link #REGEX_TYPE}
- * were initially left out of this package, mistakenly grouped with a real, separate gap
- * ({@code UriType}/{@code RegexType}'s own *schema-resolution*-time defaulting, see {@code
- * MetaKernelBootstrapResolver}'s own Javadoc) that has nothing to do with reading data against an
- * already-correctly-resolved schema -- by the time a real {@code uri}/{@code regex} entry reaches
- * this layer, {@code MetaKernelBootstrapResolver}'s own hand-picked binding has already filled in {@code
- * specification}/{@code constraints} correctly, so these two work exactly like every other family;
- * confirmed against the real resolved entries, not just reasoned about.
+ * constant</b>, one per constructor name, rather than a separate one-class-per-constructor file --
+ * each is a one-line cast-and-adapt, identical in shape (see {@link #INTEGER_TYPE} for the
+ * pattern), so a whole file per constructor would be pure boilerplate; a caller assembling a
+ * {@link TsonParserFactoryRegistry} just does {@code .register("integer_type",
+ * AtomTypeParser.INTEGER_TYPE)}. {@link #URI_TYPE}/{@link #REGEX_TYPE} work like every other
+ * family despite {@code UriType}/{@code RegexType}'s own schema-resolution-time defaulting (see
+ * {@code MetaKernelBootstrapResolver}'s own Javadoc) -- by the time a real {@code uri}/{@code
+ * regex} entry reaches this layer, that defaulting has already filled in {@code specification}/
+ * {@code constraints} correctly, so there's nothing left for this layer to handle specially.
  */
 public final class AtomTypeParser<T> implements TsonValueReader<T> {
 
@@ -105,8 +102,7 @@ public final class AtomTypeParser<T> implements TsonValueReader<T> {
      * no target Java type to reconcile against, so it keeps producing {@code String} for {@code
      * boolean} too, matching already-established, already-tested behavior (e.g. {@code
      * MetaKernelEndToEndTest}'s own {@code "true"} string assertion). {@code public}, unlike this
-     * class's other factory constants, specifically so {@code io.ltr8.tson.parser.binder} can reach it
-     * (moved out of this package 2026-07-27).
+     * class's other factory constants, specifically so {@code io.ltr8.tson.parser.binder} can reach it.
      */
     public static final TsonParserFactory ENUM_OBJECT_MODE = (_, name, definition, ctx) ->
             "boolean".equals(name)

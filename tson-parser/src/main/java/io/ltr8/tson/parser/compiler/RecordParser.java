@@ -115,9 +115,9 @@ public final class RecordParser<R> implements TsonValueReader<R> {
      * per read; see {@link RecordShape}'s own Javadoc for why that matters.
      *
      * <p>{@code public}, unlike the rest of this package's own internal machinery, specifically so
-     * {@code io.ltr8.tson.parser.binder} (object-binding mode, moved out of this package 2026-07-27)
-     * can build its own {@code "record"} factory entry from its own {@code RecordShapeFactory}
-     * implementation without this package needing any awareness that caller exists.
+     * {@code io.ltr8.tson.parser.binder} (object-binding mode) can build its own {@code "record"}
+     * factory entry from its own {@code RecordShapeFactory} implementation without this package
+     * needing any awareness that caller exists.
      */
     public static TsonParserFactory factory(RecordShapeFactory<?> shapeFactory) {
         return (_, name, definition, ctx) -> {

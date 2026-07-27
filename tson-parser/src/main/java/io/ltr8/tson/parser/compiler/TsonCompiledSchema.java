@@ -8,27 +8,16 @@ import java.util.Map;
 
 /**
  * A compiled {@link TsonLinkedSchema} -- {@code Map<String, TypeDefinition>} lifted to {@code
- * Map<String, TsonValueReader<?>>}, where every parser's own references to other entries are real
- * Java object references (a {@link ParserHandle}), not further name lookups. This is the "compile
- * the schema once, read many data documents against it fast" layer sitting on top of {@code
- * DefinitionResolver}'s own per-declaration resolution and {@code TsonSchemaRegistry}'s whole-schema
- * materialization/validation -- {@link SchemaValidatingParser}, the actual Class 2
- * (schema-validating) data parser, is built on top of a {@code TsonCompiledSchema}, not directly on
- * {@code TsonSchema}.
+ * Map<String, TsonValueReader<?>>}, where every reader already holds real Java object references to
+ * its own child readers (a {@link ParserHandle}) rather than resolving names again at read time.
+ * {@link SchemaValidatingParser}, the Class 2 (schema-validating) data parser, is built on top of
+ * this, not directly on a {@link TsonSchema}.
  *
- * <p>Produced by {@link TsonSchemaCompiler#compile}, never constructed directly -- {@code
- * TsonSchemaCompiler} is the verb, this class is the noun it produces, and (2026-07-27, on the
- * user's own explicit direction) this class holds nothing else: no build logic, no cycle-detection
- * bookkeeping -- just the already-finished result of one {@link TsonSchemaCompiler#compile} call,
- * an immutable {@code Map<String, TsonValueReader<?>>} handed in fully built. See {@link
- * TsonSchemaCompiler}'s own Javadoc for how compilation itself works (eager building, cycle
- * detection, per-entry {@link ErrorParser} deferral) -- none of that lives here anymore.
- *
- * <p>Holds the {@link TsonLinkedSchema} it was compiled from, not just the bare {@link TsonSchema}
- * -- matching {@link TsonSchemaCompiler#compile}'s own parameter type. {@link #schema()} still
- * unwraps to the bare {@code TsonSchema} for the common case (a caller only wanting to read its
- * resolved {@code entries()}); nothing today needs the linked-proof back out of an already-compiled
- * schema, so there's no {@code linkedSchema()} accessor to go with it.
+ * <p>Produced by {@link TsonSchemaCompiler#compile}, never constructed directly -- an immutable,
+ * already-built value with no build logic of its own; see {@link TsonSchemaCompiler} for how
+ * compilation works. {@link #schema()} unwraps to the bare {@link TsonSchema} for the common case
+ * of reading resolved {@code entries()}; there's no accessor for the linked schema itself, since
+ * nothing needs it back out once compiled.
  */
 public final class TsonCompiledSchema {
 

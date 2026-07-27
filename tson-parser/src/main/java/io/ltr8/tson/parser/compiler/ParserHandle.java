@@ -44,10 +44,9 @@ public sealed interface ParserHandle<T> extends TsonValueReader<T> {
      * #compile} call that created this handle has already returned (nothing outside the compiler
      * can reach a handle embedded inside a parser before that call returns), and every {@code
      * resolve} invocation on that call's own build -- including the one for {@code typeName} -- has
-     * by then populated {@code registry}. Now that compilation is eager (every entry in the schema
-     * is resolved before {@code compile} returns, not just whichever one a caller first asked for),
-     * this is simpler than it used to be under lazy compilation: it genuinely is "the whole schema
-     * finishes, then reads happen," not merely "this one recursive chain finishes."
+     * by then populated {@code registry}. Compilation is eager (every entry in the schema is
+     * resolved before {@code compile} returns), so this genuinely is "the whole schema finishes,
+     * then reads happen."
      */
     record Indirect<T>(String typeName, Map<String, TsonValueReader<?>> registry) implements ParserHandle<T> {
 

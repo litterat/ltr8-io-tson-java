@@ -22,11 +22,10 @@ import java.util.Map;
  * {@code "set"} entry to register at all, since {@code set} was never a distinct resolved *shape*,
  * only a distinct declared *name*.
  *
- * <p><b>Implements {@link TsonParserFactory} itself</b> (2026-07-27, on the user's own explicit
- * direction) -- {@link #create} does exactly what a caller used to do by hand (look the right
- * factory up via {@link #require}, then call it), so {@link TsonSchemaCompiler} makes one uniform
- * call regardless of whether it's holding a full registry or a single-shape implementation; see
- * {@link TsonParserFactory}'s own Javadoc for the fuller reasoning.
+ * <p><b>Implements {@link TsonParserFactory} itself</b> -- {@link #create} looks the right factory
+ * up via {@link #require} and calls it, so {@link TsonSchemaCompiler} makes one uniform call
+ * regardless of whether it's holding a full registry or a single-shape implementation; see {@link
+ * TsonParserFactory}'s own Javadoc for the fuller reasoning.
  *
  * <p>Keyed by name (not by {@code Class<? extends Top>}) specifically so this can grow past today's
  * fixed, closed set without a code change to this class -- meta-kernel and a governing meta-schema
@@ -85,10 +84,10 @@ public final class TsonParserFactoryRegistry implements TsonParserFactory {
      * branch.
      *
      * <p>{@code public}, unlike the rest of this class's own internal assembly, specifically so
-     * {@code io.ltr8.tson.parser.binder} (object-binding mode, moved out of this package 2026-07-27)
-     * can build its own registry from the identical composite/atom-family baseline {@link #dom()}
-     * uses, without this package needing any awareness object-binding mode exists at all. Each
-     * caller appends its own `"record"`/`"enum"` registrations on top.
+     * {@code io.ltr8.tson.parser.binder} (object-binding mode) can build its own registry from the
+     * identical composite/atom-family baseline {@link #dom()} uses, without this package needing
+     * any awareness object-binding mode exists at all. Each caller appends its own
+     * `"record"`/`"enum"` registrations on top.
      */
     public static Builder withoutRecordOrEnum() {
         return builder()
@@ -115,15 +114,11 @@ public final class TsonParserFactoryRegistry implements TsonParserFactory {
     /**
      * Every DOM-mode factory this build of the library actually has -- `record` producing a plain
      * {@code Map<String, Object>}, same as every other composite/atom-family factory {@link
-     * #withoutRecordOrEnum()} provides. Previously hand-duplicated as a private
-     * {@code fullRegistry()} helper in several test classes (`MetaKernelEndToEndTest`, {@code
-     * SchemaValidatingParserTest}, ...) and, as of {@code TsonCompiledRegistry}, real production code too --
-     * factored out here once a fourth/fifth copy made the duplication worth closing. Not the *only*
-     * legitimate registry a caller might build (a caller reading only a narrow slice of a schema can
-     * still assemble a smaller one directly via {@link #builder}), just the canonical "everything
-     * this build knows how to construct in DOM mode" one. Object-binding mode's own equivalent lives
-     * in {@code io.ltr8.tson.parser.binder} (moved out of this class 2026-07-27) -- this class has no
-     * dependency on it, and no awareness it exists.
+     * #withoutRecordOrEnum()} provides. Not the *only* legitimate registry a caller might build (a
+     * caller reading only a narrow slice of a schema can still assemble a smaller one directly via
+     * {@link #builder}), just the canonical "everything this build knows how to construct in DOM
+     * mode" one. Object-binding mode's own equivalent lives in {@code io.ltr8.tson.parser.binder} --
+     * this class has no dependency on it, and no awareness it exists.
      */
     public static TsonParserFactoryRegistry dom() {
         return withoutRecordOrEnum()
