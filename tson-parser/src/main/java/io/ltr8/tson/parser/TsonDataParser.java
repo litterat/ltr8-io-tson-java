@@ -16,8 +16,8 @@ import io.ltr8.tson.parser.lexer.Lexer;
 import io.ltr8.tson.parser.lexer.Position;
 import io.ltr8.tson.parser.lexer.Token;
 import io.ltr8.tson.parser.lexer.TokenType;
-import io.ltr8.tson.parser.resolver.vocab.AtomParseException;
-import io.ltr8.tson.parser.resolver.vocab.UriParser;
+import io.ltr8.tson.parser.atom.AtomParseException;
+import io.ltr8.tson.parser.atom.UriParser;
 
 import java.util.ArrayList;
 import java.util.List;

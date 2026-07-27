@@ -23,11 +23,11 @@ import io.ltr8.tson.parser.ast.MapValue;
 import io.ltr8.tson.parser.ast.RecordValue;
 import io.ltr8.tson.parser.ast.ScopedValue;
 import io.ltr8.tson.parser.ast.TokenValue;
-import io.ltr8.tson.parser.resolver.BaseTypeResolver;
-import io.ltr8.tson.parser.resolver.BaseValue;
-import io.ltr8.tson.parser.resolver.vocab.AtomType;
-import io.ltr8.tson.parser.resolver.vocab.AtomTypeException;
-import io.ltr8.tson.parser.resolver.vocab.BuiltinTypeVocabulary;
+import io.ltr8.tson.parser.base.BaseTypeResolver;
+import io.ltr8.tson.parser.base.BaseValue;
+import io.ltr8.tson.parser.atom.AtomType;
+import io.ltr8.tson.parser.atom.AtomTypeException;
+import io.ltr8.tson.parser.atom.BuiltinTypeVocabulary;
 
 import java.util.HashMap;
 import java.util.List;
@@ -38,7 +38,7 @@ import java.util.Optional;
  * Binds a parsed TSON {@link DataValue} tree to a Java object, given its {@link DataClass}
  * descriptor from {@code tson-bind}. Operates directly against {@link DataBindContext} (the same
  * level {@code MapMapper}/{@code ArrayMapper} in {@code tson-bind} operate at), not against any
- * bigger schema/type-registry layer -- except where {@code resolver.schema} itself is the caller,
+ * bigger schema/type-registry layer -- except where {@code resolver} itself is the caller,
  * binding a resolved constructor's own {@code DataValue} bindings onto its {@code schema.meta}
  * class (see {@code DefinitionResolver}'s own Javadoc for that use).
  *

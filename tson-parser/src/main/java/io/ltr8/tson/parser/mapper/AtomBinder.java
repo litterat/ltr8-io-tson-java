@@ -1,10 +1,10 @@
 package io.ltr8.tson.parser.mapper;
 
 import io.ltr8.bind.DataBindException;
-import io.ltr8.tson.parser.resolver.BaseValue;
-import io.ltr8.tson.parser.resolver.NumberForm;
-import io.ltr8.tson.parser.resolver.NumberForms;
-import io.ltr8.tson.parser.resolver.NumberNarrowing;
+import io.ltr8.tson.parser.base.BaseValue;
+import io.ltr8.tson.parser.base.NumberForm;
+import io.ltr8.tson.parser.base.NumberForms;
+import io.ltr8.tson.parser.base.NumberNarrowing;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;

@@ -5,10 +5,10 @@ import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassField;
 import io.ltr8.bind.DataClassRecord;
-import io.ltr8.tson.parser.resolver.NumberNarrowing;
-import io.ltr8.tson.parser.resolver.schema.compiled.RecordParser.RecordBuilder;
-import io.ltr8.tson.parser.resolver.schema.compiled.RecordParser.RecordShape;
-import io.ltr8.tson.parser.resolver.schema.compiled.RecordParser.RecordShapeFactory;
+import io.ltr8.tson.parser.base.NumberNarrowing;
+import io.ltr8.tson.parser.compiler.RecordParser.RecordBuilder;
+import io.ltr8.tson.parser.compiler.RecordParser.RecordShape;
+import io.ltr8.tson.parser.compiler.RecordParser.RecordShapeFactory;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -159,7 +159,7 @@ public final class ObjectRecordShapeFactory implements RecordShapeFactory<Object
          * declared width -- e.g. {@code text_type}'s {@code min_length}/{@code max_length} are the
          * schema's own unconstrained {@code integer} atom, whose natural host type is {@link
          * BigInteger}, but {@code TextType.minLength} is {@code Optional<Integer>}. Reuses {@link
-         * NumberNarrowing}, the same utility {@code resolver.vocab}'s numeric family and {@code
+         * NumberNarrowing}, the same utility {@code atom}'s numeric family and {@code
          * io.ltr8.tson.parser.mapper}'s untyped-number binding already share for exactly this
          * purpose, rather than a second copy of the same logic.
          *

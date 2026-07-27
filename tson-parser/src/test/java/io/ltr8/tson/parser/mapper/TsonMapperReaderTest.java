@@ -10,7 +10,7 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.tson.parser.ast.Annotation;
 import io.ltr8.tson.parser.ast.TokenValue;
-import io.ltr8.tson.parser.resolver.vocab.Complex;
+import io.ltr8.tson.parser.atom.Complex;
 import io.ltr8.tson.schema.meta.IsoDuration;
 import io.ltr8.tson.schema.meta.Rational;
 import org.junit.jupiter.api.Test;

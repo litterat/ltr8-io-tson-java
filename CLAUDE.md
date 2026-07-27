@@ -100,7 +100,7 @@ machinery a consumer never names directly, leave it bare.
 
 `tson-parser` holds the lexer, the data-grammar structural parser, base type resolution, the built-in
 type vocabulary, the Part 2 schema grammar (`TsonSchemaParser`, `ast.schema`), the schema resolver
-(`io.ltr8.tson.parser.resolver.schema.TsonSchemaResolver`, producing Class 2's resolved schema value), *and*
+(`io.ltr8.tson.parser.resolver.TsonSchemaResolver`, producing Class 2's resolved schema value), *and*
 (moved here 2026-07-24, see "Mapper" below) the generic `DataValue`&lt;-&gt;Java-object binding layer
 (`io.ltr8.tson.parser.mapper`) — every one of these is tightly coupled to the shared lexer/token-stream
 machinery (the schema grammar reuses the data grammar's own `annotation`/`data-value`/directive-parsing
@@ -255,10 +255,10 @@ string, §4.5) for `TokenValue`s produced by the parser. `NumberGrammar.tryParse
   a DoS-hardening recommendation, not a grammar rule, and adding an unconfigurable limit now would be
   premature without a real configuration mechanism — noted here so it isn't mistaken for an oversight.
 - `BaseTypeResolver` only implements the *default*, untyped resolution path — the built-in type
-  vocabulary (§5 — `!uuid`, `!date`, `!int32`, etc.) is a separate implementation, `resolver.vocab`
+  vocabulary (§5 — `!uuid`, `!date`, `!int32`, etc.) is a separate implementation, `atom`
   (below), consulted only when a value actually carries a type-ref.
 
-### Built-in type vocabulary (`tson-parser/src/main/java/io/ltr8/tson/parser/resolver/vocab/`)
+### Built-in type vocabulary (`tson-parser/src/main/java/io/ltr8/tson/parser/atom/`)
 
 `AtomType<T>` is a built-in vocabulary atom's parsing contract (§5.2): `read(TokenValue)` (the
 atom's own natural host value), `read(TokenValue, Class<?>)` (narrow directly to a caller-supplied
@@ -275,7 +275,7 @@ a pure constraint-*values* record in `io.ltr8.tson.schema.meta` (`IntegerType`, 
 `RegexType`, `DecimalType`, `FloatType`, `RationalType`, `UuidType`, `BinaryType`, `DateType`,
 `TimeType`, `DateTimeType`, `DurationType`, `UriType` — no parsing/validation, matching the kernel's
 own `*_type` constructor shape exactly, the same modeling `io.ltr8.tson.schema.meta` uses everywhere
-else), and a same-named-but-suffixed `*TsonDataParser` class here in `resolver.vocab` (`IntegerParser`,
+else), and a same-named-but-suffixed `*TsonDataParser` class here in `atom` (`IntegerParser`,
 `TextParser`, `RegexParser`, ...) holding one as `constraints` and doing the actual
 `read`/`write`/validate work. `RegexType` (added 2026-07-23, after the initial split) is itself a
 *composition*, not a flat record: `RegexType(TextType constraints, AtomSpecification specification)`
@@ -324,7 +324,7 @@ regardless; see `tson-bind/README.md`'s "Under development" section for the full
 model, previously `tson-schema` depending on `tson-parser` for its own grammar-layer `SchemaMap`)
 had to stop depending on `tson-parser` at all for a vocab class here to hold one of its records
 without a module cycle. Two consequences: `TsonSchemaResolver`/`TsonSchema` (which *do* need
-`tson-parser`'s grammar AST) moved into this module, at `resolver.schema` (this package's own
+`tson-parser`'s grammar AST) moved into this module, at `resolver` (this package's own
 sibling — see "Schema resolution" below); and `schema.meta.Token` was introduced as a local,
 structurally-identical stand-in for `tson-parser.ast.TokenValue`/`TokenForm` (same `text`/`form`
 fields, same three enum members) purely so `RecordField.value`/`TypeArgument.Value` (§8.1's literal-
@@ -333,7 +333,7 @@ one spot that needs it (`resolveField`'s `toMetaToken`). `tson-schema`'s own mod
 *only* `io.ltr8.tson.schema.meta` and depends on nothing but `tson-annotation` (for `@Typename`/
 `@Field`); `tson-parser` depends on `tson-schema`, the reverse of before. This groundwork is for a
 future schema-*validating* parser (Class 2): once one exists inside `tson-parser`, it can hold and
-consult a resolved `TsonSchema`/`TypeDefinition` directly, the same way `resolver.vocab` already
+consult a resolved `TsonSchema`/`TypeDefinition` directly, the same way `atom` already
 consults `schema.meta` constraint records — without `tson-schema` ever needing to import
 `tson-parser` back.
 
@@ -356,10 +356,10 @@ by name and prose-level parsing contract, not by schema shape." The pre-split si
 had it ever reached one (`AtomTypeParser`'s own adapter requires a `TokenValue` before ever calling
 an `AtomType`, and `_` — `AbsentValue` — isn't one; this bug was latent, never actually exercised,
 since nothing called compiled-parser reading against `void` before this session). Now: `ValueParser`
-(`resolver.vocab`) actually runs `BaseTypeResolver` and narrows to the natural host type (`null`/
+(`atom`) actually runs `BaseTypeResolver` and narrows to the natural host type (`null`/
 `Boolean`/`BigInteger`/`BigDecimal`/`Double` for `.nan`/`.inf`/`String`) — `value`'s own doc: "the
 result of base type resolution... applied to a source token." `VoidParser`
-(`resolver.schema.compiled`, not `resolver.vocab` — its contract doesn't fit `AtomType.
+(`compiler`, not `atom` — its contract doesn't fit `AtomType.
 read(TokenValue)` at all, since it needs to see the `DataValue`'s own `core-value` shape, not a
 token) accepts only `AbsentValue` and reads to Java `null`. Dispatch is keyed on the *declaration's
 own name* (`AtomTypeParser.UNIT`'s factory switches on its `name` parameter, not on
@@ -473,7 +473,7 @@ positional-form value generically; wrapping the bare value into an equivalent on
   repo's own `spec/` directory, not the sibling test-suite repo) end-to-end with no exceptions — real,
   full-sized schema documents, not just the spec's illustrative snippets.
 
-### Schema resolution (`tson-parser/src/main/java/io/ltr8/tson/parser/resolver/schema/`)
+### Schema resolution (`tson-parser/src/main/java/io/ltr8/tson/parser/resolver/`)
 
 `DefinitionResolver` turns the grammar-layer `SchemaMap` (same module, `io.ltr8.tson.parser.ast.schema`)
 into resolved `TypeDefinition`s (Part 2 §4, §8) -- values from `tson-schema`'s `io.ltr8.tson.schema.meta`
@@ -534,7 +534,7 @@ direction: "I just deleted compiledMetaSchema because I realise it wasn't used b
 Once it was `private` and a pure one-line pass-through, keeping it as a named method bought nothing
 over inlining -- `resolveSchema`'s own `TsonCompiledSchema metaParser = compiledMetaSchema(document);`
 became `TsonCompiledSchema metaParser = loader.load(document.meta());` directly. The method's own
-Javadoc (the "same-module, cross-package reach from `resolver.schema` up into `resolver.schema.compiled`"
+Javadoc (the "same-module, cross-package reach from `resolver` up into `compiler`"
 note, explaining *why* this class needs the full `TsonCompiledSchema` rather than the narrower
 `DefinitionMetaReader` `DefinitionResolver` gets by with) was dropped along with it -- that reasoning
 is still true of `resolveSchema` as a whole, just no longer anchored to a now-nonexistent method name.
@@ -552,7 +552,7 @@ provide into the two genuinely different things `DefinitionResolver` actually ne
 - **`DefinitionMetaReader`** (new, one method: `Top read(String type, DataValue value)`) -- what
   `bindAtomInstance` uses to actually *bind* a constructor-application/atom-refinement value, now a
   **required constructor parameter** rather than threaded per call. `DefinitionResolver` has zero
-  dependency on `resolver.schema.compiled` now -- the one place this class used to reach into that
+  dependency on `compiler` now -- the one place this class used to reach into that
   package is gone; `TsonSchemaResolver` (which still needs the full `TsonCompiledSchema`, to derive
   *both* the structure namespace and the reader) is where that reach now lives instead, one layer up
   (see `compiledMetaSchema`'s own Javadoc).
@@ -1014,7 +1014,7 @@ is tempted to "fix" this back to a plain record, re-read `TypeArgument`'s Javado
     first place. **`Cidr4Type`/`Cidr6Type`/`EmailType`/`MacType`/`Ipv4Type`/`Ipv6Type`/`ComplexType`
     (all `Atom`) and `UnknownType` (`Sum`, not `Atom` -- `unknown_type => ~sum & {}`, the first real
     constructor found outside the atom family) joined the same day, record-only, deliberately with
-    no `resolver.vocab` parser at all** -- added specifically so their own real `core.tn1` instances
+    no `atom` parser at all** -- added specifically so their own real `core.tn1` instances
     resolve (`cidr4`, `email`, `unknown`, ...), not to add real CIDR/email/MAC/complex-number
     validation; each one's own Javadoc says so explicitly. Their RFC-citation field is a flat
     `String spec`, not nested `AtomSpecification` and not `java.net.URI` -- see `Cidr4Type`'s own
@@ -1101,7 +1101,7 @@ is tempted to "fix" this back to a plain record, re-read `TypeArgument`'s Javado
   a real fixture until more constructs are supported (or use `MetaKernelBootstrapResolver`, below, for
   meta-kernel specifically).
 
-### Meta-kernel bootstrap (`tson-parser/src/main/java/io/ltr8/tson/parser/resolver/schema/MetaKernelBootstrapResolver.java`)
+### Meta-kernel bootstrap (`tson-parser/src/main/java/io/ltr8/tson/parser/resolver/MetaKernelBootstrapResolver.java`)
 
 Meta-kernel is special: its own `!!meta` names *itself* (§1.5's "one deliberate circularity in the
 series, closed by pre-loading rather than by resolution: implementations ship the kernel's resolved
@@ -1432,7 +1432,7 @@ from meta.tn1's own composition-based declarations (`date_type => ~atom & atom_s
 declaration order already places each dependency before its use), and the merged, linked
 registration succeeds outright.
 
-### Class 2 compilation (`resolver/schema/compiled/{TsonSchemaCompiler,TsonCompiledSchema,TsonParserFactory,TsonParserFactoryRegistry,ErrorParser}.java`)
+### Class 2 compilation (`compiler/{TsonSchemaCompiler,TsonCompiledSchema,TsonParserFactory,TsonParserFactoryRegistry,ErrorParser}.java`)
 
 `TsonSchemaCompiler.compile(TsonSchema, TsonParserFactory)` is the "compile" stage of
 parse -> resolve -> link -> register -> compile -> read; `TsonCompiledSchema` is the noun it
@@ -1490,7 +1490,7 @@ as a whole still compiles in full; only actually `read`ing a value against that 
 fails, and only then, with the original exception's message preserved (a deferral, not a swallow).
 Two real causes confirmed against real fixtures, not just imagined: no `TsonParserFactory`
 registered for a constructor at all (`TsonParserFactoryRegistry#require` throwing — e.g. core.tn1's
-own `cidr4`/`email`/... atom families, which have no `resolver.vocab` parser yet), and — found
+own `cidr4`/`email`/... atom families, which have no `atom` parser yet), and — found
 empirically, once
 eager building actually ran against the real, registered meta-kernel/meta.tn1 fixtures in
 object-binding mode — a factory that *is* registered still rejecting one particular entry
@@ -1510,7 +1510,7 @@ a factory built to reject them at all, rather than the two eager-validation mech
 (`ObjectRecordShapeFactory#validate`'s own skip-list and this compiler's own eager walk) agreeing on
 which entries are exempt in the first place, hasn't been revisited — noted here so it isn't lost.
 
-### Compiled schema registry (`tson-parser/src/main/java/io/ltr8/tson/parser/resolver/schema/compiled/TsonCompiledRegistry.java`)
+### Compiled schema registry (`tson-parser/src/main/java/io/ltr8/tson/parser/compiler/TsonCompiledRegistry.java`)
 
 Added 2026-07-25: pairs one-to-one with `TsonSchemaRegistry` (`tson-schema`) but stores *compiled*
 schemas (`TsonCompiledSchema`) instead of resolved ones — for every schema `TsonCompiledRegistry`
@@ -1552,7 +1552,7 @@ governed by one of these reuses whatever's already sitting in the registry.
 version of the register-meta-kernel/meta.tn1/core.tn1 sequence (and where it should live) is still
 open.
 
-**`TsonCompiledSchemaLoader`/`DefaultTsonCompiledSchemaLoader`** (`tson-parser/src/main/java/io/ltr8/tson/parser/resolver/schema/{TsonCompiledSchemaLoader,DefaultTsonCompiledSchemaLoader,TsonSchemaSource}.java`,
+**`TsonCompiledSchemaLoader`/`DefaultTsonCompiledSchemaLoader`** (`tson-parser/src/main/java/io/ltr8/tson/parser/resolver/{TsonCompiledSchemaLoader,DefaultTsonCompiledSchemaLoader,TsonSchemaSource}.java`,
 added 2026-07-25, replacing an earlier version of `TsonSchemaResolver`'s own constructor that took a bare
 `TsonCompiledRegistry` directly) — `TsonSchemaResolver` now holds a `TsonCompiledSchemaLoader`, not a registry.
 The reason a plain registry reference isn't enough: resolving *meta-kernel's own* document means
@@ -1680,20 +1680,20 @@ path (fetch → parse → resolve → register → compile). `TsonSchemaRegistry
 directly too (accepts a well-formed candidate silently; rejects no-scheme and carries-a-port cases).
 
 **A real, named layering exception, not an oversight.** Every other note about these two packages
-describes `resolver.schema.compiled` sitting *on top of* `resolver.schema`'s own resolution
+describes `compiler` sitting *on top of* `resolver`'s own resolution
 (`TsonCompiledSchema`'s own Javadoc: "sitting on top of `DefinitionResolver`'s own per-declaration
-resolution"). `TsonCompiledSchemaLoader`/`DefaultTsonCompiledSchemaLoader` (in `resolver.schema`, alongside
+resolution"). `TsonCompiledSchemaLoader`/`DefaultTsonCompiledSchemaLoader` (in `resolver`, alongside
 `TsonSchemaResolver`) reach the opposite direction, importing `TsonCompiledRegistry`/`TsonCompiledSchema`/
-`TsonSchemaCompiler`/`TsonParserFactoryRegistry` from `resolver.schema.compiled` — the one place in
-`resolver.schema` that does. Not a cycle (nothing in `resolver.schema.compiled`'s own *main* code
-imports back from `resolver.schema`), and both packages are in the same module regardless (no
+`TsonSchemaCompiler`/`TsonParserFactoryRegistry` from `compiler` — the one place in
+`resolver` that does. Not a cycle (nothing in `compiler`'s own *main* code
+imports back from `resolver`), and both packages are in the same module regardless (no
 Gradle/JPMS boundary to violate), but a deliberate exception to the general framing, made because
 bootstrapping/fetching/compiling a governing schema is exactly the one place lower-layer resolution
 genuinely needs the higher layer's own compiled output, not just its resolved one. `TsonCompiledSchema`
 itself carries a `schema()` accessor for this (its own resolved `TsonSchema`) — mirroring
 `SchemaValidatingParser.schema()`'s own precedent.
 
-### Bundled schema documents (`tson-parser/src/main/java/io/ltr8/tson/parser/resolver/schema/BundledSchemaSource.java`)
+### Bundled schema documents (`tson-parser/src/main/java/io/ltr8/tson/parser/resolver/BundledSchemaSource.java`)
 
 A `TsonSchemaSource` serving this library's own three bundled schema documents — meta-kernel, meta.tn1,
 core.tn1 — straight off the classpath, the same resources `tson-parser/build.gradle.kts`'s own
@@ -1737,7 +1737,7 @@ here anyway so this class is a complete, uniform "fetch any of this library's ow
 documents" utility on its own terms, and safe for any *other* `TsonCompiledSchemaLoader` implementation that
 doesn't special-case meta-kernel the way `DefaultTsonCompiledSchemaLoader` does.
 
-### Object-binding mode (`resolver/schema/compiled/RecordParser.java` + `parser/bind/{TsonObjectBinding,ObjectRecordShapeFactory,TsonTypeNameBinder,SchemaMetaTypeNameBinder}.java`)
+### Object-binding mode (`compiler/RecordParser.java` + `parser/bind/{TsonObjectBinding,ObjectRecordShapeFactory,TsonTypeNameBinder,SchemaMetaTypeNameBinder}.java`)
 
 Added 2026-07-25: a second output mode for the compiled reader, alongside DOM mode's plain
 `Map<String, Object>` — `RecordParser` can now instead produce a real, bound `schema.meta` Java
@@ -1751,12 +1751,12 @@ direction — "`TsonSchemaResolver` and `TsonSchemaCompiler` aren't anywhere nea
 `TsonSchemaLinker`/`TsonSchemaRegistry`/`TsonDataParser`/`TsonSchemaParser`]... move out the
 `TsonTypeNameBinder` code and anything related to binding to java classes").** `TsonTypeNameBinder`,
 `SchemaMetaTypeNameBinder`, and `ObjectRecordShapeFactory` all moved verbatim (package declaration
-only) from `resolver.schema.compiled` into the new package; the registry-assembly logic that used to
+only) from `compiler` into the new package; the registry-assembly logic that used to
 live as `TsonParserFactoryRegistry.object(TsonSchema, DataBindContext[, TsonTypeNameBinder])` moved
 too, as a new standalone class, `TsonObjectBinding.factoryRegistry(...)` — not just the three binder
 classes, so the dependency between the two packages is genuinely **one-way**:
-`io.ltr8.tson.parser.bind` depends on `resolver.schema.compiled` (for `TsonParserFactoryRegistry`,
-`RecordParser.factory`, `AtomTypeParser.ENUM_OBJECT_MODE`), but `resolver.schema.compiled` has zero
+`io.ltr8.tson.parser.bind` depends on `compiler` (for `TsonParserFactoryRegistry`,
+`RecordParser.factory`, `AtomTypeParser.ENUM_OBJECT_MODE`), but `compiler` has zero
 awareness of, or dependency on, `io.ltr8.tson.parser.bind` — the actual compiler-facing package
 never needs to know Java-object-binding exists at all, mirroring the reasoning that keeps `tson-bind`
 itself a leaf module (DOM mode never touches `DataClassRecord` reflection, so nothing about
@@ -1837,17 +1837,17 @@ object-binding mode's own class, in `io.ltr8.tson.parser.bind`."
   knowledge of a target Java field's own declared width (e.g. `text_type`'s `min_length`/
   `max_length` are the schema's own unconstrained `integer` atom, natural host type `BigInteger`,
   but `TextType.minLength` is `Optional<Integer>`) — `ObjectRecordShapeFactory`'s own builder reuses
-  `io.ltr8.tson.parser.resolver.NumberNarrowing`, the same utility `resolver.vocab`'s numeric family
+  `io.ltr8.tson.parser.base.NumberNarrowing`, the same utility `atom`'s numeric family
   and `io.ltr8.tson.parser.mapper`'s untyped-number binding already share for exactly this, rather
   than a third copy.
 - **`TsonObjectBinding.factoryRegistry(TsonSchema, DataBindContext)`** (+ a `TsonTypeNameBinder`-taking
-  overload; `io.ltr8.tson.parser.bind`, not `resolver.schema.compiled` — see above) is the
+  overload; `io.ltr8.tson.parser.bind`, not `compiler` — see above) is the
   object-binding-mode sibling to `TsonParserFactoryRegistry.dom()` — every other factory
   (array/map/tuple/choice + every atom-family constant) is shared via `TsonParserFactoryRegistry`'s
   own public `withoutRecordOrEnum()` (widened + renamed from a private `withoutRecord()` for exactly
   this cross-package reuse — `"enum"` also differs between the two modes, not just `"record"`, so the
   shared base excludes both), only `"record"`/`"enum"`'s own factories differ.
-- **`TsonAtomContext`** (new, `io.ltr8.tson.parser.resolver`) — `TsonMapperContext.defaultContext()`'s
+- **`TsonAtomContext`** (new, `io.ltr8.tson.parser.base`) — `TsonMapperContext.defaultContext()`'s
   own built-in-vocabulary atom registrations (`UUID`/`byte[]`/`LocalDate`/`OffsetTime`/
   `OffsetDateTime`/`URI`/`Inet4Address`/`Inet6Address`), pulled out to a public class at this shared
   layer once a third consumer (`ObjectRecordShapeFactory`, needing `DataBindContext.getDescriptor`
@@ -1871,7 +1871,7 @@ unchanged by the whole existing suite.
 **`AtomTypeParser.ENUM_OBJECT_MODE`/`BooleanParser`** — object mode's own `"enum"` factory
 dispatches name-keyed, not shape-keyed: every enum instance *except* the schema's own `boolean`
 entry (`product_access_type`, `field_state`, `binary_encoding`, ...) reads its member token's own
-text as a plain `String` via the ordinary `resolver.vocab.EnumParser` (through `AtomTypeParser
+text as a plain `String` via the ordinary `atom.EnumParser` (through `AtomTypeParser
 .ENUM`) — exactly right for an arbitrary, user-defined enum label. `boolean` specifically
 (`boolean => !enum [true false]`) routes to `BooleanParser` instead, producing a real Java
 `Boolean` — its two members are meant to *be* the two Java boolean values, not the strings
@@ -1901,19 +1901,19 @@ No system Gradle — always use the wrapper:
 ./gradlew test
 ./gradlew test --tests "io.ltr8.tson.parser.lexer.LexerTest"
 ./gradlew test --tests "io.ltr8.tson.parser.TsonDataParserTest"
-./gradlew test --tests "io.ltr8.tson.parser.resolver.NumberGrammarTest"
-./gradlew test --tests "io.ltr8.tson.parser.resolver.BaseTypeResolverTest"
+./gradlew test --tests "io.ltr8.tson.parser.base.NumberGrammarTest"
+./gradlew test --tests "io.ltr8.tson.parser.base.BaseTypeResolverTest"
 ./gradlew test --tests "io.ltr8.tson.parser.ConformanceSuiteTest"   # skipped unless ../../ltr8-io-tson-test-suite exists
 ./gradlew test --tests "io.ltr8.tson.parser.lexer.LexerTest.multilineBasicIndentStripping"
 ./gradlew :tson-schema:test --tests "io.ltr8.tson.schema.TsonSchemaRegistryTest"
 ./gradlew :tson-schema:test --tests "io.ltr8.tson.schema.TsonSchemaLinkerTest"
-./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.MetaKernelSchemaRegistryTest"
-./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.MetaKernelBootstrapResolverTest"
-./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.MetaSchemaImportTest"
-./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.compiled.MetaKernelEndToEndTest"
-./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.compiled.MetaTn1CompiledEndToEndTest"
-./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.compiled.SchemaValidatingParserTest"
-./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.schema.TsonSchemaResolverCompiledMetaSchemaTest"
+./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.MetaKernelSchemaRegistryTest"
+./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.MetaKernelBootstrapResolverTest"
+./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.MetaSchemaImportTest"
+./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.compiler.MetaKernelEndToEndTest"
+./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.compiler.MetaTn1CompiledEndToEndTest"
+./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.compiler.SchemaValidatingParserTest"
+./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.TsonSchemaResolverCompiledMetaSchemaTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.mapper.TsonMapperReaderTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.mapper.TsonMapperWriterTest"
 ```
@@ -1935,7 +1935,7 @@ No system Gradle — always use the wrapper:
   (`ComplexType`, added 2026-07-24); `unknown_type` too (`UnknownType`). No real fixture declaration
   remains unresolved in `meta-kernel.tn1`/`meta.tn1`; core.tn1's own current end-to-end status isn't
   pinned down by any test right now (see "Schema resolution" above's status paragraph).
-- The schema-validating data parser (Class 2) — `io.ltr8.tson.parser.resolver.schema.compiled`
+- The schema-validating data parser (Class 2) — `io.ltr8.tson.parser.compiler`
   (`TsonSchemaCompiler`/`TsonCompiledSchema`, `SchemaValidatingParser`, `TsonParserFactoryRegistry`,
   `RecordParser`/`ArrayParser`/`MapParser`/`TupleParser`/`ChoiceParser`/`VariantParser`,
   `AtomTypeParser` + the vocab-family parsers) — now has dedicated coverage above ("Compiled schema
@@ -1943,7 +1943,7 @@ No system Gradle — always use the wrapper:
   no `!!schema`-header auto-selection (`SchemaValidatingParser`'s own Javadoc explains why,
   deliberately deferred); eight core.tn1 atom entries (`complex`/`email`/`ipv4`/`ipv6`/`cidr4`/
   `cidr6`/`mac`/`unknown`) have no compiled-parser factory at all yet, since their `schema.meta`
-  classes were added "record-only, deliberately with no resolver.vocab parser"; a permanent
+  classes were added "record-only, deliberately with no atom parser"; a permanent
   standard-library "load meta-kernel/meta.tn1/core.tn1 and register them" entry point doesn't exist
   yet (see "Compiled schema registry" above); `REQUIRED_FIXED`/`OPTIONAL_FIXED` value validation,
   `value_param` real parameter substitution, and thread-safety are all still deferred design

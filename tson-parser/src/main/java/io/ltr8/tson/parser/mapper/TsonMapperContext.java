@@ -1,7 +1,7 @@
 package io.ltr8.tson.parser.mapper;
 
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.tson.parser.resolver.TsonAtomContext;
+import io.ltr8.tson.parser.base.TsonAtomContext;
 
 /**
  * The default {@link DataBindContext} shared by {@link TsonMapperReader}'s and {@link
@@ -11,7 +11,7 @@ import io.ltr8.tson.parser.resolver.TsonAtomContext;
  *
  * <p><b>Delegates to {@link TsonAtomContext#defaultContext()}</b> (moved there once a third
  * consumer needed the identical registration list -- an object-binding
- * {@code io.ltr8.tson.parser.resolver.schema.compiled.RecordShapeFactory}, in a package with no
+ * {@code io.ltr8.tson.parser.bind.ObjectRecordShapeFactory}, in a package with no
  * dependency on this one). See {@link TsonAtomContext}'s own Javadoc for exactly which atoms are
  * registered and why (UUID/byte[]/LocalDate/OffsetTime/OffsetDateTime/URI/Inet4Address/
  * Inet6Address) -- that reasoning didn't change, only its address.

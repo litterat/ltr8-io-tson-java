@@ -13,19 +13,8 @@ import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassTuple;
 import io.ltr8.bind.DataClassUnion;
 import io.ltr8.tson.parser.TsonDataEmitter;
-import io.ltr8.tson.parser.resolver.vocab.AtomType;
-import io.ltr8.tson.parser.resolver.vocab.BinaryParser;
-import io.ltr8.tson.parser.resolver.vocab.Complex;
-import io.ltr8.tson.parser.resolver.vocab.ComplexParser;
-import io.ltr8.tson.parser.resolver.vocab.DateParser;
-import io.ltr8.tson.parser.resolver.vocab.DateTimeParser;
-import io.ltr8.tson.parser.resolver.vocab.DurationParser;
-import io.ltr8.tson.parser.resolver.vocab.Ipv4Parser;
-import io.ltr8.tson.parser.resolver.vocab.Ipv6Parser;
-import io.ltr8.tson.parser.resolver.vocab.RationalParser;
-import io.ltr8.tson.parser.resolver.vocab.TimeParser;
-import io.ltr8.tson.parser.resolver.vocab.UriParser;
-import io.ltr8.tson.parser.resolver.vocab.UuidParser;
+import io.ltr8.tson.parser.atom.*;
+import io.ltr8.tson.parser.atom.RationalParser;
 import io.ltr8.tson.schema.meta.IsoDuration;
 import io.ltr8.tson.schema.meta.Rational;
 
@@ -51,7 +40,7 @@ public final class TsonMapperWriter {
     private final DataBindContext context;
 
     /**
-     * The reverse of {@link io.ltr8.tson.parser.resolver.vocab.BuiltinTypeVocabulary}'s
+     * The reverse of {@link BuiltinTypeVocabulary}'s
      * name-&gt;{@code AtomType} map: which {@code AtomType} (and under what type-ref name) writes a
      * given bound Java class's values, for {@link #toTson}. Curated by hand, not derived from
      * {@code BuiltinTypeVocabulary} wholesale -- the integer/decimal/float family has no unique

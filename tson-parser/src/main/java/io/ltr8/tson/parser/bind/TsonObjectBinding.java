@@ -1,9 +1,9 @@
 package io.ltr8.tson.parser.bind;
 
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.tson.parser.resolver.schema.compiled.AtomTypeParser;
-import io.ltr8.tson.parser.resolver.schema.compiled.RecordParser;
-import io.ltr8.tson.parser.resolver.schema.compiled.TsonParserFactoryRegistry;
+import io.ltr8.tson.parser.compiler.AtomTypeParser;
+import io.ltr8.tson.parser.compiler.RecordParser;
+import io.ltr8.tson.parser.compiler.TsonParserFactoryRegistry;
 import io.ltr8.tson.schema.TsonSchema;
 
 /**
@@ -20,9 +20,9 @@ import io.ltr8.tson.schema.TsonSchema;
  * Java-object-binding machinery at all, the same reasoning that keeps {@code tson-bind} itself a
  * leaf module: DOM mode never needs {@code tson-bind}'s own {@code DataClassRecord} reflection, so
  * nothing about compiling a schema should require it either. This package depends on {@code
- * resolver.schema.compiled} (for {@link TsonParserFactoryRegistry} itself, {@link
+ * compiler} (for {@link TsonParserFactoryRegistry} itself, {@link
  * RecordParser#factory}, and {@link AtomTypeParser#ENUM_OBJECT_MODE}, each widened to {@code public}
- * specifically for this one external caller) -- but {@code resolver.schema.compiled} has no
+ * specifically for this one external caller) -- but {@code compiler} has no
  * dependency on, or awareness of, this package at all. One-way, not circular.
  */
 public final class TsonObjectBinding {
