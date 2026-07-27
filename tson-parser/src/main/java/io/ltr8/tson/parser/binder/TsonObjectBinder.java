@@ -26,15 +26,18 @@ import java.util.Map;
  *
  * <p>Walks every {@code record}-shaped entry in the schema (i.e. every entry whose {@link
  * TypeDefinition#body()} is a {@link RecordBody} -- the ones that would actually reach {@link
- * ObjectRecordShapeFactory#shapeFor} once compiled), resolving {@code binder}'s own schema-name ->
- * Java-{@link Class} mapping and then {@code context}'s own {@link DataClassRecord} descriptor for
- * each.
+ * ObjectRecordShapeFactory#shapeFor} once compiled), resolving each entry's own name to a
+ * {@link DataClass} descriptor via {@code context}'s own {@code getDescriptor(String)} -- itself a
+ * composition of {@code context}'s configured {@code DataNameBinder} (schema name -> Java {@link
+ * Class}) and its ordinary {@code getDescriptor(Class)} (Java {@link Class} -> descriptor). {@code
+ * context} must already carry the right {@code DataNameBinder} for this schema's own namespace
+ * (see {@link TsonObjectBinding#defaultContext}) -- this class does no name resolution of its own.
  *
  * <p><b>An entry that resolves to a real, existing Java class which isn't a record is silently
  * skipped, not treated as a failure.</b> A handful of real meta-kernel entries (its own {@code
  * atom}/{@code product}/{@code sum}/{@code top} base-kind declarations, and {@code type_argument})
  * mangle to a genuine {@code schema.meta} class that's deliberately a sealed marker interface, not
- * a plain record (see {@link SchemaMetaTypeNameBinder}'s own Javadoc) -- these are meta-schema
+ * a plain record (see {@link SchemaMetaNameBinder}'s own Javadoc) -- these are meta-schema
  * machinery real application data is never actually read as an instance of, so failing the whole
  * schema's binding over them would be a false positive -- confirmed empirically, not assumed, by
  * running this against the real, fully registered meta-kernel.tn1 fixture (0 genuine problems, 5
@@ -48,8 +51,7 @@ public final class TsonObjectBinder {
     /**
      * @throws IllegalStateException naming every entry that failed to resolve, if any did
      */
-    public static TsonBoundSchema bind(TsonLinkedSchema linkedSchema, DataBindContext context,
-                                                    TsonTypeNameBinder binder) {
+    public static TsonBoundSchema bind(TsonLinkedSchema linkedSchema, DataBindContext context) {
         Map<String, DataClass> bound = new LinkedHashMap<>();
         TsonSchema schema = linkedSchema.schema();
         List<String> problems = new ArrayList<>();
@@ -58,19 +60,11 @@ public final class TsonObjectBinder {
             if (!(entry.getValue().body() instanceof RecordBody)) {
                 continue;
             }
-            Class<?> target;
-            try {
-                target = binder.resolve(name);
-            } catch (ClassNotFoundException e) {
-                problems.add("'" + name + "': " + e.getMessage());
-                continue;
-            }
             DataClass descriptor;
             try {
-                descriptor = context.getDescriptor(target);
+                descriptor = context.getDescriptor(name);
             } catch (DataBindException e) {
-                problems.add("'" + name + "' resolved to " + target + ", but tson-bind could not build a "
-                        + "descriptor for it: " + e.getMessage());
+                problems.add("tson-bind unable to return a descriptor for '" + name + "': " + e.getMessage());
                 continue;
             }
             if (!(descriptor instanceof DataClassRecord recordDescriptor)) {

@@ -1,7 +1,8 @@
 package io.ltr8.tson.parser.binder;
 
+import io.ltr8.bind.DataBindContext;
+import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
-import io.ltr8.bind.DataClassRecord;
 import io.ltr8.tson.parser.base.TsonAtomContext;
 import io.ltr8.tson.parser.resolver.MetaKernelBootstrapResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -25,7 +26,7 @@ class TsonObjectBinderTest {
     void theWholeRealMetaKernelSchemaBindsCleanly() {
         // Confirmed empirically (not assumed): of the 58 real, registered entries, 23 are
         // record-shaped and genuinely bind (including set/array_min/array_max/array_ranged, via
-        // SchemaMetaTypeNameBinder's own ArrayBody alias, and every atom constraint-vocabulary
+        // SchemaMetaNameBinder's own ArrayBody alias, and every atom constraint-vocabulary
         // record like uri_type/regex_type, which need TsonAtomContext's own URI/UUID/... atom
         // registrations to resolve at all); 5 more (atom/product/sum/top/type_argument) resolve to
         // a real, deliberately non-record class and are silently skipped, not failures. Nothing
@@ -33,19 +34,21 @@ class TsonObjectBinderTest {
         TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
         TsonLinkedSchema registered = TsonSchemaLinker.linkBootstrap(raw);
 
-        TsonObjectBinder.bind(registered, TsonAtomContext.defaultContext(), SchemaMetaTypeNameBinder.INSTANCE);
+        TsonObjectBinder.bind(registered, TsonObjectBinding.defaultContext());
     }
 
     @Test
     void bindReportsEveryUnresolvableEntryAtOnceRatherThanOneAtATime() {
         TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
         TsonLinkedSchema registered = TsonSchemaLinker.linkBootstrap(raw);
-        TsonTypeNameBinder alwaysMissing = name -> {
-            throw new ClassNotFoundException("no class for '" + name + "' under this test's own binder");
-        };
+        DataBindContext alwaysMissing = TsonAtomContext.registerDefaults(DataBindContext.builder()
+                .nameBinder(name -> {
+                    throw new DataBindException("no class for '" + name + "' under this test's own binder");
+                })
+                .build());
 
         IllegalStateException thrown = assertThrows(IllegalStateException.class,
-                () -> TsonObjectBinder.bind(registered, TsonAtomContext.defaultContext(), alwaysMissing));
+                () -> TsonObjectBinder.bind(registered, alwaysMissing));
 
         // At least "integer_type" and "text_type" -- two real, distinct record-shaped entries --
         // both named in the one report, not just the first one bind() happened to hit.
@@ -57,8 +60,7 @@ class TsonObjectBinderTest {
     void resultOmitsEntriesThatResolveToARealNonRecordClass() {
         TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
         TsonLinkedSchema registered = TsonSchemaLinker.linkBootstrap(raw);
-        TsonBoundSchema boundSchema =
-                TsonObjectBinder.bind(registered, TsonAtomContext.defaultContext(), SchemaMetaTypeNameBinder.INSTANCE);
+        TsonBoundSchema boundSchema = TsonObjectBinder.bind(registered, TsonObjectBinding.defaultContext());
         Map<String, DataClass> bound = boundSchema.boundMap();
 
         assertTrue(bound.containsKey("integer_type"));

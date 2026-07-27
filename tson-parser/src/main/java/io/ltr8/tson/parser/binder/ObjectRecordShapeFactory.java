@@ -44,7 +44,7 @@ public final class ObjectRecordShapeFactory implements RecordShapeFactory<Object
         DataClassRecord descriptor = (DataClassRecord) bound.get(typeName);
         if (descriptor == null) {
             throw new IllegalStateException("'" + typeName + "' was never bound -- call "
-                    + "TsonObjectBinder.bind(TsonLinkedSchema, DataBindContext, TsonTypeNameBinder) with the "
+                    + "TsonObjectBinder.bind(TsonLinkedSchema, DataBindContext) with the "
                     + "governing schema before compiling against it (see TsonObjectBinding#factoryRegistry)");
         }
         return () -> new ObjectRecordBuilder(descriptor);

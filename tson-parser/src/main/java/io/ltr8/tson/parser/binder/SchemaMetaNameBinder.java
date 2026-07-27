@@ -1,10 +1,14 @@
 package io.ltr8.tson.parser.binder;
 
+import io.ltr8.bind.DataNameBinder;
+
 import java.util.Map;
+import java.util.Set;
 
 /**
- * The default {@link TsonTypeNameBinder} for {@code io.ltr8.tson.schema.meta} -- a fixed namespace
- * plus a snake_case-to-PascalCase mangling of the schema type name (e.g. {@code "integer_size"} ->
+ * The {@link DataNameBinder} object-binding mode builds its default {@code DataBindContext}
+ * against (see {@link TsonObjectBinding#defaultContext}) -- a fixed namespace plus a
+ * snake_case-to-PascalCase mangling of the schema type name (e.g. {@code "integer_size"} ->
  * {@code IntegerSize}, {@code "atom_specification"} -> {@code AtomSpecification}), which holds
  * directly for every genuine constraint-vocabulary/helper record in that package, with one
  * confirmed exception (found by actually running this against the real, registered
@@ -35,12 +39,13 @@ import java.util.Map;
  * mangles to {@link io.ltr8.tson.schema.meta.TypeArgument}, deliberately a sealed interface, not a
  * plain record (see that class's own Javadoc on the mutual-recursion trap that forced this). This
  * binder resolves the class either way -- it isn't this class's job to decide whether a resolved
- * class is usable as a record; see {@link TsonObjectBinder#bind} for why a non-record
- * result there is treated as "doesn't apply" rather than a binding failure.
+ * class is usable as a record; see {@link TsonObjectBinder#bind} for why a non-record result there
+ * is treated as "doesn't apply" rather than a binding failure.
  */
-public final class SchemaMetaTypeNameBinder implements TsonTypeNameBinder {
+public final class SchemaMetaNameBinder {
 
-    public static final SchemaMetaTypeNameBinder INSTANCE = new SchemaMetaTypeNameBinder();
+    private SchemaMetaNameBinder() {
+    }
 
     private static final String NAMESPACE = "io.ltr8.tson.schema.meta";
 
@@ -59,25 +64,5 @@ public final class SchemaMetaTypeNameBinder implements TsonTypeNameBinder {
             Map.entry("binary", "binary_type"),
             Map.entry("datetime_type", "date_time_type"));
 
-    @Override
-    public Class<?> resolve(String schemaTypeName) throws ClassNotFoundException {
-        String lookupName = ALIASES.getOrDefault(schemaTypeName, schemaTypeName);
-        return Class.forName(NAMESPACE + "." + mangle(lookupName));
-    }
-
-    private static String mangle(String snakeCase) {
-        StringBuilder result = new StringBuilder(snakeCase.length());
-        boolean capitalizeNext = true;
-        for (char c : snakeCase.toCharArray()) {
-            if (c == '_') {
-                capitalizeNext = true;
-            } else if (capitalizeNext) {
-                result.append(Character.toUpperCase(c));
-                capitalizeNext = false;
-            } else {
-                result.append(Character.toLowerCase(c));
-            }
-        }
-        return result.toString();
-    }
+    public static final DataNameBinder INSTANCE = new DataNameBinder.DefaultDataNameBinder(Set.of(NAMESPACE), ALIASES);
 }

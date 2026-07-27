@@ -1737,7 +1737,7 @@ here anyway so this class is a complete, uniform "fetch any of this library's ow
 documents" utility on its own terms, and safe for any *other* `TsonCompiledSchemaLoader` implementation that
 doesn't special-case meta-kernel the way `DefaultTsonCompiledSchemaLoader` does.
 
-### Object-binding mode (`compiler/RecordParser.java` + `parser/bind/{TsonObjectBinding,TsonObjectBinder,ObjectRecordShapeFactory,TsonTypeNameBinder,SchemaMetaTypeNameBinder}.java`)
+### Object-binding mode (`compiler/RecordParser.java` + `parser/binder/{TsonObjectBinding,TsonObjectBinder,TsonBoundSchema,ObjectRecordShapeFactory,SchemaMetaNameBinder}.java` + `tson-bind`'s own `DataNameBinder`)
 
 Added 2026-07-25: a second output mode for the compiled reader, alongside DOM mode's plain
 `Map<String, Object>` — `RecordParser` can now instead produce a real, bound `schema.meta` Java
@@ -1789,6 +1789,36 @@ then constructs the factory from its return value. Named `TsonObjectBinder`, not
 first proposed, to disambiguate from `TsonTypeNameBinder` (a single name→`Class` lookup) already in the
 same package and to signal it's object-binding-mode-specific, not a general schema-pipeline stage.
 
+**The name→`Class` lookup itself moved down into `tson-bind` as `DataNameBinder`, and `TsonTypeNameBinder`/
+`SchemaMetaTypeNameBinder` were deleted outright (2026-07-27, same day, on the user's own explicit
+direction, following their own sketch: "Added DataNameBinder with a default strategy using aliases
+and packages. Added them to the DataBindContext in it's builder. The user api is now another
+overload of getDescription(schemaTypeName)").** `io.ltr8.bind.DataNameBinder` (`resolve(String) ->
+Class<?>`, throwing `DataBindException` — `tson-bind`'s own exception, not `ClassNotFoundException`)
+is now a genuinely `tson-bind`-owned concept, not a `tson-parser`-specific one — matching the
+`litterat-core DefaultNameBinder` precedent the deleted `TsonTypeNameBinder`'s own Javadoc already
+cited, and letting a `DataBindContext` compose it directly: `DataBindContext.Builder#nameBinder`
+(or the `nameBinderPackages`/`nameBinderAliases` convenience pair, backing
+`DataNameBinder.DefaultDataNameBinder` when no explicit binder is supplied) fixes a context's own
+naming policy at construction, and the new `DataBindContext.getDescriptor(String)` composes
+`nameBinder.resolve(name)` with the ordinary `getDescriptor(Class)` into one call. `TsonObjectBinder
+.bind` narrowed from three parameters to two (`bind(TsonLinkedSchema, DataBindContext)`) — it calls
+`context.getDescriptor(name)` directly and does no name resolution of its own; a context handed to
+it must already carry the right `DataNameBinder`, since one can only be attached at a
+`DataBindContext`'s own construction, never retrofitted after the fact. **`SchemaMetaNameBinder`**
+(renamed from `SchemaMetaTypeNameBinder`, no longer implementing anything — `TsonTypeNameBinder`
+itself is gone) is now just a small holder for `io.ltr8.tson.schema.meta`'s own namespace/alias
+data, exposing a ready-built `DataNameBinder INSTANCE`. **`TsonObjectBinding.defaultContext()`**
+(new) is the one place that data actually gets wired into a real `DataBindContext` —
+`TsonAtomContext.registerDefaults` (the atom-registration block `TsonAtomContext.defaultContext()`
+already ran, now factored out so it can apply to an already-built, custom-configured context, not
+just a fresh unconfigured one) applied to `DataBindContext.builder().nameBinder(SchemaMetaNameBinder
+.INSTANCE).build()`. Every call site that used to build its context via plain
+`TsonAtomContext.defaultContext()` before handing it to `TsonObjectBinding.factoryRegistry` now uses
+`TsonObjectBinding.defaultContext()` instead — `TsonAtomContext.defaultContext()` itself is
+unchanged and stays `schema.meta`-agnostic, still the right choice for DOM mode/`mapper`, which have
+no use for a `DataNameBinder` at all.
+
 - **`RecordParser.RecordShape<R>`/`RecordParser.RecordBuilder<R>`/`RecordParser.RecordShapeFactory<R>`**
   — public interfaces nested inside `RecordParser` itself, not standalone top-level types (nothing
   outside this package's own object-binding mode implements or consumes them, so keeping them
@@ -1809,7 +1839,7 @@ same package and to signal it's object-binding-mode-specific, not a general sche
   step of `read()` changed, from inline `Map` mutation to `shape.begin()`/`builder.field(...)`/
   `builder.build()`. `RecordParser.FACTORY` (the DOM-mode constant 10+ test classes reference
   directly, including by identity) is preserved as `factory(DomRecordShapeFactory.INSTANCE)`.
-- **`TsonTypeNameBinder`/`SchemaMetaTypeNameBinder`** — the schema-type-name → Java-`Class` binding
+- **`DataNameBinder`/`SchemaMetaNameBinder`** — the schema-type-name → Java-`Class` binding
   this needed. **Not** a scan of `Top`'s own sealed
   union (an earlier version of this file did exactly that, keyed off `@Typename`/`DataClassUnion
   .memberTypes()`) — corrected on the user's own direct guidance, pointing at a sibling project's
@@ -1819,9 +1849,9 @@ same package and to signal it's object-binding-mode-specific, not a general sche
   uses. The `Top`-union-scan version was a real, discovered dead end, not just a style
   preference — it made `integer_type` itself uncompilable in object mode at all (its own `size:
   integer_size?` field eagerly resolves `integer_size` at compile time regardless of whether any
-  given value populates `size`, and `IntegerSize` was never a `Top` member) — `SchemaMetaTypeNameBinder`
+  given value populates `size`, and `IntegerSize` was never a `Top` member) — a plain name lookup
   has no such restriction, since it resolves by name, not by hierarchy membership.
-  `SchemaMetaTypeNameBinder`'s own convention: fixed namespace `io.ltr8.tson.schema.meta`, a
+  `SchemaMetaNameBinder`'s own convention: fixed namespace `io.ltr8.tson.schema.meta`, a
   snake_case-to-PascalCase mangle, with one confirmed alias table (`record`/`array`/`map`/`tuple`/
   `choice`/`enum` → their own `*Body` class, since meta-kernel's own description of a composite
   constructor's shape is structurally identical to the class representing a *bound instance* of
@@ -1832,7 +1862,7 @@ same package and to signal it's object-binding-mode-specific, not a general sche
   of 58 entries bind as real records, 5 (`atom`/`product`/`sum`/`top`/`type_argument`) resolve to a
   real but deliberately non-record class (sealed marker interfaces) and are treated as "doesn't
   apply," not a failure — see below.
-- **`TsonObjectBinder.bind(TsonSchema, DataBindContext, TsonTypeNameBinder)`** — binding happens *eagerly*,
+- **`TsonObjectBinder.bind(TsonLinkedSchema, DataBindContext)`** — binding happens *eagerly*,
   walking every `record`-shaped entry in the whole schema and resolving a `DataClassRecord` for each
   into the returned map, rather than lazily discovering a missing binding one entry at a time as
   unrelated reads happen to reach them (per the user's own explicit direction: "That binding should
@@ -1854,8 +1884,9 @@ same package and to signal it's object-binding-mode-specific, not a general sche
   `io.ltr8.tson.parser.base.NumberNarrowing`, the same utility `atom`'s numeric family
   and `io.ltr8.tson.parser.mapper`'s untyped-number binding already share for exactly this, rather
   than a third copy.
-- **`TsonObjectBinding.factoryRegistry(TsonSchema, DataBindContext)`** (+ a `TsonTypeNameBinder`-taking
-  overload; `io.ltr8.tson.parser.binder`, not `compiler` — see above) is the
+- **`TsonObjectBinding.factoryRegistry(TsonLinkedSchema, DataBindContext)`** (`io.ltr8.tson.parser.binder`,
+  not `compiler` — see above; `context` must already carry the right `DataNameBinder` — see
+  `TsonObjectBinding.defaultContext()` above) is the
   object-binding-mode sibling to `TsonParserFactoryRegistry.dom()` — every other factory
   (array/map/tuple/choice + every atom-family constant) is shared via `TsonParserFactoryRegistry`'s
   own public `withoutRecordOrEnum()` (widened + renamed from a private `withoutRecord()` for exactly
@@ -1878,8 +1909,8 @@ unexercised there rather than proven either way — it's a primitive `boolean` f
 path, a different mechanism than `BooleanParser`'s own name-keyed `"boolean"` dispatch below it; a
 separate, narrower, still-open question from this test's own actual scope, not a regression here).
 `TsonObjectBinder.bind`'s own eager, whole-schema behavior has its own dedicated coverage in
-`TsonObjectBinderTest`: the whole real schema binds with zero problems; a custom `TsonTypeNameBinder`
-that always fails proves `bind`'s own multi-problem report names more than one offending entry at
+`TsonObjectBinderTest`: the whole real schema binds with zero problems; a `DataBindContext` built with a
+custom, always-failing `DataNameBinder` proves `bind`'s own multi-problem report names more than one offending entry at
 once, not just the first; and the returned map genuinely omits the 5 real, non-record-bound marker
 entries (`atom`/`top`/...) rather than including a null or placeholder for them. `RecordParser.FACTORY`'s
 own identity and DOM-mode output are confirmed byte-for-byte unchanged by the whole existing suite.

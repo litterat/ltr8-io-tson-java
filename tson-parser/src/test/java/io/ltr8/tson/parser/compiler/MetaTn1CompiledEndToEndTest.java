@@ -6,7 +6,6 @@ import io.ltr8.tson.parser.TsonSchemaParser;
 import io.ltr8.tson.parser.ast.Document;
 import io.ltr8.tson.parser.ast.schema.SchemaDocument;
 import io.ltr8.tson.parser.binder.TsonObjectBinding;
-import io.ltr8.tson.parser.base.TsonAtomContext;
 import io.ltr8.tson.parser.resolver.BundledSchemaSource;
 import io.ltr8.tson.parser.resolver.DefaultTsonCompiledSchemaLoader;
 import io.ltr8.tson.parser.resolver.MetaKernelBootstrapResolver;
@@ -40,7 +39,7 @@ class MetaTn1CompiledEndToEndTest {
         TsonSchemaRegistry registry = new TsonSchemaRegistry();
         TsonLinkedSchema materializedMetaKernelBootstrap = TsonSchemaLinker.linkBootstrap(metaKernelBootstrap);
 
-        DataBindContext context = TsonAtomContext.defaultContext();
+        DataBindContext context = TsonObjectBinding.defaultContext();
         TsonParserFactoryRegistry objectFactories = TsonObjectBinding.factoryRegistry(materializedMetaKernelBootstrap, context);
         TsonCompiledRegistry compiledRegistry = new TsonCompiledRegistry(objectFactories);
         DefaultTsonCompiledSchemaLoader loader = new DefaultTsonCompiledSchemaLoader(compiledRegistry);

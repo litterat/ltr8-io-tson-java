@@ -29,7 +29,18 @@ public final class TsonAtomContext {
     }
 
     public static DataBindContext defaultContext() {
-        DataBindContext context = DataBindContext.builder().build();
+        return registerDefaults(DataBindContext.builder().build());
+    }
+
+    /**
+     * Applies this library's own default atom registrations to an already-built {@code context} --
+     * the same registrations {@link #defaultContext()} applies to a fresh, unconfigured one -- so a
+     * caller who needs a {@link DataBindContext.Builder} setting {@link #defaultContext()} doesn't
+     * expose (e.g. object-binding mode's own {@link io.ltr8.tson.parser.binder.TsonObjectBinding
+     * #defaultContext}, which also configures a {@code DataNameBinder}) can still get the same base
+     * registrations without duplicating this list.
+     */
+    public static DataBindContext registerDefaults(DataBindContext context) {
         try {
             context.registerAtom(UUID.class);
             context.registerAtom(byte[].class);

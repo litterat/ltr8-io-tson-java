@@ -25,6 +25,8 @@ import java.lang.reflect.Type;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Date;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class DataBindContext {
@@ -35,11 +37,20 @@ public class DataBindContext {
 	// default resolver
 	private final DefaultClassBinder dataClassResolver;
 
+	// resolves a bare type name (e.g. a schema's own type name) to the Class getDescriptor(String) builds against
+	private final DataNameBinder nameBinder;
+
 	public static class Builder {
 
 		boolean allowAny = false;
 
 		boolean allowSerializable = false;
+
+		Map<String, String> nameBinderAliases = Map.of();
+
+		Set<String> nameBinderPackages = Set.of();
+
+		DataNameBinder nameBinder = null;
 
 		public Builder() {
 		}
@@ -51,6 +62,24 @@ public class DataBindContext {
 
 		public Builder allowSerializable() {
 			allowSerializable = true;
+			return this;
+		}
+
+		/** Aliases consulted by the default {@link DataNameBinder} built when {@link #nameBinder(DataNameBinder)} isn't called. */
+		public Builder nameBinderAliases(Map<String, String> aliases) {
+			this.nameBinderAliases = aliases;
+			return this;
+		}
+
+		/** Packages searched, in order, by the default {@link DataNameBinder} built when {@link #nameBinder(DataNameBinder)} isn't called. */
+		public Builder nameBinderPackages(Set<String> packages) {
+			this.nameBinderPackages = packages;
+			return this;
+		}
+
+		/** Supplies a {@link DataNameBinder} directly, in place of the default {@link DataNameBinder.DefaultDataNameBinder}. */
+		public Builder nameBinder(DataNameBinder nameBinder) {
+			this.nameBinder = nameBinder;
 			return this;
 		}
 
@@ -66,6 +95,8 @@ public class DataBindContext {
 	private DataBindContext(Builder builder) {
 
 		this.dataClassResolver = new DefaultClassBinder();
+		this.nameBinder = builder.nameBinder != null ? builder.nameBinder
+				: new DataNameBinder.DefaultDataNameBinder(builder.nameBinderPackages, builder.nameBinderAliases);
 
 		try {
 			registerAtom(Boolean.class);
@@ -114,6 +145,18 @@ public class DataBindContext {
 		}
 
 		return descriptor;
+	}
+
+	/**
+	 * Resolves {@code schemaTypeName} to a Java class via this context's own {@link DataNameBinder}
+	 * (see {@link Builder#nameBinder}/{@link Builder#nameBinderPackages}/{@link
+	 * Builder#nameBinderAliases}), then returns its descriptor exactly as {@link
+	 * #getDescriptor(Class)} would -- one call in place of resolving the class and fetching its
+	 * descriptor as two separate steps.
+	 */
+	public DataClass getDescriptor(String schemaTypeName) throws DataBindException {
+		Class<?> target = nameBinder.resolve(schemaTypeName);
+		return getDescriptor(target);
 	}
 
 	private <T> void checkExists(Type targetClass) throws DataBindException {
