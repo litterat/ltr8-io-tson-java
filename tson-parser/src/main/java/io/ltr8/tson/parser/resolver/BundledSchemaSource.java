@@ -24,23 +24,22 @@ import java.util.Map;
  * does:
  *
  * <pre>{@code
- * TsonSchema metaKernel = MetaKernelBootstrapResolver.getMetaKernelSchema();
  * TsonSchemaRegistry schemaRegistry = new TsonSchemaRegistry();
- * TsonSchema materializedMetaKernel = schemaRegistry.materializeBootstrap(metaKernel);
- * DataBindContext context = TsonObjectBinding.defaultContext();
- * TsonParserFactoryRegistry factories = TsonObjectBinding.factoryRegistry(materializedMetaKernel, context);
- * TsonCompiledRegistry registry = new TsonCompiledRegistry(schemaRegistry, factories);
- * registry.register(materializedMetaKernel); // meta.tn1's own !!import needs this present first --
- *                                             // see DefaultTsonCompiledSchemaLoader's own Javadoc on
- *                                             // why the bootstrap case alone doesn't satisfy
- *                                             // SchemaValidator's import merge. Registering the
- *                                             // already-materialized result, not the raw metaKernel
- *                                             // itself -- TsonSchemaRegistry.register refuses an
- *                                             // unmaterialized bootstrap schema outright (see its
- *                                             // own Javadoc).
+ * ValueReaderFactoryResolver resolver = ValueReaderFactoryRegistry.bind(SchemaMetaNameBinder.defaultContext());
+ * TsonCompiledRegistry registry = new TsonCompiledRegistry(schemaRegistry, resolver);
  * DefaultTsonCompiledSchemaLoader loader = new DefaultTsonCompiledSchemaLoader(registry, BundledSchemaSource.INSTANCE);
- * TsonCompiledSchema meta = loader.load(BundledSchemaSource.META_TN1_ID);
- * TsonCompiledSchema core = loader.load(BundledSchemaSource.CORE_TN1_ID); // needs meta.tn1 registered first, same reasoning
+ *
+ * // meta.tn1's own !!import needs meta-kernel present in the *shared* registry first -- meta-kernel's
+ * // own bootstrap case (loader.load(META_KERNEL_ID)) is never cached in registry itself (see
+ * // DefaultTsonCompiledSchemaLoader's own Javadoc), so it needs registering separately, resolved
+ * // ordinarily against this same loader (whose own bootstrap branch supplies the structure namespace).
+ * SchemaDocument metaKernelDocument = new TsonSchemaParser(
+ *         BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID)).parseSchemaDocument();
+ * TsonSchema resolvedMetaKernel = new TsonSchemaResolver(loader).resolveSchema(metaKernelDocument);
+ * registry.register(resolvedMetaKernel, loader.load(BundledSchemaSource.META_KERNEL_ID));
+ *
+ * TsonCompiledMetaSchema meta = loader.load(BundledSchemaSource.META_TN1_ID);
+ * TsonCompiledMetaSchema core = loader.load(BundledSchemaSource.CORE_TN1_ID); // needs meta.tn1 registered first, same reasoning
  * }</pre>
  *
  * <p><b>{@link #META_KERNEL_ID} is meta-kernel's own well-known identity</b> -- the canonical

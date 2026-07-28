@@ -5,10 +5,8 @@ import io.ltr8.tson.parser.TsonDataParser;
 import io.ltr8.tson.parser.TsonSchemaParser;
 import io.ltr8.tson.parser.ast.Document;
 import io.ltr8.tson.parser.ast.schema.SchemaDocument;
-import io.ltr8.tson.parser.binder.TsonObjectBinding;
 import io.ltr8.tson.parser.resolver.BundledSchemaSource;
 import io.ltr8.tson.parser.resolver.DefaultTsonCompiledSchemaLoader;
-import io.ltr8.tson.parser.resolver.MetaKernelBootstrapResolver;
 import io.ltr8.tson.parser.resolver.TsonSchemaResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
@@ -16,12 +14,14 @@ import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.schema.TsonSchemaLinker;
 import org.junit.jupiter.api.Test;
 
+import java.util.Map;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * The same proof {@link MetaKernelEndToEndTest} gives for meta-kernel.tn1, one rung up the schema
  * ladder: compiles the ENTIRE real, registered {@code meta.tn1} (meta-kernel + meta.tn1, chained
- * the way {@link io.ltr8.tson.parser.base.schema.MetaSchemaImportTest} registers them) and
+ * the way {@code io.ltr8.tson.parser.resolver.MetaSchemaImportTest} registers them) and
  * reads real TSON data text against one of meta.tn1's own genuinely useful record types.
  */
 class MetaTn1CompiledEndToEndTest {
@@ -35,12 +35,9 @@ class MetaTn1CompiledEndToEndTest {
      * TsonSchema}, unrelated to how it got resolved).
      */
     private static TsonLinkedSchema registerMeta() {
-        TsonSchema metaKernelBootstrap = MetaKernelBootstrapResolver.getMetaKernelSchema();
         TsonSchemaRegistry registry = new TsonSchemaRegistry();
-        TsonLinkedSchema materializedMetaKernelBootstrap = TsonSchemaLinker.linkBootstrap(metaKernelBootstrap);
-
-        DataBindContext context = TsonObjectBinding.defaultContext();
-        TsonParserFactoryRegistry objectFactories = TsonObjectBinding.factoryRegistry(materializedMetaKernelBootstrap, context);
+        DataBindContext context = SchemaMetaNameBinder.defaultContext();
+        ValueReaderFactoryRegistry objectFactories = ValueReaderFactoryRegistry.bind(context);
         TsonCompiledRegistry compiledRegistry = new TsonCompiledRegistry(objectFactories);
         DefaultTsonCompiledSchemaLoader loader = new DefaultTsonCompiledSchemaLoader(compiledRegistry);
 
@@ -48,7 +45,10 @@ class MetaTn1CompiledEndToEndTest {
         SchemaDocument metaKernelDocument = new TsonSchemaParser(metaKernelSource).parseSchemaDocument();
         TsonSchema metaKernel = new TsonSchemaResolver(loader).resolveSchema(metaKernelDocument);
         TsonLinkedSchema metaKernelMaterialized = registry.register(TsonSchemaLinker.link(metaKernel, registry));
-        compiledRegistry.register(metaKernelMaterialized.schema());
+        // meta-kernel governs itself -- loader.load(META_KERNEL_ID) re-bootstraps a fresh
+        // TsonCompiledMetaSchema (never cached for that identity, see DefaultTsonCompiledSchemaLoader's
+        // own Javadoc), which is exactly what register's own governingMeta argument needs here.
+        compiledRegistry.register(metaKernelMaterialized.schema(), loader.load(BundledSchemaSource.META_KERNEL_ID));
 
         String source = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_TN1_ID);
         SchemaDocument metaDocument = new TsonSchemaParser(source).parseSchemaDocument();
@@ -58,8 +58,20 @@ class MetaTn1CompiledEndToEndTest {
     }
 
     /**
+     * The raw {@link TsonCompiledSchema} underneath a throwaway bootstrap {@link
+     * TsonCompiledMetaSchema} -- this test's own outer compile is plain DOM mode against the global
+     * registry directly, not against any real governing meta (mirrors {@code
+     * MetaKernelEndToEndTest#rawCompile}).
+     */
+    private static TsonCompiledSchema rawCompile(TsonLinkedSchema linked) {
+        TsonCompiledSchema placeholder = new TsonCompiledSchema(linked, Map.of());
+        TsonCompiledMetaSchema bootstrapMeta = new TsonCompiledMetaSchema(placeholder, ValueReaderFactoryRegistry.dom());
+        return TsonSchemaCompiler.compile(linked, bootstrapMeta);
+    }
+
+    /**
      * {@code meta.tn1} declares 31 entries of its own, but the *registered* schema this compiles --
-     * the one a real reader actually needs, since it's what {@link TsonCompiledSchema#compile} accepts
+     * the one a real reader actually needs, since it's what {@link TsonSchemaCompiler#compile} accepts
      * -- also carries meta-kernel's own entries (merged in via meta.tn1's real {@code !!import}) plus
      * whatever array-sugar materialization synthesized, matching {@code MetaSchemaImportTest}'s own
      * counts. Every one of them still compiles cleanly with the same registry this whole atom-family
@@ -69,7 +81,7 @@ class MetaTn1CompiledEndToEndTest {
     @Test
     void everyRealMetaEntryCompilesCleanly() {
         TsonLinkedSchema meta = registerMeta();
-        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(meta, TsonParserFactoryRegistry.dom());
+        TsonCompiledSchema compiled = rawCompile(meta);
 
         for (String name : meta.schema().entries().keySet()) {
             compiled.get(name);
@@ -80,7 +92,7 @@ class MetaTn1CompiledEndToEndTest {
     @Test
     void readsBinaryEncodingEnumMembersAgainstRealData() {
         TsonLinkedSchema meta = registerMeta();
-        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(meta, TsonParserFactoryRegistry.dom());
+        TsonCompiledSchema compiled = rawCompile(meta);
         Document document = new TsonDataParser("BASE64").parseDocument();
 
         Object result = compiled.get("binary_encoding").read(document.root());

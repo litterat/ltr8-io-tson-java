@@ -122,7 +122,7 @@ public class DataBindContext {
 			registerAtom(Date.class);
 
 		} catch (DataBindException e) {
-			throw new IllegalArgumentException();
+			throw new IllegalArgumentException(e);
 		}
 
 	}

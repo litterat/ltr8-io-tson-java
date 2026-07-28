@@ -28,7 +28,21 @@ class MetaKernelEndToEndTest {
     private static TsonCompiledSchema compiled() {
         TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
         TsonLinkedSchema linked = TsonSchemaLinker.linkBootstrap(raw);
-        return TsonSchemaCompiler.compile(linked, TsonParserFactoryRegistry.dom());
+        return rawCompile(linked);
+    }
+
+    /**
+     * The raw {@link TsonCompiledSchema} underneath a bootstrap {@link TsonCompiledMetaSchema} --
+     * unlike {@link TsonCompiledMetaSchema#reader}, {@link TsonCompiledSchema#get} reads *any*
+     * entry, not just the ones with {@code constructor() == true}, which every test in this class
+     * needs (e.g. {@code integer_size}, {@code field_group}, ordinary records with no constructor of
+     * their own). Mirrors {@link TsonCompiledMetaSchema#bootstrap}'s own first step exactly, without
+     * the final re-wrap that method's own return value would otherwise force.
+     */
+    private static TsonCompiledSchema rawCompile(TsonLinkedSchema linked) {
+        TsonCompiledSchema placeholder = new TsonCompiledSchema(linked, Map.of());
+        TsonCompiledMetaSchema bootstrapMeta = new TsonCompiledMetaSchema(placeholder, ValueReaderFactoryRegistry.dom());
+        return TsonSchemaCompiler.compile(linked, bootstrapMeta);
     }
 
     /**
@@ -49,7 +63,7 @@ class MetaKernelEndToEndTest {
         TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
         TsonLinkedSchema linked = TsonSchemaLinker.linkBootstrap(raw);
         TsonSchema registered = linked.schema();
-        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(linked, TsonParserFactoryRegistry.dom());
+        TsonCompiledSchema compiled = rawCompile(linked);
 
         for (String name : registered.entries().keySet()) {
             compiled.get(name);

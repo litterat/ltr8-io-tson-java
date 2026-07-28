@@ -1,6 +1,6 @@
 package io.ltr8.tson.parser.resolver;
 
-import io.ltr8.tson.parser.compiler.TsonCompiledSchema;
+import io.ltr8.tson.parser.compiler.TsonCompiledMetaSchema;
 
 /**
  * Given a schema's own URI (a document's {@code !!meta} target, or one of its {@code !!import}
@@ -32,5 +32,5 @@ public interface TsonCompiledSchemaLoader {
      *                          {@link TsonSchemaSource#registeredOnly()}, or whatever a caller-supplied
      *                          {@link TsonSchemaSource} itself throws.
      */
-    TsonCompiledSchema load(String uri);
+    TsonCompiledMetaSchema load(String uri);
 }

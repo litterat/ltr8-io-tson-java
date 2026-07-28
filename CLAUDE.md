@@ -89,7 +89,7 @@ If a class name contains `Tson` at all, `Tson` MUST be the leading word (`TsonSc
 `TsonSchemaCompiler`, `TsonDataParser`, `TsonMapperReader`) — never buried in the middle (`CompiledTsonSchema`
 is wrong; it was renamed to `TsonCompiledSchema` specifically to fix this, 2026-07-26). The prefix isn't
 applied to every class in the library, either — most of `tson-parser`/`tson-schema`'s own internal machinery
-is deliberately bare (`Lexer`, `RecordParser`, `DeferredValueReader`, `CanonicalIdentity`).
+is deliberately bare (`Lexer`, `RecordAbstractReader`, `DeferredValueReader`, `CanonicalIdentity`).
 Reserve the `Tson` prefix for the classes a *consumer of this library* actually names in
 their own code — its value is disambiguation at the call site (`TsonSchema` vs. a domain object also called
 `Schema`, `TsonDataParser` vs. a domain-specific `DataParser`) and quick identification when skimming a
@@ -353,16 +353,16 @@ by name and prose-level parsing contract, not by schema shape." The pre-split si
 (renamed `TokenParser`, unchanged behavior: raw NFC-normalised token text, unconstrained — this is
 `token`'s own real contract) was silently wrong for the other two: it accepted *any* token for
 `void` (should accept only the absent sentinel `_`) and, worse, would have *rejected* `_` outright
-had it ever reached one (`AtomTypeParser`'s own adapter requires a `TokenValue` before ever calling
+had it ever reached one (`AtomValueReader`'s own adapter requires a `TokenValue` before ever calling
 an `AtomType`, and `_` — `AbsentValue` — isn't one; this bug was latent, never actually exercised,
 since nothing called compiled-parser reading against `void` before this session). Now: `ValueParser`
 (`atom`) actually runs `BaseTypeResolver` and narrows to the natural host type (`null`/
 `Boolean`/`BigInteger`/`BigDecimal`/`Double` for `.nan`/`.inf`/`String`) — `value`'s own doc: "the
-result of base type resolution... applied to a source token." `VoidParser`
+result of base type resolution... applied to a source token." `VoidReader`
 (`compiler`, not `atom` — its contract doesn't fit `AtomType.
 read(TokenValue)` at all, since it needs to see the `DataValue`'s own `core-value` shape, not a
 token) accepts only `AbsentValue` and reads to Java `null`. Dispatch is keyed on the *declaration's
-own name* (`AtomTypeParser.UNIT`'s factory switches on its `name` parameter, not on
+own name* (`AtomValueReader.UNIT`'s factory switches on its `name` parameter, not on
 `definition.body()` the way every other constant in that class does) — an unrecognized `unit`-
 constructed name falls back to `TokenParser`'s behavior (the previous, pre-split default for
 everything) rather than failing.
@@ -890,6 +890,16 @@ per that same "Javadoc conventions" note.
     -- see `Cidr4Type`'s own Javadoc for the two corrections that took (nested → flat, then
     `java.net.URI` → `String`, since an untyped string can't bind into `URI` without a `!uri`
     type-ref -- the same reason `TextType`/`UriType.pattern` are `String`, not a compiled `Pattern`).
+
+  **`PositionalForm` deleted outright (2026-07-28, once the compiled reader made it redundant, not
+  before).** Both jobs described above -- positional-form wrapping and schema-composed defaulting --
+  are now handled uniformly by `RecordAbstractReader` itself (`dataFields`'s own
+  `positionalFieldIndex` handling; `precomputedValue`/`defaultOrRequireNonFixed`/`readSchemaDefault`
+  respectively -- see "Class 2 compilation" below), consulted on *every* compiled record read, not
+  just `Instance` resolution. `resolveInstance` already requires the constructor's own body to be
+  record-shaped before ever reaching `bindAtomInstance`, so every real call path is guaranteed to hit
+  a compiled `Record*Reader` -- confirmed by removing the call, rerunning the full suite (still
+  1130/1130), and only then deleting the class and its own dedicated test.
 - **Atom refinement** (`!I ^ { values }`, `AtomRefinement`, §5.5/§5.7, `resolveAtomRefinement`,
   added 2026-07-24, Phase B step 5) -- resolves `I` against the type-name namespace *only* (never
   the structure namespace, unlike `C` above), rejects a constructor source and a non-atom-family
@@ -948,7 +958,7 @@ was ever consulted), so `"true"`/`"false"` misidentified as real Java booleans b
 `EnumBody.members: List<String>` ever saw them -- every *other* real enum instance across both
 fixtures has ordinary identifier members that never collide this way. The compiled reader's own
 atom-family dispatch is schema-driven (looked up by the constructor's own name, fixed at compile
-time via `TsonParserFactoryRegistry`), not token-identification-driven, so this collision simply
+time via `ValueReaderFactoryRegistry`), not token-identification-driven, so this collision simply
 doesn't happen there -- verified directly: `DefinitionResolverTest
 .booleanInstanceResolvesCorrectlyViaTheCompiledReader` resolves `boolean` from a real-fixture-shaped
 schema and gets back `EnumBody(members=["true", "false"])`, no exception. This also retired
@@ -961,7 +971,7 @@ registry" above), and nothing replaced their end-to-end coverage of resolving co
 declarations in one pass; re-verify with a throwaway probe (register meta-kernel ordinarily first,
 build object-mode factories from *its own* registered result, then `loader.load
 (BundledSchemaSource.CORE_TN1_ID)`) before relying on a specific count -- a first attempt at exactly
-this hit an `ObjectRecordShapeFactory` validation error compiling one of core.tn1's own transitively
+this hit a `RecordBindReader.Factory` validation error compiling one of core.tn1's own transitively
 merged-in atom-constraint entries, not yet root-caused, and may be a genuine, currently-uncovered
 gap in the loader/compiled-registry path for a three-schema chain in object-binding mode, not
 just a probe-script mistake.
@@ -1161,7 +1171,7 @@ real fixture, meta-kernel only ever instantiates them in exactly two shapes: a b
 or a bare `new Unit()` for `unit` itself, is already exactly right) or a bare array of tokens
 (`enum` -- this class's own `toEnumBody`, package-private for its own test accessibility, reading
 `TokenValue.text()` directly, bypassing base-type identification entirely). No compiled reader
-(`TsonSchemaCompiler`/`TsonCompiledSchema`), no `TsonParserFactoryRegistry`, no materialization, no
+(`TsonSchemaCompiler`/`TsonCompiledSchema`), no `ValueReaderFactoryRegistry`, no materialization, no
 `TsonMapperReader` involved anywhere in meta-kernel's own bootstrap now. (The grammar-layer
 `TsonSchemaParser` -- an unrelated class, despite the similar name, see "Naming convention" above --
 *is* used, straightforwardly, to parse meta-kernel's own source text into a `SchemaDocument` before
@@ -1170,8 +1180,8 @@ any of this runs.)
 **Why even a *compiled*-reader-based bootstrap can't safely read meta-kernel from its own
 in-progress state either -- this is why `instanceBody` doesn't attempt one:** `enum => ~atom & {
 members: set<token> } }`'s own field type is *argument-bearing* (`set` + the `token` argument), and
-the compiled-parser layer's own `RecordParser`/`CompilationContext` assume every field type is
-already a bare, materialized name -- true only after `TsonSchemaLinker`'s own materialization pass has
+the compiled-parser layer's own `RecordAbstractReader`/`TsonSchemaCompiler.Compilation` assume every
+field type is already a bare, materialized name -- true only after `TsonSchemaLinker`'s own materialization pass has
 run, which meta-kernel (the thing that pass would normally run *over*) has never been through while
 it's still being produced. Solving that would mean either running a whole-schema materialization
 pass over a knowingly-incomplete map (checked directly: doesn't work -- `integer_size => { bits:
@@ -1363,8 +1373,8 @@ deliberate, confirmed tradeoff rather than adding a module descriptor now.
      self-referencing" test** (an earlier version of this check was structural, tightened the same
      day on the user's own further direction): every resolved `TypeDefinition.body` and every
      `!instance` construction is interpretable only because a matching constructor is declared in
-     *this specific* meta-kernel — `TsonParserFactoryRegistry`/`AtomTypeParser`/`RecordParser` (in
-     `tson-parser`) are Java code hard-wired to this one meta-kernel's own fixed vocabulary, not to
+     *this specific* meta-kernel — `ValueReaderFactoryRegistry`/`AtomValueReader`/`RecordDomReader`/
+     `RecordBindReader` (in `tson-parser`) are Java code hard-wired to this one meta-kernel's own fixed vocabulary, not to
      "whatever schema happens to be self-referencing"; a library supports one meta-kernel version at a
      time. No loader lookup needed at all now — comparing `schema.meta()` directly against the fixed
      constant works uniformly for meta-kernel itself (whose own `!!meta` literally is that constant)
@@ -1378,7 +1388,7 @@ deliberate, confirmed tradeoff rather than adding a module descriptor now.
      link cleanly; core.tn1 (governed by meta.tn1, zero constructors of its own) was already compliant
      before this check existed. Two test fixtures needed a real fix, not a workaround — both were
      hand-built schemas that legitimately declare their own constructor vocabulary
-     (`EnumTypeParserFactoryTest`'s copy of meta-kernel's own entries; `TsonSchemaLinkerTest`'s
+     (`EnumDomReaderTest`'s copy of meta-kernel's own entries; `TsonSchemaLinkerTest`'s
      synthetic `array`/`set` stand-ins for testing materialization in isolation) but had a placeholder
      `!!meta` value; pointed at the real meta-kernel identity instead, which is what they actually use.
   5. Returns a new `TsonLinkedSchema` wrapping a `TsonSchema` — even when the input carried
@@ -1414,7 +1424,7 @@ deliberate, confirmed tradeoff rather than adding a module descriptor now.
   unchanged.
 - **`TsonSchemaLinker.linkBootstrap(TsonSchema)`** — the one sanctioned way to turn meta-kernel's raw
   bootstrap output into a `TsonLinkedSchema` without registering it, needed so a caller (e.g.
-  building an object-binding-mode `TsonParserFactoryRegistry`) can get a genuinely linked result to
+  building an object-binding-mode `ValueReaderFactoryRegistry`) can get a genuinely linked result to
   validate against, without the registry's own self-referential-bootstrap guard getting in the way.
   Moved here from `TsonSchemaRegistry` (2026-07-27, on the user's own observation that it belonged
   with the verb it performs, not with a registry it deliberately never stores its own result in) —
@@ -1459,147 +1469,109 @@ from meta.tn1's own composition-based declarations (`date_type => ~atom & atom_s
 declaration order already places each dependency before its use), and the merged, linked
 registration succeeds outright.
 
-### Class 2 compilation (`compiler/{TsonSchemaCompiler,TsonCompiledSchema,TsonParserFactory,TsonParserFactoryRegistry,ErrorParser}.java`, `TsonValueReader.java`)
+### Class 2 compilation (`compiler/{TsonSchemaCompiler,TsonCompiledSchema,TsonCompiledMetaSchema,ValueReaderFactory,ValueReaderFactoryRegistry,ValueReaderFactoryResolver,ValueReaderResolver,ErrorReader}.java`, `TsonValueReader.java`)
 
-`TsonSchemaCompiler.compile(TsonLinkedSchema, TsonParserFactory)` is the "compile" stage of
+`TsonSchemaCompiler.compile(TsonLinkedSchema, TsonCompiledMetaSchema)` is the "compile" stage of
 parse -> resolve -> link -> register -> compile -> read; `TsonCompiledSchema` is the noun it
 produces, one `TsonValueReader` per resolved entry, wired together as real Java object
 references rather than further name lookups at read time (except at the edges that close a
-cycle, where `DeferredValueReader` does one lazy lookup, see `TsonSchemaCompiler` below).
+cycle, where `DeferredValueReader` does one lazy lookup). `TsonValueReader` (root package,
+alongside `TsonDataParser`/`TsonSchemaParser`) is the single-method front door a caller actually
+holds after compiling (`TsonCompiledSchema#get`) -- `T read(DataValue value)`, no `throws` clause,
+matching this whole read/parse stack's unchecked-only convention.
 
-**`compile` tightened from a bare `TsonSchema` to `TsonLinkedSchema` (2026-07-27, on the user's own
-explicit direction, same session as the `TsonValueReader` rename).** Closes the exact gap flagged a
-few passes earlier: `compile`'s own Javadoc already stated "must be compiled from an
-already-materialized, already-validated `TsonSchema`... never a raw `TsonSchemaResolver.resolveSchema`
-result directly" as a caller responsibility, enforced only by convention. Now the parameter's own
-type carries that signal, matching `TsonSchemaRegistry#register`'s own precedent. `TsonCompiledSchema`
-itself now holds the `TsonLinkedSchema` it was compiled from (not just the bare `TsonSchema`) --
-`schema()` still unwraps to the bare `TsonSchema` for the common case, so no caller outside this
-package needed to change. Not a runtime-enforced guarantee, worth being honest about: `TsonLinkedSchema`'s
-own canonical constructor is public, so a caller (or a test hand-building a self-contained schema
-with no imports or argument-bearing `type_ref`s) can still wrap an unlinked `TsonSchema` in one
-directly -- every real production path just never does, always arriving via `TsonSchemaLinker.link`/
-`TsonSchemaRegistry#register`.
+**`TsonCompiledSchema` is a plain, already-built value** -- two final fields (`linkedSchema`, an
+immutable `Map<String, TsonValueReader<?>>`), no build logic of its own, matching the verb/noun
+split this project's own pipeline vocabulary uses everywhere else (`TsonSchemaLinker`/
+`TsonLinkedSchema`, `TsonSchemaResolver`/its own resolved `TsonSchema`). `get(name)` reads *any*
+entry, unscoped; `schema()` unwraps to the bare `TsonSchema` for the common case of reading resolved
+`entries()`. All the actual compile-time work -- the eager walk, cycle detection, per-entry
+build-failure deferral -- lives in `TsonSchemaCompiler` itself, in a private nested `Compilation`
+helper: one instance per `compile` call, holding that call's own mutable `finished`/`building`
+state, discarded once `compile` returns and hands back an immutable snapshot.
 
-**`ParserHandle` (the `Direct`/`Indirect` sealed pair) deleted outright, same session.** Nothing
-outside `TsonSchemaCompiler`'s own `Compilation.resolve` ever branched on which variant it got --
-every caller (`ArrayParser`, `MapParser`, `RecordParser`, `TupleParser`, `NamedDispatchParser`)
-already stored/used the result as a plain `TsonValueReader<?>`. `Direct` was a pure pass-through
-wrapper (`read` just delegated); `Compilation.resolve`'s "already finished" and "just built" cases
-now return the `TsonValueReader<?>` directly, no wrapping. `Indirect`'s lazy, name-keyed
-cycle-breaking lookup was the only genuinely load-bearing piece -- kept as its own small,
-package-private class, `DeferredValueReader`, implementing `TsonValueReader<T>` directly (same
-shape as `ErrorParser`), no longer needing a sealed family around it. `CompilationContext.resolve`
-now returns `TsonValueReader<?>` instead of `ParserHandle<?>`.
+**Eager, not lazy** -- `compile` walks every one of `linkedSchema.schema().entries()` and resolves
+each before returning, so a caller that only ever reads a handful of a large schema's own types
+still gets the same assurance that every other entry compiles too, and any genuinely broken entry
+is discovered at compile time rather than piecemeal whenever some future caller happens to `get` it.
 
-**`TsonValueReader` (renamed from `TsonSchemaTypeParser`, moved out of `compiler` to this module's
-own root package, alongside `TsonDataParser`/`TsonSchemaParser` -- 2026-07-27, on the user's own
-explicit direction, working through the compiler's own structure: "the general pattern is the
-handle is a TsonValueReader... and should be a top level interface... a user level front-door type
-interface to the library").** A caller already receives one of these directly (`TsonCompiledSchema
-#get`, `SchemaValidatingParser#read`) without ever needing to know how it was built, the same
-"front door" status `TsonDataParser`/`TsonSchemaParser` already have -- the old name/location
-described internal machinery, not what it actually is. Still a single method, `T read(DataValue
-value)`, no `throws` clause -- every exception in this whole read/parse stack is unchecked
-(`LexException`, `TsonParseException`, `TsonSchemaValidationException`, ...); the one checked
-exception anywhere in the codebase, `tson-bind`'s own `DataBindException`, is confined to
-compile/bind-time setup and never reaches a `read` call, and a checked exception here would also
-have to propagate through every functional interface this reader composes through (`TsonParserFactory`,
-`CompilationContext`, `DataNameBinder`). A second parameter, `TsonContext ctx`, for whatever
-per-read state a future need might carry (error-path tracking, a depth guard, multi-problem
-accumulation) was considered and deliberately not added -- there's no concrete consumer yet to
-design its shape against (validation mode itself isn't built), so adding it now would be guessing;
-the marginal cost of adding it later, once a real need exists, is the same as adding it now, so
-there's no cost being deferred here, only a decision.
+**`ErrorReader`** (package-private) is what makes eager building survive real coverage gaps without
+weakening that guarantee: `Compilation#resolve` catches *any* `RuntimeException` thrown while
+`build`ing one specific entry and substitutes an `ErrorReader` wrapping it, rather than letting one
+bad entry abort the whole eager walk. The schema as a whole still compiles in full; only actually
+`read`ing a value against that specific entry fails, and only then, with the original exception's
+message preserved (a deferral, not a swallow). Real causes seen against real fixtures: no
+`ValueReaderFactory` registered for a constructor at all (`ValueReaderFactoryRegistry#resolve`
+throwing -- e.g. core.tn1's own `cidr4`/`email`/`ipv4`/... atom families, which have no compiled
+parser yet), and a factory that *is* registered still rejecting one particular entry (e.g.
+`RecordBindReader.Factory` on a record that has both real fields of its own and subtypes -- see
+"Object-binding mode" below). A missing/absent *referenced* name (`build`'s own target not present
+in `schema.entries()` at all) is a different, stricter case -- a genuine `TsonSchemaLinker` invariant
+violation, not "this build doesn't support constructor X yet" -- and still propagates immediately,
+uncaught, not deferred into an `ErrorReader`. **The catch was briefly narrowed, mid-refactor, to two
+hardcoded entry names (`atom_specification`/`type_argument`) while debugging the object-binding
+rewrite below -- restored to the general catch-all on the user's own direction once it became clear
+that was the right design all along, not a workaround** (confirmed: restoring it took the failing
+suite straight to 1130/1130, since every other entry it was catching was *supposed* to defer, not
+abort).
 
-**All the actual compile-time work — the eager walk, cycle detection, per-entry build-failure
-deferral — lives in `TsonSchemaCompiler`, not `TsonCompiledSchema` (moved 2026-07-27, on the user's
-own explicit direction: "the compile step still lives in TsonCompiledSchema.. move the compiler
-code into TsonSchemaCompiler").** `TsonCompiledSchema` is now a plain, already-built value: two
-final fields (`schema`, an immutable `Map<String, TsonValueReader<?>>`), no build logic, no
-`finished`/`building` bookkeeping at all — matching the same verb/noun split this project's own
-pipeline vocabulary already uses everywhere else (`TsonSchemaLinker`/`TsonLinkedSchema`,
-`TsonSchemaResolver`/its own resolved `TsonSchema`). The actual recursion (`resolve`/`build`, cycle
-detection via a `building` name-set, the try/catch around `build` that substitutes an `ErrorParser`)
-now lives in a private nested `TsonSchemaCompiler.Compilation` helper — one instance per `compile`
-call, holding that call's own mutable state, discarded once `compile` returns and hands back an
-immutable snapshot.
+**`ValueReaderFactory`/`ValueReaderFactoryResolver`/`ValueReaderResolver`** are the three small
+interfaces the dispatch runs through: `ValueReaderFactory.create(name, typeDefinition, resolver)`
+builds one entry's own reader; `ValueReaderFactoryResolver.resolve(constructorName)` finds the
+factory for a constructor name; `ValueReaderResolver.resolve(typeName)` is what a composite reader's
+own child-field resolution calls (`RecordAbstractReader.buildFields`, `ArrayAbstractReader`'s own
+element-reader resolution, ...) -- in practice always `Compilation::resolve` itself, so a child
+reference recurses back into the same eager, cycle-safe machinery.
 
-**`TsonParserFactory.create` takes `typeName` as its own first argument now, and
-`TsonParserFactoryRegistry` implements `TsonParserFactory` itself** (both 2026-07-27, on the user's
-own explicit direction: "modify the TsonParserFactory to include typename and pass in the
-implementation which does the lookup... get a proper single method call out from the compiler").
-Previously `Compilation#build` did two steps — `registry.require(typenameOf(body))` to find the
-right factory, then `factory.create(name, definition, ctx)` to run it — which meant `Compilation`
-had to reference `TsonParserFactoryRegistry` as a concrete type just to make that lookup call. Now
-it's one call: `factory.create(TsonParserFactoryRegistry.typenameOf(body), name, definition,
-this::resolve)`. `TsonParserFactoryRegistry#create` does exactly what that two-step call used to do
-by hand — `require(typeName).create(typeName, name, definition, ctx)` — so `Compilation`'s own
-`factory` field is typed `TsonParserFactory`, not `TsonParserFactoryRegistry`: it can hold a full
-registry (the common case) or any narrower single-shape implementation (useful for a test that only
-wants to compile against one constructor) with no code difference at the call site. Every
-individual leaf factory (`RecordParser.FACTORY`, `ArrayParser.FACTORY`, every constant on
-`AtomTypeParser`, ...) picked up the same new leading parameter too, unused in every one of them —
-spelled `_` (Java's unnamed-variable syntax, finalized since JDK 22) rather than a name nothing
-reads, to make "yes this exists in the signature, no this implementation cares" visually obvious at
-each of the ~17 call sites.
+**`ValueReaderFactoryRegistry`** (`.dom()`/`.bind(DataBindContext)`) is a *fixed*, non-extensible
+`constructor name -> ValueReaderFactory` table -- unlike an earlier, buildable registry design, there's
+no `.builder()`/`.register(name, factory)` API; `dom()` and `bind(context)` are the two instances a
+caller actually wants, each wiring the same closed vocabulary of meta-kernel/meta.tn1 constructors to
+either DOM-mode or object-binding-mode factories (see "Object-binding mode" below for exactly which
+constructors differ per mode, and which don't have a compiled parser at all yet, registered to
+`ErrorReader` so a schema merely *declaring* one still compiles).
 
-**Eager, not lazy (flipped 2026-07-27, on the user's own explicit direction).** An earlier version
-built nothing until `TsonCompiledSchema#get` first asked for a given name — the stated reason wasn't
-performance, it was registry coverage: a real schema like meta-kernel declares more constructors
-than any one `TsonParserFactoryRegistry` necessarily has factories for, so eagerly building
-everything seemed to demand a factory for all of them. The user pushed back directly: these are
-schemas with tens or hundreds of entries, not millions, so the performance argument doesn't hold —
-and building the graph upfront is exactly what lets every entry's buildability be validated at
-compile time, not discovered piecemeal whenever some future caller happens to `get` an entry nobody
-tried before. `TsonSchemaCompiler.compile` now walks every one of `schema.entries()` and calls
-`Compilation#resolve` for each before returning `TsonCompiledSchema` its already-finished result.
-
-**`ErrorParser`** (package-private) is what makes eager building survive the coverage gap that
-motivated staying lazy in the first place, without weakening the guarantee: `Compilation#resolve`
-catches any `RuntimeException` thrown while `build`ing one specific entry and substitutes an
-`ErrorParser` wrapping it, rather than letting one bad entry abort the whole eager walk. The schema
-as a whole still compiles in full; only actually `read`ing a value against that specific entry
-fails, and only then, with the original exception's message preserved (a deferral, not a swallow).
-Two real causes confirmed against real fixtures, not just imagined: no `TsonParserFactory`
-registered for a constructor at all (`TsonParserFactoryRegistry#require` throwing — e.g. core.tn1's
-own `cidr4`/`email`/... atom families, which have no `atom` parser yet), and — found
-empirically, once
-eager building actually ran against the real, registered meta-kernel/meta.tn1 fixtures in
-object-binding mode — a factory that *is* registered still rejecting one particular entry
-(`TsonObjectBinder` deliberately never binds meta-kernel's own non-record-bound marker
-entries like `top`/`atom`; building the ordinary `"record"` factory against those specific entries
-throws even though the same factory works fine for every genuinely record-shaped one). Both surface
-identically through `ErrorParser`. A missing/absent *referenced* name (`build`'s own target not
-present in `schema.entries()` at all) is a different, stricter case — a genuine `TsonSchemaLinker`
-invariant violation, not "this build doesn't support constructor X yet" — and still propagates
-immediately, uncaught, not deferred into an `ErrorParser`.
-
-**The `top`/`atom`/... case specifically is flagged by the user as needing its own review later** —
-`ErrorParser` deferring it is accepted as the right behavior for now (these five entries are
-meta-schema machinery real application data is never actually read as an instance of, so a caller
-in object-binding mode was never going to `get`/`read` them anyway), but *why* eager building reaches
-a factory built to reject them at all, rather than the two eager-validation mechanisms
-(`TsonObjectBinder#bind`'s own skip-list and this compiler's own eager walk) agreeing on
-which entries are exempt in the first place, hasn't been revisited — noted here so it isn't lost.
+**`TsonCompiledMetaSchema`** is both halves a `!!meta`-governed schema needs from its own governing
+meta: `reader(name)` reads an instance of one of the governing meta-schema's own declared
+constructors (scoped to exactly what that meta-schema declares -- the structure namespace's own
+rule, §3.3.1 -- built lazily on first call, not in the constructor, since a throwaway instance
+wrapping a not-yet-compiled placeholder is only ever consulted via `create`, never `reader`); `create
+(name, typeDefinition, resolver)` builds a compiled reader for some *other* schema's own declaration
+during `TsonSchemaCompiler#compile`, dispatched by the resolved body's own constructor name against
+the *full, global* `ValueReaderFactoryResolver` this meta-schema was built with -- deliberately not
+scoped to `reader`'s own narrower set, since a schema governed by this meta-schema is free to declare
+constructors the governing meta itself never mentions (meta.tn1, governed by meta-kernel, declares
+`float_type` -- one of meta-kernel's own 12 doesn't include it). `bootstrap(TsonLinkedSchema,
+ValueReaderFactoryResolver)` is the one deliberate circularity's own escape hatch (§1.5): a throwaway
+meta-schema wrapping an *empty* placeholder `TsonCompiledSchema` stands in as `TsonSchemaCompiler
+.compile`'s own required parameter while meta-kernel compiles against itself -- safe, since `create`
+never reads anything from the wrapped schema, only from `resolver`, the same `resolver` either way.
 
 ### Compiled schema registry (`tson-parser/src/main/java/io/ltr8/tson/parser/compiler/TsonCompiledRegistry.java`)
 
-Added 2026-07-25: pairs one-to-one with `TsonSchemaRegistry` (`tson-schema`) but stores *compiled*
-schemas (`TsonCompiledSchema`) instead of resolved ones — for every schema `TsonCompiledRegistry`
+Pairs one-to-one with `TsonSchemaRegistry` (`tson-schema`) but stores *compiled* meta-schemas
+(`TsonCompiledMetaSchema`) instead of resolved ones — for every schema `TsonCompiledRegistry`
 registers, it also compiles the registered result and keeps the compiled reader around, so a caller
 never recompiles the same governing chain twice. This is what an application actually wants at
-startup: register meta-kernel, compile+store it; register meta.tn1 (against meta-kernel), compile+
-store it; register core.tn1 (against meta.tn1), compile+store it — then any user-defined schema
-governed by one of these reuses whatever's already sitting in the registry.
+startup: bootstrap meta-kernel (`TsonCompiledMetaSchema#bootstrap`, outside this class entirely — it
+needs no registry at all), register it (against its own bootstrap result, since nothing governs
+meta-kernel but itself), then meta.tn1 (against meta-kernel's own freshly-registered compiled
+meta-schema), then core.tn1 (against meta.tn1's own) — each step's own return value is exactly what
+the next step needs as its own `governingMeta` argument. Any user-defined schema governed by one of
+these reuses whatever's already sitting in the registry rather than recompiling its own governing
+chain from scratch.
 
-- **`register(TsonSchema)`** — links {@code schema} via `TsonSchemaLinker.link` (using the paired
-  `TsonSchemaRegistry` itself as the `!!import`/`!!meta` lookup source), registers the linked result via
-  `TsonSchemaRegistry#register` (ordinary collision/reference-validation rules apply unchanged), compiles
-  the *registered* result (never the raw input — `TsonSchemaCompiler` needs linking already done),
-  stores it keyed by the schema's own raw `!!id` string, and returns the compiled reader directly (so
-  the very next schema in a bootstrap chain, which needs *this* return value as its own structure
-  namespace's compiled reader, doesn't have to immediately call `get` right back).
+- **`register(TsonSchema schema, TsonCompiledMetaSchema governingMeta)`** — links `schema` via
+  `TsonSchemaLinker.link` (using the paired `TsonSchemaRegistry` itself as the `!!import`/`!!meta`
+  lookup source), registers the linked result via `TsonSchemaRegistry#register` (ordinary
+  collision/reference-validation rules apply unchanged), compiles the *registered* result against
+  `governingMeta` (never the raw input — `TsonSchemaCompiler` needs linking already done, and needs
+  a real governing meta to dispatch constructor names against), wraps the result as this schema's
+  own `TsonCompiledMetaSchema`, stores it keyed by the schema's own raw `!!id` string, and returns
+  the wrapped result directly (so the very next schema in a governing chain, which needs *this*
+  return value as its own `governingMeta` argument, doesn't have to immediately call `get` right
+  back). `governingMeta` is always a previous call's own return value, except meta-kernel's own case
+  (see `TsonCompiledMetaSchema#bootstrap` above).
 - **Keyed by raw `!!id`, not a canonicalized identity** — deliberately. `CanonicalIdentity`
   (`tson-schema.registry`) is internal-by-convention to `TsonSchemaRegistry`/`TsonSchemaLinker` (confirmed via
   its own class Javadoc: "a caller outside this module should go through `TsonSchemaRegistry` instead of
@@ -1610,11 +1582,12 @@ governed by one of these reuses whatever's already sitting in the registry.
   they would through `TsonSchemaRegistry.get` — acceptable for the one real caller today (always
   registers and looks up using each schema's own exact `!!id` string), a real narrower guarantee,
   not an oversight.
-- **One shared `TsonParserFactoryRegistry` across every schema it compiles** — `TsonParserFactoryRegistry
-  .dom()` is the obvious default: every DOM-mode factory this build actually has (composite kinds +
-  every `AtomTypeParser` atom-family constant), factored out once it turned out to be
-  hand-duplicated, byte-for-byte identical, across several test classes — all of them now call
-  `TsonParserFactoryRegistry.dom()` directly instead of their own private `fullRegistry()` copy.
+- **One shared `ValueReaderFactoryResolver` across every schema it compiles** — `resolver()` exposes
+  it directly, e.g. so a caller can compile a one-off reader (such as meta-kernel's own bootstrap)
+  with the same factories, without registering or caching it here. `ValueReaderFactoryRegistry.dom()`/
+  `.bind(context)` are the two real instances a caller actually wants (see "Class 2 compilation"
+  above) — every DOM-mode or object-binding-mode test that needs a full factory table calls one of
+  these directly rather than hand-assembling its own.
 - **Verified against real fixtures, not hand-built ones** — `MetaTn1CompiledEndToEndTest` loads
   meta-kernel and meta.tn1 through a single `TsonCompiledRegistry`/`DefaultTsonCompiledSchemaLoader` pair
   and compiles/reads against the result; several other tests (`TsonSchemaResolverCompiledMetaSchemaTest`,
@@ -1625,15 +1598,14 @@ governed by one of these reuses whatever's already sitting in the registry.
 version of the register-meta-kernel/meta.tn1/core.tn1 sequence (and where it should live) is still
 open.
 
-**`TsonCompiledSchemaLoader`/`DefaultTsonCompiledSchemaLoader`** (`tson-parser/src/main/java/io/ltr8/tson/parser/resolver/{TsonCompiledSchemaLoader,DefaultTsonCompiledSchemaLoader,TsonSchemaSource}.java`,
-added 2026-07-25, replacing an earlier version of `TsonSchemaResolver`'s own constructor that took a bare
-`TsonCompiledRegistry` directly) — `TsonSchemaResolver` now holds a `TsonCompiledSchemaLoader`, not a registry.
-The reason a plain registry reference isn't enough: resolving *meta-kernel's own* document means
-resolving *its own* `!!meta`, which names itself (Part 2 §1.5's "one deliberate circularity"). A
-"look it up, throw if missing" registry has no way to close that loop on its own — it would need
-meta-kernel already registered before it could ever register meta-kernel. `TsonCompiledSchemaLoader.load
-(String uri)` is the fix: given any schema's URI, it returns a *compiled* reader, fetching/resolving/
-registering/compiling on demand rather than requiring everything to pre-exist.
+**`TsonCompiledSchemaLoader`/`DefaultTsonCompiledSchemaLoader`** (`tson-parser/src/main/java/io/ltr8/tson/parser/resolver/{TsonCompiledSchemaLoader,DefaultTsonCompiledSchemaLoader,TsonSchemaSource}.java`)
+— `TsonSchemaResolver` holds a `TsonCompiledSchemaLoader`, not a bare registry. The reason a plain
+registry reference isn't enough: resolving *meta-kernel's own* document means resolving *its own*
+`!!meta`, which names itself (Part 2 §1.5's "one deliberate circularity"). A "look it up, throw if
+missing" registry has no way to close that loop on its own — it would need meta-kernel already
+registered before it could ever register meta-kernel. `TsonCompiledSchemaLoader.load(String uri)` is
+the fix: given any schema's URI, it returns a *compiled meta-schema* (`TsonCompiledMetaSchema`),
+fetching/resolving/registering/compiling on demand rather than requiring everything to pre-exist.
 
 **Renamed from `SchemaCoordinator`/`DefaultSchemaCoordinator` (same-day follow-up, on the user's own
 explicit direction, after independently confirming the rename target from an earlier analysis:
@@ -1664,9 +1636,11 @@ sibling shape.
   keying) — a real, narrower guarantee, not an oversight. (3) otherwise, fetch `uri`'s own source
   text via this loader's own `TsonSchemaSource`, parse it, resolve it via a fresh
   `TsonSchemaResolver(this)` (so *that* document's own `!!meta`/`!!import` targets resolve the same way,
-  recursively, cache-then-bootstrap-then-fetch all the way down), then register and compile the
-  result — *this* result genuinely is cached (`TsonCompiledRegistry.register`), so the *next* request
-  for the same non-bootstrap `uri` is a cache hit.
+  recursively, cache-then-bootstrap-then-fetch all the way down), then look up its own already-cached
+  `governingMeta` (a second `load(document.meta())` call — a cache hit by this point, not a second
+  compile) and register+compile via `TsonCompiledRegistry.register(resolved, governingMeta)` —
+  *this* result genuinely is cached, so the *next* request for the same non-bootstrap `uri` is a
+  cache hit.
   **Case (2) is deliberately the one exception — never cached, on the user's own explicit direction**:
   the one-off linked-and-compiled meta-kernel reader is never passed to `TsonCompiledRegistry.register`
   — so every call for `META_KERNEL_ID` that isn't already a cache hit re-bootstraps, re-links, and
@@ -1696,7 +1670,7 @@ sibling shape.
   `TsonSchemaSource` (with whatever whitelist/blacklist policy) is deliberately not built yet.
 - **`TsonSchemaResolver(TsonCompiledSchemaLoader)`** replaces the earlier `TsonSchemaResolver(TsonCompiledRegistry)`
   constructor. `loader.load(document.meta())` (inlined directly into `resolveSchema`, not a separate
-  method) returns a plain `TsonCompiledSchema` (not an `Optional`) and *throws* if it can't be
+  method) returns a `TsonCompiledMetaSchema` (not an `Optional`) and *throws* if it can't be
   resolved — with a real loader behind it, "not available" is a genuine, nameable failure (the
   loader is supposed to make it available, fetching/bootstrapping as needed), not a normal "maybe
   try again" outcome the way a bare registry miss used to be.
@@ -1753,18 +1727,16 @@ path (fetch → parse → resolve → register → compile). `TsonSchemaRegistry
 directly too (accepts a well-formed candidate silently; rejects no-scheme and carries-a-port cases).
 
 **A real, named layering exception, not an oversight.** Every other note about these two packages
-describes `compiler` sitting *on top of* `resolver`'s own resolution
-(`TsonCompiledSchema`'s own Javadoc: "sitting on top of `DefinitionResolver`'s own per-declaration
-resolution"). `TsonCompiledSchemaLoader`/`DefaultTsonCompiledSchemaLoader` (in `resolver`, alongside
-`TsonSchemaResolver`) reach the opposite direction, importing `TsonCompiledRegistry`/`TsonCompiledSchema`/
-`TsonSchemaCompiler`/`TsonParserFactoryRegistry` from `compiler` — the one place in
-`resolver` that does. Not a cycle (nothing in `compiler`'s own *main* code
-imports back from `resolver`), and both packages are in the same module regardless (no
-Gradle/JPMS boundary to violate), but a deliberate exception to the general framing, made because
-bootstrapping/fetching/compiling a governing schema is exactly the one place lower-layer resolution
-genuinely needs the higher layer's own compiled output, not just its resolved one. `TsonCompiledSchema`
-itself carries a `schema()` accessor for this (its own resolved `TsonSchema`) — mirroring
-`SchemaValidatingParser.schema()`'s own precedent.
+describes `compiler` sitting *on top of* `resolver`'s own resolution. `TsonCompiledSchemaLoader`/
+`DefaultTsonCompiledSchemaLoader` (in `resolver`, alongside `TsonSchemaResolver`) reach the opposite
+direction, importing `TsonCompiledRegistry`/`TsonCompiledSchema`/`TsonCompiledMetaSchema`/
+`TsonSchemaCompiler`/`ValueReaderFactoryRegistry` from `compiler` — the one place in `resolver` that
+does. Not a cycle (nothing in `compiler`'s own *main* code imports back from `resolver`), and both
+packages are in the same module regardless (no Gradle/JPMS boundary to violate), but a deliberate
+exception to the general framing, made because bootstrapping/fetching/compiling a governing schema
+is exactly the one place lower-layer resolution genuinely needs the higher layer's own compiled
+output, not just its resolved one. `TsonCompiledMetaSchema` itself carries a `schema()` accessor for
+this (its own resolved `TsonSchema`) — mirroring `TsonCompiledSchema.schema()`'s own precedent.
 
 ### Bundled schema documents (`tson-parser/src/main/java/io/ltr8/tson/parser/resolver/BundledSchemaSource.java`)
 
@@ -1782,23 +1754,22 @@ class is that source for all three well-known identities — nothing more. A cal
 own compiled reader now does:
 
 ```java
-TsonSchema metaKernel = MetaKernelBootstrapResolver.getMetaKernelSchema();
 TsonSchemaRegistry schemaRegistry = new TsonSchemaRegistry();
-TsonLinkedSchema linkedMetaKernel = TsonSchemaLinker.linkBootstrap(metaKernel);
-TsonParserFactoryRegistry factories = TsonObjectBinding.factoryRegistry(linkedMetaKernel.schema(), context);
-TsonCompiledRegistry registry = new TsonCompiledRegistry(schemaRegistry, factories);
+ValueReaderFactoryResolver resolver = ValueReaderFactoryRegistry.bind(SchemaMetaNameBinder.defaultContext());
+TsonCompiledRegistry registry = new TsonCompiledRegistry(schemaRegistry, resolver);
 DefaultTsonCompiledSchemaLoader loader = new DefaultTsonCompiledSchemaLoader(registry, BundledSchemaSource.INSTANCE);
 
-// meta.tn1's own !!import needs meta-kernel present in the *shared* registry first -- resolve it
-// ordinarily (not the raw/linked bootstrap form) and register that, per the loader's own note
-// above on why the one-off bootstrap case alone doesn't satisfy import merging.
+// meta.tn1's own !!import needs meta-kernel present in the *shared* registry first -- meta-kernel's
+// own bootstrap case (loader.load(META_KERNEL_ID)) is never cached in registry itself (see
+// DefaultTsonCompiledSchemaLoader's own Javadoc), so it needs registering separately, resolved
+// ordinarily against this same loader (whose own bootstrap branch supplies the structure namespace).
 SchemaDocument metaKernelDocument = new TsonSchemaParser(
         BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID)).parseSchemaDocument();
 TsonSchema resolvedMetaKernel = new TsonSchemaResolver(loader).resolveSchema(metaKernelDocument);
-registry.register(resolvedMetaKernel);
+registry.register(resolvedMetaKernel, loader.load(BundledSchemaSource.META_KERNEL_ID));
 
-TsonCompiledSchema meta = loader.load(BundledSchemaSource.META_TN1_ID);
-TsonCompiledSchema core = loader.load(BundledSchemaSource.CORE_TN1_ID); // needs meta.tn1 registered first, same reasoning
+TsonCompiledMetaSchema meta = loader.load(BundledSchemaSource.META_TN1_ID);
+TsonCompiledMetaSchema core = loader.load(BundledSchemaSource.CORE_TN1_ID); // needs meta.tn1 registered first, same reasoning
 ```
 
 **That `META_KERNEL_ID` entry in `RESOURCES` is still never actually reached through
@@ -1810,193 +1781,160 @@ here anyway so this class is a complete, uniform "fetch any of this library's ow
 documents" utility on its own terms, and safe for any *other* `TsonCompiledSchemaLoader` implementation that
 doesn't special-case meta-kernel the way `DefaultTsonCompiledSchemaLoader` does.
 
-### Object-binding mode (`compiler/RecordParser.java` + `parser/binder/{TsonObjectBinding,TsonObjectBinder,TsonBoundSchema,ObjectRecordShapeFactory,SchemaMetaNameBinder}.java` + `tson-bind`'s own `DataNameBinder`)
+### Object-binding mode (`compiler/{RecordBindReader,ArrayBindReader,MapBindReader,TupleBindReader,VariantBindReader,VariantSchemaReader,SchemaMetaNameBinder}.java` + `tson-bind`'s own `DataNameBinder`/`DataParameterizedType`)
 
-Added 2026-07-25: a second output mode for the compiled reader, alongside DOM mode's plain
-`Map<String, Object>` — `RecordParser` can now instead produce a real, bound `schema.meta` Java
-object (a real `IntegerType`, not a map of its field names). This is exactly what let
-`TsonSchemaResolver.bindAtomInstance` swap onto the compiled reader shortly afterward (2026-07-26 —
-"Schema resolution" above), retiring the `TsonMapperReader.toObject(normalized, Top.class)` path it
-used to bind through.
+A second output mode for the compiled reader, alongside DOM mode's plain `Map<String, Object>` --
+`RecordBindReader` produces a real, bound `schema.meta` Java object (a real `IntegerType`, not a map
+of its field names). This is what `TsonSchemaResolver.bindAtomInstance` binds through (see "Schema
+resolution" above), and what every real meta-kernel/meta.tn1/core.tn1 self-compilation exercise
+described below and in "Meta-kernel bootstrap" ultimately depends on.
 
-**Moved into its own `io.ltr8.tson.parser.binder` package (2026-07-26, on the user's own explicit
-direction — "`TsonSchemaResolver` and `TsonSchemaCompiler` aren't anywhere near as clean [as
-`TsonSchemaLinker`/`TsonSchemaRegistry`/`TsonDataParser`/`TsonSchemaParser`]... move out the
-`TsonTypeNameBinder` code and anything related to binding to java classes").** `TsonTypeNameBinder`,
-`SchemaMetaTypeNameBinder`, and `ObjectRecordShapeFactory` all moved verbatim (package declaration
-only) from `compiler` into the new package; the registry-assembly logic that used to
-live as `TsonParserFactoryRegistry.object(TsonSchema, DataBindContext[, TsonTypeNameBinder])` moved
-too, as a new standalone class, `TsonObjectBinding.factoryRegistry(...)` — not just the three binder
-classes, so the dependency between the two packages is genuinely **one-way**:
-`io.ltr8.tson.parser.binder` depends on `compiler` (for `TsonParserFactoryRegistry`,
-`RecordParser.factory`, `AtomTypeParser.ENUM_OBJECT_MODE`), but `compiler` has zero
-awareness of, or dependency on, `io.ltr8.tson.parser.binder` — the actual compiler-facing package
-never needs to know Java-object-binding exists at all, mirroring the reasoning that keeps `tson-bind`
-itself a leaf module (DOM mode never touches `DataClassRecord` reflection, so nothing about
-compiling a schema should require it either).
+**Lives directly in `compiler`, symmetric with DOM mode, not in a separate package (2026-07-28, once
+the whole `compiler` package was rewritten from its earlier `RecordParser`/`ArrayParser`/.../
+`TsonParserFactoryRegistry` shape).** The earlier design (a standalone `io.ltr8.tson.parser.binder`
+package holding `TsonObjectBinding`/`TsonObjectBinder`/`TsonBoundSchema`/`ObjectRecordShapeFactory`,
+depending one-way on `compiler`) was deleted outright, not migrated -- every `*Parser` class it
+depended on (`RecordParser`, `AtomTypeParser`, `TsonParserFactoryRegistry`, ...) was itself replaced.
+Each structural kind now splits into a shared `*AbstractReader` base (`RecordAbstractReader`,
+`ArrayAbstractReader`, `MapAbstractReader`, `TupleAbstractReader` -- the compiled-field list, absent/
+default handling, unwrapping the incoming `DataValue`) plus two concrete subclasses, `*DomReader`
+(plain `Map`/`List`) and `*BindReader` (real bound Java objects) -- the DOM/bind split that used to
+live *between* two separate packages (`compiler` vs `binder`) now lives *within* each reader family
+instead, as sibling classes sharing one base. `ValueReaderFactoryRegistry.dom()`/`.bind(DataBindContext)`
+build the two complete factory tables (see "Class 2 compilation" above); only the `record`/`enum`
+constructor slots (and, transitively, whatever a record's own array/map/tuple-typed fields resolve
+to) actually differ per mode -- every atom-family factory is shared verbatim between both.
 
-**Cost of the one-way split: `RecordParser` and `AtomTypeParser` (plus two of their members) had to
-widen from package-private to `public`.** A real, non-obvious Java rule surfaced doing this: a
-`public` nested interface of a *non-public* outer class still isn't accessible from another
-package — the outer class itself has to be resolvable first. `RecordParser.RecordShapeFactory`/
-`RecordShape`/`RecordBuilder` were already `public interface`, but `RecordParser` itself was
-package-private `final class RecordParser<R>`, so none of it was actually reachable from
-`io.ltr8.tson.parser.binder` until `RecordParser` (class) and `RecordParser.factory(...)` (the one
-static method `ObjectRecordShapeFactory` needs to plug into) were both widened to `public` —
-likewise `AtomTypeParser` (class) and `AtomTypeParser.ENUM_OBJECT_MODE` (the one constant
-`TsonObjectBinding` needs). Both classes' Javadoc now says outright why they're `public` despite
-being otherwise pure internal machinery: "the only implementation/consumer outside this package is
-object-binding mode's own class, in `io.ltr8.tson.parser.binder`."
+**`SchemaMetaNameBinder`** (moved into `compiler` directly, no longer implementing an interface of
+its own) is the schema-type-name → Java-`Class` binding object-binding mode needs, backed by
+`tson-bind`'s own `io.ltr8.bind.DataNameBinder` (`resolve(String) -> Class<?>`, throwing
+`DataBindException`). **Deliberately a plain name → `Class.forName` lookup with a caller-supplied
+naming convention, not a scan of `Top`'s own sealed union** -- there is no reflection API to
+enumerate "every class in a package," and a union-scan approach is a real, discovered dead end: it
+made `integer_type` itself uncompilable in object mode at all (its own `size: integer_size?` field
+eagerly resolves `integer_size` at compile time regardless of whether any given value populates
+`size`, and `IntegerSize` was never a `Top` member) -- a plain name lookup has no such restriction,
+since it resolves by name, not by hierarchy membership. Its own convention: fixed namespace
+`io.ltr8.tson.schema.meta`, a snake_case-to-PascalCase mangle, with one confirmed alias table
+(`record`/`array`/`map`/`tuple`/`choice`/`enum` → their own `*Body` class, since meta-kernel's own
+description of a composite constructor's shape is structurally identical to the class representing a
+*bound instance* of that constructor, but that class's own `@Typename` is the bare name, not
+`_body`-suffixed; `set`/`array_min`/`array_max`/`array_ranged`/`vector` → `ArrayBody`, since
+refinement never adds or removes fields, so their own field set is identical to `array`'s).
+`SchemaMetaNameBinder.defaultContext()` is the one place this actually gets wired into a real
+`DataBindContext` -- `TsonAtomContext.registerDefaults` (the same built-in-vocabulary atom
+registrations `TsonMapperContext.defaultContext()` also applies -- `UUID`/`byte[]`/`LocalDate`/
+`OffsetTime`/`OffsetDateTime`/`URI`/`Inet4Address`/`Inet6Address`) applied to
+`DataBindContext.builder().nameBinder(SchemaMetaNameBinder.INSTANCE).build()`.
 
-**`TsonObjectBinder`, a new class, took over the eager whole-schema walk from `ObjectRecordShapeFactory.validate`
-(2026-07-27, on the user's own explicit direction: "I think this belongs in a TsonBinder class with
-the method called .bind instead").** Same verb/noun split this project's own pipeline vocabulary
-already uses elsewhere (`TsonSchemaCompiler`/`TsonCompiledSchema`) — `TsonObjectBinder.bind(TsonSchema,
-DataBindContext, TsonTypeNameBinder)` is the verb (a static method on a private-constructor utility
-class, walking every `record`-shaped entry and resolving+validating a `DataClassRecord` for each,
-exactly as `validate` used to), returning a plain, immutable `Map<String, DataClassRecord>` — the
-noun. `ObjectRecordShapeFactory` shrank to a pure `RecordShapeFactory<Object>` adapter holding
-nothing but that already-bound map; it no longer takes a `DataBindContext`/`TsonTypeNameBinder` at
-all, only the finished result. `TsonObjectBinding.factoryRegistry` calls `TsonObjectBinder.bind` first,
-then constructs the factory from its return value. Named `TsonObjectBinder`, not the bare `TsonBinder`
-first proposed, to disambiguate from `TsonTypeNameBinder` (a single name→`Class` lookup) already in the
-same package and to signal it's object-binding-mode-specific, not a general schema-pipeline stage.
+**`RecordBindReader`** -- built once `super(name, body, resolver)` (`RecordAbstractReader`'s own
+constructor) resolves each field's schema-driven child reader by name, `RecordBindReader`'s own
+constructor looks up each field's real `DataClassField` from `descriptor.fields()` (`descriptor`
+itself resolved by `RecordBindReader.Factory` via `context.getDescriptor(name)`), narrows every
+precomputed default/fixed value to that field's target type, and -- **new, 2026-07-28** -- rebuilds
+any field whose target `DataClassField.dataClass()` is itself a `DataClassArray`/`DataClassMap`
+against that real target directly (`rebindContainerIfNeeded`), discarding whatever the schema-driven
+first pass built for that field. This closes a real gap: a *synthesized*, materialized array/map
+entry (e.g. `enum`'s own `members: set<token>` field, materialized by `TsonSchemaLinker` into a
+hash-suffixed name like `set_token_9a29ae06`) has no Java class registered under that name and never
+will, since nothing legitimately names a schema-internal linking artifact -- `ArrayBindReader.Factory`/
+`MapBindReader.Factory` resolving a class purely by the *child entry's own* name can never work for
+it. The consuming *field* always knows its own real target type independently, though (reflection on
+the record's own real generic field type, e.g. `List<String>`, already resolved a genuine
+`DataClassArray` when `descriptor` itself was built) -- so `RecordBindReader` rebuilds the array/map
+reader using that, reusing the schema-driven build's own `ArrayBody`/`MapBody`/element-reader (`body`/
+`elementParser`, read directly off the discarded reader -- package-private fields, same package) and
+swapping in only the target Java container type. Only `Array`/`Map` are covered this way today --
+`TupleBindReader` has no equivalent rebind, and no equivalent problem yet either, since no real
+fixture materializes a synthesized tuple.
 
-**The name→`Class` lookup itself moved down into `tson-bind` as `DataNameBinder`, and `TsonTypeNameBinder`/
-`SchemaMetaTypeNameBinder` were deleted outright (2026-07-27, same day, on the user's own explicit
-direction, following their own sketch: "Added DataNameBinder with a default strategy using aliases
-and packages. Added them to the DataBindContext in it's builder. The user api is now another
-overload of getDescription(schemaTypeName)").** `io.ltr8.bind.DataNameBinder` (`resolve(String) ->
-Class<?>`, throwing `DataBindException` — `tson-bind`'s own exception, not `ClassNotFoundException`)
-is now a genuinely `tson-bind`-owned concept, not a `tson-parser`-specific one — matching the
-`litterat-core DefaultNameBinder` precedent the deleted `TsonTypeNameBinder`'s own Javadoc already
-cited, and letting a `DataBindContext` compose it directly: `DataBindContext.Builder#nameBinder`
-(or the `nameBinderPackages`/`nameBinderAliases` convenience pair, backing
-`DataNameBinder.DefaultDataNameBinder` when no explicit binder is supplied) fixes a context's own
-naming policy at construction, and the new `DataBindContext.getDescriptor(String)` composes
-`nameBinder.resolve(name)` with the ordinary `getDescriptor(Class)` into one call. `TsonObjectBinder
-.bind` narrowed from three parameters to two (`bind(TsonLinkedSchema, DataBindContext)`) — it calls
-`context.getDescriptor(name)` directly and does no name resolution of its own; a context handed to
-it must already carry the right `DataNameBinder`, since one can only be attached at a
-`DataBindContext`'s own construction, never retrofitted after the fact. **`SchemaMetaNameBinder`**
-(renamed from `SchemaMetaTypeNameBinder`, no longer implementing anything — `TsonTypeNameBinder`
-itself is gone) is now just a small holder for `io.ltr8.tson.schema.meta`'s own namespace/alias
-data, exposing a ready-built `DataNameBinder INSTANCE`. **`TsonObjectBinding.defaultContext()`**
-(new) is the one place that data actually gets wired into a real `DataBindContext` —
-`TsonAtomContext.registerDefaults` (the atom-registration block `TsonAtomContext.defaultContext()`
-already ran, now factored out so it can apply to an already-built, custom-configured context, not
-just a fresh unconfigured one) applied to `DataBindContext.builder().nameBinder(SchemaMetaNameBinder
-.INSTANCE).build()`. Every call site that used to build its context via plain
-`TsonAtomContext.defaultContext()` before handing it to `TsonObjectBinding.factoryRegistry` now uses
-`TsonObjectBinding.defaultContext()` instead — `TsonAtomContext.defaultContext()` itself is
-unchanged and stays `schema.meta`-agnostic, still the right choice for DOM mode/`mapper`, which have
-no use for a `DataNameBinder` at all.
+**`RecordBindReader.Factory` splits a subtypes-bearing record three ways, not two.** When
+`typeDefinition.subtypes()` is empty, `name` resolves as an ordinary record, no dispatch wrapper at
+all. When it's non-empty, what `name` itself resolves to decides the rest: a `DataClassUnion` is a
+pure marker root (`top`/`atom`/`product`/`sum` -- an empty record body with a huge subtype list,
+bound to a Java sealed interface with nothing instantiable of its own), where `ownParser` is a
+stand-in that unconditionally throws, since there's no real Java object "just `top`" could
+construct. A `DataClassRecord` instead means the declaration is directly instantiable *and* composed
+on top of -- `text_type` is the one real fixture case (`uri_type`/`regex_type`/`email_type` all
+compose on top of it, but `text_type` itself is a plain, real `TextType`) -- so `ownParser` is a real,
+reachable `RecordBindReader` for the declaration's own body. Either way, dispatch to a named subtype
+is bounded by the schema's own `subtypes()` list, not by any Java type, via `VariantSchemaReader`
+(renamed from `VariantDomReader` once its own dispatch logic -- schema-name-validated, never bounded
+by a Java union -- turned out to be exactly what both cases need, not just DOM mode's own
+"unconditionally, ownParser always reachable" one). An explicit `!uri_type {...}` value at a
+`text_type`-typed position now correctly dispatches to `uri_type`'s own compiled reader, producing a
+real `UriType`, not a `TextType` -- confirmed directly, not just reasoned about, by
+`RecordBindReaderTest.constructorFlaggedTypeWithRealSubtypesDispatchesToTheNamedSubtype` (a
+hand-built schema mirroring `text_type`/`email_type`'s real shape, since `uri_type`/`regex_type`
+themselves have a separate, pre-existing binding gap of their own -- their RFC-citation field is
+nested inside `specification: AtomSpecification` rather than flat, so it doesn't fill from a
+schema-composed default the way `email_type`'s own flat `spec` field does; unrelated to subtype
+dispatch itself, not fixed by this change).
 
-- **`RecordParser.RecordShape<R>`/`RecordParser.RecordBuilder<R>`/`RecordParser.RecordShapeFactory<R>`**
-  — public interfaces nested inside `RecordParser` itself, not standalone top-level types (nothing
-  outside this package's own object-binding mode implements or consumes them, so keeping them
-  physically inside the one class that defines their contract keeps the package easier to scan). A
-  two-level split, not a single per-read factory: `RecordShapeFactory.shapeFor(typeName, definition,
-  body)` runs *once per compiled type*, inside `RecordParser.factory`'s own `TsonParserFactory`
-  lambda, at the same point child fields are resolved via `ctx.resolve` — this is deliberately where
-  an object-binding mode's own expensive, per-type reflective cost (resolving a `DataClassRecord`
-  descriptor: constructor `MethodHandle` + field metadata) belongs, paid once, not once per read.
-  `RecordShape.begin()` is the cheap half, called fresh per `RecordParser.read()`, returning a
-  `RecordBuilder` that accumulates one record's own field values (`field(name, value)`) and
-  finalizes them (`build()`) — DOM mode's own `DomRecordShapeFactory`/`DomRecordBuilder` (private,
-  also nested in `RecordParser`) is a trivial `LinkedHashMap` wrapper, byte-for-byte the same
-  behavior the class had before this split. `RecordParser` itself is now generic (`RecordParser<R>`)
-  — its field-iteration/
-  absence/defaulting logic (`fieldValuesByName`/`isAbsent`/`defaultOrRequire`/`readSchemaDefault`)
-  is completely unchanged, since none of it ever constructed the result directly; only the last
-  step of `read()` changed, from inline `Map` mutation to `shape.begin()`/`builder.field(...)`/
-  `builder.build()`. `RecordParser.FACTORY` (the DOM-mode constant 10+ test classes reference
-  directly, including by identity) is preserved as `factory(DomRecordShapeFactory.INSTANCE)`.
-- **`DataNameBinder`/`SchemaMetaNameBinder`** — the schema-type-name → Java-`Class` binding
-  this needed. **Not** a scan of `Top`'s own sealed
-  union (an earlier version of this file did exactly that, keyed off `@Typename`/`DataClassUnion
-  .memberTypes()`) — corrected on the user's own direct guidance, pointing at a sibling project's
-  own `litterat-core`, `DefaultNameBinder`: there is no reflection API to enumerate "every class in
-  a package," so the only real mechanism is a name → `Class.forName` lookup with a caller-supplied
-  naming convention, the same shape `DefaultNameBinder.resolve(TypeContext, Typename)` already
-  uses. The `Top`-union-scan version was a real, discovered dead end, not just a style
-  preference — it made `integer_type` itself uncompilable in object mode at all (its own `size:
-  integer_size?` field eagerly resolves `integer_size` at compile time regardless of whether any
-  given value populates `size`, and `IntegerSize` was never a `Top` member) — a plain name lookup
-  has no such restriction, since it resolves by name, not by hierarchy membership.
-  `SchemaMetaNameBinder`'s own convention: fixed namespace `io.ltr8.tson.schema.meta`, a
-  snake_case-to-PascalCase mangle, with one confirmed alias table (`record`/`array`/`map`/`tuple`/
-  `choice`/`enum` → their own `*Body` class, since meta-kernel's own description of a composite
-  constructor's shape is structurally identical to the class representing a *bound instance* of
-  that constructor, but that class's own `@Typename` is the bare name, not `_body`-suffixed;
-  `set`/`array_min`/`array_max`/`array_ranged` → `ArrayBody`, since refinement never adds or
-  removes fields, so their own field set is identical to `array`'s). Verified empirically against
-  the real, fully registered meta-kernel.tn1 fixture (not assumed): 0 genuine binding failures, 23
-  of 58 entries bind as real records, 5 (`atom`/`product`/`sum`/`top`/`type_argument`) resolve to a
-  real but deliberately non-record class (sealed marker interfaces) and are treated as "doesn't
-  apply," not a failure — see below.
-- **`TsonObjectBinder.bind(TsonLinkedSchema, DataBindContext)`** — binding happens *eagerly*,
-  walking every `record`-shaped entry in the whole schema and resolving a `DataClassRecord` for each
-  into the returned map, rather than lazily discovering a missing binding one entry at a time as
-  unrelated reads happen to reach them (per the user's own explicit direction: "That binding should
-  occur at schema load time so any errors can be reported"). A schema with a genuinely unresolvable
-  entry still *registers* fine (`TsonSchemaRegistry`/`TsonSchemaLinker` are unaffected) — it just can't
-  be *bound* for object-binding mode, and fails with every problem entry named at once. **An entry that
-  resolves to a real, existing class which isn't a record is silently skipped, not a failure** —
-  `atom`/`product`/`sum`/`top` (meta-kernel's own empty-bodied base-kind declarations) and
-  `type_argument` mangle to real `schema.meta` classes that are deliberately sealed marker
-  interfaces (`Top`'s own kind hierarchy; `TypeArgument`'s own mutual-recursion-trap workaround, see
-  its own Javadoc) — these are meta-schema machinery real application data is never actually read
-  as an instance of, so failing the whole schema's binding over them would be a false
-  positive — confirmed by actually running this against the real fixture and finding exactly
-  these 5, not by guessing them in advance.
-- **Narrowing** — the schema-driven child-parser recursion (`CompilationContext.resolve`) has no
-  knowledge of a target Java field's own declared width (e.g. `text_type`'s `min_length`/
-  `max_length` are the schema's own unconstrained `integer` atom, natural host type `BigInteger`,
-  but `TextType.minLength` is `Optional<Integer>`) — `ObjectRecordShapeFactory`'s own builder reuses
-  `io.ltr8.tson.parser.base.NumberNarrowing`, the same utility `atom`'s numeric family
-  and `io.ltr8.tson.parser.mapper`'s untyped-number binding already share for exactly this, rather
-  than a third copy.
-- **`TsonObjectBinding.factoryRegistry(TsonLinkedSchema, DataBindContext)`** (`io.ltr8.tson.parser.binder`,
-  not `compiler` — see above; `context` must already carry the right `DataNameBinder` — see
-  `TsonObjectBinding.defaultContext()` above) is the
-  object-binding-mode sibling to `TsonParserFactoryRegistry.dom()` — every other factory
-  (array/map/tuple/choice + every atom-family constant) is shared via `TsonParserFactoryRegistry`'s
-  own public `withoutRecordOrEnum()` (widened + renamed from a private `withoutRecord()` for exactly
-  this cross-package reuse — `"enum"` also differs between the two modes, not just `"record"`, so the
-  shared base excludes both), only `"record"`/`"enum"`'s own factories differ.
-- **`TsonAtomContext`** (new, `io.ltr8.tson.parser.base`) — `TsonMapperContext.defaultContext()`'s
-  own built-in-vocabulary atom registrations (`UUID`/`byte[]`/`LocalDate`/`OffsetTime`/
-  `OffsetDateTime`/`URI`/`Inet4Address`/`Inet6Address`), pulled out to a public class at this shared
-  layer once a third consumer (`TsonObjectBinder`, needing `DataBindContext.getDescriptor`
-  to succeed for e.g. `AtomSpecification.spec: URI`) needed the identical list from a package with
-  no dependency on `mapper`. `TsonMapperContext` now just delegates — same reasoning as
-  `NumberNarrowing`'s own "one place, not one per caller" precedent.
+**`ArrayBindReader.Factory`/`MapBindReader.Factory` always target `List`/`Map` (never a Java array
+or a more specific collection), but resolve the schema's own element/key/value type name to a real
+bound Java class where one exists** (`context.getDescriptor(schemaTypeName)`), falling back to
+`String` only when it doesn't (confirmed against the real fixture: `ipv4_type`'s own
+`[value]`-sugared field is the real case that hits the fallback -- `schema.meta` has no `Value`
+class). `token` is a known, accepted imprecision the *other* direction, found by probing it
+directly rather than assumed: it resolves without falling back, but to `schema.meta.Token` (the raw
+literal wrapper §5.2/§5.10 field modifiers use), not `String`, `token`'s own actual natural host
+type -- left as-is rather than special-cased, since (below) the declared element type here never
+affects what a real read decodes anyway. `DataParameterizedType` (moved into `tson-bind`, `io.ltr8
+.bind`, as a small, generic, reusable `ParameterizedType` builder -- `tson-bind`'s own array/map
+binders need a genuine `ParameterizedType` to recover an element/key/value type past erasure, and
+neither factory has a real generically-typed Java field to reflect one off of) is what builds the
+target `List<X>`/`Map<K, V>` by hand -- covered on its own terms in `tson-bind`'s
+`DataParameterizedTypeTest` (accessors, defensive-copy of `getActualTypeArguments()`, nesting,
+`equals`/`hashCode` including agreement with a genuine JDK-reflected `ParameterizedType`, and two
+`DataBindContext.getDescriptor` integration cases proving it actually drives `DataClassArray`/
+`DataClassMap`'s own element/key/value resolution, not just that it satisfies the interface). **Still
+a known, accepted fragility, not a full fix**: the
+declared element/key/value type built here -- real, `String` fallback, or `token`'s own mismatch --
+is never actually consulted by either reader's own `read()` (only `constructor()`/`iterator()`/
+`put()` are; decoded values come from the schema-level element/key/value reader independently), and
+`List.add(Object)`/`Map.put(Object,Object)` accept any value at runtime regardless of declared
+generics (type erasure) -- so correctness today quietly depends on `tson-bind` never adding runtime
+type-checking against a `DataClassArray`/`DataClassMap`'s own declared element type. A caller reading
+through a record field is unaffected by any of this either way, real or synthesized element type,
+since `RecordBindReader`'s own rebind step (above) discards this build entirely and rebuilds against
+that field's own real target. A more complete fix would mean `RecordBindReader`'s rebind step
+becoming the *only* path that ever builds a genuine array/map reader in bind mode -- a bigger change
+than this pass attempts, left as an open direction.
 
-Verified in `ObjectRecordShapeFactoryTest` against the real, registered meta-kernel.tn1 fixture:
-`text_type` narrows a real `BigInteger` down to `Integer` with a genuine `equals()` match;
-`integer_type` itself now compiles (previously impossible under the `Top`-union design) and reads
-correctly with `size` left absent in the data (`IntegerSize.signed` is deliberately left
-unexercised there rather than proven either way — it's a primitive `boolean` field on a plain
-`record`-shaped entry, narrowed through `ObjectRecordShapeFactory`'s own generic, reflective binding
-path, a different mechanism than `BooleanParser`'s own name-keyed `"boolean"` dispatch below it; a
-separate, narrower, still-open question from this test's own actual scope, not a regression here).
-`TsonObjectBinder.bind`'s own eager, whole-schema behavior has its own dedicated coverage in
-`TsonObjectBinderTest`: the whole real schema binds with zero problems; a `DataBindContext` built with a
-custom, always-failing `DataNameBinder` proves `bind`'s own multi-problem report names more than one offending entry at
-once, not just the first; and the returned map genuinely omits the 5 real, non-record-bound marker
-entries (`atom`/`top`/...) rather than including a null or placeholder for them. `RecordParser.FACTORY`'s
-own identity and DOM-mode output are confirmed byte-for-byte unchanged by the whole existing suite.
-
-**`AtomTypeParser.ENUM_OBJECT_MODE`/`BooleanParser`** — object mode's own `"enum"` factory
+**`AtomValueReader.ENUM_OBJECT_MODE`/`BooleanReader`** -- object mode's own `"enum"` factory
 dispatches name-keyed, not shape-keyed: every enum instance *except* the schema's own `boolean`
 entry (`product_access_type`, `field_state`, `binary_encoding`, ...) reads its member token's own
-text as a plain `String` via the ordinary `atom.EnumParser` (through `AtomTypeParser
-.ENUM`) — exactly right for an arbitrary, user-defined enum label. `boolean` specifically
-(`boolean => !enum [true false]`) routes to `BooleanParser` instead, producing a real Java
-`Boolean` — its two members are meant to *be* the two Java boolean values, not the strings
-`"true"`/`"false"`. DOM mode is deliberately untouched (`AtomTypeParser.ENUM` keeps producing
-`String` for `boolean` there too, matching already-established, already-tested behavior).
+text as a plain `String` via the ordinary `atom.EnumParser` (through `AtomValueReader.ENUM`) --
+exactly right for an arbitrary, user-defined enum label. `boolean` specifically (`boolean => !enum
+[true false]`) routes to `BooleanReader` instead, producing a real Java `Boolean` -- its two members
+are meant to *be* the two Java boolean values, not the strings `"true"`/`"false"`. DOM mode is
+deliberately untouched (`AtomValueReader.ENUM` keeps producing `String` for `boolean` there too).
+
+**No standalone "eagerly report every unresolvable entry at once" step exists anymore.** The earlier
+design's `TsonObjectBinder.bind` walked every `record`-shaped entry as its own dedicated pre-pass,
+batching every binding failure into one report before compilation ever started. That's gone --
+binding now happens as a side effect of `TsonSchemaCompiler.compile`'s own eager per-entry walk (via
+`RecordBindReader.Factory.create`), and each entry's own build failure is individually caught and
+deferred into an `ErrorReader` (see "Class 2 compilation" above) rather than batched with any
+sibling failures or surfaced at schema-load time. A caller wanting "does the whole schema bind
+cleanly, and what breaks if not" now has to walk `compiled.get(name)` for every entry name itself
+(never throws) and separately try reading each one to find out.
+
+Verified in `RecordBindReaderTest` against a mix of the real meta-kernel fixture and small,
+self-contained schemas built to isolate one behavior at a time (the narrowing test specifically uses
+a hand-built, subtype-free schema, to isolate that behavior from the subtype-dispatch one below):
+`text_type` narrows a real `BigInteger` down to `Integer` with a genuine `equals()` match;
+`integer_type` itself compiles and reads correctly with `size` left absent in the data
+(`IntegerSize.signed` is deliberately left unexercised there rather than proven either way -- a
+primitive `boolean` field narrowed through the same generic, reflective binding path, a separate,
+still-open question from this test's own actual scope); a hand-built schema mirroring `text_type`/
+`email_type`'s real shape proves the own-body path still reads a plain own-type value correctly *and*
+an explicit subtype type-ref now dispatches to the named subtype's own real class, not the parent's;
+the whole real meta-kernel schema compiles cleanly in bind mode, including the five pure marker roots
+(`atom`/`product`/`sum`/`top`/`type_argument`), which get a real compiled reader (via
+`VariantBindReader`, dispatching to a `DataClassUnion`) but throw if actually read without an
+explicit type-ref, since there's no Java object "just a top" could construct.
 
 ### Conformance suite integration (`ConformanceSuiteTest`)
 
@@ -2032,7 +1970,7 @@ No system Gradle — always use the wrapper:
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.MetaSchemaImportTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.compiler.MetaKernelEndToEndTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.compiler.MetaTn1CompiledEndToEndTest"
-./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.compiler.SchemaValidatingParserTest"
+./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.compiler.CompiledSchemaDomReadTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.resolver.TsonSchemaResolverCompiledMetaSchemaTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.mapper.TsonMapperReaderTest"
 ./gradlew :tson-parser:test --tests "io.ltr8.tson.parser.mapper.TsonMapperWriterTest"
@@ -2056,16 +1994,23 @@ No system Gradle — always use the wrapper:
   remains unresolved in `meta-kernel.tn1`/`meta.tn1`; core.tn1's own current end-to-end status isn't
   pinned down by any test right now (see "Schema resolution" above's status paragraph).
 - The schema-validating data parser (Class 2) — `io.ltr8.tson.parser.compiler`
-  (`TsonSchemaCompiler`/`TsonCompiledSchema`, `SchemaValidatingParser`, `TsonParserFactoryRegistry`,
-  `RecordParser`/`ArrayParser`/`MapParser`/`TupleParser`/`ChoiceParser`/`VariantParser`,
-  `AtomTypeParser` + the vocab-family parsers) — now has dedicated coverage above ("Compiled schema
-  registry", "Bundled schema documents", "Object-binding mode"). Known, still-open gaps within it:
-  no `!!schema`-header auto-selection (`SchemaValidatingParser`'s own Javadoc explains why,
-  deliberately deferred); eight core.tn1 atom entries (`complex`/`email`/`ipv4`/`ipv6`/`cidr4`/
-  `cidr6`/`mac`/`unknown`) have no compiled-parser factory at all yet, since their `schema.meta`
-  classes were added "record-only, deliberately with no atom parser"; a permanent
-  standard-library "load meta-kernel/meta.tn1/core.tn1 and register them" entry point doesn't exist
-  yet (see "Compiled schema registry" above); `REQUIRED_FIXED`/`OPTIONAL_FIXED` value validation,
+  (`TsonSchemaCompiler`/`TsonCompiledSchema`/`TsonCompiledMetaSchema`, `ValueReaderFactoryRegistry`,
+  `Record`/`Array`/`Map`/`Tuple{DomReader,BindReader}`, `VariantSchemaReader`/`VariantBindReader`,
+  `ChoiceReader`, `AtomValueReader` + the vocab-family parsers) — now has dedicated coverage above
+  ("Class 2 compilation", "Compiled schema registry", "Bundled schema documents", "Object-binding
+  mode"). Known, still-open gaps within it: no `!!schema`-header auto-selection (a caller must
+  already know which schema-known position it's reading against -- there's no single "read this
+  string, pick the right compiled reader automatically" entry point); six core.tn1 atom entries
+  (`extern`/`unknown`/`email`/`cidr4`/`cidr6`/`mac`) have no compiled-parser factory at all yet,
+  registered to `ErrorReader` so a schema declaring one still compiles (`complex`/`ipv4`/`ipv6` *do*
+  now have one, wired to the existing `atom.ComplexParser`/`Ipv4Parser`/`Ipv6Parser`); `uri_type`/
+  `regex_type` still don't bind correctly in object-binding mode (their own RFC-citation field is
+  nested inside `specification: AtomSpecification` rather than flat, so it never receives a
+  schema-composed default the way `email_type`'s own flat `spec` field does -- see "Object-binding
+  mode" above; subtype *dispatch* to them is fixed, this is a separate, narrower, still-open gap in
+  their own field binding); a permanent standard-library "load meta-kernel/meta.tn1/core.tn1 and
+  register them" entry point doesn't exist yet (see "Compiled schema registry" above);
+  `REQUIRED_FIXED`/`OPTIONAL_FIXED` value validation,
   `value_param` real parameter substitution, and thread-safety are all still deferred design
   questions; a general disk/HTTP-backed `TsonSchemaSource` (with whitelist/blacklist policy) is
   deliberately not built yet either (see "Bundled schema documents" above).

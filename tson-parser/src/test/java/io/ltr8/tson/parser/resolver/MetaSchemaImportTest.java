@@ -3,9 +3,9 @@ package io.ltr8.tson.parser.resolver;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.parser.TsonSchemaParser;
 import io.ltr8.tson.parser.ast.schema.SchemaDocument;
-import io.ltr8.tson.parser.binder.TsonObjectBinding;
-import io.ltr8.tson.parser.compiler.TsonParserFactoryRegistry;
+import io.ltr8.tson.parser.compiler.SchemaMetaNameBinder;
 import io.ltr8.tson.parser.compiler.TsonCompiledRegistry;
+import io.ltr8.tson.parser.compiler.ValueReaderFactoryRegistry;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
@@ -70,11 +70,8 @@ class MetaSchemaImportTest {
      * own pattern exactly.
      */
     private static TsonSchema parseMetaTn1(TsonSchemaRegistry registry) {
-        TsonSchema metaKernelBootstrap = MetaKernelBootstrapResolver.getMetaKernelSchema();
-        TsonLinkedSchema materializedMetaKernelBootstrap = TsonSchemaLinker.linkBootstrap(metaKernelBootstrap);
-
-        DataBindContext context = TsonObjectBinding.defaultContext();
-        TsonParserFactoryRegistry objectFactories = TsonObjectBinding.factoryRegistry(materializedMetaKernelBootstrap, context);
+        DataBindContext context = SchemaMetaNameBinder.defaultContext();
+        ValueReaderFactoryRegistry objectFactories = ValueReaderFactoryRegistry.bind(context);
         TsonCompiledRegistry compiledRegistry = new TsonCompiledRegistry(objectFactories);
         DefaultTsonCompiledSchemaLoader loader = new DefaultTsonCompiledSchemaLoader(compiledRegistry);
 
@@ -82,7 +79,10 @@ class MetaSchemaImportTest {
         SchemaDocument metaKernelDocument = new TsonSchemaParser(metaKernelSource).parseSchemaDocument();
         TsonSchema metaKernel = new TsonSchemaResolver(loader).resolveSchema(metaKernelDocument);
         TsonLinkedSchema metaKernelMaterialized = registry.register(TsonSchemaLinker.link(metaKernel, registry));
-        compiledRegistry.register(metaKernelMaterialized.schema());
+        // meta-kernel governs itself -- loader.load(META_KERNEL_ID) re-bootstraps a fresh
+        // TsonCompiledMetaSchema (never cached for that identity), exactly what register's own
+        // governingMeta argument needs here.
+        compiledRegistry.register(metaKernelMaterialized.schema(), loader.load(BundledSchemaSource.META_KERNEL_ID));
 
         String source = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_TN1_ID);
         SchemaDocument metaDocument = new TsonSchemaParser(source).parseSchemaDocument();

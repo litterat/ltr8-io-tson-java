@@ -2,7 +2,7 @@ package io.ltr8.tson.parser.resolver;
 
 import io.ltr8.tson.parser.ast.schema.SchemaDocument;
 import io.ltr8.tson.parser.ast.schema.SchemaMap;
-import io.ltr8.tson.parser.compiler.TsonCompiledSchema;
+import io.ltr8.tson.parser.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
@@ -105,10 +105,10 @@ public final class TsonSchemaResolver {
             TsonSchemaRegistry.validateIdentity(importUri);
         }
 
-        TsonCompiledSchema metaParser = loader.load(document.meta());
+        TsonCompiledMetaSchema metaParser = loader.load(document.meta());
         Map<String, TypeDefinition> namespace = mergeImports(document);
         DefinitionResolver definitionResolver = new DefinitionResolver(
-                (type, value) -> (Top) metaParser.get(type).read(value), metaParser.schema().entries()::get, namespace::get);
+                (type, value) -> (Top) metaParser.reader(type).read(value), metaParser.schema().entries()::get, namespace::get);
 
         Map<String, TypeDefinition> localOnly = new LinkedHashMap<>();
         for (SchemaMap.Declaration declaration : document.body().declarations().values()) {

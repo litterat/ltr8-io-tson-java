@@ -282,12 +282,14 @@ final class DefinitionResolver {
      * with {@code value}. {@code C} resolves against the structure namespace only (see {@link
      * #resolveConstructorTarget}); the found entry MUST be a constructor ({@code constructor: true})
      * or this is a resolver error (the spec's own suggested diagnostic: "did you mean atom
-     * refinement?"). {@code value} is normalized to record form ({@link PositionalForm}, using
-     * {@code C}'s own resolved field list to find its positionally-fillable field, if any) and bound
-     * via {@link #bindAtomInstance} -- {@code instance.value().typeRef()} already names {@code C}
-     * (per {@code Instance}'s own reshape, {@code SPEC-FEEDBACK.md} #16). Construction transfers only
-     * {@code C}'s {@code kind} (§5.5): no supertypes, no parameters, {@code constructor: false} on
-     * the result.
+     * refinement?"). {@code value} is bound via {@link #bindAtomInstance} directly --
+     * {@code instance.value().typeRef()} already names {@code C} (per {@code Instance}'s own
+     * reshape, {@code SPEC-FEEDBACK.md} #16); positional form (§5.6) and schema-composed defaults
+     * (§5.2/§5.7) are handled uniformly by the compiled {@code Record*Reader} itself (see {@code
+     * RecordAbstractReader}'s own Javadoc), not by a separate normalization step here -- {@code C}'s
+     * own body is always record-shaped (checked below), so every real call reaches one. Construction
+     * transfers only {@code C}'s {@code kind} (§5.5): no supertypes, no parameters, {@code
+     * constructor: false} on the result.
      *
      * <p>Binds against {@link Top}, not the narrower {@code Atom} -- some constructors (e.g. {@code
      * unknown_type => ~sum & {}}) compose with {@code sum}, not {@code atom}. {@code C}'s own body
@@ -302,12 +304,11 @@ final class DefinitionResolver {
             throw new UnsupportedOperationException("'" + name + "': '!" + target + "' does not resolve to a "
                     + "constructor (§3.3.1) -- did you mean atom refinement ('!" + target + " ^ { ... }')?");
         }
-        if (!(constructor.body() instanceof RecordBody constructorFields)) {
+        if (!(constructor.body() instanceof RecordBody _)) {
             throw new UnsupportedOperationException("'" + name + "': constructor '" + target
                     + "' has a non-record body, not resolved yet");
         }
-        DataValue normalized = PositionalForm.normalizeToRecordForm(instance.value(), constructorFields);
-        Top body = bindAtomInstance(name, normalized);
+        Top body = bindAtomInstance(name, instance.value());
         return new TypeDefinition(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of(target)), constructor.kind(),
                 List.of(), false, List.of(), List.of(), Optional.empty(), body);
     }

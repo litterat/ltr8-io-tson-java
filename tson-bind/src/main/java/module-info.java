@@ -16,5 +16,5 @@ module io.ltr8.bind {
 	exports io.ltr8.bind.mapper;
     exports io.ltr8.bind.bridge;
 
-	requires io.ltr8.annotation;
+	requires transitive io.ltr8.annotation;
 }

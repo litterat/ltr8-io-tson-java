@@ -2,10 +2,7 @@ package io.ltr8.tson.parser.resolver;
 
 import io.ltr8.tson.parser.TsonSchemaParser;
 import io.ltr8.tson.parser.ast.schema.SchemaDocument;
-import io.ltr8.tson.parser.compiler.TsonCompiledRegistry;
-import io.ltr8.tson.parser.compiler.TsonCompiledSchema;
-import io.ltr8.tson.parser.compiler.TsonParserFactoryRegistry;
-import io.ltr8.tson.parser.compiler.TsonSchemaCompiler;
+import io.ltr8.tson.parser.compiler.*;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchemaLinker;
 import io.ltr8.tson.schema.TsonSchema;
@@ -36,11 +33,11 @@ import java.util.Optional;
  *   TsonSchemaLinker#linkBootstrap} -- no registry involved at all, just that one static call --
  *   purely so {@code TsonSchemaLinker}'s own materialization/validation pass runs (synthesizing
  *   entries for argument-bearing {@code type_ref}s, e.g. {@code enum}'s own {@code members:
- *   set<token>}) before compiling ({@code TsonSchemaCompiler.compile}, using this loader's own {@link
- *   TsonParserFactoryRegistry} so it reads the same way
- *   anything else compiled here would). The *linked* result is never passed to {@link
- *   TsonCompiledRegistry#register} -- so every call for {@link BundledSchemaSource#META_KERNEL_ID}
- *   that isn't already a cache hit re-bootstraps, re-links, and re-compiles from scratch, every time.
+ *   set<token>}) before compiling ({@link TsonCompiledMetaSchema#bootstrap}, using this loader's own
+ *   {@link TsonCompiledRegistry#resolver()} so it reads the same way anything else compiled here
+ *   would). The *linked* result is never passed to {@link TsonCompiledRegistry#register} -- so every
+ *   call for {@link BundledSchemaSource#META_KERNEL_ID} that isn't already a cache hit re-bootstraps,
+ *   re-links, and re-compiles from scratch, every time.
  *   The *permanent*, shared registry entry for meta-kernel comes from an explicit "load it and
  *   register it" step done once, elsewhere; until that step runs, this one-off bootstrap stands in
  *   for it, so nothing is ever left unable to resolve at all.
@@ -85,8 +82,8 @@ public final class DefaultTsonCompiledSchemaLoader implements TsonCompiledSchema
     }
 
     @Override
-    public TsonCompiledSchema load(String uri) {
-        Optional<TsonCompiledSchema> cached = registry.get(uri);
+    public TsonCompiledMetaSchema load(String uri) {
+        Optional<TsonCompiledMetaSchema> cached = registry.get(uri);
         if (cached.isPresent()) {
             return cached.get();
         }
@@ -99,12 +96,17 @@ public final class DefaultTsonCompiledSchemaLoader implements TsonCompiledSchema
             // re-bootstraps and re-links from scratch, every time -- only the *quality* of the
             // one-off result changes (58 entries, not 49), not its lifetime.
             TsonLinkedSchema linked = TsonSchemaLinker.linkBootstrap(metaKernel);
-            return TsonSchemaCompiler.compile(linked, registry.factories());
+            return TsonCompiledMetaSchema.bootstrap(linked, registry.resolver());
         }
         String sourceText = source.fetch(uri);
         SchemaDocument document = new TsonSchemaParser(sourceText).parseSchemaDocument();
         TsonSchemaResolver resolver = new TsonSchemaResolver(this);
         TsonSchema resolved = resolver.resolveSchema(document);
-        return registry.register(resolved);
+        // resolveSchema already called load(document.meta()) internally to build its own structure
+        // namespace, so this is a cache hit, not a second compile -- registry.register still needs
+        // the governing TsonCompiledMetaSchema itself as its own second argument, which resolveSchema
+        // has no way to hand back (it returns only the resolved TsonSchema).
+        TsonCompiledMetaSchema governingMeta = load(document.meta());
+        return registry.register(resolved, governingMeta);
     }
 }

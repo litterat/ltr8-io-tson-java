@@ -445,8 +445,9 @@ public final class TsonSchemaLinker {
      *
      * <p><b>Deliberately hand-written per target shape, not routed through generic {@code tson-bind}
      * binding</b> -- {@code tson-schema} has no dependency on {@code tson-parser} (where {@code
-     * DefinitionResolver}'s own {@code resolveInstance}/{@code PositionalForm} already do the general
-     * version of this for an explicit {@code !C value} instance), and every field a materializable
+     * DefinitionResolver}'s own {@code resolveInstance}, backed by the compiled {@code
+     * Record*Reader}, already does the general version of this for an explicit {@code !C value}
+     * instance), and every field a materializable
      * shape like {@link ArrayBody} needs is a plain {@code boolean}/{@code BigInteger}/{@code
      * TypeRef} -- not worth a new cross-module dependency to bind generically. {@code source} on the
      * result mirrors {@code resolveInstance}'s own convention exactly: the bare constructor name
@@ -509,9 +510,9 @@ public final class TsonSchemaLinker {
      * parameter routing, {@code value_param}) -- anything else (no routing, or a literal-value
      * argument where a type is expected) means this can't be built, {@code null} rather than a
      * wrong guess. {@code state}/{@code unordered}/{@code unique_items} take the vocabulary's own
-     * schema-composed default {@link RecordField#value} when present (mirroring, in miniature,
-     * {@code PositionalForm}'s own schema-composed defaulting one layer up in {@code tson-parser})
-     * -- this is exactly what makes {@code set}'s own tightened defaults (all three {@code
+     * schema-composed default {@link RecordField#value} when present (mirroring, in miniature, the
+     * compiled {@code Record*Reader}'s own schema-composed defaulting one layer up in {@code
+     * tson-parser}) -- this is exactly what makes {@code set}'s own tightened defaults (all three {@code
      * REQUIRED_FIXED}, unlike {@code array}'s own {@code REQUIRED_DEFAULT}/{@code
      * REQUIRED_DEFAULT}/{@code REQUIRED_DEFAULT}) come out correctly without this method needing to
      * know which constructor it's assembling for. {@code min_items}/{@code max_items} have no

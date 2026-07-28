@@ -1,37 +1,39 @@
 package io.ltr8.tson.parser.compiler;
 
 import io.ltr8.tson.schema.TsonLinkedSchema;
-import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaLinker;
+import io.ltr8.tson.schema.TsonSchemaRegistry;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 
 /**
- * A store of compiled schemas ({@link TsonCompiledSchema}), paired one-to-one with a {@link
- * TsonSchemaRegistry}'s own store of resolved, validated schemas -- the "also stored" half of the real
- * startup sequence: bootstrap meta-kernel, register it, *and* compile it and store the compiled
- * reader here, ready for reuse; then meta.tn1, then core.tn1, each the same way; then any
- * user-defined schema governed by one of them reuses whatever's already sitting in this registry
- * rather than recompiling its own governing chain from scratch.
+ * A store of compiled meta-schemas ({@link TsonCompiledMetaSchema}), paired one-to-one with a
+ * {@link TsonSchemaRegistry}'s own store of resolved, validated schemas -- this package's own
+ * rewrite of {@code compiler.TsonCompiledRegistry}, adapted to {@link TsonSchemaCompiler#compile}'s
+ * own {@link TsonCompiledMetaSchema}-based signature (the old class still compiles against a bare
+ * {@code TsonParserFactoryRegistry}, a shape that no longer exists anywhere in this package).
  *
- * <p><b>One {@link TsonParserFactoryRegistry}, shared across every schema this registry compiles.</b>
- * Every schema meta-kernel/meta.tn1/core.tn1 govern is built from the same closed vocabulary of
- * constructors, so there's no reason for a caller to assemble a fresh registry per schema -- {@link
- * TsonParserFactoryRegistry#dom} is the obvious default, but a caller compiling in a different mode
- * (once one exists, see {@code TsonParserFactoryRegistry}'s own Javadoc) supplies its own instead.
+ * <p>Startup sequence this exists for: bootstrap meta-kernel ({@link
+ * TsonCompiledMetaSchema#bootstrap}, outside this class entirely -- it needs no registry at all),
+ * {@link #register} it (against its own bootstrap result, since nothing governs meta-kernel but
+ * itself), then meta.tn1 (against meta-kernel's own freshly-registered {@link
+ * TsonCompiledMetaSchema}), then core.tn1 (against meta.tn1's own) -- each step's own return value
+ * is exactly what the next step needs as its {@code governingMeta} argument. Any user-defined schema
+ * governed by one of these reuses whatever's already sitting in {@link #get} rather than
+ * recompiling its own governing chain from scratch.
  *
- * <p><b>Keyed by each schema's own raw {@code !!id} string, not a canonicalized identity.</b>
- * {@code io.ltr8.tson.schema.registry.CanonicalIdentity} is internal-by-convention to {@code
- * TsonSchemaRegistry} itself (see that package's own Javadoc) -- reaching into it from here, a
- * different module, would be exactly the kind of cross-module layering violation this project
- * otherwise avoids. In practice this is a non-issue for the one real use today (this registry's own
- * caller always registers and looks up using the exact same {@code !!id} string each schema
- * publishes), but it does mean two differently-spelled-but-equivalent URIs for the same schema
- * won't find each other here the way they would through {@link TsonSchemaRegistry#get} -- a real,
- * documented, narrower guarantee than {@code TsonSchemaRegistry}'s own, not an oversight.
+ * <p><b>Keyed by each schema's own raw {@code !!id} string, not a canonicalized identity.</b> {@code
+ * io.ltr8.tson.schema.registry.CanonicalIdentity} is internal-by-convention to {@link
+ * TsonSchemaRegistry} itself -- reaching into it from here, a different module, would be exactly the
+ * kind of cross-module layering violation this project otherwise avoids. In practice this is a
+ * non-issue for the one real use today (this registry's own caller always registers and looks up
+ * using the exact same {@code !!id} string each schema publishes), but it does mean two differently-
+ * spelled-but-equivalent URIs for the same schema won't find each other here the way they would
+ * through {@link TsonSchemaRegistry#get} -- a real, documented, narrower guarantee, not an
+ * oversight.
  *
  * <p>Not thread-safe beyond {@code synchronized} on {@link #register}/{@link #get} themselves --
  * matches {@link TsonSchemaRegistry}'s own stated guarantee, no stronger.
@@ -39,18 +41,18 @@ import java.util.Optional;
 public final class TsonCompiledRegistry {
 
     private final TsonSchemaRegistry schemaRegistry;
-    private final TsonParserFactoryRegistry factories;
-    private final Map<String, TsonCompiledSchema> compiled = new LinkedHashMap<>();
+    private final ValueReaderFactoryResolver resolver;
+    private final Map<String, TsonCompiledMetaSchema> compiled = new LinkedHashMap<>();
 
     /** A fresh, empty {@link TsonSchemaRegistry} of its own -- the common case: this registry owns the whole registration+compilation pipeline for its caller. */
-    public TsonCompiledRegistry(TsonParserFactoryRegistry factories) {
-        this(new TsonSchemaRegistry(), factories);
+    public TsonCompiledRegistry(ValueReaderFactoryResolver resolver) {
+        this(new TsonSchemaRegistry(), resolver);
     }
 
     /** @param schemaRegistry an existing registry to compile *alongside* -- a caller that already registers schemas elsewhere and wants compiled readers for them too, without this registry re-registering anything itself. */
-    public TsonCompiledRegistry(TsonSchemaRegistry schemaRegistry, TsonParserFactoryRegistry factories) {
+    public TsonCompiledRegistry(TsonSchemaRegistry schemaRegistry, ValueReaderFactoryResolver resolver) {
         this.schemaRegistry = schemaRegistry;
-        this.factories = factories;
+        this.resolver = resolver;
     }
 
     /** The paired {@link TsonSchemaRegistry} -- a caller resolving a declaration against one of the schemas registered here (structure namespace, {@code !!import}, ...) reads its resolved entries from there, same as always; this registry only adds the compiled half. */
@@ -58,33 +60,38 @@ public final class TsonCompiledRegistry {
         return schemaRegistry;
     }
 
-    /** The {@link TsonParserFactoryRegistry} every schema here is compiled with -- e.g. so a caller (such as {@code DefaultTsonCompiledSchemaLoader}'s own meta-kernel bootstrap case) can compile a one-off reader with the same factories, without registering or caching it here. */
-    public TsonParserFactoryRegistry factories() {
-        return factories;
+    /** The {@link ValueReaderFactoryResolver} every schema here is compiled with -- e.g. so a caller can compile a one-off reader (such as meta-kernel's own bootstrap, via {@link TsonCompiledMetaSchema#bootstrap}) with the same factories, without registering or caching it here. */
+    public ValueReaderFactoryResolver resolver() {
+        return resolver;
     }
 
     /**
-     * Links {@code schema} (via {@link TsonSchemaLinker#link}, using the paired {@link #schemaRegistry}
-     * itself as the lookup source for {@code !!import}/{@code !!meta} targets) and registers the
-     * result (via {@link TsonSchemaRegistry#register}, so the usual `!!import`-merging/reference-
-     * validation rules all apply exactly as they would calling that directly), compiles the
-     * *registered* result (never the raw input -- a compiled reader needs linking already done, per
-     * {@link TsonCompiledSchema}'s own Javadoc), and stores it here keyed by {@code schema}'s own
-     * {@code !!id}. Returns the compiled reader, so a caller with no further need to look it up
-     * again later (e.g. the immediate next schema in a bootstrap chain, which needs *this* return
-     * value as its own structure namespace's compiled reader) doesn't have to call {@link #get}
-     * right back.
+     * Links {@code schema} (via {@link TsonSchemaLinker#link}, using the paired {@link
+     * #schemaRegistry} itself as the lookup source for {@code !!import}/{@code !!meta} targets) and
+     * registers the result (via {@link TsonSchemaRegistry#register}, so the usual {@code
+     * !!import}-merging/reference-validation rules all apply exactly as they would calling that
+     * directly), compiles the *registered* result against {@code governingMeta} (never the raw
+     * input -- a compiled reader needs linking already done), wraps the result as this schema's own
+     * {@link TsonCompiledMetaSchema}, and stores it keyed by {@code schema}'s own {@code !!id}.
+     * Returns the wrapped result, so the immediate next schema in a governing chain (which needs
+     * *this* return value as its own {@code governingMeta} argument) doesn't have to call {@link
+     * #get} right back.
+     *
+     * @param governingMeta the already-compiled meta-schema {@code schema.meta()} names -- meta-
+     *                       kernel's own case aside (see {@link TsonCompiledMetaSchema#bootstrap}),
+     *                       always a previous call's own return value
      */
-    public synchronized TsonCompiledSchema register(TsonSchema schema) {
+    public synchronized TsonCompiledMetaSchema register(TsonSchema schema, TsonCompiledMetaSchema governingMeta) {
         TsonLinkedSchema linked = TsonSchemaLinker.link(schema, schemaRegistry);
         TsonLinkedSchema registered = schemaRegistry.register(linked);
-        TsonCompiledSchema compiledParser = TsonSchemaCompiler.compile(registered, factories);
-        compiled.put(registered.schema().id(), compiledParser);
-        return compiledParser;
+        TsonCompiledSchema compiledSchema = TsonSchemaCompiler.compile(registered, governingMeta);
+        TsonCompiledMetaSchema compiledMeta = new TsonCompiledMetaSchema(compiledSchema, resolver);
+        compiled.put(registered.schema().id(), compiledMeta);
+        return compiledMeta;
     }
 
     /** {@code id} must be the exact raw {@code !!id} string {@code schema} was registered with (see this class's own Javadoc on why -- unlike {@link TsonSchemaRegistry#get}, this is not canonicalized). */
-    public synchronized Optional<TsonCompiledSchema> get(String id) {
+    public synchronized Optional<TsonCompiledMetaSchema> get(String id) {
         return Optional.ofNullable(compiled.get(id));
     }
 }

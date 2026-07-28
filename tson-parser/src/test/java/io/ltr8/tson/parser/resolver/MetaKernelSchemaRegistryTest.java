@@ -3,9 +3,9 @@ package io.ltr8.tson.parser.resolver;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.parser.TsonSchemaParser;
 import io.ltr8.tson.parser.ast.schema.SchemaDocument;
-import io.ltr8.tson.parser.binder.TsonObjectBinding;
-import io.ltr8.tson.parser.compiler.TsonParserFactoryRegistry;
+import io.ltr8.tson.parser.compiler.SchemaMetaNameBinder;
 import io.ltr8.tson.parser.compiler.TsonCompiledRegistry;
+import io.ltr8.tson.parser.compiler.ValueReaderFactoryRegistry;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
@@ -133,12 +133,10 @@ class MetaKernelSchemaRegistryTest {
      */
     @Test
     void registeringTheOrdinarilyResolvedNonBootstrapMetaKernelSucceeds() {
-        TsonSchema metaKernelBootstrap = MetaKernelBootstrapResolver.getMetaKernelSchema();
         TsonSchemaRegistry registry = new TsonSchemaRegistry();
-        TsonLinkedSchema linkedBootstrap = TsonSchemaLinker.linkBootstrap(metaKernelBootstrap);
 
-        DataBindContext context = TsonObjectBinding.defaultContext();
-        TsonParserFactoryRegistry objectFactories = TsonObjectBinding.factoryRegistry(linkedBootstrap, context);
+        DataBindContext context = SchemaMetaNameBinder.defaultContext();
+        ValueReaderFactoryRegistry objectFactories = ValueReaderFactoryRegistry.bind(context);
         TsonCompiledRegistry compiledRegistry = new TsonCompiledRegistry(objectFactories);
         DefaultTsonCompiledSchemaLoader loader = new DefaultTsonCompiledSchemaLoader(compiledRegistry);
 

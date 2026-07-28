@@ -5,12 +5,11 @@ import io.ltr8.bind.DataBindException;
 import io.ltr8.tson.parser.TsonSchemaParser;
 import io.ltr8.tson.parser.ast.schema.SchemaDocument;
 import io.ltr8.tson.parser.ast.schema.SchemaMap;
-import io.ltr8.tson.parser.binder.TsonObjectBinding;
 import io.ltr8.tson.parser.mapper.TsonMapperWriter;
-import io.ltr8.tson.parser.compiler.TsonParserFactoryRegistry;
+import io.ltr8.tson.parser.compiler.SchemaMetaNameBinder;
+import io.ltr8.tson.parser.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.parser.compiler.TsonCompiledRegistry;
-import io.ltr8.tson.parser.compiler.TsonCompiledSchema;
-import io.ltr8.tson.parser.compiler.TsonSchemaCompiler;
+import io.ltr8.tson.parser.compiler.ValueReaderFactoryRegistry;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaLinker;
@@ -112,8 +111,8 @@ class DefinitionResolverTest {
     private final DefinitionResolver resolver = new DefinitionResolver(NEVER_CALLED, EMPTY_NAMESPACE, resolved::get);
     private final TsonMapperWriter mapper = new TsonMapperWriter();
 
-    private static DefinitionResolver definitionResolverFor(TsonCompiledSchema metaParser, DefinitionGetter definitionGetter) {
-        return new DefinitionResolver((type, value) -> (Top) metaParser.get(type).read(value),
+    private static DefinitionResolver definitionResolverFor(TsonCompiledMetaSchema metaParser, DefinitionGetter definitionGetter) {
+        return new DefinitionResolver((type, value) -> (Top) metaParser.reader(type).read(value),
                 metaParser.schema().entries()::get, definitionGetter);
     }
 
@@ -939,7 +938,7 @@ class DefinitionResolverTest {
         // `set<token>`), not this test's own narrow, unmaterialized `resolved` map, which doesn't
         // have one. The full, materialized meta-kernel resolves the identical `enum` declaration,
         // just reached a different way, so bindAtomInstance's own reader is compiled from that.
-        TsonCompiledSchema metaKernelParser = metaKernelCompiled();
+        TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
         TypeDefinition accessType = definitionResolverFor(metaKernelParser, resolved::get).resolve(
                 schemaMap.declarations().get("product_access_type"));
 
@@ -969,7 +968,7 @@ class DefinitionResolverTest {
         resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom")));
         resolved.put("enum", resolver.resolve(schemaMap.declarations().get("enum")));
 
-        TsonCompiledSchema metaKernelParser = metaKernelCompiled();
+        TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
         TypeDefinition booleanDef = definitionResolverFor(metaKernelParser, resolved::get).resolve(
                 schemaMap.declarations().get("boolean"));
 
@@ -986,7 +985,7 @@ class DefinitionResolverTest {
      */
     @Test
     void instanceResolvesViaTheStructureNamespaceWhenNotLocallyAvailable() {
-        TsonCompiledSchema metaKernelParser = metaKernelCompiled();
+        TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
         SchemaMap schemaMap = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 { my_bool => !enum [YES NO] }""").parseSchemaDocument().body();
@@ -1004,7 +1003,7 @@ class DefinitionResolverTest {
         // "token" resolves fine (kind ATOM) but constructor: false -- !token {} must be rejected,
         // not silently treated as a valid constructor application (§3.3.1's own suggested
         // diagnostic: "did you mean atom refinement?").
-        TsonCompiledSchema metaKernelParser = metaKernelCompiled();
+        TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
         SchemaMap schemaMap = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 { bad => !token {} }""").parseSchemaDocument().body();
@@ -1029,7 +1028,7 @@ class DefinitionResolverTest {
         // `integer` purely through the type-name namespace (§3.3.1 -- atom refinement never
         // touches the structure namespace), which is exactly `resolved` here since `integer` was
         // just added to it.
-        TsonCompiledSchema metaKernelParser = metaKernelCompiled();
+        TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, resolved::get);
         SchemaMap schemaMap = schemaMapFromCoreFixture();
         resolved.put("integer", instanceResolver.resolve(schemaMap.declarations().get("integer")));
@@ -1047,7 +1046,7 @@ class DefinitionResolverTest {
     void resolvesPositiveIntegerFromTheRealCoreTypeLibraryFixture() throws IOException {
         // positive_integer => !integer ^ { min: 1 } -- a scalar (not nested-record) refinement
         // value, confirming the binder isn't only exercised by int32's own nested-IntegerSize case.
-        TsonCompiledSchema metaKernelParser = metaKernelCompiled();
+        TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, resolved::get);
         SchemaMap schemaMap = schemaMapFromCoreFixture();
         resolved.put("integer", instanceResolver.resolve(schemaMap.declarations().get("integer")));
@@ -1067,7 +1066,7 @@ class DefinitionResolverTest {
         // `binary`'s own constructor is declared in meta.tn1, not meta-kernel.tn1 (SPEC-FEEDBACK.md
         // #11), so this needs the fuller meta.tn1-merged namespace, not just meta-kernel's entries.
         SchemaMap schemaMap = schemaMapFromCoreFixture();
-        TsonCompiledSchema metaTn1Parser = metaTn1Compiled();
+        TsonCompiledMetaSchema metaTn1Parser = metaTn1Compiled();
 
         TypeDefinition hex = definitionResolverFor(metaTn1Parser, EMPTY_NAMESPACE).resolve(
                 schemaMap.declarations().get("hex"));
@@ -1079,10 +1078,10 @@ class DefinitionResolverTest {
     void resolvesFloat32AndFloat64FromTheRealCoreTypeLibraryFixture() throws IOException {
         // float32 => !float_type { format: BINARY32 } -- never mentions allow_nan/allow_infinity/
         // allow_subnormal/allow_negative_zero (all `boolean ~ true` in meta.tn1's real float_type),
-        // so this only resolves at all once PositionalForm fills in REQUIRED_DEFAULT fields from
-        // the schema itself; previously failed with "missing required field 'allow_nan'".
+        // so this only resolves at all because the compiled RecordBindReader fills in REQUIRED_DEFAULT
+        // fields from the schema itself; previously failed with "missing required field 'allow_nan'".
         SchemaMap schemaMap = schemaMapFromCoreFixture();
-        TsonCompiledSchema metaTn1Parser = metaTn1Compiled();
+        TsonCompiledMetaSchema metaTn1Parser = metaTn1Compiled();
         DefinitionResolver instanceResolver = definitionResolverFor(metaTn1Parser, EMPTY_NAMESPACE);
 
         TypeDefinition float32 = instanceResolver.resolve(schemaMap.declarations().get("float32"));
@@ -1099,10 +1098,10 @@ class DefinitionResolverTest {
         // MacType), no tson-parser vocab parser, added specifically so these real declarations
         // resolve; previously failed with "no member of union ... matches type name 'cidr4_type'"
         // (and friends) since Atom had no member for any of them at all. Each one's own `spec`
-        // field is filled in by PositionalForm from the schema's REQUIRED_FIXED default, the same
-        // mechanism float32/float64 above rely on.
+        // field is filled in by the compiled RecordBindReader from the schema's REQUIRED_FIXED
+        // default, the same mechanism float32/float64 above rely on.
         SchemaMap schemaMap = schemaMapFromCoreFixture();
-        TsonCompiledSchema metaTn1Parser = metaTn1Compiled();
+        TsonCompiledMetaSchema metaTn1Parser = metaTn1Compiled();
         DefinitionResolver instanceResolver = definitionResolverFor(metaTn1Parser, EMPTY_NAMESPACE);
 
         TypeDefinition cidr4 = instanceResolver.resolve(schemaMap.declarations().get("cidr4"));
@@ -1121,7 +1120,7 @@ class DefinitionResolverTest {
         // ipv4 => !ipv4_type {}, ipv6 => !ipv6_type {} -- Ipv4Type/Ipv6Type, same treatment as
         // Cidr4Type/Cidr6Type above (record-only, no vocab parser, flat String spec).
         SchemaMap schemaMap = schemaMapFromCoreFixture();
-        TsonCompiledSchema metaTn1Parser = metaTn1Compiled();
+        TsonCompiledMetaSchema metaTn1Parser = metaTn1Compiled();
         DefinitionResolver instanceResolver = definitionResolverFor(metaTn1Parser, EMPTY_NAMESPACE);
 
         TypeDefinition ipv4 = instanceResolver.resolve(schemaMap.declarations().get("ipv4"));
@@ -1140,7 +1139,7 @@ class DefinitionResolverTest {
         // composes with `sum`, not `atom`; resolves fine since bindAtomInstance binds against Top,
         // not the narrower Atom.
         SchemaMap schemaMap = schemaMapFromCoreFixture();
-        TsonCompiledSchema metaTn1Parser = metaTn1Compiled();
+        TsonCompiledMetaSchema metaTn1Parser = metaTn1Compiled();
         DefinitionResolver instanceResolver = definitionResolverFor(metaTn1Parser, EMPTY_NAMESPACE);
 
         TypeDefinition complex = instanceResolver.resolve(schemaMap.declarations().get("complex"));
@@ -1202,7 +1201,7 @@ class DefinitionResolverTest {
         // metaParser is now *also* needed, separately, for bindAtomInstance itself to find and read
         // "integer_type" (the constructor int8's own refinement source resolves through), which was
         // never something namespace lookup alone could provide.
-        TsonCompiledSchema metaKernelParser = metaKernelCompiled();
+        TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
         Map<String, TypeDefinition> metaKernelEntries = metaKernelParser.schema().entries();
         Map<String, TypeDefinition> chainNamespace = new LinkedHashMap<>(metaKernelEntries);
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
@@ -1246,7 +1245,7 @@ class DefinitionResolverTest {
         // `integer_type` supplied only as structureNamespace (never consulted for `^`), "!integer_type
         // ^ {...}" still fails to resolve `I` at all -- a different failure from "resolves but isn't
         // an instance" (the constructor-rejection test above), which requires `I` to resolve first.
-        TsonCompiledSchema metaKernelParser = metaKernelCompiled();
+        TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
         SchemaMap schemaMap = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 { bad => !integer_type ^ { min: 1 } }""").parseSchemaDocument().body();
@@ -1264,21 +1263,20 @@ class DefinitionResolverTest {
 
     /**
      * Wraps a bare, already-resolved {@code Map<String, TypeDefinition>} into a compiled,
-     * object-binding-mode {@link TsonCompiledSchema} -- what {@link #definitionResolverFor} needs to
+     * object-binding-mode {@link TsonCompiledMetaSchema} -- what {@link #definitionResolverFor} needs to
      * build both a {@link DefinitionMetaReader} that can actually *bind* a constructor-application/
      * atom-refinement value, and the {@code DefinitionResolver} constructor's own structure-namespace
      * parameter (a plain {@code TypeDefinition} lookup is all that one needs). Generic over whatever
      * map a caller already has in hand (a hand-built {@code resolved} map, meta-kernel's own entries,
      * meta.tn1's own registered/merged entries, ...) -- the header fields (id/meta/imports) are
-     * inert, {@code TsonCompiledSchema}'s own {@code Compiler} never reads them, only {@code
+     * inert, {@code TsonCompiledMetaSchema}'s own {@code Compiler} never reads them, only {@code
      * entries()}.
      */
-    private static TsonCompiledSchema compileAsMetaParser(Map<String, TypeDefinition> entries) {
+    private static TsonCompiledMetaSchema compileAsMetaParser(Map<String, TypeDefinition> entries) {
         TsonSchema synthetic = new TsonSchema("test", "", List.of(), entries);
         TsonLinkedSchema linkedSynthetic = new TsonLinkedSchema(synthetic);
-        DataBindContext context = TsonObjectBinding.defaultContext();
-        TsonParserFactoryRegistry objectFactories = TsonObjectBinding.factoryRegistry(linkedSynthetic, context);
-        return TsonSchemaCompiler.compile(linkedSynthetic, objectFactories);
+        ValueReaderFactoryRegistry resolver = ValueReaderFactoryRegistry.bind(SchemaMetaNameBinder.defaultContext());
+        return TsonCompiledMetaSchema.bootstrap(linkedSynthetic, resolver);
     }
 
     /**
@@ -1288,7 +1286,7 @@ class DefinitionResolverTest {
      * set<token>} field to the raw, wrong {@code set} declaration instead of a synthesized "array of
      * token" entry, the same bug {@code DefaultTsonCompiledSchemaLoader}'s own bootstrap had), then compiled.
      */
-    private static TsonCompiledSchema metaKernelCompiled() {
+    private static TsonCompiledMetaSchema metaKernelCompiled() {
         TsonSchema metaKernel = MetaKernelBootstrapResolver.getMetaKernelSchema();
         TsonLinkedSchema linked = TsonSchemaLinker.linkBootstrap(metaKernel);
         return compileAsMetaParser(linked.schema().entries());
@@ -1308,12 +1306,10 @@ class DefinitionResolverTest {
      * despite the forward reference); that result carries no {@code bootstrap} flag, so it can
      * actually be registered.
      */
-    private static TsonCompiledSchema metaTn1Compiled() throws IOException {
-        TsonSchema metaKernelBootstrap = MetaKernelBootstrapResolver.getMetaKernelSchema();
+    private static TsonCompiledMetaSchema metaTn1Compiled() throws IOException {
         io.ltr8.tson.schema.TsonSchemaRegistry registry = new io.ltr8.tson.schema.TsonSchemaRegistry();
-        TsonLinkedSchema materializedMetaKernelBootstrap = TsonSchemaLinker.linkBootstrap(metaKernelBootstrap);
-        DataBindContext context = TsonObjectBinding.defaultContext();
-        TsonParserFactoryRegistry objectFactories = TsonObjectBinding.factoryRegistry(materializedMetaKernelBootstrap, context);
+        DataBindContext context = SchemaMetaNameBinder.defaultContext();
+        ValueReaderFactoryRegistry objectFactories = ValueReaderFactoryRegistry.bind(context);
         TsonCompiledRegistry throwawayRegistry = new TsonCompiledRegistry(objectFactories);
         DefaultTsonCompiledSchemaLoader throwawayLoader =
                 new DefaultTsonCompiledSchemaLoader(throwawayRegistry, BundledSchemaSource.INSTANCE);
@@ -1322,7 +1318,7 @@ class DefinitionResolverTest {
         SchemaDocument metaKernelDocument = new TsonSchemaParser(metaKernelSource).parseSchemaDocument();
         TsonSchema metaKernel = new TsonSchemaResolver(throwawayLoader).resolveSchema(metaKernelDocument);
         registry.register(TsonSchemaLinker.link(metaKernel, registry)); // permanent, so meta.tn1's own !!import finds it below
-        TsonCompiledSchema metaKernelParser = metaKernelCompiled();
+        TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
 
         String source = Files.readString(Path.of("").toAbsolutePath().resolve("../spec/m/meta.tn1").normalize());
         SchemaDocument metaDoc = new TsonSchemaParser(source).parseSchemaDocument();

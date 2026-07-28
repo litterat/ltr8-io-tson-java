@@ -15,10 +15,11 @@ import java.util.Optional;
  *
  * <p>{@code spec} is a bare {@link String}, not nested inside {@link AtomSpecification} or typed
  * as a {@link java.net.URI} -- see {@link Cidr4Type}'s own Javadoc for why: a flat field is what
- * lets {@code PositionalForm}'s schema-composed-default filling actually populate it (unlike {@link
- * UriType}/{@link RegexType}'s own nested {@code specification} field, which predates that
- * mechanism), and a bare {@code String} target is what an untyped, unannotated string value can
- * actually bind into ({@code java.net.URI} can't, without a {@code !uri} type-ref).
+ * lets {@code tson-parser}'s compiled {@code Record*Reader}'s own schema-composed-default filling
+ * actually populate it (unlike {@link UriType}/{@link RegexType}'s own nested {@code specification}
+ * field, which predates that mechanism), and a bare {@code String} target is what an untyped,
+ * unannotated string value can actually bind into ({@code java.net.URI} can't, without a {@code
+ * !uri} type-ref).
  */
 @Typename(name = "email_type")
 public record EmailType(String spec, @Field("min_length") Optional<Integer> minLength,

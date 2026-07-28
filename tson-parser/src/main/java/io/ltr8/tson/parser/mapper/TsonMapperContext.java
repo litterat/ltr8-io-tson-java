@@ -9,12 +9,10 @@ import io.ltr8.tson.parser.base.TsonAtomContext;
  * atom registrations both directions need are listed once, not duplicated across two classes that
  * could drift apart.
  *
- * <p><b>Delegates to {@link TsonAtomContext#defaultContext()}</b> (moved there once a third
- * consumer needed the identical registration list -- an object-binding
- * {@code io.ltr8.tson.parser.binder.TsonObjectBinder}, in a package with no
- * dependency on this one). See {@link TsonAtomContext}'s own Javadoc for exactly which atoms are
- * registered and why (UUID/byte[]/LocalDate/OffsetTime/OffsetDateTime/URI/Inet4Address/
- * Inet6Address) -- that reasoning didn't change, only its address.
+ * <p><b>Delegates to {@link TsonAtomContext#defaultContext()}</b>, shared with object-binding
+ * mode's own {@code compiler.SchemaMetaNameBinder#defaultContext}. See {@link TsonAtomContext}'s own
+ * Javadoc for exactly which atoms are registered and why (UUID/byte[]/LocalDate/OffsetTime/
+ * OffsetDateTime/URI/Inet4Address/Inet6Address).
  */
 final class TsonMapperContext {
 

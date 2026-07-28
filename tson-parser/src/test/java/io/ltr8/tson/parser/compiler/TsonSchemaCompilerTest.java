@@ -5,12 +5,12 @@ import io.ltr8.tson.parser.ast.DataValue;
 import io.ltr8.tson.parser.ast.EmptyBrace;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.meta.EmailType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.schema.meta.Unit;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -27,17 +27,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * (the reason {@link DeferredValueReader} exists at all) and eager,
  * whole-schema build (every entry is built as soon as {@link TsonSchemaCompiler#compile} returns,
  * not deferred to whenever {@link TsonCompiledSchema#get} first asks for a given name -- see that
- * class's own "Eager, not lazy" note). {@link RecordParserTest}/{@link VariantParserTest}/{@link
- * EnumTypeParserFactoryTest} exercise this compilation machinery too, but only ever incidentally,
+ * class's own "Eager, not lazy" note). {@link RecordDomReaderTest}/{@link VariantDomReaderTest}/
+ * {@link EnumDomReaderTest} exercise this compilation machinery too, but only ever incidentally,
  * through schemas with no real cycles -- this class targets it directly.
  */
 class TsonSchemaCompilerTest {
 
-    private static final TsonParserFactoryRegistry RECORD_ONLY = TsonParserFactoryRegistry.builder()
-            .register("record", RecordParser.FACTORY)
-            .build();
-
     private static final DataValue EMPTY_RECORD = new DataValue(List.of(), Optional.empty(), new EmptyBrace());
+
+    private static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema) {
+        TsonCompiledSchema placeholder = new TsonCompiledSchema(linkedSchema, Map.of());
+        TsonCompiledMetaSchema bootstrapMeta = new TsonCompiledMetaSchema(placeholder, ValueReaderFactoryRegistry.dom());
+        return TsonSchemaCompiler.compile(linkedSchema, bootstrapMeta);
+    }
 
     @Test
     void mutualCycleCompilesWithoutStackOverflow() {
@@ -52,7 +54,7 @@ class TsonSchemaCompilerTest {
         TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
 
-        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(linkedSchema, RECORD_ONLY);
+        TsonCompiledSchema compiled = compile(linkedSchema);
 
         // Reached compilation successfully; reading an empty record against a REQUIRED field then
         // fails for the ordinary reason (missing field), not a compiler failure.
@@ -67,25 +69,25 @@ class TsonSchemaCompilerTest {
         TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
 
-        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(linkedSchema, RECORD_ONLY);
+        TsonCompiledSchema compiled = compile(linkedSchema);
 
         assertThrows(IllegalArgumentException.class, () -> compiled.get("Node").read(EMPTY_RECORD));
     }
 
     @Test
     void anEntryWithNoRegisteredFactoryDoesNotBlockCompilingTheRestOfTheSchemaButFailsOnlyWhenActuallyRead() {
-        // "orphan" uses a constructor ("unit") with no registered factory at all -- TsonSchemaCompiler
+        // "orphan" uses a constructor ("email_type") with no compiled parser at all -- TsonSchemaCompiler
         // .compile() still builds the whole schema eagerly, including "orphan" itself (get("orphan")
         // succeeds, unlike the old lazy behavior where it never got attempted at all until asked for);
         // "used" (which never references "orphan") reads normally either way.
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("used", TypeDefinition.product(RecordBody.of(List.of())));
         entries.put("orphan", new TypeDefinition(Optional.empty(), TypeKind.ATOM,
-                List.of(), false, List.of(), List.of(), Optional.empty(), new Unit()));
+                List.of(), true, List.of(), List.of(), Optional.empty(), EmailType.UNCONSTRAINED));
         TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
 
-        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(linkedSchema, RECORD_ONLY);
+        TsonCompiledSchema compiled = compile(linkedSchema);
 
         @SuppressWarnings("unchecked")
         Map<String, Object> used = (Map<String, Object>) compiled.get("used").read(EMPTY_RECORD);
@@ -102,7 +104,7 @@ class TsonSchemaCompilerTest {
     void getOnAnUnknownNameThrowsBeforeAnyCompilationHappens() {
         TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), Map.of());
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
-        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(linkedSchema, RECORD_ONLY);
+        TsonCompiledSchema compiled = compile(linkedSchema);
 
         IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class, () -> compiled.get("nope"));
         assertEquals("'nope' is not in this compiled schema", thrown.getMessage());

@@ -7,18 +7,22 @@ import io.ltr8.tson.schema.TsonSchema;
 import java.util.Map;
 
 /**
- * A compiled {@link TsonLinkedSchema} -- {@code Map<String, TypeDefinition>} lifted to {@code
- * Map<String, TsonValueReader<?>>}, where every reader already holds real Java object references to
- * its own child readers rather than resolving names again at read time (except at the specific edges
- * that close a cycle, where a {@link DeferredValueReader} does exactly one lazy lookup).
- * {@link SchemaValidatingParser}, the Class 2 (schema-validating) data parser, is built on top of
- * this, not directly on a {@link TsonSchema}.
+ * The "compile" stage's own noun -- an already-built, immutable {@code Map<String,
+ * TsonValueReader<?>>} paired with the {@link TsonLinkedSchema} it was compiled from, produced by
+ * {@link TsonSchemaCompiler#compile} and never constructed directly outside this package. Holds no
+ * build logic of its own; all the actual compile-time work (the eager walk, cycle detection,
+ * per-entry build-failure deferral) lives in {@link TsonSchemaCompiler} itself, matching the
+ * verb/noun split this project's own pipeline vocabulary uses everywhere else ({@code
+ * TsonSchemaLinker}/{@code TsonLinkedSchema}, {@code TsonSchemaResolver}/its own resolved {@code
+ * TsonSchema}).
  *
- * <p>Produced by {@link TsonSchemaCompiler#compile}, never constructed directly -- an immutable,
- * already-built value with no build logic of its own; see {@link TsonSchemaCompiler} for how
- * compilation works. {@link #schema()} unwraps to the bare {@link TsonSchema} for the common case
- * of reading resolved {@code entries()}; there's no accessor for the linked schema itself, since
- * nothing needs it back out once compiled.
+ * <p>{@link #get} reads *any* entry, unscoped -- unlike {@link TsonCompiledMetaSchema#reader}, which
+ * is deliberately scoped to only the entries a governing meta-schema itself declares as constructors
+ * (§3.3.1's structure-namespace rule). A caller holding a bare {@code TsonCompiledSchema} directly
+ * (rather than the {@link TsonCompiledMetaSchema} that wraps one) has already opted out of that
+ * scoping -- e.g. a caller reading an arbitrary resolved entry directly, or {@link
+ * TsonCompiledMetaSchema} itself, which needs unscoped access while first building its own {@code
+ * reader()} lookup.
  */
 public final class TsonCompiledSchema {
 

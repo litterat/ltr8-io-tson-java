@@ -12,9 +12,10 @@ import io.ltr8.annotation.Typename;
  * real complex-number validation).
  *
  * <p>{@code component}'s own schema-level default ({@code ~ NUMBER}) is filled in by {@code
- * PositionalForm} from the schema itself before binding, the same mechanism {@link FloatType}'s
- * own defaulted {@code boolean} fields rely on -- an enum-typed field binds from the resulting bare
- * token by ordinary name matching, the same way {@link FloatType#format} already does.
+ * tson-parser}'s compiled {@code Record*Reader} from the schema itself before binding, the same
+ * mechanism {@link FloatType}'s own defaulted {@code boolean} fields rely on -- an enum-typed field
+ * binds from the resulting bare token by ordinary name matching, the same way {@link
+ * FloatType#format} already does.
  *
  * <p>{@link Component} mirrors {@code complex_component}'s own five members (meta.tn1: {@code
  * complex_component => !enum [INTEGER NUMBER RATIONAL FLOAT32 FLOAT64]}) -- a plain nested enum,
