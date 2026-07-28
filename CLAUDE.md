@@ -10,13 +10,14 @@ TSON spec series:
 - Part 1 (lexer, structural grammar, base type resolution, built-in type vocabulary):
   https://tson.io/raw/2026/32/tson-part1-data.md
 - Part 2 (schema grammar, type system) — grammar layer complete (see `TsonSchemaParser` below);
-  resolution well underway (see `TsonSchemaResolver` below) — `meta-kernel.tn1` and `meta.tn1` both
-  resolve and register in full. `boolean => !enum [true false]`'s own once-permanent generic-binding
-  limitation was fixed 2026-07-26 when `bindAtomInstance` moved onto the compiled reader (verified:
+  resolution well underway (see `TsonSchemaResolver` below) — `meta-kernel.tn1`, `meta.tn1`, and
+  `core.tn1` all resolve and register in full (49, 90-merged, 48 declarations respectively).
+  `boolean => !enum [true false]`'s own once-permanent generic-binding limitation was fixed
+  2026-07-26 when `bindAtomInstance` moved onto the compiled reader (verified:
   `DefinitionResolverTest.booleanInstanceResolvesCorrectlyViaTheCompiledReader`); core.tn1's own
-  end-to-end resolution no longer has a dedicated test since `CoreTn1Parser`/`CoreTn1ParserTest`
-  were retired in the same change (see "Not yet implemented" below) — re-verify its exact
-  declaration count with a throwaway probe before citing one: https://tson.io/raw/2026/32/tson-part2-schema.md
+  end-to-end *resolve-and-register* pass is covered by `CoreSchemaImportTest` (2026-07-28, see
+  "Schema registry" below) — `CoreTn1Parser`/`CoreTn1ParserTest`/`CoreTn1CompiledEndToEndTest`
+  themselves stay retired (see "Not yet implemented" below): https://tson.io/raw/2026/32/tson-part2-schema.md
 
 The spec is a *working revision* (2026 series) and changes between revisions without compatibility
 guarantees — re-fetch the current URL rather than trusting a cached copy of the text when in doubt, and
@@ -964,17 +965,23 @@ doesn't happen there -- verified directly: `DefinitionResolverTest
 schema and gets back `EnumBody(members=["true", "false"])`, no exception. This also retired
 `CoreTn1Parser`'s own hand-picked `boolean` bypass entirely (see "Bundled schema documents" above)
 -- core.tn1's own local `boolean => !enum [true false]` redeclaration now resolves the same
-generic way. **`core.tn1`'s own current end-to-end declaration count is not pinned down by any
-test right now** -- `CoreTn1Parser`/`CoreTn1ParserTest`/`CoreTn1CompiledEndToEndTest` were all
-deleted the same day (superseded by `DefaultTsonCompiledSchemaLoader`'s own generic path, "Compiled schema
-registry" above), and nothing replaced their end-to-end coverage of resolving core.tn1's all 48
-declarations in one pass; re-verify with a throwaway probe (register meta-kernel ordinarily first,
-build object-mode factories from *its own* registered result, then `loader.load
-(BundledSchemaSource.CORE_TN1_ID)`) before relying on a specific count -- a first attempt at exactly
-this hit a `RecordBindReader.Factory` validation error compiling one of core.tn1's own transitively
-merged-in atom-constraint entries, not yet root-caused, and may be a genuine, currently-uncovered
-gap in the loader/compiled-registry path for a three-schema chain in object-binding mode, not
-just a probe-script mistake.
+generic way. **`core.tn1`'s own end-to-end declaration count is pinned down by
+`CoreSchemaImportTest` (`io.ltr8.tson.parser.resolver`, 2026-07-28)** -- `CoreTn1Parser`/
+`CoreTn1ParserTest`/`CoreTn1CompiledEndToEndTest` stay deleted (superseded by
+`DefaultTsonCompiledSchemaLoader`'s own generic path, "Compiled schema registry" above), but this
+new test covers the same ground with the current pipeline: registers meta-kernel then meta.tn1 then
+core.tn1 via `loader.load`, exactly the sequence `BundledSchemaSource`'s own class Javadoc
+documents, and confirms all 48 of core.tn1's own declarations resolve and register. A second test,
+`exactlyTheFiveUndocumentedAtomConstructorsCompileToErrorReaders`, goes one step further -- compiling
+the registered result (a side effect of `TsonCompiledRegistry#register`, reached via the same
+`loader.load` calls) -- and confirms *exactly* `cidr4`/`cidr6`/`email`/`mac`/`unknown` compile to
+`ErrorReader` (constructed via `cidr4_type`/`cidr6_type`/`email_type`/`mac_type`/`unknown_type`,
+five of the six constructors `ValueReaderFactoryRegistry` registers to `ErrorReader` outright -- the
+sixth, `extern`, has no core.tn1 declaration), and every other entry compiles to a genuinely usable
+reader. This resolves the open question an earlier probe attempt had left here (a `RecordBindReader
+.Factory` validation error, not yet root-caused at the time) -- it wasn't a bug: the "validation
+error" was always this same already-documented missing-factory gap, just not yet distinguished from
+a genuine regression.
 
 `duration` was a second real generic-binding failure until 2026-07-24, when `DurationType.min`/
 `max` were retyped from `Optional<IsoDuration>` to `Optional<String>` (matching the
@@ -1991,8 +1998,8 @@ No system Gradle — always use the wrapper:
   `duration` no longer fails either (`DurationType.min`/`max` retyped to `Optional<String>`,
   2026-07-24 — see "Schema resolution" above). `complex_type`'s own `component` field binds fine
   (`ComplexType`, added 2026-07-24); `unknown_type` too (`UnknownType`). No real fixture declaration
-  remains unresolved in `meta-kernel.tn1`/`meta.tn1`; core.tn1's own current end-to-end status isn't
-  pinned down by any test right now (see "Schema resolution" above's status paragraph).
+  remains unresolved in `meta-kernel.tn1`/`meta.tn1`/`core.tn1` (all 48 of core.tn1's own resolve and
+  register, `CoreSchemaImportTest`, 2026-07-28 — see "Schema resolution" above's status paragraph).
 - The schema-validating data parser (Class 2) — `io.ltr8.tson.parser.compiler`
   (`TsonSchemaCompiler`/`TsonCompiledSchema`/`TsonCompiledMetaSchema`, `ValueReaderFactoryRegistry`,
   `Record`/`Array`/`Map`/`Tuple{DomReader,BindReader}`, `VariantSchemaReader`/`VariantBindReader`,
@@ -2000,9 +2007,12 @@ No system Gradle — always use the wrapper:
   ("Class 2 compilation", "Compiled schema registry", "Bundled schema documents", "Object-binding
   mode"). Known, still-open gaps within it: no `!!schema`-header auto-selection (a caller must
   already know which schema-known position it's reading against -- there's no single "read this
-  string, pick the right compiled reader automatically" entry point); six core.tn1 atom entries
-  (`extern`/`unknown`/`email`/`cidr4`/`cidr6`/`mac`) have no compiled-parser factory at all yet,
-  registered to `ErrorReader` so a schema declaring one still compiles (`complex`/`ipv4`/`ipv6` *do*
+  string, pick the right compiled reader automatically" entry point); five real core.tn1 declarations
+  (`unknown`/`email`/`cidr4`/`cidr6`/`mac`, constructed via `unknown_type`/`email_type`/`cidr4_type`/
+  `cidr6_type`/`mac_type`) plus a sixth constructor with no core.tn1 declaration at all (`extern`)
+  have no compiled-parser factory yet, registered to `ErrorReader` so a schema declaring one still
+  compiles -- confirmed exactly (not just asserted) by `CoreSchemaImportTest
+  .exactlyTheFiveUndocumentedAtomConstructorsCompileToErrorReaders` (`complex`/`ipv4`/`ipv6` *do*
   now have one, wired to the existing `atom.ComplexParser`/`Ipv4Parser`/`Ipv6Parser`); `uri_type`/
   `regex_type` still don't bind correctly in object-binding mode (their own RFC-citation field is
   nested inside `specification: AtomSpecification` rather than flat, so it never receives a
