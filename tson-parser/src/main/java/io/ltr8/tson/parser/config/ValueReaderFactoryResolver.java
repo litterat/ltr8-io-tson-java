@@ -1,4 +1,8 @@
-package io.ltr8.tson.parser.compiler;
+package io.ltr8.tson.parser.config;
+
+import io.ltr8.tson.parser.compiler.TsonCompiledMetaSchema;
+import io.ltr8.tson.parser.compiler.ValueReaderFactory;
+import io.ltr8.tson.parser.compiler.ValueReaderFactoryRegistry;
 
 /**
  * Finds the {@link ValueReaderFactory} registered for a constructor name (e.g. {@code "record"},

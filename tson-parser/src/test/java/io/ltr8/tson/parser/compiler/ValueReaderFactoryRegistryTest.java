@@ -1,6 +1,8 @@
 package io.ltr8.tson.parser.compiler;
 
 import io.ltr8.tson.parser.TsonValueReader;
+import io.ltr8.tson.parser.config.SchemaMetaNameBinder;
+import io.ltr8.tson.parser.config.ValueReaderFactoryResolver;
 import io.ltr8.tson.parser.ast.DataValue;
 import io.ltr8.tson.parser.ast.TokenForm;
 import io.ltr8.tson.parser.ast.TokenValue;

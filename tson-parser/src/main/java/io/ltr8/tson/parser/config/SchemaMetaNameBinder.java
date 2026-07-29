@@ -1,8 +1,9 @@
-package io.ltr8.tson.parser.compiler;
+package io.ltr8.tson.parser.config;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.parser.base.TsonAtomContext;
+import io.ltr8.tson.parser.compiler.ValueReaderFactoryRegistry;
 
 import java.util.Map;
 import java.util.Set;

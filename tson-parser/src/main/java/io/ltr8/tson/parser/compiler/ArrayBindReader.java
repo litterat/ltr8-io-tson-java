@@ -84,7 +84,8 @@ public final class ArrayBindReader extends ArrayAbstractReader<Object> {
      * falling back to {@link String} only when that name has no real bound class at all -- {@code
      * ipv4_type}'s own {@code [value]}-sugared field is a real fixture example (materializes to a
      * synthesized array entry whose own {@code element_type} is {@code value}, and {@code
-     * schema.meta} has no {@code Value} class for {@link SchemaMetaNameBinder} to find by that name).
+     * schema.meta} has no {@code Value} class for {@link io.ltr8.tson.parser.config.SchemaMetaNameBinder}
+     * to find by that name).
      * {@code token} specifically is a known, accepted imprecision the other direction: it resolves
      * *without* falling back, but to {@link io.ltr8.tson.schema.meta.Token} -- a real class, just the
      * wrong one (the raw literal wrapper §5.2/§5.10 field modifiers use, not the plain {@link String}

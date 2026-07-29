@@ -2,6 +2,7 @@ package io.ltr8.tson.parser.compiler;
 
 import io.ltr8.annotation.Typename;
 import io.ltr8.tson.parser.TsonValueReader;
+import io.ltr8.tson.parser.config.ValueReaderFactoryResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Top;

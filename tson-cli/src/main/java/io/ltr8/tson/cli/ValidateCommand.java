@@ -4,7 +4,7 @@ import io.ltr8.tson.parser.TsonDataParser;
 import io.ltr8.tson.parser.TsonValueReader;
 import io.ltr8.tson.parser.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.parser.compiler.ValueReaderFactoryRegistry;
-import io.ltr8.tson.schema.TsonLinkedSchema;
+import io.ltr8.tson.parser.config.TsonStandardLibrary;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -32,9 +32,8 @@ final class ValidateCommand {
     static int run(Path schemaFile, String typeName, List<Path> dataFiles, OutputFormat format) {
         TsonCompiledMetaSchema compiledSchema;
         try {
-            StandardLibrary.Bootstrapped stdlib = StandardLibrary.bootstrap();
-            TsonLinkedSchema linked = StandardLibrary.resolveUserSchema(stdlib, Io.readFile(schemaFile));
-            compiledSchema = StandardLibrary.compile(linked, ValueReaderFactoryRegistry.dom());
+            TsonStandardLibrary library = TsonStandardLibrary.builder().build();
+            compiledSchema = library.compile(Io.readFile(schemaFile), ValueReaderFactoryRegistry.dom());
         } catch (RuntimeException e) {
             System.out.println(format.render(ValidationReport.failed("SCHEMA_ERROR", e.getMessage())));
             return 2;

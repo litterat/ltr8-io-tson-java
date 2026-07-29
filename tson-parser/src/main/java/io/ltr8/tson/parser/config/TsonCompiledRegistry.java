@@ -1,5 +1,8 @@
-package io.ltr8.tson.parser.compiler;
+package io.ltr8.tson.parser.config;
 
+import io.ltr8.tson.parser.compiler.TsonCompiledMetaSchema;
+import io.ltr8.tson.parser.compiler.TsonCompiledSchema;
+import io.ltr8.tson.parser.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaLinker;
@@ -11,10 +14,7 @@ import java.util.Optional;
 
 /**
  * A store of compiled meta-schemas ({@link TsonCompiledMetaSchema}), paired one-to-one with a
- * {@link TsonSchemaRegistry}'s own store of resolved, validated schemas -- this package's own
- * rewrite of {@code compiler.TsonCompiledRegistry}, adapted to {@link TsonSchemaCompiler#compile}'s
- * own {@link TsonCompiledMetaSchema}-based signature (the old class still compiles against a bare
- * {@code TsonParserFactoryRegistry}, a shape that no longer exists anywhere in this package).
+ * {@link TsonSchemaRegistry}'s own store of resolved, validated schemas.
  *
  * <p>Startup sequence this exists for: bootstrap meta-kernel ({@link
  * TsonCompiledMetaSchema#bootstrap}, outside this class entirely -- it needs no registry at all),

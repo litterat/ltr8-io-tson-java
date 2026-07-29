@@ -10,7 +10,7 @@ import io.ltr8.tson.parser.base.TsonAtomContext;
  * could drift apart.
  *
  * <p><b>Delegates to {@link TsonAtomContext#defaultContext()}</b>, shared with object-binding
- * mode's own {@code compiler.SchemaMetaNameBinder#defaultContext}. See {@link TsonAtomContext}'s own
+ * mode's own {@code config.SchemaMetaNameBinder#defaultContext}. See {@link TsonAtomContext}'s own
  * Javadoc for exactly which atoms are registered and why (UUID/byte[]/LocalDate/OffsetTime/
  * OffsetDateTime/URI/Inet4Address/Inet6Address).
  */

@@ -20,26 +20,15 @@ import java.util.Map;
  * sequence for one schema specifically; the general version of that sequence is exactly what
  * {@link DefaultTsonCompiledSchemaLoader#load(String)}'s own generic branch already does for *any*
  * URI, given a {@link TsonSchemaSource} that knows how to fetch it. This class is that source for all
- * three well-known identities -- nothing more. A caller wanting meta.tn1's own compiled reader now
- * does:
+ * three well-known identities -- nothing more.
+ *
+ * <p>A caller wanting a working environment uses {@code io.ltr8.tson.parser.config.TsonStandardLibrary}
+ * directly rather than assembling the fetch-parse-resolve-register-compile sequence by hand -- this
+ * class is still exactly what powers it underneath:
  *
  * <pre>{@code
- * TsonSchemaRegistry schemaRegistry = new TsonSchemaRegistry();
- * ValueReaderFactoryResolver resolver = ValueReaderFactoryRegistry.bind(SchemaMetaNameBinder.defaultContext());
- * TsonCompiledRegistry registry = new TsonCompiledRegistry(schemaRegistry, resolver);
- * DefaultTsonCompiledSchemaLoader loader = new DefaultTsonCompiledSchemaLoader(registry, BundledSchemaSource.INSTANCE);
- *
- * // meta.tn1's own !!import needs meta-kernel present in the *shared* registry first -- meta-kernel's
- * // own bootstrap case (loader.load(META_KERNEL_ID)) is never cached in registry itself (see
- * // DefaultTsonCompiledSchemaLoader's own Javadoc), so it needs registering separately, resolved
- * // ordinarily against this same loader (whose own bootstrap branch supplies the structure namespace).
- * SchemaDocument metaKernelDocument = new TsonSchemaParser(
- *         BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID)).parseSchemaDocument();
- * TsonSchema resolvedMetaKernel = new TsonSchemaResolver(loader).resolveSchema(metaKernelDocument);
- * registry.register(resolvedMetaKernel, loader.load(BundledSchemaSource.META_KERNEL_ID));
- *
- * TsonCompiledMetaSchema meta = loader.load(BundledSchemaSource.META_TN1_ID);
- * TsonCompiledMetaSchema core = loader.load(BundledSchemaSource.CORE_TN1_ID); // needs meta.tn1 registered first, same reasoning
+ * TsonStandardLibrary library = TsonStandardLibrary.builder().build(); // meta-kernel + meta.tn1 + core.tn1
+ * TsonCompiledMetaSchema compiled = library.compile(schemaText, ValueReaderFactoryRegistry.dom());
  * }</pre>
  *
  * <p><b>{@link #META_KERNEL_ID} is meta-kernel's own well-known identity</b> -- the canonical

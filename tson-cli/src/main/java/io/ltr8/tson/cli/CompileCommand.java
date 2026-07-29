@@ -1,7 +1,7 @@
 package io.ltr8.tson.cli;
 
 import io.ltr8.tson.parser.compiler.ValueReaderFactoryRegistry;
-import io.ltr8.tson.schema.TsonLinkedSchema;
+import io.ltr8.tson.parser.config.TsonStandardLibrary;
 
 import java.nio.file.Path;
 
@@ -19,9 +19,8 @@ final class CompileCommand {
     /** @return exit code: 0 compiled cleanly, 1 it didn't */
     static int run(Path schemaFile, OutputFormat format) {
         try {
-            StandardLibrary.Bootstrapped stdlib = StandardLibrary.bootstrap();
-            TsonLinkedSchema linked = StandardLibrary.resolveUserSchema(stdlib, Io.readFile(schemaFile));
-            StandardLibrary.compile(linked, ValueReaderFactoryRegistry.dom());
+            TsonStandardLibrary library = TsonStandardLibrary.builder().build();
+            library.compile(Io.readFile(schemaFile), ValueReaderFactoryRegistry.dom());
             System.out.println(format.render(ValidationReport.ok()));
             return 0;
         } catch (RuntimeException e) {

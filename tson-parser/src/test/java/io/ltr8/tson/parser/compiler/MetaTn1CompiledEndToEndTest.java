@@ -5,6 +5,8 @@ import io.ltr8.tson.parser.TsonDataParser;
 import io.ltr8.tson.parser.TsonSchemaParser;
 import io.ltr8.tson.parser.ast.Document;
 import io.ltr8.tson.parser.ast.schema.SchemaDocument;
+import io.ltr8.tson.parser.config.SchemaMetaNameBinder;
+import io.ltr8.tson.parser.config.TsonCompiledRegistry;
 import io.ltr8.tson.parser.resolver.BundledSchemaSource;
 import io.ltr8.tson.parser.resolver.DefaultTsonCompiledSchemaLoader;
 import io.ltr8.tson.parser.resolver.TsonSchemaResolver;

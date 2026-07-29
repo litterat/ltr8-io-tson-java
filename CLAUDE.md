@@ -1749,17 +1749,55 @@ after meta-kernel is registered *explicitly* first — resolves it end to end th
 path (fetch → parse → resolve → register → compile). `TsonSchemaRegistryTest` covers `validateIdentity`
 directly too (accepts a well-formed candidate silently; rejects no-scheme and carries-a-port cases).
 
-**A real, named layering exception, not an oversight.** Every other note about these two packages
+**A real, named layering exception, not an oversight.** Every other note about these packages
 describes `compiler` sitting *on top of* `resolver`'s own resolution. `TsonCompiledSchemaLoader`/
 `DefaultTsonCompiledSchemaLoader` (in `resolver`, alongside `TsonSchemaResolver`) reach the opposite
-direction, importing `TsonCompiledRegistry`/`TsonCompiledSchema`/`TsonCompiledMetaSchema`/
-`TsonSchemaCompiler`/`ValueReaderFactoryRegistry` from `compiler` — the one place in `resolver` that
-does. Not a cycle (nothing in `compiler`'s own *main* code imports back from `resolver`), and both
-packages are in the same module regardless (no Gradle/JPMS boundary to violate), but a deliberate
-exception to the general framing, made because bootstrapping/fetching/compiling a governing schema
-is exactly the one place lower-layer resolution genuinely needs the higher layer's own compiled
-output, not just its resolved one. `TsonCompiledMetaSchema` itself carries a `schema()` accessor for
-this (its own resolved `TsonSchema`) — mirroring `TsonCompiledSchema.schema()`'s own precedent.
+direction, importing `TsonCompiledSchema`/`TsonCompiledMetaSchema`/`TsonSchemaCompiler`/
+`ValueReaderFactoryRegistry` from `compiler` and `TsonCompiledRegistry` from `config` (see "Configuration
+package" below) — the one place in `resolver` that does either. Not a cycle (nothing in `compiler`'s
+own *main* code imports back from `resolver`, and `config` sits above both), and all three packages
+are in the same module regardless (no Gradle/JPMS boundary to violate), but a deliberate exception to
+the general framing, made because bootstrapping/fetching/compiling a governing schema is exactly the
+one place lower-layer resolution genuinely needs the higher layer's own compiled output, not just its
+resolved one. `TsonCompiledMetaSchema` itself carries a `schema()` accessor for this (its own resolved
+`TsonSchema`) — mirroring `TsonCompiledSchema.schema()`'s own precedent.
+
+### Configuration package (`tson-parser/src/main/java/io/ltr8/tson/parser/config/`)
+
+Holds the classes that configure/wire together a working compiled-reader environment, as distinct
+from `compiler`'s own eager-compile *mechanics* -- `TsonCompiledRegistry` (orchestration:
+link+register+compile a schema against a governing meta), `SchemaMetaNameBinder` (the
+object-binding-mode naming convention, schema type name → `io.ltr8.tson.schema.meta` class),
+`ValueReaderFactoryResolver` (the small dispatch interface `ValueReaderFactoryRegistry` implements),
+and `TsonStandardLibrary` (see "Front door" below). Moved out of `compiler` on the user's own
+observation that they "set out the configuration of the library" rather than being compiler
+mechanics -- confirmed before moving anything: none of the three touches a package-private compiler
+class directly, so the move needed zero forced visibility changes elsewhere.
+`ValueReaderFactoryRegistry` itself deliberately **stayed** in `compiler`, despite reading the same
+way at first glance -- it's the literal wiring table binding constructor names to concrete reader
+implementations (`AtomValueReader`, `BooleanReader`, `ChoiceReader`, `VariantBindReader`,
+`VariantSchemaReader`, `VoidReader`, `ErrorReader`), every one of them deliberately package-private
+per this file's own "Naming convention" note above; moving the registry out would have forced all of
+them public just so it could keep referencing them, a real, unwanted expansion of internal surface,
+not a free move.
+
+**`TsonStandardLibrary`** is the "load the standard library" front door (`BACKLOG.md`'s own
+"Front door / ergonomics" item, now landed): `TsonStandardLibrary.builder().build()` bootstraps
+meta-kernel → meta.tn1 → core.tn1 in one call, replacing the `TsonSchemaRegistry`/
+`TsonCompiledRegistry`/`DefaultTsonCompiledSchemaLoader` wiring `TinySchemaImportsCoreTn1Test`/
+`CoreSchemaImportTest` (and `tson-cli`'s own, now-deleted internal `StandardLibrary` helper) used to
+hand-roll; `.resolve(schemaText)` and `.compile(linked, mode)`/`.compile(schemaText, mode)` then
+resolve/compile a caller-supplied schema governed by one of the three. **`resolve` takes no mode
+parameter at all -- only `compile` does**, reflecting a real, non-obvious constraint found while
+building this: resolving an `Instance`/`AtomRefinement` declaration (`DefinitionResolver
+.bindAtomInstance`) always needs a real, object-binding-mode governing-meta reader, regardless of
+what mode the *final* compiled schema wants, since it casts its governing meta-schema's own reader
+output straight to `schema.meta.Top` -- a DOM reader's plain `Map`/`List` output fails that cast
+outright. Only *compiling* an already-resolved, already-linked schema (`TsonCompiledMetaSchema
+.bootstrap`) is free to pick a different mode, since it just dispatches an already-built `Top` body
+tree to a factory by constructor name and never re-runs resolution. `tson-cli` was refactored to
+build on this directly (`ValidateCommand`/`CompileCommand`/`DiagnosticsSchema`), making it real,
+working proof the front door is usable, not just a design on paper.
 
 ### Bundled schema documents (`tson-parser/src/main/java/io/ltr8/tson/parser/resolver/BundledSchemaSource.java`)
 
@@ -1773,27 +1811,20 @@ own real, published `!!id`.
 hand-roll its own fetch-parse-resolve-register-compile sequence for one schema specifically; the
 general version of that sequence is exactly what `DefaultTsonCompiledSchemaLoader#load(String)`'s own
 generic branch already does for *any* URI, given a `TsonSchemaSource` that knows how to fetch it. This
-class is that source for all three well-known identities — nothing more. A caller wanting meta.tn1's
-own compiled reader now does:
+class is that source for all three well-known identities — nothing more.
+
+**A caller wanting a working environment now uses `TsonStandardLibrary` directly** (see
+"Configuration package" above) rather than assembling `TsonSchemaRegistry`/`TsonCompiledRegistry`/
+`DefaultTsonCompiledSchemaLoader` by hand — `BundledSchemaSource` is still exactly what powers it
+underneath, just no longer something a caller needs to reach for directly:
 
 ```java
-TsonSchemaRegistry schemaRegistry = new TsonSchemaRegistry();
-ValueReaderFactoryResolver resolver = ValueReaderFactoryRegistry.bind(SchemaMetaNameBinder.defaultContext());
-TsonCompiledRegistry registry = new TsonCompiledRegistry(schemaRegistry, resolver);
-DefaultTsonCompiledSchemaLoader loader = new DefaultTsonCompiledSchemaLoader(registry, BundledSchemaSource.INSTANCE);
-
-// meta.tn1's own !!import needs meta-kernel present in the *shared* registry first -- meta-kernel's
-// own bootstrap case (loader.load(META_KERNEL_ID)) is never cached in registry itself (see
-// DefaultTsonCompiledSchemaLoader's own Javadoc), so it needs registering separately, resolved
-// ordinarily against this same loader (whose own bootstrap branch supplies the structure namespace).
-SchemaDocument metaKernelDocument = new TsonSchemaParser(
-        BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID)).parseSchemaDocument();
-TsonSchema resolvedMetaKernel = new TsonSchemaResolver(loader).resolveSchema(metaKernelDocument);
-registry.register(resolvedMetaKernel, loader.load(BundledSchemaSource.META_KERNEL_ID));
-
-TsonCompiledMetaSchema meta = loader.load(BundledSchemaSource.META_TN1_ID);
-TsonCompiledMetaSchema core = loader.load(BundledSchemaSource.CORE_TN1_ID); // needs meta.tn1 registered first, same reasoning
+TsonStandardLibrary library = TsonStandardLibrary.builder().build(); // meta-kernel + meta.tn1 + core.tn1
+TsonCompiledMetaSchema compiled = library.compile(schemaText, ValueReaderFactoryRegistry.dom());
 ```
+
+The hand-assembled sequence above still exists — `TsonStandardLibrary.Builder#build`'s own
+implementation is exactly it — but a caller no longer needs to write it out themselves.
 
 **That `META_KERNEL_ID` entry in `RESOURCES` is still never actually reached through
 `DefaultTsonCompiledSchemaLoader#load`**, though — that method special-cases it and resolves it via

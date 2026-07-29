@@ -1,6 +1,6 @@
 package io.ltr8.tson.parser.resolver;
 
-import io.ltr8.tson.parser.compiler.TsonCompiledRegistry;
+import io.ltr8.tson.parser.config.TsonCompiledRegistry;
 
 /**
  * Where a {@link TsonCompiledSchemaLoader} gets a schema document's own raw source text from, for a
