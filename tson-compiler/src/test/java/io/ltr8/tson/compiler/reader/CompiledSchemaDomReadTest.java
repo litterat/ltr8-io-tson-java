@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonDataParser;
+import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -72,6 +73,6 @@ class CompiledSchemaDomReadTest {
     void badDataStillFailsWithAClearError() {
         TsonCompiledSchema compiled = compiled();
 
-        assertThrows(IllegalArgumentException.class, () -> read(compiled, "{}", "integer_size"));
+        assertThrows(TsonReadException.class, () -> read(compiled, "{}", "integer_size"));
     }
 }

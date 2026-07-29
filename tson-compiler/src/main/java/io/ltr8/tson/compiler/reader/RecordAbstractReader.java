@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.TsonValueReaderResolver;
 import io.ltr8.tson.compiler.ast.AbsentValue;
@@ -13,6 +14,7 @@ import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
+import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.Token;
 
 import java.util.ArrayList;
@@ -59,9 +61,12 @@ abstract class RecordAbstractReader<T> implements TsonValueReader<T> {
     final Object[] precomputedValue;
     final int[] fixedFieldIndices;
     final int positionalFieldIndex;
+    final Optional<SourcePosition> schemaPosition;
 
-    RecordAbstractReader(String name, RecordBody body, TsonValueReaderResolver resolver) {
+    RecordAbstractReader(String name, RecordBody body, TsonValueReaderResolver resolver,
+                          Optional<SourcePosition> schemaPosition) {
         this.name = name;
+        this.schemaPosition = schemaPosition;
         this.fields = buildFields(body, resolver);
         this.fieldIndex = new HashMap<>();
         this.precomputedValue = new Object[fields.size()];
@@ -122,12 +127,21 @@ abstract class RecordAbstractReader<T> implements TsonValueReader<T> {
         return state == FieldState.REQUIRED_FIXED || state == FieldState.OPTIONAL_FIXED;
     }
 
-    /** {@code REQUIRED_FIXED}/{@code OPTIONAL_FIXED} fields are pre-seeded from {@link #fixedFieldIndices} before this can ever be reached for them. */
-    final Object defaultOrRequireNonFixed(int schemaIndex) {
+    /**
+     * {@code REQUIRED_FIXED}/{@code OPTIONAL_FIXED} fields are pre-seeded from {@link
+     * #fixedFieldIndices} before this can ever be reached for them. {@code enclosingValue} is the
+     * record-shaped {@link DataValue} being read -- not the missing field's own value, which by
+     * definition doesn't exist -- so a {@link TsonReadException} thrown here can carry the
+     * enclosing record's own {@link CoreValue} identity (for a caller holding the original parser's
+     * own position side-table to resolve) alongside {@link #schemaPosition} (already resolved, no
+     * further lookup needed).
+     */
+    final Object defaultOrRequireNonFixed(int schemaIndex, DataValue enclosingValue) {
         RecordField schema = fields.get(schemaIndex).schema();
         return switch (schema.state()) {
-            case REQUIRED -> throw new IllegalArgumentException(
-                    "missing required field '" + schema.name() + "' for '" + name + "'");
+            case REQUIRED -> throw new TsonReadException(
+                    "missing required field '" + schema.name() + "' for '" + name + "'",
+                    enclosingValue.coreValue(), schemaPosition);
             case OPTIONAL -> null;
             case REQUIRED_DEFAULT -> precomputedValue[schemaIndex];
             case REQUIRED_FIXED, OPTIONAL_FIXED -> throw new IllegalStateException("unreachable: '" + schema.name()

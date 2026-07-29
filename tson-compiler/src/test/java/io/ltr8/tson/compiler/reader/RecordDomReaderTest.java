@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonDataParser;
+import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.ast.Document;
 import io.ltr8.tson.compiler.atom.AtomValidationException;
@@ -85,7 +86,7 @@ class RecordDomReaderTest {
         TsonCompiledSchema compiled = compile(
                 pointSchema(atomEntry(IntegerType.UNCONSTRAINED), RecordField.required("value", TypeRef.of("integer"))));
 
-        IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class, () -> read(compiled, "{}"));
+        TsonReadException thrown = assertThrows(TsonReadException.class, () -> read(compiled, "{}"));
         assertTrue(thrown.getMessage().contains("value"), thrown.getMessage());
     }
 

@@ -2,6 +2,7 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.compiler.ast.AbsentValue;
 import io.ltr8.tson.compiler.ast.ArrayValue;
+import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.Document;
 import io.ltr8.tson.compiler.ast.EmptyBrace;
@@ -12,8 +13,13 @@ import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import org.junit.jupiter.api.Test;
 
+import java.util.Map;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -620,5 +626,41 @@ class TsonDataParserTest {
         assertEquals(TokenForm.MULTI_LINE_QUOTED, notesToken.form());
         assertEquals("Leave the parcel with the concierge.\nGift wrap — no prices on the slip.",
                 notesToken.text());
+    }
+
+    // ── Position side-table ──────────────────────────────────────────────
+
+    @Test
+    void positionsRecordsTheStartOfEachCoreValue() {
+        TsonDataParser parser = new TsonDataParser("{ a: 1 }");
+        Document document = parser.parseDocument();
+        RecordValue record = assertInstanceOf(RecordValue.class, document.root().coreValue());
+        TokenValue value = assertInstanceOf(TokenValue.class,
+                record.fields().get(0).value().value().coreValue());
+
+        Map<CoreValue, Position> positions = parser.positions();
+        assertEquals(new Position(1, 1, 0), positions.get(record));
+        assertEquals(1, positions.get(value).line());
+        assertTrue(positions.get(value).column() > positions.get(record).column());
+    }
+
+    @Test
+    void positionsAssignsDistinctEntriesToStructurallyIdenticalElements() {
+        TsonDataParser parser = new TsonDataParser("[42 42]");
+        Document document = parser.parseDocument();
+        ArrayValue array = assertInstanceOf(ArrayValue.class, document.root().coreValue());
+
+        CoreValue first = array.elements().get(0).value().coreValue();
+        CoreValue second = array.elements().get(1).value().coreValue();
+        assertEquals(first, second, "structurally identical -- both TokenValue(\"42\", UNQUOTED)");
+        assertNotSame(first, second, "but two distinct occurrences, never the same object");
+
+        Map<CoreValue, Position> positions = parser.positions();
+        Position firstPosition = positions.get(first);
+        Position secondPosition = positions.get(second);
+        assertNotNull(firstPosition);
+        assertNotNull(secondPosition);
+        assertNotEquals(firstPosition, secondPosition,
+                "an IdentityHashMap keyed on == must not collapse two equals()-equal but distinct occurrences");
     }
 }

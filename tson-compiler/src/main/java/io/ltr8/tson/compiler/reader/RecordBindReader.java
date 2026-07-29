@@ -15,11 +15,13 @@ import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.base.NumberNarrowing;
 import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Object-binding mode's own {@code record} reader -- reads a record-shaped value into a real, bound
@@ -67,8 +69,9 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
     private final int nonFixedFieldCount;
     private final boolean hasUnboundField;
 
-    public RecordBindReader(String name, RecordBody body, DataClassRecord descriptor, TsonValueReaderResolver resolver) {
-        super(name, body, resolver);
+    public RecordBindReader(String name, RecordBody body, DataClassRecord descriptor, TsonValueReaderResolver resolver,
+                             Optional<SourcePosition> schemaPosition) {
+        super(name, body, resolver, schemaPosition);
         this.descriptor = descriptor;
         this.targetField = new DataClassField[fields.size()];
         boolean anyUnbound = false;
@@ -164,7 +167,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 }
                 DataValue fieldValue = dataField.value().value();
                 arguments[target.index()] = isAbsent(fieldValue)
-                        ? defaultOrRequireNonFixed(schemaIndex)
+                        ? defaultOrRequireNonFixed(schemaIndex, value)
                         : narrow(field.parser().read(fieldValue), target.type());
                 filledCount++;
             } else {
@@ -173,7 +176,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 }
                 DataValue fieldValue = dataField.value().value();
                 if (isAbsent(fieldValue)) {
-                    defaultOrRequireNonFixed(schemaIndex);
+                    defaultOrRequireNonFixed(schemaIndex, value);
                 } else {
                     field.parser().read(fieldValue);
                 }
@@ -191,10 +194,10 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 DataClassField target = targetField[i];
                 if (target != null) {
                     if (arguments[target.index()] == null) {
-                        arguments[target.index()] = defaultOrRequireNonFixed(i);
+                        arguments[target.index()] = defaultOrRequireNonFixed(i, value);
                     }
                 } else if (!unboundFilled[i]) {
-                    defaultOrRequireNonFixed(i);
+                    defaultOrRequireNonFixed(i, value);
                 }
             }
         }
@@ -280,7 +283,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             DataClass dataClass = descriptorFor(name);
 
             if (typeDefinition.subtypes().isEmpty()) {
-                return new RecordBindReader(name, body, requireRecord(name, dataClass), resolver);
+                return new RecordBindReader(name, body, requireRecord(name, dataClass), resolver, typeDefinition.position());
             }
 
             if (dataClass instanceof DataClassUnion union) {
@@ -293,7 +296,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             }
 
             if (dataClass instanceof DataClassRecord record) {
-                RecordBindReader ownParser = new RecordBindReader(name, body, record, resolver);
+                RecordBindReader ownParser = new RecordBindReader(name, body, record, resolver, typeDefinition.position());
                 return new VariantSchemaReader(name, ownParser, typeDefinition.subtypes(), resolver);
             }
 

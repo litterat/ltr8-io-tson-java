@@ -2313,6 +2313,82 @@ as an environment/tool-specific artifact of the session that investigated it, no
 the test class's own designed-in tolerance (`Assumptions.assumeTrue`, skip rather than fail) is
 exactly why a full build stayed green regardless.
 
+### Positional read errors: a thin end-to-end stripe
+
+Before this, position info existed only *during* parsing -- `TsonParseException`/
+`TsonUnsupportedDocumentException` already carried a `Position`, but once a `Document`/resolved
+schema exists, every position was gone; `RecordAbstractReader`'s missing-required-field error named
+things by string only ("missing required field 'x' for 'y'"), nowhere to point at. Built as a
+single vertical slice through one concrete scenario -- missing required field, reporting *both*
+where the record sits in the data source and where the field was declared in the schema source --
+rather than building every layer to full generality first.
+
+- **Two identity-keyed side-tables, not a `Position` field on every AST node.** `TsonDataParser`
+  gained `Map<CoreValue, Position> positions` (`IdentityHashMap`, `positions()` returning an
+  unmodifiable view) and `TsonSchemaParser` gained a second, separately-keyed
+  `Map<SchemaMap.Declaration, Position> declarationPositions` -- both populated at every real
+  construction site (`recordPosition(value, position)`, called from `parseCoreValue`/
+  `parseBraceValue`/`parseArray`/`parseFieldModifier`/`parseTypeArg`/`parseDeclaration`). Keyed on
+  identity (`==`), not `equals()`, deliberately: two structurally-identical-but-distinct occurrences
+  (`[42 42]`'s two elements) must never collide, and every `CoreValue`/`SchemaMap.Declaration` is a
+  fresh `new` at every occurrence, never cached or reused as a singleton, so identity keying is sound.
+- **`SourcePosition`** (`tson-schema/.../meta/SourcePosition.java`, `{int line(); int column(); int
+  byteOffset();}`) is the same "interface in the dependency, implemented by the dependent" shape
+  `schema.meta.Token` already established for `tson-compiler`'s own `TokenValue`/`TokenForm` --
+  `tson-schema` has zero dependency on `tson-compiler`, so `schema.meta` can't name `Position`
+  directly; `tson-compiler`'s own `Position` record implements `SourcePosition` directly instead
+  (`tson-compiler` already `requires transitive io.ltr8.tson.schema`).
+- **`TypeDefinition` carries `position` directly, not a third side-table.** `TypeDefinition` already
+  flows unchanged through every compile-stage hop (`TsonSchemaCompiler.compile -> Compilation.build
+  -> TsonCompiledMetaSchema.create -> ValueReaderFactory.create`, the same three-parameter shape at
+  every hop), so a 9th component, `Optional<SourcePosition> position`, reaches `RecordAbstractReader`'s
+  own construction with zero interface changes anywhere in that chain. A `TypeDefinition ->
+  TsonSchema` back-reference (considered, dropped) wasn't needed and would have been a real
+  object-graph cycle (`TsonSchema.entries()` is `Map<String, TypeDefinition>`). The canonical
+  9-arg constructor carries `@Record` (a second public constructor, same `IntegerSize`-precedent
+  gotcha documented elsewhere in this file) alongside an 8-arg convenience constructor defaulting
+  `position` to `Optional.empty()`, so every pre-existing `new TypeDefinition(...)` call site is
+  unaffected; `withPosition(Optional<SourcePosition>)` builds a repositioned copy. **`equals`/
+  `hashCode` are hand-written, deliberately excluding `position`** -- `TypeDefinition` is compared
+  structurally throughout `DefinitionResolverTest` (hand-built expected value vs. a real resolved
+  one), and two logically-identical entries legitimately come from different parses; `toString()`
+  stays generated. `DefinitionResolver.resolve(SchemaMap.Declaration)` now delegates to a new
+  `resolve(SchemaMap.Declaration, Optional<SourcePosition>)` overload, attaching a real position at
+  its one entry point uniformly (not restricted to only the fresh-record-construction path) --
+  broader coverage than the originally scoped plan for negligible extra cost, since every resolution
+  path already funnels through this single method.
+- **`RecordAbstractReader`/`RecordDomReader`/`RecordBindReader`** each gained an `Optional<SourcePosition>
+  schemaPosition` constructor parameter (threaded from `typeDefinition.position()` in both
+  `Factory.create` methods) and `defaultOrRequireNonFixed` gained a `DataValue enclosingValue`
+  parameter (already in scope at all 5 call sites) so its `REQUIRED` branch can throw a real
+  `TsonReadException` naming both.
+- **`TsonReadException`** (root package, alongside `TsonParseException`) carries the message, the
+  failing `CoreValue` itself (for a caller holding the *original* parser's own `positions()` table to
+  resolve after the fact -- a compiled reader is built once and reused across many unrelated reads,
+  so it can never hold one specific read's own position table itself), and `Optional<SourcePosition>
+  schemaPosition` directly (simpler than threading the whole `TypeDefinition` through the exception,
+  since `.position()` is all a catcher ever needs).
+- **`SourcePositionStringBridge`** (`config`, registered in `TsonAtomContext.registerDefaults`)
+  teaches `tson-bind`'s generic reflective binder how to write a `SourcePosition` field as a compact
+  `"line:column:byteOffset"` string -- needed because an interface with no `sealed`/`@Union` signal
+  has no other way to bind generically, and `SourcePosition` can't be given one without
+  `tson-schema` naming `Position` back. Hit the same `MethodHandles.publicLookup()` gotcha
+  `PatternStringBridge` already established: a registered `DataBridge` implementation class must
+  itself be `public`, not just its methods, or `unreflect` throws `IllegalAccessException` at
+  runtime, not compile time.
+- **`PositionalReadErrorsTest`** (`resolver` package, so it can construct a `DefinitionResolver`
+  directly) is the real proof: parses a small schema and a small data document via the real parsers,
+  resolves/compiles/reads through the real pipeline, catches a real `TsonReadException`, and asserts
+  both `dataPositions.get(thrown.dataValue())` and `thrown.schemaPosition()` resolve to the actual
+  line numbers in each hand-written source string (computed from the source text itself via a
+  `lineOf` helper, not hardcoded, so the assertion can't silently drift from the fixture).
+
+**Scope boundaries, not yet built:** no position for `DataValue`/`Annotation`/`ScopedValue`/
+`Document`, only `CoreValue`; single anchor `Position`, no start+end span; no per-`RecordField`
+position (would hit the same equals/hashCode exposure, sharper); every other `RecordAbstractReader`
+failure mode and every other reader kind (`Array`/`Map`/`Tuple`/`Choice`/atom readers) still throws
+its previous plain-string exception.
+
 ### Conformance suite integration (`ConformanceSuiteTest`)
 
 Separate from `LexerTest`/`TsonDataParserTest` (fine-grained unit tests) is `ConformanceSuiteTest`, which runs
