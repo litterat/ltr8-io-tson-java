@@ -116,28 +116,27 @@ yet implemented" section for the technical detail behind several of these items.
   from `.base` to `config` (it was `.base`'s only genuine external caller; the rest is §4
   base-type-resolution machinery). Both re-verified with a real scratch-file compile failure before
   being deleted, same technique as the `.registry` check above.
-- [ ] **A facade over `tson-compiler`'s own pipeline stages, in its own root package** — the user's
-  own stated direction (2026-07-29), sharpened once `tson-parser` actually became `tson-compiler`
-  (see `CLAUDE.md`'s own "`tson-parser` renamed to `tson-compiler`" note): move the actual lexer +
-  Class 1 structural parser (today's root package, `.ast`, `.lexer`) into a new `io.ltr8.tson.compiler.parser`
-  sub-package — a compiler's frontend is its parser, standard compiler-architecture terminology, and
-  it stops the module's own root package from being "everything, undifferentiated" — then put a real
-  facade class directly in `io.ltr8.tson.compiler` giving access to every pipeline stage (parse,
-  resolve, compile) without a caller needing to know the package layout underneath. Two open design
-  questions to settle before building, not blockers to agreeing on the direction: (1) the existing
-  `io.ltr8.tson.compiler.reader` sub-package (the compiled-reader stage) reads redundant now that
-  the *module* itself is called "compiler" — likely folds up into the root package alongside the new
-  facade, matching how `TsonValueReader` already lives at the root today for the identical reason;
-  (2) `.mapper` (`TsonMapperReader`/`TsonMapperWriter`) doesn't semantically belong under "compiler"
-  either — it's a generic schemaless object mapper, not a compiler stage — but it's already a known,
-  separately-tracked situation (blocked on the "Atom-refinement constraint validation" item below
-  removing `DefinitionResolver`'s own `TsonMapperWriter` dependency), not something this facade work
-  needs to solve. Narrower in scope than the `tson` module's own front door (which also bootstraps
-  meta-kernel/meta.tn/core.tn and picks a `DataBindContext`) — this would be `tson-compiler`'s own
-  front door onto its own pipeline stages specifically, for a caller reasoning about it as its own
-  library, not just plumbing under `tson`. This type of package-wide move is planned to be done via
-  IDE refactoring tooling again, not by hand, the same way the module rename itself was — not yet
-  started.
+- [x] **A facade over `tson-compiler`'s own pipeline stages, in its own root package** — done, though
+  not quite via the originally-speculated shape (moving the lexer/structural parser into their own
+  `io.ltr8.tson.compiler.parser` sub-package never happened; `.ast`/`.lexer` stayed where they were).
+  What actually landed instead: the pipeline-stage classes a caller reasons about directly now sit in
+  the root `io.ltr8.tson.compiler` package itself — `TsonDataParser`/`TsonSchemaParser` (parse),
+  `TsonSchemaResolver` (resolve, a thin public wrapper over `resolver.SchemaResolver` now that
+  `.resolver` itself is unexported), `TsonSchemaCompiler`/`TsonCompiledSchema`/`TsonCompiledMetaSchema`
+  (compile), `TsonCompiledSchemaLoader`/`TsonSchemaSource` (the fetch/bootstrap hook), and
+  `TsonValueReader` (read) — so a caller reasoning about `tson-compiler` as its own library sees every
+  stage without needing to know the package layout underneath, without a separate facade *class*
+  being built on top. The two open design questions from the original plan resolved differently than
+  guessed: `.reader` (the compiled-reader stage) did *not* fold into root — it stays its own
+  sub-package, holding only reader implementations, once `TsonSchemaCompiler`/`TsonCompiledSchema`/
+  `TsonCompiledMetaSchema` moved out of it; `.mapper` remains unresolved, still blocked on the same
+  "Atom-refinement constraint validation" item as before.
+  Remaining, lower-priority cleanup identified along the way, not blocking and not yet started —
+  pick up as other work happens to touch this area: removing the `config` package entirely (folding
+  `SchemaMetaNameBinder`/`TsonAtomContext`/`TsonCompiledRegistry`/`ValueReaderFactoryResolver`
+  somewhere that isn't its own separate "configuration" layer); and further polish on the facade
+  interfaces themselves (`TsonCompiledSchemaLoader`/`TsonSchemaSource`/`TsonValueReaderResolver`) once
+  it's clearer what a caller actually needs from them in practice.
 
 ## Layer boundaries / schema registry
 

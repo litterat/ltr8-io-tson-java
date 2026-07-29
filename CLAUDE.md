@@ -126,7 +126,8 @@ match rather than being a fixed, unchangeable external identity.
 
 `tson-compiler` holds the lexer, the data-grammar structural parser, base type resolution, the built-in
 type vocabulary, the Part 2 schema grammar (`TsonSchemaParser`, `ast.schema`), the schema resolver
-(`io.ltr8.tson.compiler.resolver.TsonSchemaResolver`, producing Class 2's resolved schema value), *and*
+(`io.ltr8.tson.compiler.TsonSchemaResolver`, a thin public wrapper over `resolver.SchemaResolver`,
+producing Class 2's resolved schema value), *and*
 (moved here 2026-07-24, see "Mapper" below) the generic `DataValue`&lt;-&gt;Java-object binding layer
 (`io.ltr8.tson.compiler.mapper`) — every one of these is tightly coupled to the shared lexer/token-stream
 machinery (the schema grammar reuses the data grammar's own `annotation`/`data-value`/directive-parsing
@@ -2252,6 +2253,28 @@ before executing: fold those classes up into the root `io.ltr8.tson.compiler` pa
 already holds `TsonValueReader` for the identical reason — it's the thing a caller actually holds,
 not an internal detail), alongside a new facade giving access to every pipeline stage without a
 caller needing to know the package layout — not yet built, tracked in `BACKLOG.md`.
+
+**Done, 2026-07-29, though not quite via the plan above.** `TsonSchemaCompiler`/`TsonCompiledSchema`
+moved to the root package as planned, but `.compiler.compiler` was renamed to `.compiler.reader`
+rather than folded away entirely — it still holds the reader implementations
+(`ValueReaderFactory`/`Registry`, the `*DomReader`/`*BindReader` families, `ErrorReader`, ...),
+just not the noun/verb classes a caller actually holds. `TsonCompiledMetaSchema` moved to root
+alongside `TsonSchemaCompiler`/`TsonCompiledSchema`; `ValueReaderResolver` moved with them too, made
+public as `TsonValueReaderResolver` (root) since the `*Reader`/`*AbstractReader` classes staying
+behind in `.reader` still need to reference it across the new package boundary. Root also gained
+`TsonSchemaResolver` — a thin public wrapper over `resolver.SchemaResolver` (renamed from
+`resolver.TsonSchemaResolver`, on the user's own direction, once `.resolver` itself dropped out of
+`module-info.java`'s own exports list) — and `TsonCompiledSchemaLoader`/`TsonSchemaSource`, moved
+from `.resolver` for the identical "consumer needs an exported package to reach this" reason. No
+separate facade *class* was built on top of all this; the root package itself, now holding one class
+per pipeline stage a caller actually names (parse: `TsonDataParser`/`TsonSchemaParser`; resolve:
+`TsonSchemaResolver`; compile: `TsonSchemaCompiler`/`TsonCompiledSchema`/`TsonCompiledMetaSchema`;
+read: `TsonValueReader`), is the facade. `.mapper`'s own non-fit (see this section's own note above)
+is still unresolved, still blocked on the same "Atom-refinement constraint validation" item. Two
+further, lower-priority loose ends surfaced along the way, deliberately deferred rather than pulled
+into this pass — see `BACKLOG.md`: removing the `config` package entirely, and a further pass over
+the facade interfaces themselves (`TsonCompiledSchemaLoader`/`TsonSchemaSource`/
+`TsonValueReaderResolver`) once it's clearer what a caller actually needs from them.
 
 **Verified, not assumed**: full `./gradlew clean build` green across all six modules after the two
 `module-info.java` fixes (906/906 tests in `tson-compiler`, 50/50 `tson-schema`, 5/5 `tson`, 20/20
