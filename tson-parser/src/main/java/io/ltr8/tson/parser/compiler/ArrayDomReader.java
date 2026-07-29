@@ -20,7 +20,7 @@ import java.util.List;
  * <p>Everything else -- resolving the element reader, unwrapping the incoming {@link DataValue},
  * size/uniqueness/absent-element validation -- lives on {@link ArrayAbstractReader}.
  */
-public final class ArrayDomReader extends ArrayAbstractReader<List<Object>> {
+final class ArrayDomReader extends ArrayAbstractReader<List<Object>> {
 
     public ArrayDomReader(String name, ArrayBody body, ValueReaderResolver resolver) {
         super(name, body, resolver);

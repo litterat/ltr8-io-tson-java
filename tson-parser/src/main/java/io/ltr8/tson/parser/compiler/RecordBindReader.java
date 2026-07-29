@@ -59,7 +59,7 @@ import java.util.List;
  * real bound object instead of a plain {@code Map}: the target-field lookup, narrowing, and
  * constructor invocation.
  */
-public final class RecordBindReader extends RecordAbstractReader<Object> {
+final class RecordBindReader extends RecordAbstractReader<Object> {
 
     private final DataClassRecord descriptor;
     private final DataClassField[] targetField;

@@ -31,7 +31,7 @@ import java.util.List;
  * DataValue} and checking its arity, absent-position handling -- lives on {@link
  * TupleAbstractReader}.
  */
-public final class TupleBindReader extends TupleAbstractReader<Object> {
+final class TupleBindReader extends TupleAbstractReader<Object> {
 
     private final DataClassTuple descriptor;
 

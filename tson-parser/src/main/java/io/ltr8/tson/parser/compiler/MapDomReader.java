@@ -19,7 +19,7 @@ import java.util.Map;
  * <p>Everything else -- resolving the key/value readers, unwrapping the incoming {@link DataValue},
  * size validation, rejecting an absent key -- lives on {@link MapAbstractReader}.
  */
-public final class MapDomReader extends MapAbstractReader<Map<Object, Object>> {
+final class MapDomReader extends MapAbstractReader<Map<Object, Object>> {
 
     public MapDomReader(String name, MapBody body, ValueReaderResolver resolver) {
         super(name, body, resolver);

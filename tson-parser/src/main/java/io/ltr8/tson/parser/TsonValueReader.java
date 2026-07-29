@@ -2,7 +2,6 @@ package io.ltr8.tson.parser;
 
 import io.ltr8.tson.parser.ast.DataValue;
 import io.ltr8.tson.parser.atom.AtomType;
-import io.ltr8.tson.parser.compiler.RecordDomReader;
 import io.ltr8.tson.parser.compiler.TsonCompiledSchema;
 import io.ltr8.tson.parser.compiler.ValueReaderFactory;
 import io.ltr8.tson.parser.compiler.ValueReaderFactoryRegistry;
@@ -41,7 +40,7 @@ import io.ltr8.tson.parser.compiler.ValueReaderFactoryRegistry;
  * ValueReaderFactory} would produce a result that was never meant to be written back out at all, so
  * a single {@code write(T)} on this interface would be meaningless for at least one of the reader
  * families this is meant to cover. Left for a later pass once a non-object-binding factory set
- * actually exists to design against -- only DOM mode ({@link RecordDomReader}, object-shaped) and
+ * actually exists to design against -- only DOM mode ({@code RecordDomReader}, object-shaped) and
  * object-binding mode's own atom-family factories exist today.
  *
  * @param <T> the host value this reader produces -- an atom's natural host type for an atom-family

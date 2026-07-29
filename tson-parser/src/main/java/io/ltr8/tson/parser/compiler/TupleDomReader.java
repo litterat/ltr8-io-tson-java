@@ -22,7 +22,7 @@ import java.util.List;
  * DataValue} and checking its arity, absent-position handling -- lives on {@link
  * TupleAbstractReader}.
  */
-public final class TupleDomReader extends TupleAbstractReader<List<Object>> {
+final class TupleDomReader extends TupleAbstractReader<List<Object>> {
 
     public TupleDomReader(String name, TupleBody body, ValueReaderResolver resolver) {
         super(name, body, resolver);

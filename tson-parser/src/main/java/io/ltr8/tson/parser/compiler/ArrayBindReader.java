@@ -39,7 +39,7 @@ import java.util.List;
  * unique_items} is still enforced there regardless of what {@code descriptor}'s own backing
  * collection would otherwise silently tolerate.
  */
-public final class ArrayBindReader extends ArrayAbstractReader<Object> {
+final class ArrayBindReader extends ArrayAbstractReader<Object> {
 
     private final DataClassArray descriptor;
 

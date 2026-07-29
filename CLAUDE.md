@@ -1492,7 +1492,7 @@ from meta.tn1's own composition-based declarations (`date_type => ~atom & atom_s
 declaration order already places each dependency before its use), and the merged, linked
 registration succeeds outright.
 
-### Class 2 compilation (`compiler/{TsonSchemaCompiler,TsonCompiledSchema,TsonCompiledMetaSchema,ValueReaderFactory,ValueReaderFactoryRegistry,ValueReaderFactoryResolver,ValueReaderResolver,ErrorReader}.java`, `TsonValueReader.java`)
+### Class 2 compilation (`compiler/{TsonSchemaCompiler,TsonCompiledSchema,TsonCompiledMetaSchema,ValueReaderFactory,ValueReaderFactoryRegistry,ValueReaderResolver,ErrorReader}.java`, `config/ValueReaderFactoryResolver.java`, `TsonValueReader.java`)
 
 `TsonSchemaCompiler.compile(TsonLinkedSchema, TsonCompiledMetaSchema)` is the "compile" stage of
 parse -> resolve -> link -> register -> compile -> read; `TsonCompiledSchema` is the noun it
@@ -1537,6 +1537,17 @@ rewrite below -- restored to the general catch-all on the user's own direction o
 that was the right design all along, not a workaround** (confirmed: restoring it took the failing
 suite straight to 1130/1130, since every other entry it was catching was *supposed* to defer, not
 abort).
+
+**`ValueReaderResolver` is package-private, alongside the eight `*DomReader`/`*BindReader` classes
+(`Array`/`Map`/`Record`/`Tuple` × Dom/Bind, "Object-binding mode" below) -- narrowed in an
+API-surface pass once `Tson`/`TsonConfig` gave this codebase a real front door to check against.**
+All nine were `public` purely as a leftover of an earlier refactor stage (mid-refactor cross-package
+test access, not a real external caller) -- confirmed by checking every actual reference before
+touching anything: none is ever named from outside `compiler`'s own package, by any of the `tson`/
+`tson-cli` modules or by a cross-package test. `TsonCompiledMetaSchema`/`TsonCompiledSchema`/
+`TsonSchemaCompiler`/`ValueReaderFactory`/`ValueReaderFactoryRegistry` stayed public -- each has a
+genuine cross-package or cross-module caller (`ValueReaderFactory` specifically because `config
+.ValueReaderFactoryResolver#resolve` returns one across the `compiler`/`config` package boundary).
 
 **`ValueReaderFactory`/`ValueReaderFactoryResolver`/`ValueReaderResolver`** are the three small
 interfaces the dispatch runs through: `ValueReaderFactory.create(name, typeDefinition, resolver)`
@@ -1904,7 +1915,7 @@ here anyway so this class is a complete, uniform "fetch any of this library's ow
 documents" utility on its own terms, and safe for any *other* `TsonCompiledSchemaLoader` implementation that
 doesn't special-case meta-kernel the way `DefaultTsonCompiledSchemaLoader` does.
 
-### Object-binding mode (`compiler/{RecordBindReader,ArrayBindReader,MapBindReader,TupleBindReader,VariantBindReader,VariantSchemaReader,SchemaMetaNameBinder}.java` + `tson-bind`'s own `DataNameBinder`/`DataParameterizedType`)
+### Object-binding mode (`compiler/{RecordBindReader,ArrayBindReader,MapBindReader,TupleBindReader,VariantBindReader,VariantSchemaReader}.java`, `config/SchemaMetaNameBinder.java` + `tson-bind`'s own `DataNameBinder`/`DataParameterizedType`)
 
 A second output mode for the compiled reader, alongside DOM mode's plain `Map<String, Object>` --
 `RecordBindReader` produces a real, bound `schema.meta` Java object (a real `IntegerType`, not a map
@@ -1928,8 +1939,9 @@ build the two complete factory tables (see "Class 2 compilation" above); only th
 constructor slots (and, transitively, whatever a record's own array/map/tuple-typed fields resolve
 to) actually differ per mode -- every atom-family factory is shared verbatim between both.
 
-**`SchemaMetaNameBinder`** (moved into `compiler` directly, no longer implementing an interface of
-its own) is the schema-type-name → Java-`Class` binding object-binding mode needs, backed by
+**`SchemaMetaNameBinder`** (now in `config`, alongside the other configuration/wiring classes -- see
+"Configuration package" above; no longer implementing an interface of its own) is the schema-type-name
+→ Java-`Class` binding object-binding mode needs, backed by
 `tson-bind`'s own `io.ltr8.bind.DataNameBinder` (`resolve(String) -> Class<?>`, throwing
 `DataBindException`). **Deliberately a plain name → `Class.forName` lookup with a caller-supplied
 naming convention, not a scan of `Top`'s own sealed union** -- there is no reflection API to

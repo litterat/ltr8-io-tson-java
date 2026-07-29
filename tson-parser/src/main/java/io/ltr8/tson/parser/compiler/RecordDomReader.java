@@ -39,7 +39,7 @@ import java.util.Map;
  * {@link RecordAbstractReader}; this class holds only what's genuinely different about producing a
  * plain {@code Map} instead of a bound object.
  */
-public final class RecordDomReader extends RecordAbstractReader<Map<String, Object>> {
+final class RecordDomReader extends RecordAbstractReader<Map<String, Object>> {
 
     public RecordDomReader(String name, RecordBody body, ValueReaderResolver resolver) {
         super(name, body, resolver);

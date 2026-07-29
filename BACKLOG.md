@@ -78,9 +78,22 @@ yet implemented" section for the technical detail behind several of these items.
   schema position it's reading against.
 - [ ] A real disk/HTTP-backed `TsonSchemaSource` with whitelist/blacklist policy — only
   `BundledSchemaSource` and `TsonSchemaSource.registeredOnly()` exist today.
-- [ ] API-surface pass, now that a real front door (`Tson`/`TsonConfig`) exists — a lot of what's
-  `public` in `compiler`/`resolver`/`config` today is public only because tests needed cross-package
-  access mid-refactor, not because it's meant to be part of a consumer-facing API.
+- [x] **API-surface pass — `compiler`'s eight `*DomReader`/`*BindReader` classes
+  (`Array`/`Map`/`Record`/`Tuple` × Dom/Bind) and `ValueReaderResolver` narrowed to package-private.**
+  Checked every public class/method in `compiler`/`resolver`/`config` against real cross-package (same
+  module) and cross-module usage before touching anything, not just by inspection — these nine were
+  the only ones referenced *exclusively* from within `compiler`'s own package (main + same-package
+  tests), confirming they'd been left `public` purely as a leftover of an earlier refactor stage, not
+  because any real caller (the `tson` front door, `tson-cli`, or a cross-package test) ever names them
+  directly. `TsonValueReader`'s own Javadoc (`tson-parser`'s root package) referenced `RecordDomReader`
+  via `{@link}` — switched to `{@code}` (plain text, no cross-package accessibility requirement) and
+  dropped the now-invalid `import`. Everything else already checked out: `TsonCompiledMetaSchema`/
+  `TsonCompiledSchema`/`TsonSchemaCompiler`/`ValueReaderFactory`/`ValueReaderFactoryRegistry` (real,
+  used-elsewhere API), and every public class in `resolver`/`config`, all have at least one genuine
+  cross-package or cross-module caller (`Tson`/`TsonConfig`, `tson-cli`'s `DiagnosticsSchema`, or
+  another `tson-parser` package) — `MetaKernelBootstrapResolver.getMetaKernelSchema()` in particular
+  stays public because `compiler`-package tests call it directly, not just `resolver`-package ones.
+  Full `./gradlew clean build` stayed green throughout (no cross-package caller was missed).
 
 ## Layer boundaries / schema registry
 

@@ -31,7 +31,7 @@ import java.util.Map;
  * <p>Everything else -- resolving the key/value readers, unwrapping the incoming {@link DataValue},
  * size validation, rejecting an absent key -- lives on {@link MapAbstractReader}.
  */
-public final class MapBindReader extends MapAbstractReader<Object> {
+final class MapBindReader extends MapAbstractReader<Object> {
 
     private final DataClassMap descriptor;
 

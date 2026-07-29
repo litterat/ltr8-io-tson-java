@@ -12,6 +12,6 @@ import io.ltr8.tson.parser.TsonValueReader;
  * of this interface never needs to know or care whether it's being called recursively from a child
  * field or from the top level.
  */
-public interface ValueReaderResolver {
+interface ValueReaderResolver {
     TsonValueReader<?> resolve(String typeName);
 }
