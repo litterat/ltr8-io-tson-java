@@ -134,14 +134,13 @@ import java.util.Set;
  *
  * Everything else -- elided field types outside a tightening entry, an {@code Absent} modifier
  * value ({@code = _}) or any modifier on an OPTIONAL field, the identity-diagonal value-invariant
- * for a restated FIXED field, atom refinement ({@code !I ^ { ... }}, a distinct grammar form from
- * {@code RefinedDef}), constructor application / atom instances ({@code !C value}, {@code Instance}
- * -- {@code value => !unit {}}, {@code boolean => !enum [true false]}, and every other atom-family
- * bootstrap instance in the real fixture use this and are not dispatched at all yet in {@link
- * #resolveTypeDef}), restating a field group in a refinement body, subtraction, a generic type-ref
- * with a nested or value (non-simple) argument, and an inter-supertype field collision -- is
- * explicitly out of scope for now and reported via {@link UnsupportedOperationException} rather
- * than silently mis-resolved; each is a later, separate pass.
+ * for a restated FIXED field, restating a field group in a refinement body, subtraction, a generic
+ * type-ref with a nested or value (non-simple) argument, and an inter-supertype field collision --
+ * is explicitly out of scope for now and reported via {@link UnsupportedOperationException} rather
+ * than silently mis-resolved; each is a later, separate pass. (Constructor application / atom
+ * instances -- {@code !C value}, {@link Instance} -- and atom refinement -- {@code !I ^ { ... }},
+ * {@link AtomRefinement} -- are both dispatched, via {@link #resolveInstance}/{@link
+ * #resolveAtomRefinement} below.)
  *
  * <p>Declarations are resolved against two separate namespaces (§3.3.1), each exposed through a
  * required constructor parameter rather than threaded through individual method calls, since both

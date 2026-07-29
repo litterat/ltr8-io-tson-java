@@ -1985,6 +1985,11 @@ No system Gradle — always use the wrapper:
 
 ## Not yet implemented
 
+See `BACKLOG.md` at the repo root for the actively-tracked engineering backlog this section feeds
+into, and `STRUCTURED-OUTPUT.md` for the target-use-case plan (LLM structured output validation,
+JSON compatibility) — the notes below are the technical detail behind specific items, not a task
+list to work through in order.
+
 - Part 2 schema resolution: subtraction, elided field types outside a tightening entry, restating a
   field group in a refinement body, the identity-diagonal FIXED-value invariant, and generic
   type-refs beyond a bare two-argument `map<K, V>` application or a refinement source — see

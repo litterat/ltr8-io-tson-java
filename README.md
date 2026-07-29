@@ -39,35 +39,26 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
 - [x] Part 2 schema resolution — composition (`&`), refinement (`^`) including tightening, bare and
       generic type references, field modifiers/defaults/fixed values, type parameters, array sugar,
       and generalized constructor-application/atom-refinement resolution (`!C value`); `meta-kernel.tn1`
-      resolves all 49 of its own declarations and `meta.tn1` all 31 of its own, both end-to-end (see
-      [Not yet implemented](#not-yet-implemented) below for the specific constructs still out of scope)
-- [x] Part 2 schema linking and registration — flattens argument-bearing type references into real
-      named entries, merges `!!import`s, validates every reference in a schema actually resolves, and
+      resolves all 49 of its own declarations, `meta.tn1` all 31, and `core.tn1` all 48, all
+      end-to-end (see [Not yet implemented](#not-yet-implemented) below for the specific constructs
+      still out of scope)
+- [x] Part 2 schema linking and registration — validates a document's own `!!id`/`!!import` header
+      directives during resolution, flattens argument-bearing type references into real named
+      entries, merges `!!import`s, validates every reference in a schema actually resolves, and
       locks a schema into a registry keyed by its canonical `!!id`
 - [x] A compiled, schema-validating data reader (Class 2, §1.5) — compiles a linked schema into real
       Java object references between per-type parsers (DOM or object-binding mode) for fast repeated
       reads against real TSON data documents (see [Schema pipeline](#schema-pipeline) below)
+- [x] The full pipeline verified end-to-end, three schemas deep — an ordinary, user-defined schema
+      can `!!import` `core.tn1` (itself governed by `meta.tn1`, governed by `meta-kernel.tn1`) and
+      compile cleanly with real, manually-registered Java classes bound against records composed
+      from its imported vocabulary, reading real TSON data through the whole chain
 
 **Not yet implemented:**
 
-- [ ] Network/identifier types — `cidr4`, `cidr6`, `mac` (Part 1 built-in vocabulary; the Part 2
-  `schema.meta` shapes for these exist, but no `resolver.vocab` atom parser does yet)
-- [ ] General resolver-layer structural rules as reusable primitives, rather than binding-time-only
-  behavior — empty-brace resolution, absent-vs-missing distinction
-- [ ] Annotation access on individual fields, array/tuple elements, and map keys/values — only a
-  whole bound record's own annotations are reachable today, not its children's
-- [ ] Header/value directive interpretation — `!!id` verification, a data document's own `!!schema`
-  auto-selecting which compiled schema to validate against
-- [ ] Multi-error reporting — currently fail-fast on the first lex/parse error
-- [ ] Security hardening — numeric-literal length limits, confusable-character and
-  bidi-formatting-character warnings
-- [ ] Part 2: subtraction, elided field types outside a tightening entry, restating a field group in
-  a refinement body, the identity-diagonal FIXED-value invariant, and generic type-refs beyond a bare
-  two-argument `map<K, V>` application or a refinement source
-- [ ] A permanent "load the standard schema library" entry point — bootstrapping/registering/compiling
-  `meta-kernel.tn1`/`meta.tn1`/`core.tn1` currently has to be assembled by hand (see
-  [Schema pipeline](#schema-pipeline)); `value_param` real parameter substitution and
-  `REQUIRED_FIXED`/`OPTIONAL_FIXED` value validation are also still open
+See [BACKLOG.md](BACKLOG.md) for the actively-tracked engineering backlog, and
+[STRUCTURED-OUTPUT.md](STRUCTURED-OUTPUT.md) for the target-use-case plan (LLM structured-output
+validation, JSON compatibility).
 
 See [CLAUDE.md](CLAUDE.md#architecture) for architecture and design notes, and
 [Conformance](#conformance) below for edge-case behavior worth knowing about.
