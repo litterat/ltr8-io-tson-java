@@ -1,10 +1,10 @@
 package io.ltr8.tson.cli;
 
 import io.ltr8.tson.Tson;
-import io.ltr8.tson.parser.TsonDataParser;
-import io.ltr8.tson.parser.TsonValueReader;
-import io.ltr8.tson.parser.compiler.TsonCompiledMetaSchema;
-import io.ltr8.tson.parser.compiler.ValueReaderFactoryRegistry;
+import io.ltr8.tson.compiler.TsonDataParser;
+import io.ltr8.tson.compiler.TsonValueReader;
+import io.ltr8.tson.compiler.compiler.TsonCompiledMetaSchema;
+import io.ltr8.tson.compiler.compiler.ValueReaderFactoryRegistry;
 
 import java.nio.file.Path;
 import java.util.List;

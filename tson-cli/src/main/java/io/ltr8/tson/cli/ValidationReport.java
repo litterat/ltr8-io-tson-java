@@ -8,7 +8,7 @@ import java.util.List;
  * errors (tracked in {@code STRUCTURED-OUTPUT.md}; this class catches a single exception from the
  * existing fail-fast stack, it doesn't run a real multi-error pass). Shape matches {@code
  * diagnostics.tn1} (see {@link OutputFormat}) field for field, so {@link
- * io.ltr8.tson.parser.mapper.TsonMapperWriter#toTson} and that schema's own compiled reader agree.
+ * io.ltr8.tson.compiler.mapper.TsonMapperWriter#toTson} and that schema's own compiled reader agree.
  *
  * <p>Public for the same reason {@link CliDiagnostic} is -- see its own Javadoc.
  */

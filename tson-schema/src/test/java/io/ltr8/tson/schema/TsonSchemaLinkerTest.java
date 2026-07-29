@@ -27,9 +27,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Hand-built schemas only -- {@code tson-schema} has no dependency on {@code tson-parser}, so it
+ * Hand-built schemas only -- {@code tson-schema} has no dependency on {@code tson-compiler}, so it
  * can't reach {@code MetaKernelBootstrapResolver} for a real fixture (see {@code MetaKernelSchemaRegistryTest}
- * in {@code tson-parser} for the real end-to-end check against meta-kernel.tn1 itself).
+ * in {@code tson-compiler} for the real end-to-end check against meta-kernel.tn1 itself).
  *
  * <p>Renamed from {@code SchemaValidatorTest} (2026-07-27, alongside {@code SchemaValidator}
  * itself becoming {@link TsonSchemaLinker}) -- what's tested hasn't changed, only the class/method

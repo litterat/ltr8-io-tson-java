@@ -9,7 +9,7 @@ import java.util.List;
  * rule, general over schema-backed data). {@code arguments}, when present, is a resolved {@code
  * type_argument} list; empty means "no {@code <...>}" was applied, i.e. a simple reference.
  *
- * <p>Same name as {@code tson-parser}'s grammar-layer {@code io.ltr8.tson.parser.ast.schema.TypeRef}
+ * <p>Same name as {@code tson-compiler}'s grammar-layer {@code io.ltr8.tson.compiler.ast.schema.TypeRef}
  * -- a different package, a deliberately different concept (source-text reference vs. resolved
  * reference), matching the kernel's own choice to call both "type_ref" too.
  */

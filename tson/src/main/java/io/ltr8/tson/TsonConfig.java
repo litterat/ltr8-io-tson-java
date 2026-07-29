@@ -1,17 +1,17 @@
 package io.ltr8.tson;
 
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.tson.parser.TsonSchemaParser;
-import io.ltr8.tson.parser.ast.schema.SchemaDocument;
-import io.ltr8.tson.parser.compiler.ValueReaderFactoryRegistry;
-import io.ltr8.tson.parser.config.SchemaMetaNameBinder;
-import io.ltr8.tson.parser.config.TsonAtomContext;
-import io.ltr8.tson.parser.config.TsonCompiledRegistry;
-import io.ltr8.tson.parser.config.ValueReaderFactoryResolver;
-import io.ltr8.tson.parser.mapper.TsonMapperReader;
-import io.ltr8.tson.parser.mapper.TsonMapperWriter;
-import io.ltr8.tson.parser.resolver.DefaultTsonCompiledSchemaLoader;
-import io.ltr8.tson.parser.resolver.TsonSchemaResolver;
+import io.ltr8.tson.compiler.TsonSchemaParser;
+import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
+import io.ltr8.tson.compiler.compiler.ValueReaderFactoryRegistry;
+import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.TsonAtomContext;
+import io.ltr8.tson.compiler.config.TsonCompiledRegistry;
+import io.ltr8.tson.compiler.config.ValueReaderFactoryResolver;
+import io.ltr8.tson.compiler.mapper.TsonMapperReader;
+import io.ltr8.tson.compiler.mapper.TsonMapperWriter;
+import io.ltr8.tson.compiler.resolver.DefaultTsonCompiledSchemaLoader;
+import io.ltr8.tson.compiler.resolver.TsonSchemaResolver;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
@@ -20,7 +20,7 @@ import io.ltr8.tson.schema.TsonSchemaRegistry;
  * Configures and builds a {@link Tson} -- reached via {@link Tson#builder()}, never constructed
  * directly. No configurable options beyond {@link #dataBindContext} yet: the standard library is
  * always meta-kernel/meta.tn/core.tn, fetched from {@link TsonBundledSchemas}; a future pluggable
- * {@link io.ltr8.tson.parser.resolver.TsonSchemaSource} belongs here too, not as a breaking change to
+ * {@link io.ltr8.tson.compiler.resolver.TsonSchemaSource} belongs here too, not as a breaking change to
  * {@link Tson}'s own public shape.
  */
 public final class TsonConfig {

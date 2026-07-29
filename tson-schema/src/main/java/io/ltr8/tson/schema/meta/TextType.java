@@ -8,7 +8,7 @@ import java.util.Optional;
 /**
  * The meta-kernel's {@code text_type} constructor -- the Unicode code point sequence type every
  * other text-shaped atom composes with. Pure constraint values, no parsing/validation behavior --
- * {@code tson-parser}'s {@code TextParser} holds one of these and does the actual reading/writing.
+ * {@code tson-compiler}'s {@code TextParser} holds one of these and does the actual reading/writing.
  *
  * <p><b>{@code pattern} is the regex's own source text ({@link String}), not a compiled {@link
  * java.util.regex.Pattern}</b> -- kept a pure, hashable/equatable value the same as every other

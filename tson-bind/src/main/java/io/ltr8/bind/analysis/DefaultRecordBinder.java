@@ -355,7 +355,7 @@ public class DefaultRecordBinder {
 	 * {@code DataClass} to resolve and {@link DataClassField#dataClass()} is left {@code null}.
 	 * {@code tson-bind} itself has no dependency on the mapper layer above it, so it can't validate
 	 * that the component's declared type is actually {@code TsonAnnotations} here -- that check
-	 * happens where the type is visible, at binding time in {@code io.ltr8.tson.parser.mapper}.
+	 * happens where the type is visible, at binding time in {@code io.ltr8.tson.compiler.mapper}.
 	 */
 	private DataClassField resolveAnnotationsCarrierField(Class<?> targetClass, ComponentInfo info, int index) {
 		MethodHandle accessor = accessor(info);

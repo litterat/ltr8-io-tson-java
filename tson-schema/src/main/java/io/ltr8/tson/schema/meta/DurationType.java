@@ -7,7 +7,7 @@ import java.util.Optional;
 /**
  * The meta-kernel's {@code duration_type} constructor (§5.4's {@code duration} atom, ISO 8601's
  * {@code PnYnMnDTnHnMnS}). Pure constraint values, no parsing/validation behavior -- {@code
- * tson-parser}'s {@code DurationParser} holds one of these and does the actual reading/writing.
+ * tson-compiler}'s {@code DurationParser} holds one of these and does the actual reading/writing.
  *
  * <p>{@code min}/{@code max} are the raw ISO 8601 duration text, {@code String}, not {@link
  * IsoDuration} -- matching the {@code TextType.pattern}/{@code UriType.pattern} precedent: {@code

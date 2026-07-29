@@ -11,7 +11,7 @@ import java.util.Optional;
  * text_type}'s {@code min_length}/{@code max_length}/{@code pattern}, {@code atom_specification}'s
  * {@code spec}, and its own {@code scheme} field (meta.tn1: {@code uri_type => ~text_type &
  * atom_specification & { spec: = "https://www.rfc-editor.org/rfc/rfc3986" scheme: text? } }). Pure
- * constraint values, no parsing/validation behavior -- {@code tson-parser}'s {@code UriParser}
+ * constraint values, no parsing/validation behavior -- {@code tson-compiler}'s {@code UriParser}
  * holds one of these and does the actual reading/writing.
  *
  * <p>{@code pattern} is the regex's own source text ({@link String}), not a compiled {@link

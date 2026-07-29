@@ -12,7 +12,7 @@ import java.net.URI;
  * these two composed values, so there's nothing to flatten *into*) with {@code atom_specification}'s
  * {@code spec} (held as an {@link AtomSpecification}, fixed to RFC 9485 -- the I-Regexp
  * specification -- distinct from {@code uri_type}'s own RFC 3986 citation via the same mixin, see
- * {@link UriType}). Pure constraint values, no parsing/validation behavior -- {@code tson-parser}'s
+ * {@link UriType}). Pure constraint values, no parsing/validation behavior -- {@code tson-compiler}'s
  * {@code RegexParser} holds one of these and does the actual reading/writing.
  *
  * <p>Also an {@link Atom} variant (added 2026-07-23, alongside {@code text_type}/{@code uri_type}

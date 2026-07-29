@@ -1,28 +1,28 @@
 package io.ltr8.tson;
 
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.tson.parser.TsonSchemaParser;
-import io.ltr8.tson.parser.ast.schema.SchemaDocument;
-import io.ltr8.tson.parser.compiler.TsonCompiledMetaSchema;
-import io.ltr8.tson.parser.config.TsonCompiledRegistry;
-import io.ltr8.tson.parser.config.ValueReaderFactoryResolver;
-import io.ltr8.tson.parser.mapper.TsonMapperReader;
-import io.ltr8.tson.parser.mapper.TsonMapperWriter;
-import io.ltr8.tson.parser.resolver.DefaultTsonCompiledSchemaLoader;
-import io.ltr8.tson.parser.resolver.TsonSchemaResolver;
+import io.ltr8.tson.compiler.TsonSchemaParser;
+import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
+import io.ltr8.tson.compiler.compiler.TsonCompiledMetaSchema;
+import io.ltr8.tson.compiler.config.TsonCompiledRegistry;
+import io.ltr8.tson.compiler.config.ValueReaderFactoryResolver;
+import io.ltr8.tson.compiler.mapper.TsonMapperReader;
+import io.ltr8.tson.compiler.mapper.TsonMapperWriter;
+import io.ltr8.tson.compiler.resolver.DefaultTsonCompiledSchemaLoader;
+import io.ltr8.tson.compiler.resolver.TsonSchemaResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaLinker;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
 
 /**
- * The front door -- a small, curated entry point over {@code tson-parser}'s own, larger and more
+ * The front door -- a small, curated entry point over {@code tson-compiler}'s own, larger and more
  * mechanical surface (lexer, both grammars, resolution, linking-adjacent validation, compilation,
  * config wiring), the way Retrofit sits on top of OkHttp or Apache HttpClient5 sits on top of
  * HttpCore5. Doesn't reimplement anything -- every method here just constructs/returns the real
- * {@code tson-parser}/{@code tson-schema} class underneath. Built via {@link #builder()}, which
+ * {@code tson-compiler}/{@code tson-schema} class underneath. Built via {@link #builder()}, which
  * bootstraps meta-kernel/meta.tn/core.tn into a fresh, governed environment (previously a
- * sequence every real schema-compiling test hand-rolled for itself, e.g. {@code tson-parser}'s own
+ * sequence every real schema-compiling test hand-rolled for itself, e.g. {@code tson-compiler}'s own
  * {@code TinySchemaImportsCoreTn1Test}/{@code CoreSchemaImportTest}, and {@code tson-cli}'s own
  * former internal {@code StandardLibrary} helper):
  *
@@ -44,14 +44,14 @@ import io.ltr8.tson.schema.TsonSchemaRegistry;
  * mode parameter at all; only {@link #compile} does.
  *
  * <p>Only supports a schema governed by (and importing only from) meta-kernel/meta.tn/core.tn --
- * a real, disk/HTTP-backed {@link io.ltr8.tson.parser.resolver.TsonSchemaSource} for arbitrary other
+ * a real, disk/HTTP-backed {@link io.ltr8.tson.compiler.resolver.TsonSchemaSource} for arbitrary other
  * governing chains is its own, separately tracked backlog item; {@link TsonConfig} is the natural
  * place for that to plug in once it exists.
  *
- * <p>{@link TsonMapperReader}/{@link TsonMapperWriter} themselves still live in {@code tson-parser
- * .mapper}, not here -- {@code DefinitionResolver}, part of {@code tson-parser}'s own resolution
+ * <p>{@link TsonMapperReader}/{@link TsonMapperWriter} themselves still live in {@code tson-compiler
+ * .mapper}, not here -- {@code DefinitionResolver}, part of {@code tson-compiler}'s own resolution
  * engine, has a real, current dependency on {@link TsonMapperWriter} (atom-refinement merging), so
- * they can't move to a module that depends *on* {@code tson-parser} without a cycle. See {@code
+ * they can't move to a module that depends *on* {@code tson-compiler} without a cycle. See {@code
  * BACKLOG.md} for the plan to remove that dependency and revisit moving them here once it's gone.
  * {@link #mapperReader()}/{@link #mapperWriter()} bind them to this instance's own {@link
  * #dataBindContext()} (configurable via {@link TsonConfig#dataBindContext}), so a caller gets one

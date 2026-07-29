@@ -1,6 +1,6 @@
 rootProject.name = "tson-java"
 
-include("tson-parser")
+include("tson-compiler")
 include("tson-annotation")
 include("tson-bind")
 include("tson-schema")

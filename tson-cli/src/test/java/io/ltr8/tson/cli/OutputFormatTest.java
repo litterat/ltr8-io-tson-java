@@ -1,6 +1,6 @@
 package io.ltr8.tson.cli;
 
-import io.ltr8.tson.parser.TsonDataParser;
+import io.ltr8.tson.compiler.TsonDataParser;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

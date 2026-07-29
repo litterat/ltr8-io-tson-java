@@ -9,14 +9,14 @@ import java.util.Optional;
 /**
  * meta.tn1's {@code cidr4_type} constructor (IPv4-network constraint vocabulary, RFC 4632):
  * prefix-length bounds plus CIDR-text network lists. Pure constraint values, no parsing/validation
- * behavior -- deliberately no {@code tson-parser} parser exists for this atom yet (added as a
+ * behavior -- deliberately no {@code tson-compiler} compiler exists for this atom yet (added as a
  * {@code schema.meta}/{@link Atom} variant only, per explicit user direction, so {@code
  * !cidr4_type {}}/{@code cidr4}'s own resolution succeeds -- not to add real CIDR validation).
  *
  * <p>{@code spec} is a bare {@link String}, not nested inside {@link AtomSpecification} the way
  * {@link UriType}/{@link RegexType} keep it, and not a {@link java.net.URI} either -- two separate
  * corrections from an initial attempt, both confirmed empirically, not assumed: (1) {@code
- * tson-parser}'s compiled {@code Record*Reader} injects a REQUIRED_FIXED field's schema-composed
+ * tson-compiler}'s compiled {@code Record*Reader} injects a REQUIRED_FIXED field's schema-composed
  * default value flat, under its own schema field name, and {@code
  * atom_specification}'s own {@code spec} field composes into {@code cidr4_type} flat too
  * (composition always flattens, §5.8) -- {@code UriType}/{@code RegexType}'s own nested {@code

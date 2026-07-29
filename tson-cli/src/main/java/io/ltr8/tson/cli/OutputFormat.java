@@ -1,8 +1,8 @@
 package io.ltr8.tson.cli;
 
 import io.ltr8.bind.DataBindException;
-import io.ltr8.tson.parser.TsonDataParser;
-import io.ltr8.tson.parser.mapper.TsonMapperWriter;
+import io.ltr8.tson.compiler.TsonDataParser;
+import io.ltr8.tson.compiler.mapper.TsonMapperWriter;
 
 import java.util.Locale;
 

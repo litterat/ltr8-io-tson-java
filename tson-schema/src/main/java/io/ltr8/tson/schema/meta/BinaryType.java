@@ -11,7 +11,7 @@ import java.util.Optional;
  * a closed four-value enum, exactly the same shape as {@link IntegerType}'s {@code size} or {@link
  * FloatType}'s {@code format} -- a single constructor parameterized by one of its own fields, not
  * four different constructors. Pure constraint values, no parsing/validation behavior -- {@code
- * tson-parser}'s {@code BinaryParser} holds one of these and does the actual reading/writing.
+ * tson-compiler}'s {@code BinaryParser} holds one of these and does the actual reading/writing.
  *
  * <p>Named {@code BinaryType} here despite meta.tn1's constructor being spelled {@code binary}, not
  * {@code binary_type} like every other constructor -- see {@code SPEC-FEEDBACK.md} #11. The

@@ -10,7 +10,7 @@ package io.ltr8.tson.schema.meta;
  * {@link UuidType}/{@link BinaryType}/{@link DateType}/{@link TimeType}/{@link DateTimeType}/
  * {@link DurationType} (the remaining atom constraint-vocabulary families, joined 2026-07-24),
  * {@link Cidr4Type}/{@link Cidr6Type}/{@link EmailType}/{@link MacType}/{@link Ipv4Type}/{@link
- * Ipv6Type}/{@link ComplexType} (record-only, no parser -- added 2026-07-24 so their own
+ * Ipv6Type}/{@link ComplexType} (record-only, no compiler -- added 2026-07-24 so their own
  * real-fixture instances resolve; see each one's own Javadoc). {@link UnknownType} is the sibling
  * SUM-kind case -- see {@link Sum}, not here.
  */

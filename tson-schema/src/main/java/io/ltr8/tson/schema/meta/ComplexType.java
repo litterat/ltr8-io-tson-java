@@ -6,13 +6,13 @@ import io.ltr8.annotation.Typename;
  * meta.tn1's {@code complex_type} constructor ({@code complex_type => ~atom & { component:
  * complex_component ~ NUMBER } }): {@code component} narrows the numeric family used for the
  * real/imaginary parts, defaulting to {@code NUMBER} (the exact-decimal tier). Pure constraint
- * value, no parsing/validation behavior -- deliberately no {@code tson-parser} parser exists for
+ * value, no parsing/validation behavior -- deliberately no {@code tson-compiler} compiler exists for
  * this atom yet (added as a {@code schema.meta}/{@link Atom} variant only, per explicit user
  * direction, so {@code !complex_type {}}/{@code complex}'s own resolution succeeds -- not to add
  * real complex-number validation).
  *
  * <p>{@code component}'s own schema-level default ({@code ~ NUMBER}) is filled in by {@code
- * tson-parser}'s compiled {@code Record*Reader} from the schema itself before binding, the same
+ * tson-compiler}'s compiled {@code Record*Reader} from the schema itself before binding, the same
  * mechanism {@link FloatType}'s own defaulted {@code boolean} fields rely on -- an enum-typed field
  * binds from the resulting bare token by ordinary name matching, the same way {@link
  * FloatType#format} already does.

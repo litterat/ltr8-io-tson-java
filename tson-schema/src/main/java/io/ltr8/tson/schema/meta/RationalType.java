@@ -7,7 +7,7 @@ import java.util.Optional;
 
 /**
  * The meta-kernel's {@code rational_type} constructor (§5.6's {@code rational} atom). Pure
- * constraint values, no parsing/validation behavior -- {@code tson-parser}'s {@code RationalParser}
+ * constraint values, no parsing/validation behavior -- {@code tson-compiler}'s {@code RationalParser}
  * holds one of these and does the actual reading/writing.
  *
  * <p>Also an {@link Atom} variant (joined 2026-07-24): {@code rational => !rational_type {}} is a

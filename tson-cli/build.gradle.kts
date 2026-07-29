@@ -8,7 +8,7 @@ application {
 
 dependencies {
     implementation(project(":tson"))
-    implementation(project(":tson-parser"))
+    implementation(project(":tson-compiler"))
     implementation(project(":tson-schema"))
     implementation(project(":tson-bind"))
     implementation(project(":tson-annotation"))

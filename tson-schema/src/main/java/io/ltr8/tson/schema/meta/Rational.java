@@ -7,7 +7,7 @@ import java.util.Objects;
  * meta-kernel's {@code rational} host value -- an exact fraction, {@code numerator}/{@code
  * denominator}, {@code denominator} always strictly positive (§7.6's grammar never permits a
  * negative or zero denominator; any sign belongs to the numerator). Lives in {@code schema.meta},
- * not {@code tson-parser}, because {@code RationalType}'s own {@code min}/{@code max}/{@code
+ * not {@code tson-compiler}, because {@code RationalType}'s own {@code min}/{@code max}/{@code
  * multipleOf} constraint fields are typed as this.
  *
  * <p><b>Not normalized, but compared by value.</b> meta.tn1's own doc for {@code rational_type} is
@@ -21,7 +21,7 @@ import java.util.Objects;
  * it (e.g. re-serializing back to TSON text).
  *
  * <p>This is deliberately a minimal value type, not a full arithmetic library (no {@code plus}/
- * {@code times}/reduction methods). <b>{@code io.ltr8.tson.parser.mapper}'s {@code
+ * {@code times}/reduction methods). <b>{@code io.ltr8.tson.compiler.mapper}'s {@code
  * TsonMapperReader} cannot bind directly to this class at all</b> -- it's itself a Java record, so
  * {@code tson-bind}'s record
  * auto-detection claims it ahead of anything atom/vocabulary-related, and a {@code !rational}

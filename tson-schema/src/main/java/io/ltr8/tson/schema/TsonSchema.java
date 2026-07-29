@@ -12,7 +12,7 @@ import java.util.Objects;
  * A resolved schema (Part 2 §8): the kernel's own {@code schema} type, {@code map<type_name,
  * type_definition>} (§9), plus the governing-chain directives its own document header carried
  * ({@code !!id}/{@code !!meta}/{@code !!import}*, §2.2) -- the "produced schema" this module
- * exists for, as opposed to {@code tson-parser}'s grammar-only {@code SchemaDocument}/{@code
+ * exists for, as opposed to {@code tson-compiler}'s grammar-only {@code SchemaDocument}/{@code
  * SchemaMap}. {@code entries}' insertion order is preserved, matching {@code SchemaMap.
  * declarations}' own ordering guarantee.
  *

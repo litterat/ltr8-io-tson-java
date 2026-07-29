@@ -1,10 +1,10 @@
 package io.ltr8.tson;
 
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.tson.parser.TsonDataParser;
-import io.ltr8.tson.parser.compiler.TsonCompiledMetaSchema;
-import io.ltr8.tson.parser.compiler.ValueReaderFactoryRegistry;
-import io.ltr8.tson.parser.mapper.TsonMapperReader;
+import io.ltr8.tson.compiler.TsonDataParser;
+import io.ltr8.tson.compiler.compiler.TsonCompiledMetaSchema;
+import io.ltr8.tson.compiler.compiler.ValueReaderFactoryRegistry;
+import io.ltr8.tson.compiler.mapper.TsonMapperReader;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import org.junit.jupiter.api.Test;

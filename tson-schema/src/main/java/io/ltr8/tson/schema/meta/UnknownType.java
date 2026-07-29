@@ -15,7 +15,7 @@ import io.ltr8.annotation.Typename;
  * constructor," flagged as "a one-word change if it's ever needed") -- see {@code DefinitionResolver}'s
  * own Javadoc for the widened version.
  *
- * <p>Pure marker, no parsing/validation behavior -- deliberately no {@code tson-parser} parser
+ * <p>Pure marker, no parsing/validation behavior -- deliberately no {@code tson-compiler} compiler
  * exists for this atom (added as a {@code schema.meta}/{@link Sum} variant only, per explicit user
  * direction, so {@code !unknown_type {}}/{@code unknown}'s own resolution succeeds).
  */

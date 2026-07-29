@@ -118,7 +118,7 @@ application-level consumer that wants to use `type-ref` for host-language type d
 resolving a Java union member from `!Circle`) has zero spec guidance today, and no way to know whether the
 eventual Part 2 rule will be case-sensitive-only (as §5.1 is, for the built-in set) or something looser.
 
-**Interpretation chosen:** `TsonMapperReader.resolveUnionMember` (`io.ltr8.tson.parser.mapper`) treats this as purely an
+**Interpretation chosen:** `TsonMapperReader.resolveUnionMember` (`io.ltr8.tson.compiler.mapper`) treats this as purely an
 application-binding decision, not a spec-conformance one — the Class 1/Class 2 preservation requirement is
 satisfied upstream (the parser hands the type-ref through as an uninterpreted string), and everything
 downstream of that is this implementation's own policy: try an exact match against a member class's
@@ -422,7 +422,7 @@ record about, since every implementation doing typed binding on top of TSON will
 
 **Interpretation chosen:** `io.ltr8.annotation.Annotated`, a marker on one Java record component,
 opts a caller into recovering *only* the annotations on the value the whole record itself corresponds
-to (`TsonAnnotations`, in `io.ltr8.tson.parser.mapper`, wrapping the raw, ordered `Annotation` list) — deliberately not
+to (`TsonAnnotations`, in `io.ltr8.tson.compiler.mapper`, wrapping the raw, ordered `Annotation` list) — deliberately not
 a general "child annotations" mechanism. A record-field-keyed (or array-index-keyed, or map-key-keyed)
 carrier for children's annotations was considered and rejected: it would only push the same problem down
 one level without resolving the recursive case, needs a different bespoke convention per container kind,
@@ -499,7 +499,7 @@ both agree `field-modifier` actually accepts.
 **Interpretation chosen:** Implemented per the ABNF and §5.2 (the two mutually-consistent sources): a
 field modifier's value is a bare token or the absent sentinel — no annotations, no type-ref, never a
 container. `tson-parser`'s `FieldDef.Modifier` models this as a plain `TokenValue`/`AbsentValue` (reusing
-`io.ltr8.tson.parser.ast`'s existing leaf types), not a full `DataValue`.
+`io.ltr8.tson.compiler.ast`'s existing leaf types), not a full `DataValue`.
 
 **Suggested resolution:** Fix the summary sentence in §12.1's lead paragraph to read "...and
 field-modifier values, which are restricted to a bare token or the absent sentinel (§5.2), not full

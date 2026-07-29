@@ -17,7 +17,7 @@ yet implemented" section for the technical detail behind several of these items.
   engine underneath it). Holds `Tson` (a real, immutable, instance-based object — `resolve`/
   `compile`/`mapperReader`/`mapperWriter`/`dataBindContext`, plus the underlying registries/loader
   for a caller who needs to reach past the front door) and `TsonConfig` (`Tson`'s own builder,
-  reached via `Tson.builder()`; moved here from `io.ltr8.tson.parser.config`, since it's purely a
+  reached via `Tson.builder()`; moved here from `io.ltr8.tson.compiler.config`, since it's purely a
   caller-facing convenience with zero internal consumers inside `tson-parser` itself — confirmed
   before moving it, the same way the three classes in "Layer boundaries" below were checked).
   `tson-parser`/`tson-schema`/`tson-bind` are `api` (not `implementation`) dependencies, so a caller
@@ -128,7 +128,7 @@ yet implemented" section for the technical detail behind several of these items.
 
 ## Layer boundaries / schema registry
 
-- [x] **Configuration/wiring classes moved out of `compiler` into a new `io.ltr8.tson.parser.config`
+- [x] **Configuration/wiring classes moved out of `compiler` into a new `io.ltr8.tson.compiler.config`
   package** — `TsonCompiledRegistry`, `SchemaMetaNameBinder`, `ValueReaderFactoryResolver`. These
   read as "how a caller configures a working environment," not compiler mechanics, and none of the
   three touched a package-private compiler class, so the move was clean. (An earlier version of

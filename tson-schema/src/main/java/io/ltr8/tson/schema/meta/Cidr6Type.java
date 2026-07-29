@@ -12,7 +12,7 @@ import java.util.Optional;
  * family range (0-128 instead of 0-32, not enforced here either way). See {@link Cidr4Type}'s own
  * Javadoc for why {@code spec} is a flat {@link String} rather than nested {@link
  * AtomSpecification} or a {@link java.net.URI}, why {@code within}/{@code excluding} are bare
- * {@code List<String>} with a defensive compact constructor, and why no parser exists for this atom
+ * {@code List<String>} with a defensive compact constructor, and why no compiler exists for this atom
  * yet.
  */
 @Typename(name = "cidr6_type")

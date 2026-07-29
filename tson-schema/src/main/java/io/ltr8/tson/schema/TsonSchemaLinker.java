@@ -69,7 +69,7 @@ import java.util.Set;
  * nothing else was meant to call. Renaming it to a real pipeline-stage name changes that on
  * purpose: {@code link} is now something a caller orchestrating the pipeline calls directly and
  * deliberately, same as {@code parse}/{@code resolve}/{@code compile} -- including from *other*
- * modules (e.g. {@code tson-parser}'s own {@code TsonCompiledRegistry}, which needs to link a
+ * modules (e.g. {@code tson-compiler}'s own {@code TsonCompiledRegistry}, which needs to link a
  * schema before registering it, exactly the same as any other caller). Moved out of {@code
  * io.ltr8.tson.schema.registry} into this package directly (2026-07-27) once that publicness was
  * settled -- living in a package whose own docs describe it as "private pass-2 machinery nothing
@@ -242,7 +242,7 @@ public final class TsonSchemaLinker {
      * resolved {@code TypeDefinition.body} and every {@code !instance} construction (`!enum`,
      * `!integer_type`, ...) is only interpretable because a matching type constructor is declared in
      * *this* meta-kernel specifically -- {@code TsonParserFactoryRegistry}/{@code AtomTypeParser}/
-     * {@code RecordParser} (in {@code tson-parser}) are Java code hard-wired to this one meta-kernel's
+     * {@code RecordParser} (in {@code tson-compiler}) are Java code hard-wired to this one meta-kernel's
      * own fixed vocabulary, not to "whatever schema happens to be self-referencing." A library
      * supports one meta-kernel version at a time (a new revision would mean rebuilding that
      * machinery, not just accepting a differently-identified but structurally-similar substitute), so
@@ -435,7 +435,7 @@ public final class TsonSchemaLinker {
      * assembler for yet.
      *
      * <p><b>Deliberately hand-written per target shape, not routed through generic {@code tson-bind}
-     * binding</b> -- {@code tson-schema} has no dependency on {@code tson-parser} (where {@code
+     * binding</b> -- {@code tson-schema} has no dependency on {@code tson-compiler} (where {@code
      * DefinitionResolver}'s own {@code resolveInstance}, backed by the compiled {@code
      * Record*Reader}, already does the general version of this for an explicit {@code !C value}
      * instance), and every field a materializable
@@ -503,7 +503,7 @@ public final class TsonSchemaLinker {
      * wrong guess. {@code state}/{@code unordered}/{@code unique_items} take the vocabulary's own
      * schema-composed default {@link RecordField#value} when present (mirroring, in miniature, the
      * compiled {@code Record*Reader}'s own schema-composed defaulting one layer up in {@code
-     * tson-parser}) -- this is exactly what makes {@code set}'s own tightened defaults (all three {@code
+     * tson-compiler}) -- this is exactly what makes {@code set}'s own tightened defaults (all three {@code
      * REQUIRED_FIXED}, unlike {@code array}'s own {@code REQUIRED_DEFAULT}/{@code
      * REQUIRED_DEFAULT}/{@code REQUIRED_DEFAULT}) come out correctly without this method needing to
      * know which constructor it's assembling for. {@code min_items}/{@code max_items} have no

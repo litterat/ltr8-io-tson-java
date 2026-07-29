@@ -9,7 +9,7 @@ import java.util.Optional;
 /**
  * The meta-kernel's {@code decimal_type} constructor (§5.6's {@code number} atom -- SQL's exact
  * tier, ISO/IEC 11404 {@code scaled}). Pure constraint values, no parsing/validation behavior --
- * {@code tson-parser}'s {@code DecimalParser} holds one of these and does the actual
+ * {@code tson-compiler}'s {@code DecimalParser} holds one of these and does the actual
  * reading/writing.
  *
  * <p>Also an {@link Atom} variant (joined 2026-07-24, alongside the other 8 remaining atom

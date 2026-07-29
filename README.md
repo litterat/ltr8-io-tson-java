@@ -70,8 +70,8 @@ built-in vocabulary types (§5), which is where TSON goes beyond what JSON alone
 `!ipv4` below bind to `java.util.UUID` and `java.net.Inet4Address` directly, with no custom code:
 
 ```java
-import io.ltr8.tson.parser.mapper.TsonMapperReader;
-import io.ltr8.tson.parser.mapper.TsonMapperWriter;
+import io.ltr8.tson.compiler.mapper.TsonMapperReader;
+import io.ltr8.tson.compiler.mapper.TsonMapperWriter;
 
 import java.net.Inet4Address;
 import java.time.LocalDate;

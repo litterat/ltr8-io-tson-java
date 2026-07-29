@@ -7,7 +7,7 @@ import java.util.Optional;
 
 /**
  * The meta-kernel's {@code time_type} constructor (§5.4's {@code time} atom, RFC 3339 {@code
- * full-time}). Pure constraint values, no parsing/validation behavior -- {@code tson-parser}'s
+ * full-time}). Pure constraint values, no parsing/validation behavior -- {@code tson-compiler}'s
  * {@code TimeParser} holds one of these and does the actual reading/writing.
  *
  * <p>Also an {@link Atom} variant (joined 2026-07-24): {@code time => !time_type {}} is a

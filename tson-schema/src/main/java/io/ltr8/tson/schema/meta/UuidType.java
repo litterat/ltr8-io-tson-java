@@ -6,7 +6,7 @@ import java.util.Optional;
 
 /**
  * The meta-kernel's {@code uuid_type} constructor (§5.5's {@code uuid} atom, RFC 9562). Pure
- * constraint values, no parsing/validation behavior -- {@code tson-parser}'s {@code UuidParser}
+ * constraint values, no parsing/validation behavior -- {@code tson-compiler}'s {@code UuidParser}
  * holds one of these and does the actual reading/writing.
  *
  * <p>Also an {@link Atom} variant (joined 2026-07-24): {@code uuid => !uuid_type {}} is a

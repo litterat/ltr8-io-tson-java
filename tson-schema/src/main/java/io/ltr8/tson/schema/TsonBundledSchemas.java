@@ -15,20 +15,20 @@ import java.util.Map;
  * module's own classpath.
  *
  * <p>Both the identities and their source text live here, in `tson-schema`, not in a separate
- * `tson-parser`-side class -- there's nothing left for a split class to do once both halves of
+ * `tson-compiler`-side class -- there's nothing left for a split class to do once both halves of
  * "what these documents are" (identity) and "where their content lives" (fetch) sit in the one
- * module that can be the single canonical source for `tson-parser`-side consumers (e.g. {@code
- * io.ltr8.tson.parser.resolver.DefaultTsonCompiledSchemaLoader}, {@code MetaKernelBootstrapResolver})
+ * module that can be the single canonical source for `tson-compiler`-side consumers (e.g. {@code
+ * io.ltr8.tson.compiler.resolver.DefaultTsonCompiledSchemaLoader}, {@code MetaKernelBootstrapResolver})
  * and `tson-schema`'s own {@link TsonSchemaLinker#isMetaKernelGoverned} alike, since `tson-schema`
- * has no dependency on `tson-parser` (only the reverse). {@link #fetch} deliberately doesn't
- * implement {@code io.ltr8.tson.parser.resolver.TsonSchemaSource} -- that interface lives in
- * `tson-parser`, a module this one has no dependency on -- but its shape (a single {@code
+ * has no dependency on `tson-compiler` (only the reverse). {@link #fetch} deliberately doesn't
+ * implement {@code io.ltr8.tson.compiler.resolver.TsonSchemaSource} -- that interface lives in
+ * `tson-compiler`, a module this one has no dependency on -- but its shape (a single {@code
  * String fetch(String uri)} method) already matches that interface's own single abstract method
- * exactly, so a `tson-parser`-side caller needing a real {@code TsonSchemaSource} instance passes
+ * exactly, so a `tson-compiler`-side caller needing a real {@code TsonSchemaSource} instance passes
  * the method reference {@code TsonBundledSchemas::fetch} directly; no adapter class needed on either
  * side.
  *
- * <p><b>Replaces the old, standalone {@code BundledSchemaSource} class</b> (`tson-parser`, deleted
+ * <p><b>Replaces the old, standalone {@code BundledSchemaSource} class</b> (`tson-compiler`, deleted
  * once this existed) -- once this class already held the one canonical copy of all three identities
  * (2026-07-29), keeping the fetch capability split out in a different module, in front of a
  * fixed table keyed by those same three identities, bought nothing further; consolidating both here

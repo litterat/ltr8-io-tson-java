@@ -10,9 +10,9 @@ import java.time.Period;
  * and {@link Duration} handles the clock part ({@code H}/{@code M}/{@code S}, plus {@code D} as a
  * fixed 24-hour unit with no calendar semantics) but rejects any {@code Y}/{@code M} outright
  * ({@code Duration.parse("P1Y")} throws) -- confirmed empirically before writing {@code
- * tson-parser}'s {@code DurationParser}, not assumed. This pairs the two rather than inventing six
+ * tson-compiler}'s {@code DurationParser}, not assumed. This pairs the two rather than inventing six
  * raw fields of its own, reusing each type's own (correct, JDK-provided) equality and arithmetic
- * for its half instead of rebuilding it. Lives in {@code schema.meta}, not {@code tson-parser},
+ * for its half instead of rebuilding it. Lives in {@code schema.meta}, not {@code tson-compiler},
  * because {@code DurationType}'s own {@code min}/{@code max} constraint fields are typed as this.
  *
  * <p>Not {@link Comparable} -- core.tn1 marks {@code duration}'s ordering {@code @ordered:PARTIAL}

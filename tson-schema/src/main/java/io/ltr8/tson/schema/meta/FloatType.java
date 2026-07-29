@@ -9,7 +9,7 @@ import java.util.Optional;
 /**
  * The meta-kernel's {@code float_type} constructor (§5.6's {@code float32}/{@code float64} atoms
  * -- SQL's approximate tier, IEEE 754-2019). Pure constraint values, no parsing/validation behavior
- * -- {@code tson-parser}'s {@code FloatParser} holds one of these and does the actual
+ * -- {@code tson-compiler}'s {@code FloatParser} holds one of these and does the actual
  * reading/writing.
  *
  * <p>Also an {@link Atom} variant (joined 2026-07-24): {@code float32 => !float_type { format:

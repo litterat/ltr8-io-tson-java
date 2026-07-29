@@ -11,7 +11,7 @@ import java.util.Optional;
  * The meta-kernel's {@code integer_type} constructor (Part 2 §5.6/§9): the integer family's atom
  * constraint vocabulary -- bit width/signedness (via {@link IntegerSize}), bounds, and a
  * multiple-of constraint. Pure constraint values, no parsing or validation behavior -- {@code
- * tson-parser}'s {@code IntegerParser} holds one of these and does the actual reading/writing.
+ * tson-compiler}'s {@code IntegerParser} holds one of these and does the actual reading/writing.
  *
  * <p>Also an {@link Atom} variant (added 2026-07-23, alongside {@code MetaKernelBootstrapResolver}): {@code
  * integer => !integer_type {}} is a constructor-application instance (§5.5) whose resolved body is

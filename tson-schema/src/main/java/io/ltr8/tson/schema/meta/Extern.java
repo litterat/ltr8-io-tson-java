@@ -25,7 +25,7 @@ import java.util.List;
  * parameters} already follow), defensively defaulted to {@link List#of()} when absent.
  *
  * <p>Pure marker/constraint record, no parsing/validation behavior -- deliberately no {@code
- * tson-parser} parser exists for this atom yet (added as a {@code schema.meta}/{@link Sum} variant
+ * tson-compiler} compiler exists for this atom yet (added as a {@code schema.meta}/{@link Sum} variant
  * only, so {@code !extern {...}}'s own resolution succeeds -- not to add real cross-schema
  * reference resolution).
  */

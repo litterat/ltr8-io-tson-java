@@ -1,0 +1,364 @@
+package io.ltr8.tson.compiler.mapper;
+
+import io.ltr8.annotation.Typename;
+import io.ltr8.bind.DataBindContext;
+import io.ltr8.bind.DataBindException;
+import io.ltr8.bind.DataClass;
+import io.ltr8.bind.DataClassArray;
+import io.ltr8.bind.DataClassAtom;
+import io.ltr8.bind.DataClassElement;
+import io.ltr8.bind.DataClassField;
+import io.ltr8.bind.DataClassMap;
+import io.ltr8.bind.DataClassRecord;
+import io.ltr8.bind.DataClassTuple;
+import io.ltr8.bind.DataClassUnion;
+import io.ltr8.tson.compiler.TsonDataParser;
+import io.ltr8.tson.compiler.ast.AbsentValue;
+import io.ltr8.tson.compiler.ast.ArrayValue;
+import io.ltr8.tson.compiler.ast.CoreValue;
+import io.ltr8.tson.compiler.ast.DataValue;
+import io.ltr8.tson.compiler.ast.Document;
+import io.ltr8.tson.compiler.ast.EmptyBrace;
+import io.ltr8.tson.compiler.ast.MapValue;
+import io.ltr8.tson.compiler.ast.RecordValue;
+import io.ltr8.tson.compiler.ast.ScopedValue;
+import io.ltr8.tson.compiler.ast.TokenValue;
+import io.ltr8.tson.compiler.base.BaseTypeResolver;
+import io.ltr8.tson.compiler.base.BaseValue;
+import io.ltr8.tson.compiler.atom.AtomType;
+import io.ltr8.tson.compiler.atom.AtomTypeException;
+import io.ltr8.tson.compiler.atom.BuiltinTypeVocabulary;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+/**
+ * Binds a parsed TSON {@link DataValue} tree to a Java object, given its {@link DataClass}
+ * descriptor from {@code tson-bind}. Operates directly against {@link DataBindContext} (the same
+ * level {@code MapMapper}/{@code ArrayMapper} in {@code tson-bind} operate at), not against any
+ * bigger schema/type-registry layer -- except where {@code resolver} itself is the caller,
+ * binding a resolved constructor's own {@code DataValue} bindings onto its {@code schema.meta}
+ * class (see {@code DefinitionResolver}'s own Javadoc for that use).
+ *
+ * <p>Read/write split from what was originally one class ({@code TsonMapper}) into {@link
+ * TsonMapperReader}/{@link TsonMapperWriter} -- each already paired one {@code to*} method per
+ * {@code write*} method, one per {@link DataClass} kind, so the split follows an already-present
+ * internal seam. Originally lived in a separate {@code tson-mapper} module; moved into {@code
+ * tson-compiler} (this module) so schema resolution (constructor application, atom refinement, §5.5)
+ * can use this binding directly without a module cycle ({@code tson-mapper} depended on {@code
+ * tson-compiler}, so the reverse was impossible) -- {@code tson-bind}, what this is built on, has no
+ * dependency on {@code tson-compiler}/{@code tson-schema} at all, so depending on it directly here is
+ * clean.
+ *
+ * <p>Unlike {@code litterat-json}'s {@code JsonMapper}, this reads from an already-parsed AST
+ * (the {@code TsonDataParser} has already built the full tree) rather than a live token stream, so there's
+ * no need to buffer array elements into a temporary list first -- {@code ArrayValue.elements()}
+ * is already a concrete {@code List}.
+ *
+ * <p>Atom binding first checks whether the value carries a type-ref at all. If it does, {@link
+ * BuiltinTypeVocabulary} must resolve it (§5) -- an unrecognized type-ref is a binding error here,
+ * not silently ignored, even though the Class 1 processing step underneath (§5.1) is required to
+ * (and does, in {@code tson-compiler}'s {@code TsonDataParser}/{@code BaseTypeResolver}) preserve an
+ * unrecognized annotation as an uninterpreted marker rather than erroring -- that rule is about
+ * passive preservation during parsing, not about what an application actively binding the value to
+ * a caller-declared Java type should do with a marker it can't interpret; see SPEC-FEEDBACK.md #7.
+ * A resolved built-in type does identification, validation, and narrowing to the target class in
+ * one call ({@link AtomType#read(TokenValue, Class)}), since it alone knows both its own parsing
+ * contract and (per the target {@code Class<?>} passed in) how to narrow to it. With no type-ref at
+ * all, binding falls through to plain untyped resolution: {@link BaseTypeResolver} (identification:
+ * which of null/boolean/number/string, and for numbers which of the four §7.6 grammar forms) then
+ * {@link AtomBinder} (binding: that identified shape into whatever concrete Java type the target
+ * field actually declares). Both paths end up sharing the same narrowing code ({@code
+ * NumberNarrowing}, in {@code tson-compiler}) one level down, so a plain {@code 42} and a {@code
+ * !uint8 42} bind through the same final step regardless of which path found them.
+ */
+public final class TsonMapperReader {
+
+    private final DataBindContext context;
+
+    public TsonMapperReader(DataBindContext context) {
+        this.context = context;
+    }
+
+    public TsonMapperReader() {
+        this(TsonMapperContext.defaultContext());
+    }
+
+    // ── Entry points ─────────────────────────────────────────────────────
+
+    public <T> T toObject(String tsonSource, Class<T> targetClass) throws DataBindException {
+        Document document = new TsonDataParser(tsonSource).parseDocument();
+        return toObject(document.root(), targetClass);
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T> T toObject(DataValue value, Class<T> targetClass) throws DataBindException {
+        DataClass dataClass = context.getDescriptor(targetClass);
+        return (T) toObject(value, dataClass);
+    }
+
+    // ── Core dispatch ────────────────────────────────────────────────────
+
+    private Object toObject(DataValue value, DataClass dataClass) throws DataBindException {
+        try {
+            Object result = switch (dataClass) {
+                case DataClassAtom atom -> toAtom(value, atom);
+                case DataClassRecord record -> toRecord(value, record);
+                case DataClassArray array -> toArray(value, array);
+                case DataClassMap map -> toMap(value, map);
+                case DataClassTuple tuple -> toTuple(value, tuple);
+                case DataClassUnion union -> toUnion(value, union);
+                default -> throw new DataBindException("unsupported DataClass: " + dataClass);
+            };
+
+            if (dataClass.bridge().isPresent()) {
+                result = dataClass.bridge().get().toObject().invoke(result);
+            }
+            return result;
+        } catch (DataBindException e) {
+            throw e;
+        } catch (Throwable t) {
+            throw new DataBindException("failed to bind value to " + dataClass.typeClass(), t);
+        }
+    }
+
+    /** {@code null} if {@code value} is either genuinely absent (missing) or the TSON absent sentinel {@code _}. */
+    private static boolean isAbsent(DataValue value) {
+        return value == null || value.coreValue() instanceof AbsentValue;
+    }
+
+    // ── Atoms: built-in vocabulary (§5) or identification (BaseTypeResolver) + binding (AtomBinder) ──
+
+    private Object toAtom(DataValue value, DataClassAtom dataClass) throws DataBindException {
+        if (isAbsent(value)) {
+            return AtomBinder.bind(new BaseValue.NullValue(), dataClass.dataClass());
+        }
+        CoreValue core = value.coreValue();
+        if (!(core instanceof TokenValue token)) {
+            throw new DataBindException("expected a token for " + dataClass.typeClass() + ", found " + core);
+        }
+
+        Optional<String> typeRef = value.typeRef();
+        if (typeRef.isPresent()) {
+            // Unlike the Class 1 processing step underneath us (TsonDataParser/BaseTypeResolver, which
+            // correctly preserves an unrecognized type-ref as an uninterpreted marker per §5.1),
+            // an unresolvable annotation on a value we're actively binding to a caller-declared
+            // Java type is treated as an error here, not silent fallthrough -- see
+            // SPEC-FEEDBACK.md #7. A typo like !Uuid (case-sensitive per §5.1) should be loud, not
+            // quietly disable the validation the author clearly wanted.
+            AtomType<?> atomType = BuiltinTypeVocabulary.lookup(typeRef.get())
+                    .orElseThrow(() -> new DataBindException("unrecognized type annotation '!"
+                            + typeRef.get() + "' for " + dataClass.typeClass()));
+            return bindBuiltin(atomType, token, dataClass.dataClass());
+        }
+
+        BaseValue resolved = BaseTypeResolver.resolve(token);
+        return AtomBinder.bind(resolved, dataClass.dataClass());
+    }
+
+    private static Object bindBuiltin(AtomType<?> atomType, TokenValue token, Class<?> target) throws DataBindException {
+        try {
+            return atomType.read(token, target);
+        } catch (AtomTypeException e) {
+            // §5.2's parse/validation distinction doesn't need to survive past this boundary today --
+            // both are just "this value doesn't satisfy its own declared type" from a binding caller's
+            // perspective -- but the underlying AtomParseException/AtomValidationException is preserved
+            // as the cause for anyone who wants to distinguish them.
+            throw new DataBindException(e.getMessage(), e);
+        } catch (ArithmeticException e) {
+            throw new DataBindException(token.text() + " does not fit in " + target, e);
+        } catch (IllegalArgumentException e) {
+            throw new DataBindException("cannot bind '" + token.text() + "' to " + target, e);
+        }
+    }
+
+    // ── Records ──────────────────────────────────────────────────────────
+
+    /**
+     * A field marked {@code @Annotated} (io.ltr8.annotation) isn't bound from a same-named
+     * authored field at all -- it's populated directly from {@code value.annotations()}, the
+     * annotations on this record's *own* value (e.g. {@code @doc:"..." !person { name: Alice } }'s
+     * {@code @doc}), which is exactly what {@link DataClassField#isAnnotationsCarrier()} exists to
+     * flag before the ordinary by-name lookup below ever runs for it. {@code tson-bind} can't
+     * validate the component's declared type is {@link TsonAnnotations} itself (no dependency on
+     * this module), so that check happens here, at the one place both are visible.
+     */
+    private Object toRecord(DataValue value, DataClassRecord dataClass) throws Throwable {
+        Map<String, DataValue> byName = new HashMap<>();
+        CoreValue core = value.coreValue();
+        if (core instanceof RecordValue rv) {
+            // "Last value wins" for duplicate field names falls out naturally: iterating in
+            // source order and overwriting on put() matches the spec's own rule (§2.5).
+            for (RecordValue.Field f : rv.fields()) {
+                byName.put(f.name(), f.value().value());
+            }
+        } else if (!(core instanceof EmptyBrace)) {
+            throw new DataBindException("expected a record for " + dataClass.typeClass() + ", found " + core);
+        }
+
+        DataClassField[] fields = dataClass.fields();
+        Object[] construct = new Object[fields.length];
+        for (DataClassField field : fields) {
+            if (field.isAnnotationsCarrier()) {
+                if (field.type() != TsonAnnotations.class) {
+                    throw new DataBindException("@Annotated component '" + field.name() + "' on "
+                            + dataClass.typeClass() + " must be of type TsonAnnotations, found " + field.type());
+                }
+                construct[field.index()] = new TsonAnnotations(value.annotations());
+                continue;
+            }
+            DataValue fieldValue = byName.get(field.name());
+            if (isAbsent(fieldValue)) {
+                if (field.isRequired()) {
+                    throw new DataBindException(
+                            "missing required field '" + field.name() + "' for " + dataClass.typeClass());
+                }
+                construct[field.index()] = null;
+            } else {
+                construct[field.index()] = toObject(fieldValue, field.dataClass());
+            }
+        }
+        return dataClass.constructor().invoke(construct);
+    }
+
+    // ── Arrays ───────────────────────────────────────────────────────────
+
+    private Object toArray(DataValue value, DataClassArray dataClass) throws Throwable {
+        CoreValue core = value.coreValue();
+        if (!(core instanceof ArrayValue av)) {
+            throw new DataBindException("expected an array for " + dataClass.typeClass() + ", found " + core);
+        }
+        List<ScopedValue> elements = av.elements();
+
+        Object arrayData = dataClass.constructor().invoke(elements.size());
+        Object iterator = dataClass.iterator().invoke(arrayData);
+        DataClass elementClass = dataClass.arrayDataClass();
+
+        for (ScopedValue element : elements) {
+            Object bound = toObject(element.value(), elementClass);
+            dataClass.put().invoke(arrayData, iterator, bound);
+        }
+        return arrayData;
+    }
+
+    // ── Maps ─────────────────────────────────────────────────────────────
+
+    /**
+     * A map key is a full {@code data-value} (§2.6), not just a token, so it's bound recursively
+     * through {@link #toObject(DataValue, DataClass)} exactly like a value is -- there's nothing
+     * map-specific about interpreting a key beyond that. "Last value wins" for a duplicate key
+     * falls out for free from repeated {@code put()} calls in source order, the same way {@link
+     * #toRecord} gets record field deduplication for free (§2.5/§2.6) -- key *equality* here is
+     * whatever the bound key type's own {@code equals()}/{@code hashCode()} say it is, which for a
+     * plain {@code String} key naturally matches the resolver-layer's textual comparison, but isn't
+     * guaranteed to for an arbitrary bound key type.
+     *
+     * <p>{@code {}} parses as {@link EmptyBrace}, not {@link MapValue} -- resolving which typed
+     * container an empty {@code {}} denotes is a deferred resolver-layer concern (§2.8), the same
+     * reason {@link #toRecord} special-cases it. Treated as zero entries here, the same reasonable
+     * default {@code toRecord} uses for zero fields.
+     *
+     * <p>§2.9: the absent sentinel {@code _} "MUST NOT appear as a map key -- a resolver-layer
+     * constraint, not a grammar constraint: the map-entry production accepts any value in key
+     * position, and the resolver rejects absent keys." The structural compiler correctly allows
+     * {@code { _ => 1 } } through (confirmed by {@code TsonDataParserTest}) since that's a grammar-level
+     * permission, not a resolver one -- this is the one place that resolver-layer rejection
+     * actually happens, since nothing between the compiler and here is positioned to enforce it.
+     */
+    private Object toMap(DataValue value, DataClassMap dataClass) throws Throwable {
+        CoreValue core = value.coreValue();
+        List<MapValue.MapEntry> entries;
+        if (core instanceof MapValue mv) {
+            entries = mv.entries();
+        } else if (core instanceof EmptyBrace) {
+            entries = List.of();
+        } else {
+            throw new DataBindException("expected a map for " + dataClass.typeClass() + ", found " + core);
+        }
+
+        Object mapData = dataClass.constructor().invoke(entries.size());
+        DataClass keyClass = dataClass.keyDataClass();
+        DataClass valueClass = dataClass.valueDataClass();
+
+        for (MapValue.MapEntry entry : entries) {
+            if (entry.key().coreValue() instanceof AbsentValue) {
+                throw new DataBindException(
+                        "the absent sentinel '_' must not appear as a map key (§2.9) for " + dataClass.typeClass());
+            }
+            Object key = toObject(entry.key(), keyClass);
+            Object boundValue = toObject(entry.value().value(), valueClass);
+            dataClass.put().invoke(mapData, key, boundValue);
+        }
+        return mapData;
+    }
+
+    // ── Tuples ───────────────────────────────────────────────────────────
+
+    /**
+     * A tuple is array-shaped on the wire, not record-shaped ({@code io.ltr8.annotation.Tuple}'s
+     * own Javadoc: the meta-kernel's {@code tuple} is a {@code product} like {@code record}, but
+     * with array's {@code INDEX} access pattern instead of {@code NAMED}) -- so unlike {@link
+     * #toRecord}, {@code {}} isn't a plausible reading here at all; only {@link ArrayValue}
+     * applies, and TSON's empty array {@code []} is unambiguous already, so there's no
+     * {@link EmptyBrace} case to special-case the way {@link #toRecord}/{@link #toMap} need.
+     */
+    private Object toTuple(DataValue value, DataClassTuple dataClass) throws Throwable {
+        CoreValue core = value.coreValue();
+        if (!(core instanceof ArrayValue av)) {
+            throw new DataBindException("expected an array for tuple " + dataClass.typeClass() + ", found " + core);
+        }
+        List<ScopedValue> elements = av.elements();
+
+        DataClassElement[] slots = dataClass.elements();
+        if (elements.size() != slots.length) {
+            throw new DataBindException("tuple " + dataClass.typeClass() + " has " + slots.length
+                    + " elements, found " + elements.size());
+        }
+
+        Object[] construct = new Object[slots.length];
+        for (int i = 0; i < slots.length; i++) {
+            construct[i] = toObject(elements.get(i).value(), slots[i].dataClass());
+        }
+        return dataClass.constructor().invoke(construct);
+    }
+
+    // ── Unions ───────────────────────────────────────────────────────────
+
+    /**
+     * Disambiguated by the value's own type annotation (§3.2's {@code !typeName}) -- TSON has a
+     * first-class way to say "this value is specifically a Circle", unlike JSON, which needs an
+     * ad hoc injected field for the same purpose. A member class's {@link Typename} annotation
+     * gives the exact match; falling that, the member's simple class name matches
+     * case-insensitively (so {@code !circle} matches a Java class named {@code Circle} without
+     * requiring every fixture to be annotated).
+     */
+    private Object toUnion(DataValue value, DataClassUnion dataClass) throws Throwable {
+        String typeName = value.typeRef().orElseThrow(() -> new DataBindException(
+                "union type " + dataClass.typeClass() + " requires a type annotation (!typeName) to disambiguate members"));
+
+        Class<?> member = resolveUnionMember(dataClass, typeName);
+        DataClass memberDataClass = context.getDescriptor(member);
+
+        // Strip the type-ref before recursing -- it named the member, not a further type for it.
+        DataValue memberValue = new DataValue(value.annotations(), Optional.empty(), value.coreValue());
+        return toObject(memberValue, memberDataClass);
+    }
+
+    private static Class<?> resolveUnionMember(DataClassUnion dataClass, String typeName) throws DataBindException {
+        for (Class<?> member : dataClass.memberTypes()) {
+            Typename tn = member.getAnnotation(Typename.class);
+            if (tn != null && tn.name().equals(typeName)) {
+                return member;
+            }
+        }
+        for (Class<?> member : dataClass.memberTypes()) {
+            if (member.getAnnotation(Typename.class) == null && member.getSimpleName().equalsIgnoreCase(typeName)) {
+                return member;
+            }
+        }
+        throw new DataBindException(
+                "no member of union " + dataClass.typeClass() + " matches type name '" + typeName + "'");
+    }
+}

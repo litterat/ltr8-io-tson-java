@@ -7,7 +7,7 @@ import java.util.List;
 /**
  * meta.tn1's {@code ipv6_type} constructor (IPv6 address constraint vocabulary, RFC 4291) --
  * {@link Ipv4Type}'s exact IPv6 counterpart, same shape, different RFC citation. Pure constraint
- * values, no parsing/validation behavior -- deliberately no {@code tson-parser} parser exists for
+ * values, no parsing/validation behavior -- deliberately no {@code tson-compiler} compiler exists for
  * this atom yet (added as a {@code schema.meta}/{@link Atom} variant only, per explicit user
  * direction, so {@code !ipv6_type {}}/{@code ipv6}'s own resolution succeeds -- not to add real
  * IPv6 validation). See {@link Cidr4Type}'s own Javadoc for why {@code spec} is a flat {@link
