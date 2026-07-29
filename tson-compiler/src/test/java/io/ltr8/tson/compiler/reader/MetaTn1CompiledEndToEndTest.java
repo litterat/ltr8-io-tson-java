@@ -7,7 +7,7 @@ import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.config.TsonCompiledRegistry;
 import io.ltr8.tson.compiler.resolver.DefaultTsonCompiledSchemaLoader;
-import io.ltr8.tson.compiler.resolver.TsonSchemaResolver;
+import io.ltr8.tson.compiler.resolver.SchemaResolver;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
@@ -44,7 +44,7 @@ class MetaTn1CompiledEndToEndTest {
 
         String metaKernelSource = TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID);
         SchemaDocument metaKernelDocument = new TsonSchemaParser(metaKernelSource).parseSchemaDocument();
-        TsonSchema metaKernel = new TsonSchemaResolver(loader).resolveSchema(metaKernelDocument);
+        TsonSchema metaKernel = new SchemaResolver(loader).resolveSchema(metaKernelDocument);
         TsonLinkedSchema metaKernelMaterialized = registry.register(TsonSchemaLinker.link(metaKernel, registry));
         // meta-kernel governs itself -- loader.load(META_KERNEL_ID) re-bootstraps a fresh
         // TsonCompiledMetaSchema (never cached for that identity, see DefaultTsonCompiledSchemaLoader's
@@ -53,7 +53,7 @@ class MetaTn1CompiledEndToEndTest {
 
         String source = TsonBundledSchemas.fetch(TsonBundledSchemas.META_ID);
         SchemaDocument metaDocument = new TsonSchemaParser(source).parseSchemaDocument();
-        TsonSchema meta = new TsonSchemaResolver(loader).resolveSchema(metaDocument);
+        TsonSchema meta = new SchemaResolver(loader).resolveSchema(metaDocument);
 
         return registry.register(TsonSchemaLinker.link(meta, registry));
     }

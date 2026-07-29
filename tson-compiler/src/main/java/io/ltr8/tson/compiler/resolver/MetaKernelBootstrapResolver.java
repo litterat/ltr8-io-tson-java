@@ -1,6 +1,7 @@
 package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.compiler.TsonSchemaParser;
+import io.ltr8.tson.compiler.TsonSchemaSource;
 import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.EmptyBrace;

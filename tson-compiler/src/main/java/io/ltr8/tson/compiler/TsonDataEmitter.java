@@ -5,7 +5,7 @@ import java.util.Deque;
 import java.util.regex.Pattern;
 
 /**
- * Builds TSON source text incrementally -- the write-side counterpart to {@link Lexer}/{@link
+ * Builds TSON source text incrementally -- the write-side counterpart to {@link io.ltr8.tson.compiler.lexer.Lexer}/{@link
  * TsonDataParser}'s read side, and just as agnostic of any particular Java object model: this class knows
  * TSON's own grammar (delimiters, separators, escaping) and nothing about {@code DataClass} or
  * any bound Java type. {@code TsonMapper} is the layer that walks a Java object graph and drives
@@ -19,7 +19,7 @@ import java.util.regex.Pattern;
  * before a non-empty scope's closing delimiter -- {@code { x: 1 y: 2 }}, not {@code {x: 1, y: 2}}
  * -- valid either way, but matching this repo's own established literal style.
  *
- * <p>Not thread-safe; single-use, like {@link Lexer}.
+ * <p>Not thread-safe; single-use, like {@link io.ltr8.tson.compiler.lexer.Lexer}.
  */
 public final class TsonDataEmitter {
 

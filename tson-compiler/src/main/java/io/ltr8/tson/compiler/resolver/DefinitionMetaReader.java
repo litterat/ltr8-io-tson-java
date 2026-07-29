@@ -11,7 +11,7 @@ import io.ltr8.tson.schema.meta.Top;
  *
  * <p>A required constructor parameter of {@link DefinitionResolver}, not threaded per call --
  * {@link DefinitionResolver} has no dependency on {@code reader} at all; a caller
- * with a real compiled reader (e.g. {@link TsonSchemaResolver}) supplies one of these wrapping it
+ * with a real compiled reader (e.g. {@link SchemaResolver}) supplies one of these wrapping it
  * (typically a one-line lambda, {@code (type, value) -> (Top) metaParser.get(type).read(value)}).
  * {@link MetaKernelBootstrapResolver} never actually reaches {@link
  * DefinitionResolver#bindAtomInstance} at all (its own {@code instanceBody} switch handles every real

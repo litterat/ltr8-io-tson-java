@@ -1,15 +1,12 @@
 package io.ltr8.tson;
 
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.tson.compiler.TsonSchemaParser;
+import io.ltr8.tson.compiler.*;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
-import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.config.TsonCompiledRegistry;
 import io.ltr8.tson.compiler.config.ValueReaderFactoryResolver;
 import io.ltr8.tson.compiler.mapper.TsonMapperReader;
 import io.ltr8.tson.compiler.mapper.TsonMapperWriter;
-import io.ltr8.tson.compiler.resolver.DefaultTsonCompiledSchemaLoader;
-import io.ltr8.tson.compiler.resolver.TsonSchemaResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaLinker;
@@ -44,7 +41,7 @@ import io.ltr8.tson.schema.TsonSchemaRegistry;
  * mode parameter at all; only {@link #compile} does.
  *
  * <p>Only supports a schema governed by (and importing only from) meta-kernel/meta.tn/core.tn --
- * a real, disk/HTTP-backed {@link io.ltr8.tson.compiler.resolver.TsonSchemaSource} for arbitrary other
+ * a real, disk/HTTP-backed {@link TsonSchemaSource} for arbitrary other
  * governing chains is its own, separately tracked backlog item; {@link TsonConfig} is the natural
  * place for that to plug in once it exists.
  *
@@ -61,11 +58,11 @@ public final class Tson {
 
     private final TsonSchemaRegistry schemaRegistry;
     private final TsonCompiledRegistry compiledRegistry;
-    private final DefaultTsonCompiledSchemaLoader loader;
+    private final TsonCompiledSchemaLoader loader;
     private final DataBindContext dataBindContext;
 
     Tson(TsonSchemaRegistry schemaRegistry, TsonCompiledRegistry compiledRegistry,
-         DefaultTsonCompiledSchemaLoader loader, DataBindContext dataBindContext) {
+         TsonCompiledSchemaLoader loader, DataBindContext dataBindContext) {
         this.schemaRegistry = schemaRegistry;
         this.compiledRegistry = compiledRegistry;
         this.loader = loader;
@@ -131,7 +128,7 @@ public final class Tson {
     }
 
     /** The underlying loader -- e.g. {@code loader().load(TsonBundledSchemas.META_ID)} to reach the standard library's own compiled meta-schemas directly. */
-    public DefaultTsonCompiledSchemaLoader loader() {
+    public TsonCompiledSchemaLoader loader() {
         return loader;
     }
 }

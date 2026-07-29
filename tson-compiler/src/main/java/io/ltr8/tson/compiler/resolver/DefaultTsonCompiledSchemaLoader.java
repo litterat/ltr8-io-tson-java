@@ -1,7 +1,9 @@
 package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
+import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
 import io.ltr8.tson.compiler.TsonSchemaParser;
+import io.ltr8.tson.compiler.TsonSchemaSource;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.config.TsonCompiledRegistry;
 import io.ltr8.tson.schema.TsonBundledSchemas;
@@ -21,7 +23,7 @@ import java.util.Optional;
  *   <li><b>Meta-kernel's own well-known identity?</b> Resolved via {@link
  *   MetaKernelBootstrapResolver#getMetaKernelSchema()} -- never through this loader's own generic
  *   path below, which would recurse forever: that path resolves a document via {@code
- *   TsonSchemaResolver(this)}, and {@code TsonSchemaResolver.resolveSchema} itself calls back into
+ *   SchemaResolver(this)}, and {@code SchemaResolver.resolveSchema} itself calls back into
  *   {@link #load} for the document's own {@code !!meta} target -- fine for any real schema, whose
  *   {@code !!meta} points at something *other* than itself, but meta-kernel's own {@code !!meta}
  *   names itself (Part 2 §1.5's "one deliberate circularity"). This check runs *before* that path is
@@ -49,11 +51,11 @@ import java.util.Optional;
  *   registration with "{@code !!import '...' is not registered}" unless meta-kernel has *separately*
  *   been registered in the *shared* registry first: {@code TsonSchemaLinker}'s own import-merging
  *   (run inside {@code TsonSchemaRegistry#register}, a step distinct from {@code
- *   TsonSchemaResolver}'s own resolution-time import-merging above) resolves an import via {@code
+ *   SchemaResolver}'s own resolution-time import-merging above) resolves an import via {@code
  *   TsonSchemaRegistry}'s own registered-only {@code TsonSchemaLoader}, which knows nothing about
  *   this loader or its one-off bootstrap case. In practice this means a caller resolving anything
  *   beyond meta-kernel itself still needs to register meta-kernel explicitly first -- resolved
- *   *ordinarily* via {@code TsonSchemaResolver.resolveSchema} against a loader whose own bootstrap
+ *   *ordinarily* via {@code SchemaResolver.resolveSchema} against a loader whose own bootstrap
  *   branch supplies the structure namespace (never the raw/one-off linked bootstrap form directly --
  *   {@code TsonSchemaRegistry#register} refuses any self-referential schema with {@code bootstrap()
  *   == true}, see its own Javadoc) -- before asking this loader for anything that transitively
@@ -61,7 +63,7 @@ import java.util.Optional;
  *   separate *import-merge* requirement.</li>
  *   <li><b>Otherwise</b>, fetch {@code uri}'s own source text via this loader's own {@link
  *   TsonSchemaSource} (default: {@link TsonSchemaSource#registeredOnly()}, so nothing is fetched from
- *   anywhere unless a caller opts in), parse it, resolve it via a fresh {@code TsonSchemaResolver}
+ *   anywhere unless a caller opts in), parse it, resolve it via a fresh {@code SchemaResolver}
  *   constructed with *this same loader* (so that document's own {@code !!meta}/{@code !!import}
  *   targets resolve the same way, recursively, cache-then-bootstrap-then-fetch all the way down),
  *   then register and compile the result -- *this* result genuinely is cached, unlike meta-kernel's
@@ -102,7 +104,7 @@ public final class DefaultTsonCompiledSchemaLoader implements TsonCompiledSchema
         }
         String sourceText = source.fetch(uri);
         SchemaDocument document = new TsonSchemaParser(sourceText).parseSchemaDocument();
-        TsonSchemaResolver resolver = new TsonSchemaResolver(this);
+        SchemaResolver resolver = new SchemaResolver(this);
         TsonSchema resolved = resolver.resolveSchema(document);
         // resolveSchema already called load(document.meta()) internally to build its own structure
         // namespace, so this is a cache hit, not a second compile -- registry.register still needs

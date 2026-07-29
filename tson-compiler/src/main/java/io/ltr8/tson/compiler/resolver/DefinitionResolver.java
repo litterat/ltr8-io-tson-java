@@ -197,7 +197,7 @@ import java.util.Set;
  * import here.
  *
  * <p>Package-private, no {@code Tson} prefix -- internal machinery a consumer of this library never
- * names directly (see "Naming convention" in this project's own CLAUDE.md). {@link TsonSchemaResolver}
+ * names directly (see "Naming convention" in this project's own CLAUDE.md). {@link SchemaResolver}
  * is the public, document-level counterpart: it validates a document's own header directives ({@code
  * !!id}/{@code !!import}), merges {@code !!import} entries, derives the structure namespace from a
  * {@code TsonCompiledSchemaLoader}, and holds one instance of this class to do the actual
@@ -207,7 +207,7 @@ import java.util.Set;
  *
  * <p>Has no dependency on {@code reader} -- {@link #bindAtomInstance}'s own binding
  * step goes through {@link DefinitionMetaReader} (a required constructor parameter), a narrow read
- * contract rather than the full {@code TsonCompiledSchema}; see {@code TsonSchemaResolver#resolveSchema}'s
+ * contract rather than the full {@code TsonCompiledSchema}; see {@code SchemaResolver#resolveSchema}'s
  * own Javadoc for where that fuller reach actually lives.
  */
 final class DefinitionResolver {

@@ -42,7 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * neitherRawNorLinkedBootstrapFormCanEverBeRegistered} below cover that rejection in both forms;
  * {@code registeringTheOrdinarilyResolvedNonBootstrapMetaKernelSucceeds} covers the one way
  * meta-kernel's own identity can actually end up registered -- resolved via ordinary {@code
- * TsonSchemaResolver.resolveSchema} (which never sets {@code bootstrap}), using the loader's own
+ * SchemaResolver.resolveSchema} (which never sets {@code bootstrap}), using the loader's own
  * bootstrap branch as the structure-namespace ground truth, mirroring {@code
  * MetaTn1CompiledEndToEndTest#registerMeta}'s own pattern.
  */
@@ -124,7 +124,7 @@ class MetaKernelSchemaRegistryTest {
 
     /**
      * The one way meta-kernel's own identity can actually end up registered: resolved via ordinary
-     * {@code TsonSchemaResolver.resolveSchema} against a loader whose own bootstrap branch supplies the
+     * {@code SchemaResolver.resolveSchema} against a loader whose own bootstrap branch supplies the
      * complete structure namespace (so even a forward-referencing declaration like {@code boolean =>
      * !enum [...]} resolves correctly, the same as {@code MetaKernelBootstrapResolver}'s own two-pass logic
      * achieves, just via the generic mechanism instead) -- {@code resolveSchema} never sets {@code
@@ -143,7 +143,7 @@ class MetaKernelSchemaRegistryTest {
 
         String source = TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID);
         SchemaDocument document = new TsonSchemaParser(source).parseSchemaDocument();
-        TsonSchema resolved = new TsonSchemaResolver(loader).resolveSchema(document);
+        TsonSchema resolved = new SchemaResolver(loader).resolveSchema(document);
         assertFalse(resolved.bootstrap());
 
         TsonLinkedSchema registered = registry.register(TsonSchemaLinker.link(resolved, registry));

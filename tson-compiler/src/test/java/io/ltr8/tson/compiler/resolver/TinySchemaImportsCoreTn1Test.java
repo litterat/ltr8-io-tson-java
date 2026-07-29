@@ -83,14 +83,14 @@ class TinySchemaImportsCoreTn1Test {
         // class Javadoc for why this step can't just be another loader.load(...) call.
         SchemaDocument metaKernelDocument = new TsonSchemaParser(
                 TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID)).parseSchemaDocument();
-        TsonSchema resolvedMetaKernel = new TsonSchemaResolver(loader).resolveSchema(metaKernelDocument);
+        TsonSchema resolvedMetaKernel = new SchemaResolver(loader).resolveSchema(metaKernelDocument);
         registry.register(resolvedMetaKernel, loader.load(TsonBundledSchemas.META_KERNEL_ID));
 
         TsonCompiledMetaSchema compiledMeta = loader.load(TsonBundledSchemas.META_ID);
         loader.load(TsonBundledSchemas.CORE_ID); // must be registered before the tiny schema's own !!import can find it
 
         SchemaDocument tinyDocument = new TsonSchemaParser(TINY_DOCUMENT).parseSchemaDocument();
-        TsonSchema resolvedTiny = new TsonSchemaResolver(loader).resolveSchema(tinyDocument);
+        TsonSchema resolvedTiny = new SchemaResolver(loader).resolveSchema(tinyDocument);
 
         // Imported entries are visible during resolution but never part of the resolved schema's own
         // entries() -- only the three local declarations should be here.

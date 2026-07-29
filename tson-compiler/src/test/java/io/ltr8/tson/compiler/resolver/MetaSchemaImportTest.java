@@ -25,13 +25,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Verifies {@code SchemaValidator}'s {@code !!import} merging (see its own Javadoc) against the
  * real {@code meta.tn1} fixture -- register meta-kernel first, then meta.tn1's own declarations
- * (resolved via {@link TsonSchemaResolver#resolveSchema}, mirroring the now-deleted {@code MetaTn1Parser}'s
+ * (resolved via {@link SchemaResolver#resolveSchema}, mirroring the now-deleted {@code MetaTn1Parser}'s
  * own bootstrap steps -- see {@link #parseMetaTn1}), and confirm meta-kernel's names (e.g. {@code
  * atom}, {@code text_type}) are visible and correctly referenced from meta.tn1's own
  * composition-based declarations (e.g. {@code date_type => ~atom & atom_specification & {...}}).
  *
  * <p><b>meta.tn1 now registers in full, all 31 declarations</b> (2026-07-24, once {@code
- * TsonSchemaResolver} gained generic {@code Instance} resolution -- Phase B step 4) -- previously 4 of
+ * SchemaResolver} gained generic {@code Instance} resolution -- Phase B step 4) -- previously 4 of
  * its 31 declarations ({@code binary_encoding}, {@code ieee_format}, {@code complex_component},
  * {@code ordered}, all {@code !enum [...]}) had to be skipped, and 3 more ({@code binary}, {@code
  * float_type}, {@code complex_type}) that reference one of those four as a field type had to be
@@ -45,7 +45,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class MetaSchemaImportTest {
 
     /**
-     * Deliberately still resolves via a bare {@link TsonSchemaResolver#resolveSchema(SchemaDocument)} call
+     * Deliberately still resolves via a bare {@link SchemaResolver#resolveSchema(SchemaDocument)} call
      * rather than {@link DefaultTsonCompiledSchemaLoader#load(String)} -- this test wants meta.tn1's own
      * *raw, unregistered, local-only* result (31 entries, no merged imports) to exercise {@code
      * TsonSchemaRegistry#register}'s own import-merge itself, one stage later; {@code
@@ -56,7 +56,7 @@ class MetaSchemaImportTest {
      * {@code MetaTn1Parser} everywhere else that only wants the *fully* resolved-and-registered
      * result (see {@code TsonSchemaResolverCompiledMetaSchemaTest#loadMetaKernelAndMeta}).
      *
-     * <p><b>Meta-kernel itself is resolved via ordinary {@code TsonSchemaResolver.resolveSchema}, not
+     * <p><b>Meta-kernel itself is resolved via ordinary {@code SchemaResolver.resolveSchema}, not
      * registered as the raw bootstrap output</b> (2026-07-26, {@code TsonSchemaRegistry#register} now
      * refuses <i>any</i> self-referential schema with {@code bootstrap() == true}, materialized or
      * not -- see that method's own Javadoc). {@code registry.materializeBootstrap(...)} still runs
@@ -78,7 +78,7 @@ class MetaSchemaImportTest {
 
         String metaKernelSource = TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID);
         SchemaDocument metaKernelDocument = new TsonSchemaParser(metaKernelSource).parseSchemaDocument();
-        TsonSchema metaKernel = new TsonSchemaResolver(loader).resolveSchema(metaKernelDocument);
+        TsonSchema metaKernel = new SchemaResolver(loader).resolveSchema(metaKernelDocument);
         TsonLinkedSchema metaKernelMaterialized = registry.register(TsonSchemaLinker.link(metaKernel, registry));
         // meta-kernel governs itself -- loader.load(META_KERNEL_ID) re-bootstraps a fresh
         // TsonCompiledMetaSchema (never cached for that identity), exactly what register's own
@@ -87,7 +87,7 @@ class MetaSchemaImportTest {
 
         String source = TsonBundledSchemas.fetch(TsonBundledSchemas.META_ID);
         SchemaDocument metaDocument = new TsonSchemaParser(source).parseSchemaDocument();
-        return new TsonSchemaResolver(loader).resolveSchema(metaDocument);
+        return new SchemaResolver(loader).resolveSchema(metaDocument);
     }
 
     @Test

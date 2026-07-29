@@ -58,7 +58,7 @@ class CoreSchemaImportTest {
         // structure namespace).
         SchemaDocument metaKernelDocument = new TsonSchemaParser(
                 TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID)).parseSchemaDocument();
-        TsonSchema resolvedMetaKernel = new TsonSchemaResolver(loader).resolveSchema(metaKernelDocument);
+        TsonSchema resolvedMetaKernel = new SchemaResolver(loader).resolveSchema(metaKernelDocument);
         registry.register(resolvedMetaKernel, loader.load(TsonBundledSchemas.META_KERNEL_ID));
 
         loader.load(TsonBundledSchemas.META_ID);

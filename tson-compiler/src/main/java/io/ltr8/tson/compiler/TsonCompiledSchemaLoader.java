@@ -1,6 +1,7 @@
-package io.ltr8.tson.compiler.resolver;
+package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
+import io.ltr8.tson.compiler.resolver.DefaultTsonCompiledSchemaLoader;
+import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
 
 /**
  * Given a schema's own URI (a document's {@code !!meta} target, or one of its {@code !!import}

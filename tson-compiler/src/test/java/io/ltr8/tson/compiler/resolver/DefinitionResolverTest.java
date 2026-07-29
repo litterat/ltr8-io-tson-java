@@ -149,7 +149,7 @@ class DefinitionResolverTest {
     void resolveSchemaResolvesEveryDeclarationInSourceOrder() throws DataBindException {
         // DefinitionResolver has no resolveSchema(SchemaDocument) batch convenience of its own --
         // resolving a whole document, in source order, is this loop, matching
-        // TsonSchemaResolver#resolveSchema's own production loop.
+        // SchemaResolver#resolveSchema's own production loop.
         SchemaDocument doc = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 {
@@ -1297,7 +1297,7 @@ class DefinitionResolverTest {
      * Meta-kernel registered, then meta.tn1 resolved and registered on top -- see {@code
      * MetaSchemaImportTest} for the same, fully-verified pattern (31/31 declarations, validated).
      *
-     * <p>Meta-kernel itself is registered via ordinary {@code TsonSchemaResolver.resolveSchema}, not
+     * <p>Meta-kernel itself is registered via ordinary {@code SchemaResolver.resolveSchema}, not
      * the raw bootstrap output ({@code TsonSchemaRegistry#register} refuses any self-referential
      * schema with {@code bootstrap() == true}, materialized or not -- see that method's own Javadoc)
      * -- mirrors {@code MetaTn1CompiledEndToEndTest#registerMeta}'s own pattern: a throwaway
@@ -1317,7 +1317,7 @@ class DefinitionResolverTest {
 
         String metaKernelSource = TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID);
         SchemaDocument metaKernelDocument = new TsonSchemaParser(metaKernelSource).parseSchemaDocument();
-        TsonSchema metaKernel = new TsonSchemaResolver(throwawayLoader).resolveSchema(metaKernelDocument);
+        TsonSchema metaKernel = new SchemaResolver(throwawayLoader).resolveSchema(metaKernelDocument);
         registry.register(TsonSchemaLinker.link(metaKernel, registry)); // permanent, so meta.tn1's own !!import finds it below
         TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
 

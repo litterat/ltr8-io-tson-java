@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
@@ -33,7 +34,7 @@ import java.util.Objects;
  * feeds and passed as {@code namespace::get} -- a plain method reference onto the map, not a copy, so
  * the resolver sees each newly-added entry on the very next loop iteration.
  */
-public final class TsonSchemaResolver {
+public final class SchemaResolver {
 
     private final TsonCompiledSchemaLoader loader;
 
@@ -52,7 +53,7 @@ public final class TsonSchemaResolver {
      *               and answers it directly (see {@link DefaultTsonCompiledSchemaLoader}'s own
      *               Javadoc) instead of looping forever.
      */
-    public TsonSchemaResolver(TsonCompiledSchemaLoader loader) {
+    public SchemaResolver(TsonCompiledSchemaLoader loader) {
         this.loader = Objects.requireNonNull(loader, "loader");
     }
 
