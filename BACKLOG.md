@@ -19,6 +19,31 @@ yet implemented" section for the technical detail behind several of these items.
 - [ ] A fluent/builder API replacing that same hand-assembled wiring (`TsonSchemaRegistry` +
   `TsonCompiledRegistry` + `DefaultTsonCompiledSchemaLoader` + `ValueReaderFactoryRegistry` +
   `SchemaMetaNameBinder`) with something closer to one call.
+- [x] **A CLI, ajv-cli-style — v1 landed** (new `tson-cli` module: `TsonCli`/`ValidateCommand`/
+  `CompileCommand`/`OutputFormat`/`StandardLibrary`/`DiagnosticsSchema`). `tson validate --type
+  <name> [--output text|json|tson] <schema> <data...>` and `tson compile [--output text|json|tson]
+  <schema>`, positional schema-then-data arguments, Unix-conventional exit codes (0 valid/compiled,
+  1 a real failure, 2 usage error). `--output tson` renders the report via the plain, schemaless
+  `TsonMapperWriter` and reads it straight back through a small hand-authored `diagnostics.tn1`
+  schema's own compiled `validation_report` reader (bound to real `ValidationReport`/`CliDiagnostic`
+  classes) — genuinely dogfooded, not just described (`OutputFormatTest
+  .tsonOutputGenuinelyRoundTripsThroughTheDiagnosticsSchema` proves the round trip, not just that
+  the text looks TSON-shaped). Arg-parsing is hand-rolled, resolving the open question this bullet
+  used to carry — no external dependency needed for a flag set this small.
+  **Still v1-scoped, not the full design**: no `--all-errors` yet — each file's own read is still
+  the existing fail-fast stack, with the single caught exception formatted into a one-entry report;
+  real multi-error collection needs the full `Diagnostic`/`validate(...)` API `STRUCTURED-OUTPUT.md`
+  still describes, not yet built. `--type` is required (no `!!schema`-header auto-selection exists
+  yet, tracked separately below). A real `StandardLibrary` surfaced a genuine, non-obvious pipeline
+  constraint worth remembering for any future front-door work: resolving an `Instance`/
+  `AtomRefinement` declaration (`DefinitionResolver.bindAtomInstance`) always needs a real,
+  object-binding-mode governing-meta reader, regardless of what mode the *final* compiled schema
+  wants — DOM-mode resolution of the standard library itself fails outright (a `Map` can't cast to
+  `schema.meta.Top`). Only *compiling* an already-resolved, already-linked schema
+  (`TsonCompiledMetaSchema.bootstrap`) is free to pick a different mode, since it never re-resolves
+  anything.
+- [ ] `--all-errors`/`-a`, once the real `Diagnostic` API lands — collect every validation failure
+  in a file instead of stopping at the first.
 - [ ] No `!!schema`-header auto-selection on the data side — given a data document, there's no
   "find the right compiled reader yourself" entry point; a caller always has to already know what
   schema position it's reading against.

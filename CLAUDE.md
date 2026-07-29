@@ -99,6 +99,22 @@ ask "would a consumer of this library plausibly also have their own class with t
 the type is meant to be used from outside this library's own internals, prefix it; if it's internal
 machinery a consumer never names directly, leave it bare.
 
+### Project-owned schema `!!id` convention
+
+A schema this project authors itself (not one of the spec's own bundled `meta-kernel.tn1`/`meta.tn1`/
+`core.tn1` companion artifacts) gets a `!!id` of the shape
+`https://tson.io/2026/32/ltr8/<group>/<name>-<version>.tn1` — e.g. `tson-cli`'s own
+`diagnostics.tn1`: `https://tson.io/2026/32/ltr8/cli/diagnostics-1.tn1`. Reading the path
+left to right: `/2026/32` is the spec revision this schema is written against (the same version
+segment the spec's own bundled schemas publish under); `ltr8` is the publishing org (this project's
+own group id); `<group>` is a short name for the module/subsystem the schema belongs to (`cli` for
+`tson-cli`'s own schemas); `<name>-<version>` is the schema's own name with a trailing integer
+version — bump it, under a new name (`diagnostics-2.tn1`, not an in-place edit), whenever the
+schema's own shape changes, per §10's own "each published schema version is immutable, different
+content hashes and different URLs" rule. A schema's own `@doc` annotation (see `diagnostics.tn1`
+itself) should point back to this section by name so the convention is discoverable from the schema
+file alone, not just from here.
+
 `tson-parser` holds the lexer, the data-grammar structural parser, base type resolution, the built-in
 type vocabulary, the Part 2 schema grammar (`TsonSchemaParser`, `ast.schema`), the schema resolver
 (`io.ltr8.tson.parser.resolver.TsonSchemaResolver`, producing Class 2's resolved schema value), *and*
