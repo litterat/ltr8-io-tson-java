@@ -89,7 +89,7 @@ left. Don't defer this to a separate pass; do it in the same edit that touches t
 If a class name contains `Tson` at all, `Tson` MUST be the leading word (`TsonSchema`, `TsonCompiledSchema`,
 `TsonSchemaCompiler`, `TsonDataParser`, `TsonMapperReader`) — never buried in the middle (`CompiledTsonSchema`
 is wrong; it was renamed to `TsonCompiledSchema` specifically to fix this, 2026-07-26). The prefix isn't
-applied to every class in the library, either — most of `tson-parser`/`tson-schema`'s own internal machinery
+applied to every class in the library, either — most of `tson-compiler`/`tson-schema`'s own internal machinery
 is deliberately bare (`Lexer`, `RecordAbstractReader`, `DeferredValueReader`, `CanonicalIdentity`).
 Reserve the `Tson` prefix for the classes a *consumer of this library* actually names in
 their own code — its value is disambiguation at the call site (`TsonSchema` vs. a domain object also called
@@ -124,7 +124,7 @@ not settled precedent to follow). Renamed from `.tn1` to `.tn` throughout this p
 on the user's own explicit direction, once it was confirmed the live spec site could be updated to
 match rather than being a fixed, unchangeable external identity.
 
-`tson-parser` holds the lexer, the data-grammar structural parser, base type resolution, the built-in
+`tson-compiler` holds the lexer, the data-grammar structural parser, base type resolution, the built-in
 type vocabulary, the Part 2 schema grammar (`TsonSchemaParser`, `ast.schema`), the schema resolver
 (`io.ltr8.tson.compiler.resolver.TsonSchemaResolver`, producing Class 2's resolved schema value), *and*
 (moved here 2026-07-24, see "Mapper" below) the generic `DataValue`&lt;-&gt;Java-object binding layer
@@ -137,26 +137,26 @@ the lexer and structural parser together.
 
 **`tson-schema` holds exactly one thing: `io.ltr8.tson.schema.meta`, the resolved-schema *value* model**
 (§8's `TypeDefinition` et al.) — pure data (records, sealed interfaces, enums), no parsing, no
-resolution logic, and (deliberately) no dependency on `tson-parser` at all. This is the reverse of the
-dependency direction the module names might suggest: `tson-parser` depends on `tson-schema`, not the
-other way around, precisely so that `tson-parser`'s own resolver (and, later, a schema-validating data
+resolution logic, and (deliberately) no dependency on `tson-compiler` at all. This is the reverse of the
+dependency direction the module names might suggest: `tson-compiler` depends on `tson-schema`, not the
+other way around, precisely so that `tson-compiler`'s own resolver (and, later, a schema-validating data
 parser) can hold and consult `schema.meta` types directly. `schema.meta.Token` is the one place this
-shows concretely: it structurally mirrors `tson-parser`'s own `TokenValue`/`TokenForm` (same field
+shows concretely: it structurally mirrors `tson-compiler`'s own `TokenValue`/`TokenForm` (same field
 names, same enum members) but is declared locally rather than imported, specifically so `schema.meta`
-never needs to reference `tson-parser` at all; `TsonSchemaResolver` converts field-by-field at the one spot
+never needs to reference `tson-compiler` at all; `TsonSchemaResolver` converts field-by-field at the one spot
 that needs it (`resolveField`'s `toMetaToken`). `tson-bind`/`tson-annotation` are the separate
 Java-object-binding layer (see their own package Javadoc; not detailed in this file yet) —
 `tson-schema`'s own `schema.meta` classes depend on `tson-annotation` only (for `@Typename`/`@Field`),
 never on `tson-bind`.
 
 **There is no `tson-mapper` module anymore.** It originally held the `DataValue`&lt;-&gt;Java-object
-mapper (`TsonMapper`, plus `AtomBinder`/`AtomWriter`/`TsonAnnotations`), depending on `tson-parser` +
-`tson-schema` + `tson-bind`. Moved into `tson-parser` itself (2026-07-24) — split into
+mapper (`TsonMapper`, plus `AtomBinder`/`AtomWriter`/`TsonAnnotations`), depending on `tson-compiler` +
+`tson-schema` + `tson-bind`. Moved into `tson-compiler` itself (2026-07-24) — split into
 `TsonMapperReader`/`TsonMapperWriter` along the way (see "Mapper" below) — once `TsonSchemaResolver`'s own
 generalized constructor-application/atom-refinement resolution needed exactly this generic binding
-directly, which `tson-mapper`'s own dependency *on* `tson-parser` made impossible without a module
-cycle. `tson-bind` itself has no dependency on `tson-parser`/`tson-schema` (a leaf module), so
-`tson-parser` depending on it directly, in main scope, is clean — the `tson-mapper` module had nothing
+directly, which `tson-mapper`'s own dependency *on* `tson-compiler` made impossible without a module
+cycle. `tson-bind` itself has no dependency on `tson-compiler`/`tson-schema` (a leaf module), so
+`tson-compiler` depending on it directly, in main scope, is clean — the `tson-mapper` module had nothing
 left in it afterward and was deleted outright, not just deprecated.
 
 Package: `io.ltr8.tson.compiler.lexer` (group `io.ltr8`). The group is `io.ltr8`, not `io.tson`: reverse-DNS
@@ -165,7 +165,7 @@ verification actually checks), not the subject matter. `tson.io` is the spec's h
 implement it — and this is one implementation of it, published under the `ltr8.io` banner, not a claim to
 be *the* tson.io-blessed implementation.
 
-### Lexer (`tson-parser/src/main/java/io/ltr8/tson/parser/lexer/`)
+### Lexer (`tson-compiler/src/main/java/io/ltr8/tson/compiler/lexer/`)
 
 `Lexer` is a single hand-written scanner (`Lexer.java`) producing a stream of `Token`s. Key design
 points, tied to specific spec sections:
@@ -213,7 +213,7 @@ The lexer is complete and frozen for the whole series per the spec itself (§1.3
 no new tokens, no new lexer modes, and no changes to character classification." Everything above it
 changes; the lexer doesn't.
 
-### Structural parser (`tson-parser/src/main/java/io/ltr8/tson/parser/`)
+### Structural parser (`tson-compiler/src/main/java/io/ltr8/tson/compiler/`)
 
 `TsonDataParser` (`TsonDataParser.java`) turns the lexer's token stream into a `Document` (§2, §3, §7.4). AST types live
 in the `ast` subpackage as a sealed `CoreValue` hierarchy (`RecordValue`, `MapValue`, `ArrayValue`,
@@ -252,7 +252,7 @@ Key design points:
   documents this as intentional, spec-derived behavior, not a bug, so don't "fix" it without re-reading
   that entry first.
 
-### Base type resolution (`tson-parser/src/main/java/io/ltr8/tson/parser/base/`)
+### Base type resolution (`tson-compiler/src/main/java/io/ltr8/tson/compiler/base/`)
 
 `BaseTypeResolver.resolve(TokenValue)` implements §4's fixed resolution order (null → boolean → number →
 string, §4.5) for `TokenValue`s produced by the parser. `NumberGrammar.tryParse(String)` recognizes the
@@ -284,7 +284,7 @@ string, §4.5) for `TokenValue`s produced by the parser. `NumberGrammar.tryParse
   vocabulary (§5 — `!uuid`, `!date`, `!int32`, etc.) is a separate implementation, `atom`
   (below), consulted only when a value actually carries a type-ref.
 
-### Built-in type vocabulary (`tson-parser/src/main/java/io/ltr8/tson/parser/atom/`)
+### Built-in type vocabulary (`tson-compiler/src/main/java/io/ltr8/tson/compiler/atom/`)
 
 `AtomType<T>` is a built-in vocabulary atom's parsing contract (§5.2): `read(TokenValue)` (the
 atom's own natural host value), `read(TokenValue, Class<?>)` (narrow directly to a caller-supplied
@@ -296,7 +296,7 @@ published table, e.g. the full `int8`..`int256` width ladder vs. the four §5.6 
 tracked in `SPEC-FEEDBACK.md`).
 
 **Each constructor is split into two classes, one per module, not one flat class** (widened to all
-implementations 2026-07-23, alongside the `tson-schema`/`tson-parser` dependency inversion below):
+implementations 2026-07-23, alongside the `tson-schema`/`tson-compiler` dependency inversion below):
 a pure constraint-*values* record in `io.ltr8.tson.schema.meta` (`IntegerType`, `TextType`,
 `RegexType`, `DecimalType`, `FloatType`, `RationalType`, `UuidType`, `BinaryType`, `DateType`,
 `TimeType`, `DateTimeType`, `DurationType`, `UriType` — no parsing/validation, matching the kernel's
@@ -347,21 +347,21 @@ their own field type -- not needed by this fix, but added and unit-tested (`Patt
 regardless; see `tson-bind/README.md`'s "Under development" section for the full note.
 
 **Why the split needed a dependency-direction flip.** `schema.meta` (§8's resolved-schema value
-model, previously `tson-schema` depending on `tson-parser` for its own grammar-layer `SchemaMap`)
-had to stop depending on `tson-parser` at all for a vocab class here to hold one of its records
+model, previously `tson-schema` depending on `tson-compiler` for its own grammar-layer `SchemaMap`)
+had to stop depending on `tson-compiler` at all for a vocab class here to hold one of its records
 without a module cycle. Two consequences: `TsonSchemaResolver`/`TsonSchema` (which *do* need
-`tson-parser`'s grammar AST) moved into this module, at `resolver` (this package's own
+`tson-compiler`'s grammar AST) moved into this module, at `resolver` (this package's own
 sibling — see "Schema resolution" below); and `schema.meta.Token` was introduced as a local,
-structurally-identical stand-in for `tson-parser.ast.TokenValue`/`TokenForm` (same `text`/`form`
+structurally-identical stand-in for `tson-compiler.ast.TokenValue`/`TokenForm` (same `text`/`form`
 fields, same three enum members) purely so `RecordField.value`/`TypeArgument.Value` (§8.1's literal-
-value fields) don't need `tson-parser`'s own type — `TsonSchemaResolver` converts between the two at the
+value fields) don't need `tson-compiler`'s own type — `TsonSchemaResolver` converts between the two at the
 one spot that needs it (`resolveField`'s `toMetaToken`). `tson-schema`'s own module now holds
 *only* `io.ltr8.tson.schema.meta` and depends on nothing but `tson-annotation` (for `@Typename`/
-`@Field`); `tson-parser` depends on `tson-schema`, the reverse of before. This groundwork is for a
-future schema-*validating* parser (Class 2): once one exists inside `tson-parser`, it can hold and
+`@Field`); `tson-compiler` depends on `tson-schema`, the reverse of before. This groundwork is for a
+future schema-*validating* parser (Class 2): once one exists inside `tson-compiler`, it can hold and
 consult a resolved `TsonSchema`/`TypeDefinition` directly, the same way `atom` already
 consults `schema.meta` constraint records — without `tson-schema` ever needing to import
-`tson-parser` back.
+`tson-compiler` back.
 
 **Now genuinely used, not just prepared for.** Part 2's own atom-refinement resolution (`!I ^ {
 ... }`, `TsonSchemaResolver.resolveAtomRefinement`, added 2026-07-24) binds a refinement's own values
@@ -393,13 +393,13 @@ own name* (`AtomValueReader.UNIT`'s factory switches on its `name` parameter, no
 constructed name falls back to `TokenParser`'s behavior (the previous, pre-split default for
 everything) rather than failing.
 
-### Mapper (`tson-parser/src/main/java/io/ltr8/tson/parser/mapper/`)
+### Mapper (`tson-compiler/src/main/java/io/ltr8/tson/compiler/mapper/`)
 
 Binds a parsed `DataValue` tree to a Java object given its `DataClass` descriptor from `tson-bind`,
 and back — `TsonMapperReader`/`TsonMapperWriter`. Moved here from a separate `tson-mapper` module
 (2026-07-24; see "Architecture" above for the module-cycle reasoning) once `TsonSchemaResolver`'s own
 generalized constructor-application/atom-refinement resolution needed exactly this generic binding
-directly, which the old module's own dependency *on* `tson-parser` made impossible to reach from
+directly, which the old module's own dependency *on* `tson-compiler` made impossible to reach from
 here without a cycle.
 
 **Split into `TsonMapperReader`/`TsonMapperWriter`, not one `TsonMapper` class**, for readability —
@@ -432,19 +432,19 @@ handling (see "Meta-kernel bootstrap" below) stays hand-written rather than rout
 positional-form value generically; wrapping the bare value into an equivalent one-field
 `RecordValue` before delegating to ordinary record binding is the natural fix, not yet built.
 
-### Schema grammar (`tson-parser/src/main/java/io/ltr8/tson/parser/TsonSchemaParser.java`,
+### Schema grammar (`tson-compiler/src/main/java/io/ltr8/tson/compiler/TsonSchemaParser.java`,
 `.../ast/schema/`)
 
 `TsonSchemaParser` parses a schema document's body (Part 2 §2.1, §5, ABNF at §12.1) into a
 `SchemaDocument`, the schema-grammar analogue of `Document`/`CoreValue`. AST types live in the
 `ast.schema` subpackage (`TypeDef`, `TypeRef`, `RecordDef`, `ContainerDef`, etc.) alongside
-`tson-parser.ast`'s data-grammar types, one sealed hierarchy per ABNF production family, mirroring
+`tson-compiler.ast`'s data-grammar types, one sealed hierarchy per ABNF production family, mirroring
 `ast`'s own shape.
 
 - **Grammar-only, deliberately.** `TsonSchemaParser` builds a faithful AST from a schema document's source
   text and does nothing else itself — no namespace resolution (§3), no `type_definition`
   materialisation or desugaring (§8), no validation; see "Schema resolution" below for the module
-  (`tson-schema`) that consumes this AST and does that work, kept out of `tson-parser` on purpose since
+  (`tson-schema`) that consumes this AST and does that work, kept out of `tson-compiler` on purpose since
   it has real independent conformance meaning (Class 2 proper) the grammar layer itself doesn't.
 - **`SchemaMap.declarations` is a `Map<String, Declaration>`, not a `List`** — keyed by name, insertion
   order preserved (a `LinkedHashMap`), exactly the shape §3.4.1's Pass 1 needs ("populated with skeleton
@@ -488,7 +488,7 @@ positional-form value generically; wrapping the bare value into an equivalent on
 - **`field-modifier`'s value is a bare token or the absent sentinel, not a full `data-value`** — §12.1's
   own introductory prose claims otherwise, but its ABNF and §5.2's prose agree on the narrower rule; see
   `SPEC-FEEDBACK.md` #15. `FieldDef.Modifier.Value` models exactly `token | absent`, reusing
-  `tson-parser.ast`'s `TokenValue` rather than the full `DataValue`.
+  `tson-compiler.ast`'s `TokenValue` rather than the full `DataValue`.
 - **An unquoted, non-numeric type-argument always parses as a type reference, never a value literal** —
   `TsonSchemaParser.parseTypeArg`'s Javadoc explains why this is the grammar's own deliberate deferral (§12.1,
   §5.10: "settled against the applied signature's parameter kinds... not by the grammar"), not an
@@ -499,11 +499,11 @@ positional-form value generically; wrapping the bare value into an equivalent on
   repo's own `spec/` directory, not the sibling test-suite repo) end-to-end with no exceptions — real,
   full-sized schema documents, not just the spec's illustrative snippets.
 
-### Schema resolution (`tson-parser/src/main/java/io/ltr8/tson/parser/resolver/`)
+### Schema resolution (`tson-compiler/src/main/java/io/ltr8/tson/compiler/resolver/`)
 
 `DefinitionResolver` turns the grammar-layer `SchemaMap` (same module, `io.ltr8.tson.compiler.ast.schema`)
 into resolved `TypeDefinition`s (Part 2 §4, §8) -- values from `tson-schema`'s `io.ltr8.tson.schema.meta`
-(see "Architecture" above for why the resolver itself lives in `tson-parser`, not `tson-schema`, despite
+(see "Architecture" above for why the resolver itself lives in `tson-compiler`, not `tson-schema`, despite
 producing `tson-schema` values). Started 2026-07-23, deliberately narrow, incrementally widened the same
 day to a second construct:
 
@@ -1042,7 +1042,7 @@ is tempted to "fix" this back to a plain record, re-read `TypeArgument`'s Javado
   kernel's own `record` constructor name exactly -- a Java class literally named `Record` would collide,
   confusingly, with `java.lang.Record` (the language feature every type in this model is built from); see
   `RecordBody`'s own Javadoc. `TypeRef` here shares a name with (but is a different package and a different
-  concept from) `tson-parser`'s grammar-layer `io.ltr8.tson.compiler.ast.schema.TypeRef` -- a source-text
+  concept from) `tson-compiler`'s grammar-layer `io.ltr8.tson.compiler.ast.schema.TypeRef` -- a source-text
   reference vs. a resolved one, the same overload the kernel itself makes. Every multi-word field carries
   an explicit `@io.ltr8.annotation.Field("snake_case_name")` -- `tson-bind` otherwise writes the bare Java
   component name verbatim (camelCase), and the kernel's own field names are snake_case throughout.
@@ -1125,7 +1125,7 @@ is tempted to "fix" this back to a plain record, re-read `TypeArgument`'s Javado
   schema-specific encoding rule a Part-1-only binder has no reason to know about).
 - **`TsonSchema`** (`io.ltr8.tson.schema.TsonSchema`, in `tson-schema`'s own main package, not
   `.meta` -- moved back there 2026-07-23; it had briefly lived alongside `TsonSchemaResolver` in
-  `tson-parser` purely for organizational convenience, but needs no `tson-parser` dependency at
+  `tson-compiler` purely for organizational convenience, but needs no `tson-compiler` dependency at
   all) is the resolved-schema wrapper -- the kernel's own `schema` type, `map<type_name,
   type_definition>` (§9), plus the governing-chain header directives its own document carried
   (`id`/`meta`/`imports`, §2.2), plus a `bootstrap` flag. **A plain `record`** -- an earlier version
@@ -1143,7 +1143,7 @@ is tempted to "fix" this back to a plain record, re-read `TypeArgument`'s Javado
   a real fixture until more constructs are supported (or use `MetaKernelBootstrapResolver`, below, for
   meta-kernel specifically).
 
-### Meta-kernel bootstrap (`tson-parser/src/main/java/io/ltr8/tson/parser/resolver/MetaKernelBootstrapResolver.java`)
+### Meta-kernel bootstrap (`tson-compiler/src/main/java/io/ltr8/tson/compiler/resolver/MetaKernelBootstrapResolver.java`)
 
 Meta-kernel is special: its own `!!meta` names *itself* (§1.5's "one deliberate circularity in the
 series, closed by pre-loading rather than by resolution: implementations ship the kernel's resolved
@@ -1288,14 +1288,14 @@ written out at all before) with `@Record` attached -- both annotations stay in p
 
 ### Schema registry (`tson-schema/src/main/java/io/ltr8/tson/schema/`, `.../registry/`)
 
-`DefinitionResolver`/`MetaKernelBootstrapResolver` (both in `tson-parser`) resolve each declaration
+`DefinitionResolver`/`MetaKernelBootstrapResolver` (both in `tson-compiler`) resolve each declaration
 *individually* — no whole-schema consistency checking, references carried through as bare,
 unverified strings, `!!import` parsed but never consulted, and a `type_ref` with arguments (e.g.
 `enum`'s own `members: set<token>` field, or any field using §5.3's `[X]`/`[X]?` array sugar) left
 exactly as written. `TsonSchemaLinker`/`TsonSchemaRegistry` add the missing second stage on top:
 internal-consistency validation, flattening every argument-bearing `type_ref` into a real named
 entry, and — once satisfied — locking the schema into a registry keyed by its canonical `!!id`
-identity. Added 2026-07-24, entirely in `tson-schema` (no dependency on `tson-parser`, preserving
+identity. Added 2026-07-24, entirely in `tson-schema` (no dependency on `tson-compiler`, preserving
 the established one-way direction).
 
 **Linking and registering are two separate stages, not one** (`link` -> `register`, split
@@ -1325,14 +1325,14 @@ it was never a named pipeline stage. **`TsonSchemaLinker` was renamed from `Sche
 (alongside the `link`/`validate` rename) and moved out of `.registry` into this package directly
 (2026-07-27), once its own publicness was settled** — a caller orchestrating the pipeline calls
 `TsonSchemaLinker.link` directly and deliberately, same as `parse`/`resolve`/`compile`, including
-from *other* modules (e.g. `tson-parser`'s own `TsonCompiledRegistry`, which links a schema before
+from *other* modules (e.g. `tson-compiler`'s own `TsonCompiledRegistry`, which links a schema before
 registering it); living inside `.registry`, a package whose own docs describe its contents as
 "private pass-2 machinery nothing outside this module calls directly," was the one thing still
 contradicting that. **Now genuinely enforced, not just package-naming discipline** — `tson-schema`
 gained a real `module-info.java` (2026-07-29, see "Module system (JPMS)" near the end of this file)
 that exports `io.ltr8.tson.schema`/`io.ltr8.tson.schema.meta` but deliberately not `.registry` —
 `CanonicalIdentity` stays `public` (still needed cross-package by `TsonSchemaRegistry`/
-`TsonSchemaLinker`, in the same module), but a *different* module (e.g. `tson-parser`) importing it
+`TsonSchemaLinker`, in the same module), but a *different* module (e.g. `tson-compiler`) importing it
 now fails to compile outright ("package io.ltr8.tson.schema.registry is not visible ... does not
 export it"), confirmed by trying it directly, not just reasoned about.
 
@@ -1408,12 +1408,12 @@ export it"), confirmed by trying it directly, not just reasoned about.
      day on the user's own further direction): every resolved `TypeDefinition.body` and every
      `!instance` construction is interpretable only because a matching constructor is declared in
      *this specific* meta-kernel — `ValueReaderFactoryRegistry`/`AtomValueReader`/`RecordDomReader`/
-     `RecordBindReader` (in `tson-parser`) are Java code hard-wired to this one meta-kernel's own fixed vocabulary, not to
+     `RecordBindReader` (in `tson-compiler`) are Java code hard-wired to this one meta-kernel's own fixed vocabulary, not to
      "whatever schema happens to be self-referencing"; a library supports one meta-kernel version at a
      time. No loader lookup needed at all now — comparing `schema.meta()` directly against the fixed
      constant works uniformly for meta-kernel itself (whose own `!!meta` literally is that constant)
      and for meta.tn (governed one hop below it) alike. `TsonBundledSchemas` (`tson-schema`, see
-     "Bundled schema documents" below) is the one shared source this check and every `tson-parser`-side
+     "Bundled schema documents" below) is the one shared source this check and every `tson-compiler`-side
      consumer both reference — neither declares its own copy. Scoped to locally-declared entries only — an imported
      `constructor: true` entry (e.g. meta.tn importing meta-kernel's own `record`/`array`/...) was
      already validated when *its own* home schema was linked, matching this class's own "merged
@@ -1484,7 +1484,7 @@ export it"), confirmed by trying it directly, not just reasoned about.
   the one-off linked bootstrap result (see "Meta-kernel bootstrap" below).
 
 **Verified against the real fixture, not just hand-built schemas.** `MetaKernelSchemaRegistryTest`
-(in `tson-parser`, not `tson-schema` — that module has no dependency on `tson-parser`/
+(in `tson-compiler`, not `tson-schema` — that module has no dependency on `tson-compiler`/
 `MetaKernelBootstrapResolver` at all, so this is the one place both are available) links
 `MetaKernelBootstrapResolver.getMetaKernelSchema()`'s real output end-to-end: 49 raw declarations, 58 once
 linked — 9 synthesized entries, not the 1 (`set_token_*`) a naive `<...>` grep of the source
@@ -1496,7 +1496,7 @@ predicts: `[X]`/`[X]?` array-sugar field types elsewhere in the fixture (`argume
 entry, confirmed against the real data, not just a hand-built case.
 
 **`!!import` merging verified against the real `meta.tn1` fixture too — registers in full.**
-`MetaSchemaImportTest` (`tson-parser`, same reasoning as above for why it lives there) registers the
+`MetaSchemaImportTest` (`tson-compiler`, same reasoning as above for why it lives there) registers the
 real meta-kernel schema first, then meta.tn1's own declarations (`!!import:"...meta-kernel.tn1"`),
 confirming meta-kernel's own entries (`atom`, `text_type`, ...) are visible and correctly referenced
 from meta.tn1's own composition-based declarations (`date_type => ~atom & atom_specification &
@@ -1593,7 +1593,7 @@ meta-schema wrapping an *empty* placeholder `TsonCompiledSchema` stands in as `T
 .compile`'s own required parameter while meta-kernel compiles against itself -- safe, since `create`
 never reads anything from the wrapped schema, only from `resolver`, the same `resolver` either way.
 
-### Compiled schema registry (`tson-parser/src/main/java/io/ltr8/tson/parser/compiler/TsonCompiledRegistry.java`)
+### Compiled schema registry (`tson-compiler/src/main/java/io/ltr8/tson/compiler/compiler/TsonCompiledRegistry.java`)
 
 Pairs one-to-one with `TsonSchemaRegistry` (`tson-schema`) but stores *compiled* meta-schemas
 (`TsonCompiledMetaSchema`) instead of resolved ones — for every schema `TsonCompiledRegistry`
@@ -1621,7 +1621,7 @@ chain from scratch.
 - **Keyed by raw `!!id`, not a canonicalized identity** — deliberately. `CanonicalIdentity`
   (`tson-schema.registry`) is internal-by-convention to `TsonSchemaRegistry`/`TsonSchemaLinker` (confirmed via
   its own class Javadoc: "a caller outside this module should go through `TsonSchemaRegistry` instead of
-  depending on this class directly") — reaching into it from `tson-parser`, a different module,
+  depending on this class directly") — reaching into it from `tson-compiler`, a different module,
   would be exactly the cross-module layering violation this project otherwise avoids -- and, since
   `tson-schema` gained a real `module-info.java` (see "Module system (JPMS)" near the end of this
   file), that reach now genuinely fails to compile, not just a convention this class's own Javadoc
@@ -1646,7 +1646,7 @@ chain from scratch.
 version of the register-meta-kernel/meta.tn1/core.tn1 sequence (and where it should live) is still
 open.
 
-**`TsonCompiledSchemaLoader`/`DefaultTsonCompiledSchemaLoader`** (`tson-parser/src/main/java/io/ltr8/tson/parser/resolver/{TsonCompiledSchemaLoader,DefaultTsonCompiledSchemaLoader,TsonSchemaSource}.java`)
+**`TsonCompiledSchemaLoader`/`DefaultTsonCompiledSchemaLoader`** (`tson-compiler/src/main/java/io/ltr8/tson/compiler/resolver/{TsonCompiledSchemaLoader,DefaultTsonCompiledSchemaLoader,TsonSchemaSource}.java`)
 — `TsonSchemaResolver` holds a `TsonCompiledSchemaLoader`, not a bare registry. The reason a plain
 registry reference isn't enough: resolving *meta-kernel's own* document means resolving *its own*
 `!!meta`, which names itself (Part 2 §1.5's "one deliberate circularity"). A "look it up, throw if
@@ -1715,7 +1715,7 @@ sibling shape.
   .registeredOnly()` is the default (mirrors `TsonSchemaRegistry`'s own no-arg-constructor default and
   `TsonSchemaLoader`'s own precedent) — nothing is ever fetched from anywhere unless a caller opts in.
   `TsonBundledSchemas::fetch` (below -- `tson-schema`, not implementing this interface directly since
-  that module has no dependency on `tson-parser`, but matching its single-method shape exactly) is
+  that module has no dependency on `tson-compiler`, but matching its single-method shape exactly) is
   the one real fetch capability wired up so far; a general disk/HTTP-backed `TsonSchemaSource` (with
   whatever whitelist/blacklist policy) is deliberately not built yet.
 - **`TsonSchemaResolver(TsonCompiledSchemaLoader)`** replaces the earlier `TsonSchemaResolver(TsonCompiledRegistry)`
@@ -1789,7 +1789,7 @@ one place lower-layer resolution genuinely needs the higher layer's own compiled
 resolved one. `TsonCompiledMetaSchema` itself carries a `schema()` accessor for this (its own resolved
 `TsonSchema`) — mirroring `TsonCompiledSchema.schema()`'s own precedent.
 
-### Configuration package (`tson-parser/src/main/java/io/ltr8/tson/parser/config/`)
+### Configuration package (`tson-compiler/src/main/java/io/ltr8/tson/compiler/config/`)
 
 Holds the classes that configure/wire together a working compiled-reader environment, as distinct
 from `compiler`'s own eager-compile *mechanics* -- `TsonCompiledRegistry` (orchestration:
@@ -1809,7 +1809,7 @@ not a free move. (An earlier version of `Tson`'s own builder briefly lived here 
 before moving one step further out to the `tson` module -- see "Front door module" below.)
 
 **`BundledSchemaSource` briefly joined this package too, moved from `resolver`, before being deleted
-outright the same week.** It moved here once its only real in-`tson-parser` consumer
+outright the same week.** It moved here once its only real in-`tson-compiler` consumer
 (`MetaKernelBootstrapResolver.getMetaKernelSchema`) was confirmed to be its sole caller; then, once
 `TsonBundledSchemas` (`tson-schema`) already held the one canonical copy of the three bundled
 schemas' own identities, the user pointed out the class itself was "exactly the same thing sitting in
@@ -1825,7 +1825,7 @@ atom registrations (`UUID`/`byte[]`/`LocalDate`/`OffsetTime`/`OffsetDateTime`/`U
 `Inet6Address`) every `DataBindContext` consumer in this library needs, shared by `mapper
 .TsonMapperContext` and this package's own `SchemaMetaNameBinder`. It was `base`'s only genuine
 external (cross-module) caller -- the rest of `base` (`BaseTypeResolver`, `NumberGrammar`, ...) is §4
-base-type-resolution machinery nothing outside `tson-parser` itself ever references -- and `config`
+base-type-resolution machinery nothing outside `tson-compiler` itself ever references -- and `config`
 is where "how a caller configures a working environment" already lives, so this was the same kind of
 move `BundledSchemaSource`'s own relocation here had been, at the time. `mapper` reaching into
 `config` for it is a new, harmless dependency edge (`config` has no dependency back on `mapper`, so no
@@ -1833,11 +1833,14 @@ cycle).
 
 ### Front door module (`tson/src/main/java/io/ltr8/tson/`)
 
-A small module sitting *on top of* `tson-parser` (and, transitively via `api` dependencies,
+A small module sitting *on top of* `tson-compiler` (and, transitively via `api` dependencies,
 `tson-schema`/`tson-bind`), the way Retrofit sits on OkHttp or Apache HttpClient5 sits on HttpCore5
--- `tson-parser` itself stays as-is (superseding an earlier `tson-parser` → `tson-core` rename idea
-discussed and dropped the same day: simpler to add a small module on top than rename the engine
-underneath it). `tson-parser`/`tson-schema`/`tson-bind` are declared `api`, not `implementation`, in
+-- `tson-compiler` (named `tson-parser` at the time) stayed as-is at first, superseding an earlier
+`tson-parser` → `tson-core` rename idea discussed and dropped the same day: simpler to add a small
+module on top than rename the engine underneath it. `tson-parser` was renamed to `tson-compiler`
+later anyway, for a different, better reason -- see "Module system (JPMS)" near the end of this file
+for the JPMS/API-surface work that preceded it, and the rename itself. `tson-compiler`/`tson-schema`/
+`tson-bind` are declared `api`, not `implementation`, in
 `tson/build.gradle.kts` specifically so a caller depending on just `tson` still sees the real classes
 underneath on their own compile classpath (`TsonCompiledMetaSchema`, `TsonLinkedSchema`,
 `TsonMapperReader`, `DataBindContext`, ...) -- confirmed by compiling against it, not assumed:
@@ -1850,7 +1853,7 @@ Holds two classes so far, a real object plus its builder -- not a bag of static 
 - **`Tson`** -- the actual front door, a real, immutable, instance-based object: `resolve(schemaText)`,
   `compile(linked, mode)`/`compile(schemaText, mode)`, `mapperReader()`, `mapperWriter()`,
   `dataBindContext()`, plus `schemaRegistry()`/`compiledRegistry()`/`loader()` for a caller that needs
-  to reach past the front door into the underlying `tson-parser`/`tson-schema` machinery directly.
+  to reach past the front door into the underlying `tson-compiler`/`tson-schema` machinery directly.
   Constructed only via `Tson.builder()` (returning a fresh `TsonConfig`), never directly -- its own
   constructor is package-private. `resolve`/`compile` replace the `TsonSchemaRegistry`/
   `TsonCompiledRegistry`/`DefaultTsonCompiledSchemaLoader` wiring `TinySchemaImportsCoreTn1Test`/
@@ -1887,11 +1890,11 @@ Holds two classes so far, a real object plus its builder -- not a bag of static 
   (`resolve`/`compile`/`mapperReader`/`mapperWriter`) lives on `Tson` itself.
 
 **`TsonMapperReader`/`TsonMapperWriter` deliberately did *not* move here, and can't yet.**
-`tson-parser`'s own `DefinitionResolver` has a real, current dependency on `TsonMapperWriter`
+`tson-compiler`'s own `DefinitionResolver` has a real, current dependency on `TsonMapperWriter`
 (`private final TsonMapperWriter writer`, used by `mergeWithSource` to re-serialize an atom
 refinement's source during chained-refinement merging) -- moving them to a module that depends *on*
-`tson-parser` would recreate the exact module cycle that caused `tson-mapper` to be merged *into*
-`tson-parser` in the first place, historically (see "Mapper" elsewhere in this file). `BACKLOG.md`'s
+`tson-compiler` would recreate the exact module cycle that caused `tson-mapper` to be merged *into*
+`tson-compiler` in the first place, historically (see "Mapper" elsewhere in this file). `BACKLOG.md`'s
 own "Atom-refinement constraint validation" section tracks removing that dependency (the merge
 should validate that a refinement genuinely narrows its source, e.g. via a per-constraint-type
 `constraintsCheck(A, B)`, rather than blindly overriding fields through a generic
@@ -1910,25 +1913,25 @@ text.
 **Both halves live in `tson-schema` now, in one class — not split across two modules the way they
 used to be.** `TsonBundledSchemas` originally held only the three identities (2026-07-29, moved there
 from two previous, split homes — `META_KERNEL_ID` on `tson-schema`'s own `TsonSchemaLinker`, needed
-there for `isMetaKernelGoverned`'s constructor-eligibility check, with `tson-parser`'s own
+there for `isMetaKernelGoverned`'s constructor-eligibility check, with `tson-compiler`'s own
 `BundledSchemaSource` defining its own copy in terms of that one; `META_ID`/`CORE_ID` had no canonical
 source at all, only `BundledSchemaSource`'s own literal copies). The same day, on the user's own
 further, explicit direction ("I realise that the schemas should be bundled there and BundledSchemaSource
 is exactly the same thing sitting in config of the wrong package. So move the fetch method directly
 into TsonBundledSchemas and bundle the schemas in tson-schema. Then BundledSchemaSource can be
 deleted"), `fetch` and the bundled `.tn` resource files themselves moved here too, and
-`BundledSchemaSource` (`tson-parser.config`) was deleted outright — there was nothing left for a
-separate `tson-parser`-side class to do once both halves of "what these documents are" and "where
+`BundledSchemaSource` (`tson-compiler.config`) was deleted outright — there was nothing left for a
+separate `tson-compiler`-side class to do once both halves of "what these documents are" and "where
 their content lives" could sit in the one module that's the single canonical source for both a
-`tson-parser`-side consumer and `tson-schema`'s own `TsonSchemaLinker`, since `tson-schema` has no
-dependency on `tson-parser` (only the reverse).
+`tson-compiler`-side consumer and `tson-schema`'s own `TsonSchemaLinker`, since `tson-schema` has no
+dependency on `tson-compiler` (only the reverse).
 
-**`fetch` deliberately doesn't implement `tson-parser`'s own `TsonSchemaSource` interface** — that
-would require a dependency `tson-schema` doesn't have — **but a `tson-parser`-side caller needing a
+**`fetch` deliberately doesn't implement `tson-compiler`'s own `TsonSchemaSource` interface** — that
+would require a dependency `tson-schema` doesn't have — **but a `tson-compiler`-side caller needing a
 real `TsonSchemaSource` passes the method reference `TsonBundledSchemas::fetch` directly**, with no
 adapter class on either side: `TsonSchemaSource` is `@FunctionalInterface`, a single `String
 fetch(String uri)` method, exactly `TsonBundledSchemas.fetch`'s own shape, so Java's own method-
-reference conversion satisfies it for free. Every `tson-parser`/`tson` call site that used to pass
+reference conversion satisfies it for free. Every `tson-compiler`/`tson` call site that used to pass
 `BundledSchemaSource.INSTANCE` as a `TsonSchemaSource` (e.g.
 `new DefaultTsonCompiledSchemaLoader(registry, BundledSchemaSource.INSTANCE)`) now passes
 `TsonBundledSchemas::fetch` instead; every direct-fetch call site (`BundledSchemaSource.INSTANCE
@@ -1936,7 +1939,7 @@ reference conversion satisfies it for free. Every `tson-parser`/`tson` call site
 
 **Verified the resources genuinely moved, not just the Java code** — `unzip -l` on the built jars
 confirms `meta-kernel.tn`/`meta.tn`/`core.tn` are present in `tson-schema`'s own jar and absent from
-`tson-parser`'s.
+`tson-compiler`'s.
 
 **Replaces two now-deleted, standalone classes, `MetaTn1Parser`/`CoreTn1Parser`** — each used to
 hand-roll its own fetch-parse-resolve-register-compile sequence for one schema specifically; the
@@ -2126,7 +2129,7 @@ explicit type-ref, since there's no Java object "just a top" could construct.
 ### Module system (JPMS)
 
 Every module now has a real `module-info.java` (2026-07-29) — `tson-bind`/`tson-annotation` already
-did; `tson-schema`, `tson-parser`, `tson`, and `tson-cli` gained one in this pass, once the "API-surface
+did; `tson-schema`, `tson-compiler`, `tson`, and `tson-cli` gained one in this pass, once the "API-surface
 pass" above had already trimmed each module's own accidental public surface down to what's genuinely
 meant to be consumer-facing. Doing the trim first mattered: `module-info.java` exports are
 package-grained, not class-grained, so exporting a package exposes *every* public class in it — trying
@@ -2141,7 +2144,7 @@ mixed real API with mid-refactor leftovers, telling you nothing about what shoul
   `io.ltr8.tson.schema.registry`** — the first real enforcement of the "internal-by-convention" split
   that package's own Javadoc already described (see "Schema registry" above) but had no way to actually
   hold to before this. Confirmed genuinely enforced, not just declared: a scratch file added temporarily
-  to `tson-parser` importing `io.ltr8.tson.schema.registry.CanonicalIdentity` fails to compile outright
+  to `tson-compiler` importing `io.ltr8.tson.schema.registry.CanonicalIdentity` fails to compile outright
   (`package io.ltr8.tson.schema.registry is not visible ... does not export it`), then was deleted —
   this was a real experiment, not just writing the module-info and assuming it worked. `requires
   io.ltr8.annotation` (not `transitive`) since no `schema`/`schema.meta` public method signature ever
@@ -2151,20 +2154,20 @@ mixed real API with mid-refactor leftovers, telling you nothing about what shoul
   `api`, plus its own `id("java-library")` plugin block** — a real, non-obvious Gradle/JPMS friction
   point, not a design choice: `tson-schema`'s `module-info.java` requires `io.ltr8.annotation` to
   physically exist on the module path for *any* downstream compilation that transitively depends on
-  `tson-schema` (`tson-parser`, `tson`), regardless of whether that module's own source ever names an
+  `tson-schema` (`tson-compiler`, `tson`), regardless of whether that module's own source ever names an
   `io.ltr8.annotation` type directly — Gradle's `implementation`/`api` split controls compile-classpath
   *type visibility*, a separate concern from whether the module graph can even resolve. `tson:compileJava`
   failed with `module not found: io.ltr8.annotation` before this fix; `requires io.ltr8.annotation` itself
   stayed non-`transitive` in `tson-schema`'s own module-info (the Gradle promotion doesn't change what
-  `tson-parser`/`tson` are actually allowed to *read* — module readability is still `tson-schema`-only).
-- **`tson-parser` exports every package with a real cross-module caller**
+  `tson-compiler`/`tson` are actually allowed to *read* — module readability is still `tson-schema`-only).
+- **`tson-compiler` exports every package with a real cross-module caller**
   (`io.ltr8.tson.compiler`/`.ast`/`.ast.schema`/`.compiler`/`.config`/`.mapper`/`.resolver`), confirmed
   against actual `tson`/`tson-cli` imports rather than assumed, and leaves `.atom` unexported (nothing
-  outside `tson-parser` itself ever references it). `requires transitive io.ltr8.bind` (`DataBindContext`
+  outside `tson-compiler` itself ever references it). `requires transitive io.ltr8.bind` (`DataBindContext`
   appears directly in `TsonMapperReader`'s own public constructor, and `DataBindException` in a
   `throws` clause) and `requires transitive io.ltr8.tson.schema` (`schema`/`schema.meta` types are
   pervasive throughout `resolver`/`compiler`/`config`'s own public signatures) — both `transitive`,
-  since a caller of `tson-parser` unavoidably needs to read both directly too.
+  since a caller of `tson-compiler` unavoidably needs to read both directly too.
 - **`.lexer` and `.base` both went from "exported by accident" to genuinely internal (2026-07-29,
   same-day follow-up, on the user's own explicit direction).** Both had exactly one thing forcing the
   export, and both got fixed at the source rather than left exported:
@@ -2173,7 +2176,7 @@ mixed real API with mid-refactor leftovers, telling you nothing about what shoul
     `position()` accessor was the *only* reason `.lexer` needed exporting at all — confirmed by
     `javac -Xlint:exports` flagging exactly this leak when `.lexer` was first left unexported, per the
     "Module system (JPMS)" section's own original pass). `Lexer`/`Token`/`TokenType`/`LexException`
-    (genuine scanner internals, "frozen for the whole series," never referenced outside `tson-parser`
+    (genuine scanner internals, "frozen for the whole series," never referenced outside `tson-compiler`
     itself) gained a same-module `import io.ltr8.tson.compiler.Position;` in place of the free same-package
     reference they used to have, and `.lexer` was dropped from `module-info.java`'s own `exports` list.
   - **`TsonAtomContext` moved from `.base` into `config`** — it was `.base`'s only genuine external
@@ -2216,6 +2219,52 @@ mixed real API with mid-refactor leftovers, telling you nothing about what shoul
   constructors/methods, see `DefaultRecordBinder.getConstructor`'s own note elsewhere in this file),
   and `Automatic-Module-Name` for a hypothetical future non-modular consumer.
 
+### `tson-parser` renamed to `tson-compiler`
+
+Renamed (2026-07-29, on the user's own explicit direction) once the API-surface and JPMS passes above
+made the mismatch obvious: the module had long since outgrown "parser" — it holds the lexer, the
+structural (Class 1) parser, base type resolution, the built-in atom vocabulary, schema resolution,
+the whole `compiler` package (the compiled-reader stage), `config`/wiring, and the mapper — matching
+this project's own established pipeline vocabulary (parse -> resolve -> link -> register -> compile
+-> read) end to end, not just the grammar layer. "tson-parser" only ever accurately described that one
+layer. "tson-compiler" was chosen over the earlier, previously-rejected "tson-core" idea (see "Front
+door module" above) specifically because it names something real and precise — this module
+genuinely *is* a compiler in the classic sense (frontend: lex + parse; middle: resolve; backend:
+compile to a `TsonValueReader`) — where "tson-core" was rejected for being too generic to say
+anything.
+
+Done as an IDE-driven rename (module directory, Gradle project name, `io.ltr8.tson.parser` ->
+`io.ltr8.tson.compiler` package, every import and Javadoc cross-reference) rather than by hand, for
+reliability — this class of rename (package-wide, touching hundreds of import statements) is exactly
+the kind of mechanical transform an IDE's own refactoring tool handles more reliably than manual or
+scripted edits. Two spots the IDE rename didn't reach, since they're outside the renamed module's own
+source tree: `tson`'s and `tson-cli`'s own `module-info.java` files still `requires`'d the old
+`io.ltr8.tson.parser` module name — found by a full `./gradlew clean build` (a real compile error,
+`module not found: io.ltr8.tson.parser`, not just a grep miss) and fixed to `requires
+io.ltr8.tson.compiler`.
+
+**The internal `io.ltr8.tson.compiler.compiler` package (the compiled-reader stage — `TsonSchemaCompiler`,
+`TsonCompiledSchema`, `TsonCompiledMetaSchema`, `ValueReaderFactory`/`Registry`, the reader
+implementations) is a known, deliberately-deferred loose end from this first pass** — a sub-package
+named the same as the module itself reads redundant, the same "Tson is a prefix, never an infix"
+smell this codebase already avoids for class names (see "Naming convention" above). The plan discussed
+before executing: fold those classes up into the root `io.ltr8.tson.compiler` package directly (which
+already holds `TsonValueReader` for the identical reason — it's the thing a caller actually holds,
+not an internal detail), alongside a new facade giving access to every pipeline stage without a
+caller needing to know the package layout — not yet built, tracked in `BACKLOG.md`.
+
+**Verified, not assumed**: full `./gradlew clean build` green across all six modules after the two
+`module-info.java` fixes (906/906 tests in `tson-compiler`, 50/50 `tson-schema`, 5/5 `tson`, 20/20
+`tson-cli`), zero remaining `io.ltr8.tson.parser`/`tson-parser` references in any code or build file,
+and the installed CLI binary still running a real schema end to end. `ConformanceSuiteTest`'s own
+`parserVectors()` factory reported the sibling `ltr8-io-tson-test-suite` checkout as briefly not found
+in one diagnostic run, while the other three layer checks (`lexer`/`resolver`/`vocabulary`) found it
+fine from the identical computed path in the same run — confirmed via a standalone Java process using
+the identical path-resolution logic that the directory genuinely exists and is readable, so this reads
+as an environment/tool-specific artifact of the session that investigated it, not a real regression;
+the test class's own designed-in tolerance (`Assumptions.assumeTrue`, skip rather than fail) is
+exactly why a full build stayed green regardless.
+
 ### Conformance suite integration (`ConformanceSuiteTest`)
 
 Separate from `LexerTest`/`TsonDataParserTest` (fine-grained unit tests) is `ConformanceSuiteTest`, which runs
@@ -2245,15 +2294,15 @@ No system Gradle — always use the wrapper:
 ./gradlew test --tests "io.ltr8.tson.compiler.lexer.LexerTest.multilineBasicIndentStripping"
 ./gradlew :tson-schema:test --tests "io.ltr8.tson.schema.TsonSchemaRegistryTest"
 ./gradlew :tson-schema:test --tests "io.ltr8.tson.schema.TsonSchemaLinkerTest"
-./gradlew :tson-parser:test --tests "io.ltr8.tson.compiler.resolver.MetaKernelSchemaRegistryTest"
-./gradlew :tson-parser:test --tests "io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolverTest"
-./gradlew :tson-parser:test --tests "io.ltr8.tson.compiler.resolver.MetaSchemaImportTest"
-./gradlew :tson-parser:test --tests "io.ltr8.tson.compiler.compiler.MetaKernelEndToEndTest"
-./gradlew :tson-parser:test --tests "io.ltr8.tson.compiler.compiler.MetaTn1CompiledEndToEndTest"
-./gradlew :tson-parser:test --tests "io.ltr8.tson.compiler.compiler.CompiledSchemaDomReadTest"
-./gradlew :tson-parser:test --tests "io.ltr8.tson.compiler.resolver.TsonSchemaResolverCompiledMetaSchemaTest"
-./gradlew :tson-parser:test --tests "io.ltr8.tson.compiler.mapper.TsonMapperReaderTest"
-./gradlew :tson-parser:test --tests "io.ltr8.tson.compiler.mapper.TsonMapperWriterTest"
+./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.resolver.MetaKernelSchemaRegistryTest"
+./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolverTest"
+./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.resolver.MetaSchemaImportTest"
+./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.compiler.MetaKernelEndToEndTest"
+./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.compiler.MetaTn1CompiledEndToEndTest"
+./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.compiler.CompiledSchemaDomReadTest"
+./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.resolver.TsonSchemaResolverCompiledMetaSchemaTest"
+./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.mapper.TsonMapperReaderTest"
+./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.mapper.TsonMapperWriterTest"
 ```
 
 ## Not yet implemented

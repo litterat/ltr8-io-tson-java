@@ -177,7 +177,7 @@ four to the schemaless built-in vocabulary. Confirmed (outside the spec text its
 that the missing twelve are an oversight in the published table, not a deliberate narrowing of the
 schemaless surface relative to the core type library.
 
-**Interpretation chosen:** `tson-parser`'s built-in vocabulary (`BuiltinTypeVocabulary`,
+**Interpretation chosen:** `tson-compiler`'s built-in vocabulary (`BuiltinTypeVocabulary`,
 `resolver.vocab` package) implements the full sixteen-instance `integer_type` family from `core.tn1` —
 `int8` through `int256`, `uint8` through `uint256`, and all four bound-only refinements — not just the
 four §5.6 currently lists. `IntegerType`/`IntegerConstraints`/`IntegerSize` are written generically
@@ -212,7 +212,7 @@ implementer's guide could usefully address.
 
 **Interpretation chosen:** `TsonMapper` treats an atom-typed value carrying a type-ref that
 `BuiltinTypeVocabulary` doesn't recognize as a binding error (`DataBindException`), not silent fallthrough
-to base type resolution. The Class 1 processing step itself (`tson-parser`'s `Parser`/`BaseTypeResolver`)
+to base type resolution. The Class 1 processing step itself (`tson-compiler`'s `Parser`/`BaseTypeResolver`)
 still faithfully preserves the type-ref exactly as §5.1 requires — this is a binding-layer policy choice
 layered on top, not a change to Part 1 conformance. Rationale: a mistyped or unimplemented type-ref on a
 value the caller is actively binding to a specific Java type is far more likely to be a bug worth
@@ -250,7 +250,7 @@ token failed to be interpreted"), written without cross-checking §8.1's stricte
 exact phrase is a fixed mapping to one specific processing-layer category.
 
 **Interpretation chosen:** This implementation's atom types (`resolver.vocab.AtomParseException`) live in
-`tson-parser`'s resolver package, architecturally alongside — not inside — the structural parser
+`tson-compiler`'s resolver package, architecturally alongside — not inside — the structural parser
 (`Parser`/`ParseException`), and are raised only from atom-type `read()` calls, never from `Parser` itself.
 For the conformance test suite (`ltr8-io-tson-test-suite`'s `vocabulary/invalid` vectors), this failure
 mode is tagged `category: resolver`, not `parser`, as the more architecturally coherent reading — but each
@@ -354,7 +354,7 @@ has `min_length`/`max_length` fields playing exactly the same constraint-vocabul
 `extern` rather than with the nineteen `_type` constructors it otherwise resembles.
 
 **Interpretation chosen:** Treated as the same constructor either way -- this implementation's
-`BinaryType` class (in `tson-parser`'s `resolver.vocab` package) is named to match the established
+`BinaryType` class (in `tson-compiler`'s `resolver.vocab` package) is named to match the established
 `_type`-suffix convention of its siblings (`IntegerType`, `FloatType`, ...) rather than mirror `binary`'s
 own unsuffixed spelling, since the naming asymmetry doesn't appear to carry semantic weight for an
 implementation (it's still one atom constructor, `~atom`, with a constraint-vocabulary-shaped field set).
@@ -473,7 +473,7 @@ not the literal alternative-1 production: a construction's supertype list is `ty
 type-ref)*`, and on each `&` the parser checks one token ahead — `{` means the trailing `record-def`
 (terminating the supertype list), anything else means another `type-ref` supertype. This is equivalent to
 alternative 1 with an implicit `"&" ws` inserted directly before its `[record-def]` slot. Implemented in
-`tson-parser`'s `SchemaParser.parseConstructionDefContinuation`.
+`tson-compiler`'s `SchemaParser.parseConstructionDefContinuation`.
 
 **Suggested resolution:** Add the missing `"&" ws` before `record-def` in alternative 1, i.e.:
 `type-ref 1*(ws "&" ws type-ref) [ws "&" ws record-def] [ws removal-set]` — at which point alternative 2
@@ -498,7 +498,7 @@ both agree `field-modifier` actually accepts.
 
 **Interpretation chosen:** Implemented per the ABNF and §5.2 (the two mutually-consistent sources): a
 field modifier's value is a bare token or the absent sentinel — no annotations, no type-ref, never a
-container. `tson-parser`'s `FieldDef.Modifier` models this as a plain `TokenValue`/`AbsentValue` (reusing
+container. `tson-compiler`'s `FieldDef.Modifier` models this as a plain `TokenValue`/`AbsentValue` (reusing
 `io.ltr8.tson.compiler.ast`'s existing leaf types), not a full `DataValue`.
 
 **Suggested resolution:** Fix the summary sentence in §12.1's lead paragraph to read "...and
@@ -543,7 +543,7 @@ right there in the same ABNF block.
 **Interpretation chosen:** Implemented per the narrower, evidently-intended productions: `instance = "!"
 type-name ws core-value` (dropping the `*annotation [type-ref]` prefix `data-value` would otherwise
 contribute, since the constructor name is already fully supplied by `"!" type-name`, and `core-value`
-already covers every real positional/braced/bare-array shape `instance` needs). `tson-parser`'s
+already covers every real positional/braced/bare-array shape `instance` needs). `tson-compiler`'s
 `ast.schema.Instance` was reshaped accordingly: it no longer carries a separate `target: String`
 field alongside a full-generality `value: DataValue` (the redundancy that surfaced this while designing
 `SchemaResolver`'s generalized constructor-application resolution — `target` and `DataValue.typeRef()`
@@ -610,7 +610,7 @@ section family, and explicitly said to support further chaining (§5.5: "`age`..
 further") -- should behave in the *opposite* way (full replacement) rather than the same way
 (tightening: explicit values override, everything else survives).
 
-**Interpretation chosen:** Merge, not replace. `tson-parser`'s `SchemaResolver.resolveAtomRefinement`
+**Interpretation chosen:** Merge, not replace. `tson-compiler`'s `SchemaResolver.resolveAtomRefinement`
 re-serializes `I`'s own already-bound value back to wire form (reusing `TsonMapperWriter`, so no
 hand-written per-type merge logic is needed for any of the many atom-constraint classes), merges it
 field-by-field with the new refinement's own `values` (explicit values in `values` win; every field

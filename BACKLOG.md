@@ -11,21 +11,23 @@ yet implemented" section for the technical detail behind several of these items.
 
 ## Front door / ergonomics
 
-- [x] **A new `tson` module — the developer front door, sitting on top of `tson-parser` the way
-  Retrofit sits on OkHttp or Apache HttpClient5 sits on HttpCore5** (superseded the earlier
-  `tson-parser` → `tson-core` rename idea — simpler to add a small module on top than rename the
-  engine underneath it). Holds `Tson` (a real, immutable, instance-based object — `resolve`/
+- [x] **A new `tson` module — the developer front door, sitting on top of `tson-compiler` (named
+  `tson-parser` at the time) the way Retrofit sits on OkHttp or Apache HttpClient5 sits on HttpCore5**
+  (superseded an earlier `tson-parser` → `tson-core` rename idea — simpler to add a small module on
+  top than rename the engine underneath it; `tson-parser` was renamed to `tson-compiler` later
+  anyway, for a different, better reason — see the "renamed to `tson-compiler`" item below). Holds
+  `Tson` (a real, immutable, instance-based object — `resolve`/
   `compile`/`mapperReader`/`mapperWriter`/`dataBindContext`, plus the underlying registries/loader
   for a caller who needs to reach past the front door) and `TsonConfig` (`Tson`'s own builder,
   reached via `Tson.builder()`; moved here from `io.ltr8.tson.compiler.config`, since it's purely a
-  caller-facing convenience with zero internal consumers inside `tson-parser` itself — confirmed
+  caller-facing convenience with zero internal consumers inside `tson-compiler` itself — confirmed
   before moving it, the same way the three classes in "Layer boundaries" below were checked).
-  `tson-parser`/`tson-schema`/`tson-bind` are `api` (not `implementation`) dependencies, so a caller
+  `tson-compiler`/`tson-schema`/`tson-bind` are `api` (not `implementation`) dependencies, so a caller
   depending on just `tson` still sees the real classes underneath directly.
-  **`TsonMapperReader`/`TsonMapperWriter` deliberately did *not* move here** — `tson-parser`'s own
+  **`TsonMapperReader`/`TsonMapperWriter` deliberately did *not* move here** — `tson-compiler`'s own
   `DefinitionResolver` has a real, current dependency on `TsonMapperWriter` (atom-refinement
-  merging), so moving them to a module that depends *on* `tson-parser` would recreate the exact
-  module cycle that caused `tson-mapper` to be merged *into* `tson-parser` in the first place,
+  merging), so moving them to a module that depends *on* `tson-compiler` would recreate the exact
+  module cycle that caused `tson-mapper` to be merged *into* `tson-compiler` in the first place,
   historically. See "Atom-refinement constraint validation" below for the plan to remove that
   dependency and revisit the move once it's gone — noted directly on `Tson`'s own class Javadoc too.
   `tson-cli` now depends on `tson` as well (alongside its existing direct deps, still needed for DOM
@@ -85,16 +87,16 @@ yet implemented" section for the technical detail behind several of these items.
   the only ones referenced *exclusively* from within `compiler`'s own package (main + same-package
   tests), confirming they'd been left `public` purely as a leftover of an earlier refactor stage, not
   because any real caller (the `tson` front door, `tson-cli`, or a cross-package test) ever names them
-  directly. `TsonValueReader`'s own Javadoc (`tson-parser`'s root package) referenced `RecordDomReader`
+  directly. `TsonValueReader`'s own Javadoc (`tson-compiler`'s root package) referenced `RecordDomReader`
   via `{@link}` — switched to `{@code}` (plain text, no cross-package accessibility requirement) and
   dropped the now-invalid `import`. Everything else already checked out: `TsonCompiledMetaSchema`/
   `TsonCompiledSchema`/`TsonSchemaCompiler`/`ValueReaderFactory`/`ValueReaderFactoryRegistry` (real,
   used-elsewhere API), and every public class in `resolver`/`config`, all have at least one genuine
   cross-package or cross-module caller (`Tson`/`TsonConfig`, `tson-cli`'s `DiagnosticsSchema`, or
-  another `tson-parser` package) — `MetaKernelBootstrapResolver.getMetaKernelSchema()` in particular
+  another `tson-compiler` package) — `MetaKernelBootstrapResolver.getMetaKernelSchema()` in particular
   stays public because `compiler`-package tests call it directly, not just `resolver`-package ones.
   Full `./gradlew clean build` stayed green throughout (no cross-package caller was missed).
-- [x] **`module-info.java` added to `tson-schema`/`tson-parser`/`tson`/`tson-cli`** (`tson-bind`/
+- [x] **`module-info.java` added to `tson-schema`/`tson-compiler`/`tson`/`tson-cli`** (`tson-bind`/
   `tson-annotation` already had one) — done right after the API-surface pass above specifically
   because it's the input a real export list needs (exports are package-, not class-grained, so
   exporting a not-yet-trimmed package would have exported mid-refactor leftovers too). Full detail in
@@ -114,17 +116,28 @@ yet implemented" section for the technical detail behind several of these items.
   from `.base` to `config` (it was `.base`'s only genuine external caller; the rest is §4
   base-type-resolution machinery). Both re-verified with a real scratch-file compile failure before
   being deleted, same technique as the `.registry` check above.
-- [ ] A facade over `.resolver`/`.compiler` in `tson-parser`'s own root package — the user's own
-  stated direction (2026-07-29): those two packages stay exported (`tson`'s own `Tson`/`TsonConfig`
-  genuinely need `DefaultTsonCompiledSchemaLoader`/`TsonSchemaResolver`/`TsonCompiledMetaSchema`/
-  `TsonSchemaCompiler`/`ValueReaderFactoryRegistry`/... directly today), but a caller reasoning about
-  `tson-parser` as its own library, not just plumbing under `tson`, shouldn't need to know either
-  package exists — "the user doesn't need to access what's in those packages." Narrower than the
-  `tson` module's own front door (which also bootstraps meta-kernel/meta.tn1/core.tn1 and picks a
-  `DataBindContext`); this would be `tson-parser`'s own front door onto its two least-approachable
-  packages specifically. Not designed yet — worth revisiting once there's a second real caller shape
-  to design against, the same way `Tson`/`TsonConfig` themselves only crystallized once `tson-cli`
-  gave them one.
+- [ ] **A facade over `tson-compiler`'s own pipeline stages, in its own root package** — the user's
+  own stated direction (2026-07-29), sharpened once `tson-parser` actually became `tson-compiler`
+  (see `CLAUDE.md`'s own "`tson-parser` renamed to `tson-compiler`" note): move the actual lexer +
+  Class 1 structural parser (today's root package, `.ast`, `.lexer`) into a new `io.ltr8.tson.compiler.parser`
+  sub-package — a compiler's frontend is its parser, standard compiler-architecture terminology, and
+  it stops the module's own root package from being "everything, undifferentiated" — then put a real
+  facade class directly in `io.ltr8.tson.compiler` giving access to every pipeline stage (parse,
+  resolve, compile) without a caller needing to know the package layout underneath. Two open design
+  questions to settle before building, not blockers to agreeing on the direction: (1) the existing
+  `io.ltr8.tson.compiler.compiler` sub-package (the compiled-reader stage) reads redundant now that
+  the *module* itself is called "compiler" — likely folds up into the root package alongside the new
+  facade, matching how `TsonValueReader` already lives at the root today for the identical reason;
+  (2) `.mapper` (`TsonMapperReader`/`TsonMapperWriter`) doesn't semantically belong under "compiler"
+  either — it's a generic schemaless object mapper, not a compiler stage — but it's already a known,
+  separately-tracked situation (blocked on the "Atom-refinement constraint validation" item below
+  removing `DefinitionResolver`'s own `TsonMapperWriter` dependency), not something this facade work
+  needs to solve. Narrower in scope than the `tson` module's own front door (which also bootstraps
+  meta-kernel/meta.tn/core.tn and picks a `DataBindContext`) — this would be `tson-compiler`'s own
+  front door onto its own pipeline stages specifically, for a caller reasoning about it as its own
+  library, not just plumbing under `tson`. This type of package-wide move is planned to be done via
+  IDE refactoring tooling again, not by hand, the same way the module rename itself was — not yet
+  started.
 
 ## Layer boundaries / schema registry
 
@@ -142,7 +155,7 @@ yet implemented" section for the technical detail behind several of these items.
   deliberately package-private; moving it out would force every one of those public just so it could
   keep referencing them — a real, unwanted expansion of the public surface, not a free move.
 - [x] **`BundledSchemaSource` moved into `config` too, from `resolver`** — same "how a caller
-  configures a working environment" reasoning as above, once its only real in-`tson-parser` consumer
+  configures a working environment" reasoning as above, once its only real in-`tson-compiler` consumer
   (`MetaKernelBootstrapResolver.getMetaKernelSchema`) was confirmed to be its sole caller here.
   `MetaKernelBootstrapResolver`/`DefaultTsonCompiledSchemaLoader` (both stay in `resolver`) now reach
   into `config` for it directly, the same named layering exception already documented for
@@ -154,10 +167,10 @@ yet implemented" section for the technical detail behind several of these items.
 - [x] **`META_KERNEL_ID`/`META_ID`/`CORE_ID` consolidated into a new `TsonBundledSchemas` class in
   `tson-schema`** (2026-07-29, on the user's own explicit direction) — previously split across two
   homes: `META_KERNEL_ID` lived on `tson-schema`'s own `TsonSchemaLinker` (needed there for
-  `isMetaKernelGoverned`), with `BundledSchemaSource` (`tson-parser`) defining its own copy in terms
+  `isMetaKernelGoverned`), with `BundledSchemaSource` (`tson-compiler`) defining its own copy in terms
   of that one; `META_ID`/`CORE_ID` had no canonical source at all, only `BundledSchemaSource`'s own
-  literals. `tson-schema` is the only module both a `tson-parser`-side consumer and `tson-schema`'s
-  own `TsonSchemaLinker` can share a source with (no dependency back on `tson-parser`), so a shared
+  literals. `tson-schema` is the only module both a `tson-compiler`-side consumer and `tson-schema`'s
+  own `TsonSchemaLinker` can share a source with (no dependency back on `tson-compiler`), so a shared
   home had to live there regardless. A fresh, narrow class rather than adding fields to
   `TsonSchemaLinker` (a verb in this project's own pipeline vocabulary, not a constants holder) or
   `BundledSchemaSource` (fetch capability, not identity — the same split this project draws
@@ -168,21 +181,21 @@ yet implemented" section for the technical detail behind several of these items.
   unrelated `CanonicalIdentity`), `TsonVersion` (doesn't convey "document identities" at all),
   `TsonPrelude` (evocative but borrows outside jargon and is slightly inaccurate — these three are
   pre-loaded by the library, not auto-imported into a consumer's own namespace). Every consumer (13
-  files across `tson-parser`/`tson`, main and test) updated and re-verified: full `./gradlew clean
+  files across `tson-compiler`/`tson`, main and test) updated and re-verified: full `./gradlew clean
   build` green, plus the installed CLI binary still runs a real schema end to end.
 - [x] **`BundledSchemaSource` deleted outright, the same day, a follow-up** — once `TsonBundledSchemas`
   already held the one canonical copy of all three identities, the user pointed out
   `BundledSchemaSource` was "exactly the same thing sitting in config of the wrong package": its
   `fetch` method and the bundled `.tn` resource files themselves (previously copied into
-  `tson-parser`'s own classpath by its `build.gradle.kts`) moved into `TsonBundledSchemas`
-  (`tson-schema`) too, and `tson-parser`'s own `BundledSchemaSource` class and its
+  `tson-compiler`'s own classpath by its `build.gradle.kts`) moved into `TsonBundledSchemas`
+  (`tson-schema`) too, and `tson-compiler`'s own `BundledSchemaSource` class and its
   `processResources` copy step were deleted, not just relocated again. `fetch` deliberately doesn't
-  implement `tson-parser`'s own `TsonSchemaSource` (a dependency `tson-schema` doesn't have), but its
-  shape already matches that interface's single method exactly, so every `tson-parser`/`tson` call
+  implement `tson-compiler`'s own `TsonSchemaSource` (a dependency `tson-schema` doesn't have), but its
+  shape already matches that interface's single method exactly, so every `tson-compiler`/`tson` call
   site that needs a real `TsonSchemaSource` now passes the method reference `TsonBundledSchemas::fetch`
   directly — no adapter class needed on either side. Verified the resources genuinely moved, not just
   the Java code: `unzip -l` on the built jars confirms `meta-kernel.tn`/`meta.tn`/`core.tn` are present
-  in `tson-schema`'s own jar and absent from `tson-parser`'s. Full `./gradlew clean build` green, plus
+  in `tson-schema`'s own jar and absent from `tson-compiler`'s. Full `./gradlew clean build` green, plus
   the installed CLI binary still runs a real schema end to end.
 - [ ] Distinguish "has constructor vocabulary, eligible to govern (a valid `!!meta` target)" from
   "ordinary consumer schema" at the type level. Right now `TsonCompiledMetaSchema` wraps *any*
@@ -290,8 +303,8 @@ own prose (which had gone stale on at least one of them):
   `TsonMapperWriter` (`private final TsonMapperWriter writer`, used only for this merge's own
   re-serialization step) should go away — a real narrowing check wouldn't need to round-trip through
   the generic mapper at all. This is also *why* `TsonMapperReader`/`TsonMapperWriter` still live in
-  `tson-parser.mapper` rather than the new `tson` front-door module (see "Front door" above) — moving
-  them today would create a cycle, since `tson-parser`'s own resolution engine genuinely depends on
+  `tson-compiler.mapper` rather than the new `tson` front-door module (see "Front door" above) — moving
+  them today would create a cycle, since `tson-compiler`'s own resolution engine genuinely depends on
   them. Once this dependency is gone, revisit moving `TsonMapperReader`/`TsonMapperWriter` into `tson`
   (or their own module) — noted directly on `Tson`'s own class Javadoc too, so it isn't lost.
 
@@ -371,7 +384,7 @@ everything outstanding is tracked in one place.)
   spec's own bundled `meta-kernel.tn1`/`meta.tn1`/`core.tn1` couldn't be renamed (a fixed, external
   identity) turned out not to hold, since the spec is still genuinely editable at this stage, not
   something this project has to treat as immutable. Renamed throughout: `spec/m/*.tn1` → `*.tn` (and
-  every `!!id`/`!!meta`/`!!import` directive value inside them); `tson-parser`'s `processResources`
+  every `!!id`/`!!meta`/`!!import` directive value inside them); `tson-compiler`'s `processResources`
   copy list; `BundledSchemaSource`'s `META_KERNEL_ID`/`META_ID`/`CORE_ID` constants (the latter two
   also renamed from `META_TN1_ID`/`CORE_TN1_ID`, dropping the now-stale "TN1" from the identifier
   itself) and its `RESOURCES` map; `TsonSchemaLinker.META_KERNEL_ID`; `tson-cli`'s own
