@@ -7,10 +7,10 @@ import io.ltr8.tson.parser.ast.schema.SchemaDocument;
 import io.ltr8.tson.parser.ast.schema.SchemaMap;
 import io.ltr8.tson.parser.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.parser.compiler.ValueReaderFactoryRegistry;
-import io.ltr8.tson.parser.config.BundledSchemaSource;
 import io.ltr8.tson.parser.config.SchemaMetaNameBinder;
 import io.ltr8.tson.parser.config.TsonCompiledRegistry;
 import io.ltr8.tson.parser.mapper.TsonMapperWriter;
+import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaLinker;
@@ -1258,7 +1258,7 @@ class DefinitionResolverTest {
     }
 
     private SchemaMap schemaMapFromCoreFixture() throws IOException {
-        String source = Files.readString(Path.of("").toAbsolutePath().resolve("../spec/m/core.tn1").normalize());
+        String source = Files.readString(Path.of("").toAbsolutePath().resolve("../spec/m/core.tn").normalize());
         return new TsonSchemaParser(source).parseSchemaDocument().body();
     }
 
@@ -1313,15 +1313,15 @@ class DefinitionResolverTest {
         ValueReaderFactoryRegistry objectFactories = ValueReaderFactoryRegistry.bind(context);
         TsonCompiledRegistry throwawayRegistry = new TsonCompiledRegistry(objectFactories);
         DefaultTsonCompiledSchemaLoader throwawayLoader =
-                new DefaultTsonCompiledSchemaLoader(throwawayRegistry, BundledSchemaSource.INSTANCE);
+                new DefaultTsonCompiledSchemaLoader(throwawayRegistry, TsonBundledSchemas::fetch);
 
-        String metaKernelSource = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID);
+        String metaKernelSource = TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID);
         SchemaDocument metaKernelDocument = new TsonSchemaParser(metaKernelSource).parseSchemaDocument();
         TsonSchema metaKernel = new TsonSchemaResolver(throwawayLoader).resolveSchema(metaKernelDocument);
         registry.register(TsonSchemaLinker.link(metaKernel, registry)); // permanent, so meta.tn1's own !!import finds it below
         TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
 
-        String source = Files.readString(Path.of("").toAbsolutePath().resolve("../spec/m/meta.tn1").normalize());
+        String source = Files.readString(Path.of("").toAbsolutePath().resolve("../spec/m/meta.tn").normalize());
         SchemaDocument metaDoc = new TsonSchemaParser(source).parseSchemaDocument();
         Map<String, TypeDefinition> namespace = new LinkedHashMap<>(metaKernel.entries());
         DefinitionResolver metaResolver = definitionResolverFor(metaKernelParser, namespace::get);
@@ -1366,6 +1366,6 @@ class DefinitionResolverTest {
     }
 
     private static String readFixture() throws IOException {
-        return Files.readString(Path.of("").toAbsolutePath().resolve("../spec/m/meta-kernel.tn1").normalize());
+        return Files.readString(Path.of("").toAbsolutePath().resolve("../spec/m/meta-kernel.tn").normalize());
     }
 }

@@ -48,7 +48,7 @@ class OutputFormatTest {
 
     /**
      * The actual point of {@code --output tson}: the emitted text isn't just TSON-shaped, it's
-     * genuinely readable back through {@code diagnostics.tn1}'s own compiled {@code
+     * genuinely readable back through {@code diagnostics.tn}'s own compiled {@code
      * validation_report} reader -- the dogfooding claim, proven, not just asserted in a comment.
      */
     @Test

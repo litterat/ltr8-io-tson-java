@@ -429,19 +429,19 @@ class TsonSchemaParserTest {
 
     @Test
     void metaKernelParses() throws IOException {
-        SchemaDocument doc = parse(readFixture("meta-kernel.tn1"));
+        SchemaDocument doc = parse(readFixture("meta-kernel.tn"));
         assertEquals(49, doc.body().declarations().size());
     }
 
     @Test
     void metaSchemaParses() throws IOException {
-        SchemaDocument doc = parse(readFixture("meta.tn1"));
+        SchemaDocument doc = parse(readFixture("meta.tn"));
         assertFalse(doc.body().declarations().isEmpty());
     }
 
     @Test
     void coreTypeLibraryParses() throws IOException {
-        SchemaDocument doc = parse(readFixture("core.tn1"));
+        SchemaDocument doc = parse(readFixture("core.tn"));
         assertFalse(doc.body().declarations().isEmpty());
     }
 

@@ -1,6 +1,6 @@
-!!id:"https://tson.io/2026/32/ltr8/cli/diagnostics-1.tn1"
-!!meta:"https://tson.io/2026/32/m/meta.tn1"
-!!import:"https://tson.io/2026/32/m/core.tn1"
+!!id:"https://tson.io/2026/32/ltr8/cli/diagnostics-1.tn"
+!!meta:"https://tson.io/2026/32/m/meta.tn"
+!!import:"https://tson.io/2026/32/m/core.tn"
 @doc:"""
   This project's own schema !!id convention (see CLAUDE.md's "Project-owned schema !!id
   convention"): /2026/32 is the spec revision this schema is written against, ltr8 is the

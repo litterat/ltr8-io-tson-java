@@ -101,19 +101,28 @@ machinery a consumer never names directly, leave it bare.
 
 ### Project-owned schema `!!id` convention
 
-A schema this project authors itself (not one of the spec's own bundled `meta-kernel.tn1`/`meta.tn1`/
-`core.tn1` companion artifacts) gets a `!!id` of the shape
-`https://tson.io/2026/32/ltr8/<group>/<name>-<version>.tn1` — e.g. `tson-cli`'s own
-`diagnostics.tn1`: `https://tson.io/2026/32/ltr8/cli/diagnostics-1.tn1`. Reading the path
+A schema this project authors itself (not one of the spec's own bundled `meta-kernel.tn`/`meta.tn`/
+`core.tn` companion artifacts) gets a `!!id` of the shape
+`https://tson.io/2026/32/ltr8/<group>/<name>-<version>.tn` — e.g. `tson-cli`'s own
+`diagnostics.tn`: `https://tson.io/2026/32/ltr8/cli/diagnostics-1.tn`. Reading the path
 left to right: `/2026/32` is the spec revision this schema is written against (the same version
 segment the spec's own bundled schemas publish under); `ltr8` is the publishing org (this project's
 own group id); `<group>` is a short name for the module/subsystem the schema belongs to (`cli` for
 `tson-cli`'s own schemas); `<name>-<version>` is the schema's own name with a trailing integer
-version — bump it, under a new name (`diagnostics-2.tn1`, not an in-place edit), whenever the
+version — bump it, under a new name (`diagnostics-2.tn`, not an in-place edit), whenever the
 schema's own shape changes, per §10's own "each published schema version is immutable, different
-content hashes and different URLs" rule. A schema's own `@doc` annotation (see `diagnostics.tn1`
+content hashes and different URLs" rule. A schema's own `@doc` annotation (see `diagnostics.tn`
 itself) should point back to this section by name so the convention is discoverable from the schema
 file alone, not just from here.
+
+**`.tn`, not `.tn1`, for as long as the spec itself stays a pre-release, 2026-revision-series draft**
+(both here and for the spec's own bundled `meta-kernel`/`meta`/`core` companion artifacts, per the
+same reasoning) — `.tn1` is a positive stability claim §7.1 reserves for the eventual, frozen "TSON
+version 1" release, which hasn't happened yet (see `SPEC-FEEDBACK.md` #20 for the full finding, and
+why the spec's own pre-release material publishing under `.tn1` today is itself an open spec issue,
+not settled precedent to follow). Renamed from `.tn1` to `.tn` throughout this project on 2026-07-29,
+on the user's own explicit direction, once it was confirmed the live spec site could be updated to
+match rather than being a fixed, unchangeable external identity.
 
 `tson-parser` holds the lexer, the data-grammar structural parser, base type resolution, the built-in
 type vocabulary, the Part 2 schema grammar (`TsonSchemaParser`, `ast.schema`), the schema resolver
@@ -986,7 +995,7 @@ generic way. **`core.tn1`'s own end-to-end declaration count is pinned down by
 `CoreTn1ParserTest`/`CoreTn1CompiledEndToEndTest` stay deleted (superseded by
 `DefaultTsonCompiledSchemaLoader`'s own generic path, "Compiled schema registry" above), but this
 new test covers the same ground with the current pipeline: registers meta-kernel then meta.tn1 then
-core.tn1 via `loader.load`, exactly the sequence `BundledSchemaSource`'s own class Javadoc
+core.tn1 via `loader.load`, exactly the sequence `TsonBundledSchemas`'s own class Javadoc
 documents, and confirms all 48 of core.tn1's own declarations resolve and register. A second test,
 `exactlyTheFiveUndocumentedAtomConstructorsCompileToErrorReaders`, goes one step further -- compiling
 the registered result (a side effect of `TsonCompiledRegistry#register`, reached via the same
@@ -1150,7 +1159,7 @@ version of this class extended `TsonSchema` directly; then briefly held a dedica
 subtype for the result, since removed 2026-07-26 in favor of the plain `bootstrap` flag -- see
 "Schema registry" above). **Deliberately locked down to exactly one public method, taking no
 arguments** (narrowed 2026-07-26, on the user's own explicit direction) -- this class exists to
-bootstrap *the* real meta-kernel document (`BundledSchemaSource#META_KERNEL_ID`), nothing else. An
+bootstrap *the* real meta-kernel document (`TsonBundledSchemas#META_KERNEL_ID`), nothing else. An
 earlier version also exposed `parse(String source)`, letting a caller resolve arbitrary
 meta-kernel-shaped text through this same two-pass machinery -- unused anywhere in this codebase and
 removed outright, not just deprecated, since keeping it around invites exactly the kind of "just
@@ -1228,15 +1237,15 @@ and in isolation (`MetaKernelBootstrapResolverTest`'s own `unrecognizedInstanceT
 `aNonEmptyBodyForAnEmptyBodiedTargetThrows`, absorbed from the deleted `BootstrapMetaKernelCompiler`
 class's own test the same way the production code was).
 
-**`meta-kernel.tn1` is packaged as a classpath resource, not read from a filesystem path.**
-`getMetaKernelSchema()` fetches its own source text via `BundledSchemaSource.INSTANCE.fetch
-(BundledSchemaSource.META_KERNEL_ID)` (see "Bundled schema documents" below) rather than reading the
-classpath resource itself directly, as an earlier version of this class did -- one place now owns
-"how this library's own bundled schema documents get their raw text," not two. `tson-parser/build
-.gradle.kts` wires its `processResources` task to copy `meta-kernel.tn1`/`meta.tn1`/`core.tn1`
-straight from the repo's own `spec/m/` snapshots at build time, so there is exactly one copy of each
-file on disk to keep in sync with the spec, but the bootstrap still works from a built jar (e.g.
-published to a repository), not only from a repo checkout.
+**`meta-kernel.tn` is packaged as a classpath resource, not read from a filesystem path.**
+`getMetaKernelSchema()` fetches its own source text via `TsonBundledSchemas.fetch
+(TsonBundledSchemas.META_KERNEL_ID)` (`tson-schema` -- see "Bundled schema documents" below) rather
+than reading the classpath resource itself directly, as an earlier version of this class did -- one
+place now owns "how this library's own bundled schema documents get their raw text," not two.
+`tson-schema/build.gradle.kts` wires its own `processResources` task to copy
+`meta-kernel.tn`/`meta.tn`/`core.tn` straight from the repo's own `spec/m/` snapshots at build time,
+so there is exactly one copy of each file on disk to keep in sync with the spec, but the bootstrap
+still works from a built jar (e.g. published to a repository), not only from a repo checkout.
 
 **`IntegerType`, then `TextType`/`UriType`/`RegexType`, all became real `Atom` variants for this
 (2026-07-23)** -- the four atom constraint-vocabulary families the old `TypeBody`'s own Javadoc used
@@ -1390,10 +1399,10 @@ export it"), confirmed by trying it directly, not just reasoned about.
      check against a different namespace (sibling field names within the same record, not type
      names). Any failure throws `TsonSchemaValidationException` naming the offending entry/reference.
      **Constructor eligibility** (added 2026-07-27, on the user's own explicit direction, per §2.2.2's
-     own "chaining to meta-kernel.tn1 directly is a meta-programming case" — see `SPEC-FEEDBACK.md`
+     own "chaining to meta-kernel.tn directly is a meta-programming case" — see `SPEC-FEEDBACK.md`
      #19 for why this isn't stated as a spec MUST): a locally-declared entry with `constructor: true`
-     is only valid if `schema`'s own `!!meta` is *exactly* `TsonSchemaLinker.META_KERNEL_ID`
-     (`https://tson.io/2026/32/m/meta-kernel.tn1`) — checked once, lazily, on the first such entry
+     is only valid if `schema`'s own `!!meta` is *exactly* `TsonBundledSchemas.META_KERNEL_ID`
+     (`https://tson.io/2026/32/m/meta-kernel.tn`) — checked once, lazily, on the first such entry
      found (`isMetaKernelGoverned`). **A fixed identity, not a structural "is this schema
      self-referencing" test** (an earlier version of this check was structural, tightened the same
      day on the user's own further direction): every resolved `TypeDefinition.body` and every
@@ -1403,14 +1412,15 @@ export it"), confirmed by trying it directly, not just reasoned about.
      "whatever schema happens to be self-referencing"; a library supports one meta-kernel version at a
      time. No loader lookup needed at all now — comparing `schema.meta()` directly against the fixed
      constant works uniformly for meta-kernel itself (whose own `!!meta` literally is that constant)
-     and for meta.tn1 (governed one hop below it) alike. `BundledSchemaSource.META_KERNEL_ID` (in
-     `tson-parser`) is defined in terms of `TsonSchemaLinker.META_KERNEL_ID`, not a separate copy of
-     the same string. Scoped to locally-declared entries only — an imported `constructor: true` entry
-     (e.g. meta.tn1 importing meta-kernel's own `record`/`array`/...) was already validated when *its
-     own* home schema was linked, matching this class's own "merged entries keep their home namespace,
+     and for meta.tn (governed one hop below it) alike. `TsonBundledSchemas` (`tson-schema`, see
+     "Bundled schema documents" below) is the one shared source this check and every `tson-parser`-side
+     consumer both reference — neither declares its own copy. Scoped to locally-declared entries only — an imported
+     `constructor: true` entry (e.g. meta.tn importing meta-kernel's own `record`/`array`/...) was
+     already validated when *its own* home schema was linked, matching this class's own "merged
+     entries keep their home namespace,
      never re-validated against the importer" principle. Confirmed against the real fixtures, not just
-     reasoned about: meta-kernel.tn1 (9 constructors) and meta.tn1 (18, one hop below meta-kernel) both
-     link cleanly; core.tn1 (governed by meta.tn1, zero constructors of its own) was already compliant
+     reasoned about: meta-kernel.tn (9 constructors) and meta.tn (18, one hop below meta-kernel) both
+     link cleanly; core.tn (governed by meta.tn, zero constructors of its own) was already compliant
      before this check existed. Two test fixtures needed a real fix, not a workaround — both were
      hand-built schemas that legitimately declare their own constructor vocabulary
      (`EnumDomReaderTest`'s copy of meta-kernel's own entries; `TsonSchemaLinkerTest`'s
@@ -1704,8 +1714,10 @@ sibling shape.
   requests and just load from disk, or only HTTP requests to certain hosts." `TsonSchemaSource
   .registeredOnly()` is the default (mirrors `TsonSchemaRegistry`'s own no-arg-constructor default and
   `TsonSchemaLoader`'s own precedent) — nothing is ever fetched from anywhere unless a caller opts in.
-  `BundledSchemaSource` (below) is the one real implementation so far; a general disk/HTTP-backed
-  `TsonSchemaSource` (with whatever whitelist/blacklist policy) is deliberately not built yet.
+  `TsonBundledSchemas::fetch` (below -- `tson-schema`, not implementing this interface directly since
+  that module has no dependency on `tson-parser`, but matching its single-method shape exactly) is
+  the one real fetch capability wired up so far; a general disk/HTTP-backed `TsonSchemaSource` (with
+  whatever whitelist/blacklist policy) is deliberately not built yet.
 - **`TsonSchemaResolver(TsonCompiledSchemaLoader)`** replaces the earlier `TsonSchemaResolver(TsonCompiledRegistry)`
   constructor. `loader.load(document.meta())` (inlined directly into `resolveSchema`, not a separate
   method) returns a `TsonCompiledMetaSchema` (not an `Optional`) and *throws* if it can't be
@@ -1796,11 +1808,16 @@ them public just so it could keep referencing them, a real, unwanted expansion o
 not a free move. (An earlier version of `Tson`'s own builder briefly lived here too, the same day,
 before moving one step further out to the `tson` module -- see "Front door module" below.)
 
-**`BundledSchemaSource` joined this package too, moved from `resolver`** once its only real
-in-`tson-parser` consumer (`MetaKernelBootstrapResolver.getMetaKernelSchema`) was confirmed to be its
-sole caller here -- see "Bundled schema documents" below for the full reasoning, including why
-`getMetaKernelSchema()` itself deliberately stayed zero-argument rather than accepting an injected
-`TsonSchemaSource`.
+**`BundledSchemaSource` briefly joined this package too, moved from `resolver`, before being deleted
+outright the same week.** It moved here once its only real in-`tson-parser` consumer
+(`MetaKernelBootstrapResolver.getMetaKernelSchema`) was confirmed to be its sole caller; then, once
+`TsonBundledSchemas` (`tson-schema`) already held the one canonical copy of the three bundled
+schemas' own identities, the user pointed out the class itself was "exactly the same thing sitting in
+config of the wrong package" — its `fetch` method and the bundled `.tn` resource files moved into
+`TsonBundledSchemas` too, and `BundledSchemaSource` was deleted, not just relocated again. See
+"Bundled schema documents" below for the full reasoning, including why `MetaKernelBootstrapResolver
+.getMetaKernelSchema()` itself deliberately stayed zero-argument throughout all of this rather than
+accepting an injected `TsonSchemaSource`.
 
 **`TsonAtomContext` joined this package too, moved from `base`** (2026-07-29, alongside the JPMS
 lockdown pass -- see "Module system (JPMS)" near the end of this file) -- the built-in-vocabulary
@@ -1809,9 +1826,10 @@ atom registrations (`UUID`/`byte[]`/`LocalDate`/`OffsetTime`/`OffsetDateTime`/`U
 .TsonMapperContext` and this package's own `SchemaMetaNameBinder`. It was `base`'s only genuine
 external (cross-module) caller -- the rest of `base` (`BaseTypeResolver`, `NumberGrammar`, ...) is §4
 base-type-resolution machinery nothing outside `tson-parser` itself ever references -- and `config`
-is where "how a caller configures a working environment" already lives, so this is the same move as
-`BundledSchemaSource`'s own, not a new kind of one. `mapper` reaching into `config` for it is a new,
-harmless dependency edge (`config` has no dependency back on `mapper`, so no cycle).
+is where "how a caller configures a working environment" already lives, so this was the same kind of
+move `BundledSchemaSource`'s own relocation here had been, at the time. `mapper` reaching into
+`config` for it is a new, harmless dependency edge (`config` has no dependency back on `mapper`, so no
+cycle).
 
 ### Front door module (`tson/src/main/java/io/ltr8/tson/`)
 
@@ -1880,55 +1898,74 @@ should validate that a refinement genuinely narrows its source, e.g. via a per-c
 serialize-then-merge round trip) -- revisit moving `TsonMapperReader`/`TsonMapperWriter` here once
 it's gone, noted directly on `Tson`'s own class Javadoc too so it isn't lost.
 
-### Bundled schema documents (`tson-parser/src/main/java/io/ltr8/tson/parser/config/BundledSchemaSource.java`)
+### Bundled schema documents (`tson-schema/src/main/java/io/ltr8/tson/schema/TsonBundledSchemas.java`)
 
-A `TsonSchemaSource` serving this library's own three bundled schema documents — meta-kernel, meta.tn1,
-core.tn1 — straight off the classpath, the same resources `tson-parser/build.gradle.kts`'s own
-`processResources` task copies in from `spec/m/` for `MetaKernelBootstrapResolver` (see that class's own
-one-file-to-keep-in-sync reasoning). `META_KERNEL_ID`/`META_TN1_ID`/`CORE_TN1_ID` are each schema's
-own real, published `!!id`.
+The real, published identities of this library's own three bundled schema documents — meta-kernel,
+meta, core — **and** their raw source text, straight off `tson-schema`'s own classpath (the same
+resources `tson-schema/build.gradle.kts`'s own `processResources` task copies in from `spec/m/`,
+mirroring `MetaKernelBootstrapResolver`'s identical one-file-to-keep-in-sync reasoning). `META_KERNEL_ID`/
+`META_ID`/`CORE_ID` are each schema's own `!!id`; `fetch(uri)` returns the matching document's own raw
+text.
 
-**Lives in `config`, not `resolver`** — it's a fixed, caller-facing statement of "what schema
-documents this library ships and where they live," the same "configuration/wiring, not resolution
-mechanics" reasoning that already placed `TsonCompiledRegistry`/`SchemaMetaNameBinder`/
-`ValueReaderFactoryResolver` there (see "Configuration package" above); it moved out of `resolver`
-once `MetaKernelBootstrapResolver`'s own only real caller (`getMetaKernelSchema`) was confirmed to be
-its sole in-`tson-parser` consumer. `MetaKernelBootstrapResolver`/`DefaultTsonCompiledSchemaLoader`
-(both still in `resolver`) reach into `config` for it directly by import — the same named layering
-exception `TsonCompiledSchemaLoader`/`DefaultTsonCompiledSchemaLoader` already document for reaching
-into `compiler`/`config` from `resolver`, not a new one. **`MetaKernelBootstrapResolver.getMetaKernelSchema()`
-deliberately stayed zero-argument** rather than gaining a `TsonSchemaSource` parameter — that would
-reopen exactly what removing this class's own `parse(String source)` overload (see "Meta-kernel
-bootstrap" above) closed off: a caller handing it text that isn't genuinely meta-kernel under the
-`META_KERNEL_ID` identity. The package moved; the lock-down didn't.
+**Both halves live in `tson-schema` now, in one class — not split across two modules the way they
+used to be.** `TsonBundledSchemas` originally held only the three identities (2026-07-29, moved there
+from two previous, split homes — `META_KERNEL_ID` on `tson-schema`'s own `TsonSchemaLinker`, needed
+there for `isMetaKernelGoverned`'s constructor-eligibility check, with `tson-parser`'s own
+`BundledSchemaSource` defining its own copy in terms of that one; `META_ID`/`CORE_ID` had no canonical
+source at all, only `BundledSchemaSource`'s own literal copies). The same day, on the user's own
+further, explicit direction ("I realise that the schemas should be bundled there and BundledSchemaSource
+is exactly the same thing sitting in config of the wrong package. So move the fetch method directly
+into TsonBundledSchemas and bundle the schemas in tson-schema. Then BundledSchemaSource can be
+deleted"), `fetch` and the bundled `.tn` resource files themselves moved here too, and
+`BundledSchemaSource` (`tson-parser.config`) was deleted outright — there was nothing left for a
+separate `tson-parser`-side class to do once both halves of "what these documents are" and "where
+their content lives" could sit in the one module that's the single canonical source for both a
+`tson-parser`-side consumer and `tson-schema`'s own `TsonSchemaLinker`, since `tson-schema` has no
+dependency on `tson-parser` (only the reverse).
+
+**`fetch` deliberately doesn't implement `tson-parser`'s own `TsonSchemaSource` interface** — that
+would require a dependency `tson-schema` doesn't have — **but a `tson-parser`-side caller needing a
+real `TsonSchemaSource` passes the method reference `TsonBundledSchemas::fetch` directly**, with no
+adapter class on either side: `TsonSchemaSource` is `@FunctionalInterface`, a single `String
+fetch(String uri)` method, exactly `TsonBundledSchemas.fetch`'s own shape, so Java's own method-
+reference conversion satisfies it for free. Every `tson-parser`/`tson` call site that used to pass
+`BundledSchemaSource.INSTANCE` as a `TsonSchemaSource` (e.g.
+`new DefaultTsonCompiledSchemaLoader(registry, BundledSchemaSource.INSTANCE)`) now passes
+`TsonBundledSchemas::fetch` instead; every direct-fetch call site (`BundledSchemaSource.INSTANCE
+.fetch(...)`) now calls the static `TsonBundledSchemas.fetch(...)` directly.
+
+**Verified the resources genuinely moved, not just the Java code** — `unzip -l` on the built jars
+confirms `meta-kernel.tn`/`meta.tn`/`core.tn` are present in `tson-schema`'s own jar and absent from
+`tson-parser`'s.
 
 **Replaces two now-deleted, standalone classes, `MetaTn1Parser`/`CoreTn1Parser`** — each used to
 hand-roll its own fetch-parse-resolve-register-compile sequence for one schema specifically; the
 general version of that sequence is exactly what `DefaultTsonCompiledSchemaLoader#load(String)`'s own
-generic branch already does for *any* URI, given a `TsonSchemaSource` that knows how to fetch it. This
-class is that source for all three well-known identities — nothing more.
+generic branch already does for *any* URI, given a `TsonSchemaSource` that knows how to fetch it.
+`TsonBundledSchemas` is that source for all three well-known identities — nothing more.
 
 **A caller wanting a working environment now uses `Tson` directly** (see "Front door module" above)
 rather than assembling `TsonSchemaRegistry`/`TsonCompiledRegistry`/`DefaultTsonCompiledSchemaLoader`
-by hand — `BundledSchemaSource` is still exactly what powers it underneath, just no longer something
+by hand — `TsonBundledSchemas` is still exactly what powers it underneath, just no longer something
 a caller needs to reach for directly:
 
 ```java
-Tson tson = Tson.builder().build(); // meta-kernel + meta.tn1 + core.tn1
+Tson tson = Tson.builder().build(); // meta-kernel + meta.tn + core.tn
 TsonCompiledMetaSchema compiled = tson.compile(schemaText, ValueReaderFactoryRegistry.dom());
 ```
 
 The hand-assembled sequence above still exists — `TsonConfig#build`'s own implementation is exactly
 it — but a caller no longer needs to write it out themselves.
 
-**That `META_KERNEL_ID` entry in `RESOURCES` is still never actually reached through
-`DefaultTsonCompiledSchemaLoader#load`**, though — that method special-cases it and resolves it via
-`MetaKernelBootstrapResolver#getMetaKernelSchema()` directly, before this source's own `fetch` is ever consulted
-(see "Compiled schema registry" above for why: meta-kernel's `!!meta` names itself, and falling
-through to the generic fetch-then-`TsonSchemaResolver(this)` path would recurse forever). It's included
-here anyway so this class is a complete, uniform "fetch any of this library's own bundled schema
-documents" utility on its own terms, and safe for any *other* `TsonCompiledSchemaLoader` implementation that
-doesn't special-case meta-kernel the way `DefaultTsonCompiledSchemaLoader` does.
+**That `META_KERNEL_ID` entry in `TsonBundledSchemas`'s own internal resource table is still never
+actually reached through `DefaultTsonCompiledSchemaLoader#load`**, though — that method special-cases
+it and resolves it via `MetaKernelBootstrapResolver#getMetaKernelSchema()` directly, before
+`TsonBundledSchemas.fetch` is ever consulted (see "Compiled schema registry" above for why:
+meta-kernel's `!!meta` names itself, and falling through to the generic
+fetch-then-`TsonSchemaResolver(this)` path would recurse forever). It's included here anyway so this
+class is a complete, uniform "fetch any of this library's own bundled schema documents" utility on its
+own terms, and safe for any *other* `TsonCompiledSchemaLoader` implementation that doesn't
+special-case meta-kernel the way `DefaultTsonCompiledSchemaLoader` does.
 
 ### Object-binding mode (`compiler/{RecordBindReader,ArrayBindReader,MapBindReader,TupleBindReader,VariantBindReader,VariantSchemaReader}.java`, `config/SchemaMetaNameBinder.java` + `tson-bind`'s own `DataNameBinder`/`DataParameterizedType`)
 

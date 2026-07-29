@@ -118,15 +118,6 @@ import java.util.Set;
  */
 public final class TsonSchemaLinker {
 
-    /**
-     * The one meta-kernel this library's own compiled-reader machinery is built against -- see
-     * {@link #isMetaKernelGoverned}'s own Javadoc for why this has to be a specific, fixed identity
-     * rather than a structural "is this schema self-referencing" test. {@code
-     * io.ltr8.tson.parser.resolver.BundledSchemaSource#META_KERNEL_ID} (in {@code tson-parser},
-     * which depends on this module) is defined in terms of this constant, not a separate copy.
-     */
-    public static final String META_KERNEL_ID = "https://tson.io/2026/32/m/meta-kernel.tn1";
-
     private TsonSchemaLinker() {
     }
 
@@ -221,7 +212,7 @@ public final class TsonSchemaLinker {
                     throw new TsonSchemaValidationException("'" + entry.getKey() + "' declares a type constructor "
                             + "(the '~' marker), but '" + schema.id() + "' is not governed directly by the "
                             + "meta-kernel (its own !!meta is '" + schema.meta() + "') -- only a schema chaining "
-                            + "to meta-kernel.tn1 directly may declare new constructors (§2.2.2's "
+                            + "to meta-kernel.tn directly may declare new constructors (§2.2.2's "
                             + "meta-programming case); an ordinary type library or application schema may only "
                             + "apply or refine constructors it doesn't declare itself");
                 }
@@ -245,7 +236,7 @@ public final class TsonSchemaLinker {
 
     /**
      * Whether {@code schema} is entitled to declare its own {@code ~}-marked constructors -- true
-     * only if its own {@code !!meta} target is exactly {@link #META_KERNEL_ID}, the *specific*
+     * only if its own {@code !!meta} target is exactly {@link TsonBundledSchemas#META_KERNEL_ID}, the *specific*
      * meta-kernel this library's own compiled-reader machinery is built against, not merely "some
      * self-referencing schema." This is stricter than structural self-reference alone: every
      * resolved {@code TypeDefinition.body} and every {@code !instance} construction (`!enum`,
@@ -256,11 +247,11 @@ public final class TsonSchemaLinker {
      * supports one meta-kernel version at a time (a new revision would mean rebuilding that
      * machinery, not just accepting a differently-identified but structurally-similar substitute), so
      * this checks the schema's own {@code !!meta} string directly, no lookup needed -- correct for
-     * meta-kernel itself (whose own {@code !!meta} literally is {@link #META_KERNEL_ID}) and for
-     * meta.tn1 (governed one hop below it) alike.
+     * meta-kernel itself (whose own {@code !!meta} literally is {@link TsonBundledSchemas#META_KERNEL_ID}) and for
+     * meta.tn (governed one hop below it) alike.
      */
     private static boolean isMetaKernelGoverned(TsonSchema schema) {
-        return CanonicalIdentity.of(schema.meta()).equals(CanonicalIdentity.of(META_KERNEL_ID));
+        return CanonicalIdentity.of(schema.meta()).equals(CanonicalIdentity.of(TsonBundledSchemas.META_KERNEL_ID));
     }
 
     // ── Subtypes (reverse index) ─────────────────────────────────────────
@@ -578,7 +569,7 @@ public final class TsonSchemaLinker {
             // structure namespace... field types... composition targets"). See #link's own note
             // on `structureNamespace` for why this matters concretely: `void => !unit {}`'s own
             // `source: unit` is exactly this case -- `unit` lives in meta-kernel, reachable from
-            // core.tn1 only via its `!!meta` chain, never a local declaration or `!!import`.
+            // core.tn only via its `!!meta` chain, never a local declaration or `!!import`.
             Map<String, TypeDefinition> sourceLookup = structureNamespace.isEmpty() ? namespace
                     : mergeWithFallback(namespace, structureNamespace);
             validateTypeRef(def.source().get(), sourceLookup, def.parameters(), "'" + name + "' source");

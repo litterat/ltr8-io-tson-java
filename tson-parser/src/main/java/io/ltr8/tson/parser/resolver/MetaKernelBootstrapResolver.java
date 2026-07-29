@@ -9,7 +9,7 @@ import io.ltr8.tson.parser.ast.TokenValue;
 import io.ltr8.tson.parser.ast.schema.Instance;
 import io.ltr8.tson.parser.ast.schema.SchemaDocument;
 import io.ltr8.tson.parser.ast.schema.SchemaMap;
-import io.ltr8.tson.parser.config.BundledSchemaSource;
+import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.IntegerType;
@@ -49,7 +49,7 @@ import java.util.Optional;
  * separately, compiles it -- a distinct, later stage this class has nothing to do with.
  *
  * <p>Deliberately locked down to exactly one public method, taking no arguments -- this class exists
- * to bootstrap *the* real meta-kernel document (see {@link BundledSchemaSource#META_KERNEL_ID}),
+ * to bootstrap *the* real meta-kernel document (see {@link TsonBundledSchemas#META_KERNEL_ID}),
  * nothing else.
  *
  * <p><b>Every {@code Instance} declaration resolves through {@link #instanceBody}, a closed,
@@ -64,14 +64,12 @@ import java.util.Optional;
  * #instanceBody} hand-picks all of them uniformly -- meta-kernel only ever instantiates its own six
  * real constructors in two known shapes (a bare {@code {}} or a bare array of tokens).
  *
- * <p>{@link #getMetaKernelSchema()} reads meta-kernel.tn1 packaged as a classpath resource, via
- * {@link BundledSchemaSource} (see this module's {@code build.gradle.kts}, which copies it straight
- * from the repo's own {@code spec/m/meta-kernel.tn1} snapshot into this module's resources at build
- * time), so the bootstrap works from a built jar, not just a repo checkout. {@code BundledSchemaSource}
- * itself lives in the sibling {@code config} package, not here -- the same named layering exception
- * {@link DefaultTsonCompiledSchemaLoader} already documents (this class hard-codes the one real,
- * bundled source deliberately, per the lock-down above, rather than accepting a caller-supplied
- * {@link TsonSchemaSource}).
+ * <p>{@link #getMetaKernelSchema()} reads meta-kernel.tn packaged as a classpath resource, via
+ * {@link TsonBundledSchemas#fetch} (`tson-schema` -- see that class's own Javadoc for why its own
+ * `build.gradle.kts` copies the file straight from the repo's own {@code spec/m/meta-kernel.tn}
+ * snapshot into that module's own resources, not this one's), so the bootstrap works from a built
+ * jar, not just a repo checkout. This class hard-codes that one real, bundled source deliberately,
+ * per the lock-down above, rather than accepting a caller-supplied {@link TsonSchemaSource}.
  */
 public final class MetaKernelBootstrapResolver {
 
@@ -87,11 +85,11 @@ public final class MetaKernelBootstrapResolver {
      * here, not merely something shaped like it.
      */
     public static TsonSchema getMetaKernelSchema() {
-        String source = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID);
+        String source = TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID);
         SchemaDocument document = new TsonSchemaParser(source).parseSchemaDocument();
         Map<String, TypeDefinition> entries = resolveEntries(document);
         String id = document.id().orElseThrow(() -> new IllegalStateException(
-                "meta-kernel.tn1 has no !!id -- this should never happen for the real, bundled fixture"));
+                "meta-kernel.tn has no !!id -- this should never happen for the real, bundled fixture"));
         return new TsonSchema(id, document.meta(), document.imports(), entries, true);
     }
 

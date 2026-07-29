@@ -149,7 +149,41 @@ yet implemented" section for the technical detail behind several of these items.
   `TsonCompiledSchemaLoader`. Deliberately did *not* also change `getMetaKernelSchema()` to accept an
   injected `TsonSchemaSource` — that would reopen exactly what removing this class's own earlier
   `parse(String source)` overload closed off (a caller supplying text that isn't genuinely meta-kernel
-  under the `META_KERNEL_ID` identity); package placement changed, the zero-argument lock-down didn't.
+  under the well-known meta-kernel identity); package placement changed, the zero-argument lock-down
+  didn't.
+- [x] **`META_KERNEL_ID`/`META_ID`/`CORE_ID` consolidated into a new `TsonBundledSchemas` class in
+  `tson-schema`** (2026-07-29, on the user's own explicit direction) — previously split across two
+  homes: `META_KERNEL_ID` lived on `tson-schema`'s own `TsonSchemaLinker` (needed there for
+  `isMetaKernelGoverned`), with `BundledSchemaSource` (`tson-parser`) defining its own copy in terms
+  of that one; `META_ID`/`CORE_ID` had no canonical source at all, only `BundledSchemaSource`'s own
+  literals. `tson-schema` is the only module both a `tson-parser`-side consumer and `tson-schema`'s
+  own `TsonSchemaLinker` can share a source with (no dependency back on `tson-parser`), so a shared
+  home had to live there regardless. A fresh, narrow class rather than adding fields to
+  `TsonSchemaLinker` (a verb in this project's own pipeline vocabulary, not a constants holder) or
+  `BundledSchemaSource` (fetch capability, not identity — the same split this project draws
+  everywhere else, e.g. `TsonLinkedSchema`/`TsonSchemaLinker`). Named `TsonBundledSchemas`, not
+  `TsonMetaSchemas` — spec §9 ("The Meta Layer") is explicit only *two* of the three (meta-kernel,
+  meta) make up "the meta layer"; core is a separate type library, so a "meta schemas" name would
+  misname it. Also considered and rejected: `TsonIdentity` (collides conceptually with the existing,
+  unrelated `CanonicalIdentity`), `TsonVersion` (doesn't convey "document identities" at all),
+  `TsonPrelude` (evocative but borrows outside jargon and is slightly inaccurate — these three are
+  pre-loaded by the library, not auto-imported into a consumer's own namespace). Every consumer (13
+  files across `tson-parser`/`tson`, main and test) updated and re-verified: full `./gradlew clean
+  build` green, plus the installed CLI binary still runs a real schema end to end.
+- [x] **`BundledSchemaSource` deleted outright, the same day, a follow-up** — once `TsonBundledSchemas`
+  already held the one canonical copy of all three identities, the user pointed out
+  `BundledSchemaSource` was "exactly the same thing sitting in config of the wrong package": its
+  `fetch` method and the bundled `.tn` resource files themselves (previously copied into
+  `tson-parser`'s own classpath by its `build.gradle.kts`) moved into `TsonBundledSchemas`
+  (`tson-schema`) too, and `tson-parser`'s own `BundledSchemaSource` class and its
+  `processResources` copy step were deleted, not just relocated again. `fetch` deliberately doesn't
+  implement `tson-parser`'s own `TsonSchemaSource` (a dependency `tson-schema` doesn't have), but its
+  shape already matches that interface's single method exactly, so every `tson-parser`/`tson` call
+  site that needs a real `TsonSchemaSource` now passes the method reference `TsonBundledSchemas::fetch`
+  directly — no adapter class needed on either side. Verified the resources genuinely moved, not just
+  the Java code: `unzip -l` on the built jars confirms `meta-kernel.tn`/`meta.tn`/`core.tn` are present
+  in `tson-schema`'s own jar and absent from `tson-parser`'s. Full `./gradlew clean build` green, plus
+  the installed CLI binary still runs a real schema end to end.
 - [ ] Distinguish "has constructor vocabulary, eligible to govern (a valid `!!meta` target)" from
   "ordinary consumer schema" at the type level. Right now `TsonCompiledMetaSchema` wraps *any*
   compiled schema, constructors or not — nothing stopped a zero-constructor consumer schema (like
@@ -306,9 +340,21 @@ everything outstanding is tracked in one place.)
 
 ## Conformance test suite
 
-- [ ] Build out `ltr8-io-tson-test-suite` well beyond its current 38 vectors. Those cover Part 1
-  (lexer/parser) only — Part 2 (resolution, linking, compilation) has no conformance-suite coverage
-  at all yet, only this repo's own unit/integration tests.
+- [ ] Build out `ltr8-io-tson-test-suite` well beyond its current 110 vectors (grown from the 38 this
+  note originally cited — it's picked up a fourth `vocabulary` bucket alongside `lexer`/`parser`/
+  `resolver` since). Still Part 1 (lexer/parser/§5 vocabulary) only — Part 2 (resolution, linking,
+  compilation) has no conformance-suite coverage at all yet, only this repo's own unit/integration
+  tests.
+- [x] **Sibling repo's own vector naming migrated from `.tn1`/`.tson` to `.tn`/`-expected.tn`**
+  (2026-07-29, same rename as the "Documentation" section's pre-release file-extension item above) —
+  all 110 subject files renamed `<slug>.tn1` → `<slug>.tn`; all 110 sidecars renamed `<slug>.tson` →
+  `<slug>-expected.tn` (own `!!id` updated to match); `scripts/check_vectors.py`'s pairing logic
+  rewritten for the new same-extension, suffix-distinguished scheme (was extension-distinguished);
+  `README.md`'s layout diagram and prose updated throughout. `-expected` chosen over the user's own
+  initial `-check` suggestion — clearer to an unfamiliar reader (any implementation in any language is
+  meant to be able to pick this suite up) than this project's own internal "sidecar" jargon would be.
+  `ConformanceSuiteTest` (this repo) updated to match and re-verified against the real, renamed sibling
+  checkout: 110/110 vectors still pass, not just recompiles.
 
 ## Documentation
 
@@ -318,6 +364,27 @@ everything outstanding is tracked in one place.)
 - [ ] `@doc` annotations aren't carried through resolution into `TypeDefinition` at all right now —
   worth preserving if user docs/tooling will ever want to generate documentation from a schema,
   rather than bolting it on later and revisiting every resolution path again.
+- [x] **Pre-release file-extension convention decided and applied: `.tn`, unversioned, for as long
+  as the spec stays a 2026-revision-series draft** (see `SPEC-FEEDBACK.md` #20 for the full finding
+  this decision responds to). Landed 2026-07-29, on the user's own explicit direction, once it was
+  confirmed the live spec site itself would be updated to match — the earlier assumption that the
+  spec's own bundled `meta-kernel.tn1`/`meta.tn1`/`core.tn1` couldn't be renamed (a fixed, external
+  identity) turned out not to hold, since the spec is still genuinely editable at this stage, not
+  something this project has to treat as immutable. Renamed throughout: `spec/m/*.tn1` → `*.tn` (and
+  every `!!id`/`!!meta`/`!!import` directive value inside them); `tson-parser`'s `processResources`
+  copy list; `BundledSchemaSource`'s `META_KERNEL_ID`/`META_ID`/`CORE_ID` constants (the latter two
+  also renamed from `META_TN1_ID`/`CORE_TN1_ID`, dropping the now-stale "TN1" from the identifier
+  itself) and its `RESOURCES` map; `TsonSchemaLinker.META_KERNEL_ID`; `tson-cli`'s own
+  `diagnostics.tn1` → `diagnostics.tn`; every test fixture whose `!!meta`/`!!import` header must
+  actually resolve against the real bundled schemas (found by compiling, then running the full suite,
+  and fixing exactly what broke, rather than a blind grep-and-replace); and the "Project-owned schema
+  `!!id` convention" section above. Deliberately *not* swept: fictional/placeholder test URLs
+  (`https://example.test/...`) whose extension is incidental to what they test, and informal Javadoc
+  prose mentions scattered through `schema.meta.*` classes and `CLAUDE.md`'s own historical
+  narrative — cosmetic staleness, not functional, and out of scope for this pass. The sibling
+  `ltr8-io-tson-test-suite` repo's own `.tn1`/`.tson` vector files are a separate, not-yet-done step
+  (that repo also needs a naming decision for the sidecar half — see the "Conformance test suite"
+  section below).
 
 ## Miscellaneous
 

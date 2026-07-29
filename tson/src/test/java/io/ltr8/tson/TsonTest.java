@@ -4,8 +4,8 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.parser.TsonDataParser;
 import io.ltr8.tson.parser.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.parser.compiler.ValueReaderFactoryRegistry;
-import io.ltr8.tson.parser.config.BundledSchemaSource;
 import io.ltr8.tson.parser.mapper.TsonMapperReader;
+import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import org.junit.jupiter.api.Test;
 
@@ -19,15 +19,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * The same real scenario {@code TinySchemaImportsCoreTn1Test} proves by hand-assembling
  * {@code TsonSchemaRegistry}/{@code TsonCompiledRegistry}/{@code DefaultTsonCompiledSchemaLoader}
- * directly -- a small, user-defined schema importing core.tn1 -- but through this class's own
+ * directly -- a small, user-defined schema importing core.tn -- but through this class's own
  * public front door instead, confirming the builder genuinely replaces that wiring.
  */
 class TsonTest {
 
     private static final String TINY_DOCUMENT = """
             !!id:"https://example.test/tson-test.tn1"
-            !!meta:"https://tson.io/2026/32/m/meta.tn1"
-            !!import:"https://tson.io/2026/32/m/core.tn1"
+            !!meta:"https://tson.io/2026/32/m/meta.tn"
+            !!import:"https://tson.io/2026/32/m/core.tn"
             {
               my_int => int32
               my_percentage => !positive_integer ^ { max: 100 }
@@ -39,7 +39,7 @@ class TsonTest {
         Tson tson = Tson.builder().build();
 
         TsonLinkedSchema linked = tson.resolve(TINY_DOCUMENT);
-        // Merged view: the two local declarations, plus core.tn1's own 48 imported entries --
+        // Merged view: the two local declarations, plus core.tn's own 48 imported entries --
         // TsonSchemaLinker.link copies an import's own entries in, unlike the raw resolved TsonSchema
         // resolve()'s own resolution step produces internally, which stays local-only.
         assertEquals(50, linked.schema().entries().size());
@@ -76,7 +76,7 @@ class TsonTest {
     void theStandardLibraryItselfIsReachableThroughTheLoader() {
         Tson tson = Tson.builder().build();
 
-        TsonCompiledMetaSchema meta = tson.loader().load(BundledSchemaSource.META_TN1_ID);
+        TsonCompiledMetaSchema meta = tson.loader().load(TsonBundledSchemas.META_ID);
 
         assertTrue(meta.schema().entries().containsKey("text_type"));
     }

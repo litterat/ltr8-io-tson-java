@@ -21,7 +21,7 @@ import io.ltr8.tson.schema.TsonSchemaRegistry;
  * config wiring), the way Retrofit sits on top of OkHttp or Apache HttpClient5 sits on top of
  * HttpCore5. Doesn't reimplement anything -- every method here just constructs/returns the real
  * {@code tson-parser}/{@code tson-schema} class underneath. Built via {@link #builder()}, which
- * bootstraps meta-kernel/meta.tn1/core.tn1 into a fresh, governed environment (previously a
+ * bootstraps meta-kernel/meta.tn/core.tn into a fresh, governed environment (previously a
  * sequence every real schema-compiling test hand-rolled for itself, e.g. {@code tson-parser}'s own
  * {@code TinySchemaImportsCoreTn1Test}/{@code CoreSchemaImportTest}, and {@code tson-cli}'s own
  * former internal {@code StandardLibrary} helper):
@@ -34,7 +34,7 @@ import io.ltr8.tson.schema.TsonSchemaRegistry;
  *
  * <p><b>Resolution always runs in object-binding mode, regardless of what mode a caller ultimately
  * wants to read data in.</b> Resolving an {@code Instance}/{@code AtomRefinement} declaration
- * (meta.tn1's/core.tn1's own {@code binary_encoding => !enum [...]}, {@code int32 => !integer ^
+ * (meta.tn's/core.tn's own {@code binary_encoding => !enum [...]}, {@code int32 => !integer ^
  * {...}}, and so on -- there are many) calls {@code DefinitionResolver.bindAtomInstance}, which
  * casts its governing meta-schema's own reader output straight to {@code schema.meta.Top} -- a DOM
  * reader's plain {@code Map}/{@code List} output fails that cast outright. Only *compilation* of an
@@ -43,7 +43,7 @@ import io.ltr8.tson.schema.TsonSchemaRegistry;
  * a factory by constructor name -- it never re-runs resolution. {@link #resolve} therefore takes no
  * mode parameter at all; only {@link #compile} does.
  *
- * <p>Only supports a schema governed by (and importing only from) meta-kernel/meta.tn1/core.tn1 --
+ * <p>Only supports a schema governed by (and importing only from) meta-kernel/meta.tn/core.tn --
  * a real, disk/HTTP-backed {@link io.ltr8.tson.parser.resolver.TsonSchemaSource} for arbitrary other
  * governing chains is its own, separately tracked backlog item; {@link TsonConfig} is the natural
  * place for that to plug in once it exists.
@@ -72,7 +72,7 @@ public final class Tson {
         this.dataBindContext = dataBindContext;
     }
 
-    /** A fresh {@link TsonConfig} -- {@link TsonConfig#build()} bootstraps meta-kernel/meta.tn1/core.tn1 and returns the resulting {@link Tson}. */
+    /** A fresh {@link TsonConfig} -- {@link TsonConfig#build()} bootstraps meta-kernel/meta.tn/core.tn and returns the resulting {@link Tson}. */
     public static TsonConfig builder() {
         return new TsonConfig();
     }
@@ -94,7 +94,7 @@ public final class Tson {
 
     /**
      * Resolves, links, and registers {@code schemaText} -- its own {@code !!meta} must already be
-     * registered here (meta-kernel, meta.tn1, or core.tn1), and any {@code !!import} it carries must
+     * registered here (meta-kernel, meta.tn, or core.tn), and any {@code !!import} it carries must
      * resolve the same way. Deliberately stops short of compiling -- see {@link #compile} for why
      * that's a separate step with its own mode.
      */
@@ -130,7 +130,7 @@ public final class Tson {
         return compiledRegistry;
     }
 
-    /** The underlying loader -- e.g. {@code loader().load(BundledSchemaSource.META_TN1_ID)} to reach the standard library's own compiled meta-schemas directly. */
+    /** The underlying loader -- e.g. {@code loader().load(TsonBundledSchemas.META_ID)} to reach the standard library's own compiled meta-schemas directly. */
     public DefaultTsonCompiledSchemaLoader loader() {
         return loader;
     }

@@ -41,7 +41,7 @@ class MetaKernelBootstrapResolverTest {
 
         // §1.5: meta-kernel's own !!meta names itself -- the one deliberate circularity.
         assertEquals(schema.id(), schema.meta());
-        assertTrue(schema.meta().endsWith("meta-kernel.tn1"));
+        assertTrue(schema.meta().endsWith("meta-kernel.tn"));
         assertEquals(List.of(), schema.imports());
         // getMetaKernelSchema() is the one and only place that ever sets this -- see TsonSchema's own Javadoc.
         assertTrue(schema.bootstrap());

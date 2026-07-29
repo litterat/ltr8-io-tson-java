@@ -31,8 +31,8 @@ class TsonCliTest {
     void validateWithoutTypeExitsTwo(@TempDir Path dir) throws IOException {
         Path schema = writeFile(dir, "schema.tn1", """
                 !!id:"https://example.test/cli-arg-test.tn1"
-                !!meta:"https://tson.io/2026/32/m/meta.tn1"
-                !!import:"https://tson.io/2026/32/m/core.tn1"
+                !!meta:"https://tson.io/2026/32/m/meta.tn"
+                !!import:"https://tson.io/2026/32/m/core.tn"
                 { my_int => int32 }
                 """);
         Path data = writeFile(dir, "data.tson", "42");
@@ -47,8 +47,8 @@ class TsonCliTest {
     void validateEndToEndThroughMainDispatchExitsZeroForValidData(@TempDir Path dir) throws IOException {
         Path schema = writeFile(dir, "schema.tn1", """
                 !!id:"https://example.test/cli-arg-test-2.tn1"
-                !!meta:"https://tson.io/2026/32/m/meta.tn1"
-                !!import:"https://tson.io/2026/32/m/core.tn1"
+                !!meta:"https://tson.io/2026/32/m/meta.tn"
+                !!import:"https://tson.io/2026/32/m/core.tn"
                 { my_int => int32 }
                 """);
         Path data = writeFile(dir, "data.tson", "42");

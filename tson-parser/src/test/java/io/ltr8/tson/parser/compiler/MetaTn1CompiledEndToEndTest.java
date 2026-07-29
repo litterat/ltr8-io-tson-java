@@ -5,11 +5,11 @@ import io.ltr8.tson.parser.TsonDataParser;
 import io.ltr8.tson.parser.TsonSchemaParser;
 import io.ltr8.tson.parser.ast.Document;
 import io.ltr8.tson.parser.ast.schema.SchemaDocument;
-import io.ltr8.tson.parser.config.BundledSchemaSource;
 import io.ltr8.tson.parser.config.SchemaMetaNameBinder;
 import io.ltr8.tson.parser.config.TsonCompiledRegistry;
 import io.ltr8.tson.parser.resolver.DefaultTsonCompiledSchemaLoader;
 import io.ltr8.tson.parser.resolver.TsonSchemaResolver;
+import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
@@ -43,16 +43,16 @@ class MetaTn1CompiledEndToEndTest {
         TsonCompiledRegistry compiledRegistry = new TsonCompiledRegistry(objectFactories);
         DefaultTsonCompiledSchemaLoader loader = new DefaultTsonCompiledSchemaLoader(compiledRegistry);
 
-        String metaKernelSource = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID);
+        String metaKernelSource = TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID);
         SchemaDocument metaKernelDocument = new TsonSchemaParser(metaKernelSource).parseSchemaDocument();
         TsonSchema metaKernel = new TsonSchemaResolver(loader).resolveSchema(metaKernelDocument);
         TsonLinkedSchema metaKernelMaterialized = registry.register(TsonSchemaLinker.link(metaKernel, registry));
         // meta-kernel governs itself -- loader.load(META_KERNEL_ID) re-bootstraps a fresh
         // TsonCompiledMetaSchema (never cached for that identity, see DefaultTsonCompiledSchemaLoader's
         // own Javadoc), which is exactly what register's own governingMeta argument needs here.
-        compiledRegistry.register(metaKernelMaterialized.schema(), loader.load(BundledSchemaSource.META_KERNEL_ID));
+        compiledRegistry.register(metaKernelMaterialized.schema(), loader.load(TsonBundledSchemas.META_KERNEL_ID));
 
-        String source = BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_TN1_ID);
+        String source = TsonBundledSchemas.fetch(TsonBundledSchemas.META_ID);
         SchemaDocument metaDocument = new TsonSchemaParser(source).parseSchemaDocument();
         TsonSchema meta = new TsonSchemaResolver(loader).resolveSchema(metaDocument);
 

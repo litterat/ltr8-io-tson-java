@@ -47,7 +47,7 @@ class TsonSchemaLinkerTest {
     }
 
     /**
-     * {@code !!meta} is {@link TsonSchemaLinker#META_KERNEL_ID} itself -- every caller passes {@code
+     * {@code !!meta} is {@link TsonBundledSchemas#META_KERNEL_ID} itself -- every caller passes {@code
      * null} for {@code loader}, so the structure namespace this would otherwise supply is always
      * empty regardless of what URI it names; using the real meta-kernel identity instead lets a
      * hand-built local entry declare its own {@code constructor: true} vocabulary (e.g. {@link
@@ -56,7 +56,7 @@ class TsonSchemaLinkerTest {
      * against that exact identity, not merely "is this schema self-referencing."
      */
     private static TsonSchema schemaOf(Map<String, TypeDefinition> entries) {
-        return new TsonSchema("https://example.test/s.tn1", TsonSchemaLinker.META_KERNEL_ID,
+        return new TsonSchema("https://example.test/s.tn1", TsonBundledSchemas.META_KERNEL_ID,
                 List.of(), entries);
     }
 

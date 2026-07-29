@@ -18,8 +18,8 @@ class ValidateCommandTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/cli-validate.tn1"
-            !!meta:"https://tson.io/2026/32/m/meta.tn1"
-            !!import:"https://tson.io/2026/32/m/core.tn1"
+            !!meta:"https://tson.io/2026/32/m/meta.tn"
+            !!import:"https://tson.io/2026/32/m/core.tn"
             {
               my_int => int32
             }
@@ -51,7 +51,7 @@ class ValidateCommandTest {
     void aSchemaThatFailsToCompileExitsTwo(@TempDir Path dir) throws IOException {
         Path schema = writeFile(dir, "broken.tn1", """
                 !!id:"https://example.test/cli-broken.tn1"
-                !!meta:"https://tson.io/2026/32/m/meta.tn1"
+                !!meta:"https://tson.io/2026/32/m/meta.tn"
                 {
                   my_int => this_type_does_not_exist
                 }

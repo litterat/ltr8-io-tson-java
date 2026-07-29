@@ -5,10 +5,10 @@ import io.ltr8.tson.parser.TsonValueReader;
 import io.ltr8.tson.parser.ast.schema.SchemaDocument;
 import io.ltr8.tson.parser.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.parser.compiler.ValueReaderFactoryRegistry;
-import io.ltr8.tson.parser.config.BundledSchemaSource;
 import io.ltr8.tson.parser.config.SchemaMetaNameBinder;
 import io.ltr8.tson.parser.config.TsonCompiledRegistry;
 import io.ltr8.tson.parser.config.ValueReaderFactoryResolver;
+import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
@@ -22,14 +22,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The same proof {@link MetaSchemaImportTest} gives for meta.tn1, one rung further up the schema
+ * The same proof {@link MetaSchemaImportTest} gives for meta.tn, one rung further up the schema
  * ladder: registers meta-kernel explicitly (its own well-known bootstrap case, per {@link
- * DefaultTsonCompiledSchemaLoader}'s own Javadoc), then loads meta.tn1 and {@code core.tn1} through
+ * DefaultTsonCompiledSchemaLoader}'s own Javadoc), then loads meta.tn and {@code core.tn} through
  * the fully generic fetch-parse-resolve-register-compile path -- exactly the sequence {@link
- * BundledSchemaSource}'s own class Javadoc documents as the intended way to load this library's
+ * TsonBundledSchemas}'s own class Javadoc documents as the intended way to load this library's
  * three bundled schema documents.
  *
- * <p>Every real {@code core.tn1} declaration resolves in a single source-order pass, the same way
+ * <p>Every real {@code core.tn} declaration resolves in a single source-order pass, the same way
  * meta.tn1's own 31 do -- core.tn1's own declaration order already places each dependency before its
  * use, so no {@code MetaKernelBootstrapResolver}-style two-pass ordering is needed here either.
  */
@@ -49,7 +49,7 @@ class CoreSchemaImportTest {
         TsonSchemaRegistry schemaRegistry = new TsonSchemaRegistry();
         ValueReaderFactoryResolver resolver = ValueReaderFactoryRegistry.bind(SchemaMetaNameBinder.defaultContext());
         TsonCompiledRegistry registry = new TsonCompiledRegistry(schemaRegistry, resolver);
-        DefaultTsonCompiledSchemaLoader loader = new DefaultTsonCompiledSchemaLoader(registry, BundledSchemaSource.INSTANCE);
+        DefaultTsonCompiledSchemaLoader loader = new DefaultTsonCompiledSchemaLoader(registry, TsonBundledSchemas::fetch);
 
         // meta.tn1's own !!import needs meta-kernel present in the *shared* registry first --
         // meta-kernel's own bootstrap case (loader.load(META_KERNEL_ID)) is never cached in registry
@@ -57,12 +57,12 @@ class CoreSchemaImportTest {
         // resolved ordinarily against this same loader (whose own bootstrap branch supplies the
         // structure namespace).
         SchemaDocument metaKernelDocument = new TsonSchemaParser(
-                BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID)).parseSchemaDocument();
+                TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID)).parseSchemaDocument();
         TsonSchema resolvedMetaKernel = new TsonSchemaResolver(loader).resolveSchema(metaKernelDocument);
-        registry.register(resolvedMetaKernel, loader.load(BundledSchemaSource.META_KERNEL_ID));
+        registry.register(resolvedMetaKernel, loader.load(TsonBundledSchemas.META_KERNEL_ID));
 
-        loader.load(BundledSchemaSource.META_TN1_ID);
-        loader.load(BundledSchemaSource.CORE_TN1_ID); // needs meta.tn1 registered first, same reasoning
+        loader.load(TsonBundledSchemas.META_ID);
+        loader.load(TsonBundledSchemas.CORE_ID); // needs meta.tn1 registered first, same reasoning
 
         return new Loaded(schemaRegistry, loader);
     }
@@ -71,7 +71,7 @@ class CoreSchemaImportTest {
     void resolvesAndRegistersEveryRealCoreTn1Declaration() {
         TsonSchemaRegistry schemaRegistry = loadMetaKernelMetaAndCore().schemaRegistry();
 
-        Optional<TsonLinkedSchema> registered = schemaRegistry.get(BundledSchemaSource.CORE_TN1_ID);
+        Optional<TsonLinkedSchema> registered = schemaRegistry.get(TsonBundledSchemas.CORE_ID);
         assertTrue(registered.isPresent(), "expected core.tn1 to be registered");
 
         TsonSchema core = registered.get().schema();
@@ -118,11 +118,11 @@ class CoreSchemaImportTest {
     @Test
     void exactlyTheFiveUndocumentedAtomConstructorsCompileToErrorReaders() {
         Loaded loaded = loadMetaKernelMetaAndCore();
-        TsonSchema core = loaded.schemaRegistry().get(BundledSchemaSource.CORE_TN1_ID).orElseThrow().schema();
+        TsonSchema core = loaded.schemaRegistry().get(TsonBundledSchemas.CORE_ID).orElseThrow().schema();
 
         // A cache hit on TsonCompiledRegistry's own store -- core.tn1 was already compiled inside
         // loadMetaKernelMetaAndCore, this just fetches that same TsonCompiledMetaSchema back.
-        TsonCompiledMetaSchema compiledCore = loaded.loader().load(BundledSchemaSource.CORE_TN1_ID);
+        TsonCompiledMetaSchema compiledCore = loaded.loader().load(TsonBundledSchemas.CORE_ID);
 
         Set<String> errored = new TreeSet<>();
         for (String name : core.entries().keySet()) {

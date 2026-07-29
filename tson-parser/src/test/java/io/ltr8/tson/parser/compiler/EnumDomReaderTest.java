@@ -2,9 +2,9 @@ package io.ltr8.tson.parser.compiler;
 
 import io.ltr8.tson.parser.TsonDataParser;
 import io.ltr8.tson.parser.ast.Document;
-import io.ltr8.tson.parser.config.BundledSchemaSource;
 import io.ltr8.tson.parser.resolver.MetaKernelBootstrapResolver;
 import io.ltr8.tson.parser.atom.AtomValidationException;
+import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.schema.TsonSchema;
@@ -49,7 +49,7 @@ class EnumDomReaderTest {
         // requires it (the placeholder "meta.tn1" this used to point at was never registered in
         // schemaRegistry below, so it was already functionally inert either way).
         TsonSchema schema = new TsonSchema("https://example.test/flag.tn1",
-                BundledSchemaSource.META_KERNEL_ID, List.of(), entries);
+                TsonBundledSchemas.META_KERNEL_ID, List.of(), entries);
 
         TsonSchemaRegistry schemaRegistry = new TsonSchemaRegistry();
         TsonLinkedSchema registered = schemaRegistry.register(TsonSchemaLinker.link(schema, schemaRegistry));

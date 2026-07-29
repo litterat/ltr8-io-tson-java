@@ -1,7 +1,7 @@
-!!id:"https://tson.io/2026/32/m/meta-kernel-resolved.tn1"
-!!schema:"https://tson.io/2026/32/m/meta-kernel.tn1"
+!!id:"https://tson.io/2026/32/m/meta-kernel-resolved.tn"
+!!schema:"https://tson.io/2026/32/m/meta-kernel.tn"
 @doc:"""
-  Resolver-output fixture for meta-kernel.tn1 (2026 Revision 32 draft).
+  Resolver-output fixture for meta-kernel.tn (2026 Revision 32 draft).
   Parse the source schema, run the resolver, canonicalise, compare.
 
   Conventions:

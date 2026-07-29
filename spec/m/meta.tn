@@ -1,12 +1,12 @@
-!!id:"https://tson.io/2026/32/m/meta.tn1"
-!!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
-!!import:"https://tson.io/2026/32/m/meta-kernel.tn1"
+!!id:"https://tson.io/2026/32/m/meta.tn"
+!!meta:"https://tson.io/2026/32/m/meta-kernel.tn"
+!!import:"https://tson.io/2026/32/m/meta-kernel.tn"
 @doc:"""
   TSON meta-schema — 2026 Revision 32 draft.
 
   The canonical meta-schema for user schemas: a schema governed by the
   meta-kernel that adds the type constructors the core type library
-  (core.tn1) instantiates. Type constructors are a meta-schema concern:
+  (core.tn) instantiates. Type constructors are a meta-schema concern:
   user schemas use them but should not define new ones.
 
   User schemas normally chain to this file via `!!meta`. The

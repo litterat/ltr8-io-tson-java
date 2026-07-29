@@ -102,7 +102,7 @@ class ConformanceSuiteTest {
     }
 
     private interface VectorCheck {
-        void check(String bucket, Path tn1, RecordValue sidecarBody) throws IOException;
+        void check(String bucket, Path subject, RecordValue sidecarBody) throws IOException;
     }
 
     private Stream<DynamicTest> vectorsIn(String layer, VectorCheck check) {
@@ -127,15 +127,15 @@ class ConformanceSuiteTest {
         String bucket = bucketDir.getFileName().toString();
         try (Stream<Path> files = Files.list(bucketDir)) {
             return files
-                    .filter(p -> p.toString().endsWith(".tn1"))
+                    .filter(p -> p.toString().endsWith(".tn") && !p.toString().endsWith("-expected.tn"))
                     .sorted()
-                    .map(tn1 -> {
-                        String slug = tn1.getFileName().toString().replace(".tn1", "");
-                        Path tson = bucketDir.resolve(slug + ".tson");
+                    .map(subject -> {
+                        String slug = subject.getFileName().toString().replace(".tn", "");
+                        Path tson = bucketDir.resolve(slug + "-expected.tn");
                         String name = layer + "/" + bucket + "/" + slug;
                         return DynamicTest.dynamicTest(name, () -> {
                             RecordValue sidecarBody = parseSidecarBody(tson);
-                            check.check(bucket, tn1, sidecarBody);
+                            check.check(bucket, subject, sidecarBody);
                         });
                     })
                     .toList()
@@ -160,9 +160,9 @@ class ConformanceSuiteTest {
 
     // ── Lexer-layer vectors ──────────────────────────────────────────────
 
-    private static void checkLexerVector(String bucket, Path tn1, RecordValue sidecar) throws IOException {
+    private static void checkLexerVector(String bucket, Path subject, RecordValue sidecar) throws IOException {
         String outcome = fieldText(sidecar, "outcome");
-        String raw = readRaw(tn1);
+        String raw = readRaw(subject);
         switch (outcome) {
             case "valid" -> {
                 List<Token> actual = new Lexer(raw).tokenize();
@@ -198,9 +198,9 @@ class ConformanceSuiteTest {
 
     // ── TsonDataParser-layer vectors ─────────────────────────────────────────────
 
-    private static void checkParserVector(String bucket, Path tn1, RecordValue sidecar) throws IOException {
+    private static void checkParserVector(String bucket, Path subject, RecordValue sidecar) throws IOException {
         String outcome = fieldText(sidecar, "outcome");
-        String raw = readRaw(tn1);
+        String raw = readRaw(subject);
         switch (outcome) {
             case "valid" -> {
                 Document actual = new TsonDataParser(raw).parseDocument();
@@ -306,15 +306,15 @@ class ConformanceSuiteTest {
 
     // ── Resolver-layer vectors ───────────────────────────────────────────
 
-    private static void checkResolverVector(String bucket, Path tn1, RecordValue sidecar) throws IOException {
+    private static void checkResolverVector(String bucket, Path subject, RecordValue sidecar) throws IOException {
         String outcome = fieldText(sidecar, "outcome");
         if (!outcome.equals("valid")) {
             fail("unknown resolver-layer outcome: " + outcome);
             return;
         }
-        Document doc = new TsonDataParser(readRaw(tn1)).parseDocument();
+        Document doc = new TsonDataParser(readRaw(subject)).parseDocument();
         TokenValue token = assertInstanceOf(TokenValue.class, doc.root().coreValue(),
-                "resolver vector .tn1 must be a single bare token");
+                "resolver vector .tn must be a single bare token");
         BaseValue actual = BaseTypeResolver.resolve(token);
         RecordValue expected = (RecordValue) fieldCore(sidecar, "base-value");
         assertBaseValueMatches(expected, actual);
@@ -406,7 +406,7 @@ class ConformanceSuiteTest {
     // ── Vocabulary-layer vectors (§5) ────────────────────────────────────
 
     /**
-     * The .tn1 is a {@code !type-ref token} data-value. On a {@code valid} vector, most families
+     * The .tn is a {@code !type-ref token} data-value. On a {@code valid} vector, most families
      * assert {@code value} (a plain decimal string) against {@link AtomType#read(TokenValue, Class)}
      * with {@link BigDecimal} as the target -- host-representation-neutral, matching the suite's own
      * resolver-vector philosophy (§5.2 leaves the concrete bound type implementation-defined), and
@@ -429,14 +429,14 @@ class ConformanceSuiteTest {
      * own README flags as unsettled (see SPEC-FEEDBACK.md #8): parse-shape failures as {@code
      * resolver}, range/constraint failures as {@code validation}.
      */
-    private static void checkVocabularyVector(String bucket, Path tn1, RecordValue sidecar) throws IOException {
+    private static void checkVocabularyVector(String bucket, Path subject, RecordValue sidecar) throws IOException {
         String outcome = fieldText(sidecar, "outcome");
-        Document doc = new TsonDataParser(readRaw(tn1)).parseDocument();
+        Document doc = new TsonDataParser(readRaw(subject)).parseDocument();
         DataValue root = doc.root();
         String typeRef = root.typeRef().orElseThrow(
-                () -> new AssertionError("vocabulary vector .tn1 must carry a type-ref"));
+                () -> new AssertionError("vocabulary vector .tn must carry a type-ref"));
         TokenValue token = assertInstanceOf(TokenValue.class, root.coreValue(),
-                "vocabulary vector .tn1 must be a type-ref'd token");
+                "vocabulary vector .tn must be a type-ref'd token");
         AtomType<?> atomType = BuiltinTypeVocabulary.lookup(typeRef)
                 .orElseThrow(() -> new AssertionError("unrecognized type-ref in vocabulary vector: " + typeRef));
 

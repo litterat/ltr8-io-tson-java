@@ -1,15 +1,15 @@
-!!id:"https://tson.io/2026/32/m/meta-resolved.tn1"
-!!schema:"https://tson.io/2026/32/m/meta-kernel.tn1"
+!!id:"https://tson.io/2026/32/m/meta-resolved.tn"
+!!schema:"https://tson.io/2026/32/m/meta-kernel.tn"
 @doc:"""
-  Resolver-output fixture for meta.tn1 (2026 Revision 32 draft).
+  Resolver-output fixture for meta.tn (2026 Revision 32 draft).
   Parse the source schema, run the resolver, canonicalise, compare.
-  Conventions as in meta-kernel-resolved.tn1.
+  Conventions as in meta-kernel-resolved.tn.
 
   As a data document, this header cannot carry `!!import`; its
   `!!schema` names this document's own governing chain, not the
   schema it describes. The namespace in which this map's type-name
-  tokens resolve — meta.tn1's locals plus its import of
-  meta-kernel.tn1 — is declared by the source schema's header and
+  tokens resolve — meta.tn's locals plus its import of
+  meta-kernel.tn — is declared by the source schema's header and
   supplied at ingest ([TSON-SCHEMA] Section 8.1), never by this
   document. Supertype names in this map (`atom`, `sum`, `text_type`,
   `atom_specification`, `top`) resolve through that kernel import; `subtypes` lists entries of this map only, and none

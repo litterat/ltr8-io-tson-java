@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/32/m/core.tn1"
-!!meta:"https://tson.io/2026/32/m/meta.tn1"
+!!id:"https://tson.io/2026/32/m/core.tn"
+!!meta:"https://tson.io/2026/32/m/meta.tn"
 @doc:"""
   TSON Core Type Library — canonical types for data interchange
   (2026 Revision 32 draft).
@@ -18,7 +18,7 @@
       non_empty_text   => !text ^ { min_length: 1 }
 
   Annotation types (`@ordered`, `@bounded`, `@exact`, `@numeric`,
-  `@deprecated`, `@since`, `@todo`, `@lang`) live in meta.tn1 —
+  `@deprecated`, `@since`, `@todo`, `@lang`) live in meta.tn —
   annotations resolve one hop against the governing target's
   namespace (Part 2 §3.3.3, §6), so for this schema document they
   must be reachable through the `!!meta` chain; they appear here

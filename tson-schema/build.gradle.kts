@@ -15,3 +15,14 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
+
+// TsonBundledSchemas needs meta-kernel/meta/core's own source files on the classpath at runtime
+// (none of the three can be resolved from nothing -- see that class's own Javadoc). Packaged straight
+// from the repo's own spec/ snapshot rather than a duplicated copy under src/main/resources, so there
+// is exactly one file per document to keep in sync with the spec. Moved here from tson-parser
+// (2026-07-29) alongside TsonBundledSchemas itself -- see that class's own Javadoc.
+tasks.named<org.gradle.language.jvm.tasks.ProcessResources>("processResources") {
+    from(rootProject.layout.projectDirectory.dir("spec/m")) {
+        include("meta-kernel.tn", "meta.tn", "core.tn")
+    }
+}

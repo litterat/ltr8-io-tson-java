@@ -1,15 +1,15 @@
-!!id:"https://tson.io/2026/32/m/core-resolved.tn1"
-!!schema:"https://tson.io/2026/32/m/meta.tn1"
+!!id:"https://tson.io/2026/32/m/core-resolved.tn"
+!!schema:"https://tson.io/2026/32/m/meta.tn"
 @doc:"""
-  Resolver-output fixture for core.tn1 (2026 Revision 32 draft).
+  Resolver-output fixture for core.tn (2026 Revision 32 draft).
   Parse the source schema, run the resolver, canonicalise, compare.
-  Conventions as in meta-kernel-resolved.tn1.
+  Conventions as in meta-kernel-resolved.tn.
 
   This document is governed by the meta-schema: the structural
   vocabulary (`type_definition`, `record`, `enum`, ...) reaches it
   through meta's kernel import. As a data document, this header
   cannot carry `!!import`: the namespace in which this map's
-  type-name tokens resolve (core.tn1's locals; core imports nothing)
+  type-name tokens resolve (core.tn's locals; core imports nothing)
   is declared by the source schema's header and supplied at ingest
   ([TSON-SCHEMA] Section 8.1), never by this document. The
   annotation types used here

@@ -15,8 +15,8 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Compiles this module's own {@code diagnostics.tn1} (a small schema, governed by meta.tn1 and
- * importing core.tn1, declaring {@code diagnostic}/{@code validation_report}), *compiled* in
+ * Compiles this module's own {@code diagnostics.tn} (a small schema, governed by meta.tn and
+ * importing core.tn, declaring {@code diagnostic}/{@code validation_report}), *compiled* in
  * object-binding mode -- bound directly to {@link CliDiagnostic}/{@link ValidationReport} via
  * {@link #BINDER} -- what {@link OutputFormat#TSON} reads a written report back through, to prove
  * the emitted text is genuinely valid against a real TSON schema, not just structurally similar to
@@ -44,7 +44,7 @@ final class DiagnosticsSchema {
                 TsonAtomContext.registerDefaults(DataBindContext.builder().nameBinder(BINDER).build());
         ValueReaderFactoryResolver resolver = ValueReaderFactoryRegistry.bind(context);
         Tson tson = Tson.builder().build();
-        return tson.compile(readResource("/diagnostics.tn1"), resolver);
+        return tson.compile(readResource("/diagnostics.tn"), resolver);
     }
 
     private static String readResource(String path) {

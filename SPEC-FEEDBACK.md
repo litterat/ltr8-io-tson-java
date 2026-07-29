@@ -741,3 +741,64 @@ is meant as a single canonical document every conforming implementation resolves
 implementation is free to define its own compatible meta-kernel under a different identity — the
 "one deliberate circularity" language (§1.5) and the pre-loading requirement (§3.4, §10.1) both read
 as assuming the former, but neither says so explicitly.
+
+---
+
+## 20. `.tn1` is defined as the file extension for "TSON version 1," but the spec's own pre-release material already uses it
+
+**Section:** §7.1 ("Encoding, Normalization, and Media Type"); cross-referenced against the document
+status header and §1.2 principle 7 ("Permanent stability"), and against Part 2's own bundled-schema
+table (§9).
+
+**Problem:** §7.1 states: "TSON version 1 uses the file extension `.tn1` for all documents; future
+major versions use correspondingly numbered extensions (`.tn2`, …)." This reads as a *positive claim
+of stability* — reinforced by §1.2 principle 7: "TSON version 1 is a permanent specification...
+There is no TSON 1.1 or TSON 2... The permanence guarantee attaches to the version 1 release:
+2026-series revisions of this document, **including this one, may change anything**." The document's
+own status header agrees: "The 2026 revision series is subject to change without compatibility
+guarantees. **When finalised**, this specification will be published as **TSON version 1** and
+frozen... until then, revisions are released under the 2026 series." Taken together, these three
+passages say plainly that "TSON version 1" — and by extension the stability the `.tn1` extension is
+defined to signal — has not been reached yet, and may never be reached in the document's current
+form.
+
+Yet the spec's own bundled, normative fixtures are already published using that exact extension,
+during this explicitly-unstable period: `meta-kernel.tn1`, `meta.tn1`, and `core.tn1` (Part 2 §9) are
+served at `https://tson.io/2026/32/m/meta-kernel.tn1`, `.../meta.tn1`, `.../core.tn1` — real,
+resolvable URLs an implementation is required to fetch/pre-load verbatim to be conformant at all,
+carrying a `2026/32` (year/revision) path segment that is, by the spec's own words, not "TSON version
+1." A file extension defined as "this document will not change" is already load-bearing on documents
+the spec's own status line says may still change in any way. Nothing in the spec addresses this gap:
+there is no notion of a draft/pre-release file extension, no statement that the 2026-revision-series
+bundled fixtures are a deliberate, acknowledged exception to §7.1's rule, and no guidance for a
+downstream implementation (like this one) or an application built on this library about what
+extension its own schemas should use while the spec itself is still in this state — every schema this
+project publishes today necessarily also uses `.tn1` (see `CLAUDE.md`'s own "Project-owned schema
+`!!id` convention"), for lack of any spec-sanctioned alternative, making the identical claim of
+stability the bundled fixtures make.
+
+**Interpretation chosen:** None yet — this implementation currently has no choice but to follow the
+spec's own bundled-fixture precedent and use `.tn1` throughout (including for its own project-owned
+schemas), since renaming the spec's own published `meta-kernel.tn1`/`meta.tn1`/`core.tn1` identities
+is not something a consuming implementation can do unilaterally: those URLs are fixed, external
+identities this implementation must fetch and reference verbatim to interoperate at all. Whether this
+project's own artifacts (as opposed to the spec's) should adopt a different, explicitly-unstable
+extension while the spec remains in the 2026 revision series is an open decision, being tracked
+separately (`BACKLOG.md`) rather than resolved here — a leading candidate under discussion is an
+unversioned `.tn` extension, scoped as "no stable version guarantee" (rather than strictly "pre-v1",
+so it wouldn't need redefining if TSON ever entered a v2 draft period after v1 ships) and reserved
+for project-owned, non-canonical artifacts only, since the spec's own bundled fixtures can't be
+renamed regardless of what this project decides.
+
+**Suggested resolution:** Add a normative statement to §7.1 (or the document status header) covering
+the pre-finalization case explicitly — for example, either (a) state that 2026-revision-series
+documents, including the spec's own bundled `meta-kernel.tn1`/`meta.tn1`/`core.tn1`, are a
+deliberate, acknowledged exception to the "version 1" naming rule, made because there is currently no
+alternative extension defined, and that this will be corrected at the version 1 release; or (b)
+define an explicit, unversioned extension (e.g. `.tn`) for any document produced before the version 1
+freeze, reserving `.tn1` as a claim that MUST NOT be made before that freeze actually happens — the
+same distinction the spec already draws at the media-type level between bare `application/tson` (no
+stability claim) and `application/tson; version=1` (a positive one). Either resolution should also
+say whether a document renamed from a pre-release extension to `.tn1` at the version 1 release is
+expected to change its own `!!id` (and therefore its canonical identity, §2.2.1) — a real
+interoperability question for anything hash-pinned or referenced during the draft period.

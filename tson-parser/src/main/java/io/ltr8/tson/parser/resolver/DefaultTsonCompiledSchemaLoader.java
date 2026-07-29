@@ -3,8 +3,8 @@ package io.ltr8.tson.parser.resolver;
 import io.ltr8.tson.parser.TsonSchemaParser;
 import io.ltr8.tson.parser.ast.schema.SchemaDocument;
 import io.ltr8.tson.parser.compiler.*;
-import io.ltr8.tson.parser.config.BundledSchemaSource;
 import io.ltr8.tson.parser.config.TsonCompiledRegistry;
+import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchemaLinker;
 import io.ltr8.tson.schema.TsonSchema;
@@ -38,7 +38,7 @@ import java.util.Optional;
  *   set<token>}) before compiling ({@link TsonCompiledMetaSchema#bootstrap}, using this loader's own
  *   {@link TsonCompiledRegistry#resolver()} so it reads the same way anything else compiled here
  *   would). The *linked* result is never passed to {@link TsonCompiledRegistry#register} -- so every
- *   call for {@link BundledSchemaSource#META_KERNEL_ID} that isn't already a cache hit re-bootstraps,
+ *   call for {@link TsonBundledSchemas#META_KERNEL_ID} that isn't already a cache hit re-bootstraps,
  *   re-links, and re-compiles from scratch, every time.
  *   The *permanent*, shared registry entry for meta-kernel comes from an explicit "load it and
  *   register it" step done once, elsewhere; until that step runs, this one-off bootstrap stands in
@@ -89,7 +89,7 @@ public final class DefaultTsonCompiledSchemaLoader implements TsonCompiledSchema
         if (cached.isPresent()) {
             return cached.get();
         }
-        if (BundledSchemaSource.META_KERNEL_ID.equals(uri)) {
+        if (TsonBundledSchemas.META_KERNEL_ID.equals(uri)) {
             TsonSchema metaKernel = MetaKernelBootstrapResolver.getMetaKernelSchema();
             // TsonSchemaLinker.linkBootstrap runs its own materialization pass (synthesizing entries
             // for argument-bearing type-refs like enum's own `members: set<token>`) before compiling,

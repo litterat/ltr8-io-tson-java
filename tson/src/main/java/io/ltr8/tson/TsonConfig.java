@@ -4,7 +4,6 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.parser.TsonSchemaParser;
 import io.ltr8.tson.parser.ast.schema.SchemaDocument;
 import io.ltr8.tson.parser.compiler.ValueReaderFactoryRegistry;
-import io.ltr8.tson.parser.config.BundledSchemaSource;
 import io.ltr8.tson.parser.config.SchemaMetaNameBinder;
 import io.ltr8.tson.parser.config.TsonAtomContext;
 import io.ltr8.tson.parser.config.TsonCompiledRegistry;
@@ -13,13 +12,14 @@ import io.ltr8.tson.parser.mapper.TsonMapperReader;
 import io.ltr8.tson.parser.mapper.TsonMapperWriter;
 import io.ltr8.tson.parser.resolver.DefaultTsonCompiledSchemaLoader;
 import io.ltr8.tson.parser.resolver.TsonSchemaResolver;
+import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
 
 /**
  * Configures and builds a {@link Tson} -- reached via {@link Tson#builder()}, never constructed
  * directly. No configurable options beyond {@link #dataBindContext} yet: the standard library is
- * always meta-kernel/meta.tn1/core.tn1, fetched from {@link BundledSchemaSource}; a future pluggable
+ * always meta-kernel/meta.tn/core.tn, fetched from {@link TsonBundledSchemas}; a future pluggable
  * {@link io.ltr8.tson.parser.resolver.TsonSchemaSource} belongs here too, not as a breaking change to
  * {@link Tson}'s own public shape.
  */
@@ -49,17 +49,17 @@ public final class TsonConfig {
         TsonSchemaRegistry schemaRegistry = new TsonSchemaRegistry();
         TsonCompiledRegistry compiledRegistry = new TsonCompiledRegistry(schemaRegistry, resolver);
         DefaultTsonCompiledSchemaLoader loader =
-                new DefaultTsonCompiledSchemaLoader(compiledRegistry, BundledSchemaSource.INSTANCE);
+                new DefaultTsonCompiledSchemaLoader(compiledRegistry, TsonBundledSchemas::fetch);
 
-        // Meta-kernel's own bootstrap case, registered explicitly -- see BundledSchemaSource's own
+        // Meta-kernel's own bootstrap case, registered explicitly -- see TsonBundledSchemas's own
         // class Javadoc for why this step can't just be another loader.load(...) call.
         SchemaDocument metaKernelDocument = new TsonSchemaParser(
-                BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID)).parseSchemaDocument();
+                TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID)).parseSchemaDocument();
         TsonSchema resolvedMetaKernel = new TsonSchemaResolver(loader).resolveSchema(metaKernelDocument);
-        compiledRegistry.register(resolvedMetaKernel, loader.load(BundledSchemaSource.META_KERNEL_ID));
+        compiledRegistry.register(resolvedMetaKernel, loader.load(TsonBundledSchemas.META_KERNEL_ID));
 
-        loader.load(BundledSchemaSource.META_TN1_ID);
-        loader.load(BundledSchemaSource.CORE_TN1_ID);
+        loader.load(TsonBundledSchemas.META_ID);
+        loader.load(TsonBundledSchemas.CORE_ID);
 
         return new Tson(schemaRegistry, compiledRegistry, loader, dataBindContext);
     }
