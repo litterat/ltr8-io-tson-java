@@ -125,7 +125,7 @@ yet implemented" section for the technical detail behind several of these items.
   facade class directly in `io.ltr8.tson.compiler` giving access to every pipeline stage (parse,
   resolve, compile) without a caller needing to know the package layout underneath. Two open design
   questions to settle before building, not blockers to agreeing on the direction: (1) the existing
-  `io.ltr8.tson.compiler.compiler` sub-package (the compiled-reader stage) reads redundant now that
+  `io.ltr8.tson.compiler.reader` sub-package (the compiled-reader stage) reads redundant now that
   the *module* itself is called "compiler" — likely folds up into the root package alongside the new
   facade, matching how `TsonValueReader` already lives at the root today for the identical reason;
   (2) `.mapper` (`TsonMapperReader`/`TsonMapperWriter`) doesn't semantically belong under "compiler"

@@ -23,7 +23,7 @@ import java.math.BigInteger;
  * ever the one, natural representation.
  *
  * <p>See {@link TokenParser}'s own Javadoc for why this class -- along with {@code void}'s own
- * {@code io.ltr8.tson.compiler.compiler.VoidParser} -- exists as a separate,
+ * {@code io.ltr8.tson.compiler.reader.VoidReader} -- exists as a separate,
  * name-keyed specialization rather than one shared {@code unit} compiler: the kernel's own text says
  * {@code value}/{@code token}/{@code void} are "distinguished by name and prose-level parsing
  * contract, not by schema shape."

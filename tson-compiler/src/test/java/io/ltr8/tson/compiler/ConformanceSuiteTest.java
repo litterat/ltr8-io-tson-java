@@ -88,7 +88,7 @@ class ConformanceSuiteTest {
 
     @TestFactory
     Stream<DynamicTest> parserVectors() {
-        return vectorsIn("compiler", ConformanceSuiteTest::checkParserVector);
+        return vectorsIn("parser", ConformanceSuiteTest::checkParserVector);
     }
 
     @TestFactory
@@ -210,7 +210,7 @@ class ConformanceSuiteTest {
             case "error" -> assertThrows(TsonParseException.class, () -> new TsonDataParser(raw).parseDocument());
             case "schema-document" -> assertThrows(TsonUnsupportedDocumentException.class,
                     () -> new TsonDataParser(raw).parseDocument());
-            default -> fail("unknown compiler-layer outcome: " + outcome);
+            default -> fail("unknown parser-layer outcome: " + outcome);
         }
     }
 

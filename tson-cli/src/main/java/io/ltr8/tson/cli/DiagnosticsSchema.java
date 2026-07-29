@@ -3,8 +3,8 @@ package io.ltr8.tson.cli;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.Tson;
-import io.ltr8.tson.compiler.compiler.TsonCompiledMetaSchema;
-import io.ltr8.tson.compiler.compiler.ValueReaderFactoryRegistry;
+import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
+import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
 import io.ltr8.tson.compiler.config.ValueReaderFactoryResolver;
@@ -42,7 +42,7 @@ final class DiagnosticsSchema {
     static TsonCompiledMetaSchema compiled() {
         DataBindContext context =
                 TsonAtomContext.registerDefaults(DataBindContext.builder().nameBinder(BINDER).build());
-        ValueReaderFactoryResolver resolver = ValueReaderFactoryRegistry.bind(context);
+        ValueReaderFactoryResolver resolver = TsonSchemaCompiler.bind(context);
         Tson tson = Tson.builder().build();
         return tson.compile(readResource("/diagnostics.tn"), resolver);
     }

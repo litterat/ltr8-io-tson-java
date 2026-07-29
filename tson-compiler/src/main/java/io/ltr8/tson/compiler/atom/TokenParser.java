@@ -17,7 +17,7 @@ import io.ltr8.tson.compiler.ast.TokenValue;
  * (previously named {@code UnitParser} and shared, incorrectly, across all three -- see {@code
  * SPEC-FEEDBACK.md}). {@code value} routes through {@link io.ltr8.tson.compiler.base.BaseTypeResolver}
  * instead ({@link ValueParser}), and {@code void} accepts only the absent sentinel {@code _}, not a
- * token at all -- see {@code io.ltr8.tson.compiler.compiler.VoidParser}, since that
+ * token at all -- see {@code io.ltr8.tson.compiler.reader.VoidReader}, since that
  * contract doesn't fit {@link AtomType}'s {@code read(TokenValue)} shape in the first place.
  *
  * <p>Not part of Part 1's published built-in vocabulary (§5) -- like {@link TextParser}/{@link

@@ -205,7 +205,7 @@ import java.util.Set;
  * SchemaDocument} at all --
  * everything here takes a bare declaration or an already-parsed {@code SchemaMap} entry.
  *
- * <p>Has no dependency on {@code compiler} -- {@link #bindAtomInstance}'s own binding
+ * <p>Has no dependency on {@code reader} -- {@link #bindAtomInstance}'s own binding
  * step goes through {@link DefinitionMetaReader} (a required constructor parameter), a narrow read
  * contract rather than the full {@code TsonCompiledSchema}; see {@code TsonSchemaResolver#resolveSchema}'s
  * own Javadoc for where that fuller reach actually lives.
@@ -432,9 +432,9 @@ final class DefinitionResolver {
 
     /**
      * Shared by {@link #resolveInstance} and {@link #resolveAtomRefinement} -- both need to read a
-     * type-ref-carrying value against its own constructor's compiled compiler. {@code value} already
+     * type-ref-carrying value against its own constructor's compiled reader. {@code value} already
      * names its own constructor via {@link DataValue#typeRef()}, so {@code
-     * definitionMetaReader.read(constructorName, value)} finds and reads the right compiled compiler
+     * definitionMetaReader.read(constructorName, value)} finds and reads the right compiled reader
      * directly -- no separate name→class table, no union-member scan.
      */
     private Top bindAtomInstance(String name, DataValue value) {

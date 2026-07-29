@@ -2243,7 +2243,7 @@ source tree: `tson`'s and `tson-cli`'s own `module-info.java` files still `requi
 `module not found: io.ltr8.tson.parser`, not just a grep miss) and fixed to `requires
 io.ltr8.tson.compiler`.
 
-**The internal `io.ltr8.tson.compiler.compiler` package (the compiled-reader stage — `TsonSchemaCompiler`,
+**The internal `io.ltr8.tson.compiler.reader` package (the compiled-reader stage — `TsonSchemaCompiler`,
 `TsonCompiledSchema`, `TsonCompiledMetaSchema`, `ValueReaderFactory`/`Registry`, the reader
 implementations) is a known, deliberately-deferred loose end from this first pass** — a sub-package
 named the same as the module itself reads redundant, the same "Tson is a prefix, never an infix"
@@ -2297,9 +2297,9 @@ No system Gradle — always use the wrapper:
 ./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.resolver.MetaKernelSchemaRegistryTest"
 ./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolverTest"
 ./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.resolver.MetaSchemaImportTest"
-./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.compiler.MetaKernelEndToEndTest"
-./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.compiler.MetaTn1CompiledEndToEndTest"
-./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.compiler.CompiledSchemaDomReadTest"
+./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.reader.MetaKernelEndToEndTest"
+./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.reader.MetaTn1CompiledEndToEndTest"
+./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.reader.CompiledSchemaDomReadTest"
 ./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.resolver.TsonSchemaResolverCompiledMetaSchemaTest"
 ./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.mapper.TsonMapperReaderTest"
 ./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.mapper.TsonMapperWriterTest"
@@ -2327,7 +2327,7 @@ list to work through in order.
   (`ComplexType`, added 2026-07-24); `unknown_type` too (`UnknownType`). No real fixture declaration
   remains unresolved in `meta-kernel.tn1`/`meta.tn1`/`core.tn1` (all 48 of core.tn1's own resolve and
   register, `CoreSchemaImportTest`, 2026-07-28 — see "Schema resolution" above's status paragraph).
-- The schema-validating data parser (Class 2) — `io.ltr8.tson.compiler.compiler`
+- The schema-validating data parser (Class 2) — `io.ltr8.tson.compiler.reader`
   (`TsonSchemaCompiler`/`TsonCompiledSchema`/`TsonCompiledMetaSchema`, `ValueReaderFactoryRegistry`,
   `Record`/`Array`/`Map`/`Tuple{DomReader,BindReader}`, `VariantSchemaReader`/`VariantBindReader`,
   `ChoiceReader`, `AtomValueReader` + the vocab-family parsers) — now has dedicated coverage above

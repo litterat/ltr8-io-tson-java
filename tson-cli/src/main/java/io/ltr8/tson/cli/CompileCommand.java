@@ -1,7 +1,7 @@
 package io.ltr8.tson.cli;
 
 import io.ltr8.tson.Tson;
-import io.ltr8.tson.compiler.compiler.ValueReaderFactoryRegistry;
+import io.ltr8.tson.compiler.TsonSchemaCompiler;
 
 import java.nio.file.Path;
 
@@ -20,7 +20,7 @@ final class CompileCommand {
     static int run(Path schemaFile, OutputFormat format) {
         try {
             Tson tson = Tson.builder().build();
-            tson.compile(Io.readFile(schemaFile), ValueReaderFactoryRegistry.dom());
+            tson.compile(Io.readFile(schemaFile), TsonSchemaCompiler.dom());
             System.out.println(format.render(ValidationReport.ok()));
             return 0;
         } catch (RuntimeException e) {

@@ -2,15 +2,14 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.atom.AtomType;
-import io.ltr8.tson.compiler.compiler.TsonCompiledSchema;
-import io.ltr8.tson.compiler.compiler.ValueReaderFactory;
-import io.ltr8.tson.compiler.compiler.ValueReaderFactoryRegistry;
+import io.ltr8.tson.compiler.reader.ValueReaderFactory;
+import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
 
 /**
  * Reads a value at one compiled, schema-known position -- the front door a caller actually holds
  * after compiling a schema, via {@link TsonCompiledSchema#get}. Lives at this module's own root
  * package, alongside {@link TsonDataParser}/{@link TsonSchemaParser} -- this library's other two
- * types a consumer directly names -- rather than in {@code compiler}, since a caller receives one
+ * types a consumer directly names -- rather than in {@code reader}, since a caller receives one
  * of these directly and never needs to know how it was built.
  *
  * <p>The Class 2 analogue of {@link AtomType}, generalized from atoms to every {@link

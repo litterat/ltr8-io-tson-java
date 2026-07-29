@@ -18,7 +18,7 @@ import java.util.List;
  * is, since it binds via {@code TsonMapperReader}'s ordinary array/atom path), {@code "true"}/
  * {@code "false"} get identified as actual TSON booleans before {@code EnumBody.members: List
  * <String>} ever sees them -- a real, permanent limit of generic binding (see this repo's own
- * CLAUDE.md). This class exists specifically for callers -- {@code compiler}'s
+ * CLAUDE.md). This class exists specifically for callers -- {@code reader}'s
  * {@code EnumTypeParserFactory} chief among them -- that already know, from a schema position
  * rather than from identifying the token itself, that an enum match is what's wanted here: reading
  * {@link TokenValue#text()} straight off the token and checking it against {@link

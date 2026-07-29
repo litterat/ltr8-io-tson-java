@@ -1,9 +1,9 @@
 package io.ltr8.tson;
 
 import io.ltr8.bind.DataBindContext;
+import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
-import io.ltr8.tson.compiler.compiler.ValueReaderFactoryRegistry;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
 import io.ltr8.tson.compiler.config.TsonCompiledRegistry;
@@ -45,7 +45,7 @@ public final class TsonConfig {
 
     public Tson build() {
         ValueReaderFactoryResolver resolver =
-                ValueReaderFactoryRegistry.bind(SchemaMetaNameBinder.defaultContext());
+                TsonSchemaCompiler.bind(SchemaMetaNameBinder.defaultContext());
         TsonSchemaRegistry schemaRegistry = new TsonSchemaRegistry();
         TsonCompiledRegistry compiledRegistry = new TsonCompiledRegistry(schemaRegistry, resolver);
         DefaultTsonCompiledSchemaLoader loader =

@@ -3,8 +3,8 @@ package io.ltr8.tson.cli;
 import io.ltr8.tson.Tson;
 import io.ltr8.tson.compiler.TsonDataParser;
 import io.ltr8.tson.compiler.TsonValueReader;
-import io.ltr8.tson.compiler.compiler.TsonCompiledMetaSchema;
-import io.ltr8.tson.compiler.compiler.ValueReaderFactoryRegistry;
+import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
+import io.ltr8.tson.compiler.TsonSchemaCompiler;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -33,7 +33,7 @@ final class ValidateCommand {
         TsonCompiledMetaSchema compiledSchema;
         try {
             Tson tson = Tson.builder().build();
-            compiledSchema = tson.compile(Io.readFile(schemaFile), ValueReaderFactoryRegistry.dom());
+            compiledSchema = tson.compile(Io.readFile(schemaFile), TsonSchemaCompiler.dom());
         } catch (RuntimeException e) {
             System.out.println(format.render(ValidationReport.failed("SCHEMA_ERROR", e.getMessage())));
             return 2;

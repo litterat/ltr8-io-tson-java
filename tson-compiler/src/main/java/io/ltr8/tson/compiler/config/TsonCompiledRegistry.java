@@ -1,8 +1,8 @@
 package io.ltr8.tson.compiler.config;
 
-import io.ltr8.tson.compiler.compiler.TsonCompiledMetaSchema;
-import io.ltr8.tson.compiler.compiler.TsonCompiledSchema;
-import io.ltr8.tson.compiler.compiler.TsonSchemaCompiler;
+import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
+import io.ltr8.tson.compiler.TsonCompiledSchema;
+import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaLinker;

@@ -2,7 +2,7 @@ package io.ltr8.tson.compiler.config;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
-import io.ltr8.tson.compiler.compiler.ValueReaderFactoryRegistry;
+import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
 
 import java.util.Map;
 import java.util.Set;
