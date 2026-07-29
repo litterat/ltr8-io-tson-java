@@ -2,11 +2,11 @@ package io.ltr8.tson.cli;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
+import io.ltr8.tson.Tson;
 import io.ltr8.tson.parser.base.TsonAtomContext;
 import io.ltr8.tson.parser.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.parser.compiler.ValueReaderFactoryRegistry;
 import io.ltr8.tson.parser.config.SchemaMetaNameBinder;
-import io.ltr8.tson.parser.config.TsonStandardLibrary;
 import io.ltr8.tson.parser.config.ValueReaderFactoryResolver;
 
 import java.io.IOException;
@@ -22,10 +22,10 @@ import java.nio.charset.StandardCharsets;
  * the emitted text is genuinely valid against a real TSON schema, not just structurally similar to
  * one.
  *
- * <p>A fresh {@link TsonStandardLibrary} of its own -- resolution always runs in object-binding mode
- * internally (see that class's own Javadoc for why), and this schema is independently *compiled*
- * here in object-binding mode too, unlike a user schema {@code validate}/{@code compile} reads in
- * DOM mode instead. Each call builds its own fresh library, so this schema's own registration never
+ * <p>A fresh {@link Tson} of its own -- resolution always runs in object-binding mode internally
+ * (see that class's own Javadoc for why), and this schema is independently *compiled* here in
+ * object-binding mode too, unlike a user schema {@code validate}/{@code compile} reads in DOM mode
+ * instead. Each call builds its own fresh {@link Tson}, so this schema's own registration never
  * collides with a user schema's.
  */
 final class DiagnosticsSchema {
@@ -43,8 +43,8 @@ final class DiagnosticsSchema {
         DataBindContext context =
                 TsonAtomContext.registerDefaults(DataBindContext.builder().nameBinder(BINDER).build());
         ValueReaderFactoryResolver resolver = ValueReaderFactoryRegistry.bind(context);
-        TsonStandardLibrary library = TsonStandardLibrary.builder().build();
-        return library.compile(readResource("/diagnostics.tn1"), resolver);
+        Tson tson = Tson.builder().build();
+        return tson.compile(readResource("/diagnostics.tn1"), resolver);
     }
 
     private static String readResource(String path) {

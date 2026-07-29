@@ -4,6 +4,7 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.parser.TsonSchemaParser;
 import io.ltr8.tson.parser.ast.schema.SchemaDocument;
 import io.ltr8.tson.parser.compiler.ValueReaderFactoryRegistry;
+import io.ltr8.tson.parser.config.BundledSchemaSource;
 import io.ltr8.tson.parser.config.SchemaMetaNameBinder;
 import io.ltr8.tson.parser.config.TsonCompiledRegistry;
 import io.ltr8.tson.schema.TsonLinkedSchema;

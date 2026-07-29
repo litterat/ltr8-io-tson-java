@@ -1,0 +1,66 @@
+package io.ltr8.tson;
+
+import io.ltr8.bind.DataBindContext;
+import io.ltr8.tson.parser.TsonSchemaParser;
+import io.ltr8.tson.parser.ast.schema.SchemaDocument;
+import io.ltr8.tson.parser.base.TsonAtomContext;
+import io.ltr8.tson.parser.compiler.ValueReaderFactoryRegistry;
+import io.ltr8.tson.parser.config.BundledSchemaSource;
+import io.ltr8.tson.parser.config.SchemaMetaNameBinder;
+import io.ltr8.tson.parser.config.TsonCompiledRegistry;
+import io.ltr8.tson.parser.config.ValueReaderFactoryResolver;
+import io.ltr8.tson.parser.mapper.TsonMapperReader;
+import io.ltr8.tson.parser.mapper.TsonMapperWriter;
+import io.ltr8.tson.parser.resolver.DefaultTsonCompiledSchemaLoader;
+import io.ltr8.tson.parser.resolver.TsonSchemaResolver;
+import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.TsonSchemaRegistry;
+
+/**
+ * Configures and builds a {@link Tson} -- reached via {@link Tson#builder()}, never constructed
+ * directly. No configurable options beyond {@link #dataBindContext} yet: the standard library is
+ * always meta-kernel/meta.tn1/core.tn1, fetched from {@link BundledSchemaSource}; a future pluggable
+ * {@link io.ltr8.tson.parser.resolver.TsonSchemaSource} belongs here too, not as a breaking change to
+ * {@link Tson}'s own public shape.
+ */
+public final class TsonConfig {
+
+    private DataBindContext dataBindContext = TsonAtomContext.defaultContext();
+
+    TsonConfig() {
+    }
+
+    /**
+     * The {@link DataBindContext} the built {@link Tson}'s own {@link Tson#mapperReader()}/{@link
+     * Tson#mapperWriter()} bind against -- defaults to {@link TsonAtomContext#defaultContext()}, the
+     * same default {@link TsonMapperReader}'s/{@link TsonMapperWriter}'s own no-arg constructors use.
+     * Unrelated to (and never overrides) the object-binding-mode context {@link #build()} always uses
+     * internally to resolve the standard library itself -- see {@link Tson}'s own Javadoc for why
+     * that one is fixed, not configurable.
+     */
+    public TsonConfig dataBindContext(DataBindContext dataBindContext) {
+        this.dataBindContext = dataBindContext;
+        return this;
+    }
+
+    public Tson build() {
+        ValueReaderFactoryResolver resolver =
+                ValueReaderFactoryRegistry.bind(SchemaMetaNameBinder.defaultContext());
+        TsonSchemaRegistry schemaRegistry = new TsonSchemaRegistry();
+        TsonCompiledRegistry compiledRegistry = new TsonCompiledRegistry(schemaRegistry, resolver);
+        DefaultTsonCompiledSchemaLoader loader =
+                new DefaultTsonCompiledSchemaLoader(compiledRegistry, BundledSchemaSource.INSTANCE);
+
+        // Meta-kernel's own bootstrap case, registered explicitly -- see BundledSchemaSource's own
+        // class Javadoc for why this step can't just be another loader.load(...) call.
+        SchemaDocument metaKernelDocument = new TsonSchemaParser(
+                BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID)).parseSchemaDocument();
+        TsonSchema resolvedMetaKernel = new TsonSchemaResolver(loader).resolveSchema(metaKernelDocument);
+        compiledRegistry.register(resolvedMetaKernel, loader.load(BundledSchemaSource.META_KERNEL_ID));
+
+        loader.load(BundledSchemaSource.META_TN1_ID);
+        loader.load(BundledSchemaSource.CORE_TN1_ID);
+
+        return new Tson(schemaRegistry, compiledRegistry, loader, dataBindContext);
+    }
+}

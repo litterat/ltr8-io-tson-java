@@ -2,7 +2,7 @@ package io.ltr8.tson.parser.compiler;
 
 import io.ltr8.tson.parser.TsonDataParser;
 import io.ltr8.tson.parser.ast.Document;
-import io.ltr8.tson.parser.resolver.BundledSchemaSource;
+import io.ltr8.tson.parser.config.BundledSchemaSource;
 import io.ltr8.tson.parser.resolver.MetaKernelBootstrapResolver;
 import io.ltr8.tson.parser.atom.AtomValidationException;
 import io.ltr8.tson.schema.TsonLinkedSchema;

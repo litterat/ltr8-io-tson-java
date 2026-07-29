@@ -1,10 +1,13 @@
-package io.ltr8.tson.parser.config;
+package io.ltr8.tson;
 
+import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.parser.TsonSchemaParser;
 import io.ltr8.tson.parser.ast.schema.SchemaDocument;
 import io.ltr8.tson.parser.compiler.TsonCompiledMetaSchema;
-import io.ltr8.tson.parser.compiler.ValueReaderFactoryRegistry;
-import io.ltr8.tson.parser.resolver.BundledSchemaSource;
+import io.ltr8.tson.parser.config.TsonCompiledRegistry;
+import io.ltr8.tson.parser.config.ValueReaderFactoryResolver;
+import io.ltr8.tson.parser.mapper.TsonMapperReader;
+import io.ltr8.tson.parser.mapper.TsonMapperWriter;
 import io.ltr8.tson.parser.resolver.DefaultTsonCompiledSchemaLoader;
 import io.ltr8.tson.parser.resolver.TsonSchemaResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -13,15 +16,19 @@ import io.ltr8.tson.schema.TsonSchemaLinker;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
 
 /**
- * The "load the standard library" front door -- bootstraps meta-kernel/meta.tn1/core.tn1 into a
- * fresh, governed environment (previously a sequence every real schema-compiling test hand-rolled
- * for itself, e.g. {@code TinySchemaImportsCoreTn1Test}/{@code CoreSchemaImportTest} in this
- * module's own tests, and {@code tson-cli}'s own internal {@code StandardLibrary} helper, which this
- * class now replaces), then resolves and compiles caller-supplied schemas governed by one of them.
+ * The front door -- a small, curated entry point over {@code tson-parser}'s own, larger and more
+ * mechanical surface (lexer, both grammars, resolution, linking-adjacent validation, compilation,
+ * config wiring), the way Retrofit sits on top of OkHttp or Apache HttpClient5 sits on top of
+ * HttpCore5. Doesn't reimplement anything -- every method here just constructs/returns the real
+ * {@code tson-parser}/{@code tson-schema} class underneath. Built via {@link #builder()}, which
+ * bootstraps meta-kernel/meta.tn1/core.tn1 into a fresh, governed environment (previously a
+ * sequence every real schema-compiling test hand-rolled for itself, e.g. {@code tson-parser}'s own
+ * {@code TinySchemaImportsCoreTn1Test}/{@code CoreSchemaImportTest}, and {@code tson-cli}'s own
+ * former internal {@code StandardLibrary} helper):
  *
  * <pre>{@code
- * TsonStandardLibrary library = TsonStandardLibrary.builder().build();
- * TsonCompiledMetaSchema compiled = library.compile(schemaText, ValueReaderFactoryRegistry.dom());
+ * Tson tson = Tson.builder().build();
+ * TsonCompiledMetaSchema compiled = tson.compile(schemaText, ValueReaderFactoryRegistry.dom());
  * Object value = compiled.compiledSchema().get("my_type").read(dataValue);
  * }</pre>
  *
@@ -38,57 +45,51 @@ import io.ltr8.tson.schema.TsonSchemaRegistry;
  *
  * <p>Only supports a schema governed by (and importing only from) meta-kernel/meta.tn1/core.tn1 --
  * a real, disk/HTTP-backed {@link io.ltr8.tson.parser.resolver.TsonSchemaSource} for arbitrary other
- * governing chains is its own, separately tracked backlog item; {@link Builder} is the natural place
- * for that to plug in once it exists.
+ * governing chains is its own, separately tracked backlog item; {@link TsonConfig} is the natural
+ * place for that to plug in once it exists.
+ *
+ * <p>{@link TsonMapperReader}/{@link TsonMapperWriter} themselves still live in {@code tson-parser
+ * .mapper}, not here -- {@code DefinitionResolver}, part of {@code tson-parser}'s own resolution
+ * engine, has a real, current dependency on {@link TsonMapperWriter} (atom-refinement merging), so
+ * they can't move to a module that depends *on* {@code tson-parser} without a cycle. See {@code
+ * BACKLOG.md} for the plan to remove that dependency and revisit moving them here once it's gone.
+ * {@link #mapperReader()}/{@link #mapperWriter()} bind them to this instance's own {@link
+ * #dataBindContext()} (configurable via {@link TsonConfig#dataBindContext}), so a caller gets one
+ * consistent binding configuration across mapping without having to wire it up twice.
  */
-public final class TsonStandardLibrary {
+public final class Tson {
 
     private final TsonSchemaRegistry schemaRegistry;
     private final TsonCompiledRegistry compiledRegistry;
     private final DefaultTsonCompiledSchemaLoader loader;
+    private final DataBindContext dataBindContext;
 
-    private TsonStandardLibrary(TsonSchemaRegistry schemaRegistry, TsonCompiledRegistry compiledRegistry,
-                                 DefaultTsonCompiledSchemaLoader loader) {
+    Tson(TsonSchemaRegistry schemaRegistry, TsonCompiledRegistry compiledRegistry,
+         DefaultTsonCompiledSchemaLoader loader, DataBindContext dataBindContext) {
         this.schemaRegistry = schemaRegistry;
         this.compiledRegistry = compiledRegistry;
         this.loader = loader;
+        this.dataBindContext = dataBindContext;
     }
 
-    public static Builder builder() {
-        return new Builder();
+    /** A fresh {@link TsonConfig} -- {@link TsonConfig#build()} bootstraps meta-kernel/meta.tn1/core.tn1 and returns the resulting {@link Tson}. */
+    public static TsonConfig builder() {
+        return new TsonConfig();
     }
 
-    /**
-     * Builds a {@link TsonStandardLibrary} -- no configurable options yet (the standard library is
-     * always meta-kernel/meta.tn1/core.tn1, fetched from {@link BundledSchemaSource}); a future
-     * pluggable {@link io.ltr8.tson.parser.resolver.TsonSchemaSource} belongs here, not as a
-     * breaking change to this class's own public shape.
-     */
-    public static final class Builder {
+    /** A fresh, schemaless (Class 1) {@link TsonMapperReader} bound to {@link #dataBindContext()} -- TSON text straight to plain Java objects, no schema involved. */
+    public TsonMapperReader mapperReader() {
+        return new TsonMapperReader(dataBindContext);
+    }
 
-        private Builder() {
-        }
+    /** A fresh, schemaless (Class 1) {@link TsonMapperWriter} bound to {@link #dataBindContext()} -- the inverse of {@link #mapperReader()}. */
+    public TsonMapperWriter mapperWriter() {
+        return new TsonMapperWriter(dataBindContext);
+    }
 
-        public TsonStandardLibrary build() {
-            ValueReaderFactoryResolver resolver =
-                    ValueReaderFactoryRegistry.bind(SchemaMetaNameBinder.defaultContext());
-            TsonSchemaRegistry schemaRegistry = new TsonSchemaRegistry();
-            TsonCompiledRegistry compiledRegistry = new TsonCompiledRegistry(schemaRegistry, resolver);
-            DefaultTsonCompiledSchemaLoader loader =
-                    new DefaultTsonCompiledSchemaLoader(compiledRegistry, BundledSchemaSource.INSTANCE);
-
-            // Meta-kernel's own bootstrap case, registered explicitly -- see BundledSchemaSource's
-            // own class Javadoc for why this step can't just be another loader.load(...) call.
-            SchemaDocument metaKernelDocument = new TsonSchemaParser(
-                    BundledSchemaSource.INSTANCE.fetch(BundledSchemaSource.META_KERNEL_ID)).parseSchemaDocument();
-            TsonSchema resolvedMetaKernel = new TsonSchemaResolver(loader).resolveSchema(metaKernelDocument);
-            compiledRegistry.register(resolvedMetaKernel, loader.load(BundledSchemaSource.META_KERNEL_ID));
-
-            loader.load(BundledSchemaSource.META_TN1_ID);
-            loader.load(BundledSchemaSource.CORE_TN1_ID);
-
-            return new TsonStandardLibrary(schemaRegistry, compiledRegistry, loader);
-        }
+    /** The {@link DataBindContext} {@link #mapperReader()}/{@link #mapperWriter()} are bound to -- see {@link TsonConfig#dataBindContext} to customize it. */
+    public DataBindContext dataBindContext() {
+        return dataBindContext;
     }
 
     /**

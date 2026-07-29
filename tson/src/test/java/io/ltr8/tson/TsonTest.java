@@ -1,14 +1,19 @@
-package io.ltr8.tson.parser.config;
+package io.ltr8.tson;
 
+import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.parser.TsonDataParser;
 import io.ltr8.tson.parser.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.parser.compiler.ValueReaderFactoryRegistry;
+import io.ltr8.tson.parser.config.BundledSchemaSource;
+import io.ltr8.tson.parser.mapper.TsonMapperReader;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -17,10 +22,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * directly -- a small, user-defined schema importing core.tn1 -- but through this class's own
  * public front door instead, confirming the builder genuinely replaces that wiring.
  */
-class TsonStandardLibraryTest {
+class TsonTest {
 
     private static final String TINY_DOCUMENT = """
-            !!id:"https://example.test/tson-standard-library-test.tn1"
+            !!id:"https://example.test/tson-test.tn1"
             !!meta:"https://tson.io/2026/32/m/meta.tn1"
             !!import:"https://tson.io/2026/32/m/core.tn1"
             {
@@ -31,9 +36,9 @@ class TsonStandardLibraryTest {
 
     @Test
     void resolvesAndCompilesATinySchemaThatImportsCoreTn1() {
-        TsonStandardLibrary library = TsonStandardLibrary.builder().build();
+        Tson tson = Tson.builder().build();
 
-        TsonLinkedSchema linked = library.resolve(TINY_DOCUMENT);
+        TsonLinkedSchema linked = tson.resolve(TINY_DOCUMENT);
         // Merged view: the two local declarations, plus core.tn1's own 48 imported entries --
         // TsonSchemaLinker.link copies an import's own entries in, unlike the raw resolved TsonSchema
         // resolve()'s own resolution step produces internally, which stays local-only.
@@ -41,7 +46,7 @@ class TsonStandardLibraryTest {
         assertTrue(linked.schema().entries().containsKey("my_int"));
         assertTrue(linked.schema().entries().containsKey("my_percentage"));
 
-        TsonCompiledMetaSchema compiled = library.compile(linked, ValueReaderFactoryRegistry.dom());
+        TsonCompiledMetaSchema compiled = tson.compile(linked, ValueReaderFactoryRegistry.dom());
 
         // int32 has a real bit-width (size: {bits: 32 signed: true}), so IntegerParser narrows to
         // Integer -- atom reading is shared verbatim between DOM and bind mode (CLAUDE.md), so this
@@ -58,9 +63,9 @@ class TsonStandardLibraryTest {
 
     @Test
     void theSingleCallCompileConvenienceMatchesResolveThenCompile() {
-        TsonStandardLibrary library = TsonStandardLibrary.builder().build();
+        Tson tson = Tson.builder().build();
 
-        TsonCompiledMetaSchema compiled = library.compile(TINY_DOCUMENT, ValueReaderFactoryRegistry.dom());
+        TsonCompiledMetaSchema compiled = tson.compile(TINY_DOCUMENT, ValueReaderFactoryRegistry.dom());
 
         Object myInt = compiled.compiledSchema().get("my_int")
                 .read(new TsonDataParser("7").parseDocument().root());
@@ -69,10 +74,33 @@ class TsonStandardLibraryTest {
 
     @Test
     void theStandardLibraryItselfIsReachableThroughTheLoader() {
-        TsonStandardLibrary library = TsonStandardLibrary.builder().build();
+        Tson tson = Tson.builder().build();
 
-        TsonCompiledMetaSchema meta = library.loader().load(io.ltr8.tson.parser.resolver.BundledSchemaSource.META_TN1_ID);
+        TsonCompiledMetaSchema meta = tson.loader().load(BundledSchemaSource.META_TN1_ID);
 
         assertTrue(meta.schema().entries().containsKey("text_type"));
+    }
+
+    @Test
+    void mapperReaderAndWriterAreBoundToTheConfiguredDataBindContext() {
+        DataBindContext context = DataBindContext.builder().build();
+        Tson tson = Tson.builder().dataBindContext(context).build();
+
+        assertSame(context, tson.dataBindContext());
+    }
+
+    @Test
+    void mapperReaderIsUsableWithTheDefaultDataBindContext() throws Exception {
+        Tson tson = Tson.builder().build();
+        assertNotNull(tson.dataBindContext());
+
+        TsonMapperReader reader = tson.mapperReader();
+
+        Point point = reader.toObject("{ x: 1 y: 2 }", Point.class);
+        assertEquals(new Point(1, 2), point);
+    }
+
+    /** Public, not local/package-private -- {@code tson-bind}'s own reflective binding only ever finds *public* constructors (see {@code CliDiagnostic}'s own Javadoc in {@code tson-cli} for the identical gotcha). */
+    public record Point(int x, int y) {
     }
 }

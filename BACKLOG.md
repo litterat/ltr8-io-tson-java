@@ -11,29 +11,51 @@ yet implemented" section for the technical detail behind several of these items.
 
 ## Front door / ergonomics
 
-- [x] **A single "load the standard library" entry point — landed as `TsonStandardLibrary`**
-  (`io.ltr8.tson.parser.config`, new package — see "Layer boundaries" below for the rest of the
-  move). `TsonStandardLibrary.builder().build()` bootstraps meta-kernel → meta.tn1 → core.tn1 in one
-  call; `.resolve(schemaText)`/`.compile(linked, mode)`/`.compile(schemaText, mode)` replace the
-  hand-assembled `TsonSchemaRegistry`/`TsonCompiledRegistry`/`DefaultTsonCompiledSchemaLoader`
-  wiring `TinySchemaImportsCoreTn1Test`/`CoreSchemaImportTest` (and `tson-cli`'s own now-deleted
-  internal `StandardLibrary` helper) used to hand-roll. `TsonStandardLibraryTest` re-proves
-  `TinySchemaImportsCoreTn1Test`'s exact scenario through this front door instead. Surfaced a real,
-  non-obvious pipeline constraint along the way, now documented on the class itself: resolving an
-  `Instance`/`AtomRefinement` declaration (`DefinitionResolver.bindAtomInstance`) always needs a
-  real, object-binding-mode governing-meta reader, regardless of what mode the *final* compiled
-  schema wants — DOM-mode resolution of the standard library itself fails outright (a `Map` can't
-  cast to `schema.meta.Top`). Only *compiling* an already-resolved, already-linked schema
+- [x] **A new `tson` module — the developer front door, sitting on top of `tson-parser` the way
+  Retrofit sits on OkHttp or Apache HttpClient5 sits on HttpCore5** (superseded the earlier
+  `tson-parser` → `tson-core` rename idea — simpler to add a small module on top than rename the
+  engine underneath it). Holds `Tson` (a real, immutable, instance-based object — `resolve`/
+  `compile`/`mapperReader`/`mapperWriter`/`dataBindContext`, plus the underlying registries/loader
+  for a caller who needs to reach past the front door) and `TsonConfig` (`Tson`'s own builder,
+  reached via `Tson.builder()`; moved here from `io.ltr8.tson.parser.config`, since it's purely a
+  caller-facing convenience with zero internal consumers inside `tson-parser` itself — confirmed
+  before moving it, the same way the three classes in "Layer boundaries" below were checked).
+  `tson-parser`/`tson-schema`/`tson-bind` are `api` (not `implementation`) dependencies, so a caller
+  depending on just `tson` still sees the real classes underneath directly.
+  **`TsonMapperReader`/`TsonMapperWriter` deliberately did *not* move here** — `tson-parser`'s own
+  `DefinitionResolver` has a real, current dependency on `TsonMapperWriter` (atom-refinement
+  merging), so moving them to a module that depends *on* `tson-parser` would recreate the exact
+  module cycle that caused `tson-mapper` to be merged *into* `tson-parser` in the first place,
+  historically. See "Atom-refinement constraint validation" below for the plan to remove that
+  dependency and revisit the move once it's gone — noted directly on `Tson`'s own class Javadoc too.
+  `tson-cli` now depends on `tson` as well (alongside its existing direct deps, still needed for DOM
+  mode/custom binders) and was re-verified end to end against it.
+- [x] **A single "load the standard library" entry point — landed as `Tson`/`TsonConfig`**
+  (`io.ltr8.tson`, the new front-door module above). `Tson.builder().build()` bootstraps meta-kernel
+  → meta.tn1 → core.tn1 in one call and returns a ready `Tson`; its `.resolve(schemaText)`/
+  `.compile(linked, mode)`/`.compile(schemaText, mode)` replace the hand-assembled
+  `TsonSchemaRegistry`/`TsonCompiledRegistry`/`DefaultTsonCompiledSchemaLoader` wiring
+  `TinySchemaImportsCoreTn1Test`/`CoreSchemaImportTest` (and `tson-cli`'s own now-deleted internal
+  `StandardLibrary` helper) used to hand-roll. `TsonTest` re-proves `TinySchemaImportsCoreTn1Test`'s
+  exact scenario through this front door instead. Surfaced a real, non-obvious pipeline constraint
+  along the way, now documented on `Tson`'s own class itself: resolving an `Instance`/
+  `AtomRefinement` declaration (`DefinitionResolver.bindAtomInstance`) always needs a real,
+  object-binding-mode governing-meta reader, regardless of what mode the *final* compiled schema
+  wants — DOM-mode resolution of the standard library itself fails outright (a `Map` can't cast to
+  `schema.meta.Top`). Only *compiling* an already-resolved, already-linked schema
   (`TsonCompiledMetaSchema.bootstrap`) is free to pick a different mode, since it never re-resolves
-  anything — hence `resolve` takes no mode parameter at all, only `compile` does.
-- [x] **A fluent/builder API — landed as the same `TsonStandardLibrary`** above; `tson-cli`'s
-  `ValidateCommand`/`CompileCommand`/`DiagnosticsSchema` were refactored to use it directly in place
-  of their own hand-rolled wiring, so the CLI itself is now real, working validation that the
-  builder is usable, not just a design on paper. Still narrow by design (no pluggable
-  `TsonSchemaSource`, no config beyond the standard library itself) — `TsonStandardLibrary.Builder`
+  anything — hence `resolve` takes no mode parameter at all, only `compile` does. `TsonConfig` itself
+  was split back out of an earlier single class that mixed builder config with these operations,
+  once `mapperReader()`/`mapperWriter()` needed to be non-static instance methods bound to a real,
+  configurable `DataBindContext` — see "Front door module" in `CLAUDE.md` for the full reasoning.
+- [x] **A fluent/builder API — landed as `TsonConfig`** above; `tson-cli`'s
+  `ValidateCommand`/`CompileCommand`/`DiagnosticsSchema` were refactored to use `Tson.builder().build()`
+  directly in place of their own hand-rolled wiring, so the CLI itself is now real, working validation
+  that the builder is usable, not just a design on paper. Still narrow by design (no pluggable
+  `TsonSchemaSource`, no config beyond `dataBindContext` and the standard library itself) — `TsonConfig`
   is exactly where a future pluggable source belongs, per its own Javadoc.
 - [x] **A CLI, ajv-cli-style — v1 landed** (new `tson-cli` module: `TsonCli`/`ValidateCommand`/
-  `CompileCommand`/`OutputFormat`/`DiagnosticsSchema`, now built on `TsonStandardLibrary` above
+  `CompileCommand`/`OutputFormat`/`DiagnosticsSchema`, now built on `Tson`/`TsonConfig` above
   rather than its own internal copy). `tson validate --type <name> [--output text|json|tson]
   <schema> <data...>` and `tson compile [--output text|json|tson] <schema>`, positional
   schema-then-data arguments, Unix-conventional exit codes (0 valid/compiled, 1 a real failure, 2
@@ -56,22 +78,34 @@ yet implemented" section for the technical detail behind several of these items.
   schema position it's reading against.
 - [ ] A real disk/HTTP-backed `TsonSchemaSource` with whitelist/blacklist policy — only
   `BundledSchemaSource` and `TsonSchemaSource.registeredOnly()` exist today.
-- [ ] API-surface pass, now that a real front door (`TsonStandardLibrary`) exists — a lot of what's
+- [ ] API-surface pass, now that a real front door (`Tson`/`TsonConfig`) exists — a lot of what's
   `public` in `compiler`/`resolver`/`config` today is public only because tests needed cross-package
   access mid-refactor, not because it's meant to be part of a consumer-facing API.
 
 ## Layer boundaries / schema registry
 
 - [x] **Configuration/wiring classes moved out of `compiler` into a new `io.ltr8.tson.parser.config`
-  package** — `TsonCompiledRegistry`, `SchemaMetaNameBinder`, `ValueReaderFactoryResolver` (plus the
-  new `TsonStandardLibrary`, see "Front door" above). These read as "how a caller configures a
-  working environment," not compiler mechanics, and none of the three touched a package-private
-  compiler class, so the move was clean. `ValueReaderFactoryRegistry` deliberately stayed in
+  package** — `TsonCompiledRegistry`, `SchemaMetaNameBinder`, `ValueReaderFactoryResolver`. These
+  read as "how a caller configures a working environment," not compiler mechanics, and none of the
+  three touched a package-private compiler class, so the move was clean. (An earlier version of
+  `Tson`'s own builder, built the same day, briefly lived here too before moving one step further out
+  to the new `tson` front-door module itself, see "Front door" above — a config-package class it was,
+  at the time.)
+  `ValueReaderFactoryRegistry` deliberately stayed in
   `compiler` despite being asked about in the same review — it's the literal wiring table binding
   constructor names to concrete reader implementations (`AtomValueReader`, `BooleanReader`,
   `ChoiceReader`, `VariantBindReader`, `VariantSchemaReader`, `VoidReader`, `ErrorReader`), all
   deliberately package-private; moving it out would force every one of those public just so it could
   keep referencing them — a real, unwanted expansion of the public surface, not a free move.
+- [x] **`BundledSchemaSource` moved into `config` too, from `resolver`** — same "how a caller
+  configures a working environment" reasoning as above, once its only real in-`tson-parser` consumer
+  (`MetaKernelBootstrapResolver.getMetaKernelSchema`) was confirmed to be its sole caller here.
+  `MetaKernelBootstrapResolver`/`DefaultTsonCompiledSchemaLoader` (both stay in `resolver`) now reach
+  into `config` for it directly, the same named layering exception already documented for
+  `TsonCompiledSchemaLoader`. Deliberately did *not* also change `getMetaKernelSchema()` to accept an
+  injected `TsonSchemaSource` — that would reopen exactly what removing this class's own earlier
+  `parse(String source)` overload closed off (a caller supplying text that isn't genuinely meta-kernel
+  under the `META_KERNEL_ID` identity); package placement changed, the zero-argument lock-down didn't.
 - [ ] Distinguish "has constructor vocabulary, eligible to govern (a valid `!!meta` target)" from
   "ordinary consumer schema" at the type level. Right now `TsonCompiledMetaSchema` wraps *any*
   compiled schema, constructors or not — nothing stopped a zero-constructor consumer schema (like
@@ -157,6 +191,31 @@ own prose (which had gone stale on at least one of them):
   record checked for parameter-slot agreement with its `source` application. Entirely unimplemented
   — "ingest" doesn't appear anywhere in the codebase. Lower priority than the three items above:
   the spec marks this path explicitly **optional** ("MAY implement ingest"), not a MUST.
+
+## Atom-refinement constraint validation
+
+- [ ] **Atom-refinement merging never checks that a refinement actually narrows its source** —
+  `DefinitionResolver.mergeWithSource` (chained atom refinement, `!I ^ { values }`) re-serializes
+  `I`'s own already-bound constraint object to wire form via `TsonMapperWriter`, then merges it with
+  the new refinement's own `values` field by field: `merged.put(field.name(), field)` — a plain map
+  override, explicit values simply win, with **no check that the new value is actually a valid
+  narrowing** of what it replaces. Concretely: `!uint8 ^ { min: -10 max: 300 }` is not rejected, even
+  though `uint8`'s own real range is 0..255 — the "refinement" *widens* rather than narrows, directly
+  contradicting §5.7's whole premise (refinement tightens, it never loosens), and nothing catches it
+  today. The right fix, per the user's own direction: each constraint-vocabulary class (`IntegerType`,
+  `TextType`, `DecimalType`, `FloatType`, ...) should own a method like `constraintsCheck(A, B)`
+  returning whether `B` is a valid narrowing of `A` — the type itself is the only thing that actually
+  knows what "more constrained" means for its own fields (an integer's `min`/`max`, a text's
+  `min_length`/`max_length`/`pattern`, and so on) — called during merge instead of the current blind,
+  generic override.
+- [ ] **Related cleanup, once the above lands**: `DefinitionResolver`'s own dependency on
+  `TsonMapperWriter` (`private final TsonMapperWriter writer`, used only for this merge's own
+  re-serialization step) should go away — a real narrowing check wouldn't need to round-trip through
+  the generic mapper at all. This is also *why* `TsonMapperReader`/`TsonMapperWriter` still live in
+  `tson-parser.mapper` rather than the new `tson` front-door module (see "Front door" above) — moving
+  them today would create a cycle, since `tson-parser`'s own resolution engine genuinely depends on
+  them. Once this dependency is gone, revisit moving `TsonMapperReader`/`TsonMapperWriter` into `tson`
+  (or their own module) — noted directly on `Tson`'s own class Javadoc too, so it isn't lost.
 
 ## Remaining built-in types
 

@@ -1,5 +1,9 @@
-package io.ltr8.tson.parser.resolver;
+package io.ltr8.tson.parser.config;
 
+import io.ltr8.tson.parser.resolver.DefaultTsonCompiledSchemaLoader;
+import io.ltr8.tson.parser.resolver.MetaKernelBootstrapResolver;
+import io.ltr8.tson.parser.resolver.TsonCompiledSchemaLoader;
+import io.ltr8.tson.parser.resolver.TsonSchemaSource;
 import io.ltr8.tson.schema.TsonSchemaLinker;
 
 import java.io.IOException;
@@ -22,13 +26,14 @@ import java.util.Map;
  * URI, given a {@link TsonSchemaSource} that knows how to fetch it. This class is that source for all
  * three well-known identities -- nothing more.
  *
- * <p>A caller wanting a working environment uses {@code io.ltr8.tson.parser.config.TsonStandardLibrary}
- * directly rather than assembling the fetch-parse-resolve-register-compile sequence by hand -- this
- * class is still exactly what powers it underneath:
+ * <p>A caller wanting a working environment uses {@code io.ltr8.tson.Tson} (in the {@code tson}
+ * module, sitting on top of this one) directly rather than assembling the
+ * fetch-parse-resolve-register-compile sequence by hand -- this class is still exactly what powers
+ * it underneath:
  *
  * <pre>{@code
- * TsonStandardLibrary library = TsonStandardLibrary.builder().build(); // meta-kernel + meta.tn1 + core.tn1
- * TsonCompiledMetaSchema compiled = library.compile(schemaText, ValueReaderFactoryRegistry.dom());
+ * Tson tson = Tson.builder().build(); // meta-kernel + meta.tn1 + core.tn1
+ * TsonCompiledMetaSchema compiled = tson.compile(schemaText, ValueReaderFactoryRegistry.dom());
  * }</pre>
  *
  * <p><b>{@link #META_KERNEL_ID} is meta-kernel's own well-known identity</b> -- the canonical

@@ -3,6 +3,7 @@ package io.ltr8.tson.parser.resolver;
 import io.ltr8.tson.parser.TsonSchemaParser;
 import io.ltr8.tson.parser.ast.schema.SchemaDocument;
 import io.ltr8.tson.parser.compiler.*;
+import io.ltr8.tson.parser.config.BundledSchemaSource;
 import io.ltr8.tson.parser.config.TsonCompiledRegistry;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchemaLinker;
