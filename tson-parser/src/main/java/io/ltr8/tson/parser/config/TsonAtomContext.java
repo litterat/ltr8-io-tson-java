@@ -1,4 +1,4 @@
-package io.ltr8.tson.parser.base;
+package io.ltr8.tson.parser.config;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
@@ -14,11 +14,12 @@ import java.util.UUID;
 /**
  * The default built-in-vocabulary atom registrations every {@link DataBindContext} consumer in
  * this library needs (UUID/byte[]/LocalDate/OffsetTime/OffsetDateTime/URI/Inet4Address/
- * Inet6Address) -- shared by {@code io.ltr8.tson.parser.mapper.TsonMapperContext} and {@code
- * compiler.SchemaMetaNameBinder}'s own {@link #registerDefaults}-based {@code defaultContext()}.
- * Lives at this layer (alongside {@link NumberNarrowing}, `base`'s own "shared behind more than one
- * downstream consumer" spot) rather than in `compiler` itself, since `mapper` needs it too and
- * `mapper` doesn't depend on `compiler`.
+ * Inet6Address) -- shared by {@code io.ltr8.tson.parser.mapper.TsonMapperContext} and this
+ * package's own {@code SchemaMetaNameBinder}'s {@link #registerDefaults}-based {@code
+ * defaultContext()}. Lives here, alongside the other configuration/wiring classes ("how a caller
+ * configures a working environment," not `base`'s own §4 base-type-resolution machinery a consumer
+ * never names directly) -- `mapper` reaching into `config` for this one class is a new, harmless
+ * edge (`config` has no dependency back on `mapper`, so no cycle).
  */
 public final class TsonAtomContext {
 

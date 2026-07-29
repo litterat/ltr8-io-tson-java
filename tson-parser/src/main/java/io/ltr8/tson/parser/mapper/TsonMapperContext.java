@@ -1,7 +1,7 @@
 package io.ltr8.tson.parser.mapper;
 
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.tson.parser.base.TsonAtomContext;
+import io.ltr8.tson.parser.config.TsonAtomContext;
 
 /**
  * The default {@link DataBindContext} shared by {@link TsonMapperReader}'s and {@link

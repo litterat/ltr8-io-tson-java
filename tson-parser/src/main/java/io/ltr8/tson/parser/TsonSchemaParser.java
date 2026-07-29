@@ -32,7 +32,6 @@ import io.ltr8.tson.parser.ast.schema.TupleContainerDef;
 import io.ltr8.tson.parser.ast.schema.TypeArg;
 import io.ltr8.tson.parser.ast.schema.TypeDef;
 import io.ltr8.tson.parser.ast.schema.TypeRef;
-import io.ltr8.tson.parser.lexer.Position;
 import io.ltr8.tson.parser.lexer.Token;
 import io.ltr8.tson.parser.lexer.TokenType;
 import io.ltr8.tson.parser.base.NumberGrammar;

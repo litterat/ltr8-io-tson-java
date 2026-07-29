@@ -94,6 +94,37 @@ yet implemented" section for the technical detail behind several of these items.
   another `tson-parser` package) — `MetaKernelBootstrapResolver.getMetaKernelSchema()` in particular
   stays public because `compiler`-package tests call it directly, not just `resolver`-package ones.
   Full `./gradlew clean build` stayed green throughout (no cross-package caller was missed).
+- [x] **`module-info.java` added to `tson-schema`/`tson-parser`/`tson`/`tson-cli`** (`tson-bind`/
+  `tson-annotation` already had one) — done right after the API-surface pass above specifically
+  because it's the input a real export list needs (exports are package-, not class-grained, so
+  exporting a not-yet-trimmed package would have exported mid-refactor leftovers too). Full detail in
+  `CLAUDE.md`'s new "Module system (JPMS)" section — highlights: `tson-schema.registry`'s own
+  "internal-by-convention" split is now genuinely JPMS-enforced (verified with a real scratch-file
+  compile failure, not just reasoned about); `tson-schema/build.gradle.kts` needed `implementation`
+  promoted to `api` for its own `tson-annotation` dependency purely for module-path resolution (a real
+  Gradle/JPMS friction point, not a design choice); `.atom` stayed unexported (no real external
+  caller). Verified both at compile time (`./gradlew clean build`, every module) and at runtime (the
+  installed CLI binary still runs end to end on its classpath-based `application`-plugin distribution).
+- [x] **`.lexer`/`.base` locked down too, same day, a follow-up pass** — both were exported for
+  exactly one accidental reason each, both fixed at the source rather than left exported: `Position`
+  moved out of `.lexer` into the root package (it leaks through `TsonParseException`/
+  `TsonUnsupportedDocumentException`'s own public constructors, caught by a genuine
+  `javac -Xlint:exports` warning when `.lexer` was first left unexported — `Lexer`/`Token`/
+  `TokenType`/`LexException` themselves have no real external caller), and `TsonAtomContext` moved
+  from `.base` to `config` (it was `.base`'s only genuine external caller; the rest is §4
+  base-type-resolution machinery). Both re-verified with a real scratch-file compile failure before
+  being deleted, same technique as the `.registry` check above.
+- [ ] A facade over `.resolver`/`.compiler` in `tson-parser`'s own root package — the user's own
+  stated direction (2026-07-29): those two packages stay exported (`tson`'s own `Tson`/`TsonConfig`
+  genuinely need `DefaultTsonCompiledSchemaLoader`/`TsonSchemaResolver`/`TsonCompiledMetaSchema`/
+  `TsonSchemaCompiler`/`ValueReaderFactoryRegistry`/... directly today), but a caller reasoning about
+  `tson-parser` as its own library, not just plumbing under `tson`, shouldn't need to know either
+  package exists — "the user doesn't need to access what's in those packages." Narrower than the
+  `tson` module's own front door (which also bootstraps meta-kernel/meta.tn1/core.tn1 and picks a
+  `DataBindContext`); this would be `tson-parser`'s own front door onto its two least-approachable
+  packages specifically. Not designed yet — worth revisiting once there's a second real caller shape
+  to design against, the same way `Tson`/`TsonConfig` themselves only crystallized once `tson-cli`
+  gave them one.
 
 ## Layer boundaries / schema registry
 

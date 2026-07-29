@@ -3,10 +3,10 @@ package io.ltr8.tson.cli;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.Tson;
-import io.ltr8.tson.parser.base.TsonAtomContext;
 import io.ltr8.tson.parser.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.parser.compiler.ValueReaderFactoryRegistry;
 import io.ltr8.tson.parser.config.SchemaMetaNameBinder;
+import io.ltr8.tson.parser.config.TsonAtomContext;
 import io.ltr8.tson.parser.config.ValueReaderFactoryResolver;
 
 import java.io.IOException;

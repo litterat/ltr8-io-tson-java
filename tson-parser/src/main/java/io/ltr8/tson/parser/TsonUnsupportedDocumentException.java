@@ -1,6 +1,5 @@
 package io.ltr8.tson.parser;
 
-import io.ltr8.tson.parser.lexer.Position;
 
 /**
  * Thrown when a document's header contains {@code !!meta}, making it a TSON <em>schema</em>

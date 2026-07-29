@@ -1,5 +1,7 @@
 package io.ltr8.tson.parser.lexer;
 
+import io.ltr8.tson.parser.Position;
+
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.List;

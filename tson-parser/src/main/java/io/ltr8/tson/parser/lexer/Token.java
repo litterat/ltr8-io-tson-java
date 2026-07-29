@@ -1,5 +1,7 @@
 package io.ltr8.tson.parser.lexer;
 
+import io.ltr8.tson.parser.Position;
+
 /**
  * A single lexical token.
  *

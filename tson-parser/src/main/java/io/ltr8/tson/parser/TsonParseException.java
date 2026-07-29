@@ -1,6 +1,5 @@
 package io.ltr8.tson.parser;
 
-import io.ltr8.tson.parser.lexer.Position;
 
 /**
  * A parser error (§8.1): structural mismatches -- unclosed brackets, adjacency violations,

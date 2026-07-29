@@ -13,7 +13,6 @@ import io.ltr8.tson.parser.ast.ScopedValue;
 import io.ltr8.tson.parser.ast.TokenForm;
 import io.ltr8.tson.parser.ast.TokenValue;
 import io.ltr8.tson.parser.lexer.Lexer;
-import io.ltr8.tson.parser.lexer.Position;
 import io.ltr8.tson.parser.lexer.Token;
 import io.ltr8.tson.parser.lexer.TokenType;
 import io.ltr8.tson.parser.atom.AtomParseException;

@@ -1,5 +1,6 @@
 package io.ltr8.tson.parser.lexer;
 
+import io.ltr8.tson.parser.Position;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

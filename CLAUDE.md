@@ -243,7 +243,7 @@ Key design points:
   documents this as intentional, spec-derived behavior, not a bug, so don't "fix" it without re-reading
   that entry first.
 
-### Base type resolution (`tson-parser/src/main/java/io/ltr8/tson/parser/resolver/`)
+### Base type resolution (`tson-parser/src/main/java/io/ltr8/tson/parser/base/`)
 
 `BaseTypeResolver.resolve(TokenValue)` implements §4's fixed resolution order (null → boolean → number →
 string, §4.5) for `TokenValue`s produced by the parser. `NumberGrammar.tryParse(String)` recognizes the
@@ -1319,11 +1319,13 @@ it was never a named pipeline stage. **`TsonSchemaLinker` was renamed from `Sche
 from *other* modules (e.g. `tson-parser`'s own `TsonCompiledRegistry`, which links a schema before
 registering it); living inside `.registry`, a package whose own docs describe its contents as
 "private pass-2 machinery nothing outside this module calls directly," was the one thing still
-contradicting that. **Note on enforcement:** `tson-schema` has no `module-info.java` (unlike
-`tson-bind`/`tson-annotation`, which do), so there's no JPMS boundary to truly hide `.registry`
-behind — `CanonicalIdentity` is `public` purely because `TsonSchemaRegistry`/`TsonSchemaLinker` need
-to call it cross-package; "internal-by-convention" here means package-naming discipline only, a
-deliberate, confirmed tradeoff rather than adding a module descriptor now.
+contradicting that. **Now genuinely enforced, not just package-naming discipline** — `tson-schema`
+gained a real `module-info.java` (2026-07-29, see "Module system (JPMS)" near the end of this file)
+that exports `io.ltr8.tson.schema`/`io.ltr8.tson.schema.meta` but deliberately not `.registry` —
+`CanonicalIdentity` stays `public` (still needed cross-package by `TsonSchemaRegistry`/
+`TsonSchemaLinker`, in the same module), but a *different* module (e.g. `tson-parser`) importing it
+now fails to compile outright ("package io.ltr8.tson.schema.registry is not visible ... does not
+export it"), confirmed by trying it directly, not just reasoned about.
 
 - **`CanonicalIdentity.of(String)`** implements `[TSON-DATA] §2.2.1`'s canonical-identity algorithm
   exactly — **not** general URI normalization. The spec performs exactly two reductions (strip
@@ -1610,8 +1612,10 @@ chain from scratch.
   (`tson-schema.registry`) is internal-by-convention to `TsonSchemaRegistry`/`TsonSchemaLinker` (confirmed via
   its own class Javadoc: "a caller outside this module should go through `TsonSchemaRegistry` instead of
   depending on this class directly") — reaching into it from `tson-parser`, a different module,
-  would be exactly the cross-module layering violation this project otherwise avoids, even though
-  nothing stops it at compile time (`tson-schema` has no `module-info.java`). The cost: two
+  would be exactly the cross-module layering violation this project otherwise avoids -- and, since
+  `tson-schema` gained a real `module-info.java` (see "Module system (JPMS)" near the end of this
+  file), that reach now genuinely fails to compile, not just a convention this class's own Javadoc
+  asks nicely for. The cost: two
   differently-spelled-but-equivalent URIs for the same schema won't find each other here the way
   they would through `TsonSchemaRegistry.get` — acceptable for the one real caller today (always
   registers and looks up using each schema's own exact `!!id` string), a real narrower guarantee,
@@ -1797,6 +1801,17 @@ in-`tson-parser` consumer (`MetaKernelBootstrapResolver.getMetaKernelSchema`) wa
 sole caller here -- see "Bundled schema documents" below for the full reasoning, including why
 `getMetaKernelSchema()` itself deliberately stayed zero-argument rather than accepting an injected
 `TsonSchemaSource`.
+
+**`TsonAtomContext` joined this package too, moved from `base`** (2026-07-29, alongside the JPMS
+lockdown pass -- see "Module system (JPMS)" near the end of this file) -- the built-in-vocabulary
+atom registrations (`UUID`/`byte[]`/`LocalDate`/`OffsetTime`/`OffsetDateTime`/`URI`/`Inet4Address`/
+`Inet6Address`) every `DataBindContext` consumer in this library needs, shared by `mapper
+.TsonMapperContext` and this package's own `SchemaMetaNameBinder`. It was `base`'s only genuine
+external (cross-module) caller -- the rest of `base` (`BaseTypeResolver`, `NumberGrammar`, ...) is §4
+base-type-resolution machinery nothing outside `tson-parser` itself ever references -- and `config`
+is where "how a caller configures a working environment" already lives, so this is the same move as
+`BundledSchemaSource`'s own, not a new kind of one. `mapper` reaching into `config` for it is a new,
+harmless dependency edge (`config` has no dependency back on `mapper`, so no cycle).
 
 ### Front door module (`tson/src/main/java/io/ltr8/tson/`)
 
@@ -2070,6 +2085,99 @@ the whole real meta-kernel schema compiles cleanly in bind mode, including the f
 (`atom`/`product`/`sum`/`top`/`type_argument`), which get a real compiled reader (via
 `VariantBindReader`, dispatching to a `DataClassUnion`) but throw if actually read without an
 explicit type-ref, since there's no Java object "just a top" could construct.
+
+### Module system (JPMS)
+
+Every module now has a real `module-info.java` (2026-07-29) — `tson-bind`/`tson-annotation` already
+did; `tson-schema`, `tson-parser`, `tson`, and `tson-cli` gained one in this pass, once the "API-surface
+pass" above had already trimmed each module's own accidental public surface down to what's genuinely
+meant to be consumer-facing. Doing the trim first mattered: `module-info.java` exports are
+package-grained, not class-grained, so exporting a package exposes *every* public class in it — trying
+this before the surface pass would have forced exporting packages (`compiler` in particular) that still
+mixed real API with mid-refactor leftovers, telling you nothing about what should actually be hidden.
+
+**Module names mirror each module's own root exported package** (`io.ltr8.bind`, `io.ltr8.annotation`,
+`io.ltr8.tson.schema`, `io.ltr8.tson.parser`, `io.ltr8.tson`, `io.ltr8.tson.cli`), the same convention
+`tson-bind`/`tson-annotation` already established.
+
+- **`tson-schema` exports `io.ltr8.tson.schema`/`io.ltr8.tson.schema.meta`, deliberately not
+  `io.ltr8.tson.schema.registry`** — the first real enforcement of the "internal-by-convention" split
+  that package's own Javadoc already described (see "Schema registry" above) but had no way to actually
+  hold to before this. Confirmed genuinely enforced, not just declared: a scratch file added temporarily
+  to `tson-parser` importing `io.ltr8.tson.schema.registry.CanonicalIdentity` fails to compile outright
+  (`package io.ltr8.tson.schema.registry is not visible ... does not export it`), then was deleted —
+  this was a real experiment, not just writing the module-info and assuming it worked. `requires
+  io.ltr8.annotation` (not `transitive`) since no `schema`/`schema.meta` public method signature ever
+  exposes an `@Typename`/`@Field`/`@Record` annotation type directly, only applies them as declaration
+  annotations `tson-bind` reads reflectively later.
+- **`tson-schema/build.gradle.kts` needed `implementation(project(":tson-annotation"))` promoted to
+  `api`, plus its own `id("java-library")` plugin block** — a real, non-obvious Gradle/JPMS friction
+  point, not a design choice: `tson-schema`'s `module-info.java` requires `io.ltr8.annotation` to
+  physically exist on the module path for *any* downstream compilation that transitively depends on
+  `tson-schema` (`tson-parser`, `tson`), regardless of whether that module's own source ever names an
+  `io.ltr8.annotation` type directly — Gradle's `implementation`/`api` split controls compile-classpath
+  *type visibility*, a separate concern from whether the module graph can even resolve. `tson:compileJava`
+  failed with `module not found: io.ltr8.annotation` before this fix; `requires io.ltr8.annotation` itself
+  stayed non-`transitive` in `tson-schema`'s own module-info (the Gradle promotion doesn't change what
+  `tson-parser`/`tson` are actually allowed to *read* — module readability is still `tson-schema`-only).
+- **`tson-parser` exports every package with a real cross-module caller**
+  (`io.ltr8.tson.parser`/`.ast`/`.ast.schema`/`.compiler`/`.config`/`.mapper`/`.resolver`), confirmed
+  against actual `tson`/`tson-cli` imports rather than assumed, and leaves `.atom` unexported (nothing
+  outside `tson-parser` itself ever references it). `requires transitive io.ltr8.bind` (`DataBindContext`
+  appears directly in `TsonMapperReader`'s own public constructor, and `DataBindException` in a
+  `throws` clause) and `requires transitive io.ltr8.tson.schema` (`schema`/`schema.meta` types are
+  pervasive throughout `resolver`/`compiler`/`config`'s own public signatures) — both `transitive`,
+  since a caller of `tson-parser` unavoidably needs to read both directly too.
+- **`.lexer` and `.base` both went from "exported by accident" to genuinely internal (2026-07-29,
+  same-day follow-up, on the user's own explicit direction).** Both had exactly one thing forcing the
+  export, and both got fixed at the source rather than left exported:
+  - **`Position` moved out of `.lexer` into the root package** (`io.ltr8.tson.parser`, right alongside
+    `TsonParseException`/`TsonUnsupportedDocumentException`, the two classes whose own public
+    `position()` accessor was the *only* reason `.lexer` needed exporting at all — confirmed by
+    `javac -Xlint:exports` flagging exactly this leak when `.lexer` was first left unexported, per the
+    "Module system (JPMS)" section's own original pass). `Lexer`/`Token`/`TokenType`/`LexException`
+    (genuine scanner internals, "frozen for the whole series," never referenced outside `tson-parser`
+    itself) gained a same-module `import io.ltr8.tson.parser.Position;` in place of the free same-package
+    reference they used to have, and `.lexer` was dropped from `module-info.java`'s own `exports` list.
+  - **`TsonAtomContext` moved from `.base` into `config`** — it was `.base`'s only genuine external
+    caller (`tson`'s own `TsonConfig`, `tson-cli`'s own `DiagnosticsSchema`); `BaseTypeResolver`/
+    `NumberGrammar`/`NumberForm`/etc. (§4 base-type-resolution internals) never had one. `config` is
+    where it conceptually belongs anyway — "how a caller configures a working environment," the same
+    framing `SchemaMetaNameBinder`/`BundledSchemaSource`/`TsonCompiledRegistry` already have — and the
+    move creates no cycle (`mapper.TsonMapperContext`, `.base`'s other real consumer, gained a new
+    `mapper` → `config` edge, but `config` has no dependency back on `mapper`). `.base` was dropped from
+    `module-info.java`'s own `exports` list once this left it with zero external callers.
+  - **Both fixes verified the same way the original pass verified `.registry`** — not just "the build is
+    green," a scratch file added temporarily to `tson` importing `io.ltr8.tson.parser.lexer.Lexer` and
+    `io.ltr8.tson.parser.base.NumberGrammar` failed to compile outright (`package ... is not visible ...
+    does not export it`) before being deleted.
+- **`ValueReaderResolver` (narrowed package-private in the API-surface pass above) still triggers a
+  `javac -Xlint:exports` warning** on `ValueReaderFactory.create`/`TsonCompiledMetaSchema.create`'s own
+  signatures ("is not accessible to clients that require this module") — expected, not a regression:
+  that parameter type was deliberately made unreachable from outside `compiler`'s own package in the
+  API-surface pass, and the warning is `javac` correctly noticing a *public method* still mentions an
+  inaccessible type in its signature. No external caller ever legitimately invokes `.create(...)`
+  directly (see "Class 2 compilation" above), so left as-is rather than papering over a correct warning.
+- **`tson` exports only `io.ltr8.tson`** (its one package), `requires transitive` all three of
+  `io.ltr8.bind`/`io.ltr8.tson.parser`/`io.ltr8.tson.schema` — `Tson`'s own public methods return types
+  from all three directly (`DataBindContext`, `TsonMapperReader`, `TsonCompiledMetaSchema`,
+  `TsonSchemaRegistry`, `TsonLinkedSchema`, ...), so a caller depending on just `tson` needs to read all
+  three too, matching the Gradle-level `api` dependencies already in place.
+- **`tson-cli` exports nothing** (an application module — nothing depends on it), `requires`
+  `io.ltr8.bind`/`io.ltr8.tson`/`io.ltr8.tson.parser` directly (not just transitively through `tson`),
+  matching its own `build.gradle.kts`'s existing direct dependencies (needed for DOM mode/custom
+  binders alongside the front door, see "Front door module" above).
+- **Verified both ways, not just "it compiles"**: a full `./gradlew clean build` across every module
+  stays green (compile + the whole test suite, still on the classpath for test source sets, which have
+  no `module-info.java` of their own), *and* the real installed CLI binary
+  (`tson-cli/build/install/tson-cli/bin/tson-cli validate ...`) still runs correctly end to end — the
+  `application` plugin's default distribution launches on the classpath, not the module path, so this
+  also confirms module-path enforcement at compile time and the existing classpath-based runtime
+  distribution coexist without conflict.
+- **Not attempted**: a `jlink` custom runtime image, `opens` directives (nothing reflects into a
+  non-public member anywhere in this codebase — `tson-bind`'s own binding only ever touches public
+  constructors/methods, see `DefaultRecordBinder.getConstructor`'s own note elsewhere in this file),
+  and `Automatic-Module-Name` for a hypothetical future non-modular consumer.
 
 ### Conformance suite integration (`ConformanceSuiteTest`)
 

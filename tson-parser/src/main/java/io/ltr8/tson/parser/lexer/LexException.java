@@ -1,5 +1,7 @@
 package io.ltr8.tson.parser.lexer;
 
+import io.ltr8.tson.parser.Position;
+
 /**
  * A lexer error (spec §8.1): a malformed token — an unterminated quoted or
  * multi-line token, an invalid or unpaired-surrogate escape, an unrecognised

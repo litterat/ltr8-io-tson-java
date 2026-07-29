@@ -3,10 +3,10 @@ plugins {
 }
 
 dependencies {
-    // api, not implementation -- this module's own public surface (TsonStandardLibrary in
-    // particular) hands back tson-parser/tson-schema types directly (TsonCompiledMetaSchema,
-    // TsonLinkedSchema, TsonMapperReader/TsonMapperWriter, ...), so a caller depending on just
-    // this module still needs them on its own compile classpath.
+    // api, not implementation -- this module's own public surface (Tson/TsonConfig in particular)
+    // hands back tson-parser/tson-schema types directly (TsonCompiledMetaSchema, TsonLinkedSchema,
+    // TsonMapperReader/TsonMapperWriter, ...), so a caller depending on just this module still needs
+    // them on its own compile classpath.
     api(project(":tson-parser"))
     api(project(":tson-schema"))
     api(project(":tson-bind"))
