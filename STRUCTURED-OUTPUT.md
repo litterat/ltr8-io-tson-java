@@ -156,6 +156,25 @@ all, with no decoder integration required.
   JSON Schema's informal `discriminator` keyword), letting a schema author designate one field as
   the union-branch selector for JSON-only consumption. A real design decision, not just an
   implementation detail.
+  - **The user's own proposed shape for (b), discussed 2026-07-29 while designing
+    `ltr8-io-tson-test-suite`'s own sidecar-format schemas (see `BACKLOG.md`'s "Conformance test
+    suite" section for the concrete case that surfaced it) — dependent typing at the meta-schema
+    level.** Rather than the discriminator field's own *name* doing the selecting (a field group,
+    §5.11, already resolves today but requires nesting the selected variant's data under a keyed
+    sub-object) or a `choice`'s own member disambiguation, the discriminator field stays an ordinary
+    `enum`, and each enum *member* carries an association to a type; a companion field elsewhere in
+    the same record then resolves to whichever type the discriminator's current value names. `kind:
+    record` on one field and `fields: [...]` on a plain, unrenamed sibling, with the schema itself
+    enforcing that `fields`'s own real type follows `kind`'s value — the same flat, `kind`-plus-
+    siblings shape every real sidecar (and plenty of real-world discriminated JSON) already uses, no
+    wire-format change required to adopt it. Decouples "which type validates this value" from "what
+    this field happens to be named," which is both what OpenAPI's `discriminator.mapping` /
+    JSON Schema's informal `discriminator` keyword are themselves reaching for, and a closer match to
+    how hand-written discriminated JSON is actually shaped in the wild than a field-group-based
+    design would be. Unstarted: a genuine meta-kernel/meta.tn vocabulary addition (something in the
+    shape of `enum`'s own constructor needing to carry a per-member type association, plus resolver
+    support for reading a field's type dependently), not a `DefinitionResolver` bug fix — not
+    designed or scoped beyond this note yet.
 - [ ] **A "is this schema/type JSON-compatible" check**, surfaced during linking (or as a property
   on `TypeDefinition`) — so a schema author can tell which parts of their schema can validate JSON
   input at all, given the union-tagging and numeric-extension limits above, rather than discovering

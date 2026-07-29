@@ -21,13 +21,20 @@ import io.ltr8.tson.compiler.atom.AtomParseException;
 import io.ltr8.tson.compiler.atom.AtomType;
 import io.ltr8.tson.compiler.atom.AtomTypeException;
 import io.ltr8.tson.compiler.atom.AtomValidationException;
+import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.compiler.atom.Complex;
+import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.TsonCompiledRegistry;
+import io.ltr8.tson.schema.TsonBundledSchemas;
+import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.IsoDuration;
 import io.ltr8.tson.schema.meta.Rational;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DynamicTest;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestFactory;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -49,6 +56,7 @@ import java.time.Period;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -56,6 +64,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
@@ -80,6 +89,18 @@ class ConformanceSuiteTest {
 
     private static final Path SUITE_TESTS_ROOT =
             Paths.get("").toAbsolutePath().resolve("../../ltr8-io-tson-test-suite/tests").normalize();
+
+    /**
+     * Short, unversioned names a vector's own sidecar may use for {@code meta}/{@code import}
+     * (see {@link #resolvedRaw}) instead of hardcoding the current spec revision's real, versioned
+     * identity -- resolved directly off {@link TsonBundledSchemas}'s own constants, so a future
+     * version bump only touches that one class, not every vector that references core.tn.
+     */
+    private static final Map<String, String> SCHEMA_SHORT_NAMES = Map.of(
+            "meta-kernel.tn", TsonBundledSchemas.META_KERNEL_ID,
+            "meta.tn", TsonBundledSchemas.META_ID,
+            "core.tn", TsonBundledSchemas.CORE_ID
+    );
 
     @TestFactory
     Stream<DynamicTest> lexerVectors() {
@@ -162,7 +183,7 @@ class ConformanceSuiteTest {
 
     private static void checkLexerVector(String bucket, Path subject, RecordValue sidecar) throws IOException {
         String outcome = fieldText(sidecar, "outcome");
-        String raw = readRaw(subject);
+        String raw = resolvedRaw(subject, sidecar);
         switch (outcome) {
             case "valid" -> {
                 List<Token> actual = new Lexer(raw).tokenize();
@@ -200,7 +221,7 @@ class ConformanceSuiteTest {
 
     private static void checkParserVector(String bucket, Path subject, RecordValue sidecar) throws IOException {
         String outcome = fieldText(sidecar, "outcome");
-        String raw = readRaw(subject);
+        String raw = resolvedRaw(subject, sidecar);
         switch (outcome) {
             case "valid" -> {
                 Document actual = new TsonDataParser(raw).parseDocument();
@@ -312,7 +333,7 @@ class ConformanceSuiteTest {
             fail("unknown resolver-layer outcome: " + outcome);
             return;
         }
-        Document doc = new TsonDataParser(readRaw(subject)).parseDocument();
+        Document doc = new TsonDataParser(resolvedRaw(subject, sidecar)).parseDocument();
         TokenValue token = assertInstanceOf(TokenValue.class, doc.root().coreValue(),
                 "resolver vector .tn must be a single bare token");
         BaseValue actual = BaseTypeResolver.resolve(token);
@@ -431,7 +452,7 @@ class ConformanceSuiteTest {
      */
     private static void checkVocabularyVector(String bucket, Path subject, RecordValue sidecar) throws IOException {
         String outcome = fieldText(sidecar, "outcome");
-        Document doc = new TsonDataParser(readRaw(subject)).parseDocument();
+        Document doc = new TsonDataParser(resolvedRaw(subject, sidecar)).parseDocument();
         DataValue root = doc.root();
         String typeRef = root.typeRef().orElseThrow(
                 () -> new AssertionError("vocabulary vector .tn must carry a type-ref"));
@@ -526,6 +547,50 @@ class ConformanceSuiteTest {
         return new Rational(new BigInteger(parts[0]), new BigInteger(parts[1]));
     }
 
+    // ── Dynamic meta/import splicing (see resolvedRaw) ───────────────────
+
+    /**
+     * Proves {@link #resolvedRaw} both splices the right text, in the right place, and produces a
+     * document that genuinely resolves against the real bundled meta.tn/core.tn chain -- not just
+     * something that looks plausible. Self-contained: doesn't depend on the sibling test-suite repo
+     * being checked out.
+     */
+    @Test
+    void resolvedRawSplicesRealDirectivesThatActuallyResolve(@TempDir Path tempDir) throws IOException {
+        Path subject = tempDir.resolve("synthetic.tn");
+        Files.writeString(subject,
+                "!!id:\"https://tson.io/test-suite/schema/valid/synthetic.tn\"\n{ my_int => integer }");
+        RecordValue sidecar = (RecordValue) new TsonDataParser("{ meta: \"meta.tn\" import: [\"core.tn\"] }")
+                .parseDocument().root().coreValue();
+
+        String resolved = resolvedRaw(subject, sidecar);
+
+        assertEquals(
+                "!!id:\"https://tson.io/test-suite/schema/valid/synthetic.tn\"\n"
+                        + "!!meta:\"" + TsonBundledSchemas.META_ID + "\"\n"
+                        + "!!import:\"" + TsonBundledSchemas.CORE_ID + "\"\n"
+                        + "{ my_int => integer }",
+                resolved, "!!meta/!!import spliced right after !!id, in header order");
+
+        SchemaDocument schemaDocument = new TsonSchemaParser(resolved).parseSchemaDocument();
+        // Resolution (unlike compilation) always needs an object-binding-mode governing-meta reader,
+        // regardless of what mode the caller eventually wants -- see Tson's own class Javadoc.
+        // Same bootstrap sequence TsonConfig#build uses: meta-kernel has to be resolved and
+        // registered explicitly before anything that transitively !!imports it (meta.tn, here) can
+        // register itself -- see TsonBundledSchemas's own class Javadoc for why.
+        TsonCompiledRegistry compiledRegistry =
+                new TsonCompiledRegistry(TsonSchemaCompiler.bind(SchemaMetaNameBinder.defaultContext()));
+        TsonCompiledSchemaLoader loader = TsonSchemaResolver.defaultLoader(compiledRegistry, TsonBundledSchemas::fetch);
+        SchemaDocument metaKernelDocument = new TsonSchemaParser(
+                TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID)).parseSchemaDocument();
+        TsonSchema resolvedMetaKernel = new TsonSchemaResolver(loader).resolveSchema(metaKernelDocument);
+        compiledRegistry.register(resolvedMetaKernel, loader.load(TsonBundledSchemas.META_KERNEL_ID));
+
+        TsonSchema resolvedSchema = new TsonSchemaResolver(loader).resolveSchema(schemaDocument);
+        assertTrue(resolvedSchema.entries().containsKey("my_int"),
+                "my_int should resolve as a bare reference to core.tn's own integer, reachable via the real spliced !!import");
+    }
+
     // ── Sidecar field helpers ────────────────────────────────────────────
 
     private static DataValue fieldValue(RecordValue r, String name) {
@@ -551,7 +616,67 @@ class ConformanceSuiteTest {
         return (v.coreValue() instanceof AbsentValue) ? null : fieldText(r, name);
     }
 
+    /** Unlike {@link #fieldTextOrAbsent}, for a field that may be genuinely absent from the record entirely (not present with value {@code _}) -- what an optional sidecar field like {@code meta}/{@code import} (see {@link #resolvedRaw}) actually looks like when unused. */
+    private static boolean hasField(RecordValue r, String name) {
+        return r.fields().stream().anyMatch(f -> f.name().equals(name));
+    }
+
+    /** Each element of an array-of-tokens field (e.g. {@code import}), as plain text. */
+    private static List<String> fieldTextArray(RecordValue r, String name) {
+        ArrayValue array = (ArrayValue) fieldCore(r, name);
+        List<String> result = new ArrayList<>();
+        for (ScopedValue element : array.elements()) {
+            result.add(assertInstanceOf(TokenValue.class, element.value().coreValue(),
+                    "field '" + name + "' element").text());
+        }
+        return result;
+    }
+
     private static String readRaw(Path p) throws IOException {
         return new String(Files.readAllBytes(p), StandardCharsets.UTF_8);
+    }
+
+    /**
+     * {@code subject}'s own raw text, with a {@code meta}/{@code import} sidecar field (see {@link
+     * #SCHEMA_SHORT_NAMES}) resolved to its real bundled-schema identity and spliced into the
+     * document's own header as a genuine {@code !!meta}/{@code !!import} directive -- a pure no-op
+     * (returns {@link #readRaw} unchanged) when the sidecar declares neither field, which is every
+     * vector as of this writing.
+     *
+     * <p>Can't be a blind prepend: {@code TsonSchemaParser}'s own header grammar is a fixed
+     * sequence -- optional {@code !!id}, then exactly one {@code !!meta} ("immediately after
+     * {@code !!id} if present"), then zero or more {@code !!import} -- so the resolved directive
+     * block is inserted right after the subject's own {@code !!id} line (every real schema-document
+     * subject already writes one), or at the very start if the subject has none.
+     */
+    private static String resolvedRaw(Path subject, RecordValue sidecar) throws IOException {
+        String raw = readRaw(subject);
+        if (!hasField(sidecar, "meta")) {
+            return raw;
+        }
+        StringBuilder directives = new StringBuilder();
+        directives.append("!!meta:\"").append(resolveShortName(fieldText(sidecar, "meta"))).append("\"\n");
+        if (hasField(sidecar, "import")) {
+            for (String importName : fieldTextArray(sidecar, "import")) {
+                directives.append("!!import:\"").append(resolveShortName(importName)).append("\"\n");
+            }
+        }
+        int insertAt;
+        if (raw.startsWith("!!id:")) {
+            int newline = raw.indexOf('\n');
+            insertAt = (newline == -1) ? raw.length() : newline + 1;
+        } else {
+            insertAt = 0;
+        }
+        return raw.substring(0, insertAt) + directives + raw.substring(insertAt);
+    }
+
+    private static String resolveShortName(String shortName) {
+        String resolved = SCHEMA_SHORT_NAMES.get(shortName);
+        if (resolved == null) {
+            throw new AssertionError("unknown schema short name '" + shortName
+                    + "' -- expected one of " + SCHEMA_SHORT_NAMES.keySet());
+        }
+        return resolved;
     }
 }

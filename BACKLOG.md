@@ -335,6 +335,23 @@ own prose (which had gone stale on at least one of them):
   name resolving to a parameter) anywhere in its body, at any depth. Distinct from `value_param`
   *substitution* (tracked in `STRUCTURED-OUTPUT.md`) — this is a rejection rule for a malformed
   "closed" entry, not the substitution mechanism itself.
+- [ ] **`!choice { variants: [...] }` construction (§5.4) fails to resolve — a genuine bug, not just
+  an unimplemented case, confirmed empirically (2026-07-29) while designing the sibling
+  `ltr8-io-tson-test-suite` repo's own sidecar-format schemas (see "Conformance test suite" below):
+  a tagged union would have modeled `core_value`/`base_value`/each layer's own `outcome`-discriminated
+  sidecar shape far more precisely than the "one record, kind enum, every other field optional"
+  design those schemas actually ended up using, so this was worth pinning down exactly rather than
+  left as a guess. `DefinitionResolver.bindAtomInstance` throws `UnsupportedOperationException`
+  wrapping a `NullPointerException` ("Cannot invoke `Collection.isEmpty()` because `coll` is null"),
+  from `TypeRef`'s own constructor via `List.copyOf`, reached through
+  `RecordBindReader.read`/`ArrayBindReader.read` while binding `choice`'s own `variants: [type_ref]`
+  field — each variant is written as a bare, unadorned type name (`!choice { variants: [text
+  integer] }`), and something in that array-of-bare-type-ref binding path isn't defaulting
+  `TypeRef.arguments` before construction the way the equivalent single-field case already does
+  elsewhere. Narrow, likely a short fix once someone's in that code path — but real, and blocks any
+  schema (this project's own or a consumer's) from declaring a genuine tagged union at all today, not
+  just from getting `disjoint` computed for one (see "Choice disjointness derivation" under
+  "Resolution & linking generality" above, which assumes a choice already resolved).
 
 (All already named in `DefinitionResolver`'s own Javadoc and `CLAUDE.md`; carried here so
 everything outstanding is tracked in one place.)
@@ -367,6 +384,66 @@ everything outstanding is tracked in one place.)
   meant to be able to pick this suite up) than this project's own internal "sidecar" jargon would be.
   `ConformanceSuiteTest` (this repo) updated to match and re-verified against the real, renamed sibling
   checkout: 110/110 vectors still pass, not just recompiles.
+- [x] **Dynamic `!!meta`/`!!import` splicing, and the sibling repo's sidecar format described as real
+  TSON schemas instead of ad hoc BNF** (2026-07-29) — a sidecar can now declare `meta`/`import` by
+  short, unversioned name (`meta: "meta.tn"`, `import: ["core.tn"]`); `ConformanceSuiteTest`'s new
+  `resolvedRaw` splices the real, current bundled identity (off `TsonBundledSchemas`, so a spec
+  revision bump touches one class, not every vector) into the subject's own header before parsing,
+  right after `!!id` per the schema grammar's own fixed directive order — a no-op today (no vector
+  uses it yet), plumbing for whenever schema-governed vectors actually get added. Separately,
+  `ltr8-io-tson-test-suite/schemas/{lexer,parser,resolver,vocabulary}-sidecar.tn` now formally
+  describe each layer's sidecar shape as real, resolver-verified schemas (`SidecarSchemasTest`, this
+  repo, resolves all four against the live bundled chain every run) — replacing the README's own
+  `document = { ... } / { ... }` BNF-style blocks. Modeled as one record per layer with an `outcome`
+  discriminator and every other field `OPTIONAL`, not a tagged union, since `!choice` construction
+  doesn't resolve yet (see the new item under "Remaining Part 2 resolution gaps" above) — the real,
+  named cost of that gap: nothing today stops a `valid` sidecar from also carrying `category`, or an
+  `error` one from carrying `document`. Field names match the real sidecar spelling exactly, hyphens
+  included (`base-value`, `type-ref`, `schema-ref`, `integer-part`, `fraction-digits`) — confirmed
+  empirically that a hyphenated schema field name parses and resolves fine, not assumed.
+- [ ] **Retrofit the ~110 existing sidecars with a real `!!schema` directive** pointing at the new
+  per-layer schemas above, and fix whatever real shape mismatches that validation surfaces —
+  explicitly *not* done in the same pass that wrote the schemas (see the sibling README's own note
+  on this), so today the schemas are resolver-verified documentation, not live validation of the
+  actual fixtures. **Worth doing sooner rather than later, per the user's own explicit reasoning**
+  (2026-07-29): only ~110 files exist today, cheap to migrate; that stops being true once the suite
+  grows into the thousands, so if the wire format itself is going to change (see the next item), now
+  is the cheap moment to do it, not after the corpus is large.
+- [ ] **A precise, `outcome`/`kind`-correlated sidecar shape needs a real design decision first,
+  not just a retrofit** — the flat, all-optional modeling these schemas use today (`core_value`'s
+  `kind` plus every variant's fields all `OPTIONAL` side by side) doesn't enforce that `kind: token`
+  implies `form`/`text` present and `fields`/`entries`/`elements` absent, and so on. Three ways to
+  actually get that enforcement, discussed with the user 2026-07-29, in order of how much the real
+  wire format would have to change:
+  - `!choice { variants: [...] }` — doesn't resolve at all today (see the new item above); even once
+    fixed, a schema built on it typically still needs a `!variant` tag or a discriminator convention
+    to disambiguate on read (`ChoiceReader`'s own "no structural-recovery path" gap, "Resolution &
+    linking generality" above) — not free once the construction bug itself is fixed.
+  - **Field groups** (§5.11) — confirmed empirically to work today, including with a record-typed
+    member (`core_value => { ( token: core_value_token | record: core_value_record | ... ) }`,
+    resolves cleanly, each member individually `OPTIONAL`, mutual exclusivity captured in the
+    entry's own `groups`). The real cost: the group member's own *name* is what discriminates, so
+    each variant's fields would have to move under a keyed sub-object (`{ token: { form: ...
+    text: ... } }`) instead of today's flat `{ kind: token form: ... text: ... }` — a genuine wire
+    format break for every existing sidecar, not just a schema change.
+  - **Dependent typing at the meta-schema level — the user's own proposed direction, already on
+    their own "not yet" list before this discussion, and the one that best fits this specific case**:
+    `kind` stays exactly as it is today (a plain enum field, flat, no wire change at all) — the new
+    mechanism is a meta-schema-level association from an enum's own *member* to a type, so a
+    companion field's actual type is resolved from whichever member `kind` currently holds, rather
+    than from the field's own static declared type or its own name. Lets a schema designer decouple
+    "which type validates this value" from "what this field happens to be named" — relevant well
+    beyond this one schema, including for JSON-facing discriminated unions (see
+    `STRUCTURED-OUTPUT.md`'s own "The real sharp edge: untagged unions" item, extended with this
+    same mechanism). This is real, unstarted design work at the meta-kernel/meta.tn vocabulary level,
+    not a `DefinitionResolver` bug fix — tracked here and in `STRUCTURED-OUTPUT.md` so it isn't lost,
+    not scoped or planned yet.
+- [ ] **`vocabulary-sidecar.tn`'s own `value` field is a known simplification** — typed as plain
+  optional `text`, which doesn't capture the two atom families (`complex`, `duration`) that actually
+  write `value` as a small nested record on the wire. Revisit once `!choice` construction resolves
+  (a precise per-family shape would need a discriminator on `type-ref` itself — an open ~30-name
+  vocabulary, not a small closed enum like `outcome`/`kind`, so even with `!choice` working this one
+  isn't a completely free win the way the `outcome`-discriminated shapes are).
 
 ## Documentation
 
