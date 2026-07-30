@@ -230,7 +230,7 @@ public final class TsonSchemaParser extends TsonDataParser {
             // "-"/continuation rule) -- but after a construction's closing "}" it does not, since
             // "}" isn't an unquoted-continuation character either way, so this check is only ever
             // load-bearing in that second case.
-            Position beforeMinus = tokens.get(pos - 1).end();
+            Position beforeMinus = lastTokenEnd();
             if (beforeMinus.equals(peek().start())) {
                 throw parseError("a removal clause's '-' must be separated from the preceding token "
                         + "by whitespace (otherwise it would be absorbed into a hyphenated name)");
@@ -547,7 +547,7 @@ public final class TsonSchemaParser extends TsonDataParser {
         if (!check(TokenType.QUESTION)) {
             return false;
         }
-        Position prevEnd = tokens.get(pos - 1).end();
+        Position prevEnd = lastTokenEnd();
         if (!prevEnd.equals(peek().start())) {
             throw parseError("'?' must be immediately adjacent to the preceding type (no whitespace)");
         }

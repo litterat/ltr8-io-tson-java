@@ -27,8 +27,10 @@ import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TypeRef;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.Iterator;
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 
@@ -77,12 +79,27 @@ import java.util.Optional;
  * <p>This lookahead is bounded (at most two tokens, held in {@link #current}/{@link #pending})
  * regardless of document size or nesting depth -- it is never proportional to the size of the
  * first key/value's own subtree, unlike the naive "parse first, then decide" approach.
+ *
+ * <h2>Shared with Tier 3</h2>
+ *
+ * <p>{@link TsonDataParser} builds a full {@code Document} by pulling this class's public {@link
+ * #hasNext()}/{@link #next()} and reducing the flat event sequence back into a tree -- it holds no
+ * competing implementation of this grammar. Package-private beneath that: {@link
+ * #nextDataValueEvents()}/{@link #nextCoreValueEvents()}/{@link #nextAnnotationEvents()} run this
+ * same frame machinery for exactly one data-value/core-value/annotation at the current cursor
+ * position, without the document-header/root wrapper {@link #ensureStarted()} imposes, and the
+ * cursor primitives ({@link #peek()}, {@link #advance()}, {@link #check(TokenType)}, {@link
+ * #expect(TokenType, String)}, ...) are reachable directly. Both exist so {@link TsonSchemaParser}
+ * -- which extends {@link TsonDataParser} to reuse this exact machinery for [TSON-SCHEMA]'s own
+ * shared productions, per §12.1 -- can interleave its own schema-only token handling with calls
+ * back into the shared data grammar on the very same cursor, the same relationship it had with
+ * {@link TsonDataParser}'s token list before this class existed.
  */
 public final class TsonDataStream implements Iterator<TsonEvent> {
 
     private final Lexer lexer;
 
-    /** The next not-yet-consumed token -- always populated once {@link #ensureStarted()} has run. */
+    /** The next not-yet-consumed token -- lazily populated by {@link #peek()} on first use. */
     private Token current;
 
     /** A second lookahead token, buffered only transiently to resolve {@code {}} disambiguation. */
@@ -126,6 +143,42 @@ public final class TsonDataStream implements Iterator<TsonEvent> {
         frames.push(frame);
     }
 
+    /**
+     * Runs the frame stack to completion starting from {@code start}, collecting every event it
+     * (and anything it pushes) produces. Used for {@link #nextDataValueEvents()}/{@link
+     * #nextCoreValueEvents()}/{@link #nextAnnotationEvents()}: each parses exactly one bounded
+     * production at the current cursor position, standalone, without the document-header/root
+     * wrapper {@link #ensureStarted()} imposes -- {@code frames}/{@code ready} are guaranteed
+     * empty again when this returns, so repeated calls (interleaved with direct cursor use) are
+     * always safe.
+     */
+    private List<TsonEvent> drain(Frame start) {
+        List<TsonEvent> collected = new ArrayList<>();
+        pushFrame(start);
+        while (!frames.isEmpty()) {
+            frames.pop().step();
+            while (!ready.isEmpty()) {
+                collected.add(ready.poll());
+            }
+        }
+        return collected;
+    }
+
+    /** One full {@code data-value} (§2.3) at the current cursor position. */
+    List<TsonEvent> nextDataValueEvents() {
+        return drain(new DataValueFrame());
+    }
+
+    /** One bare {@code core-value} (§2.3) at the current cursor position -- see {@link CoreValueFrame}. */
+    List<TsonEvent> nextCoreValueEvents() {
+        return drain(new CoreValueFrame());
+    }
+
+    /** One standalone annotation (§3.1) at the current cursor position. */
+    List<TsonEvent> nextAnnotationEvents() {
+        return drain(new AnnotationOnlyFrame());
+    }
+
     // ── Startup: header directives (§2.2), mirroring TsonDataParser.parseDocument ───────
 
     private void ensureStarted() {
@@ -133,7 +186,6 @@ public final class TsonDataStream implements Iterator<TsonEvent> {
             return;
         }
         started = true;
-        current = lexer.nextToken();
 
         Position docStart = peek().start();
         Optional<String> id = Optional.empty();
@@ -164,8 +216,13 @@ public final class TsonDataStream implements Iterator<TsonEvent> {
     }
 
     // ── Cursor primitives over Lexer.nextToken() (bounded 2-token lookahead) ────────────
+    // Package-private (not private): TsonDataParser forwards these to TsonSchemaParser, which
+    // needs raw token-level access for its own, non-data-grammar productions.
 
-    private Token peek() {
+    Token peek() {
+        if (current == null) {
+            current = lexer.nextToken();
+        }
         return current;
     }
 
@@ -176,8 +233,8 @@ public final class TsonDataStream implements Iterator<TsonEvent> {
         return pending;
     }
 
-    private Token advance() {
-        Token t = current;
+    Token advance() {
+        Token t = peek();
         lastEnd = t.end();
         if (pending != null) {
             current = pending;
@@ -188,22 +245,27 @@ public final class TsonDataStream implements Iterator<TsonEvent> {
         return t;
     }
 
-    private boolean check(TokenType type) {
-        return current.type() == type;
+    boolean check(TokenType type) {
+        return peek().type() == type;
     }
 
-    private Token expect(TokenType type, String context) {
+    Token expect(TokenType type, String context) {
         if (!check(type)) {
             throw parseError("expected " + type + " (" + context + "), found " + describe(peek()));
         }
         return advance();
     }
 
-    private TsonParseException parseError(String message) {
+    TsonParseException parseError(String message) {
         return new TsonParseException(message, peek().start());
     }
 
-    private static String describe(Token t) {
+    /** End position of the most recently consumed token -- the streaming stand-in for {@code tokens.get(pos - 1).end()}. */
+    Position lastTokenEnd() {
+        return lastEnd;
+    }
+
+    static String describe(Token t) {
         if (t.type() == TokenType.EOF) {
             return "end of input";
         }
@@ -246,7 +308,7 @@ public final class TsonDataStream implements Iterator<TsonEvent> {
      * comma, or both) is required between elements unless the closing delimiter is immediately
      * next; a trailing separator right before the closing delimiter is likewise a parse error.
      */
-    private boolean consumeSeparatorOrCloseCheck(TokenType closing) {
+    boolean consumeSeparatorOrCloseCheck(TokenType closing) {
         if (check(closing)) {
             return false;
         }
@@ -265,13 +327,13 @@ public final class TsonDataStream implements Iterator<TsonEvent> {
     }
 
     /** Looks ahead at an upcoming {@code !!name} directive's name without consuming anything. */
-    private String peekDirectiveName() {
+    String peekDirectiveName() {
         Token name = peekSecond();
         return name.type() == TokenType.UNQUOTED ? name.text() : null;
     }
 
-    /** {@code "!!" name ":" single-line-token}, requiring the directive name to equal {@code expectedName}. See {@code TsonDataParser.parseNamedDirective} for the identical rule set (§3.3). */
-    private String parseNamedDirective(String expectedName) {
+    /** {@code "!!" name ":" single-line-token}, requiring the directive name to equal {@code expectedName} (§3.3). */
+    String parseNamedDirective(String expectedName) {
         Token bangbang = expect(TokenType.DIRECTIVE, "directive");
         Token name = peek();
         if (name.type() != TokenType.UNQUOTED) {
@@ -331,11 +393,12 @@ public final class TsonDataStream implements Iterator<TsonEvent> {
         return name.text();
     }
 
-    private Token expectFieldNameToken() {
+    /** {@code field-name = token} (§7.4): any of the three token forms. Shared with [TSON-SCHEMA]'s identical production (§12.1). */
+    Token expectFieldNameToken(String context) {
         Token name = peek();
         if (name.type() != TokenType.UNQUOTED && name.type() != TokenType.SINGLE_LINE_STRING
                 && name.type() != TokenType.MULTI_LINE_STRING) {
-            throw parseError("expected a field name (a token) for a record field, found " + describe(name));
+            throw parseError("expected a field name (a token) for " + context + ", found " + describe(name));
         }
         advance();
         return name;
@@ -361,28 +424,39 @@ public final class TsonDataStream implements Iterator<TsonEvent> {
 
     /**
      * Parses one full {@code data-value} at the current position: zero or more annotations, an
-     * optional type-ref, then a core-value (§2.3, §7.4). Stateless -- every step either finishes
-     * the value outright or (for one annotation at a time) re-pushes a fresh instance of itself
-     * to continue at the same logical position once the annotation's own value/close is done.
+     * optional type-ref, then a core-value (§2.3, §7.4), delegating each part to {@link
+     * AnnotationOnlyFrame}/{@link CoreValueFrame}. Stateless -- every step either finishes the
+     * value outright or (for one annotation at a time) re-pushes a fresh instance of itself to
+     * continue at the same logical position once the annotation's own value/close is done.
      */
     private final class DataValueFrame extends Frame {
         @Override
         void step() {
             Token t = peek();
             if (t.type() == TokenType.AT) {
-                parseAnnotation();
+                pushFrame(new DataValueFrame()); // continue this position once the annotation closes
+                pushFrame(new AnnotationOnlyFrame());
                 return;
             }
             if (t.type() == TokenType.BANG) {
                 String name = parseTypeRefName();
                 ready.add(new TypeRef(name, t.start()));
-                parseCoreValue();
+                pushFrame(new CoreValueFrame());
                 return;
             }
-            parseCoreValue();
+            pushFrame(new CoreValueFrame());
         }
+    }
 
-        private void parseAnnotation() {
+    /**
+     * One standalone annotation (§3.1): {@code "@" unquoted-token [ ":" data-value ]}. Split out
+     * of {@link DataValueFrame} so {@link #nextAnnotationEvents()} can drive exactly this
+     * production on its own -- [TSON-SCHEMA]'s own annotation positions (§12.1) reuse it the same
+     * way {@link TsonSchemaParser} reuses {@code TsonDataParser.parseAnnotation()} today.
+     */
+    private final class AnnotationOnlyFrame extends Frame {
+        @Override
+        void step() {
             Token at = advance();
             Token name = peek();
             if (name.type() != TokenType.UNQUOTED) {
@@ -396,7 +470,6 @@ public final class TsonDataStream implements Iterator<TsonEvent> {
             if (check(TokenType.COLON) && name.end().equals(peek().start())) {
                 advance(); // ':'
                 ready.add(new AnnotationStart(name.text(), at.start()));
-                pushFrame(new DataValueFrame()); // continue this position once the annotation closes
                 pushFrame(new AnnotationEndFrame());
                 pushFrame(new DataValueFrame()); // the annotation's own value
                 return;
@@ -409,10 +482,19 @@ public final class TsonDataStream implements Iterator<TsonEvent> {
             }
             ready.add(new AnnotationStart(name.text(), at.start()));
             ready.add(new AnnotationEnd(peek().start()));
-            pushFrame(new DataValueFrame()); // continue this position for further annotations/type-ref/core-value
         }
+    }
 
-        private void parseCoreValue() {
+    /**
+     * A bare {@code core-value} (§2.3, §7.4) -- no annotation/type-ref layer. Split out of {@link
+     * DataValueFrame} so {@link #nextCoreValueEvents()} can drive exactly this narrower
+     * production directly, for [TSON-SCHEMA] §5.5's {@code instance} ({@code "!" type-name ws
+     * core-value}, corrected from the spec's own literal {@code data-value} -- see {@code
+     * SPEC-FEEDBACK.md}), which must not accept a payload with its own competing annotations/type-ref.
+     */
+    private final class CoreValueFrame extends Frame {
+        @Override
+        void step() {
             Token t = peek();
             switch (t.type()) {
                 case LBRACE -> parseBraceValue();
@@ -516,7 +598,7 @@ public final class TsonDataStream implements Iterator<TsonEvent> {
                 return;
             }
             consumeSeparatorOrCloseCheck(TokenType.RBRACE);
-            Token name = expectFieldNameToken();
+            Token name = expectFieldNameToken("a record field");
             expect(TokenType.COLON, "record field");
             ready.add(new FieldName(name.text(), name.start()));
             pushFrame(new RecordFrame());
