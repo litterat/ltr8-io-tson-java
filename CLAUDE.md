@@ -189,6 +189,57 @@ points, tied to specific spec sections:
   is therefore unreachable for any real byte input and fails loudly (`IllegalStateException`) rather
   than silently fabricating a codepoint, on the same "don't handle what can't happen" principle this
   codebase applies elsewhere.
+- **`nextToken()` returns only `TokenType`, not a `Token` -- and `Token` itself no longer nests two
+  `Position` objects** (switched 2026-07-30, immediately after the `InputStream` change above, for the
+  same "reduce GC pressure on a high-throughput read" motivation). A token's text/position are read off
+  separately, via `text()`/`startLine()`/`startColumn()`/`startByteOffset()`/`endLine()`/`endColumn()`/
+  `endByteOffset()` -- accessors reflecting whichever token `nextToken()` most recently produced, valid
+  until the next call. `endLine()`/`endColumn()`/`endByteOffset()` cost nothing extra to expose: they're
+  simply the live cursor's own current coordinates the instant a token finishes (nothing else advances
+  the cursor before the next `nextToken()` call), so no separate "end" state is tracked at all;
+  `startLine()`/etc. are a small snapshot of the same three coordinates taken once, at the top of
+  `nextToken()`, before that token's own characters are consumed -- replacing the old practice of
+  threading a `Position start` parameter through every compound-token helper method (`lexQuoted`,
+  `lexBangOrDirective`, `checkNfc`, `decodeAllEscapes`, ...), all of which now read `tokenStartLine`/
+  `tokenStartColumn`/`tokenStartByteOffset` directly instead, needing no parameter at all. Every
+  `lexError(...)`-shaped call site was replaced by one of two named helpers, `errorAtTokenStart(String)`
+  (this token's own start -- most errors) or `errorHere(String)` (the live cursor's current position --
+  the handful of errors discovered mid-token, e.g. an unterminated escape sequence, where the offending
+  character isn't the token's own start), each building the one real `Position` object an exception
+  actually needs to carry, only at the point it's thrown. **`Token` (`lexer.Token`) itself is now a flat
+  record of six raw `int`s (`startLine`/`startColumn`/`startByteOffset`/`endLine`/`endColumn`/
+  `endByteOffset`) plus `type`/`text`, not two nested `Position` fields** -- `start()`/`end()` stay as
+  convenience methods with the same names and return type as before (so every existing call site
+  everywhere else in this codebase, e.g. `TsonSchemaParser`'s own adjacency checks, keeps compiling and
+  behaving identically), but now materialize a `Position` on demand rather than returning an
+  already-built field, so a token whose position is only ever used for a same-document adjacency
+  comparison never allocates one at all. Two comparison helpers exist for exactly that: `boolean
+  adjacentTo(Token other)` (this token's end is exactly where `other` starts) and `boolean startsAt(int
+  line, int column, int byteOffset)` (this token starts at the given raw coordinates) -- `TsonDataStream`
+  replaced every `a.end().equals(b.start())`-shaped comparison (directive/type-ref/annotation adjacency
+  checks, and the per-separator `lastEnd.equals(peekToken().start())` check that runs once per record
+  field/map entry/array element) with one of these; `TsonDataStream`'s own `lastEnd` field became three
+  raw ints (`lastEndLine`/`lastEndColumn`/`lastEndByteOffset`) for the same reason, with
+  `lastTokenEnd()` (its one real external caller, `TsonSchemaParser`) still materializing a genuine
+  `Position` on demand. `TsonDataStream.current`/`.pending` (its own bounded, always-exactly-two-slot
+  token lookahead, see below) still hold real, addressable `Token` snapshots -- built once, immediately
+  after each `lexer.nextToken()` call, via a small `snapshot(...)` helper reading the new accessor
+  methods -- since `TsonDataStream`'s own access pattern (holding multiple previously-fetched tokens
+  live simultaneously, comparing arbitrary pairs across frame-step boundaries) genuinely needs a
+  retainable value per token regardless of how `Lexer` itself exposes one; only `Lexer`'s own internal
+  bookkeeping stopped building `Position`/`Token` objects it might never need. **The one dynamic
+  allocation this pass also closed**: the eleven single-character "special" tokens (`@`, `&`, `<`, `>`,
+  `?`, `~`, `|`, `;`, `(`, `)`, `^`) used to build their own text via `new String(Character.toChars(cp))`
+  every time, the one text allocation in this class that wasn't already a compile-time string literal
+  (every other fixed-token spelling, e.g. `"{"`/`"=>"`/`"!!"`, was already a literal and therefore
+  already interned by the JVM's own string pool, needing no explicit change) -- `specialTokenText(cp)`
+  replaces it with a plain switch over literal strings. Verified behavior-preserving, not just
+  compiling: full `./gradlew clean build` stayed green across every module (1236/1236, unchanged from
+  before this pass), including `LexerTest` (49/49) and the real sibling conformance suite via
+  `ConformanceSuiteTest` (111/111, ran for real against the checked-out fixtures, not skipped) --
+  neither needed a single change, confirming the public/package-private surface these tests and
+  `TsonSchemaParser` depend on (`Token.type()`/`.text()`/`.start()`/`.end()`, `Lexer.tokenize()`)
+  stayed byte-for-byte compatible throughout.
 - **Code-point addressed, not char-addressed.** The cursor advances by Unicode code point
   (`Character.isHighSurrogate`/`Character.toCodePoint` pairing two `char`s back into one code point
   when reading from the underlying `Reader`) so supplementary-plane characters (valid in TSON

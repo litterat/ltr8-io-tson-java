@@ -108,8 +108,10 @@ public final class TsonDataStream implements TsonEventSource {
     /** A second lookahead token, buffered only transiently to resolve {@code {}} disambiguation. */
     private Token pending;
 
-    /** End position of the most recently consumed token, exposed via {@link #lastTokenEnd()}. */
-    private Position lastEnd;
+    /** End position of the most recently consumed token, exposed via {@link #lastTokenEnd()} -- three raw coordinates, not a stored {@link Position}, so a separator check (the hottest consumer, once per record field/map entry/array element) never allocates one; {@link #lastTokenEnd()} itself still materializes a real {@link Position} on demand for its own (much rarer) callers. */
+    private int lastEndLine;
+    private int lastEndColumn;
+    private int lastEndByteOffset;
 
     private final Deque<Frame> frames = new ArrayDeque<>();
     private final Deque<TsonEvent> ready = new ArrayDeque<>();
@@ -230,28 +232,36 @@ public final class TsonDataStream implements TsonEventSource {
     // Package-private (not private): TsonDataParser forwards these to TsonSchemaParser, which
     // needs raw token-level access for its own, non-data-grammar productions.
 
+    /** Runs {@link Lexer#nextToken()} and immediately snapshots its text/position accessors into a retainable {@link Token} -- {@code current}/{@code pending} genuinely need to be addressable and compared pairwise across frame steps, unlike {@link Lexer}'s own single-token live cursor. */
+    private static Token snapshot(Lexer lexer, TokenType type) {
+        return new Token(type, lexer.text(), lexer.startLine(), lexer.startColumn(), lexer.startByteOffset(),
+                lexer.endLine(), lexer.endColumn(), lexer.endByteOffset());
+    }
+
     Token peekToken() {
         if (current == null) {
-            current = lexer.nextToken();
+            current = snapshot(lexer, lexer.nextToken());
         }
         return current;
     }
 
     private Token peekSecond() {
         if (pending == null) {
-            pending = lexer.nextToken();
+            pending = snapshot(lexer, lexer.nextToken());
         }
         return pending;
     }
 
     Token advance() {
         Token t = peekToken();
-        lastEnd = t.end();
+        lastEndLine = t.endLine();
+        lastEndColumn = t.endColumn();
+        lastEndByteOffset = t.endByteOffset();
         if (pending != null) {
             current = pending;
             pending = null;
         } else {
-            current = lexer.nextToken();
+            current = snapshot(lexer, lexer.nextToken());
         }
         return t;
     }
@@ -277,7 +287,7 @@ public final class TsonDataStream implements TsonEventSource {
      * must confirm no whitespace separates the current token from the one just consumed.
      */
     Position lastTokenEnd() {
-        return lastEnd;
+        return new Position(lastEndLine, lastEndColumn, lastEndByteOffset);
     }
 
     static String describe(Token t) {
@@ -327,7 +337,7 @@ public final class TsonDataStream implements TsonEventSource {
         if (check(closing)) {
             return false;
         }
-        boolean sawSeparator = !lastEnd.equals(peekToken().start());
+        boolean sawSeparator = !peekToken().startsAt(lastEndLine, lastEndColumn, lastEndByteOffset);
         if (check(TokenType.COMMA)) {
             advance();
             sawSeparator = true;
@@ -354,7 +364,7 @@ public final class TsonDataStream implements TsonEventSource {
         if (name.type() != TokenType.UNQUOTED) {
             throw parseError("expected a directive name after '!!', found " + describe(name));
         }
-        if (!bangbang.end().equals(name.start())) {
+        if (!bangbang.adjacentTo(name)) {
             throw parseError("'!!' must be immediately adjacent to the directive name (no whitespace)");
         }
         if (!name.text().equals(expectedName)) {
@@ -364,7 +374,7 @@ public final class TsonDataStream implements TsonEventSource {
         advance();
 
         Token colon = peekToken();
-        if (colon.type() != TokenType.COLON || !name.end().equals(colon.start())) {
+        if (colon.type() != TokenType.COLON || !name.adjacentTo(colon)) {
             throw parseError("expected ':' immediately after directive name '!!" + expectedName + "'");
         }
         advance();
@@ -395,13 +405,13 @@ public final class TsonDataStream implements TsonEventSource {
         if (name.type() != TokenType.UNQUOTED) {
             throw parseError("expected a type name after '!', found " + describe(name));
         }
-        if (!bang.end().equals(name.start())) {
+        if (!bang.adjacentTo(name)) {
             throw parseError("'!' must be immediately adjacent to the type name (no whitespace)");
         }
         advance();
 
         Token next = peekToken();
-        if (!isStructuralDelimiter(next.type()) && name.end().equals(next.start())) {
+        if (!isStructuralDelimiter(next.type()) && name.adjacentTo(next)) {
             throw parseError("expected whitespace after type name '" + name.text()
                     + "' before " + describe(next));
         }
@@ -477,12 +487,12 @@ public final class TsonDataStream implements TsonEventSource {
             if (name.type() != TokenType.UNQUOTED) {
                 throw parseError("expected an annotation name after '@', found " + describe(name));
             }
-            if (!at.end().equals(name.start())) {
+            if (!at.adjacentTo(name)) {
                 throw parseError("'@' must be immediately adjacent to the annotation name (no whitespace)");
             }
             advance();
 
-            if (check(TokenType.COLON) && name.end().equals(peekToken().start())) {
+            if (check(TokenType.COLON) && name.adjacentTo(peekToken())) {
                 advance(); // ':'
                 ready.add(new AnnotationStart(name.text(), at.start()));
                 pushFrame(new AnnotationEndFrame());
@@ -491,7 +501,7 @@ public final class TsonDataStream implements TsonEventSource {
             }
 
             // Valueless: at least one whitespace character MUST follow the annotation name (§3.1).
-            if (name.end().equals(peekToken().start())) {
+            if (name.adjacentTo(peekToken())) {
                 throw parseError("expected whitespace after annotation name '" + name.text()
                         + "' (or an adjacent ':' to give it a value)");
             }
