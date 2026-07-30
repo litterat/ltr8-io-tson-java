@@ -63,9 +63,7 @@ class MultiErrorCollectionTest {
                   items: [1 hello 3]
                 }
                 """;
-        TsonDataStream dataStream = new TsonDataStream(dataSource);
-        dataStream.next(); // DocumentStart
-        TsonReadContext ctx = TsonReadContext.collecting(dataStream);
+        TsonReadContext ctx = TsonReadContext.collecting(dataSource);
 
         @SuppressWarnings("unchecked")
         Map<String, Object> result = (Map<String, Object>) compiled.get("my_record").read(ctx);

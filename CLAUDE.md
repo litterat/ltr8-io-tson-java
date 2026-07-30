@@ -2821,6 +2821,42 @@ every module (`tson-compiler` 993/993, `tson-schema` 53/53, `tson` 5/5, `tson-cl
 160/160), including `tson`'s and `tson-cli`'s own call sites (`TsonTest`, `OutputFormat.renderTson`,
 `ValidateCommand.run`, `OutputFormatTest`) that reached the compiled-reader layer directly.
 
+**Whole-document `TsonReadContext` factories (a follow-up, 2026-07-30).** The collecting-mode call
+site the reader redesign left behind was awkward -- `new TsonDataStream(source); stream.next(); //
+DocumentStart; TsonReadContext.collecting(stream)` -- leaking the internal event protocol (a caller
+had to know the first event is always `DocumentStart` and manually discard it). Four new
+`TsonReadContext` factory overloads hide that: `throwing(String)`/`throwing(InputStream)`/
+`collecting(String)`/`collecting(InputStream)` each build a `TsonDataStream` and consume its
+`DocumentStart` framing themselves (via a small private `documentStream` helper), so a caller writes
+`TsonReadContext.collecting(source)` and nothing else. **These are deliberately distinct from the
+pre-existing `throwing(TsonEventSource)`/`collecting(TsonEventSource)` overloads, which stay "raw"** --
+no document framing assumed -- since those are what a mid-document/replay source (`ListEventSource`,
+for schema defaults and `DataValueEvents`) genuinely needs; the split is "whole document's own
+source text/bytes" vs. "these exact events." `TsonValueReader.read(String)` was reworked to go through
+`throwing(String)` (dropping its own manual `DocumentStart` skip), and gained a streaming sibling,
+`read(InputStream)` -- both delegate to one private `readDocument(ctx)` that reads the root value then
+verifies the next event is `DocumentEnd` (the trailing-content check, now via `ctx.next()` since the
+context shares the same underlying stream, rather than a separately-held `TsonDataStream` reference).
+**`TsonDataStream` gained an `InputStream` constructor** (the `String` one now just delegates,
+wrapping in a UTF-8 `ByteArrayInputStream`) -- and this is what makes the `InputStream` factories
+matter beyond ergonomics: `tson-cli`'s `ValidateCommand` now reads each data file via `Files
+.newInputStream(dataFile)` in a try-with-resources, streaming it genuinely, where it previously did
+`Io.readFile` (a `Files.readString` that slurps the whole file into a `String` first, defeating the
+bounded-memory point of the streaming stack for a large document). The schema file itself still goes
+through `Io.readFile` -- a schema document is small, self-contained, and parsed once, so there's no
+benefit to streaming it (the same reasoning that leaves the whole schema pipeline unstreamed). A
+missing/unreadable data file's own `IOException` (from `newInputStream` or `close`) now joins the same
+`catch` that already handled a malformed document, reported as one `VALIDATION_ERROR` -- byte-for-byte
+the same outcome the old `Io.readFile`-throwing-`UncheckedIOException` path produced. Verified: full
+`./gradlew build` green (1236/1236, unchanged), the three collecting/throwing test call sites
+(`MultiErrorCollectionTest`/`DuplicateFieldOverwriteTest`/`PositionalReadErrorsTest`) migrated to the
+new factories, and the installed CLI binary re-checked end to end against a real schema+data pair
+(valid → `OK`/exit 0; missing required field → real `FIELD_REQUIRED` with a genuine `dataPosition`/
+exit 1; missing file → `VALIDATION_ERROR`/exit 1). `StreamingLazinessTest` deliberately keeps the raw
+`new TsonDataStream` + manual `DocumentStart` skip -- it wraps the stream in a counting
+`TsonEventSource` the factories can't interpose, exactly the "raw `TsonEventSource`" case those
+overloads exist for.
+
 ### Conformance suite integration (`ConformanceSuiteTest`)
 
 Separate from `LexerTest`/`TsonDataParserTest` (fine-grained unit tests) is `ConformanceSuiteTest`, which runs

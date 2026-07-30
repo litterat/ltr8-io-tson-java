@@ -3,7 +3,6 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
-import io.ltr8.tson.compiler.TsonDataStream;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -54,9 +53,7 @@ class DuplicateFieldOverwriteTest {
 
         // "value" appears twice: first as 999 (out of int8's own -128..127 range), then as 42 (valid).
         String dataSource = "{ value: 999  value: 42 }";
-        TsonDataStream dataStream = new TsonDataStream(dataSource);
-        dataStream.next(); // DocumentStart
-        TsonReadContext ctx = TsonReadContext.collecting(dataStream);
+        TsonReadContext ctx = TsonReadContext.collecting(dataSource);
 
         @SuppressWarnings("unchecked")
         Map<String, Object> result = (Map<String, Object>) compiled.get("holder").read(ctx);

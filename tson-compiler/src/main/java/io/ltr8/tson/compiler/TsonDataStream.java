@@ -28,6 +28,7 @@ import io.ltr8.tson.compiler.stream.TsonEventSource;
 import io.ltr8.tson.compiler.stream.TypeRef;
 
 import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -119,7 +120,17 @@ public final class TsonDataStream implements TsonEventSource {
     private boolean started;
 
     public TsonDataStream(String source) {
-        this.lexer = new Lexer(new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8)));
+        this(new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8)));
+    }
+
+    /**
+     * Reads directly off {@code source}'s own bytes (UTF-8), one lexer token at a time -- for a large
+     * file this streams genuinely, never slurping the whole document into a {@code String} first the
+     * way the {@code String} constructor's callers necessarily have. {@code source} is not closed here;
+     * a caller that opened it owns closing it.
+     */
+    public TsonDataStream(InputStream source) {
+        this.lexer = new Lexer(source);
     }
 
     @Override

@@ -6,6 +6,8 @@ import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.compiler.stream.DocumentEnd;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 
+import java.io.InputStream;
+
 /**
  * Reads a value at one compiled, schema-known position -- the front door a caller actually holds
  * after compiling a schema, via {@link TsonCompiledSchema#get}. Lives at this module's own root
@@ -58,15 +60,28 @@ public interface TsonValueReader<T> {
     /**
      * Convenience for a caller with real source text and no document-level metadata ({@code !!id}/
      * {@code !!schema}) or context of their own to manage -- fail-fast, single-error, matching
-     * today's default. Consumes the document's own header/root-value framing directly off a fresh
-     * {@link TsonDataStream} and confirms there's no trailing content after the value read, the same
-     * check {@code TsonDataStream}'s own {@code RootFrame} already performs for a full document parse.
+     * today's default. Reads the whole document's own root value and confirms there's no trailing
+     * content after it, the same check {@code TsonDataStream}'s own {@code RootFrame} already performs
+     * for a full document parse.
      */
     default T read(String source) {
-        TsonDataStream stream = new TsonDataStream(source);
-        stream.next(); // DocumentStart -- no !!id/!!schema needed for schema-validated reading
-        T result = read(TsonReadContext.throwing(stream));
-        TsonEvent trailing = stream.next();
+        return readDocument(TsonReadContext.throwing(source));
+    }
+
+    /**
+     * The streaming counterpart to {@link #read(String)} -- reads the whole document's own bytes
+     * (UTF-8) genuinely off {@code source}, never buffering it into a {@link String} first, so a
+     * large file is never fully resident. {@code source} is not closed here; a caller that opened it
+     * owns closing it.
+     */
+    default T read(InputStream source) {
+        return readDocument(TsonReadContext.throwing(source));
+    }
+
+    /** Reads the root value through {@code ctx} (already positioned past {@code DocumentStart}), then confirms the next event is {@code DocumentEnd} -- no trailing content after the document's value. */
+    private T readDocument(TsonReadContext ctx) {
+        T result = read(ctx);
+        TsonEvent trailing = ctx.next();
         if (!(trailing instanceof DocumentEnd)) {
             throw new IllegalStateException("unexpected trailing event after the document's value: " + trailing);
         }
