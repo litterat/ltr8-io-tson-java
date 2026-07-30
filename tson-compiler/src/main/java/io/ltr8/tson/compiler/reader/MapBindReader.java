@@ -5,16 +5,19 @@ import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassMap;
 import io.ltr8.bind.DataParameterizedType;
+import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.TsonValueReaderResolver;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.schema.meta.MapBody;
+import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Object-binding mode's own {@code map} reader -- reads a map-shaped value into a real, bound Java
@@ -36,17 +39,22 @@ final class MapBindReader extends MapAbstractReader<Object> {
 
     private final DataClassMap descriptor;
 
-    public MapBindReader(String name, MapBody body, DataClassMap descriptor, TsonValueReaderResolver resolver) {
-        super(name, body, resolver);
+    public MapBindReader(String name, MapBody body, DataClassMap descriptor, TsonValueReaderResolver resolver,
+                         Optional<SourcePosition> schemaPosition) {
+        super(name, body, resolver, schemaPosition);
         this.descriptor = descriptor;
     }
 
     @Override
-    public Object read(DataValue value) {
-        List<MapValue.MapEntry> entries = entries(value);
+    public Object read(DataValue value, TsonReadContext ctx) {
+        ctx = ctx.at(value).withSchemaPosition(schemaPosition);
+        List<MapValue.MapEntry> entries = entries(value, ctx);
+        if (entries == null) {
+            return null;
+        }
         try {
             Object mapData = descriptor.constructor().invoke(entries.size());
-            readInto(entries, (key, decodedValue) -> put(mapData, key, decodedValue));
+            readInto(entries, ctx, (key, decodedValue) -> put(mapData, key, decodedValue));
             return mapData;
         } catch (RuntimeException e) {
             throw e;
@@ -99,7 +107,7 @@ final class MapBindReader extends MapAbstractReader<Object> {
                 throw new IllegalArgumentException("'" + name + "' resolves to " + dataClass.typeClass()
                         + ", which isn't map-shaped -- can't bind '" + name + "' as one");
             }
-            return new MapBindReader(name, body, descriptor, resolver);
+            return new MapBindReader(name, body, descriptor, resolver, typeDefinition.position());
         }
 
         /** {@code schemaTypeName} has no real bound Java class only for a synthesized, materialized type -- see this factory's own Javadoc. */

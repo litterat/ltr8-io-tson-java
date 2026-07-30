@@ -4,6 +4,7 @@ import io.ltr8.tson.compiler.Position;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonDataParser;
+import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.TsonSchemaParser;
@@ -89,16 +90,17 @@ class PositionalReadErrorsTest {
         Document document = dataParser.parseDocument();
         Map<CoreValue, Position> dataPositions = dataParser.positions();
 
+        TsonReadContext ctx = TsonReadContext.throwing(dataPositions);
         TsonReadException thrown = assertThrows(TsonReadException.class,
-                () -> compiled.get("my_record").read(document.root()));
+                () -> compiled.get("my_record").read(document.root(), ctx));
 
         assertTrue(thrown.getMessage().contains("value"), thrown.getMessage());
 
-        Position dataPosition = dataPositions.get(thrown.dataValue());
+        SourcePosition dataPosition = thrown.diagnostic().dataPosition().orElseThrow();
         assertEquals(new Position(lineOf(dataSource, "{"), 1, 0), dataPosition);
 
-        assertTrue(thrown.schemaPosition().isPresent());
-        SourcePosition schemaPosition = thrown.schemaPosition().get();
+        assertTrue(thrown.diagnostic().schemaPosition().isPresent());
+        SourcePosition schemaPosition = thrown.diagnostic().schemaPosition().get();
         assertEquals(lineOf(schemaSource, "my_record"), schemaPosition.line());
 
         String enriched = thrown.getMessage() + " (data at line " + dataPosition.line()

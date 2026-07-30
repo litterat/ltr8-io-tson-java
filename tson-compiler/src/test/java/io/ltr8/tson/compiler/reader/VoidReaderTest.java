@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.ast.AbsentValue;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
@@ -15,24 +16,25 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class VoidReaderTest {
 
+    private static final VoidReader READER = new VoidReader(Optional.empty());
+
     @Test
     void acceptsTheAbsentSentinelAndReadsAsNull() {
         DataValue value = new DataValue(List.of(), Optional.empty(), new AbsentValue());
 
-        assertNull(VoidReader.INSTANCE.read(value));
+        assertNull(READER.read(value));
     }
 
     @Test
     void rejectsAnOrdinaryToken() {
         DataValue value = new DataValue(List.of(), Optional.empty(), new TokenValue("hello", TokenForm.UNQUOTED));
 
-        IllegalArgumentException thrown =
-                assertThrows(IllegalArgumentException.class, () -> VoidReader.INSTANCE.read(value));
+        TsonReadException thrown = assertThrows(TsonReadException.class, () -> READER.read(value));
         assertTrue(thrown.getMessage().contains("void"));
     }
 
     @Test
     void rejectsAMissingValueOutright() {
-        assertThrows(IllegalArgumentException.class, () -> VoidReader.INSTANCE.read(null));
+        assertThrows(TsonReadException.class, () -> READER.read(null));
     }
 }

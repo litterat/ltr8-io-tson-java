@@ -34,6 +34,12 @@ import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
  * ValueReaderFactory}, {@code CompilationContext}, {@code DataNameBinder}), which this codebase has
  * consistently avoided elsewhere for the same reason.
  *
+ * <p>Takes a {@link TsonReadContext} alongside the value -- the tree walk's own error sink, current
+ * path, and position tracking, shared across an entire read so a problem at one field/element
+ * doesn't have to abort the whole read to be reported; see that interface's own Javadoc. The
+ * single-argument {@link #read(DataValue)} is a convenience for a caller who just wants today's
+ * fail-fast, single-error behavior with no context of its own to manage.
+ *
  * <p>Deliberately read-only for now -- {@code write} (the serialization direction) isn't sketched
  * yet. It isn't obviously symmetric the way {@link AtomType#write} is: a validation-mode {@link
  * ValueReaderFactory} would produce a result that was never meant to be written back out at all, so
@@ -49,5 +55,10 @@ import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
  */
 public interface TsonValueReader<T> {
 
-    T read(DataValue value);
+    T read(DataValue value, TsonReadContext ctx);
+
+    /** Convenience for a caller that just wants today's fail-fast, single-error behavior. */
+    default T read(DataValue value) {
+        return read(value, TsonReadContext.throwing());
+    }
 }

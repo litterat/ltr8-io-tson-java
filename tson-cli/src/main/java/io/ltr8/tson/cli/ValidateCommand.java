@@ -1,10 +1,13 @@
 package io.ltr8.tson.cli;
 
 import io.ltr8.tson.Tson;
-import io.ltr8.tson.compiler.TsonDataParser;
-import io.ltr8.tson.compiler.TsonValueReader;
+import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
+import io.ltr8.tson.compiler.TsonDataParser;
+import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
+import io.ltr8.tson.compiler.TsonValueReader;
+import io.ltr8.tson.compiler.ast.Document;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -14,9 +17,13 @@ import java.util.List;
  * {@code schema} (DOM mode: an arbitrary user schema's own Java shape, if any, isn't known to this
  * CLI), gets the compiled reader for {@code --type}, and reads each data file against it.
  *
- * <p><b>No multi-error collection yet</b> (tracked in {@code STRUCTURED-OUTPUT.md}) -- the existing
- * reader/resolver stack is fail-fast, so each file either reads cleanly or throws on the first
- * problem found; that single caught exception becomes this file's one {@link CliDiagnostic}.
+ * <p><b>Always collects every problem in a file, not just the first</b> -- each data file is read
+ * through a collecting {@link TsonReadContext}, so a single {@code validate} run surfaces every
+ * independent problem in that file in one pass, not just the first one found. There's no separate
+ * fail-fast mode/flag: collecting *is* the default, since gating it behind a flag would just add a
+ * mode nobody uses. A failure that happens outside any single read at all (the schema itself doesn't
+ * compile, or {@code --type} names something that doesn't exist) still reports as one infrastructure-
+ * level {@link CliDiagnostic}, via {@link ValidationReport#failed}.
  *
  * <p><b>Requires an explicit {@code --type}</b> because there's no {@code !!schema}-header
  * auto-selection yet (tracked in {@code BACKLOG.md}'s "Front door / ergonomics") -- a TSON schema
@@ -35,7 +42,7 @@ final class ValidateCommand {
             Tson tson = Tson.builder().build();
             compiledSchema = tson.compile(Io.readFile(schemaFile), TsonSchemaCompiler.dom());
         } catch (RuntimeException e) {
-            System.out.println(format.render(ValidationReport.failed("SCHEMA_ERROR", e.getMessage())));
+            System.out.println(format.render(ValidationReport.failed(Diagnostic.Code.SCHEMA_ERROR, e.getMessage())));
             return 2;
         }
 
@@ -43,7 +50,7 @@ final class ValidateCommand {
         try {
             reader = compiledSchema.compiledSchema().get(typeName);
         } catch (RuntimeException e) {
-            System.out.println(format.render(ValidationReport.failed("UNKNOWN_TYPE", e.getMessage())));
+            System.out.println(format.render(ValidationReport.failed(Diagnostic.Code.UNKNOWN_TYPE, e.getMessage())));
             return 2;
         }
 
@@ -53,11 +60,18 @@ final class ValidateCommand {
                 System.out.println("# " + dataFile);
             }
             try {
-                reader.read(new TsonDataParser(Io.readFile(dataFile)).parseDocument().root());
-                System.out.println(format.render(ValidationReport.ok()));
+                TsonDataParser parser = new TsonDataParser(Io.readFile(dataFile));
+                Document document = parser.parseDocument();
+                TsonReadContext ctx = TsonReadContext.collecting(parser.positions());
+                reader.read(document.root(), ctx);
+                List<CliDiagnostic> errors = ctx.diagnostics().stream().map(CliDiagnostic::from).toList();
+                if (!errors.isEmpty()) {
+                    allValid = false;
+                }
+                System.out.println(format.render(new ValidationReport(errors.isEmpty(), errors)));
             } catch (RuntimeException e) {
                 allValid = false;
-                System.out.println(format.render(ValidationReport.failed("VALIDATION_ERROR", e.getMessage())));
+                System.out.println(format.render(ValidationReport.failed(Diagnostic.Code.VALIDATION_ERROR, e.getMessage())));
             }
         }
         return allValid ? 0 : 1;

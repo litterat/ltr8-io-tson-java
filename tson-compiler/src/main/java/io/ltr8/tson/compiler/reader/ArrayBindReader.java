@@ -5,15 +5,18 @@ import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassArray;
 import io.ltr8.bind.DataParameterizedType;
+import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.TsonValueReaderResolver;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.ScopedValue;
 import io.ltr8.tson.schema.meta.ArrayBody;
+import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.lang.reflect.Type;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Object-binding mode's own {@code array} reader -- reads an array-shaped value into a real, bound
@@ -44,18 +47,23 @@ final class ArrayBindReader extends ArrayAbstractReader<Object> {
 
     private final DataClassArray descriptor;
 
-    public ArrayBindReader(String name, ArrayBody body, DataClassArray descriptor, TsonValueReaderResolver resolver) {
-        super(name, body, resolver);
+    public ArrayBindReader(String name, ArrayBody body, DataClassArray descriptor, TsonValueReaderResolver resolver,
+                           Optional<SourcePosition> schemaPosition) {
+        super(name, body, resolver, schemaPosition);
         this.descriptor = descriptor;
     }
 
     @Override
-    public Object read(DataValue value) {
-        List<ScopedValue> elements = elements(value);
+    public Object read(DataValue value, TsonReadContext ctx) {
+        ctx = ctx.at(value).withSchemaPosition(schemaPosition);
+        List<ScopedValue> elements = elements(value, ctx);
+        if (elements == null) {
+            return null;
+        }
         try {
             Object arrayData = descriptor.constructor().invoke(elements.size());
             Object iterator = descriptor.iterator().invoke(arrayData);
-            readInto(elements, decoded -> put(arrayData, iterator, decoded));
+            readInto(elements, ctx, decoded -> put(arrayData, iterator, decoded));
             return arrayData;
         } catch (RuntimeException e) {
             throw e;
@@ -128,7 +136,7 @@ final class ArrayBindReader extends ArrayAbstractReader<Object> {
                 throw new IllegalArgumentException("'" + name + "' resolves to " + dataClass.typeClass()
                         + ", which isn't array-shaped -- can't bind '" + name + "' as one");
             }
-            return new ArrayBindReader(name, body, descriptor, resolver);
+            return new ArrayBindReader(name, body, descriptor, resolver, typeDefinition.position());
         }
 
         /** {@code schemaTypeName} has no real bound Java class only for a synthesized, materialized type -- see this factory's own Javadoc. */

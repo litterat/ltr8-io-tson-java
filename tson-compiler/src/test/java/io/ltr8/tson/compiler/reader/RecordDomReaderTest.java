@@ -6,7 +6,6 @@ import io.ltr8.tson.compiler.TsonDataParser;
 import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.ast.Document;
-import io.ltr8.tson.compiler.atom.AtomValidationException;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.FieldState;
@@ -78,7 +77,7 @@ class RecordDomReaderTest {
                         RecordField.required("value", TypeRef.of("integer"))));
 
         assertEquals((byte) 100, read(compiled, "{ value: 100 }").get("value"));
-        assertThrows(AtomValidationException.class, () -> read(compiled, "{ value: 200 }"));
+        assertThrows(TsonReadException.class, () -> read(compiled, "{ value: 200 }"));
     }
 
     @Test

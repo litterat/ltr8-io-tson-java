@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonDataParser;
+import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.ast.Document;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -68,8 +69,8 @@ class TupleDomReaderTest {
     void wrongArityThrows() {
         TsonCompiledSchema compiled = compile(twoRequiredSlots());
 
-        assertThrows(IllegalArgumentException.class, () -> readTuple(compiled, "[42]"));
-        assertThrows(IllegalArgumentException.class, () -> readTuple(compiled, "[42 hello extra]"));
+        assertThrows(TsonReadException.class, () -> readTuple(compiled, "[42]"));
+        assertThrows(TsonReadException.class, () -> readTuple(compiled, "[42 hello extra]"));
     }
 
     @Test
@@ -77,7 +78,7 @@ class TupleDomReaderTest {
         // A tuple is array-shaped on the wire -- {} is never a plausible reading, unlike record/map.
         TsonCompiledSchema compiled = compile(twoRequiredSlots());
 
-        assertThrows(IllegalArgumentException.class, () -> readTuple(compiled, "{}"));
+        assertThrows(TsonReadException.class, () -> readTuple(compiled, "{}"));
     }
 
     @Test
@@ -96,6 +97,6 @@ class TupleDomReaderTest {
     void requiredPositionRejectsTheAbsentSentinel() {
         TsonCompiledSchema compiled = compile(twoRequiredSlots());
 
-        assertThrows(IllegalArgumentException.class, () -> readTuple(compiled, "[42 _]"));
+        assertThrows(TsonReadException.class, () -> readTuple(compiled, "[42 _]"));
     }
 }

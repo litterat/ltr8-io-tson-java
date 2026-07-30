@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonDataParser;
+import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.ast.Document;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -69,7 +70,7 @@ class ChoiceReaderTest {
     void missingTypeRefThrowsNamingTheDeclaredVariants() {
         TsonCompiledSchema compiled = compiled();
 
-        IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class,
+        TsonReadException thrown = assertThrows(TsonReadException.class,
                 () -> read(compiled, "{ address: 1 }"));
         assertTrue(thrown.getMessage().contains("email"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("phone"), thrown.getMessage());
@@ -79,6 +80,6 @@ class ChoiceReaderTest {
     void undeclaredVariantThrows() {
         TsonCompiledSchema compiled = compiled();
 
-        assertThrows(IllegalArgumentException.class, () -> read(compiled, "!fax { address: 1 }"));
+        assertThrows(TsonReadException.class, () -> read(compiled, "!fax { address: 1 }"));
     }
 }

@@ -2,6 +2,8 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.annotation.Typename;
 import io.ltr8.bind.DataClassUnion;
+import io.ltr8.tson.compiler.Diagnostic;
+import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.TsonValueReaderResolver;
 import io.ltr8.tson.compiler.ast.DataValue;
@@ -66,29 +68,33 @@ final class VariantBindReader implements TsonValueReader<Object> {
     }
 
     @Override
-    public Object read(DataValue value) {
+    public Object read(DataValue value, TsonReadContext ctx) {
         if (value == null || value.typeRef().isEmpty() || value.typeRef().get().equals(name)) {
-            return ownParser.read(value);
+            return ownParser.read(value, ctx);
         }
         String typeRef = value.typeRef().get();
-        requireMember(typeRef);
-        return resolver.resolve(typeRef).read(value);
+        if (!isMember(typeRef)) {
+            ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF, "'" + typeRef + "' is not a member of the union '" + name
+                            + "' binds against " + describeMembers(),
+                    "one of " + describeMembers(), typeRef);
+            return null;
+        }
+        return resolver.resolve(typeRef).read(value, ctx);
     }
 
-    private void requireMember(String typeRef) {
+    private boolean isMember(String typeRef) {
         for (Class<?> member : descriptor.memberTypes()) {
             Typename tn = member.getAnnotation(Typename.class);
             if (tn != null && tn.name().equals(typeRef)) {
-                return;
+                return true;
             }
         }
         for (Class<?> member : descriptor.memberTypes()) {
             if (member.getAnnotation(Typename.class) == null && member.getSimpleName().equalsIgnoreCase(typeRef)) {
-                return;
+                return true;
             }
         }
-        throw new IllegalArgumentException(
-                "'" + typeRef + "' is not a member of the union '" + name + "' binds against " + describeMembers());
+        return false;
     }
 
     private String describeMembers() {

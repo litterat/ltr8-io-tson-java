@@ -11,8 +11,6 @@ yet implemented" section for the technical detail behind several of these items.
 
 ## Front door / ergonomics
 
-- [ ] `--all-errors`/`-a`, once the real `Diagnostic` API lands — collect every validation failure
-  in a file instead of stopping at the first.
 - [ ] No `!!schema`-header auto-selection on the data side — given a data document, there's no
   "find the right compiled reader yourself" entry point; a caller always has to already know what
   schema position it's reading against.
@@ -341,11 +339,18 @@ everything outstanding is tracked in one place.)
   .tsonOutputGenuinelyRoundTripsThroughTheDiagnosticsSchema` proves the round trip, not just that
   the text looks TSON-shaped). Arg-parsing is hand-rolled, resolving the open question this bullet
   used to carry — no external dependency needed for a flag set this small.
-  **Still v1-scoped, not the full design**: no `--all-errors` yet — each file's own read is still
-  the existing fail-fast stack, with the single caught exception formatted into a one-entry report;
-  real multi-error collection needs the full `Diagnostic`/`validate(...)` API `STRUCTURED-OUTPUT.md`
-  still describes, not yet built. `--type` is required (no `!!schema`-header auto-selection exists
-  yet, tracked separately below).
+  **`--type` is still required** (no `!!schema`-header auto-selection exists yet, tracked separately
+  below). Multi-error collection landed the same session, on a separate feature branch — see the next
+  bullet.
+- [x] **Multi-error collection — `TsonReadContext`/`Diagnostic`, landed** — every `validate` run now
+  collects every problem in a file in one pass instead of stopping at the first, via a real
+  `Diagnostic` value (`path`/`code`/`message`/`expected`/`actual`/`dataPosition`/`schemaPosition`)
+  both a fail-fast `TsonReadException` and a collecting `TsonReadContext` report through uniformly.
+  No `--all-errors` flag — collecting is simply the default now. See `CLAUDE.md`'s "Multi-error
+  collection" section for the full design (continuation policy, the `TsonReadContext` interface
+  shape, per-reader-family treatment, and what's explicitly still out of scope: code-templated
+  `message` synthesis, fine-grained atom-level codes, `UNRECOGNIZED_FIELD`/`DUPLICATE_MAP_KEY`
+  detection, per-field schema position, lexer/parser-level diagnostics).
 - [x] **Sibling repo's own vector naming migrated from `.tn1`/`.tson` to `.tn`/`-expected.tn`**
   (2026-07-29, same rename as the "Documentation" section's pre-release file-extension item above) —
   all 110 subject files renamed `<slug>.tn1` → `<slug>.tn`; all 110 sidecars renamed `<slug>.tson` →

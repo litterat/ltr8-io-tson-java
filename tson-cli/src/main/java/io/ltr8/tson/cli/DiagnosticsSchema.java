@@ -3,6 +3,7 @@ package io.ltr8.tson.cli;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.Tson;
+import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
@@ -33,6 +34,7 @@ final class DiagnosticsSchema {
     private static final DataNameBinder BINDER = name -> switch (name) {
         case "validation_report" -> ValidationReport.class;
         case "diagnostic" -> CliDiagnostic.class;
+        case "diagnostic_code" -> Diagnostic.Code.class;
         default -> SchemaMetaNameBinder.INSTANCE.resolve(name);
     };
 

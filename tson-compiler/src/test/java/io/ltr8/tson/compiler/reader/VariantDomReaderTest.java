@@ -117,7 +117,7 @@ class VariantDomReaderTest {
     void unknownTypeRefThrowsNamingTheOffendingValue() {
         TsonCompiledSchema compiled = compiled();
 
-        IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class,
+        TsonReadException thrown = assertThrows(TsonReadException.class,
                 () -> read(compiled, "!partial_response { value: 42 }"));
         assertTrue(thrown.getMessage().contains("partial_response"), thrown.getMessage());
     }

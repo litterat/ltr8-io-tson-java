@@ -1,15 +1,18 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.TsonValueReaderResolver;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.schema.meta.MapBody;
+import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * DOM mode's own {@code map} reader -- reads a map-shaped value into a plain {@code Map<Object,
@@ -22,15 +25,19 @@ import java.util.Map;
  */
 final class MapDomReader extends MapAbstractReader<Map<Object, Object>> {
 
-    public MapDomReader(String name, MapBody body, TsonValueReaderResolver resolver) {
-        super(name, body, resolver);
+    public MapDomReader(String name, MapBody body, TsonValueReaderResolver resolver, Optional<SourcePosition> schemaPosition) {
+        super(name, body, resolver, schemaPosition);
     }
 
     @Override
-    public Map<Object, Object> read(DataValue value) {
-        List<MapValue.MapEntry> entries = entries(value);
+    public Map<Object, Object> read(DataValue value, TsonReadContext ctx) {
+        ctx = ctx.at(value).withSchemaPosition(schemaPosition);
+        List<MapValue.MapEntry> entries = entries(value, ctx);
+        if (entries == null) {
+            return null;
+        }
         Map<Object, Object> result = new LinkedHashMap<>();
-        readInto(entries, result::put);
+        readInto(entries, ctx, result::put);
         return result;
     }
 
@@ -42,7 +49,7 @@ final class MapDomReader extends MapAbstractReader<Map<Object, Object>> {
             if (!(typeDefinition.body() instanceof MapBody body)) {
                 throw new IllegalArgumentException("'" + name + "' is not map-shaped: " + typeDefinition.body());
             }
-            return new MapDomReader(name, body, resolver);
+            return new MapDomReader(name, body, resolver, typeDefinition.position());
         }
     }
 }

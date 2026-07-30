@@ -2379,15 +2379,200 @@ rather than building every layer to full generality first.
 - **`PositionalReadErrorsTest`** (`resolver` package, so it can construct a `DefinitionResolver`
   directly) is the real proof: parses a small schema and a small data document via the real parsers,
   resolves/compiles/reads through the real pipeline, catches a real `TsonReadException`, and asserts
-  both `dataPositions.get(thrown.dataValue())` and `thrown.schemaPosition()` resolve to the actual
-  line numbers in each hand-written source string (computed from the source text itself via a
-  `lineOf` helper, not hardcoded, so the assertion can't silently drift from the fixture).
+  both the data and schema positions resolve to the actual line numbers in each hand-written source
+  string (computed from the source text itself via a `lineOf` helper, not hardcoded, so the assertion
+  can't silently drift from the fixture).
 
-**Scope boundaries, not yet built:** no position for `DataValue`/`Annotation`/`ScopedValue`/
-`Document`, only `CoreValue`; single anchor `Position`, no start+end span; no per-`RecordField`
-position (would hit the same equals/hashCode exposure, sharper); every other `RecordAbstractReader`
-failure mode and every other reader kind (`Array`/`Map`/`Tuple`/`Choice`/atom readers) still throws
-its previous plain-string exception.
+**Scope boundaries from this stripe, since widened -- see "Multi-error collection" below:** no
+position for `DataValue`/`Annotation`/`ScopedValue`/`Document`, only `CoreValue`; single anchor
+`Position`, no start+end span; no per-`RecordField` position (would hit the same equals/hashCode
+exposure, sharper) -- all three remain true today. What *isn't* true anymore: `TsonReadException`'s
+own 3-field shape (`message`/`dataValue`/`schemaPosition`) was superseded the same session by
+wrapping a single `Diagnostic`, and every reader kind, not just `RecordAbstractReader`'s
+missing-required-field case, now reports through the same mechanism.
+
+### Multi-error collection: `TsonReadContext` and `Diagnostic`
+
+The positional-errors stripe above proved position info could reach a `TsonReadException` for one
+scenario, but stayed fundamentally single-shot: `TsonValueReader.read(DataValue)` throws on the
+first problem and the whole read aborts. The next real goal -- driven by wanting `tson-cli`'s own
+`validate` command to report *every* problem in a file in one pass, not just the first -- turned out
+to be orthogonal to DOM vs. object-binding mode, since both share the same composite reader classes
+doing the tree walk. Built the same session as the stripe above, immediately after it.
+
+- **`Diagnostic`** (root package, alongside `TsonReadException`) -- the structured value both a
+  fail-fast `TsonReadException` and a collecting `TsonReadContext` report through, so both modes
+  produce the identical shape regardless of which a caller chose: `path` (an RFC 6901 JSON Pointer
+  into the *data*, e.g. `/orders/3/total` -- reuses an existing IETF standard, and matches the
+  convention JSON Schema's own standardized output format already uses for `instanceLocation`),
+  `code` (a closed `Code` enum -- `FIELD_REQUIRED`/`TYPE_MISMATCH`/`WRONG_ARITY`/`UNKNOWN_TYPE_REF`/
+  `ATOM_CONSTRAINT_VIOLATION` actually produced by a real reader today; `UNRECOGNIZED_FIELD`/
+  `DUPLICATE_MAP_KEY` reserved but unused, see "Explicitly out of scope" below; `SCHEMA_ERROR`/
+  `UNKNOWN_TYPE`/`VALIDATION_ERROR` are `tson-cli`'s own infrastructure-level fallbacks for a failure
+  outside any single read at all), `message` (hand-composed at each `TsonReadContext#report` call
+  site, preserving each failure's own existing, already-tested wording -- not yet synthesized purely
+  from `code` + params, which would need a richer per-code parameter shape than exists yet),
+  `expected`/`actual` (the machine-parseable pieces a caller, e.g. an LLM retry loop, can build its
+  own message from without parsing `message` itself), and `dataPosition`/`schemaPosition`
+  (`Optional<SourcePosition>`, resolved the same way the positional-errors stripe's own
+  `TsonReadException` did).
+- **`TsonReadContext`** (root package) -- an interface, not a concrete class, specifically so its
+  backing implementation can change later without an API break (see "kept in mind, not built"
+  below). `position()`/`schemaPosition()` expose "where am I right now" directly, never a raw
+  `Map<CoreValue, Position>` a caller has to look up into themselves; `path()`; `failFast()`;
+  `field(name, value)`/`index(i, value)` (a copy of this context scoped one level deeper, RFC
+  6901-escaping the name, resolving `position()` from `value`'s own identity -- `value` may be
+  `null`, e.g. a missing required field has nothing to point at, in which case `position()` on the
+  result simply *keeps* whatever it already was rather than clearing to empty, since the enclosing
+  value's own position remains the nearest real anchor in the submitted text); `withSchemaPosition`;
+  `at(value)` (resolves `position()` fresh from `value` directly -- what every reader calls, paired
+  with `withSchemaPosition`, at the very top of its own `read(value, ctx)`, since a top-level read has
+  no parent `field`/`index` call to have already seeded it); `report(code, message, expected,
+  actual)`; `diagnostics()`. Two static factories back both by one package-private
+  `DefaultTsonReadContext`, parametrized by a `failFast` boolean: `throwing()`/`throwing(dataPositions)`
+  (today's single-error behavior -- the zero-arg form is what `TsonValueReader`'s own single-arg
+  `read(DataValue)` convenience uses, with no position tracking at all since it has no parser-produced
+  table in hand; the position-aware overload exists for a fail-fast caller that still wants the
+  thrown exception's own `dataPosition` populated) and `collecting(dataPositions)` (accumulates
+  instead of throwing, `dataPositions` normally a parser's own `positions()` table).
+- **`report(...)` alone decides fail-fast vs. collect** -- if the context is fail-fast, it throws
+  `TsonReadException` immediately; if collecting, it appends to an internal sink and returns
+  normally. Every reader calls `report(...)` identically either way; no call site anywhere branches
+  on `ctx.failFast()` itself -- the difference is entirely inside `TsonReadContext`.
+- **Continuation policy: always keep reading and collecting**, on the user's own explicit direction
+  ("that's the point") -- a failure at one field/element doesn't abort the record/array it's in; the
+  reader records the problem (via `report`, which returns normally in collecting mode) and keeps
+  going with a `null` placeholder for that one field/element/entry, so sibling problems in the same
+  file still surface in the same pass. An array/tuple element is never *skipped* on failure -- the
+  `null` placeholder is kept at that index specifically so later elements' own `index()` positions
+  stay accurate against the original data, not shifted by a dropped element.
+- **`TsonValueReader<T>`** -- `T read(DataValue value, TsonReadContext ctx)` is now the sole
+  abstract method; the old `T read(DataValue value)` became a default delegating to
+  `read(value, TsonReadContext.throwing())`. Every existing caller/test using the single-arg form
+  keeps compiling and behaving identically (fail-fast, throws `TsonReadException` on the first
+  problem) with zero changes on their side -- only the ~19 classes that directly implement the
+  interface needed real edits.
+- **Every reader family widened to carry its own `schemaPosition`**, not just `RecordAbstractReader`
+  (which already had it from the stripe above) -- `ArrayAbstractReader`/`MapAbstractReader`/
+  `TupleAbstractReader`/`AtomValueReader`/`BooleanReader`/`VoidReader` all gained an
+  `Optional<SourcePosition> schemaPosition` field threaded from `typeDefinition.position()` in their
+  own `*Factory.create`. **The "stamp my own schema position" convention**: every reader's
+  `read(value, ctx)` starts with `ctx = ctx.at(value).withSchemaPosition(schemaPosition);` before
+  doing anything else, including before descending into its own children -- so a diagnostic reported
+  from inside, say, an atom reader for `integer` carries *that atom's own* declared position, not
+  whatever the enclosing record happened to leave in the context; `field`/`index` only ever update
+  path + data position, schema position is always claimed by whichever reader is currently running.
+  `BooleanReader`/`VoidReader` lost their old `INSTANCE` singleton in the process -- each declaration
+  needs its own real position now, so `AtomValueReader.UNIT`/`ENUM_OBJECT_MODE` construct a fresh one
+  per compiled entry instead of sharing one constant.
+- **Shape-mismatch and missing-required-value handling, uniformly per container kind**:
+  `RecordAbstractReader.dataFields`/`ArrayAbstractReader.elements`/`MapAbstractReader.entries`/
+  `TupleAbstractReader.elements` all return `null` (never a real element/field list) on a shape
+  mismatch, having already reported `TYPE_MISMATCH` (or, for a tuple's own exact-count mismatch,
+  `WRONG_ARITY`) to `ctx` -- a caller in collecting mode must check for `null` and stop processing
+  that value entirely rather than *also* reporting every one of its own fields/elements as separately
+  missing, which would be misleading noise on top of the one real problem (the value was never the
+  right shape to begin with). A missing required field/element/position reports `FIELD_REQUIRED`
+  uniformly across every container kind, not a different code per kind.
+- **`AtomValueReader` is the one place `atom.AtomTypeException` crosses into this whole mechanism** --
+  wraps `delegate.read(token)` in a `try/catch(AtomTypeException e)`, converting to
+  `ctx.report(ATOM_CONSTRAINT_VIOLATION, e.getMessage(), ...)`. Deliberately does **not** touch
+  `AtomType`'s own signature at all -- confirmed via a real Explore pass that `AtomType`/its
+  `*Parser` implementors are shared with `TsonMapperReader.bindBuiltin` (Class 1, schemaless), which
+  has no schema, no `TsonReadContext` concept, and does its own independent
+  `AtomTypeException`-to-`DataBindException` wrapping at its own boundary already -- changing
+  `AtomType.read` would have rippled into that unrelated path for no benefit. Every constraint
+  violation (integer-range, pattern-mismatch, enum-member, ...) maps to the single
+  `ATOM_CONSTRAINT_VIOLATION` code for now, since `AtomValidationException` itself doesn't carry a
+  structured code yet to route on -- see "explicitly out of scope" below.
+- **Dispatch readers** (`VariantSchemaReader`/`VariantBindReader`/`NamedDispatchReader`, plus the
+  `RecordBindReader.Factory`-built "no own data, provide an explicit subtype" stand-in for a pure
+  marker root like `top`) -- an unrecognized or missing `!typeName` reports `UNKNOWN_TYPE_REF`; the
+  matched target's own recursive call threads `ctx` straight through with no `field`/`index` descent,
+  since dispatch itself doesn't add a path segment.
+- **`RecordBindReader`/`TupleBindReader` skip constructing their own target object once collecting
+  mode has already reported a problem among their own fields/elements** -- checked via a simple
+  before/after `ctx.diagnostics().size()` snapshot around the read. Unlike a DOM `Map` (which
+  tolerates a `null` value for any key regardless of the target's own declared type), a real Java
+  constructor can't tolerate `null` for a primitive-typed parameter -- attempting it anyway would
+  risk a confusing secondary `NullPointerException` on top of the diagnostic already reported, for no
+  benefit (the caller already has everything they need from `ctx.diagnostics()`). `ArrayBindReader`/
+  `MapBindReader` build incrementally via `put()` per element/entry instead and aren't guarded this
+  way -- accepted as a known, low-probability edge case (would need a primitive-array/collection
+  target) rather than over-engineered against.
+- **`ErrorReader` stays an unconditional throw, ignoring `ctx` entirely -- deliberately, even in
+  collecting mode.** It represents a library/schema-compile gap ("no reader implemented for this
+  constructor yet"), not a per-document data problem; a caller can't fix it by correcting their data,
+  so silently collecting it as one more diagnostic among many would be misleading. The one documented
+  exception to "every reader always goes through `ctx.report`."
+- **One outlier stays on the old single-arg convenience, deliberately**:
+  `RecordAbstractReader.readSchemaDefault`'s own `field.parser().read(synthetic)` call happens
+  *inside the constructor*, precomputing a `REQUIRED_DEFAULT` field's value from the schema's own
+  literal token, before any real document read is in progress or any `TsonReadContext` exists yet. A
+  malformed schema default is a schema-authoring bug and should always fail loudly at compile time,
+  not become a collected diagnostic against some future caller's own document.
+- **`tson-cli` wired all the way through** -- `ValidateCommand` builds a
+  `TsonReadContext.collecting(parser.positions())` per data file and always uses it (no
+  fail-fast/`--all-errors` flag: collecting *is* the default now, confirmed with the user --
+  gating it behind a flag would just add a mode nobody uses). `ValidationReport` became
+  `ValidationReport(boolean valid, List<CliDiagnostic> errors)`; `CliDiagnostic` (widened from its
+  old two-field `code`/`message` v1-minimal stand-in, not deleted) mirrors `Diagnostic` field for
+  field except `dataPosition`/`schemaPosition` are pre-rendered `Optional<String>` (`"line:column:
+  byteOffset"`) rather than kept as `SourcePosition` objects -- deliberately: `diagnostics.tn`'s own
+  `data_position`/`schema_position` fields are plain `text?`, and a raw bound string can't be
+  narrowed back into an arbitrary atom-bridged type the way an enum or a number can
+  (`RecordBindReader.narrow`'s own switch only knows about a handful of specific cases); a separate,
+  string-only DTO sidesteps that gap entirely rather than risking an unverified narrowing path.
+  `code` stays the real `Diagnostic.Code` enum on `CliDiagnostic` too, since enum narrowing *is* a
+  proven, already-used binding path elsewhere in this codebase. `diagnostics.tn` bumped to
+  `diagnostics-2.tn` (per this project's own "immutable, bump under a new name" schema-versioning
+  convention) adding `diagnostic_code => !enum [...]` and the five new `diagnostic` fields;
+  `DiagnosticsSchema`'s hand-written `DataNameBinder` gained a `"diagnostic_code" -> Diagnostic.Code.class`
+  entry alongside its existing two. **A real, non-obvious `tson-bind` gotcha hit and fixed along the
+  way**: `CliDiagnostic.dataPosition`/`schemaPosition` needed explicit
+  `@io.ltr8.annotation.Field("data_position")`/`@io.ltr8.annotation.Field("schema_position")`
+  annotations -- without them, `TsonMapperWriter` (Class 1, no `@Field` awareness needed since it
+  writes whatever the bare Java field is named) wrote the bare camelCase name (`dataPosition:
+  "1:1:0"`), but the schema-driven compiled reader looked for the schema's own snake_case field name
+  (`data_position`) in the parsed data and never found it -- silently defaulting to `Optional.empty()`
+  on every round trip instead of throwing, since the field is legitimately `OPTIONAL` in the schema.
+  Caught by `OutputFormatTest.tsonOutputRoundTripsRealPositions`, not by inspection.
+
+**Kept in mind, not built this pass**: a bigger redesign where `TsonValueReader.read` takes *only* a
+`TsonReadContext` (no separate `DataValue` parameter), and `TsonReadContext` itself gains a `CoreValue
+next()` method -- enabling a genuinely streaming parser instead of buffering the whole document
+first. `TsonReadContext` is an interface, backed by one swappable implementation, specifically so
+this door stays open; not attempted this pass.
+
+**Explicitly out of scope this pass** (deliberate, not oversights): message synthesis purely from
+`code` + params (STRUCTURED-OUTPUT.md's own eventual ideal) -- `message` stays hand-composed per call
+site until the `code` vocabulary + parameter shapes are fleshed out further; fine-grained atom-level
+codes (`INTEGER_OUT_OF_RANGE`/`PATTERN_MISMATCH`/`ENUM_MEMBER_NOT_RECOGNIZED` from
+STRUCTURED-OUTPUT.md's own starter list) -- `AtomValidationException` doesn't carry a structured code
+to route on yet, so every atom constraint violation maps to one general `ATOM_CONSTRAINT_VIOLATION`;
+`UNRECOGNIZED_FIELD` detection -- nothing in the current reader stack checks for a data field the
+schema doesn't declare at all (readers iterate *schema* fields, never *data* fields), so adding that
+check would be new validation behavior, not a refactor of an existing throw site; `DUPLICATE_MAP_KEY`
+detection -- the parser layer already resolves "last value wins" before a `MapValue` ever reaches a
+reader, so nothing at this layer currently detects the duplicate at all; per-field schema position --
+still only declaration-level, inherited from the positional-errors stripe above; lexer/parser-level
+diagnostics (`LexException`/`TsonParseException`) feeding the same `Diagnostic` model -- flagged as a
+separate, undecided question in STRUCTURED-OUTPUT.md itself.
+
+Verified with `TsonReadContextTest` (path accumulation and RFC 6901 escaping, position/schema-position
+tracking across descent, fail-fast-throws-vs-collecting-accumulates, `withSchemaPosition` semantics),
+`MultiErrorCollectionTest` (the actual payoff: one data file with three independent, unrelated
+problems -- a missing required field, an out-of-range sibling field, and a bad element nested inside
+an array field -- reads through a collecting context in a single call and reports all three, each
+with its own correct `path`/`code`/real `dataPosition`, not just the first one found), and two new
+`ValidateCommandTest` cases proving the same end to end through the real CLI in both `--output text`
+and `--output json`. Every existing test using the single-arg `read(DataValue)` convenience kept
+passing unchanged after the ripple, confirming fail-fast semantics survived byte for byte; a handful
+of pre-existing tests asserting a bare `IllegalArgumentException`/`AtomValidationException` were
+updated to expect `TsonReadException` instead (a real, intended behavior change, not incidental
+breakage), and two `ValidateCommandTest` assertions were sharpened from the generic `[VALIDATION_ERROR]`
+fallback to the real, specific `[ATOM_CONSTRAINT_VIOLATION]` code a collecting context now produces
+for that exact scenario.
 
 ### Conformance suite integration (`ConformanceSuiteTest`)
 

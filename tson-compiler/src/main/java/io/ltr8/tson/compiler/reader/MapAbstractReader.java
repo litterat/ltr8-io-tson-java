@@ -1,5 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.Diagnostic;
+import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.TsonValueReaderResolver;
 import io.ltr8.tson.compiler.ast.AbsentValue;
@@ -7,10 +9,13 @@ import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.EmptyBrace;
 import io.ltr8.tson.compiler.ast.MapValue;
+import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.MapBody;
+import io.ltr8.tson.schema.meta.SourcePosition;
 
 import java.math.BigInteger;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.BiConsumer;
 
 /**
@@ -34,17 +39,22 @@ abstract class MapAbstractReader<T> implements TsonValueReader<T> {
     final MapBody body;
     final TsonValueReader<?> keyParser;
     final TsonValueReader<?> valueParser;
+    final Optional<SourcePosition> schemaPosition;
 
-    MapAbstractReader(String name, MapBody body, TsonValueReaderResolver resolver) {
+    MapAbstractReader(String name, MapBody body, TsonValueReaderResolver resolver, Optional<SourcePosition> schemaPosition) {
         this.name = name;
         this.body = body;
         this.keyParser = resolver.resolve(body.keyType().name());
         this.valueParser = resolver.resolve(body.valueType().name());
+        this.schemaPosition = schemaPosition;
     }
 
-    final List<MapValue.MapEntry> entries(DataValue value) {
+    /** Returns {@code null} (not a real entry list) on a shape mismatch -- see {@link RecordAbstractReader#dataFields} for the identical "caller must stop, not also report every entry missing" contract. */
+    final List<MapValue.MapEntry> entries(DataValue value, TsonReadContext ctx) {
         if (value == null) {
-            throw new IllegalArgumentException("expected a map for '" + name + "', found no value");
+            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a map for '" + name + "', found no value",
+                    "a map", "no value");
+            return null;
         }
         CoreValue core = value.coreValue();
         if (core instanceof MapValue mv) {
@@ -53,34 +63,52 @@ abstract class MapAbstractReader<T> implements TsonValueReader<T> {
         if (core instanceof EmptyBrace) {
             return List.of();
         }
-        throw new IllegalArgumentException("expected a map for '" + name + "', found " + core);
+        ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a map for '" + name + "', found " + core,
+                "a map", String.valueOf(core));
+        return null;
     }
 
-    /** Validates size, then decodes every entry in order, handing each key/value pair to {@code sink}. */
-    final void readInto(List<MapValue.MapEntry> entries, BiConsumer<Object, Object> sink) {
-        validateSize(entries.size());
+    /**
+     * Validates size, then decodes every entry in order, handing each key/value pair to {@code sink}
+     * -- keeps decoding every remaining entry after one fails, so sibling entries' own problems still
+     * surface in the same pass.
+     */
+    final void readInto(List<MapValue.MapEntry> entries, TsonReadContext ctx, BiConsumer<Object, Object> sink) {
+        validateSize(entries.size(), ctx);
         for (MapValue.MapEntry entry : entries) {
+            String keySegment = keySegment(entry.key());
             if (entry.key().coreValue() instanceof AbsentValue) {
-                throw new IllegalArgumentException(
-                        "'" + name + "': the absent sentinel '_' must not appear as a map key (§2.9)");
+                ctx.field(keySegment, entry.key()).report(Diagnostic.Code.TYPE_MISMATCH,
+                        "'" + name + "': the absent sentinel '_' must not appear as a map key (§2.9)",
+                        "a real map key, never the absent sentinel '_'", "_");
+                continue;
             }
-            Object key = keyParser.read(entry.key());
-            Object decodedValue = valueParser.read(entry.value().value());
+            Object key = keyParser.read(entry.key(), ctx.field(keySegment, entry.key()));
+            Object decodedValue = valueParser.read(entry.value().value(), ctx.field(keySegment, entry.value().value()));
             sink.accept(key, decodedValue);
         }
     }
 
-    private void validateSize(int size) {
+    private static String keySegment(DataValue key) {
+        if (key.coreValue() instanceof TokenValue token) {
+            return token.text();
+        }
+        return String.valueOf(key.coreValue());
+    }
+
+    private void validateSize(int size, TsonReadContext ctx) {
         body.minItems().ifPresent(min -> {
             if (BigInteger.valueOf(size).compareTo(min) < 0) {
-                throw new IllegalArgumentException(
-                        "'" + name + "' has " + size + " entries, fewer than the minimum " + min);
+                ctx.report(Diagnostic.Code.TYPE_MISMATCH,
+                        "'" + name + "' has " + size + " entries, fewer than the minimum " + min,
+                        "at least " + min + " entries", String.valueOf(size));
             }
         });
         body.maxItems().ifPresent(max -> {
             if (BigInteger.valueOf(size).compareTo(max) > 0) {
-                throw new IllegalArgumentException(
-                        "'" + name + "' has " + size + " entries, more than the maximum " + max);
+                ctx.report(Diagnostic.Code.TYPE_MISMATCH,
+                        "'" + name + "' has " + size + " entries, more than the maximum " + max,
+                        "at most " + max + " entries", String.valueOf(size));
             }
         });
     }

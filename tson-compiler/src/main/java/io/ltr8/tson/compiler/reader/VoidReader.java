@@ -1,8 +1,13 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.Diagnostic;
+import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.ast.AbsentValue;
 import io.ltr8.tson.compiler.ast.DataValue;
+import io.ltr8.tson.schema.meta.SourcePosition;
+
+import java.util.Optional;
 
 /**
  * Parses meta-kernel's {@code void} instance of the {@code unit} atom constructor -- per its own
@@ -16,16 +21,20 @@ import io.ltr8.tson.compiler.ast.DataValue;
  */
 final class VoidReader implements TsonValueReader<Object> {
 
-    static final VoidReader INSTANCE = new VoidReader();
+    private final Optional<SourcePosition> schemaPosition;
 
-    private VoidReader() {
+    VoidReader(Optional<SourcePosition> schemaPosition) {
+        this.schemaPosition = schemaPosition;
     }
 
     @Override
-    public Object read(DataValue value) {
+    public Object read(DataValue value, TsonReadContext ctx) {
+        ctx = ctx.at(value).withSchemaPosition(schemaPosition);
         if (value == null || !(value.coreValue() instanceof AbsentValue)) {
-            throw new IllegalArgumentException(
-                    "expected the absent sentinel '_' for void, found " + (value == null ? "no value" : value.coreValue()));
+            ctx.report(Diagnostic.Code.TYPE_MISMATCH,
+                    "expected the absent sentinel '_' for void, found " + (value == null ? "no value" : value.coreValue()),
+                    "the absent sentinel '_'", value == null ? "no value" : String.valueOf(value.coreValue()));
+            return null;
         }
         return null;
     }

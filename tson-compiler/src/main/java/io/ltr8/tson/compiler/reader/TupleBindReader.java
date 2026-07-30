@@ -4,14 +4,17 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassTuple;
+import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.TsonValueReaderResolver;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.ScopedValue;
+import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Object-binding mode's own {@code tuple} reader -- reads a tuple's own array-shaped value into a
@@ -36,15 +39,27 @@ final class TupleBindReader extends TupleAbstractReader<Object> {
 
     private final DataClassTuple descriptor;
 
-    public TupleBindReader(String name, TupleBody body, DataClassTuple descriptor, TsonValueReaderResolver resolver) {
-        super(name, body, resolver);
+    public TupleBindReader(String name, TupleBody body, DataClassTuple descriptor, TsonValueReaderResolver resolver,
+                           Optional<SourcePosition> schemaPosition) {
+        super(name, body, resolver, schemaPosition);
         this.descriptor = descriptor;
     }
 
     @Override
-    public Object read(DataValue value) {
-        List<ScopedValue> elements = elements(value);
-        Object[] decoded = decode(elements);
+    public Object read(DataValue value, TsonReadContext ctx) {
+        ctx = ctx.at(value).withSchemaPosition(schemaPosition);
+        List<ScopedValue> elements = elements(value, ctx);
+        if (elements == null) {
+            return null;
+        }
+        int diagnosticsBefore = ctx.diagnostics().size();
+        Object[] decoded = decode(elements, ctx);
+        if (ctx.diagnostics().size() > diagnosticsBefore) {
+            // Same reasoning as RecordBindReader.read -- a bound constructor can't tolerate a null
+            // argument for a primitive-typed position, so skip it once collecting mode already
+            // reported a problem with one of this tuple's own elements.
+            return null;
+        }
         try {
             return descriptor.constructor().invoke(decoded);
         } catch (RuntimeException e) {
@@ -74,7 +89,7 @@ final class TupleBindReader extends TupleAbstractReader<Object> {
                 throw new IllegalArgumentException("'" + name + "' resolves to " + dataClass.typeClass()
                         + ", which isn't tuple-shaped -- can't bind '" + name + "' as one");
             }
-            return new TupleBindReader(name, body, descriptor, resolver);
+            return new TupleBindReader(name, body, descriptor, resolver, typeDefinition.position());
         }
 
         private DataClass descriptorFor(String name) {

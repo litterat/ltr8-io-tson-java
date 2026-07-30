@@ -1,14 +1,17 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.TsonValueReaderResolver;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.ScopedValue;
+import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * DOM mode's own {@code tuple} reader -- reads a tuple's own array-shaped value into a plain {@code
@@ -25,14 +28,18 @@ import java.util.List;
  */
 final class TupleDomReader extends TupleAbstractReader<List<Object>> {
 
-    public TupleDomReader(String name, TupleBody body, TsonValueReaderResolver resolver) {
-        super(name, body, resolver);
+    public TupleDomReader(String name, TupleBody body, TsonValueReaderResolver resolver, Optional<SourcePosition> schemaPosition) {
+        super(name, body, resolver, schemaPosition);
     }
 
     @Override
-    public List<Object> read(DataValue value) {
-        List<ScopedValue> elements = elements(value);
-        return Arrays.asList(decode(elements));
+    public List<Object> read(DataValue value, TsonReadContext ctx) {
+        ctx = ctx.at(value).withSchemaPosition(schemaPosition);
+        List<ScopedValue> elements = elements(value, ctx);
+        if (elements == null) {
+            return null;
+        }
+        return Arrays.asList(decode(elements, ctx));
     }
 
     /** Validates {@code typeDefinition} is tuple-shaped before ever constructing a {@link TupleDomReader} for it -- no {@link io.ltr8.bind.DataBindContext} needed, since DOM mode targets no Java type. */
@@ -43,7 +50,7 @@ final class TupleDomReader extends TupleAbstractReader<List<Object>> {
             if (!(typeDefinition.body() instanceof TupleBody body)) {
                 throw new IllegalArgumentException("'" + name + "' is not tuple-shaped: " + typeDefinition.body());
             }
-            return new TupleDomReader(name, body, resolver);
+            return new TupleDomReader(name, body, resolver, typeDefinition.position());
         }
     }
 }

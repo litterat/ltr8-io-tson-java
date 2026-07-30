@@ -30,39 +30,37 @@ much larger future effort, captured here only at a high level.
 
 ### Tier 1 — validate + fast feedback
 
-- [ ] **A structured `Diagnostic` value, not an exception**, returned from a non-fail-fast
-  `validate(...)` call (`List<Diagnostic>`, empty = valid) — this is the multi-error-collection
-  need, now given a concrete shape:
-  - `path` — location in the *data* document, as an RFC 6901 JSON Pointer (e.g.
-    `/orders/3/total`). Reuses an existing IETF standard rather than inventing a TSON-specific path
-    syntax, and matches the convention JSON Schema's own standardized output format already uses
-    for `instanceLocation`.
-  - `code` — a stable, machine-readable identifier from a **closed TSON vocabulary** (a real enum,
-    the same modeling discipline `TypeKind`/`FieldState` already use — not a free string). Starter
-    set: `FIELD_REQUIRED`, `TYPE_MISMATCH`, `INTEGER_OUT_OF_RANGE`, `ENUM_MEMBER_NOT_RECOGNIZED`,
-    `PATTERN_MISMATCH`, `DUPLICATE_MAP_KEY`, `UNRECOGNIZED_FIELD`, `WRONG_ARITY`,
-    `UNKNOWN_TYPE_REF`.
-  - `message` — a rendered, human/LLM-readable sentence, generated *from* `code` + params, not
-    hand-written per call site.
-  - `expected` — the actual constraint, rendered concretely (e.g. "an integer between
-    -2147483648 and 2147483647," "one of: PENDING, SHIPPED, DELIVERED" — never a vague "invalid
-    value").
-  - `actual` — the literal offending value/text, verbatim — critical for a retry loop: the model
-    can't reliably fix what it can't see it wrote.
-  - `dataPosition` — line/column/byte offset in the *submitted* document. The lexer already
-    produces `Position`; this needs threading through the compiled-reader validation path, plus
-    accumulating `path` as validation descends into nested structures.
-  - `schemaPosition` — line/column of where the relevant type/field was *declared in the schema
-    source*. This is the "store `Position` on `RecordBody`" idea (and the other `Top` variants —
-    `ArrayBody`/`MapBody`/`TupleBody`/`ChoiceBody`/the atom constraint families have the identical
-    gap), folded in here as the concrete reason it matters: it distinguishes "your data is wrong"
-    from "the schema itself is the problem," and is something pydantic/JSON Schema tooling
-    generally can't offer at all, since their schemas aren't parsed, positioned documents the way a
-    TSON schema is. Decide the shape once (declaration-level `Position` on `TypeDefinition` vs.
-    per-body-variant) before implementing it piecemeal.
+- [x] **A structured `Diagnostic` value, not an exception** — landed as `io.ltr8.tson.compiler.Diagnostic`
+  plus `TsonReadContext` (a collecting, non-fail-fast reading context; the `validate(...)`-shaped
+  entry point itself is `tson-cli`'s own `ValidateCommand`, not a library-level method yet). See
+  `CLAUDE.md`'s "Multi-error collection" section for the full design. Field by field, against the
+  shape sketched below:
+  - `path` — landed exactly as described, an RFC 6901 JSON Pointer accumulated by
+    `TsonReadContext.field`/`index` as a read descends.
+  - `code` — landed as a real, closed `Diagnostic.Code` enum, not the exact starter set sketched
+    below: `FIELD_REQUIRED`/`TYPE_MISMATCH`/`WRONG_ARITY`/`UNKNOWN_TYPE_REF`/`ATOM_CONSTRAINT_VIOLATION`
+    are genuinely produced by a real reader today; `INTEGER_OUT_OF_RANGE`/`ENUM_MEMBER_NOT_RECOGNIZED`/
+    `PATTERN_MISMATCH` never landed as their own codes — every atom-constraint violation maps to the
+    one general `ATOM_CONSTRAINT_VIOLATION` instead, since `AtomValidationException` itself doesn't
+    carry a structured code to route on yet (still open, see below); `UNRECOGNIZED_FIELD`/
+    `DUPLICATE_MAP_KEY` exist on the enum but are reserved, unused (also still open, see below).
+  - `message` — landed, but still **hand-composed at each call site**, not synthesized from `code` +
+    params as this bullet originally called for — that needs a richer per-code parameter shape than
+    exists yet. Still open.
+  - `expected`/`actual` — landed exactly as described.
+  - `dataPosition` — landed, resolved via `TsonReadContext`'s own identity-keyed position table (a
+    parser's `positions()`), not a fresh lexer-level `Position` thread.
+  - `schemaPosition` — landed, but narrower than sketched: declaration-level only (`TypeDefinition.position()`,
+    from the positional-errors stripe), not the finer per-`RecordBody`/`ArrayBody`/`MapBody`/`TupleBody`/
+    `ChoiceBody`/atom-constraint-family granularity this bullet originally proposed deciding between —
+    a diagnostic for a specific field still shows its *enclosing type's* declared position, not the
+    field's own line. Still open if that finer grain ever turns out to matter in practice.
 
-- [ ] **Alignment with existing conventions** — no single industry standard exists, but two real
-  conventions are worth deliberately aligning with:
+- [x] **Alignment with existing conventions** — realized in `tson-cli`'s own `--output json` shape
+  (`OutputFormat.renderJson`), which emits every `CliDiagnostic` field (`path`/`code`/`message`/
+  `expected`/`actual`/`dataPosition`/`schemaPosition`) as flat JSON, no library-level `type`/`loc`/
+  `msg`/`input`/`ctx` remapping built on top yet — a caller wanting exact Pydantic-v2-shaped output
+  still does that translation themselves for now. Two real conventions this was aligned with:
   - **Pydantic v2's `ValidationError.errors()` shape** (`type`/`loc`/`msg`/`input`/`ctx`) — the de
     facto standard in the Python LLM-tooling ecosystem specifically (pydantic-ai, Instructor, and
     LangChain-style output-fixers all build on or feed this shape back to the model). This is the
@@ -83,10 +81,12 @@ much larger future effort, captured here only at a high level.
   retry prompt in practice, but should be a *rendering* of the structured fields, not
   hand-authored per site.
 
-- [ ] **A TSON-native idea worth pursuing**: since a diagnostic list is itself structured data,
-  define it as a real TSON type (a small new "diagnostics" vocabulary) and validate it against its
-  own schema — dogfooding the library for its own error output, and giving any TSON-aware tool a
-  typed, validated way to consume TSON's own validation errors for free.
+- [x] **A TSON-native idea worth pursuing** — landed as `tson-cli`'s own `diagnostics.tn`
+  (`diagnostic`/`diagnostic_code`/`validation_report`) plus `DiagnosticsSchema`'s compiled reader:
+  `--output tson` writes a real `ValidationReport` via the schemaless `TsonMapperWriter`, then reads
+  it straight back through `diagnostics.tn`'s own compiled `validation_report` reader, proving the
+  emitted text is genuinely valid against a real TSON schema, not just structurally similar to one
+  (`OutputFormatTest`'s own round-trip tests, including one exercising real, non-empty positions).
 
 - [ ] **Schema-to-prompt rendering** (a supporting need, not the main focus) — a way to render a
   *resolved schema* back out as compact, LLM-promptable text (TSON's equivalent of

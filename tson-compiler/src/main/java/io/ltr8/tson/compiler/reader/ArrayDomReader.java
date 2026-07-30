@@ -1,14 +1,17 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.TsonValueReaderResolver;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.ScopedValue;
 import io.ltr8.tson.schema.meta.ArrayBody;
+import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * DOM mode's own {@code array} reader -- reads an array-shaped value into a plain {@code
@@ -23,15 +26,19 @@ import java.util.List;
  */
 final class ArrayDomReader extends ArrayAbstractReader<List<Object>> {
 
-    public ArrayDomReader(String name, ArrayBody body, TsonValueReaderResolver resolver) {
-        super(name, body, resolver);
+    public ArrayDomReader(String name, ArrayBody body, TsonValueReaderResolver resolver, Optional<SourcePosition> schemaPosition) {
+        super(name, body, resolver, schemaPosition);
     }
 
     @Override
-    public List<Object> read(DataValue value) {
-        List<ScopedValue> elements = elements(value);
+    public List<Object> read(DataValue value, TsonReadContext ctx) {
+        ctx = ctx.at(value).withSchemaPosition(schemaPosition);
+        List<ScopedValue> elements = elements(value, ctx);
+        if (elements == null) {
+            return null;
+        }
         List<Object> result = new ArrayList<>(elements.size());
-        readInto(elements, result::add);
+        readInto(elements, ctx, result::add);
         return result;
     }
 
@@ -43,7 +50,7 @@ final class ArrayDomReader extends ArrayAbstractReader<List<Object>> {
             if (!(typeDefinition.body() instanceof ArrayBody body)) {
                 throw new IllegalArgumentException("'" + name + "' is not array-shaped: " + typeDefinition.body());
             }
-            return new ArrayDomReader(name, body, resolver);
+            return new ArrayDomReader(name, body, resolver, typeDefinition.position());
         }
     }
 }

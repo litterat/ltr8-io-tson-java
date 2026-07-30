@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.TsonValueReaderResolver;
 import io.ltr8.tson.compiler.ast.DataValue;
@@ -75,8 +76,12 @@ final class RecordDomReader extends RecordAbstractReader<Map<String, Object>> {
     }
 
     @Override
-    public Map<String, Object> read(DataValue value) {
-        List<RecordValue.Field> dataFields = dataFields(value);
+    public Map<String, Object> read(DataValue value, TsonReadContext ctx) {
+        ctx = ctx.at(value).withSchemaPosition(schemaPosition);
+        List<RecordValue.Field> dataFields = dataFields(value, ctx);
+        if (dataFields == null) {
+            return null;
+        }
         Map<String, Object> result = new LinkedHashMap<>();
 
         for (int schemaIndex : fixedFieldIndices) {
@@ -95,15 +100,15 @@ final class RecordDomReader extends RecordAbstractReader<Map<String, Object>> {
                 continue;
             }
             DataValue fieldValue = dataField.value().value();
-            result.put(fieldName,
-                    isAbsent(fieldValue) ? defaultOrRequireNonFixed(schemaIndex, value) : field.parser().read(fieldValue));
+            result.put(fieldName, isAbsent(fieldValue) ? defaultOrRequireNonFixed(schemaIndex, ctx)
+                    : field.parser().read(fieldValue, ctx.field(fieldName, fieldValue)));
         }
 
         if (result.size() < fields.size()) {
             for (int i = 0; i < fields.size(); i++) {
                 String fieldName = fields.get(i).schema().name();
                 if (!result.containsKey(fieldName)) {
-                    result.put(fieldName, defaultOrRequireNonFixed(i, value));
+                    result.put(fieldName, defaultOrRequireNonFixed(i, ctx));
                 }
             }
         }

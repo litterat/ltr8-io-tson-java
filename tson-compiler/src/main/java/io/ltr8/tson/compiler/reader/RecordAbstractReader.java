@@ -1,6 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
-import io.ltr8.tson.compiler.TsonReadException;
+import io.ltr8.tson.compiler.Diagnostic;
+import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.TsonValueReaderResolver;
 import io.ltr8.tson.compiler.ast.AbsentValue;
@@ -101,9 +102,20 @@ abstract class RecordAbstractReader<T> implements TsonValueReader<T> {
         return fields;
     }
 
-    final List<RecordValue.Field> dataFields(DataValue value) {
+    /**
+     * Returns {@code null} (never a real field list) if the value's own shape doesn't match at all --
+     * a {@link Diagnostic.Code#TYPE_MISMATCH} has already been reported to {@code ctx} by the time
+     * this returns (or, in fail-fast mode, {@code ctx} already threw before returning at all). A
+     * caller in collecting mode must check for {@code null} and stop processing this record entirely
+     * rather than also reporting every one of its own fields as separately missing, which would be
+     * misleading noise on top of the one real problem (the value was never record-shaped to begin
+     * with).
+     */
+    final List<RecordValue.Field> dataFields(DataValue value, TsonReadContext ctx) {
         if (value == null) {
-            throw new IllegalArgumentException("expected a record for '" + name + "', found no value");
+            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a record for '" + name + "', found no value",
+                    "a record", "no value");
+            return null;
         }
         CoreValue core = value.coreValue();
         if (core instanceof RecordValue rv) {
@@ -116,7 +128,9 @@ abstract class RecordAbstractReader<T> implements TsonValueReader<T> {
             String fieldName = fields.get(positionalFieldIndex).schema().name();
             return List.of(new RecordValue.Field(fieldName, new ScopedValue(Optional.empty(), value)));
         }
-        throw new IllegalArgumentException("expected a record for '" + name + "', found " + core);
+        ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a record for '" + name + "', found " + core,
+                "a record", String.valueOf(core));
+        return null;
     }
 
     static boolean isAbsent(DataValue value) {
@@ -129,19 +143,23 @@ abstract class RecordAbstractReader<T> implements TsonValueReader<T> {
 
     /**
      * {@code REQUIRED_FIXED}/{@code OPTIONAL_FIXED} fields are pre-seeded from {@link
-     * #fixedFieldIndices} before this can ever be reached for them. {@code enclosingValue} is the
-     * record-shaped {@link DataValue} being read -- not the missing field's own value, which by
-     * definition doesn't exist -- so a {@link TsonReadException} thrown here can carry the
-     * enclosing record's own {@link CoreValue} identity (for a caller holding the original parser's
-     * own position side-table to resolve) alongside {@link #schemaPosition} (already resolved, no
-     * further lookup needed).
+     * #fixedFieldIndices} before this can ever be reached for them. {@code ctx} is expected to still
+     * be scoped to the *enclosing* record (not yet descended into the missing field) -- this itself
+     * descends one level via {@link TsonReadContext#field} with a {@code null} value (there's nothing
+     * for the missing field's own {@link TsonReadContext#position()} to point at), so the reported
+     * {@link Diagnostic#path()} still names the missing field while its own {@link
+     * Diagnostic#schemaPosition()} falls back to the enclosing record's (no per-field schema position
+     * exists yet).
      */
-    final Object defaultOrRequireNonFixed(int schemaIndex, DataValue enclosingValue) {
+    final Object defaultOrRequireNonFixed(int schemaIndex, TsonReadContext ctx) {
         RecordField schema = fields.get(schemaIndex).schema();
         return switch (schema.state()) {
-            case REQUIRED -> throw new TsonReadException(
-                    "missing required field '" + schema.name() + "' for '" + name + "'",
-                    enclosingValue.coreValue(), schemaPosition);
+            case REQUIRED -> {
+                ctx.field(schema.name(), null).report(Diagnostic.Code.FIELD_REQUIRED,
+                        "missing required field '" + schema.name() + "' for '" + name + "'",
+                        "a value for '" + schema.name() + "'", "(absent)");
+                yield null;
+            }
             case OPTIONAL -> null;
             case REQUIRED_DEFAULT -> precomputedValue[schemaIndex];
             case REQUIRED_FIXED, OPTIONAL_FIXED -> throw new IllegalStateException("unreachable: '" + schema.name()

@@ -4,6 +4,7 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonDataParser;
+import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.ast.Document;
@@ -176,6 +177,6 @@ class RecordBindReaderTest {
         TsonCompiledSchema compiled = compiled();
         Document document = new TsonDataParser("{}").parseDocument();
 
-        assertThrows(IllegalArgumentException.class, () -> compiled.get("top").read(document.root()));
+        assertThrows(TsonReadException.class, () -> compiled.get("top").read(document.root()));
     }
 }

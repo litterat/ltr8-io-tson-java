@@ -44,7 +44,7 @@ class CompileCommandTest {
 
         String output = captureStdout(() -> assertEquals(1, CompileCommand.run(schema, OutputFormat.TEXT)));
 
-        assertTrue(output.contains("[COMPILE_ERROR]"), output);
+        assertTrue(output.contains("[SCHEMA_ERROR]"), output);
     }
 
     private static Path writeFile(Path dir, String name, String content) throws IOException {

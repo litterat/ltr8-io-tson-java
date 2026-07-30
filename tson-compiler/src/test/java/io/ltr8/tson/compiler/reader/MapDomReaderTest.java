@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonDataParser;
+import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.ast.Document;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -70,7 +71,7 @@ class MapDomReaderTest {
     void absentSentinelAsKeyThrows() {
         TsonCompiledSchema compiled = compile(MapBody.of(TypeRef.of("integer"), TypeRef.of("integer")));
 
-        IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class,
+        TsonReadException thrown = assertThrows(TsonReadException.class,
                 () -> readMap(compiled, "{ _ => 1 }"));
         assertTrue(thrown.getMessage().contains("absent sentinel"), thrown.getMessage());
     }
@@ -81,7 +82,7 @@ class MapDomReaderTest {
         TsonCompiledSchema compiled = compile(body);
 
         assertEquals(2, readMap(compiled, "{ 1 => 1 2 => 2 }").size());
-        assertThrows(IllegalArgumentException.class, () -> readMap(compiled, "{ 1 => 1 }"));
+        assertThrows(TsonReadException.class, () -> readMap(compiled, "{ 1 => 1 }"));
     }
 
     @Test
@@ -90,6 +91,6 @@ class MapDomReaderTest {
         TsonCompiledSchema compiled = compile(body);
 
         assertEquals(1, readMap(compiled, "{ 1 => 1 }").size());
-        assertThrows(IllegalArgumentException.class, () -> readMap(compiled, "{ 1 => 1 2 => 2 }"));
+        assertThrows(TsonReadException.class, () -> readMap(compiled, "{ 1 => 1 2 => 2 }"));
     }
 }
