@@ -24,12 +24,12 @@ import io.ltr8.tson.compiler.stream.RecordStart;
 import io.ltr8.tson.compiler.stream.SchemaRef;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
+import io.ltr8.tson.compiler.stream.TsonEventSource;
 import io.ltr8.tson.compiler.stream.TypeRef;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
-import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
@@ -89,18 +89,18 @@ import java.util.Optional;
  * #nextDataValueEvents()}/{@link #nextCoreValueEvents()}/{@link #nextAnnotationEvents()} run this
  * same frame machinery for exactly one data-value/core-value/annotation at the current cursor
  * position, without the document-header/root wrapper {@link #ensureStarted()} imposes, and the
- * cursor primitives ({@link #peek()}, {@link #advance()}, {@link #check(TokenType)}, {@link
+ * cursor primitives ({@link #peekToken()}, {@link #advance()}, {@link #check(TokenType)}, {@link
  * #expect(TokenType, String)}, ...) are reachable directly. Both exist so {@link TsonSchemaParser}
  * -- which extends {@link TsonDataParser} to reuse this exact machinery for [TSON-SCHEMA]'s own
  * shared productions, per §12.1 -- can interleave its own schema-only token handling with calls
  * back into the shared data grammar on the very same cursor, the same relationship it had with
  * {@link TsonDataParser}'s token list before this class existed.
  */
-public final class TsonDataStream implements Iterator<TsonEvent> {
+public final class TsonDataStream implements TsonEventSource {
 
     private final Lexer lexer;
 
-    /** The next not-yet-consumed token -- lazily populated by {@link #peek()} on first use. */
+    /** The next not-yet-consumed token -- lazily populated by {@link #peekToken()} on first use. */
     private Token current;
 
     /** A second lookahead token, buffered only transiently to resolve {@code {}} disambiguation. */
@@ -131,6 +131,14 @@ public final class TsonDataStream implements Iterator<TsonEvent> {
             throw new NoSuchElementException("no more TSON stream events");
         }
         return ready.poll();
+    }
+
+    @Override
+    public TsonEvent peek() {
+        if (!hasNext()) {
+            throw new NoSuchElementException("no more TSON stream events");
+        }
+        return ready.peek();
     }
 
     /** Runs frames until an event is ready or the stream is exhausted. */
@@ -188,14 +196,14 @@ public final class TsonDataStream implements Iterator<TsonEvent> {
         }
         started = true;
 
-        Position docStart = peek().start();
+        Position docStart = peekToken().start();
         Optional<String> id = Optional.empty();
         if (check(TokenType.DIRECTIVE) && "id".equals(peekDirectiveName())) {
             id = Optional.of(parseNamedDirective("id"));
         }
 
         if (check(TokenType.DIRECTIVE) && "meta".equals(peekDirectiveName())) {
-            Position metaStart = peek().start();
+            Position metaStart = peekToken().start();
             parseNamedDirective("meta");
             throw new TsonUnsupportedDocumentException(metaStart);
         }
@@ -220,7 +228,7 @@ public final class TsonDataStream implements Iterator<TsonEvent> {
     // Package-private (not private): TsonDataParser forwards these to TsonSchemaParser, which
     // needs raw token-level access for its own, non-data-grammar productions.
 
-    Token peek() {
+    Token peekToken() {
         if (current == null) {
             current = lexer.nextToken();
         }
@@ -235,7 +243,7 @@ public final class TsonDataStream implements Iterator<TsonEvent> {
     }
 
     Token advance() {
-        Token t = peek();
+        Token t = peekToken();
         lastEnd = t.end();
         if (pending != null) {
             current = pending;
@@ -247,18 +255,18 @@ public final class TsonDataStream implements Iterator<TsonEvent> {
     }
 
     boolean check(TokenType type) {
-        return peek().type() == type;
+        return peekToken().type() == type;
     }
 
     Token expect(TokenType type, String context) {
         if (!check(type)) {
-            throw parseError("expected " + type + " (" + context + "), found " + describe(peek()));
+            throw parseError("expected " + type + " (" + context + "), found " + describe(peekToken()));
         }
         return advance();
     }
 
     TsonParseException parseError(String message) {
-        return new TsonParseException(message, peek().start());
+        return new TsonParseException(message, peekToken().start());
     }
 
     /**
@@ -317,7 +325,7 @@ public final class TsonDataStream implements Iterator<TsonEvent> {
         if (check(closing)) {
             return false;
         }
-        boolean sawSeparator = !lastEnd.equals(peek().start());
+        boolean sawSeparator = !lastEnd.equals(peekToken().start());
         if (check(TokenType.COMMA)) {
             advance();
             sawSeparator = true;
@@ -326,7 +334,7 @@ public final class TsonDataStream implements Iterator<TsonEvent> {
             throw parseError("adjacent values must be separated by whitespace, a comma, or both");
         }
         if (check(closing)) {
-            throw parseError("a trailing separator is not permitted before " + describe(peek()));
+            throw parseError("a trailing separator is not permitted before " + describe(peekToken()));
         }
         return true;
     }
@@ -340,7 +348,7 @@ public final class TsonDataStream implements Iterator<TsonEvent> {
     /** {@code "!!" name ":" single-line-token}, requiring the directive name to equal {@code expectedName} (§3.3). */
     String parseNamedDirective(String expectedName) {
         Token bangbang = expect(TokenType.DIRECTIVE, "directive");
-        Token name = peek();
+        Token name = peekToken();
         if (name.type() != TokenType.UNQUOTED) {
             throw parseError("expected a directive name after '!!', found " + describe(name));
         }
@@ -353,13 +361,13 @@ public final class TsonDataStream implements Iterator<TsonEvent> {
         }
         advance();
 
-        Token colon = peek();
+        Token colon = peekToken();
         if (colon.type() != TokenType.COLON || !name.end().equals(colon.start())) {
             throw parseError("expected ':' immediately after directive name '!!" + expectedName + "'");
         }
         advance();
 
-        Token arg = peek();
+        Token arg = peekToken();
         if (arg.type() == TokenType.MULTI_LINE_STRING) {
             throw parseError("a multi-line token is not permitted as a directive argument; "
                     + "use a single-line quoted token");
@@ -381,7 +389,7 @@ public final class TsonDataStream implements Iterator<TsonEvent> {
 
     private String parseTypeRefName() {
         Token bang = advance();
-        Token name = peek();
+        Token name = peekToken();
         if (name.type() != TokenType.UNQUOTED) {
             throw parseError("expected a type name after '!', found " + describe(name));
         }
@@ -390,7 +398,7 @@ public final class TsonDataStream implements Iterator<TsonEvent> {
         }
         advance();
 
-        Token next = peek();
+        Token next = peekToken();
         if (!isStructuralDelimiter(next.type()) && name.end().equals(next.start())) {
             throw parseError("expected whitespace after type name '" + name.text()
                     + "' before " + describe(next));
@@ -400,7 +408,7 @@ public final class TsonDataStream implements Iterator<TsonEvent> {
 
     /** {@code field-name = token} (§7.4): any of the three token forms. Shared with [TSON-SCHEMA]'s identical production (§12.1). */
     Token expectFieldNameToken(String context) {
-        Token name = peek();
+        Token name = peekToken();
         if (name.type() != TokenType.UNQUOTED && name.type() != TokenType.SINGLE_LINE_STRING
                 && name.type() != TokenType.MULTI_LINE_STRING) {
             throw parseError("expected a field name (a token) for " + context + ", found " + describe(name));
@@ -421,9 +429,9 @@ public final class TsonDataStream implements Iterator<TsonEvent> {
         @Override
         void step() {
             if (!check(TokenType.EOF)) {
-                throw parseError("unexpected content after the document's value: " + describe(peek()));
+                throw parseError("unexpected content after the document's value: " + describe(peekToken()));
             }
-            ready.add(new DocumentEnd(peek().start()));
+            ready.add(new DocumentEnd(peekToken().start()));
         }
     }
 
@@ -437,7 +445,7 @@ public final class TsonDataStream implements Iterator<TsonEvent> {
     private final class DataValueFrame extends Frame {
         @Override
         void step() {
-            Token t = peek();
+            Token t = peekToken();
             if (t.type() == TokenType.AT) {
                 pushFrame(new DataValueFrame()); // continue this position once the annotation closes
                 pushFrame(new AnnotationOnlyFrame());
@@ -463,7 +471,7 @@ public final class TsonDataStream implements Iterator<TsonEvent> {
         @Override
         void step() {
             Token at = advance();
-            Token name = peek();
+            Token name = peekToken();
             if (name.type() != TokenType.UNQUOTED) {
                 throw parseError("expected an annotation name after '@', found " + describe(name));
             }
@@ -472,7 +480,7 @@ public final class TsonDataStream implements Iterator<TsonEvent> {
             }
             advance();
 
-            if (check(TokenType.COLON) && name.end().equals(peek().start())) {
+            if (check(TokenType.COLON) && name.end().equals(peekToken().start())) {
                 advance(); // ':'
                 ready.add(new AnnotationStart(name.text(), at.start()));
                 pushFrame(new AnnotationEndFrame());
@@ -481,12 +489,12 @@ public final class TsonDataStream implements Iterator<TsonEvent> {
             }
 
             // Valueless: at least one whitespace character MUST follow the annotation name (§3.1).
-            if (name.end().equals(peek().start())) {
+            if (name.end().equals(peekToken().start())) {
                 throw parseError("expected whitespace after annotation name '" + name.text()
                         + "' (or an adjacent ':' to give it a value)");
             }
             ready.add(new AnnotationStart(name.text(), at.start()));
-            ready.add(new AnnotationEnd(peek().start()));
+            ready.add(new AnnotationEnd(peekToken().start()));
         }
     }
 
@@ -500,7 +508,7 @@ public final class TsonDataStream implements Iterator<TsonEvent> {
     private final class CoreValueFrame extends Frame {
         @Override
         void step() {
-            Token t = peek();
+            Token t = peekToken();
             switch (t.type()) {
                 case LBRACE -> parseBraceValue();
                 case LBRACKET -> {
@@ -524,7 +532,7 @@ public final class TsonDataStream implements Iterator<TsonEvent> {
         /** The one place brace disambiguation happens -- see this class's own Javadoc. */
         private void parseBraceValue() {
             Token lbrace = advance();
-            Token t1 = peek();
+            Token t1 = peekToken();
 
             if (t1.type() == TokenType.RBRACE) {
                 advance();
@@ -572,7 +580,7 @@ public final class TsonDataStream implements Iterator<TsonEvent> {
     private final class AnnotationEndFrame extends Frame {
         @Override
         void step() {
-            ready.add(new AnnotationEnd(peek().start()));
+            ready.add(new AnnotationEnd(peekToken().start()));
         }
     }
 
@@ -585,7 +593,7 @@ public final class TsonDataStream implements Iterator<TsonEvent> {
                 if (!"schema".equals(name)) {
                     throw parseError("directive '!!" + name + "' is not permitted here (only '!!schema' is)");
                 }
-                Position pos = peek().start();
+                Position pos = peekToken().start();
                 String uri = parseNamedDirective("schema");
                 ready.add(new SchemaRef(uri, pos));
             }

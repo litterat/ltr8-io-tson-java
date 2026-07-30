@@ -3,9 +3,8 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
-import io.ltr8.tson.compiler.ast.CoreValue;
-import io.ltr8.tson.compiler.ast.DataValue;
-import io.ltr8.tson.compiler.ast.TokenValue;
+import io.ltr8.tson.compiler.stream.TokenEvent;
+import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.schema.meta.SourcePosition;
 
 import java.util.Optional;
@@ -28,19 +27,17 @@ final class BooleanReader implements TsonValueReader<Boolean> {
     }
 
     @Override
-    public Boolean read(DataValue value, TsonReadContext ctx) {
-        ctx = ctx.at(value).withSchemaPosition(schemaPosition);
-        if (value == null) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a token for 'boolean', found no value",
-                    "a token", "no value");
+    public Boolean read(TsonReadContext ctx) {
+        ctx = ctx.withSchemaPosition(schemaPosition);
+        EventSkip.annotationsAndTypeRef(ctx);
+        TsonEvent e = ctx.peek();
+        if (!(e instanceof TokenEvent token)) {
+            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a token for 'boolean', found " + e,
+                    "a token", String.valueOf(e));
+            EventSkip.coreValue(ctx);
             return null;
         }
-        CoreValue core = value.coreValue();
-        if (!(core instanceof TokenValue token)) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a token for 'boolean', found " + core,
-                    "a token", String.valueOf(core));
-            return null;
-        }
+        ctx.next();
         return switch (token.text()) {
             case "true" -> Boolean.TRUE;
             case "false" -> Boolean.FALSE;

@@ -3,14 +3,11 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.TsonValueReaderResolver;
-import io.ltr8.tson.compiler.ast.DataValue;
-import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -18,10 +15,10 @@ import java.util.Optional;
  * DOM mode's own {@code map} reader -- reads a map-shaped value into a plain {@code Map<Object,
  * Object>}, one entry per source entry, in source order (a {@code LinkedHashMap}, matching {@code
  * TsonMapperReader.toMap}'s own "last value wins" behavior for a duplicate key -- an ordinary {@code
- * put} in iteration order needs nothing extra to get that for free).
+ * put} in stream order needs nothing extra to get that for free).
  *
- * <p>Everything else -- resolving the key/value readers, unwrapping the incoming {@link DataValue},
- * size validation, rejecting an absent key -- lives on {@link MapAbstractReader}.
+ * <p>Everything else -- resolving the key/value readers, confirming a map shape, size validation,
+ * rejecting an absent key -- lives on {@link MapAbstractReader}.
  */
 final class MapDomReader extends MapAbstractReader<Map<Object, Object>> {
 
@@ -30,14 +27,16 @@ final class MapDomReader extends MapAbstractReader<Map<Object, Object>> {
     }
 
     @Override
-    public Map<Object, Object> read(DataValue value, TsonReadContext ctx) {
-        ctx = ctx.at(value).withSchemaPosition(schemaPosition);
-        List<MapValue.MapEntry> entries = entries(value, ctx);
-        if (entries == null) {
+    public Map<Object, Object> read(TsonReadContext ctx) {
+        ctx = ctx.withSchemaPosition(schemaPosition);
+        Shape shape = expectMapShape(ctx);
+        if (shape == Shape.MISMATCH) {
             return null;
         }
         Map<Object, Object> result = new LinkedHashMap<>();
-        readInto(entries, ctx, result::put);
+        if (shape == Shape.ENTRIES) {
+            readInto(ctx, result::put);
+        }
         return result;
     }
 

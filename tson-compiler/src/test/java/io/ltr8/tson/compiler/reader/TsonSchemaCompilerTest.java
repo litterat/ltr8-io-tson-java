@@ -5,8 +5,6 @@ import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.TsonValueReader;
-import io.ltr8.tson.compiler.ast.DataValue;
-import io.ltr8.tson.compiler.ast.EmptyBrace;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.EmailType;
@@ -37,8 +35,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class TsonSchemaCompilerTest {
 
-    private static final DataValue EMPTY_RECORD = new DataValue(List.of(), Optional.empty(), new EmptyBrace());
-
     private static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema) {
         TsonCompiledSchema placeholder = new TsonCompiledSchema(linkedSchema, Map.of());
         TsonCompiledMetaSchema bootstrapMeta = new TsonCompiledMetaSchema(placeholder, ValueReaderFactoryRegistry.dom());
@@ -62,7 +58,7 @@ class TsonSchemaCompilerTest {
 
         // Reached compilation successfully; reading an empty record against a REQUIRED field then
         // fails for the ordinary reason (missing field), not a reader failure.
-        assertThrows(TsonReadException.class, () -> compiled.get("A").read(EMPTY_RECORD));
+        assertThrows(TsonReadException.class, () -> compiled.get("A").read("{}"));
     }
 
     @Test
@@ -75,7 +71,7 @@ class TsonSchemaCompilerTest {
 
         TsonCompiledSchema compiled = compile(linkedSchema);
 
-        assertThrows(TsonReadException.class, () -> compiled.get("Node").read(EMPTY_RECORD));
+        assertThrows(TsonReadException.class, () -> compiled.get("Node").read("{}"));
     }
 
     @Test
@@ -94,13 +90,13 @@ class TsonSchemaCompilerTest {
         TsonCompiledSchema compiled = compile(linkedSchema);
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> used = (Map<String, Object>) compiled.get("used").read(EMPTY_RECORD);
+        Map<String, Object> used = (Map<String, Object>) compiled.get("used").read("{}");
         assertTrue(used.isEmpty());
 
         // Compiling/getting "orphan" itself succeeds -- only reading an actual value against it fails.
         TsonValueReader<?> orphan = compiled.get("orphan");
         UnsupportedOperationException thrown =
-                assertThrows(UnsupportedOperationException.class, () -> orphan.read(EMPTY_RECORD));
+                assertThrows(UnsupportedOperationException.class, () -> orphan.read("{}"));
         assertTrue(thrown.getMessage().contains("orphan"), thrown.getMessage());
     }
 

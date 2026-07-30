@@ -7,13 +7,10 @@ import io.ltr8.bind.DataClassTuple;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.TsonValueReaderResolver;
-import io.ltr8.tson.compiler.ast.DataValue;
-import io.ltr8.tson.compiler.ast.ScopedValue;
 import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
-import java.util.List;
 import java.util.Optional;
 
 /**
@@ -31,9 +28,8 @@ import java.util.Optional;
  * each position's own binding already happened recursively, inside whatever reader {@code resolver}
  * produced for its type.
  *
- * <p>Everything else -- resolving each position's own reader, unwrapping the incoming {@link
- * DataValue} and checking its arity, absent-position handling -- lives on {@link
- * TupleAbstractReader}.
+ * <p>Everything else -- resolving each position's own reader, confirming a tuple shape, arity
+ * checking, absent-position handling -- lives on {@link TupleAbstractReader}.
  */
 final class TupleBindReader extends TupleAbstractReader<Object> {
 
@@ -46,14 +42,13 @@ final class TupleBindReader extends TupleAbstractReader<Object> {
     }
 
     @Override
-    public Object read(DataValue value, TsonReadContext ctx) {
-        ctx = ctx.at(value).withSchemaPosition(schemaPosition);
-        List<ScopedValue> elements = elements(value, ctx);
-        if (elements == null) {
+    public Object read(TsonReadContext ctx) {
+        ctx = ctx.withSchemaPosition(schemaPosition);
+        if (!expectTupleStart(ctx)) {
             return null;
         }
         int diagnosticsBefore = ctx.diagnostics().size();
-        Object[] decoded = decode(elements, ctx);
+        Object[] decoded = decode(ctx);
         if (ctx.diagnostics().size() > diagnosticsBefore) {
             // Same reasoning as RecordBindReader.read -- a bound constructor can't tolerate a null
             // argument for a primitive-typed position, so skip it once collecting mode already

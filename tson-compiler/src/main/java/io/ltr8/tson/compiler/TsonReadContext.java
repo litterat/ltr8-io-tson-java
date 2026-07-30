@@ -1,27 +1,31 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.compiler.ast.CoreValue;
-import io.ltr8.tson.compiler.ast.DataValue;
+import io.ltr8.tson.compiler.stream.TsonEvent;
+import io.ltr8.tson.compiler.stream.TsonEventSource;
 import io.ltr8.tson.schema.meta.SourcePosition;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 /**
- * Carried alongside a {@link DataValue} through every {@link TsonValueReader#read(DataValue,
- * TsonReadContext)} call -- the tree walk's own error sink, current path, and position tracking.
- * Orthogonal to DOM vs. object-binding mode: both share the same composite readers (record/array/
- * map/tuple/atom), which are the only things that ever touch this.
+ * Carried through every {@link TsonValueReader#read(TsonReadContext)} call -- the read's own pull
+ * cursor over a {@link TsonEventSource}, error sink, current path, and position tracking. Orthogonal
+ * to DOM vs. object-binding mode: both share the same composite readers (record/array/map/tuple/
+ * atom), which are the only things that ever touch this.
  *
- * <p>An interface, not a concrete class, deliberately -- {@link #position()} exposes "where am I
- * right now," not a raw {@code Map<CoreValue, Position>} plus a lookup a caller has to perform
- * itself, so the backing implementation can change later (e.g. a streaming reader tracking a live
- * cursor position instead of an identity-keyed map built from an already-fully-parsed document)
- * without breaking this contract. Kept in mind but not built yet: a bigger redesign where {@link
- * TsonValueReader#read} takes only a {@code TsonReadContext} (no separate {@code DataValue}
- * parameter) and this interface gains a {@code CoreValue next()} of its own, enabling a genuinely
- * streaming parser -- this shape is chosen specifically so that door stays open.
+ * <p>An interface, not a concrete class, deliberately -- the backing implementation can change later
+ * (e.g. a different {@link TsonEventSource}) without breaking this contract. Kept in mind but not
+ * built yet: {@link TsonValueReader#read} could eventually take *only* a {@code TsonReadContext} with
+ * no separate value parameter at all if every remaining caller moved to pull-based reading; today's
+ * shape (a single {@code ctx} parameter already) is the step that got taken.
+ *
+ * <p><b>{@link #peek()}/{@link #next()} are the core primitives</b> every reader consumes, delegating
+ * to a single {@link TsonEventSource} shared across an entire read -- every scoped copy this
+ * interface hands back (see {@link #field}/{@link #index}/{@link #withSchemaPosition}) points at the
+ * *same* underlying source and diagnostic sink, so pulling an event through any one copy is visible
+ * to all of them. {@link #position()} is not a stored, per-copy value -- it always reflects whichever
+ * event was most recently peeked or consumed, on *any* copy, since there is only ever one real cursor
+ * per read.
  *
  * <p><b>Fail-fast vs. collecting is decided entirely inside {@link #report}</b> -- a fail-fast
  * context throws {@link TsonReadException} the instant it's called (today's single-error behavior,
@@ -29,13 +33,23 @@ import java.util.Optional;
  * reader calls {@code report(...)} identically either way; no call site branches on {@link
  * #failFast()} itself.
  *
- * <p><b>The "stamp my own schema position" convention</b>: every reader's {@code read(value, ctx)}
- * starts by claiming {@code ctx = ctx.withSchemaPosition(this.schemaPosition);} before doing
- * anything else, including before descending into its own children -- so a diagnostic reported from
- * inside, say, an atom reader for {@code integer} carries *that atom's own* declared position, not
- * whatever the enclosing record happened to leave in the context. {@link #field}/{@link #index} only
- * ever update the path and data position; schema position is always claimed by whichever reader is
- * currently running, not inherited through descent.
+ * <p><b>The "stamp my own schema position" convention</b>: every reader's {@code read(ctx)} starts by
+ * claiming {@code ctx = ctx.withSchemaPosition(this.schemaPosition);} before doing anything else,
+ * including before descending into its own children -- so a diagnostic reported from inside, say, an
+ * atom reader for {@code integer} carries *that atom's own* declared position, not whatever the
+ * enclosing record happened to leave in the context. {@link #field}/{@link #index} never touch schema
+ * position; it's always claimed by whichever reader is currently running, not inherited through descent.
+ *
+ * <p><b>A missing value (e.g. a missing required field) needs no special casing when it's noticed
+ * inline</b> -- a reader that decides a field is absent without ever calling {@link #peek()}/{@link
+ * #next()} for it (there is nothing in the stream to pull) simply reports against whatever {@link
+ * #position()} the shared cursor was already at -- the enclosing container's own nearest real anchor
+ * in the submitted text, for free, with no null-value parameter or fallback logic needed anywhere.
+ * A field never mentioned by the data at all can only be noticed *after* the whole enclosing record
+ * has already been consumed (there's no event of its own to notice it at), by which point the shared
+ * cursor has moved on -- {@link #withPosition} exists for exactly this: pinning a context's own
+ * {@link #position()} to a value captured earlier (the record's own opening position) rather than
+ * whatever the live cursor has drifted to since.
  *
  * <p><b>Placeholder-on-failure, not skip-on-failure</b>: after a call to {@link #report} returns
  * (collecting mode -- in fail-fast mode it never returns), the caller continues with {@code null} as
@@ -46,7 +60,13 @@ import java.util.Optional;
  */
 public interface TsonReadContext {
 
-    /** The current position in the <em>data</em> document -- absent if untracked (fail-fast mode) or unknown. */
+    /** The next event, without consuming it -- repeated calls with no intervening {@link #next()} return the same event. */
+    TsonEvent peek();
+
+    /** Consumes and returns the next event, advancing {@link #position()} to reflect it. */
+    TsonEvent next();
+
+    /** The position of whichever event was most recently peeked or consumed, on any copy of this context sharing the same read. */
     Optional<SourcePosition> position();
 
     /** The current position in the <em>schema</em> document -- absent if the governing declaration carries none. */
@@ -57,30 +77,22 @@ public interface TsonReadContext {
 
     boolean failFast();
 
-    /**
-     * A copy of this context scoped one record field or map entry deeper -- {@code name} is RFC
-     * 6901-escaped into the path. {@code value} may be {@code null} (a missing required field has no
-     * value of its own to point at); {@link #position()} on the result then stays whatever it already
-     * was -- the enclosing value's own position remains the nearest real anchor in the submitted
-     * text, more useful than reporting no position at all -- while the path still descends normally.
-     */
-    TsonReadContext field(String name, DataValue value);
+    /** A copy of this context scoped one record field or map entry deeper -- {@code name} is RFC 6901-escaped into the path. */
+    TsonReadContext field(String name);
 
     /** A copy of this context scoped one array/tuple element deeper. */
-    TsonReadContext index(int i, DataValue value);
+    TsonReadContext index(int i);
 
     /** A copy of this context with {@link #schemaPosition()} replaced -- see this interface's own "stamp my own schema position" note. */
     TsonReadContext withSchemaPosition(Optional<SourcePosition> schemaPosition);
 
     /**
-     * A copy of this context with {@link #position()} resolved directly from {@code value} -- what
-     * every reader calls, alongside {@link #withSchemaPosition}, at the very top of its own {@code
-     * read(value, ctx)}. For a nested read this is a harmless no-op re-resolving the same value the
-     * parent's own {@link #field}/{@link #index} call already resolved; for the top-level read (no
-     * parent ever called {@link #field}/{@link #index} to seed it) this is the only place {@link
-     * #position()} ever gets set at all.
+     * A copy of this context whose {@link #position()} is pinned to {@code position} rather than
+     * following the shared cursor -- see this interface's own note on a field never mentioned by the
+     * data at all. {@link #peek()}/{@link #next()} on the returned copy still pull from the same
+     * live, shared cursor as always; only {@link #position()} itself is overridden.
      */
-    TsonReadContext at(DataValue value);
+    TsonReadContext withPosition(Optional<SourcePosition> position);
 
     /**
      * Records one problem at the current {@link #path()}/{@link #position()}/{@link #schemaPosition()}.
@@ -92,32 +104,13 @@ public interface TsonReadContext {
     /** Every diagnostic collected so far -- empty in fail-fast mode (a fail-fast context never accumulates; it throws instead). */
     List<Diagnostic> diagnostics();
 
-    /**
-     * A context that throws {@link TsonReadException} from the first {@link #report} call -- today's
-     * single-error behavior, with no {@link #position()} tracking (the common case: a caller with no
-     * parser-produced position table in hand, e.g. every {@link TsonValueReader#read(DataValue)}
-     * call). {@link #failFast()} is {@code true} on the result.
-     */
-    static TsonReadContext throwing() {
-        return DefaultTsonReadContext.throwing(Map.of());
+    /** A context that throws {@link TsonReadException} from the first {@link #report} call -- today's single-error behavior. */
+    static TsonReadContext throwing(TsonEventSource events) {
+        return DefaultTsonReadContext.throwing(events);
     }
 
-    /**
-     * Same as {@link #throwing()}, but with real {@link #position()} tracking -- for a fail-fast
-     * caller that still wants the thrown {@link TsonReadException}'s own {@link Diagnostic#dataPosition()}
-     * populated, the same {@code dataPositions} table {@link #collecting} accepts.
-     */
-    static TsonReadContext throwing(Map<CoreValue, Position> dataPositions) {
-        return DefaultTsonReadContext.throwing(dataPositions);
-    }
-
-    /**
-     * A context that accumulates every {@link #report} call into {@link #diagnostics()} instead of
-     * throwing -- {@code dataPositions} is normally a parser's own {@code positions()} table (see
-     * {@code TsonDataParser}), consulted by {@link #field}/{@link #index} to resolve each child
-     * value's own position as the read descends.
-     */
-    static TsonReadContext collecting(Map<CoreValue, Position> dataPositions) {
-        return DefaultTsonReadContext.collecting(dataPositions);
+    /** A context that accumulates every {@link #report} call into {@link #diagnostics()} instead of throwing. */
+    static TsonReadContext collecting(TsonEventSource events) {
+        return DefaultTsonReadContext.collecting(events);
     }
 }

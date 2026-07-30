@@ -1,9 +1,11 @@
 package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
+import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
+import io.ltr8.tson.compiler.stream.ListEventSource;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
@@ -109,7 +111,9 @@ public final class SchemaResolver {
         TsonCompiledMetaSchema metaParser = loader.load(document.meta());
         Map<String, TypeDefinition> namespace = mergeImports(document);
         DefinitionResolver definitionResolver = new DefinitionResolver(
-                (type, value) -> (Top) metaParser.reader(type).read(value), metaParser.schema().entries()::get, namespace::get);
+                (type, value) -> (Top) metaParser.reader(type)
+                        .read(TsonReadContext.throwing(new ListEventSource(DataValueEvents.of(value)))),
+                metaParser.schema().entries()::get, namespace::get);
 
         Map<String, TypeDefinition> localOnly = new LinkedHashMap<>();
         for (SchemaMap.Declaration declaration : document.body().declarations().values()) {

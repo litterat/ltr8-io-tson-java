@@ -220,14 +220,17 @@ Two classes turn the lexer's tokens into a `Document` (§2, §3, §7.4), split b
 by grammar coverage — there is exactly one implementation of the data grammar, not two:
 
 - **`TsonDataStream` (Tier 2)** is the one place that actually walks source text: a lazy,
-  pull-based `Iterator<TsonEvent>` (`RecordStart`/`RecordEnd`, `MapStart`/`MapArrow`/`MapEnd`,
+  pull-based `TsonEventSource` (`stream.TsonEventSource`, a small `hasNext()`/`next()`/`peek()`
+  interface extending `Iterator<TsonEvent>` — extracted out from `TsonDataStream` itself once the
+  compiled-reader stack needed to depend on the *shape* of a pull source, not the concrete class, see
+  "Streaming readers" below) producing `RecordStart`/`RecordEnd`, `MapStart`/`MapArrow`/`MapEnd`,
   `ArrayStart`/`ArrayEnd`, `AnnotationStart`/`AnnotationEnd`, `TypeRef`, `SchemaRef`, `TokenEvent`,
-  `AbsentEvent`, `EmptyBraceEvent` — the `stream` subpackage, one sealed `TsonEvent` interface).
-  Driven directly off `Lexer.nextToken()`, never `Lexer.tokenize()`, with an explicit `Frame` stack
-  standing in for recursion (so memory held at any point is proportional to open-container depth,
-  never document size) and at most two tokens of lookahead ever buffered, used only to resolve
-  `{}` record/map disambiguation (see the class's own Javadoc for exactly how that lookahead stays
-  bounded regardless of nesting depth).
+  `AbsentEvent`, `EmptyBraceEvent` (the `stream` subpackage, one sealed `TsonEvent` interface, every
+  variant carrying its own `Position`). Driven directly off `Lexer.nextToken()`, never
+  `Lexer.tokenize()`, with an explicit `Frame` stack standing in for recursion (so memory held at any
+  point is proportional to open-container depth, never document size) and at most two tokens of
+  lookahead ever buffered, used only to resolve `{}` record/map disambiguation (see the class's own
+  Javadoc for exactly how that lookahead stays bounded regardless of nesting depth).
 - **`TsonDataParser` (Tier 3)** builds the full AST — `ast` subpackage, a sealed `CoreValue`
   hierarchy (`RecordValue`, `MapValue`, `ArrayValue`, `EmptyBrace`, `AbsentValue`, `TokenValue`)
   on Java 25 records, matching the grammar's own shape — by pulling a `TsonDataStream`'s events and
@@ -2542,7 +2545,12 @@ doing the tree walk. Built the same session as the stripe above, immediately aft
 `TsonReadContext` (no separate `DataValue` parameter), and `TsonReadContext` itself gains a `CoreValue
 next()` method -- enabling a genuinely streaming parser instead of buffering the whole document
 first. `TsonReadContext` is an interface, backed by one swappable implementation, specifically so
-this door stays open; not attempted this pass.
+this door stays open; not attempted this pass. **Done in a later session** -- see "Streaming readers:
+building every `*Reader` on `TsonDataStream`" below, which replaces the `at(value)`/`field(name,
+value)`/`index(i, value)`/`throwing(dataPositions)`/`collecting(dataPositions)` shape this whole
+section describes with a pull-based one; this section's own narrative of *why* multi-error collection
+was built stays accurate, but its own API description of `TsonReadContext` itself no longer matches
+the current code.
 
 **Explicitly out of scope this pass** (deliberate, not oversights): message synthesis purely from
 `code` + params (STRUCTURED-OUTPUT.md's own eventual ideal) -- `message` stays hand-composed per call
@@ -2573,6 +2581,175 @@ updated to expect `TsonReadException` instead (a real, intended behavior change,
 breakage), and two `ValidateCommandTest` assertions were sharpened from the generic `[VALIDATION_ERROR]`
 fallback to the real, specific `[ATOM_CONSTRAINT_VIOLATION]` code a collecting context now produces
 for that exact scenario.
+
+### Streaming readers: building every `*Reader` on `TsonDataStream`
+
+The multi-error-collection work above landed on `main`, then a new branch (`feature/streaming-readers`)
+took up the redesign that section's own "kept in mind, not built" note flagged: every `*Reader` in
+`io.ltr8.tson.compiler.reader` used to require a fully-materialized `DataValue` tree (`TsonDataParser`,
+Tier 3) before it could read anything at all -- schema-validated reading could never begin, and no
+diagnostic could ever surface, until the *entire* document had already been parsed into memory. This
+throws away exactly the laziness `TsonDataStream` (Tier 2) was built for. The fix: every reader now
+pulls `TsonEvent`s directly off a `TsonEventSource`, via a redesigned `TsonReadContext`, with no
+`DataValue` parameter anywhere in the compiled-reader stack at all. `TsonSchemaParser`/`SchemaResolver`
+and the whole schema parse→resolve→link→register→compile pipeline are unaffected -- a schema document
+is small, self-contained, and parsed exactly once at compile time, so there's no benefit to streaming
+it, and it already reused `TsonDataStream`'s own package-private surface unmodified.
+
+- **`TsonDataStream implements TsonEventSource`** (the interface extracted above, `stream.TsonEventSource
+  extends Iterator<TsonEvent>` plus one added method, `TsonEvent peek()`) -- a strict widening of its
+  previous bare `Iterator<TsonEvent>` declaration. `peek()` reuses the class's own pre-existing `ready`
+  deque and `fill()` internals; nothing about `TsonSchemaParser`'s own reuse of `TsonDataStream`/
+  `TsonDataParser`'s package-private surface changed. `peek()` collided by name with a pre-existing
+  package-private `Token peek()` (token-level lookahead, ~20 internal call sites) -- the same class of
+  overload collision this session hit once already (`TsonReadContext.failFast()`); resolved by renaming
+  the old one to `peekToken()`, keeping the new, public-facing `TsonEvent peek()` as the clean name
+  matching `TsonEventSource`'s own contract.
+- **`TsonReadContext` redesigned around pull access, not a position side-table.** `peek()`/`next()`
+  (delegating to one shared `TsonEventSource` per read) are now the core primitives every reader
+  consumes; `position()` is derived *live* from whichever event was most recently peeked or consumed on
+  *any* scoped copy of the same read (`field`/`index`/`withSchemaPosition` all share one underlying
+  mutable cursor -- there is only ever one real cursor per read) -- the identity-keyed `Map<CoreValue,
+  Position>` side-table the positional-errors stripe built specifically because `ast.CoreValue` doesn't
+  carry its own position is gone from this path entirely, since a streamed `TsonEvent` already carries
+  `position()` directly. `field(name)`/`index(i)` dropped their old `value` parameter (nothing to
+  resolve a position from anymore -- descending is now purely "push a path segment"). `throwing`/
+  `collecting` now take a `TsonEventSource`, not a `Map<CoreValue, Position>` of pre-parsed positions.
+- **A genuinely new emergent property: a missing value needs no special casing, but only when it's
+  noticed *inline*.** A reader that decides a field/element is absent without ever calling `peek()`/
+  `next()` for it (there's nothing in the stream to pull) automatically reports against whatever
+  `position()` the shared cursor was already at -- the enclosing container's nearest real anchor, for
+  free, with none of the old `field(name, value)`-with-a-null-value special-casing. This breaks down for
+  exactly one case, though: a record field never mentioned by the data *at all* can only be noticed
+  *after* the whole record has already been consumed (there's no event of its own to notice it at), by
+  which point the shared cursor has moved on, past `RecordEnd`. `TsonReadContext.withPosition(Optional
+  <SourcePosition>)` (a new method, alongside `withSchemaPosition`) exists for exactly this -- pinning a
+  context's own `position()` to a value captured earlier (the record's own opening position, captured by
+  `RecordAbstractReader.expectRecordShape`'s own `ShapeResult.anchor()`) rather than the live cursor.
+  Found the hard way: a first draft let a never-mentioned-field's `FIELD_REQUIRED` diagnostic report
+  against whatever the cursor happened to be at by the time the second "fill in defaults" pass ran
+  (`RecordEnd`'s own position, the record's *closing* brace) -- wrong, and caught by `MultiErrorCollectionTest`'s
+  own pre-existing assertion that a missing field's own `dataPosition` names the record's *opening* line.
+- **`EventSkip`** (new, package-private, `reader` package) -- the shared grammar-aware "consume and
+  discard" utility every reader needs, modeling `data-value = annotation* type-ref? core-value` and
+  `scoped-value = [schema-directive] data-value` directly: `annotationsAndTypeRef(ctx)` (consumes/
+  discards leading annotations -- never consulted by any reader -- and an optional type-ref, returning
+  its name if present; called by *every* reader as its own first step, only dispatch readers consult the
+  returned name), `dataValue(ctx)`/`scopedValue(ctx)` (discard one whole value), `coreValue(ctx)`
+  (discards one core-value whose first event has already been peeked-but-not-consumed -- used whenever a
+  reader discovers a shape mismatch and must fully discard whatever nested structure was actually there,
+  to keep the stream correctly positioned for collecting-mode continuation). This is also what makes a
+  record field with no match in the compiled field list safe to skip now -- unlike the old design (where
+  an unmatched schema-driven loop simply never looked at the leftover data at all, since the whole tree
+  already existed regardless), an unmatched field's own value must be actively discarded from the stream
+  to keep the cursor positioned correctly for whatever follows.
+- **Per-family translation**, closely following the shape every family already had:
+  - **Atom/leaf readers** (`AtomValueReader`, `BooleanReader`, `VoidReader`) -- `EventSkip
+    .annotationsAndTypeRef(ctx)`, peek for exactly one leaf event (`TokenEvent`, or `AbsentEvent` for
+    `VoidReader`), `TYPE_MISMATCH` + `EventSkip.coreValue(ctx)` on a mismatch. The actual atom-parsing/
+    `AtomTypeException`-catching logic is unchanged, only how a token's text/form/position arrives does.
+  - **Array/Map** (`ArrayAbstractReader`/`MapAbstractReader`) -- an `expect*Start(ctx)` (Array) /
+    `expect*Shape(ctx)` (Map, a three-way `Shape` enum since `{}` is a real zero-entry map shorthand
+    Array has no analogue for) confirms the shape and consumes the opener; a forward `readInto(ctx,
+    sink)` loop decodes element/entry events up to the closer, handing each to a `Consumer`/`BiConsumer`
+    rather than assembling a result itself (DOM's plain `List.add`/`Map.put` vs. a `tson-bind`
+    `DataClassArray`/`DataClassMap`'s own `put()` `MethodHandle` differ completely between the two
+    concrete subclasses). `min_items`/`max_items` are validated once against the final count, known only
+    at the closing event -- **deliberately checked at the closer, not incrementally the instant a
+    `max_items` violation is crossed** (`ArrayAbstractReader`'s own Javadoc calls this out explicitly): a
+    genuinely oversized array/map still gets fully read (and every element/entry validated) before the
+    violation is reported, a simplification with no correctness cost, only an efficiency one for an
+    already-invalid case. A map's own absent-key rejection (§2.9) discards the paired value via
+    `EventSkip.scopedValue` too, since there's no meaningful key to associate it with.
+  - **Tuple** (`TupleAbstractReader`) -- same `expectTupleStart`-then-`decode` shape as Array, but arity
+    (fixed and exact, unlike Array/Map's `min_items`/`max_items` range) is checked incrementally, not
+    against a pre-known length: a position beyond the schema's own slot count reports `WRONG_ARITY` once
+    and keeps decoding-and-discarding every further extra element (to stay correctly positioned for
+    `ArrayEnd`); `ArrayEnd` arriving before every slot got a value reports `WRONG_ARITY` too.
+  - **Record** (`RecordAbstractReader`/`RecordDomReader`/`RecordBindReader`, the hardest case) --
+    `expectRecordShape` now returns a `ShapeResult(Shape, Optional<SourcePosition> anchor)`, `Shape`
+    itself a four-way enum (`FIELDS`/`EMPTY`/`POSITIONAL`/`MISMATCH`) since positional form (§5.6) is a
+    real third possibility no other family has: a value that isn't `RecordStart`/`EmptyBraceEvent` but
+    the record itself has exactly one bare `REQUIRED` field reads directly, with *no* synthetic wrapping
+    at all -- the peeked event is simply left alone and the sole positional field's own parser reads it
+    straight off the cursor (`readPositional`), which the streaming redesign gets "for free" in a way the
+    old `DataValue`-based `PositionalForm` helper (deleted well before this session, see "Schema
+    resolution" above) never could without literally constructing a synthetic wrapper value. `readFields`
+    loops `FieldName` events forward (see "Forward, single-pass, with overwrite" below), returning a
+    `boolean[] seen` (by schema position) that both `RecordDomReader`/`RecordBindReader` reuse directly as
+    the "does this field still need its own required-or-default handling" signal for their own second
+    pass -- `RecordBindReader` in particular lost its own separate `boolean[] unboundFilled` array
+    entirely, since `seen[]` already covers an unbound field (no `DataClassField` target to hold an
+    "already filled" signal in) the same uniform way it covers a bound one.
+  - **Dispatch readers** (`VariantSchemaReader`/`VariantBindReader`/`NamedDispatchReader`) -- read the
+    driving type-ref via `EventSkip.annotationsAndTypeRef(ctx)` themselves (rather than inspecting
+    `value.typeRef()`) before deciding whether to delegate to `ownParser`/an explicit subtype's own
+    reader; delegating to `ownParser.read(ctx)` afterward is safe since that reader's own first-step
+    `EventSkip.annotationsAndTypeRef` call is a no-op once nothing's left to consume.
+  - **`DeferredValueReader`/`ErrorReader`** -- purely mechanical signature updates, no behavior change
+    (`ErrorReader` never touches its own `ctx` argument at all, throwing unconditionally either way).
+- **Forward, single-pass, with overwrite on a duplicate record field name -- a deliberate, accepted
+  behavior change from every family's own previous design.** The pre-streaming `RecordDomReader`/
+  `RecordBindReader` scanned a record's own (fully materialized) field list *backward*, skipping a field
+  name already filled -- so a shadowed duplicate's own value was never read at all, silently. A
+  single-pass, forward-only pull stream genuinely cannot know in advance whether a field name will recur
+  later without buffering the whole record first, defeating the entire point of streaming -- so
+  `RecordAbstractReader.readFields` now decodes (and thus validates) *every* occurrence of a recognized
+  field name, forward, with a later occurrence's own decoded value simply overwriting an earlier one's
+  (§2.5's "last value wins," reached by overwrite rather than by skip). A malformed *shadowed*
+  occurrence now surfaces as a real diagnostic even though its own decoded value is ultimately discarded
+  -- recorded as `SPEC-FEEDBACK.md` #21 (§2.5 doesn't actually say whether an implementation must
+  validate a shadowed occurrence, only which value wins), and verified directly in
+  `DuplicateFieldOverwriteTest`: a record with the same field name twice, first occurrence out of range
+  for its own atom type, second occurrence valid, confirms exactly one diagnostic (for the first,
+  shadowed occurrence) and a final stored value matching the second, surviving one.
+- **`readSchemaDefault`'s fix, and `ListEventSource`.** `RecordAbstractReader.readSchemaDefault`
+  (precomputing a `REQUIRED_DEFAULT`/`REQUIRED_FIXED`/`OPTIONAL_FIXED` field's own literal schema value
+  at *construction* time) has no real stream to pull from at all -- it runs once, before any actual
+  document is being read. Fixed with **`ListEventSource`** (new, public, `stream` package -- a fixed,
+  in-memory `TsonEventSource` replaying a pre-built `List<TsonEvent>`, useful generally for any synthetic
+  or already-decoded value being replayed through a compiled reader, not just this one case):
+  `readSchemaDefault` wraps the schema's own literal `Token` in a single synthetic `TokenEvent` (a
+  placeholder `Position`, since there's no real source position for a value that was never actually
+  re-lexed) and reads it through a fail-fast-only context built over a one-element `ListEventSource`.
+  **The identical `DataValue`-to-events gap turned up a second time**, in `resolver.SchemaResolver`'s own
+  `DefinitionMetaReader` lambda (`(type, value) -> (Top) metaParser.reader(type).read(value)`) -- this
+  one *does* have a real, already-fully-resolved `DataValue` tree in hand (an atom-refinement/`Instance`
+  binding's own already-normalized value, produced entirely within `resolver`'s own unchanged,
+  `DataValue`-based pipeline), just needs to hand it to a compiled reader that's now streaming-only.
+  **`DataValueEvents`** (new, package-private, `resolver` package -- not `reader`, since it depends on
+  `ast.DataValue` and belongs next to its one real caller) replays an already-built `DataValue` tree as
+  the exact `TsonEvent` sequence a real `TsonDataStream` would have produced for the same source text
+  (walking `RecordValue`/`MapValue`/`ArrayValue`/`EmptyBrace`/`AbsentValue`/`TokenValue` recursively,
+  same placeholder-`Position` reasoning as `readSchemaDefault`), so `SchemaResolver`'s own lambda becomes
+  `(type, value) -> (Top) metaParser.reader(type).read(TsonReadContext.throwing(new
+  ListEventSource(DataValueEvents.of(value))))`. `DefinitionResolverTest`'s own identical
+  `definitionResolverFor` test helper needed the same fix, for the same reason.
+- **`TsonValueReader<T>` narrowed to one method, `T read(TsonReadContext ctx)`** -- the old
+  `read(DataValue, TsonReadContext)` is gone outright (the plan's own "full replacement, not dual-mode"
+  decision), replaced by a new default method, `T read(String source)`: builds a `TsonDataStream`,
+  consumes `DocumentStart` itself, reads through a fail-fast context, then consumes and verifies
+  `DocumentEnd` (replicating what `TsonDataParser.parseDocument()` used to do implicitly) -- the
+  convenience every test/CLI call site that used to do `new TsonDataParser(source).parseDocument().root()`
+  then `.read(rootValue)` now just calls `.read(source)` directly.
+
+**Not attempted this pass, deliberately** (matching the plan's own explicit scope boundaries): any
+change to `UNRECOGNIZED_FIELD`/`DUPLICATE_MAP_KEY` detection semantics beyond what's needed to preserve
+today's already-documented "not detected" behavior -- `EventSkip` exists to keep the stream correctly
+positioned past an unmatched field/entry, not to add new validation; `TsonMapperReader`/`TsonMapperWriter`
+(Class 1, schemaless) are untouched, having no relationship to the compiled-reader layer this touches.
+
+Verified: a dedicated `StreamingLazinessTest` wraps a real `TsonDataStream` in a counting
+`TsonEventSource` and confirms a fail-fast error on an early record field pulls well under 100 events
+total, even though the same document's own trailing field contains 50,000 elements worth of events the
+reader never needed to look at -- proving genuine laziness, not just that the new API compiles.
+`DuplicateFieldOverwriteTest` covers the accepted behavior change (above). Every pre-existing reader-
+package test (Record/Array/Map/Tuple × Dom/Bind, dispatch, atom, the whole multi-error-collection test
+suite) was updated to the new `.read(source)`/`.read(ctx)` call shape and kept passing unchanged
+otherwise -- no behavior change for valid, non-duplicate-field data. Full `./gradlew build` green across
+every module (`tson-compiler` 993/993, `tson-schema` 53/53, `tson` 5/5, `tson-cli` 25/25, `tson-bind`
+160/160), including `tson`'s and `tson-cli`'s own call sites (`TsonTest`, `OutputFormat.renderTson`,
+`ValidateCommand.run`, `OutputFormatTest`) that reached the compiled-reader layer directly.
 
 ### Conformance suite integration (`ConformanceSuiteTest`)
 

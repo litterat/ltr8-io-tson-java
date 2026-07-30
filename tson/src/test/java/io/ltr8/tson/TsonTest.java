@@ -1,7 +1,6 @@
 package io.ltr8.tson;
 
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.tson.compiler.TsonDataParser;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.mapper.TsonMapperReader;
@@ -52,12 +51,12 @@ class TsonTest {
         // Integer -- atom reading is shared verbatim between DOM and bind mode (CLAUDE.md), so this
         // holds regardless of TsonSchemaCompiler.dom() here.
         Object myInt = compiled.compiledSchema().get("my_int")
-                .read(new TsonDataParser("42").parseDocument().root());
+                .read("42");
         assertEquals(42, myInt);
 
         // my_percentage never sets size, so IntegerParser falls back to BigInteger.
         Object myPercentage = compiled.compiledSchema().get("my_percentage")
-                .read(new TsonDataParser("50").parseDocument().root());
+                .read("50");
         assertEquals(BigInteger.valueOf(50), myPercentage);
     }
 
@@ -68,7 +67,7 @@ class TsonTest {
         TsonCompiledMetaSchema compiled = tson.compile(TINY_DOCUMENT, TsonSchemaCompiler.dom());
 
         Object myInt = compiled.compiledSchema().get("my_int")
-                .read(new TsonDataParser("7").parseDocument().root());
+                .read("7");
         assertEquals(7, myInt);
     }
 

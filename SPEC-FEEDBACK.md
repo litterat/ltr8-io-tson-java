@@ -802,3 +802,54 @@ stability claim) and `application/tson; version=1` (a positive one). Either reso
 say whether a document renamed from a pre-release extension to `.tn1` at the version 1 release is
 expected to change its own `!!id` (and therefore its canonical identity, §2.2.1) — a real
 interoperability question for anything hash-pinned or referenced during the draft period.
+
+---
+
+## 21. §2.5's "last value wins" for a duplicate record field name doesn't say whether a shadowed occurrence's own value must still be validated
+
+**Section:** §2.5 ("Records").
+
+**Problem:** §2.5 states that when a field name is repeated within the same record, "the last value
+associated with that name is the field's value" — a resolution rule for which value survives, said
+purely in terms of the final result. It says nothing about what a conformant processor is required
+(or permitted) to do with an *earlier*, shadowed occurrence's own value on the way there: whether it
+must still be lexed/parsed/validated as a real value in its own right (so a malformed shadowed
+occurrence is itself a parse/validation error, independent of whether it's ultimately kept), or
+whether an implementation may skip it entirely once a later occurrence of the same name is known to
+exist, treating it as inert, unvalidated text. Both readings are consistent with "the last value
+wins" as a *result* — the gap is about the process that gets there, and specifically about a case
+this implementation actually had to choose between: single-pass, forward-only, event-stream-based
+reading (§7.4's own token stream is inherently single-pass) genuinely cannot know in advance, upon
+seeing the *first* occurrence of a field name, whether it will recur later — so it must either buffer
+that occurrence speculatively (undoing the memory/latency benefit of streaming in the first place) or
+decode-and-validate it immediately and simply let it be overwritten if a later occurrence turns up.
+
+**Interpretation chosen:** Every occurrence of a duplicate field name is read and validated in full,
+forward, in source order — not just the one that ultimately wins. A malformed *shadowed* occurrence
+(one later overwritten by a subsequent occurrence of the same name) still surfaces as a real
+diagnostic (a thrown `TsonReadException` in fail-fast mode, or a collected `Diagnostic` in collecting
+mode) even though its own decoded value is discarded once the later occurrence is read. This is a
+deliberate, observable behavior change from an earlier version of this implementation, which scanned
+a record's own (fully materialized) field list *backward* and skipped a field name already filled —
+never touching a shadowed occurrence's own value at all, so a malformed shadowed occurrence was
+silently ignored. The backward-scan approach was only possible because that earlier version always
+had the record's complete field list in hand before reading any of it (built from a pre-parsed
+`Document` tree); once reading moved to pull genuinely one event at a time directly off the lexer
+(`RecordAbstractReader`/`TsonDataStream`, "Streaming readers" in `CLAUDE.md`), backward iteration was
+no longer available at all, and the forward, validate-everything behavior was chosen as the one
+consistent with never buffering more than one open container's worth of state. Verified in
+`DuplicateFieldOverwriteTest`: a record with the same field name twice, first occurrence out of range
+for its own atom type, second occurrence valid, confirms exactly one diagnostic is reported for the
+first (shadowed) occurrence and the field's own final value is the second (surviving) occurrence's.
+
+**Suggested resolution:** State explicitly, alongside "the last value associated with that name is
+the field's value," whether a conformant processor MUST, MAY, or MUST NOT validate a shadowed
+duplicate occurrence's own value — ideally phrased so a genuinely single-pass, streaming
+implementation (one that cannot know in advance whether a field name will recur) remains conformant
+either way, e.g.: "a processor MAY validate every occurrence of a duplicate field name as it is
+encountered, or MAY validate only the occurrence that ultimately wins; a document MUST NOT be
+considered invalid solely because an implementation chose to (or declined to) surface a problem in a
+shadowed occurrence." This also has a direct interoperability consequence worth naming: two
+conformant processors reading the identical malformed-duplicate document may legitimately disagree on
+whether it's valid at all, purely as a function of their own internal parsing strategy (streaming vs.
+buffered) — worth the spec saying so plainly rather than leaving it to be discovered.

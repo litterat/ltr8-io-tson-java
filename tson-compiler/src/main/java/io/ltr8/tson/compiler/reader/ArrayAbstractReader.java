@@ -4,37 +4,44 @@ import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.TsonValueReaderResolver;
-import io.ltr8.tson.compiler.ast.AbsentValue;
-import io.ltr8.tson.compiler.ast.ArrayValue;
-import io.ltr8.tson.compiler.ast.CoreValue;
-import io.ltr8.tson.compiler.ast.DataValue;
-import io.ltr8.tson.compiler.ast.ScopedValue;
+import io.ltr8.tson.compiler.stream.AbsentEvent;
+import io.ltr8.tson.compiler.stream.ArrayEnd;
+import io.ltr8.tson.compiler.stream.ArrayStart;
+import io.ltr8.tson.compiler.stream.SchemaRef;
+import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.SourcePosition;
 
 import java.math.BigInteger;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 
 /**
  * Everything {@link ArrayDomReader} and {@link ArrayBindReader} share verbatim: resolving the
- * element type's own reader once at construction, unwrapping an array-shaped {@link DataValue} into
- * its element list, and decoding those elements one at a time -- validating {@code min_items}/{@code
- * max_items}, tolerating (or rejecting) an absent element per {@link ElementState}, and rejecting a
- * duplicate *decoded* element when {@code unique_items} says to -- handing each decoded element to a
- * {@link Consumer} rather than assembling a result itself, since how a decoded element gets stored
- * (a plain {@code List.add}, or a {@code tson-bind} {@code DataClassArray}'s own {@code put()}
- * {@link java.lang.invoke.MethodHandle}) differs completely between the two subclasses. Array
- * elements have no default/fixed-value concept at all ({@link ElementState} has only {@code
- * REQUIRED}/{@code OPTIONAL}, unlike a record field's five-member {@code FieldState}), so there's
- * nothing here resembling {@link RecordAbstractReader}'s own precomputed-default machinery.
+ * element type's own reader once at construction, confirming an array-shaped value's own
+ * {@code ArrayStart}, and decoding elements one at a time straight off the event stream --
+ * validating {@code min_items}/{@code max_items} (against the final count, known only once {@code
+ * ArrayEnd} arrives -- a stream has no up-front length the way an already-built element list did),
+ * tolerating (or rejecting) an absent element per {@link ElementState}, and rejecting a duplicate
+ * *decoded* element when {@code unique_items} says to -- handing each decoded element to a {@link
+ * Consumer} rather than assembling a result itself, since how a decoded element gets stored (a plain
+ * {@code List.add}, or a {@code tson-bind} {@code DataClassArray}'s own {@code put()} {@link
+ * java.lang.invoke.MethodHandle}) differs completely between the two subclasses. Array elements have
+ * no default/fixed-value concept at all ({@link ElementState} has only {@code REQUIRED}/{@code
+ * OPTIONAL}, unlike a record field's five-member {@code FieldState}), so there's nothing here
+ * resembling {@link RecordAbstractReader}'s own precomputed-default machinery.
  *
  * <p>{@code unordered} is deliberately never validated here -- there's nothing to check about a
  * single array value's own ordering in isolation, only meaningful when *comparing* two arrays.
+ *
+ * <p><b>{@code max_items} is checked once, at {@code ArrayEnd}, not as soon as the count is
+ * exceeded</b> -- a deliberate simplification for this pass; a genuinely oversized array still gets
+ * fully read (and every element validated) before the violation is reported, rather than failing
+ * fast the instant the limit is crossed. Correctness is unaffected either way; only how much of an
+ * already-too-large array gets read before reporting it.
  */
 abstract class ArrayAbstractReader<T> implements TsonValueReader<T> {
 
@@ -50,54 +57,59 @@ abstract class ArrayAbstractReader<T> implements TsonValueReader<T> {
         this.schemaPosition = schemaPosition;
     }
 
-    /** Returns {@code null} (not a real element list) on a shape mismatch -- see {@link RecordAbstractReader#dataFields} for the identical "caller must stop, not also report every element missing" contract. */
-    final List<ScopedValue> elements(DataValue value, TsonReadContext ctx) {
-        if (value == null) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected an array for '" + name + "', found no value",
-                    "an array", "no value");
-            return null;
+    /**
+     * Consumes leading annotations/type-ref, then checks for {@code ArrayStart}, consuming it on
+     * success and returning {@code true}. On a shape mismatch, reports {@code TYPE_MISMATCH},
+     * discards whatever was actually there (see {@link RecordAbstractReader#dataFields} for the
+     * identical "caller must stop, not also report every element missing" contract), and returns
+     * {@code false}.
+     */
+    final boolean expectArrayStart(TsonReadContext ctx) {
+        EventSkip.annotationsAndTypeRef(ctx);
+        if (ctx.peek() instanceof ArrayStart) {
+            ctx.next();
+            return true;
         }
-        CoreValue core = value.coreValue();
-        if (core instanceof ArrayValue av) {
-            return av.elements();
-        }
-        ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected an array for '" + name + "', found " + core,
-                "an array", String.valueOf(core));
-        return null;
-    }
-
-    static boolean isAbsent(DataValue value) {
-        return value == null || value.coreValue() instanceof AbsentValue;
+        TsonEvent e = ctx.peek();
+        ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected an array for '" + name + "', found " + e,
+                "an array", String.valueOf(e));
+        EventSkip.coreValue(ctx);
+        return false;
     }
 
     /**
-     * Validates size, then decodes every element in order, handing each to {@code sink} -- checking
-     * {@code unique_items} along the way regardless of how (or whether) {@code sink} itself would
-     * otherwise tolerate a duplicate. Keeps decoding every remaining element after one fails (a
-     * {@code null} placeholder is handed to {@code sink} for that element, never skipped) so later
-     * elements' own {@link TsonReadContext#index} positions stay accurate against the original data.
+     * Decodes every element up to {@code ArrayEnd} (the cursor assumed already positioned right
+     * after {@code ArrayStart} -- see {@link #expectArrayStart}), handing each to {@code sink};
+     * {@code min_items}/{@code max_items} are validated against the final count once {@code
+     * ArrayEnd} arrives. Keeps decoding every remaining element after one fails (a {@code null}
+     * placeholder is handed to {@code sink} for that element, never skipped) so later elements' own
+     * {@link TsonReadContext#index} positions stay accurate against the original data.
      */
-    final void readInto(List<ScopedValue> elements, TsonReadContext ctx, Consumer<Object> sink) {
-        validateSize(elements.size(), ctx);
+    final void readInto(TsonReadContext ctx, Consumer<Object> sink) {
         Set<Object> seen = body.uniqueItems() ? new LinkedHashSet<>() : null;
         int index = 0;
-        for (ScopedValue element : elements) {
-            DataValue elementValue = element.value();
-            Object decoded = isAbsent(elementValue) ? defaultOrRequire(index, ctx)
-                    : elementParser.read(elementValue, ctx.index(index, elementValue));
+        while (!(ctx.peek() instanceof ArrayEnd)) {
+            if (ctx.peek() instanceof SchemaRef) {
+                ctx.next();
+            }
+            Object decoded = ctx.peek() instanceof AbsentEvent ? defaultOrRequire(index, ctx)
+                    : elementParser.read(ctx.index(index));
             if (seen != null && !seen.add(decoded)) {
-                ctx.index(index, elementValue).report(Diagnostic.Code.TYPE_MISMATCH,
+                ctx.index(index).report(Diagnostic.Code.TYPE_MISMATCH,
                         "'" + name + "' requires unique elements, '" + decoded + "' appears more than once",
                         "a value not already present in this array", String.valueOf(decoded));
             }
             sink.accept(decoded);
             index++;
         }
+        ctx.next(); // ArrayEnd
+        validateSize(index, ctx);
     }
 
     private Object defaultOrRequire(int index, TsonReadContext ctx) {
+        ctx.next(); // consume the AbsentEvent regardless of REQUIRED/OPTIONAL
         if (body.state() == ElementState.REQUIRED) {
-            ctx.index(index, null).report(Diagnostic.Code.FIELD_REQUIRED,
+            ctx.index(index).report(Diagnostic.Code.FIELD_REQUIRED,
                     "'" + name + "' element [" + index + "] is absent, but elements are required",
                     "a value", "(absent)");
         }

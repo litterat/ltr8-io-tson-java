@@ -2,7 +2,6 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
-import io.ltr8.tson.compiler.TsonDataParser;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
@@ -111,18 +110,18 @@ class TinySchemaImportsCoreTn1Test {
         // Reading real data through the compiled readers proves core.tn's own vocabulary was
         // genuinely reached, not just referenced at the resolver level.
         Object myIntValue = compiledTiny.compiledSchema().get("my_int")
-                .read(new TsonDataParser("42").parseDocument().root());
+                .read("42");
         assertEquals(42, myIntValue);
 
         Object myPercentageValue = compiledTiny.compiledSchema().get("my_percentage")
-                .read(new TsonDataParser("50").parseDocument().root());
+                .read("50");
         assertEquals(BigInteger.valueOf(50), myPercentageValue);
 
         // The record case: real TSON data binds directly to the manually-registered MyRecord class,
         // its own "value" field narrowed through core.tn's own int32 the same way an ordinary
         // schema-declared field would be.
         Object myRecordValue = compiledTiny.compiledSchema().get("my_record")
-                .read(new TsonDataParser("{ value: 7 }").parseDocument().root());
+                .read("{ value: 7 }");
         assertEquals(new MyRecord(7), myRecordValue);
     }
 }

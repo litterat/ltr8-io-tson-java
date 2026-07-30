@@ -1,7 +1,6 @@
 package io.ltr8.tson.cli;
 
 import io.ltr8.tson.compiler.Diagnostic;
-import io.ltr8.tson.compiler.TsonDataParser;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -78,7 +77,7 @@ class OutputFormatTest {
         String rendered = OutputFormat.TSON.render(original);
 
         Object reread = DiagnosticsSchema.compiled().compiledSchema().get("validation_report")
-                .read(new TsonDataParser(rendered).parseDocument().root());
+                .read(rendered);
 
         assertEquals(original, reread);
     }
@@ -90,7 +89,7 @@ class OutputFormatTest {
         String rendered = OutputFormat.TSON.render(original);
 
         Object reread = DiagnosticsSchema.compiled().compiledSchema().get("validation_report")
-                .read(new TsonDataParser(rendered).parseDocument().root());
+                .read(rendered);
 
         assertEquals(original, reread);
     }
@@ -106,7 +105,7 @@ class OutputFormatTest {
         String rendered = OutputFormat.TSON.render(original);
 
         Object reread = DiagnosticsSchema.compiled().compiledSchema().get("validation_report")
-                .read(new TsonDataParser(rendered).parseDocument().root());
+                .read(rendered);
 
         assertEquals(original, reread);
         assertTrue(rendered.contains("first problem"));
@@ -122,7 +121,7 @@ class OutputFormatTest {
         String rendered = OutputFormat.TSON.render(original);
 
         Object reread = DiagnosticsSchema.compiled().compiledSchema().get("validation_report")
-                .read(new TsonDataParser(rendered).parseDocument().root());
+                .read(rendered);
 
         assertEquals(original, reread);
     }

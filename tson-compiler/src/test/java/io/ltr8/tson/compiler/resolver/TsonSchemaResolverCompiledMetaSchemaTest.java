@@ -2,7 +2,6 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
-import io.ltr8.tson.compiler.TsonDataParser;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
@@ -131,7 +130,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
         TsonCompiledMetaSchema compiledMeta = loader.load(coreDocument.meta());
         Object result = compiledMeta.compiledSchema().get("binary_encoding")
-                .read(new TsonDataParser("BASE64").parseDocument().root());
+                .read("BASE64");
 
         assertEquals("BASE64", result);
     }
@@ -163,7 +162,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
         TsonCompiledMetaSchema compiledMetaKernel = loader.load(metaDocument.meta());
         Object result = compiledMetaKernel.compiledSchema().get("product_access_type")
-                .read(new TsonDataParser("INDEX").parseDocument().root());
+                .read("INDEX");
 
         assertEquals("INDEX", result);
     }
@@ -374,7 +373,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         // *quality* of the one-off result changed, not its lifetime.
         assertEquals(58, compiled.schema().entries().size());
         assertEquals(java.util.Map.of(),
-                compiled.compiledSchema().get("top").read(new TsonDataParser("{}").parseDocument().root()));
+                compiled.compiledSchema().get("top").read("{}"));
     }
 
     @Test
@@ -435,7 +434,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         TsonCompiledMetaSchema compiled = loader.load(TsonBundledSchemas.META_ID);
 
         assertEquals("BASE64", compiled.compiledSchema().get("binary_encoding")
-                .read(new TsonDataParser("BASE64").parseDocument().root()));
+                .read("BASE64"));
         // Still there, from the explicit pre-registration step above -- meta.tn's own resolution
         // didn't need to (and doesn't) re-register it.
         assertTrue(registry.get(TsonBundledSchemas.META_KERNEL_ID).isPresent());

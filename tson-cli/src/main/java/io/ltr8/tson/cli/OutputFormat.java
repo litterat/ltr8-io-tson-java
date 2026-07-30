@@ -1,7 +1,6 @@
 package io.ltr8.tson.cli;
 
 import io.ltr8.bind.DataBindException;
-import io.ltr8.tson.compiler.TsonDataParser;
 import io.ltr8.tson.compiler.mapper.TsonMapperWriter;
 
 import java.util.Locale;
@@ -109,7 +108,7 @@ enum OutputFormat {
         try {
             String text = new TsonMapperWriter().toTson(report);
             Object reread = DiagnosticsSchema.compiled().compiledSchema().get("validation_report")
-                    .read(new TsonDataParser(text).parseDocument().root());
+                    .read(text);
             if (!(reread instanceof ValidationReport)) {
                 throw new IllegalStateException("diagnostics.tn1's own validation_report read back as "
                         + reread.getClass() + ", not ValidationReport");

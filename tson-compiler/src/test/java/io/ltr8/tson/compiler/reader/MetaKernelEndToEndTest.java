@@ -2,9 +2,7 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
-import io.ltr8.tson.compiler.TsonDataParser;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
-import io.ltr8.tson.compiler.ast.Document;
 import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
@@ -80,10 +78,9 @@ class MetaKernelEndToEndTest {
         // in the schema. A value with no type annotation at a top-typed position is a real, valid
         // "just a top" reading, not an error demanding one of its many subtypes be named.
         TsonCompiledSchema compiled = compiled();
-        Document document = new TsonDataParser("{}").parseDocument();
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) compiled.get("top").read(document.root());
+        Map<String, Object> result = (Map<String, Object>) compiled.get("top").read("{}");
 
         assertEquals(Map.of(), result);
     }
@@ -91,10 +88,9 @@ class MetaKernelEndToEndTest {
     @Test
     void explicitTypeRefNamingTheDeclarationItselfAlsoUsesItsOwnBody() {
         TsonCompiledSchema compiled = compiled();
-        Document document = new TsonDataParser("!top {}").parseDocument();
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) compiled.get("top").read(document.root());
+        Map<String, Object> result = (Map<String, Object>) compiled.get("top").read("!top {}");
 
         assertEquals(Map.of(), result);
     }
@@ -104,10 +100,9 @@ class MetaKernelEndToEndTest {
         // The exact fix under test: enum => ~atom & { members: set<token> } -- previously
         // unbuildable (set<token> fell back to an unusable placeholder), now a genuine ArrayBody.
         TsonCompiledSchema compiled = compiled();
-        Document document = new TsonDataParser("{ members: [true false] }").parseDocument();
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) compiled.get("enum").read(document.root());
+        Map<String, Object> result = (Map<String, Object>) compiled.get("enum").read("{ members: [true false] }");
 
         assertEquals(List.of("true", "false"), result.get("members"));
     }
@@ -115,10 +110,9 @@ class MetaKernelEndToEndTest {
     @Test
     void readsIntegerSizeAgainstRealData() {
         TsonCompiledSchema compiled = compiled();
-        Document document = new TsonDataParser("{ bits: 32 signed: true }").parseDocument();
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) compiled.get("integer_size").read(document.root());
+        Map<String, Object> result = (Map<String, Object>) compiled.get("integer_size").read("{ bits: 32 signed: true }");
 
         assertEquals(BigInteger.valueOf(32), result.get("bits"));
         assertEquals("true", result.get("signed")); // boolean => !enum [true false] -- text, not a Java boolean
@@ -127,10 +121,9 @@ class MetaKernelEndToEndTest {
     @Test
     void readsFieldGroupAgainstRealData() {
         TsonCompiledSchema compiled = compiled();
-        Document document = new TsonDataParser("{ members: [foo bar] state: OPTIONAL }").parseDocument();
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) compiled.get("field_group").read(document.root());
+        Map<String, Object> result = (Map<String, Object>) compiled.get("field_group").read("{ members: [foo bar] state: OPTIONAL }");
 
         assertEquals(List.of("foo", "bar"), result.get("members"));
         assertEquals("OPTIONAL", result.get("state"));
@@ -139,10 +132,9 @@ class MetaKernelEndToEndTest {
     @Test
     void readsTupleElementAgainstRealNestedData() {
         TsonCompiledSchema compiled = compiled();
-        Document document = new TsonDataParser("{ element_type: { name: text arguments: [] } state: REQUIRED }").parseDocument();
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) compiled.get("tuple_element").read(document.root());
+        Map<String, Object> result = (Map<String, Object>) compiled.get("tuple_element").read("{ element_type: { name: text arguments: [] } state: REQUIRED }");
 
         assertEquals("REQUIRED", result.get("state"));
         @SuppressWarnings("unchecked")

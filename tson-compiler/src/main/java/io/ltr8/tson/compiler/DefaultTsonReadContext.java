@@ -1,52 +1,82 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.compiler.ast.CoreValue;
-import io.ltr8.tson.compiler.ast.DataValue;
+import io.ltr8.tson.compiler.stream.TsonEvent;
+import io.ltr8.tson.compiler.stream.TsonEventSource;
 import io.ltr8.tson.schema.meta.SourcePosition;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 /**
- * The one backing implementation for both {@link TsonReadContext#throwing()} and {@link
- * TsonReadContext#collecting}, parametrized by {@code failFast} rather than two separate classes --
- * every other field is computed identically either way, only {@link #report} itself branches.
- * Package-private: a caller only ever reaches this through {@link TsonReadContext}'s own static
- * factories, never by name -- see that interface's own Javadoc for why it's an interface at all.
+ * The one backing implementation for both {@link TsonReadContext#throwing(TsonEventSource)} and
+ * {@link TsonReadContext#collecting(TsonEventSource)}, parametrized by {@code failFast} rather than
+ * two separate classes -- every other field is computed identically either way, only {@link #report}
+ * itself branches. Package-private: a caller only ever reaches this through {@link TsonReadContext}'s
+ * own static factories, never by name -- see that interface's own Javadoc for why it's an interface
+ * at all.
  */
 final class DefaultTsonReadContext implements TsonReadContext {
 
-    private final Map<CoreValue, Position> dataPositions;
+    /**
+     * Every scoped copy of a single read (see {@link #field}/{@link #index}/{@link
+     * #withSchemaPosition}/{@link #withPosition}) shares one of these -- the real event source, its
+     * own live cursor position (mutated by {@link #peek}/{@link #next} regardless of which copy made
+     * the call, since there is only ever one real cursor per read), and, in collecting mode, the
+     * accumulating diagnostic sink.
+     */
+    private static final class Cursor {
+        final TsonEventSource events;
+        final List<Diagnostic> diagnostics;
+        final boolean failFast;
+        Optional<SourcePosition> position = Optional.empty();
+
+        Cursor(TsonEventSource events, List<Diagnostic> diagnostics, boolean failFast) {
+            this.events = events;
+            this.diagnostics = diagnostics;
+            this.failFast = failFast;
+        }
+    }
+
+    private final Cursor cursor;
     private final String path;
-    private final Optional<SourcePosition> position;
     private final Optional<SourcePosition> schemaPosition;
-    private final List<Diagnostic> diagnostics;
-    private final boolean failFast;
+    private final Optional<SourcePosition> positionOverride;
 
-    private DefaultTsonReadContext(Map<CoreValue, Position> dataPositions, String path, Optional<SourcePosition> position,
-                                    Optional<SourcePosition> schemaPosition, List<Diagnostic> diagnostics, boolean failFast) {
-        this.dataPositions = dataPositions;
+    private DefaultTsonReadContext(Cursor cursor, String path, Optional<SourcePosition> schemaPosition,
+                                    Optional<SourcePosition> positionOverride) {
+        this.cursor = cursor;
         this.path = path;
-        this.position = position;
         this.schemaPosition = schemaPosition;
-        this.diagnostics = diagnostics;
-        this.failFast = failFast;
+        this.positionOverride = positionOverride;
     }
 
-    static TsonReadContext throwing(Map<CoreValue, Position> dataPositions) {
-        return new DefaultTsonReadContext(dataPositions, "", Optional.empty(), Optional.empty(), null, true);
+    static TsonReadContext throwing(TsonEventSource events) {
+        return new DefaultTsonReadContext(new Cursor(events, null, true), "", Optional.empty(), Optional.empty());
     }
 
-    static TsonReadContext collecting(Map<CoreValue, Position> dataPositions) {
-        return new DefaultTsonReadContext(dataPositions, "", Optional.empty(), Optional.empty(), new ArrayList<>(), false);
+    static TsonReadContext collecting(TsonEventSource events) {
+        return new DefaultTsonReadContext(new Cursor(events, new ArrayList<>(), false), "", Optional.empty(), Optional.empty());
+    }
+
+    @Override
+    public TsonEvent peek() {
+        TsonEvent e = cursor.events.peek();
+        cursor.position = Optional.of(e.position());
+        return e;
+    }
+
+    @Override
+    public TsonEvent next() {
+        TsonEvent e = cursor.events.next();
+        cursor.position = Optional.of(e.position());
+        return e;
     }
 
     @Override
     public Optional<SourcePosition> position() {
-        return position;
+        return positionOverride.isPresent() ? positionOverride : cursor.position;
     }
 
     @Override
@@ -61,59 +91,41 @@ final class DefaultTsonReadContext implements TsonReadContext {
 
     @Override
     public boolean failFast() {
-        return failFast;
-    }
-
-    /**
-     * A missing value ({@code value == null}, e.g. a missing required field) has no {@code CoreValue}
-     * of its own to look up, so this keeps the *current* {@link #position()} rather than clearing it
-     * to empty -- the enclosing record/array/tuple's own position remains the nearest real anchor a
-     * caller (e.g. an LLM retry loop) can point at in the actual submitted text, and is strictly more
-     * useful than reporting no position at all.
-     */
-    @Override
-    public TsonReadContext field(String name, DataValue value) {
-        Optional<SourcePosition> childPosition = value == null ? position : positionOf(value);
-        return new DefaultTsonReadContext(dataPositions, path + "/" + escape(name), childPosition, schemaPosition,
-                diagnostics, failFast);
+        return cursor.failFast;
     }
 
     @Override
-    public TsonReadContext index(int i, DataValue value) {
-        Optional<SourcePosition> childPosition = value == null ? position : positionOf(value);
-        return new DefaultTsonReadContext(dataPositions, path + "/" + i, childPosition, schemaPosition,
-                diagnostics, failFast);
+    public TsonReadContext field(String name) {
+        return new DefaultTsonReadContext(cursor, path + "/" + escape(name), schemaPosition, positionOverride);
+    }
+
+    @Override
+    public TsonReadContext index(int i) {
+        return new DefaultTsonReadContext(cursor, path + "/" + i, schemaPosition, positionOverride);
     }
 
     @Override
     public TsonReadContext withSchemaPosition(Optional<SourcePosition> schemaPosition) {
-        return new DefaultTsonReadContext(dataPositions, path, position, schemaPosition, diagnostics, failFast);
+        return new DefaultTsonReadContext(cursor, path, schemaPosition, positionOverride);
     }
 
     @Override
-    public TsonReadContext at(DataValue value) {
-        return new DefaultTsonReadContext(dataPositions, path, positionOf(value), schemaPosition, diagnostics, failFast);
+    public TsonReadContext withPosition(Optional<SourcePosition> position) {
+        return new DefaultTsonReadContext(cursor, path, schemaPosition, position);
     }
 
     @Override
     public void report(Diagnostic.Code code, String message, String expected, String actual) {
-        Diagnostic diagnostic = new Diagnostic(path, code, message, expected, actual, position, schemaPosition);
-        if (failFast) {
+        Diagnostic diagnostic = new Diagnostic(path, code, message, expected, actual, position(), schemaPosition);
+        if (cursor.failFast) {
             throw new TsonReadException(diagnostic);
         }
-        diagnostics.add(diagnostic);
+        cursor.diagnostics.add(diagnostic);
     }
 
     @Override
     public List<Diagnostic> diagnostics() {
-        return diagnostics == null ? List.of() : Collections.unmodifiableList(diagnostics);
-    }
-
-    private Optional<SourcePosition> positionOf(DataValue value) {
-        if (value == null) {
-            return Optional.empty();
-        }
-        return Optional.<SourcePosition>ofNullable(dataPositions.get(value.coreValue()));
+        return cursor.diagnostics == null ? List.of() : Collections.unmodifiableList(cursor.diagnostics);
     }
 
     private static String escape(String name) {

@@ -3,14 +3,11 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.TsonValueReaderResolver;
-import io.ltr8.tson.compiler.ast.DataValue;
-import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -19,29 +16,19 @@ import java.util.Optional;
  * Map<String, Object>}, one entry per schema field. {@code resolver} turns a field's own type-ref
  * name into the {@link TsonValueReader} that reads its value.
  *
- * <p><b>{@link #read} walks the incoming data once, not the schema's own field list per field, and
- * needs no separate "already filled" tracker.</b> Every {@code REQUIRED_FIXED}/{@code
- * OPTIONAL_FIXED} field's own precomputed value ({@link RecordAbstractReader#precomputedValue}) is
- * written into {@code result} up front, before the data is ever consulted -- a fixed field's value
- * is immutable, so data can never override it, and pre-seeding it means the ordinary data pass never
- * needs to special-case "is this field fixed" at all: {@code result.containsKey(name)} already
- * being {@code true} makes it skip straight past, the same way it skips an already-filled duplicate.
- * The one data pass runs *backward*, so the first occurrence found for a still-unfilled field is
- * genuinely its last in source order (§2.5's "last value wins"). A schema field neither fixed nor
- * mentioned by the data still needs its own required-or-default handling, but that second pass over
- * the schema's own field list only runs when {@code result} came out smaller than the full field
- * count -- a document supplying every non-fixed field skips it entirely. No {@code boolean[]}
- * tracker anywhere: {@code result} itself, via {@code containsKey}, is the only "have I resolved
- * this field yet" signal needed, at the cost of a {@code Map} lookup instead of an array read. One
- * consequence worth knowing: the returned map's own iteration order is no longer guaranteed to match
- * schema-declaration order (fixed fields land first, then whatever order the backward data scan
- * finds the rest, defaulted ones last) -- nothing in this codebase relies on a DOM record's own key
- * order today, so this trades that incidental property for the allocation savings.
+ * <p>Every {@code REQUIRED_FIXED}/{@code OPTIONAL_FIXED} field's own precomputed value ({@link
+ * RecordAbstractReader#precomputedValue}) is written into {@code result} up front, before the data
+ * is ever consulted -- {@link RecordAbstractReader#readFields} already discards any data occurrence
+ * of one of these unread, so nothing later ever overwrites it. A single forward pass over the
+ * stream (via {@link RecordAbstractReader#readFields}/{@link RecordAbstractReader#readPositional})
+ * then fills every other field it actually finds -- {@code sink} is a plain {@code result::put} by
+ * field name -- with a second pass over the full field list filling in whatever the {@code
+ * boolean[]} it returns says wasn't seen.
  *
  * <p>Everything shared with {@link RecordBindReader} -- the compiled field list, the name lookup,
- * unwrapping a record-shaped {@link DataValue}, precomputing default/fixed values -- lives on
- * {@link RecordAbstractReader}; this class holds only what's genuinely different about producing a
- * plain {@code Map} instead of a bound object.
+ * confirming a record-shaped value, precomputing default/fixed values -- lives on {@link
+ * RecordAbstractReader}; this class holds only what's genuinely different about producing a plain
+ * {@code Map} instead of a bound object.
  */
 final class RecordDomReader extends RecordAbstractReader<Map<String, Object>> {
 
@@ -76,41 +63,29 @@ final class RecordDomReader extends RecordAbstractReader<Map<String, Object>> {
     }
 
     @Override
-    public Map<String, Object> read(DataValue value, TsonReadContext ctx) {
-        ctx = ctx.at(value).withSchemaPosition(schemaPosition);
-        List<RecordValue.Field> dataFields = dataFields(value, ctx);
-        if (dataFields == null) {
+    public Map<String, Object> read(TsonReadContext ctx) {
+        ctx = ctx.withSchemaPosition(schemaPosition);
+        ShapeResult shapeResult = expectRecordShape(ctx);
+        if (shapeResult.shape() == Shape.MISMATCH) {
             return null;
         }
         Map<String, Object> result = new LinkedHashMap<>();
-
         for (int schemaIndex : fixedFieldIndices) {
             result.put(fields.get(schemaIndex).schema().name(), precomputedValue[schemaIndex]);
         }
-
-        for (int i = dataFields.size() - 1; i >= 0; i--) {
-            RecordValue.Field dataField = dataFields.get(i);
-            Integer schemaIndex = fieldIndex.get(dataField.name());
-            if (schemaIndex == null) {
+        FieldSink sink = (schemaIndex, decoded) -> result.put(fields.get(schemaIndex).schema().name(), decoded);
+        boolean[] seen = switch (shapeResult.shape()) {
+            case FIELDS -> readFields(ctx, sink);
+            case EMPTY -> new boolean[fields.size()];
+            case POSITIONAL -> readPositional(ctx, sink);
+            case MISMATCH -> throw new IllegalStateException("unreachable");
+        };
+        TsonReadContext anchoredCtx = ctx.withPosition(shapeResult.anchor());
+        for (int i = 0; i < fields.size(); i++) {
+            if (isFixed(fields.get(i).schema().state()) || seen[i]) {
                 continue;
             }
-            CompiledField field = fields.get(schemaIndex);
-            String fieldName = field.schema().name();
-            if (result.containsKey(fieldName)) {
-                continue;
-            }
-            DataValue fieldValue = dataField.value().value();
-            result.put(fieldName, isAbsent(fieldValue) ? defaultOrRequireNonFixed(schemaIndex, ctx)
-                    : field.parser().read(fieldValue, ctx.field(fieldName, fieldValue)));
-        }
-
-        if (result.size() < fields.size()) {
-            for (int i = 0; i < fields.size(); i++) {
-                String fieldName = fields.get(i).schema().name();
-                if (!result.containsKey(fieldName)) {
-                    result.put(fieldName, defaultOrRequireNonFixed(i, ctx));
-                }
-            }
+            result.put(fields.get(i).schema().name(), defaultOrRequireNonFixed(i, anchoredCtx));
         }
         return result;
     }

@@ -2,7 +2,6 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
-import io.ltr8.tson.compiler.ast.DataValue;
 
 import java.util.Map;
 
@@ -20,7 +19,7 @@ public record DeferredValueReader<T>(String typeName, Map<String, TsonValueReade
 
     @Override
     @SuppressWarnings("unchecked")
-    public T read(DataValue value, TsonReadContext ctx) {
+    public T read(TsonReadContext ctx) {
         TsonValueReader<?> resolved = registry.get(typeName);
         if (resolved == null) {
             throw new IllegalStateException("'" + typeName + "' has no compiled reader -- a deferred lookup "
@@ -29,6 +28,6 @@ public record DeferredValueReader<T>(String typeName, Map<String, TsonValueReade
                     + "building '" + typeName + "' returned without ever finishing it, which is a reader "
                     + "bug, not a caller error");
         }
-        return (T) resolved.read(value, ctx);
+        return (T) resolved.read(ctx);
     }
 }

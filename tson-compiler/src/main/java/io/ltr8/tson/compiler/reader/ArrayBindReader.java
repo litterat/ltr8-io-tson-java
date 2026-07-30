@@ -8,13 +8,12 @@ import io.ltr8.bind.DataParameterizedType;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.TsonValueReaderResolver;
-import io.ltr8.tson.compiler.ast.DataValue;
-import io.ltr8.tson.compiler.ast.ScopedValue;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.lang.reflect.Type;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -38,10 +37,19 @@ import java.util.Optional;
  * record-shaped, and so on), so this class's own job is only routing each already-decoded element
  * into {@code descriptor}'s own assembly machinery.
  *
- * <p>Everything else -- resolving the element reader, unwrapping the incoming {@link DataValue},
- * size/uniqueness/absent-element validation -- lives on {@link ArrayAbstractReader}; {@code
- * unique_items} is still enforced there regardless of what {@code descriptor}'s own backing
- * collection would otherwise silently tolerate.
+ * <p>Everything else -- resolving the element reader, confirming an array shape, size/uniqueness/
+ * absent-element validation -- lives on {@link ArrayAbstractReader}; {@code unique_items} is still
+ * enforced there regardless of what {@code descriptor}'s own backing collection would otherwise
+ * silently tolerate.
+ *
+ * <p><b>A real Java array target needs its own exact final size known before construction, unlike a
+ * growable {@code List}/{@code Set}</b> ({@code descriptor.constructor()} for an array type is
+ * {@code MethodHandles.arrayConstructor}, genuinely fixed-size -- {@code put()}-ing past the
+ * allocated length throws {@code ArrayIndexOutOfBoundsException}, not "grows"). A stream has no
+ * up-front element count the way an already-built element list did, so {@link #read} branches on
+ * {@code descriptor.typeClass().isArray()}: a real array decodes into a temporary buffer first, then
+ * allocates and copies once the true count is known; every other (growable) target still constructs
+ * empty and appends incrementally, genuinely one element at a time.
  */
 final class ArrayBindReader extends ArrayAbstractReader<Object> {
 
@@ -54,16 +62,18 @@ final class ArrayBindReader extends ArrayAbstractReader<Object> {
     }
 
     @Override
-    public Object read(DataValue value, TsonReadContext ctx) {
-        ctx = ctx.at(value).withSchemaPosition(schemaPosition);
-        List<ScopedValue> elements = elements(value, ctx);
-        if (elements == null) {
+    public Object read(TsonReadContext ctx) {
+        ctx = ctx.withSchemaPosition(schemaPosition);
+        if (!expectArrayStart(ctx)) {
             return null;
         }
         try {
-            Object arrayData = descriptor.constructor().invoke(elements.size());
+            if (descriptor.typeClass().isArray()) {
+                return readIntoFixedSizeArray(ctx);
+            }
+            Object arrayData = descriptor.constructor().invoke(0);
             Object iterator = descriptor.iterator().invoke(arrayData);
-            readInto(elements, ctx, decoded -> put(arrayData, iterator, decoded));
+            readInto(ctx, decoded -> put(arrayData, iterator, decoded));
             return arrayData;
         } catch (RuntimeException e) {
             throw e;
@@ -71,6 +81,17 @@ final class ArrayBindReader extends ArrayAbstractReader<Object> {
             throw new IllegalStateException("failed to construct " + descriptor.typeClass() + " from '" + name
                     + "'s own decoded elements", t);
         }
+    }
+
+    private Object readIntoFixedSizeArray(TsonReadContext ctx) throws Throwable {
+        List<Object> buffered = new ArrayList<>();
+        readInto(ctx, buffered::add);
+        Object arrayData = descriptor.constructor().invoke(buffered.size());
+        Object iterator = descriptor.iterator().invoke(arrayData);
+        for (Object decoded : buffered) {
+            put(arrayData, iterator, decoded);
+        }
+        return arrayData;
     }
 
     /** {@code descriptor.put()} is a {@link java.lang.invoke.MethodHandle}, declared to throw {@code Throwable} -- caught and rewrapped here since this is called from within a {@code Consumer}, which can't declare it. */

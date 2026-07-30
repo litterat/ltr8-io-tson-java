@@ -1,12 +1,10 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.TsonValueReaderResolver;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.config.ValueReaderFactoryResolver;
-import io.ltr8.tson.compiler.ast.DataValue;
-import io.ltr8.tson.compiler.ast.TokenForm;
-import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.EmailType;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -56,7 +54,8 @@ class ValueReaderFactoryRegistryTest {
 
         TsonValueReader<?> reader = registry.resolve("email_type").create("email", entry, NEVER_CALLED);
 
-        UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class, () -> reader.read(null));
+        UnsupportedOperationException thrown =
+                assertThrows(UnsupportedOperationException.class, () -> reader.read((TsonReadContext) null));
         assertEquals(true, thrown.getMessage().contains("email"));
     }
 
@@ -64,29 +63,27 @@ class ValueReaderFactoryRegistryTest {
     void domAndBindDisagreeOnlyForBooleanEnumMembers() {
         TypeDefinition booleanEntry = new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), true,
                 List.of(), List.of(), Optional.empty(), new EnumBody(List.of("true", "false")));
-        DataValue trueToken = new DataValue(List.of(), Optional.empty(), new TokenValue("true", TokenForm.UNQUOTED));
 
         TsonValueReader<?> domReader = ValueReaderFactoryRegistry.dom().resolve("enum")
                 .create("boolean", booleanEntry, NEVER_CALLED);
         TsonValueReader<?> bindReader = ValueReaderFactoryRegistry.bind(SchemaMetaNameBinder.defaultContext())
                 .resolve("enum").create("boolean", booleanEntry, NEVER_CALLED);
 
-        assertEquals("true", domReader.read(trueToken));
-        assertEquals(Boolean.TRUE, bindReader.read(trueToken));
+        assertEquals("true", domReader.read("true"));
+        assertEquals(Boolean.TRUE, bindReader.read("true"));
     }
 
     @Test
     void domAndBindAgreeForAnOrdinaryNonBooleanEnum() {
         TypeDefinition statusEntry = new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), true,
                 List.of(), List.of(), Optional.empty(), new EnumBody(List.of("ACTIVE", "INACTIVE")));
-        DataValue activeToken = new DataValue(List.of(), Optional.empty(), new TokenValue("ACTIVE", TokenForm.UNQUOTED));
 
         TsonValueReader<?> domReader = ValueReaderFactoryRegistry.dom().resolve("enum")
                 .create("status", statusEntry, NEVER_CALLED);
         TsonValueReader<?> bindReader = ValueReaderFactoryRegistry.bind(SchemaMetaNameBinder.defaultContext())
                 .resolve("enum").create("status", statusEntry, NEVER_CALLED);
 
-        assertEquals("ACTIVE", domReader.read(activeToken));
-        assertEquals("ACTIVE", bindReader.read(activeToken));
+        assertEquals("ACTIVE", domReader.read("ACTIVE"));
+        assertEquals("ACTIVE", bindReader.read("ACTIVE"));
     }
 }

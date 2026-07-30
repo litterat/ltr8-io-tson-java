@@ -3,11 +3,10 @@ package io.ltr8.tson.cli;
 import io.ltr8.tson.Tson;
 import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
-import io.ltr8.tson.compiler.TsonDataParser;
+import io.ltr8.tson.compiler.TsonDataStream;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.TsonValueReader;
-import io.ltr8.tson.compiler.ast.Document;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -60,10 +59,10 @@ final class ValidateCommand {
                 System.out.println("# " + dataFile);
             }
             try {
-                TsonDataParser parser = new TsonDataParser(Io.readFile(dataFile));
-                Document document = parser.parseDocument();
-                TsonReadContext ctx = TsonReadContext.collecting(parser.positions());
-                reader.read(document.root(), ctx);
+                TsonDataStream dataStream = new TsonDataStream(Io.readFile(dataFile));
+                dataStream.next(); // DocumentStart
+                TsonReadContext ctx = TsonReadContext.collecting(dataStream);
+                reader.read(ctx);
                 List<CliDiagnostic> errors = ctx.diagnostics().stream().map(CliDiagnostic::from).toList();
                 if (!errors.isEmpty()) {
                     allValid = false;

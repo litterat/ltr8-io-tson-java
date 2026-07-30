@@ -2,10 +2,8 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
-import io.ltr8.tson.compiler.TsonDataParser;
 import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
-import io.ltr8.tson.compiler.ast.Document;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.FieldState;
@@ -34,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * End-to-end proof of the compiled-schema-reader sketch against the real {@link RecordDomReader} and
  * {@link AtomValueReader#INTEGER_TYPE} -- a real (hand-built, but shaped exactly like a materialized
  * {@link TsonSchema} would be) schema compiled with the real DOM-mode factory registry, read against
- * real TSON data source text through the real {@link TsonDataParser}.
+ * real TSON data source text through the real compiled reader.
  */
 class RecordDomReaderTest {
 
@@ -58,8 +56,7 @@ class RecordDomReaderTest {
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> read(TsonCompiledSchema compiled, String source) {
-        Document document = new TsonDataParser(source).parseDocument();
-        return (Map<String, Object>) compiled.get("point").read(document.root());
+        return (Map<String, Object>) compiled.get("point").read(source);
     }
 
     @Test
