@@ -27,6 +27,8 @@ import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TsonEventSource;
 import io.ltr8.tson.compiler.stream.TypeRef;
 
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -115,7 +117,7 @@ public final class TsonDataStream implements TsonEventSource {
     private boolean started;
 
     public TsonDataStream(String source) {
-        this.lexer = new Lexer(source);
+        this.lexer = new Lexer(new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8)));
     }
 
     @Override

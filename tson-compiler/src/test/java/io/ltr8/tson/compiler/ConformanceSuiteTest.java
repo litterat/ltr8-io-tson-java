@@ -36,6 +36,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestFactory;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.math.BigDecimal;
@@ -186,7 +187,7 @@ class ConformanceSuiteTest {
         String raw = resolvedRaw(subject, sidecar);
         switch (outcome) {
             case "valid" -> {
-                List<Token> actual = new Lexer(raw).tokenize();
+                List<Token> actual = new Lexer(new ByteArrayInputStream(raw.getBytes(StandardCharsets.UTF_8))).tokenize();
                 actual.removeIf(t -> t.type() == TokenType.EOF);
                 ArrayValue expectedTokens = (ArrayValue) fieldCore(sidecar, "tokens");
                 assertEquals(expectedTokens.elements().size(), actual.size(), "token count");
@@ -198,7 +199,8 @@ class ConformanceSuiteTest {
                     assertEquals(expText, actual.get(i).text(), "token[" + i + "].text");
                 }
             }
-            case "error" -> assertThrows(LexException.class, () -> new Lexer(raw).tokenize());
+            case "error" -> assertThrows(LexException.class,
+                    () -> new Lexer(new ByteArrayInputStream(raw.getBytes(StandardCharsets.UTF_8))).tokenize());
             default -> fail("unknown lexer-layer outcome: " + outcome);
         }
     }

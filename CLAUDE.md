@@ -171,8 +171,27 @@ be *the* tson.io-blessed implementation.
 `Lexer` is a single hand-written scanner (`Lexer.java`) producing a stream of `Token`s. Key design
 points, tied to specific spec sections:
 
+- **Constructed from an `InputStream`, not a `String`** (switched 2026-07-30) -- decoded via
+  `InputStreamReader(source, StandardCharsets.UTF_8)` and buffered one Unicode code point at a time
+  into a small `List<Integer> lookahead` (never more than the couple of code points any lexical rule
+  here actually needs to peek ahead -- `""` disambiguation, the `..` range-vs-continuation check,
+  `\r\n` pairing), rather than requiring the whole document already resident as an in-memory `String`.
+  `peekCodePointAt(int ahead)` is the one lookahead primitive every other cursor method (`peekCodePoint`,
+  `atEnd`, `advance`) is built on, replacing the old absolute-index `source.codePointAt(pos + delta)`/
+  `source.charAt(pos + delta)` calls -- every one of those was already relative to the cursor by a
+  small, fixed offset (0 or 1), so the switch to bounded lookahead needed no change to any lexical
+  rule's own logic, only to how "peek ahead" is implemented underneath it. `TsonDataStream`'s own
+  public `String`-taking constructor is unchanged -- it wraps its `source` in a `ByteArrayInputStream`
+  (UTF-8-encoded) before handing it to `Lexer`, so this is purely an internal representation change at
+  the lexer layer, not a ripple through the rest of the stack. A UTF-8-decoding `InputStreamReader`
+  always emits well-formed UTF-16 (a malformed byte sequence decodes to the replacement character,
+  U+FFFD, never a raw lone surrogate) -- `readCodePointFromReader`'s own "lone high surrogate" branch
+  is therefore unreachable for any real byte input and fails loudly (`IllegalStateException`) rather
+  than silently fabricating a codepoint, on the same "don't handle what can't happen" principle this
+  codebase applies elsewhere.
 - **Code-point addressed, not char-addressed.** The cursor advances by Unicode code point
-  (`source.codePointAt`/`Character.charCount`) so supplementary-plane characters (valid in TSON
+  (`Character.isHighSurrogate`/`Character.toCodePoint` pairing two `char`s back into one code point
+  when reading from the underlying `Reader`) so supplementary-plane characters (valid in TSON
   identifiers per UAX #31) are never split across a surrogate pair. `Position.column` counts code
   points, not UTF-16 units.
 - **Position tracks line, column, and a UTF-8 byte offset** (computed incrementally per code point),
