@@ -1,15 +1,18 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.TsonValueReaderResolver;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * DOM mode's own {@code record} reader -- reads a record-shaped value into a plain {@code
@@ -42,8 +45,9 @@ import java.util.Map;
  */
 final class RecordDomReader extends RecordAbstractReader<Map<String, Object>> {
 
-    public RecordDomReader(String name, RecordBody body, TsonValueReaderResolver resolver) {
-        super(name, body, resolver);
+    public RecordDomReader(String name, RecordBody body, TsonValueReaderResolver resolver,
+                            Optional<SourcePosition> schemaPosition) {
+        super(name, body, resolver, schemaPosition);
     }
 
     /**
@@ -63,7 +67,7 @@ final class RecordDomReader extends RecordAbstractReader<Map<String, Object>> {
                 throw new IllegalArgumentException(
                         "'" + name + "' is not record-shaped: " + typeDefinition.body());
             }
-            RecordDomReader ownParser = new RecordDomReader(name, body, resolver);
+            RecordDomReader ownParser = new RecordDomReader(name, body, resolver, typeDefinition.position());
             if (typeDefinition.subtypes().isEmpty()) {
                 return ownParser;
             }
@@ -72,8 +76,12 @@ final class RecordDomReader extends RecordAbstractReader<Map<String, Object>> {
     }
 
     @Override
-    public Map<String, Object> read(DataValue value) {
-        List<RecordValue.Field> dataFields = dataFields(value);
+    public Map<String, Object> read(DataValue value, TsonReadContext ctx) {
+        ctx = ctx.at(value).withSchemaPosition(schemaPosition);
+        List<RecordValue.Field> dataFields = dataFields(value, ctx);
+        if (dataFields == null) {
+            return null;
+        }
         Map<String, Object> result = new LinkedHashMap<>();
 
         for (int schemaIndex : fixedFieldIndices) {
@@ -92,15 +100,15 @@ final class RecordDomReader extends RecordAbstractReader<Map<String, Object>> {
                 continue;
             }
             DataValue fieldValue = dataField.value().value();
-            result.put(fieldName,
-                    isAbsent(fieldValue) ? defaultOrRequireNonFixed(schemaIndex) : field.parser().read(fieldValue));
+            result.put(fieldName, isAbsent(fieldValue) ? defaultOrRequireNonFixed(schemaIndex, ctx)
+                    : field.parser().read(fieldValue, ctx.field(fieldName, fieldValue)));
         }
 
         if (result.size() < fields.size()) {
             for (int i = 0; i < fields.size(); i++) {
                 String fieldName = fields.get(i).schema().name();
                 if (!result.containsKey(fieldName)) {
-                    result.put(fieldName, defaultOrRequireNonFixed(i));
+                    result.put(fieldName, defaultOrRequireNonFixed(i, ctx));
                 }
             }
         }

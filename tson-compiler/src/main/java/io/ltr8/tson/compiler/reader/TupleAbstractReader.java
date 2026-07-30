@@ -1,5 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.Diagnostic;
+import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.TsonValueReaderResolver;
 import io.ltr8.tson.compiler.ast.AbsentValue;
@@ -8,11 +10,13 @@ import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.ScopedValue;
 import io.ltr8.tson.schema.meta.ElementState;
+import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TupleElement;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Everything {@link TupleDomReader} and {@link TupleBindReader} share verbatim: resolving every
@@ -39,38 +43,49 @@ abstract class TupleAbstractReader<T> implements TsonValueReader<T> {
 
     final String name;
     final List<CompiledSlot> slots;
+    final Optional<SourcePosition> schemaPosition;
 
-    TupleAbstractReader(String name, TupleBody body, TsonValueReaderResolver resolver) {
+    TupleAbstractReader(String name, TupleBody body, TsonValueReaderResolver resolver, Optional<SourcePosition> schemaPosition) {
         this.name = name;
         List<CompiledSlot> slots = new ArrayList<>(body.elements().size());
         for (TupleElement element : body.elements()) {
             slots.add(new CompiledSlot(element, resolver.resolve(element.elementType().name())));
         }
         this.slots = slots;
+        this.schemaPosition = schemaPosition;
     }
 
-    final List<ScopedValue> elements(DataValue value) {
+    /** Returns {@code null} (not a real element list) on a shape or arity mismatch -- see {@link RecordAbstractReader#dataFields} for the identical "caller must stop" contract. */
+    final List<ScopedValue> elements(DataValue value, TsonReadContext ctx) {
         if (value == null) {
-            throw new IllegalArgumentException("expected a tuple for '" + name + "', found no value");
+            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a tuple for '" + name + "', found no value",
+                    "a tuple (array-shaped)", "no value");
+            return null;
         }
         CoreValue core = value.coreValue();
         if (!(core instanceof ArrayValue av)) {
-            throw new IllegalArgumentException("expected a tuple (array-shaped) for '" + name + "', found " + core);
+            ctx.report(Diagnostic.Code.TYPE_MISMATCH,
+                    "expected a tuple (array-shaped) for '" + name + "', found " + core,
+                    "a tuple (array-shaped)", String.valueOf(core));
+            return null;
         }
         List<ScopedValue> elements = av.elements();
         if (elements.size() != slots.size()) {
-            throw new IllegalArgumentException("'" + name + "' has " + slots.size() + " positions, found "
-                    + elements.size() + " elements");
+            ctx.report(Diagnostic.Code.WRONG_ARITY, "'" + name + "' has " + slots.size() + " positions, found "
+                            + elements.size() + " elements",
+                    slots.size() + " elements", String.valueOf(elements.size()));
+            return null;
         }
         return elements;
     }
 
-    final Object[] decode(List<ScopedValue> elements) {
+    final Object[] decode(List<ScopedValue> elements, TsonReadContext ctx) {
         Object[] result = new Object[slots.size()];
         for (int i = 0; i < slots.size(); i++) {
             CompiledSlot slot = slots.get(i);
             DataValue elementValue = elements.get(i).value();
-            result[i] = isAbsent(elementValue) ? defaultOrRequire(slot, i) : slot.parser().read(elementValue);
+            result[i] = isAbsent(elementValue) ? defaultOrRequire(slot, i, ctx)
+                    : slot.parser().read(elementValue, ctx.index(i, elementValue));
         }
         return result;
     }
@@ -79,10 +94,11 @@ abstract class TupleAbstractReader<T> implements TsonValueReader<T> {
         return value == null || value.coreValue() instanceof AbsentValue;
     }
 
-    private Object defaultOrRequire(CompiledSlot slot, int index) {
+    private Object defaultOrRequire(CompiledSlot slot, int index, TsonReadContext ctx) {
         if (slot.schema().state() == ElementState.REQUIRED) {
-            throw new IllegalArgumentException(
-                    "'" + name + "' position [" + index + "] is absent, but this position is required");
+            ctx.index(index, null).report(Diagnostic.Code.FIELD_REQUIRED,
+                    "'" + name + "' position [" + index + "] is absent, but this position is required",
+                    "a value", "(absent)");
         }
         return null;
     }

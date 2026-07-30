@@ -1,6 +1,7 @@
 package io.ltr8.tson.cli;
 
 import io.ltr8.tson.Tson;
+import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 
 import java.nio.file.Path;
@@ -24,7 +25,7 @@ final class CompileCommand {
             System.out.println(format.render(ValidationReport.ok()));
             return 0;
         } catch (RuntimeException e) {
-            System.out.println(format.render(ValidationReport.failed("COMPILE_ERROR", e.getMessage())));
+            System.out.println(format.render(ValidationReport.failed(Diagnostic.Code.SCHEMA_ERROR, e.getMessage())));
             return 1;
         }
     }

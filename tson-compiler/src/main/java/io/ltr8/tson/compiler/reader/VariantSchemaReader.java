@@ -1,5 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.Diagnostic;
+import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.TsonValueReaderResolver;
 import io.ltr8.tson.compiler.ast.DataValue;
@@ -47,15 +49,17 @@ final class VariantSchemaReader implements TsonValueReader<Object> {
     }
 
     @Override
-    public Object read(DataValue value) {
+    public Object read(DataValue value, TsonReadContext ctx) {
         if (value == null || value.typeRef().isEmpty() || value.typeRef().get().equals(name)) {
-            return ownParser.read(value);
+            return ownParser.read(value, ctx);
         }
         String typeRef = value.typeRef().get();
         if (!subtypeNames.contains(typeRef)) {
-            throw new IllegalArgumentException("'" + typeRef + "' is not a known subtype of '" + name
-                    + "' -- expected one of " + subtypeNames);
+            ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF, "'" + typeRef + "' is not a known subtype of '" + name
+                            + "' -- expected one of " + subtypeNames,
+                    "one of " + subtypeNames, typeRef);
+            return null;
         }
-        return resolver.resolve(typeRef).read(value);
+        return resolver.resolve(typeRef).read(value, ctx);
     }
 }

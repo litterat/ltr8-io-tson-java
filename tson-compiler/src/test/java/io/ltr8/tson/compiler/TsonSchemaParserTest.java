@@ -454,4 +454,28 @@ class TsonSchemaParserTest {
                 { %s }""".formatted(declaration));
         return doc.body().declarations().values().iterator().next();
     }
+
+    // ── Declaration position side-table ──────────────────────────────────
+
+    @Test
+    void declarationPositionsRecordsEachDeclarationsOwnNameTokenPosition() {
+        String source = """
+                !!meta:"https://tson.io/2026/32/m/meta.tn1"
+                {
+                  first => {}
+
+                  second => {}
+                }
+                """;
+        TsonSchemaParser parser = new TsonSchemaParser(source);
+        SchemaDocument doc = parser.parseSchemaDocument();
+
+        SchemaMap.Declaration first = doc.body().declarations().get("first");
+        SchemaMap.Declaration second = doc.body().declarations().get("second");
+
+        Map<SchemaMap.Declaration, Position> declarationPositions = parser.declarationPositions();
+        assertEquals(new Position(3, 3, source.indexOf("first")), declarationPositions.get(first));
+        assertEquals(5, declarationPositions.get(second).line());
+        assertTrue(declarationPositions.get(second).line() > declarationPositions.get(first).line());
+    }
 }

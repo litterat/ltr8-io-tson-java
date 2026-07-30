@@ -1,5 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.Diagnostic;
+import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.TsonValueReaderResolver;
 import io.ltr8.tson.compiler.ast.DataValue;
@@ -35,13 +37,20 @@ final class NamedDispatchReader implements TsonValueReader<Object> {
     }
 
     @Override
-    public Object read(DataValue value) {
-        String typeRef = value.typeRef().orElseThrow(() -> new IllegalArgumentException(
-                "'" + positionName + "' " + missingTypeRefMessage + ": " + candidateNames));
-        if (!candidateNames.contains(typeRef)) {
-            throw new IllegalArgumentException("'" + typeRef + "' is not a " + candidateNoun + " of '"
-                    + positionName + "' -- expected one of " + candidateNames);
+    public Object read(DataValue value, TsonReadContext ctx) {
+        if (value == null || value.typeRef().isEmpty()) {
+            ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF,
+                    "'" + positionName + "' " + missingTypeRefMessage + ": " + candidateNames,
+                    "one of " + candidateNames, "no type annotation");
+            return null;
         }
-        return resolver.resolve(typeRef).read(value);
+        String typeRef = value.typeRef().get();
+        if (!candidateNames.contains(typeRef)) {
+            ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF, "'" + typeRef + "' is not a " + candidateNoun + " of '"
+                            + positionName + "' -- expected one of " + candidateNames,
+                    "one of " + candidateNames, typeRef);
+            return null;
+        }
+        return resolver.resolve(typeRef).read(value, ctx);
     }
 }

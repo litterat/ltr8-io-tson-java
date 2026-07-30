@@ -31,7 +31,10 @@ import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TypeRef;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -66,8 +69,36 @@ public class TsonDataParser {
 
     private final TsonDataStream stream;
 
+    /**
+     * Every {@link CoreValue} built during this parse, keyed by reference identity (an {@link
+     * IdentityHashMap}, not an ordinary {@code HashMap}) rather than a field on {@code CoreValue}
+     * itself -- every {@code CoreValue} implementor is a plain record compared structurally
+     * throughout this codebase's own test suite, so a {@code Position} component would flow
+     * straight into generated {@code equals}/{@code hashCode} and break every hand-built fixture
+     * that constructs one directly. Identity keying is what makes this safe *and* correct: two
+     * structurally-identical-but-distinct values (two array elements that are both the literal
+     * {@code 42}) must not collide, which is exactly what {@code ==}-keyed lookup guarantees and
+     * {@code .equals()}-keyed lookup would not. This is only sound because every {@code CoreValue}
+     * constructed by this parser (see {@link #recordPosition}) is a fresh {@code new} at its own
+     * occurrence, never cached or reused as a singleton -- a future optimization that shares a
+     * single {@code EmptyBrace}/{@code AbsentValue} instance across occurrences would silently
+     * corrupt this table.
+     */
+    final Map<CoreValue, Position> positions = new IdentityHashMap<>();
+
     public TsonDataParser(String source) {
         this.stream = new TsonDataStream(source);
+    }
+
+    /** Every {@link CoreValue} built by {@link #parseDocument()}, mapped to its own start {@link Position} in the source -- see {@link #positions}'s own Javadoc for why this is identity-keyed. */
+    public Map<CoreValue, Position> positions() {
+        return Collections.unmodifiableMap(positions);
+    }
+
+    /** Records {@code value}'s own start position and returns it unchanged, so a construction site can wrap a bare {@code new XValue(...)} in place. */
+    <T extends CoreValue> T recordPosition(T value, Position position) {
+        positions.put(value, position);
+        return value;
     }
 
     public Document parseDocument() {
@@ -151,8 +182,14 @@ public class TsonDataParser {
      * A fresh instance per call (never shared across {@link #parseDataValue()}/{@link
      * #parseCoreValue()}/{@link #parseAnnotation()} invocations), so nested/repeated calls from
      * {@link TsonSchemaParser} can never corrupt one another's position.
+     *
+     * <p>A non-static inner class, deliberately -- {@link #coreValue()} calls the outer instance's
+     * own {@link #recordPosition} directly, using each {@link TsonEvent}'s own {@link
+     * TsonEvent#position()} (already captured at Tier 2, by {@link TsonDataStream}) rather than
+     * threading a {@link Token}'s position through by hand the way the old, pre-streaming
+     * recursive-descent parser did.
      */
-    private static final class EventReducer {
+    private final class EventReducer {
 
         private final List<TsonEvent> events;
         private int pos;
@@ -186,13 +223,14 @@ public class TsonDataParser {
 
         CoreValue coreValue() {
             TsonEvent e = events.get(pos++);
+            Position position = e.position();
             return switch (e) {
-                case TokenEvent t -> new TokenValue(t.text(), t.form());
-                case AbsentEvent ignored -> new AbsentValue();
-                case EmptyBraceEvent ignored -> new EmptyBrace();
-                case RecordStart ignored -> record();
-                case MapStart ignored -> map();
-                case ArrayStart ignored -> array();
+                case TokenEvent t -> recordPosition(new TokenValue(t.text(), t.form()), position);
+                case AbsentEvent ignored -> recordPosition(new AbsentValue(), position);
+                case EmptyBraceEvent ignored -> recordPosition(new EmptyBrace(), position);
+                case RecordStart ignored -> recordPosition(record(), position);
+                case MapStart ignored -> recordPosition(map(), position);
+                case ArrayStart ignored -> recordPosition(array(), position);
                 default -> throw new IllegalStateException("unexpected event reducing a core-value: " + e);
             };
         }

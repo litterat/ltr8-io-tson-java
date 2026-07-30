@@ -37,6 +37,8 @@ import io.ltr8.tson.compiler.lexer.TokenType;
 import io.ltr8.tson.compiler.base.NumberGrammar;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -62,8 +64,24 @@ import java.util.Optional;
  */
 public final class TsonSchemaParser extends TsonDataParser {
 
+    /**
+     * Every {@link SchemaMap.Declaration} built during this parse, keyed by reference identity --
+     * same reasoning as {@link #positions} (inherited from {@link TsonDataParser}), a separate
+     * table because {@code SchemaMap.Declaration} is a different key type from {@code CoreValue}.
+     * This is what lets a resolver look up "where was this declared" using the exact {@code
+     * Declaration} object it already holds, without {@code SchemaMap.Declaration} itself carrying a
+     * {@code Position} field (it's compared structurally elsewhere, same concern as {@code
+     * CoreValue}).
+     */
+    private final Map<SchemaMap.Declaration, Position> declarationPositions = new IdentityHashMap<>();
+
     public TsonSchemaParser(String source) {
         super(source);
+    }
+
+    /** Every {@link SchemaMap.Declaration} built by {@link #parseSchemaDocument()}, mapped to its own name token's start {@link Position} -- see {@link #declarationPositions}'s own Javadoc for why this is identity-keyed. */
+    public Map<SchemaMap.Declaration, Position> declarationPositions() {
+        return Collections.unmodifiableMap(declarationPositions);
     }
 
     public SchemaDocument parseSchemaDocument() {
@@ -118,11 +136,14 @@ public final class TsonSchemaParser extends TsonDataParser {
 
     private SchemaMap.Declaration parseDeclaration() {
         List<Annotation> nameAnnotations = parseAnnotationList();
+        Position namePosition = peek().start();
         String name = expectTypeName("a declaration name");
         expect(TokenType.MAP_ARROW, "declaration");
         List<Annotation> typeDefAnnotations = parseAnnotationList();
         TypeDef typeDef = parseTypeDef();
-        return new SchemaMap.Declaration(nameAnnotations, name, typeDefAnnotations, typeDef);
+        SchemaMap.Declaration declaration = new SchemaMap.Declaration(nameAnnotations, name, typeDefAnnotations, typeDef);
+        declarationPositions.put(declaration, namePosition);
+        return declaration;
     }
 
     // ── Type Definitions (§5, §12.1) ─────────────────────────────────────
@@ -312,7 +333,7 @@ public final class TsonSchemaParser extends TsonDataParser {
                         + (kind == FieldDef.Modifier.Kind.DEFAULT ? "~" : "=") + "', found " + describe(t));
             };
             advance();
-            value = new FieldDef.Modifier.Value.Literal(new TokenValue(t.text(), form));
+            value = new FieldDef.Modifier.Value.Literal(recordPosition(new TokenValue(t.text(), form), t.start()));
         }
         return new FieldDef.Modifier(kind, value);
     }
@@ -428,12 +449,12 @@ public final class TsonSchemaParser extends TsonDataParser {
         if (t.type() == TokenType.SINGLE_LINE_STRING || t.type() == TokenType.MULTI_LINE_STRING) {
             advance();
             TokenForm form = t.type() == TokenType.SINGLE_LINE_STRING ? TokenForm.SINGLE_LINE_QUOTED : TokenForm.MULTI_LINE_QUOTED;
-            return new TypeArg.Value(new TokenValue(t.text(), form));
+            return new TypeArg.Value(recordPosition(new TokenValue(t.text(), form), t.start()));
         }
         if (t.type() == TokenType.UNQUOTED) {
             if (NumberGrammar.tryParse(t.text()).isPresent()) {
                 advance();
-                return new TypeArg.Value(new TokenValue(t.text(), TokenForm.UNQUOTED));
+                return new TypeArg.Value(recordPosition(new TokenValue(t.text(), TokenForm.UNQUOTED), t.start()));
             }
             return new TypeArg.Ref(parseTypeRefHead());
         }

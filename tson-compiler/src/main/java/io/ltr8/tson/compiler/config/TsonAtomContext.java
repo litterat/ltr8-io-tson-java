@@ -2,6 +2,7 @@ package io.ltr8.tson.compiler.config;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
+import io.ltr8.tson.schema.meta.SourcePosition;
 
 import java.net.Inet4Address;
 import java.net.Inet6Address;
@@ -14,8 +15,8 @@ import java.util.UUID;
 /**
  * The default built-in-vocabulary atom registrations every {@link DataBindContext} consumer in
  * this library needs (UUID/byte[]/LocalDate/OffsetTime/OffsetDateTime/URI/Inet4Address/
- * Inet6Address) -- shared by {@code io.ltr8.tson.compiler.mapper.TsonMapperContext} and this
- * package's own {@code SchemaMetaNameBinder}'s {@link #registerDefaults}-based {@code
+ * Inet6Address/SourcePosition) -- shared by {@code io.ltr8.tson.compiler.mapper.TsonMapperContext}
+ * and this package's own {@code SchemaMetaNameBinder}'s {@link #registerDefaults}-based {@code
  * defaultContext()}. Lives here, alongside the other configuration/wiring classes ("how a caller
  * configures a working environment," not `base`'s own §4 base-type-resolution machinery a consumer
  * never names directly) -- `mapper` reaching into `config` for this one class is a new, harmless
@@ -48,6 +49,11 @@ public final class TsonAtomContext {
             context.registerAtom(URI.class);
             context.registerAtom(Inet4Address.class);
             context.registerAtom(Inet6Address.class);
+            // schema.meta.TypeDefinition.position is typed SourcePosition, not tson-compiler's own
+            // Position, specifically so tson-schema never has to name it -- an interface with no
+            // sealed/@Union signal tson-bind could auto-detect, so it needs this same explicit
+            // registration every other non-auto-detectable atom-like type already gets.
+            context.registerAtom(SourcePosition.class, new SourcePositionStringBridge());
         } catch (DataBindException e) {
             throw new IllegalStateException("failed to register default atom types on a fresh DataBindContext", e);
         }

@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonDataParser;
+import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.ast.Document;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -108,7 +109,7 @@ class VariantDomReaderTest {
 
         // "shape" has subtypes ("triangle") but its own body REQUIRES "sides" -- the fallback reads
         // against that real body, not a free pass, so a missing required field still fails.
-        assertThrows(IllegalArgumentException.class, () -> read(compiled, "shape", "{}"));
+        assertThrows(TsonReadException.class, () -> read(compiled, "shape", "{}"));
         assertEquals(BigInteger.valueOf(3), read(compiled, "shape", "{ sides: 3 }").get("sides"));
     }
 
@@ -116,7 +117,7 @@ class VariantDomReaderTest {
     void unknownTypeRefThrowsNamingTheOffendingValue() {
         TsonCompiledSchema compiled = compiled();
 
-        IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class,
+        TsonReadException thrown = assertThrows(TsonReadException.class,
                 () -> read(compiled, "!partial_response { value: 42 }"));
         assertTrue(thrown.getMessage().contains("partial_response"), thrown.getMessage());
     }

@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonDataParser;
+import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.ast.Document;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -80,7 +81,7 @@ class ArrayDomReaderTest {
         TsonCompiledSchema compiled = compile(Map.of("numbers", TypeDefinition.product(body)));
 
         assertEquals(List.of(BigInteger.ONE, BigInteger.TWO), readArray(compiled, "numbers", "[1 2]"));
-        assertThrows(IllegalArgumentException.class, () -> readArray(compiled, "numbers", "[1]"));
+        assertThrows(TsonReadException.class, () -> readArray(compiled, "numbers", "[1]"));
     }
 
     @Test
@@ -90,7 +91,7 @@ class ArrayDomReaderTest {
         TsonCompiledSchema compiled = compile(Map.of("numbers", TypeDefinition.product(body)));
 
         assertEquals(List.of(BigInteger.ONE, BigInteger.TWO), readArray(compiled, "numbers", "[1 2]"));
-        assertThrows(IllegalArgumentException.class, () -> readArray(compiled, "numbers", "[1 2 3]"));
+        assertThrows(TsonReadException.class, () -> readArray(compiled, "numbers", "[1 2 3]"));
     }
 
     @Test
@@ -100,7 +101,7 @@ class ArrayDomReaderTest {
         TsonCompiledSchema compiled = compile(Map.of("numbers", TypeDefinition.product(body)));
 
         assertEquals(List.of(BigInteger.ONE, BigInteger.TWO), readArray(compiled, "numbers", "[1 2]"));
-        assertThrows(IllegalArgumentException.class, () -> readArray(compiled, "numbers", "[1 2 1]"));
+        assertThrows(TsonReadException.class, () -> readArray(compiled, "numbers", "[1 2 1]"));
     }
 
     @Test
@@ -121,7 +122,7 @@ class ArrayDomReaderTest {
                 Optional.empty(), Optional.empty());
         TsonCompiledSchema compiled = compile(Map.of("numbers", TypeDefinition.product(body)));
 
-        assertThrows(IllegalArgumentException.class, () -> readArray(compiled, "numbers", "[1 _ 3]"));
+        assertThrows(TsonReadException.class, () -> readArray(compiled, "numbers", "[1 _ 3]"));
     }
 
     @Test

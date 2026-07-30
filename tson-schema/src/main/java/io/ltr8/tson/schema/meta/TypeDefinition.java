@@ -1,6 +1,9 @@
 package io.ltr8.tson.schema.meta;
 
+import io.ltr8.annotation.Record;
+
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -20,15 +23,34 @@ import java.util.Optional;
  * See {@code TsonSchema}'s and {@code DefinitionResolverTest}'s own notes for what this means in
  * practice: written output is structurally faithful but more verbose than the non-normative
  * {@code meta-kernel-resolved.tn1} fixture's own hand-authored, terser conventions.
+ *
+ * <p>{@code position} -- where this declaration sits in whatever schema source text it was resolved
+ * from, when known -- is deliberately excluded from {@link #equals}/{@link #hashCode} (both
+ * hand-written below, not generated). Every other component here is compared structurally
+ * throughout this repo's own resolver test suite (a hand-built expected {@code TypeDefinition}
+ * against a real resolved one); if {@code position} participated in equality, two {@code
+ * TypeDefinition}s representing the same logical type from different parses (or the same source
+ * parsed twice) would stop comparing equal, breaking that whole test style. {@code toString()} stays
+ * generated -- {@code position} carries no reference back to this type or its own schema, so there's
+ * no cycle risk in printing it. The compact constructor now carries {@code @Record} -- required as
+ * soon as a second, convenience constructor exists, or {@code tson-bind}'s own constructor-selection
+ * fails outright (see {@link IntegerSize}'s own Javadoc for the identical situation).
  */
 public record TypeDefinition(Optional<TypeRef> source, TypeKind kind, List<String> parameters,
                               boolean constructor, List<String> supertypes, List<String> subtypes,
-                              Optional<Boolean> disjoint, Top body) {
+                              Optional<Boolean> disjoint, Top body, Optional<SourcePosition> position) {
 
+    @Record
     public TypeDefinition {
         parameters = List.copyOf(parameters);
         supertypes = List.copyOf(supertypes);
         subtypes = List.copyOf(subtypes);
+    }
+
+    /** Same as the canonical constructor, {@code position} defaulted to absent -- every existing caller that doesn't know its own source position. */
+    public TypeDefinition(Optional<TypeRef> source, TypeKind kind, List<String> parameters, boolean constructor,
+                           List<String> supertypes, List<String> subtypes, Optional<Boolean> disjoint, Top body) {
+        this(source, kind, parameters, constructor, supertypes, subtypes, disjoint, body, Optional.empty());
     }
 
     /** A fresh (non-constructor, no source/supertypes/parameters) PRODUCT definition -- {@code integer_size}'s own shape. */
@@ -56,5 +78,30 @@ public record TypeDefinition(Optional<TypeRef> source, TypeKind kind, List<Strin
     public static TypeDefinition reference(TypeRef target) {
         return new TypeDefinition(Optional.of(target), TypeKind.REFERENCE, List.of(), false, List.of(),
                 List.of(), Optional.empty(), new Reference(target));
+    }
+
+    /** A copy of this definition with {@code position} replaced -- every other component unchanged. */
+    public TypeDefinition withPosition(Optional<SourcePosition> position) {
+        return new TypeDefinition(source, kind, parameters, constructor, supertypes, subtypes, disjoint, body, position);
+    }
+
+    /** Excludes {@code position} -- see this class's own Javadoc for why. */
+    @Override
+    public boolean equals(Object o) {
+        return o instanceof TypeDefinition other
+                && Objects.equals(source, other.source)
+                && kind == other.kind
+                && Objects.equals(parameters, other.parameters)
+                && constructor == other.constructor
+                && Objects.equals(supertypes, other.supertypes)
+                && Objects.equals(subtypes, other.subtypes)
+                && Objects.equals(disjoint, other.disjoint)
+                && Objects.equals(body, other.body);
+    }
+
+    /** Excludes {@code position} -- see this class's own Javadoc for why. */
+    @Override
+    public int hashCode() {
+        return Objects.hash(source, kind, parameters, constructor, supertypes, subtypes, disjoint, body);
     }
 }

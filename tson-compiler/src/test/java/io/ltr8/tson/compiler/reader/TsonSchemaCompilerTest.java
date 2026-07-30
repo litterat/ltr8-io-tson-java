@@ -2,6 +2,7 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
+import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.ast.DataValue;
@@ -61,7 +62,7 @@ class TsonSchemaCompilerTest {
 
         // Reached compilation successfully; reading an empty record against a REQUIRED field then
         // fails for the ordinary reason (missing field), not a reader failure.
-        assertThrows(IllegalArgumentException.class, () -> compiled.get("A").read(EMPTY_RECORD));
+        assertThrows(TsonReadException.class, () -> compiled.get("A").read(EMPTY_RECORD));
     }
 
     @Test
@@ -74,7 +75,7 @@ class TsonSchemaCompilerTest {
 
         TsonCompiledSchema compiled = compile(linkedSchema);
 
-        assertThrows(IllegalArgumentException.class, () -> compiled.get("Node").read(EMPTY_RECORD));
+        assertThrows(TsonReadException.class, () -> compiled.get("Node").read(EMPTY_RECORD));
     }
 
     @Test

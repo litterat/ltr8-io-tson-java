@@ -44,7 +44,48 @@ class ValidateCommandTest {
         String output = captureStdout(() ->
                 assertEquals(1, ValidateCommand.run(schema, "my_int", List.of(data), OutputFormat.TEXT)));
 
-        assertTrue(output.contains("[VALIDATION_ERROR]"), output);
+        // A real, per-value diagnostic from the collecting TsonReadContext -- not the generic
+        // VALIDATION_ERROR fallback, which is reserved for a failure outside any single read at all.
+        assertTrue(output.contains("[ATOM_CONSTRAINT_VIOLATION]"), output);
+    }
+
+    private static final String TWO_FIELD_SCHEMA = """
+            !!id:"https://example.test/cli-multi-error.tn1"
+            !!meta:"https://tson.io/2026/32/m/meta.tn"
+            !!import:"https://tson.io/2026/32/m/core.tn"
+            {
+              my_record => { a: int32  b: int32 }
+            }
+            """;
+
+    @Test
+    void aFileWithMultipleProblemsReportsEveryOneOfThemInTextOutput(@TempDir Path dir) throws IOException {
+        Path schema = writeFile(dir, "schema.tn1", TWO_FIELD_SCHEMA);
+        // "b" is missing entirely; "a" is out of int32 range -- two independent problems in one file.
+        Path data = writeFile(dir, "invalid.tson", "{ a: 99999999999999 }");
+
+        String output = captureStdout(() ->
+                assertEquals(1, ValidateCommand.run(schema, "my_record", List.of(data), OutputFormat.TEXT)));
+
+        assertTrue(output.contains("[FIELD_REQUIRED]"), output);
+        assertTrue(output.contains("[ATOM_CONSTRAINT_VIOLATION]"), output);
+        assertTrue(output.contains("/b"), output);
+        assertTrue(output.contains("/a"), output);
+    }
+
+    @Test
+    void aFileWithMultipleProblemsReportsEveryOneOfThemInJsonOutput(@TempDir Path dir) throws IOException {
+        Path schema = writeFile(dir, "schema.tn1", TWO_FIELD_SCHEMA);
+        Path data = writeFile(dir, "invalid.tson", "{ a: 99999999999999 }");
+
+        String output = captureStdout(() ->
+                assertEquals(1, ValidateCommand.run(schema, "my_record", List.of(data), OutputFormat.JSON)));
+
+        assertTrue(output.contains("\"valid\":false"), output);
+        assertTrue(output.contains("\"code\":\"FIELD_REQUIRED\""), output);
+        assertTrue(output.contains("\"code\":\"ATOM_CONSTRAINT_VIOLATION\""), output);
+        // Both diagnostics landed in the SAME errors array from a SINGLE read -- not two separate runs.
+        assertEquals(2, output.split("\"code\":").length - 1, output);
     }
 
     @Test
@@ -84,7 +125,7 @@ class ValidateCommandTest {
                 assertEquals(1, ValidateCommand.run(schema, "my_int", List.of(data), OutputFormat.JSON)));
 
         assertTrue(output.contains("\"valid\":false"), output);
-        assertTrue(output.contains("\"code\":\"VALIDATION_ERROR\""), output);
+        assertTrue(output.contains("\"code\":\"ATOM_CONSTRAINT_VIOLATION\""), output);
     }
 
     private static Path writeFile(Path dir, String name, String content) throws IOException {

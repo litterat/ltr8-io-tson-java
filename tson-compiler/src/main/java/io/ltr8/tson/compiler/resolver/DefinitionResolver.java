@@ -36,6 +36,7 @@ import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
+import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeArgument;
@@ -229,10 +230,25 @@ final class DefinitionResolver {
     /**
      * Resolves a single declaration against this instance's own type-name/structure namespaces --
      * the sole entry point; every other {@code resolve*} method is a private dispatch target reached
-     * from here.
+     * from here. Delegates to {@link #resolve(SchemaMap.Declaration, Optional)} with no position,
+     * for a caller with no {@code TsonSchemaParser}-produced position table to hand back (the vast
+     * majority of existing callers, including every hand-built test fixture).
      */
     TypeDefinition resolve(SchemaMap.Declaration declaration) {
-        return resolveTypeDef(declaration.name(), declaration.typeDef());
+        return resolve(declaration, Optional.empty());
+    }
+
+    /**
+     * Same as {@link #resolve(SchemaMap.Declaration)}, but the resulting {@link TypeDefinition}
+     * carries {@code declarationPosition} (typically looked up by the caller in {@code
+     * TsonSchemaParser#declarationPositions()} for this exact {@code declaration}) -- "where was
+     * this declared" is a property of the declaration itself, so it's attached uniformly here at
+     * the one place every resolution path already funnels through, regardless of which internal
+     * {@code resolve*} method actually built the result.
+     */
+    TypeDefinition resolve(SchemaMap.Declaration declaration, Optional<SourcePosition> declarationPosition) {
+        TypeDefinition resolved = resolveTypeDef(declaration.name(), declaration.typeDef());
+        return declarationPosition.isPresent() ? resolved.withPosition(declarationPosition) : resolved;
     }
 
     private TypeDefinition resolveTypeDef(String name, TypeDef typeDef) {

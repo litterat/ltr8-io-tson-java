@@ -8,6 +8,8 @@ import io.ltr8.bind.DataClassField;
 import io.ltr8.bind.DataClassMap;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassUnion;
+import io.ltr8.tson.compiler.Diagnostic;
+import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.TsonValueReaderResolver;
 import io.ltr8.tson.compiler.ast.DataValue;
@@ -15,11 +17,13 @@ import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.base.NumberNarrowing;
 import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Object-binding mode's own {@code record} reader -- reads a record-shaped value into a real, bound
@@ -67,8 +71,9 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
     private final int nonFixedFieldCount;
     private final boolean hasUnboundField;
 
-    public RecordBindReader(String name, RecordBody body, DataClassRecord descriptor, TsonValueReaderResolver resolver) {
-        super(name, body, resolver);
+    public RecordBindReader(String name, RecordBody body, DataClassRecord descriptor, TsonValueReaderResolver resolver,
+                             Optional<SourcePosition> schemaPosition) {
+        super(name, body, resolver, schemaPosition);
         this.descriptor = descriptor;
         this.targetField = new DataClassField[fields.size()];
         boolean anyUnbound = false;
@@ -126,17 +131,22 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             TsonValueReaderResolver resolver) {
         TsonValueReader<?> parser = field.parser();
         if (target.dataClass() instanceof DataClassArray targetArray && parser instanceof ArrayBindReader existing) {
-            return new ArrayBindReader(field.schema().name(), existing.body, targetArray, resolver);
+            return new ArrayBindReader(field.schema().name(), existing.body, targetArray, resolver, existing.schemaPosition);
         }
         if (target.dataClass() instanceof DataClassMap targetMap && parser instanceof MapBindReader existing) {
-            return new MapBindReader(field.schema().name(), existing.body, targetMap, resolver);
+            return new MapBindReader(field.schema().name(), existing.body, targetMap, resolver, existing.schemaPosition);
         }
         return parser;
     }
 
     @Override
-    public Object read(DataValue value) {
-        List<RecordValue.Field> dataFields = dataFields(value);
+    public Object read(DataValue value, TsonReadContext ctx) {
+        ctx = ctx.at(value).withSchemaPosition(schemaPosition);
+        List<RecordValue.Field> dataFields = dataFields(value, ctx);
+        if (dataFields == null) {
+            return null;
+        }
+        int diagnosticsBefore = ctx.diagnostics().size();
         Object[] arguments = new Object[descriptor.fields().length];
         boolean[] unboundFilled = hasUnboundField ? new boolean[fields.size()] : null;
 
@@ -164,8 +174,8 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 }
                 DataValue fieldValue = dataField.value().value();
                 arguments[target.index()] = isAbsent(fieldValue)
-                        ? defaultOrRequireNonFixed(schemaIndex)
-                        : narrow(field.parser().read(fieldValue), target.type());
+                        ? defaultOrRequireNonFixed(schemaIndex, ctx)
+                        : narrow(field.parser().read(fieldValue, ctx.field(field.schema().name(), fieldValue)), target.type());
                 filledCount++;
             } else {
                 if (isFixed(field.schema().state()) || unboundFilled[schemaIndex]) {
@@ -173,9 +183,9 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 }
                 DataValue fieldValue = dataField.value().value();
                 if (isAbsent(fieldValue)) {
-                    defaultOrRequireNonFixed(schemaIndex);
+                    defaultOrRequireNonFixed(schemaIndex, ctx);
                 } else {
-                    field.parser().read(fieldValue);
+                    field.parser().read(fieldValue, ctx.field(field.schema().name(), fieldValue));
                 }
                 unboundFilled[schemaIndex] = true;
                 filledCount++;
@@ -191,14 +201,21 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 DataClassField target = targetField[i];
                 if (target != null) {
                     if (arguments[target.index()] == null) {
-                        arguments[target.index()] = defaultOrRequireNonFixed(i);
+                        arguments[target.index()] = defaultOrRequireNonFixed(i, ctx);
                     }
                 } else if (!unboundFilled[i]) {
-                    defaultOrRequireNonFixed(i);
+                    defaultOrRequireNonFixed(i, ctx);
                 }
             }
         }
 
+        if (ctx.diagnostics().size() > diagnosticsBefore) {
+            // Collecting mode, and at least one of this record's own fields already failed -- a bound
+            // Java constructor (unlike a DOM Map) can't tolerate a null argument for a primitive-typed
+            // parameter, so building it now would risk a confusing secondary NPE instead of the one
+            // diagnostic already reported. Nothing to construct; the caller already has what it needs.
+            return null;
+        }
         try {
             return descriptor.constructor().invoke(arguments);
         } catch (RuntimeException e) {
@@ -280,20 +297,22 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             DataClass dataClass = descriptorFor(name);
 
             if (typeDefinition.subtypes().isEmpty()) {
-                return new RecordBindReader(name, body, requireRecord(name, dataClass), resolver);
+                return new RecordBindReader(name, body, requireRecord(name, dataClass), resolver, typeDefinition.position());
             }
 
             if (dataClass instanceof DataClassUnion union) {
-                TsonValueReader<?> noOwnData = value -> {
-                    throw new IllegalArgumentException("'" + name + "' has no data of its own to bind -- provide "
-                            + "an explicit type annotation (!typeName) naming one of its subtypes "
-                            + typeDefinition.subtypes());
+                TsonValueReader<?> noOwnData = (value, ctx) -> {
+                    ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF,
+                            "'" + name + "' has no data of its own to bind -- provide an explicit type annotation "
+                                    + "(!typeName) naming one of its subtypes " + typeDefinition.subtypes(),
+                            "an explicit type annotation naming one of " + typeDefinition.subtypes(), "(none)");
+                    return null;
                 };
                 return new VariantBindReader(name, noOwnData, union, resolver);
             }
 
             if (dataClass instanceof DataClassRecord record) {
-                RecordBindReader ownParser = new RecordBindReader(name, body, record, resolver);
+                RecordBindReader ownParser = new RecordBindReader(name, body, record, resolver, typeDefinition.position());
                 return new VariantSchemaReader(name, ownParser, typeDefinition.subtypes(), resolver);
             }
 
