@@ -214,44 +214,66 @@ The lexer is complete and frozen for the whole series per the spec itself (§1.3
 no new tokens, no new lexer modes, and no changes to character classification." Everything above it
 changes; the lexer doesn't.
 
-### Structural parser (`tson-compiler/src/main/java/io/ltr8/tson/compiler/`)
+### Structural parsing: Tier 2 stream + Tier 3 AST builder (`tson-compiler/src/main/java/io/ltr8/tson/compiler/`)
 
-`TsonDataParser` (`TsonDataParser.java`) turns the lexer's token stream into a `Document` (§2, §3, §7.4). AST types live
-in the `ast` subpackage as a sealed `CoreValue` hierarchy (`RecordValue`, `MapValue`, `ArrayValue`,
-`EmptyBrace`, `AbsentValue`, `TokenValue`) built on Java 25 records, matching the grammar's own shape.
-Key design points:
+Two classes turn the lexer's tokens into a `Document` (§2, §3, §7.4), split by role rather than
+by grammar coverage — there is exactly one implementation of the data grammar, not two:
 
-- **Whitespace is invisible by the time tokens reach the parser** — the lexer already discarded it,
-  leaving only `Position` gaps as evidence it was there. Two consequences run through the whole class:
-  (1) wherever the grammar shows `ws` between tokens, nothing special is needed — it's already permitted
-  by default; (2) wherever the spec requires strict *adjacency* (`!`, `!!`, `@` to their operand, `:` to a
-  preceding annotation/directive name, §7.5), the parser checks it explicitly via `Position` equality
-  between one token's `end()` and the next's `start()`. The inverse comes up once too: a valueless
-  annotation requires a whitespace *gap* to follow (§3.1) — checked as positions being *unequal*.
+- **`TsonDataStream` (Tier 2)** is the one place that actually walks source text: a lazy,
+  pull-based `Iterator<TsonEvent>` (`RecordStart`/`RecordEnd`, `MapStart`/`MapArrow`/`MapEnd`,
+  `ArrayStart`/`ArrayEnd`, `AnnotationStart`/`AnnotationEnd`, `TypeRef`, `SchemaRef`, `TokenEvent`,
+  `AbsentEvent`, `EmptyBraceEvent` — the `stream` subpackage, one sealed `TsonEvent` interface).
+  Driven directly off `Lexer.nextToken()`, never `Lexer.tokenize()`, with an explicit `Frame` stack
+  standing in for recursion (so memory held at any point is proportional to open-container depth,
+  never document size) and at most two tokens of lookahead ever buffered, used only to resolve
+  `{}` record/map disambiguation (see the class's own Javadoc for exactly how that lookahead stays
+  bounded regardless of nesting depth).
+- **`TsonDataParser` (Tier 3)** builds the full AST — `ast` subpackage, a sealed `CoreValue`
+  hierarchy (`RecordValue`, `MapValue`, `ArrayValue`, `EmptyBrace`, `AbsentValue`, `TokenValue`)
+  on Java 25 records, matching the grammar's own shape — by pulling a `TsonDataStream`'s events and
+  reducing the flat sequence back into that tree (`TsonDataParser.EventReducer`, index-based over
+  the event list, structurally the streaming counterpart of a DOM builder sitting on a SAX/StAX
+  reader). It holds no grammar logic of its own.
+
+Key design points, most of which now live on `TsonDataStream` rather than `TsonDataParser`:
+
+- **Whitespace is invisible by the time tokens reach `TsonDataStream`** — the lexer already
+  discarded it, leaving only `Position` gaps as evidence it was there. Two consequences run
+  through the class: (1) wherever the grammar shows `ws` between tokens, nothing special is
+  needed — it's already permitted by default; (2) wherever the spec requires strict *adjacency*
+  (`!`, `!!`, `@` to their operand, `:` to a preceding annotation/directive name, §7.5), it's
+  checked explicitly via `Position` equality between one token's `end()` and the next's `start()`.
+  The inverse comes up once too: a valueless annotation requires a whitespace *gap* to follow
+  (§3.1) — checked as positions being *unequal*.
 - **Separator detection (§2.4) works the same way.** Between record fields / map entries / array
-  elements, "zero-width separation is a parse error" and "trailing separators are not permitted" are both
-  implemented by comparing the end position of the previous element's last token against the start
-  position of whatever comes next (`TsonDataParser.consumeSeparatorOrCloseCheck`) — a real comma token is
-  optional evidence, a position gap is the other kind of evidence, and at least one of the two is
-  required unless the closing delimiter is immediately next (which needs no separator at all,
-  §2.4: structural delimiters create their own token boundary).
-- **Layering is deliberately incomplete, on purpose, matching the spec's own division of labor (§1.2):**
-  the parser does not deduplicate record fields or detect duplicate map keys ("last value wins" is a
-  resolver-layer rule, §2.5/§2.6), does not NFC-normalize field names or reject `_` as a map key (both
-  explicitly resolver-layer, §2.9/§7.2.1), does not resolve `EmptyBrace` to a record or typed container
-  (explicitly deferred to the resolver, §2.8), and does not interpret `TokenValue` text as null/boolean/
-  number/string (base type resolution, §4, not yet implemented). All of these are intentional gaps, not
-  omissions — a resolver layer consuming `Document`/`DataValue` is the next natural piece of work.
-- **`!!meta` in the header throws `TsonUnsupportedDocumentException`, not `TsonParseException`.** This is a Class 1
-  (data-format-only) processor (§1.5); encountering a schema document isn't malformed input, it's a
-  well-formed document of a kind this parser doesn't implement, and the spec requires that distinction be
-  visible in how it's reported (§8.1: "MUST report the document as a TSON schema document that this
-  processor does not support" — a categorized diagnostic, not a generic parse error).
+  elements, "zero-width separation is a parse error" and "trailing separators are not permitted"
+  are both implemented by comparing the end position of the previous element's last token against
+  the start position of whatever comes next (`TsonDataStream.consumeSeparatorOrCloseCheck`) — a
+  real comma token is optional evidence, a position gap is the other kind of evidence, and at least
+  one of the two is required unless the closing delimiter is immediately next (which needs no
+  separator at all, §2.4: structural delimiters create their own token boundary).
+- **Layering is deliberately incomplete, on purpose, matching the spec's own division of labor
+  (§1.2):** neither class deduplicates record fields or detects duplicate map keys ("last value
+  wins" is a resolver-layer rule, §2.5/§2.6), NFC-normalizes field names, or rejects `_` as a map
+  key (both explicitly resolver-layer, §2.9/§7.2.1); `EmptyBrace`/`EmptyBraceEvent` is never
+  resolved to a record or typed container here (explicitly deferred to the resolver, §2.8); and
+  `TokenValue`/`TokenEvent` text is never interpreted as null/boolean/number/string (base type
+  resolution, §4, a separate layer below). All of these are intentional gaps, not omissions.
+- **`!!meta` in the header throws `TsonUnsupportedDocumentException`, not `TsonParseException`**
+  (checked in `TsonDataStream.hasNext()`, the first thing it does on any document). This is a
+  Class 1 (data-format-only) processor (§1.5); encountering a schema document isn't malformed
+  input, it's a well-formed document of a kind this parser doesn't implement, and the spec requires
+  that distinction be visible in how it's reported (§8.1: "MUST report the document as a TSON
+  schema document that this processor does not support" — a categorized diagnostic, not a generic
+  parse error).
 - **Nested annotation value-scope is right-recursive and can legitimately leave an outer data-value
-  without a core-value.** `@a:@b:val` fully consumes everything as `@a`'s nested value, all the way down
-  — see `SPEC-FEEDBACK.md` #3 for the exact trace; `TsonDataParserTest.nestedAnnotationValueScopeAloneIsIncomplete`
-  documents this as intentional, spec-derived behavior, not a bug, so don't "fix" it without re-reading
-  that entry first.
+  without a core-value.** `@a:@b:val` fully consumes everything as `@a`'s nested value, all the way
+  down — see `SPEC-FEEDBACK.md` #3 for the exact trace; `TsonDataParserTest.nestedAnnotationValueScopeAloneIsIncomplete`
+  documents this as intentional, spec-derived behavior, not a bug, so don't "fix" it without
+  re-reading that entry first.
+- **`TsonDataParser`'s public API is unchanged by the Tier 2/3 split** (`TsonDataParser(String)`,
+  `parseDocument()`) — every existing caller (`TsonMapperReader`, `DefinitionResolver`, `tson-cli`)
+  and every existing test needed zero changes when this landed.
 
 ### Base type resolution (`tson-compiler/src/main/java/io/ltr8/tson/compiler/base/`)
 
@@ -457,14 +479,17 @@ positional-form value generically; wrapping the bare value into an equivalent on
   `annotation`, `data-value`, and directive parsing directly from Part 1 §7.4 — the same tokens, the same
   adjacency/separator rules, the same `!!name:"..."` directive shape for `!!id`/`!!meta`/`!!import` as
   data documents use for `!!id`/`!!schema`. Rather than re-implementing that grammar a second time,
-  `TsonDataParser`'s relevant fields and helper methods are package-private, not `private` (see its own Javadoc
-  on why it isn't `final`), and `TsonSchemaParser` calls straight into them — `parseDataValue()` for
-  atom-refinement values, `parseCoreValue()` for constructor-application (`instance`) values (see the
-  next bullet for why these two aren't the same production), `parseAnnotation()`,
-  `parseNamedDirective()` for all three header directives, `expectFieldNameToken()`, and the
-  cursor/separator primitives. `TsonDataParser` itself is untouched in behavior — it still rejects `!!meta`
-  documents exactly as before; only its own private-vs-package visibility changed, and only because
-  `TsonSchemaParser` needed it, not because either class became part of a different module.
+  `TsonSchemaParser` calls straight into package-private methods `TsonDataParser` forwards onto its held
+  `TsonDataStream` — `parseDataValue()` for atom-refinement values, `parseCoreValue()` for
+  constructor-application (`instance`) values (see the next bullet for why these two aren't the same
+  production), `parseAnnotation()`, `parseNamedDirective()` for all three header directives,
+  `expectFieldNameToken()`, `consumeSeparatorOrCloseCheck()`, `peekDirectiveName()`, and the raw
+  cursor primitives (`peek()`/`advance()`/`check()`/`expect()`) for its own schema-only tokens
+  (`~ ^ & | ( ) < > ? ; -`) that aren't part of the data grammar's own `TsonEvent` vocabulary at all.
+  `lastTokenEnd()` replaces a direct `tokens.get(pos - 1).end()` field read from before `TsonDataStream`
+  existed. `TsonSchemaParser` itself needed exactly two call-site changes (both to `lastTokenEnd()`) when
+  `TsonDataParser` became Tier 3 (see "Structural parsing" above) — everything else it calls kept its
+  exact name and signature throughout that rewrite.
 - **`instance`'s ABNF says `data-value`, but the intended production is the narrower `core-value`** —
   the literal grammar (`instance = "!" type-name ws data-value`) lets a constructor-application payload
   carry its own further annotations and a second, competing type-ref (`data-value = *annotation

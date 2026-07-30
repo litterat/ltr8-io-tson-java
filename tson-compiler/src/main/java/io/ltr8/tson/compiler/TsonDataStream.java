@@ -53,24 +53,25 @@ import java.util.Optional;
  * <h2>The {@code {}} record/map lookahead</h2>
  *
  * <p>Every other decision in the grammar is resolved by the current token alone. The one
- * exception is {@code {}} disambiguation (§2.8): {@link TsonDataParser} resolves it by parsing
- * the brace's first data-value in full and then checking whether {@code :} or {@code =>} follows.
- * That's exactly right for a full first-value-then-decide strategy, but a naive equivalent here
- * would need to buffer arbitrarily deep before it could emit anything -- undermining the point of
- * being lazy. It's avoidable because record-field position requires the first thing after {@code
- * {} to reduce to a single bare token (no annotations, no type-ref, no nested container) --
- * anything else can only ever be valid as a map key. That collapses the lookahead to at most two
- * tokens, decided the instant {@code {} is seen, with no recursive buffering at all:
+ * exception is {@code {}} disambiguation (§2.8): a record's first field name and a map's first
+ * key share one opening delimiter, and the grammar only tells them apart by what follows the
+ * first thing inside -- {@code :} for a record, {@code =>} for a map. The naive way to resolve
+ * that is to fully parse whatever comes first (which can itself be an arbitrarily deep nested
+ * value) and only then check which delimiter follows -- correct, but it would force this class to
+ * buffer arbitrarily deep before emitting anything, undermining the point of being lazy. It's
+ * avoidable because record-field position requires the first thing after {@code {} to reduce to a
+ * single bare token (no annotations, no type-ref, no nested container) -- anything else can only
+ * ever be valid as a map key. That collapses the lookahead to at most two tokens, decided the
+ * instant {@code {} is seen, with no recursive buffering at all:
  *
  * <ul>
  *   <li>{@code {}} immediately followed by {@code @}, {@code !}, {@code {}, {@code [}, or {@code
  *       _} can only be a map -- none of those can reduce to a bare field-name token, so a single
- *       token of lookahead settles it. ({@link TsonDataParser}'s own disambiguation would still
- *       report a parse error if the document is actually malformed here (e.g. an annotated key
- *       immediately followed by {@code :} instead of {@code =>}) -- this class commits to {@link
- *       MapStart} regardless and lets the mismatch surface a token later, at the point it expects
- *       {@code =>}; the diagnostic wording differs slightly from {@link TsonDataParser}'s in that
- *       one malformed-input corner, both are {@link TsonParseException}.)
+ *       token of lookahead settles it. A document that's actually malformed here (e.g. an
+ *       annotated key immediately followed by {@code :} instead of {@code =>}) still commits to
+ *       {@link MapStart} at this point; the mismatch surfaces one token later instead, at the
+ *       point {@code =>} is expected -- a {@link TsonParseException} either way, just anchored to
+ *       a slightly later token than a full first-value-then-decide parse would report.
  *   <li>{@code {}} followed by a bare token needs exactly one more token of lookahead: if {@code
  *       :} comes next it's a record field name; if {@code =>} comes next it's a map key that
  *       happens to be an unannotated, untyped token. Nothing else is legal there.
@@ -105,7 +106,7 @@ public final class TsonDataStream implements Iterator<TsonEvent> {
     /** A second lookahead token, buffered only transiently to resolve {@code {}} disambiguation. */
     private Token pending;
 
-    /** End position of the most recently consumed token; stands in for {@code TsonDataParser}'s {@code tokens.get(pos - 1).end()}. */
+    /** End position of the most recently consumed token, exposed via {@link #lastTokenEnd()}. */
     private Position lastEnd;
 
     private final Deque<Frame> frames = new ArrayDeque<>();
@@ -260,7 +261,11 @@ public final class TsonDataStream implements Iterator<TsonEvent> {
         return new TsonParseException(message, peek().start());
     }
 
-    /** End position of the most recently consumed token -- the streaming stand-in for {@code tokens.get(pos - 1).end()}. */
+    /**
+     * End position of the most recently consumed token. {@link TsonSchemaParser} needs this
+     * directly at two points (a removal clause's {@code -}, a {@code ?} adjacency check) where it
+     * must confirm no whitespace separates the current token from the one just consumed.
+     */
     Position lastTokenEnd() {
         return lastEnd;
     }
@@ -304,9 +309,9 @@ public final class TsonDataStream implements Iterator<TsonEvent> {
     }
 
     /**
-     * Mirrors {@code TsonDataParser.consumeSeparatorOrCloseCheck}: a separator (whitespace, a
-     * comma, or both) is required between elements unless the closing delimiter is immediately
-     * next; a trailing separator right before the closing delimiter is likewise a parse error.
+     * Between elements of a record/map/array (§2.4): a separator (whitespace, a comma, or both)
+     * is required unless the closing delimiter is immediately next; a trailing separator right
+     * before the closing delimiter is likewise a parse error.
      */
     boolean consumeSeparatorOrCloseCheck(TokenType closing) {
         if (check(closing)) {

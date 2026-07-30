@@ -13,8 +13,8 @@ import java.util.regex.Pattern;
  *
  * <p><b>Separation, not commas.</b> Confirmed against §2.4 and this repo's own test literals: TSON
  * never requires a comma between sibling elements -- "zero-width separation is a parse error", not
- * "a comma is required" (`TsonDataParser.consumeSeparatorOrCloseCheck`'s own doc: "a real comma token is
- * optional evidence, a position gap is the other kind of evidence"). This writer always inserts a
+ * "a comma is required" (see {@code TsonDataStream.consumeSeparatorOrCloseCheck}, which accepts
+ * either a comma or a whitespace gap as the required separator). This writer always inserts a
  * single space before every element (including the first, right after an opening delimiter) and
  * before a non-empty scope's closing delimiter -- {@code { x: 1 y: 2 }}, not {@code {x: 1, y: 2}}
  * -- valid either way, but matching this repo's own established literal style.

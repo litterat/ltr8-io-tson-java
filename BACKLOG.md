@@ -367,6 +367,23 @@ everything outstanding is tracked in one place.)
   `STRUCTURED-OUTPUT.md`'s "JSON compatibility" section, tracked here alongside the general writer
   since it's the same underlying gap (no schema-aware writer exists at all yet).
 
+## Streaming
+
+- [ ] `TsonDataStream` (Tier 2, `tson-compiler/.../stream/`) is driven off `Lexer.nextToken()`, one
+  token at a time, but `Lexer` itself is constructed over a complete in-memory `String` — so even
+  the streaming path is still O(document size) at the character-buffer level. A `Reader`-based
+  lexer (pulling characters incrementally rather than indexing into a fully-loaded `String`) is the
+  next natural tier down if truly-large (multi-GB) documents are ever a real requirement; today's
+  split only bounds the *parsed-representation* memory (record/map/array nesting depth), not the
+  raw source text itself.
+- [ ] No consumer bypasses Tier 3 yet to actually realize the low-memory benefit end to end --
+  `TsonDataParser` (Tier 3) still materializes a full `Document` AST from `TsonDataStream`'s events,
+  by design (it's a tree builder, not a streaming consumer). A real streaming use -- e.g. a
+  schema-validating pass or a direct-to-Java-object binder that consumes `TsonEvent`s without ever
+  building a `Document` -- is the natural next thing to build on top of `TsonDataStream` directly,
+  and would be the first real-world proof that the flat, bounded-memory event model is worth having
+  independent of `TsonDataParser`.
+
 ## Conformance test suite
 
 - [ ] Build out `ltr8-io-tson-test-suite` well beyond its current 110 vectors (grown from the 38 this
