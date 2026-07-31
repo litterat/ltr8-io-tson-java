@@ -1,7 +1,7 @@
 package io.ltr8.tson.cli;
 
 import io.ltr8.bind.DataBindException;
-import io.ltr8.tson.compiler.mapper.TsonMapperWriter;
+import io.ltr8.tson.compiler.TsonObjectWriter;
 
 import java.util.Locale;
 import java.util.Optional;
@@ -98,7 +98,7 @@ enum OutputFormat {
     }
 
     /**
-     * Writes {@code report} via the plain, schemaless {@link TsonMapperWriter} (Class 1 -- there's
+     * Writes {@code report} via the plain, schemaless {@link TsonObjectWriter} (Class 1 -- there's
      * no schema-aware writer yet, tracked in {@code BACKLOG.md}'s "Write side"), then reads it back
      * through {@code diagnostics.tn}'s own compiled {@code validation_report} reader -- proving the
      * emitted text is genuinely valid against a real TSON schema, not just structurally similar to
@@ -106,7 +106,7 @@ enum OutputFormat {
      */
     private static String renderTson(ValidationReport report) {
         try {
-            String text = new TsonMapperWriter().toTson(report);
+            String text = new TsonObjectWriter().toTson(report);
             Object reread = DiagnosticsSchema.compiled().compiledSchema().get("validation_report")
                     .read(text);
             if (!(reread instanceof ValidationReport)) {

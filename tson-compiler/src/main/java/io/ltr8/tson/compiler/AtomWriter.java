@@ -1,7 +1,6 @@
-package io.ltr8.tson.compiler.mapper;
+package io.ltr8.tson.compiler;
 
 import io.ltr8.bind.DataBindException;
-import io.ltr8.tson.compiler.TsonDataEmitter;
 import io.ltr8.tson.compiler.atom.FloatParser;
 
 /**
@@ -9,8 +8,8 @@ import io.ltr8.tson.compiler.atom.FloatParser;
  * built-in vocabulary at all (§4's default resolution, not §5) -- boolean/number/string/null.
  * Formatting a *vocabulary* atom's value is each atom's own job now ({@code
  * io.ltr8.tson.compiler.atom.AtomType#write}), looked up through {@code
- * TsonMapperWriter}'s own registry rather than duplicated here; see {@code
- * TsonMapperWriter.toTson}'s Javadoc. {@code Double}/{@code Float} are the one default-resolvable
+ * TsonObjectWriter}'s own registry rather than duplicated here; see {@code
+ * TsonObjectWriter.toTson}'s Javadoc. {@code Double}/{@code Float} are the one default-resolvable
  * case that still delegates to a vocabulary type ({@link FloatParser}) purely to reuse its {@code
  * .nan}/{@code +.inf}/{@code -.inf} special-value formatting rather than duplicating it a second
  * time -- §4.3's default number resolution already recognises that spelling (§7.6's {@code

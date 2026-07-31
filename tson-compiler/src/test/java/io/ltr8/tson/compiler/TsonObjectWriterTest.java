@@ -1,4 +1,4 @@
-package io.ltr8.tson.compiler.mapper;
+package io.ltr8.tson.compiler;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
@@ -7,31 +7,31 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Optional;
 
-import io.ltr8.tson.compiler.mapper.TsonMapperReaderTest.BytesHolder;
-import io.ltr8.tson.compiler.mapper.TsonMapperReaderTest.CountsHolder;
-import io.ltr8.tson.compiler.mapper.TsonMapperReaderTest.Customer;
-import io.ltr8.tson.compiler.mapper.TsonMapperReaderTest.DoubleHolder;
-import io.ltr8.tson.compiler.mapper.TsonMapperReaderTest.Ipv4Holder;
-import io.ltr8.tson.compiler.mapper.TsonMapperReaderTest.Ipv6Holder;
-import io.ltr8.tson.compiler.mapper.TsonMapperReaderTest.Items;
-import io.ltr8.tson.compiler.mapper.TsonMapperReaderTest.NameAndAge;
-import io.ltr8.tson.compiler.mapper.TsonMapperReaderTest.NamedShapeHolder;
-import io.ltr8.tson.compiler.mapper.TsonMapperReaderTest.Order;
-import io.ltr8.tson.compiler.mapper.TsonMapperReaderTest.Paint;
-import io.ltr8.tson.compiler.mapper.TsonMapperReaderTest.PersonHolder;
-import io.ltr8.tson.compiler.mapper.TsonMapperReaderTest.Point;
-import io.ltr8.tson.compiler.mapper.TsonMapperReaderTest.ShapeHolder;
-import io.ltr8.tson.compiler.mapper.TsonMapperReaderTest.StringListHolder;
-import io.ltr8.tson.compiler.mapper.TsonMapperReaderTest.UserComplex;
-import io.ltr8.tson.compiler.mapper.TsonMapperReaderTest.UserComplexBridge;
-import io.ltr8.tson.compiler.mapper.TsonMapperReaderTest.UserComplexHolder;
-import io.ltr8.tson.compiler.mapper.TsonMapperReaderTest.UserDuration;
-import io.ltr8.tson.compiler.mapper.TsonMapperReaderTest.UserDurationBridge;
-import io.ltr8.tson.compiler.mapper.TsonMapperReaderTest.UserDurationHolder;
-import io.ltr8.tson.compiler.mapper.TsonMapperReaderTest.UserFraction;
-import io.ltr8.tson.compiler.mapper.TsonMapperReaderTest.UserFractionBridge;
-import io.ltr8.tson.compiler.mapper.TsonMapperReaderTest.UserFractionHolder;
-import io.ltr8.tson.compiler.mapper.TsonMapperReaderTest.UuidHolder;
+import io.ltr8.tson.compiler.TsonObjectReaderTest.BytesHolder;
+import io.ltr8.tson.compiler.TsonObjectReaderTest.CountsHolder;
+import io.ltr8.tson.compiler.TsonObjectReaderTest.Customer;
+import io.ltr8.tson.compiler.TsonObjectReaderTest.DoubleHolder;
+import io.ltr8.tson.compiler.TsonObjectReaderTest.Ipv4Holder;
+import io.ltr8.tson.compiler.TsonObjectReaderTest.Ipv6Holder;
+import io.ltr8.tson.compiler.TsonObjectReaderTest.Items;
+import io.ltr8.tson.compiler.TsonObjectReaderTest.NameAndAge;
+import io.ltr8.tson.compiler.TsonObjectReaderTest.NamedShapeHolder;
+import io.ltr8.tson.compiler.TsonObjectReaderTest.Order;
+import io.ltr8.tson.compiler.TsonObjectReaderTest.Paint;
+import io.ltr8.tson.compiler.TsonObjectReaderTest.PersonHolder;
+import io.ltr8.tson.compiler.TsonObjectReaderTest.Point;
+import io.ltr8.tson.compiler.TsonObjectReaderTest.ShapeHolder;
+import io.ltr8.tson.compiler.TsonObjectReaderTest.StringListHolder;
+import io.ltr8.tson.compiler.TsonObjectReaderTest.UserComplex;
+import io.ltr8.tson.compiler.TsonObjectReaderTest.UserComplexBridge;
+import io.ltr8.tson.compiler.TsonObjectReaderTest.UserComplexHolder;
+import io.ltr8.tson.compiler.TsonObjectReaderTest.UserDuration;
+import io.ltr8.tson.compiler.TsonObjectReaderTest.UserDurationBridge;
+import io.ltr8.tson.compiler.TsonObjectReaderTest.UserDurationHolder;
+import io.ltr8.tson.compiler.TsonObjectReaderTest.UserFraction;
+import io.ltr8.tson.compiler.TsonObjectReaderTest.UserFractionBridge;
+import io.ltr8.tson.compiler.TsonObjectReaderTest.UserFractionHolder;
+import io.ltr8.tson.compiler.TsonObjectReaderTest.UuidHolder;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -39,15 +39,15 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The write-direction counterpart to {@link TsonMapperReaderTest} -- split the same way {@link
- * TsonMapperReader}/{@link TsonMapperWriter} themselves are. Fixture record/class types shared with
- * read-side tests (round-tripping needs to build a value via {@link TsonMapperReader} before writing
- * it back) are reused from {@link TsonMapperReaderTest} directly rather than redeclared here.
+ * The write-direction counterpart to {@link TsonObjectReaderTest} -- split the same way {@link
+ * TsonObjectReader}/{@link TsonObjectWriter} themselves are. Fixture record/class types shared with
+ * read-side tests (round-tripping needs to build a value via {@link TsonObjectReader} before writing
+ * it back) are reused from {@link TsonObjectReaderTest} directly rather than redeclared here.
  */
-class TsonMapperWriterTest {
+class TsonObjectWriterTest {
 
-    private final TsonMapperReader reader = new TsonMapperReader();
-    private final TsonMapperWriter writer = new TsonMapperWriter();
+    private final TsonObjectReader reader = new TsonObjectReader();
+    private final TsonObjectWriter writer = new TsonObjectWriter();
 
     @Test
     void writeSimpleRecord() throws DataBindException {
@@ -96,7 +96,7 @@ class TsonMapperWriterTest {
     @Test
     void writeEnumGoesThroughItsBridgeAsAQuotedStringAndRoundTrips() throws DataBindException {
         // EnumStringBridge.toData() produces a plain String ("RED"), which then writes through the
-        // ordinary string path (quoted) -- no enum-specific special case in TsonMapperWriter.write().
+        // ordinary string path (quoted) -- no enum-specific special case in TsonObjectWriter.write().
         Paint original = reader.toObject("{ color: RED }", Paint.class);
         String tson = writer.toTson(original);
         assertEquals("{ color: \"RED\" }", tson);
@@ -209,8 +209,8 @@ class TsonMapperWriterTest {
     void writeRationalComplexDurationRoundTripThroughDataBridges() throws DataBindException {
         DataBindContext fractionContext = DataBindContext.builder().build();
         fractionContext.registerAtom(UserFraction.class, new UserFractionBridge());
-        TsonMapperReader fractionReader = new TsonMapperReader(fractionContext);
-        TsonMapperWriter fractionWriter = new TsonMapperWriter(fractionContext);
+        TsonObjectReader fractionReader = new TsonObjectReader(fractionContext);
+        TsonObjectWriter fractionWriter = new TsonObjectWriter(fractionContext);
         UserFractionHolder fraction = fractionReader.toObject("{ value: !rational \"2/3\" }", UserFractionHolder.class);
         String fractionTson = fractionWriter.toTson(fraction);
         assertEquals("{ value: !rational \"2/3\" }", fractionTson);
@@ -218,8 +218,8 @@ class TsonMapperWriterTest {
 
         DataBindContext complexContext = DataBindContext.builder().build();
         complexContext.registerAtom(UserComplex.class, new UserComplexBridge());
-        TsonMapperReader complexReader = new TsonMapperReader(complexContext);
-        TsonMapperWriter complexWriter = new TsonMapperWriter(complexContext);
+        TsonObjectReader complexReader = new TsonObjectReader(complexContext);
+        TsonObjectWriter complexWriter = new TsonObjectWriter(complexContext);
         UserComplexHolder complex = complexReader.toObject("{ value: !complex 3+4i }", UserComplexHolder.class);
         // UserComplexBridge.toData() goes through BigDecimal.valueOf(double), which reflects
         // Double.toString()'s own canonical form -- "3.0", not "3" -- for a whole-number double.
@@ -227,8 +227,8 @@ class TsonMapperWriterTest {
 
         DataBindContext durationContext = DataBindContext.builder().build();
         durationContext.registerAtom(UserDuration.class, new UserDurationBridge());
-        TsonMapperReader durationReader = new TsonMapperReader(durationContext);
-        TsonMapperWriter durationWriter = new TsonMapperWriter(durationContext);
+        TsonObjectReader durationReader = new TsonObjectReader(durationContext);
+        TsonObjectWriter durationWriter = new TsonObjectWriter(durationContext);
         UserDurationHolder duration =
                 durationReader.toObject("{ value: !duration P1Y2M3DT4H5M6S }", UserDurationHolder.class);
         assertEquals("{ value: !duration \"P1Y2M3DT4H5M6S\" }", durationWriter.toTson(duration));

@@ -5,8 +5,8 @@ import io.ltr8.tson.compiler.*;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.config.TsonCompiledRegistry;
 import io.ltr8.tson.compiler.config.ValueReaderFactoryResolver;
-import io.ltr8.tson.compiler.mapper.TsonMapperReader;
-import io.ltr8.tson.compiler.mapper.TsonMapperWriter;
+import io.ltr8.tson.compiler.TsonObjectReader;
+import io.ltr8.tson.compiler.TsonObjectWriter;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaLinker;
@@ -45,14 +45,13 @@ import io.ltr8.tson.schema.TsonSchemaRegistry;
  * governing chains is its own, separately tracked backlog item; {@link TsonConfig} is the natural
  * place for that to plug in once it exists.
  *
- * <p>{@link TsonMapperReader}/{@link TsonMapperWriter} themselves still live in {@code tson-compiler
- * .mapper}, not here -- {@code DefinitionResolver}, part of {@code tson-compiler}'s own resolution
- * engine, has a real, current dependency on {@link TsonMapperWriter} (atom-refinement merging), so
- * they can't move to a module that depends *on* {@code tson-compiler} without a cycle. See {@code
- * BACKLOG.md} for the plan to remove that dependency and revisit moving them here once it's gone.
- * {@link #mapperReader()}/{@link #mapperWriter()} bind them to this instance's own {@link
- * #dataBindContext()} (configurable via {@link TsonConfig#dataBindContext}), so a caller gets one
- * consistent binding configuration across mapping without having to wire it up twice.
+ * <p>{@link TsonObjectReader}/{@link TsonObjectWriter} live in {@code tson-compiler}'s own root
+ * package, alongside the other read-side front doors -- {@code DefinitionResolver}, part of that
+ * module's own resolution engine, has a real, current dependency on {@link TsonObjectWriter}
+ * (atom-refinement merging), so they can't move to a module that depends *on* {@code tson-compiler}
+ * without a cycle. {@link #objectReader()}/{@link #objectWriter()} bind them to this instance's own
+ * {@link #dataBindContext()} (configurable via {@link TsonConfig#dataBindContext}), so a caller gets
+ * one consistent binding configuration without having to wire it up twice.
  */
 public final class Tson {
 
@@ -74,17 +73,17 @@ public final class Tson {
         return new TsonConfig();
     }
 
-    /** A fresh, schemaless (Class 1) {@link TsonMapperReader} bound to {@link #dataBindContext()} -- TSON text straight to plain Java objects, no schema involved. */
-    public TsonMapperReader mapperReader() {
-        return new TsonMapperReader(dataBindContext);
+    /** A fresh, schemaless (Class 1) {@link TsonObjectReader} bound to {@link #dataBindContext()} -- TSON text straight to plain Java objects, no schema involved. */
+    public TsonObjectReader objectReader() {
+        return new TsonObjectReader(dataBindContext);
     }
 
-    /** A fresh, schemaless (Class 1) {@link TsonMapperWriter} bound to {@link #dataBindContext()} -- the inverse of {@link #mapperReader()}. */
-    public TsonMapperWriter mapperWriter() {
-        return new TsonMapperWriter(dataBindContext);
+    /** A fresh, schemaless (Class 1) {@link TsonObjectWriter} bound to {@link #dataBindContext()} -- the inverse of {@link #objectReader()}. */
+    public TsonObjectWriter objectWriter() {
+        return new TsonObjectWriter(dataBindContext);
     }
 
-    /** The {@link DataBindContext} {@link #mapperReader()}/{@link #mapperWriter()} are bound to -- see {@link TsonConfig#dataBindContext} to customize it. */
+    /** The {@link DataBindContext} {@link #objectReader()}/{@link #objectWriter()} are bound to -- see {@link TsonConfig#dataBindContext} to customize it. */
     public DataBindContext dataBindContext() {
         return dataBindContext;
     }

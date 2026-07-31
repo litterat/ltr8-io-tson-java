@@ -1,4 +1,4 @@
-package io.ltr8.tson.compiler.mapper;
+package io.ltr8.tson.compiler;
 
 import io.ltr8.annotation.Typename;
 import io.ltr8.bind.DataBindContext;
@@ -12,9 +12,9 @@ import io.ltr8.bind.DataClassMap;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassTuple;
 import io.ltr8.bind.DataClassUnion;
-import io.ltr8.tson.compiler.TsonDataEmitter;
 import io.ltr8.tson.compiler.atom.*;
 import io.ltr8.tson.compiler.atom.RationalParser;
+import io.ltr8.tson.compiler.config.TsonAtomContext;
 import io.ltr8.tson.schema.meta.IsoDuration;
 import io.ltr8.tson.schema.meta.Rational;
 
@@ -30,12 +30,12 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * The write-side counterpart to {@link TsonMapperReader} -- given a Java object and its {@link
+ * The write-side counterpart to {@link TsonObjectReader} -- given a Java object and its {@link
  * DataClass} descriptor from {@code tson-bind}, writes it as TSON text. See {@link
- * TsonMapperReader}'s own Javadoc for why this pair now lives in {@code tson-compiler} rather than
- * the original, separate {@code tson-mapper} module.
+ * TsonObjectReader}'s own Javadoc for the read/write split and why this pair lives in {@code
+ * tson-compiler}.
  */
-public final class TsonMapperWriter {
+public final class TsonObjectWriter {
 
     private final DataBindContext context;
 
@@ -56,13 +56,13 @@ public final class TsonMapperWriter {
      */
     private final Map<Class<?>, VocabularyAtom> vocabularyAtoms;
 
-    public TsonMapperWriter(DataBindContext context) {
+    public TsonObjectWriter(DataBindContext context) {
         this.context = context;
         this.vocabularyAtoms = defaultVocabularyAtoms();
     }
 
-    public TsonMapperWriter() {
-        this(TsonMapperContext.defaultContext());
+    public TsonObjectWriter() {
+        this(TsonAtomContext.defaultContext());
     }
 
     /** Pairs an {@code AtomType} with the type-ref name {@link #toTson} should write it under. */
@@ -253,7 +253,7 @@ public final class TsonMapperWriter {
     // ── Unions ───────────────────────────────────────────────────────────
 
     /**
-     * The reverse of {@code TsonMapperReader}'s own union-member resolution: given the value's own
+     * The reverse of {@code TsonObjectReader}'s own union-member resolution: given the value's own
      * runtime class (necessarily one specific member, not the union type itself), picks one
      * canonical type-ref name for it -- {@link Typename} if present, else the simple class name --
      * rather than accepting either form the way the read side does. Read/write asymmetry is fine

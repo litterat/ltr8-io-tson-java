@@ -105,7 +105,7 @@ class MetaSchemaImportTest {
         // meta.tn1's own composition against an imported supertype resolved and validated correctly.
         assertTrue(registered.schema().entries().containsKey("date_type"));
         // The four constructor-application (!enum [...]) declarations previously excluded now
-        // resolve too, bound generically via TsonMapperReader against Atom.class.
+        // resolve too, bound generically via TsonObjectReader against Atom.class.
         assertEquals(new EnumBody(List.of("BASE64", "BASE64URL", "BASE32", "HEX")),
                 registered.schema().entries().get("binary_encoding").body());
         // ...and the three declarations that reference one of those four as a field type now

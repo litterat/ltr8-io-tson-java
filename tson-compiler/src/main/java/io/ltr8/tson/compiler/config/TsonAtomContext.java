@@ -15,12 +15,11 @@ import java.util.UUID;
 /**
  * The default built-in-vocabulary atom registrations every {@link DataBindContext} consumer in
  * this library needs (UUID/byte[]/LocalDate/OffsetTime/OffsetDateTime/URI/Inet4Address/
- * Inet6Address/SourcePosition) -- shared by {@code io.ltr8.tson.compiler.mapper.TsonMapperContext}
- * and this package's own {@code SchemaMetaNameBinder}'s {@link #registerDefaults}-based {@code
- * defaultContext()}. Lives here, alongside the other configuration/wiring classes ("how a caller
- * configures a working environment," not `base`'s own §4 base-type-resolution machinery a consumer
- * never names directly) -- `mapper` reaching into `config` for this one class is a new, harmless
- * edge (`config` has no dependency back on `mapper`, so no cycle).
+ * Inet6Address/SourcePosition) -- the shared {@code defaultContext()} that {@code TsonObjectReader}'s
+ * and {@code TsonObjectWriter}'s own no-arg constructors, and this package's own {@code
+ * SchemaMetaNameBinder}'s {@link #registerDefaults}-based {@code defaultContext()}, all delegate to.
+ * Lives here, alongside the other configuration/wiring classes ("how a caller configures a working
+ * environment," not `base`'s own §4 base-type-resolution machinery a consumer never names directly).
  */
 public final class TsonAtomContext {
 

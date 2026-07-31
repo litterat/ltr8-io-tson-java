@@ -11,7 +11,7 @@ import java.util.List;
  * infrastructure-level failure ({@link #failed}) that happens outside any read at all -- the schema
  * itself didn't compile, or a requested type name doesn't exist. Shape matches {@code
  * diagnostics.tn}'s own {@code validation_report} field for field (see {@link OutputFormat}), so
- * {@code TsonMapperWriter#toTson} and that schema's own compiled reader agree.
+ * {@code TsonObjectWriter#toTson} and that schema's own compiled reader agree.
  *
  * <p>Public for the same reason {@link CliDiagnostic} is -- see its own Javadoc.
  */

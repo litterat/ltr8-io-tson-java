@@ -13,7 +13,7 @@ import java.util.Optional;
  * array_max}/{@code array_ranged} (§5.3's size-refinement templates and {@code set}'s own
  * refinement all resolve to this same shape, just with different field values -- {@code set}
  * pins {@code state: REQUIRED}, {@code unordered: true}, {@code unique_items: true}). Bound
- * through plain {@code TsonMapper.toTson}, {@code state}/{@code unordered}/{@code uniqueItems}
+ * through plain {@code TsonObjectWriter.toTson}, {@code state}/{@code unordered}/{@code uniqueItems}
  * always appear in written output even at their nominal default -- unlike a hand-written writer,
  * generic record binding has no notion of "this primitive/enum value is the default, omit it".
  */

@@ -7,8 +7,6 @@ import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
 import io.ltr8.tson.compiler.config.TsonCompiledRegistry;
 import io.ltr8.tson.compiler.config.ValueReaderFactoryResolver;
-import io.ltr8.tson.compiler.mapper.TsonMapperReader;
-import io.ltr8.tson.compiler.mapper.TsonMapperWriter;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
@@ -28,9 +26,9 @@ public final class TsonConfig {
     }
 
     /**
-     * The {@link DataBindContext} the built {@link Tson}'s own {@link Tson#mapperReader()}/{@link
-     * Tson#mapperWriter()} bind against -- defaults to {@link TsonAtomContext#defaultContext()}, the
-     * same default {@link TsonMapperReader}'s/{@link TsonMapperWriter}'s own no-arg constructors use.
+     * The {@link DataBindContext} the built {@link Tson}'s own {@link Tson#objectReader()}/{@link
+     * Tson#objectWriter()} bind against -- defaults to {@link TsonAtomContext#defaultContext()}, the
+     * same default {@link TsonObjectReader}'s/{@link TsonObjectWriter}'s own no-arg constructors use.
      * Unrelated to (and never overrides) the object-binding-mode context {@link #build()} always uses
      * internally to resolve the standard library itself -- see {@link Tson}'s own Javadoc for why
      * that one is fixed, not configurable.

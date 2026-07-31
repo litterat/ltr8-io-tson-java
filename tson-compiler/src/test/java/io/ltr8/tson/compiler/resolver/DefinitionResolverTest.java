@@ -11,7 +11,7 @@ import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.config.TsonCompiledRegistry;
-import io.ltr8.tson.compiler.mapper.TsonMapperWriter;
+import io.ltr8.tson.compiler.TsonObjectWriter;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
@@ -56,7 +56,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Writes resolved values through plain {@code TsonMapperWriter.toTson} -- no hand-written
+ * Writes resolved values through plain {@code TsonObjectWriter.toTson} -- no hand-written
  * schema-model writer at all -- deliberately, to validate the {@code io.ltr8.tson.schema.meta}
  * model is built from ordinary, idiomatic Java (records, sealed interfaces, enums, {@code
  * Optional}) that {@code tson-bind}'s generic introspection already knows how to bind, rather than
@@ -73,12 +73,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * equivalent to, but textually more verbose than, {@code meta-kernel-resolved.tn1}'s own
  * hand-authored style -- no outer {@code !type_definition} tag (plain records, unlike union
  * members, never self-announce a type-ref), quoted strings where the fixture writes bare tokens
- * (an enum's bridge produces a {@code String}, and {@code TsonMapperWriter} always quotes strings --
+ * (an enum's bridge produces a {@code String}, and {@code TsonObjectWriter} always quotes strings --
  * already true, and already documented, for every other enum this codebase binds), every
  * empty-list/false/{@code REQUIRED}-at-default field written out rather than omitted ({@code
  * Optional.empty()}/{@code null} are the only things generic binding omits), and {@code TypeRef}
  * always in its full {@code { name: ... arguments: [...] } } form, never Part 2 §5.6's positional
- * bare-token spelling (a schema-specific encoding convention plain {@code tson-compiler.mapper}, a
+ * bare-token spelling (a schema-specific encoding convention plain {@code TsonObjectWriter}, a
  * Part-1-only binder, has no reason to know about). None of these are wrong -- same value, just a
  * different spelling -- so the assertions below check the real, current {@code toTson} output
  * exactly, not a hand-massaged approximation of the fixture's own terser conventions.
@@ -112,7 +112,7 @@ class DefinitionResolverTest {
     private final Map<String, TypeDefinition> resolved = new LinkedHashMap<>();
 
     private final DefinitionResolver resolver = new DefinitionResolver(NEVER_CALLED, EMPTY_NAMESPACE, resolved::get);
-    private final TsonMapperWriter mapper = new TsonMapperWriter();
+    private final TsonObjectWriter mapper = new TsonObjectWriter();
 
     private static DefinitionResolver definitionResolverFor(TsonCompiledMetaSchema metaParser, DefinitionGetter definitionGetter) {
         return new DefinitionResolver((type, value) -> (Top) metaParser.reader(type)

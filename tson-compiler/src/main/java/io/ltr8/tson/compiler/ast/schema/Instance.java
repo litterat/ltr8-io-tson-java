@@ -16,7 +16,7 @@ import io.ltr8.tson.compiler.ast.DataValue;
  * {@code "!" type-name} prefix at parse time), and {@code value.annotations()} is always empty (the
  * corrected grammar has no room for any). This is also exactly the shape {@code DefinitionResolver}'s
  * generalized constructor-application resolution needs: {@code value} can be handed straight to
- * {@code TsonMapperReader.toObject(value, Atom.class)} with no separate wrapping step to attach a
+ * {@code TsonObjectReader.toObject(value, Atom.class)} with no separate wrapping step to attach a
  * type-ref, since it's already there.
  *
  * <p>{@link #target()} MUST resolve to a constructor (a semantic-layer check, not enforced here).

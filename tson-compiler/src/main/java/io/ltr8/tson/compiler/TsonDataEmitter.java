@@ -8,8 +8,8 @@ import java.util.regex.Pattern;
  * Builds TSON source text incrementally -- the write-side counterpart to {@link io.ltr8.tson.compiler.lexer.Lexer}/{@link
  * TsonDataParser}'s read side, and just as agnostic of any particular Java object model: this class knows
  * TSON's own grammar (delimiters, separators, escaping) and nothing about {@code DataClass} or
- * any bound Java type. {@code TsonMapper} is the layer that walks a Java object graph and drives
- * this writer, the same relationship it already has with {@code TsonDataParser}'s output on the read side.
+ * any bound Java type. {@link TsonObjectWriter} is the layer that walks a Java object graph and drives
+ * this writer, the same relationship {@link TsonObjectReader} has with {@code TsonDataParser}'s output on the read side.
  *
  * <p><b>Separation, not commas.</b> Confirmed against §2.4 and this repo's own test literals: TSON
  * never requires a comma between sibling elements -- "zero-width separation is a parse error", not

@@ -12,7 +12,7 @@ import java.util.Optional;
  * appears in output; {@code source}/{@code disjoint} are genuinely OPTIONAL ({@code
  * Optional<TypeRef>}/{@code Optional<Boolean>}) and omitted from written output when absent, the
  * same as any other {@code Optional}-wrapped scalar/record field bound through plain {@code
- * TsonMapper.toTson}. {@code parameters}/{@code supertypes}/{@code subtypes} are conceptually
+ * TsonObjectWriter.toTson}. {@code parameters}/{@code supertypes}/{@code subtypes} are conceptually
  * OPTIONAL in the kernel too ({@code [type_name]?} etc.), but modeled here as a bare, always-present
  * {@code List} rather than {@code Optional<List<...>>} -- {@code tson-bind} doesn't support an
  * {@code Optional} wrapping a parameterized collection type yet, so there's no way to opt an empty

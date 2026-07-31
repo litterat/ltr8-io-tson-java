@@ -24,7 +24,7 @@ import java.util.Optional;
  * this class's -- same division of responsibility as {@link RecordBindReader}'s own {@code
  * DataClassRecord}).
  *
- * <p><b>Mirrors {@code TsonMapperReader.toArray} exactly, down to which {@link
+ * <p><b>Mirrors {@code TsonObjectReader.toArray} exactly, down to which {@link
  * java.lang.invoke.MethodHandle}s get called and in what order</b> -- {@code
  * descriptor.constructor().invoke(size)} to allocate the target with a known capacity, {@code
  * descriptor.iterator().invoke(arrayData)} once, then {@code descriptor.put().invoke(arrayData,

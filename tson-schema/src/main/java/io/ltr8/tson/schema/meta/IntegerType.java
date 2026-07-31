@@ -15,7 +15,7 @@ import java.util.Optional;
  *
  * <p>Also an {@link Atom} variant (added 2026-07-23, alongside {@code MetaKernelBootstrapResolver}): {@code
  * integer => !integer_type {}} is a constructor-application instance (§5.5) whose resolved body is
- * exactly this shape, bound via plain {@code TsonMapper.toObject} the same way every other {@link
+ * exactly this shape, bound via plain {@code TsonObjectReader.toObject} the same way every other {@link
  * Top} variant round-trips through generic binding -- it's the first of the atom
  * constraint-vocabulary families to be modeled this way, since its fields (unlike {@code
  * text_type}/{@code uri_type}/{@code regex_type}'s) already needed no field-group-in-a-bound-
@@ -29,7 +29,7 @@ import java.util.Optional;
  * DefaultRecordBinder.getConstructor} only auto-picks a bare class's sole constructor when exactly
  * one exists, and throws {@code CodeAnalysisException} ("Could not find constructor") otherwise
  * unless one is explicitly marked. Confirmed empirically -- {@code MetaKernelBootstrapResolver} binding {@code
- * integer => !integer_type {}} via plain {@code TsonMapper.toObject} was the first real use of
+ * integer => !integer_type {}} via plain {@code TsonObjectReader.toObject} was the first real use of
  * this class as a bind *target* (every earlier use just constructed it directly in Java), and
  * surfaced this immediately.
  */

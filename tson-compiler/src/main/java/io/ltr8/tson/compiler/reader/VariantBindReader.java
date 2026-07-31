@@ -46,12 +46,12 @@ import java.util.Optional;
  * variants, not hundreds of record fields), so the linear scan this trades for isn't the kind of
  * per-read cost the rest of this package was built to avoid.
  *
- * <p>Matches {@code TsonMapperReader.resolveUnionMember}'s own two-pass precedence exactly (an exact
+ * <p>Matches {@code TsonObjectReader.resolveUnionMember}'s own two-pass precedence exactly (an exact
  * {@link Typename} match first, then a case-insensitive simple-class-name match for an un-annotated
  * member) -- except this only needs to confirm membership, not resolve to a {@code Class}: once a
  * type-ref is confirmed a real member, the actual read dispatches by schema name through {@code
  * resolver}, the same compiled-schema path every other dispatch in this codebase uses, not by
- * reflectively constructing the member class directly the way {@code TsonMapperReader} does.
+ * reflectively constructing the member class directly the way {@code TsonObjectReader} does.
  *
  * <p>The type-ref driving this decision is consumed here, via {@link EventSkip#annotationsAndTypeRef}
  * -- {@code ownParser} still calls it again on delegation (every reader does, as its own first step),

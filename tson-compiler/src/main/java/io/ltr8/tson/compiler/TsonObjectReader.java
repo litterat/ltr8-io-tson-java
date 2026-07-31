@@ -1,4 +1,4 @@
-package io.ltr8.tson.compiler.mapper;
+package io.ltr8.tson.compiler;
 
 import io.ltr8.annotation.Typename;
 import io.ltr8.bind.DataBindContext;
@@ -12,7 +12,6 @@ import io.ltr8.bind.DataClassMap;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassTuple;
 import io.ltr8.bind.DataClassUnion;
-import io.ltr8.tson.compiler.TsonDataParser;
 import io.ltr8.tson.compiler.ast.AbsentValue;
 import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
@@ -28,6 +27,7 @@ import io.ltr8.tson.compiler.base.BaseValue;
 import io.ltr8.tson.compiler.atom.AtomType;
 import io.ltr8.tson.compiler.atom.AtomTypeException;
 import io.ltr8.tson.compiler.atom.BuiltinTypeVocabulary;
+import io.ltr8.tson.compiler.config.TsonAtomContext;
 
 import java.util.HashMap;
 import java.util.List;
@@ -42,15 +42,12 @@ import java.util.Optional;
  * binding a resolved constructor's own {@code DataValue} bindings onto its {@code schema.meta}
  * class (see {@code DefinitionResolver}'s own Javadoc for that use).
  *
- * <p>Read/write split from what was originally one class ({@code TsonMapper}) into {@link
- * TsonMapperReader}/{@link TsonMapperWriter} -- each already paired one {@code to*} method per
- * {@code write*} method, one per {@link DataClass} kind, so the split follows an already-present
- * internal seam. Originally lived in a separate {@code tson-mapper} module; moved into {@code
- * tson-compiler} (this module) so schema resolution (constructor application, atom refinement, §5.5)
- * can use this binding directly without a module cycle ({@code tson-mapper} depended on {@code
- * tson-compiler}, so the reverse was impossible) -- {@code tson-bind}, what this is built on, has no
- * dependency on {@code tson-compiler}/{@code tson-schema} at all, so depending on it directly here is
- * clean.
+ * <p>Read/write split from what was originally one class into {@link TsonObjectReader}/{@link
+ * TsonObjectWriter} -- each already paired one {@code to*} method per {@code write*} method, one per
+ * {@link DataClass} kind, so the split follows an already-present internal seam. {@code tson-bind},
+ * what this is built on, has no dependency on {@code tson-compiler}/{@code tson-schema} at all, so
+ * depending on it directly here is clean -- which is also what lets schema resolution (constructor
+ * application, atom refinement, §5.5) use this binding directly, in the same module, without a cycle.
  *
  * <p>Unlike {@code litterat-json}'s {@code JsonMapper}, this reads from an already-parsed AST
  * (the {@code TsonDataParser} has already built the full tree) rather than a live token stream, so there's
@@ -74,16 +71,16 @@ import java.util.Optional;
  * NumberNarrowing}, in {@code tson-compiler}) one level down, so a plain {@code 42} and a {@code
  * !uint8 42} bind through the same final step regardless of which path found them.
  */
-public final class TsonMapperReader {
+public final class TsonObjectReader {
 
     private final DataBindContext context;
 
-    public TsonMapperReader(DataBindContext context) {
+    public TsonObjectReader(DataBindContext context) {
         this.context = context;
     }
 
-    public TsonMapperReader() {
-        this(TsonMapperContext.defaultContext());
+    public TsonObjectReader() {
+        this(TsonAtomContext.defaultContext());
     }
 
     // ── Entry points ─────────────────────────────────────────────────────

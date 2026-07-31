@@ -14,7 +14,7 @@ import java.util.Optional;
 /**
  * DOM mode's own {@code map} reader -- reads a map-shaped value into a plain {@code Map<Object,
  * Object>}, one entry per source entry, in source order (a {@code LinkedHashMap}, matching {@code
- * TsonMapperReader.toMap}'s own "last value wins" behavior for a duplicate key -- an ordinary {@code
+ * TsonObjectReader.toMap}'s own "last value wins" behavior for a duplicate key -- an ordinary {@code
  * put} in stream order needs nothing extra to get that for free).
  *
  * <p>Everything else -- resolving the key/value readers, confirming a map shape, size validation,

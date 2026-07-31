@@ -23,7 +23,7 @@ package io.ltr8.tson.schema.meta;
  * shape that lets {@code tson-bind} bind a mutually-recursive pair like this at all today.
  *
  * <p>The cost: since {@code Ref}/{@code Value} are {@code DataClassUnion} members with no {@code
- * @Typename}, {@code TsonMapper.toTson} writes them with a spurious {@code !ref}/{@code !value}
+ * @Typename}, {@code TsonObjectWriter.toTson} writes them with a spurious {@code !ref}/{@code !value}
  * type-ref the kernel's own resolved form doesn't have (a real, {@code toTson}-surfaced divergence,
  * not silently swept aside) -- same value, same field-group semantics, just an extra tag; no
  * {@code @Typename} choice removes it, since the divergence is the tag's *presence*, not its name.

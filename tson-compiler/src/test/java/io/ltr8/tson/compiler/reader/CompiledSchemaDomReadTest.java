@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  * everything {@link MetaKernelEndToEndTest} proved piece by piece (a real, fully-registered
  * meta-kernel schema; every composite kind; every atom family; {@code top}'s own polymorphism),
  * now exercised through a single {@code compiled.get(typeName).read(document.root())} call, the
- * same one-line shape {@code TsonMapperReader.toObject(String, Class)} already offers for Class 1.
+ * same one-line shape {@code TsonObjectReader.toObject(String, Class)} already offers for Class 1.
  */
 class CompiledSchemaDomReadTest {
 

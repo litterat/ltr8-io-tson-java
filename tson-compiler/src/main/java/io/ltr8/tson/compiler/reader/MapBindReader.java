@@ -22,7 +22,7 @@ import java.util.Optional;
  * map's own target Java type (same division of responsibility as {@link RecordBindReader}'s {@code
  * DataClassRecord}/{@link ArrayBindReader}'s {@code DataClassArray}).
  *
- * <p>Mirrors {@code TsonMapperReader.toMap} exactly: {@code descriptor.constructor().invoke(size)}
+ * <p>Mirrors {@code TsonObjectReader.toMap} exactly: {@code descriptor.constructor().invoke(size)}
  * to allocate the target with a known capacity, then {@code descriptor.put().invoke(mapData, key,
  * value)} per decoded entry -- no iterator needed, unlike {@link DataClassMap}'s own *reading* side,
  * since writing a map only ever needs {@code put}. Unlike {@link ArrayBindReader}, there's no fixed-

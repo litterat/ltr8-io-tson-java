@@ -3,7 +3,7 @@ package io.ltr8.tson;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
-import io.ltr8.tson.compiler.mapper.TsonMapperReader;
+import io.ltr8.tson.compiler.TsonObjectReader;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import org.junit.jupiter.api.Test;
@@ -81,7 +81,7 @@ class TsonTest {
     }
 
     @Test
-    void mapperReaderAndWriterAreBoundToTheConfiguredDataBindContext() {
+    void objectReaderAndWriterAreBoundToTheConfiguredDataBindContext() {
         DataBindContext context = DataBindContext.builder().build();
         Tson tson = Tson.builder().dataBindContext(context).build();
 
@@ -89,11 +89,11 @@ class TsonTest {
     }
 
     @Test
-    void mapperReaderIsUsableWithTheDefaultDataBindContext() throws Exception {
+    void objectReaderIsUsableWithTheDefaultDataBindContext() throws Exception {
         Tson tson = Tson.builder().build();
         assertNotNull(tson.dataBindContext());
 
-        TsonMapperReader reader = tson.mapperReader();
+        TsonObjectReader reader = tson.objectReader();
 
         Point point = reader.toObject("{ x: 1 y: 2 }", Point.class);
         assertEquals(new Point(1, 2), point);

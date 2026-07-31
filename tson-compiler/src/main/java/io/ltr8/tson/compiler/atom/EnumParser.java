@@ -15,7 +15,7 @@ import java.util.List;
  * null/boolean/number/string identification.</b> This is the one thing that makes {@code boolean
  * => !enum [true false]} readable at all: routed through generic identification (as {@code
  * MetaKernelBootstrapResolver}'s own binding of the *schema* {@code !enum [true false]} instance necessarily
- * is, since it binds via {@code TsonMapperReader}'s ordinary array/atom path), {@code "true"}/
+ * is, since it binds via {@code TsonObjectReader}'s ordinary array/atom path), {@code "true"}/
  * {@code "false"} get identified as actual TSON booleans before {@code EnumBody.members: List
  * <String>} ever sees them -- a real, permanent limit of generic binding (see this repo's own
  * CLAUDE.md). This class exists specifically for callers -- {@code reader}'s

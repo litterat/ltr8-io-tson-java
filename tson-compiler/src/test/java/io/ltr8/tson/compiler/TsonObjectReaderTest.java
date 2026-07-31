@@ -1,4 +1,4 @@
-package io.ltr8.tson.compiler.mapper;
+package io.ltr8.tson.compiler;
 
 import io.ltr8.annotation.Annotated;
 import io.ltr8.annotation.Atom;
@@ -38,9 +38,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class TsonMapperReaderTest {
+class TsonObjectReaderTest {
 
-    private final TsonMapperReader mapper = new TsonMapperReader();
+    private final TsonObjectReader mapper = new TsonObjectReader();
 
     // ── Records ──────────────────────────────────────────────────────────
 
@@ -612,8 +612,8 @@ class TsonMapperReaderTest {
     void builtinUuidAnnotationBindsDirectlyThroughTheMapper() throws DataBindException {
         // Unlike Rational/Complex, UUID isn't a Java record, so it doesn't collide with
         // tson-bind's record auto-detection -- but it also can't self-declare @Atom (it's a JDK
-        // class), so TsonMapperReader's default DataBindContext pre-registers it (see
-        // TsonMapperContext.defaultContext()) rather than requiring every caller to do so themselves.
+        // class), so TsonObjectReader's default DataBindContext pre-registers it (see
+        // TsonAtomContext.defaultContext()) rather than requiring every caller to do so themselves.
         UuidHolder h = mapper.toObject("{ value: !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09 }", UuidHolder.class);
         assertEquals(UUID.fromString("9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09"), h.value());
     }
@@ -632,7 +632,7 @@ class TsonMapperReaderTest {
     @Test
     void builtinUriAnnotationBindsDirectlyThroughTheMapper() throws DataBindException {
         // Like UUID, java.net.URI isn't a record or an array, so no auto-detection collision --
-        // but it also can't self-declare @Atom, being a JDK class, so TsonMapperReader's default
+        // but it also can't self-declare @Atom, being a JDK class, so TsonObjectReader's default
         // context pre-registers it the same way it does UUID/LocalDate. Quoted because ':' '/' '?'
         // '=' are not legal unquoted-token characters (§7.2) -- the URI value itself is unaffected
         // by that, it's a lexer-layer constraint, not a UriParser one.
@@ -655,8 +655,8 @@ class TsonMapperReaderTest {
     @Test
     void builtinIpv4AnnotationBindsDirectlyThroughTheMapper() throws DataBindException, UnknownHostException {
         // Ipv4Parser#read always returns Inet4Address specifically (never the broader InetAddress),
-        // and TsonMapperReader's default context registers exactly that class -- see
-        // TsonMapperContext's Javadoc on why the field must be declared Inet4Address, not
+        // and TsonObjectReader's default context registers exactly that class -- see
+        // TsonAtomContext's Javadoc on why the field must be declared Inet4Address, not
         // InetAddress, to bind directly.
         Ipv4Holder h = mapper.toObject("{ value: !ipv4 192.168.0.1 }", Ipv4Holder.class);
         assertEquals(InetAddress.getByAddress(new byte[]{(byte) 192, (byte) 168, 0, 1}), h.value());
@@ -701,7 +701,7 @@ class TsonMapperReaderTest {
     @Test
     void builtinDateAnnotationBindsDirectlyThroughTheMapper() throws DataBindException {
         // LocalDate isn't a record or an array, so no auto-detection collision -- but it also
-        // can't self-declare @Atom, being a JDK class, so TsonMapperReader's default context
+        // can't self-declare @Atom, being a JDK class, so TsonObjectReader's default context
         // pre-registers it the same way it does UUID.
         DateHolder h = mapper.toObject("{ value: !date 2025-03-13 }", DateHolder.class);
         assertEquals(LocalDate.of(2025, 3, 13), h.value());
@@ -768,7 +768,7 @@ class TsonMapperReaderTest {
     void durationBindsToAThirdPartyTypeViaRegisteredDataBridge() throws DataBindException {
         DataBindContext context = DataBindContext.builder().build();
         context.registerAtom(UserDuration.class, new UserDurationBridge());
-        TsonMapperReader bridgedMapper = new TsonMapperReader(context);
+        TsonObjectReader bridgedMapper = new TsonObjectReader(context);
 
         UserDurationHolder h = bridgedMapper.toObject("{ value: !duration P1Y2M3DT4H5M6S }", UserDurationHolder.class);
         assertEquals(new UserDuration(1, 2, 3, 4 * 3600L + 5 * 60L + 6L), h.value());
@@ -780,14 +780,14 @@ class TsonMapperReaderTest {
     }
 
     @Test
-    void directBindingToByteArrayFailsWithoutTsonMappersDefaultPreRegistration() throws DataBindException {
+    void directBindingToByteArrayFailsWithoutTsonObjectReadersDefaultPreRegistration() throws DataBindException {
         // byte[].isArray() is true, so DefaultClassBinder's array auto-detection would claim it
         // ahead of the atom/vocabulary path -- the same shape of collision Rational/Complex have
         // with record auto-detection, just against arrays instead of records -- on a bare context
-        // that hasn't pre-registered byte[].class the way TsonMapperReader's own default
-        // constructor does (see TsonMapperContext.defaultContext()). This documents *why* that
+        // that hasn't pre-registered byte[].class the way TsonObjectReader's own default
+        // constructor does (see TsonAtomContext.defaultContext()). This documents *why* that
         // pre-registration exists.
-        TsonMapperReader bareMapper = new TsonMapperReader(DataBindContext.builder().build());
+        TsonObjectReader bareMapper = new TsonObjectReader(DataBindContext.builder().build());
         assertThrows(DataBindException.class, () -> bareMapper.toObject("{ value: !base64 TWFu }", BytesHolder.class));
     }
 
@@ -859,7 +859,7 @@ class TsonMapperReaderTest {
     void rationalBindsToAThirdPartyTypeViaRegisteredDataBridge() throws DataBindException {
         DataBindContext context = DataBindContext.builder().build();
         context.registerAtom(UserFraction.class, new UserFractionBridge());
-        TsonMapperReader bridgedMapper = new TsonMapperReader(context);
+        TsonObjectReader bridgedMapper = new TsonObjectReader(context);
 
         UserFractionHolder h = bridgedMapper.toObject("{ value: !rational \"2/3\" }", UserFractionHolder.class);
         assertEquals(new UserFraction(2, 3), h.value());
@@ -898,7 +898,7 @@ class TsonMapperReaderTest {
     void complexBindsToAThirdPartyTypeViaRegisteredDataBridge() throws DataBindException {
         DataBindContext context = DataBindContext.builder().build();
         context.registerAtom(UserComplex.class, new UserComplexBridge());
-        TsonMapperReader bridgedMapper = new TsonMapperReader(context);
+        TsonObjectReader bridgedMapper = new TsonObjectReader(context);
 
         UserComplexHolder h = bridgedMapper.toObject("{ value: !complex 3+4i }", UserComplexHolder.class);
         assertEquals(new UserComplex(3.0, 4.0), h.value());

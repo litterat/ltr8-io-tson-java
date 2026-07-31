@@ -21,7 +21,7 @@ import java.util.function.BiConsumer;
 /**
  * Everything {@link MapDomReader} and {@link MapBindReader} share verbatim: resolving the key/value
  * types' own readers once at construction, confirming a map-shaped value's own {@code MapStart} (or
- * {@code EmptyBraceEvent}, zero entries, matching {@code TsonMapperReader.toMap}'s own treatment of
+ * {@code EmptyBraceEvent}, zero entries, matching {@code TsonObjectReader.toMap}'s own treatment of
  * {@code {}}), and decoding entries one at a time straight off the event stream -- validating {@code
  * min_items}/{@code max_items} against the final count (known only once {@code MapEnd} arrives),
  * rejecting the absent sentinel {@code _} in key position (§2.9) -- handing each decoded key/value
@@ -31,7 +31,7 @@ import java.util.function.BiConsumer;
  * <p>Unlike {@link ArrayAbstractReader}, there's no {@code unique_items}/{@code ElementState}
  * concept here at all -- {@link MapBody} carries neither: a map's own keys are inherently unique by
  * construction (a duplicate key is "last value wins" via an ordinary {@code put}, matching {@code
- * TsonMapperReader.toMap}'s own note, not a validation error), and there's no per-entry
+ * TsonObjectReader.toMap}'s own note, not a validation error), and there's no per-entry
  * required/optional state for a value the way an array element or tuple position has.
  *
  * <p><b>A key's own path segment is read from a bare peek, not a fully-decoded value</b> -- an

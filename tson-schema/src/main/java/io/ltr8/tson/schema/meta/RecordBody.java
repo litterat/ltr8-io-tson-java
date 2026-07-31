@@ -10,7 +10,7 @@ import java.util.List;
  * appear in output; {@code supertypes} is populated only when the source composed with `&` (e.g.
  * `atom => top & {}`) -- empty here ideally means a fresh record with no listed supertypes, omitted
  * from output the same way; {@code groups} similarly for a record with no field groups. In
- * practice, bound through plain {@code TsonMapper.toTson} rather than a hand-written writer (see
+ * practice, bound through plain {@code TsonObjectWriter.toTson} rather than a hand-written writer (see
  * {@code TypeDefinition}'s own Javadoc), both currently render as {@code []} rather than being
  * omitted when empty -- {@code tson-bind} doesn't support {@code Optional<List<T>>} record
  * components yet (only a bare, always-present {@code List} does), so there's no wrapper available

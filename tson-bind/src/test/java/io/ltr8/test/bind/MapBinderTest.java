@@ -30,7 +30,7 @@ import io.ltr8.bind.DataClassRecord;
 
 /**
  * Exercises {@link DataClassMap}'s full MethodHandle interface directly -- not just the
- * construct-then-put half {@code TsonMapper} actually uses today, but also the
+ * construct-then-put half {@code TsonObjectReader} actually uses today, but also the
  * iterator/next/key/value half built for symmetry with {@link io.ltr8.bind.DataClassArray} and
  * a future write direction, which nothing else in this codebase calls yet.
  */
@@ -136,7 +136,7 @@ public class MapBinderTest {
 
 	@Test
 	public void uuidKeyedMap() throws Throwable {
-		// UUID isn't registered by a bare DataBindContext (that's a TsonMapper-specific default,
+		// UUID isn't registered by a bare DataBindContext (that's a TsonObjectReader-specific default,
 		// deliberately kept out of tson-bind itself) -- register it here the same way
 		// SimpleArrayTest does for its own UUID-keyed case.
 		context.registerAtom(UUID.class);

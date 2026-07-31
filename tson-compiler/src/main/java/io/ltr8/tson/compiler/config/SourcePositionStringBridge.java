@@ -19,7 +19,7 @@ import io.ltr8.tson.schema.meta.SourcePosition;
  * <p>{@link #toObject} always produces a real {@link Position} -- the only concrete {@code
  * SourcePosition} that exists anywhere in this codebase -- even though nothing currently reads a
  * {@code TypeDefinition} generically from data (only writes one, for test verification via {@code
- * TsonMapperWriter.toTson}); implementing the read direction correctly costs nothing and avoids
+ * TsonObjectWriter.toTson}); implementing the read direction correctly costs nothing and avoids
  * leaving a bridge that's only honest in one direction.
  */
 public final class SourcePositionStringBridge implements DataBridge<String, SourcePosition> {
