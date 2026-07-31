@@ -1,6 +1,6 @@
 # tson-java
 
-A Java implementation of [TSON](https://tson.io) (Typed Schema Object Notation) — is a schema system with immutable, 
+A Java implementation of [TSON](https://tson.io) (Typed Schema Object Notation) — a schema system with immutable, 
 hash-pinned schemas whose definitions are themselves data. A document names its schema, the schema names 
 its meta-schema; one hash verifies the whole chain. The finishing touch, TSON's data format is a 
 Unicode-first superset of JSON you'll actually enjoy writing. This is the first implementation of the specification.
@@ -31,7 +31,7 @@ Try it (the data names its own schema and type, so no --type is needed):
   …
 ```
 
-Here's the `person.tn` schema created. It show's a few of the basic schema features, including records, record groups,
+Here's the `person.tn` schema created. It shows a few of the basic schema features, including records, record groups,
 enums and some in-built types:
 
 ```tson
@@ -61,7 +61,7 @@ enums and some in-built types:
 }
 ```
 
-And here's a corresponding  `person-data.tn`, *data* document. It's *self-describing*: the
+And here's a corresponding `person-data.tn` *data* document. It's *self-describing*: the
 `!!schema` header names the schema it conforms to, and the leading `!person` says which type:
 
 ```tson
