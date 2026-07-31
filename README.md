@@ -8,6 +8,170 @@ interpretation.
 This is one implementation of an open specification, not the canonical one — anyone can implement TSON.
 Published under the [litterat](https://github.com/litterat) org, group id `io.ltr8`.
 
+> **New to TSON?** It's a superset of JSON's data model with two things JSON lacks: *type annotations*
+> on the wire (`!ipv4 192.0.2.10`, `!uuid …`, `!date 2026-01-15`) and a first-class *schema layer*.
+> A value can carry its own type (`!circle { radius: 5 }`), and separators are whitespace *or* commas,
+> so a record reads like `{ name: "Ada"  age: 30 }`. Everything below is about reading that into Java.
+
+---
+
+## Getting started
+
+Requires **Java 25**. There are no external runtime dependencies. The module you depend on is `tson`
+(the front door); it pulls in `tson-compiler`/`tson-schema`/`tson-bind` transitively. Build from source:
+
+```
+./gradlew build
+```
+
+The fastest thing to try — bind a TSON document straight to a Java record, with the built-in vocabulary
+types (`!ipv4`, `!uuid`, `!date`) landing in the right JDK types automatically, no custom code:
+
+```java
+import io.ltr8.tson.compiler.TsonObjectReader;
+
+import java.net.Inet4Address;
+import java.time.LocalDate;
+import java.util.UUID;
+
+record Server(String hostname, Inet4Address address, UUID id, LocalDate deployedOn) {}
+
+Server server = new TsonObjectReader().read("""
+        {
+            hostname: "web-01"
+            address: !ipv4 192.0.2.10
+            id: !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09
+            deployedOn: !date 2026-01-15
+        }""", Server.class);
+
+// Server[hostname=web-01, address=/192.0.2.10,
+//        id=9f1c8e2a-…, deployedOn=2026-01-15]
+```
+
+That's the schemaless path: your Java class *is* the shape the data is checked against. No schema
+document, no registration, no setup. The rest of this section is about the other ways to read, and when
+you'd reach for each.
+
+---
+
+## Reading TSON: choosing an entry point
+
+There are two questions that pick your reader: **what drives the interpretation** (nothing, your Java
+class, or a TSON schema document), and **what you want out** (a generic tree/stream, or a bound Java
+object). That's the whole matrix:
+
+| You have… | You want… | Use | You get |
+|---|---|---|---|
+| a Java class | it bound, no schema | **`TsonObjectReader`** | your object |
+| nothing (schemaless) | a navigable tree | **`TsonDataParser`** | a `Document` AST |
+| nothing (schemaless) | to pull events lazily | **`TsonDataStream`** | a `TsonEvent` stream |
+| a TSON schema | validation + generic output | **`TsonValueReader`** (DOM mode) | `Map`/`List` |
+| a TSON schema | validation + a bound object | **`TsonValueReader`** (bind mode) | your object |
+
+The two "bound object" rows are mirror images: `TsonObjectReader` checks the data against your Java
+class *reflectively* (the class is the schema); `TsonValueReader` checks it against a real TSON *schema
+document*. Both stream their input — a large document is never fully buffered before reading begins —
+and both accept a `String` or an `InputStream`.
+
+### 1. Bind to a Java class — `TsonObjectReader`
+
+Schemaless (Class 1). Records, `Map<K, V>`, `List<E>`, tuples, plain enums, sealed-interface unions,
+and the whole built-in vocabulary (`!uuid`/`!ipv4`/`!date`/`!uint8`/…) all bind with no custom code.
+See [Getting started](#getting-started) above for the basic call. From an `InputStream`:
+
+```java
+try (var in = Files.newInputStream(Path.of("server.tn"))) {
+    Server server = new TsonObjectReader().read(in, Server.class);
+}
+```
+
+On a mismatch it throws `TsonReadException` (fail-fast). To collect *every* problem in one pass instead
+of stopping at the first, hand it a collecting context:
+
+```java
+var ctx = TsonReadContext.collecting("{ hostname: 1  address: nope }");
+new TsonObjectReader().read(ctx, Server.class);
+for (Diagnostic d : ctx.diagnostics()) {
+    System.out.println(d.path() + ": " + d.message());   // /hostname: …, /address: …
+}
+```
+
+### 2. Walk a generic tree — `TsonDataParser`
+
+No schema, no target class: parse the document into an AST you can navigate. Good for tooling,
+transformation, or when you don't know the shape ahead of time.
+
+```java
+import io.ltr8.tson.compiler.TsonDataParser;
+import io.ltr8.tson.compiler.ast.*;
+
+Document doc = new TsonDataParser("{ name: \"Ada\"  tags: [a b c] }").parseDocument();
+CoreValue root = doc.root().coreValue();   // RecordValue | MapValue | ArrayValue | TokenValue | …
+```
+
+### 3. Pull events lazily — `TsonDataStream`
+
+The tier below the AST: a pull-based event stream (`RecordStart`, `FieldName`, `TokenEvent`,
+`ArrayStart`, …), never materializing a tree. Memory held is proportional to nesting depth, not
+document size — the right tool for very large documents or a custom consumer.
+
+```java
+import io.ltr8.tson.compiler.TsonDataStream;
+import io.ltr8.tson.compiler.stream.TsonEvent;
+
+var stream = new TsonDataStream("{ name: \"Ada\" }");
+while (stream.hasNext()) {
+    TsonEvent event = stream.next();   // DocumentStart, RecordStart, FieldName, TokenEvent, …
+}
+```
+
+### 4. Validate against a TSON schema — `TsonValueReader`
+
+This is where the *schema layer* comes in: a schema document declares types, and a data document is
+validated against one of them. `Tson.builder().build()` bootstraps the standard library
+(meta-kernel/meta.tn/core.tn); `compile` turns your schema into fast, reusable per-type readers; then
+you `get` the reader for a type and `read` data against it. **DOM mode** produces plain `Map`/`List`:
+
+```java
+import io.ltr8.tson.Tson;
+import io.ltr8.tson.compiler.TsonSchemaCompiler;
+
+Tson tson = Tson.builder().build();
+
+String schema = """
+        !!id:"https://example.com/2026/32/app/server-1.tn"
+        !!meta:"https://tson.io/2026/32/m/meta.tn"
+        !!import:"https://tson.io/2026/32/m/core.tn"
+        {
+            server => { hostname: text  port: int32 }
+        }""";
+
+var compiled = tson.compile(schema, TsonSchemaCompiler.dom());
+
+@SuppressWarnings("unchecked")
+Map<String, Object> value = (Map<String, Object>)
+        compiled.compiledSchema().get("server").read("{ hostname: \"web-01\" port: 8080 }");
+// { hostname=web-01, port=8080 } — validated against the schema; a bad port would surface as a diagnostic
+```
+
+**Bind mode** (`TsonSchemaCompiler.bind(dataBindContext)`) produces bound Java objects the same way
+`TsonObjectReader` does, but with the TSON schema — not your Java class — as the source of truth. The
+full multi-stage pipeline behind this (parse → resolve → link → register → compile → read), and how a
+schema governed by meta.tn/core.tn is assembled, is described under [Schema pipeline](#schema-pipeline)
+below.
+
+### Writing TSON back out — `TsonObjectWriter`
+
+The read-side inverse of `TsonObjectReader`: a Java object to TSON text. Mainly a debugging aid, not a
+guaranteed-lossless serializer (see [Conformance](#conformance) for exactly where it's lossy):
+
+```java
+String text = new TsonObjectWriter().toTson(server);
+// { hostname: "web-01" address: !ipv4 "192.0.2.10" id: !uuid "9f1c8e2a-…" deployedOn: !date "2026-01-15" }
+```
+
+---
+
 ## Status
 
 Built against TSON Part 1 (lexer + data format), a working draft: https://tson.io/raw/2026/32/tson-part1-data.md,
@@ -33,15 +197,17 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
 - [x] Full document binding — TSON text straight to Java objects, dispatching into all of the above,
       and back again (`toTson`) — mainly a debugging tool, not a guaranteed-lossless round trip
       (e.g. the integer family's exact width isn't recoverable schemaless; see [Conformance](#conformance))
+- [x] Streaming reads throughout — the lexer reads from an `InputStream`, and both the schemaless
+      binder (`TsonObjectReader`) and the schema-validating reader (`TsonValueReader`) pull events one
+      at a time rather than materializing a whole document tree first
 - [x] Part 2 schema grammar — full schema document parsing into a faithful AST (records, compositions,
       refinements, generic/array-sugar type-refs, field groups, and more), verified end-to-end against
-      the spec's own real `meta-kernel.tn1`/`meta.tn1`/`core.tn1` fixtures
+      the spec's own real `meta-kernel.tn`/`meta.tn`/`core.tn` fixtures
 - [x] Part 2 schema resolution — composition (`&`), refinement (`^`) including tightening, bare and
       generic type references, field modifiers/defaults/fixed values, type parameters, array sugar,
-      and generalized constructor-application/atom-refinement resolution (`!C value`); `meta-kernel.tn1`
-      resolves all 49 of its own declarations, `meta.tn1` all 31, and `core.tn1` all 48, all
-      end-to-end (see [Not yet implemented](#not-yet-implemented) below for the specific constructs
-      still out of scope)
+      and generalized constructor-application/atom-refinement resolution (`!C value`); `meta-kernel.tn`
+      resolves all 49 of its own declarations, `meta.tn` all 31, and `core.tn` all 48, all
+      end-to-end (see [BACKLOG.md](BACKLOG.md) for the specific constructs still out of scope)
 - [x] Part 2 schema linking and registration — validates a document's own `!!id`/`!!import` header
       directives during resolution, flattens argument-bearing type references into real named
       entries, merges `!!import`s, validates every reference in a schema actually resolves, and
@@ -50,7 +216,7 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       Java object references between per-type parsers (DOM or object-binding mode) for fast repeated
       reads against real TSON data documents (see [Schema pipeline](#schema-pipeline) below)
 - [x] The full pipeline verified end-to-end, three schemas deep — an ordinary, user-defined schema
-      can `!!import` `core.tn1` (itself governed by `meta.tn1`, governed by `meta-kernel.tn1`) and
+      can `!!import` `core.tn` (itself governed by `meta.tn`, governed by `meta-kernel.tn`) and
       compile cleanly with real, manually-registered Java classes bound against records composed
       from its imported vocabulary, reading real TSON data through the whole chain
 
@@ -58,56 +224,21 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
 
 See [BACKLOG.md](BACKLOG.md) for the actively-tracked engineering backlog, and
 [STRUCTURED-OUTPUT.md](STRUCTURED-OUTPUT.md) for the target-use-case plan (LLM structured-output
-validation, JSON compatibility).
+validation, JSON compatibility). One onboarding-relevant gap worth naming: there's no `!!schema`-header
+auto-selection yet — every read above needs you to name the target class or schema type up front; a
+data document can't yet drive its own reader from its own `!!schema` directive.
 
 See [CLAUDE.md](CLAUDE.md#architecture) for architecture and design notes, and
 [Conformance](#conformance) below for edge-case behavior worth knowing about.
 
-## Quickstart
-
-`TsonMapperReader`/`TsonMapperWriter` bind TSON text straight to plain Java records — including the
-built-in vocabulary types (§5), which is where TSON goes beyond what JSON alone can express. `!uuid` and
-`!ipv4` below bind to `java.util.UUID` and `java.net.Inet4Address` directly, with no custom code:
-
-```java
-import io.ltr8.tson.compiler.mapper.TsonMapperReader;
-import io.ltr8.tson.compiler.mapper.TsonMapperWriter;
-
-import java.net.Inet4Address;
-import java.time.LocalDate;
-import java.util.UUID;
-
-record Server(String hostname, Inet4Address address, UUID id, LocalDate deployedOn) {
-}
-
-TsonMapperReader reader = new TsonMapperReader();
-TsonMapperWriter writer = new TsonMapperWriter();
-
-String tson = """
-        {
-            hostname: "web-01"
-            address: !ipv4 192.0.2.10
-            id: !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09
-            deployedOn: !date 2026-01-15
-        }""";
-
-Server server = reader.toObject(tson, Server.class);
-// Server[hostname=web-01, address=/192.0.2.10, id=9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09, deployedOn=2026-01-15]
-
-String written = writer.toTson(server);
-// { hostname: "web-01" address: !ipv4 "192.0.2.10" id: !uuid "9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09" deployedOn: !date "2026-01-15" }
-```
-
-`toTson` is not a lossless serializer — see [Conformance](#conformance) below for exactly where it's lossy.
-
 ## Schema pipeline
 
-The Quickstart above binds data against a plain Java class with no schema involved — that's Class 1
-(§1.5), TSON's schemaless mode. Part 2 layers a schema *system* on top: a governing document that
-declares types, which a data document can then be validated against. Turning schema source text into
-something a data reader can actually use goes through a handful of well-defined stages, each with its
-own class, deliberately named after standard compiler vocabulary — parse → resolve → link → register →
-compile → read:
+The [reader table](#reading-tson-choosing-an-entry-point) above binds data against a plain Java class
+with no schema involved — that's Class 1 (§1.5), TSON's schemaless mode. Part 2 layers a schema
+*system* on top: a governing document that declares types, which a data document can then be validated
+against. Turning schema source text into something a data reader can actually use goes through a
+handful of well-defined stages, each with its own class, deliberately named after standard compiler
+vocabulary — parse → resolve → link → register → compile → read:
 
 1. **Parse** (`TsonSchemaParser`) — schema document text into a faithful AST (`SchemaDocument`):
    records, compositions (`&`), refinements (`^`), type references, and so on. No interpretation yet —
@@ -129,21 +260,23 @@ compile → read:
 5. **Compile** (`TsonSchemaCompiler`) — turns a registered schema's `Map<String, TypeDefinition>` into
    a `TsonCompiledSchema`: real Java object references between per-type parsers rather than further
    name lookups, built once, reused for every document read against it.
-6. **Read** — the compiled schema validates and binds actual TSON *data* documents against one of its
-   own types — the schema-validating reader (Class 2) that Part 1's plain `TsonMapperReader`/
-   `TsonDataParser` don't attempt on their own.
+6. **Read** (`TsonValueReader`) — the compiled schema validates and binds actual TSON *data* documents
+   against one of its own types — the schema-validating reader (Class 2) that the schemaless
+   `TsonObjectReader`/`TsonDataParser` don't attempt on their own.
 
-Resolving and linking a schema both need its own *governing* schema already compiled, to resolve
-constructor names like `!enum`/`!integer_type` against — including meta-kernel itself, whose own
-`!!meta` names *itself* (§1.5's "one deliberate circularity in the series"), closed by pre-loading a
-hand-written bootstrap (`MetaKernelBootstrapResolver`) rather than resolving it the ordinary way.
-Fetching/registering/compiling a governing schema on demand is what `TsonCompiledSchemaLoader` exists for —
-still evolving, so not detailed here; see [CLAUDE.md](CLAUDE.md#architecture) for the full pipeline
-walkthrough, including how meta-kernel/meta.tn1/core.tn1 are loaded and registered together today.
+`Tson.builder().build()` wires all of this together for the standard library and hands you a `Tson`
+whose `resolve`/`compile` run the pipeline for you (as shown in the [reader table](#reading-tson-choosing-an-entry-point)'s
+schema example) — so you rarely touch the individual stages directly. Under the hood, resolving and
+linking a schema both need its own *governing* schema already compiled, to resolve constructor names
+like `!enum`/`!integer_type` against — including meta-kernel itself, whose own `!!meta` names *itself*
+(§1.5's "one deliberate circularity in the series"), closed by pre-loading a hand-written bootstrap
+(`MetaKernelBootstrapResolver`) rather than resolving it the ordinary way. See
+[CLAUDE.md](CLAUDE.md#architecture) for the full walkthrough, including how meta-kernel/meta.tn/core.tn
+are loaded and registered together.
 
-There's no polished, single-call "load the standard schema library" entry point yet (see
-[Not yet implemented](#not-yet-implemented)) — assembling meta-kernel/meta.tn1/core.tn1 through these
-stages currently has to be done by hand, the way the test suite itself does it.
+There's no polished, single-call "load a *custom* governing chain" entry point yet (see
+[BACKLOG.md](BACKLOG.md)) — `Tson` today assumes a schema governed by the standard
+meta-kernel/meta.tn/core.tn library.
 
 ## Conformance
 
@@ -209,7 +342,7 @@ is accepted as `!uri`'s actual contract for now. See `UriParser`'s Javadoc.
 **`RegexParser` accepts `java.util.regex.Pattern`'s own syntax, not a real RFC 9485 (I-Regexp) validator.**
 Not part of Part 1's published built-in vocabulary (`TextParser`/`RegexParser` are groundwork for Part 2,
 which doesn't yet have anything that consumes a `regex` constraint), but the same kind of conformance
-call as the `!uri` gap below: I-Regexp is a deliberately restricted, interoperable subset of a
+call as the `!uri` gap above: I-Regexp is a deliberately restricted, interoperable subset of a
 different regex dialect (roughly ECMA-262) than `java.util.regex`'s own Perl-derived syntax, and
 neither is a subset of the other. Writing an RFC 9485 validator from scratch is real, standalone work,
 not worth doing before anything actually needs it. See `RegexParser`'s Javadoc.
@@ -228,7 +361,7 @@ annotation to reach for any more than a schemaless reader has one to validate ag
 always write back as `!base64`, regardless of which of `base64`/`base64url`/`base32`/`hex` they were
 originally decoded from — that information doesn't survive decoding, so `!base64` is an arbitrary but
 reasonable default. Tuples write as plain arrays, with nothing marking them as tuples at all. Wire-format
-annotations captured via `@Annotated` (see above) aren't re-emitted yet.
+annotations captured via `@Annotated` aren't re-emitted yet.
 
 Ambiguities, inconsistencies, and errors in the spec text itself — as opposed to this implementation's own
 behavior at the edges — are tracked separately in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
@@ -244,6 +377,10 @@ behavior at the edges — are tracked separately in [SPEC-FEEDBACK.md](SPEC-FEED
 ./gradlew build
 ./gradlew test
 ```
+
+There's also a CLI (`tson-cli`): `tson validate --type <name> <schema> <data...>` and
+`tson compile <schema>`, with `--output text|json|tson`. Build it with `./gradlew :tson-cli:installDist`
+and run `tson-cli/build/install/tson-cli/bin/tson-cli`.
 
 ## Related
 

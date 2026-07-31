@@ -30,6 +30,7 @@ import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TypeRef;
 
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IdentityHashMap;
@@ -88,6 +89,17 @@ public class TsonDataParser {
     final Map<CoreValue, Position> positions = new IdentityHashMap<>();
 
     public TsonDataParser(String source) {
+        this.stream = new TsonDataStream(source);
+    }
+
+    /**
+     * Reads directly off {@code source}'s own bytes (UTF-8) -- for consistency with the rest of the
+     * read stack ({@link TsonDataStream}, {@code Lexer}, {@link TsonObjectReader}, {@link
+     * TsonReadContext}), all of which take an {@link InputStream}. Note the Tier 3 AST this builds is
+     * fully materialized regardless, so unlike those, this holds the whole {@code Document} in memory
+     * -- the {@code InputStream} only bounds the raw source-text buffering, not the tree.
+     */
+    public TsonDataParser(InputStream source) {
         this.stream = new TsonDataStream(source);
     }
 
