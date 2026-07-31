@@ -1,25 +1,14 @@
 # tson-java
 
-A Java implementation of [TSON](https://tson.io) (Typed Schema Object Notation) — a schema system with
-its own text notation, extending JSON with richer structural types, optional annotations and type
-annotations, and a layered resolution model that separates structural parsing from semantic
-interpretation.
-
-This is one implementation of an open specification, not the canonical one — anyone can implement TSON.
-Published under the [litterat](https://github.com/litterat) org, group id `io.ltr8`.
-
-> **New to TSON?** It's a superset of JSON's data model with two things JSON lacks: *type annotations*
-> on the wire (`!ipv4 192.0.2.10`, `!uuid …`, `!date 2026-01-15`) and a first-class *schema layer*.
-> A value can carry its own type (`!circle { radius: 5 }`), and separators are whitespace *or* commas,
-> so a record reads like `{ name: "Ada"  age: 30 }`. Everything below is about reading that into Java.
-
----
+A Java implementation of [TSON](https://tson.io) (Typed Schema Object Notation) — is a schema system with immutable, 
+hash-pinned schemas whose definitions are themselves data. A document names its schema, the schema names 
+its meta-schema; one hash verifies the whole chain. The finishing touch, TSON's data format is a 
+Unicode-first superset of JSON you'll actually enjoy writing. This is the first implementation of the specification.
 
 ## Getting started
 
-TSON's schema and data notation are new — the quickest way to get a feel for them is the `tson`
-command-line tool, no Java required. Requires **Java 25**, no external dependencies. Clone the repo,
-build and install the command, and put it on your `PATH`:
+The quickest way to get a feel for them is the `tson` command-line tool. Requires **Java 25**, no external dependencies.
+Clone the repo, build and install the command:
 
 ```
 git clone https://github.com/litterat/ltr8-io-tson-java.git
@@ -28,12 +17,10 @@ cd ltr8-io-tson-java
 export PATH="$PWD/tson-cli/build/install/tson/bin:$PATH"
 ```
 
-Java 25 is recent — if you don't have it, [SDKMAN!](https://sdkman.io) (`sdk install java 25-tem`)
-or an [Adoptium](https://adoptium.net/temurin/releases/?version=25) build is the quickest way to get
-it. Gradle itself needs no separate install: the checked-in `./gradlew` wrapper downloads the pinned
-version (Gradle 9.4.1) on first run.
+Need Java 25? Quick install via [SDKMAN!](https://sdkman.io) (`sdk install java 25-tem`) or 
+an [Adoptium](https://adoptium.net/temurin/releases/?version=25) build. 
 
-**`tson init-example`** scaffolds a working example — a schema and a matching data file — to start from:
+The `tson` command-line tool can be used to provide a working example, just run the init-example command: 
 
 ```
 $ tson init-example
@@ -44,8 +31,8 @@ Try it (the data names its own schema and type, so no --type is needed):
   …
 ```
 
-Here's the whole of `person.tn` — a TSON *schema*. If you've seen JSON, most of this reads the way you'd
-guess; the parts that don't are exactly what TSON adds:
+Here's the `person.tn` schema created. It show's a few of the basic schema features, including records, record groups,
+enums and some in-built types:
 
 ```tson
 !!id:"https://example.com/2026/32/getting-started/person-1.tn"
@@ -74,19 +61,7 @@ guess; the parts that don't are exactly what TSON adds:
 }
 ```
 
-Reading top to bottom, most of it is familiar and a few things are new:
-
-- **`role => !enum [admin member guest]`** — a named enum type: `role` is one of three fixed labels.
-- **`address => { … }`** — a named *record* type (a nested object shape), reused as a field type in
-  `person` below. Records are declared once and referenced by name.
-- **built-in types** — `uuid`, `text`, `int32`, `date` are part of TSON's own vocabulary (via the
-  imported `core.tn`); no need to model "a UUID" or "a date" as a string and validate it yourself.
-- **`email: text?`** — the `?` makes a field *optional*. Everything else is required.
-- **`skills: [text]`** — an array of text. `[T]` is array-of-`T`.
-- **`( phone: text | mobile: text )?`** — a *field group*: "at most one of these" (with `?`; drop the
-  `?` and it's "exactly one"). A record-level either/or with no JSON equivalent.
-
-And here's `person-data.tn`, a *data* document — an instance of that shape. It's *self-describing*: the
+And here's a corresponding  `person-data.tn`, *data* document. It's *self-describing*: the
 `!!schema` header names the schema it conforms to, and the leading `!person` says which type:
 
 ```tson
@@ -107,15 +82,8 @@ And here's `person-data.tn`, a *data* document — an instance of that shape. It
 }
 ```
 
-A few data-notation things to notice versus JSON: the document declares its own schema and type up
-front (`!!schema` + `!person`); values can carry their own *type annotation* on the wire (`!uuid …`,
-`!date …`); and separators are whitespace *or* commas — the array `[ mathematics analysis "computing"
-]` and the record fields need no commas at all. Note `email` is simply absent (it's optional), and
-only `mobile` is given, not `phone` (the group allows at most one).
-
 **`tson validate`** takes the files and validates the data. You pass both files; the data's `!!schema`
-selects `person.tn` (by its `!!id`) and its root `!person` selects the type, so you need no `--type`.
-(A data file with no `!!schema` is instead checked schemalessly — base syntax plus built-in types.)
+selects `person.tn` (by its `!!id`) and its root `!person` selects the type.
 
 ```
 $ tson validate person.tn person-data.tn
