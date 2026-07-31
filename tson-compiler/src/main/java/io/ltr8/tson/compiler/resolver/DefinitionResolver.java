@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler.resolver;
 
-import io.ltr8.bind.DataBindException;
+import io.ltr8.tson.compiler.TsonWriteException;
 import io.ltr8.tson.compiler.TsonDataParser;
 import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
@@ -422,7 +422,7 @@ final class DefinitionResolver {
         try {
             String sourceText = writer.toTson(sourceBody);
             return new TsonDataParser(sourceText).parseDocument().root().coreValue();
-        } catch (DataBindException e) {
+        } catch (TsonWriteException e) {
             throw new UnsupportedOperationException(
                     "'" + name + "': failed to re-serialize the refinement source: " + e.getMessage(), e);
         }

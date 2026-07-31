@@ -163,7 +163,9 @@ below.
 ### Writing TSON back out — `TsonObjectWriter`
 
 The read-side inverse of `TsonObjectReader`: a Java object to TSON text. Mainly a debugging aid, not a
-guaranteed-lossless serializer (see [Conformance](#conformance) for exactly where it's lossy):
+guaranteed-lossless serializer (see [Conformance](#conformance) for exactly where it's lossy). It
+throws unchecked `TsonWriteException` on failure, symmetric to the reader's `TsonReadException` — no
+checked exceptions on either side of the object-binding pair:
 
 ```java
 String text = new TsonObjectWriter().toTson(server);

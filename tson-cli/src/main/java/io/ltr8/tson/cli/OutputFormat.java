@@ -1,7 +1,7 @@
 package io.ltr8.tson.cli;
 
-import io.ltr8.bind.DataBindException;
 import io.ltr8.tson.compiler.TsonObjectWriter;
+import io.ltr8.tson.compiler.TsonWriteException;
 
 import java.util.Locale;
 import java.util.Optional;
@@ -114,7 +114,7 @@ enum OutputFormat {
                         + reread.getClass() + ", not ValidationReport");
             }
             return text;
-        } catch (DataBindException e) {
+        } catch (TsonWriteException e) {
             throw new IllegalStateException("failed to render this CLI's own diagnostics as TSON", e);
         }
     }

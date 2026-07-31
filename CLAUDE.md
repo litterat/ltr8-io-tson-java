@@ -544,10 +544,18 @@ schema resolution binds through the compiled reader now, not this).
   ever buffered, never the value body, so streaming isn't defeated. `EventSkip` (in `reader`) was
   made `public` so `TsonObjectReader` can reuse it for discard/skip navigation.
 
-`TsonObjectWriter.toTson(Object)` (the write side, unchanged by the streaming rewrite) is mainly a
-debugging tool rather than a guaranteed-lossless serializer (the integer family's exact width, a
-tuple's tuple-ness, and `@Annotated`-captured wire-format annotations are all documented, deliberate
-write-side losses — see `toTson`'s own Javadoc). Atom binding on the read side checks for a type-ref
+`TsonObjectWriter.toTson(Object)` (the write side, not streaming — it walks an in-memory object
+graph) is mainly a debugging tool rather than a guaranteed-lossless serializer (the integer family's
+exact width, a tuple's tuple-ness, and `@Annotated`-captured wire-format annotations are all
+documented, deliberate write-side losses — see `toTson`'s own Javadoc). **Throws unchecked
+`TsonWriteException` (2026-07-31, on the user's own direction), not checked `DataBindException`** — so
+the whole object-binding pair is symmetric: `read` throws unchecked `TsonReadException`, `toTson`
+throws unchecked `TsonWriteException`, and a caller writes neither a `throws` clause nor a try/catch
+for the common path. `toTson` catches `tson-bind`'s own `DataBindException` at its one public
+boundary and rethrows it wrapped (preserved as the cause); the internal `write*` methods keep
+throwing `DataBindException` unchanged. Its two real callers (`DefinitionResolver`'s atom-refinement
+re-serialization, `tson-cli`'s `OutputFormat`) both already caught the failure — retargeted to
+`TsonWriteException`. Atom binding on the read side checks for a type-ref
 first (`BuiltinTypeVocabulary`, §5) before falling through to plain `BaseTypeResolver` identification
 + `AtomBinder` binding for an untyped value — both paths share the same final narrowing step
 (`NumberNarrowing`) so a plain `42` and a `!uint8 42` bind identically regardless of which path found

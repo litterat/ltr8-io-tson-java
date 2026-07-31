@@ -111,15 +111,19 @@ public final class TsonObjectWriter {
      * <p>{@code @Annotated}-captured wire-format annotations are not re-emitted yet -- deferred to
      * a follow-up, not part of this first pass (values only).
      */
-    public String toTson(Object value) throws DataBindException {
-        TsonDataEmitter writer = new TsonDataEmitter();
-        if (value == null) {
-            writer.nullValue();
+    public String toTson(Object value) {
+        try {
+            TsonDataEmitter writer = new TsonDataEmitter();
+            if (value == null) {
+                writer.nullValue();
+                return writer.toString();
+            }
+            DataClass dataClass = context.getDescriptor(value.getClass());
+            write(value, dataClass, writer);
             return writer.toString();
+        } catch (DataBindException e) {
+            throw new TsonWriteException("cannot write " + value.getClass() + " as TSON: " + e.getMessage(), e);
         }
-        DataClass dataClass = context.getDescriptor(value.getClass());
-        write(value, dataClass, writer);
-        return writer.toString();
     }
 
     // ── Core dispatch ────────────────────────────────────────────────────
