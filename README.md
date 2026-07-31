@@ -368,6 +368,61 @@ annotations captured via `@Annotated` aren't re-emitted yet.
 Ambiguities, inconsistencies, and errors in the spec text itself — as opposed to this implementation's own
 behavior at the edges — are tracked separately in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
 
+## Command-line interface
+
+The `tson-cli` module is a small, zero-dependency CLI (ajv-cli-style) for checking TSON from the shell —
+no Java to write. Two commands: **`validate`** reads a data file against one type of a schema, and
+**`compile`** checks that a schema document itself resolves and compiles cleanly.
+
+Build and install it, then run the launcher:
+
+```
+./gradlew :tson-cli:installDist
+tson-cli/build/install/tson-cli/bin/tson-cli           # run with no arguments to print usage
+```
+
+(or, without installing, `./gradlew :tson-cli:run --args="compile schema.tn"`.) The examples below
+use `tson-cli` as shorthand for that launcher path.
+
+```
+tson-cli validate --type <name> [--output text|json|tson] <schema> <data...>
+tson-cli compile  [--output text|json|tson] <schema>
+```
+
+Given a schema `person.tn` and a data file `ada.tn`:
+
+```tson
+# person.tn
+!!id:"https://example.com/2026/32/app/person-1.tn"
+!!meta:"https://tson.io/2026/32/m/meta.tn"
+!!import:"https://tson.io/2026/32/m/core.tn"
+{
+    person => { name: text  age: int32 }
+}
+```
+
+```
+$ tson-cli validate --type person person.tn ada.tn        # ada.tn = { name: "Ada"  age: 30 }
+OK
+
+$ tson-cli validate --type person --output json person.tn bad.tn   # bad.tn = { age: 30 }
+{"valid":false,"errors":[{"path":"/name","code":"FIELD_REQUIRED",
+  "message":"missing required field 'name' for 'person'","expected":"a value for 'name'",
+  "actual":"(absent)","dataPosition":"1:1:0","schemaPosition":null}]}
+
+$ tson-cli compile person.tn
+OK
+```
+
+- **`--type`** (validate only) is required — a TSON schema declares many types, so you name which one
+  the data is read against. There's no `!!schema`-header auto-selection yet (see [Status](#status)).
+- **`--output`**: `text` (default, human-readable), `json` (for scripts/agents — the shape aligns with
+  Pydantic's own `errors()`), or `tson` (the diagnostics rendered as a real, schema-validated TSON
+  document — the CLI dogfooding the library).
+- **Exit codes** are Unix-conventional: `0` valid/compiled, `1` a real validation/compile failure,
+  `2` a usage error (bad arguments, an unreadable file) — so a script gets a clean pass/fail without
+  parsing prose. `validate` collects *every* problem in a file in one pass, not just the first.
+
 ## Requirements
 
 - Java 25
@@ -380,9 +435,7 @@ behavior at the edges — are tracked separately in [SPEC-FEEDBACK.md](SPEC-FEED
 ./gradlew test
 ```
 
-There's also a CLI (`tson-cli`): `tson validate --type <name> <schema> <data...>` and
-`tson compile <schema>`, with `--output text|json|tson`. Build it with `./gradlew :tson-cli:installDist`
-and run `tson-cli/build/install/tson-cli/bin/tson-cli`.
+For the command-line tool, see [Command-line interface](#command-line-interface) above.
 
 ## Related
 
