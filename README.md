@@ -164,6 +164,10 @@ class *reflectively* (the class is the schema); `TsonValueReader` checks it agai
 document*. Both stream their input — a large document is never fully buffered before reading begins —
 and both accept a `String` or an `InputStream`.
 
+> **Want to try this without a project or build tool?** [`examples/`](examples/) has runnable
+> single-file Java 25 programs that load the library over the module system — `./gradlew :tson:modules`,
+> then `java --module-path tson/build/modules --add-modules io.ltr8.tson examples/ObjectBinding.java`.
+
 ### 1. Bind to a Java class — `TsonObjectReader`
 
 Schemaless (Class 1). Records, `Map<K, V>`, `List<E>`, tuples, plain enums, sealed-interface unions,
