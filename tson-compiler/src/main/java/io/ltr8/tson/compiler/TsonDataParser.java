@@ -36,6 +36,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.BiConsumer;
 
 /**
  * Tier 3: builds a full {@code Document} AST (§2, §3, §7.4) by pulling {@link TsonEvent}s from a
@@ -108,22 +109,22 @@ public class TsonDataParser {
         }
         DocumentStart start = (DocumentStart) all.get(0);
         List<TsonEvent> rootEvents = all.subList(1, all.size() - 1); // trims the trailing DocumentEnd
-        DataValue root = new EventReducer(rootEvents).dataValue();
+        DataValue root = new EventReducer(rootEvents, positions::put).dataValue();
         return new Document(start.id(), start.schema(), root);
     }
 
     // ── Shared data-grammar entry points, reused by TsonSchemaParser ────────────────────
 
     DataValue parseDataValue() {
-        return new EventReducer(stream.nextDataValueEvents()).dataValue();
+        return new EventReducer(stream.nextDataValueEvents(), positions::put).dataValue();
     }
 
     CoreValue parseCoreValue() {
-        return new EventReducer(stream.nextCoreValueEvents()).coreValue();
+        return new EventReducer(stream.nextCoreValueEvents(), positions::put).coreValue();
     }
 
     Annotation parseAnnotation() {
-        return new EventReducer(stream.nextAnnotationEvents()).annotation();
+        return new EventReducer(stream.nextAnnotationEvents(), positions::put).annotation();
     }
 
     String parseNamedDirective(String expectedName) {
@@ -189,13 +190,23 @@ public class TsonDataParser {
      * threading a {@link Token}'s position through by hand the way the old, pre-streaming
      * recursive-descent parser did.
      */
-    private final class EventReducer {
+    /**
+     * Package-private and {@code static} (rather than a private inner class) so {@link
+     * TsonObjectReader} can reuse it to reduce a bounded event list -- e.g. one value's own captured
+     * wire annotations -- back into an {@code ast} subtree, without duplicating this reduction. Its
+     * one dependency on an enclosing parser, recording each core-value's own source position, is
+     * passed in as {@code recorder} instead: {@link TsonDataParser} supplies its own {@link
+     * #positions} map; a caller that doesn't track positions passes a no-op.
+     */
+    static final class EventReducer {
 
         private final List<TsonEvent> events;
+        private final BiConsumer<CoreValue, Position> recorder;
         private int pos;
 
-        EventReducer(List<TsonEvent> events) {
+        EventReducer(List<TsonEvent> events, BiConsumer<CoreValue, Position> recorder) {
             this.events = events;
+            this.recorder = recorder;
         }
 
         DataValue dataValue() {
@@ -224,15 +235,17 @@ public class TsonDataParser {
         CoreValue coreValue() {
             TsonEvent e = events.get(pos++);
             Position position = e.position();
-            return switch (e) {
-                case TokenEvent t -> recordPosition(new TokenValue(t.text(), t.form()), position);
-                case AbsentEvent ignored -> recordPosition(new AbsentValue(), position);
-                case EmptyBraceEvent ignored -> recordPosition(new EmptyBrace(), position);
-                case RecordStart ignored -> recordPosition(record(), position);
-                case MapStart ignored -> recordPosition(map(), position);
-                case ArrayStart ignored -> recordPosition(array(), position);
+            CoreValue value = switch (e) {
+                case TokenEvent t -> new TokenValue(t.text(), t.form());
+                case AbsentEvent ignored -> new AbsentValue();
+                case EmptyBraceEvent ignored -> new EmptyBrace();
+                case RecordStart ignored -> record();
+                case MapStart ignored -> map();
+                case ArrayStart ignored -> array();
                 default -> throw new IllegalStateException("unexpected event reducing a core-value: " + e);
             };
+            recorder.accept(value, position);
+            return value;
         }
 
         private RecordValue record() {

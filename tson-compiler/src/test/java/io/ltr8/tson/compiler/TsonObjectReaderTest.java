@@ -49,13 +49,13 @@ class TsonObjectReaderTest {
 
     @Test
     void simpleRecord() throws DataBindException {
-        Point p = mapper.toObject("{ x: 1 y: 2 }", Point.class);
+        Point p = mapper.read("{ x: 1 y: 2 }", Point.class);
         assertEquals(new Point(1, 2), p);
     }
 
     @Test
     void recordFieldOrderInSourceDoesNotMatterMatchedByName() throws DataBindException {
-        Point p = mapper.toObject("{ y: 2 x: 1 }", Point.class);
+        Point p = mapper.read("{ y: 2 x: 1 }", Point.class);
         assertEquals(new Point(1, 2), p);
     }
 
@@ -67,7 +67,7 @@ class TsonObjectReaderTest {
 
     @Test
     void nestedRecord() throws DataBindException {
-        Order o = mapper.toObject("""
+        Order o = mapper.read("""
                 { orderId: 1042 customer: { name: "Ada Lovelace" email: "ada@example.com" } }
                 """, Order.class);
         assertEquals(1042, o.orderId());
@@ -80,32 +80,32 @@ class TsonObjectReaderTest {
 
     @Test
     void missingOptionalFieldBindsToEmpty() throws DataBindException {
-        WithOptional w = mapper.toObject("{ required: 1 }", WithOptional.class);
+        WithOptional w = mapper.read("{ required: 1 }", WithOptional.class);
         assertEquals(1, w.required());
         assertTrue(w.nickname().isEmpty());
     }
 
     @Test
     void absentSentinelBindsSameAsMissingForOptionalField() throws DataBindException {
-        WithOptional w = mapper.toObject("{ required: 1 nickname: _ }", WithOptional.class);
+        WithOptional w = mapper.read("{ required: 1 nickname: _ }", WithOptional.class);
         assertTrue(w.nickname().isEmpty());
     }
 
     @Test
     void presentOptionalFieldBindsToValue() throws DataBindException {
-        WithOptional w = mapper.toObject("{ required: 1 nickname: \"Ada\" }", WithOptional.class);
+        WithOptional w = mapper.read("{ required: 1 nickname: \"Ada\" }", WithOptional.class);
         assertEquals("Ada", w.nickname().orElseThrow());
     }
 
     @Test
     void missingRequiredFieldThrows() throws DataBindException {
-        assertThrows(DataBindException.class, () -> mapper.toObject("{ y: 2 }", Point.class));
+        assertThrows(TsonReadException.class, () -> mapper.read("{ y: 2 }", Point.class));
     }
 
     @Test
     void duplicateFieldNameLastValueWins() throws DataBindException {
         // §2.5: "If duplicate field names are present, the last value wins."
-        Point p = mapper.toObject("{ x: 1 x: 99 y: 2 }", Point.class);
+        Point p = mapper.read("{ x: 1 x: 99 y: 2 }", Point.class);
         assertEquals(99, p.x());
     }
 
@@ -114,7 +114,7 @@ class TsonObjectReaderTest {
 
     @Test
     void fieldAnnotationRenamesBoundField() throws DataBindException {
-        Renamed r = mapper.toObject("{ xx: 1 yy: 2 }", Renamed.class);
+        Renamed r = mapper.read("{ xx: 1 yy: 2 }", Renamed.class);
         assertEquals(1, r.x());
         assertEquals(2, r.y());
     }
@@ -124,7 +124,7 @@ class TsonObjectReaderTest {
 
     @Test
     void emptyBraceBindsAsRecordWithNoRequiredFields() throws DataBindException {
-        EmptyBraceRecord r = mapper.toObject("{}", EmptyBraceRecord.class);
+        EmptyBraceRecord r = mapper.read("{}", EmptyBraceRecord.class);
         assertTrue(r.a().isEmpty());
         assertTrue(r.b().isEmpty());
     }
@@ -136,7 +136,7 @@ class TsonObjectReaderTest {
 
     @Test
     void annotatedComponentReceivesTheValuesOwnAnnotations() throws DataBindException {
-        AnnotatedItem item = mapper.toObject("@doc:\"a widget\" { name: Widget }", AnnotatedItem.class);
+        AnnotatedItem item = mapper.read("@doc:\"a widget\" { name: Widget }", AnnotatedItem.class);
         assertEquals("Widget", item.name());
         Annotation doc = item.meta().get("doc").orElseThrow();
         TokenValue text = (TokenValue) doc.value().orElseThrow().coreValue();
@@ -145,7 +145,7 @@ class TsonObjectReaderTest {
 
     @Test
     void annotatedComponentIsEmptyWhenTheValueHasNoAnnotations() throws DataBindException {
-        AnnotatedItem item = mapper.toObject("{ name: Widget }", AnnotatedItem.class);
+        AnnotatedItem item = mapper.read("{ name: Widget }", AnnotatedItem.class);
         assertTrue(item.meta().values().isEmpty());
     }
 
@@ -153,7 +153,7 @@ class TsonObjectReaderTest {
     void annotatedComponentPreservesRepeatedAnnotationsInSourceOrder() throws DataBindException {
         // §3.1: "An annotation name MAY appear any number of times on a single value; all
         // occurrences are preserved in source order."
-        AnnotatedItem item = mapper.toObject("@tag:one @tag:two { name: Widget }", AnnotatedItem.class);
+        AnnotatedItem item = mapper.read("@tag:one @tag:two { name: Widget }", AnnotatedItem.class);
         List<Annotation> tags = item.meta().getAll("tag");
         assertEquals(2, tags.size());
         assertEquals("one", ((TokenValue) tags.get(0).value().orElseThrow().coreValue()).text());
@@ -165,7 +165,7 @@ class TsonObjectReaderTest {
         // Deliberate scope limit: @Annotated only recovers the enclosing value's own annotations,
         // not a field value's -- a bare String field has nowhere in Java to carry its own
         // annotations (see SPEC-FEEDBACK.md).
-        AnnotatedItem item = mapper.toObject("{ name: @deprecated Widget }", AnnotatedItem.class);
+        AnnotatedItem item = mapper.read("{ name: @deprecated Widget }", AnnotatedItem.class);
         assertTrue(item.meta().values().isEmpty());
     }
 
@@ -174,8 +174,8 @@ class TsonObjectReaderTest {
 
     @Test
     void annotatedComponentMustBeOfTypeTsonAnnotations() {
-        assertThrows(DataBindException.class,
-                () -> mapper.toObject("{ name: Widget meta: x }", BadCarrierType.class));
+        assertThrows(TsonReadException.class,
+                () -> mapper.read("{ name: Widget meta: x }", BadCarrierType.class));
     }
 
     public record TwoCarriers(@Annotated TsonAnnotations a, @Annotated TsonAnnotations b, String name) {
@@ -183,7 +183,7 @@ class TsonObjectReaderTest {
 
     @Test
     void atMostOneAnnotatedComponentAllowed() {
-        assertThrows(DataBindException.class, () -> mapper.toObject("{ name: Widget }", TwoCarriers.class));
+        assertThrows(TsonReadException.class, () -> mapper.read("{ name: Widget }", TwoCarriers.class));
     }
 
     // ── Arrays ───────────────────────────────────────────────────────────
@@ -193,7 +193,7 @@ class TsonObjectReaderTest {
 
     @Test
     void listOfRecords() throws DataBindException {
-        Items items = mapper.toObject("{ points: [ { x: 1 y: 2 } { x: 3 y: 4 } ] }", Items.class);
+        Items items = mapper.read("{ points: [ { x: 1 y: 2 } { x: 3 y: 4 } ] }", Items.class);
         assertEquals(2, items.points().size());
         assertEquals(new Point(1, 2), items.points().get(0));
         assertEquals(new Point(3, 4), items.points().get(1));
@@ -204,7 +204,7 @@ class TsonObjectReaderTest {
 
     @Test
     void primitiveIntArray() throws DataBindException {
-        IntArrayHolder h = mapper.toObject("{ values: [1 2 3] }", IntArrayHolder.class);
+        IntArrayHolder h = mapper.read("{ values: [1 2 3] }", IntArrayHolder.class);
         assertEquals(3, h.values().length);
         assertEquals(2, h.values()[1]);
     }
@@ -214,7 +214,7 @@ class TsonObjectReaderTest {
 
     @Test
     void emptyArray() throws DataBindException {
-        StringListHolder h = mapper.toObject("{ tags: [] }", StringListHolder.class);
+        StringListHolder h = mapper.read("{ tags: [] }", StringListHolder.class);
         assertTrue(h.tags().isEmpty());
     }
 
@@ -225,7 +225,7 @@ class TsonObjectReaderTest {
 
     @Test
     void mapOfStringToInt() throws DataBindException {
-        CountsHolder h = mapper.toObject("{ counts: { apples => 3 pears => 5 } }", CountsHolder.class);
+        CountsHolder h = mapper.read("{ counts: { apples => 3 pears => 5 } }", CountsHolder.class);
         assertEquals(2, h.counts().size());
         assertEquals(3, h.counts().get("apples"));
         assertEquals(5, h.counts().get("pears"));
@@ -236,7 +236,7 @@ class TsonObjectReaderTest {
 
     @Test
     void mapOfStringToRecord() throws DataBindException {
-        LocationsHolder h = mapper.toObject(
+        LocationsHolder h = mapper.read(
                 "{ locations: { origin => { x: 0 y: 0 } target => { x: 3 y: 4 } } }", LocationsHolder.class);
         assertEquals(2, h.locations().size());
         assertEquals(new Point(0, 0), h.locations().get("origin"));
@@ -245,7 +245,7 @@ class TsonObjectReaderTest {
 
     @Test
     void emptyMap() throws DataBindException {
-        CountsHolder h = mapper.toObject("{ counts: {} }", CountsHolder.class);
+        CountsHolder h = mapper.read("{ counts: {} }", CountsHolder.class);
         assertTrue(h.counts().isEmpty());
     }
 
@@ -253,7 +253,7 @@ class TsonObjectReaderTest {
     void mapDuplicateKeyLastValueWins() throws DataBindException {
         // §2.6: "last value wins" for a duplicate map key, the same rule §2.5 gives record fields --
         // falls out for free here from repeated put() calls in source order.
-        CountsHolder h = mapper.toObject("{ counts: { apples => 3 apples => 7 } }", CountsHolder.class);
+        CountsHolder h = mapper.read("{ counts: { apples => 3 apples => 7 } }", CountsHolder.class);
         assertEquals(1, h.counts().size());
         assertEquals(7, h.counts().get("apples"));
     }
@@ -263,14 +263,14 @@ class TsonObjectReaderTest {
         // §2.9: "_" MUST NOT appear as a map key -- a resolver-layer constraint, not a grammar
         // one, so the compiler itself accepts { _ => 1 } (see TsonDataParserTest); toMap is where it's
         // actually rejected.
-        assertThrows(DataBindException.class, () -> mapper.toObject("{ counts: { _ => 3 } }", CountsHolder.class));
+        assertThrows(TsonReadException.class, () -> mapper.read("{ counts: { _ => 3 } }", CountsHolder.class));
     }
 
     @Test
     void mapAllowsAbsentSentinelAsValue() throws DataBindException {
         // §2.9 only restricts the key position -- a value of "_" is legitimately "present with
         // an absent value" (distinct from the entry not existing at all), so this must still bind.
-        CountsHolder h = mapper.toObject("{ counts: { apples => _ } }", CountsHolder.class);
+        CountsHolder h = mapper.read("{ counts: { apples => _ } }", CountsHolder.class);
         assertEquals(1, h.counts().size());
         assertNull(h.counts().get("apples"));
     }
@@ -282,7 +282,7 @@ class TsonObjectReaderTest {
     void mapOfIntegerToString() throws DataBindException {
         // §2.6: a map key is a full data-value, not just a string token -- bound recursively the
         // same way a value is, so a non-string key works with no map-specific code at all.
-        ByIdHolder h = mapper.toObject("{ names: { 1 => Alice 2 => Bob } }", ByIdHolder.class);
+        ByIdHolder h = mapper.read("{ names: { 1 => Alice 2 => Bob } }", ByIdHolder.class);
         assertEquals(2, h.names().size());
         assertEquals("Alice", h.names().get(1));
         assertEquals("Bob", h.names().get(2));
@@ -295,7 +295,7 @@ class TsonObjectReaderTest {
     void mapOfUuidToString() throws DataBindException {
         // A key type that itself needs a type-ref to resolve (!uuid isn't the default token
         // resolution) still binds correctly -- the key's own DataValue carries its own annotation.
-        ByUuidHolder h = mapper.toObject(
+        ByUuidHolder h = mapper.read(
                 "{ owners: { !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09 => \"Alice\" } }", ByUuidHolder.class);
         assertEquals(1, h.owners().size());
         assertEquals("Alice", h.owners().get(UUID.fromString("9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09")));
@@ -313,7 +313,7 @@ class TsonObjectReaderTest {
     @Test
     void tupleBindsFromAnArrayPositionally() throws DataBindException {
         // A tuple is array-shaped on the wire, unlike an ordinary named-field record.
-        PersonHolder h = mapper.toObject("{ person: [ Alice 30 ] }", PersonHolder.class);
+        PersonHolder h = mapper.read("{ person: [ Alice 30 ] }", PersonHolder.class);
         assertEquals(new NameAndAge("Alice", 30), h.person());
     }
 
@@ -321,15 +321,15 @@ class TsonObjectReaderTest {
     void tupleRejectsRecordSyntax() throws DataBindException {
         // { name: ... age: ... } is a TSON record, not an array -- @Tuple binds positionally from
         // an ArrayValue only.
-        assertThrows(DataBindException.class,
-                () -> mapper.toObject("{ person: { name: Alice age: 30 } }", PersonHolder.class));
+        assertThrows(TsonReadException.class,
+                () -> mapper.read("{ person: { name: Alice age: 30 } }", PersonHolder.class));
     }
 
     @Test
     void tupleRejectsWrongArity() throws DataBindException {
-        assertThrows(DataBindException.class, () -> mapper.toObject("{ person: [ Alice ] }", PersonHolder.class));
-        assertThrows(DataBindException.class,
-                () -> mapper.toObject("{ person: [ Alice 30 extra ] }", PersonHolder.class));
+        assertThrows(TsonReadException.class, () -> mapper.read("{ person: [ Alice ] }", PersonHolder.class));
+        assertThrows(TsonReadException.class,
+                () -> mapper.read("{ person: [ Alice 30 extra ] }", PersonHolder.class));
     }
 
     public record NestedTuple(NameAndAge a, NameAndAge b) {
@@ -339,7 +339,7 @@ class TsonObjectReaderTest {
     void tupleElementsBindRecursively() throws DataBindException {
         // A tuple slot's own type is bound the same way any other DataClass is -- here, nested
         // tuples-of-tuples.
-        NestedTuple h = mapper.toObject("{ a: [ Alice 30 ] b: [ Bob 25 ] }", NestedTuple.class);
+        NestedTuple h = mapper.read("{ a: [ Alice 30 ] b: [ Bob 25 ] }", NestedTuple.class);
         assertEquals(new NameAndAge("Alice", 30), h.a());
         assertEquals(new NameAndAge("Bob", 25), h.b());
     }
@@ -351,14 +351,14 @@ class TsonObjectReaderTest {
 
     @Test
     void booleanAndStringAtoms() throws DataBindException {
-        Flags f = mapper.toObject("{ active: true label: GOLD }", Flags.class);
+        Flags f = mapper.read("{ active: true label: GOLD }", Flags.class);
         assertTrue(f.active());
         assertEquals("GOLD", f.label());
     }
 
     @Test
     void quotedTokenAlwaysBindsAsString() throws DataBindException {
-        Flags f = mapper.toObject("{ active: true label: \"true\" }", Flags.class);
+        Flags f = mapper.read("{ active: true label: \"true\" }", Flags.class);
         assertEquals("true", f.label());
     }
 
@@ -367,7 +367,7 @@ class TsonObjectReaderTest {
 
     @Test
     void nullKeywordBindsToJavaNull() throws DataBindException {
-        Nullable n = mapper.toObject("{ text: null }", Nullable.class);
+        Nullable n = mapper.read("{ text: null }", Nullable.class);
         assertNull(n.text());
     }
 
@@ -376,7 +376,7 @@ class TsonObjectReaderTest {
 
     @Test
     void cannotBindNullToPrimitive() throws DataBindException {
-        assertThrows(DataBindException.class, () -> mapper.toObject("{ x: null }", RequiresInt.class));
+        assertThrows(TsonReadException.class, () -> mapper.read("{ x: null }", RequiresInt.class));
     }
 
     // ── Atoms: enums (EnumStringBridge) ──────────────────────────────────
@@ -389,21 +389,21 @@ class TsonObjectReaderTest {
 
     @Test
     void enumBindsViaEnumStringBridge() throws DataBindException {
-        Paint p = mapper.toObject("{ color: RED }", Paint.class);
+        Paint p = mapper.read("{ color: RED }", Paint.class);
         assertEquals(Color.RED, p.color());
     }
 
     @Test
     void enumRoundTripsThroughEveryMember() throws DataBindException {
         for (Color c : Color.values()) {
-            Paint p = mapper.toObject("{ color: " + c.name() + " }", Paint.class);
+            Paint p = mapper.read("{ color: " + c.name() + " }", Paint.class);
             assertEquals(c, p.color());
         }
     }
 
     @Test
     void unrecognizedEnumMemberThrows() throws DataBindException {
-        assertThrows(DataBindException.class, () -> mapper.toObject("{ color: PURPLE }", Paint.class));
+        assertThrows(TsonReadException.class, () -> mapper.read("{ color: PURPLE }", Paint.class));
     }
 
     public record UnannotatedColorHolder(UnannotatedColor color) {
@@ -415,7 +415,7 @@ class TsonObjectReaderTest {
     void enumWithoutAtomAnnotationBindsViaEnumStringBridge() throws DataBindException {
         // DefaultClassBinder auto-detects Class#isEnum() the same way it does isRecord()/isArray()
         // -- no @Atom needed, same default EnumStringBridge (by name()) as an annotated enum gets.
-        UnannotatedColorHolder h = mapper.toObject("{ color: RED }", UnannotatedColorHolder.class);
+        UnannotatedColorHolder h = mapper.read("{ color: RED }", UnannotatedColorHolder.class);
         assertEquals(UnannotatedColor.RED, h.color());
     }
 
@@ -426,7 +426,7 @@ class TsonObjectReaderTest {
 
     @Test
     void numericTargetTypesAllBindFromPlainIntegerToken() throws DataBindException {
-        Numbers n = mapper.toObject(
+        Numbers n = mapper.read(
                 "{ i: 42 l: 42 d: 42 bi: 42 bd: 42 }", Numbers.class);
         assertEquals(42, n.i());
         assertEquals(42L, n.l());
@@ -441,8 +441,8 @@ class TsonObjectReaderTest {
     @Test
     void hexAndDecimalRepresentationsBindEqually() throws DataBindException {
         // §4.3 equivalence: 255 and 0xFF must resolve to equal values.
-        assertEquals(255, mapper.toObject("{ value: 255 }", HexInt.class).value());
-        assertEquals(255, mapper.toObject("{ value: 0xFF }", HexInt.class).value());
+        assertEquals(255, mapper.read("{ value: 255 }", HexInt.class).value());
+        assertEquals(255, mapper.read("{ value: 0xFF }", HexInt.class).value());
     }
 
     public record UnderscoreInt(int value) {
@@ -450,7 +450,7 @@ class TsonObjectReaderTest {
 
     @Test
     void underscoreSeparatedDigitsBindCorrectly() throws DataBindException {
-        assertEquals(1_000_000, mapper.toObject("{ value: 1_000_000 }", UnderscoreInt.class).value());
+        assertEquals(1_000_000, mapper.read("{ value: 1_000_000 }", UnderscoreInt.class).value());
     }
 
     public record SignedInt(int value) {
@@ -458,7 +458,7 @@ class TsonObjectReaderTest {
 
     @Test
     void negativeIntegerBinds() throws DataBindException {
-        assertEquals(-42, mapper.toObject("{ value: -42 }", SignedInt.class).value());
+        assertEquals(-42, mapper.read("{ value: -42 }", SignedInt.class).value());
     }
 
     public record DoubleHolder(double value) {
@@ -466,7 +466,7 @@ class TsonObjectReaderTest {
 
     @Test
     void floatFormBindsToDouble() throws DataBindException {
-        assertEquals(199.90, mapper.toObject("{ value: 199.90 }", DoubleHolder.class).value(), 0.0001);
+        assertEquals(199.90, mapper.read("{ value: 199.90 }", DoubleHolder.class).value(), 0.0001);
     }
 
     public record IntHolder(int value) {
@@ -474,7 +474,7 @@ class TsonObjectReaderTest {
 
     @Test
     void floatFormCannotBindToIntegralType() throws DataBindException {
-        assertThrows(DataBindException.class, () -> mapper.toObject("{ value: 199.90 }", IntHolder.class));
+        assertThrows(TsonReadException.class, () -> mapper.read("{ value: 199.90 }", IntHolder.class));
     }
 
     public record ByteHolder(byte value) {
@@ -482,7 +482,7 @@ class TsonObjectReaderTest {
 
     @Test
     void overflowingIntegerThrows() throws DataBindException {
-        assertThrows(DataBindException.class, () -> mapper.toObject("{ value: 1000 }", ByteHolder.class));
+        assertThrows(TsonReadException.class, () -> mapper.read("{ value: 1000 }", ByteHolder.class));
     }
 
     public record DoublePair(double a, double b) {
@@ -490,7 +490,7 @@ class TsonObjectReaderTest {
 
     @Test
     void infinityAndNanBindToDouble() throws DataBindException {
-        DoublePair p = mapper.toObject("{ a: .inf b: .nan }", DoublePair.class);
+        DoublePair p = mapper.read("{ a: .inf b: .nan }", DoublePair.class);
         assertEquals(Double.POSITIVE_INFINITY, p.a());
         assertTrue(Double.isNaN(p.b()));
     }
@@ -500,7 +500,7 @@ class TsonObjectReaderTest {
 
     @Test
     void negativeInfinityBindsToDouble() throws DataBindException {
-        assertEquals(Double.NEGATIVE_INFINITY, mapper.toObject("{ value: -.inf }", NegInf.class).value());
+        assertEquals(Double.NEGATIVE_INFINITY, mapper.read("{ value: -.inf }", NegInf.class).value());
     }
 
     // ── Built-in type vocabulary (§5) ───────────────────────────────────────
@@ -509,7 +509,7 @@ class TsonObjectReaderTest {
     void unannotatedTargetTypeStillBindsAsBefore() throws DataBindException {
         // No !type-ref present at all -- falls through to plain BaseTypeResolver/AtomBinder,
         // unaffected by the built-in vocabulary path existing.
-        assertEquals(42, mapper.toObject("{ value: 42 }", IntHolder.class).value());
+        assertEquals(42, mapper.read("{ value: 42 }", IntHolder.class).value());
     }
 
     @Test
@@ -518,45 +518,45 @@ class TsonObjectReaderTest {
         // Class 1 processing step (tson-compiler), not this binding layer -- an unresolvable
         // annotation on a value we're actively binding to a declared type is treated as an error,
         // so a typo doesn't silently disable the validation the author intended.
-        assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !notabuiltin 42 }", IntHolder.class));
+        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !notabuiltin 42 }", IntHolder.class));
     }
 
     @Test
     void caseSensitiveTypoOfABuiltinNameIsRejectedRatherThanSilentlyUnvalidated() throws DataBindException {
         // §5.1: "Annotation names are case-sensitive." !Int32 is not !int32.
-        assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !Int32 42 }", IntHolder.class));
+        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !Int32 42 }", IntHolder.class));
     }
 
     @Test
     void builtinIntegerAnnotationBindsDirectlyToTheDeclaredTarget() throws DataBindException {
         // !uint8's own contract (0..255) is checked, then narrowed straight to the declared int
         // field -- no intermediate natural-width value.
-        assertEquals(200, mapper.toObject("{ value: !uint8 200 }", IntHolder.class).value());
+        assertEquals(200, mapper.read("{ value: !uint8 200 }", IntHolder.class).value());
     }
 
     @Test
     void builtinIntegerAnnotationValidatesAgainstItsOwnRangeNotJustTheTarget() throws DataBindException {
         // 300 would fit comfortably in an int field, but uint8's own declared range rejects it --
         // the built-in vocabulary's constraint applies regardless of how wide the target is.
-        assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !uint8 300 }", IntHolder.class));
+        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !uint8 300 }", IntHolder.class));
     }
 
     @Test
     void builtinIntegerAnnotationRejectsATargetNarrowerThanItsOwnGuarantee() throws DataBindException {
         // int32 guarantees up to 2^31-1; a byte target can't hold 200 even though 200 alone would
         // satisfy int32's own range.
-        assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !int32 200 }", ByteHolder.class));
+        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !int32 200 }", ByteHolder.class));
     }
 
     @Test
     void unsignedNegativeValueParsesThenFailsValidationThroughTheMapper() throws DataBindException {
         // §5.6: "the range constraint, not the lexer, enforces unsignedness" -- exercised end to end.
-        assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !uint32 -10 }", IntHolder.class));
+        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !uint32 -10 }", IntHolder.class));
     }
 
     @Test
     void nonIntegerTokenUnderAnIntegerAnnotationIsAParseErrorThroughTheMapper() throws DataBindException {
-        assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !int32 3.14 }", IntHolder.class));
+        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !int32 3.14 }", IntHolder.class));
     }
 
     public record WideInt(long value) {
@@ -565,7 +565,7 @@ class TsonObjectReaderTest {
     @Test
     void extendedIntegerFamilyWidthsAreReachableThroughTheMapper() throws DataBindException {
         // SPEC-FEEDBACK.md #6: int16 isn't in §5.6's published table but is implemented anyway.
-        assertEquals(30000L, mapper.toObject("{ value: !int16 30000 }", WideInt.class).value());
+        assertEquals(30000L, mapper.read("{ value: !int16 30000 }", WideInt.class).value());
     }
 
     public record DecimalHolder(BigDecimal value) {
@@ -574,18 +574,18 @@ class TsonObjectReaderTest {
     @Test
     void builtinNumberAnnotationPreservesExactValueThroughTheMapper() throws DataBindException {
         // !number is the exact tier -- 199.90's trailing zero survives, unlike a double round-trip.
-        assertEquals(new BigDecimal("199.90"), mapper.toObject("{ value: !number 199.90 }", DecimalHolder.class).value());
+        assertEquals(new BigDecimal("199.90"), mapper.read("{ value: !number 199.90 }", DecimalHolder.class).value());
     }
 
     @Test
     void builtinNumberAnnotationRejectsSpecialValuesThroughTheMapper() throws DataBindException {
         // §5.6: "!number, being exact, does not accept the special values."
-        assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !number .inf }", DecimalHolder.class));
+        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !number .inf }", DecimalHolder.class));
     }
 
     @Test
     void builtinFloat32AnnotationBindsThroughTheMapper() throws DataBindException {
-        assertEquals(3.14f, mapper.toObject("{ value: !float32 3.14 }", FloatHolder.class).value());
+        assertEquals(3.14f, mapper.read("{ value: !float32 3.14 }", FloatHolder.class).value());
     }
 
     public record FloatHolder(float value) {
@@ -594,13 +594,13 @@ class TsonObjectReaderTest {
     @Test
     void builtinFloat64AnnotationAcceptsHexFloatThroughTheMapper() throws DataBindException {
         // 0x1.8p3 = 1.5 * 2^3 = 12.0 -- only reachable through the typed atom, never base resolution.
-        assertEquals(12.0, mapper.toObject("{ value: !float64 0x1.8p3 }", DoubleHolder.class).value());
+        assertEquals(12.0, mapper.read("{ value: !float64 0x1.8p3 }", DoubleHolder.class).value());
     }
 
     @Test
     void builtinFloat64AnnotationRejectsBasedIntegerThroughTheMapper() throws DataBindException {
         // §5.6: float atoms accept integer/float/hex-float/special-value, not based-integer.
-        assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !float64 0xFF }", DoubleHolder.class));
+        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !float64 0xFF }", DoubleHolder.class));
     }
 
     // ── UUID (§5.5) ──────────────────────────────────────────────────────
@@ -614,14 +614,14 @@ class TsonObjectReaderTest {
         // tson-bind's record auto-detection -- but it also can't self-declare @Atom (it's a JDK
         // class), so TsonObjectReader's default DataBindContext pre-registers it (see
         // TsonAtomContext.defaultContext()) rather than requiring every caller to do so themselves.
-        UuidHolder h = mapper.toObject("{ value: !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09 }", UuidHolder.class);
+        UuidHolder h = mapper.read("{ value: !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09 }", UuidHolder.class);
         assertEquals(UUID.fromString("9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09"), h.value());
     }
 
     @Test
     void builtinUuidAnnotationRejectsMalformedUuidThroughTheMapper() throws DataBindException {
         // UUID.fromString itself would accept "1-2-3-4-5" -- UuidParser's own shape check must not.
-        assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !uuid 1-2-3-4-5 }", UuidHolder.class));
+        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !uuid 1-2-3-4-5 }", UuidHolder.class));
     }
 
     // ── URI (§5.5) ───────────────────────────────────────────────────────
@@ -636,7 +636,7 @@ class TsonObjectReaderTest {
         // context pre-registers it the same way it does UUID/LocalDate. Quoted because ':' '/' '?'
         // '=' are not legal unquoted-token characters (§7.2) -- the URI value itself is unaffected
         // by that, it's a lexer-layer constraint, not a UriParser one.
-        UriHolder h = mapper.toObject("{ value: !uri \"https://example.com/a/b?x=1\" }", UriHolder.class);
+        UriHolder h = mapper.read("{ value: !uri \"https://example.com/a/b?x=1\" }", UriHolder.class);
         assertEquals(URI.create("https://example.com/a/b?x=1"), h.value());
     }
 
@@ -644,7 +644,7 @@ class TsonObjectReaderTest {
     void builtinUriAnnotationRejectsMalformedUriThroughTheMapper() throws DataBindException {
         // An unescaped space is not valid anywhere in a URI -- java.net.URI itself rejects it, so
         // this is really exercising the mapper wiring rather than UriParser's own leniency.
-        assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !uri \"http://example.com/a b\" }", UriHolder.class));
+        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !uri \"http://example.com/a b\" }", UriHolder.class));
     }
 
     // ── IPv4 (§5.5) ──────────────────────────────────────────────────────
@@ -658,7 +658,7 @@ class TsonObjectReaderTest {
         // and TsonObjectReader's default context registers exactly that class -- see
         // TsonAtomContext's Javadoc on why the field must be declared Inet4Address, not
         // InetAddress, to bind directly.
-        Ipv4Holder h = mapper.toObject("{ value: !ipv4 192.168.0.1 }", Ipv4Holder.class);
+        Ipv4Holder h = mapper.read("{ value: !ipv4 192.168.0.1 }", Ipv4Holder.class);
         assertEquals(InetAddress.getByAddress(new byte[]{(byte) 192, (byte) 168, 0, 1}), h.value());
     }
 
@@ -666,8 +666,8 @@ class TsonObjectReaderTest {
     void builtinIpv4AnnotationRejectsLenientFormsThroughTheMapper() throws DataBindException {
         // InetAddress.ofLiteral itself would accept both of these -- Ipv4Parser's own RFC 3986
         // dec-octet check must not.
-        assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !ipv4 010.0.0.1 }", Ipv4Holder.class));
-        assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !ipv4 3232235521 }", Ipv4Holder.class));
+        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !ipv4 010.0.0.1 }", Ipv4Holder.class));
+        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !ipv4 3232235521 }", Ipv4Holder.class));
     }
 
     // ── IPv6 (§5.5) ──────────────────────────────────────────────────────
@@ -681,7 +681,7 @@ class TsonObjectReaderTest {
         // input text, where the generic InetAddress.getByAddress(byte[]) would otherwise silently
         // hand back an Inet4Address instead (see Ipv6Parser's Javadoc). Quoted because ':' is not a
         // legal unquoted-token character (§7.2).
-        Ipv6Holder h = mapper.toObject("{ value: !ipv6 \"2001:db8::1\" }", Ipv6Holder.class);
+        Ipv6Holder h = mapper.read("{ value: !ipv6 \"2001:db8::1\" }", Ipv6Holder.class);
         assertEquals(Inet6Address.getByAddress(null,
                 new byte[]{0x20, 0x01, 0x0d, (byte) 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}, -1), h.value());
     }
@@ -690,7 +690,7 @@ class TsonObjectReaderTest {
     void builtinIpv6AnnotationRejectsAmbiguousCompressionThroughTheMapper() throws DataBindException {
         // More than one "::" run is ambiguous -- how many zero groups each one represents can't be
         // determined -- so Ipv6Parser's own grammar check must reject it.
-        assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !ipv6 \"1::2::3\" }", Ipv6Holder.class));
+        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !ipv6 \"1::2::3\" }", Ipv6Holder.class));
     }
 
     // ── Temporal types (§5.4) ────────────────────────────────────────────
@@ -703,7 +703,7 @@ class TsonObjectReaderTest {
         // LocalDate isn't a record or an array, so no auto-detection collision -- but it also
         // can't self-declare @Atom, being a JDK class, so TsonObjectReader's default context
         // pre-registers it the same way it does UUID.
-        DateHolder h = mapper.toObject("{ value: !date 2025-03-13 }", DateHolder.class);
+        DateHolder h = mapper.read("{ value: !date 2025-03-13 }", DateHolder.class);
         assertEquals(LocalDate.of(2025, 3, 13), h.value());
     }
 
@@ -711,7 +711,7 @@ class TsonObjectReaderTest {
     void builtinDateAnnotationRejectsExtendedYearThroughTheMapper() throws DataBindException {
         // LocalDate.parse("+12025-03-13") would succeed on its own -- DateParser's own shape check
         // must not accept RFC 3339's stricter 4-digit-year requirement being violated.
-        assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !date +12025-03-13 }", DateHolder.class));
+        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !date +12025-03-13 }", DateHolder.class));
     }
 
     public record TimeHolder(OffsetTime value) {
@@ -719,7 +719,7 @@ class TsonObjectReaderTest {
 
     @Test
     void builtinTimeAnnotationBindsDirectlyThroughTheMapper() throws DataBindException {
-        TimeHolder h = mapper.toObject("{ value: !time \"10:15:30Z\" }", TimeHolder.class);
+        TimeHolder h = mapper.read("{ value: !time \"10:15:30Z\" }", TimeHolder.class);
         assertEquals(OffsetTime.parse("10:15:30Z"), h.value());
     }
 
@@ -728,7 +728,7 @@ class TsonObjectReaderTest {
 
     @Test
     void builtinDateTimeAnnotationBindsDirectlyThroughTheMapper() throws DataBindException {
-        DateTimeHolder h = mapper.toObject("{ value: !datetime \"2025-03-13T10:15:30Z\" }", DateTimeHolder.class);
+        DateTimeHolder h = mapper.read("{ value: !datetime \"2025-03-13T10:15:30Z\" }", DateTimeHolder.class);
         assertEquals(OffsetDateTime.parse("2025-03-13T10:15:30Z"), h.value());
     }
 
@@ -739,8 +739,8 @@ class TsonObjectReaderTest {
     void directBindingToTsonsOwnIsoDurationDoesNotWork() throws DataBindException {
         // IsoDuration is itself a Java record (calendarPart, clockPart) -- same collision as
         // Rational/Complex, same reason: tson-bind's record auto-detection claims it first.
-        assertThrows(DataBindException.class,
-                () -> mapper.toObject("{ value: !duration P1Y2M3DT4H5M6S }", DurationHolder.class));
+        assertThrows(TsonReadException.class,
+                () -> mapper.read("{ value: !duration P1Y2M3DT4H5M6S }", DurationHolder.class));
     }
 
     /** Stand-in for an application's own preferred duration representation -- e.g. threeten-extra's PeriodDuration, or just a total estimate collapsing calendar units. */
@@ -770,7 +770,7 @@ class TsonObjectReaderTest {
         context.registerAtom(UserDuration.class, new UserDurationBridge());
         TsonObjectReader bridgedMapper = new TsonObjectReader(context);
 
-        UserDurationHolder h = bridgedMapper.toObject("{ value: !duration P1Y2M3DT4H5M6S }", UserDurationHolder.class);
+        UserDurationHolder h = bridgedMapper.read("{ value: !duration P1Y2M3DT4H5M6S }", UserDurationHolder.class);
         assertEquals(new UserDuration(1, 2, 3, 4 * 3600L + 5 * 60L + 6L), h.value());
     }
 
@@ -788,36 +788,36 @@ class TsonObjectReaderTest {
         // constructor does (see TsonAtomContext.defaultContext()). This documents *why* that
         // pre-registration exists.
         TsonObjectReader bareMapper = new TsonObjectReader(DataBindContext.builder().build());
-        assertThrows(DataBindException.class, () -> bareMapper.toObject("{ value: !base64 TWFu }", BytesHolder.class));
+        assertThrows(TsonReadException.class, () -> bareMapper.read("{ value: !base64 TWFu }", BytesHolder.class));
     }
 
     @Test
     void builtinBase64AnnotationBindsDirectlyThroughTheMapper() throws DataBindException {
-        BytesHolder h = mapper.toObject("{ value: !base64 TWFu }", BytesHolder.class);
+        BytesHolder h = mapper.read("{ value: !base64 TWFu }", BytesHolder.class);
         assertArrayEquals("Man".getBytes(java.nio.charset.StandardCharsets.UTF_8), h.value());
     }
 
     @Test
     void builtinBase64UrlAnnotationBindsDirectlyThroughTheMapper() throws DataBindException {
-        BytesHolder h = mapper.toObject("{ value: !base64url TWFu }", BytesHolder.class);
+        BytesHolder h = mapper.read("{ value: !base64url TWFu }", BytesHolder.class);
         assertArrayEquals("Man".getBytes(java.nio.charset.StandardCharsets.UTF_8), h.value());
     }
 
     @Test
     void builtinHexAnnotationBindsDirectlyThroughTheMapper() throws DataBindException {
-        BytesHolder h = mapper.toObject("{ value: !hex deadbeef }", BytesHolder.class);
+        BytesHolder h = mapper.read("{ value: !hex deadbeef }", BytesHolder.class);
         assertArrayEquals(new byte[]{(byte) 0xDE, (byte) 0xAD, (byte) 0xBE, (byte) 0xEF}, h.value());
     }
 
     @Test
     void builtinBase32AnnotationBindsDirectlyThroughTheMapper() throws DataBindException {
-        BytesHolder h = mapper.toObject("{ value: !base32 MZXW6YTB }", BytesHolder.class);
+        BytesHolder h = mapper.read("{ value: !base32 MZXW6YTB }", BytesHolder.class);
         assertArrayEquals("fooba".getBytes(java.nio.charset.StandardCharsets.UTF_8), h.value());
     }
 
     @Test
     void builtinBase64AnnotationRejectsMissingPaddingThroughTheMapper() throws DataBindException {
-        assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !base64 TWE }", BytesHolder.class));
+        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !base64 TWE }", BytesHolder.class));
     }
 
     // ── Rational/Complex: binding to a richer third-party type via DataBridge ──────────────
@@ -833,7 +833,7 @@ class TsonObjectReaderTest {
         // a token ("2/3"), not a record, so binding fails outright. This is exactly why the
         // recommended path is a DataBridge (below), not direct binding to tson-compiler's own minimal
         // Rational/Complex types.
-        assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !rational \"2/3\" }", RationalHolder.class));
+        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !rational \"2/3\" }", RationalHolder.class));
     }
 
     /** Stand-in for a richer third-party type an application might already use, e.g. Apache Commons Math's {@code BigFraction} -- structurally similar, but a different class the binder has never heard of. */
@@ -861,7 +861,7 @@ class TsonObjectReaderTest {
         context.registerAtom(UserFraction.class, new UserFractionBridge());
         TsonObjectReader bridgedMapper = new TsonObjectReader(context);
 
-        UserFractionHolder h = bridgedMapper.toObject("{ value: !rational \"2/3\" }", UserFractionHolder.class);
+        UserFractionHolder h = bridgedMapper.read("{ value: !rational \"2/3\" }", UserFractionHolder.class);
         assertEquals(new UserFraction(2, 3), h.value());
     }
 
@@ -872,7 +872,7 @@ class TsonObjectReaderTest {
     void directBindingToTsonsOwnComplexDoesNotWork() throws DataBindException {
         // Same reasoning as Rational: Complex is itself a Java record (real, imaginary), so it's
         // auto-detected as a record target, not routed through ComplexParser.
-        assertThrows(DataBindException.class, () -> mapper.toObject("{ value: !complex 3+4i }", ComplexHolder.class));
+        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !complex 3+4i }", ComplexHolder.class));
     }
 
     /** Stand-in for e.g. Apache Commons Math's {@code Complex} (always double-precision, unlike tson-compiler's exact-by-default {@link Complex}). */
@@ -900,7 +900,7 @@ class TsonObjectReaderTest {
         context.registerAtom(UserComplex.class, new UserComplexBridge());
         TsonObjectReader bridgedMapper = new TsonObjectReader(context);
 
-        UserComplexHolder h = bridgedMapper.toObject("{ value: !complex 3+4i }", UserComplexHolder.class);
+        UserComplexHolder h = bridgedMapper.read("{ value: !complex 3+4i }", UserComplexHolder.class);
         assertEquals(new UserComplex(3.0, 4.0), h.value());
     }
 
@@ -921,14 +921,14 @@ class TsonObjectReaderTest {
 
     @Test
     void unionMemberMatchedByCaseInsensitiveSimpleName() throws DataBindException {
-        ShapeHolder h = mapper.toObject("{ shape: !circle { radius: 5 } }", ShapeHolder.class);
+        ShapeHolder h = mapper.read("{ shape: !circle { radius: 5 } }", ShapeHolder.class);
         assertInstanceOf(Circle.class, h.shape());
         assertEquals(5, ((Circle) h.shape()).radius());
     }
 
     @Test
     void unionMemberMatchedByCaseInsensitiveSimpleNameOtherMember() throws DataBindException {
-        ShapeHolder h = mapper.toObject("{ shape: !rectangle { width: 3 height: 4 } }", ShapeHolder.class);
+        ShapeHolder h = mapper.read("{ shape: !rectangle { width: 3 height: 4 } }", ShapeHolder.class);
         assertInstanceOf(Rectangle.class, h.shape());
     }
 
@@ -945,18 +945,18 @@ class TsonObjectReaderTest {
 
     @Test
     void unionMemberMatchedByExplicitTypename() throws DataBindException {
-        NamedShapeHolder h = mapper.toObject("{ shape: !sq { side: 2 } }", NamedShapeHolder.class);
+        NamedShapeHolder h = mapper.read("{ shape: !sq { side: 2 } }", NamedShapeHolder.class);
         assertEquals(2, ((Square) h.shape()).side());
     }
 
     @Test
     void unionWithoutTypeAnnotationThrows() throws DataBindException {
-        assertThrows(DataBindException.class, () -> mapper.toObject("{ shape: { radius: 5 } }", ShapeHolder.class));
+        assertThrows(TsonReadException.class, () -> mapper.read("{ shape: { radius: 5 } }", ShapeHolder.class));
     }
 
     @Test
     void unionWithUnknownTypeNameThrows() throws DataBindException {
-        assertThrows(DataBindException.class,
-                () -> mapper.toObject("{ shape: !triangle { a: 1 } }", ShapeHolder.class));
+        assertThrows(TsonReadException.class,
+                () -> mapper.read("{ shape: !triangle { a: 1 } }", ShapeHolder.class));
     }
 }

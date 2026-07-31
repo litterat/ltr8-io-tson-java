@@ -489,44 +489,75 @@ own name* (`AtomValueReader.UNIT`'s factory switches on its `name` parameter, no
 constructed name falls back to `TokenParser`'s behavior (the previous, pre-split default for
 everything) rather than failing.
 
-### Mapper (`tson-compiler/src/main/java/io/ltr8/tson/compiler/mapper/`)
+### Object binder: `TsonObjectReader`/`TsonObjectWriter` (root `io.ltr8.tson.compiler` package)
 
-Binds a parsed `DataValue` tree to a Java object given its `DataClass` descriptor from `tson-bind`,
-and back — `TsonMapperReader`/`TsonMapperWriter`. Moved here from a separate `tson-mapper` module
-(2026-07-24; see "Architecture" above for the module-cycle reasoning) once `TsonSchemaResolver`'s own
-generalized constructor-application/atom-refinement resolution needed exactly this generic binding
-directly, which the old module's own dependency *on* `tson-compiler` made impossible to reach from
-here without a cycle.
+Schemaless (Class 1) binding between TSON and a Java object, driven by the target class's own
+`tson-bind` `DataClass` descriptor (which is in effect the schema the data must satisfy) — the
+reflective, class-driven counterpart to the schema-driven `TsonValueReader`, and the read-side
+inverse of `TsonObjectWriter`. `AtomBinder`/`AtomWriter` (the read/write pair `bindAtom`/`writeAtom`
+delegate to for values never bound through the built-in vocabulary at all) and `TsonAnnotations`
+(the `@Annotated` carrier) sit alongside them; both classes' own no-arg constructors share one
+`DataBindContext` factory (`TsonAtomContext.defaultContext()`, in `config`) rather than duplicating
+the built-in-vocabulary atom registration list.
 
-**Split into `TsonMapperReader`/`TsonMapperWriter`, not one `TsonMapper` class**, for readability —
-the original already internally paired one `to*` method with one `write*` method per `DataClass`
-kind (`toAtom`/`writeAtom`, `toRecord`/`writeRecord`, `toArray`/`writeArray`, `toMap`/`writeMap`,
-`toTuple`/`writeTuple`, `toUnion`/`writeUnion`), so the split follows an already-present internal
-seam rather than inventing a new one. `AtomBinder`/`AtomWriter` (the read/write pair `toAtom`/
-`writeAtom` delegate to for values never bound through the built-in vocabulary at all) already had
-this shape from the start. Both new classes' own no-arg constructors share one `DataBindContext`
-factory (`TsonMapperContext.defaultContext()`) rather than duplicating the built-in-vocabulary atom
-registration list (`UUID`/`byte[]`/`LocalDate`/`OffsetTime`/`OffsetDateTime`/`URI`/`Inet4Address`/
-`Inet6Address`) across two classes that could drift apart.
+**Renamed from `TsonMapperReader`/`TsonMapperWriter` and moved out of a `.mapper` subpackage into
+the root package (2026-07-31), on the user's own direction** — named for what a *consumer* holds (a
+Java object), matching Jackson's `ObjectReader`/`ObjectWriter`, and sitting beside the other
+read-side front doors (`TsonDataParser`, `TsonDataStream`, `TsonValueReader`) rather than in a
+subpackage. `Tson.objectReader()`/`objectWriter()` (the front-door module) build them bound to a
+`Tson`'s own configured `DataBindContext`. `AtomBinder`/`AtomWriter` moved with them but stayed
+package-private (hidden from consumers even in the exported root package); `TsonMapperContext` (a
+one-line delegate to `TsonAtomContext.defaultContext()`) was deleted and inlined. History note: the
+pair originally lived in a separate `tson-mapper` module, merged into `tson-compiler` (2026-07-24)
+once `TsonSchemaResolver`'s own resolution needed this binding directly — a module that depended
+*on* `tson-compiler` couldn't provide it without a cycle; `tson-bind`, what this is built on, has no
+such dependency, so depending on it here is clean.
 
-`TsonMapperReader.toObject(DataValue, Class)`/`toObject(String, Class)` bind a parsed value onto a
-target class via `tson-bind`'s `DataClass` descriptor; `TsonMapperWriter.toTson(Object)` is the
-reverse, mainly useful as a debugging tool rather than a guaranteed-lossless serializer (the integer
-family's exact width, a tuple's tuple-ness, and `@Annotated`-captured wire-format annotations are
-all documented, deliberate write-side losses — see `toTson`'s own Javadoc). Atom binding checks for
-a type-ref first (`BuiltinTypeVocabulary`, §5) before falling through to plain `BaseTypeResolver`
-identification + `AtomBinder` binding for an untyped value — both paths share the same final
-narrowing step (`NumberNarrowing`, in `resolver`) so a plain `42` and a `!uint8 42` bind identically
-regardless of which path found them.
+**`TsonObjectReader` streams its events, ctx-based, like `TsonValueReader` (rewritten 2026-07-31).**
+`read(String, Class)`/`read(InputStream, Class)`/`read(TsonReadContext, Class)` pull one `TsonEvent`
+at a time off a `TsonReadContext` (in practice a `TsonDataStream`), walking the `DataClass`
+descriptor in parallel — never materializing a `DataValue` tree first, so a large document is never
+fully buffered before binding begins (`TsonObjectReaderStreamingTest` proves it: a fail-fast error on
+an early field pulls well under 100 events even with 50,000 trailing). Problems report through `ctx`
+using the same model the compiled readers use: a fail-fast context throws `TsonReadException` at the
+first problem; a **collecting** context accumulates every independent problem into
+`ctx.diagnostics()` and reads on (also proven in that test). **A `tson-bind` `DataBindException`
+thrown while narrowing a value, applying a bridge (e.g. a bad enum member surfacing as
+`IllegalArgumentException` from `Enum.valueOf`), or invoking a constructor is caught and re-reported
+through `ctx`** — so a caller sees one uniform error model (`TsonReadException`/`Diagnostic`)
+regardless of which layer noticed the problem, the deliberate replacement (user's own explicit
+choice) for the old tree-based binder's uniform `throws DataBindException`. This is what changed
+~50 test assertions in `TsonObjectReaderTest`/`TsonObjectWriterTest` from `DataBindException` to
+`TsonReadException`. The old `toObject(DataValue, Class)` tree-walk entry point is gone (no caller —
+schema resolution binds through the compiled reader now, not this).
 
-**No positional-form support** (§5.6: a record with exactly one `REQUIRED` field can be filled by a
-bare, non-braced value at any schema-backed data position) — `toRecord` only accepts a `RecordValue`
-or `EmptyBrace`, never a bare token/array. This is why `MetaKernelBootstrapResolver`'s own `!enum [...]`
-handling (see "Meta-kernel bootstrap" below) stays hand-written rather than routing through
-`TsonMapperReader` generically — a real, currently-unclosed gap for any future caller (e.g.
-`TsonSchemaResolver`'s own generalized constructor-application resolution) that needs to bind a
-positional-form value generically; wrapping the bare value into an equivalent one-field
-`RecordValue` before delegating to ordinary record binding is the natural fix, not yet built.
+- **Arrays always buffer-then-construct** — a streamed array has no up-front element count, so
+  elements are decoded into an `ArrayList` first, then `constructor().invoke(size)` + `put()` per
+  element. This uniformly handles both a real fixed-size Java array and a growable collection with no
+  `isArray()` branch (the size is known before construction either way) — simpler than the compiled
+  `ArrayBindReader`, which streams into the target incrementally and therefore *does* need that branch.
+- **`@Annotated` capture** (a record field of type `TsonAnnotations` populated from the record
+  value's own wire annotations) buffers just that one value's leading annotation events and reduces
+  them back to `ast.Annotation`s via `TsonDataParser`'s own `EventReducer` — made a package-private
+  `static` reducer (parametrized by a position-recorder `BiConsumer`, `TsonObjectReader` passing a
+  no-op) so it's reusable without duplicating the reduction. Only a single value's annotations are
+  ever buffered, never the value body, so streaming isn't defeated. `EventSkip` (in `reader`) was
+  made `public` so `TsonObjectReader` can reuse it for discard/skip navigation.
+
+`TsonObjectWriter.toTson(Object)` (the write side, unchanged by the streaming rewrite) is mainly a
+debugging tool rather than a guaranteed-lossless serializer (the integer family's exact width, a
+tuple's tuple-ness, and `@Annotated`-captured wire-format annotations are all documented, deliberate
+write-side losses — see `toTson`'s own Javadoc). Atom binding on the read side checks for a type-ref
+first (`BuiltinTypeVocabulary`, §5) before falling through to plain `BaseTypeResolver` identification
++ `AtomBinder` binding for an untyped value — both paths share the same final narrowing step
+(`NumberNarrowing`) so a plain `42` and a `!uint8 42` bind identically regardless of which path found
+them.
+
+**No positional-form support and no schema-composed defaults** — both are schema-layer concepts a
+schemaless, class-driven bind has no equivalent for; a record must be written braced (`bindRecord`
+accepts only `RecordStart`/`EmptyBraceEvent`), and an absent required field is a `FIELD_REQUIRED`
+problem. This is why `MetaKernelBootstrapResolver`'s own `!enum [...]` handling (see "Meta-kernel
+bootstrap" below) stays hand-written rather than routing through `TsonObjectReader` generically.
 
 ### Schema grammar (`tson-compiler/src/main/java/io/ltr8/tson/compiler/TsonSchemaParser.java`,
 `.../ast/schema/`)

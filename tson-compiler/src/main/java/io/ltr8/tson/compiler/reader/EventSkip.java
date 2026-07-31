@@ -31,7 +31,7 @@ import java.util.Optional;
  * same grammar), just discarding instead of building where {@link #dataValue}/{@link #coreValue}/
  * {@link #scopedValue} are used for that purpose.
  */
-final class EventSkip {
+public final class EventSkip {
 
     private EventSkip() {
     }
@@ -44,7 +44,7 @@ final class EventSkip {
      * (record subtype/union/choice) consult the returned name, everything else ignores it, matching
      * how a plain {@code DataValue.typeRef()} used to be ignored by every non-dispatch reader.
      */
-    static Optional<String> annotationsAndTypeRef(TsonReadContext ctx) {
+    public static Optional<String> annotationsAndTypeRef(TsonReadContext ctx) {
         while (ctx.peek() instanceof AnnotationStart) {
             ctx.next();
             if (!(ctx.peek() instanceof AnnotationEnd)) {
@@ -60,13 +60,13 @@ final class EventSkip {
     }
 
     /** Discards one full {@code data-value}: leading annotations/type-ref (see {@link #annotationsAndTypeRef}), then one core-value. */
-    static void dataValue(TsonReadContext ctx) {
+    public static void dataValue(TsonReadContext ctx) {
         annotationsAndTypeRef(ctx);
         coreValue(ctx);
     }
 
     /** Discards {@code [ schema-directive ] data-value} -- record field values, map entry values, array elements. */
-    static void scopedValue(TsonReadContext ctx) {
+    public static void scopedValue(TsonReadContext ctx) {
         if (ctx.peek() instanceof SchemaRef) {
             ctx.next();
         }
@@ -78,7 +78,7 @@ final class EventSkip {
      * the caller -- the natural shape for a reader that peeked to decide "this isn't what I expected"
      * and now needs to fully discard whatever's actually there, including a nested container.
      */
-    static void coreValue(TsonReadContext ctx) {
+    public static void coreValue(TsonReadContext ctx) {
         TsonEvent e = ctx.next();
         switch (e) {
             case RecordStart ignored -> {

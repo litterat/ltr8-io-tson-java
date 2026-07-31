@@ -95,7 +95,7 @@ class TsonTest {
 
         TsonObjectReader reader = tson.objectReader();
 
-        Point point = reader.toObject("{ x: 1 y: 2 }", Point.class);
+        Point point = reader.read("{ x: 1 y: 2 }", Point.class);
         assertEquals(new Point(1, 2), point);
     }
 

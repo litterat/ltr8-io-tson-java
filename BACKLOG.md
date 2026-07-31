@@ -122,13 +122,14 @@ own prose (which had gone stale on at least one of them):
   `min_length`/`max_length`/`pattern`, and so on) — called during merge instead of the current blind,
   generic override.
 - [ ] **Related cleanup, once the above lands**: `DefinitionResolver`'s own dependency on
-  `TsonMapperWriter` (`private final TsonMapperWriter writer`, used only for this merge's own
+  `TsonObjectWriter` (`private final TsonObjectWriter writer`, used only for this merge's own
   re-serialization step) should go away — a real narrowing check wouldn't need to round-trip through
-  the generic mapper at all. This is also *why* `TsonMapperReader`/`TsonMapperWriter` still live in
-  `tson-compiler.mapper` rather than the new `tson` front-door module (see "Front door" above) — moving
-  them today would create a cycle, since `tson-compiler`'s own resolution engine genuinely depends on
-  them. Once this dependency is gone, revisit moving `TsonMapperReader`/`TsonMapperWriter` into `tson`
-  (or their own module) — noted directly on `Tson`'s own class Javadoc too, so it isn't lost.
+  the generic binder at all. This is also *why* `TsonObjectReader`/`TsonObjectWriter` still live in
+  `tson-compiler` (its root package, since the 2026-07-31 rename/move out of `.mapper`) rather than
+  the `tson` front-door module (see "Front door" above) — moving them to a module that depends *on*
+  `tson-compiler` would create a cycle, since `tson-compiler`'s own resolution engine genuinely
+  depends on the writer. Once this dependency is gone, revisit moving them into `tson` — noted
+  directly on `Tson`'s own class Javadoc too, so it isn't lost.
 
 ## Remaining built-in types
 
@@ -265,6 +266,27 @@ everything outstanding is tracked in one place.)
 
 ## Done
 
+- [x] **The schemaless Class-1 binder now streams — `TsonObjectReader` over `TsonDataStream`, and
+  renamed from `TsonMapperReader`/`TsonMapperWriter` → `TsonObjectReader`/`TsonObjectWriter` into the
+  root `io.ltr8.tson.compiler` package** (2026-07-31). Closes the one asymmetric cell in the read-side
+  matrix: "schemaless → Java object" was the lone reader that still materialized a whole `DataValue`
+  tree before binding, while `TsonDataStream` and both compiled-reader modes already streamed. Now it
+  pulls `TsonEvent`s off a `TsonReadContext` (in practice a `TsonDataStream`) one at a time, walking
+  the target class's `tson-bind` `DataClass` in parallel — a large document is never fully buffered
+  (`TsonObjectReaderStreamingTest` proves a fail-fast error on an early field pulls <100 events with
+  50,000 trailing). Reports through `ctx` in the same model the compiled readers use: fail-fast throws
+  `TsonReadException`, a collecting context accumulates every independent problem — `tson-bind`'s own
+  `DataBindException` (narrowing, bridge, constructor failures) caught and re-reported through `ctx`,
+  so the whole read/bind stack shares one uniform error model (the user's own explicit choice;
+  replaced the old uniform `throws DataBindException`, changing ~50 test assertions). Named for what a
+  consumer holds (a Java object), Jackson-`ObjectReader`-style, beside the other root-package front
+  doors. `AtomBinder`/`AtomWriter`/`TsonAnnotations` moved along; `TsonMapperContext` deleted (inlined
+  to `TsonAtomContext.defaultContext()`); `Tson.objectReader()`/`objectWriter()`. `@Annotated` capture
+  reuses `TsonDataParser`'s own `EventReducer` (made a reusable package-private `static` reducer);
+  `EventSkip` made public for cross-package reuse. See CLAUDE.md's "Object binder" section. **Still not
+  streamed: the `!!schema`-header-driven "read this document, pick the reader/type automatically"
+  entry point** — every read still needs the caller to name the target class or schema type up front
+  (tracked under "Front door / ergonomics").
 - [x] **A new `tson` module — the developer front door, sitting on top of `tson-compiler` (named
   `tson-parser` at the time) the way Retrofit sits on OkHttp or Apache HttpClient5 sits on HttpCore5**
   (superseded an earlier `tson-parser` → `tson-core` rename idea — simpler to add a small module on
