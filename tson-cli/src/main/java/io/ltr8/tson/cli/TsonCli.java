@@ -21,12 +21,12 @@ public final class TsonCli {
 
     private static final String USAGE = """
             usage:
-              tson init [<dir>]
+              tson init-example [<dir>]
               tson validate --type <name> [--output text|json|tson] <schema> <data...>
               tson compile [--output text|json|tson] <schema>
 
             commands:
-              init        write an example schema + data file to try, then edit and re-run validate
+              init-example        write an example schema + data file to try, then edit and re-run validate
               validate    read data files against one type of a schema, reporting every problem
               compile     check that a schema document itself resolves and compiles
 
@@ -44,7 +44,7 @@ public final class TsonCli {
             "usage: tson compile [--output text|json|tson] <schema>";
 
     private static final String INIT_USAGE =
-            "usage: tson init [<dir>]   (writes an example person.tn and person-data.tn; default dir: .)";
+            "usage: tson init-example [<dir>]   (writes an example person.tn and person-data.tn; default dir: .)";
 
     private TsonCli() {
     }
@@ -67,11 +67,11 @@ public final class TsonCli {
 
         try {
             return switch (subcommand) {
-                case "init" -> runInit(rest);
+                case "init-example" -> runInit(rest);
                 case "validate" -> runValidate(rest);
                 case "compile" -> runCompile(rest);
                 default -> {
-                    System.err.println("unknown command '" + subcommand + "' -- expected init, validate, or compile");
+                    System.err.println("unknown command '" + subcommand + "' -- expected init-example, validate, or compile");
                     System.err.println(USAGE);
                     yield 2;
                 }

@@ -78,7 +78,7 @@ class TsonCliTest {
 
     @Test
     void initScaffoldsAnExampleThatActuallyValidates(@TempDir Path dir) {
-        assertEquals(0, TsonCli.run(new String[] {"init", dir.toString()}));
+        assertEquals(0, TsonCli.run(new String[] {"init-example", dir.toString()}));
 
         Path schema = dir.resolve("person.tn");
         Path data = dir.resolve("person-data.tn");
@@ -93,8 +93,8 @@ class TsonCliTest {
 
     @Test
     void initRefusesToOverwriteExistingFiles(@TempDir Path dir) throws IOException {
-        assertEquals(0, TsonCli.run(new String[] {"init", dir.toString()}));
-        String err = captureStderr(() -> assertEquals(1, TsonCli.run(new String[] {"init", dir.toString()})));
+        assertEquals(0, TsonCli.run(new String[] {"init-example", dir.toString()}));
+        String err = captureStderr(() -> assertEquals(1, TsonCli.run(new String[] {"init-example", dir.toString()})));
         assertTrue(err.contains("refusing to overwrite"), err);
     }
 

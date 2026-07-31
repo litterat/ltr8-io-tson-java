@@ -26,10 +26,10 @@ the command, and put it on your `PATH`:
 export PATH="$PWD/tson-cli/build/install/tson/bin:$PATH"
 ```
 
-**`tson init`** scaffolds a working example — a schema and a matching data file — to start from:
+**`tson init-example`** scaffolds a working example — a schema and a matching data file — to start from:
 
 ```
-$ tson init
+$ tson init-example
 Wrote ./person.tn and ./person-data.tn.
 
 Try it:
@@ -37,17 +37,84 @@ Try it:
   …
 ```
 
-`person.tn` is a TSON *schema* — it declares a `person` type (with an enum, an optional field, and
-built-in types like `date`). `person-data.tn` is a *data* document. **`tson validate`** reads the data
-against a type of the schema:
+Here's the whole of `person.tn` — a TSON *schema*. If you've seen JSON, most of this reads the way you'd
+guess; the parts that don't are exactly what TSON adds:
+
+```tson
+# person.tn
+!!id:"https://example.com/2026/32/getting-started/person-1.tn"
+!!meta:"https://tson.io/2026/32/m/meta.tn"
+!!import:"https://tson.io/2026/32/m/core.tn"
+{
+    role => !enum [admin member guest]
+
+    address => {
+        street: text
+        city: text
+        country: text
+    }
+
+    person => {
+        id: uuid
+        name: text
+        age: int32
+        role: role
+        joined: date
+        email: text?
+        address: address
+        skills: [text]
+        ( phone: text | mobile: text )?
+    }
+}
+```
+
+Reading top to bottom, most of it is familiar and a few things are new:
+
+- **`role => !enum [admin member guest]`** — a named enum type: `role` is one of three fixed labels.
+- **`address => { … }`** — a named *record* type (a nested object shape), reused as a field type in
+  `person` below. Records are declared once and referenced by name.
+- **built-in types** — `uuid`, `text`, `int32`, `date` are part of TSON's own vocabulary (via the
+  imported `core.tn`); no need to model "a UUID" or "a date" as a string and validate it yourself.
+- **`email: text?`** — the `?` makes a field *optional*. Everything else is required.
+- **`skills: [text]`** — an array of text. `[T]` is array-of-`T`.
+- **`( phone: text | mobile: text )?`** — a *field group*: "at most one of these" (with `?`; drop the
+  `?` and it's "exactly one"). A record-level either/or with no JSON equivalent.
+
+And here's `person-data.tn`, a *data* document — an instance of that shape:
+
+```tson
+# person-data.tn
+{
+    id: !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09
+    name: "Ada Lovelace"
+    age: 30
+    role: member
+    joined: !date 1843-12-10
+    address: {
+        street: "12 Analytical Ave"
+        city: "London"
+        country: "UK"
+    }
+    skills: [ mathematics analysis "computing" ]
+    mobile: "+44 20 7946 0958"
+}
+```
+
+Two data-notation things to notice versus JSON: values can carry their own *type annotation* on the
+wire (`!uuid …`, `!date …`), and separators are whitespace *or* commas — the array `[ mathematics
+analysis "computing" ]` and the record fields need no commas at all. Note `email` is simply absent
+(it's optional), and only `mobile` is given, not `phone` (the group allows at most one).
+
+**`tson validate`** reads the data against a type of the schema:
 
 ```
 $ tson validate --type person person.tn person-data.tn
 OK
 ```
 
-Now break something — open `person-data.tn`, change `age: 30` to `age: "thirty"`, or delete the `name`
-line — and run it again. Every problem is reported at once, with a path and a reason:
+Now break something — open `person-data.tn`, change `age: 30` to `age: "thirty"`, delete the `name`
+line, use a `role` that isn't one of the three, or add `phone: "…"` alongside `mobile` (the group
+allows at most one) — and run it again. Every problem is reported at once, with a path and a reason:
 
 ```
 $ tson validate --type person person.tn person-data.tn
@@ -407,9 +474,9 @@ behavior at the edges — are tracked separately in [SPEC-FEEDBACK.md](SPEC-FEED
 ## Command-line interface
 
 The `tson-cli` module is a small, zero-dependency CLI (ajv-cli-style) for checking TSON from the shell —
-no Java to write. Three commands: **`init`** scaffolds an example schema + data file to start from,
-**`validate`** reads a data file against one type of a schema, and **`compile`** checks that a schema
-document itself resolves and compiles cleanly.
+no Java to write. Three commands: **`init-example`** scaffolds an example schema + data file to start
+from, **`validate`** reads a data file against one type of a schema, and **`compile`** checks that a
+schema document itself resolves and compiles cleanly.
 
 Build and install it — the installed command is `tson`:
 
@@ -422,12 +489,12 @@ tson-cli/build/install/tson/bin/tson --help        # or -h, or `tson help`
 write `tson` for that launcher path.
 
 ```
-tson init     [<dir>]
-tson validate --type <name> [--output text|json|tson] <schema> <data...>
-tson compile  [--output text|json|tson] <schema>
+tson init-example [<dir>]
+tson validate     --type <name> [--output text|json|tson] <schema> <data...>
+tson compile      [--output text|json|tson] <schema>
 ```
 
-`tson init` writes a ready-to-run `person.tn` + `person-data.tn` (see [Getting started](#getting-started)).
+`tson init-example` writes a ready-to-run `person.tn` + `person-data.tn` (see [Getting started](#getting-started)).
 For a hand-written schema `person.tn` and a data file `ada.tn`:
 
 ```tson
