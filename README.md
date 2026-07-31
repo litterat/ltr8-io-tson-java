@@ -356,15 +356,16 @@ write `tson` for that launcher path.
 
 ```
 tson init-example [<dir>]
-tson validate     [--type <name>] [--output text|json|tson] <file>...
+tson validate     [--output text|json|tson] <file>...
 tson compile      [--output text|json|tson] <schema>
 ```
 
 **`validate` takes a flat list of files** and auto-classifies each as a schema (its header carries
 `!!meta`) or a data document. A data file's own `!!schema` directive selects which schema it's
-validated against — the schema files are just made available, so order doesn't matter and you can pass
-several of each. A data file with **no `!!schema`** is checked *schemalessly*: base syntax plus any
-built-in type (`!uuid`/`!int32`/`!date`/…), with a non-built-in type-ref reported as unknown.
+validated against and its root type-ref (`!person`) selects the type — the schema files are just made
+available, so order doesn't matter and you can pass several of each. A data file with **no `!!schema`**
+is checked *schemalessly*: base syntax plus any built-in type (`!uuid`/`!int32`/`!date`/…), with a
+non-built-in type-ref reported as unknown.
 
 For a hand-written schema `person.tn` and a self-describing data file `ada.tn`:
 
@@ -390,10 +391,10 @@ $ tson compile person.tn
 OK
 ```
 
-- **`--type`** (validate only) overrides which of a schema's types a schema-driven data file is read
-  against — optional when the data opens with a root type-ref (`!person`), and ignored for schemaless
-  data. If a data file's `!!schema` names a schema you didn't pass, that's a `SCHEMA_ERROR`. There's no
-  URL *fetching* — schemas come from the files you list (a whitelisted-URI source is future work).
+- **Schema selection** is entirely the data's own doing: its `!!schema` names the schema and its root
+  type-ref (`!person`) names the type. If a data file's `!!schema` names a schema you didn't pass,
+  that's a `SCHEMA_ERROR`. There's no URL *fetching* — schemas come from the files you list (a
+  whitelisted-URI source is future work).
 - **`--output`**: `text` (default, human-readable), `json` (for scripts/agents — the shape aligns with
   Pydantic's own `errors()`), or `tson` (the diagnostics rendered as a real, schema-validated TSON
   document — the CLI dogfooding the library).

@@ -22,26 +22,24 @@ public final class TsonCli {
     private static final String USAGE = """
             usage:
               tson init-example [<dir>]
-              tson validate [--type <name>] [--output text|json|tson] <file>...
+              tson validate [--output text|json|tson] <file>...
               tson compile [--output text|json|tson] <schema>
 
             commands:
               init-example        write an example schema + data file to try, then edit and re-run validate
               validate    validate data files; each file is auto-classified as a schema or data
-                          document, and a data file's !!schema selects its schema (or, with no
-                          !!schema, a base-syntax + built-in-type check)
+                          document, and a data file's !!schema selects its schema and its root type-ref
+                          (!person) the type (or, with no !!schema, a base-syntax + built-in-type check)
               compile     check that a schema document itself resolves and compiles
 
             options:
-              --type <name>              (validate) override the type a schema-driven data file is read
-                                         against; optional when the data opens with a root type-ref (!person)
               --output text|json|tson    output format (default: text)
               --help, -h                 print this help
 
             exit codes: 0 ok, 1 validation/compile failure, 2 usage error""";
 
     private static final String VALIDATE_USAGE =
-            "usage: tson validate [--type <name>] [--output text|json|tson] <file>...";
+            "usage: tson validate [--output text|json|tson] <file>...";
 
     private static final String COMPILE_USAGE =
             "usage: tson compile [--output text|json|tson] <schema>";
@@ -103,14 +101,12 @@ public final class TsonCli {
             System.out.println(VALIDATE_USAGE);
             return 0;
         }
-        String typeName = null;
         OutputFormat format = OutputFormat.TEXT;
         List<Path> files = new ArrayList<>();
 
         for (int i = 0; i < args.size(); i++) {
             String arg = args.get(i);
             switch (arg) {
-                case "--type" -> typeName = requireValue(args, ++i, "--type");
                 case "--output" -> format = OutputFormat.parse(requireValue(args, ++i, "--output"));
                 default -> files.add(Path.of(arg));
             }
@@ -119,7 +115,7 @@ public final class TsonCli {
         if (files.isEmpty()) {
             throw new IllegalArgumentException(VALIDATE_USAGE);
         }
-        return ValidateCommand.run(files, typeName, format);
+        return ValidateCommand.run(files, format);
     }
 
     private static int runCompile(List<String> args) {

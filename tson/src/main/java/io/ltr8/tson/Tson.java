@@ -7,10 +7,21 @@ import io.ltr8.tson.compiler.config.TsonCompiledRegistry;
 import io.ltr8.tson.compiler.config.ValueReaderFactoryResolver;
 import io.ltr8.tson.compiler.TsonObjectReader;
 import io.ltr8.tson.compiler.TsonObjectWriter;
+import io.ltr8.tson.compiler.stream.DocumentStart;
+import io.ltr8.tson.compiler.stream.TypeRef;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaLinker;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * The front door -- a small, curated entry point over {@code tson-compiler}'s own, larger and more
@@ -59,6 +70,10 @@ public final class Tson {
     private final TsonCompiledRegistry compiledRegistry;
     private final TsonCompiledSchemaLoader loader;
     private final DataBindContext dataBindContext;
+
+    // The one bit of mutable state: a per-!!schema-URI cache of DOM-mode compiled schemas, so
+    // validating many data documents that name the same schema compiles it once. A cache only.
+    private final Map<String, TsonCompiledMetaSchema> validationSchemas = new ConcurrentHashMap<>();
 
     Tson(TsonSchemaRegistry schemaRegistry, TsonCompiledRegistry compiledRegistry,
          TsonCompiledSchemaLoader loader, DataBindContext dataBindContext) {
@@ -114,6 +129,75 @@ public final class Tson {
     /** {@link #resolve} then {@link #compile(TsonLinkedSchema, ValueReaderFactoryResolver)} in one call -- the common case, when a caller has no other use for the intermediate {@link TsonLinkedSchema}. */
     public TsonCompiledMetaSchema compile(String schemaText, ValueReaderFactoryResolver mode) {
         return compile(resolve(schemaText), mode);
+    }
+
+    /**
+     * Validates a data document, working out on its own whether a schema applies. If the document
+     * declares a {@code !!schema}, that URI selects the schema (resolved through this instance's own
+     * {@link TsonConfig#schemaSource} and compiled once, in DOM mode) and the document's root type-ref
+     * (e.g. {@code !person}) selects the type; with no {@code !!schema} it's validated schemalessly
+     * (Class 1: base syntax plus built-in / core-vocabulary atoms).
+     *
+     * <p>Returns every problem found, an empty list meaning valid. A problem specific to this document
+     * that isn't a value error -- a {@code !!schema} the source can't provide, a root type the schema
+     * doesn't declare, a missing root type-ref -- comes back as a {@link Diagnostic} in the list too,
+     * so a caller has one shape to render and never has to catch an exception for a bad input document.
+     */
+    public List<Diagnostic> validate(String data) {
+        TsonDataStream stream = new TsonDataStream(data);
+        DocumentStart start = (DocumentStart) stream.next();
+
+        if (start.schema().isEmpty()) {
+            return SchemalessValidator.validate(data);
+        }
+
+        TsonCompiledMetaSchema compiled;
+        try {
+            compiled = domCompiled(start.schema().get());
+        } catch (RuntimeException e) {
+            return List.of(problem(Diagnostic.Code.SCHEMA_ERROR, e.getMessage()));
+        }
+        if (!(stream.peek() instanceof TypeRef typeRef)) {
+            return List.of(problem(Diagnostic.Code.VALIDATION_ERROR,
+                    "data declares a !!schema but has no root type-ref (e.g. `!person`) to select a type"));
+        }
+        TsonValueReader<?> reader;
+        try {
+            reader = compiled.compiledSchema().get(typeRef.name());
+        } catch (RuntimeException e) {
+            return List.of(problem(Diagnostic.Code.UNKNOWN_TYPE, e.getMessage()));
+        }
+
+        TsonReadContext ctx = TsonReadContext.collecting(stream);
+        reader.read(ctx);
+        return ctx.diagnostics();
+    }
+
+    /**
+     * {@link #validate(String)} from a stream. The document is read into memory first -- validation
+     * reads the whole document anyway (collecting mode never stops early, and the schemaless path
+     * builds the full tree), and it must be re-readable for the schemaless branch.
+     */
+    public List<Diagnostic> validate(InputStream data) {
+        try {
+            return validate(new String(data.readAllBytes(), StandardCharsets.UTF_8));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /** The DOM-mode compiled schema for {@code schemaUri}, resolved+registered through the source and compiled once. */
+    private TsonCompiledMetaSchema domCompiled(String schemaUri) {
+        return validationSchemas.computeIfAbsent(schemaUri, uri -> {
+            loader.load(uri);   // resolve + register via the source (throws if it can't be provided)
+            TsonLinkedSchema linked = schemaRegistry.get(uri).orElseThrow(() ->
+                    new IllegalStateException("schema \"" + uri + "\" resolved but is not registered"));
+            return compile(linked, TsonSchemaCompiler.dom());
+        });
+    }
+
+    private static Diagnostic problem(Diagnostic.Code code, String message) {
+        return new Diagnostic("", code, message, "", "", Optional.empty(), Optional.empty());
     }
 
     /** The underlying {@link TsonSchemaRegistry} -- e.g. for {@code schemaRegistry().get(uri)} on an already-registered identity. */
