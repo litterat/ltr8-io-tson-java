@@ -45,9 +45,9 @@ class TsonCliTest {
     }
 
     @Test
-    void validatePlainDataWithoutTypeOrTypeRefExitsOne(@TempDir Path dir) throws IOException {
-        // --type is optional now, but plain data (no root type-ref, no !!schema) gives nothing to
-        // select a type from -- a per-file failure (exit 1), not a usage error.
+    void plainDataWithNoSchemaValidatesSchemalessly(@TempDir Path dir) throws IOException {
+        // A data file with no !!schema is checked schemalessly (base syntax + built-in atoms), even
+        // when schema files are also present. A plain, well-formed value is valid.
         Path schema = writeFile(dir, "schema.tn1", """
                 !!id:"https://example.test/cli-arg-test.tn1"
                 !!meta:"https://tson.io/2026/32/m/meta.tn"
@@ -57,9 +57,9 @@ class TsonCliTest {
         Path data = writeFile(dir, "data.tson", "42");
 
         String out = captureStdout(() ->
-                assertEquals(1, TsonCli.run(new String[] {"validate", schema.toString(), data.toString()})));
+                assertEquals(0, TsonCli.run(new String[] {"validate", schema.toString(), data.toString()})));
 
-        assertTrue(out.contains("root type-ref"), out);
+        assertTrue(out.contains("OK"), out);
     }
 
     @Test
@@ -70,10 +70,13 @@ class TsonCliTest {
                 !!import:"https://tson.io/2026/32/m/core.tn"
                 { my_int => int32 }
                 """);
-        Path data = writeFile(dir, "data.tson", "42");
+        Path data = writeFile(dir, "data.tson", """
+                !!schema:"https://example.test/cli-arg-test-2.tn1"
+                !my_int 42
+                """);
 
         int exitCode = TsonCli.run(new String[] {
-                "validate", "--type", "my_int", "--output", "json", schema.toString(), data.toString()});
+                "validate", "--output", "json", schema.toString(), data.toString()});
 
         assertEquals(0, exitCode);
     }

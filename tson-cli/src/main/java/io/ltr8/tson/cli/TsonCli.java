@@ -22,24 +22,26 @@ public final class TsonCli {
     private static final String USAGE = """
             usage:
               tson init-example [<dir>]
-              tson validate [--type <name>] [--output text|json|tson] <schema> <data...>
+              tson validate [--type <name>] [--output text|json|tson] <file>...
               tson compile [--output text|json|tson] <schema>
 
             commands:
               init-example        write an example schema + data file to try, then edit and re-run validate
-              validate    read data files against one type of a schema, reporting every problem
+              validate    validate data files; each file is auto-classified as a schema or data
+                          document, and a data file's !!schema selects its schema (or, with no
+                          !!schema, a base-syntax + built-in-type check)
               compile     check that a schema document itself resolves and compiles
 
             options:
-              --type <name>              (validate) the schema type to read each data file against;
-                                         optional if the data opens with a root type-ref (e.g. !person)
+              --type <name>              (validate) override the type a schema-driven data file is read
+                                         against; optional when the data opens with a root type-ref (!person)
               --output text|json|tson    output format (default: text)
               --help, -h                 print this help
 
             exit codes: 0 ok, 1 validation/compile failure, 2 usage error""";
 
     private static final String VALIDATE_USAGE =
-            "usage: tson validate [--type <name>] [--output text|json|tson] <schema> <data...>";
+            "usage: tson validate [--type <name>] [--output text|json|tson] <file>...";
 
     private static final String COMPILE_USAGE =
             "usage: tson compile [--output text|json|tson] <schema>";
@@ -103,23 +105,21 @@ public final class TsonCli {
         }
         String typeName = null;
         OutputFormat format = OutputFormat.TEXT;
-        List<Path> positional = new ArrayList<>();
+        List<Path> files = new ArrayList<>();
 
         for (int i = 0; i < args.size(); i++) {
             String arg = args.get(i);
             switch (arg) {
                 case "--type" -> typeName = requireValue(args, ++i, "--type");
                 case "--output" -> format = OutputFormat.parse(requireValue(args, ++i, "--output"));
-                default -> positional.add(Path.of(arg));
+                default -> files.add(Path.of(arg));
             }
         }
 
-        if (positional.size() < 2) {
+        if (files.isEmpty()) {
             throw new IllegalArgumentException(VALIDATE_USAGE);
         }
-        Path schema = positional.get(0);
-        List<Path> data = positional.subList(1, positional.size());
-        return ValidateCommand.run(schema, typeName, data, format);
+        return ValidateCommand.run(files, typeName, format);
     }
 
     private static int runCompile(List<String> args) {

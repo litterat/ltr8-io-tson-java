@@ -2897,54 +2897,68 @@ exit 1; missing file → `VALIDATION_ERROR`/exit 1). `StreamingLazinessTest` del
 `TsonEventSource` the factories can't interpose, exactly the "raw `TsonEventSource`" case those
 overloads exist for.
 
-### CLI: self-describing data validation (`!!schema` + root type-ref)
+### CLI: schema-source validation model + schemaless fallback
 
-`tson validate` now reads a *self-describing* data document -- one that opens with a root type-ref
-(`!person { ... }`) and, optionally, a `!!schema:"<uri>"` header naming the schema it conforms to --
-without needing `--type`. This is CLI-level `!!schema`-header consumption; the library front door
-(`Tson`) still has no equivalent one-call auto-select entry point (see "Not yet implemented"). Added
-alongside the `init-example` example becoming self-describing, so the scaffolded `person-data.tn` is a
-genuine, self-identifying TSON document rather than a bare `{ ... }` that only validated because the
-CLI was separately told `--type person`.
+`tson validate` takes a **flat list of files** (`tson validate [--type <name>] [--output ...]
+<file>...`), auto-classifies each as a schema or data document, exposes the schema files through a
+`TsonSchemaSource`, and validates each data file by resolving its own `!!schema` directive through the
+**normal loader** (`tson.loader().load(uri)`) -- the `!!schema` URI *is* the schema selector. A data
+file with no `!!schema` is validated **schemalessly** (Class 1, see `SchemalessValidator` below).
+This replaced an earlier "positional schema file + ad-hoc `schemaMatches` verify" design (user's own
+direction: the schema shouldn't be a special positional argument, and verification shouldn't be a
+bespoke string compare -- routing through the real resolution mechanism is the right interface, and a
+step toward whitelisted-URI loading later). The `schemaMatches` helper is gone.
 
-- **CLI shape (user's own explicit choice): positional schema file + verify, no URI-mapping flag.**
-  `tson validate [--type <name>] [--output ...] <schema> <data...>`. The positional `<schema>` is
-  compiled exactly as before (DOM mode); its own `!!id` is what a data file's `!!schema` is checked
-  against. Deliberately *not* a `--schema <uri>=<file>` mapping flag and *not* a new file/HTTP-backed
-  `TsonSchemaSource` -- the schema is always supplied directly, so no fetch capability is needed
-  (import-chain URI resolution by fetch stays future work). `--type` is now **optional** (was
-  required): an explicit override, and still the only way to read a plain, non-self-describing `{ ... }`
-  document.
-- **`ValidateCommand.run(Path, String /*nullable typeName*/, List<Path>, OutputFormat)`** -- compiles
-  the schema once, captures `compiled.schema().id()`. An explicit `--type` still resolves its reader
-  *up front* (an unknown name is a load error, exit 2, unchanged). With no `--type`, each data file is
-  handled per-file: build `new TsonDataStream(in)`, `next()` the `DocumentStart` (whose `schema()`
-  carries the root `!!schema` URI -- the one event the plain `TsonReadContext.collecting(in)` overload
-  discards, which is why this path builds the stream itself and uses the raw
-  `collecting(TsonEventSource)` overload instead), then `peek()`: a leading `TypeRef` event supplies
-  the type name for `compiled.compiledSchema().get(name)`. The chosen reader's own first step
-  (`EventSkip.annotationsAndTypeRef`) re-consumes that same `!person` type-ref, so peeking-not-consuming
-  it is exactly right.
-- **`!!schema` verification.** If a data file declares a `!!schema`, it must name the schema being
-  validated against: checked via `tson.schemaRegistry().get(declaredUri)` (the schema was registered
-  by `tson.compile`; `get` canonicalizes the URI internally via `CanonicalIdentity`) and comparing the
-  looked-up entry's own `!!id` to the compiled schema's. A mismatch (or an unregistered/malformed
-  declared URI) is a per-file `SCHEMA_ERROR`, exit 1 -- the document claims conformance to a schema it
-  isn't actually being checked against. No `!!schema` in the data → verification skipped (nothing to
-  check), keeping plain `{ ... }` + `--type` data working. `TsonSchemaRegistry.validateIdentity` was
-  *not* used for this -- it returns `void` (validates only), so the registry-`get` route is what
-  actually canonicalizes-and-compares.
-- **Type-determination failure is per-file, not usage.** No `--type` and no root type-ref (a plain
-  `42`/`{ ... }`) → a per-file `VALIDATION_ERROR` ("no --type given and the data has no root
-  type-ref"), exit 1 -- not the old exit-2 "validate requires --type" usage error, which is gone.
-  `TsonCliTest.validatePlainDataWithoutTypeOrTypeRefExitsOne` (retargeted from the old
-  `validateWithoutTypeExitsTwo`) pins this.
-- **Verified end to end**, both via `ValidateCommandTest` (self-describing validates with no `--type`;
-  `--type` override still works on self-describing data; a mismatched `!!schema` → `SCHEMA_ERROR`/exit
-  1; plain data + no `--type` → `VALIDATION_ERROR`/exit 1) and against the real installed binary
-  (`init-example` → `tson validate person.tn person-data.tn` → `OK`/exit 0; a diverted `!!schema` →
-  `SCHEMA_ERROR`/exit 1). The `init-example` `DATA` constant gained the `!!schema` header + `!person`;
-  `TsonCliTest.initScaffoldsAnExampleThatActuallyValidates` validates it with no `--type`.
+- **`TsonConfig.schemaSource(TsonSchemaSource)`** (`tson` module) -- the "future pluggable source" its
+  own Javadoc had promised, now real. A field defaulting to `TsonSchemaSource.registeredOnly()`;
+  `build()` composes it **bundled-first, configured-fallback** (`uri -> isBundled(uri) ?
+  TsonBundledSchemas.fetch(uri) : schemaSource.fetch(uri)`, `isBundled` checking the three
+  `TsonBundledSchemas.*_ID` constants), so the standard library always loads and a caller's source only
+  ever *adds* URIs, never overrides the bundled three. `DefaultTsonCompiledSchemaLoader.load(uri)`
+  already does fetch→parse→resolve(recursive via the same loader)→register→compile→cache, so a user
+  schema fetched via the source resolves its own `!!meta`/`!!import` through the same source with no
+  further change.
+- **`SchemalessValidator`** (`tson-compiler`, root package -- `public static List<Diagnostic>
+  validate(String|InputStream)`). Class 1 validation: parse via `TsonDataParser` (base syntax; a
+  lex/parse/`TsonUnsupportedDocumentException` failure is one `VALIDATION_ERROR` `Diagnostic`), then
+  recurse the `DataValue`/`CoreValue` tree -- at each node with a `typeRef`, `BuiltinTypeVocabulary
+  .lookup(name)` empty → `UNKNOWN_TYPE_REF` (not built-in, no schema to define it), present +
+  `TokenValue` → `atomType.read(token)` in `try/catch (AtomTypeException)` → `ATOM_CONSTRAINT_VIOLATION`
+  (mirrors `AtomValueReader`, minus the Java-target arms), present + non-token → `TYPE_MISMATCH`. An
+  untyped token never fails (§4). RFC-6901 path built during recursion; `dataPosition` from
+  `parser.positions()`. Lives in `tson-compiler` **because** it needs `BuiltinTypeVocabulary` (`.atom`)
+  and `BaseTypeResolver`/`.base`, both unexported to other modules -- the CLI can't do this itself.
+- **`ValidateCommand.run(List<Path> files, String typeName, OutputFormat format)`** -- (1) classify:
+  a header peek via `new TsonDataStream(in).next()` throwing `TsonUnsupportedDocumentException` ⇒
+  schema (then `TsonSchemaParser.parseSchemaDocument().id()` keys it into a `Map<id, text>`; a schema
+  with no `!!id` or that won't parse is a `SCHEMA_ERROR`, exit 2), a clean `DocumentStart` ⇒ data. (2)
+  Build a `TsonSchemaSource` over the map (`uri -> map.get(uri) or throw`) and one
+  `Tson.builder().schemaSource(source).build()`. (3) No data files at all → exit 2. (4) Per data file:
+  peek `DocumentStart.schema()` -- present ⇒ **schema-driven** (`domCompiledSchema`, below), absent ⇒
+  **schemaless** (`SchemalessValidator.validate`, re-read from the top). Report through the existing
+  `ValidationReport`/`CliDiagnostic`/`OutputFormat`.
+- **`domCompiledSchema(tson, uri, domCache)`** -- the load-bearing subtlety. The `Tson` loader compiles
+  in **object-binding mode** (fixed at `build()`, needed to bind meta.tn instances to `schema.meta`
+  classes during resolution), which has no Java class for a user type like `person` -- so
+  `tson.loader().load(uri)` alone yields an `ErrorReader` ("no bound Java class for 'person'"). Fix:
+  `loader.load(uri)` to resolve+**register** the schema (and its imports) through the source, then
+  `tson.schemaRegistry().get(uri)` for the linked schema, then `tson.compile(linked,
+  TsonSchemaCompiler.dom())` to compile it in **DOM mode** for reading. `Tson.compile(TsonLinkedSchema,
+  mode)` (= `TsonCompiledMetaSchema.bootstrap`, no re-registration) is what makes recompiling a
+  *linked* schema in a different mode safe. Cached per URI (`domCache`) so multiple data files sharing a
+  schema compile it once, and so a schema pulled in as another's `!!import` (already registered) is
+  reached via `registry.get` rather than a double-registering re-resolve.
+- **Type selection** (schema-driven only): `--type` if given (override), else the root `TypeRef` name
+  (`stream.peek()`), else `VALIDATION_ERROR`. `--type` is ignored for schemaless data (no schema).
+- **Exit codes**: 0 all valid, 1 any data file invalid (bad value, unresolvable `!!schema`, unknown
+  type), 2 usage/classification (no files, only schema files, an unreadable/malformed schema file).
+- **Verified** via `SchemalessValidatorTest` (`tson-compiler`), `ValidateCommandTest` (schema-driven
+  valid/invalid, file-order independence, unprovided-`!!schema` → `SCHEMA_ERROR`, multi-schema routing,
+  `--type` override, schemaless good/bad atom, only-schemas → exit 2, JSON shape), retargeted
+  `TsonCliTest`, and the real installed binary (`init-example` → `tson validate person.tn
+  person-data.tn` → `OK`; a diverted `!!schema` → `SCHEMA_ERROR`; a plain data file with a bad `!int32`
+  → `ATOM_CONSTRAINT_VIOLATION`). `init-example`'s scaffolded `person-data.tn` (still `!!schema` +
+  `!person`) resolves `person.tn` through the source unchanged.
 
 ### Conformance suite integration (`ConformanceSuiteTest`)
 
@@ -3014,11 +3028,11 @@ list to work through in order.
   `ChoiceReader`, `AtomValueReader` + the vocab-family parsers) — now has dedicated coverage above
   ("Class 2 compilation", "Compiled schema registry", "Bundled schema documents", "Object-binding
   mode"). Known, still-open gaps within it: no *library*-level `!!schema`-header auto-selection (the
-  `tson-cli` `validate` command now does drive type selection from a data document's own root type-ref
-  and verifies its `!!schema` against the schema's `!!id` -- see "CLI: self-describing data" below --
-  but there's no single library-facing "read this string, pick the right compiled reader automatically
-  from its own `!!schema`/type-ref" entry point on `Tson` yet; a programmatic caller must still name
-  the schema type up front); five real core.tn1 declarations
+  `tson-cli` `validate` command now drives schema selection from a data document's own `!!schema` URI,
+  resolved through a `TsonSchemaSource`, and type selection from its root type-ref -- see "CLI:
+  schema-source validation model" below -- but there's no single library-facing "read this string, pick
+  the right compiled reader automatically from its own `!!schema`/type-ref" entry point on `Tson` yet;
+  a programmatic caller must still name the schema type up front); five real core.tn1 declarations
   (`unknown`/`email`/`cidr4`/`cidr6`/`mac`, constructed via `unknown_type`/`email_type`/`cidr4_type`/
   `cidr6_type`/`mac_type`) plus a sixth constructor with no core.tn1 declaration at all (`extern`)
   have no compiled-parser factory yet, registered to `ErrorReader` so a schema declaring one still

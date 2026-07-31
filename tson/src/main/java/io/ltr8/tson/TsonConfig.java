@@ -21,8 +21,23 @@ import io.ltr8.tson.schema.TsonSchemaRegistry;
 public final class TsonConfig {
 
     private DataBindContext dataBindContext = TsonAtomContext.defaultContext();
+    private TsonSchemaSource schemaSource = TsonSchemaSource.registeredOnly();
 
     TsonConfig() {
+    }
+
+    /**
+     * A source for schema documents beyond the bundled standard library -- consulted by the built
+     * {@link Tson}'s loader to fetch a {@code !!schema}/{@code !!import}/{@code !!meta} target it
+     * doesn't already have registered. The bundled meta-kernel/meta.tn/core.tn are always served
+     * first, so this source only needs to know its own URIs; it is a fallback, never an override of
+     * the standard library. Defaults to {@link TsonSchemaSource#registeredOnly()} (nothing extra
+     * fetchable). This is the seam for loading schemas from local files, or later from a whitelist of
+     * allowed hosts/URIs.
+     */
+    public TsonConfig schemaSource(TsonSchemaSource schemaSource) {
+        this.schemaSource = schemaSource;
+        return this;
     }
 
     /**
@@ -43,7 +58,13 @@ public final class TsonConfig {
                 TsonSchemaCompiler.bind(SchemaMetaNameBinder.defaultContext());
         TsonSchemaRegistry schemaRegistry = new TsonSchemaRegistry();
         TsonCompiledRegistry compiledRegistry = new TsonCompiledRegistry(schemaRegistry, resolver);
-        TsonCompiledSchemaLoader loader = TsonSchemaResolver.defaultLoader(compiledRegistry, TsonBundledSchemas::fetch);
+        // Bundled standard library always served first; the configured source (default: none)
+        // supplies any additional schema URIs -- e.g. local files the CLI collected, or later a
+        // whitelist of allowed hosts. It never overrides the three bundled identities.
+        TsonSchemaSource composed = uri -> isBundled(uri)
+                ? TsonBundledSchemas.fetch(uri)
+                : schemaSource.fetch(uri);
+        TsonCompiledSchemaLoader loader = TsonSchemaResolver.defaultLoader(compiledRegistry, composed);
 
         // Meta-kernel's own bootstrap case, registered explicitly -- see TsonBundledSchemas's own
         // class Javadoc for why this step can't just be another loader.load(...) call.
@@ -56,5 +77,11 @@ public final class TsonConfig {
         loader.load(TsonBundledSchemas.CORE_ID);
 
         return new Tson(schemaRegistry, compiledRegistry, loader, dataBindContext);
+    }
+
+    private static boolean isBundled(String uri) {
+        return uri.equals(TsonBundledSchemas.META_KERNEL_ID)
+                || uri.equals(TsonBundledSchemas.META_ID)
+                || uri.equals(TsonBundledSchemas.CORE_ID);
     }
 }

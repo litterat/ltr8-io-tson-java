@@ -113,8 +113,9 @@ front (`!!schema` + `!person`); values can carry their own *type annotation* on 
 ]` and the record fields need no commas at all. Note `email` is simply absent (it's optional), and
 only `mobile` is given, not `phone` (the group allows at most one).
 
-**`tson validate`** reads the data against the schema. Because the data names its own type, you don't
-need `--type` — and its `!!schema` is checked against the schema file's `!!id`:
+**`tson validate`** takes the files and validates the data. You pass both files; the data's `!!schema`
+selects `person.tn` (by its `!!id`) and its root `!person` selects the type, so you need no `--type`.
+(A data file with no `!!schema` is instead checked schemalessly — base syntax plus built-in types.)
 
 ```
 $ tson validate person.tn person-data.tn
@@ -364,7 +365,8 @@ meta-kernel/meta.tn/core.tn library.
 
 The `tson-cli` module is a small, zero-dependency CLI (ajv-cli-style) for checking TSON from the shell —
 no Java to write. Three commands: **`init-example`** scaffolds an example schema + data file to start
-from, **`validate`** reads a data file against one type of a schema, and **`compile`** checks that a
+from, **`validate`** checks data files (each against the schema its own `!!schema` names, or
+schemalessly), and **`compile`** checks that a
 schema document itself resolves and compiles cleanly.
 
 Build and install it — the installed command is `tson`:
@@ -379,13 +381,17 @@ write `tson` for that launcher path.
 
 ```
 tson init-example [<dir>]
-tson validate     [--type <name>] [--output text|json|tson] <schema> <data...>
+tson validate     [--type <name>] [--output text|json|tson] <file>...
 tson compile      [--output text|json|tson] <schema>
 ```
 
-`tson init-example` writes a ready-to-run `person.tn` + `person-data.tn` (see [Getting started](#getting-started)),
-whose data is self-describing so `validate` needs no `--type`. For a plain, hand-written schema
-`person.tn` and a data file `ada.tn` (no `!!schema`/type-ref, so `--type` names the type):
+**`validate` takes a flat list of files** and auto-classifies each as a schema (its header carries
+`!!meta`) or a data document. A data file's own `!!schema` directive selects which schema it's
+validated against — the schema files are just made available, so order doesn't matter and you can pass
+several of each. A data file with **no `!!schema`** is checked *schemalessly*: base syntax plus any
+built-in type (`!uuid`/`!int32`/`!date`/…), with a non-built-in type-ref reported as unknown.
+
+For a hand-written schema `person.tn` and a self-describing data file `ada.tn`:
 
 ```tson
 !!id:"https://example.com/2026/32/app/person-1.tn"
@@ -397,23 +403,22 @@ whose data is self-describing so `validate` needs no `--type`. For a plain, hand
 ```
 
 ```
-$ tson validate --type person person.tn ada.tn        # ada.tn = { name: "Ada"  age: 30 }
+$ tson validate person.tn ada.tn      # ada.tn = !!schema:"…/person-1.tn" !person { name: "Ada" age: 30 }
 OK
 
-$ tson validate --type person --output json person.tn bad.tn   # bad.tn = { age: 30 }
+$ tson validate --output json person.tn bad.tn   # bad.tn = !!schema:"…/person-1.tn" !person { age: 30 }
 {"valid":false,"errors":[{"path":"/name","code":"FIELD_REQUIRED",
   "message":"missing required field 'name' for 'person'","expected":"a value for 'name'",
-  "actual":"(absent)","dataPosition":"1:1:0","schemaPosition":null}]}
+  "actual":"(absent)","dataPosition":"2:1:…","schemaPosition":null}]}
 
 $ tson compile person.tn
 OK
 ```
 
-- **`--type`** (validate only) names which of a schema's many types the data is read against. It's
-  *optional* for a self-describing data document — one that opens with a root type-ref (`!person`) — and
-  required otherwise. When the data carries a `!!schema` header, it's verified against the schema
-  file's own `!!id` (a mismatch is a `SCHEMA_ERROR`, exit 1). There's no `!!schema`-URI-to-file
-  *fetching* — you always pass the schema file explicitly.
+- **`--type`** (validate only) overrides which of a schema's types a schema-driven data file is read
+  against — optional when the data opens with a root type-ref (`!person`), and ignored for schemaless
+  data. If a data file's `!!schema` names a schema you didn't pass, that's a `SCHEMA_ERROR`. There's no
+  URL *fetching* — schemas come from the files you list (a whitelisted-URI source is future work).
 - **`--output`**: `text` (default, human-readable), `json` (for scripts/agents — the shape aligns with
   Pydantic's own `errors()`), or `tson` (the diagnostics rendered as a real, schema-validated TSON
   document — the CLI dogfooding the library).
