@@ -10,8 +10,10 @@ import java.nio.file.Path;
  * a matching data file ({@code person-data.tn}) to disk, so a newcomer can validate, edit, and re-run
  * entirely from the shell without writing any Java or hand-authoring a first schema. The example is a
  * short tour of TSON: a record, an enum, an optional field, built-in types (uuid/date), a nested
- * record, an array, and a field group ("one of"). The two files are the starting point the README's
- * Getting Started section walks through.
+ * record, an array, and a field group ("one of"). The data file is self-describing -- a {@code
+ * !!schema} header naming the schema plus a root {@code !person} type-ref -- so {@code tson validate}
+ * needs no {@code --type}. The two files are the starting point the README's Getting Started section
+ * walks through.
  *
  * <p>Refuses to overwrite either file if it already exists (exit 1) -- this is a scaffold, not
  * something that should ever clobber a user's own edits when re-run.
@@ -47,7 +49,8 @@ final class InitCommand {
             """;
 
     private static final String DATA = """
-            {
+            !!schema:"https://example.com/2026/32/getting-started/person-1.tn"
+            !person {
               id: !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09
               name: "Ada Lovelace"
               age: 30
@@ -86,8 +89,8 @@ final class InitCommand {
 
         System.out.println("Wrote " + schema + " and " + data + ".");
         System.out.println();
-        System.out.println("Try it:");
-        System.out.println("  tson validate --type person " + schema + " " + data);
+        System.out.println("Try it (the data names its own schema and type, so no --type is needed):");
+        System.out.println("  tson validate " + schema + " " + data);
         System.out.println();
         System.out.println("Then edit person-data.tn to see the diagnostics -- for example: change a value's type");
         System.out.println("(age: \"thirty\"), remove a required field, use a role that isn't admin/member/guest,");

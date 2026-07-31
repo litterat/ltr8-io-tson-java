@@ -128,6 +128,63 @@ class ValidateCommandTest {
         assertTrue(output.contains("\"code\":\"ATOM_CONSTRAINT_VIOLATION\""), output);
     }
 
+    // A self-describing data document: it names its own schema (matching SCHEMA's !!id) and opens
+    // with a root type-ref, so it needs no --type.
+    private static final String SELF_DESCRIBING = """
+            !!schema:"https://example.test/cli-validate.tn1"
+            !my_int 42
+            """;
+
+    @Test
+    void selfDescribingDataValidatesWithNoType(@TempDir Path dir) throws IOException {
+        Path schema = writeFile(dir, "schema.tn1", SCHEMA);
+        Path data = writeFile(dir, "data.tson", SELF_DESCRIBING);
+
+        String output = captureStdout(() ->
+                assertEquals(0, ValidateCommand.run(schema, null, List.of(data), OutputFormat.TEXT)));
+
+        assertEquals("OK", output.strip());
+    }
+
+    @Test
+    void selfDescribingDataStillHonorsAnExplicitTypeOverride(@TempDir Path dir) throws IOException {
+        Path schema = writeFile(dir, "schema.tn1", SCHEMA);
+        Path data = writeFile(dir, "data.tson", SELF_DESCRIBING);
+
+        String output = captureStdout(() ->
+                assertEquals(0, ValidateCommand.run(schema, "my_int", List.of(data), OutputFormat.TEXT)));
+
+        assertEquals("OK", output.strip());
+    }
+
+    @Test
+    void aDeclaredSchemaThatDoesntMatchIsAPerFileError(@TempDir Path dir) throws IOException {
+        Path schema = writeFile(dir, "schema.tn1", SCHEMA);
+        // The data claims a schema URI other than the one it's being validated against.
+        Path data = writeFile(dir, "data.tson", """
+                !!schema:"https://example.test/some-other-schema.tn1"
+                !my_int 42
+                """);
+
+        String output = captureStdout(() ->
+                assertEquals(1, ValidateCommand.run(schema, null, List.of(data), OutputFormat.TEXT)));
+
+        assertTrue(output.contains("[SCHEMA_ERROR]"), output);
+        assertTrue(output.contains("some-other-schema"), output);
+    }
+
+    @Test
+    void plainDataWithNoTypeAndNoTypeRefIsAPerFileError(@TempDir Path dir) throws IOException {
+        Path schema = writeFile(dir, "schema.tn1", SCHEMA);
+        Path data = writeFile(dir, "data.tson", "42");
+
+        String output = captureStdout(() ->
+                assertEquals(1, ValidateCommand.run(schema, null, List.of(data), OutputFormat.TEXT)));
+
+        assertTrue(output.contains("[VALIDATION_ERROR]"), output);
+        assertTrue(output.contains("root type-ref"), output);
+    }
+
     private static Path writeFile(Path dir, String name, String content) throws IOException {
         Path file = dir.resolve(name);
         Files.writeString(file, content);

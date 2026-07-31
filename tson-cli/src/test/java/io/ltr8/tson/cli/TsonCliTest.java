@@ -45,7 +45,9 @@ class TsonCliTest {
     }
 
     @Test
-    void validateWithoutTypeExitsTwo(@TempDir Path dir) throws IOException {
+    void validatePlainDataWithoutTypeOrTypeRefExitsOne(@TempDir Path dir) throws IOException {
+        // --type is optional now, but plain data (no root type-ref, no !!schema) gives nothing to
+        // select a type from -- a per-file failure (exit 1), not a usage error.
         Path schema = writeFile(dir, "schema.tn1", """
                 !!id:"https://example.test/cli-arg-test.tn1"
                 !!meta:"https://tson.io/2026/32/m/meta.tn"
@@ -54,10 +56,10 @@ class TsonCliTest {
                 """);
         Path data = writeFile(dir, "data.tson", "42");
 
-        String err = captureStderr(() ->
-                assertEquals(2, TsonCli.run(new String[] {"validate", schema.toString(), data.toString()})));
+        String out = captureStdout(() ->
+                assertEquals(1, TsonCli.run(new String[] {"validate", schema.toString(), data.toString()})));
 
-        assertTrue(err.contains("--type"), err);
+        assertTrue(out.contains("root type-ref"), out);
     }
 
     @Test
@@ -86,9 +88,10 @@ class TsonCliTest {
         assertTrue(Files.exists(data), "person-data.tn written");
 
         // The whole point: the scaffolded pair the README's getting-started walks through must
-        // validate cleanly, so onboarding can never ship a broken example.
+        // validate cleanly, so onboarding can never ship a broken example. The data is
+        // self-describing (!!schema + a root !person), so no --type is needed.
         assertEquals(0, TsonCli.run(new String[] {
-                "validate", "--type", "person", schema.toString(), data.toString()}));
+                "validate", schema.toString(), data.toString()}));
     }
 
     @Test

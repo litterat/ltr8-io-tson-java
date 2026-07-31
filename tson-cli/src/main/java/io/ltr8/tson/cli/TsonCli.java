@@ -22,7 +22,7 @@ public final class TsonCli {
     private static final String USAGE = """
             usage:
               tson init-example [<dir>]
-              tson validate --type <name> [--output text|json|tson] <schema> <data...>
+              tson validate [--type <name>] [--output text|json|tson] <schema> <data...>
               tson compile [--output text|json|tson] <schema>
 
             commands:
@@ -31,14 +31,15 @@ public final class TsonCli {
               compile     check that a schema document itself resolves and compiles
 
             options:
-              --type <name>              (validate) the schema type to read each data file against
+              --type <name>              (validate) the schema type to read each data file against;
+                                         optional if the data opens with a root type-ref (e.g. !person)
               --output text|json|tson    output format (default: text)
               --help, -h                 print this help
 
             exit codes: 0 ok, 1 validation/compile failure, 2 usage error""";
 
     private static final String VALIDATE_USAGE =
-            "usage: tson validate --type <name> [--output text|json|tson] <schema> <data...>";
+            "usage: tson validate [--type <name>] [--output text|json|tson] <schema> <data...>";
 
     private static final String COMPILE_USAGE =
             "usage: tson compile [--output text|json|tson] <schema>";
@@ -113,9 +114,6 @@ public final class TsonCli {
             }
         }
 
-        if (typeName == null) {
-            throw new IllegalArgumentException("validate requires --type <name>");
-        }
         if (positional.size() < 2) {
             throw new IllegalArgumentException(VALIDATE_USAGE);
         }

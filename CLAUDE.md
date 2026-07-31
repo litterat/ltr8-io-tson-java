@@ -2897,6 +2897,55 @@ exit 1; missing file → `VALIDATION_ERROR`/exit 1). `StreamingLazinessTest` del
 `TsonEventSource` the factories can't interpose, exactly the "raw `TsonEventSource`" case those
 overloads exist for.
 
+### CLI: self-describing data validation (`!!schema` + root type-ref)
+
+`tson validate` now reads a *self-describing* data document -- one that opens with a root type-ref
+(`!person { ... }`) and, optionally, a `!!schema:"<uri>"` header naming the schema it conforms to --
+without needing `--type`. This is CLI-level `!!schema`-header consumption; the library front door
+(`Tson`) still has no equivalent one-call auto-select entry point (see "Not yet implemented"). Added
+alongside the `init-example` example becoming self-describing, so the scaffolded `person-data.tn` is a
+genuine, self-identifying TSON document rather than a bare `{ ... }` that only validated because the
+CLI was separately told `--type person`.
+
+- **CLI shape (user's own explicit choice): positional schema file + verify, no URI-mapping flag.**
+  `tson validate [--type <name>] [--output ...] <schema> <data...>`. The positional `<schema>` is
+  compiled exactly as before (DOM mode); its own `!!id` is what a data file's `!!schema` is checked
+  against. Deliberately *not* a `--schema <uri>=<file>` mapping flag and *not* a new file/HTTP-backed
+  `TsonSchemaSource` -- the schema is always supplied directly, so no fetch capability is needed
+  (import-chain URI resolution by fetch stays future work). `--type` is now **optional** (was
+  required): an explicit override, and still the only way to read a plain, non-self-describing `{ ... }`
+  document.
+- **`ValidateCommand.run(Path, String /*nullable typeName*/, List<Path>, OutputFormat)`** -- compiles
+  the schema once, captures `compiled.schema().id()`. An explicit `--type` still resolves its reader
+  *up front* (an unknown name is a load error, exit 2, unchanged). With no `--type`, each data file is
+  handled per-file: build `new TsonDataStream(in)`, `next()` the `DocumentStart` (whose `schema()`
+  carries the root `!!schema` URI -- the one event the plain `TsonReadContext.collecting(in)` overload
+  discards, which is why this path builds the stream itself and uses the raw
+  `collecting(TsonEventSource)` overload instead), then `peek()`: a leading `TypeRef` event supplies
+  the type name for `compiled.compiledSchema().get(name)`. The chosen reader's own first step
+  (`EventSkip.annotationsAndTypeRef`) re-consumes that same `!person` type-ref, so peeking-not-consuming
+  it is exactly right.
+- **`!!schema` verification.** If a data file declares a `!!schema`, it must name the schema being
+  validated against: checked via `tson.schemaRegistry().get(declaredUri)` (the schema was registered
+  by `tson.compile`; `get` canonicalizes the URI internally via `CanonicalIdentity`) and comparing the
+  looked-up entry's own `!!id` to the compiled schema's. A mismatch (or an unregistered/malformed
+  declared URI) is a per-file `SCHEMA_ERROR`, exit 1 -- the document claims conformance to a schema it
+  isn't actually being checked against. No `!!schema` in the data → verification skipped (nothing to
+  check), keeping plain `{ ... }` + `--type` data working. `TsonSchemaRegistry.validateIdentity` was
+  *not* used for this -- it returns `void` (validates only), so the registry-`get` route is what
+  actually canonicalizes-and-compares.
+- **Type-determination failure is per-file, not usage.** No `--type` and no root type-ref (a plain
+  `42`/`{ ... }`) → a per-file `VALIDATION_ERROR` ("no --type given and the data has no root
+  type-ref"), exit 1 -- not the old exit-2 "validate requires --type" usage error, which is gone.
+  `TsonCliTest.validatePlainDataWithoutTypeOrTypeRefExitsOne` (retargeted from the old
+  `validateWithoutTypeExitsTwo`) pins this.
+- **Verified end to end**, both via `ValidateCommandTest` (self-describing validates with no `--type`;
+  `--type` override still works on self-describing data; a mismatched `!!schema` → `SCHEMA_ERROR`/exit
+  1; plain data + no `--type` → `VALIDATION_ERROR`/exit 1) and against the real installed binary
+  (`init-example` → `tson validate person.tn person-data.tn` → `OK`/exit 0; a diverted `!!schema` →
+  `SCHEMA_ERROR`/exit 1). The `init-example` `DATA` constant gained the `!!schema` header + `!person`;
+  `TsonCliTest.initScaffoldsAnExampleThatActuallyValidates` validates it with no `--type`.
+
 ### Conformance suite integration (`ConformanceSuiteTest`)
 
 Separate from `LexerTest`/`TsonDataParserTest` (fine-grained unit tests) is `ConformanceSuiteTest`, which runs
@@ -2964,9 +3013,12 @@ list to work through in order.
   `Record`/`Array`/`Map`/`Tuple{DomReader,BindReader}`, `VariantSchemaReader`/`VariantBindReader`,
   `ChoiceReader`, `AtomValueReader` + the vocab-family parsers) — now has dedicated coverage above
   ("Class 2 compilation", "Compiled schema registry", "Bundled schema documents", "Object-binding
-  mode"). Known, still-open gaps within it: no `!!schema`-header auto-selection (a caller must
-  already know which schema-known position it's reading against -- there's no single "read this
-  string, pick the right compiled reader automatically" entry point); five real core.tn1 declarations
+  mode"). Known, still-open gaps within it: no *library*-level `!!schema`-header auto-selection (the
+  `tson-cli` `validate` command now does drive type selection from a data document's own root type-ref
+  and verifies its `!!schema` against the schema's `!!id` -- see "CLI: self-describing data" below --
+  but there's no single library-facing "read this string, pick the right compiled reader automatically
+  from its own `!!schema`/type-ref" entry point on `Tson` yet; a programmatic caller must still name
+  the schema type up front); five real core.tn1 declarations
   (`unknown`/`email`/`cidr4`/`cidr6`/`mac`, constructed via `unknown_type`/`email_type`/`cidr4_type`/
   `cidr6_type`/`mac_type`) plus a sixth constructor with no core.tn1 declaration at all (`extern`)
   have no compiled-parser factory yet, registered to `ErrorReader` so a schema declaring one still

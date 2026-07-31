@@ -39,8 +39,8 @@ version (Gradle 9.4.1) on first run.
 $ tson init-example
 Wrote ./person.tn and ./person-data.tn.
 
-Try it:
-  tson validate --type person ./person.tn ./person-data.tn
+Try it (the data names its own schema and type, so no --type is needed):
+  tson validate ./person.tn ./person-data.tn
   …
 ```
 
@@ -86,10 +86,12 @@ Reading top to bottom, most of it is familiar and a few things are new:
 - **`( phone: text | mobile: text )?`** — a *field group*: "at most one of these" (with `?`; drop the
   `?` and it's "exactly one"). A record-level either/or with no JSON equivalent.
 
-And here's `person-data.tn`, a *data* document — an instance of that shape:
+And here's `person-data.tn`, a *data* document — an instance of that shape. It's *self-describing*: the
+`!!schema` header names the schema it conforms to, and the leading `!person` says which type:
 
 ```tson
-{
+!!schema:"https://example.com/2026/32/getting-started/person-1.tn"
+!person {
     id: !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09
     name: "Ada Lovelace"
     age: 30
@@ -105,15 +107,17 @@ And here's `person-data.tn`, a *data* document — an instance of that shape:
 }
 ```
 
-Two data-notation things to notice versus JSON: values can carry their own *type annotation* on the
-wire (`!uuid …`, `!date …`), and separators are whitespace *or* commas — the array `[ mathematics
-analysis "computing" ]` and the record fields need no commas at all. Note `email` is simply absent
-(it's optional), and only `mobile` is given, not `phone` (the group allows at most one).
+A few data-notation things to notice versus JSON: the document declares its own schema and type up
+front (`!!schema` + `!person`); values can carry their own *type annotation* on the wire (`!uuid …`,
+`!date …`); and separators are whitespace *or* commas — the array `[ mathematics analysis "computing"
+]` and the record fields need no commas at all. Note `email` is simply absent (it's optional), and
+only `mobile` is given, not `phone` (the group allows at most one).
 
-**`tson validate`** reads the data against a type of the schema:
+**`tson validate`** reads the data against the schema. Because the data names its own type, you don't
+need `--type` — and its `!!schema` is checked against the schema file's `!!id`:
 
 ```
-$ tson validate --type person person.tn person-data.tn
+$ tson validate person.tn person-data.tn
 OK
 ```
 
@@ -122,7 +126,7 @@ line, use a `role` that isn't one of the three, or add `phone: "…"` alongside 
 allows at most one) — and run it again. Every problem is reported at once, with a path and a reason:
 
 ```
-$ tson validate --type person person.tn person-data.tn
+$ tson validate person.tn person-data.tn
 [ATOM_CONSTRAINT_VIOLATION] /age: 'thirty' is not a valid integer …
 [FIELD_REQUIRED] /name: missing required field 'name' for 'person'
 ```
@@ -334,9 +338,12 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
 
 See [BACKLOG.md](BACKLOG.md) for the actively-tracked engineering backlog, and
 [STRUCTURED-OUTPUT.md](STRUCTURED-OUTPUT.md) for the target-use-case plan (LLM structured-output
-validation, JSON compatibility). One onboarding-relevant gap worth naming: there's no `!!schema`-header
-auto-selection yet — every read above needs you to name the target class or schema type up front; a
-data document can't yet drive its own reader from its own `!!schema` directive.
+validation, JSON compatibility). One onboarding-relevant gap worth naming: the *CLI* now reads a
+self-describing data document — one that opens with a root type-ref (`!person`) and verifies its own
+`!!schema` header against the schema (see [Command-line interface](#command-line-interface)) — but the
+*library* front door doesn't yet have the equivalent one-call "read this string and auto-pick the
+reader from its own `!!schema`/type-ref" entry point; every `read` above still needs you to name the
+target class or schema type up front.
 
 See [CLAUDE.md](CLAUDE.md#architecture) for architecture and design notes, and
 [Conformance](#conformance) below for edge-case behavior worth knowing about.
@@ -495,12 +502,13 @@ write `tson` for that launcher path.
 
 ```
 tson init-example [<dir>]
-tson validate     --type <name> [--output text|json|tson] <schema> <data...>
+tson validate     [--type <name>] [--output text|json|tson] <schema> <data...>
 tson compile      [--output text|json|tson] <schema>
 ```
 
-`tson init-example` writes a ready-to-run `person.tn` + `person-data.tn` (see [Getting started](#getting-started)).
-For a hand-written schema `person.tn` and a data file `ada.tn`:
+`tson init-example` writes a ready-to-run `person.tn` + `person-data.tn` (see [Getting started](#getting-started)),
+whose data is self-describing so `validate` needs no `--type`. For a plain, hand-written schema
+`person.tn` and a data file `ada.tn` (no `!!schema`/type-ref, so `--type` names the type):
 
 ```tson
 !!id:"https://example.com/2026/32/app/person-1.tn"
@@ -524,8 +532,11 @@ $ tson compile person.tn
 OK
 ```
 
-- **`--type`** (validate only) is required — a TSON schema declares many types, so you name which one
-  the data is read against. There's no `!!schema`-header auto-selection yet (see [Status](#status)).
+- **`--type`** (validate only) names which of a schema's many types the data is read against. It's
+  *optional* for a self-describing data document — one that opens with a root type-ref (`!person`) — and
+  required otherwise. When the data carries a `!!schema` header, it's verified against the schema
+  file's own `!!id` (a mismatch is a `SCHEMA_ERROR`, exit 1). There's no `!!schema`-URI-to-file
+  *fetching* — you always pass the schema file explicitly.
 - **`--output`**: `text` (default, human-readable), `json` (for scripts/agents — the shape aligns with
   Pydantic's own `errors()`), or `tson` (the diagnostics rendered as a real, schema-validated TSON
   document — the CLI dogfooding the library).
