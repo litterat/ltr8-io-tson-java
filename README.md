@@ -17,40 +17,55 @@ Published under the [litterat](https://github.com/litterat) org, group id `io.lt
 
 ## Getting started
 
-Requires **Java 25**. There are no external runtime dependencies. The module you depend on is `tson`
-(the front door); it pulls in `tson-compiler`/`tson-schema`/`tson-bind` transitively. Build from source:
+TSON's schema and data notation are new — the quickest way to get a feel for them is the `tson`
+command-line tool, no Java required. Requires **Java 25**, no external dependencies. Build and install
+the command, and put it on your `PATH`:
 
 ```
-./gradlew build
+./gradlew :tson-cli:installDist
+export PATH="$PWD/tson-cli/build/install/tson/bin:$PATH"
 ```
 
-The fastest thing to try — bind a TSON document straight to a Java record, with the built-in vocabulary
-types (`!ipv4`, `!uuid`, `!date`) landing in the right JDK types automatically, no custom code:
+**`tson init`** scaffolds a working example — a schema and a matching data file — to start from:
 
-```java
-import io.ltr8.tson.compiler.TsonObjectReader;
+```
+$ tson init
+Wrote ./person.tn and ./person-data.tn.
 
-import java.net.Inet4Address;
-import java.time.LocalDate;
-import java.util.UUID;
-
-record Server(String hostname, Inet4Address address, UUID id, LocalDate deployedOn) {}
-
-Server server = new TsonObjectReader().read("""
-        {
-            hostname: "web-01"
-            address: !ipv4 192.0.2.10
-            id: !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09
-            deployedOn: !date 2026-01-15
-        }""", Server.class);
-
-// Server[hostname=web-01, address=/192.0.2.10,
-//        id=9f1c8e2a-…, deployedOn=2026-01-15]
+Try it:
+  tson validate --type person ./person.tn ./person-data.tn
+  …
 ```
 
-That's the schemaless path: your Java class *is* the shape the data is checked against. No schema
-document, no registration, no setup. The rest of this section is about the other ways to read, and when
-you'd reach for each.
+`person.tn` is a TSON *schema* — it declares a `person` type (with an enum, an optional field, and
+built-in types like `date`). `person-data.tn` is a *data* document. **`tson validate`** reads the data
+against a type of the schema:
+
+```
+$ tson validate --type person person.tn person-data.tn
+OK
+```
+
+Now break something — open `person-data.tn`, change `age: 30` to `age: "thirty"`, or delete the `name`
+line — and run it again. Every problem is reported at once, with a path and a reason:
+
+```
+$ tson validate --type person person.tn person-data.tn
+[ATOM_CONSTRAINT_VIOLATION] /age: 'thirty' is not a valid integer …
+[FIELD_REQUIRED] /name: missing required field 'name' for 'person'
+```
+
+Then edit the *schema* `person.tn` — add a field, make one optional with `?`, change a type — and
+**`tson compile`** checks it still resolves:
+
+```
+$ tson compile person.tn
+OK
+```
+
+That's the whole loop, all from the shell: scaffold → edit → validate. See
+[Command-line interface](#command-line-interface) below for the full command reference, and
+[Reading TSON](#reading-tson-choosing-an-entry-point) for reading TSON *from Java*.
 
 ---
 
@@ -76,8 +91,29 @@ and both accept a `String` or an `InputStream`.
 ### 1. Bind to a Java class — `TsonObjectReader`
 
 Schemaless (Class 1). Records, `Map<K, V>`, `List<E>`, tuples, plain enums, sealed-interface unions,
-and the whole built-in vocabulary (`!uuid`/`!ipv4`/`!date`/`!uint8`/…) all bind with no custom code.
-See [Getting started](#getting-started) above for the basic call. From an `InputStream`:
+and the whole built-in vocabulary (`!uuid`/`!ipv4`/`!date`/`!uint8`/…) all bind with no custom code —
+your Java class is the shape the data is checked against, no schema document involved:
+
+```java
+import io.ltr8.tson.compiler.TsonObjectReader;
+
+import java.net.Inet4Address;
+import java.time.LocalDate;
+import java.util.UUID;
+
+record Server(String hostname, Inet4Address address, UUID id, LocalDate deployedOn) {}
+
+Server server = new TsonObjectReader().read("""
+        {
+            hostname: "web-01"
+            address: !ipv4 192.0.2.10
+            id: !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09
+            deployedOn: !date 2026-01-15
+        }""", Server.class);
+// Server[hostname=web-01, address=/192.0.2.10, id=9f1c8e2a-…, deployedOn=2026-01-15]
+```
+
+`read` also takes an `InputStream`, streaming the file rather than buffering it whole:
 
 ```java
 try (var in = Files.newInputStream(Path.of("server.tn"))) {
@@ -371,8 +407,9 @@ behavior at the edges — are tracked separately in [SPEC-FEEDBACK.md](SPEC-FEED
 ## Command-line interface
 
 The `tson-cli` module is a small, zero-dependency CLI (ajv-cli-style) for checking TSON from the shell —
-no Java to write. Two commands: **`validate`** reads a data file against one type of a schema, and
-**`compile`** checks that a schema document itself resolves and compiles cleanly.
+no Java to write. Three commands: **`init`** scaffolds an example schema + data file to start from,
+**`validate`** reads a data file against one type of a schema, and **`compile`** checks that a schema
+document itself resolves and compiles cleanly.
 
 Build and install it — the installed command is `tson`:
 
@@ -385,11 +422,13 @@ tson-cli/build/install/tson/bin/tson --help        # or -h, or `tson help`
 write `tson` for that launcher path.
 
 ```
+tson init     [<dir>]
 tson validate --type <name> [--output text|json|tson] <schema> <data...>
 tson compile  [--output text|json|tson] <schema>
 ```
 
-Given a schema `person.tn` and a data file `ada.tn`:
+`tson init` writes a ready-to-run `person.tn` + `person-data.tn` (see [Getting started](#getting-started)).
+For a hand-written schema `person.tn` and a data file `ada.tn`:
 
 ```tson
 # person.tn

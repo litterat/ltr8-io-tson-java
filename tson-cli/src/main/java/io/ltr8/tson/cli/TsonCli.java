@@ -21,8 +21,14 @@ public final class TsonCli {
 
     private static final String USAGE = """
             usage:
+              tson init [<dir>]
               tson validate --type <name> [--output text|json|tson] <schema> <data...>
               tson compile [--output text|json|tson] <schema>
+
+            commands:
+              init        write an example schema + data file to try, then edit and re-run validate
+              validate    read data files against one type of a schema, reporting every problem
+              compile     check that a schema document itself resolves and compiles
 
             options:
               --type <name>              (validate) the schema type to read each data file against
@@ -36,6 +42,9 @@ public final class TsonCli {
 
     private static final String COMPILE_USAGE =
             "usage: tson compile [--output text|json|tson] <schema>";
+
+    private static final String INIT_USAGE =
+            "usage: tson init [<dir>]   (writes an example person.tn and person-data.tn; default dir: .)";
 
     private TsonCli() {
     }
@@ -58,10 +67,11 @@ public final class TsonCli {
 
         try {
             return switch (subcommand) {
+                case "init" -> runInit(rest);
                 case "validate" -> runValidate(rest);
                 case "compile" -> runCompile(rest);
                 default -> {
-                    System.err.println("unknown command '" + subcommand + "' -- expected validate or compile");
+                    System.err.println("unknown command '" + subcommand + "' -- expected init, validate, or compile");
                     System.err.println(USAGE);
                     yield 2;
                 }
@@ -71,6 +81,18 @@ public final class TsonCli {
             System.err.println(USAGE);
             return 2;
         }
+    }
+
+    private static int runInit(List<String> args) {
+        if (hasHelpFlag(args)) {
+            System.out.println(INIT_USAGE);
+            return 0;
+        }
+        if (args.size() > 1) {
+            throw new IllegalArgumentException(INIT_USAGE);
+        }
+        Path dir = args.isEmpty() ? Path.of(".") : Path.of(args.get(0));
+        return InitCommand.run(dir);
     }
 
     private static int runValidate(List<String> args) {

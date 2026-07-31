@@ -76,6 +76,28 @@ class TsonCliTest {
         assertEquals(0, exitCode);
     }
 
+    @Test
+    void initScaffoldsAnExampleThatActuallyValidates(@TempDir Path dir) {
+        assertEquals(0, TsonCli.run(new String[] {"init", dir.toString()}));
+
+        Path schema = dir.resolve("person.tn");
+        Path data = dir.resolve("person-data.tn");
+        assertTrue(Files.exists(schema), "person.tn written");
+        assertTrue(Files.exists(data), "person-data.tn written");
+
+        // The whole point: the scaffolded pair the README's getting-started walks through must
+        // validate cleanly, so onboarding can never ship a broken example.
+        assertEquals(0, TsonCli.run(new String[] {
+                "validate", "--type", "person", schema.toString(), data.toString()}));
+    }
+
+    @Test
+    void initRefusesToOverwriteExistingFiles(@TempDir Path dir) throws IOException {
+        assertEquals(0, TsonCli.run(new String[] {"init", dir.toString()}));
+        String err = captureStderr(() -> assertEquals(1, TsonCli.run(new String[] {"init", dir.toString()})));
+        assertTrue(err.contains("refusing to overwrite"), err);
+    }
+
     private static Path writeFile(Path dir, String name, String content) throws IOException {
         Path file = dir.resolve(name);
         Files.writeString(file, content);
