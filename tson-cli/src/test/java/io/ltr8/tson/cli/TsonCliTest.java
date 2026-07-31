@@ -28,6 +28,23 @@ class TsonCliTest {
     }
 
     @Test
+    void helpExitsZeroToStdout() throws IOException {
+        for (String flag : new String[] {"--help", "-h", "help"}) {
+            String out = captureStdout(() -> assertEquals(0, TsonCli.run(new String[] {flag})));
+            assertTrue(out.contains("usage:"), flag + " => " + out);
+        }
+    }
+
+    @Test
+    void perCommandHelpExitsZeroToStdout() throws IOException {
+        String validate = captureStdout(() -> assertEquals(0, TsonCli.run(new String[] {"validate", "--help"})));
+        assertTrue(validate.contains("tson validate"), validate);
+
+        String compile = captureStdout(() -> assertEquals(0, TsonCli.run(new String[] {"compile", "-h"})));
+        assertTrue(compile.contains("tson compile"), compile);
+    }
+
+    @Test
     void validateWithoutTypeExitsTwo(@TempDir Path dir) throws IOException {
         Path schema = writeFile(dir, "schema.tn1", """
                 !!id:"https://example.test/cli-arg-test.tn1"
@@ -77,6 +94,18 @@ class TsonCliTest {
             body.run();
         } finally {
             System.setErr(original);
+        }
+        return buffer.toString(StandardCharsets.UTF_8);
+    }
+
+    private static String captureStdout(ThrowingRunnable body) throws IOException {
+        PrintStream original = System.out;
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        System.setOut(new PrintStream(buffer, true, StandardCharsets.UTF_8));
+        try {
+            body.run();
+        } finally {
+            System.setOut(original);
         }
         return buffer.toString(StandardCharsets.UTF_8);
     }

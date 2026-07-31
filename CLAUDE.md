@@ -2348,7 +2348,8 @@ mixed real API with mid-refactor leftovers, telling you nothing about what shoul
 - **Verified both ways, not just "it compiles"**: a full `./gradlew clean build` across every module
   stays green (compile + the whole test suite, still on the classpath for test source sets, which have
   no `module-info.java` of their own), *and* the real installed CLI binary
-  (`tson-cli/build/install/tson-cli/bin/tson-cli validate ...`) still runs correctly end to end — the
+  (`tson-cli/build/install/tson/bin/tson validate ...` — the installed command is `tson`, set via
+  `application.applicationName`, not the Gradle module name `tson-cli`) still runs correctly end to end — the
   `application` plugin's default distribution launches on the classpath, not the module path, so this
   also confirms module-path enforcement at compile time and the existing classpath-based runtime
   distribution coexist without conflict.

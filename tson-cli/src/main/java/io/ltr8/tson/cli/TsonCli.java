@@ -5,17 +5,37 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Entry point for this module's own CLI ({@code BACKLOG.md}'s "Front door / ergonomics" -- a CLI,
+ * Entry point for the {@code tson} command ({@code BACKLOG.md}'s "Front door / ergonomics" -- a CLI,
  * ajv-cli-style): {@code tson validate --type <name> [--output text|json|tson] <schema> <data...>}
  * and {@code tson compile [--output text|json|tson] <schema>}. Hand-rolled argument parsing --
  * deliberately, matching this codebase's own "no external runtime dependencies" constraint; the
  * flag set is small and fixed enough that a real parsing library buys nothing here.
  *
- * <p>Exit codes are Unix-conventional: 0 valid/compiled cleanly, 1 a real validation/compile
- * failure, 2 a usage error (bad arguments, a file that can't be read) -- so a script or agent
- * shelling out gets a clean pass/fail signal without parsing prose.
+ * <p>Exit codes are Unix-conventional: 0 valid/compiled cleanly (or an explicit {@code --help}), 1 a
+ * real validation/compile failure, 2 a usage error (bad arguments, a file that can't be read) -- so a
+ * script or agent shelling out gets a clean pass/fail signal without parsing prose. Help requested
+ * explicitly ({@code --help}/{@code -h}/{@code help}) prints to stdout and exits 0; usage shown
+ * because of a mistake (no command, a bad flag) prints to stderr and exits 2.
  */
 public final class TsonCli {
+
+    private static final String USAGE = """
+            usage:
+              tson validate --type <name> [--output text|json|tson] <schema> <data...>
+              tson compile [--output text|json|tson] <schema>
+
+            options:
+              --type <name>              (validate) the schema type to read each data file against
+              --output text|json|tson    output format (default: text)
+              --help, -h                 print this help
+
+            exit codes: 0 ok, 1 validation/compile failure, 2 usage error""";
+
+    private static final String VALIDATE_USAGE =
+            "usage: tson validate --type <name> [--output text|json|tson] <schema> <data...>";
+
+    private static final String COMPILE_USAGE =
+            "usage: tson compile [--output text|json|tson] <schema>";
 
     private TsonCli() {
     }
@@ -26,10 +46,14 @@ public final class TsonCli {
 
     static int run(String[] args) {
         if (args.length == 0) {
-            printUsage();
+            System.err.println(USAGE);
             return 2;
         }
         String subcommand = args[0];
+        if (isHelpRequest(subcommand)) {
+            System.out.println(USAGE);
+            return 0;
+        }
         List<String> rest = new ArrayList<>(List.of(args).subList(1, args.length));
 
         try {
@@ -38,18 +62,22 @@ public final class TsonCli {
                 case "compile" -> runCompile(rest);
                 default -> {
                     System.err.println("unknown command '" + subcommand + "' -- expected validate or compile");
-                    printUsage();
+                    System.err.println(USAGE);
                     yield 2;
                 }
             };
         } catch (IllegalArgumentException e) {
             System.err.println(e.getMessage());
-            printUsage();
+            System.err.println(USAGE);
             return 2;
         }
     }
 
     private static int runValidate(List<String> args) {
+        if (hasHelpFlag(args)) {
+            System.out.println(VALIDATE_USAGE);
+            return 0;
+        }
         String typeName = null;
         OutputFormat format = OutputFormat.TEXT;
         List<Path> positional = new ArrayList<>();
@@ -67,8 +95,7 @@ public final class TsonCli {
             throw new IllegalArgumentException("validate requires --type <name>");
         }
         if (positional.size() < 2) {
-            throw new IllegalArgumentException(
-                    "usage: tson validate --type <name> [--output text|json|tson] <schema> <data...>");
+            throw new IllegalArgumentException(VALIDATE_USAGE);
         }
         Path schema = positional.get(0);
         List<Path> data = positional.subList(1, positional.size());
@@ -76,6 +103,10 @@ public final class TsonCli {
     }
 
     private static int runCompile(List<String> args) {
+        if (hasHelpFlag(args)) {
+            System.out.println(COMPILE_USAGE);
+            return 0;
+        }
         OutputFormat format = OutputFormat.TEXT;
         List<Path> positional = new ArrayList<>();
 
@@ -88,7 +119,7 @@ public final class TsonCli {
         }
 
         if (positional.size() != 1) {
-            throw new IllegalArgumentException("usage: tson compile [--output text|json|tson] <schema>");
+            throw new IllegalArgumentException(COMPILE_USAGE);
         }
         return CompileCommand.run(positional.get(0), format);
     }
@@ -100,10 +131,13 @@ public final class TsonCli {
         return args.get(index);
     }
 
-    private static void printUsage() {
-        System.err.println("""
-                usage:
-                  tson validate --type <name> [--output text|json|tson] <schema> <data...>
-                  tson compile [--output text|json|tson] <schema>""");
+    /** Top-level help: {@code --help}, {@code -h}, or a bare {@code help} subcommand. */
+    private static boolean isHelpRequest(String arg) {
+        return arg.equals("--help") || arg.equals("-h") || arg.equals("help");
+    }
+
+    /** A {@code --help}/{@code -h} flag anywhere in a subcommand's own arguments. */
+    private static boolean hasHelpFlag(List<String> args) {
+        return args.contains("--help") || args.contains("-h");
     }
 }

@@ -374,19 +374,19 @@ The `tson-cli` module is a small, zero-dependency CLI (ajv-cli-style) for checki
 no Java to write. Two commands: **`validate`** reads a data file against one type of a schema, and
 **`compile`** checks that a schema document itself resolves and compiles cleanly.
 
-Build and install it, then run the launcher:
+Build and install it — the installed command is `tson`:
 
 ```
 ./gradlew :tson-cli:installDist
-tson-cli/build/install/tson-cli/bin/tson-cli           # run with no arguments to print usage
+tson-cli/build/install/tson/bin/tson --help        # or -h, or `tson help`
 ```
 
 (or, without installing, `./gradlew :tson-cli:run --args="compile schema.tn"`.) The examples below
-use `tson-cli` as shorthand for that launcher path.
+write `tson` for that launcher path.
 
 ```
-tson-cli validate --type <name> [--output text|json|tson] <schema> <data...>
-tson-cli compile  [--output text|json|tson] <schema>
+tson validate --type <name> [--output text|json|tson] <schema> <data...>
+tson compile  [--output text|json|tson] <schema>
 ```
 
 Given a schema `person.tn` and a data file `ada.tn`:
@@ -402,15 +402,15 @@ Given a schema `person.tn` and a data file `ada.tn`:
 ```
 
 ```
-$ tson-cli validate --type person person.tn ada.tn        # ada.tn = { name: "Ada"  age: 30 }
+$ tson validate --type person person.tn ada.tn        # ada.tn = { name: "Ada"  age: 30 }
 OK
 
-$ tson-cli validate --type person --output json person.tn bad.tn   # bad.tn = { age: 30 }
+$ tson validate --type person --output json person.tn bad.tn   # bad.tn = { age: 30 }
 {"valid":false,"errors":[{"path":"/name","code":"FIELD_REQUIRED",
   "message":"missing required field 'name' for 'person'","expected":"a value for 'name'",
   "actual":"(absent)","dataPosition":"1:1:0","schemaPosition":null}]}
 
-$ tson-cli compile person.tn
+$ tson compile person.tn
 OK
 ```
 

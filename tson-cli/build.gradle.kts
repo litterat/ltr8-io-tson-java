@@ -4,6 +4,9 @@ plugins {
 
 application {
     mainClass.set("io.ltr8.tson.cli.TsonCli")
+    // The installed command is `tson` (matching its own usage text), not the Gradle module name
+    // `tson-cli`. Unrelated to the TsonCli class or the io.ltr8.tson.Tson library facade.
+    applicationName = "tson"
 }
 
 dependencies {
