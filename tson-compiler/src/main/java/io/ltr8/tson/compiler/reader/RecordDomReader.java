@@ -87,6 +87,7 @@ final class RecordDomReader extends RecordAbstractReader<Map<String, Object>> {
             }
             result.put(fields.get(i).schema().name(), defaultOrRequireNonFixed(i, anchoredCtx));
         }
+        validateGroups(anchoredCtx, seen);
         return result;
     }
 }

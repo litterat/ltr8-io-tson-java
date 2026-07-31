@@ -163,6 +163,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 arguments[target.index()] = defaulted;
             }
         }
+        validateGroups(anchoredCtx, seen);
 
         if (ctx.diagnostics().size() > diagnosticsBefore) {
             // Collecting mode, and at least one of this record's own fields already failed -- a bound

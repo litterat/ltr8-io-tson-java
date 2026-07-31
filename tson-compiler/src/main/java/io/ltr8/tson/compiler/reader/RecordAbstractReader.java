@@ -15,6 +15,8 @@ import io.ltr8.tson.compiler.stream.RecordStart;
 import io.ltr8.tson.compiler.stream.SchemaRef;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
+import io.ltr8.tson.schema.meta.ElementState;
+import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
@@ -98,6 +100,7 @@ abstract class RecordAbstractReader<T> implements TsonValueReader<T> {
     final String name;
     final List<CompiledField> fields;
     final Map<String, Integer> fieldIndex;
+    final List<FieldGroup> groups;
     final Object[] precomputedValue;
     final int[] fixedFieldIndices;
     final int positionalFieldIndex;
@@ -108,6 +111,7 @@ abstract class RecordAbstractReader<T> implements TsonValueReader<T> {
         this.name = name;
         this.schemaPosition = schemaPosition;
         this.fields = buildFields(body, resolver);
+        this.groups = body.groups();
         this.fieldIndex = new HashMap<>();
         this.precomputedValue = new Object[fields.size()];
         List<Integer> fixedIndices = new ArrayList<>();
@@ -218,6 +222,38 @@ abstract class RecordAbstractReader<T> implements TsonValueReader<T> {
 
     static boolean isFixed(FieldState state) {
         return state == FieldState.REQUIRED_FIXED || state == FieldState.OPTIONAL_FIXED;
+    }
+
+    /**
+     * Field-group presence check (§5.11): a bare (REQUIRED) group must have exactly one member
+     * present, a {@code ?} (OPTIONAL) group at most one -- the group's members flatten into ordinary
+     * OPTIONAL fields (§5.11's own resolution), so this is the only place the group's own
+     * "at most/exactly one" multiplicity is actually enforced at read time. "Present" means the
+     * member's field name appeared in the data ({@code seen}); a member written as the absent
+     * sentinel {@code _} still counts as appearing, an edge this doesn't distinguish. Reported
+     * through {@code ctx} like any other problem, so both readers gain it by calling this once after
+     * their own field pass, and collecting mode surfaces a group violation alongside sibling ones.
+     */
+    final void validateGroups(TsonReadContext ctx, boolean[] seen) {
+        for (FieldGroup group : groups) {
+            int present = 0;
+            for (String member : group.members()) {
+                Integer idx = fieldIndex.get(member);
+                if (idx != null && seen[idx]) {
+                    present++;
+                }
+            }
+            String members = String.join(" | ", group.members());
+            if (present > 1) {
+                ctx.report(Diagnostic.Code.TYPE_MISMATCH,
+                        "at most one of (" + members + ") may be present for '" + name + "', found " + present,
+                        "at most one of (" + members + ")", present + " present");
+            } else if (group.state() == ElementState.REQUIRED && present == 0) {
+                ctx.report(Diagnostic.Code.FIELD_REQUIRED,
+                        "exactly one of (" + members + ") must be present for '" + name + "'",
+                        "one of (" + members + ")", "none present");
+            }
+        }
     }
 
     /**
