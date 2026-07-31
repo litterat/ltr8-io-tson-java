@@ -28,6 +28,11 @@ cd ltr8-io-tson-java
 export PATH="$PWD/tson-cli/build/install/tson/bin:$PATH"
 ```
 
+Java 25 is recent — if you don't have it, [SDKMAN!](https://sdkman.io) (`sdk install java 25-tem`)
+or an [Adoptium](https://adoptium.net/temurin/releases/?version=25) build is the quickest way to get
+it. Gradle itself needs no separate install: the checked-in `./gradlew` wrapper downloads the pinned
+version (Gradle 9.4.1) on first run.
+
 **`tson init-example`** scaffolds a working example — a schema and a matching data file — to start from:
 
 ```
