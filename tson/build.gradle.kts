@@ -27,3 +27,12 @@ tasks.register<Sync>("modules") {
     from(tasks.named("jar"))
     into(layout.buildDirectory.dir("modules"))
 }
+
+// ExamplesTest runs every examples/ program as a real subprocess, so an API change that breaks one
+// fails the build instead of silently rotting the docs. It needs the gathered module path (`modules`)
+// and the two directories, passed as system properties.
+tasks.named<Test>("test") {
+    dependsOn("modules")
+    systemProperty("tson.examples.dir", rootProject.projectDir.resolve("examples").absolutePath)
+    systemProperty("tson.modules.dir", layout.buildDirectory.dir("modules").get().asFile.absolutePath)
+}

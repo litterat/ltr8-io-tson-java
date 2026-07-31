@@ -34,6 +34,9 @@ Requires **Java 25** (see the main [README](../README.md#getting-started) for ho
 
 ## What's here
 
+Every file here is run as a real subprocess by `ExamplesTest` (part of `./gradlew :tson:test`), so a
+change that breaks an example fails the build instead of quietly rotting the docs.
+
 These are the four numbered reader entry points from the main [README](../README.md#reading-tson-choosing-an-entry-point):
 
 | File | Shows |
