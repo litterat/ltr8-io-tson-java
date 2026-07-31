@@ -3,8 +3,6 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
-import io.ltr8.tson.compiler.ast.CoreValue;
-import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.atom.AtomType;
 import io.ltr8.tson.compiler.atom.AtomTypeException;
@@ -27,6 +25,8 @@ import io.ltr8.tson.compiler.atom.TokenParser;
 import io.ltr8.tson.compiler.atom.UriParser;
 import io.ltr8.tson.compiler.atom.UuidParser;
 import io.ltr8.tson.compiler.atom.ValueParser;
+import io.ltr8.tson.compiler.stream.TokenEvent;
+import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.schema.meta.BinaryType;
 import io.ltr8.tson.schema.meta.DateTimeType;
 import io.ltr8.tson.schema.meta.DateType;
@@ -135,23 +135,22 @@ final class AtomValueReader<T> implements TsonValueReader<T> {
     }
 
     @Override
-    public T read(DataValue value, TsonReadContext ctx) {
-        ctx = ctx.at(value).withSchemaPosition(schemaPosition);
-        if (value == null) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a token for " + delegate + ", found no value",
-                    "a token", "no value");
+    public T read(TsonReadContext ctx) {
+        ctx = ctx.withSchemaPosition(schemaPosition);
+        EventSkip.annotationsAndTypeRef(ctx);
+        TsonEvent e = ctx.peek();
+        if (!(e instanceof TokenEvent token)) {
+            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a token for " + delegate + ", found " + e,
+                    "a token", String.valueOf(e));
+            EventSkip.coreValue(ctx);
             return null;
         }
-        CoreValue core = value.coreValue();
-        if (!(core instanceof TokenValue token)) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a token for " + delegate + ", found " + core,
-                    "a token", String.valueOf(core));
-            return null;
-        }
+        ctx.next();
+        TokenValue tokenValue = new TokenValue(token.text(), token.form());
         try {
-            return delegate.read(token);
-        } catch (AtomTypeException e) {
-            ctx.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, e.getMessage(), "a value satisfying " + delegate,
+            return delegate.read(tokenValue);
+        } catch (AtomTypeException ex) {
+            ctx.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, ex.getMessage(), "a value satisfying " + delegate,
                     token.text());
             return null;
         }

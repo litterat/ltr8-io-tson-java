@@ -4,36 +4,45 @@ import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.TsonValueReaderResolver;
-import io.ltr8.tson.compiler.ast.AbsentValue;
-import io.ltr8.tson.compiler.ast.CoreValue;
-import io.ltr8.tson.compiler.ast.DataValue;
-import io.ltr8.tson.compiler.ast.EmptyBrace;
-import io.ltr8.tson.compiler.ast.MapValue;
-import io.ltr8.tson.compiler.ast.TokenValue;
+import io.ltr8.tson.compiler.stream.AbsentEvent;
+import io.ltr8.tson.compiler.stream.EmptyBraceEvent;
+import io.ltr8.tson.compiler.stream.MapEnd;
+import io.ltr8.tson.compiler.stream.MapStart;
+import io.ltr8.tson.compiler.stream.SchemaRef;
+import io.ltr8.tson.compiler.stream.TokenEvent;
+import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.SourcePosition;
 
 import java.math.BigInteger;
-import java.util.List;
 import java.util.Optional;
 import java.util.function.BiConsumer;
 
 /**
  * Everything {@link MapDomReader} and {@link MapBindReader} share verbatim: resolving the key/value
- * types' own readers once at construction, unwrapping a map-shaped {@link DataValue} into its entry
- * list ({@code {}} reads as zero entries, matching {@code TsonMapperReader.toMap}'s own {@link
- * EmptyBrace} treatment), and decoding those entries one at a time -- validating {@code min_items}/
- * {@code max_items}, rejecting the absent sentinel {@code _} in key position (§2.9) -- handing each
- * decoded key/value pair to a {@link BiConsumer} rather than assembling a result itself, the same
- * reasoning {@link ArrayAbstractReader#readInto} documents for arrays.
+ * types' own readers once at construction, confirming a map-shaped value's own {@code MapStart} (or
+ * {@code EmptyBraceEvent}, zero entries, matching {@code TsonMapperReader.toMap}'s own treatment of
+ * {@code {}}), and decoding entries one at a time straight off the event stream -- validating {@code
+ * min_items}/{@code max_items} against the final count (known only once {@code MapEnd} arrives),
+ * rejecting the absent sentinel {@code _} in key position (§2.9) -- handing each decoded key/value
+ * pair to a {@link BiConsumer} rather than assembling a result itself, the same reasoning {@link
+ * ArrayAbstractReader#readInto} documents for arrays.
  *
  * <p>Unlike {@link ArrayAbstractReader}, there's no {@code unique_items}/{@code ElementState}
  * concept here at all -- {@link MapBody} carries neither: a map's own keys are inherently unique by
  * construction (a duplicate key is "last value wins" via an ordinary {@code put}, matching {@code
  * TsonMapperReader.toMap}'s own note, not a validation error), and there's no per-entry
  * required/optional state for a value the way an array element or tuple position has.
+ *
+ * <p><b>A key's own path segment is read from a bare peek, not a fully-decoded value</b> -- an
+ * annotated key ({@code @foo "mykey" => ...}, a rare shape in practice) reports its path segment as
+ * the raw leading annotation event rather than the key's own eventual text; a deliberate, accepted
+ * narrowing for this pass rather than adding a "peek past annotations without consuming" capability
+ * for a cosmetic-only purpose.
  */
 abstract class MapAbstractReader<T> implements TsonValueReader<T> {
+
+    enum Shape { ENTRIES, EMPTY, MISMATCH }
 
     final String name;
     final MapBody body;
@@ -49,51 +58,70 @@ abstract class MapAbstractReader<T> implements TsonValueReader<T> {
         this.schemaPosition = schemaPosition;
     }
 
-    /** Returns {@code null} (not a real entry list) on a shape mismatch -- see {@link RecordAbstractReader#dataFields} for the identical "caller must stop, not also report every entry missing" contract. */
-    final List<MapValue.MapEntry> entries(DataValue value, TsonReadContext ctx) {
-        if (value == null) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a map for '" + name + "', found no value",
-                    "a map", "no value");
-            return null;
+    /**
+     * Consumes leading annotations/type-ref, then checks for {@code MapStart} ({@link Shape#ENTRIES},
+     * entries to loop over follow) or {@code EmptyBraceEvent} ({@link Shape#EMPTY}, nothing more to
+     * read). Reports {@code TYPE_MISMATCH} and discards whatever was actually there on a shape
+     * mismatch ({@link Shape#MISMATCH}) -- see {@link RecordAbstractReader#dataFields} for the
+     * identical "caller must stop" contract.
+     */
+    final Shape expectMapShape(TsonReadContext ctx) {
+        EventSkip.annotationsAndTypeRef(ctx);
+        TsonEvent e = ctx.peek();
+        if (e instanceof MapStart) {
+            ctx.next();
+            return Shape.ENTRIES;
         }
-        CoreValue core = value.coreValue();
-        if (core instanceof MapValue mv) {
-            return mv.entries();
+        if (e instanceof EmptyBraceEvent) {
+            ctx.next();
+            return Shape.EMPTY;
         }
-        if (core instanceof EmptyBrace) {
-            return List.of();
-        }
-        ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a map for '" + name + "', found " + core,
-                "a map", String.valueOf(core));
-        return null;
+        ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a map for '" + name + "', found " + e,
+                "a map", String.valueOf(e));
+        EventSkip.coreValue(ctx);
+        return Shape.MISMATCH;
     }
 
     /**
-     * Validates size, then decodes every entry in order, handing each key/value pair to {@code sink}
-     * -- keeps decoding every remaining entry after one fails, so sibling entries' own problems still
-     * surface in the same pass.
+     * Decodes every entry up to {@code MapEnd} (the cursor assumed already positioned right after
+     * {@code MapStart} -- see {@link #expectMapShape}), handing each key/value pair to {@code sink};
+     * {@code min_items}/{@code max_items} are validated against the final count once {@code MapEnd}
+     * arrives. Keeps decoding every remaining entry after one fails, so sibling entries' own problems
+     * still surface in the same pass.
      */
-    final void readInto(List<MapValue.MapEntry> entries, TsonReadContext ctx, BiConsumer<Object, Object> sink) {
-        validateSize(entries.size(), ctx);
-        for (MapValue.MapEntry entry : entries) {
-            String keySegment = keySegment(entry.key());
-            if (entry.key().coreValue() instanceof AbsentValue) {
-                ctx.field(keySegment, entry.key()).report(Diagnostic.Code.TYPE_MISMATCH,
+    final void readInto(TsonReadContext ctx, BiConsumer<Object, Object> sink) {
+        int count = 0;
+        while (!(ctx.peek() instanceof MapEnd)) {
+            TsonEvent keyPeek = ctx.peek();
+            if (keyPeek instanceof AbsentEvent) {
+                ctx.next(); // the absent key itself
+                ctx.report(Diagnostic.Code.TYPE_MISMATCH,
                         "'" + name + "': the absent sentinel '_' must not appear as a map key (§2.9)",
                         "a real map key, never the absent sentinel '_'", "_");
+                ctx.next(); // MapArrow
+                EventSkip.scopedValue(ctx); // no meaningful key to associate the value with -- discard it
+                count++;
                 continue;
             }
-            Object key = keyParser.read(entry.key(), ctx.field(keySegment, entry.key()));
-            Object decodedValue = valueParser.read(entry.value().value(), ctx.field(keySegment, entry.value().value()));
+            String keySegment = keySegmentFor(keyPeek);
+            Object key = keyParser.read(ctx.field(keySegment));
+            ctx.next(); // MapArrow
+            if (ctx.peek() instanceof SchemaRef) {
+                ctx.next();
+            }
+            Object decodedValue = valueParser.read(ctx.field(keySegment));
             sink.accept(key, decodedValue);
+            count++;
         }
+        ctx.next(); // MapEnd
+        validateSize(count, ctx);
     }
 
-    private static String keySegment(DataValue key) {
-        if (key.coreValue() instanceof TokenValue token) {
+    private static String keySegmentFor(TsonEvent e) {
+        if (e instanceof TokenEvent token) {
             return token.text();
         }
-        return String.valueOf(key.coreValue());
+        return String.valueOf(e);
     }
 
     private void validateSize(int size, TsonReadContext ctx) {

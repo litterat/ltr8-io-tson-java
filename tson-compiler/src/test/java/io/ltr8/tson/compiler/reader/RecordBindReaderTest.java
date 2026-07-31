@@ -3,11 +3,9 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
-import io.ltr8.tson.compiler.TsonDataParser;
 import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.compiler.ast.Document;
 import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
@@ -79,9 +77,8 @@ class RecordBindReaderTest {
         TsonCompiledSchema placeholder = new TsonCompiledSchema(linkedSchema, Map.of());
         TsonCompiledMetaSchema bootstrapMeta = new TsonCompiledMetaSchema(placeholder, ValueReaderFactoryRegistry.bind(context));
         TsonCompiledSchema compiled = TsonSchemaCompiler.compile(linkedSchema, bootstrapMeta);
-        Document document = new TsonDataParser("{ min_length: 3 max_length: 10 }").parseDocument();
 
-        Object result = compiled.get("text_type").read(document.root());
+        Object result = compiled.get("text_type").read("{ min_length: 3 max_length: 10 }");
 
         TextType textType = assertInstanceOf(TextType.class, result);
         assertEquals(new TextType(Optional.of(3), Optional.of(10), Optional.empty(), Optional.empty()), textType);
@@ -99,9 +96,8 @@ class RecordBindReaderTest {
         // Java boolean -- an already-documented, permanent limit of generic binding (see
         // MetaKernelEndToEndTest's own "text, not a Java boolean" note), unrelated to this test.
         TsonCompiledSchema compiled = compiled();
-        Document document = new TsonDataParser("{ min: -5 max: 100 }").parseDocument();
 
-        Object result = compiled.get("integer_type").read(document.root());
+        Object result = compiled.get("integer_type").read("{ min: -5 max: 100 }");
 
         IntegerType integerType = assertInstanceOf(IntegerType.class, result);
         assertEquals(new IntegerType(Optional.empty(), Optional.of(BigInteger.valueOf(-5)), Optional.empty(),
@@ -154,15 +150,13 @@ class RecordBindReaderTest {
         TsonCompiledSchema compiled = TsonSchemaCompiler.compile(linkedSchema, bootstrapMeta);
 
         // No type-ref -- reads against text_type's own body, same as before the fix.
-        Document ownBody = new TsonDataParser("{ min_length: 3 }").parseDocument();
-        Object ownResult = compiled.get("text_type").read(ownBody.root());
+        Object ownResult = compiled.get("text_type").read("{ min_length: 3 }");
         TextType textType = assertInstanceOf(TextType.class, ownResult);
         assertEquals(3, textType.minLength().orElseThrow());
 
         // An explicit !email_type value at the same text_type-typed position now dispatches to
         // email_type's own compiled reader, producing a real EmailType, not a TextType.
-        Document subtypeBody = new TsonDataParser("!email_type { min_length: 5 }").parseDocument();
-        Object subtypeResult = compiled.get("text_type").read(subtypeBody.root());
+        Object subtypeResult = compiled.get("text_type").read("!email_type { min_length: 5 }");
         io.ltr8.tson.schema.meta.EmailType emailType =
                 assertInstanceOf(io.ltr8.tson.schema.meta.EmailType.class, subtypeResult);
         assertEquals(5, emailType.minLength().orElseThrow());
@@ -175,8 +169,7 @@ class RecordBindReaderTest {
         // reading a value with no type-ref against it -- i.e. treating it as if it had real fields
         // of its own -- fails, since there's no Java object "just a top" could construct.
         TsonCompiledSchema compiled = compiled();
-        Document document = new TsonDataParser("{}").parseDocument();
 
-        assertThrows(TsonReadException.class, () -> compiled.get("top").read(document.root()));
+        assertThrows(TsonReadException.class, () -> compiled.get("top").read("{}"));
     }
 }

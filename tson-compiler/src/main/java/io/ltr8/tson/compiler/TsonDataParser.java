@@ -150,7 +150,7 @@ public class TsonDataParser {
     // ── Raw cursor primitives, reused by TsonSchemaParser for its own, non-data-grammar tokens ──
 
     Token peek() {
-        return stream.peek();
+        return stream.peekToken();
     }
 
     Token advance() {

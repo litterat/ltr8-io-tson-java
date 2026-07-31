@@ -2,10 +2,8 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
-import io.ltr8.tson.compiler.TsonDataParser;
 import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
-import io.ltr8.tson.compiler.ast.Document;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ElementState;
@@ -48,8 +46,7 @@ class TupleDomReaderTest {
 
     @SuppressWarnings("unchecked")
     private static List<Object> readTuple(TsonCompiledSchema compiled, String source) {
-        Document document = new TsonDataParser(source).parseDocument();
-        return (List<Object>) compiled.get("pair").read(document.root());
+        return (List<Object>) compiled.get("pair").read(source);
     }
 
     private static TupleBody twoRequiredSlots() {

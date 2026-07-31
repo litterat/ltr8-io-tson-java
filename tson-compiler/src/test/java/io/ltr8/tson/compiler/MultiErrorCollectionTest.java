@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.compiler.ast.Document;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
@@ -64,12 +63,10 @@ class MultiErrorCollectionTest {
                   items: [1 hello 3]
                 }
                 """;
-        TsonDataParser dataParser = new TsonDataParser(dataSource);
-        Document document = dataParser.parseDocument();
-        TsonReadContext ctx = TsonReadContext.collecting(dataParser.positions());
+        TsonReadContext ctx = TsonReadContext.collecting(dataSource);
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) compiled.get("my_record").read(document.root(), ctx);
+        Map<String, Object> result = (Map<String, Object>) compiled.get("my_record").read(ctx);
 
         assertEquals(3, ctx.diagnostics().size(), ctx.diagnostics().toString());
 

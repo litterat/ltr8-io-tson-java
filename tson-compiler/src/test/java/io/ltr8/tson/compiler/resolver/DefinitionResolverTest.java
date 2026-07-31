@@ -2,7 +2,9 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
+import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonSchemaParser;
+import io.ltr8.tson.compiler.stream.ListEventSource;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
@@ -113,7 +115,8 @@ class DefinitionResolverTest {
     private final TsonMapperWriter mapper = new TsonMapperWriter();
 
     private static DefinitionResolver definitionResolverFor(TsonCompiledMetaSchema metaParser, DefinitionGetter definitionGetter) {
-        return new DefinitionResolver((type, value) -> (Top) metaParser.reader(type).read(value),
+        return new DefinitionResolver((type, value) -> (Top) metaParser.reader(type)
+                        .read(TsonReadContext.throwing(new ListEventSource(DataValueEvents.of(value)))),
                 metaParser.schema().entries()::get, definitionGetter);
     }
 

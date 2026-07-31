@@ -2,10 +2,8 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
-import io.ltr8.tson.compiler.TsonDataParser;
 import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
-import io.ltr8.tson.compiler.ast.Document;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
@@ -55,8 +53,7 @@ class ArrayDomReaderTest {
 
     @SuppressWarnings("unchecked")
     private static List<Object> readArray(TsonCompiledSchema compiled, String rootName, String source) {
-        Document document = new TsonDataParser(source).parseDocument();
-        return (List<Object>) compiled.get(rootName).read(document.root());
+        return (List<Object>) compiled.get(rootName).read(source);
     }
 
     @Test
@@ -133,9 +130,8 @@ class ArrayDomReaderTest {
                 RecordBody.of(List.of(RecordField.required("items", TypeRef.of("numbers"))))));
         TsonCompiledSchema compiled = compile(extra);
 
-        Document document = new TsonDataParser("{ items: [1 2 3] }").parseDocument();
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) compiled.get("holder").read(document.root());
+        Map<String, Object> result = (Map<String, Object>) compiled.get("holder").read("{ items: [1 2 3] }");
 
         assertEquals(List.of(BigInteger.ONE, BigInteger.TWO, BigInteger.valueOf(3)), result.get("items"));
     }

@@ -2,10 +2,8 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
-import io.ltr8.tson.compiler.TsonDataParser;
 import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
-import io.ltr8.tson.compiler.ast.Document;
 import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -32,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  * BaseTypeResolver} identification at all. Uses {@code boolean}'s own *real*, {@code
  * MetaKernelBootstrapResolver}-resolved {@link io.ltr8.tson.schema.meta.EnumBody} -- not a
  * hand-built stand-in -- as the field type of a small local record, then reads real TSON data
- * source text through the real {@link TsonDataParser}. Object-binding mode's own contrasting
+ * source text through the real compiled reader. Object-binding mode's own contrasting
  * behavior (real {@code Boolean} values, via {@link BooleanReader}) is covered separately, in
  * {@link RecordBindReaderTest}/{@code DefinitionResolverTest}.
  */
@@ -63,8 +61,7 @@ class EnumDomReaderTest {
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> read(TsonCompiledSchema compiled, String source) {
-        Document document = new TsonDataParser(source).parseDocument();
-        return (Map<String, Object>) compiled.get("flag_holder").read(document.root());
+        return (Map<String, Object>) compiled.get("flag_holder").read(source);
     }
 
     @Test

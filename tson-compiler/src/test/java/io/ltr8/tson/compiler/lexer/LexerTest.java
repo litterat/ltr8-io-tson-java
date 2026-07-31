@@ -2,6 +2,8 @@ package io.ltr8.tson.compiler.lexer;
 
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -10,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class LexerTest {
 
     private static List<Token> lex(String source) {
-        return new Lexer(source).tokenize();
+        return new Lexer(new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8))).tokenize();
     }
 
     /** Tokenizes and strips the trailing EOF, for tests that only care about content tokens. */

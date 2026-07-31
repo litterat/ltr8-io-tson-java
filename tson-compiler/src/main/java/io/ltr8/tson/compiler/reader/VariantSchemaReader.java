@@ -4,9 +4,9 @@ import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.TsonValueReaderResolver;
-import io.ltr8.tson.compiler.ast.DataValue;
 
 import java.util.Collection;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -32,6 +32,10 @@ import java.util.Set;
  * an explicit {@code !uri_type {...}} value at a {@code text_type}-typed position dispatches straight
  * to {@code uri_type}'s own already-compiled reader, producing a real {@code UriType}, not a
  * {@code TextType}).
+ *
+ * <p>The type-ref driving this decision is consumed here, via {@link EventSkip#annotationsAndTypeRef}
+ * -- {@code ownParser} still calls it again on delegation (every reader does, as its own first step),
+ * which is a safe no-op once nothing's left to consume.
  */
 final class VariantSchemaReader implements TsonValueReader<Object> {
 
@@ -49,17 +53,19 @@ final class VariantSchemaReader implements TsonValueReader<Object> {
     }
 
     @Override
-    public Object read(DataValue value, TsonReadContext ctx) {
-        if (value == null || value.typeRef().isEmpty() || value.typeRef().get().equals(name)) {
-            return ownParser.read(value, ctx);
+    public Object read(TsonReadContext ctx) {
+        Optional<String> typeRef = EventSkip.annotationsAndTypeRef(ctx);
+        if (typeRef.isEmpty() || typeRef.get().equals(name)) {
+            return ownParser.read(ctx);
         }
-        String typeRef = value.typeRef().get();
-        if (!subtypeNames.contains(typeRef)) {
-            ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF, "'" + typeRef + "' is not a known subtype of '" + name
+        String ref = typeRef.get();
+        if (!subtypeNames.contains(ref)) {
+            ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF, "'" + ref + "' is not a known subtype of '" + name
                             + "' -- expected one of " + subtypeNames,
-                    "one of " + subtypeNames, typeRef);
+                    "one of " + subtypeNames, ref);
+            EventSkip.coreValue(ctx);
             return null;
         }
-        return resolver.resolve(typeRef).read(value, ctx);
+        return resolver.resolve(ref).read(ctx);
     }
 }

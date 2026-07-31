@@ -94,9 +94,8 @@ class MetaTn1CompiledEndToEndTest {
     void readsBinaryEncodingEnumMembersAgainstRealData() {
         TsonLinkedSchema meta = registerMeta();
         TsonCompiledSchema compiled = rawCompile(meta);
-        Document document = new TsonDataParser("BASE64").parseDocument();
 
-        Object result = compiled.get("binary_encoding").read(document.root());
+        Object result = compiled.get("binary_encoding").read("BASE64");
 
         assertEquals("BASE64", result);
     }

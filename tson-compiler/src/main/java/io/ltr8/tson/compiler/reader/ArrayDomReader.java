@@ -3,8 +3,6 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.TsonValueReaderResolver;
-import io.ltr8.tson.compiler.ast.DataValue;
-import io.ltr8.tson.compiler.ast.ScopedValue;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -21,8 +19,8 @@ import java.util.Optional;
  * unconditional {@code Map} output); {@link ArrayBindReader} is the one that assembles decoded
  * elements into whatever real Java array/collection type a bound field actually declares.
  *
- * <p>Everything else -- resolving the element reader, unwrapping the incoming {@link DataValue},
- * size/uniqueness/absent-element validation -- lives on {@link ArrayAbstractReader}.
+ * <p>Everything else -- resolving the element reader, confirming an array shape, size/uniqueness/
+ * absent-element validation -- lives on {@link ArrayAbstractReader}.
  */
 final class ArrayDomReader extends ArrayAbstractReader<List<Object>> {
 
@@ -31,14 +29,13 @@ final class ArrayDomReader extends ArrayAbstractReader<List<Object>> {
     }
 
     @Override
-    public List<Object> read(DataValue value, TsonReadContext ctx) {
-        ctx = ctx.at(value).withSchemaPosition(schemaPosition);
-        List<ScopedValue> elements = elements(value, ctx);
-        if (elements == null) {
+    public List<Object> read(TsonReadContext ctx) {
+        ctx = ctx.withSchemaPosition(schemaPosition);
+        if (!expectArrayStart(ctx)) {
             return null;
         }
-        List<Object> result = new ArrayList<>(elements.size());
-        readInto(elements, ctx, result::add);
+        List<Object> result = new ArrayList<>();
+        readInto(ctx, result::add);
         return result;
     }
 

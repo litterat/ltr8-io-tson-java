@@ -2,10 +2,8 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
-import io.ltr8.tson.compiler.TsonDataParser;
 import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
-import io.ltr8.tson.compiler.ast.Document;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ChoiceBody;
@@ -54,8 +52,7 @@ class ChoiceReaderTest {
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> read(TsonCompiledSchema compiled, String source) {
-        Document document = new TsonDataParser(source).parseDocument();
-        return (Map<String, Object>) compiled.get("contact_method").read(document.root());
+        return (Map<String, Object>) compiled.get("contact_method").read(source);
     }
 
     @Test

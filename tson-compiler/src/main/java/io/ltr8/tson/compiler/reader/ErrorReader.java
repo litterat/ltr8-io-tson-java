@@ -2,7 +2,6 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
-import io.ltr8.tson.compiler.ast.DataValue;
 
 /**
  * A stand-in {@link TsonValueReader} for a constructor with no compiled reader implemented yet --
@@ -28,7 +27,7 @@ final public class ErrorReader implements TsonValueReader<Object> {
     }
 
     @Override
-    public Object read(DataValue value, TsonReadContext ctx) {
+    public Object read(TsonReadContext ctx) {
         throw new UnsupportedOperationException("'" + name + "' has no usable compiled reader -- "
                 + "the schema itself compiled fine, but nothing can read a value against this type: "
                 + cause.getMessage(), cause);

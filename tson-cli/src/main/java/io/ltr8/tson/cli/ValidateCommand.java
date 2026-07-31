@@ -3,12 +3,13 @@ package io.ltr8.tson.cli;
 import io.ltr8.tson.Tson;
 import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
-import io.ltr8.tson.compiler.TsonDataParser;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.TsonValueReader;
-import io.ltr8.tson.compiler.ast.Document;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -59,17 +60,15 @@ final class ValidateCommand {
             if (dataFiles.size() > 1) {
                 System.out.println("# " + dataFile);
             }
-            try {
-                TsonDataParser parser = new TsonDataParser(Io.readFile(dataFile));
-                Document document = parser.parseDocument();
-                TsonReadContext ctx = TsonReadContext.collecting(parser.positions());
-                reader.read(document.root(), ctx);
+            try (InputStream in = Files.newInputStream(dataFile)) {
+                TsonReadContext ctx = TsonReadContext.collecting(in);
+                reader.read(ctx);
                 List<CliDiagnostic> errors = ctx.diagnostics().stream().map(CliDiagnostic::from).toList();
                 if (!errors.isEmpty()) {
                     allValid = false;
                 }
                 System.out.println(format.render(new ValidationReport(errors.isEmpty(), errors)));
-            } catch (RuntimeException e) {
+            } catch (RuntimeException | IOException e) {
                 allValid = false;
                 System.out.println(format.render(ValidationReport.failed(Diagnostic.Code.VALIDATION_ERROR, e.getMessage())));
             }

@@ -8,14 +8,11 @@ import io.ltr8.bind.DataParameterizedType;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.TsonValueReaderResolver;
-import io.ltr8.tson.compiler.ast.DataValue;
-import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.lang.reflect.Type;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -28,12 +25,16 @@ import java.util.Optional;
  * <p>Mirrors {@code TsonMapperReader.toMap} exactly: {@code descriptor.constructor().invoke(size)}
  * to allocate the target with a known capacity, then {@code descriptor.put().invoke(mapData, key,
  * value)} per decoded entry -- no iterator needed, unlike {@link DataClassMap}'s own *reading* side,
- * since writing a map only ever needs {@code put}. As with {@link ArrayBindReader}, there's no
- * narrowing at this level -- each key and value's own binding already happened recursively, inside
- * whatever reader {@code resolver} produced for its type.
+ * since writing a map only ever needs {@code put}. Unlike {@link ArrayBindReader}, there's no fixed-
+ * size-target concern here at all -- {@code tson-bind}'s own {@code MapAccessBridge.constructor()}
+ * always resolves to a growable, hash-based constructor (confirmed by reading {@code
+ * DefaultMapBinder} directly), so this always constructs empty ({@code invoke(0)}) and appends
+ * incrementally, one entry at a time, with no buffer-then-allocate step. As with {@link
+ * ArrayBindReader}, there's no narrowing at this level either -- each key and value's own binding
+ * already happened recursively, inside whatever reader {@code resolver} produced for its type.
  *
- * <p>Everything else -- resolving the key/value readers, unwrapping the incoming {@link DataValue},
- * size validation, rejecting an absent key -- lives on {@link MapAbstractReader}.
+ * <p>Everything else -- resolving the key/value readers, confirming a map shape, size validation,
+ * rejecting an absent key -- lives on {@link MapAbstractReader}.
  */
 final class MapBindReader extends MapAbstractReader<Object> {
 
@@ -46,15 +47,17 @@ final class MapBindReader extends MapAbstractReader<Object> {
     }
 
     @Override
-    public Object read(DataValue value, TsonReadContext ctx) {
-        ctx = ctx.at(value).withSchemaPosition(schemaPosition);
-        List<MapValue.MapEntry> entries = entries(value, ctx);
-        if (entries == null) {
+    public Object read(TsonReadContext ctx) {
+        ctx = ctx.withSchemaPosition(schemaPosition);
+        Shape shape = expectMapShape(ctx);
+        if (shape == Shape.MISMATCH) {
             return null;
         }
         try {
-            Object mapData = descriptor.constructor().invoke(entries.size());
-            readInto(entries, ctx, (key, decodedValue) -> put(mapData, key, decodedValue));
+            Object mapData = descriptor.constructor().invoke(0);
+            if (shape == Shape.ENTRIES) {
+                readInto(ctx, (key, decodedValue) -> put(mapData, key, decodedValue));
+            }
             return mapData;
         } catch (RuntimeException e) {
             throw e;

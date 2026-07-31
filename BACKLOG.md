@@ -190,23 +190,6 @@ everything outstanding is tracked in one place.)
   `STRUCTURED-OUTPUT.md`'s "JSON compatibility" section, tracked here alongside the general writer
   since it's the same underlying gap (no schema-aware writer exists at all yet).
 
-## Streaming
-
-- [ ] `TsonDataStream` (Tier 2, `tson-compiler/.../stream/`) is driven off `Lexer.nextToken()`, one
-  token at a time, but `Lexer` itself is constructed over a complete in-memory `String` — so even
-  the streaming path is still O(document size) at the character-buffer level. A `Reader`-based
-  lexer (pulling characters incrementally rather than indexing into a fully-loaded `String`) is the
-  next natural tier down if truly-large (multi-GB) documents are ever a real requirement; today's
-  split only bounds the *parsed-representation* memory (record/map/array nesting depth), not the
-  raw source text itself.
-- [ ] No consumer bypasses Tier 3 yet to actually realize the low-memory benefit end to end --
-  `TsonDataParser` (Tier 3) still materializes a full `Document` AST from `TsonDataStream`'s events,
-  by design (it's a tree builder, not a streaming consumer). A real streaming use -- e.g. a
-  schema-validating pass or a direct-to-Java-object binder that consumes `TsonEvent`s without ever
-  building a `Document` -- is the natural next thing to build on top of `TsonDataStream` directly,
-  and would be the first real-world proof that the flat, bounded-memory event model is worth having
-  independent of `TsonDataParser`.
-
 ## Conformance test suite
 
 - [ ] Build out `ltr8-io-tson-test-suite` well beyond its current 110 vectors (grown from the 38 this
@@ -512,3 +495,37 @@ everything outstanding is tracked in one place.)
   pre-loaded by the library, not auto-imported into a consumer's own namespace). Every consumer (13
   files across `tson-compiler`/`tson`, main and test) updated and re-verified: full `./gradlew clean
   build` green, plus the installed CLI binary still runs a real schema end to end.
+- [x] **A real streaming consumer now bypasses `Document`/Tier 3 entirely — the whole compiled-reader
+  stack does.** Every `TsonValueReader` in `io.ltr8.tson.compiler.reader`
+  (`RecordAbstractReader`/`ArrayAbstractReader`/`MapAbstractReader`/`TupleAbstractReader`/
+  `AtomValueReader`/`BooleanReader`/`VoidReader`/the dispatch readers) now pulls `TsonEvent`s directly
+  off a `TsonEventSource` via a redesigned `TsonReadContext`, with no `DataValue` parameter anywhere
+  in the compiled-reader stack at all — schema-validated reading and diagnostics can now start, and a
+  fail-fast error can be reported, well before a document is anywhere close to fully parsed.
+  `StreamingLazinessTest` proves it directly, not just that the new API compiles: a fail-fast error on
+  an early record field pulls well under 100 events total even though the same document's own
+  trailing field contains 50,000 elements' worth of events the reader never needed to look at.
+  `TsonSchemaParser`/`SchemaResolver` and the whole schema parse→resolve→link→register→compile
+  pipeline are unaffected — a schema document is small, self-contained, and parsed exactly once at
+  compile time, so there's no benefit to streaming it. Records read forward, single-pass, with
+  overwrite on a duplicate field name — a deliberate, accepted behavior change from the old
+  backward-scan-and-skip design (necessary for genuinely single-pass reading), recorded as
+  `SPEC-FEEDBACK.md` #21 and covered by `DuplicateFieldOverwriteTest`. New supporting pieces:
+  `TsonEventSource`, `ListEventSource`, `EventSkip`, `DataValueEvents`, and
+  `TsonReadContext.withPosition` (so a never-mentioned record field's own `FIELD_REQUIRED` diagnostic
+  reports the record's own opening position, not wherever the cursor drifted to after consuming the
+  rest of the record). See `CLAUDE.md`'s "Streaming readers: building every `*Reader` on
+  `TsonDataStream`" for the full design.
+- [x] **`Lexer` now reads incrementally from an `InputStream`, not a fully-loaded `String`** — the
+  natural next tier down once the reader stack above actually needed genuine streaming end to end.
+  Decoded via `InputStreamReader(source, StandardCharsets.UTF_8)`, buffered one Unicode code point at
+  a time into a small, bounded lookahead list — never more than the couple of code points any lexical
+  rule actually needs to peek ahead (`""` disambiguation, the `..` range-vs-continuation check,
+  `\r\n` pairing) — rather than requiring the whole document already resident as an in-memory
+  `String`. Every lexical rule's own lookahead was already relative to the cursor by a small, fixed
+  offset (0 or 1), so the switch needed no change to any rule's own logic, only to how "peek ahead" is
+  implemented underneath it. `TsonDataStream`'s own public `String`-taking constructor is unchanged —
+  it wraps `source` in a UTF-8-encoded `ByteArrayInputStream` before handing it to `Lexer` — so this
+  bounds the *raw source text* memory too, not just the parsed-representation memory the Tier 2/3
+  split already bounded. Verified against `LexerTest` (49/49) and the real sibling conformance suite
+  (`ConformanceSuiteTest`, 111/111, ran for real against the checked-out fixtures, not skipped).

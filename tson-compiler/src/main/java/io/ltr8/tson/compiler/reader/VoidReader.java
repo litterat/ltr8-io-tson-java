@@ -3,8 +3,8 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
-import io.ltr8.tson.compiler.ast.AbsentValue;
-import io.ltr8.tson.compiler.ast.DataValue;
+import io.ltr8.tson.compiler.stream.AbsentEvent;
+import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.schema.meta.SourcePosition;
 
 import java.util.Optional;
@@ -28,14 +28,17 @@ final class VoidReader implements TsonValueReader<Object> {
     }
 
     @Override
-    public Object read(DataValue value, TsonReadContext ctx) {
-        ctx = ctx.at(value).withSchemaPosition(schemaPosition);
-        if (value == null || !(value.coreValue() instanceof AbsentValue)) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH,
-                    "expected the absent sentinel '_' for void, found " + (value == null ? "no value" : value.coreValue()),
-                    "the absent sentinel '_'", value == null ? "no value" : String.valueOf(value.coreValue()));
+    public Object read(TsonReadContext ctx) {
+        ctx = ctx.withSchemaPosition(schemaPosition);
+        EventSkip.annotationsAndTypeRef(ctx);
+        TsonEvent e = ctx.peek();
+        if (!(e instanceof AbsentEvent)) {
+            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected the absent sentinel '_' for void, found " + e,
+                    "the absent sentinel '_'", String.valueOf(e));
+            EventSkip.coreValue(ctx);
             return null;
         }
+        ctx.next();
         return null;
     }
 }

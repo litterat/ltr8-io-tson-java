@@ -3,13 +3,10 @@ package io.ltr8.tson.compiler.resolver;
 import io.ltr8.tson.compiler.Position;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
-import io.ltr8.tson.compiler.TsonDataParser;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.TsonSchemaParser;
-import io.ltr8.tson.compiler.ast.CoreValue;
-import io.ltr8.tson.compiler.ast.Document;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -30,10 +27,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * The end-to-end stripe: a missing-required-field {@link TsonReadException} carries enough for a
  * caller to report both where the offending record sits in the <em>data</em> source and where the
- * field was <em>declared</em> in the <em>schema</em> source -- proving {@link TsonSchemaParser#declarationPositions()}/
- * {@link TsonDataParser#positions()}, {@link TypeDefinition#position()}, and {@link
- * TsonReadException#schemaPosition()} genuinely connect end to end, not just that each piece
- * compiles in isolation.
+ * field was <em>declared</em> in the <em>schema</em> source -- proving {@link
+ * TsonSchemaParser#declarationPositions()}, {@link TypeDefinition#position()}, and every real
+ * {@code TsonEvent}'s own {@code position()} (the data side -- there's no separate position
+ * side-table on this path anymore, {@link TsonReadContext#position()} reflects whichever event the
+ * stream most recently produced) genuinely connect end to end, not just that each piece compiles in
+ * isolation.
  *
  * <p>Deliberately narrow, matching this stripe's own scope: only the fresh-record-construction
  * resolution path is exercised (a schema with no supertypes/refinement/instances at all), and only
@@ -86,13 +85,9 @@ class PositionalReadErrorsTest {
         TsonCompiledSchema compiled = compile(new TsonLinkedSchema(schema));
 
         String dataSource = "{}";
-        TsonDataParser dataParser = new TsonDataParser(dataSource);
-        Document document = dataParser.parseDocument();
-        Map<CoreValue, Position> dataPositions = dataParser.positions();
-
-        TsonReadContext ctx = TsonReadContext.throwing(dataPositions);
+        TsonReadContext ctx = TsonReadContext.throwing(dataSource);
         TsonReadException thrown = assertThrows(TsonReadException.class,
-                () -> compiled.get("my_record").read(document.root(), ctx));
+                () -> compiled.get("my_record").read(ctx));
 
         assertTrue(thrown.getMessage().contains("value"), thrown.getMessage());
 

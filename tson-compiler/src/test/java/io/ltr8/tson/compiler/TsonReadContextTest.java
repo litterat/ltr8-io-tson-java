@@ -1,15 +1,13 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.compiler.ast.CoreValue;
-import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
-import io.ltr8.tson.compiler.ast.TokenValue;
+import io.ltr8.tson.compiler.stream.ListEventSource;
+import io.ltr8.tson.compiler.stream.TokenEvent;
+import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.schema.meta.SourcePosition;
 import org.junit.jupiter.api.Test;
 
-import java.util.IdentityHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -19,97 +17,92 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TsonReadContextTest {
 
-    private static DataValue tokenValue(String text) {
-        return new DataValue(List.of(), Optional.empty(), new TokenValue(text, TokenForm.UNQUOTED));
+    private static TokenEvent token(String text, Position position) {
+        return new TokenEvent(text, TokenForm.UNQUOTED, position);
+    }
+
+    private static TsonReadContext contextOver(TsonEvent... events) {
+        return TsonReadContext.collecting(new ListEventSource(List.of(events)));
     }
 
     @Test
     void pathAccumulatesAcrossFieldAndIndexDescent() {
-        TsonReadContext ctx = TsonReadContext.collecting(Map.of());
+        TsonReadContext ctx = contextOver(token("x", new Position(1, 1, 0)));
 
-        TsonReadContext descended = ctx.field("orders", tokenValue("x")).index(3, tokenValue("y")).field("total", tokenValue("z"));
+        TsonReadContext descended = ctx.field("orders").index(3).field("total");
 
         assertEquals("/orders/3/total", descended.path());
     }
 
     @Test
     void pathEscapesTildeAndSlashPerRfc6901() {
-        TsonReadContext ctx = TsonReadContext.collecting(Map.of());
+        TsonReadContext ctx = contextOver(token("x", new Position(1, 1, 0)));
 
-        TsonReadContext descended = ctx.field("a/b~c", null);
+        TsonReadContext descended = ctx.field("a/b~c");
 
         assertEquals("/a~1b~0c", descended.path());
     }
 
     @Test
-    void positionResolvesFromTheSuppliedDataPositionsMap() {
-        DataValue value = tokenValue("42");
+    void positionIsEmptyUntilSomethingIsActuallyPeekedOrConsumed() {
+        TsonReadContext ctx = contextOver(token("42", new Position(3, 5, 12)));
+
+        assertTrue(ctx.position().isEmpty());
+    }
+
+    @Test
+    void positionReflectsTheMostRecentlyPeekedOrConsumedEvent() {
         Position position = new Position(3, 5, 12);
-        Map<CoreValue, Position> positions = new IdentityHashMap<>();
-        positions.put(value.coreValue(), position);
-        TsonReadContext ctx = TsonReadContext.collecting(positions);
+        TsonReadContext ctx = contextOver(token("42", position));
 
-        TsonReadContext at = ctx.at(value);
+        ctx.peek();
 
-        assertEquals(Optional.of(position), at.position());
+        assertEquals(Optional.of(position), ctx.position());
     }
 
+    /** There is only ever one real cursor per read -- every scoped copy shares it, so pulling an event through any one copy is visible to all of them. */
     @Test
-    void positionIsAbsentForAValueNotInTheSuppliedMap() {
-        TsonReadContext ctx = TsonReadContext.collecting(Map.of());
-
-        TsonReadContext at = ctx.at(tokenValue("unrecorded"));
-
-        assertTrue(at.position().isEmpty());
-    }
-
-    @Test
-    void fieldKeepsTheParentsPositionWhenTheChildValueIsMissing() {
-        DataValue value = tokenValue("42");
+    void positionIsSharedAcrossEveryScopedCopyOfTheSameRead() {
         Position position = new Position(6, 3, 42);
-        Map<CoreValue, Position> positions = new IdentityHashMap<>();
-        positions.put(value.coreValue(), position);
-        TsonReadContext ctx = TsonReadContext.collecting(positions).at(value);
+        TsonReadContext ctx = contextOver(token("42", position));
+        TsonReadContext descended = ctx.field("value");
 
-        TsonReadContext missingField = ctx.field("value", null);
+        descended.peek();
 
-        assertEquals(Optional.of(position), missingField.position());
-        assertEquals("/value", missingField.path());
+        assertEquals(Optional.of(position), ctx.position());
+        assertEquals(Optional.of(position), descended.position());
     }
 
     @Test
-    void indexAlsoKeepsTheParentsPositionWhenTheElementIsMissing() {
-        DataValue value = tokenValue("42");
-        Position position = new Position(1, 1, 0);
-        Map<CoreValue, Position> positions = new IdentityHashMap<>();
-        positions.put(value.coreValue(), position);
-        TsonReadContext ctx = TsonReadContext.collecting(positions).at(value);
+    void withPositionOverridesOnlyThePinnedCopysOwnPosition() {
+        Position live = new Position(1, 1, 0);
+        Position pinned = new Position(9, 9, 90);
+        TsonReadContext ctx = contextOver(token("42", live));
+        ctx.peek();
 
-        TsonReadContext missingElement = ctx.index(0, null);
+        TsonReadContext anchored = ctx.withPosition(Optional.of(pinned));
 
-        assertEquals(Optional.of(position), missingElement.position());
-        assertEquals("/0", missingElement.path());
+        assertEquals(Optional.of(pinned), anchored.position());
+        assertEquals(Optional.of(live), ctx.position());
     }
 
     @Test
     void withSchemaPositionReplacesOnlySchemaPosition() {
-        DataValue value = tokenValue("42");
-        Position dataPosition = new Position(1, 1, 0);
-        Map<CoreValue, Position> positions = new IdentityHashMap<>();
-        positions.put(value.coreValue(), dataPosition);
-        TsonReadContext ctx = TsonReadContext.collecting(positions).at(value).field("x", value);
+        TsonReadContext ctx = contextOver(token("42", new Position(1, 1, 0)));
+        ctx.peek();
+        TsonReadContext descended = ctx.field("x");
 
         SourcePosition schemaPosition = new Position(9, 2, 99);
-        TsonReadContext restamped = ctx.withSchemaPosition(Optional.of(schemaPosition));
+        TsonReadContext restamped = descended.withSchemaPosition(Optional.of(schemaPosition));
 
         assertEquals(Optional.of(schemaPosition), restamped.schemaPosition());
-        assertEquals(ctx.position(), restamped.position());
-        assertEquals(ctx.path(), restamped.path());
+        assertEquals(descended.position(), restamped.position());
+        assertEquals(descended.path(), restamped.path());
     }
 
     @Test
     void throwingContextFailFastIsTrueAndThrowsImmediatelyOnReport() {
-        TsonReadContext ctx = TsonReadContext.throwing();
+        TsonReadContext ctx = TsonReadContext.throwing(new ListEventSource(List.of()));
 
         assertTrue(ctx.failFast());
         TsonReadException thrown = assertThrows(TsonReadException.class,
@@ -123,11 +116,11 @@ class TsonReadContextTest {
 
     @Test
     void collectingContextFailFastIsFalseAndAccumulatesWithoutThrowing() {
-        TsonReadContext ctx = TsonReadContext.collecting(Map.of());
+        TsonReadContext ctx = TsonReadContext.collecting(new ListEventSource(List.of()));
 
         assertFalse(ctx.failFast());
         ctx.report(Diagnostic.Code.FIELD_REQUIRED, "first problem", "x", "y");
-        ctx.field("nested", null).report(Diagnostic.Code.TYPE_MISMATCH, "second problem", "a", "b");
+        ctx.field("nested").report(Diagnostic.Code.TYPE_MISMATCH, "second problem", "a", "b");
 
         assertEquals(2, ctx.diagnostics().size());
         assertEquals("first problem", ctx.diagnostics().get(0).message());
@@ -138,16 +131,13 @@ class TsonReadContextTest {
 
     @Test
     void reportedDiagnosticCarriesTheCurrentPathPositionAndSchemaPosition() {
-        DataValue value = tokenValue("42");
         Position dataPosition = new Position(4, 2, 30);
-        Map<CoreValue, Position> positions = new IdentityHashMap<>();
-        positions.put(value.coreValue(), dataPosition);
         SourcePosition schemaPosition = new Position(10, 1, 100);
+        TsonReadContext ctx = contextOver(token("42", dataPosition));
 
-        TsonReadContext ctx = TsonReadContext.collecting(positions).at(value)
-                .withSchemaPosition(Optional.of(schemaPosition))
-                .field("value", value);
-        ctx.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, "out of range", "0..100", "200");
+        TsonReadContext scoped = ctx.withSchemaPosition(Optional.of(schemaPosition)).field("value");
+        scoped.peek();
+        scoped.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, "out of range", "0..100", "200");
 
         Diagnostic diagnostic = ctx.diagnostics().get(0);
         assertEquals("/value", diagnostic.path());

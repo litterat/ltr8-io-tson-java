@@ -2,9 +2,7 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
-import io.ltr8.tson.compiler.TsonDataParser;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
-import io.ltr8.tson.compiler.ast.Document;
 import io.ltr8.tson.compiler.atom.DurationParser;
 import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -38,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /**
  * Real data text, for each atom-family body in {@code schema.meta} -- one small {@code holder}
  * record per family, reusing the exact literal each family's own {@code atom} test already proved
- * valid, read through the real {@link TsonDataParser} and the real compiled reader (not by
+ * valid, read through the real compiled reader (not by
  * constructing a {@code TokenValue} directly). Dispatch to the right {@link AtomValueReader}
  * constant happens automatically, keyed by each body's own {@code @Typename} (see {@link
  * ValueReaderFactoryRegistry}'s own registration table) -- so a real wiring mistake (e.g.
@@ -62,9 +60,8 @@ class AtomValueReaderTest {
         TsonCompiledMetaSchema bootstrapMeta = new TsonCompiledMetaSchema(placeholder, ValueReaderFactoryRegistry.dom());
         TsonCompiledSchema compiled = TsonSchemaCompiler.compile(linkedSchema, bootstrapMeta);
 
-        Document document = new TsonDataParser(source).parseDocument();
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) compiled.get("holder").read(document.root());
+        Map<String, Object> result = (Map<String, Object>) compiled.get("holder").read(source);
         return result.get("value");
     }
 
@@ -171,9 +168,8 @@ class AtomValueReaderTest {
         TsonCompiledMetaSchema bootstrapMeta = new TsonCompiledMetaSchema(placeholder, ValueReaderFactoryRegistry.dom());
         TsonCompiledSchema compiled = TsonSchemaCompiler.compile(linkedSchema, bootstrapMeta);
 
-        Document document = new TsonDataParser(source).parseDocument();
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) compiled.get("holder").read(document.root());
+        Map<String, Object> result = (Map<String, Object>) compiled.get("holder").read(source);
         return result;
     }
 }

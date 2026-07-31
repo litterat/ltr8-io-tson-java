@@ -2,7 +2,6 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
-import io.ltr8.tson.compiler.TsonDataParser;
 import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
@@ -36,7 +35,7 @@ class CompiledSchemaDomReadTest {
     }
 
     private static Object read(TsonCompiledSchema compiled, String source, String typeName) {
-        return compiled.get(typeName).read(new TsonDataParser(source).parseDocument().root());
+        return compiled.get(typeName).read(source);
     }
 
     @Test

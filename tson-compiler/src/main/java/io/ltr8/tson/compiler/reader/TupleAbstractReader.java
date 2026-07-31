@@ -4,11 +4,11 @@ import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.TsonValueReaderResolver;
-import io.ltr8.tson.compiler.ast.AbsentValue;
-import io.ltr8.tson.compiler.ast.ArrayValue;
-import io.ltr8.tson.compiler.ast.CoreValue;
-import io.ltr8.tson.compiler.ast.DataValue;
-import io.ltr8.tson.compiler.ast.ScopedValue;
+import io.ltr8.tson.compiler.stream.AbsentEvent;
+import io.ltr8.tson.compiler.stream.ArrayEnd;
+import io.ltr8.tson.compiler.stream.ArrayStart;
+import io.ltr8.tson.compiler.stream.SchemaRef;
+import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.TupleBody;
@@ -20,11 +20,10 @@ import java.util.Optional;
 
 /**
  * Everything {@link TupleDomReader} and {@link TupleBindReader} share verbatim: resolving every
- * position's own reader once at construction, unwrapping a tuple's own array-shaped {@link
- * DataValue} (never {@link io.ltr8.tson.compiler.ast.EmptyBrace} -- a tuple is array-shaped on the
- * wire, not record-shaped, matching {@code TsonMapperReader.toTuple}'s own note) and checking its
- * arity against the fixed number of positions, and decoding every position into a single {@code
- * Object[]} in slot order.
+ * position's own reader once at construction, confirming a tuple's own array-shaped event sequence
+ * (never {@code EmptyBraceEvent} -- a tuple is array-shaped on the wire, not record-shaped, matching
+ * {@code TsonMapperReader.toTuple}'s own note), and decoding every position into a single {@code
+ * Object[]} in slot order straight off the stream.
  *
  * <p>Each position carries its own type *and* its own {@link ElementState} (§5.3) -- unlike {@link
  * ArrayAbstractReader}, where every element shares one type/state -- so absent-position handling
@@ -32,9 +31,13 @@ import java.util.Optional;
  * duplicated rather than forced through one shared method (matching how {@code isAbsent} is
  * duplicated, not shared, across every structural kind in this package).
  *
- * <p>Arity is fixed and exact, unlike {@link ArrayAbstractReader}/{@link MapAbstractReader}'s {@code
- * min_items}/{@code max_items} range -- a tuple's own arity isn't a range to begin with, so there's
- * nothing resembling their size validation here.
+ * <p><b>Arity is fixed and exact</b>, unlike {@link ArrayAbstractReader}/{@link MapAbstractReader}'s
+ * {@code min_items}/{@code max_items} range -- but a stream has no up-front element count the way an
+ * already-built element list did, so arity is checked incrementally rather than against a pre-known
+ * length: an element arriving past {@code slots.size()} reports {@code WRONG_ARITY} once (and every
+ * further extra element is still decoded and discarded, not silently dropped -- keeping the cursor
+ * correctly positioned for {@code ArrayEnd}), and {@code ArrayEnd} arriving before every slot got a
+ * value reports {@code WRONG_ARITY} too.
  */
 abstract class TupleAbstractReader<T> implements TsonValueReader<T> {
 
@@ -55,48 +58,69 @@ abstract class TupleAbstractReader<T> implements TsonValueReader<T> {
         this.schemaPosition = schemaPosition;
     }
 
-    /** Returns {@code null} (not a real element list) on a shape or arity mismatch -- see {@link RecordAbstractReader#dataFields} for the identical "caller must stop" contract. */
-    final List<ScopedValue> elements(DataValue value, TsonReadContext ctx) {
-        if (value == null) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a tuple for '" + name + "', found no value",
-                    "a tuple (array-shaped)", "no value");
-            return null;
+    /**
+     * Consumes leading annotations/type-ref, then checks for {@code ArrayStart}, consuming it on
+     * success and returning {@code true}. On a shape mismatch, reports {@code TYPE_MISMATCH},
+     * discards whatever was actually there, and returns {@code false} -- see {@link
+     * RecordAbstractReader#dataFields} for the identical "caller must stop" contract.
+     */
+    final boolean expectTupleStart(TsonReadContext ctx) {
+        EventSkip.annotationsAndTypeRef(ctx);
+        if (ctx.peek() instanceof ArrayStart) {
+            ctx.next();
+            return true;
         }
-        CoreValue core = value.coreValue();
-        if (!(core instanceof ArrayValue av)) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH,
-                    "expected a tuple (array-shaped) for '" + name + "', found " + core,
-                    "a tuple (array-shaped)", String.valueOf(core));
-            return null;
-        }
-        List<ScopedValue> elements = av.elements();
-        if (elements.size() != slots.size()) {
-            ctx.report(Diagnostic.Code.WRONG_ARITY, "'" + name + "' has " + slots.size() + " positions, found "
-                            + elements.size() + " elements",
-                    slots.size() + " elements", String.valueOf(elements.size()));
-            return null;
-        }
-        return elements;
+        TsonEvent e = ctx.peek();
+        ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a tuple (array-shaped) for '" + name + "', found " + e,
+                "a tuple (array-shaped)", String.valueOf(e));
+        EventSkip.coreValue(ctx);
+        return false;
     }
 
-    final Object[] decode(List<ScopedValue> elements, TsonReadContext ctx) {
+    /**
+     * Decodes every position up to {@code ArrayEnd} (the cursor assumed already positioned right
+     * after {@code ArrayStart} -- see {@link #expectTupleStart}) into a fixed-size {@code Object[]}.
+     * A slot beyond {@code slots.size()} is still fully decoded-and-discarded (see this class's own
+     * Javadoc); a diagnostic reported anywhere during decoding (arity or per-slot) is what {@link
+     * TupleBindReader#read} checks before ever attempting to construct a bound object from the result.
+     */
+    final Object[] decode(TsonReadContext ctx) {
         Object[] result = new Object[slots.size()];
-        for (int i = 0; i < slots.size(); i++) {
-            CompiledSlot slot = slots.get(i);
-            DataValue elementValue = elements.get(i).value();
-            result[i] = isAbsent(elementValue) ? defaultOrRequire(slot, i, ctx)
-                    : slot.parser().read(elementValue, ctx.index(i, elementValue));
+        int index = 0;
+        boolean reportedExtra = false;
+        while (!(ctx.peek() instanceof ArrayEnd)) {
+            if (ctx.peek() instanceof SchemaRef) {
+                ctx.next();
+            }
+            if (index >= slots.size()) {
+                if (!reportedExtra) {
+                    ctx.report(Diagnostic.Code.WRONG_ARITY,
+                            "'" + name + "' has " + slots.size() + " positions, found more than " + slots.size() + " elements",
+                            slots.size() + " elements", "more than " + slots.size());
+                    reportedExtra = true;
+                }
+                EventSkip.dataValue(ctx);
+                index++;
+                continue;
+            }
+            CompiledSlot slot = slots.get(index);
+            result[index] = ctx.peek() instanceof AbsentEvent ? defaultOrRequire(slot, index, ctx)
+                    : slot.parser().read(ctx.index(index));
+            index++;
+        }
+        ctx.next(); // ArrayEnd
+        if (index < slots.size()) {
+            ctx.report(Diagnostic.Code.WRONG_ARITY,
+                    "'" + name + "' has " + slots.size() + " positions, found only " + index + " elements",
+                    slots.size() + " elements", String.valueOf(index));
         }
         return result;
     }
 
-    private static boolean isAbsent(DataValue value) {
-        return value == null || value.coreValue() instanceof AbsentValue;
-    }
-
     private Object defaultOrRequire(CompiledSlot slot, int index, TsonReadContext ctx) {
+        ctx.next(); // consume the AbsentEvent regardless of REQUIRED/OPTIONAL
         if (slot.schema().state() == ElementState.REQUIRED) {
-            ctx.index(index, null).report(Diagnostic.Code.FIELD_REQUIRED,
+            ctx.index(index).report(Diagnostic.Code.FIELD_REQUIRED,
                     "'" + name + "' position [" + index + "] is absent, but this position is required",
                     "a value", "(absent)");
         }

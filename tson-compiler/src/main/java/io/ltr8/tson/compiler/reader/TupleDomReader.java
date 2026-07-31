@@ -3,8 +3,6 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.TsonValueReaderResolver;
-import io.ltr8.tson.compiler.ast.DataValue;
-import io.ltr8.tson.compiler.ast.ScopedValue;
 import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -22,9 +20,8 @@ import java.util.Optional;
  * Arrays.asList} tolerates {@code null} elements fine (an {@code OPTIONAL} position left absent),
  * unlike {@code List.of}.
  *
- * <p>Everything else -- resolving each position's own reader, unwrapping the incoming {@link
- * DataValue} and checking its arity, absent-position handling -- lives on {@link
- * TupleAbstractReader}.
+ * <p>Everything else -- resolving each position's own reader, confirming a tuple shape, arity
+ * checking, absent-position handling -- lives on {@link TupleAbstractReader}.
  */
 final class TupleDomReader extends TupleAbstractReader<List<Object>> {
 
@@ -33,13 +30,12 @@ final class TupleDomReader extends TupleAbstractReader<List<Object>> {
     }
 
     @Override
-    public List<Object> read(DataValue value, TsonReadContext ctx) {
-        ctx = ctx.at(value).withSchemaPosition(schemaPosition);
-        List<ScopedValue> elements = elements(value, ctx);
-        if (elements == null) {
+    public List<Object> read(TsonReadContext ctx) {
+        ctx = ctx.withSchemaPosition(schemaPosition);
+        if (!expectTupleStart(ctx)) {
             return null;
         }
-        return Arrays.asList(decode(elements, ctx));
+        return Arrays.asList(decode(ctx));
     }
 
     /** Validates {@code typeDefinition} is tuple-shaped before ever constructing a {@link TupleDomReader} for it -- no {@link io.ltr8.bind.DataBindContext} needed, since DOM mode targets no Java type. */

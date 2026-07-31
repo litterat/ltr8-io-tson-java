@@ -1,9 +1,12 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.atom.AtomType;
 import io.ltr8.tson.compiler.reader.ValueReaderFactory;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
+import io.ltr8.tson.compiler.stream.DocumentEnd;
+import io.ltr8.tson.compiler.stream.TsonEvent;
+
+import java.io.InputStream;
 
 /**
  * Reads a value at one compiled, schema-known position -- the front door a caller actually holds
@@ -19,11 +22,14 @@ import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
  * this position never re-consults the schema's own name-keyed map at read time -- except at the
  * specific edges that close a cycle, where a deferred, name-keyed lookup does exactly one.
  *
- * <p>Takes a {@link DataValue}, not a bare {@code CoreValue}/{@code TokenValue} -- a schema
- * position can carry its own annotations and an explicit type-ref same as any other data position
- * (§2.3-§2.4), and a composite reader (record/array/map/tuple/choice) needs both, the same reason
- * {@code TsonMapperReader}'s own {@code toRecord}/{@code toArray}/etc. all take {@code DataValue}
- * rather than a narrower {@code CoreValue} subtype.
+ * <p><b>Pulls its own events from {@link TsonReadContext} rather than being handed an
+ * already-materialized value</b> -- {@code ctx} wraps a {@code TsonEventSource} (in practice, almost
+ * always a real {@code TsonDataStream}), so a large document never needs to be fully parsed into a
+ * tree before schema-validated reading can begin; memory held at any point is proportional to
+ * nesting depth, the same property {@code TsonDataStream} itself already has. {@code ctx} is also the
+ * tree walk's own error sink, current path, and position tracking, shared across an entire read so a
+ * problem at one field/element doesn't have to abort the whole read to be reported; see that
+ * interface's own Javadoc.
  *
  * <p><b>Unchecked failures only, deliberately</b> -- every exception this whole read/parse stack
  * throws is a {@link RuntimeException} (the lexer's own {@code LexException}, {@code
@@ -33,12 +39,6 @@ import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
  * also propagate through every functional interface this reader composes through ({@link
  * ValueReaderFactory}, {@code CompilationContext}, {@code DataNameBinder}), which this codebase has
  * consistently avoided elsewhere for the same reason.
- *
- * <p>Takes a {@link TsonReadContext} alongside the value -- the tree walk's own error sink, current
- * path, and position tracking, shared across an entire read so a problem at one field/element
- * doesn't have to abort the whole read to be reported; see that interface's own Javadoc. The
- * single-argument {@link #read(DataValue)} is a convenience for a caller who just wants today's
- * fail-fast, single-error behavior with no context of its own to manage.
  *
  * <p>Deliberately read-only for now -- {@code write} (the serialization direction) isn't sketched
  * yet. It isn't obviously symmetric the way {@link AtomType#write} is: a validation-mode {@link
@@ -55,10 +55,36 @@ import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
  */
 public interface TsonValueReader<T> {
 
-    T read(DataValue value, TsonReadContext ctx);
+    T read(TsonReadContext ctx);
 
-    /** Convenience for a caller that just wants today's fail-fast, single-error behavior. */
-    default T read(DataValue value) {
-        return read(value, TsonReadContext.throwing());
+    /**
+     * Convenience for a caller with real source text and no document-level metadata ({@code !!id}/
+     * {@code !!schema}) or context of their own to manage -- fail-fast, single-error, matching
+     * today's default. Reads the whole document's own root value and confirms there's no trailing
+     * content after it, the same check {@code TsonDataStream}'s own {@code RootFrame} already performs
+     * for a full document parse.
+     */
+    default T read(String source) {
+        return readDocument(TsonReadContext.throwing(source));
+    }
+
+    /**
+     * The streaming counterpart to {@link #read(String)} -- reads the whole document's own bytes
+     * (UTF-8) genuinely off {@code source}, never buffering it into a {@link String} first, so a
+     * large file is never fully resident. {@code source} is not closed here; a caller that opened it
+     * owns closing it.
+     */
+    default T read(InputStream source) {
+        return readDocument(TsonReadContext.throwing(source));
+    }
+
+    /** Reads the root value through {@code ctx} (already positioned past {@code DocumentStart}), then confirms the next event is {@code DocumentEnd} -- no trailing content after the document's value. */
+    private T readDocument(TsonReadContext ctx) {
+        T result = read(ctx);
+        TsonEvent trailing = ctx.next();
+        if (!(trailing instanceof DocumentEnd)) {
+            throw new IllegalStateException("unexpected trailing event after the document's value: " + trailing);
+        }
+        return result;
     }
 }
