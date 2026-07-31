@@ -15,21 +15,21 @@ void main() {
     Tson tson = Tson.builder().build();
 
     String schema = """
-            !!id:"https://example.com/2026/32/demo/point-1.tn"
+            !!id:"https://example.com/2026/32/app/server-1.tn"
             !!meta:"https://tson.io/2026/32/m/meta.tn"
             !!import:"https://tson.io/2026/32/m/core.tn"
             {
-                point => { x: int32  y: int32 }
+                server => { hostname: text  port: int32 }
             }""";
 
     var compiled = tson.compile(schema, TsonSchemaCompiler.dom());
-    var reader = compiled.compiledSchema().get("point");
+    var reader = compiled.compiledSchema().get("server");
 
-    IO.println("valid:   " + reader.read("{ x: 3  y: 4 }"));   // {x=3, y=4}
+    IO.println("valid:   " + reader.read("{ hostname: \"web-01\"  port: 8080 }"));   // {hostname=web-01, port=8080}
 
     // A bad value surfaces as a diagnostic rather than a wrong result. Collect every problem in one
     // pass instead of stopping at the first:
-    var ctx = TsonReadContext.collecting("{ x: 3  y: 99999999999999 }");   // y is out of int32 range
+    var ctx = TsonReadContext.collecting("{ hostname: \"web-01\"  port: 99999999999999 }");   // out of int32 range
     reader.read(ctx);
     for (Diagnostic d : ctx.diagnostics()) {
         IO.println("problem: " + d.path() + " -- " + d.message());

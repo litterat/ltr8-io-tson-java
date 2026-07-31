@@ -164,9 +164,10 @@ class *reflectively* (the class is the schema); `TsonValueReader` checks it agai
 document*. Both stream their input — a large document is never fully buffered before reading begins —
 and both accept a `String` or an `InputStream`.
 
-> **Want to try this without a project or build tool?** [`examples/`](examples/) has runnable
-> single-file Java 25 programs that load the library over the module system — `./gradlew :tson:modules`,
-> then `java --module-path tson/build/modules --add-modules io.ltr8.tson examples/ObjectBinding.java`.
+> **Try any of these without a project or build tool.** Each of the four numbered examples below is a
+> runnable single-file Java 25 program in [`examples/`](examples/) that loads the library over the
+> module system. Build the module path once — `./gradlew :tson:modules` — then run any of them with
+> `java --module-path tson/build/modules --add-modules io.ltr8.tson examples/<File>.java`.
 
 ### 1. Bind to a Java class — `TsonObjectReader`
 
@@ -192,6 +193,8 @@ Server server = new TsonObjectReader().read("""
         }""", Server.class);
 // Server[hostname=web-01, address=/192.0.2.10, id=9f1c8e2a-…, deployedOn=2026-01-15]
 ```
+
+▶ Runnable: [`examples/ObjectBinding.java`](examples/ObjectBinding.java) — `java --module-path tson/build/modules --add-modules io.ltr8.tson examples/ObjectBinding.java`
 
 `read` also takes an `InputStream`, streaming the file rather than buffering it whole:
 
@@ -225,6 +228,8 @@ Document doc = new TsonDataParser("{ name: \"Ada\"  tags: [a b c] }").parseDocum
 CoreValue root = doc.root().coreValue();   // RecordValue | MapValue | ArrayValue | TokenValue | …
 ```
 
+▶ Runnable: [`examples/TreeWalk.java`](examples/TreeWalk.java) — `java --module-path tson/build/modules --add-modules io.ltr8.tson examples/TreeWalk.java`
+
 ### 3. Pull events lazily — `TsonDataStream`
 
 The tier below the AST: a pull-based event stream (`RecordStart`, `FieldName`, `TokenEvent`,
@@ -240,6 +245,8 @@ while (stream.hasNext()) {
     TsonEvent event = stream.next();   // DocumentStart, RecordStart, FieldName, TokenEvent, …
 }
 ```
+
+▶ Runnable: [`examples/EventStream.java`](examples/EventStream.java) — `java --module-path tson/build/modules --add-modules io.ltr8.tson examples/EventStream.java`
 
 ### 4. Validate against a TSON schema — `TsonValueReader`
 
@@ -269,6 +276,8 @@ Map<String, Object> value = (Map<String, Object>)
         compiled.compiledSchema().get("server").read("{ hostname: \"web-01\" port: 8080 }");
 // { hostname=web-01, port=8080 } — validated against the schema; a bad port would surface as a diagnostic
 ```
+
+▶ Runnable: [`examples/SchemaValidation.java`](examples/SchemaValidation.java) — `java --module-path tson/build/modules --add-modules io.ltr8.tson examples/SchemaValidation.java` (also shows collecting a diagnostic)
 
 **Bind mode** (`TsonSchemaCompiler.bind(dataBindContext)`) produces bound Java objects the same way
 `TsonObjectReader` does, but with the TSON schema — not your Java class — as the source of truth. The

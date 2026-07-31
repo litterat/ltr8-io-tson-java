@@ -18,6 +18,8 @@ Then run any example directly (from the repo root):
 
 ```
 java --module-path tson/build/modules --add-modules io.ltr8.tson examples/ObjectBinding.java
+java --module-path tson/build/modules --add-modules io.ltr8.tson examples/TreeWalk.java
+java --module-path tson/build/modules --add-modules io.ltr8.tson examples/EventStream.java
 java --module-path tson/build/modules --add-modules io.ltr8.tson examples/SchemaValidation.java
 ```
 
@@ -32,7 +34,11 @@ Requires **Java 25** (see the main [README](../README.md#getting-started) for ho
 
 ## What's here
 
+These are the four numbered reader entry points from the main [README](../README.md#reading-tson-choosing-an-entry-point):
+
 | File | Shows |
 |---|---|
 | [`ObjectBinding.java`](ObjectBinding.java) | Schemaless — bind a TSON document straight to a Java `record` (built-in types `!ipv4`/`!uuid`/`!date` map to `java.base` types). |
+| [`TreeWalk.java`](TreeWalk.java) | Schemaless — parse into a navigable `Document`/`CoreValue` AST. |
+| [`EventStream.java`](EventStream.java) | Schemaless — pull a lazy `TsonEvent` stream without materializing a tree. |
 | [`SchemaValidation.java`](SchemaValidation.java) | Schema-driven — compile a TSON *schema* and validate data against a type, collecting every problem in one pass. |
