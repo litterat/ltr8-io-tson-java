@@ -1,13 +1,22 @@
 # tson-java
 
-A Java implementation of [TSON](https://tson.io) (Typed Schema Object Notation) — a schema system with immutable, 
-hash-pinned schemas whose definitions are themselves data. A document names its schema, the schema names 
-its meta-schema; one hash verifies the whole chain. The finishing touch, TSON's data format is a 
-Unicode-first superset of JSON you'll actually enjoy writing. This is the first implementation of the specification.
+A Java implementation of [TSON](https://tson.io) (Typed Schema Object Notation) — a schema system with immutable, hash-pinned
+schemas whose definitions are themselves data. A document names its schema, the schema names its meta-schema;
+one hash verifies the whole chain. The finishing touch, TSON's data format is a Unicode-first superset of JSON
+you'll actually enjoy writing.
+
+> **Status:** first implementation of TSON, built against a working-draft spec (2026
+> revision 32). Part 1 (data format) and most of Part 2 (schema layer) are implemented; the
+> API and the format itself may still change. See [STATUS.md](STATUS.md) for the full
+> checklist.
+
+**Requires Java 25.** No external runtime dependencies. **Not yet published to Maven Central.**
+Need Java 25? Quick install via [SDKMAN!](https://sdkman.io) (`sdk install java 25-tem`) or an
+[Adoptium](https://adoptium.net/temurin/releases/?version=25) build.
 
 ## Getting started
 
-The quickest way to get a feel for them is the `tson` command-line tool. Requires **Java 25**, no external dependencies.
+The quickest way to get a feel for the *schema layer* is the `tson` command-line tool.
 Clone the repo, build and install the command:
 
 ```
@@ -16,11 +25,8 @@ cd ltr8-io-tson-java
 ./gradlew :tson-cli:installDist
 export PATH="$PWD/tson-cli/build/install/tson/bin:$PATH"
 ```
-
-Need Java 25? Quick install via [SDKMAN!](https://sdkman.io) (`sdk install java 25-tem`) or 
-an [Adoptium](https://adoptium.net/temurin/releases/?version=25) build. 
-
-The `tson` command-line tool can be used to provide a working example, just run the init-example command: 
+The `tson` command-line tool can be used to provide a working example, just run the
+init-example command:
 
 ```
 $ tson init-example
@@ -31,8 +37,9 @@ Try it (the data names its own schema and type, so no --type is needed):
   …
 ```
 
-Here's the `person.tn` schema created. It shows a few of the basic schema features, including records, record groups,
-enums and some in-built types:
+Here's the `person.tn` schema created. It shows a few of the basic schema features,
+including records, record groups, enums and some in-built types. The `2026/32` in the
+URIs is the draft year/revision marker from the spec's release scheme.
 
 ```tson
 !!id:"https://example.com/2026/32/getting-started/person-1.tn"
