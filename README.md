@@ -275,7 +275,7 @@ below.
 ### Writing TSON back out — `TsonObjectWriter`
 
 The read-side inverse of `TsonObjectReader`: a Java object to TSON text. Mainly a debugging aid, not a
-guaranteed-lossless serializer (see [Conformance](#conformance) for exactly where it's lossy). It
+guaranteed-lossless serializer (see [CONFORMANCE.md](CONFORMANCE.md) for exactly where it's lossy). It
 throws unchecked `TsonWriteException` on failure, symmetric to the reader's `TsonReadException` — no
 checked exceptions on either side of the object-binding pair:
 
@@ -288,65 +288,17 @@ String text = new TsonObjectWriter().toTson(server);
 
 ## Status
 
-Built against TSON Part 1 (lexer + data format), a working draft: https://tson.io/raw/2026/32/tson-part1-data.md,
-and Part 2 (schema grammar + type system), also a working draft: https://tson.io/raw/2026/32/tson-part2-schema.md
+This is the **first implementation** of TSON, built against a working-draft spec (Part 1 data format
+and Part 2 schema layer, 2026 revision). Part 1 and most of Part 2 — schema grammar, resolution,
+linking/registration, and a compiled schema-validating reader — are implemented; some Part 2 constructs
+are still out of scope. Details live in dedicated docs rather than crowding this page:
 
-This is the spec's first implementation. Issues and ambiguities found in the spec while implementing are
-tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
-
-**Implemented:**
-
-- [x] Lexer and structural parser — records, maps, arrays, annotations, directives (`!!id`/
-      `!!schema`/`!!meta` arguments are validated as URIs, not just single-line tokens)
-- [x] Base types — null, boolean, string, numbers (integer, float, hex-float, based-integer)
-- [x] Integer types — `int8`–`int256`, `uint8`–`uint256`, `positive_integer` and siblings
-- [x] Decimal/float types — `number`, `float32`, `float64`, `rational`, `complex`
-- [x] Identifier/network types — `uuid`, `uri`, `ipv4`, `ipv6`
-- [x] Binary types — `base64`, `base64url`, `base32`, `hex`
-- [x] Temporal types — `date`, `time`, `datetime`, `duration`
-- [x] Object binding — Java records, hand-written immutable classes, `Map<K, V>`, tuples, plain
-      enums, sealed interfaces/unions
-- [x] Wire-format annotation access — a bound record's own `@name[:value]` annotations, via an
-      opt-in carrier component
-- [x] Full document binding — TSON text straight to Java objects, dispatching into all of the above,
-      and back again (`toTson`) — mainly a debugging tool, not a guaranteed-lossless round trip
-      (e.g. the integer family's exact width isn't recoverable schemaless; see [Conformance](#conformance))
-- [x] Streaming reads throughout — the lexer reads from an `InputStream`, and both the schemaless
-      binder (`TsonObjectReader`) and the schema-validating reader (`TsonValueReader`) pull events one
-      at a time rather than materializing a whole document tree first
-- [x] Part 2 schema grammar — full schema document parsing into a faithful AST (records, compositions,
-      refinements, generic/array-sugar type-refs, field groups, and more), verified end-to-end against
-      the spec's own real `meta-kernel.tn`/`meta.tn`/`core.tn` fixtures
-- [x] Part 2 schema resolution — composition (`&`), refinement (`^`) including tightening, bare and
-      generic type references, field modifiers/defaults/fixed values, type parameters, array sugar,
-      and generalized constructor-application/atom-refinement resolution (`!C value`); `meta-kernel.tn`
-      resolves all 49 of its own declarations, `meta.tn` all 31, and `core.tn` all 48, all
-      end-to-end (see [BACKLOG.md](BACKLOG.md) for the specific constructs still out of scope)
-- [x] Part 2 schema linking and registration — validates a document's own `!!id`/`!!import` header
-      directives during resolution, flattens argument-bearing type references into real named
-      entries, merges `!!import`s, validates every reference in a schema actually resolves, and
-      locks a schema into a registry keyed by its canonical `!!id`
-- [x] A compiled, schema-validating data reader (Class 2, §1.5) — compiles a linked schema into real
-      Java object references between per-type parsers (DOM or object-binding mode) for fast repeated
-      reads against real TSON data documents (see [Schema pipeline](#schema-pipeline) below)
-- [x] The full pipeline verified end-to-end, three schemas deep — an ordinary, user-defined schema
-      can `!!import` `core.tn` (itself governed by `meta.tn`, governed by `meta-kernel.tn`) and
-      compile cleanly with real, manually-registered Java classes bound against records composed
-      from its imported vocabulary, reading real TSON data through the whole chain
-
-**Not yet implemented:**
-
-See [BACKLOG.md](BACKLOG.md) for the actively-tracked engineering backlog, and
-[STRUCTURED-OUTPUT.md](STRUCTURED-OUTPUT.md) for the target-use-case plan (LLM structured-output
-validation, JSON compatibility). One onboarding-relevant gap worth naming: the *CLI* now reads a
-self-describing data document — one that opens with a root type-ref (`!person`) and verifies its own
-`!!schema` header against the schema (see [Command-line interface](#command-line-interface)) — but the
-*library* front door doesn't yet have the equivalent one-call "read this string and auto-pick the
-reader from its own `!!schema`/type-ref" entry point; every `read` above still needs you to name the
-target class or schema type up front.
-
-See [CLAUDE.md](CLAUDE.md#architecture) for architecture and design notes, and
-[Conformance](#conformance) below for edge-case behavior worth knowing about.
+- **[STATUS.md](STATUS.md)** — the full implemented / not-yet-implemented checklist
+- **[CONFORMANCE.md](CONFORMANCE.md)** — edge-case behavior where a JDK parser and the RFC/ISO standard the spec cites disagree
+- **[BACKLOG.md](BACKLOG.md)** — the actively-tracked engineering backlog
+- **[STRUCTURED-OUTPUT.md](STRUCTURED-OUTPUT.md)** — the target-use-case plan (LLM structured-output validation, JSON compatibility)
+- **[SPEC-FEEDBACK.md](SPEC-FEEDBACK.md)** — ambiguities and errors found in the spec while implementing
+- **[CLAUDE.md](CLAUDE.md#architecture)** — architecture and design notes
 
 ## Schema pipeline
 
@@ -394,94 +346,6 @@ are loaded and registered together.
 There's no polished, single-call "load a *custom* governing chain" entry point yet (see
 [BACKLOG.md](BACKLOG.md)) — `Tson` today assumes a schema governed by the standard
 meta-kernel/meta.tn/core.tn library.
-
-## Conformance
-
-A handful of implementation choices are worth calling out on their own — not *what's* implemented (the
-checklists above), but *how* it behaves at the edges, where a well-known JDK parser and the RFC/ISO
-standard the spec cites don't quite agree.
-
-**Stricter than the underlying JDK default, matching the cited RFC exactly.** Several built-in atoms
-delegate to a JDK type for the bulk of parsing, but only after an explicit shape check of their own —
-because the relevant JDK parser, checked empirically in each case rather than assumed, is consistently
-*more lenient* than the RFC/ISO grammar the spec cites:
-
-- `!uuid` requires RFC 9562's canonical 8-4-4-4-12 grouping; `UUID.fromString` alone accepts unpadded
-  groups (`"1-2-3-4-5"` succeeds, silently reinterpreting where the groups fall).
-- `!base64`/`!base64url` require padding; `Base64.getDecoder()` alone accepts it missing.
-- `!date`/`!datetime`/`!time` reject ISO 8601's "extended year" form (a leading sign, more than 4 digits);
-  `LocalDate`/`OffsetDateTime`/`OffsetTime.parse()` alone accept it, even though RFC 3339's `full-date`
-  grammar requires exactly 4 digits and no sign.
-- `!duration` requires uppercase designators and no leading sign; `Duration.parse`/`Period.parse` alone
-  accept both.
-
-See the relevant class's Javadoc for the specific check in each case.
-
-**`!ipv4` doesn't delegate text parsing to the JDK at all, for a security reason, not just a
-spec-fidelity one.** `InetAddress.ofLiteral` — the modern, no-DNS, literal-only entry point, confirmed
-empirically before deciding this — is still far more lenient than RFC 3986's `IPv4address`/`dec-octet`
-grammar: it accepts a leading zero (`"0177.0.0.1"`), the legacy BSD short/class-based form (`"1.2.3"`
-→ `1.2.0.3`), and even a bare 32-bit integer literal (`"3232235521"` → `192.168.0.1`). That's not merely
-looser than the cited RFC, it's the same leniency class behind real-world SSRF-filter-bypass techniques
-(a validator and the actual network stack disagreeing about what address a string denotes). `Ipv4Parser`
-validates the token against the RFC 3986 grammar itself, extracts the four octets directly from the
-regex match, and constructs the address from raw bytes via `InetAddress.getByAddress(byte[])` — a pure
-bytes-to-object call, never handing the original text to any JDK parser.
-
-**`!ipv6` parses RFC 4291 §2.2's text representation itself too, for the same reason, plus a second,
-unrelated JDK quirk.** Handing the token text to a JDK parser would reintroduce `!ipv4`'s exact
-leniency gap through RFC 4291's IPv4-mapped alternative form (`x:x:x:x:x:x:d.d.d.d`, e.g.
-`"::ffff:192.0.2.1"`), which embeds a dotted-quad tail. So `Ipv6Parser` parses the full grammar itself
-— the 8-group preferred form, at most one `::` compression, and a dotted-quad tail checked against
-the same strict `dec-octet` grammar `!ipv4` uses — and builds the address from raw bytes. Separately:
-`InetAddress.getByAddress(byte[16])` itself was confirmed empirically to silently return an
-`Inet4Address`, not an `Inet6Address`, for any 16-byte value in the IPv4-mapped range — the same
-value ending up as a different, mutually non-`equals` Java type depending on which narrow sub-range
-it falls in. `Ipv6Parser` uses `Inet6Address.getByAddress(String, byte[], int)` with `scope_id = -1`
-instead (confirmed to behave like "no scope" and match the generic method's result for every
-non-mapped address tried) to guarantee `!ipv6` always returns `Inet6Address`, regardless of the
-address's value.
-
-**One accepted, unfixable gap.** RFC 3339's grammar permits `time-second` up to `60` (leap-second
-accommodation), but `java.time` has no leap-second concept at all — `!time`/`!datetime` reject a
-spec-legal leap-second token as a parse error. There's no reasonable fix short of a from-scratch time
-representation built solely for this one case, so it's documented (`TimeParser`'s Javadoc) rather than
-solved.
-
-**One accepted, different-revision gap.** `!uri` (§5.5) is the one atom here that does *not* get an
-extra shape check ahead of the JDK type it delegates to — the opposite situation from the atoms above.
-§5.5 cites RFC 3986, but `java.net.URI`'s own Javadoc states it implements RFC 2396 (as amended by RFC
-2732), an older revision of the same standard, not a looser/stricter variant of the same grammar. There's
-no simple shape to shim in front of `URI`'s constructor the way a four-group hex pattern works for UUID,
-and writing an RFC 3986 validator from scratch isn't worth it at this stage, so `java.net.URI`'s behavior
-is accepted as `!uri`'s actual contract for now. See `UriParser`'s Javadoc.
-
-**`RegexParser` accepts `java.util.regex.Pattern`'s own syntax, not a real RFC 9485 (I-Regexp) validator.**
-Not part of Part 1's published built-in vocabulary (`TextParser`/`RegexParser` are groundwork for Part 2,
-which doesn't yet have anything that consumes a `regex` constraint), but the same kind of conformance
-call as the `!uri` gap above: I-Regexp is a deliberately restricted, interoperable subset of a
-different regex dialect (roughly ECMA-262) than `java.util.regex`'s own Perl-derived syntax, and
-neither is a subset of the other. Writing an RFC 9485 validator from scratch is real, standalone work,
-not worth doing before anything actually needs it. See `RegexParser`'s Javadoc.
-
-**One open question.** Whether `!duration` accepts ISO 8601's alternative `PnW` week form is genuinely
-ambiguous — §5.4's table shows only `PnYnMnDTnHnMnS`. This implementation rejects `PnW` as the more
-conservative of the two readings, not a confident call — see [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #12.
-
-**`toTson`'s round trip is intentionally lossy in a few specific, documented ways.** It's a debugging
-tool, not a guaranteed-lossless serializer: a `!typeName` type-ref is only re-emitted where a value
-wouldn't read back correctly without one (the built-in vocabulary's JDK-backed host types); anything
-default value resolution (§4) already recovers on its own — the whole integer family, plain
-`number`/`float32`/`float64` — is written bare, so a field bound from `!uint8 42` writes back as plain
-`42`, indistinguishable from one that was never `!uint8`-typed at all. A schemaless writer has no
-annotation to reach for any more than a schemaless reader has one to validate against. `byte[]` values
-always write back as `!base64`, regardless of which of `base64`/`base64url`/`base32`/`hex` they were
-originally decoded from — that information doesn't survive decoding, so `!base64` is an arbitrary but
-reasonable default. Tuples write as plain arrays, with nothing marking them as tuples at all. Wire-format
-annotations captured via `@Annotated` aren't re-emitted yet.
-
-Ambiguities, inconsistencies, and errors in the spec text itself — as opposed to this implementation's own
-behavior at the edges — are tracked separately in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
 
 ## Command-line interface
 
