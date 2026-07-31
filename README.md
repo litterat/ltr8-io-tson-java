@@ -18,10 +18,12 @@ Published under the [litterat](https://github.com/litterat) org, group id `io.lt
 ## Getting started
 
 TSON's schema and data notation are new — the quickest way to get a feel for them is the `tson`
-command-line tool, no Java required. Requires **Java 25**, no external dependencies. Build and install
-the command, and put it on your `PATH`:
+command-line tool, no Java required. Requires **Java 25**, no external dependencies. Clone the repo,
+build and install the command, and put it on your `PATH`:
 
 ```
+git clone https://github.com/litterat/ltr8-io-tson-java.git
+cd ltr8-io-tson-java
 ./gradlew :tson-cli:installDist
 export PATH="$PWD/tson-cli/build/install/tson/bin:$PATH"
 ```
@@ -41,7 +43,6 @@ Here's the whole of `person.tn` — a TSON *schema*. If you've seen JSON, most o
 guess; the parts that don't are exactly what TSON adds:
 
 ```tson
-# person.tn
 !!id:"https://example.com/2026/32/getting-started/person-1.tn"
 !!meta:"https://tson.io/2026/32/m/meta.tn"
 !!import:"https://tson.io/2026/32/m/core.tn"
@@ -83,7 +84,6 @@ Reading top to bottom, most of it is familiar and a few things are new:
 And here's `person-data.tn`, a *data* document — an instance of that shape:
 
 ```tson
-# person-data.tn
 {
     id: !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09
     name: "Ada Lovelace"
@@ -498,7 +498,6 @@ tson compile      [--output text|json|tson] <schema>
 For a hand-written schema `person.tn` and a data file `ada.tn`:
 
 ```tson
-# person.tn
 !!id:"https://example.com/2026/32/app/person-1.tn"
 !!meta:"https://tson.io/2026/32/m/meta.tn"
 !!import:"https://tson.io/2026/32/m/core.tn"
