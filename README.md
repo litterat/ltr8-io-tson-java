@@ -42,9 +42,9 @@ including records, record groups, enums and some in-built types. The `2026/32` i
 URIs is the draft year/revision marker from the spec's release scheme.
 
 ```tson
-!!id:"https://example.com/2026/32/getting-started/person-1.tn"
-!!meta:"https://tson.io/2026/32/m/meta.tn"
-!!import:"https://tson.io/2026/32/m/core.tn"
+!!id:"https://example.com/2026/32/getting-started/person.tn?sha256=1434c8c4c285ec9120500ef876dc3a2254f8a35534b922b1382990a9870fc79a"
+!!meta:"https://tson.io/2026/32/m/meta.tn?sha256=983ad4da2ddf5b70b37da4af45e964290d24e6942776ef281c1e0d5942b46b07"
+!!import:"https://tson.io/2026/32/m/core.tn?sha256=63912a45d5c7b12c92b4d32a596de3dbd875b04fd252f443827d6cf2cf5a385e"
 {
     role => !enum [admin member guest]
 
@@ -68,11 +68,19 @@ URIs is the draft year/revision marker from the spec's release scheme.
 }
 ```
 
+Every reference is *hash-pinned*. The `?sha256=…` on `!!id` is the schema's own content digest — its
+identity is the URL, but its integrity is the hash, so this file *is* content-addressed. The digests
+on `!!meta` and `!!import` pin the exact standard-library versions this schema was written against;
+if a fetched `meta.tn`/`core.tn` doesn't hash to those, `validate`/`compile` refuse it rather than
+resolve against something subtly different. Run `tson hash person.tn` any time to (re)compute the
+content digest and stamp it onto `!!id` — the id line itself is excluded from the hash, so re-stamping
+is stable. (Pinning is optional: drop the `?sha256=…` and a reference resolves by identity alone.)
+
 And here's a corresponding `person-data.tn` *data* document. It's *self-describing*: the
 `!!schema` header names the schema it conforms to, and the leading `!person` says which type:
 
 ```tson
-!!schema:"https://example.com/2026/32/getting-started/person-1.tn"
+!!schema:"https://example.com/2026/32/getting-started/person.tn"
 !person {
     id: !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09
     name: "Ada Lovelace"
