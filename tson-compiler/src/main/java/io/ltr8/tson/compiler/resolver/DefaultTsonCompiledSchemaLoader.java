@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.compiler.ContentHash;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
 import io.ltr8.tson.compiler.TsonSchemaParser;
@@ -11,6 +12,7 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchemaLinker;
 import io.ltr8.tson.schema.TsonSchema;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
 /**
@@ -103,6 +105,10 @@ public final class DefaultTsonCompiledSchemaLoader implements TsonCompiledSchema
             return TsonCompiledMetaSchema.bootstrap(linked, registry.resolver());
         }
         String sourceText = source.fetch(uri);
+        // If this reference is hash-pinned (?sha256=...), verify the fetched content against it before
+        // use -- §2.2.1's MUST-verify rule. A transitive pinned !!import/!!meta is verified likewise
+        // when its own load(...) reaches here. A plain (unpinned) reference is a no-op.
+        ContentHash.verify(sourceText.getBytes(StandardCharsets.UTF_8), uri);
         SchemaDocument document = new TsonSchemaParser(sourceText).parseSchemaDocument();
         SchemaResolver resolver = new SchemaResolver(this);
         TsonSchema resolved = resolver.resolveSchema(document);

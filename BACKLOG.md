@@ -38,13 +38,13 @@ a URI's query component to compute canonical identity, but the dropped query is 
 checked against anything. Worth its own section since it's a coherent, well-specified area, not a
 handful of loose gaps.
 
-- [ ] **SHA256 verification of fetched/imported schema content** against a `?sha256=<hash>` query
-  parameter declared on a `!!id`/`!!meta`/`!!import`/`!!schema` URI — the spec's own words: "A
-  consumer holding a hashed reference MUST verify the content against the declared hash before use
-  and MUST NOT silently use mismatched content: a mismatch is an error, never a fallback."
-  `CanonicalIdentity.of` currently just discards the query outright — no rejection of an
-  unrecognized query-parameter name either (the spec requires this: a query MUST consist solely of
-  recognized hash-algorithm parameters, or it's an error, "never silently retained").
+- [x] **SHA256 verification of fetched/imported schema content** — `ContentHash.declaredSha256(uri)`
+  parses a reference's `?sha256=<hex>` pin (rejects an unrecognized query-parameter name and a
+  malformed value, "never silently retained"), and `ContentHash.verify(bytes, uri)` throws
+  `ContentHashMismatchException` on a mismatch. `DefaultTsonCompiledSchemaLoader.load` verifies every
+  fetched pinned reference before use (the top `!!schema` + each transitive pinned `!!import`/`!!meta`
+  at its own fetch); a plain reference resolves unverified. Verified end to end (correct pin → OK,
+  wrong pin / bad query → error). *Still per-fetch, not per-identity — see the aggregation bullet.*
 - [x] **Correct content-hash computation** — `io.ltr8.tson.compiler.ContentHash` (`sha256(byte[])` /
   `contentStart(byte[])`): SHA-256, lowercase hex, of every byte after the `!!id` line's own
   terminator (for `CR LF`, after the `LF`); the id line is excluded, a leading BOM stripped and never
@@ -53,8 +53,8 @@ handful of loose gaps.
   hash-pinning: publishing/pinning a schema. **Matching now ignores the pin** (a `?sha256` is
   verification metadata, not identity): `TsonSchemaRegistry.canonicalIdentity(String)` is public, and
   `ValidateCommand`'s source map + `Tson.validate`'s compile cache key by it, so a hashed schema still
-  resolves against a plain (or differently-pinned) reference. **Still open:** actual *verification* —
-  hashing a pinned reference's fetched content and erroring on a mismatch — the bullet above.
+  resolves against a plain (or differently-pinned) reference. Verification of a pinned reference is
+  wired too (the bullet above).
 - [ ] **Per-identity hash aggregation within one resolution's reference closure** ([TSON-SCHEMA]
   §10.2): an identity with no declared digest anywhere in the closure resolves unverified; a single
   declared digest is verified once, and every reference to that identity — pinned or plain alike —

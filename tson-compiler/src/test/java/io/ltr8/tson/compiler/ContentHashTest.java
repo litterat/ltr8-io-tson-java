@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -62,5 +63,36 @@ class ContentHashTest {
     @Test
     void noTerminatorAfterTheFirstLineThrows() {
         assertThrows(IllegalArgumentException.class, () -> ContentHash.sha256(utf8("!!id:\"x\"")));
+    }
+
+    @Test
+    void declaredSha256ExtractsAPinOrEmpty() {
+        assertEquals(Optional.of(SHA_ABC), ContentHash.declaredSha256("https://x/s.tn?sha256=" + SHA_ABC));
+        assertEquals(Optional.empty(), ContentHash.declaredSha256("https://x/s.tn"));
+    }
+
+    @Test
+    void declaredSha256RejectsAnUnrecognizedQueryParameter() {
+        assertThrows(IllegalArgumentException.class, () -> ContentHash.declaredSha256("https://x/s.tn?md5=abc"));
+    }
+
+    @Test
+    void declaredSha256RejectsAMalformedPin() {
+        assertThrows(IllegalArgumentException.class, () -> ContentHash.declaredSha256("https://x/s.tn?sha256=tooshort"));
+        assertThrows(IllegalArgumentException.class,   // uppercase is not full lowercase hex
+                () -> ContentHash.declaredSha256("https://x/s.tn?sha256=" + "A".repeat(64)));
+    }
+
+    @Test
+    void verifyPassesAMatchingPinAndRejectsAMismatch() {
+        byte[] doc = utf8("!!id:\"x\"\nabc");   // body "abc" hashes to SHA_ABC
+        ContentHash.verify(doc, "https://x/s.tn?sha256=" + SHA_ABC);   // no throw
+        assertThrows(ContentHashMismatchException.class,
+                () -> ContentHash.verify(doc, "https://x/s.tn?sha256=" + "0".repeat(64)));
+    }
+
+    @Test
+    void verifyIsANoOpForAnUnpinnedReference() {
+        ContentHash.verify(utf8("!!id:\"x\"\nabc"), "https://x/s.tn");   // no throw
     }
 }

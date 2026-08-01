@@ -1,9 +1,11 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.compiler.ContentHash;
 import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonSchemaSource;
 import org.junit.jupiter.api.Test;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -26,7 +28,8 @@ class TsonValidateTest {
 
     private static Tson tsonWithPoint() {
         TsonSchemaSource source = uri -> {
-            if (uri.equals(POINT_ID)) {
+            String base = uri.contains("?") ? uri.substring(0, uri.indexOf('?')) : uri;   // ignore any ?sha256= pin
+            if (base.equals(POINT_ID)) {
                 return POINT_SCHEMA;
             }
             throw new IllegalStateException("no schema for " + uri);
@@ -82,19 +85,30 @@ class TsonValidateTest {
     @Test
     void plainAndPinnedReferencesToOneSchemaBothResolve() {
         // Two references differing only by a ?sha256= pin are one identity: the schema resolves and
-        // registers once, so both validate rather than the second double-registering.
-        TsonSchemaSource source = uri -> {
-            String base = uri.contains("?") ? uri.substring(0, uri.indexOf('?')) : uri;
-            if (base.equals(POINT_ID)) {
-                return POINT_SCHEMA;
-            }
-            throw new IllegalStateException("no schema for " + uri);
-        };
-        Tson tson = Tson.builder().schemaSource(source).build();
+        // registers once, so both validate rather than the second double-registering. (Both use the
+        // correct pin so verification passes -- mismatch is its own test below.)
+        String hash = ContentHash.sha256(POINT_SCHEMA.getBytes(StandardCharsets.UTF_8));
+        Tson tson = tsonWithPoint();
 
         assertEquals(List.of(), tson.validate("!!schema:\"" + POINT_ID + "\"\n!point { x: 1  y: 2 }"));
         assertEquals(List.of(), tson.validate(
-                "!!schema:\"" + POINT_ID + "?sha256=" + "a".repeat(64) + "\"\n!point { x: 3  y: 4 }"));
+                "!!schema:\"" + POINT_ID + "?sha256=" + hash + "\"\n!point { x: 3  y: 4 }"));
+    }
+
+    @Test
+    void aCorrectlyPinnedReferenceVerifies() {
+        String hash = ContentHash.sha256(POINT_SCHEMA.getBytes(StandardCharsets.UTF_8));
+        assertEquals(List.of(), tsonWithPoint().validate(
+                "!!schema:\"" + POINT_ID + "?sha256=" + hash + "\"\n!point { x: 1  y: 2 }"));
+    }
+
+    @Test
+    void aMisPinnedReferenceIsRejected() {
+        List<Diagnostic> problems = tsonWithPoint().validate(
+                "!!schema:\"" + POINT_ID + "?sha256=" + "a".repeat(64) + "\"\n!point { x: 1  y: 2 }");
+        assertEquals(1, problems.size(), problems.toString());
+        assertEquals(Diagnostic.Code.SCHEMA_ERROR, problems.getFirst().code());
+        assertTrue(problems.getFirst().message().contains("mismatch"), problems.toString());
     }
 
     @Test

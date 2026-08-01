@@ -363,8 +363,10 @@ tson hash         <file>
 
 **`tson hash`** computes a document's content hash ([TSON-DATA] §2.2.1 — SHA-256 of every byte after
 the `!!id` line) and stamps it onto the `!!id` as `?sha256=<hex>`, in place. Requires an `!!id`; the id
-line is excluded from the hash, so a document can carry its own. This is the first step toward
-hash-pinned references — verifying pinned `!!import`/`!!schema` targets is still to come.
+line is excluded from the hash, so a document can carry its own. A pinned reference is then verified on
+use: if a data file's `!!schema` (or a schema's `!!import`/`!!meta`) carries `?sha256=…`, `validate`
+hashes the referenced content and errors on a mismatch (the pin is matched by canonical identity, so a
+pinned reference and a plain one still resolve to the same schema).
 
 **`validate` takes a flat list of files** and auto-classifies each as a schema (its header carries
 `!!meta`) or a data document. A data file's own `!!schema` directive selects which schema it's

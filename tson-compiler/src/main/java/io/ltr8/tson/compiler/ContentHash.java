@@ -2,6 +2,7 @@ package io.ltr8.tson.compiler;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Optional;
 
 /**
  * A document's content hash ([TSON-DATA] §2.2.1): SHA-256, lowercase hex at full length, of every byte
@@ -53,6 +54,68 @@ public final class ContentHash {
         }
         throw new IllegalArgumentException("the first line has no terminator -- a content-addressed "
                 + "document must follow its !!id line with one ([TSON-DATA] §2.2.1)");
+    }
+
+    /**
+     * The {@code sha256} content-hash pin declared on a reference URI's query ({@code ?sha256=<hex>}),
+     * or empty if the URI carries no query. Per [TSON-DATA] §2.2.1 a content-address query may contain
+     * *only* recognized hash-algorithm parameters, and the value is full-length (64) lowercase hex.
+     *
+     * @throws IllegalArgumentException if the query carries an unrecognized parameter name or a
+     *     malformed {@code sha256} value (never silently retained)
+     */
+    public static Optional<String> declaredSha256(String uri) {
+        int q = uri.indexOf('?');
+        if (q < 0 || q == uri.length() - 1) {
+            return Optional.empty();
+        }
+        String sha256 = null;
+        for (String param : uri.substring(q + 1).split("&")) {
+            int eq = param.indexOf('=');
+            String name = eq < 0 ? param : param.substring(0, eq);
+            if (!name.equals("sha256")) {
+                throw new IllegalArgumentException("unrecognized query parameter '" + name + "' in \"" + uri
+                        + "\" -- a content-address query may contain only hash-algorithm parameters ([TSON-DATA] §2.2.1)");
+            }
+            String value = eq < 0 ? "" : param.substring(eq + 1);
+            if (!isFullLowercaseHex(value)) {
+                throw new IllegalArgumentException("malformed sha256 pin \"" + value + "\" in \"" + uri
+                        + "\" -- expected 64 lowercase hex digits ([TSON-DATA] §2.2.1)");
+            }
+            sha256 = value;
+        }
+        return Optional.ofNullable(sha256);
+    }
+
+    /**
+     * Verifies {@code content} against the {@code sha256} pin declared on {@code referenceUri}, if any --
+     * the [TSON-DATA] §2.2.1 rule that a consumer holding a hashed reference MUST verify before use and
+     * MUST NOT use mismatched content. A reference with no pin is a no-op (resolves unverified).
+     *
+     * @throws ContentHashMismatchException if a pin is declared and the content's hash differs from it
+     */
+    public static void verify(byte[] content, String referenceUri) {
+        declaredSha256(referenceUri).ifPresent(declared -> {
+            String actual = sha256(content);
+            if (!actual.equals(declared)) {
+                throw new ContentHashMismatchException("content hash mismatch for \"" + referenceUri
+                        + "\": the reference declares sha256=" + declared + " but the content hashes to "
+                        + actual + " -- refusing to use mismatched content ([TSON-DATA] §2.2.1)");
+            }
+        });
+    }
+
+    private static boolean isFullLowercaseHex(String value) {
+        if (value.length() != 64) {
+            return false;
+        }
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if ((c < '0' || c > '9') && (c < 'a' || c > 'f')) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static MessageDigest sha256Digest() {

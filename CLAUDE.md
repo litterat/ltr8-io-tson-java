@@ -3002,10 +3002,27 @@ differ only by a pin resolve/register exactly once, not twice → no duplicate-i
 `TsonSchemaRegistry` already canonicalized in `get`/`register`; these two raw-string layers were the
 gap. So `tson hash person.tn` then `tson validate person.tn person-data.tn` (plain `!!schema`) now
 returns `OK` -- verified end to end, both directions (pinned id + plain ref, and plain id + pinned
-ref), plus the mixed case in one run. **Still not done: actual hash *verification*** -- when a
-reference carries `?sha256=X`, hashing the fetched content (via `ContentHash`) and erroring on a
-mismatch, plus §10.2's per-identity digest aggregation. That's the next backlog step; today a
-reference's declared hash value is ignored for matching and never checked.
+ref), plus the mixed case in one run.
+
+**Hash *verification* is wired too (fix 2).** `ContentHash.declaredSha256(String)` parses a reference
+URI's `?sha256=<hex>` pin (empty if none; throws on an unrecognized query parameter -- §2.2.1's "only
+hash-algorithm parameters, never silently retained" -- or a malformed non-64-lowercase-hex value), and
+`ContentHash.verify(byte[], referenceUri)` checks the content, throwing `ContentHashMismatchException`
+(root package) on a mismatch. `DefaultTsonCompiledSchemaLoader.load` calls `verify` right after
+`source.fetch(uri)`, so *every* fetched reference carrying a pin is checked before use -- the top
+`!!schema` and, since resolution recurses through the same loader, each transitive pinned
+`!!import`/`!!meta` at its own fetch. A plain reference is a no-op. The content is re-encoded UTF-8 to
+hash, which round-trips for a well-formed UTF-8 document (content-addressed docs MUST be UTF-8) --
+confirmed against the `tson hash` tool. Verified end to end: correct pin → `OK`, wrong pin →
+`SCHEMA_ERROR` ("content hash mismatch"), an `?md5=…` query → `SCHEMA_ERROR` ("unrecognized query
+parameter"), plain reference → `OK`.
+
+**Remaining (BACKLOG "Content addressing"):** §10.2's per-identity digest *aggregation* -- verification
+is per-fetch, so within one `Tson.validate` the `domCompiled` cache (keyed by canonical identity) means
+only the *first* reference to an identity fetches-and-verifies; a later reference to the same identity
+carrying a *conflicting* pin hits the cache and isn't re-checked (§10.2 wants two distinct digests for
+one identity to be an error regardless). The identity cross-check (a fetched document's own embedded
+`!!id` canonical-identity must equal the reference it was obtained under) is also not done.
 
 ### Conformance suite integration (`ConformanceSuiteTest`)
 
