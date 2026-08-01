@@ -44,7 +44,7 @@ handful of loose gaps.
   `ContentHashMismatchException` on a mismatch. `DefaultTsonCompiledSchemaLoader.load` verifies every
   fetched pinned reference before use (the top `!!schema` + each transitive pinned `!!import`/`!!meta`
   at its own fetch); a plain reference resolves unverified. Verified end to end (correct pin → OK,
-  wrong pin / bad query → error). *Still per-fetch, not per-identity — see the aggregation bullet.*
+  wrong pin / bad query → error). Now per-identity, not just per-fetch — see the aggregation bullet.
 - [x] **Correct content-hash computation** — `io.ltr8.tson.compiler.ContentHash` (`sha256(byte[])` /
   `contentStart(byte[])`): SHA-256, lowercase hex, of every byte after the `!!id` line's own
   terminator (for `CR LF`, after the `LF`); the id line is excluded, a leading BOM stripped and never
@@ -55,11 +55,17 @@ handful of loose gaps.
   `ValidateCommand`'s source map + `Tson.validate`'s compile cache key by it, so a hashed schema still
   resolves against a plain (or differently-pinned) reference. Verification of a pinned reference is
   wired too (the bullet above).
-- [ ] **Per-identity hash aggregation within one resolution's reference closure** ([TSON-SCHEMA]
-  §10.2): an identity with no declared digest anywhere in the closure resolves unverified; a single
-  declared digest is verified once, and every reference to that identity — pinned or plain alike —
-  then resolves to the verified content; two *different* declared digests for one identity is a
-  resolver error (a real conflict — at most one can describe the real bytes — never a "pick one").
+- [x] **Per-identity hash aggregation** ([TSON-SCHEMA] §10.2) — `DefaultTsonCompiledSchemaLoader`
+  records each identity's content hash (canonical-keyed) on first resolution and verifies *every*
+  reference's declared digest against it, on both the fetch and cache-hit paths: an identity with no
+  digest resolves unverified; every reference to a resolved identity (pinned or plain) resolves to the
+  verified content; a reference whose pin conflicts errors (at most one digest can match the content),
+  even a *later* one to an already-resolved identity. Enablers: `TsonCompiledRegistry` now keys by
+  canonical identity (so a pinned and a plain reference share the cache entry, no double-register), and
+  `Tson.validate` calls `loader.load` on every reference so a repeat top-level `!!schema` is re-checked
+  even when its DOM compile is cached. Verified (`TsonValidateTest` + the CLI). *The "two distinct
+  digests" case surfaces as the non-matching digest's mismatch rather than a dedicated pre-check
+  diagnostic — same outcome (an error), slightly different framing than §10.2's letter.*
 - [ ] **Caching semantics**: a verified entry, once cached under its canonical identity, is
   immutable; a *failed* verification must not overwrite or poison the canonical-identity cache entry
   (the spec allows a separate negative cache keyed on the full reference string instead).

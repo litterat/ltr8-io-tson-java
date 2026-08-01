@@ -25,15 +25,12 @@ import java.util.Optional;
  * governed by one of these reuses whatever's already sitting in {@link #get} rather than
  * recompiling its own governing chain from scratch.
  *
- * <p><b>Keyed by each schema's own raw {@code !!id} string, not a canonicalized identity.</b> {@code
- * io.ltr8.tson.schema.registry.CanonicalIdentity} is internal-by-convention to {@link
- * TsonSchemaRegistry} itself -- reaching into it from here, a different module, would be exactly the
- * kind of cross-module layering violation this project otherwise avoids. In practice this is a
- * non-issue for the one real use today (this registry's own caller always registers and looks up
- * using the exact same {@code !!id} string each schema publishes), but it does mean two differently-
- * spelled-but-equivalent URIs for the same schema won't find each other here the way they would
- * through {@link TsonSchemaRegistry#get} -- a real, documented, narrower guarantee, not an
- * oversight.
+ * <p><b>Keyed by canonical identity</b> ({@link TsonSchemaRegistry#canonicalIdentity}, scheme and query
+ * stripped), matching the paired {@link TsonSchemaRegistry}. So two differently-spelled-but-equivalent
+ * URIs for one schema -- in particular a hash-pinned {@code ?sha256=} reference and a plain one -- find
+ * the same entry here, which is what lets a pinned reference resolve against an already-registered
+ * schema without re-fetching or double-registering ([TSON-DATA] §2.2.1: the pin is verification
+ * metadata, not identity).
  *
  * <p>Not thread-safe beyond {@code synchronized} on {@link #register}/{@link #get} themselves --
  * matches {@link TsonSchemaRegistry}'s own stated guarantee, no stronger.
@@ -86,12 +83,12 @@ public final class TsonCompiledRegistry {
         TsonLinkedSchema registered = schemaRegistry.register(linked);
         TsonCompiledSchema compiledSchema = TsonSchemaCompiler.compile(registered, governingMeta);
         TsonCompiledMetaSchema compiledMeta = new TsonCompiledMetaSchema(compiledSchema, resolver);
-        compiled.put(registered.schema().id(), compiledMeta);
+        compiled.put(TsonSchemaRegistry.canonicalIdentity(registered.schema().id()), compiledMeta);
         return compiledMeta;
     }
 
-    /** {@code id} must be the exact raw {@code !!id} string {@code schema} was registered with (see this class's own Javadoc on why -- unlike {@link TsonSchemaRegistry#get}, this is not canonicalized). */
+    /** {@code id} is matched by canonical identity ({@link TsonSchemaRegistry#canonicalIdentity}), so any spelling -- pinned or plain -- of a registered schema's own {@code !!id} finds it. */
     public synchronized Optional<TsonCompiledMetaSchema> get(String id) {
-        return Optional.ofNullable(compiled.get(id));
+        return Optional.ofNullable(compiled.get(TsonSchemaRegistry.canonicalIdentity(id)));
     }
 }

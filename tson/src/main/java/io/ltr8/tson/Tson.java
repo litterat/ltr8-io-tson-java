@@ -188,11 +188,13 @@ public final class Tson {
 
     /** The DOM-mode compiled schema for {@code schemaUri}, resolved+registered through the source and compiled once. */
     private TsonCompiledMetaSchema domCompiled(String schemaUri) {
-        // Cache by canonical identity ([TSON-DATA] §2.2.1) so two references to one schema that differ
-        // only by a ?sha256= pin share the entry and the schema is resolved/registered exactly once.
+        // Resolve/register through the loader on every call -- not only on a compile-cache miss -- so
+        // this reference's own ?sha256= pin is verified against the identity's content each time, even
+        // when the DOM compile is already cached (a later reference with a conflicting pin must error,
+        // §10.2). The loader itself caches by canonical identity, so a repeat is cheap.
+        loader.load(schemaUri);
         String identity = TsonSchemaRegistry.canonicalIdentity(schemaUri);
         return validationSchemas.computeIfAbsent(identity, id -> {
-            loader.load(schemaUri);   // load by the reference as written (resolve + register via the source)
             TsonLinkedSchema linked = schemaRegistry.get(schemaUri).orElseThrow(() ->
                     new IllegalStateException("schema \"" + schemaUri + "\" resolved but is not registered"));
             return compile(linked, TsonSchemaCompiler.dom());

@@ -7,12 +7,16 @@ import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.TsonSchemaSource;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.config.TsonCompiledRegistry;
+import io.ltr8.tson.compiler.ContentHashMismatchException;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchemaLinker;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.TsonSchemaRegistry;
 
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -74,8 +78,16 @@ import java.util.Optional;
  */
 public final class DefaultTsonCompiledSchemaLoader implements TsonCompiledSchemaLoader {
 
+    private static final String META_KERNEL_IDENTITY =
+            TsonSchemaRegistry.canonicalIdentity(TsonBundledSchemas.META_KERNEL_ID);
+
     private final TsonCompiledRegistry registry;
     private final TsonSchemaSource source;
+    // Content hash per canonical identity, recorded when an identity is first resolved. Every
+    // hash-pinned reference to an identity is verified against it -- so conflicting pins for one
+    // identity error (at most one can match the content) and a plain reference resolves to the
+    // verified instance ([TSON-SCHEMA] §10.2's per-identity verification).
+    private final Map<String, String> contentHashes = new HashMap<>();
 
     /** No fetch capability -- only meta-kernel's own one-off bootstrap and whatever's already registered/compiled ever resolve. */
     public DefaultTsonCompiledSchemaLoader(TsonCompiledRegistry registry) {
@@ -89,11 +101,16 @@ public final class DefaultTsonCompiledSchemaLoader implements TsonCompiledSchema
 
     @Override
     public TsonCompiledMetaSchema load(String uri) {
+        String identity = TsonSchemaRegistry.canonicalIdentity(uri);
         Optional<TsonCompiledMetaSchema> cached = registry.get(uri);
         if (cached.isPresent()) {
+            // Already resolved: verify *this* reference's own pin against the identity's content hash.
+            // A conflicting pin (a different digest than the one this identity was verified against)
+            // errors here rather than silently resolving to the cached instance (§10.2).
+            verifyPin(uri, identity);
             return cached.get();
         }
-        if (TsonBundledSchemas.META_KERNEL_ID.equals(uri)) {
+        if (META_KERNEL_IDENTITY.equals(identity)) {
             TsonSchema metaKernel = MetaKernelBootstrapResolver.getMetaKernelSchema();
             // TsonSchemaLinker.linkBootstrap runs its own materialization pass (synthesizing entries
             // for argument-bearing type-refs like enum's own `members: set<token>`) before compiling,
@@ -101,14 +118,15 @@ public final class DefaultTsonCompiledSchemaLoader implements TsonCompiledSchema
             // schema outright, always), so this is discarded immediately after: every call still
             // re-bootstraps and re-links from scratch, every time -- only the *quality* of the
             // one-off result changes (58 entries, not 49), not its lifetime.
+            recordAndVerify(TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID), uri, identity);
             TsonLinkedSchema linked = TsonSchemaLinker.linkBootstrap(metaKernel);
             return TsonCompiledMetaSchema.bootstrap(linked, registry.resolver());
         }
         String sourceText = source.fetch(uri);
-        // If this reference is hash-pinned (?sha256=...), verify the fetched content against it before
-        // use -- §2.2.1's MUST-verify rule. A transitive pinned !!import/!!meta is verified likewise
-        // when its own load(...) reaches here. A plain (unpinned) reference is a no-op.
-        ContentHash.verify(sourceText.getBytes(StandardCharsets.UTF_8), uri);
+        // Record this identity's content hash (first resolution) and verify this reference's pin
+        // against it -- §2.2.1's MUST-verify rule. A transitive pinned !!import/!!meta is verified
+        // likewise when its own load(...) reaches here.
+        recordAndVerify(sourceText, uri, identity);
         SchemaDocument document = new TsonSchemaParser(sourceText).parseSchemaDocument();
         SchemaResolver resolver = new SchemaResolver(this);
         TsonSchema resolved = resolver.resolveSchema(document);
@@ -118,5 +136,24 @@ public final class DefaultTsonCompiledSchemaLoader implements TsonCompiledSchema
         // has no way to hand back (it returns only the resolved TsonSchema).
         TsonCompiledMetaSchema governingMeta = load(document.meta());
         return registry.register(resolved, governingMeta);
+    }
+
+    /** Record {@code identity}'s content hash (first resolution only), then verify {@code uri}'s own pin. */
+    private void recordAndVerify(String sourceText, String uri, String identity) {
+        contentHashes.putIfAbsent(identity, ContentHash.sha256(sourceText.getBytes(StandardCharsets.UTF_8)));
+        verifyPin(uri, identity);
+    }
+
+    /** Verify a reference's declared {@code ?sha256=} pin, if any, against the identity's known content hash. */
+    private void verifyPin(String referenceUri, String identity) {
+        ContentHash.declaredSha256(referenceUri).ifPresent(declared -> {
+            String contentHash = contentHashes.get(identity);
+            if (contentHash != null && !contentHash.equals(declared)) {
+                throw new ContentHashMismatchException("content hash mismatch for \"" + referenceUri
+                        + "\": the reference declares sha256=" + declared + " but the content for identity \""
+                        + identity + "\" hashes to " + contentHash
+                        + " -- refusing to use mismatched content ([TSON-DATA] §2.2.1, [TSON-SCHEMA] §10.2)");
+            }
+        });
     }
 }

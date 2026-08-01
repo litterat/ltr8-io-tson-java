@@ -3017,12 +3017,25 @@ confirmed against the `tson hash` tool. Verified end to end: correct pin → `OK
 `SCHEMA_ERROR` ("content hash mismatch"), an `?md5=…` query → `SCHEMA_ERROR` ("unrecognized query
 parameter"), plain reference → `OK`.
 
-**Remaining (BACKLOG "Content addressing"):** §10.2's per-identity digest *aggregation* -- verification
-is per-fetch, so within one `Tson.validate` the `domCompiled` cache (keyed by canonical identity) means
-only the *first* reference to an identity fetches-and-verifies; a later reference to the same identity
-carrying a *conflicting* pin hits the cache and isn't re-checked (§10.2 wants two distinct digests for
-one identity to be an error regardless). The identity cross-check (a fetched document's own embedded
-`!!id` canonical-identity must equal the reference it was obtained under) is also not done.
+**Per-identity aggregation is wired too (§10.2).** Verification is now keyed on the *identity*, not the
+individual fetch: `DefaultTsonCompiledSchemaLoader` records each identity's content hash in a
+`Map<canonical identity, hash>` when it's first resolved, and `verifyPin` checks *every* reference's
+declared digest against it -- on the fetch path (first resolution) and, crucially, on the cache-hit
+path (a later reference to an already-resolved identity). So a second reference carrying a *conflicting*
+pin errors (at most one digest can match the content) rather than silently resolving to the cached
+instance, and a plain reference that resolved an identity first still causes a later mispinned reference
+to be rejected. Two enablers: `TsonCompiledRegistry` now **keys by canonical identity** (its old
+raw-`!!id` keying only existed because `CanonicalIdentity` was internal -- `TsonSchemaRegistry
+.canonicalIdentity` is public now), so a pinned and a plain reference hit the same cached entry rather
+than double-registering; and `Tson.validate`'s `domCompiled` calls `loader.load` on *every* reference
+(not just a compile-cache miss) so each reference's pin is verified even when the DOM compile is cached.
+The meta-kernel branch records the bundled meta-kernel's own content hash so a pinned meta-kernel
+reference verifies too. Verified end to end (a conflicting later pin → `SCHEMA_ERROR`; plain-then-
+mispinned → `SCHEMA_ERROR`; plain-then-correct-pin → `OK`) and in `TsonValidateTest`.
+
+**Remaining (BACKLOG "Content addressing"):** the identity cross-check -- a fetched document's own
+embedded `!!id` canonical identity must equal the reference it was obtained under (§2.2.1) -- is not
+done.
 
 ### Conformance suite integration (`ConformanceSuiteTest`)
 

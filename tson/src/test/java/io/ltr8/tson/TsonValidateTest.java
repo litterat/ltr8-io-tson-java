@@ -112,6 +112,21 @@ class TsonValidateTest {
     }
 
     @Test
+    void aConflictingPinOnALaterReferenceToOneSchemaIsRejected() {
+        // §10.2: verification is per identity. A first (plain) reference resolves the schema and
+        // records its content hash; a later reference whose pin doesn't match that hash errors rather
+        // than resolving to the already-registered instance -- even though the schema is cached.
+        Tson tson = tsonWithPoint();
+        assertEquals(List.of(), tson.validate("!!schema:\"" + POINT_ID + "\"\n!point { x: 1  y: 2 }"));
+
+        List<Diagnostic> problems = tson.validate(
+                "!!schema:\"" + POINT_ID + "?sha256=" + "a".repeat(64) + "\"\n!point { x: 3  y: 4 }");
+        assertEquals(1, problems.size(), problems.toString());
+        assertEquals(Diagnostic.Code.SCHEMA_ERROR, problems.getFirst().code());
+        assertTrue(problems.getFirst().message().contains("mismatch"), problems.toString());
+    }
+
+    @Test
     void dataWithNoSchemaIsValidatedSchemalessly() {
         Tson tson = tsonWithPoint();
         assertEquals(List.of(), tson.validate("{ id: !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09  n: !int32 5 }"));
