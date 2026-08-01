@@ -172,6 +172,16 @@ public final class DefaultTsonCompiledSchemaLoader implements TsonCompiledSchema
      */
     private void recordAndVerify(String sourceText, String uri, String identity) {
         String contentHash = ContentHash.sha256(sourceText.getBytes(StandardCharsets.UTF_8));
+        // A pre-loaded bundled schema ships with a digest the library holds (§10.2): the shipped bytes
+        // MUST match it -- the authoritative digest a pinned reference to it is checked against, and an
+        // integrity check that the packaged resource is the one the library was built for.
+        TsonBundledSchemas.declaredSha256(uri).ifPresent(held -> {
+            if (!held.equals(contentHash)) {
+                throw new IllegalStateException("bundled schema \"" + identity + "\" content hashes to "
+                        + contentHash + " but the library holds digest " + held
+                        + " -- the packaged resource does not match its published digest");
+            }
+        });
         checkPin(uri, contentHash, identity);
         contentHashes.putIfAbsent(identity, contentHash);
     }

@@ -6,6 +6,7 @@ import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.ast.schema.Instance;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.RegexType;
@@ -39,8 +40,11 @@ class MetaKernelBootstrapResolverTest {
     void headerDirectivesCarryThroughFromTheDocument() {
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
-        // §1.5: meta-kernel's own !!meta names itself -- the one deliberate circularity.
-        assertEquals(schema.id(), schema.meta());
+        // §1.5: meta-kernel's own !!meta names itself -- the one deliberate circularity. By identity,
+        // not raw string: its !!id carries a ?sha256= pin its self-!!meta cannot (pinning it would be
+        // circular), so they differ as strings but name the same identity.
+        assertEquals(TsonSchemaRegistry.canonicalIdentity(schema.id()),
+                TsonSchemaRegistry.canonicalIdentity(schema.meta()));
         assertTrue(schema.meta().endsWith("meta-kernel.tn"));
         assertEquals(List.of(), schema.imports());
         // getMetaKernelSchema() is the one and only place that ever sets this -- see TsonSchema's own Javadoc.

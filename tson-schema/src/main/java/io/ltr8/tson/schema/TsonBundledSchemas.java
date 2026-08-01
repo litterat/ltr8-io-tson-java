@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * The real, published identities of the three schema documents this library bundles and pre-loads --
@@ -50,12 +51,32 @@ public final class TsonBundledSchemas {
     /** core's own real, published identity -- see {@code spec/m/core.tn}'s own {@code !!id}. */
     public static final String CORE_ID = "https://tson.io/2026/32/m/core.tn";
 
+    /**
+     * meta-kernel's own published content-hash digest -- the {@code ?sha256=} on {@code
+     * spec/m/meta-kernel.tn}'s own {@code !!id}. [TSON-SCHEMA] §10.2's "implementation-held digest": the
+     * library holds it so a hash-pinned reference to a pre-loaded schema can be verified, and so the
+     * shipped resource can be checked against its own published digest ({@link #declaredSha256}).
+     */
+    public static final String META_KERNEL_SHA256 = "093472adaba914ef5b16408713683b0f836309b0217bc69250bfeae0fc8f383f";
+
     private static final Map<String, String> RESOURCES = Map.of(
             META_KERNEL_ID, "/meta-kernel.tn",
             META_ID, "/meta.tn",
             CORE_ID, "/core.tn");
 
+    private static final Map<String, String> DIGESTS = Map.of(
+            TsonSchemaRegistry.canonicalIdentity(META_KERNEL_ID), META_KERNEL_SHA256);
+
     private TsonBundledSchemas() {
+    }
+
+    /**
+     * The published content-hash digest this library holds for {@code uri} if it names a pre-loaded
+     * bundled schema, else empty ([TSON-SCHEMA] §10.2). Matched by canonical identity, so a plain or a
+     * {@code ?sha256=}-pinned reference both find it.
+     */
+    public static Optional<String> declaredSha256(String uri) {
+        return Optional.ofNullable(DIGESTS.get(TsonSchemaRegistry.canonicalIdentity(uri)));
     }
 
     /**

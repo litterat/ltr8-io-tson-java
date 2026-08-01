@@ -84,9 +84,14 @@ public final class TsonSchemaRegistry implements TsonSchemaLoader {
         return schema;
     }
 
-    /** Part 2 §1.5's "one deliberate circularity": a schema whose own {@code !!meta} names its own {@code !!id}. */
+    /**
+     * Part 2 §1.5's "one deliberate circularity": a schema whose own {@code !!meta} names its own
+     * {@code !!id}. Compared by canonical identity, not raw string -- meta-kernel's own {@code !!id}
+     * may carry a {@code ?sha256=} pin while its self-{@code !!meta} cannot (pinning the self-reference
+     * would be circular, §2.2.1), so the two differ as strings but name the same identity.
+     */
     private static boolean selfReferential(TsonSchema schema) {
-        return schema.id().equals(schema.meta());
+        return CanonicalIdentity.of(schema.id()).equals(CanonicalIdentity.of(schema.meta()));
     }
 
     @Override
