@@ -3038,6 +3038,24 @@ non-deterministic source; harmless with the deterministic file source but now sp
 old store-before-verify ordering. Verified end to end (a conflicting later pin → `SCHEMA_ERROR`; plain-then-
 mispinned → `SCHEMA_ERROR`; plain-then-correct-pin → `OK`) and in `TsonValidateTest`.
 
+**The pre-loaded bundled schemas ship with published digests (§10.2).** Each of `spec/m/{meta-kernel,
+meta,core}.tn`'s own `!!id` carries its own `?sha256=` content hash (stamped with `tson hash`), and the
+library holds the three as constants (`TsonBundledSchemas.{META_KERNEL,META,CORE}_SHA256`, looked up by
+canonical identity via `declaredSha256(uri)`). The loader's `recordAndVerify`, whenever it fetches a
+bundled schema, checks the computed content hash against the held digest -- an integrity check (the
+shipped resource must be the one the library was built for) and the authoritative digest a hash-pinned
+reference to a pre-loaded schema is verified against. The bundled chain is itself pinned end to end:
+meta.tn's `!!meta`/`!!import` pin meta-kernel (`?sha256=` its digest), core.tn's `!!meta` pins meta.tn --
+so **bootstrap verifies the whole chain** (a wrong inter-pin would fail the build). The one identity
+that can never carry a pin is meta-kernel's own self-`!!meta` (its hash input would have to contain the
+pin -- circular): its `!!id` is pinned, its self-`!!meta` stays plain, and `TsonSchemaRegistry
+.selfReferential` (and the loader's identity matching) compare by *canonical* identity so the two still
+name one identity (updating that comparison from raw-string was the one real ripple). `BundledSchemaPinTest`
+verifies each held digest equals its shipped file and that a correct pin to each bundled schema
+resolves while a wrong one is rejected. Any-source note: pins on `!!schema`/`!!import`/`!!meta` are all
+checked, since every reference goes through the same `loader.load` -- a user schema can pin its
+`!!import:"…/core.tn?sha256=…"` and a mismatch is a `SCHEMA_ERROR`.
+
 **The embedded-`!!id` cross-check is wired too (§2.2.1).** `DefaultTsonCompiledSchemaLoader.crossCheckId`
 runs right after parsing a fetched document: its own embedded `!!id` canonical identity MUST equal the
 reference's identity, so a source can't return content under the wrong identity -- a mismatch is a

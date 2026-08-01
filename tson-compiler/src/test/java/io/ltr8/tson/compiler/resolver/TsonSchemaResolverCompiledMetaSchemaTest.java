@@ -116,7 +116,9 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         DefaultTsonCompiledSchemaLoader loader = loadMetaKernelAndMeta();
         SchemaDocument coreDocument = new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.CORE_ID)).parseSchemaDocument();
 
-        assertEquals("https://tson.io/2026/32/m/meta.tn", coreDocument.meta());
+        // core's own !!meta now names meta.tn with a ?sha256= pin -- compare by identity.
+        assertEquals(TsonSchemaRegistry.canonicalIdentity(TsonBundledSchemas.META_ID),
+                TsonSchemaRegistry.canonicalIdentity(coreDocument.meta()));
 
         TsonCompiledMetaSchema compiledMeta = loader.load(coreDocument.meta());
 
@@ -145,7 +147,9 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         SchemaDocument metaDocument =
                 new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.META_ID)).parseSchemaDocument();
 
-        assertEquals(TsonBundledSchemas.META_KERNEL_ID, metaDocument.meta());
+        // meta's own !!meta now names meta-kernel with a ?sha256= pin -- compare by identity.
+        assertEquals(TsonSchemaRegistry.canonicalIdentity(TsonBundledSchemas.META_KERNEL_ID),
+                TsonSchemaRegistry.canonicalIdentity(metaDocument.meta()));
 
         TsonCompiledMetaSchema compiledMetaKernel = loader.load(metaDocument.meta());
 

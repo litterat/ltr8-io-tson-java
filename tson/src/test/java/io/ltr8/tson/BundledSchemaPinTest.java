@@ -18,24 +18,33 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class BundledSchemaPinTest {
 
     @Test
-    void theHeldMetaKernelDigestMatchesTheShippedResource() {
-        // The library-held digest must equal the content hash of the packaged file -- otherwise the
-        // constant and the resource have drifted (this is the "check the held digest against the file").
-        assertEquals(TsonBundledSchemas.META_KERNEL_SHA256, ContentHash.sha256(
-                TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID).getBytes(StandardCharsets.UTF_8)));
+    void everyHeldDigestMatchesItsShippedResource() {
+        // The held constant must equal the packaged file's content hash -- else the two have drifted
+        // (this is the "check the held digest against what's in the file").
+        assertDigestMatches(TsonBundledSchemas.META_KERNEL_ID, TsonBundledSchemas.META_KERNEL_SHA256);
+        assertDigestMatches(TsonBundledSchemas.META_ID, TsonBundledSchemas.META_SHA256);
+        assertDigestMatches(TsonBundledSchemas.CORE_ID, TsonBundledSchemas.CORE_SHA256);
     }
 
     @Test
-    void aCorrectlyPinnedReferenceToTheBundledMetaKernelVerifies() {
+    void aCorrectlyPinnedReferenceToEachBundledSchemaVerifies() {
         Tson tson = Tson.builder().build();
-        assertDoesNotThrow(() -> tson.loader().load(
-                TsonBundledSchemas.META_KERNEL_ID + "?sha256=" + TsonBundledSchemas.META_KERNEL_SHA256));
+        assertDoesNotThrow(() -> {
+            tson.loader().load(TsonBundledSchemas.META_KERNEL_ID + "?sha256=" + TsonBundledSchemas.META_KERNEL_SHA256);
+            tson.loader().load(TsonBundledSchemas.META_ID + "?sha256=" + TsonBundledSchemas.META_SHA256);
+            tson.loader().load(TsonBundledSchemas.CORE_ID + "?sha256=" + TsonBundledSchemas.CORE_SHA256);
+        });
     }
 
     @Test
-    void aWrongPinToTheBundledMetaKernelIsRejected() {
+    void aWrongPinToABundledSchemaIsRejected() {
         Tson tson = Tson.builder().build();
         assertThrows(ContentHashMismatchException.class, () ->
-                tson.loader().load(TsonBundledSchemas.META_KERNEL_ID + "?sha256=" + "a".repeat(64)));
+                tson.loader().load(TsonBundledSchemas.CORE_ID + "?sha256=" + "a".repeat(64)));
+    }
+
+    private static void assertDigestMatches(String id, String heldDigest) {
+        assertEquals(heldDigest,
+                ContentHash.sha256(TsonBundledSchemas.fetch(id).getBytes(StandardCharsets.UTF_8)), id);
     }
 }

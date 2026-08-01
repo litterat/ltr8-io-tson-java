@@ -80,12 +80,17 @@ handful of loose gaps.
   same identity. Guarded by `TsonValidateTest` with a call-counting flaky source (proven to fail
   against the pre-fix store-before-verify ordering). No negative cache (the spec allows one but doesn't
   require it); a rejected reference is simply retried.
-- [ ] **Verifiable pins to the pre-loaded bootstrap schemas** — meta-kernel.tn1/meta.tn1/core.tn1
-  are pre-loaded as in-memory structures (`MetaKernelBootstrapResolver`, `BundledSchemaSource`), but
-  the spec still requires a pinned reference to one of them to be verifiable: an implementation MUST
-  hold each pre-loaded schema's own published digest (or its canonical document bytes) to check a
-  pin against. One identity can never carry a pin at all — meta-kernel's own self-referencing
-  `!!meta`, whose hash input would have to contain the pin itself.
+- [x] **Verifiable pins to the pre-loaded bootstrap schemas** — each bundled schema's `!!id` now
+  carries its own `?sha256=` content hash, and the library holds the three digests
+  (`TsonBundledSchemas.{META_KERNEL,META,CORE}_SHA256`, exposed by `declaredSha256(uri)`). The loader
+  verifies a hash-pinned reference to any of them against the held digest and checks each shipped
+  resource against its held digest on load (a mismatch = a corrupt package). The bundled chain is
+  itself pinned end to end — meta.tn's `!!meta`/`!!import` pin meta-kernel, core.tn's `!!meta` pins
+  meta.tn — so bootstrap verifies the whole chain (a wrong pin would fail the build). The one identity
+  that can never carry a pin is meta-kernel's own self-`!!meta` (its hash input would contain the pin);
+  its `!!id` is pinned, its self-`!!meta` stays plain, and `selfReferential`/matching compare by
+  canonical identity so the two agree. Verified in `BundledSchemaPinTest` (held digests == shipped
+  files; a correct pin to each verifies, a wrong one is rejected).
 
 ## Resolution & linking generality
 

@@ -1,6 +1,6 @@
-!!id:"https://tson.io/2026/32/m/meta.tn"
-!!meta:"https://tson.io/2026/32/m/meta-kernel.tn"
-!!import:"https://tson.io/2026/32/m/meta-kernel.tn"
+!!id:"https://tson.io/2026/32/m/meta.tn?sha256=983ad4da2ddf5b70b37da4af45e964290d24e6942776ef281c1e0d5942b46b07"
+!!meta:"https://tson.io/2026/32/m/meta-kernel.tn?sha256=093472adaba914ef5b16408713683b0f836309b0217bc69250bfeae0fc8f383f"
+!!import:"https://tson.io/2026/32/m/meta-kernel.tn?sha256=093472adaba914ef5b16408713683b0f836309b0217bc69250bfeae0fc8f383f"
 @doc:"""
   TSON meta-schema — 2026 Revision 32 draft.
 
