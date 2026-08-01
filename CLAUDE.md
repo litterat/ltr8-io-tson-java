@@ -2991,14 +2991,21 @@ untouched-content-bytes` back. Idempotent (re-running replaces the pin, one `?sh
 bytes never change so the pin stays valid. Requires an `!!id` first line (a file starting with
 `!!schema`/anything else → exit 1). Verified against an independent `shasum -a 256` of `tail -n +2`.
 
-**The pin is computed and stamped but not yet *consumed*** -- a known, deliberate boundary for this
-first step. After `tson hash person.tn`, its `!!id` is `…person-1.tn?sha256=…` but a data file's
-`!!schema` is still the plain URI, and `ValidateCommand`'s source map keys by the raw `!!id`, so they
-no longer match (`SCHEMA_ERROR`). Per the spec a `?sha256` is *verification metadata, not identity*
-(`CanonicalIdentity.of` already strips the query), so matching should be by canonical identity -- but
-the CLI source / loader key by raw string. Consuming pins (canonical-identity matching so a pinned
-`!!id` resolves against a plain reference, plus actual hash *verification* on a pinned reference) is
-the next backlog step under "Content addressing / hash-pinned references".
+**Matching by canonical identity is wired (the pin is not identity); *verification* is not yet.** A
+`?sha256` is verification metadata, not identity (§2.2.1), so a pinned `!!id` must resolve against a
+plain -- or differently-pinned -- reference. `TsonSchemaRegistry.canonicalIdentity(String)` (a public
+wrapper over `CanonicalIdentity.of`, the sanctioned way to canonicalize from outside `tson-schema`)
+returns the scheme+query-stripped identity, and two places now key by it: `ValidateCommand`'s source
+map (put by `canonicalIdentity(id)`, looked up by `canonicalIdentity(uri)`) and `Tson.validate`'s own
+`domCompiled` cache (keyed by `canonicalIdentity(schemaUri)` so two references to one schema that
+differ only by a pin resolve/register exactly once, not twice → no duplicate-identity error). The core
+`TsonSchemaRegistry` already canonicalized in `get`/`register`; these two raw-string layers were the
+gap. So `tson hash person.tn` then `tson validate person.tn person-data.tn` (plain `!!schema`) now
+returns `OK` -- verified end to end, both directions (pinned id + plain ref, and plain id + pinned
+ref), plus the mixed case in one run. **Still not done: actual hash *verification*** -- when a
+reference carries `?sha256=X`, hashing the fetched content (via `ContentHash`) and erroring on a
+mismatch, plus §10.2's per-identity digest aggregation. That's the next backlog step; today a
+reference's declared hash value is ignored for matching and never checked.
 
 ### Conformance suite integration (`ConformanceSuiteTest`)
 

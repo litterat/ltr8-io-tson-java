@@ -7,6 +7,7 @@ import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.TsonSchemaSource;
 import io.ltr8.tson.compiler.TsonUnsupportedDocumentException;
 import io.ltr8.tson.schema.TsonBundledSchemas;
+import io.ltr8.tson.schema.TsonSchemaRegistry;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -54,7 +55,9 @@ final class ValidateCommand {
                         System.err.println("note: " + file + " declares the built-in schema id \"" + id
                                 + "\" -- overriding meta-kernel/meta/core is not supported; ignoring this file");
                     } else {
-                        schemas.put(id, text);
+                        // Key by canonical identity so a data file's plain !!schema resolves against a
+                        // schema whose !!id carries a ?sha256= pin (the hash is not identity, §2.2.1).
+                        schemas.put(TsonSchemaRegistry.canonicalIdentity(id), text);
                     }
                 } catch (RuntimeException e) {
                     System.out.println(format.render(ValidationReport.failed(Diagnostic.Code.SCHEMA_ERROR,
@@ -75,7 +78,7 @@ final class ValidateCommand {
         // The provided schemas, made available by !!id; the bundled standard library is always served
         // underneath. Tson.validate resolves a data file's !!schema through this.
         TsonSchemaSource source = uri -> {
-            String text = schemas.get(uri);
+            String text = schemas.get(TsonSchemaRegistry.canonicalIdentity(uri));
             if (text == null) {
                 throw new IllegalStateException("no schema file provided for !!schema \"" + uri + "\"");
             }

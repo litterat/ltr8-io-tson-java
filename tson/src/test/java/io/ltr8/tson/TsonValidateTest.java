@@ -80,6 +80,24 @@ class TsonValidateTest {
     }
 
     @Test
+    void plainAndPinnedReferencesToOneSchemaBothResolve() {
+        // Two references differing only by a ?sha256= pin are one identity: the schema resolves and
+        // registers once, so both validate rather than the second double-registering.
+        TsonSchemaSource source = uri -> {
+            String base = uri.contains("?") ? uri.substring(0, uri.indexOf('?')) : uri;
+            if (base.equals(POINT_ID)) {
+                return POINT_SCHEMA;
+            }
+            throw new IllegalStateException("no schema for " + uri);
+        };
+        Tson tson = Tson.builder().schemaSource(source).build();
+
+        assertEquals(List.of(), tson.validate("!!schema:\"" + POINT_ID + "\"\n!point { x: 1  y: 2 }"));
+        assertEquals(List.of(), tson.validate(
+                "!!schema:\"" + POINT_ID + "?sha256=" + "a".repeat(64) + "\"\n!point { x: 3  y: 4 }"));
+    }
+
+    @Test
     void dataWithNoSchemaIsValidatedSchemalessly() {
         Tson tson = tsonWithPoint();
         assertEquals(List.of(), tson.validate("{ id: !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09  n: !int32 5 }"));

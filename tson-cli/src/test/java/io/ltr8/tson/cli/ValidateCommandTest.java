@@ -164,6 +164,23 @@ class ValidateCommandTest {
     }
 
     @Test
+    void aSchemaPinnedByItsOwnHashResolvesAgainstAPlainReference(@TempDir Path dir) throws IOException {
+        // The schema's !!id carries a ?sha256= pin; the data's !!schema is plain. Matching is by
+        // canonical identity (the hash is not identity), so it still validates.
+        Path schema = writeFile(dir, "schema.tn1",
+                "!!id:\"https://example.test/cli-validate.tn1?sha256=" + "a".repeat(64) + "\"\n"
+                        + "!!meta:\"https://tson.io/2026/32/m/meta.tn\"\n"
+                        + "!!import:\"https://tson.io/2026/32/m/core.tn\"\n"
+                        + "{ my_record => { a: int32  b: int32 } }\n");
+        Path data = writeFile(dir, "data.tson", selfDescribing("{ a: 1  b: 2 }"));
+
+        String output = captureStdout(() ->
+                assertEquals(0, ValidateCommand.run(List.of(schema, data), OutputFormat.TEXT)));
+
+        assertEquals("OK", output.strip());
+    }
+
+    @Test
     void aFileClaimingABundledSchemaIdIsIgnoredWithANotice(@TempDir Path dir) throws IOException {
         // Overriding meta-kernel/meta/core isn't supported -- the file is skipped, not used, and a
         // note goes to stderr so it isn't silently dropped.

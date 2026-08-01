@@ -50,10 +50,11 @@ handful of loose gaps.
   terminator (for `CR LF`, after the `LF`); the id line is excluded, a leading BOM stripped and never
   hashed. Exposed as **`tson hash <file>`** (`HashCommand`), which stamps the digest onto the `!!id`
   as `?sha256=<hex>` in place (idempotent — re-running replaces the prior pin) — the first step toward
-  hash-pinning: publishing/pinning a schema. *Not yet consumed by resolution:* the CLI's own `validate`
-  source still keys by the raw `!!id`, so a schema hashed by this tool no longer matches an unpinned
-  `!!schema`/`!!import` reference (SCHEMA_ERROR) — the identity-vs-verification-metadata split (a `?sha256`
-  is not identity) is the next item, together with the verification bullet above.
+  hash-pinning: publishing/pinning a schema. **Matching now ignores the pin** (a `?sha256` is
+  verification metadata, not identity): `TsonSchemaRegistry.canonicalIdentity(String)` is public, and
+  `ValidateCommand`'s source map + `Tson.validate`'s compile cache key by it, so a hashed schema still
+  resolves against a plain (or differently-pinned) reference. **Still open:** actual *verification* —
+  hashing a pinned reference's fetched content and erroring on a mismatch — the bullet above.
 - [ ] **Per-identity hash aggregation within one resolution's reference closure** ([TSON-SCHEMA]
   §10.2): an identity with no declared digest anywhere in the closure resolves unverified; a single
   declared digest is verified once, and every reference to that identity — pinned or plain alike —

@@ -113,6 +113,19 @@ public final class TsonSchemaRegistry implements TsonSchemaLoader {
         CanonicalIdentity.of(uri);
     }
 
+    /**
+     * The canonical identity of {@code uri} ([TSON-DATA] §2.2.1) -- scheme and query stripped, the rest
+     * required already canonical. This is the identity references are matched by, so a {@code ?sha256=}
+     * hash (verification metadata, not identity) doesn't distinguish a pinned reference from a plain one.
+     * The sanctioned way to canonicalize from outside this module, where {@link CanonicalIdentity} stays
+     * internal-by-convention.
+     *
+     * @throws TsonSchemaValidationException if {@code uri} isn't a valid canonical-identity candidate
+     */
+    public static String canonicalIdentity(String uri) {
+        return CanonicalIdentity.of(uri);
+    }
+
     private synchronized Optional<TsonLinkedSchema> lookupByCanonicalIdentity(String canonicalIdentity) {
         return Optional.ofNullable(schemas.get(canonicalIdentity));
     }
