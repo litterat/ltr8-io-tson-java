@@ -128,6 +128,7 @@ public final class DefaultTsonCompiledSchemaLoader implements TsonCompiledSchema
         // likewise when its own load(...) reaches here.
         recordAndVerify(sourceText, uri, identity);
         SchemaDocument document = new TsonSchemaParser(sourceText).parseSchemaDocument();
+        crossCheckId(document, uri, identity);
         SchemaResolver resolver = new SchemaResolver(this);
         TsonSchema resolved = resolver.resolveSchema(document);
         // resolveSchema already called load(document.meta()) internally to build its own structure
@@ -136,6 +137,31 @@ public final class DefaultTsonCompiledSchemaLoader implements TsonCompiledSchema
         // has no way to hand back (it returns only the resolved TsonSchema).
         TsonCompiledMetaSchema governingMeta = load(document.meta());
         return registry.register(resolved, governingMeta);
+    }
+
+    /**
+     * A document obtained via a reference must own the identity it was fetched under: its embedded
+     * {@code !!id} canonical identity MUST equal the reference's ([TSON-DATA] §2.2.1), so a source can't
+     * return content under the wrong identity. A hash-pinned reference's target MUST carry an {@code
+     * !!id} at all; a plain reference to an id-less development artifact is allowed here (registration
+     * requires an id separately).
+     */
+    private void crossCheckId(SchemaDocument document, String referenceUri, String identity) {
+        if (document.id().isEmpty()) {
+            if (ContentHash.declaredSha256(referenceUri).isPresent()) {
+                throw new IllegalStateException("the hash-pinned reference \"" + referenceUri
+                        + "\" resolved to a document with no !!id -- a hashed reference's target must carry one "
+                        + "([TSON-DATA] §2.2.1)");
+            }
+            return;
+        }
+        String embedded = TsonSchemaRegistry.canonicalIdentity(document.id().get());
+        if (!embedded.equals(identity)) {
+            throw new IllegalStateException("identity mismatch: reference \"" + referenceUri + "\" (identity \""
+                    + identity + "\") resolved to a document whose own !!id is \"" + document.id().get()
+                    + "\" (identity \"" + embedded + "\") -- refusing content obtained under the wrong identity "
+                    + "([TSON-DATA] §2.2.1)");
+        }
     }
 
     /** Record {@code identity}'s content hash (first resolution only), then verify {@code uri}'s own pin. */

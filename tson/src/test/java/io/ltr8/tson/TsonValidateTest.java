@@ -127,6 +127,21 @@ class TsonValidateTest {
     }
 
     @Test
+    void aDocumentReturnedUnderTheWrongIdentityIsRejected() {
+        // §2.2.1 cross-check: a source hands back the point schema (own !!id point-1.tn) for a data
+        // file that references a different identity -- so the content doesn't own the identity it was
+        // obtained under. Refuse it rather than resolve mismatched content.
+        TsonSchemaSource wrongIdSource = uri -> POINT_SCHEMA;   // ignores uri; always returns point-1.tn
+        Tson tson = Tson.builder().schemaSource(wrongIdSource).build();
+
+        List<Diagnostic> problems = tson.validate(
+                "!!schema:\"https://example.test/other-1.tn\"\n!point { x: 1  y: 2 }");
+        assertEquals(1, problems.size(), problems.toString());
+        assertEquals(Diagnostic.Code.SCHEMA_ERROR, problems.getFirst().code());
+        assertTrue(problems.getFirst().message().contains("identity mismatch"), problems.toString());
+    }
+
+    @Test
     void dataWithNoSchemaIsValidatedSchemalessly() {
         Tson tson = tsonWithPoint();
         assertEquals(List.of(), tson.validate("{ id: !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09  n: !int32 5 }"));

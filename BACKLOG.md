@@ -66,6 +66,12 @@ handful of loose gaps.
   even when its DOM compile is cached. Verified (`TsonValidateTest` + the CLI). *The "two distinct
   digests" case surfaces as the non-matching digest's mismatch rather than a dedicated pre-check
   diagnostic — same outcome (an error), slightly different framing than §10.2's letter.*
+- [x] **Embedded-`!!id` cross-check** ([TSON-DATA] §2.2.1) — `DefaultTsonCompiledSchemaLoader.crossCheckId`
+  runs after parsing a fetched document: its own `!!id` canonical identity MUST equal the reference's,
+  so a source can't return content under the wrong identity (mismatch → resolver error). An id-less
+  target is an error for a hash-pinned reference and allowed for a plain one. Defensive for a general
+  fetch source (the CLI's own source is identity-keyed, so it always agrees). Verified in
+  `TsonValidateTest`.
 - [ ] **Caching semantics**: a verified entry, once cached under its canonical identity, is
   immutable; a *failed* verification must not overwrite or poison the canonical-identity cache entry
   (the spec allows a separate negative cache keyed on the full reference string instead).

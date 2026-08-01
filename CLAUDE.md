@@ -3033,9 +3033,19 @@ The meta-kernel branch records the bundled meta-kernel's own content hash so a p
 reference verifies too. Verified end to end (a conflicting later pin → `SCHEMA_ERROR`; plain-then-
 mispinned → `SCHEMA_ERROR`; plain-then-correct-pin → `OK`) and in `TsonValidateTest`.
 
-**Remaining (BACKLOG "Content addressing"):** the identity cross-check -- a fetched document's own
-embedded `!!id` canonical identity must equal the reference it was obtained under (§2.2.1) -- is not
-done.
+**The embedded-`!!id` cross-check is wired too (§2.2.1).** `DefaultTsonCompiledSchemaLoader.crossCheckId`
+runs right after parsing a fetched document: its own embedded `!!id` canonical identity MUST equal the
+reference's identity, so a source can't return content under the wrong identity -- a mismatch is a
+resolver error (`IllegalStateException` → CLI `SCHEMA_ERROR` "identity mismatch"). An id-less document
+is a resolver error when the reference is hash-pinned (a hashed reference's target MUST carry an
+`!!id`, §2.2.1) and otherwise allowed here (a plain reference to a development artifact -- registration
+requires an id separately). Defensive for a general fetch source; the CLI's own source is identity-keyed
+so it always agrees, but the check protects any other `TsonSchemaSource`. Verified in `TsonValidateTest`
+(a source handing back a schema whose `!!id` differs from the reference → `SCHEMA_ERROR`).
+
+**Remaining (BACKLOG "Content addressing"):** verifiable pins to the pre-loaded bootstrap schemas
+(shipping/checking meta-kernel/meta/core against an implementation-held digest) and a negative-cache
+policy (a failed verification must not poison the canonical-identity cache) -- both minor.
 
 ### Conformance suite integration (`ConformanceSuiteTest`)
 
