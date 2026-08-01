@@ -163,6 +163,24 @@ class ValidateCommandTest {
         assertTrue(output.contains("\"code\":\"ATOM_CONSTRAINT_VIOLATION\""), output);
     }
 
+    @Test
+    void aFileClaimingABundledSchemaIdIsIgnoredWithANotice(@TempDir Path dir) throws IOException {
+        // Overriding meta-kernel/meta/core isn't supported -- the file is skipped, not used, and a
+        // note goes to stderr so it isn't silently dropped.
+        Path fake = writeFile(dir, "core.tn", """
+                !!id:"https://tson.io/2026/32/m/core.tn"
+                !!meta:"https://tson.io/2026/32/m/meta.tn"
+                { my_thing => int32 }
+                """);
+        Path data = writeFile(dir, "data.tson", "42");   // plain -> schemaless -> valid
+
+        String err = captureStderr(() ->
+                assertEquals(0, ValidateCommand.run(List.of(fake, data), OutputFormat.TEXT)));
+
+        assertTrue(err.contains("not supported"), err);
+        assertTrue(err.contains("core.tn"), err);
+    }
+
     private static Path writeFile(Path dir, String name, String content) throws IOException {
         Path file = dir.resolve(name);
         Files.writeString(file, content);
@@ -181,6 +199,18 @@ class ValidateCommandTest {
             body.run();
         } finally {
             System.setOut(original);
+        }
+        return buffer.toString(StandardCharsets.UTF_8);
+    }
+
+    private static String captureStderr(ThrowingRunnable body) throws IOException {
+        PrintStream original = System.err;
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        System.setErr(new PrintStream(buffer, true, StandardCharsets.UTF_8));
+        try {
+            body.run();
+        } finally {
+            System.setErr(original);
         }
         return buffer.toString(StandardCharsets.UTF_8);
     }

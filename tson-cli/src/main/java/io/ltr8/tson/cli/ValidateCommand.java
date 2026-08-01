@@ -6,6 +6,7 @@ import io.ltr8.tson.compiler.TsonDataStream;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.TsonSchemaSource;
 import io.ltr8.tson.compiler.TsonUnsupportedDocumentException;
+import io.ltr8.tson.schema.TsonBundledSchemas;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -49,7 +50,12 @@ final class ValidateCommand {
                     String text = Io.readFile(file);
                     String id = new TsonSchemaParser(text).parseSchemaDocument().id().orElseThrow(() ->
                             new IllegalArgumentException("schema " + file + " has no !!id"));
-                    schemas.put(id, text);
+                    if (isBundledId(id)) {
+                        System.err.println("note: " + file + " declares the built-in schema id \"" + id
+                                + "\" -- overriding meta-kernel/meta/core is not supported; ignoring this file");
+                    } else {
+                        schemas.put(id, text);
+                    }
                 } catch (RuntimeException e) {
                     System.out.println(format.render(ValidationReport.failed(Diagnostic.Code.SCHEMA_ERROR,
                             file + ": " + e.getMessage())));
@@ -96,6 +102,13 @@ final class ValidateCommand {
             System.out.println(format.render(new ValidationReport(errors.isEmpty(), errors)));
         }
         return allValid ? 0 : 1;
+    }
+
+    /** The three bundled standard-library identities, which {@code TsonConfig} always serves from its own resources. */
+    private static boolean isBundledId(String id) {
+        return id.equals(TsonBundledSchemas.META_KERNEL_ID)
+                || id.equals(TsonBundledSchemas.META_ID)
+                || id.equals(TsonBundledSchemas.CORE_ID);
     }
 
     /** A file whose header carries {@code !!meta} is a schema document (per the data grammar's own rejection of it). */
