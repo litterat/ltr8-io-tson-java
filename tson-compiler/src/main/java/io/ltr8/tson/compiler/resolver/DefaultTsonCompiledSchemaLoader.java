@@ -164,17 +164,30 @@ public final class DefaultTsonCompiledSchemaLoader implements TsonCompiledSchema
         }
     }
 
-    /** Record {@code identity}'s content hash (first resolution only), then verify {@code uri}'s own pin. */
+    /**
+     * Verify {@code uri}'s own pin against the fetched content, then record the content hash for the
+     * identity -- verification *first*, so a rejected fetch records nothing and cannot poison the
+     * identity's cache entry for a later, valid one (§10.2 caching semantics). {@code putIfAbsent}
+     * keeps the first-resolved (known-good) hash immutable thereafter.
+     */
     private void recordAndVerify(String sourceText, String uri, String identity) {
-        contentHashes.putIfAbsent(identity, ContentHash.sha256(sourceText.getBytes(StandardCharsets.UTF_8)));
-        verifyPin(uri, identity);
+        String contentHash = ContentHash.sha256(sourceText.getBytes(StandardCharsets.UTF_8));
+        checkPin(uri, contentHash, identity);
+        contentHashes.putIfAbsent(identity, contentHash);
     }
 
-    /** Verify a reference's declared {@code ?sha256=} pin, if any, against the identity's known content hash. */
+    /** Verify a reference's declared {@code ?sha256=} pin, if any, against the identity's already-recorded content hash. */
     private void verifyPin(String referenceUri, String identity) {
+        String contentHash = contentHashes.get(identity);
+        if (contentHash != null) {
+            checkPin(referenceUri, contentHash, identity);
+        }
+    }
+
+    /** A reference's declared {@code ?sha256=} pin, if present, MUST equal {@code contentHash}. */
+    private static void checkPin(String referenceUri, String contentHash, String identity) {
         ContentHash.declaredSha256(referenceUri).ifPresent(declared -> {
-            String contentHash = contentHashes.get(identity);
-            if (contentHash != null && !contentHash.equals(declared)) {
+            if (!declared.equals(contentHash)) {
                 throw new ContentHashMismatchException("content hash mismatch for \"" + referenceUri
                         + "\": the reference declares sha256=" + declared + " but the content for identity \""
                         + identity + "\" hashes to " + contentHash

@@ -72,9 +72,14 @@ handful of loose gaps.
   target is an error for a hash-pinned reference and allowed for a plain one. Defensive for a general
   fetch source (the CLI's own source is identity-keyed, so it always agrees). Verified in
   `TsonValidateTest`.
-- [ ] **Caching semantics**: a verified entry, once cached under its canonical identity, is
-  immutable; a *failed* verification must not overwrite or poison the canonical-identity cache entry
-  (the spec allows a separate negative cache keyed on the full reference string instead).
+- [x] **Caching semantics**: a verified entry, once cached under its canonical identity, is immutable
+  (`contentHashes` uses `putIfAbsent`; `TsonSchemaRegistry.register` refuses a duplicate identity), and
+  a *failed* verification poisons nothing — `recordAndVerify` verifies a reference's pin against the
+  *freshly-computed* content hash and only records it on success, so a rejected fetch (e.g. tampered
+  content from a non-deterministic source) leaves no stale hash to fail a later, valid fetch of the
+  same identity. Guarded by `TsonValidateTest` with a call-counting flaky source (proven to fail
+  against the pre-fix store-before-verify ordering). No negative cache (the spec allows one but doesn't
+  require it); a rejected reference is simply retried.
 - [ ] **Verifiable pins to the pre-loaded bootstrap schemas** — meta-kernel.tn1/meta.tn1/core.tn1
   are pre-loaded as in-memory structures (`MetaKernelBootstrapResolver`, `BundledSchemaSource`), but
   the spec still requires a pinned reference to one of them to be verifiable: an implementation MUST

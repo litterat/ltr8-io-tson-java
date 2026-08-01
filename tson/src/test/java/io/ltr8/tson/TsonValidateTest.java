@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -139,6 +140,25 @@ class TsonValidateTest {
         assertEquals(1, problems.size(), problems.toString());
         assertEquals(Diagnostic.Code.SCHEMA_ERROR, problems.getFirst().code());
         assertTrue(problems.getFirst().message().contains("identity mismatch"), problems.toString());
+    }
+
+    @Test
+    void aRejectedFetchDoesNotPoisonTheCacheForALaterValidReference() {
+        // §10.2 caching: a failed verification must record nothing. A flaky source returns tampered
+        // bytes first (so a correctly-pinned reference is rejected), then the real schema -- the second
+        // reference must still resolve, i.e. the first, rejected fetch left no stale content hash behind.
+        String correctHash = ContentHash.sha256(POINT_SCHEMA.getBytes(StandardCharsets.UTF_8));
+        String tampered = POINT_SCHEMA.replace("int32", "int64");   // same !!id, different body -> different hash
+        AtomicInteger calls = new AtomicInteger();
+        TsonSchemaSource flaky = uri -> calls.getAndIncrement() == 0 ? tampered : POINT_SCHEMA;
+        Tson tson = Tson.builder().schemaSource(flaky).build();
+
+        String pinnedData = "!!schema:\"" + POINT_ID + "?sha256=" + correctHash + "\"\n!point { x: 1  y: 2 }";
+
+        List<Diagnostic> rejected = tson.validate(pinnedData);   // tampered content -> pin mismatch
+        assertEquals(Diagnostic.Code.SCHEMA_ERROR, rejected.getFirst().code(), rejected.toString());
+
+        assertEquals(List.of(), tson.validate(pinnedData));       // real content now -> resolves cleanly
     }
 
     @Test

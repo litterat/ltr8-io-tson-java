@@ -3030,7 +3030,12 @@ raw-`!!id` keying only existed because `CanonicalIdentity` was internal -- `Tson
 than double-registering; and `Tson.validate`'s `domCompiled` calls `loader.load` on *every* reference
 (not just a compile-cache miss) so each reference's pin is verified even when the DOM compile is cached.
 The meta-kernel branch records the bundled meta-kernel's own content hash so a pinned meta-kernel
-reference verifies too. Verified end to end (a conflicting later pin → `SCHEMA_ERROR`; plain-then-
+reference verifies too. **Caching semantics (§10.2):** `recordAndVerify` checks a reference's pin
+against the *freshly-computed* content hash and `putIfAbsent`s it only on success -- so a rejected fetch
+records nothing and can't poison the identity's entry for a later valid one (matters for a
+non-deterministic source; harmless with the deterministic file source but now spec-clean). A
+`TsonValidateTest` flaky source (tampered content first, real second) proves it, and fails against the
+old store-before-verify ordering. Verified end to end (a conflicting later pin → `SCHEMA_ERROR`; plain-then-
 mispinned → `SCHEMA_ERROR`; plain-then-correct-pin → `OK`) and in `TsonValidateTest`.
 
 **The embedded-`!!id` cross-check is wired too (§2.2.1).** `DefaultTsonCompiledSchemaLoader.crossCheckId`
