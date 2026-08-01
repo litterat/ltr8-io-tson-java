@@ -2972,6 +2972,34 @@ step toward whitelisted-URI loading later). The `schemaMatches` helper is gone.
   `!!schema` → `SCHEMA_ERROR`; plain bad `!int32` → `ATOM_CONSTRAINT_VIOLATION`; `--help` no longer
   shows `--type`).
 
+### Content hashing (`ContentHash`) + `tson hash`
+
+`io.ltr8.tson.compiler.ContentHash` (public, root package -- a data-format §2.2.1 primitive that
+verification and the resolver will reuse) computes a document's content hash: `sha256(byte[])` returns
+the lowercase-hex SHA-256 over every byte from `contentStart(byte[])` to the end, where `contentStart`
+is past a leading BOM and past the **first line's terminator** (for `CR LF`, after the `LF`; also
+handles a lone CR, NEL, LS, PS). The first line is the `!!id` line (grammar-required first), so it --
+terminator included -- is excluded, letting a document carry its own hash on its own id line without
+circularity; a BOM is stripped and never hashed. No terminator after the first line → `IllegalArgumentException`
+(no hash-input boundary). Verified against known digests (empty-input `e3b0c4…`, `"abc"` `ba7816…`),
+so the byte boundary is pinned, not just self-consistent (`ContentHashTest`).
+
+**`tson hash <file>`** (`HashCommand`, tson-cli) stamps that digest onto the `!!id` as `?sha256=<hex>`,
+in place: reads the bytes, decodes only the prefix (BOM + id line + terminator) to rewrite the URI
+inside the quotes, strips any prior query, appends `?sha256=<hash>`, and writes `newPrefix +
+untouched-content-bytes` back. Idempotent (re-running replaces the pin, one `?sha256`), and the hashed
+bytes never change so the pin stays valid. Requires an `!!id` first line (a file starting with
+`!!schema`/anything else → exit 1). Verified against an independent `shasum -a 256` of `tail -n +2`.
+
+**The pin is computed and stamped but not yet *consumed*** -- a known, deliberate boundary for this
+first step. After `tson hash person.tn`, its `!!id` is `…person-1.tn?sha256=…` but a data file's
+`!!schema` is still the plain URI, and `ValidateCommand`'s source map keys by the raw `!!id`, so they
+no longer match (`SCHEMA_ERROR`). Per the spec a `?sha256` is *verification metadata, not identity*
+(`CanonicalIdentity.of` already strips the query), so matching should be by canonical identity -- but
+the CLI source / loader key by raw string. Consuming pins (canonical-identity matching so a pinned
+`!!id` resolves against a plain reference, plus actual hash *verification* on a pinned reference) is
+the next backlog step under "Content addressing / hash-pinned references".
+
 ### Conformance suite integration (`ConformanceSuiteTest`)
 
 Separate from `LexerTest`/`TsonDataParserTest` (fine-grained unit tests) is `ConformanceSuiteTest`, which runs

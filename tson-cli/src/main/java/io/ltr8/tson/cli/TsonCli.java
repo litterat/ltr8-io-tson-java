@@ -24,6 +24,7 @@ public final class TsonCli {
               tson init-example [<dir>]
               tson validate [--output text|json|tson] <file>...
               tson compile [--output text|json|tson] <schema>
+              tson hash <file>
 
             commands:
               init-example        write an example schema + data file to try, then edit and re-run validate
@@ -31,6 +32,7 @@ public final class TsonCli {
                           document, and a data file's !!schema selects its schema and its root type-ref
                           (!person) the type (or, with no !!schema, a base-syntax + built-in-type check)
               compile     check that a schema document itself resolves and compiles
+              hash        compute a document's content hash and stamp it onto its !!id (?sha256=...)
 
             options:
               --output text|json|tson    output format (default: text)
@@ -46,6 +48,9 @@ public final class TsonCli {
 
     private static final String INIT_USAGE =
             "usage: tson init-example [<dir>]   (writes an example person.tn and person-data.tn; default dir: .)";
+
+    private static final String HASH_USAGE =
+            "usage: tson hash <file>   (stamps the document's content hash onto its !!id as ?sha256=...)";
 
     private TsonCli() {
     }
@@ -71,8 +76,9 @@ public final class TsonCli {
                 case "init-example" -> runInit(rest);
                 case "validate" -> runValidate(rest);
                 case "compile" -> runCompile(rest);
+                case "hash" -> runHash(rest);
                 default -> {
-                    System.err.println("unknown command '" + subcommand + "' -- expected init-example, validate, or compile");
+                    System.err.println("unknown command '" + subcommand + "' -- expected init-example, validate, compile, or hash");
                     System.err.println(USAGE);
                     yield 2;
                 }
@@ -94,6 +100,17 @@ public final class TsonCli {
         }
         Path dir = args.isEmpty() ? Path.of(".") : Path.of(args.get(0));
         return InitCommand.run(dir);
+    }
+
+    private static int runHash(List<String> args) {
+        if (hasHelpFlag(args)) {
+            System.out.println(HASH_USAGE);
+            return 0;
+        }
+        if (args.size() != 1) {
+            throw new IllegalArgumentException(HASH_USAGE);
+        }
+        return HashCommand.run(Path.of(args.get(0)));
     }
 
     private static int runValidate(List<String> args) {

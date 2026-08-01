@@ -45,11 +45,15 @@ handful of loose gaps.
   `CanonicalIdentity.of` currently just discards the query outright — no rejection of an
   unrecognized query-parameter name either (the spec requires this: a query MUST consist solely of
   recognized hash-algorithm parameters, or it's an error, "never silently retained").
-- [ ] **Correct content-hash computation**, per the spec's own precise rule: the hash input is every
-  byte after the `!!id` line's own line terminator — the id line itself (up to and including its
-  terminator) is excluded, specifically so a document can embed its own hash without circularity.
-  Document bytes MUST be UTF-8. Needed both to *verify* a fetched document and to *compute* the hash
-  for a schema being published/pinned by this implementation.
+- [x] **Correct content-hash computation** — `io.ltr8.tson.compiler.ContentHash` (`sha256(byte[])` /
+  `contentStart(byte[])`): SHA-256, lowercase hex, of every byte after the `!!id` line's own
+  terminator (for `CR LF`, after the `LF`); the id line is excluded, a leading BOM stripped and never
+  hashed. Exposed as **`tson hash <file>`** (`HashCommand`), which stamps the digest onto the `!!id`
+  as `?sha256=<hex>` in place (idempotent — re-running replaces the prior pin) — the first step toward
+  hash-pinning: publishing/pinning a schema. *Not yet consumed by resolution:* the CLI's own `validate`
+  source still keys by the raw `!!id`, so a schema hashed by this tool no longer matches an unpinned
+  `!!schema`/`!!import` reference (SCHEMA_ERROR) — the identity-vs-verification-metadata split (a `?sha256`
+  is not identity) is the next item, together with the verification bullet above.
 - [ ] **Per-identity hash aggregation within one resolution's reference closure** ([TSON-SCHEMA]
   §10.2): an identity with no declared digest anywhere in the closure resolves unverified; a single
   declared digest is verified once, and every reference to that identity — pinned or plain alike —
