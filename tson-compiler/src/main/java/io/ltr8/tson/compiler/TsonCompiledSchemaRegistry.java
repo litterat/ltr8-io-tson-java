@@ -58,16 +58,16 @@ public final class TsonCompiledSchemaRegistry {
 
     /**
      * The compiled reader for the schema at {@code uri} -- resolved through the core, compiled in this
-     * registry's mode, cached by canonical identity so repeated reads of the same schema compile once.
-     * The core is asked to resolve on every call (not only on a cache miss) so this reference's own {@code
-     * ?sha256=} pin is verified against the identity's content each time ([TSON-SCHEMA] §10.2); the core
-     * caches the resolution itself, so a repeat is cheap.
+     * registry's mode, cached by canonical identity so repeated reads of the same schema compile once. The
+     * core resolves the schema (into its own linked form) but does not compile it; this registry compiles
+     * that linked form in its own mode, so a user schema is never bind-compiled in the core just to be read
+     * here. The core is asked to resolve on every call (not only on a cache miss) so this reference's own
+     * {@code ?sha256=} pin is verified against the identity's content each time ([TSON-SCHEMA] §10.2); the
+     * core caches the resolution itself, so a repeat is cheap.
      */
     public TsonCompiledSchema get(String uri) {
-        core.load(uri);
-        String identity = TsonSchemaRegistry.canonicalIdentity(uri);
-        return compiled.computeIfAbsent(identity, id -> compile(core.schemaRegistry().get(uri).orElseThrow(() ->
-                new IllegalStateException("schema \"" + uri + "\" resolved but is not registered"))));
+        TsonLinkedSchema linked = core.resolveLinked(uri);
+        return compiled.computeIfAbsent(TsonSchemaRegistry.canonicalIdentity(uri), id -> compile(linked));
     }
 
     /** Compiles an already-resolved, already-linked schema in this registry's mode -- standalone, uncached. */

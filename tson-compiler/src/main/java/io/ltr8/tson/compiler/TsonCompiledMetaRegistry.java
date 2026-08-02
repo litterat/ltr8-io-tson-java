@@ -190,20 +190,43 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
             TsonLinkedSchema linked = TsonSchemaLinker.linkBootstrap(metaKernel);
             return TsonCompiledMetaSchema.bootstrap(linked, resolver);
         }
+        TsonLinkedSchema linked = resolveLinked(uri);
+        // resolveLinked already resolved this document's own !!meta into the structure namespace, so this
+        // loadMeta is a cache hit, not a second compile -- compileAndCache still needs the governing
+        // TsonCompiledMetaSchema itself, which the linked schema doesn't carry (only its !!meta URI).
+        TsonCompiledMetaSchema governingMeta = loadMeta(linked.schema().meta());
+        return compileAndCache(linked, governingMeta);
+    }
+
+    /**
+     * Resolves {@code uri} to its linked form -- fetching/resolving/linking/registering into the paired
+     * {@link #schemaRegistry} on demand, but <b>not</b> compiling it or caching a compiled result. This is
+     * what a per-mode {@link TsonCompiledSchemaRegistry} reads a user schema through: the schema is
+     * resolved once here (bind-anchored, so its own {@code !enum}/{@code !integer} instances bind
+     * correctly), and each read registry compiles the returned linked form itself, in its own mode -- so a
+     * user schema is never bind-compiled and cached in this core just to be read. Idempotent via {@link
+     * #schemaRegistry} (a second call is a cache hit); this reference's own {@code ?sha256=} pin is
+     * verified each call (§10.2).
+     *
+     * <p>For ordinary schemas only -- not the self-referential meta-kernel bootstrap, which {@link #load}
+     * owns (meta-kernel is never registered, so it has no linked form here to hand back).
+     */
+    public TsonLinkedSchema resolveLinked(String uri) {
+        String identity = TsonSchemaRegistry.canonicalIdentity(uri);
+        Optional<TsonLinkedSchema> cached = schemaRegistry.get(uri);
+        if (cached.isPresent()) {
+            verifyPin(uri, identity);
+            return cached.get();
+        }
         String sourceText = source.fetch(uri);
-        // Record this identity's content hash (first resolution) and verify this reference's pin
-        // against it -- §2.2.1's MUST-verify rule. A transitive pinned !!import/!!meta is verified
-        // likewise when its own load(...) reaches here.
+        // Record this identity's content hash (first resolution) and verify this reference's pin against
+        // it -- §2.2.1's MUST-verify rule. A transitive pinned !!import/!!meta is verified likewise when
+        // its own resolveLinked/load reaches here.
         recordAndVerify(sourceText, uri, identity);
         SchemaDocument document = new TsonSchemaParser(sourceText).parseSchemaDocument();
         crossCheckId(document, uri, identity);
         TsonSchema resolved = new SchemaResolver(this).resolveSchema(document);
-        // resolveSchema already called loadMeta(document.meta()) internally to build its own structure
-        // namespace, so this is a cache hit, not a second compile -- register still needs the governing
-        // TsonCompiledMetaSchema itself as its second argument, which resolveSchema has no way to hand
-        // back (it returns only the resolved TsonSchema).
-        TsonCompiledMetaSchema governingMeta = loadMeta(document.meta());
-        return register(resolved, governingMeta);
+        return schemaRegistry.register(TsonSchemaLinker.link(resolved, schemaRegistry));
     }
 
     /**
@@ -226,8 +249,20 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      *                       always a previous call's own {@link #getMeta} result
      */
     public synchronized TsonCompiledSchema register(TsonSchema schema, TsonCompiledMetaSchema governingMeta) {
-        TsonLinkedSchema linked = TsonSchemaLinker.link(schema, schemaRegistry);
-        TsonLinkedSchema registered = schemaRegistry.register(linked);
+        TsonLinkedSchema registered = schemaRegistry.register(TsonSchemaLinker.link(schema, schemaRegistry));
+        return compileAndCache(registered, governingMeta);
+    }
+
+    /**
+     * Compiles an already-linked, already-registered schema against {@code governingMeta} and caches it by
+     * canonical identity -- a meta-layer schema (its own {@code !!meta} is meta-kernel) wrapped as a {@link
+     * TsonCompiledMetaSchema} so it can go on to govern others, every other schema stored bare. The
+     * compiled-cache half of resolution, split from {@link #resolveLinked}'s register-only half so a user
+     * schema read through a {@link TsonCompiledSchemaRegistry} is resolved here but compiled there, in that
+     * registry's own mode -- never bind-compiled and cached in this core just to be read.
+     */
+    private synchronized TsonCompiledSchema compileAndCache(TsonLinkedSchema registered,
+                                                            TsonCompiledMetaSchema governingMeta) {
         TsonCompiledSchema compiledSchema = TsonSchemaCompiler.compile(registered, governingMeta);
         TsonCompiledSchema result = isMetaLayer(registered.schema())
                 ? new TsonCompiledMetaSchema(compiledSchema, resolver)

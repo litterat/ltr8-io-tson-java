@@ -11,6 +11,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The two per-mode flavors of {@link TsonCompiledSchemaRegistry} ({@link TsonCompiledSchemaRegistry#dom}
@@ -81,5 +82,16 @@ class TsonCompiledSchemaRegistryTest {
 
         assertInstanceOf(Map.class, domValue);
         assertEquals(new MyRecord(7), bindValue);
+    }
+
+    @Test
+    void readingAUserSchemaResolvesItInTheCoreButDoesNotCompileItThere() {
+        TsonCompiledMetaRegistry core = core();
+        TsonCompiledSchemaRegistry.dom(core).get(SCHEMA_ID).get("my_record").read(DATA);
+
+        // The core resolved+registered the user schema -- its linked form is available -- but never
+        // compiled or cached it; the read registry owns the compile, in its own mode.
+        assertTrue(core.schemaRegistry().get(SCHEMA_ID).isPresent());
+        assertTrue(core.get(SCHEMA_ID).isEmpty());
     }
 }
