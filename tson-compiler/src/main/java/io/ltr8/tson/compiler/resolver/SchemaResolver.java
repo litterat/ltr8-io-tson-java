@@ -46,14 +46,14 @@ public final class SchemaResolver {
      *               compiling each as needed rather than requiring them to already exist somewhere.
      *               Required.
      *
-     *               <p>Deliberately a {@link TsonCompiledSchemaLoader}, not a bare {@code
-     *               TsonCompiledRegistry} -- a plain "look it up, throw if missing" registry has no
-     *               way to bootstrap meta-kernel's own document: resolving it means resolving *its
-     *               own* {@code !!meta}, which names itself, so a registry-only resolver would need
-     *               meta-kernel already registered before it could ever register meta-kernel. {@link
-     *               TsonCompiledSchemaLoader}'s own default implementation recognizes that one case
-     *               and answers it directly (see {@link DefaultTsonCompiledSchemaLoader}'s own
-     *               Javadoc) instead of looping forever.
+     *               <p>Deliberately the {@link TsonCompiledSchemaLoader} interface, not the concrete
+     *               registry that implements it -- and a loader rather than a plain "look it up, throw
+     *               if missing" lookup, because such a lookup has no way to bootstrap meta-kernel's own
+     *               document: resolving it means resolving *its own* {@code !!meta}, which names itself,
+     *               so a lookup-only resolver would need meta-kernel already registered before it could
+     *               ever register meta-kernel. The loader's implementation ({@code TsonCompiledRegistry})
+     *               recognizes that one case and answers it directly (its own hand-written bootstrap)
+     *               instead of looping forever.
      */
     public SchemaResolver(TsonCompiledSchemaLoader loader) {
         this.loader = Objects.requireNonNull(loader, "loader");

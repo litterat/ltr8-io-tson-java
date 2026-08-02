@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
@@ -46,10 +47,10 @@ class MetaSchemaImportTest {
 
     /**
      * Deliberately still resolves via a bare {@link SchemaResolver#resolveSchema(SchemaDocument)} call
-     * rather than {@link DefaultTsonCompiledSchemaLoader#load(String)} -- this test wants meta.tn1's own
+     * rather than {@link TsonCompiledRegistry#load(String)} -- this test wants meta.tn1's own
      * *raw, unregistered, local-only* result (31 entries, no merged imports) to exercise {@code
      * TsonSchemaRegistry#register}'s own import-merge itself, one stage later; {@code
-     * DefaultTsonCompiledSchemaLoader#load} would register (and materialize/merge) it immediately as
+     * TsonCompiledRegistry#load} would register (and materialize/merge) it immediately as
      * part of the same call, collapsing the two stages this test means to keep separate. {@link
      * TsonBundledSchemas} is still reused here, just for the raw fetch, so this doesn't duplicate
      * its own classpath-reading logic -- the same reasoning that replaced the old, now-deleted
@@ -74,7 +75,7 @@ class MetaSchemaImportTest {
         DataBindContext context = SchemaMetaNameBinder.defaultContext();
         ValueReaderFactoryRegistry objectFactories = ValueReaderFactoryRegistry.bind(context);
         TsonCompiledRegistry compiledRegistry = new TsonCompiledRegistry(objectFactories);
-        DefaultTsonCompiledSchemaLoader loader = new DefaultTsonCompiledSchemaLoader(compiledRegistry);
+        TsonCompiledSchemaLoader loader = compiledRegistry;
 
         String metaKernelSource = TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID);
         SchemaDocument metaKernelDocument = new TsonSchemaParser(metaKernelSource).parseSchemaDocument();

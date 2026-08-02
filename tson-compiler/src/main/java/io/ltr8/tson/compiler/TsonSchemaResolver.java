@@ -1,8 +1,6 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
-import io.ltr8.tson.compiler.config.TsonCompiledRegistry;
-import io.ltr8.tson.compiler.resolver.DefaultTsonCompiledSchemaLoader;
 import io.ltr8.tson.compiler.resolver.SchemaResolver;
 import io.ltr8.tson.schema.TsonSchema;
 
@@ -16,33 +14,24 @@ import io.ltr8.tson.schema.TsonSchema;
  * this module needs a class in an exported package to reach it -- this is that class, not a
  * reimplementation.
  *
- * <p>{@link #defaultLoader} is the same kind of wrapper for {@link DefaultTsonCompiledSchemaLoader}
- * (also {@code resolver}-package, also unexported) -- the loader a caller actually wants in the
- * ordinary case: check an already-compiled registry first, special-case meta-kernel's own bootstrap,
- * and otherwise fetch/resolve/register/compile a schema on demand (see {@link
- * TsonCompiledSchemaLoader}'s own Javadoc for why a bare {@link TsonCompiledRegistry} lookup alone
- * isn't enough).
+ * <p>The {@link TsonCompiledSchemaLoader} it is constructed with resolves the document's own {@code
+ * !!meta}/{@code !!import} targets on demand (fetch/resolve/register/compile), rather than requiring
+ * them to be pre-registered -- {@code TsonCompiledRegistry} is the implementation a caller ordinarily
+ * uses (it is both the compiled-schema registry and that loader).
  */
 public class TsonSchemaResolver {
 
-    /** {@link #defaultLoader(TsonCompiledRegistry, TsonSchemaSource)} with {@link TsonSchemaSource#registeredOnly()} -- nothing is ever fetched. */
-    public static TsonCompiledSchemaLoader defaultLoader(TsonCompiledRegistry registry) {
-        return new DefaultTsonCompiledSchemaLoader(registry);
-    }
-
-    /** @param source where to fetch a schema's own source text from, for a URI that isn't already registered/compiled and isn't meta-kernel's own bootstrap case. */
-    public static TsonCompiledSchemaLoader defaultLoader(TsonCompiledRegistry registry, TsonSchemaSource source) {
-        return new DefaultTsonCompiledSchemaLoader(registry, source);
-    }
-
     private final SchemaResolver resolver;
 
-    /** @param loader consulted to resolve {@code document}'s own {@code !!meta}/{@code !!import} targets -- see {@link #defaultLoader} for the ordinary case. */
+    /** @param loader consulted to resolve {@code document}'s own {@code !!meta}/{@code !!import} targets on demand. */
     public TsonSchemaResolver(TsonCompiledSchemaLoader loader) {
         this.resolver = new SchemaResolver(loader);
     }
 
-    /** Resolves {@code document}'s own header directives and every declaration in its body -- see {@link SchemaResolver#resolveSchema}'s own Javadoc for the full contract. */
+    /**
+     * Resolves {@code document}'s own header directives and every declaration in its body -- see {@link
+     * SchemaResolver#resolveSchema}'s own Javadoc for the full contract.
+     */
     public TsonSchema resolveSchema(SchemaDocument document) {
         return this.resolver.resolveSchema(document);
     }

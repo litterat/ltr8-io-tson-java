@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.compiler.TsonSchemaParser;
@@ -76,8 +77,8 @@ class TinySchemaImportsCoreTn1Test {
         TsonSchemaRegistry schemaRegistry = new TsonSchemaRegistry();
         DataBindContext context = TsonAtomContext.registerDefaults(DataBindContext.builder().nameBinder(MANUAL_BINDER).build());
         ValueReaderFactoryResolver resolver = ValueReaderFactoryRegistry.bind(context);
-        TsonCompiledRegistry registry = new TsonCompiledRegistry(schemaRegistry, resolver);
-        DefaultTsonCompiledSchemaLoader loader = new DefaultTsonCompiledSchemaLoader(registry, TsonBundledSchemas::fetch);
+        TsonCompiledRegistry registry = new TsonCompiledRegistry(schemaRegistry, resolver, TsonBundledSchemas::fetch);
+        TsonCompiledSchemaLoader loader = registry;
 
         // meta-kernel's own bootstrap case, registered explicitly -- see TsonBundledSchemas's own
         // class Javadoc for why this step can't just be another loader.load(...) call.

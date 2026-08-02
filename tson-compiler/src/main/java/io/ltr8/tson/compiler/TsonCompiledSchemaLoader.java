@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.compiler.resolver.DefaultTsonCompiledSchemaLoader;
 import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
 
 /**
@@ -19,8 +18,8 @@ import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
  *
  * <p>Also the natural, single place to enforce policy over *what* gets resolved from *where* (e.g.
  * whitelisting/blacklisting hosts, or disk-only resolution) -- see {@link TsonSchemaSource}, the
- * pluggable hook {@link DefaultTsonCompiledSchemaLoader} defers to for exactly this, once a request
- * isn't already cached and isn't the meta-kernel bootstrap case.
+ * pluggable hook the implementation ({@code TsonCompiledRegistry}) defers to for exactly this, once a
+ * request isn't already cached and isn't the meta-kernel bootstrap case.
  */
 public interface TsonCompiledSchemaLoader {
 

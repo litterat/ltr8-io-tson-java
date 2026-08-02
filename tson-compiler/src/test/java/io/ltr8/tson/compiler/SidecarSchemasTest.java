@@ -61,8 +61,9 @@ class SidecarSchemasTest {
         // register itself. A fresh registry per schema file, deliberately, so one file's own
         // failure doesn't leave a shared registry in a half-registered state for the next.
         TsonCompiledRegistry compiledRegistry =
-                new TsonCompiledRegistry(TsonSchemaCompiler.bind(SchemaMetaNameBinder.defaultContext()));
-        TsonCompiledSchemaLoader loader = TsonSchemaResolver.defaultLoader(compiledRegistry, TsonBundledSchemas::fetch);
+                new TsonCompiledRegistry(
+                        TsonSchemaCompiler.bind(SchemaMetaNameBinder.defaultContext()), TsonBundledSchemas::fetch);
+        TsonCompiledSchemaLoader loader = compiledRegistry;
         SchemaDocument metaKernelDocument = new TsonSchemaParser(
                 TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID)).parseSchemaDocument();
         TsonSchema resolvedMetaKernel = new TsonSchemaResolver(loader).resolveSchema(metaKernelDocument);

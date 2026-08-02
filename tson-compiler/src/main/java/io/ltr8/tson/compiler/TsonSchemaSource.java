@@ -1,8 +1,5 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.compiler.config.TsonCompiledRegistry;
-import io.ltr8.tson.compiler.resolver.DefaultTsonCompiledSchemaLoader;
-
 /**
  * Where a {@link TsonCompiledSchemaLoader} gets a schema document's own raw source text from, for a
  * URI that isn't already registered/compiled and isn't meta-kernel's own pre-loaded bootstrap case --
@@ -10,9 +7,8 @@ import io.ltr8.tson.compiler.resolver.DefaultTsonCompiledSchemaLoader;
  * blacklisting hosts, or disk-only resolution). A caller wanting a specific policy implements this
  * interface (e.g. checking {@code uri} against an allowed-host list before ever opening a
  * connection, or refusing any {@code http(s)} scheme outright and only reading from a local
- * classpath/filesystem location) and hands it to {@link
- * DefaultTsonCompiledSchemaLoader#DefaultTsonCompiledSchemaLoader(TsonCompiledRegistry,
- * TsonSchemaSource)}.
+ * classpath/filesystem location) and hands it to a {@code TsonCompiledRegistry}'s own
+ * {@code (TsonSchemaRegistry, ValueReaderFactoryResolver, TsonSchemaSource)} constructor.
  *
  * <p><b>{@link #registeredOnly()} is the default -- nothing is ever fetched.</b> Mirrors {@code
  * TsonSchemaRegistry}'s own no-arg-constructor default ("resolves an import only if it's already

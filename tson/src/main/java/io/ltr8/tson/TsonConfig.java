@@ -57,14 +57,15 @@ public final class TsonConfig {
         ValueReaderFactoryResolver resolver =
                 TsonSchemaCompiler.bind(SchemaMetaNameBinder.defaultContext());
         TsonSchemaRegistry schemaRegistry = new TsonSchemaRegistry();
-        TsonCompiledRegistry compiledRegistry = new TsonCompiledRegistry(schemaRegistry, resolver);
         // Bundled standard library always served first; the configured source (default: none)
         // supplies any additional schema URIs -- e.g. local files the CLI collected, or later a
         // whitelist of allowed hosts. It never overrides the three bundled identities.
         TsonSchemaSource composed = uri -> isBundled(uri)
                 ? TsonBundledSchemas.fetch(uri)
                 : schemaSource.fetch(uri);
-        TsonCompiledSchemaLoader loader = TsonSchemaResolver.defaultLoader(compiledRegistry, composed);
+        TsonCompiledRegistry compiledRegistry = new TsonCompiledRegistry(schemaRegistry, resolver, composed);
+        // The compiled registry is itself the on-demand loader for !!meta/!!import targets.
+        TsonCompiledSchemaLoader loader = compiledRegistry;
 
         // Meta-kernel's own bootstrap case, registered explicitly -- see TsonBundledSchemas's own
         // class Javadoc for why this step can't just be another loader.load(...) call.
