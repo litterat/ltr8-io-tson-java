@@ -9,6 +9,47 @@ yet implemented" section for the technical detail behind several of these items.
 
 ---
 
+## Tree / DOM model (`TsonNode`)
+
+A queryable, **immutable** document model — the useful result a read hands back — replacing DOM mode's
+throwaway `Map`/`List` (which is lossy: it collapses record-vs-map and array-vs-tuple, drops type-refs
+and annotations, and is discarded during validation anyway). Like Jackson's `JsonNode`, but structure-
+preserving (TSON distinguishes record/map and array/tuple, which JSON conflates) and annotation-aware.
+The data AST (`ast.CoreValue`) stays a pure, schemaless parse tree — the tree is a distinct, consumer-
+facing type set (settled: separate concepts, and the tree carries typed leaves + query ergonomics the
+AST deliberately doesn't).
+
+**Settled design decisions:**
+- **Package** `io.ltr8.tson.compiler.tree`, exported.
+- **Immutable, "new from old"** — records + builders + copy-on-write helpers (`RecordNode.with(name,
+  node)`, `ArrayNode.with(i, node)`); no mutation. A pointer-based `set("/a/b", node) → new tree` is a
+  later nicety.
+- **Model:** `sealed interface TsonNode` carrying `Optional<String> typeRef()` + `List<Annotation>
+  annotations()` on every node. Concrete: `RecordNode` (ordered name→node), `MapNode` (ordered
+  (keyNode, valueNode)), `ArrayNode`, `TupleNode` (schema-driven only), a **single** `AtomNode(Object
+  value, Optional<String> typeRef)` (not per-atom node classes — §5's vocabulary is too large), plus
+  `NullNode` and `AbsentNode`. Token form (quoted/unquoted) is dropped (captured by the resolved leaf
+  type). `TsonNode` carries the prefix; subtypes are bare (Jackson's `JsonNode`/`ObjectNode` precedent).
+- **Query API:** `get(String)`/`get(int)`/`at(jsonPointer)` (reuse the RFC 6901 machinery from the
+  diagnostics layer)/`path(...)`; `isRecord()`/`isAtom()`/… kind tests; typed accessors (`asString`/
+  `asBigInteger`/`asInt`/`asBoolean`/`asDecimal`/`asUuid`/`asLocalDate`/…, plus generic `as(Class<T>)`
+  and raw `value()`); `fields()`/`entries()`/`elements()`.
+
+**Two producers, one node set:**
+- **Schema-driven** — rework the `*DomReader` family (`Record`/`Array`/`Map`/`Tuple`) into `*TreeReader`
+  building `TsonNode` (same streaming plumbing, now keeping type-refs/annotations and splitting tuple
+  from array). `ValueReaderFactoryRegistry.dom()` → `.tree()`; `TsonCompiledSchemaRegistry.dom(core)` →
+  `.tree(core)`; `Tson.domRegistry()` → `treeRegistry()`; `validate` uses tree mode (still discards the
+  result). Plain `Map`/`List` output goes away (`TsonNode` can offer `asMap()`/`asList()` views).
+- **Schemaless `readTree`** — walk the `DataValue`/`CoreValue` AST, base-resolve each token (+
+  `BuiltinTypeVocabulary` for a `!builtin` tag), map to the same nodes. Surfaced as `Tson.readTree(...)`.
+  No tuple distinction (grammar has none); `EmptyBrace` **defaults to an empty `RecordNode`** (settled).
+
+**Phasing:** (1) node model + query API + the schema-driven `*DomReader` → `*TreeReader` rework + rewire
+(factory/registry/`Tson`/`validate` + ~17 reader-test updates — the bulk); (2) schemaless `readTree` +
+copy-on-write transform helpers; (3) `TsonNode.toTson()` serialization, then a JSON producer (the future
+JSON stack emits the same `TsonNode`).
+
 ## Front door / ergonomics
 
 - [ ] No `!!schema`-header auto-selection on the data side — given a data document, there's no
