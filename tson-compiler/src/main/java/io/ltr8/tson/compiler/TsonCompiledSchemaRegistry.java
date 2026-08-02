@@ -45,6 +45,16 @@ public final class TsonCompiledSchemaRegistry {
     }
 
     /**
+     * A registry that reads user schemas into an immutable, queryable {@link
+     * io.ltr8.tson.compiler.tree.TsonNode} tree -- structure-preserving (record vs map, array vs tuple) and
+     * with typed leaves, unlike DOM mode's plain {@code Map}/{@code List}. No {@code DataBindContext} (no Java
+     * class per schema type).
+     */
+    public static TsonCompiledSchemaRegistry tree(TsonCompiledMetaRegistry core) {
+        return new TsonCompiledSchemaRegistry(core, ValueReaderFactoryRegistry.tree());
+    }
+
+    /**
      * A registry that reads user schemas to real, object-bound Java values -- a {@code RecordBindReader}
      * produces a bound object (a caller's own class, resolved via {@code context}'s own {@code
      * DataNameBinder}), not a plain {@code Map}. {@code context} is the caller's own read-side binding

@@ -5,6 +5,7 @@ import io.ltr8.bind.DataBindContext;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.UnaryOperator;
 
 /**
  * A {@code constructor name -> ValueReaderFactory} table, one per mode -- {@link #dom()}/{@link
@@ -68,48 +69,68 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
     public static ValueReaderFactoryRegistry dom() {
         return new ValueReaderFactoryRegistry(baseFactories(
                 new RecordDomReader.Factory(), new ArrayDomReader.Factory(), new MapDomReader.Factory(),
-                new TupleDomReader.Factory(), AtomValueReader.ENUM));
+                new TupleDomReader.Factory(), AtomValueReader.ENUM, AtomValueReader.UNIT, UnaryOperator.identity()));
     }
 
     public static ValueReaderFactoryRegistry bind(DataBindContext context) {
         return new ValueReaderFactoryRegistry(baseFactories(
                 new RecordBindReader.Factory(context), new ArrayBindReader.Factory(context),
                 new MapBindReader.Factory(context), new TupleBindReader.Factory(context),
-                AtomValueReader.ENUM_OBJECT_MODE));
+                AtomValueReader.ENUM_OBJECT_MODE, AtomValueReader.UNIT, UnaryOperator.identity()));
     }
 
+    /**
+     * Tree mode: reads into an immutable {@link io.ltr8.tson.compiler.tree.TsonNode}. The container factories
+     * build node containers; every atom-family/enum factory is wrapped ({@link AtomNodeFactory}) so its leaf
+     * yields an {@code AtomNode}/{@code NullNode}, and {@code unit}'s {@code void} yields an {@code AbsentNode}
+     * (see {@link #TREE_UNIT}). Uses the object-binding enum factory so {@code boolean} reads a real {@code
+     * Boolean} rather than the text {@code "true"}/{@code "false"}.
+     */
+    public static ValueReaderFactoryRegistry tree() {
+        return new ValueReaderFactoryRegistry(baseFactories(
+                new RecordTreeReader.Factory(), new ArrayTreeReader.Factory(), new MapTreeReader.Factory(),
+                new TupleTreeReader.Factory(), AtomValueReader.ENUM_OBJECT_MODE, TREE_UNIT, AtomNodeFactory::new));
+    }
+
+    /** Tree mode's {@code unit} factory: {@code void} → {@link AbsentNodeReader}, {@code value}/{@code token} → {@link AtomNodeReader} over {@link AtomValueReader#UNIT}'s own reader. */
+    private static final ValueReaderFactory TREE_UNIT = (name, definition, resolver) ->
+            "void".equals(name)
+                    ? new AbsentNodeReader(AtomValueReader.UNIT.create(name, definition, resolver))
+                    : new AtomNodeReader(AtomValueReader.UNIT.create(name, definition, resolver), name);
+
     private static Map<String, ValueReaderFactory> baseFactories(ValueReaderFactory record, ValueReaderFactory array,
-            ValueReaderFactory map, ValueReaderFactory tuple, ValueReaderFactory enumFactory) {
+            ValueReaderFactory map, ValueReaderFactory tuple, ValueReaderFactory enumFactory,
+            ValueReaderFactory unitFactory, UnaryOperator<ValueReaderFactory> leaf) {
         Map<String, ValueReaderFactory> factories = new LinkedHashMap<>();
 
         // meta-kernel.tn1
-        factories.put("unit", AtomValueReader.UNIT);
-        factories.put("integer_type", AtomValueReader.INTEGER_TYPE);
-        factories.put("text_type", AtomValueReader.TEXT_TYPE);
-        factories.put("uri_type", AtomValueReader.URI_TYPE);
-        factories.put("regex_type", AtomValueReader.REGEX_TYPE);
+        factories.put("unit", unitFactory);
+        factories.put("integer_type", leaf.apply(AtomValueReader.INTEGER_TYPE));
+        factories.put("text_type", leaf.apply(AtomValueReader.TEXT_TYPE));
+        factories.put("uri_type", leaf.apply(AtomValueReader.URI_TYPE));
+        factories.put("regex_type", leaf.apply(AtomValueReader.REGEX_TYPE));
         factories.put("record", record);
         factories.put("array", array);
         factories.put("set", array);
         factories.put("map", map);
         factories.put("tuple", tuple);
-        factories.put("enum", enumFactory);
+        factories.put("enum", leaf.apply(enumFactory));
         factories.put("choice", ChoiceReader.FACTORY);
 
         // meta.tn1
-        factories.put("binary", AtomValueReader.BINARY);
+        factories.put("binary", leaf.apply(AtomValueReader.BINARY));
         factories.put("vector", array);
-        factories.put("float_type", AtomValueReader.FLOAT_TYPE);
-        factories.put("decimal_type", AtomValueReader.DECIMAL_TYPE);
-        factories.put("rational_type", AtomValueReader.RATIONAL_TYPE);
-        factories.put("date_type", AtomValueReader.DATE_TYPE);
-        factories.put("time_type", AtomValueReader.TIME_TYPE);
-        factories.put("datetime_type", AtomValueReader.DATETIME_TYPE);
-        factories.put("duration_type", AtomValueReader.DURATION_TYPE);
-        factories.put("uuid_type", AtomValueReader.UUID_TYPE);
-        factories.put("complex_type", AtomValueReader.COMPLEX_TYPE);
-        factories.put("ipv4_type", AtomValueReader.IPV4_TYPE);
-        factories.put("ipv6_type", AtomValueReader.IPV6_TYPE);
+        factories.put("float_type", leaf.apply(AtomValueReader.FLOAT_TYPE));
+        factories.put("decimal_type", leaf.apply(AtomValueReader.DECIMAL_TYPE));
+        factories.put("rational_type", leaf.apply(AtomValueReader.RATIONAL_TYPE));
+        factories.put("date_type", leaf.apply(AtomValueReader.DATE_TYPE));
+        factories.put("time_type", leaf.apply(AtomValueReader.TIME_TYPE));
+        factories.put("datetime_type", leaf.apply(AtomValueReader.DATETIME_TYPE));
+        factories.put("duration_type", leaf.apply(AtomValueReader.DURATION_TYPE));
+        factories.put("uuid_type", leaf.apply(AtomValueReader.UUID_TYPE));
+        factories.put("complex_type", leaf.apply(AtomValueReader.COMPLEX_TYPE));
+        factories.put("ipv4_type", leaf.apply(AtomValueReader.IPV4_TYPE));
+        factories.put("ipv6_type", leaf.apply(AtomValueReader.IPV6_TYPE));
 
         // Sugar/alias names -- not their own `~`-marked constructors, kept for lookup convenience only.
         factories.put("array_min", array);
