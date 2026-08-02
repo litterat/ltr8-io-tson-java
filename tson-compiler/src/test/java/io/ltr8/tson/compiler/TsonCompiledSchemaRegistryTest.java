@@ -2,6 +2,7 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
+import io.ltr8.tson.compiler.tree.TsonNode;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
 import io.ltr8.tson.schema.TsonBundledSchemas;
@@ -15,10 +16,10 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The two per-mode flavors of {@link TsonCompiledSchemaRegistry} ({@link TsonCompiledSchemaRegistry#dom}
+ * The two per-mode flavors of {@link TsonCompiledSchemaRegistry} ({@link TsonCompiledSchemaRegistry#tree}
  * and {@link TsonCompiledSchemaRegistry#bind}) over one shared {@link TsonCompiledMetaRegistry} resolution
  * core. Proves the overlay the split is built for: a single bind-mode core resolves a user schema once,
- * and each registry reads the same schema in its own mode -- DOM to a plain {@code Map}, object-binding to
+ * and each registry reads the same schema in its own mode -- a queryable TsonNode tree, object-binding to
  * a caller's own Java class -- so the "read mode" is which registry you hold, not a parameter threaded
  * through compile.
  */
@@ -56,11 +57,11 @@ class TsonCompiledSchemaRegistryTest {
     }
 
     @Test
-    void domRegistryReadsAUserSchemaToPlainMaps() {
-        TsonCompiledSchemaRegistry dom = TsonCompiledSchemaRegistry.dom(core());
-        Object value = dom.get(SCHEMA_ID).get("my_record").read(DATA);
-        Map<?, ?> map = assertInstanceOf(Map.class, value);
-        assertEquals(7, ((Number) map.get("value")).intValue());
+    void treeRegistryReadsAUserSchemaIntoATree() {
+        TsonCompiledSchemaRegistry tree = TsonCompiledSchemaRegistry.tree(core());
+        Object value = tree.get(SCHEMA_ID).get("my_record").read(DATA);
+        TsonNode node = assertInstanceOf(TsonNode.class, value);
+        assertEquals(7, node.get("value").asNumber().orElseThrow().intValue());
     }
 
     @Test
@@ -74,14 +75,14 @@ class TsonCompiledSchemaRegistryTest {
     @Test
     void oneCoreBacksBothModes() {
         TsonCompiledMetaRegistry core = core();
-        TsonCompiledSchemaRegistry dom = TsonCompiledSchemaRegistry.dom(core);
+        TsonCompiledSchemaRegistry tree = TsonCompiledSchemaRegistry.tree(core);
         DataBindContext context = TsonAtomContext.registerDefaults(DataBindContext.builder().nameBinder(MANUAL_BINDER).build());
         TsonCompiledSchemaRegistry bind = TsonCompiledSchemaRegistry.bind(core, context);
 
-        Object domValue = dom.get(SCHEMA_ID).get("my_record").read(DATA);
+        Object treeValue = tree.get(SCHEMA_ID).get("my_record").read(DATA);
         Object bindValue = bind.get(SCHEMA_ID).get("my_record").read(DATA);
 
-        assertInstanceOf(Map.class, domValue);
+        assertInstanceOf(TsonNode.class, treeValue);
         assertEquals(new MyRecord(7), bindValue);
     }
 
@@ -101,7 +102,7 @@ class TsonCompiledSchemaRegistryTest {
     @Test
     void readingAUserSchemaResolvesItInTheCoreButDoesNotCompileItThere() {
         TsonCompiledMetaRegistry core = core();
-        TsonCompiledSchemaRegistry.dom(core).get(SCHEMA_ID).get("my_record").read(DATA);
+        TsonCompiledSchemaRegistry.tree(core).get(SCHEMA_ID).get("my_record").read(DATA);
 
         // The core resolved+registered the user schema -- its linked form is available -- but never
         // compiled or cached it; the read registry owns the compile, in its own mode.

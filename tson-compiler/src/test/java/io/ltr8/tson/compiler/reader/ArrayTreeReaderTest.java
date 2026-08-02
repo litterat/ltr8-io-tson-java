@@ -26,12 +26,12 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
- * End-to-end proof of {@link ArrayDomReader} against real TSON data source text -- both standalone
- * (a top-level {@code numbers: array} entry) and nested inside a {@link RecordDomReader}-built
+ * End-to-end proof of {@link ArrayTreeReader} against real TSON data source text -- both standalone
+ * (a top-level {@code numbers: array} entry) and nested inside a {@link RecordTreeReader}-built
  * record (an {@code items: [integer]}-shaped field), the realistic case: almost every real array in
  * a materialized schema is reached this way, not as a schema's own top-level entry.
  */
-class ArrayDomReaderTest {
+class ArrayTreeReaderTest {
 
     private static TypeDefinition integerEntry() {
         return new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), false, List.of(), List.of(),
@@ -45,12 +45,12 @@ class ArrayDomReaderTest {
         TsonSchema schema = new TsonSchema("https://example.test/s.tn1",
                 "https://example.test/meta.tn1", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
-        return TsonSchemaCompiler.compile(linkedSchema, ValueReaderFactoryRegistry.dom());
+        return TsonSchemaCompiler.compile(linkedSchema, ValueReaderFactoryRegistry.tree());
     }
 
     @SuppressWarnings("unchecked")
     private static List<Object> readArray(TsonCompiledSchema compiled, String rootName, String source) {
-        return (List<Object>) compiled.get(rootName).read(source);
+        return (List<Object>) Dom.of((io.ltr8.tson.compiler.tree.TsonNode) compiled.get(rootName).read(source));
     }
 
     @Test
@@ -128,7 +128,7 @@ class ArrayDomReaderTest {
         TsonCompiledSchema compiled = compile(extra);
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) compiled.get("holder").read("{ items: [1 2 3] }");
+        Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.compiler.tree.TsonNode) compiled.get("holder").read("{ items: [1 2 3] }"));
 
         assertEquals(List.of(BigInteger.ONE, BigInteger.TWO, BigInteger.valueOf(3)), result.get("items"));
     }

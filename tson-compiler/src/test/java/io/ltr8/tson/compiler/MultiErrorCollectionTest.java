@@ -1,5 +1,7 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.compiler.reader.Dom;
+
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
@@ -40,7 +42,7 @@ class MultiErrorCollectionTest {
 
     private static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema) {
         TsonCompiledMetaRegistry core = new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext());
-        return TsonCompiledSchemaRegistry.dom(core).compile(linkedSchema);
+        return TsonCompiledSchemaRegistry.tree(core).compile(linkedSchema);
     }
 
     @Test
@@ -66,7 +68,7 @@ class MultiErrorCollectionTest {
         TsonReadContext ctx = TsonReadContext.collecting(dataSource);
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) compiled.get("my_record").read(ctx);
+        Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.compiler.tree.TsonNode) compiled.get("my_record").read(ctx));
 
         assertEquals(3, ctx.diagnostics().size(), ctx.diagnostics().toString());
 

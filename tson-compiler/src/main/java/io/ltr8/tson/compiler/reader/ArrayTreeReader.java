@@ -16,7 +16,7 @@ import java.util.Optional;
 
 /**
  * Tree mode's {@code array} reader -- reads an array-shaped value into an {@link ArrayNode}, one {@link
- * TsonNode} per element in source order, the counterpart to {@link ArrayDomReader}'s plain {@code List}.
+ * TsonNode} per element in source order, the counterpart to the old DOM reader's plain {@code List}.
  * Distinct from {@link TupleTreeReader}, which reads a fixed-arity, positionally-typed sequence into a {@code
  * TupleNode}. A failed/mismatched element is kept as a {@link NullNode} placeholder (its diagnostic is
  * already reported) so later elements' indices stay accurate.

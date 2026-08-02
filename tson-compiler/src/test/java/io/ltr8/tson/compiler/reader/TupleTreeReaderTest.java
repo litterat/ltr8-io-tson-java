@@ -25,8 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-/** End-to-end proof of {@link TupleDomReader} against real TSON data source text -- a heterogeneous (integer, text) pair. */
-class TupleDomReaderTest {
+/** End-to-end proof of {@link TupleTreeReader} against real TSON data source text -- a heterogeneous (integer, text) pair. */
+class TupleTreeReaderTest {
 
     private static TsonCompiledSchema compile(TupleBody body) {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
@@ -38,12 +38,12 @@ class TupleDomReaderTest {
         TsonSchema schema = new TsonSchema("https://example.test/s.tn1",
                 "https://example.test/meta.tn1", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
-        return TsonSchemaCompiler.compile(linkedSchema, ValueReaderFactoryRegistry.dom());
+        return TsonSchemaCompiler.compile(linkedSchema, ValueReaderFactoryRegistry.tree());
     }
 
     @SuppressWarnings("unchecked")
     private static List<Object> readTuple(TsonCompiledSchema compiled, String source) {
-        return (List<Object>) compiled.get("pair").read(source);
+        return (List<Object>) Dom.of((io.ltr8.tson.compiler.tree.TsonNode) compiled.get("pair").read(source));
     }
 
     private static TupleBody twoRequiredSlots() {

@@ -21,9 +21,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  * {@link ValueReaderFactoryRegistry} is a fixed, non-extensible {@code constructor name ->
  * ValueReaderFactory} table -- unlike its predecessor, there's no builder to assemble a scoped
  * subset, so this only exercises {@link ValueReaderFactoryResolver#resolve} itself: an unregistered
- * name still fails clearly, a registered one dispatches to a real factory, and {@link #dom()}/
- * {@link #bind} genuinely disagree for {@code boolean} -- the one constructor the two modes
- * register differently (see {@link ValueReaderFactoryRegistry}'s own Javadoc).
+ * name still fails clearly, a registered one dispatches to a real factory, and {@link
+ * ValueReaderFactoryRegistry#tree}/{@link ValueReaderFactoryRegistry#bind} both read {@code boolean} as a
+ * real {@code Boolean} (they share the object-binding enum factory; see {@link ValueReaderFactoryRegistry}'s
+ * own Javadoc).
  */
 class ValueReaderFactoryRegistryTest {
 
@@ -33,21 +34,21 @@ class ValueReaderFactoryRegistryTest {
 
     @Test
     void resolveThrowsForAnUnregisteredConstructor() {
-        ValueReaderFactoryRegistry registry = ValueReaderFactoryRegistry.dom();
+        ValueReaderFactoryRegistry registry = ValueReaderFactoryRegistry.tree();
 
         assertThrows(IllegalStateException.class, () -> registry.resolve("no_such_constructor"));
     }
 
     @Test
     void resolveReturnsTheSameRegisteredFactoryEveryTime() {
-        ValueReaderFactoryRegistry registry = ValueReaderFactoryRegistry.dom();
+        ValueReaderFactoryRegistry registry = ValueReaderFactoryRegistry.tree();
 
         assertSame(registry.resolve("record"), registry.resolve("record"));
     }
 
     @Test
     void aConstructorWithNoCompiledParserYetStillResolvesButFailsOnlyWhenActuallyRead() {
-        ValueReaderFactoryRegistry registry = ValueReaderFactoryRegistry.dom();
+        ValueReaderFactoryRegistry registry = ValueReaderFactoryRegistry.tree();
         TypeDefinition entry = new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), true,
                 List.of(), List.of(), Optional.empty(), EmailType.UNCONSTRAINED);
 
@@ -59,30 +60,31 @@ class ValueReaderFactoryRegistryTest {
     }
 
     @Test
-    void domAndBindDisagreeOnlyForBooleanEnumMembers() {
+    void treeAndBindBothReadBooleanEnumMembersAsRealBooleans() {
         TypeDefinition booleanEntry = new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), true,
                 List.of(), List.of(), Optional.empty(), new EnumBody(List.of("true", "false")));
 
-        TsonValueReader<?> domReader = ValueReaderFactoryRegistry.dom().resolve("enum")
+        TsonValueReader<?> treeReader = ValueReaderFactoryRegistry.tree().resolve("enum")
                 .create("boolean", booleanEntry, NEVER_CALLED);
         TsonValueReader<?> bindReader = ValueReaderFactoryRegistry.bind(SchemaMetaNameBinder.defaultContext())
                 .resolve("enum").create("boolean", booleanEntry, NEVER_CALLED);
 
-        assertEquals("true", domReader.read("true"));
+        // Both use the object-binding enum factory, so boolean reads as a real Boolean (tree wraps it in an AtomNode).
+        assertEquals(Boolean.TRUE, Dom.of((io.ltr8.tson.compiler.tree.TsonNode) treeReader.read("true")));
         assertEquals(Boolean.TRUE, bindReader.read("true"));
     }
 
     @Test
-    void domAndBindAgreeForAnOrdinaryNonBooleanEnum() {
+    void treeAndBindReadAnOrdinaryEnumMemberAsItsText() {
         TypeDefinition statusEntry = new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), true,
                 List.of(), List.of(), Optional.empty(), new EnumBody(List.of("ACTIVE", "INACTIVE")));
 
-        TsonValueReader<?> domReader = ValueReaderFactoryRegistry.dom().resolve("enum")
+        TsonValueReader<?> treeReader = ValueReaderFactoryRegistry.tree().resolve("enum")
                 .create("status", statusEntry, NEVER_CALLED);
         TsonValueReader<?> bindReader = ValueReaderFactoryRegistry.bind(SchemaMetaNameBinder.defaultContext())
                 .resolve("enum").create("status", statusEntry, NEVER_CALLED);
 
-        assertEquals("ACTIVE", domReader.read("ACTIVE"));
+        assertEquals("ACTIVE", Dom.of((io.ltr8.tson.compiler.tree.TsonNode) treeReader.read("ACTIVE")));
         assertEquals("ACTIVE", bindReader.read("ACTIVE"));
     }
 }

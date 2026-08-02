@@ -20,7 +20,7 @@ final class CompileCommand {
     static int run(Path schemaFile, OutputFormat format) {
         try {
             Tson tson = Tson.builder().build();
-            tson.domRegistry().compile(tson.resolve(Io.readFile(schemaFile)));
+            tson.treeRegistry().compile(tson.resolve(Io.readFile(schemaFile)));
             System.out.println(format.render(ValidationReport.ok()));
             return 0;
         } catch (RuntimeException e) {

@@ -16,7 +16,7 @@ import java.util.Optional;
 
 /**
  * Tree mode's {@code tuple} reader -- reads a fixed-arity, positionally-typed sequence into a {@link
- * TupleNode}, the counterpart to {@link TupleDomReader}'s plain {@code List} and a distinct kind from {@link
+ * TupleNode}, the counterpart to the old DOM reader's plain {@code List} and a distinct kind from {@link
  * ArrayTreeReader} (a schemaless read, which has no schema to tell tuple from array, can only produce an
  * array). A failed/out-of-arity slot is kept as a {@link NullNode} placeholder.
  */

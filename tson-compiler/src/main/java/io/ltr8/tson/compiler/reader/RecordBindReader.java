@@ -32,7 +32,7 @@ import java.util.Optional;
  * the target class doesn't declare this schema field) is built once, right after {@link
  * RecordAbstractReader}'s own constructor returns, which is also where every inherited {@link
  * #precomputedValue} entry gets narrowed in place to its bound field's target type -- {@link
- * RecordDomReader} leaves those unnarrowed, since a plain {@code Map} has no target type to narrow
+ * RecordTreeReader} leaves those unnarrowed, since a plain {@code Map} has no target type to narrow
  * toward.
  *
  * <p><b>No separate "already filled" tracker is needed at all</b> -- unlike this class's own
@@ -47,7 +47,7 @@ import java.util.Optional;
  * write into at all) the same way it covers a bound one, with no separate array for that case
  * anymore either.
  *
- * <p>Everything shared with {@link RecordDomReader} -- the compiled field list, the name lookup,
+ * <p>Everything shared with {@link RecordTreeReader} -- the compiled field list, the name lookup,
  * confirming a record-shaped value, precomputing default/fixed values -- lives on {@link
  * RecordAbstractReader}; this class holds only what's genuinely different about producing a real
  * bound object instead of a plain {@code Map}: the target-field lookup, narrowing, and constructor

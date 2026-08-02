@@ -20,7 +20,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 /**
- * Everything {@link ArrayDomReader} and {@link ArrayBindReader} share verbatim: resolving the
+ * Everything {@link ArrayTreeReader} and {@link ArrayBindReader} share verbatim: resolving the
  * element type's own reader once at construction, confirming an array-shaped value's own
  * {@code ArrayStart}, and decoding elements one at a time straight off the event stream --
  * validating {@code min_items}/{@code max_items} (against the final count, known only once {@code

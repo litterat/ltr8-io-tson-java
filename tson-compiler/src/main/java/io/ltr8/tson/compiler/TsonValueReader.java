@@ -45,7 +45,7 @@ import java.io.InputStream;
  * ValueReaderFactory} would produce a result that was never meant to be written back out at all, so
  * a single {@code write(T)} on this interface would be meaningless for at least one of the reader
  * families this is meant to cover. Left for a later pass once a non-object-binding factory set
- * actually exists to design against -- only DOM mode ({@code RecordDomReader}, object-shaped) and
+ * actually exists to design against -- only DOM mode ({@code RecordTreeReader}, object-shaped) and
  * object-binding mode's own atom-family factories exist today.
  *
  * @param <T> the host value this reader produces -- an atom's natural host type for an atom-family

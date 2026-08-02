@@ -61,7 +61,7 @@ class MetaTn1CompiledEndToEndTest {
      * MetaKernelEndToEndTest#rawCompile}).
      */
     private static TsonCompiledSchema rawCompile(TsonLinkedSchema linked) {
-        return TsonSchemaCompiler.compile(linked, ValueReaderFactoryRegistry.dom());
+        return TsonSchemaCompiler.compile(linked, ValueReaderFactoryRegistry.tree());
     }
 
     /**
@@ -89,7 +89,7 @@ class MetaTn1CompiledEndToEndTest {
         TsonLinkedSchema meta = registerMeta();
         TsonCompiledSchema compiled = rawCompile(meta);
 
-        Object result = compiled.get("binary_encoding").read("BASE64");
+        Object result = Dom.of((io.ltr8.tson.compiler.tree.TsonNode) compiled.get("binary_encoding").read("BASE64"));
 
         assertEquals("BASE64", result);
     }

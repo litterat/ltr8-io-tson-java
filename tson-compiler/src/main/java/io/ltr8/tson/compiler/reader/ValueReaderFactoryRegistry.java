@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.function.UnaryOperator;
 
 /**
- * A {@code constructor name -> ValueReaderFactory} table, one per mode -- {@link #dom()}/{@link
+ * A {@code constructor name -> ValueReaderFactory} table, one per mode -- {@link #tree}/{@link
  * #bind(DataBindContext)} are the two instances a caller actually wants.
  *
  * <p><b>Fully self-contained within this package</b> -- every entry is either this package's own
@@ -28,11 +28,10 @@ import java.util.function.UnaryOperator;
  * RecordBindReader.Factory}'s own Javadoc deliberately does not attempt for any composite kind but
  * {@code record}.
  *
- * <p><b>{@code enum}/{@code boolean} is the one case each mode resolves differently</b> -- {@link
- * AtomValueReader#ENUM_OBJECT_MODE} for {@link #bind} (itself dispatching {@code boolean} to a real
- * {@code Boolean} via {@link BooleanReader}, every other member name through the ordinary path),
- * {@link AtomValueReader#ENUM} for {@link #dom()} (uniformly {@code String}, no target Java type to
- * reconcile against).
+ * <p><b>{@code enum}</b> uses {@link AtomValueReader#ENUM_OBJECT_MODE} in both {@link #tree} and {@link
+ * #bind} (dispatching {@code boolean} to a real {@code Boolean} via {@link BooleanReader}, every other
+ * member name through the ordinary path) -- so {@code boolean} reads a genuine {@code Boolean}, not the
+ * text {@code "true"}/{@code "false"}. Tree mode additionally wraps every leaf in an {@code AtomNode}.
  *
  * <p><b>{@code choice} is shared between both modes</b>, registered once via {@link
  * ChoiceReader#FACTORY} -- see that class's own Javadoc for why it has no {@code
@@ -64,12 +63,6 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
             throw new IllegalStateException("no ValueReaderFactory registered for constructor '" + name + "'");
         }
         return factory;
-    }
-
-    public static ValueReaderFactoryRegistry dom() {
-        return new ValueReaderFactoryRegistry(baseFactories(
-                new RecordDomReader.Factory(), new ArrayDomReader.Factory(), new MapDomReader.Factory(),
-                new TupleDomReader.Factory(), AtomValueReader.ENUM, AtomValueReader.UNIT, UnaryOperator.identity()));
     }
 
     public static ValueReaderFactoryRegistry bind(DataBindContext context) {

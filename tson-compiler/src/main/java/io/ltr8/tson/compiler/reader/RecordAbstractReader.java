@@ -30,7 +30,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Everything {@link RecordDomReader} and {@link RecordBindReader} share verbatim: the compiled
+ * Everything {@link RecordTreeReader} and {@link RecordBindReader} share verbatim: the compiled
  * per-field list, the name -> position lookup, confirming a record-shaped value's own event
  * sequence, and precomputing every {@code REQUIRED_DEFAULT}/{@code REQUIRED_FIXED}/{@code
  * OPTIONAL_FIXED} field's own literal schema value once at construction rather than per read. Each
@@ -41,7 +41,7 @@ import java.util.Optional;
  * <p>{@link #precomputedValue} is stored raw here -- the natural host value {@code readSchemaDefault}
  * produces, with no narrowing applied. {@link RecordBindReader} overwrites its own entries in place,
  * once, right after calling this class's own constructor, narrowing each one to its bound field's
- * target type; {@link RecordDomReader} leaves them exactly as this class computed them.
+ * target type; {@link RecordTreeReader} leaves them exactly as this class computed them.
  *
  * <p><b>Forward, single-pass, with overwrite on a duplicate field name</b> (a deliberate behavior
  * change from this class's own pre-streaming design, which scanned backward specifically so a

@@ -13,9 +13,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * A per-mode registry of compiled <b>user</b> schemas, over a shared {@link TsonCompiledMetaRegistry}
  * (the bind-mode resolution core). The parallel to that class: {@code TsonCompiledMetaRegistry} holds the
  * compiled meta layer every schema resolves against; this holds compiled user schemas, read in one mode.
- * Built via {@link #dom} or {@link #bind} -- the read mode is which factory the registry was made with,
- * not a parameter threaded through compile, so two registries over one core read the same schema as plain
- * {@code Map}/{@code List} or as real Java objects.
+ * Built via {@link #tree} or {@link #bind} -- the read mode is which factory the registry was made with,
+ * not a parameter threaded through compile, so two registries over one core read the same schema as a
+ * queryable {@code TsonNode} tree or as real Java objects.
  *
  * <p><b>Resolution is always bind-anchored, so it is delegated to the core regardless of this registry's
  * own read mode.</b> Resolving a schema's own {@code !enum}/{@code !integer} instances binds them to
@@ -36,19 +36,10 @@ public final class TsonCompiledSchemaRegistry {
     }
 
     /**
-     * A registry that reads user schemas to DOM values -- a record as a plain {@code Map<String, Object>},
-     * an array as a {@code List}, and so on, with no Java class per schema type (hence no {@code
-     * DataBindContext}).
-     */
-    public static TsonCompiledSchemaRegistry dom(TsonCompiledMetaRegistry core) {
-        return new TsonCompiledSchemaRegistry(core, ValueReaderFactoryRegistry.dom());
-    }
-
-    /**
      * A registry that reads user schemas into an immutable, queryable {@link
-     * io.ltr8.tson.compiler.tree.TsonNode} tree -- structure-preserving (record vs map, array vs tuple) and
-     * with typed leaves, unlike DOM mode's plain {@code Map}/{@code List}. No {@code DataBindContext} (no Java
-     * class per schema type).
+     * io.ltr8.tson.compiler.tree.TsonNode} tree -- structure-preserving (record vs map, array vs tuple) with
+     * typed leaves and null-safe navigation, and no Java class per schema type (hence no {@code
+     * DataBindContext}). The recommended read mode; {@link #bind} is the object-binding alternative.
      */
     public static TsonCompiledSchemaRegistry tree(TsonCompiledMetaRegistry core) {
         return new TsonCompiledSchemaRegistry(core, ValueReaderFactoryRegistry.tree());

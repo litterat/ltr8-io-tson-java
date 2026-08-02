@@ -66,7 +66,7 @@ class StreamingLazinessTest {
 
     private static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema) {
         TsonCompiledMetaRegistry core = new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext());
-        return TsonCompiledSchemaRegistry.dom(core).compile(linkedSchema);
+        return TsonCompiledSchemaRegistry.tree(core).compile(linkedSchema);
     }
 
     @Test

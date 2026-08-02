@@ -14,7 +14,7 @@ import java.util.Set;
  * {@code Set<String>} of schema names) rather than any Java type -- unlike {@link VariantBindReader}'s
  * {@code DataClassUnion}-bounded version, there's no Java union to validate membership against here,
  * only the schema's own subtype list. Used wherever a real, reachable "own data" reader exists for
- * the declaration itself: unconditionally by {@link RecordDomReader.Factory} (DOM mode has no "pure
+ * the declaration itself: unconditionally by {@link RecordTreeReader.Factory} (DOM mode has no "pure
  * marker interface, nothing to construct" case at all -- an empty record body, e.g. {@code top =>
  * top & {}}, reads to a perfectly ordinary, if empty, {@code Map<String, Object>}), and by {@link
  * RecordBindReader.Factory} specifically when the declaration's own bound Java class is a real

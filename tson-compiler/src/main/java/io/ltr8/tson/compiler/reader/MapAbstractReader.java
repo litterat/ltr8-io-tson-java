@@ -19,7 +19,7 @@ import java.util.Optional;
 import java.util.function.BiConsumer;
 
 /**
- * Everything {@link MapDomReader} and {@link MapBindReader} share verbatim: resolving the key/value
+ * Everything {@link MapTreeReader} and {@link MapBindReader} share verbatim: resolving the key/value
  * types' own readers once at construction, confirming a map-shaped value's own {@code MapStart} (or
  * {@code EmptyBraceEvent}, zero entries, matching {@code TsonObjectReader.toMap}'s own treatment of
  * {@code {}}), and decoding entries one at a time straight off the event stream -- validating {@code

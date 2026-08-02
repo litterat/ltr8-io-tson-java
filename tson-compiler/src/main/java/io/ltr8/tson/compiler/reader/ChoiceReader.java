@@ -10,7 +10,7 @@ import java.util.Set;
  * The {@link ValueReaderFactory} for meta-kernel's {@code choice} constructor -- this package's own
  * copy of {@code reader.ChoiceReader}. Dispatches by the value's own {@code !typeName} annotation
  * against {@link ChoiceBody#variants}' fixed, explicitly-declared list, via {@link
- * NamedDispatchReader}. Same for both {@link ValueReaderFactoryRegistry#dom()} and {@link
+ * NamedDispatchReader}. Same for both {@link ValueReaderFactoryRegistry#tree} and {@link
  * ValueReaderFactoryRegistry#bind}, matching the {@code reader} precedent (a single shared entry,
  * not registered per mode) -- unlike {@code record}, a choice has no "own body" of its own to fall
  * back to, so there's no equivalent of {@link VariantBindReader}'s {@code DataClassUnion}-bounded

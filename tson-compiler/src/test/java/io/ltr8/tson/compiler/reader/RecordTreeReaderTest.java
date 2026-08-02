@@ -28,12 +28,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * End-to-end proof of the compiled-schema-reader sketch against the real {@link RecordDomReader} and
+ * End-to-end proof of the compiled-schema-reader sketch against the real {@link RecordTreeReader} and
  * {@link AtomValueReader#INTEGER_TYPE} -- a real (hand-built, but shaped exactly like a materialized
  * {@link TsonSchema} would be) schema compiled with the real DOM-mode factory registry, read against
  * real TSON data source text through the real compiled reader.
  */
-class RecordDomReaderTest {
+class RecordTreeReaderTest {
 
     private static TsonLinkedSchema pointSchema(TypeDefinition integerEntry, RecordField valueField) {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
@@ -48,12 +48,12 @@ class RecordDomReaderTest {
     }
 
     private static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema) {
-        return TsonSchemaCompiler.compile(linkedSchema, ValueReaderFactoryRegistry.dom());
+        return TsonSchemaCompiler.compile(linkedSchema, ValueReaderFactoryRegistry.tree());
     }
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> read(TsonCompiledSchema compiled, String source) {
-        return (Map<String, Object>) compiled.get("point").read(source);
+        return (Map<String, Object>) Dom.of((io.ltr8.tson.compiler.tree.TsonNode) compiled.get("point").read(source));
     }
 
     @Test

@@ -16,7 +16,7 @@ import java.util.Optional;
 
 /**
  * Tree mode's {@code map} reader -- reads a map-shaped value into a {@link MapNode} whose keys are
- * themselves {@link TsonNode}s (TSON map keys can be typed, §2.6), the counterpart to {@link MapDomReader}'s
+ * themselves {@link TsonNode}s (TSON map keys can be typed, §2.6), the counterpart to the old DOM reader's
  * plain {@code Map}. Preserving the record-vs-map distinction (both would be a Java {@code Map} in DOM mode)
  * is one of the reasons the tree exists.
  */

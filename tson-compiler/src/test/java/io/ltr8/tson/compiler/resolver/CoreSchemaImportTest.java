@@ -124,7 +124,7 @@ class CoreSchemaImportTest {
         // but never compiled in the core -- its readers are compiled per mode in a read registry, exactly
         // as they are when a user schema imports it. DOM mode is enough to check which entries error.
         TsonCompiledSchema compiledCore =
-                TsonCompiledSchemaRegistry.dom(loaded.registry()).get(TsonBundledSchemas.CORE_ID);
+                TsonCompiledSchemaRegistry.tree(loaded.registry()).get(TsonBundledSchemas.CORE_ID);
 
         Set<String> errored = new TreeSet<>();
         for (String name : core.entries().keySet()) {

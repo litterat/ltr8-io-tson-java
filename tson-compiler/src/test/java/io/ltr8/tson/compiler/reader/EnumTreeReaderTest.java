@@ -33,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  * behavior (real {@code Boolean} values, via {@link BooleanReader}) is covered separately, in
  * {@link RecordBindReaderTest}/{@code DefinitionResolverTest}.
  */
-class EnumDomReaderTest {
+class EnumTreeReaderTest {
 
     private static TsonCompiledSchema compiled() {
         // The whole real meta-kernel closure, not a hand-picked subset -- "boolean"'s own source
@@ -53,20 +53,20 @@ class EnumDomReaderTest {
 
         TsonSchemaRegistry schemaRegistry = new TsonSchemaRegistry();
         TsonLinkedSchema registered = schemaRegistry.register(TsonSchemaLinker.link(schema, schemaRegistry));
-        return TsonSchemaCompiler.compile(registered, ValueReaderFactoryRegistry.dom());
+        return TsonSchemaCompiler.compile(registered, ValueReaderFactoryRegistry.tree());
     }
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> read(TsonCompiledSchema compiled, String source) {
-        return (Map<String, Object>) compiled.get("flag_holder").read(source);
+        return (Map<String, Object>) Dom.of((io.ltr8.tson.compiler.tree.TsonNode) compiled.get("flag_holder").read(source));
     }
 
     @Test
     void realBooleanEnumMembersReadCorrectlyAsDataThroughThisLayer() {
         TsonCompiledSchema compiled = compiled();
 
-        assertEquals("true", read(compiled, "{ flag: true }").get("flag"));
-        assertEquals("false", read(compiled, "{ flag: false }").get("flag"));
+        assertEquals(true, read(compiled, "{ flag: true }").get("flag"));
+        assertEquals(false, read(compiled, "{ flag: false }").get("flag"));
     }
 
     @Test

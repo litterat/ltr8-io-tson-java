@@ -29,7 +29,7 @@ class RecordGroupValidationTest {
                   }
                 }""";
         Tson tson = Tson.builder().build();
-        return tson.domRegistry().compile(tson.resolve(schema)).get("contact");
+        return tson.treeRegistry().compile(tson.resolve(schema)).get("contact");
     }
 
     @Test

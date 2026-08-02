@@ -96,16 +96,12 @@ final class AtomValueReader<T> implements TsonValueReader<T> {
     /** Same reasoning as {@link #IPV4_TYPE}, for {@link Ipv6Parser}. */
     static final ValueReaderFactory IPV6_TYPE = (_, definition, _) ->
             new AtomValueReader<>(Ipv6Parser.UNCONSTRAINED, definition.position());
-    static final ValueReaderFactory ENUM = (_, definition, _) ->
-            new AtomValueReader<>(new EnumParser((EnumBody) definition.body()), definition.position());
     /**
-     * Object-binding mode's own variant of {@link #ENUM} -- identical for every enum instance
-     * except {@code boolean} itself, which reads real {@code Boolean} values ({@link BooleanReader})
-     * instead of raw member text. Dispatch is keyed on the declaration's own name, the same
-     * mechanism {@link #UNIT} uses for {@code value}/{@code token}/{@code void} -- every other enum
-     * instance falls through to ordinary {@link #ENUM} behavior. DOM mode never registers this;
-     * {@link ValueReaderFactoryRegistry#dom()} uses {@link #ENUM} for {@code boolean} too, since DOM
-     * has no target Java type to reconcile {@code "true"}/{@code "false"} against.
+     * The enum reader for both tree and object-binding modes: {@code boolean} reads a real {@code Boolean}
+     * ({@link BooleanReader}), every other enum instance its member text ({@link EnumParser}). Dispatch is
+     * keyed on the declaration's own name, the same mechanism {@link #UNIT} uses for {@code value}/{@code
+     * token}/{@code void}. (Tree mode then wraps the result in an {@code AtomNode} -- see {@link
+     * ValueReaderFactoryRegistry}.)
      */
     static final ValueReaderFactory ENUM_OBJECT_MODE = (name, definition, _) ->
             "boolean".equals(name)

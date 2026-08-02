@@ -22,8 +22,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** End-to-end proof of {@link MapDomReader} against real TSON data source text. */
-class MapDomReaderTest {
+/** End-to-end proof of {@link MapTreeReader} against real TSON data source text. */
+class MapTreeReaderTest {
 
     private static TypeDefinition integerEntry() {
         return new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), false, List.of(), List.of(),
@@ -37,12 +37,12 @@ class MapDomReaderTest {
         TsonSchema schema = new TsonSchema("https://example.test/s.tn1",
                 "https://example.test/meta.tn1", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
-        return TsonSchemaCompiler.compile(linkedSchema, ValueReaderFactoryRegistry.dom());
+        return TsonSchemaCompiler.compile(linkedSchema, ValueReaderFactoryRegistry.tree());
     }
 
     @SuppressWarnings("unchecked")
     private static Map<Object, Object> readMap(TsonCompiledSchema compiled, String source) {
-        return (Map<Object, Object>) compiled.get("scores").read(source);
+        return (Map<Object, Object>) Dom.of((io.ltr8.tson.compiler.tree.TsonNode) compiled.get("scores").read(source));
     }
 
     @Test

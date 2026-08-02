@@ -37,7 +37,7 @@ class DuplicateFieldOverwriteTest {
 
     private static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema) {
         TsonCompiledMetaRegistry core = new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext());
-        return TsonCompiledSchemaRegistry.dom(core).compile(linkedSchema);
+        return TsonCompiledSchemaRegistry.tree(core).compile(linkedSchema);
     }
 
     @Test
@@ -56,7 +56,7 @@ class DuplicateFieldOverwriteTest {
         TsonReadContext ctx = TsonReadContext.collecting(dataSource);
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) compiled.get("holder").read(ctx);
+        Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.compiler.tree.TsonNode) compiled.get("holder").read(ctx));
 
         // The malformed first occurrence was genuinely read/validated -- exactly one diagnostic,
         // for the out-of-range 999, not silently skipped the way pre-streaming backward-scan-and-

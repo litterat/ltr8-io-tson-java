@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Everything {@link TupleDomReader} and {@link TupleBindReader} share verbatim: resolving every
+ * Everything {@link TupleTreeReader} and {@link TupleBindReader} share verbatim: resolving every
  * position's own reader once at construction, confirming a tuple's own array-shaped event sequence
  * (never {@code EmptyBraceEvent} -- a tuple is array-shaped on the wire, not record-shaped, matching
  * {@code TsonObjectReader.toTuple}'s own note), and decoding every position into a single {@code

@@ -23,16 +23,16 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  * now exercised through a single {@code compiled.get(typeName).read(document.root())} call, the
  * same one-line shape {@code TsonObjectReader.toObject(String, Class)} already offers for Class 1.
  */
-class CompiledSchemaDomReadTest {
+class CompiledSchemaTreeReadTest {
 
     private static TsonCompiledSchema compiled() {
         TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
         TsonLinkedSchema linked = TsonSchemaLinker.linkBootstrap(raw);
-        return TsonSchemaCompiler.compile(linked, ValueReaderFactoryRegistry.dom());
+        return TsonSchemaCompiler.compile(linked, ValueReaderFactoryRegistry.tree());
     }
 
     private static Object read(TsonCompiledSchema compiled, String source, String typeName) {
-        return compiled.get(typeName).read(source);
+        return Dom.of((io.ltr8.tson.compiler.tree.TsonNode) compiled.get(typeName).read(source));
     }
 
     @Test
@@ -43,7 +43,7 @@ class CompiledSchemaDomReadTest {
         Map<String, Object> result = (Map<String, Object>) read(compiled, "{ bits: 32 signed: true }", "integer_size");
 
         assertEquals(BigInteger.valueOf(32), result.get("bits"));
-        assertEquals("true", result.get("signed"));
+        assertEquals(true, result.get("signed")); // boolean reads as a real Boolean in tree mode
     }
 
     @Test

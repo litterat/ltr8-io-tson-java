@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * End-to-end proof of {@link VariantDomReader}: the {@code response}/{@code success_response}/
+ * End-to-end proof of {@link VariantTreeReader}: the {@code response}/{@code success_response}/
  * {@code failure_response} case this class was originally built for (dispatch by subtype), plus the
  * {@code top}-like case that motivated its redesign -- a value with no type annotation, or one
  * naming the declaration itself, reads against the declaration's *own* body rather than always
@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * second type with a real required field of its own to prove the fallback isn't a rubber stamp --
  * it's an ordinary read against an ordinary body, which can still fail on its own terms.
  */
-class VariantDomReaderTest {
+class VariantTreeReaderTest {
 
     private static TsonSchema compileableSchema() {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
@@ -63,12 +63,12 @@ class VariantDomReaderTest {
     private static TsonCompiledSchema compiled() {
         TsonSchemaRegistry schemaRegistry = new TsonSchemaRegistry();
         TsonLinkedSchema registered = schemaRegistry.register(TsonSchemaLinker.link(compileableSchema(), schemaRegistry));
-        return TsonSchemaCompiler.compile(registered, ValueReaderFactoryRegistry.dom());
+        return TsonSchemaCompiler.compile(registered, ValueReaderFactoryRegistry.tree());
     }
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> read(TsonCompiledSchema compiled, String rootName, String source) {
-        return (Map<String, Object>) compiled.get(rootName).read(source);
+        return (Map<String, Object>) Dom.of((io.ltr8.tson.compiler.tree.TsonNode) compiled.get(rootName).read(source));
     }
 
     private static Map<String, Object> read(TsonCompiledSchema compiled, String source) {

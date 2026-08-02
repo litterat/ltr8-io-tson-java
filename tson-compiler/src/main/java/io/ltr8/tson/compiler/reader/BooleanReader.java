@@ -10,13 +10,11 @@ import io.ltr8.tson.schema.meta.SourcePosition;
 import java.util.Optional;
 
 /**
- * Object-binding mode's own reading for meta-kernel's {@code boolean => !enum [true false]} -- the
- * one real enum instance whose members are meant to stand in for a genuine Java {@code Boolean}, not
- * raw member text. Every other enum instance is bound via the ordinary {@code EnumParser} (through
- * {@link AtomValueReader#ENUM_OBJECT_MODE}), reading the member token's own text as a {@code
- * String} -- exactly right for an arbitrary, user-defined enum label, and exactly wrong for {@code
- * boolean} specifically. DOM mode is untouched: {@link AtomValueReader#ENUM} keeps producing {@code
- * String} for {@code boolean} there too.
+ * Reads meta-kernel's {@code boolean => !enum [true false]} as a genuine Java {@code Boolean} rather than
+ * raw member text -- the one real enum instance whose members are meant to stand in for the two boolean
+ * values. Every other enum instance is read via the ordinary {@code EnumParser} (through {@link
+ * AtomValueReader#ENUM_OBJECT_MODE}), taking the member token's own text as a {@code String} -- exactly
+ * right for an arbitrary, user-defined enum label, and exactly wrong for {@code boolean} specifically.
  */
 final class BooleanReader implements TsonValueReader<Boolean> {
 

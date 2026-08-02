@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * End-to-end proof of {@link ChoiceReader} -- a {@code contact_method => (email | phone)}-style
- * closed union, the explicit-list counterpart to {@link VariantDomReaderTest}'s open one.
+ * closed union, the explicit-list counterpart to {@link VariantTreeReaderTest}'s open one.
  */
 class ChoiceReaderTest {
 
@@ -44,12 +44,12 @@ class ChoiceReaderTest {
                 "https://example.test/meta.tn1", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
 
-        return TsonSchemaCompiler.compile(linkedSchema, ValueReaderFactoryRegistry.dom());
+        return TsonSchemaCompiler.compile(linkedSchema, ValueReaderFactoryRegistry.tree());
     }
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> read(TsonCompiledSchema compiled, String source) {
-        return (Map<String, Object>) compiled.get("contact_method").read(source);
+        return (Map<String, Object>) Dom.of((io.ltr8.tson.compiler.tree.TsonNode) compiled.get("contact_method").read(source));
     }
 
     @Test

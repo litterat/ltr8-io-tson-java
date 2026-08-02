@@ -33,8 +33,7 @@ import java.util.Optional;
  *
  * <p><b>The read mode is which registry you hold, not a parameter.</b> {@link #treeRegistry()} reads into an
  * immutable, queryable {@code TsonNode} (structure-preserving, typed leaves -- the recommended default);
- * {@link #bindRegistry()} reads to real Java objects (bound via {@link #dataBindContext()}); {@link
- * #domRegistry()} reads to plain, lossy {@code Map}/{@code List}. All sit over one shared, bind-mode
+ * {@link #bindRegistry()} reads to real Java objects (bound via {@link #dataBindContext()}). Both sit over one shared, bind-mode
  * resolution core: resolving an {@code Instance}/{@code AtomRefinement} declaration (meta.tn's/core.tn's own
  * {@code binary_encoding => !enum [...]}, {@code int32 => !integer ^ {...}}, and so on) binds it to a {@code
  * schema.meta.Top} object, which a non-binding reader's output can't stand in for -- so resolution is always
@@ -58,7 +57,6 @@ public final class Tson {
 
     private final TsonCompiledMetaRegistry core;
     private final TsonCompiledSchemaRegistry tree;
-    private final TsonCompiledSchemaRegistry dom;
     private final TsonCompiledSchemaRegistry bind;
     private final DataBindContext dataBindContext;
 
@@ -66,7 +64,6 @@ public final class Tson {
         this.core = core;
         this.dataBindContext = dataBindContext;
         this.tree = TsonCompiledSchemaRegistry.tree(core);
-        this.dom = TsonCompiledSchemaRegistry.dom(core);
         this.bind = TsonCompiledSchemaRegistry.bind(core, dataBindContext);
     }
 
@@ -111,11 +108,6 @@ public final class Tson {
      */
     public TsonCompiledSchemaRegistry treeRegistry() {
         return tree;
-    }
-
-    /** The DOM read registry -- reads user schemas to plain {@code Map}/{@code List} (no Java class per type). A lower-level, lossy alternative to {@link #treeRegistry()} (record-vs-map and array-vs-tuple collapse); prefer the tree. */
-    public TsonCompiledSchemaRegistry domRegistry() {
-        return dom;
     }
 
     /** The object-binding read registry over this instance's resolution core -- reads user schemas to real Java objects, bound via {@link #dataBindContext()}. */

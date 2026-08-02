@@ -28,14 +28,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * (the reason {@link DeferredValueReader} exists at all) and eager,
  * whole-schema build (every entry is built as soon as {@link TsonSchemaCompiler#compile} returns,
  * not deferred to whenever {@link TsonCompiledSchema#get} first asks for a given name -- see that
- * class's own "Eager, not lazy" note). {@link RecordDomReaderTest}/{@link VariantDomReaderTest}/
- * {@link EnumDomReaderTest} exercise this compilation machinery too, but only ever incidentally,
+ * class's own "Eager, not lazy" note). {@link RecordTreeReaderTest}/{@link VariantTreeReaderTest}/
+ * {@link EnumTreeReaderTest} exercise this compilation machinery too, but only ever incidentally,
  * through schemas with no real cycles -- this class targets it directly.
  */
 class TsonSchemaCompilerTest {
 
     private static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema) {
-        return TsonSchemaCompiler.compile(linkedSchema, ValueReaderFactoryRegistry.dom());
+        return TsonSchemaCompiler.compile(linkedSchema, ValueReaderFactoryRegistry.tree());
     }
 
     @Test
@@ -87,7 +87,7 @@ class TsonSchemaCompilerTest {
         TsonCompiledSchema compiled = compile(linkedSchema);
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> used = (Map<String, Object>) compiled.get("used").read("{}");
+        Map<String, Object> used = (Map<String, Object>) Dom.of((io.ltr8.tson.compiler.tree.TsonNode) compiled.get("used").read("{}"));
         assertTrue(used.isEmpty());
 
         // Compiling/getting "orphan" itself succeeds -- only reading an actual value against it fails.

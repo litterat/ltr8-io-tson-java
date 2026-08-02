@@ -16,7 +16,7 @@ import java.util.Optional;
 
 /**
  * Tree mode's {@code record} reader -- reads a record-shaped value into a {@link RecordNode} (name → {@link
- * TsonNode}, in schema-field order), the counterpart to {@link RecordDomReader}'s plain {@code Map}. Every
+ * TsonNode}, in schema-field order), the counterpart to the old DOM reader's plain {@code Map}. Every
  * shared concern (the compiled field list, shape checking, precomputed default/fixed values, single-pass
  * field reading) lives on {@link RecordAbstractReader}; this class only assembles the node. A field a read
  * doesn't produce (a missing required field, whose diagnostic is already reported) is simply omitted -- a
