@@ -4,6 +4,7 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * The "compile" stage's own noun -- an already-built, immutable {@code Map<String,
@@ -15,13 +16,13 @@ import java.util.Map;
  * TsonSchemaLinker}/{@code TsonLinkedSchema}, {@code TsonSchemaResolver}/its own resolved {@code
  * TsonSchema}).
  *
- * <p>{@link #get} reads *any* entry, unscoped -- unlike {@link TsonCompiledMetaSchema#reader}, which
- * is deliberately scoped to only the entries a governing meta-schema itself declares as constructors
- * (§3.3.1's structure-namespace rule). A caller holding a bare {@code TsonCompiledSchema} directly
- * (rather than the {@link TsonCompiledMetaSchema} that wraps one) has already opted out of that
- * scoping -- e.g. a caller reading an arbitrary resolved entry directly, or {@link
- * TsonCompiledMetaSchema} itself, which needs unscoped access while first building its own {@code
- * reader()} lookup.
+ * <p>{@link #get} reads *any* entry, unscoped -- unlike {@link TsonCompiledMetaSchema#reader},
+ * which is deliberately scoped to only the entries a governing meta-schema itself declares as
+ * constructors (§3.3.1's structure-namespace rule). A caller holding a bare {@code
+ * TsonCompiledSchema} directly (rather than the {@link TsonCompiledMetaSchema} that wraps one) has
+ * already opted out of that scoping -- e.g. a caller reading an arbitrary resolved entry directly,
+ * or {@link TsonCompiledMetaSchema} itself, which needs unscoped access while first building its
+ * own {@code reader()} lookup.
  */
 public final class TsonCompiledSchema {
 
@@ -41,7 +42,21 @@ public final class TsonCompiledSchema {
         return parser;
     }
 
-    /** The resolved {@link TsonSchema} this was compiled from -- e.g. so a caller that only has a compiled reader (such as {@code TsonCompiledSchemaLoader}) can still reach its own resolved {@code entries()} without a separate lookup. */
+    /**
+     * The reader for {@code typeName}, or empty if this schema has none -- the non-throwing
+     * counterpart to {@link #get}, for a caller that treats an absent entry as a normal outcome
+     * (e.g. building a governing meta's scoped constructor vocabulary, where a placeholder schema
+     * legitimately has no readers yet).
+     */
+    public Optional<TsonValueReader<?>> find(String typeName) {
+        return Optional.ofNullable(entries.get(typeName));
+    }
+
+    /**
+     * The resolved {@link TsonSchema} this was compiled from -- e.g. so a caller that only has a
+     * compiled reader (such as {@code TsonCompiledSchemaLoader}) can still reach its own resolved
+     * {@code entries()} without a separate lookup.
+     */
     public TsonSchema schema() {
         return linkedSchema.schema();
     }

@@ -19,11 +19,11 @@ import java.util.Set;
 
 /**
  * Compiles a {@link TsonLinkedSchema} into a {@link TsonCompiledSchema} -- the "compile" stage of
- * this project's own parse -&gt; resolve -&gt; link -&gt; register -&gt; compile -&gt; read pipeline
- * vocabulary: this class is the verb, {@link TsonCompiledSchema} is the noun it produces. Requires a
- * {@link TsonLinkedSchema}, not a bare {@code TsonSchema} -- every {@code type_ref} reachable from a
- * body must already be argument-free (materialization already flattened any {@code <...>}
- * application into a reference to a synthesized entry), and every name a body refers to must
+ * this project's own parse -&gt; resolve -&gt; link -&gt; register -&gt; compile -&gt; read
+ * pipeline vocabulary: this class is the verb, {@link TsonCompiledSchema} is the noun it produces.
+ * Requires a {@link TsonLinkedSchema}, not a bare {@code TsonSchema} -- every {@code type_ref}
+ * reachable from a body must already be argument-free (materialization already flattened any {@code
+ * <...>} application into a reference to a synthesized entry), and every name a body refers to must
  * actually be present in {@code linkedSchema.schema().entries()}; a referenced-but-missing name is
  * treated as a bug, not a normal failure (see {@link Compilation#resolve}'s own {@code
  * IllegalStateException}).
@@ -40,15 +40,17 @@ import java.util.Set;
  * covers both a constructor with no registered {@link ValueReaderFactory} at all, and a factory
  * that's registered but rejects this particular entry.
  *
- * <p>Dispatch to a factory is uniform across every constructor -- atom and composite alike --
- * entirely driven by {@code metaSchema}, the governing {@link TsonCompiledMetaSchema} {@link
- * #compile} was given, keyed by the resolved body's own constructor name (see {@link
- * TsonCompiledMetaSchema#create}). One non-factory case is checked first: {@link Reference} (a bare
- * {@code name => other_name} entry, §8.3) delegates straight to the target's own reader, resolved
- * recursively rather than built fresh.
+ * <p>Dispatch to a factory is keyed by the resolved body's own constructor name and
+ * preferentially scoped to {@code metaSchema}, the governing {@link TsonCompiledMetaSchema} {@link
+ * #compile} was given: {@link TsonCompiledMetaSchema#constructor} resolves it against that
+ * meta-schema's own declared vocabulary, falling back to the global factory set otherwise (that
+ * fallback is the seam a later stage tightens into rejecting an out-of-scope constructor outright).
+ * One non-factory case is checked first: {@link Reference} (a bare {@code name => other_name}
+ * entry, §8.3) delegates straight to the target's own reader, resolved recursively rather than
+ * built fresh.
  *
- * <p>The per-compilation mutable state (cycle-detection bookkeeping) lives in a private nested {@link
- * Compilation} helper, one instance per {@link #compile} call, discarded once it returns --
+ * <p>The per-compilation mutable state (cycle-detection bookkeeping) lives in a private nested
+ * {@link Compilation} helper, one instance per {@link #compile} call, discarded once it returns --
  * {@link TsonCompiledSchema} itself holds nothing but the finished, immutable result.
  */
 public final class TsonSchemaCompiler {
@@ -127,7 +129,8 @@ public final class TsonSchemaCompiler {
             if (body instanceof Reference r) {
                 return resolve(r.target().name());
             }
-            return metaSchema.create(name, definition, this::resolve);
+            ValueReaderFactory factory = metaSchema.constructor(TsonCompiledMetaSchema.typenameOf(body));
+            return factory.create(name, definition, this::resolve);
         }
     }
 }
