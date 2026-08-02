@@ -4,6 +4,7 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
+import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
 import org.junit.jupiter.api.Test;
 
@@ -82,6 +83,19 @@ class TsonCompiledSchemaRegistryTest {
 
         assertInstanceOf(Map.class, domValue);
         assertEquals(new MyRecord(7), bindValue);
+    }
+
+    @Test
+    void theCoreCompilesOnlyMetaLayerSchemas() {
+        TsonCompiledMetaRegistry core = core();
+
+        // meta-kernel and meta.tn are meta-layer (their !!meta is meta-kernel) -- compiled and cached here.
+        assertTrue(core.get(TsonBundledSchemas.META_KERNEL_ID).isPresent());
+        assertTrue(core.get(TsonBundledSchemas.META_ID).isPresent());
+
+        // core.tn is not a meta (its !!meta is meta.tn) -- resolved+registered, but never compiled here.
+        assertTrue(core.schemaRegistry().get(TsonBundledSchemas.CORE_ID).isPresent());
+        assertTrue(core.get(TsonBundledSchemas.CORE_ID).isEmpty());
     }
 
     @Test

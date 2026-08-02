@@ -30,9 +30,10 @@ class BundledSchemaPinTest {
     void aCorrectlyPinnedReferenceToEachBundledSchemaVerifies() {
         Tson tson = Tson.builder().build();
         assertDoesNotThrow(() -> {
-            tson.loader().load(TsonBundledSchemas.META_KERNEL_ID + "?sha256=" + TsonBundledSchemas.META_KERNEL_SHA256);
-            tson.loader().load(TsonBundledSchemas.META_ID + "?sha256=" + TsonBundledSchemas.META_SHA256);
-            tson.loader().load(TsonBundledSchemas.CORE_ID + "?sha256=" + TsonBundledSchemas.CORE_SHA256);
+            // meta-kernel and meta.tn are governing metas (loadMeta); core.tn is a non-meta import (resolveLinked).
+            tson.loader().loadMeta(TsonBundledSchemas.META_KERNEL_ID + "?sha256=" + TsonBundledSchemas.META_KERNEL_SHA256);
+            tson.loader().loadMeta(TsonBundledSchemas.META_ID + "?sha256=" + TsonBundledSchemas.META_SHA256);
+            tson.loader().resolveLinked(TsonBundledSchemas.CORE_ID + "?sha256=" + TsonBundledSchemas.CORE_SHA256);
         });
     }
 
@@ -40,7 +41,7 @@ class BundledSchemaPinTest {
     void aWrongPinToABundledSchemaIsRejected() {
         Tson tson = Tson.builder().build();
         assertThrows(ContentHashMismatchException.class, () ->
-                tson.loader().load(TsonBundledSchemas.CORE_ID + "?sha256=" + "a".repeat(64)));
+                tson.loader().resolveLinked(TsonBundledSchemas.CORE_ID + "?sha256=" + "a".repeat(64)));
     }
 
     private static void assertDigestMatches(String id, String heldDigest) {

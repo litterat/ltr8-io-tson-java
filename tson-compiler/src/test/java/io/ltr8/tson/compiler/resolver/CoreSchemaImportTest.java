@@ -6,6 +6,7 @@ import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
+import io.ltr8.tson.compiler.TsonCompiledSchemaRegistry;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
@@ -42,7 +43,7 @@ class CoreSchemaImportTest {
      * 1) rather than attempting to register {@code core.tn1} a second time, which {@link
      * TsonSchemaRegistry#register} would correctly reject as a duplicate identity.
      */
-    private record Loaded(TsonSchemaRegistry schemaRegistry, TsonCompiledSchemaLoader loader) {
+    private record Loaded(TsonSchemaRegistry schemaRegistry, TsonCompiledMetaRegistry registry) {
     }
 
     private static Loaded loadMetaKernelMetaAndCore() {
@@ -60,10 +61,10 @@ class CoreSchemaImportTest {
         TsonSchema resolvedMetaKernel = new SchemaResolver(loader).resolveSchema(metaKernelDocument);
         registry.register(resolvedMetaKernel, loader.loadMeta(TsonBundledSchemas.META_KERNEL_ID));
 
-        loader.load(TsonBundledSchemas.META_ID);
-        loader.load(TsonBundledSchemas.CORE_ID); // needs meta.tn1 registered first, same reasoning
+        loader.loadMeta(TsonBundledSchemas.META_ID);
+        loader.resolveLinked(TsonBundledSchemas.CORE_ID); // core.tn is a non-meta import: resolved, not compiled here
 
-        return new Loaded(schemaRegistry, loader);
+        return new Loaded(schemaRegistry, registry);
     }
 
     @Test
@@ -119,11 +120,11 @@ class CoreSchemaImportTest {
         Loaded loaded = loadMetaKernelMetaAndCore();
         TsonSchema core = loaded.schemaRegistry().get(TsonBundledSchemas.CORE_ID).orElseThrow().schema();
 
-        // A cache hit on TsonCompiledMetaRegistry's own store -- core.tn1 was already compiled inside
-        // loadMetaKernelMetaAndCore, this just fetches that same TsonCompiledSchema back. core.tn is
-        // not a meta-layer schema (its !!meta is meta.tn, not meta-kernel), so it's a plain
-        // TsonCompiledSchema, not a governing TsonCompiledMetaSchema.
-        TsonCompiledSchema compiledCore = loaded.loader().load(TsonBundledSchemas.CORE_ID);
+        // core.tn is not a meta-layer schema (its !!meta is meta.tn, not meta-kernel), so it's resolved
+        // but never compiled in the core -- its readers are compiled per mode in a read registry, exactly
+        // as they are when a user schema imports it. DOM mode is enough to check which entries error.
+        TsonCompiledSchema compiledCore =
+                TsonCompiledSchemaRegistry.dom(loaded.registry()).get(TsonBundledSchemas.CORE_ID);
 
         Set<String> errored = new TreeSet<>();
         for (String name : core.entries().keySet()) {

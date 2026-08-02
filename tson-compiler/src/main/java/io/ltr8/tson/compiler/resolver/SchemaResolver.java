@@ -132,7 +132,7 @@ public final class SchemaResolver {
     private Map<String, TypeDefinition> mergeImports(SchemaDocument document) {
         Map<String, TypeDefinition> merged = new LinkedHashMap<>();
         for (String importUri : document.imports()) {
-            TsonSchema imported = loader.load(importUri).schema();
+            TsonSchema imported = loader.resolveLinked(importUri).schema();
             for (Map.Entry<String, TypeDefinition> entry : imported.entries().entrySet()) {
                 if (merged.containsKey(entry.getKey())) {
                     throw new TsonSchemaValidationException(

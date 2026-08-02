@@ -85,7 +85,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         TsonSchema metaKernel = new SchemaResolver(loader).resolveSchema(metaKernelDocument);
         registry.register(metaKernel, loader.loadMeta(TsonBundledSchemas.META_KERNEL_ID));
 
-        loader.load(TsonBundledSchemas.META_ID);
+        loader.loadMeta(TsonBundledSchemas.META_ID);
 
         return loader;
     }
@@ -186,7 +186,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         // meta.tn isn't meta-kernel's own well-known bootstrap case, and the default TsonSchemaSource
         // fetches nothing -- so this is exactly TsonSchemaSource.registeredOnly()'s own rejection.
         IllegalStateException thrown = assertThrows(IllegalStateException.class,
-                () -> loader.load(coreDocument.meta()));
+                () -> loader.loadMeta(coreDocument.meta()));
         assertTrue(thrown.getMessage().contains("meta.tn"));
         assertTrue(thrown.getMessage().contains("no fetch capability"));
     }
@@ -362,7 +362,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
         // Meta-kernel's own !!meta names itself -- if resolve() ever fell through to the generic
         // fetch-and-resolve-via-SchemaResolver(this) path for this URI, this call would recurse
-        // forever (resolveSchema -> loader.load(sameUri) -> ...).
+        // forever (resolveSchema -> loader.loadMeta(sameUri) -> ...).
         // Completing at all is the proof; the assertions below just confirm it's genuinely usable.
         TsonCompiledMetaSchema compiled = loader.loadMeta(TsonBundledSchemas.META_KERNEL_ID);
 
@@ -400,7 +400,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         TsonCompiledSchemaLoader loader = registry;
 
         IllegalStateException thrown = assertThrows(IllegalStateException.class,
-                () -> loader.load("https://tson.io/2026/32/m/meta.tn"));
+                () -> loader.loadMeta("https://tson.io/2026/32/m/meta.tn"));
         assertTrue(thrown.getMessage().contains("no fetch capability"));
     }
 

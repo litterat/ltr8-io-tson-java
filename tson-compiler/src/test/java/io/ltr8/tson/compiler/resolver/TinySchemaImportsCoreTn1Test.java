@@ -5,13 +5,14 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
-import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
+import io.ltr8.tson.compiler.TsonCompiledSchemaRegistry;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.TsonSchemaLinker;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
@@ -84,8 +85,8 @@ class TinySchemaImportsCoreTn1Test {
         TsonSchema resolvedMetaKernel = new SchemaResolver(loader).resolveSchema(metaKernelDocument);
         registry.register(resolvedMetaKernel, loader.loadMeta(TsonBundledSchemas.META_KERNEL_ID));
 
-        TsonCompiledMetaSchema compiledMeta = loader.loadMeta(TsonBundledSchemas.META_ID);
-        loader.load(TsonBundledSchemas.CORE_ID); // must be registered before the tiny schema's own !!import can find it
+        loader.loadMeta(TsonBundledSchemas.META_ID);
+        loader.resolveLinked(TsonBundledSchemas.CORE_ID); // must be registered before the tiny schema's own !!import can find it
 
         SchemaDocument tinyDocument = new TsonSchemaParser(TINY_DOCUMENT).parseSchemaDocument();
         TsonSchema resolvedTiny = new SchemaResolver(loader).resolveSchema(tinyDocument);
@@ -100,16 +101,15 @@ class TinySchemaImportsCoreTn1Test {
         assertEquals(TypeKind.PRODUCT, myRecord.kind());
 
         // Links (merging core.tn's own entries in, via the shared schemaRegistry this time --
-        // TsonSchemaLinker's own import-merge, a separate pass from resolveSchema's own above),
-        // registers, and compiles -- governed by meta.tn's own compiled reader, the same one
-        // core.tn itself was compiled against. my_record's own field dispatches to a real,
-        // manually-bound RecordBindReader here, via MANUAL_BINDER above.
-        TsonCompiledSchema compiledTiny = registry.register(resolvedTiny, compiledMeta);
+        // TsonSchemaLinker's own import-merge, a separate pass from resolveSchema's own above) and
+        // compiles the tiny user schema through an object-binding read registry over the core -- the
+        // tiny schema is not a meta, so it is compiled here in a read registry, never in the core.
+        // my_record's own field dispatches to a real, manually-bound RecordBindReader via MANUAL_BINDER.
+        TsonCompiledSchema compiledTiny = TsonCompiledSchemaRegistry.bind(registry, context)
+                .compile(TsonSchemaLinker.link(resolvedTiny, schemaRegistry));
 
         // Reading real data through the compiled readers proves core.tn's own vocabulary was
-        // genuinely reached, not just referenced at the resolver level. (compiledTiny is a plain
-        // TsonCompiledSchema -- the tiny schema's !!meta is meta.tn, so it is not a governing
-        // meta-layer schema; read its entries directly, no .compiledSchema() hop.)
+        // genuinely reached, not just referenced at the resolver level.
         Object myIntValue = compiledTiny.get("my_int")
                 .read("42");
         assertEquals(42, myIntValue);
