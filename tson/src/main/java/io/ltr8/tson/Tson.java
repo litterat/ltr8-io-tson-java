@@ -3,10 +3,6 @@ package io.ltr8.tson;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.*;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
-import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
-import io.ltr8.tson.compiler.config.ValueReaderFactoryResolver;
-import io.ltr8.tson.compiler.TsonObjectReader;
-import io.ltr8.tson.compiler.TsonObjectWriter;
 import io.ltr8.tson.compiler.stream.DocumentStart;
 import io.ltr8.tson.compiler.stream.TypeRef;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -19,9 +15,7 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * The front door -- a small, curated entry point over {@code tson-compiler}'s own, larger and more
@@ -29,27 +23,22 @@ import java.util.concurrent.ConcurrentHashMap;
  * config wiring), the way Retrofit sits on top of OkHttp or Apache HttpClient5 sits on top of
  * HttpCore5. Doesn't reimplement anything -- every method here just constructs/returns the real
  * {@code tson-compiler}/{@code tson-schema} class underneath. Built via {@link #builder()}, which
- * bootstraps meta-kernel/meta.tn/core.tn into a fresh, governed environment (previously a
- * sequence every real schema-compiling test hand-rolled for itself, e.g. {@code tson-compiler}'s own
- * {@code TinySchemaImportsCoreTn1Test}/{@code CoreSchemaImportTest}, and {@code tson-cli}'s own
- * former internal {@code StandardLibrary} helper):
+ * bootstraps meta-kernel/meta.tn/core.tn into a fresh, governed environment:
  *
  * <pre>{@code
  * Tson tson = Tson.builder().build();
- * TsonCompiledSchema compiled = tson.compile(schemaText, ValueReaderFactoryRegistry.dom());
- * Object value = compiled.get("my_type").read(dataValue);
+ * TsonCompiledSchema compiled = tson.domRegistry().compile(tson.resolve(schemaText));
+ * Object value = compiled.get("my_type").read(dataText);
  * }</pre>
  *
- * <p><b>Resolution always runs in object-binding mode, regardless of what mode a caller ultimately
- * wants to read data in.</b> Resolving an {@code Instance}/{@code AtomRefinement} declaration
- * (meta.tn's/core.tn's own {@code binary_encoding => !enum [...]}, {@code int32 => !integer ^
- * {...}}, and so on -- there are many) calls {@code DefinitionResolver.bindAtomInstance}, which
- * casts its governing meta-schema's own reader output straight to {@code schema.meta.Top} -- a DOM
- * reader's plain {@code Map}/{@code List} output fails that cast outright. Only *compilation* of an
- * already-resolved schema (see {@link #compile(TsonLinkedSchema, ValueReaderFactoryResolver)}) is
- * free to pick a different mode, since it just dispatches an already-built {@code Top} body tree to
- * a factory by constructor name -- it never re-runs resolution. {@link #resolve} therefore takes no
- * mode parameter at all; only {@link #compile} does.
+ * <p><b>The read mode is which registry you hold, not a parameter.</b> {@link #domRegistry()} reads to
+ * plain {@code Map}/{@code List}; {@link #bindRegistry()} reads to real Java objects (bound via {@link
+ * #dataBindContext()}). Both sit over one shared, bind-mode resolution core: resolving an {@code
+ * Instance}/{@code AtomRefinement} declaration (meta.tn's/core.tn's own {@code binary_encoding => !enum
+ * [...]}, {@code int32 => !integer ^ {...}}, and so on) binds it to a {@code schema.meta.Top} object,
+ * which a DOM reader's plain {@code Map}/{@code List} output can't stand in for -- so resolution is always
+ * bind-anchored regardless of read mode, and {@link #resolve} takes no mode. Only the final compile of an
+ * already-resolved, already-linked schema (a registry's own {@code compile}/{@code get}) picks a mode.
  *
  * <p>Only supports a schema governed by (and importing only from) meta-kernel/meta.tn/core.tn --
  * a real, disk/HTTP-backed {@link TsonSchemaSource} for arbitrary other
@@ -66,21 +55,16 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class Tson {
 
-    private final TsonSchemaRegistry schemaRegistry;
-    private final TsonCompiledMetaRegistry compiledRegistry;
-    private final TsonCompiledSchemaLoader loader;
+    private final TsonCompiledMetaRegistry core;
+    private final TsonCompiledSchemaRegistry dom;
+    private final TsonCompiledSchemaRegistry bind;
     private final DataBindContext dataBindContext;
 
-    // The one bit of mutable state: a per-!!schema-URI cache of DOM-mode compiled schemas, so
-    // validating many data documents that name the same schema compiles it once. A cache only.
-    private final Map<String, TsonCompiledSchema> validationSchemas = new ConcurrentHashMap<>();
-
-    Tson(TsonSchemaRegistry schemaRegistry, TsonCompiledMetaRegistry compiledRegistry,
-         TsonCompiledSchemaLoader loader, DataBindContext dataBindContext) {
-        this.schemaRegistry = schemaRegistry;
-        this.compiledRegistry = compiledRegistry;
-        this.loader = loader;
+    Tson(TsonCompiledMetaRegistry core, DataBindContext dataBindContext) {
+        this.core = core;
         this.dataBindContext = dataBindContext;
+        this.dom = TsonCompiledSchemaRegistry.dom(core);
+        this.bind = TsonCompiledSchemaRegistry.bind(core, dataBindContext);
     }
 
     /** A fresh {@link TsonConfig} -- {@link TsonConfig#build()} bootstraps meta-kernel/meta.tn/core.tn and returns the resulting {@link Tson}. */
@@ -98,7 +82,7 @@ public final class Tson {
         return new TsonObjectWriter(dataBindContext);
     }
 
-    /** The {@link DataBindContext} {@link #objectReader()}/{@link #objectWriter()} are bound to -- see {@link TsonConfig#dataBindContext} to customize it. */
+    /** The {@link DataBindContext} {@link #objectReader()}/{@link #objectWriter()}/{@link #bindRegistry()} bind against -- see {@link TsonConfig#dataBindContext} to customize it. */
     public DataBindContext dataBindContext() {
         return dataBindContext;
     }
@@ -106,30 +90,24 @@ public final class Tson {
     /**
      * Resolves, links, and registers {@code schemaText} -- its own {@code !!meta} must already be
      * registered here (meta-kernel, meta.tn, or core.tn), and any {@code !!import} it carries must
-     * resolve the same way. Deliberately stops short of compiling -- see {@link #compile} for why
-     * that's a separate step with its own mode.
+     * resolve the same way. Deliberately stops short of compiling -- compiling in a chosen mode is a
+     * registry's job ({@link #domRegistry()}/{@link #bindRegistry()}), independent of the object-binding
+     * mode this always used internally.
      */
     public TsonLinkedSchema resolve(String schemaText) {
         SchemaDocument document = new TsonSchemaParser(schemaText).parseSchemaDocument();
-        TsonSchema resolved = new TsonSchemaResolver(loader).resolveSchema(document);
-        return schemaRegistry.register(TsonSchemaLinker.link(resolved, schemaRegistry));
+        TsonSchema resolved = new TsonSchemaResolver(core).resolveSchema(document);
+        return core.schemaRegistry().register(TsonSchemaLinker.link(resolved, core.schemaRegistry()));
     }
 
-    /**
-     * Compiles an already-resolved, already-linked schema fresh, in {@code mode} -- independent of the
-     * object-binding mode {@link #resolve} always used internally. A standalone compile ({@link
-     * TsonSchemaCompiler#compile(TsonLinkedSchema, ValueReaderFactoryResolver)}): the schema was
-     * already validated when it resolved, so this just builds readers for its entries in {@code mode},
-     * with no governing-meta scoping. Returns a plain {@link TsonCompiledSchema} -- a user schema is
-     * not a meta-schema.
-     */
-    public TsonCompiledSchema compile(TsonLinkedSchema linked, ValueReaderFactoryResolver mode) {
-        return TsonSchemaCompiler.compile(linked, mode);
+    /** The DOM read registry over this instance's resolution core -- reads user schemas to plain {@code Map}/{@code List} (no Java class per type). */
+    public TsonCompiledSchemaRegistry domRegistry() {
+        return dom;
     }
 
-    /** {@link #resolve} then {@link #compile(TsonLinkedSchema, ValueReaderFactoryResolver)} in one call -- the common case, when a caller has no other use for the intermediate {@link TsonLinkedSchema}. */
-    public TsonCompiledSchema compile(String schemaText, ValueReaderFactoryResolver mode) {
-        return compile(resolve(schemaText), mode);
+    /** The object-binding read registry over this instance's resolution core -- reads user schemas to real Java objects, bound via {@link #dataBindContext()}. */
+    public TsonCompiledSchemaRegistry bindRegistry() {
+        return bind;
     }
 
     /**
@@ -154,7 +132,7 @@ public final class Tson {
 
         TsonCompiledSchema compiled;
         try {
-            compiled = domCompiled(start.schema().get());
+            compiled = dom.get(start.schema().get());
         } catch (RuntimeException e) {
             return List.of(problem(Diagnostic.Code.SCHEMA_ERROR, e.getMessage()));
         }
@@ -187,37 +165,17 @@ public final class Tson {
         }
     }
 
-    /** The DOM-mode compiled schema for {@code schemaUri}, resolved+registered through the source and compiled once. */
-    private TsonCompiledSchema domCompiled(String schemaUri) {
-        // Resolve/register through the loader on every call -- not only on a compile-cache miss -- so
-        // this reference's own ?sha256= pin is verified against the identity's content each time, even
-        // when the DOM compile is already cached (a later reference with a conflicting pin must error,
-        // §10.2). The loader itself caches by canonical identity, so a repeat is cheap.
-        loader.load(schemaUri);
-        String identity = TsonSchemaRegistry.canonicalIdentity(schemaUri);
-        return validationSchemas.computeIfAbsent(identity, id -> {
-            TsonLinkedSchema linked = schemaRegistry.get(schemaUri).orElseThrow(() ->
-                    new IllegalStateException("schema \"" + schemaUri + "\" resolved but is not registered"));
-            return compile(linked, TsonSchemaCompiler.dom());
-        });
-    }
-
     private static Diagnostic problem(Diagnostic.Code code, String message) {
         return new Diagnostic("", code, message, "", "", Optional.empty(), Optional.empty());
     }
 
-    /** The underlying {@link TsonSchemaRegistry} -- e.g.  for {@code schemaRegistry().get(uri)} on an already-registered identity. */
+    /** The underlying resolved-schema registry -- e.g. for {@code schemaRegistry().get(uri)} on an already-registered identity. */
     public TsonSchemaRegistry schemaRegistry() {
-        return schemaRegistry;
+        return core.schemaRegistry();
     }
 
-    /** The underlying {@link TsonCompiledMetaRegistry} -- e.g. for {@code compiledRegistry().get(id)} on an already-compiled identity. */
-    public TsonCompiledMetaRegistry compiledRegistry() {
-        return compiledRegistry;
-    }
-
-    /** The underlying loader -- e.g. {@code loader().load(TsonBundledSchemas.META_ID)} to reach the standard library's own compiled meta-schemas directly. */
+    /** The resolution core as the on-demand loader -- e.g. {@code loader().loadMeta(TsonBundledSchemas.META_ID)} to reach a compiled meta-schema directly. */
     public TsonCompiledSchemaLoader loader() {
-        return loader;
+        return core;
     }
 }

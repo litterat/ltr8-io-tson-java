@@ -49,13 +49,14 @@ public final class TsonConfig {
     }
 
     public Tson build() {
-        // The compiled registry is both the store and the on-demand loader; withStandardLibrary loads
-        // the bundled meta-kernel/meta/core, and schemaSource is consulted only for other, later URIs.
-        // It compiles the standard library in object-binding mode -- the only mode that can (a DOM
-        // reader can't resolve the !enum/!integer instances a meta-schema declares), which is why it
-        // takes the bind context rather than a resolver that might be the wrong mode.
-        TsonCompiledMetaRegistry compiledRegistry =
+        // The resolution core is both the store and the on-demand loader; withStandardLibrary loads the
+        // bundled meta-kernel/meta/core, and schemaSource is consulted only for other, later URIs. It
+        // compiles the standard library in object-binding mode -- the only mode that can (a DOM reader
+        // can't resolve the !enum/!integer instances a meta-schema declares), which is why it takes the
+        // bind context rather than a resolver that might be the wrong mode. Tson builds the per-mode read
+        // registries (DOM and object-binding, the latter bound to dataBindContext) over this one core.
+        TsonCompiledMetaRegistry core =
                 TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), schemaSource);
-        return new Tson(compiledRegistry.schemaRegistry(), compiledRegistry, compiledRegistry, dataBindContext);
+        return new Tson(core, dataBindContext);
     }
 }

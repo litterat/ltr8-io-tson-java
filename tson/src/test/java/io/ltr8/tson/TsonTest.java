@@ -3,7 +3,6 @@ package io.ltr8.tson;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
-import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.TsonObjectReader;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -46,11 +45,11 @@ class TsonTest {
         assertTrue(linked.schema().entries().containsKey("my_int"));
         assertTrue(linked.schema().entries().containsKey("my_percentage"));
 
-        TsonCompiledSchema compiled = tson.compile(linked, TsonSchemaCompiler.dom());
+        TsonCompiledSchema compiled = tson.domRegistry().compile(linked);
 
         // int32 has a real bit-width (size: {bits: 32 signed: true}), so IntegerParser narrows to
         // Integer -- atom reading is shared verbatim between DOM and bind mode (CLAUDE.md), so this
-        // holds regardless of TsonSchemaCompiler.dom() here.
+        // holds regardless of the DOM read mode here.
         Object myInt = compiled.get("my_int")
                 .read("42");
         assertEquals(42, myInt);
@@ -62,10 +61,10 @@ class TsonTest {
     }
 
     @Test
-    void theSingleCallCompileConvenienceMatchesResolveThenCompile() {
+    void resolveThenCompileThroughTheDomRegistry() {
         Tson tson = Tson.builder().build();
 
-        TsonCompiledSchema compiled = tson.compile(TINY_DOCUMENT, TsonSchemaCompiler.dom());
+        TsonCompiledSchema compiled = tson.domRegistry().compile(tson.resolve(TINY_DOCUMENT));
 
         Object myInt = compiled.get("my_int")
                 .read("7");

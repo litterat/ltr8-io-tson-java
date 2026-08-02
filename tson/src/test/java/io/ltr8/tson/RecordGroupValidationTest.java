@@ -1,7 +1,6 @@
 package io.ltr8.tson;
 
 import io.ltr8.tson.compiler.TsonReadException;
-import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.TsonValueReader;
 import org.junit.jupiter.api.Test;
 
@@ -29,7 +28,8 @@ class RecordGroupValidationTest {
                     ( email: text | phone: text )
                   }
                 }""";
-        return Tson.builder().build().compile(schema, TsonSchemaCompiler.dom()).get("contact");
+        Tson tson = Tson.builder().build();
+        return tson.domRegistry().compile(tson.resolve(schema)).get("contact");
     }
 
     @Test

@@ -6,9 +6,9 @@
 ///   ./gradlew :tson:modules
 ///   java --module-path tson/build/modules --add-modules io.ltr8.tson examples/SchemaValidation.java
 ///
-/// `Tson.builder().build()` bootstraps the standard library (meta-kernel/meta.tn/core.tn); `compile`
-/// turns a schema into fast, reusable per-type readers. DOM mode returns a plain Map, so no Java
-/// class is involved -- the TSON schema itself is the source of truth.
+/// `Tson.builder().build()` bootstraps the standard library (meta-kernel/meta.tn/core.tn);
+/// `domRegistry().compile(...)` turns a resolved schema into fast, reusable per-type readers. DOM mode
+/// returns a plain Map, so no Java class is involved -- the TSON schema itself is the source of truth.
 import module io.ltr8.tson;
 
 void main() {
@@ -22,7 +22,7 @@ void main() {
                 server => { hostname: text  port: int32 }
             }""";
 
-    var compiled = tson.compile(schema, TsonSchemaCompiler.dom());
+    var compiled = tson.domRegistry().compile(tson.resolve(schema));
     var reader = compiled.get("server");
 
     IO.println("valid:   " + reader.read("{ hostname: \"web-01\"  port: 8080 }"));   // {hostname=web-01, port=8080}

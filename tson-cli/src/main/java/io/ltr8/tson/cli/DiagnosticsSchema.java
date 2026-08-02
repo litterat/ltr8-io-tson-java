@@ -5,10 +5,8 @@ import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.Tson;
 import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
-import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
-import io.ltr8.tson.compiler.config.ValueReaderFactoryResolver;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -44,9 +42,8 @@ final class DiagnosticsSchema {
     static TsonCompiledSchema compiled() {
         DataBindContext context =
                 TsonAtomContext.registerDefaults(DataBindContext.builder().nameBinder(BINDER).build());
-        ValueReaderFactoryResolver resolver = TsonSchemaCompiler.bind(context);
-        Tson tson = Tson.builder().build();
-        return tson.compile(readResource("/diagnostics.tn"), resolver);
+        Tson tson = Tson.builder().dataBindContext(context).build();
+        return tson.bindRegistry().compile(tson.resolve(readResource("/diagnostics.tn")));
     }
 
     private static String readResource(String path) {
