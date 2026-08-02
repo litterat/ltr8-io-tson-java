@@ -11,7 +11,7 @@ import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.compiler.config.TsonCompiledRegistry;
+import io.ltr8.tson.compiler.TsonCompiledSchemaRegistry;
 import io.ltr8.tson.compiler.TsonObjectWriter;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -1289,7 +1289,7 @@ class DefinitionResolverTest {
      * {@code TsonParserFactoryRegistry} has a real, synthesized-entries-included schema to validate
      * against -- an unlinked meta-kernel would resolve {@code enum}'s own {@code members:
      * set<token>} field to the raw, wrong {@code set} declaration instead of a synthesized "array of
-     * token" entry, the same bug {@code TsonCompiledRegistry}'s own bootstrap had), then compiled.
+     * token" entry, the same bug {@code TsonCompiledSchemaRegistry}'s own bootstrap had), then compiled.
      */
     private static TsonCompiledMetaSchema metaKernelCompiled() {
         TsonSchema metaKernel = MetaKernelBootstrapResolver.getMetaKernelSchema();
@@ -1314,7 +1314,7 @@ class DefinitionResolverTest {
     private static TsonCompiledMetaSchema metaTn1Compiled() throws IOException {
         io.ltr8.tson.schema.TsonSchemaRegistry registry = new io.ltr8.tson.schema.TsonSchemaRegistry();
         DataBindContext context = SchemaMetaNameBinder.defaultContext();
-        TsonCompiledRegistry throwawayRegistry = new TsonCompiledRegistry(context, TsonBundledSchemas::fetch);
+        TsonCompiledSchemaRegistry throwawayRegistry = new TsonCompiledSchemaRegistry(context, TsonBundledSchemas::fetch);
         TsonCompiledSchemaLoader throwawayLoader = throwawayRegistry;
 
         String metaKernelSource = TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID);

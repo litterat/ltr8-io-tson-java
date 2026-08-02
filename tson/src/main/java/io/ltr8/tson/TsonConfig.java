@@ -4,13 +4,13 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.*;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
-import io.ltr8.tson.compiler.config.TsonCompiledRegistry;
+import io.ltr8.tson.compiler.TsonCompiledSchemaRegistry;
 
 /**
  * Configures and builds a {@link Tson} -- reached via {@link Tson#builder()}, never constructed
  * directly. Two options: {@link #dataBindContext} (for object binding) and {@link #schemaSource} (for
  * fetching user schemas beyond the bundled standard library). {@link #build()} constructs a {@link
- * TsonCompiledRegistry} and has it load the bundled meta-kernel/meta.tn/core.tn standard library, then
+ * TsonCompiledSchemaRegistry} and has it load the bundled meta-kernel/meta.tn/core.tn standard library, then
  * wraps it as a {@link Tson}.
  */
 public final class TsonConfig {
@@ -54,8 +54,8 @@ public final class TsonConfig {
         // It compiles the standard library in object-binding mode -- the only mode that can (a DOM
         // reader can't resolve the !enum/!integer instances a meta-schema declares), which is why it
         // takes the bind context rather than a resolver that might be the wrong mode.
-        TsonCompiledRegistry compiledRegistry =
-                TsonCompiledRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), schemaSource);
+        TsonCompiledSchemaRegistry compiledRegistry =
+                TsonCompiledSchemaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), schemaSource);
         return new Tson(compiledRegistry.schemaRegistry(), compiledRegistry, compiledRegistry, dataBindContext);
     }
 }

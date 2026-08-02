@@ -1731,7 +1731,13 @@ meta-schema wrapping an *empty* placeholder `TsonCompiledSchema` stands in as `T
 .compile`'s own required parameter while meta-kernel compiles against itself -- safe, since `create`
 never reads anything from the wrapped schema, only from `resolver`, the same `resolver` either way.
 
-### Compiled schema registry (`tson-compiler/src/main/java/io/ltr8/tson/compiler/compiler/TsonCompiledRegistry.java`)
+### Compiled schema registry (`tson-compiler/src/main/java/io/ltr8/tson/compiler/config/TsonCompiledRegistry.java`)
+
+> **Superseded — see "The `TsonCompiledSchemaRegistry` cleanup arc" near the end of this file.**
+> `TsonCompiledRegistry` was renamed `TsonCompiledSchemaRegistry` and moved to the root
+> `io.ltr8.tson.compiler` package; it now also *is* the loader (`DefaultTsonCompiledSchemaLoader` was
+> deleted and folded in), owns the standard-library bootstrap, takes a `DataBindContext`, and stores
+> the meta/non-meta split. The narrative below is the earlier state.
 
 Pairs one-to-one with `TsonSchemaRegistry` (`tson-schema`) but stores *compiled* meta-schemas
 (`TsonCompiledMetaSchema`) instead of resolved ones — for every schema `TsonCompiledRegistry`
@@ -1785,6 +1791,12 @@ version of the register-meta-kernel/meta.tn1/core.tn1 sequence (and where it sho
 open.
 
 **`TsonCompiledSchemaLoader`/`DefaultTsonCompiledSchemaLoader`** (`tson-compiler/src/main/java/io/ltr8/tson/compiler/resolver/{TsonCompiledSchemaLoader,DefaultTsonCompiledSchemaLoader,TsonSchemaSource}.java`)
+
+> **Superseded — `DefaultTsonCompiledSchemaLoader` was deleted; `TsonCompiledSchemaRegistry` (root
+> package) now implements `TsonCompiledSchemaLoader` directly. See "The `TsonCompiledSchemaRegistry`
+> cleanup arc" near the end of this file.** `TsonCompiledSchemaLoader`/`TsonSchemaSource` themselves
+> survive as the interfaces; the narrative below describes the old separate `Default…` implementation.
+
 — `TsonSchemaResolver` holds a `TsonCompiledSchemaLoader`, not a bare registry. The reason a plain
 registry reference isn't enough: resolving *meta-kernel's own* document means resolving *its own*
 `!!meta`, which names itself (Part 2 §1.5's "one deliberate circularity"). A "look it up, throw if
@@ -1928,6 +1940,11 @@ resolved one. `TsonCompiledMetaSchema` itself carries a `schema()` accessor for 
 `TsonSchema`) — mirroring `TsonCompiledSchema.schema()`'s own precedent.
 
 ### Configuration package (`tson-compiler/src/main/java/io/ltr8/tson/compiler/config/`)
+
+> **Partly superseded — `TsonCompiledRegistry` moved out of `config` to the root package and was
+> renamed `TsonCompiledSchemaRegistry` (see "The `TsonCompiledSchemaRegistry` cleanup arc" near the end
+> of this file). `config` now holds only `SchemaMetaNameBinder`/`ValueReaderFactoryResolver`/
+> `TsonAtomContext`.**
 
 Holds the classes that configure/wire together a working compiled-reader environment, as distinct
 from `compiler`'s own eager-compile *mechanics* -- `TsonCompiledRegistry` (orchestration:
@@ -3084,6 +3101,90 @@ directory (Gradle's and most IDEs' default test working directory) and skips gra
 `Assumptions.assumeTrue` — reported as *aborted*, not failed — if it isn't there. CI deliberately doesn't
 check the sibling repo out, so this always shows as skipped in CI; that's expected, not a problem to fix.
 
+### The `TsonCompiledSchemaRegistry` cleanup arc (2026-08-02)
+
+An eight-step refactor (each its own reviewed commit) that turned the compiled-schema registry + loader
+into one coherent, correctly-scoped, correctly-typed unit and moved the whole load/bootstrap pipeline out
+of `Tson`/`TsonConfig` into `tson-compiler`. **This supersedes the details in "Compiled schema registry",
+"`TsonCompiledSchemaLoader`/`DefaultTsonCompiledSchemaLoader`", "Configuration package", and "Front door
+module" above wherever they conflict** — those sections describe earlier states and keep their own dated
+narratives, but the class names, package, and behavior below are the current truth.
+
+**Naming/location (the final step, stated first since everything below now uses it):**
+`TsonCompiledRegistry` (in `config`) was renamed **`TsonCompiledSchemaRegistry`** and moved to the root
+`io.ltr8.tson.compiler` package, sitting with `TsonCompiledSchema`, `TsonCompiledMetaSchema`, and the
+`TsonCompiledSchemaLoader` interface it implements. This restores the symmetry with `tson-schema`'s own
+`TsonSchemaRegistry`/`TsonSchemaLoader` (resolved schemas): `TsonCompiledSchemaRegistry`/
+`TsonCompiledSchemaLoader` are their compiled-side counterparts. Done as an IDE rename+move (no
+`module-info` change — both `config` and root are exported). `config` now holds only
+`SchemaMetaNameBinder`/`ValueReaderFactoryResolver`/`TsonAtomContext` — a step toward removing `config`
+entirely (see `BACKLOG.md`).
+
+The substantive changes, in order:
+
+1. **Scoped constructor vocabulary.** `TsonCompiledMetaSchema` holds a `Map<String, ReaderResolver>
+   constructors` — a private nested `ReaderResolver` record (an instance reader + a factory) per
+   `constructor: true` entry it declares. The global `ValueReaderFactoryResolver` is every structure the
+   library can build; a governing meta exposes only the subset it declares. `reader(name)` reads a `!C
+   value` instance during resolution; the factory half builds a reader for an entry whose body *is* a `C`.
+
+2. **Meta/non-meta split.** `TsonCompiledSchema` is now a `sealed` base `permits TsonCompiledMetaSchema`;
+   the meta subtype IS-A compiled schema plus governing vocabulary. Only a meta-layer schema (its own
+   `!!meta` is meta-kernel — `isMetaLayer`) compiles to a `TsonCompiledMetaSchema`; every other schema is
+   a bare `TsonCompiledSchema`. The registry stores one `Map<String, TsonCompiledSchema>`; `getMeta(id)`
+   narrows to the governing subtype, so a non-meta schema can never be handed back where a governing meta
+   is required. (Kept a `(TsonCompiledSchema, resolver)` constructor via package-private `linkedSchema()`/
+   `entries()` accessors so construction sites didn't ripple; `compiledSchema()` now returns `this`.)
+
+3. **Standalone vs governed compile.** `TsonSchemaCompiler` has two `compile` overloads: `compile(linked,
+   TsonCompiledMetaSchema)` (governed — dispatch scoped through the meta) and `compile(linked,
+   ValueReaderFactoryResolver)` (standalone — dispatch through a factory set directly, no scoping). Both
+   share one eager walk via a `Function<String, ValueReaderFactory>`. `Tson.compile(linked, mode)` uses
+   the standalone overload and returns a `TsonCompiledSchema` (a user schema is not a meta). The old
+   `TsonCompiledMetaSchema.bootstrap` placeholder self-compile dissolved: meta-kernel is compiled
+   standalone against the resolver, then wrapped.
+
+4. **Loader folded into the registry.** `DefaultTsonCompiledSchemaLoader` was **deleted**;
+   `TsonCompiledSchemaRegistry` now `implements TsonCompiledSchemaLoader`. One class is the store + the
+   on-demand loader (`load`/`loadMeta`: fetch → parse → resolve via `new SchemaResolver(this)` → register
+   → compile → cache), the content-hash verifier, and the meta-kernel bootstrap special-case. The old
+   `resolver → config` package edge (only DTCSL had it) is gone; `config → resolver` (the registry
+   constructs a `SchemaResolver`) replaces it, no cycle — `SchemaResolver` depends on the
+   `TsonCompiledSchemaLoader` interface, never the concrete registry. `TsonSchemaResolver.defaultLoader`
+   was removed (the registry is the loader).
+
+5. **Standard-library bootstrap moved into the registry.** `withStandardLibrary(DataBindContext,
+   TsonSchemaSource)` (static factory) constructs a registry and loads meta-kernel/meta/core.
+   `loadStandardLibrary` (private) calls `registerBundled(id)` for each: fetch straight from
+   `TsonBundledSchemas` (never the configured source), record its content hash (so hash-pinned references
+   stay verified), resolve, register — its `!!meta`/`!!import` targets are cache hits by then.
+   `TsonConfig.build` collapsed to: `withStandardLibrary(...)` → wrap as `Tson` (three lines). `load()`'s
+   generic path stays source-only, so a bare registry with a `registeredOnly()` source still throws for a
+   bundled URI it never loaded — the loader-isolation tests rely on that. A factory rather than a loading
+   constructor because all constructors funnel through the 3-arg one (loading there would auto-load the
+   bare test registries) and to avoid leaking a half-built `this` to `SchemaResolver`.
+
+6. **Constructors take a `DataBindContext`.** The registry always compiles governing metas in
+   object-binding mode — a DOM reader can't resolve the `!enum`/`!integer` instances a meta declares.
+   Taking a `ValueReaderFactoryResolver` let a caller pass the wrong mode; taking a `DataBindContext` and
+   doing `TsonSchemaCompiler.bind(context)` internally makes that unforgeable. The DOM-mode test
+   registries are gone; the loader-isolation tests pass a bind context (one that read the marker root
+   `top` as a DOM `Map` now reads a concrete record instead).
+
+7. **Enforcement flipped on.** `TsonCompiledMetaSchema.constructor(name)` is now strictly scoped (returns
+   `null`, no `resolver.resolve` fallback), and `TsonSchemaCompiler.governedFactory` does the real
+   three-way, using the compiling schema's own entries (which `constructor()` can't see): governing
+   meta's scoped vocab → the constructor the schema declares itself (sourced from `globalResolver()`) →
+   otherwise out of scope (`IllegalStateException` → deferred `ErrorReader`, same per-entry treatment as
+   any other unbuildable entry). The reader unit tests that compiled a small schema against an empty
+   placeholder meta (leaning on the removed fallback to resolve `record`/`array`/`atom`) now use the
+   standalone compile overload — they test reader mechanics, not scoping.
+
+Every stage kept the full suite green (1295 tests). The whole bundled chain and user schemas compile
+under enforcement, so no valid schema is out of scope. `Tson`/`TsonConfig` are now thin over the
+registry, which owns the whole parse → resolve → link → register → compile pipeline plus bundled-library
+loading, is the on-demand loader, and can only be constructed in the (correct) object-binding mode.
+
 ## Build and test
 
 No system Gradle — always use the wrapper:
@@ -3153,9 +3254,9 @@ list to work through in order.
   nested inside `specification: AtomSpecification` rather than flat, so it never receives a
   schema-composed default the way `email_type`'s own flat `spec` field does -- see "Object-binding
   mode" above; subtype *dispatch* to them is fixed, this is a separate, narrower, still-open gap in
-  their own field binding); a permanent standard-library "load meta-kernel/meta.tn1/core.tn1 and
-  register them" entry point doesn't exist yet (see "Compiled schema registry" above);
-  `REQUIRED_FIXED`/`OPTIONAL_FIXED` value validation,
+  their own field binding); the permanent standard-library "load meta-kernel/meta.tn1/core.tn1 and
+  register them" entry point now exists — `TsonCompiledSchemaRegistry.withStandardLibrary` (see "The
+  `TsonCompiledSchemaRegistry` cleanup arc"); `REQUIRED_FIXED`/`OPTIONAL_FIXED` value validation,
   `value_param` real parameter substitution, and thread-safety are all still deferred design
   questions; a general disk/HTTP-backed `TsonSchemaSource` (with whitelist/blacklist policy) is
   deliberately not built yet either (see "Bundled schema documents" above).

@@ -2,7 +2,6 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.compiler.config.TsonCompiledRegistry;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
 import org.junit.jupiter.api.Assumptions;
@@ -60,8 +59,8 @@ class SidecarSchemasTest {
         // registered explicitly before anything that transitively !!imports it (meta.tn, here) can
         // register itself. A fresh registry per schema file, deliberately, so one file's own
         // failure doesn't leave a shared registry in a half-registered state for the next.
-        TsonCompiledRegistry compiledRegistry =
-                new TsonCompiledRegistry(SchemaMetaNameBinder.defaultContext(), TsonBundledSchemas::fetch);
+        TsonCompiledSchemaRegistry compiledRegistry =
+                new TsonCompiledSchemaRegistry(SchemaMetaNameBinder.defaultContext(), TsonBundledSchemas::fetch);
         TsonCompiledSchemaLoader loader = compiledRegistry;
         SchemaDocument metaKernelDocument = new TsonSchemaParser(
                 TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID)).parseSchemaDocument();

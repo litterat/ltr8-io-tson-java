@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The same real scenario {@code TinySchemaImportsCoreTn1Test} proves by hand-assembling
- * {@code TsonSchemaRegistry}/{@code TsonCompiledRegistry} directly -- a small, user-defined schema
+ * {@code TsonSchemaRegistry}/{@code TsonCompiledSchemaRegistry} directly -- a small, user-defined schema
  * importing core.tn -- but through this class's own public front door instead, confirming the builder
  * genuinely replaces that wiring.
  */

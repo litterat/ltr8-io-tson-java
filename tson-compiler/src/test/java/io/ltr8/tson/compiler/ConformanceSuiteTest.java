@@ -25,7 +25,6 @@ import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.compiler.atom.Complex;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.compiler.config.TsonCompiledRegistry;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.IsoDuration;
@@ -580,8 +579,8 @@ class ConformanceSuiteTest {
         // Same bootstrap sequence TsonConfig#build uses: meta-kernel has to be resolved and
         // registered explicitly before anything that transitively !!imports it (meta.tn, here) can
         // register itself -- see TsonBundledSchemas's own class Javadoc for why.
-        TsonCompiledRegistry compiledRegistry =
-                new TsonCompiledRegistry(SchemaMetaNameBinder.defaultContext(), TsonBundledSchemas::fetch);
+        TsonCompiledSchemaRegistry compiledRegistry =
+                new TsonCompiledSchemaRegistry(SchemaMetaNameBinder.defaultContext(), TsonBundledSchemas::fetch);
         TsonCompiledSchemaLoader loader = compiledRegistry;
         SchemaDocument metaKernelDocument = new TsonSchemaParser(
                 TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID)).parseSchemaDocument();

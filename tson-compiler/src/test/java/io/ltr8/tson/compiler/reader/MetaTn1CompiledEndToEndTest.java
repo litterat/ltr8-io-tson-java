@@ -2,10 +2,9 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.*;
-import io.ltr8.tson.compiler.ast.Document;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.compiler.config.TsonCompiledRegistry;
+import io.ltr8.tson.compiler.TsonCompiledSchemaRegistry;
 import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
 import io.ltr8.tson.compiler.resolver.SchemaResolver;
 import io.ltr8.tson.schema.TsonBundledSchemas;
@@ -14,8 +13,6 @@ import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.schema.TsonSchemaLinker;
 import org.junit.jupiter.api.Test;
-
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -38,7 +35,7 @@ class MetaTn1CompiledEndToEndTest {
     private static TsonLinkedSchema registerMeta() {
         TsonSchemaRegistry registry = new TsonSchemaRegistry();
         DataBindContext context = SchemaMetaNameBinder.defaultContext();
-        TsonCompiledRegistry compiledRegistry = new TsonCompiledRegistry(context);
+        TsonCompiledSchemaRegistry compiledRegistry = new TsonCompiledSchemaRegistry(context);
         TsonCompiledSchemaLoader loader = compiledRegistry;
 
         String metaKernelSource = TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID);
@@ -46,7 +43,7 @@ class MetaTn1CompiledEndToEndTest {
         TsonSchema metaKernel = new SchemaResolver(loader).resolveSchema(metaKernelDocument);
         TsonLinkedSchema metaKernelMaterialized = registry.register(TsonSchemaLinker.link(metaKernel, registry));
         // meta-kernel governs itself -- loader.load(META_KERNEL_ID) re-bootstraps a fresh
-        // TsonCompiledMetaSchema (never cached for that identity, see TsonCompiledRegistry's
+        // TsonCompiledMetaSchema (never cached for that identity, see TsonCompiledSchemaRegistry's
         // own Javadoc), which is exactly what register's own governingMeta argument needs here.
         compiledRegistry.register(metaKernelMaterialized.schema(), loader.loadMeta(TsonBundledSchemas.META_KERNEL_ID));
 

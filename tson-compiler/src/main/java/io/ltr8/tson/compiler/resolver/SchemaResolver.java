@@ -51,7 +51,7 @@ public final class SchemaResolver {
      *               if missing" lookup, because such a lookup has no way to bootstrap meta-kernel's own
      *               document: resolving it means resolving *its own* {@code !!meta}, which names itself,
      *               so a lookup-only resolver would need meta-kernel already registered before it could
-     *               ever register meta-kernel. The loader's implementation ({@code TsonCompiledRegistry})
+     *               ever register meta-kernel. The loader's implementation ({@code TsonCompiledSchemaRegistry})
      *               recognizes that one case and answers it directly (its own hand-written bootstrap)
      *               instead of looping forever.
      */

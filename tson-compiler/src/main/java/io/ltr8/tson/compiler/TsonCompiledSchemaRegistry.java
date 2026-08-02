@@ -1,15 +1,8 @@
-package io.ltr8.tson.compiler.config;
+package io.ltr8.tson.compiler;
 
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.tson.compiler.ContentHash;
-import io.ltr8.tson.compiler.ContentHashMismatchException;
-import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
-import io.ltr8.tson.compiler.TsonCompiledSchema;
-import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
-import io.ltr8.tson.compiler.TsonSchemaCompiler;
-import io.ltr8.tson.compiler.TsonSchemaParser;
-import io.ltr8.tson.compiler.TsonSchemaSource;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
+import io.ltr8.tson.compiler.config.ValueReaderFactoryResolver;
 import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
 import io.ltr8.tson.compiler.resolver.SchemaResolver;
 import io.ltr8.tson.schema.TsonBundledSchemas;
@@ -59,7 +52,7 @@ import java.util.Optional;
  * {@link #load} (and its content-hash bookkeeping) is not -- matching {@link TsonSchemaRegistry}'s own
  * stated guarantee, no stronger.
  */
-public final class TsonCompiledRegistry implements TsonCompiledSchemaLoader {
+public final class TsonCompiledSchemaRegistry implements TsonCompiledSchemaLoader {
 
     private static final String META_KERNEL_IDENTITY =
             TsonSchemaRegistry.canonicalIdentity(TsonBundledSchemas.META_KERNEL_ID);
@@ -78,17 +71,17 @@ public final class TsonCompiledRegistry implements TsonCompiledSchemaLoader {
      * A fresh, empty {@link TsonSchemaRegistry} of its own and no fetch capability -- the common case for a
      * caller that owns the whole registration+compilation pipeline and only resolves the bundled standard library.
      */
-    public TsonCompiledRegistry(DataBindContext context) {
+    public TsonCompiledSchemaRegistry(DataBindContext context) {
         this(new TsonSchemaRegistry(), context);
     }
 
     /** As above but sharing an existing {@link TsonSchemaRegistry}, still with no fetch capability. */
-    public TsonCompiledRegistry(TsonSchemaRegistry schemaRegistry, DataBindContext context) {
+    public TsonCompiledSchemaRegistry(TsonSchemaRegistry schemaRegistry, DataBindContext context) {
         this(schemaRegistry, context, TsonSchemaSource.registeredOnly());
     }
 
     /** A fresh, empty {@link TsonSchemaRegistry} of its own, with a fetch {@code source}. */
-    public TsonCompiledRegistry(DataBindContext context, TsonSchemaSource source) {
+    public TsonCompiledSchemaRegistry(DataBindContext context, TsonSchemaSource source) {
         this(new TsonSchemaRegistry(), context, source);
     }
 
@@ -100,8 +93,8 @@ public final class TsonCompiledRegistry implements TsonCompiledSchemaLoader {
      * @param source where {@link #load} fetches a not-yet-registered schema's source text from -- {@link
      *     TsonSchemaSource#registeredOnly()} by default, so nothing is fetched unless a caller opts in.
      */
-    public TsonCompiledRegistry(TsonSchemaRegistry schemaRegistry, DataBindContext context,
-                                TsonSchemaSource source) {
+    public TsonCompiledSchemaRegistry(TsonSchemaRegistry schemaRegistry, DataBindContext context,
+                                      TsonSchemaSource source) {
         this.schemaRegistry = schemaRegistry;
         this.resolver = TsonSchemaCompiler.bind(context);
         this.source = source;
@@ -131,8 +124,8 @@ public final class TsonCompiledRegistry implements TsonCompiledSchemaLoader {
      * way to get a working registry; the plain constructors leave it empty (for a caller that populates
      * it itself, e.g. a test bootstrapping in isolation).
      */
-    public static TsonCompiledRegistry withStandardLibrary(DataBindContext context, TsonSchemaSource source) {
-        TsonCompiledRegistry registry = new TsonCompiledRegistry(context, source);
+    public static TsonCompiledSchemaRegistry withStandardLibrary(DataBindContext context, TsonSchemaSource source) {
+        TsonCompiledSchemaRegistry registry = new TsonCompiledSchemaRegistry(context, source);
         registry.loadStandardLibrary();
         return registry;
     }
