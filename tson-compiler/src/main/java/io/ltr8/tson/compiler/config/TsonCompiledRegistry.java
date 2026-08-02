@@ -37,16 +37,15 @@ import java.util.Optional;
  * hand-written bootstrap and never cached (never through the generic path below, which would recurse
  * forever on meta-kernel's self-naming {@code !!meta}, §1.5); otherwise fetch via the configured {@link
  * TsonSchemaSource}, parse, resolve via a fresh {@code SchemaResolver} bound to this same loader (so the
- * document's own {@code !!meta}/{@code !!import} resolve recursively, cache-then-bootstrap-then-fetch
- * all the way down), then {@link #register} -- which is the only result that is cached. Content hashes
- * are recorded and verified per identity along the way ([TSON-DATA] §2.2.1, [TSON-SCHEMA] §10.2).
+ * document's own {@code !!meta}/{@code !!import} resolve recursively, cache-then-bootstrap-then-fetch all
+ * the way down), then {@link #register} -- which is the only result that is cached. Content hashes are
+ * recorded and verified per identity along the way ([TSON-DATA] §2.2.1, [TSON-SCHEMA] §10.2).
  *
- * <p>Startup sequence this exists for: bootstrap meta-kernel ({@link TsonCompiledMetaSchema#bootstrap},
- * outside this class -- it needs no registry), {@link #register} it (against its own bootstrap result,
- * since nothing governs meta-kernel but itself), then meta.tn1 (against meta-kernel's freshly-registered
- * {@link TsonCompiledMetaSchema}), then core.tn1 (against meta.tn1's) -- each step's own return value is
- * what the next needs as its {@code governingMeta}. Any user schema governed by one of these reuses
- * what's already in {@link #get} rather than recompiling its governing chain from scratch.
+ * <p><b>{@link #withStandardLibrary} is the ordinary entry point</b>: it builds a registry with the three
+ * bundled schemas (meta-kernel, meta, core) already loaded -- fetched straight from {@link
+ * TsonBundledSchemas}, so it works whatever the configured source. The plain constructors leave the
+ * registry empty, for a caller that populates it itself. Any schema governed by (or importing) the
+ * bundled three then reuses what's already in {@link #get} rather than recompiling its chain.
  *
  * <p><b>Keyed by canonical identity</b> ({@link TsonSchemaRegistry#canonicalIdentity}, scheme and query
  * stripped), matching the paired {@link TsonSchemaRegistry}. So two differently-spelled-but-equivalent
@@ -119,6 +118,45 @@ public final class TsonCompiledRegistry implements TsonCompiledSchemaLoader {
      */
     public ValueReaderFactoryResolver resolver() {
         return resolver;
+    }
+
+    /**
+     * A registry with this library's three bundled schemas -- meta-kernel, meta, core -- already loaded,
+     * plus {@code source} for any other, non-bundled URIs a caller later resolves. This is the ordinary
+     * way to get a working registry; the plain constructors leave it empty (for a caller that populates
+     * it itself, e.g. a test bootstrapping in isolation).
+     */
+    public static TsonCompiledRegistry withStandardLibrary(ValueReaderFactoryResolver resolver, TsonSchemaSource source) {
+        TsonCompiledRegistry registry = new TsonCompiledRegistry(resolver, source);
+        registry.loadStandardLibrary();
+        return registry;
+    }
+
+    /**
+     * Loads this library's three bundled schema documents into this registry in dependency order, so any
+     * schema governed by (or importing) them resolves. Each is fetched straight from {@link
+     * TsonBundledSchemas} (never the configured {@code source}) and registered; its own {@code
+     * !!meta}/{@code !!import} targets are cache hits by the time they're needed (meta-kernel's own is
+     * its self-referential bootstrap case, resolved ordinarily and registered explicitly since {@link
+     * #load} never caches that identity -- see that method).
+     */
+    private void loadStandardLibrary() {
+        registerBundled(TsonBundledSchemas.META_KERNEL_ID);
+        registerBundled(TsonBundledSchemas.META_ID);
+        registerBundled(TsonBundledSchemas.CORE_ID);
+    }
+
+    /**
+     * Fetches one bundled schema's own source straight from {@link TsonBundledSchemas}, records its content
+     * hash (so a later hash-pinned reference to it is verified), resolves it against this registry (its
+     * {@code !!meta}/{@code !!import} targets already loaded), and registers it.
+     */
+    private void registerBundled(String id) {
+        String sourceText = TsonBundledSchemas.fetch(id);
+        recordAndVerify(sourceText, id, TsonSchemaRegistry.canonicalIdentity(id));
+        SchemaDocument document = new TsonSchemaParser(sourceText).parseSchemaDocument();
+        TsonSchema resolved = new SchemaResolver(this).resolveSchema(document);
+        register(resolved, loadMeta(document.meta()));
     }
 
     /**

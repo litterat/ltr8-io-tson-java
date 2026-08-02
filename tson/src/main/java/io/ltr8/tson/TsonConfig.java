@@ -2,21 +2,17 @@ package io.ltr8.tson;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.*;
-import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
 import io.ltr8.tson.compiler.config.TsonCompiledRegistry;
 import io.ltr8.tson.compiler.config.ValueReaderFactoryResolver;
-import io.ltr8.tson.schema.TsonBundledSchemas;
-import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.TsonSchemaRegistry;
 
 /**
  * Configures and builds a {@link Tson} -- reached via {@link Tson#builder()}, never constructed
- * directly. No configurable options beyond {@link #dataBindContext} yet: the standard library is
- * always meta-kernel/meta.tn/core.tn, fetched from {@link TsonBundledSchemas}; a future pluggable
- * {@link TsonSchemaSource} belongs here too, not as a breaking change to
- * {@link Tson}'s own public shape.
+ * directly. Two options: {@link #dataBindContext} (for object binding) and {@link #schemaSource} (for
+ * fetching user schemas beyond the bundled standard library). {@link #build()} constructs a {@link
+ * TsonCompiledRegistry} and has it load the bundled meta-kernel/meta.tn/core.tn standard library, then
+ * wraps it as a {@link Tson}.
  */
 public final class TsonConfig {
 
@@ -56,33 +52,9 @@ public final class TsonConfig {
     public Tson build() {
         ValueReaderFactoryResolver resolver =
                 TsonSchemaCompiler.bind(SchemaMetaNameBinder.defaultContext());
-        TsonSchemaRegistry schemaRegistry = new TsonSchemaRegistry();
-        // Bundled standard library always served first; the configured source (default: none)
-        // supplies any additional schema URIs -- e.g. local files the CLI collected, or later a
-        // whitelist of allowed hosts. It never overrides the three bundled identities.
-        TsonSchemaSource composed = uri -> isBundled(uri)
-                ? TsonBundledSchemas.fetch(uri)
-                : schemaSource.fetch(uri);
-        TsonCompiledRegistry compiledRegistry = new TsonCompiledRegistry(schemaRegistry, resolver, composed);
-        // The compiled registry is itself the on-demand loader for !!meta/!!import targets.
-        TsonCompiledSchemaLoader loader = compiledRegistry;
-
-        // Meta-kernel's own bootstrap case, registered explicitly -- see TsonBundledSchemas's own
-        // class Javadoc for why this step can't just be another loader.load(...) call.
-        SchemaDocument metaKernelDocument = new TsonSchemaParser(
-                TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID)).parseSchemaDocument();
-        TsonSchema resolvedMetaKernel = new TsonSchemaResolver(loader).resolveSchema(metaKernelDocument);
-        compiledRegistry.register(resolvedMetaKernel, loader.loadMeta(TsonBundledSchemas.META_KERNEL_ID));
-
-        loader.load(TsonBundledSchemas.META_ID);
-        loader.load(TsonBundledSchemas.CORE_ID);
-
-        return new Tson(schemaRegistry, compiledRegistry, loader, dataBindContext);
-    }
-
-    private static boolean isBundled(String uri) {
-        return uri.equals(TsonBundledSchemas.META_KERNEL_ID)
-                || uri.equals(TsonBundledSchemas.META_ID)
-                || uri.equals(TsonBundledSchemas.CORE_ID);
+        // The compiled registry is both the store and the on-demand loader; withStandardLibrary loads
+        // the bundled meta-kernel/meta/core, and schemaSource is consulted only for other, later URIs.
+        TsonCompiledRegistry compiledRegistry = TsonCompiledRegistry.withStandardLibrary(resolver, schemaSource);
+        return new Tson(compiledRegistry.schemaRegistry(), compiledRegistry, compiledRegistry, dataBindContext);
     }
 }
