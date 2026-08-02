@@ -1,11 +1,9 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.bind.DataBindContext;
-import io.ltr8.tson.compiler.config.ValueReaderFactoryResolver;
+import io.ltr8.tson.compiler.reader.ValueReaderFactoryResolver;
 import io.ltr8.tson.compiler.reader.DeferredValueReader;
 import io.ltr8.tson.compiler.reader.ErrorReader;
 import io.ltr8.tson.compiler.reader.ValueReaderFactory;
-import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Reference;
@@ -120,14 +118,6 @@ public final class TsonSchemaCompiler {
             compilation.resolve(name);
         }
         return new TsonCompiledSchema(linkedSchema, Map.copyOf(compilation.finished));
-    }
-
-    public static ValueReaderFactoryResolver dom() {
-        return ValueReaderFactoryRegistry.dom();
-    }
-
-    public static ValueReaderFactoryResolver bind(DataBindContext context) {
-        return ValueReaderFactoryRegistry.bind(context);
     }
 
     /**

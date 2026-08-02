@@ -9,7 +9,6 @@ import io.ltr8.tson.compiler.stream.ListEventSource;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
-import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
 import io.ltr8.tson.compiler.TsonObjectWriter;
@@ -1280,8 +1279,7 @@ class DefinitionResolverTest {
     private static TsonCompiledMetaSchema compileAsMetaParser(Map<String, TypeDefinition> entries) {
         TsonSchema synthetic = new TsonSchema("test", "", List.of(), entries);
         TsonLinkedSchema linkedSynthetic = new TsonLinkedSchema(synthetic);
-        ValueReaderFactoryRegistry resolver = ValueReaderFactoryRegistry.bind(SchemaMetaNameBinder.defaultContext());
-        return TsonCompiledMetaSchema.bootstrap(linkedSynthetic, resolver);
+        return new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext()).bootstrap(linkedSynthetic);
     }
 
     /**

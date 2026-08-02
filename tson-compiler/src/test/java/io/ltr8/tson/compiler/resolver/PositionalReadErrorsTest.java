@@ -4,7 +4,9 @@ import io.ltr8.tson.compiler.Position;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonReadException;
-import io.ltr8.tson.compiler.TsonSchemaCompiler;
+import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
+import io.ltr8.tson.compiler.TsonCompiledSchemaRegistry;
+import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
@@ -46,7 +48,8 @@ class PositionalReadErrorsTest {
     }
 
     private static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema) {
-        return TsonSchemaCompiler.compile(linkedSchema, TsonSchemaCompiler.dom());
+        TsonCompiledMetaRegistry core = new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext());
+        return TsonCompiledSchemaRegistry.dom(core).compile(linkedSchema);
     }
 
     @Test

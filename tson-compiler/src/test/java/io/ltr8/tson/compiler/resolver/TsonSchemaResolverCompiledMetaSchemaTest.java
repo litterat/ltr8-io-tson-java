@@ -177,9 +177,8 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
     @Test
     void aLoaderThatNeverGotMetaTn1RegisteredThrowsClearly() {
         TsonCompiledMetaRegistry registry = new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext());
-        TsonLinkedSchema linkedMetaKernel = TsonSchemaLinker.linkBootstrap(MetaKernelBootstrapResolver.getMetaKernelSchema());
-        // meta-kernel only -- no meta.tn -- governed by its own freshly bootstrapped compiled form.
-        registry.register(resolveMetaKernelOrdinarily(), TsonCompiledMetaSchema.bootstrap(linkedMetaKernel, registry.resolver()));
+        // meta-kernel only -- no meta.tn -- governed by its own freshly bootstrapped compiled form (loadMeta).
+        registry.register(resolveMetaKernelOrdinarily(), registry.loadMeta(TsonBundledSchemas.META_KERNEL_ID));
         TsonCompiledSchemaLoader loader = registry;
         SchemaDocument coreDocument = new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.CORE_ID)).parseSchemaDocument();
 

@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
@@ -38,7 +39,8 @@ class MultiErrorCollectionTest {
     }
 
     private static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema) {
-        return TsonSchemaCompiler.compile(linkedSchema, TsonSchemaCompiler.dom());
+        TsonCompiledMetaRegistry core = new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext());
+        return TsonCompiledSchemaRegistry.dom(core).compile(linkedSchema);
     }
 
     @Test

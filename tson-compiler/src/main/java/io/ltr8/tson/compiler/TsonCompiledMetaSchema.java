@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.annotation.Typename;
-import io.ltr8.tson.compiler.config.ValueReaderFactoryResolver;
+import io.ltr8.tson.compiler.reader.ValueReaderFactoryResolver;
 import io.ltr8.tson.compiler.reader.ValueReaderFactory;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.Top;
@@ -36,28 +36,12 @@ public final class TsonCompiledMetaSchema extends TsonCompiledSchema {
     private final ValueReaderFactoryResolver resolver;
     private final Map<String, ReaderResolver> constructors;
 
-    public TsonCompiledMetaSchema(TsonCompiledSchema base, ValueReaderFactoryResolver resolver) {
+    TsonCompiledMetaSchema(TsonCompiledSchema base, ValueReaderFactoryResolver resolver) {
         super(base.linkedSchema(), base.entries());
         this.resolver = resolver;
         this.constructors = buildConstructors(this, resolver);
     }
 
-    /**
-     * Bootstraps a compiled meta-schema for meta-kernel itself -- the one deliberate circularity
-     * (§1.5): meta-kernel's own {@code !!meta} names itself, so there's no already-compiled governing
-     * meta to compile it against the ordinary way. It doesn't need one: meta-kernel declares its whole
-     * vocabulary itself, so it is compiled *standalone* against {@code resolver} directly ({@link
-     * TsonSchemaCompiler#compile(TsonLinkedSchema, ValueReaderFactoryResolver)}), then wrapped as the
-     * meta-schema that governs everything below it.
-     *
-     * <p>{@code linkedMetaKernel} is expected to come from {@code TsonSchemaLinker#linkBootstrap},
-     * not the ordinary {@code link} -- that would need meta-kernel already registered somewhere to
-     * resolve its own self-referential {@code !!meta} against, which is exactly the circularity
-     * this method exists to break.
-     */
-    public static TsonCompiledMetaSchema bootstrap(TsonLinkedSchema linkedMetaKernel, ValueReaderFactoryResolver resolver) {
-        return new TsonCompiledMetaSchema(TsonSchemaCompiler.compile(linkedMetaKernel, resolver), resolver);
-    }
 
     /**
      * This meta-schema as a plain {@link TsonCompiledSchema} -- it *is* one (this class extends it),

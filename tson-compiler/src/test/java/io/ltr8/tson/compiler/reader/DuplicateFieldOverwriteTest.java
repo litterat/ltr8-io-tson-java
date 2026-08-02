@@ -3,7 +3,9 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonReadContext;
-import io.ltr8.tson.compiler.TsonSchemaCompiler;
+import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
+import io.ltr8.tson.compiler.TsonCompiledSchemaRegistry;
+import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.IntegerSize;
@@ -34,7 +36,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class DuplicateFieldOverwriteTest {
 
     private static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema) {
-        return TsonSchemaCompiler.compile(linkedSchema, TsonSchemaCompiler.dom());
+        TsonCompiledMetaRegistry core = new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext());
+        return TsonCompiledSchemaRegistry.dom(core).compile(linkedSchema);
     }
 
     @Test

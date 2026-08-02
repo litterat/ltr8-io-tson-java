@@ -4,7 +4,9 @@ import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonDataStream;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonReadException;
-import io.ltr8.tson.compiler.TsonSchemaCompiler;
+import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
+import io.ltr8.tson.compiler.TsonCompiledSchemaRegistry;
+import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TsonEventSource;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -63,7 +65,8 @@ class StreamingLazinessTest {
     }
 
     private static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema) {
-        return TsonSchemaCompiler.compile(linkedSchema, TsonSchemaCompiler.dom());
+        TsonCompiledMetaRegistry core = new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext());
+        return TsonCompiledSchemaRegistry.dom(core).compile(linkedSchema);
     }
 
     @Test

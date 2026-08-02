@@ -2,7 +2,8 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
-import io.ltr8.tson.compiler.config.ValueReaderFactoryResolver;
+import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
+import io.ltr8.tson.compiler.reader.ValueReaderFactoryResolver;
 import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
 import io.ltr8.tson.compiler.resolver.SchemaResolver;
 import io.ltr8.tson.schema.TsonBundledSchemas;
@@ -98,7 +99,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
     public TsonCompiledMetaRegistry(TsonSchemaRegistry schemaRegistry, DataBindContext context,
                                       TsonSchemaSource source) {
         this.schemaRegistry = schemaRegistry;
-        this.resolver = TsonSchemaCompiler.bind(context);
+        this.resolver = ValueReaderFactoryRegistry.bind(context);
         this.source = source;
     }
 
@@ -112,12 +113,18 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
     }
 
     /**
-     * The {@link ValueReaderFactoryResolver} every schema here is compiled with -- e.g. so a caller can compile
-     * a one-off reader (such as meta-kernel's own bootstrap, via {@link TsonCompiledMetaSchema#bootstrap}) with
-     * the same factories, without registering or caching it here.
+     * Compiles {@code linked} standalone against this registry's own object-binding resolver and wraps it as
+     * a {@link TsonCompiledMetaSchema}, without registering or caching it. The one-off/bootstrap path: it is
+     * how meta-kernel itself is first compiled -- the one deliberate circularity (§1.5), its own {@code
+     * !!meta} naming itself, so there's no already-compiled governing meta to compile it against the
+     * ordinary way; it doesn't need one, declaring its whole vocabulary itself. {@code linked} is expected
+     * to come from {@code TsonSchemaLinker#linkBootstrap} for that case (the ordinary {@code link} would
+     * need meta-kernel already registered to resolve its self-referential {@code !!meta}). Also builds a
+     * governing meta from an already-resolved entry set that never went through this registry's own
+     * fetch/resolve pipeline.
      */
-    public ValueReaderFactoryResolver resolver() {
-        return resolver;
+    public TsonCompiledMetaSchema bootstrap(TsonLinkedSchema linked) {
+        return new TsonCompiledMetaSchema(TsonSchemaCompiler.compile(linked, resolver), resolver);
     }
 
     /**
@@ -197,8 +204,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
             // done once elsewhere; until then this one-off bootstrap stands in so nothing is ever
             // left unable to resolve at all.
             recordAndVerify(TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID), uri, identity);
-            TsonLinkedSchema linked = TsonSchemaLinker.linkBootstrap(metaKernel);
-            return TsonCompiledMetaSchema.bootstrap(linked, resolver);
+            return bootstrap(TsonSchemaLinker.linkBootstrap(metaKernel));
         }
         TsonLinkedSchema linked = resolveLinked(uri);
         if (!isMetaLayer(linked.schema())) {

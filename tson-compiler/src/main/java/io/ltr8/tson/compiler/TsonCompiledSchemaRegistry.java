@@ -1,7 +1,8 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.tson.compiler.config.ValueReaderFactoryResolver;
+import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
+import io.ltr8.tson.compiler.reader.ValueReaderFactoryResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
 
@@ -40,7 +41,7 @@ public final class TsonCompiledSchemaRegistry {
      * DataBindContext}).
      */
     public static TsonCompiledSchemaRegistry dom(TsonCompiledMetaRegistry core) {
-        return new TsonCompiledSchemaRegistry(core, TsonSchemaCompiler.dom());
+        return new TsonCompiledSchemaRegistry(core, ValueReaderFactoryRegistry.dom());
     }
 
     /**
@@ -53,7 +54,7 @@ public final class TsonCompiledSchemaRegistry {
      * that mapping.
      */
     public static TsonCompiledSchemaRegistry bind(TsonCompiledMetaRegistry core, DataBindContext context) {
-        return new TsonCompiledSchemaRegistry(core, TsonSchemaCompiler.bind(context));
+        return new TsonCompiledSchemaRegistry(core, ValueReaderFactoryRegistry.bind(context));
     }
 
     /**
