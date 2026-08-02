@@ -63,7 +63,7 @@ public final class TsonSchemaCompiler {
     /**
      * <b>Governed compile</b>: compiles {@code linkedSchema} against {@code governingMeta}, so each
      * body's constructor is dispatched, scoped, through that meta-schema (see {@link #governedFactory}).
-     * This is what {@code TsonCompiledSchemaRegistry} uses to compile a schema in the context of the meta that
+     * This is what {@code TsonCompiledMetaRegistry} uses to compile a schema in the context of the meta that
      * governs it. {@code governingMeta} is always an already-compiled result from a previous compile --
      * meta-kernel's own case aside (see {@link TsonCompiledMetaSchema#bootstrap}).
      */

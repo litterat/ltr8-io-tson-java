@@ -5,7 +5,7 @@ import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
-import io.ltr8.tson.compiler.TsonCompiledSchemaRegistry;
+import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * The same proof {@link MetaSchemaImportTest} gives for meta.tn, one rung further up the schema
  * ladder: registers meta-kernel explicitly (its own well-known bootstrap case, per {@link
- * TsonCompiledSchemaRegistry}'s own Javadoc), then loads meta.tn and {@code core.tn} through
+ * TsonCompiledMetaRegistry}'s own Javadoc), then loads meta.tn and {@code core.tn} through
  * the fully generic fetch-parse-resolve-register-compile path -- exactly the sequence {@link
  * TsonBundledSchemas}'s own class Javadoc documents as the intended way to load this library's
  * three bundled schema documents.
@@ -36,9 +36,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class CoreSchemaImportTest {
 
     /**
-     * The registered {@link TsonSchemaRegistry} plus the exact {@link TsonCompiledSchemaRegistry}
+     * The registered {@link TsonSchemaRegistry} plus the exact {@link TsonCompiledMetaRegistry}
      * that loaded everything into it -- a second call reusing this same loader hits {@code
-     * TsonCompiledSchemaRegistry}'s own cache (see {@link TsonCompiledSchemaRegistry#load}'s own case
+     * TsonCompiledMetaRegistry}'s own cache (see {@link TsonCompiledMetaRegistry#load}'s own case
      * 1) rather than attempting to register {@code core.tn1} a second time, which {@link
      * TsonSchemaRegistry#register} would correctly reject as a duplicate identity.
      */
@@ -47,12 +47,12 @@ class CoreSchemaImportTest {
 
     private static Loaded loadMetaKernelMetaAndCore() {
         TsonSchemaRegistry schemaRegistry = new TsonSchemaRegistry();
-        TsonCompiledSchemaRegistry registry = new TsonCompiledSchemaRegistry(schemaRegistry, SchemaMetaNameBinder.defaultContext(), TsonBundledSchemas::fetch);
+        TsonCompiledMetaRegistry registry = new TsonCompiledMetaRegistry(schemaRegistry, SchemaMetaNameBinder.defaultContext(), TsonBundledSchemas::fetch);
         TsonCompiledSchemaLoader loader = registry;
 
         // meta.tn1's own !!import needs meta-kernel present in the *shared* registry first --
         // meta-kernel's own bootstrap case (loader.load(META_KERNEL_ID)) is never cached in registry
-        // itself (see TsonCompiledSchemaRegistry's own Javadoc), so it's registered separately,
+        // itself (see TsonCompiledMetaRegistry's own Javadoc), so it's registered separately,
         // resolved ordinarily against this same loader (whose own bootstrap branch supplies the
         // structure namespace).
         SchemaDocument metaKernelDocument = new TsonSchemaParser(
@@ -100,7 +100,7 @@ class CoreSchemaImportTest {
     }
 
     /**
-     * {@link TsonCompiledSchemaRegistry#register} (reached via {@code loader.load}, inside {@link
+     * {@link TsonCompiledMetaRegistry#register} (reached via {@code loader.load}, inside {@link
      * #loadMetaKernelMetaAndCore}) already compiled every one of core.tn1's own 48 entries as a side
      * effect of registering it -- but {@link TsonSchemaCompiler}'s own per-entry build-failure
      * deferral means a broken entry wouldn't have failed that step; it would silently have compiled to
@@ -119,7 +119,7 @@ class CoreSchemaImportTest {
         Loaded loaded = loadMetaKernelMetaAndCore();
         TsonSchema core = loaded.schemaRegistry().get(TsonBundledSchemas.CORE_ID).orElseThrow().schema();
 
-        // A cache hit on TsonCompiledSchemaRegistry's own store -- core.tn1 was already compiled inside
+        // A cache hit on TsonCompiledMetaRegistry's own store -- core.tn1 was already compiled inside
         // loadMetaKernelMetaAndCore, this just fetches that same TsonCompiledSchema back. core.tn is
         // not a meta-layer schema (its !!meta is meta.tn, not meta-kernel), so it's a plain
         // TsonCompiledSchema, not a governing TsonCompiledMetaSchema.

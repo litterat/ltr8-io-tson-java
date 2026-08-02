@@ -7,7 +7,7 @@ import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
-import io.ltr8.tson.compiler.TsonCompiledSchemaRegistry;
+import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
 import io.ltr8.tson.schema.TsonBundledSchemas;
@@ -74,7 +74,7 @@ class TinySchemaImportsCoreTn1Test {
     void aTinySchemaThatImportsCoreTn1RegistersAndCompilesCleanly() {
         TsonSchemaRegistry schemaRegistry = new TsonSchemaRegistry();
         DataBindContext context = TsonAtomContext.registerDefaults(DataBindContext.builder().nameBinder(MANUAL_BINDER).build());
-        TsonCompiledSchemaRegistry registry = new TsonCompiledSchemaRegistry(schemaRegistry, context, TsonBundledSchemas::fetch);
+        TsonCompiledMetaRegistry registry = new TsonCompiledMetaRegistry(schemaRegistry, context, TsonBundledSchemas::fetch);
         TsonCompiledSchemaLoader loader = registry;
 
         // meta-kernel's own bootstrap case, registered explicitly -- see TsonBundledSchemas's own

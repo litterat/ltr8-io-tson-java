@@ -7,7 +7,7 @@ package io.ltr8.tson.compiler;
  * blacklisting hosts, or disk-only resolution). A caller wanting a specific policy implements this
  * interface (e.g. checking {@code uri} against an allowed-host list before ever opening a
  * connection, or refusing any {@code http(s)} scheme outright and only reading from a local
- * classpath/filesystem location) and hands it to a {@code TsonCompiledSchemaRegistry}'s own
+ * classpath/filesystem location) and hands it to a {@code TsonCompiledMetaRegistry}'s own
  * {@code (TsonSchemaRegistry, ValueReaderFactoryResolver, TsonSchemaSource)} constructor.
  *
  * <p><b>{@link #registeredOnly()} is the default -- nothing is ever fetched.</b> Mirrors {@code

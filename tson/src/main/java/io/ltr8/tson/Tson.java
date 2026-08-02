@@ -3,7 +3,7 @@ package io.ltr8.tson;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.*;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
-import io.ltr8.tson.compiler.TsonCompiledSchemaRegistry;
+import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
 import io.ltr8.tson.compiler.config.ValueReaderFactoryResolver;
 import io.ltr8.tson.compiler.TsonObjectReader;
 import io.ltr8.tson.compiler.TsonObjectWriter;
@@ -67,7 +67,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class Tson {
 
     private final TsonSchemaRegistry schemaRegistry;
-    private final TsonCompiledSchemaRegistry compiledRegistry;
+    private final TsonCompiledMetaRegistry compiledRegistry;
     private final TsonCompiledSchemaLoader loader;
     private final DataBindContext dataBindContext;
 
@@ -75,7 +75,7 @@ public final class Tson {
     // validating many data documents that name the same schema compiles it once. A cache only.
     private final Map<String, TsonCompiledSchema> validationSchemas = new ConcurrentHashMap<>();
 
-    Tson(TsonSchemaRegistry schemaRegistry, TsonCompiledSchemaRegistry compiledRegistry,
+    Tson(TsonSchemaRegistry schemaRegistry, TsonCompiledMetaRegistry compiledRegistry,
          TsonCompiledSchemaLoader loader, DataBindContext dataBindContext) {
         this.schemaRegistry = schemaRegistry;
         this.compiledRegistry = compiledRegistry;
@@ -211,8 +211,8 @@ public final class Tson {
         return schemaRegistry;
     }
 
-    /** The underlying {@link TsonCompiledSchemaRegistry} -- e.g. for {@code compiledRegistry().get(id)} on an already-compiled identity. */
-    public TsonCompiledSchemaRegistry compiledRegistry() {
+    /** The underlying {@link TsonCompiledMetaRegistry} -- e.g. for {@code compiledRegistry().get(id)} on an already-compiled identity. */
+    public TsonCompiledMetaRegistry compiledRegistry() {
         return compiledRegistry;
     }
 

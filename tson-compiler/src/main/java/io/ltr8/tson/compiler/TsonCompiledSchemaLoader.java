@@ -8,7 +8,7 @@ import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
  * it doesn't already exist, rather than requiring every schema a resolver might need to already be
  * pre-registered by some other code path.
  *
- * <p>Not just a raw {@code TsonCompiledSchemaRegistry} lookup, because a plain "look it up, fail if
+ * <p>Not just a raw {@code TsonCompiledMetaRegistry} lookup, because a plain "look it up, fail if
  * missing" registry has no way to bootstrap meta-kernel's own document: resolving it means
  * resolving *its own* {@code !!meta}, which names itself, so a registry-only lookup would need
  * meta-kernel already registered before it could ever register meta-kernel. An implementation can
@@ -18,7 +18,7 @@ import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
  *
  * <p>Also the natural, single place to enforce policy over *what* gets resolved from *where* (e.g.
  * whitelisting/blacklisting hosts, or disk-only resolution) -- see {@link TsonSchemaSource}, the
- * pluggable hook the implementation ({@code TsonCompiledSchemaRegistry}) defers to for exactly this, once a
+ * pluggable hook the implementation ({@code TsonCompiledMetaRegistry}) defers to for exactly this, once a
  * request isn't already cached and isn't the meta-kernel bootstrap case.
  */
 public interface TsonCompiledSchemaLoader {

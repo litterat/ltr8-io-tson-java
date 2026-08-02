@@ -52,7 +52,7 @@ import java.util.Optional;
  * {@link #load} (and its content-hash bookkeeping) is not -- matching {@link TsonSchemaRegistry}'s own
  * stated guarantee, no stronger.
  */
-public final class TsonCompiledSchemaRegistry implements TsonCompiledSchemaLoader {
+public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader {
 
     private static final String META_KERNEL_IDENTITY =
             TsonSchemaRegistry.canonicalIdentity(TsonBundledSchemas.META_KERNEL_ID);
@@ -71,17 +71,17 @@ public final class TsonCompiledSchemaRegistry implements TsonCompiledSchemaLoade
      * A fresh, empty {@link TsonSchemaRegistry} of its own and no fetch capability -- the common case for a
      * caller that owns the whole registration+compilation pipeline and only resolves the bundled standard library.
      */
-    public TsonCompiledSchemaRegistry(DataBindContext context) {
+    public TsonCompiledMetaRegistry(DataBindContext context) {
         this(new TsonSchemaRegistry(), context);
     }
 
     /** As above but sharing an existing {@link TsonSchemaRegistry}, still with no fetch capability. */
-    public TsonCompiledSchemaRegistry(TsonSchemaRegistry schemaRegistry, DataBindContext context) {
+    public TsonCompiledMetaRegistry(TsonSchemaRegistry schemaRegistry, DataBindContext context) {
         this(schemaRegistry, context, TsonSchemaSource.registeredOnly());
     }
 
     /** A fresh, empty {@link TsonSchemaRegistry} of its own, with a fetch {@code source}. */
-    public TsonCompiledSchemaRegistry(DataBindContext context, TsonSchemaSource source) {
+    public TsonCompiledMetaRegistry(DataBindContext context, TsonSchemaSource source) {
         this(new TsonSchemaRegistry(), context, source);
     }
 
@@ -93,7 +93,7 @@ public final class TsonCompiledSchemaRegistry implements TsonCompiledSchemaLoade
      * @param source where {@link #load} fetches a not-yet-registered schema's source text from -- {@link
      *     TsonSchemaSource#registeredOnly()} by default, so nothing is fetched unless a caller opts in.
      */
-    public TsonCompiledSchemaRegistry(TsonSchemaRegistry schemaRegistry, DataBindContext context,
+    public TsonCompiledMetaRegistry(TsonSchemaRegistry schemaRegistry, DataBindContext context,
                                       TsonSchemaSource source) {
         this.schemaRegistry = schemaRegistry;
         this.resolver = TsonSchemaCompiler.bind(context);
@@ -124,8 +124,8 @@ public final class TsonCompiledSchemaRegistry implements TsonCompiledSchemaLoade
      * way to get a working registry; the plain constructors leave it empty (for a caller that populates
      * it itself, e.g. a test bootstrapping in isolation).
      */
-    public static TsonCompiledSchemaRegistry withStandardLibrary(DataBindContext context, TsonSchemaSource source) {
-        TsonCompiledSchemaRegistry registry = new TsonCompiledSchemaRegistry(context, source);
+    public static TsonCompiledMetaRegistry withStandardLibrary(DataBindContext context, TsonSchemaSource source) {
+        TsonCompiledMetaRegistry registry = new TsonCompiledMetaRegistry(context, source);
         registry.loadStandardLibrary();
         return registry;
     }
