@@ -75,7 +75,7 @@ class TsonTest {
     void theStandardLibraryItselfIsReachableThroughTheLoader() {
         Tson tson = Tson.builder().build();
 
-        TsonCompiledMetaSchema meta = tson.loader().load(TsonBundledSchemas.META_ID);
+        TsonCompiledMetaSchema meta = tson.loader().loadMeta(TsonBundledSchemas.META_ID);
 
         assertTrue(meta.schema().entries().containsKey("text_type"));
     }

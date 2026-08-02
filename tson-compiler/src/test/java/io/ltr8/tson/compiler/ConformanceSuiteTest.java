@@ -586,7 +586,7 @@ class ConformanceSuiteTest {
         SchemaDocument metaKernelDocument = new TsonSchemaParser(
                 TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID)).parseSchemaDocument();
         TsonSchema resolvedMetaKernel = new TsonSchemaResolver(loader).resolveSchema(metaKernelDocument);
-        compiledRegistry.register(resolvedMetaKernel, loader.load(TsonBundledSchemas.META_KERNEL_ID));
+        compiledRegistry.register(resolvedMetaKernel, loader.loadMeta(TsonBundledSchemas.META_KERNEL_ID));
 
         TsonSchema resolvedSchema = new TsonSchemaResolver(loader).resolveSchema(schemaDocument);
         assertTrue(resolvedSchema.entries().containsKey("my_int"),

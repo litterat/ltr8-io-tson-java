@@ -4,7 +4,6 @@ import io.ltr8.annotation.Typename;
 import io.ltr8.tson.compiler.config.ValueReaderFactoryResolver;
 import io.ltr8.tson.compiler.reader.ValueReaderFactory;
 import io.ltr8.tson.schema.TsonLinkedSchema;
-import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
@@ -33,16 +32,15 @@ import java.util.Map;
  * over this fallback is behavior-preserving today; the fallback is the seam through which
  * out-of-scope constructors are later rejected outright.
  */
-public final class TsonCompiledMetaSchema {
+public final class TsonCompiledMetaSchema extends TsonCompiledSchema {
 
-    private final TsonCompiledSchema compiledSchema;
     private final ValueReaderFactoryResolver resolver;
     private final Map<String, ReaderResolver> constructors;
 
-    public TsonCompiledMetaSchema(TsonCompiledSchema compiledSchema, ValueReaderFactoryResolver resolver) {
-        this.compiledSchema = compiledSchema;
+    public TsonCompiledMetaSchema(TsonCompiledSchema base, ValueReaderFactoryResolver resolver) {
+        super(base.linkedSchema(), base.entries());
         this.resolver = resolver;
-        this.constructors = buildConstructors(compiledSchema, resolver);
+        this.constructors = buildConstructors(this, resolver);
     }
 
     /**
@@ -66,16 +64,14 @@ public final class TsonCompiledMetaSchema {
         return new TsonCompiledMetaSchema(compiledMetaKernel, resolver);
     }
 
-    public TsonSchema schema() {
-        return compiledSchema.schema();
-    }
-
     /**
-     * The wrapped {@link TsonCompiledSchema} directly, for a caller that needs to read *any*
-     * entry -- not just the constructor-declared subset {@link #reader} exposes.
+     * This meta-schema as a plain {@link TsonCompiledSchema} -- it *is* one (this class extends it),
+     * so this returns {@code this}. Retained so a caller reading an arbitrary entry ({@code
+     * compiledSchema().get(name)}) keeps a stable spelling; {@link #reader} is the scoped,
+     * constructor-only view.
      */
     public TsonCompiledSchema compiledSchema() {
-        return compiledSchema;
+        return this;
     }
 
     /**

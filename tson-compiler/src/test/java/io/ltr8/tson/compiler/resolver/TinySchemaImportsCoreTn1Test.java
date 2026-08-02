@@ -5,6 +5,7 @@ import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
+import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
@@ -83,9 +84,9 @@ class TinySchemaImportsCoreTn1Test {
         SchemaDocument metaKernelDocument = new TsonSchemaParser(
                 TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID)).parseSchemaDocument();
         TsonSchema resolvedMetaKernel = new SchemaResolver(loader).resolveSchema(metaKernelDocument);
-        registry.register(resolvedMetaKernel, loader.load(TsonBundledSchemas.META_KERNEL_ID));
+        registry.register(resolvedMetaKernel, loader.loadMeta(TsonBundledSchemas.META_KERNEL_ID));
 
-        TsonCompiledMetaSchema compiledMeta = loader.load(TsonBundledSchemas.META_ID);
+        TsonCompiledMetaSchema compiledMeta = loader.loadMeta(TsonBundledSchemas.META_ID);
         loader.load(TsonBundledSchemas.CORE_ID); // must be registered before the tiny schema's own !!import can find it
 
         SchemaDocument tinyDocument = new TsonSchemaParser(TINY_DOCUMENT).parseSchemaDocument();
@@ -105,22 +106,24 @@ class TinySchemaImportsCoreTn1Test {
         // registers, and compiles -- governed by meta.tn's own compiled reader, the same one
         // core.tn itself was compiled against. my_record's own field dispatches to a real,
         // manually-bound RecordBindReader here, via MANUAL_BINDER above.
-        TsonCompiledMetaSchema compiledTiny = registry.register(resolvedTiny, compiledMeta);
+        TsonCompiledSchema compiledTiny = registry.register(resolvedTiny, compiledMeta);
 
         // Reading real data through the compiled readers proves core.tn's own vocabulary was
-        // genuinely reached, not just referenced at the resolver level.
-        Object myIntValue = compiledTiny.compiledSchema().get("my_int")
+        // genuinely reached, not just referenced at the resolver level. (compiledTiny is a plain
+        // TsonCompiledSchema -- the tiny schema's !!meta is meta.tn, so it is not a governing
+        // meta-layer schema; read its entries directly, no .compiledSchema() hop.)
+        Object myIntValue = compiledTiny.get("my_int")
                 .read("42");
         assertEquals(42, myIntValue);
 
-        Object myPercentageValue = compiledTiny.compiledSchema().get("my_percentage")
+        Object myPercentageValue = compiledTiny.get("my_percentage")
                 .read("50");
         assertEquals(BigInteger.valueOf(50), myPercentageValue);
 
         // The record case: real TSON data binds directly to the manually-registered MyRecord class,
         // its own "value" field narrowed through core.tn's own int32 the same way an ordinary
         // schema-declared field would be.
-        Object myRecordValue = compiledTiny.compiledSchema().get("my_record")
+        Object myRecordValue = compiledTiny.get("my_record")
                 .read("{ value: 7 }");
         assertEquals(new MyRecord(7), myRecordValue);
     }

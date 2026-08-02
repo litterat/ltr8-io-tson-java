@@ -4,6 +4,7 @@ import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
+import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.config.TsonCompiledRegistry;
@@ -59,7 +60,7 @@ class CoreSchemaImportTest {
         SchemaDocument metaKernelDocument = new TsonSchemaParser(
                 TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID)).parseSchemaDocument();
         TsonSchema resolvedMetaKernel = new SchemaResolver(loader).resolveSchema(metaKernelDocument);
-        registry.register(resolvedMetaKernel, loader.load(TsonBundledSchemas.META_KERNEL_ID));
+        registry.register(resolvedMetaKernel, loader.loadMeta(TsonBundledSchemas.META_KERNEL_ID));
 
         loader.load(TsonBundledSchemas.META_ID);
         loader.load(TsonBundledSchemas.CORE_ID); // needs meta.tn1 registered first, same reasoning
@@ -121,12 +122,14 @@ class CoreSchemaImportTest {
         TsonSchema core = loaded.schemaRegistry().get(TsonBundledSchemas.CORE_ID).orElseThrow().schema();
 
         // A cache hit on TsonCompiledRegistry's own store -- core.tn1 was already compiled inside
-        // loadMetaKernelMetaAndCore, this just fetches that same TsonCompiledMetaSchema back.
-        TsonCompiledMetaSchema compiledCore = loaded.loader().load(TsonBundledSchemas.CORE_ID);
+        // loadMetaKernelMetaAndCore, this just fetches that same TsonCompiledSchema back. core.tn is
+        // not a meta-layer schema (its !!meta is meta.tn, not meta-kernel), so it's a plain
+        // TsonCompiledSchema, not a governing TsonCompiledMetaSchema.
+        TsonCompiledSchema compiledCore = loaded.loader().load(TsonBundledSchemas.CORE_ID);
 
         Set<String> errored = new TreeSet<>();
         for (String name : core.entries().keySet()) {
-            TsonValueReader<?> reader = compiledCore.compiledSchema().get(name);
+            TsonValueReader<?> reader = compiledCore.get(name);
             if (reader.getClass().getSimpleName().equals("ErrorReader")) {
                 errored.add(name);
             }

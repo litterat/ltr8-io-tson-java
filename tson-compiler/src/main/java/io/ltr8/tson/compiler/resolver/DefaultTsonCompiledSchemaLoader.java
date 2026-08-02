@@ -2,6 +2,7 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.compiler.ContentHash;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
+import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.TsonSchemaSource;
@@ -100,9 +101,9 @@ public final class DefaultTsonCompiledSchemaLoader implements TsonCompiledSchema
     }
 
     @Override
-    public TsonCompiledMetaSchema load(String uri) {
+    public TsonCompiledSchema load(String uri) {
         String identity = TsonSchemaRegistry.canonicalIdentity(uri);
-        Optional<TsonCompiledMetaSchema> cached = registry.get(uri);
+        Optional<TsonCompiledSchema> cached = registry.get(uri);
         if (cached.isPresent()) {
             // Already resolved: verify *this* reference's own pin against the identity's content hash.
             // A conflicting pin (a different digest than the one this identity was verified against)
@@ -135,7 +136,7 @@ public final class DefaultTsonCompiledSchemaLoader implements TsonCompiledSchema
         // namespace, so this is a cache hit, not a second compile -- registry.register still needs
         // the governing TsonCompiledMetaSchema itself as its own second argument, which resolveSchema
         // has no way to hand back (it returns only the resolved TsonSchema).
-        TsonCompiledMetaSchema governingMeta = load(document.meta());
+        TsonCompiledMetaSchema governingMeta = loadMeta(document.meta());
         return registry.register(resolved, governingMeta);
     }
 

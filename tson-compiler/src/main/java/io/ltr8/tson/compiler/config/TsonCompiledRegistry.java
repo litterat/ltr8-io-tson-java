@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler.config;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
+import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaLinker;
@@ -13,8 +14,12 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * A store of compiled meta-schemas ({@link TsonCompiledMetaSchema}), paired one-to-one with a
- * {@link TsonSchemaRegistry}'s own store of resolved, validated schemas.
+ * A store of compiled schemas, paired one-to-one with a {@link TsonSchemaRegistry}'s own store of
+ * resolved, validated schemas. A meta-layer schema (its own {@code !!meta} is meta-kernel) is stored
+ * as the {@link TsonCompiledMetaSchema} subtype -- the only kind able to govern another schema's
+ * compilation; every other schema is stored as a bare {@link TsonCompiledSchema}. {@link #getMeta}
+ * narrows a lookup to the governing subtype, so a non-meta schema can never be handed back where a
+ * governing meta is required.
  *
  * <p>Startup sequence this exists for: bootstrap meta-kernel ({@link
  * TsonCompiledMetaSchema#bootstrap}, outside this class entirely -- it needs no registry at all),
@@ -39,7 +44,7 @@ public final class TsonCompiledRegistry {
 
     private final TsonSchemaRegistry schemaRegistry;
     private final ValueReaderFactoryResolver resolver;
-    private final Map<String, TsonCompiledMetaSchema> compiled = new LinkedHashMap<>();
+    private final Map<String, TsonCompiledSchema> compiled = new LinkedHashMap<>();
 
     /** A fresh, empty {@link TsonSchemaRegistry} of its own -- the common case: this registry owns the whole registration+compilation pipeline for its caller. */
     public TsonCompiledRegistry(ValueReaderFactoryResolver resolver) {
@@ -67,28 +72,51 @@ public final class TsonCompiledRegistry {
      * #schemaRegistry} itself as the lookup source for {@code !!import}/{@code !!meta} targets) and
      * registers the result (via {@link TsonSchemaRegistry#register}, so the usual {@code
      * !!import}-merging/reference-validation rules all apply exactly as they would calling that
-     * directly), compiles the *registered* result against {@code governingMeta} (never the raw
-     * input -- a compiled reader needs linking already done), wraps the result as this schema's own
-     * {@link TsonCompiledMetaSchema}, and stores it keyed by {@code schema}'s own {@code !!id}.
-     * Returns the wrapped result, so the immediate next schema in a governing chain (which needs
-     * *this* return value as its own {@code governingMeta} argument) doesn't have to call {@link
-     * #get} right back.
+     * directly), then compiles the *registered* result against {@code governingMeta} (never the raw
+     * input -- a compiled reader needs linking already done) and stores it keyed by {@code schema}'s
+     * own {@code !!id}.
+     *
+     * <p>A meta-layer schema (its own {@code !!meta} is meta-kernel) is wrapped as a {@link
+     * TsonCompiledMetaSchema} so it can go on to govern others; every other schema is stored as the
+     * bare {@link TsonCompiledSchema} it compiled to. The result is returned directly, so the
+     * immediate next schema in a governing chain (which needs a governing meta -- reachable via {@link
+     * #getMeta}) doesn't have to look it up again.
      *
      * @param governingMeta the already-compiled meta-schema {@code schema.meta()} names -- meta-
      *                       kernel's own case aside (see {@link TsonCompiledMetaSchema#bootstrap}),
-     *                       always a previous call's own return value
+     *                       always a previous call's own {@link #getMeta} result
      */
-    public synchronized TsonCompiledMetaSchema register(TsonSchema schema, TsonCompiledMetaSchema governingMeta) {
+    public synchronized TsonCompiledSchema register(TsonSchema schema, TsonCompiledMetaSchema governingMeta) {
         TsonLinkedSchema linked = TsonSchemaLinker.link(schema, schemaRegistry);
         TsonLinkedSchema registered = schemaRegistry.register(linked);
         TsonCompiledSchema compiledSchema = TsonSchemaCompiler.compile(registered, governingMeta);
-        TsonCompiledMetaSchema compiledMeta = new TsonCompiledMetaSchema(compiledSchema, resolver);
-        compiled.put(TsonSchemaRegistry.canonicalIdentity(registered.schema().id()), compiledMeta);
-        return compiledMeta;
+        TsonCompiledSchema result = isMetaLayer(registered.schema())
+                ? new TsonCompiledMetaSchema(compiledSchema, resolver)
+                : compiledSchema;
+        compiled.put(TsonSchemaRegistry.canonicalIdentity(registered.schema().id()), result);
+        return result;
     }
 
     /** {@code id} is matched by canonical identity ({@link TsonSchemaRegistry#canonicalIdentity}), so any spelling -- pinned or plain -- of a registered schema's own {@code !!id} finds it. */
-    public synchronized Optional<TsonCompiledMetaSchema> get(String id) {
+    public synchronized Optional<TsonCompiledSchema> get(String id) {
         return Optional.ofNullable(compiled.get(TsonSchemaRegistry.canonicalIdentity(id)));
+    }
+
+    /**
+     * As {@link #get}, narrowed to a governing meta-schema: present only when {@code id} names a registered
+     * meta-layer schema. A non-meta schema is never handed back here, so it can't be passed where a governing
+     * meta is required.
+     */
+    public synchronized Optional<TsonCompiledMetaSchema> getMeta(String id) {
+        return get(id).filter(TsonCompiledMetaSchema.class::isInstance).map(TsonCompiledMetaSchema.class::cast);
+    }
+
+    /**
+     * A meta-layer schema is one whose own {@code !!meta} names meta-kernel (§9's meta layer: meta-kernel and
+     * meta). Only such a schema compiles to a {@link TsonCompiledMetaSchema} and may govern others.
+     */
+    private static boolean isMetaLayer(TsonSchema schema) {
+        return TsonSchemaRegistry.canonicalIdentity(schema.meta())
+                .equals(TsonSchemaRegistry.canonicalIdentity(TsonBundledSchemas.META_KERNEL_ID));
     }
 }

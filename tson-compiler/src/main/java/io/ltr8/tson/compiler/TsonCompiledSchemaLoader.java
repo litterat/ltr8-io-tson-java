@@ -33,5 +33,23 @@ public interface TsonCompiledSchemaLoader {
      *                          {@link TsonSchemaSource#registeredOnly()}, or whatever a caller-supplied
      *                          {@link TsonSchemaSource} itself throws.
      */
-    TsonCompiledMetaSchema load(String uri);
+    TsonCompiledSchema load(String uri);
+
+    /**
+     * {@link #load}, narrowed to a governing meta-schema -- used to resolve a document's own {@code
+     * !!meta} target, which must be a meta-layer schema. A schema whose {@code !!meta} names something
+     * that isn't a meta-layer schema (so it compiled to a bare {@link TsonCompiledSchema}, not a
+     * {@link TsonCompiledMetaSchema}) is an error: only a meta-layer schema may govern another.
+     *
+     * @throws IllegalStateException if {@code uri} resolves but isn't a meta-layer schema (in addition
+     *                               to whatever {@link #load} itself may throw)
+     */
+    default TsonCompiledMetaSchema loadMeta(String uri) {
+        TsonCompiledSchema loaded = load(uri);
+        if (loaded instanceof TsonCompiledMetaSchema meta) {
+            return meta;
+        }
+        throw new IllegalStateException("'" + uri + "' is not a meta-layer schema (its own !!meta is not "
+                + "meta-kernel) and cannot govern another schema");
+    }
 }

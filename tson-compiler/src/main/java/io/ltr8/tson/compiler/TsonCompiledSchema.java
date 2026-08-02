@@ -16,15 +16,17 @@ import java.util.Optional;
  * TsonSchemaLinker}/{@code TsonLinkedSchema}, {@code TsonSchemaResolver}/its own resolved {@code
  * TsonSchema}).
  *
- * <p>{@link #get} reads *any* entry, unscoped -- unlike {@link TsonCompiledMetaSchema#reader},
- * which is deliberately scoped to only the entries a governing meta-schema itself declares as
- * constructors (§3.3.1's structure-namespace rule). A caller holding a bare {@code
- * TsonCompiledSchema} directly (rather than the {@link TsonCompiledMetaSchema} that wraps one) has
- * already opted out of that scoping -- e.g. a caller reading an arbitrary resolved entry directly,
- * or {@link TsonCompiledMetaSchema} itself, which needs unscoped access while first building its
- * own {@code reader()} lookup.
+ * <p>The compile output for *any* resolved schema. A meta-layer schema (one whose {@code !!meta} is
+ * meta-kernel) compiles to the {@link TsonCompiledMetaSchema} subtype, which adds the scoped
+ * constructor vocabulary needed to *govern* another schema's compilation; every other schema compiles
+ * to a bare {@code TsonCompiledSchema}, which can be read but never used as a governing meta. So the
+ * type itself records whether a compiled schema is allowed to govern.
+ *
+ * <p>{@link #get} reads *any* entry, unscoped -- unlike {@link TsonCompiledMetaSchema#reader}, which
+ * is deliberately scoped to only the entries a governing meta-schema itself declares as constructors
+ * (§3.3.1's structure-namespace rule).
  */
-public final class TsonCompiledSchema {
+public sealed class TsonCompiledSchema permits TsonCompiledMetaSchema {
 
     private final TsonLinkedSchema linkedSchema;
     private final Map<String, TsonValueReader<?>> entries;
@@ -32,6 +34,22 @@ public final class TsonCompiledSchema {
     public TsonCompiledSchema(TsonLinkedSchema linkedSchema, Map<String, TsonValueReader<?>> entries) {
         this.linkedSchema = linkedSchema;
         this.entries = entries;
+    }
+
+    /**
+     * The {@link TsonLinkedSchema} this was compiled from -- package-private, so the {@link
+     * TsonCompiledMetaSchema} subtype can pass it to {@code super} when built from an existing base schema.
+     */
+    TsonLinkedSchema linkedSchema() {
+        return linkedSchema;
+    }
+
+    /**
+     * The compiled readers, by entry name -- package-private, same reason as {@link #linkedSchema()}. The map
+     * is already immutable ({@link TsonSchemaCompiler} copies it before construction).
+     */
+    Map<String, TsonValueReader<?>> entries() {
+        return entries;
     }
 
     public TsonValueReader<?> get(String typeName) {

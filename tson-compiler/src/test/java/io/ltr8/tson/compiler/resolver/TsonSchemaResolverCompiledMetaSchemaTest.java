@@ -83,7 +83,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         String metaKernelSource = TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID);
         SchemaDocument metaKernelDocument = new TsonSchemaParser(metaKernelSource).parseSchemaDocument();
         TsonSchema metaKernel = new SchemaResolver(loader).resolveSchema(metaKernelDocument);
-        registry.register(metaKernel, loader.load(TsonBundledSchemas.META_KERNEL_ID));
+        registry.register(metaKernel, loader.loadMeta(TsonBundledSchemas.META_KERNEL_ID));
 
         loader.load(TsonBundledSchemas.META_ID);
 
@@ -120,7 +120,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         assertEquals(TsonSchemaRegistry.canonicalIdentity(TsonBundledSchemas.META_ID),
                 TsonSchemaRegistry.canonicalIdentity(coreDocument.meta()));
 
-        TsonCompiledMetaSchema compiledMeta = loader.load(coreDocument.meta());
+        TsonCompiledMetaSchema compiledMeta = loader.loadMeta(coreDocument.meta());
 
         assertTrue(compiledMeta.schema().entries().containsKey("binary_encoding"));
     }
@@ -130,7 +130,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         DefaultTsonCompiledSchemaLoader loader = loadMetaKernelAndMeta();
         SchemaDocument coreDocument = new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.CORE_ID)).parseSchemaDocument();
 
-        TsonCompiledMetaSchema compiledMeta = loader.load(coreDocument.meta());
+        TsonCompiledMetaSchema compiledMeta = loader.loadMeta(coreDocument.meta());
         Object result = compiledMeta.compiledSchema().get("binary_encoding")
                 .read("BASE64");
 
@@ -151,7 +151,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         assertEquals(TsonSchemaRegistry.canonicalIdentity(TsonBundledSchemas.META_KERNEL_ID),
                 TsonSchemaRegistry.canonicalIdentity(metaDocument.meta()));
 
-        TsonCompiledMetaSchema compiledMetaKernel = loader.load(metaDocument.meta());
+        TsonCompiledMetaSchema compiledMetaKernel = loader.loadMeta(metaDocument.meta());
 
         // "integer_type" is meta-kernel's own -- not one of meta.tn's own 31 declarations -- so its
         // presence confirms this genuinely reached meta-kernel's compiled reader, not meta.tn's own.
@@ -164,7 +164,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         SchemaDocument metaDocument =
                 new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.META_ID)).parseSchemaDocument();
 
-        TsonCompiledMetaSchema compiledMetaKernel = loader.load(metaDocument.meta());
+        TsonCompiledMetaSchema compiledMetaKernel = loader.loadMeta(metaDocument.meta());
         Object result = compiledMetaKernel.compiledSchema().get("product_access_type")
                 .read("INDEX");
 
@@ -367,7 +367,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         // fetch-and-resolve-via-SchemaResolver(this) path for this URI, this call would recurse
         // forever (resolveSchema -> loader.load(sameUri) -> ...).
         // Completing at all is the proof; the assertions below just confirm it's genuinely usable.
-        TsonCompiledMetaSchema compiled = loader.load(TsonBundledSchemas.META_KERNEL_ID);
+        TsonCompiledMetaSchema compiled = loader.loadMeta(TsonBundledSchemas.META_KERNEL_ID);
 
         // 58, matching a genuinely registered meta-kernel: the one-off bootstrap runs
         // MetaKernelBootstrapResolver's own raw output through TsonSchemaLinker.linkBootstrap (no
@@ -388,8 +388,8 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         TsonCompiledRegistry registry = new TsonCompiledRegistry(ValueReaderFactoryRegistry.dom());
         DefaultTsonCompiledSchemaLoader loader = new DefaultTsonCompiledSchemaLoader(registry);
 
-        TsonCompiledMetaSchema first = loader.load(TsonBundledSchemas.META_KERNEL_ID);
-        TsonCompiledMetaSchema second = loader.load(TsonBundledSchemas.META_KERNEL_ID);
+        TsonCompiledMetaSchema first = loader.loadMeta(TsonBundledSchemas.META_KERNEL_ID);
+        TsonCompiledMetaSchema second = loader.loadMeta(TsonBundledSchemas.META_KERNEL_ID);
 
         assertNotSame(first, second);
         assertTrue(registry.get(TsonBundledSchemas.META_KERNEL_ID).isEmpty());
@@ -433,9 +433,9 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         String metaKernelSource = TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID);
         SchemaDocument metaKernelDocument = new TsonSchemaParser(metaKernelSource).parseSchemaDocument();
         TsonSchema metaKernel = new SchemaResolver(loader).resolveSchema(metaKernelDocument);
-        registry.register(metaKernel, loader.load(TsonBundledSchemas.META_KERNEL_ID));
+        registry.register(metaKernel, loader.loadMeta(TsonBundledSchemas.META_KERNEL_ID));
 
-        TsonCompiledMetaSchema compiled = loader.load(TsonBundledSchemas.META_ID);
+        TsonCompiledMetaSchema compiled = loader.loadMeta(TsonBundledSchemas.META_ID);
 
         assertEquals("BASE64", compiled.compiledSchema().get("binary_encoding")
                 .read("BASE64"));

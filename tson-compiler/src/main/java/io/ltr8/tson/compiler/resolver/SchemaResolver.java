@@ -108,7 +108,7 @@ public final class SchemaResolver {
             TsonSchemaRegistry.validateIdentity(importUri);
         }
 
-        TsonCompiledMetaSchema metaParser = loader.load(document.meta());
+        TsonCompiledMetaSchema metaParser = loader.loadMeta(document.meta());
         Map<String, TypeDefinition> namespace = mergeImports(document);
         DefinitionResolver definitionResolver = new DefinitionResolver(
                 (type, value) -> (Top) metaParser.reader(type)
