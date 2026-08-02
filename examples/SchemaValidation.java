@@ -7,8 +7,9 @@
 ///   java --module-path tson/build/modules --add-modules io.ltr8.tson examples/SchemaValidation.java
 ///
 /// `Tson.builder().build()` bootstraps the standard library (meta-kernel/meta.tn/core.tn);
-/// `domRegistry().compile(...)` turns a resolved schema into fast, reusable per-type readers. DOM mode
-/// returns a plain Map, so no Java class is involved -- the TSON schema itself is the source of truth.
+/// `treeRegistry().compile(...)` turns a resolved schema into fast, reusable per-type readers. Tree mode
+/// returns an immutable, queryable TsonNode -- no Java class involved, the TSON schema is the source of
+/// truth -- that preserves structure and types and is navigable with get/at.
 import module io.ltr8.tson;
 
 void main() {
@@ -22,10 +23,12 @@ void main() {
                 server => { hostname: text  port: int32 }
             }""";
 
-    var compiled = tson.domRegistry().compile(tson.resolve(schema));
+    var compiled = tson.treeRegistry().compile(tson.resolve(schema));
     var reader = compiled.get("server");
 
-    IO.println("valid:   " + reader.read("{ hostname: \"web-01\"  port: 8080 }"));   // {hostname=web-01, port=8080}
+    TsonNode server = (TsonNode) reader.read("{ hostname: \"web-01\"  port: 8080 }");
+    IO.println("hostname: " + server.get("hostname").asString().orElseThrow());   // web-01
+    IO.println("port:     " + server.at("/port").asNumber().orElseThrow());        // 8080
 
     // A bad value surfaces as a diagnostic rather than a wrong result. Collect every problem in one
     // pass instead of stopping at the first:

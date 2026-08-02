@@ -27,16 +27,17 @@ import java.util.Optional;
  *
  * <pre>{@code
  * Tson tson = Tson.builder().build();
- * TsonCompiledSchema compiled = tson.domRegistry().compile(tson.resolve(schemaText));
- * Object value = compiled.get("my_type").read(dataText);
+ * TsonCompiledSchema compiled = tson.treeRegistry().compile(tson.resolve(schemaText));
+ * TsonNode value = compiled.get("my_type").read(dataText);   // queryable, structure-preserving, typed
  * }</pre>
  *
- * <p><b>The read mode is which registry you hold, not a parameter.</b> {@link #domRegistry()} reads to
- * plain {@code Map}/{@code List}; {@link #bindRegistry()} reads to real Java objects (bound via {@link
- * #dataBindContext()}). Both sit over one shared, bind-mode resolution core: resolving an {@code
- * Instance}/{@code AtomRefinement} declaration (meta.tn's/core.tn's own {@code binary_encoding => !enum
- * [...]}, {@code int32 => !integer ^ {...}}, and so on) binds it to a {@code schema.meta.Top} object,
- * which a DOM reader's plain {@code Map}/{@code List} output can't stand in for -- so resolution is always
+ * <p><b>The read mode is which registry you hold, not a parameter.</b> {@link #treeRegistry()} reads into an
+ * immutable, queryable {@code TsonNode} (structure-preserving, typed leaves -- the recommended default);
+ * {@link #bindRegistry()} reads to real Java objects (bound via {@link #dataBindContext()}); {@link
+ * #domRegistry()} reads to plain, lossy {@code Map}/{@code List}. All sit over one shared, bind-mode
+ * resolution core: resolving an {@code Instance}/{@code AtomRefinement} declaration (meta.tn's/core.tn's own
+ * {@code binary_encoding => !enum [...]}, {@code int32 => !integer ^ {...}}, and so on) binds it to a {@code
+ * schema.meta.Top} object, which a non-binding reader's output can't stand in for -- so resolution is always
  * bind-anchored regardless of read mode, and {@link #resolve} takes no mode. Only the final compile of an
  * already-resolved, already-linked schema (a registry's own {@code compile}/{@code get}) picks a mode.
  *
@@ -56,6 +57,7 @@ import java.util.Optional;
 public final class Tson {
 
     private final TsonCompiledMetaRegistry core;
+    private final TsonCompiledSchemaRegistry tree;
     private final TsonCompiledSchemaRegistry dom;
     private final TsonCompiledSchemaRegistry bind;
     private final DataBindContext dataBindContext;
@@ -63,6 +65,7 @@ public final class Tson {
     Tson(TsonCompiledMetaRegistry core, DataBindContext dataBindContext) {
         this.core = core;
         this.dataBindContext = dataBindContext;
+        this.tree = TsonCompiledSchemaRegistry.tree(core);
         this.dom = TsonCompiledSchemaRegistry.dom(core);
         this.bind = TsonCompiledSchemaRegistry.bind(core, dataBindContext);
     }
@@ -91,7 +94,7 @@ public final class Tson {
      * Resolves, links, and registers {@code schemaText} -- its own {@code !!meta} must already be
      * registered here (meta-kernel, meta.tn, or core.tn), and any {@code !!import} it carries must
      * resolve the same way. Deliberately stops short of compiling -- compiling in a chosen mode is a
-     * registry's job ({@link #domRegistry()}/{@link #bindRegistry()}), independent of the object-binding
+     * registry's job ({@link #treeRegistry()}/{@link #bindRegistry()}), independent of the object-binding
      * mode this always used internally.
      */
     public TsonLinkedSchema resolve(String schemaText) {
@@ -100,7 +103,17 @@ public final class Tson {
         return core.schemaRegistry().register(TsonSchemaLinker.link(resolved, core.schemaRegistry()));
     }
 
-    /** The DOM read registry over this instance's resolution core -- reads user schemas to plain {@code Map}/{@code List} (no Java class per type). */
+    /**
+     * The recommended read registry -- reads user schemas into an immutable, queryable {@link
+     * io.ltr8.tson.compiler.tree.TsonNode} tree: structure-preserving (record vs map, array vs tuple) with
+     * typed leaves and null-safe navigation, and no Java class per schema type. This is what {@link
+     * #validate} reads through.
+     */
+    public TsonCompiledSchemaRegistry treeRegistry() {
+        return tree;
+    }
+
+    /** The DOM read registry -- reads user schemas to plain {@code Map}/{@code List} (no Java class per type). A lower-level, lossy alternative to {@link #treeRegistry()} (record-vs-map and array-vs-tuple collapse); prefer the tree. */
     public TsonCompiledSchemaRegistry domRegistry() {
         return dom;
     }
@@ -113,7 +126,7 @@ public final class Tson {
     /**
      * Validates a data document, working out on its own whether a schema applies. If the document
      * declares a {@code !!schema}, that URI selects the schema (resolved through this instance's own
-     * {@link TsonConfig#schemaSource} and compiled once, in DOM mode) and the document's root type-ref
+     * {@link TsonConfig#schemaSource} and compiled once, in tree mode) and the document's root type-ref
      * (e.g. {@code !person}) selects the type; with no {@code !!schema} it's validated schemalessly
      * (Class 1: base syntax plus built-in / core-vocabulary atoms).
      *
@@ -132,7 +145,7 @@ public final class Tson {
 
         TsonCompiledSchema compiled;
         try {
-            compiled = dom.get(start.schema().get());
+            compiled = tree.get(start.schema().get());
         } catch (RuntimeException e) {
             return List.of(problem(Diagnostic.Code.SCHEMA_ERROR, e.getMessage()));
         }
