@@ -241,8 +241,6 @@ you `get` the reader for a type and `read` data against it. **DOM mode** produce
 
 ```java
 import io.ltr8.tson.Tson;
-import io.ltr8.tson.compiler.TsonSchemaCompiler;
-
 Tson tson = Tson.builder().build();
 
 String schema = """
@@ -253,11 +251,11 @@ String schema = """
             server => { hostname: text  port: int32 }
         }""";
 
-var compiled = tson.compile(schema, TsonSchemaCompiler.dom());
+var compiled = tson.domRegistry().compile(tson.resolve(schema));
 
 @SuppressWarnings("unchecked")
 Map<String, Object> value = (Map<String, Object>)
-        compiled.compiledSchema().get("server").read("{ hostname: \"web-01\" port: 8080 }");
+        compiled.get("server").read("{ hostname: \"web-01\" port: 8080 }");
 // { hostname=web-01, port=8080 } — validated against the schema; a bad port would surface as a diagnostic
 ```
 

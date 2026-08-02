@@ -233,6 +233,18 @@ everything outstanding is tracked in one place.)
 
 ## Done
 
+- [x] **Registry split: a shared meta/resolution core plus per-mode user-schema read registries**
+  (2026-08-02, follow-on; see CLAUDE.md's own "The registry split arc" section). The single compiled
+  registry became `TsonCompiledMetaRegistry` (the renamed old `TsonCompiledSchemaRegistry`, narrowed to
+  compile+cache meta-layer schemas only, and the on-demand loader) plus a reused-name
+  `TsonCompiledSchemaRegistry` for compiled user schemas, built via `dom(core)`/`bind(core, context)`.
+  The read *mode* is now which registry a caller holds, not a `compile(x, mode)` parameter —
+  `Tson.domRegistry()`/`bindRegistry()` replaced it; core.tn and user schemas are resolve-only in the
+  core (`resolveLinked`), compiled per mode in a read registry; the loader interface collapsed to
+  `resolveLinked`/`loadMeta` (generic `load`/`getMeta` gone); and `ValueReaderFactoryResolver` moved
+  from the exported `config` package to the unexported `reader` package, so a consumer can no longer
+  name it. JSON remains a deliberate future (its own event stream + readers, not reusing the TSON
+  readers — not backlogged yet).
 - [x] **Governing-meta eligibility is now enforced at the type level — the meta/non-meta split from
   the `TsonCompiledSchemaRegistry` cleanup arc** (2026-08-02; see CLAUDE.md's own
   "`TsonCompiledSchemaRegistry` cleanup arc" section). Closes the *type-level* item of the old "Layer
@@ -452,9 +464,10 @@ everything outstanding is tracked in one place.)
   "Atom-refinement constraint validation" item as before.
   Remaining, lower-priority cleanup identified along the way, not blocking and not yet started —
   pick up as other work happens to touch this area: removing the `config` package entirely (folding
-  `SchemaMetaNameBinder`/`TsonAtomContext`/`ValueReaderFactoryResolver` somewhere that isn't its own
-  separate "configuration" layer — `TsonCompiledSchemaRegistry` has since moved out of `config` to the
-  root package as part of the 2026-08-02 arc, so `config` is down to those three); and further polish
+  `SchemaMetaNameBinder`/`TsonAtomContext`/`SourcePositionStringBridge` somewhere that isn't its own
+  separate "configuration" layer — `TsonCompiledSchemaRegistry` moved out of `config` to the root
+  package in the 2026-08-02 cleanup arc, and `ValueReaderFactoryResolver` moved on to `reader` in the
+  follow-on registry-split arc, so `config` is down to those three); and further polish
   on the facade
   interfaces themselves (`TsonCompiledSchemaLoader`/`TsonSchemaSource`/`TsonValueReaderResolver`) once
   it's clearer what a caller actually needs from them in practice.

@@ -3103,6 +3103,12 @@ check the sibling repo out, so this always shows as skipped in CI; that's expect
 
 ### The `TsonCompiledSchemaRegistry` cleanup arc (2026-08-02)
 
+> **Partly superseded — see "The registry split arc" immediately below.** This arc's own
+> `TsonCompiledSchemaRegistry` was renamed to **`TsonCompiledMetaRegistry`** and narrowed to the meta
+> layer only; the `TsonCompiledSchemaRegistry` name was reused for the new per-mode user-schema read
+> registry, and `load`/`getMeta` were replaced by `resolveLinked`/`loadMeta`. The names and behavior in
+> the follow-on section below are the current truth; this section keeps its own dated narrative.
+
 An eight-step refactor (each its own reviewed commit) that turned the compiled-schema registry + loader
 into one coherent, correctly-scoped, correctly-typed unit and moved the whole load/bootstrap pipeline out
 of `Tson`/`TsonConfig` into `tson-compiler`. **This supersedes the details in "Compiled schema registry",
@@ -3184,6 +3190,88 @@ Every stage kept the full suite green (1295 tests). The whole bundled chain and 
 under enforcement, so no valid schema is out of scope. `Tson`/`TsonConfig` are now thin over the
 registry, which owns the whole parse → resolve → link → register → compile pipeline plus bundled-library
 loading, is the on-demand loader, and can only be constructed in the (correct) object-binding mode.
+
+### The registry split arc (2026-08-02, follow-on)
+
+A six-stage refactor (each its own reviewed commit) immediately following the arc above, splitting the
+single compiled-schema registry into a shared **meta/resolution core** plus **per-mode user-schema read
+registries**, and finishing the `ValueReaderFactoryResolver` hiding. **This supersedes the arc above (and
+the older "Compiled schema registry"/"Configuration package"/"Front door module" sections) wherever they
+conflict** — those keep their dated narratives, but the names, packages, and behavior below are the
+current truth.
+
+**The motivating insight (the user's):** the read *mode* — DOM (plain `Map`/`List`) vs object-binding
+(real Java objects) — shouldn't be a parameter threaded through every `compile` call; it should be *which
+registry you hold*. A future JSON reader is a whole separate stack (its own `JsonEventStream` and its own
+readers, deliberately **not** reusing the TSON readers — confirmed with the user, not even a backlog item
+yet), so this arc is purely the DOM-vs-bind mode axis within TSON. The `TsonEventSource` is therefore not
+shared across formats — that complexity isn't needed.
+
+**The resulting shape — two registries over one shared core:**
+- **`TsonCompiledMetaRegistry`** (root package) — the renamed old `TsonCompiledSchemaRegistry`, now
+  narrowed to compile+cache **only meta-layer schemas** (meta-kernel, meta.tn — those whose own `!!meta`
+  is meta-kernel). It owns the shared `TsonSchemaRegistry`, the bind-mode resolver, the `TsonSchemaSource`,
+  content-hash verification, and the meta-kernel bootstrap, and *is* the `TsonCompiledSchemaLoader`. The
+  name is now literally accurate.
+- **`TsonCompiledSchemaRegistry`** (root package, name reused for the parallel to `TsonCompiledMetaRegistry`:
+  compiled *user* schemas vs compiled *metas*) — a per-mode registry over a core, built via
+  `TsonCompiledSchemaRegistry.dom(core)` / `bind(core, context)` (one concrete class, two static
+  factories — an earlier abstract base + two subclasses was collapsed on the user's own direction).
+  `get(uri)` resolves through the core and compiles the linked form in its own mode (cached by identity);
+  `compile(linked)` is the uncached standalone primitive.
+
+The stages, in order:
+
+1. **Rename** `TsonCompiledSchemaRegistry` → `TsonCompiledMetaRegistry` (pure rename, establishing the
+   meta-core name up front so later stages are written against final names).
+2. **Introduce the per-mode `TsonCompiledSchemaRegistry`** (reusing the freed name) — `dom`/`bind` static
+   factories over a core.
+3. **Wire into `Tson`/`TsonConfig`**: `domRegistry()`/`bindRegistry()` accessors replace `compile(x,
+   mode)` — the read mode is which registry you hold, no `ValueReaderFactoryResolver` parameter; `validate`
+   routes through the DOM registry; the `validationSchemas`/`domCompiled` cache and the separate `loader`
+   field fold away (the core *is* the loader). `DiagnosticsSchema` sets its own bind context via
+   `Tson.builder().dataBindContext(ctx)` and compiles through `bindRegistry()`.
+4. **Peel user-schema compile/cache out of the core** via `resolveLinked(uri)` (fetch/resolve/link/register
+   into the shared `TsonSchemaRegistry`, but **no** compile and no compiled-cache entry); `register` splits
+   into link+register / `compileAndCache`; the user registry resolves via `resolveLinked` and compiles the
+   linked form in its own mode — so a user schema is never bind-compiled in the core just to be read.
+5. **Narrow the core to meta-only**: core.tn (its `!!meta` is meta.tn, so not a meta) becomes resolve-only,
+   joining user schemas — its compiled form was never used in production (`SchemaResolver.mergeImports` only
+   read an import's `.schema()`; core.tn is never a governing meta), only by tests, which now compile it
+   through a read registry. The loader interface collapses to two honest methods, `resolveLinked(uri) →
+   TsonLinkedSchema` (imports + user schemas) and `loadMeta(uri) → TsonCompiledMetaSchema` (governing
+   metas); the generic `load → TsonCompiledSchema` and `getMeta` are gone; `register`/`get`/`compileAndCache`
+   narrow to `TsonCompiledMetaSchema`; the `compiled` map is meta-typed. `registerBundled` branches:
+   metas compile+cache, core.tn resolve-only.
+6. **Hide `ValueReaderFactoryResolver`**: moved from the exported `config` package to the unexported
+   `reader` package — a consumer can no longer name it (JPMS-enforced; verified by a scratch import from
+   the `tson` module failing to compile). `TsonSchemaCompiler.dom()`/`bind()` removed (callers use
+   `ValueReaderFactoryRegistry.dom()`/`bind(context)`). `bootstrap` folds off `TsonCompiledMetaSchema`
+   (static, taking the resolver) onto `TsonCompiledMetaRegistry` as a non-static member using
+   `this.resolver` — dropping the resolver parameter and its `-Xlint:exports` warning, and putting it on
+   the class that owns the resolver (public, not private, because `DefinitionResolverTest` builds synthetic
+   governing metas through it cross-package). `TsonCompiledMetaSchema`'s constructor → package-private;
+   `TsonCompiledMetaRegistry.resolver()` removed (its one test caller uses `loadMeta` instead). **One
+   accepted `-Xlint:exports` warning remains** on the public standalone `TsonSchemaCompiler.compile(linked,
+   ValueReaderFactoryResolver)` — eliminating it would mean reworking 17 reader-package tests to route
+   through a throwaway registry, not worth it for the same warning already accepted for `ValueReaderResolver`.
+
+**Key invariants after the arc, all verified (not just reasoned):**
+- The core compiles+caches only metas; core.tn and user schemas are resolve-only there, compiled per mode
+  in a read registry — a user schema importing core.tn gets core.tn's entries flattened into its own linked
+  form (by `TsonSchemaLinker.link`) and compiled inline. `TsonCompiledSchemaRegistryTest
+  .theCoreCompilesOnlyMetaLayerSchemas` proves it (core.tn present in `schemaRegistry` but absent from
+  `core.get`); `readingAUserSchemaResolvesItInTheCoreButDoesNotCompileItThere` proves the same for a user
+  schema.
+- Resolution is always bind-anchored (a schema's own `!enum`/`!integer` instances bind to
+  `schema.meta.Top`, which a DOM reader's `Map` can't stand in for), so every read registry shares the one
+  bind-mode core for resolution and only the final compile runs in the registry's mode. The bind read
+  registry takes the caller's own `DataBindContext` (their user-class name binder), deliberately distinct
+  from the core's internal `SchemaMetaNameBinder`-based resolution context.
+- `config` now holds only `SchemaMetaNameBinder`/`TsonAtomContext`/`SourcePositionStringBridge`
+  (`ValueReaderFactoryResolver` moved to `reader`) — removing `config` entirely is still a backlog item.
+
+Every stage kept the full suite green and the installed CLI binary working end to end.
 
 ## Build and test
 
