@@ -38,8 +38,7 @@ class MetaTn1CompiledEndToEndTest {
     private static TsonLinkedSchema registerMeta() {
         TsonSchemaRegistry registry = new TsonSchemaRegistry();
         DataBindContext context = SchemaMetaNameBinder.defaultContext();
-        ValueReaderFactoryRegistry objectFactories = ValueReaderFactoryRegistry.bind(context);
-        TsonCompiledRegistry compiledRegistry = new TsonCompiledRegistry(objectFactories);
+        TsonCompiledRegistry compiledRegistry = new TsonCompiledRegistry(context);
         TsonCompiledSchemaLoader loader = compiledRegistry;
 
         String metaKernelSource = TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID);

@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -75,9 +76,8 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
      */
     private static TsonCompiledSchemaLoader loadMetaKernelAndMeta() {
         DataBindContext context = SchemaMetaNameBinder.defaultContext();
-        ValueReaderFactoryRegistry objectFactories = ValueReaderFactoryRegistry.bind(context);
 
-        TsonCompiledRegistry registry = new TsonCompiledRegistry(objectFactories, TsonBundledSchemas::fetch);
+        TsonCompiledRegistry registry = new TsonCompiledRegistry(context, TsonBundledSchemas::fetch);
         TsonCompiledSchemaLoader loader = registry;
 
         String metaKernelSource = TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID);
@@ -101,8 +101,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
      */
     private static TsonSchema resolveMetaKernelOrdinarily() {
         DataBindContext context = SchemaMetaNameBinder.defaultContext();
-        ValueReaderFactoryRegistry objectFactories = ValueReaderFactoryRegistry.bind(context);
-        TsonCompiledRegistry throwawayRegistry = new TsonCompiledRegistry(objectFactories, TsonBundledSchemas::fetch);
+        TsonCompiledRegistry throwawayRegistry = new TsonCompiledRegistry(context, TsonBundledSchemas::fetch);
         TsonCompiledSchemaLoader throwawayLoader = throwawayRegistry;
 
         String metaKernelSource = TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID);
@@ -177,11 +176,10 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     @Test
     void aLoaderThatNeverGotMetaTn1RegisteredThrowsClearly() {
-        ValueReaderFactoryRegistry resolver = ValueReaderFactoryRegistry.dom();
-        TsonCompiledRegistry registry = new TsonCompiledRegistry(resolver);
+        TsonCompiledRegistry registry = new TsonCompiledRegistry(SchemaMetaNameBinder.defaultContext());
         TsonLinkedSchema linkedMetaKernel = TsonSchemaLinker.linkBootstrap(MetaKernelBootstrapResolver.getMetaKernelSchema());
         // meta-kernel only -- no meta.tn -- governed by its own freshly bootstrapped compiled form.
-        registry.register(resolveMetaKernelOrdinarily(), TsonCompiledMetaSchema.bootstrap(linkedMetaKernel, resolver));
+        registry.register(resolveMetaKernelOrdinarily(), TsonCompiledMetaSchema.bootstrap(linkedMetaKernel, registry.resolver()));
         TsonCompiledSchemaLoader loader = registry;
         SchemaDocument coreDocument = new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.CORE_ID)).parseSchemaDocument();
 
@@ -219,7 +217,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     @Test
     void resolveSchemaThrowsClearlyWhenTheMetaTargetCantBeResolvedAtAll() {
-        TsonCompiledRegistry registry = new TsonCompiledRegistry(ValueReaderFactoryRegistry.dom());
+        TsonCompiledRegistry registry = new TsonCompiledRegistry(SchemaMetaNameBinder.defaultContext());
         SchemaResolver resolver = new SchemaResolver(registry);
         SchemaDocument miniDocument = new TsonSchemaParser(MINI_DOCUMENT).parseSchemaDocument();
 
@@ -359,7 +357,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     @Test
     void loaderBootstrapsMetaKernelFromAnEmptyRegistryWithNoInfiniteLoop() {
-        TsonCompiledRegistry registry = new TsonCompiledRegistry(ValueReaderFactoryRegistry.dom());
+        TsonCompiledRegistry registry = new TsonCompiledRegistry(SchemaMetaNameBinder.defaultContext());
         TsonCompiledSchemaLoader loader = registry;
 
         // Meta-kernel's own !!meta names itself -- if resolve() ever fell through to the generic
@@ -375,8 +373,9 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         // set<token>" -- runs before compiling. Never cached (see the next test) -- only the
         // *quality* of the one-off result changed, not its lifetime.
         assertEquals(58, compiled.schema().entries().size());
-        assertEquals(java.util.Map.of(),
-                compiled.compiledSchema().get("top").read("{}"));
+        // Genuinely usable: a concrete entry reads cleanly (the marker root `top` deliberately can't be
+        // read without an explicit type-ref, so it isn't the check here).
+        assertNotNull(compiled.compiledSchema().get("integer_size").read("{ bits: 8 signed: true }"));
     }
 
     @Test
@@ -384,7 +383,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         // The one-off bootstrap must never be registered or cached here -- the "real", permanent,
         // materialized registry entry for meta-kernel is meant to come from a separate, deliberate
         // "load and register" step done once elsewhere.
-        TsonCompiledRegistry registry = new TsonCompiledRegistry(ValueReaderFactoryRegistry.dom());
+        TsonCompiledRegistry registry = new TsonCompiledRegistry(SchemaMetaNameBinder.defaultContext());
         TsonCompiledSchemaLoader loader = registry;
 
         TsonCompiledMetaSchema first = loader.loadMeta(TsonBundledSchemas.META_KERNEL_ID);
@@ -397,7 +396,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     @Test
     void loaderWithTheDefaultSourceThrowsClearlyForAnUnregisteredNonBootstrapUri() {
-        TsonCompiledRegistry registry = new TsonCompiledRegistry(ValueReaderFactoryRegistry.dom());
+        TsonCompiledRegistry registry = new TsonCompiledRegistry(SchemaMetaNameBinder.defaultContext());
         TsonCompiledSchemaLoader loader = registry;
 
         IllegalStateException thrown = assertThrows(IllegalStateException.class,
@@ -422,8 +421,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         // this explicit step, registering meta.tn would fail validation with "!!import '...' is
         // not registered" even though resolution itself succeeded.
         DataBindContext context = SchemaMetaNameBinder.defaultContext();
-        ValueReaderFactoryRegistry objectFactories = ValueReaderFactoryRegistry.bind(context);
-        TsonCompiledRegistry registry = new TsonCompiledRegistry(objectFactories, TsonBundledSchemas::fetch);
+        TsonCompiledRegistry registry = new TsonCompiledRegistry(context, TsonBundledSchemas::fetch);
         TsonCompiledSchemaLoader loader = registry;
 
         // Registered via ordinary SchemaResolver.resolveSchema, not the raw bootstrap output --

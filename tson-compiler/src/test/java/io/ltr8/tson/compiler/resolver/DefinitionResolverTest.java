@@ -1314,8 +1314,7 @@ class DefinitionResolverTest {
     private static TsonCompiledMetaSchema metaTn1Compiled() throws IOException {
         io.ltr8.tson.schema.TsonSchemaRegistry registry = new io.ltr8.tson.schema.TsonSchemaRegistry();
         DataBindContext context = SchemaMetaNameBinder.defaultContext();
-        ValueReaderFactoryRegistry objectFactories = ValueReaderFactoryRegistry.bind(context);
-        TsonCompiledRegistry throwawayRegistry = new TsonCompiledRegistry(objectFactories, TsonBundledSchemas::fetch);
+        TsonCompiledRegistry throwawayRegistry = new TsonCompiledRegistry(context, TsonBundledSchemas::fetch);
         TsonCompiledSchemaLoader throwawayLoader = throwawayRegistry;
 
         String metaKernelSource = TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID);

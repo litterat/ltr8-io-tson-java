@@ -76,8 +76,7 @@ class TinySchemaImportsCoreTn1Test {
     void aTinySchemaThatImportsCoreTn1RegistersAndCompilesCleanly() {
         TsonSchemaRegistry schemaRegistry = new TsonSchemaRegistry();
         DataBindContext context = TsonAtomContext.registerDefaults(DataBindContext.builder().nameBinder(MANUAL_BINDER).build());
-        ValueReaderFactoryResolver resolver = ValueReaderFactoryRegistry.bind(context);
-        TsonCompiledRegistry registry = new TsonCompiledRegistry(schemaRegistry, resolver, TsonBundledSchemas::fetch);
+        TsonCompiledRegistry registry = new TsonCompiledRegistry(schemaRegistry, context, TsonBundledSchemas::fetch);
         TsonCompiledSchemaLoader loader = registry;
 
         // meta-kernel's own bootstrap case, registered explicitly -- see TsonBundledSchemas's own

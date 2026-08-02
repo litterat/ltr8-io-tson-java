@@ -581,8 +581,7 @@ class ConformanceSuiteTest {
         // registered explicitly before anything that transitively !!imports it (meta.tn, here) can
         // register itself -- see TsonBundledSchemas's own class Javadoc for why.
         TsonCompiledRegistry compiledRegistry =
-                new TsonCompiledRegistry(
-                        TsonSchemaCompiler.bind(SchemaMetaNameBinder.defaultContext()), TsonBundledSchemas::fetch);
+                new TsonCompiledRegistry(SchemaMetaNameBinder.defaultContext(), TsonBundledSchemas::fetch);
         TsonCompiledSchemaLoader loader = compiledRegistry;
         SchemaDocument metaKernelDocument = new TsonSchemaParser(
                 TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID)).parseSchemaDocument();

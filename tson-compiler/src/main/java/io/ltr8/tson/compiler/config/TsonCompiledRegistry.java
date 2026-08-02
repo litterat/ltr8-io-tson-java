@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.config;
 
+import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.ContentHash;
 import io.ltr8.tson.compiler.ContentHashMismatchException;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
@@ -77,28 +78,32 @@ public final class TsonCompiledRegistry implements TsonCompiledSchemaLoader {
      * A fresh, empty {@link TsonSchemaRegistry} of its own and no fetch capability -- the common case for a
      * caller that owns the whole registration+compilation pipeline and only resolves the bundled standard library.
      */
-    public TsonCompiledRegistry(ValueReaderFactoryResolver resolver) {
-        this(new TsonSchemaRegistry(), resolver);
+    public TsonCompiledRegistry(DataBindContext context) {
+        this(new TsonSchemaRegistry(), context);
     }
 
     /** As above but sharing an existing {@link TsonSchemaRegistry}, still with no fetch capability. */
-    public TsonCompiledRegistry(TsonSchemaRegistry schemaRegistry, ValueReaderFactoryResolver resolver) {
-        this(schemaRegistry, resolver, TsonSchemaSource.registeredOnly());
+    public TsonCompiledRegistry(TsonSchemaRegistry schemaRegistry, DataBindContext context) {
+        this(schemaRegistry, context, TsonSchemaSource.registeredOnly());
     }
 
     /** A fresh, empty {@link TsonSchemaRegistry} of its own, with a fetch {@code source}. */
-    public TsonCompiledRegistry(ValueReaderFactoryResolver resolver, TsonSchemaSource source) {
-        this(new TsonSchemaRegistry(), resolver, source);
+    public TsonCompiledRegistry(DataBindContext context, TsonSchemaSource source) {
+        this(new TsonSchemaRegistry(), context, source);
     }
 
     /**
+     * @param context the object-binding context this registry compiles governing meta-schemas with -- always
+     *     object-binding mode (a DOM resolver can't resolve the {@code !enum}/{@code !integer} instances a
+     *     meta-schema declares), so it is taken as a {@link DataBindContext} and the bind-mode {@code
+     *     ValueReaderFactoryResolver} is built from it here rather than accepted directly and possibly wrong.
      * @param source where {@link #load} fetches a not-yet-registered schema's source text from -- {@link
      *     TsonSchemaSource#registeredOnly()} by default, so nothing is fetched unless a caller opts in.
      */
-    public TsonCompiledRegistry(TsonSchemaRegistry schemaRegistry, ValueReaderFactoryResolver resolver,
+    public TsonCompiledRegistry(TsonSchemaRegistry schemaRegistry, DataBindContext context,
                                 TsonSchemaSource source) {
         this.schemaRegistry = schemaRegistry;
-        this.resolver = resolver;
+        this.resolver = TsonSchemaCompiler.bind(context);
         this.source = source;
     }
 
@@ -126,8 +131,8 @@ public final class TsonCompiledRegistry implements TsonCompiledSchemaLoader {
      * way to get a working registry; the plain constructors leave it empty (for a caller that populates
      * it itself, e.g. a test bootstrapping in isolation).
      */
-    public static TsonCompiledRegistry withStandardLibrary(ValueReaderFactoryResolver resolver, TsonSchemaSource source) {
-        TsonCompiledRegistry registry = new TsonCompiledRegistry(resolver, source);
+    public static TsonCompiledRegistry withStandardLibrary(DataBindContext context, TsonSchemaSource source) {
+        TsonCompiledRegistry registry = new TsonCompiledRegistry(context, source);
         registry.loadStandardLibrary();
         return registry;
     }

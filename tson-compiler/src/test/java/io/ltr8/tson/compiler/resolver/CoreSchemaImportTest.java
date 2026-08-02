@@ -49,8 +49,7 @@ class CoreSchemaImportTest {
 
     private static Loaded loadMetaKernelMetaAndCore() {
         TsonSchemaRegistry schemaRegistry = new TsonSchemaRegistry();
-        ValueReaderFactoryResolver resolver = ValueReaderFactoryRegistry.bind(SchemaMetaNameBinder.defaultContext());
-        TsonCompiledRegistry registry = new TsonCompiledRegistry(schemaRegistry, resolver, TsonBundledSchemas::fetch);
+        TsonCompiledRegistry registry = new TsonCompiledRegistry(schemaRegistry, SchemaMetaNameBinder.defaultContext(), TsonBundledSchemas::fetch);
         TsonCompiledSchemaLoader loader = registry;
 
         // meta.tn1's own !!import needs meta-kernel present in the *shared* registry first --

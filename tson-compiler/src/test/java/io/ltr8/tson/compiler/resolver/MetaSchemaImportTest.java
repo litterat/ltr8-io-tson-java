@@ -4,7 +4,6 @@ import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
-import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.config.TsonCompiledRegistry;
 import io.ltr8.tson.schema.TsonBundledSchemas;
@@ -73,8 +72,7 @@ class MetaSchemaImportTest {
      */
     private static TsonSchema parseMetaTn1(TsonSchemaRegistry registry) {
         DataBindContext context = SchemaMetaNameBinder.defaultContext();
-        ValueReaderFactoryRegistry objectFactories = ValueReaderFactoryRegistry.bind(context);
-        TsonCompiledRegistry compiledRegistry = new TsonCompiledRegistry(objectFactories);
+        TsonCompiledRegistry compiledRegistry = new TsonCompiledRegistry(context);
         TsonCompiledSchemaLoader loader = compiledRegistry;
 
         String metaKernelSource = TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID);

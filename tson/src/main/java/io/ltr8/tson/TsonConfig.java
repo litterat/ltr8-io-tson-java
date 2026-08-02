@@ -5,7 +5,6 @@ import io.ltr8.tson.compiler.*;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
 import io.ltr8.tson.compiler.config.TsonCompiledRegistry;
-import io.ltr8.tson.compiler.config.ValueReaderFactoryResolver;
 
 /**
  * Configures and builds a {@link Tson} -- reached via {@link Tson#builder()}, never constructed
@@ -50,11 +49,13 @@ public final class TsonConfig {
     }
 
     public Tson build() {
-        ValueReaderFactoryResolver resolver =
-                TsonSchemaCompiler.bind(SchemaMetaNameBinder.defaultContext());
         // The compiled registry is both the store and the on-demand loader; withStandardLibrary loads
         // the bundled meta-kernel/meta/core, and schemaSource is consulted only for other, later URIs.
-        TsonCompiledRegistry compiledRegistry = TsonCompiledRegistry.withStandardLibrary(resolver, schemaSource);
+        // It compiles the standard library in object-binding mode -- the only mode that can (a DOM
+        // reader can't resolve the !enum/!integer instances a meta-schema declares), which is why it
+        // takes the bind context rather than a resolver that might be the wrong mode.
+        TsonCompiledRegistry compiledRegistry =
+                TsonCompiledRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), schemaSource);
         return new Tson(compiledRegistry.schemaRegistry(), compiledRegistry, compiledRegistry, dataBindContext);
     }
 }
