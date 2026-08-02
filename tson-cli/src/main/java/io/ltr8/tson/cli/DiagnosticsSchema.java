@@ -4,7 +4,7 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.Tson;
 import io.ltr8.tson.compiler.Diagnostic;
-import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
+import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
@@ -41,7 +41,7 @@ final class DiagnosticsSchema {
     private DiagnosticsSchema() {
     }
 
-    static TsonCompiledMetaSchema compiled() {
+    static TsonCompiledSchema compiled() {
         DataBindContext context =
                 TsonAtomContext.registerDefaults(DataBindContext.builder().nameBinder(BINDER).build());
         ValueReaderFactoryResolver resolver = TsonSchemaCompiler.bind(context);

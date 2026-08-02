@@ -29,7 +29,7 @@ class RecordGroupValidationTest {
                     ( email: text | phone: text )
                   }
                 }""";
-        return Tson.builder().build().compile(schema, TsonSchemaCompiler.dom()).compiledSchema().get("contact");
+        return Tson.builder().build().compile(schema, TsonSchemaCompiler.dom()).get("contact");
     }
 
     @Test

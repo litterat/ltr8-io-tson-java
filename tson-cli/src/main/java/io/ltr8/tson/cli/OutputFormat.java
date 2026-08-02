@@ -107,7 +107,7 @@ enum OutputFormat {
     private static String renderTson(ValidationReport report) {
         try {
             String text = new TsonObjectWriter().toTson(report);
-            Object reread = DiagnosticsSchema.compiled().compiledSchema().get("validation_report")
+            Object reread = DiagnosticsSchema.compiled().get("validation_report")
                     .read(text);
             if (!(reread instanceof ValidationReport)) {
                 throw new IllegalStateException("diagnostics.tn1's own validation_report read back as "

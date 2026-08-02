@@ -23,7 +23,7 @@ void main() {
             }""";
 
     var compiled = tson.compile(schema, TsonSchemaCompiler.dom());
-    var reader = compiled.compiledSchema().get("server");
+    var reader = compiled.get("server");
 
     IO.println("valid:   " + reader.read("{ hostname: \"web-01\"  port: 8080 }"));   // {hostname=web-01, port=8080}
 

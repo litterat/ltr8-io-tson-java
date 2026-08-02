@@ -16,6 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 
 /**
  * Compiles a {@link TsonLinkedSchema} into a {@link TsonCompiledSchema} -- the "compile" stage of
@@ -40,14 +41,15 @@ import java.util.Set;
  * covers both a constructor with no registered {@link ValueReaderFactory} at all, and a factory
  * that's registered but rejects this particular entry.
  *
- * <p>Dispatch to a factory is keyed by the resolved body's own constructor name and
- * preferentially scoped to {@code metaSchema}, the governing {@link TsonCompiledMetaSchema} {@link
- * #compile} was given: {@link TsonCompiledMetaSchema#constructor} resolves it against that
- * meta-schema's own declared vocabulary, falling back to the global factory set otherwise (that
- * fallback is the seam a later stage tightens into rejecting an out-of-scope constructor outright).
- * One non-factory case is checked first: {@link Reference} (a bare {@code name => other_name}
- * entry, §8.3) delegates straight to the target's own reader, resolved recursively rather than
- * built fresh.
+ * <p>Two compile modes share this eager walk, differing only in how a body's constructor name maps to
+ * a factory. A <b>governed</b> compile ({@link #compile(TsonLinkedSchema, TsonCompiledMetaSchema)})
+ * dispatches through the governing meta-schema's own scoped vocabulary ({@link
+ * TsonCompiledMetaSchema#constructor}, which falls back to the global set for a constructor the
+ * compiling schema declares itself). A <b>standalone</b> compile ({@link #compile(TsonLinkedSchema,
+ * ValueReaderFactoryResolver)}) dispatches through a factory set directly, with no scoping -- for
+ * reading an already-validated schema in a chosen mode. One non-factory case is checked first in
+ * both: {@link Reference} (a bare {@code name => other_name} entry, §8.3) delegates straight to the
+ * target's own reader, resolved recursively rather than built fresh.
  *
  * <p>The per-compilation mutable state (cycle-detection bookkeeping) lives in a private nested
  * {@link Compilation} helper, one instance per {@link #compile} call, discarded once it returns --
@@ -59,13 +61,37 @@ public final class TsonSchemaCompiler {
     }
 
     /**
-     * Compiles {@code linkedSchema} against {@code metaSchema}, eagerly -- see this class's own
-     * "Eager, not lazy" note. {@code metaSchema} is the governing meta-schema for this compile --
-     * meta-kernel's own case aside (see {@link TsonCompiledMetaSchema#bootstrap}), always an
-     * already-compiled result from a previous {@link #compile} call.
+     * <b>Governed compile</b>: compiles {@code linkedSchema} against {@code governingMeta}, so each
+     * body's constructor is dispatched through that meta-schema's own scoped vocabulary (see {@link
+     * TsonCompiledMetaSchema#constructor}). This is what {@code TsonCompiledRegistry} uses to compile a
+     * schema in the context of the meta that governs it. {@code governingMeta} is always an
+     * already-compiled result from a previous compile -- meta-kernel's own case aside (see {@link
+     * TsonCompiledMetaSchema#bootstrap}).
      */
-    public static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema, TsonCompiledMetaSchema metaSchema) {
-        Compilation compilation = new Compilation(linkedSchema.schema(), metaSchema);
+    public static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema, TsonCompiledMetaSchema governingMeta) {
+        return compileWith(linkedSchema, governingMeta::constructor);
+    }
+
+    /**
+     * <b>Standalone compile</b>: compiles {@code linkedSchema} directly against a factory set, with no
+     * governing meta-schema -- every body's constructor is dispatched through {@code factories} alone.
+     * This is for reading data against an already-resolved, already-linked (hence already-validated)
+     * schema in a chosen mode: the schema's own constructor usage was checked when it was registered,
+     * so no governing-meta scoping is applied or needed here, and any of the mode's factories may be
+     * used. It is also how meta-kernel itself is first compiled ({@link TsonCompiledMetaSchema#bootstrap}),
+     * since meta-kernel declares its whole vocabulary itself and has no earlier meta to be governed by.
+     */
+    public static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema, ValueReaderFactoryResolver factories) {
+        return compileWith(linkedSchema, factories::resolve);
+    }
+
+    /**
+     * The shared eager walk (see the "Eager, not lazy" note) -- {@code factoryFor} is the only thing that
+     * differs between a governed and a standalone compile.
+     */
+    private static TsonCompiledSchema compileWith(
+            TsonLinkedSchema linkedSchema, Function<String, ValueReaderFactory> factoryFor) {
+        Compilation compilation = new Compilation(linkedSchema.schema(), factoryFor);
         for (String name : linkedSchema.schema().entries().keySet()) {
             compilation.resolve(name);
         }
@@ -88,13 +114,13 @@ public final class TsonSchemaCompiler {
      */
     private static final class Compilation {
         private final TsonSchema schema;
-        private final TsonCompiledMetaSchema metaSchema;
+        private final Function<String, ValueReaderFactory> factoryFor;
         private final Map<String, TsonValueReader<?>> finished = new LinkedHashMap<>();
         private final Set<String> building = new LinkedHashSet<>();
 
-        Compilation(TsonSchema schema, TsonCompiledMetaSchema metaSchema) {
+        Compilation(TsonSchema schema, Function<String, ValueReaderFactory> factoryFor) {
             this.schema = schema;
-            this.metaSchema = metaSchema;
+            this.factoryFor = factoryFor;
         }
 
         TsonValueReader<?> resolve(String name) {
@@ -129,7 +155,7 @@ public final class TsonSchemaCompiler {
             if (body instanceof Reference r) {
                 return resolve(r.target().name());
             }
-            ValueReaderFactory factory = metaSchema.constructor(TsonCompiledMetaSchema.typenameOf(body));
+            ValueReaderFactory factory = factoryFor.apply(TsonCompiledMetaSchema.typenameOf(body));
             return factory.create(name, definition, this::resolve);
         }
     }

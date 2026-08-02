@@ -36,8 +36,8 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <pre>{@code
  * Tson tson = Tson.builder().build();
- * TsonCompiledMetaSchema compiled = tson.compile(schemaText, ValueReaderFactoryRegistry.dom());
- * Object value = compiled.compiledSchema().get("my_type").read(dataValue);
+ * TsonCompiledSchema compiled = tson.compile(schemaText, ValueReaderFactoryRegistry.dom());
+ * Object value = compiled.get("my_type").read(dataValue);
  * }</pre>
  *
  * <p><b>Resolution always runs in object-binding mode, regardless of what mode a caller ultimately
@@ -73,7 +73,7 @@ public final class Tson {
 
     // The one bit of mutable state: a per-!!schema-URI cache of DOM-mode compiled schemas, so
     // validating many data documents that name the same schema compiles it once. A cache only.
-    private final Map<String, TsonCompiledMetaSchema> validationSchemas = new ConcurrentHashMap<>();
+    private final Map<String, TsonCompiledSchema> validationSchemas = new ConcurrentHashMap<>();
 
     Tson(TsonSchemaRegistry schemaRegistry, TsonCompiledRegistry compiledRegistry,
          TsonCompiledSchemaLoader loader, DataBindContext dataBindContext) {
@@ -116,18 +116,19 @@ public final class Tson {
     }
 
     /**
-     * Compiles an already-resolved, already-linked schema fresh, in {@code mode} -- independent of
-     * the object-binding mode {@link #resolve} always used internally. Safe because compiling only
-     * ever dispatches an already-built {@code Top} body tree to a factory by constructor name; it
-     * never re-resolves an {@code Instance}/{@code AtomRefinement} declaration, so nothing here needs
-     * a real governing-meta reader the way resolution did.
+     * Compiles an already-resolved, already-linked schema fresh, in {@code mode} -- independent of the
+     * object-binding mode {@link #resolve} always used internally. A standalone compile ({@link
+     * TsonSchemaCompiler#compile(TsonLinkedSchema, ValueReaderFactoryResolver)}): the schema was
+     * already validated when it resolved, so this just builds readers for its entries in {@code mode},
+     * with no governing-meta scoping. Returns a plain {@link TsonCompiledSchema} -- a user schema is
+     * not a meta-schema.
      */
-    public TsonCompiledMetaSchema compile(TsonLinkedSchema linked, ValueReaderFactoryResolver mode) {
-        return TsonCompiledMetaSchema.bootstrap(linked, mode);
+    public TsonCompiledSchema compile(TsonLinkedSchema linked, ValueReaderFactoryResolver mode) {
+        return TsonSchemaCompiler.compile(linked, mode);
     }
 
     /** {@link #resolve} then {@link #compile(TsonLinkedSchema, ValueReaderFactoryResolver)} in one call -- the common case, when a caller has no other use for the intermediate {@link TsonLinkedSchema}. */
-    public TsonCompiledMetaSchema compile(String schemaText, ValueReaderFactoryResolver mode) {
+    public TsonCompiledSchema compile(String schemaText, ValueReaderFactoryResolver mode) {
         return compile(resolve(schemaText), mode);
     }
 
@@ -151,7 +152,7 @@ public final class Tson {
             return SchemalessValidator.validate(data);
         }
 
-        TsonCompiledMetaSchema compiled;
+        TsonCompiledSchema compiled;
         try {
             compiled = domCompiled(start.schema().get());
         } catch (RuntimeException e) {
@@ -163,7 +164,7 @@ public final class Tson {
         }
         TsonValueReader<?> reader;
         try {
-            reader = compiled.compiledSchema().get(typeRef.name());
+            reader = compiled.get(typeRef.name());
         } catch (RuntimeException e) {
             return List.of(problem(Diagnostic.Code.UNKNOWN_TYPE, e.getMessage()));
         }
@@ -187,7 +188,7 @@ public final class Tson {
     }
 
     /** The DOM-mode compiled schema for {@code schemaUri}, resolved+registered through the source and compiled once. */
-    private TsonCompiledMetaSchema domCompiled(String schemaUri) {
+    private TsonCompiledSchema domCompiled(String schemaUri) {
         // Resolve/register through the loader on every call -- not only on a compile-cache miss -- so
         // this reference's own ?sha256= pin is verified against the identity's content each time, even
         // when the DOM compile is already cached (a later reference with a conflicting pin must error,
@@ -205,7 +206,7 @@ public final class Tson {
         return new Diagnostic("", code, message, "", "", Optional.empty(), Optional.empty());
     }
 
-    /** The underlying {@link TsonSchemaRegistry} -- e.g. for {@code schemaRegistry().get(uri)} on an already-registered identity. */
+    /** The underlying {@link TsonSchemaRegistry} -- e.g.  for {@code schemaRegistry().get(uri)} on an already-registered identity. */
     public TsonSchemaRegistry schemaRegistry() {
         return schemaRegistry;
     }

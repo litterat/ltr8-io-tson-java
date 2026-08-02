@@ -76,7 +76,7 @@ class OutputFormatTest {
 
         String rendered = OutputFormat.TSON.render(original);
 
-        Object reread = DiagnosticsSchema.compiled().compiledSchema().get("validation_report")
+        Object reread = DiagnosticsSchema.compiled().get("validation_report")
                 .read(rendered);
 
         assertEquals(original, reread);
@@ -88,7 +88,7 @@ class OutputFormatTest {
 
         String rendered = OutputFormat.TSON.render(original);
 
-        Object reread = DiagnosticsSchema.compiled().compiledSchema().get("validation_report")
+        Object reread = DiagnosticsSchema.compiled().get("validation_report")
                 .read(rendered);
 
         assertEquals(original, reread);
@@ -104,7 +104,7 @@ class OutputFormatTest {
 
         String rendered = OutputFormat.TSON.render(original);
 
-        Object reread = DiagnosticsSchema.compiled().compiledSchema().get("validation_report")
+        Object reread = DiagnosticsSchema.compiled().get("validation_report")
                 .read(rendered);
 
         assertEquals(original, reread);
@@ -120,7 +120,7 @@ class OutputFormatTest {
 
         String rendered = OutputFormat.TSON.render(original);
 
-        Object reread = DiagnosticsSchema.compiled().compiledSchema().get("validation_report")
+        Object reread = DiagnosticsSchema.compiled().get("validation_report")
                 .read(rendered);
 
         assertEquals(original, reread);

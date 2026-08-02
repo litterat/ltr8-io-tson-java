@@ -2,6 +2,7 @@ package io.ltr8.tson;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
+import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.TsonObjectReader;
 import io.ltr8.tson.schema.TsonBundledSchemas;
@@ -45,17 +46,17 @@ class TsonTest {
         assertTrue(linked.schema().entries().containsKey("my_int"));
         assertTrue(linked.schema().entries().containsKey("my_percentage"));
 
-        TsonCompiledMetaSchema compiled = tson.compile(linked, TsonSchemaCompiler.dom());
+        TsonCompiledSchema compiled = tson.compile(linked, TsonSchemaCompiler.dom());
 
         // int32 has a real bit-width (size: {bits: 32 signed: true}), so IntegerParser narrows to
         // Integer -- atom reading is shared verbatim between DOM and bind mode (CLAUDE.md), so this
         // holds regardless of TsonSchemaCompiler.dom() here.
-        Object myInt = compiled.compiledSchema().get("my_int")
+        Object myInt = compiled.get("my_int")
                 .read("42");
         assertEquals(42, myInt);
 
         // my_percentage never sets size, so IntegerParser falls back to BigInteger.
-        Object myPercentage = compiled.compiledSchema().get("my_percentage")
+        Object myPercentage = compiled.get("my_percentage")
                 .read("50");
         assertEquals(BigInteger.valueOf(50), myPercentage);
     }
@@ -64,9 +65,9 @@ class TsonTest {
     void theSingleCallCompileConvenienceMatchesResolveThenCompile() {
         Tson tson = Tson.builder().build();
 
-        TsonCompiledMetaSchema compiled = tson.compile(TINY_DOCUMENT, TsonSchemaCompiler.dom());
+        TsonCompiledSchema compiled = tson.compile(TINY_DOCUMENT, TsonSchemaCompiler.dom());
 
-        Object myInt = compiled.compiledSchema().get("my_int")
+        Object myInt = compiled.get("my_int")
                 .read("7");
         assertEquals(7, myInt);
     }

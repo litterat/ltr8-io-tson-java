@@ -45,12 +45,11 @@ public final class TsonCompiledMetaSchema extends TsonCompiledSchema {
 
     /**
      * Bootstraps a compiled meta-schema for meta-kernel itself -- the one deliberate circularity
-     * (§1.5): meta-kernel's own {@code !!meta} names itself, so there's no already-compiled
-     * governing meta to build one the ordinary way. A throwaway meta wrapping an empty {@link
-     * TsonCompiledSchema} stands in as {@link TsonSchemaCompiler#compile}'s governing-meta
-     * argument; its scoped vocabulary is empty (the placeholder has no readers), so every one of
-     * meta-kernel's own constructors is compiled via the own-declared path against {@code resolver}
-     * -- exactly the base case, since meta-kernel declares its whole vocabulary itself.
+     * (§1.5): meta-kernel's own {@code !!meta} names itself, so there's no already-compiled governing
+     * meta to compile it against the ordinary way. It doesn't need one: meta-kernel declares its whole
+     * vocabulary itself, so it is compiled *standalone* against {@code resolver} directly ({@link
+     * TsonSchemaCompiler#compile(TsonLinkedSchema, ValueReaderFactoryResolver)}), then wrapped as the
+     * meta-schema that governs everything below it.
      *
      * <p>{@code linkedMetaKernel} is expected to come from {@code TsonSchemaLinker#linkBootstrap},
      * not the ordinary {@code link} -- that would need meta-kernel already registered somewhere to
@@ -58,10 +57,7 @@ public final class TsonCompiledMetaSchema extends TsonCompiledSchema {
      * this method exists to break.
      */
     public static TsonCompiledMetaSchema bootstrap(TsonLinkedSchema linkedMetaKernel, ValueReaderFactoryResolver resolver) {
-        TsonCompiledSchema placeholder = new TsonCompiledSchema(linkedMetaKernel, Map.of());
-        TsonCompiledMetaSchema bootstrapMeta = new TsonCompiledMetaSchema(placeholder, resolver);
-        TsonCompiledSchema compiledMetaKernel = TsonSchemaCompiler.compile(linkedMetaKernel, bootstrapMeta);
-        return new TsonCompiledMetaSchema(compiledMetaKernel, resolver);
+        return new TsonCompiledMetaSchema(TsonSchemaCompiler.compile(linkedMetaKernel, resolver), resolver);
     }
 
     /**
