@@ -14,83 +14,22 @@ yet implemented" section for the technical detail behind several of these items.
 - [ ] No `!!schema`-header auto-selection on the data side — given a data document, there's no
   "find the right compiled reader yourself" entry point; a caller always has to already know what
   schema position it's reading against.
-- [ ] A real disk/HTTP-backed `TsonSchemaSource` with whitelist/blacklist policy — only
-  `BundledSchemaSource` and `TsonSchemaSource.registeredOnly()` exist today.
+- [ ] A real disk/HTTP-backed `TsonSchemaSource` with whitelist/blacklist policy — today the only
+  `TsonSchemaSource` is `TsonSchemaSource.registeredOnly()` (nothing fetched); the bundled standard
+  library is served internally by `TsonCompiledSchemaRegistry` from `TsonBundledSchemas`, not through
+  a source.
 
 ## Layer boundaries / schema registry
 
-- [ ] Distinguish "has constructor vocabulary, eligible to govern (a valid `!!meta` target)" from
-  "ordinary consumer schema" at the type level. Right now `TsonCompiledMetaSchema` wraps *any*
-  compiled schema, constructors or not — nothing stopped a zero-constructor consumer schema (like
-  `TinySchemaImportsCoreTn1Test`'s own tiny schema) from being handed to another `register(...)`
-  call as a `governingMeta`, exactly the way meta.tn1's own compiled form is.
-- [ ] Add the missing other half of `TsonSchemaLinker`'s existing "constructor eligibility" check.
-  That check already restricts *where* `constructor: true` can be declared (only a
-  meta-kernel-governed schema, per §2.2.2) — the missing half is restricting *where a schema can be
-  used as a `!!meta` target* the same way, so an ordinary consumer schema can't accidentally govern
-  another one.
-
-## Content addressing / hash-pinned references
-
-A real, spec-mandated (MUST-level) integrity mechanism — [TSON-DATA] §2.2.1, [TSON-SCHEMA] §10.2 —
-that's currently entirely unimplemented, not just incomplete: `CanonicalIdentity.of` already strips
-a URI's query component to compute canonical identity, but the dropped query is never validated or
-checked against anything. Worth its own section since it's a coherent, well-specified area, not a
-handful of loose gaps.
-
-- [x] **SHA256 verification of fetched/imported schema content** — `ContentHash.declaredSha256(uri)`
-  parses a reference's `?sha256=<hex>` pin (rejects an unrecognized query-parameter name and a
-  malformed value, "never silently retained"), and `ContentHash.verify(bytes, uri)` throws
-  `ContentHashMismatchException` on a mismatch. `DefaultTsonCompiledSchemaLoader.load` verifies every
-  fetched pinned reference before use (the top `!!schema` + each transitive pinned `!!import`/`!!meta`
-  at its own fetch); a plain reference resolves unverified. Verified end to end (correct pin → OK,
-  wrong pin / bad query → error). Now per-identity, not just per-fetch — see the aggregation bullet.
-- [x] **Correct content-hash computation** — `io.ltr8.tson.compiler.ContentHash` (`sha256(byte[])` /
-  `contentStart(byte[])`): SHA-256, lowercase hex, of every byte after the `!!id` line's own
-  terminator (for `CR LF`, after the `LF`); the id line is excluded, a leading BOM stripped and never
-  hashed. Exposed as **`tson hash <file>`** (`HashCommand`), which stamps the digest onto the `!!id`
-  as `?sha256=<hex>` in place (idempotent — re-running replaces the prior pin) — the first step toward
-  hash-pinning: publishing/pinning a schema. **Matching now ignores the pin** (a `?sha256` is
-  verification metadata, not identity): `TsonSchemaRegistry.canonicalIdentity(String)` is public, and
-  `ValidateCommand`'s source map + `Tson.validate`'s compile cache key by it, so a hashed schema still
-  resolves against a plain (or differently-pinned) reference. Verification of a pinned reference is
-  wired too (the bullet above).
-- [x] **Per-identity hash aggregation** ([TSON-SCHEMA] §10.2) — `DefaultTsonCompiledSchemaLoader`
-  records each identity's content hash (canonical-keyed) on first resolution and verifies *every*
-  reference's declared digest against it, on both the fetch and cache-hit paths: an identity with no
-  digest resolves unverified; every reference to a resolved identity (pinned or plain) resolves to the
-  verified content; a reference whose pin conflicts errors (at most one digest can match the content),
-  even a *later* one to an already-resolved identity. Enablers: `TsonCompiledRegistry` now keys by
-  canonical identity (so a pinned and a plain reference share the cache entry, no double-register), and
-  `Tson.validate` calls `loader.load` on every reference so a repeat top-level `!!schema` is re-checked
-  even when its DOM compile is cached. Verified (`TsonValidateTest` + the CLI). *The "two distinct
-  digests" case surfaces as the non-matching digest's mismatch rather than a dedicated pre-check
-  diagnostic — same outcome (an error), slightly different framing than §10.2's letter.*
-- [x] **Embedded-`!!id` cross-check** ([TSON-DATA] §2.2.1) — `DefaultTsonCompiledSchemaLoader.crossCheckId`
-  runs after parsing a fetched document: its own `!!id` canonical identity MUST equal the reference's,
-  so a source can't return content under the wrong identity (mismatch → resolver error). An id-less
-  target is an error for a hash-pinned reference and allowed for a plain one. Defensive for a general
-  fetch source (the CLI's own source is identity-keyed, so it always agrees). Verified in
-  `TsonValidateTest`.
-- [x] **Caching semantics**: a verified entry, once cached under its canonical identity, is immutable
-  (`contentHashes` uses `putIfAbsent`; `TsonSchemaRegistry.register` refuses a duplicate identity), and
-  a *failed* verification poisons nothing — `recordAndVerify` verifies a reference's pin against the
-  *freshly-computed* content hash and only records it on success, so a rejected fetch (e.g. tampered
-  content from a non-deterministic source) leaves no stale hash to fail a later, valid fetch of the
-  same identity. Guarded by `TsonValidateTest` with a call-counting flaky source (proven to fail
-  against the pre-fix store-before-verify ordering). No negative cache (the spec allows one but doesn't
-  require it); a rejected reference is simply retried.
-- [x] **Verifiable pins to the pre-loaded bootstrap schemas** — each bundled schema's `!!id` now
-  carries its own `?sha256=` content hash, and the library holds the three digests
-  (`TsonBundledSchemas.{META_KERNEL,META,CORE}_SHA256`, exposed by `declaredSha256(uri)`). The loader
-  verifies a hash-pinned reference to any of them against the held digest and checks each shipped
-  resource against its held digest on load (a mismatch = a corrupt package). The bundled chain is
-  itself pinned end to end — meta.tn's `!!meta`/`!!import` pin meta-kernel, core.tn's `!!meta` pins
-  meta.tn — so bootstrap verifies the whole chain (a wrong pin would fail the build). The one identity
-  that can never carry a pin is meta-kernel's own self-`!!meta` (its hash input would contain the pin);
-  its `!!id` is pinned, its self-`!!meta` stays plain, and `selfReferential`/matching compare by
-  canonical identity so the two agree. Verified in `BundledSchemaPinTest` (held digests == shipped
-  files; a correct pin to each verifies, a wrong one is rejected).
+- [ ] Add the missing other half of `TsonSchemaLinker`'s existing "constructor eligibility" check —
+  a resolve/link-time *diagnostic*. That check already restricts *where* `constructor: true` can be
+  declared (only a meta-kernel-governed schema, per §2.2.2); the missing half is restricting *where a
+  schema can be used as a `!!meta` target* the same way, so an ordinary consumer schema can't
+  accidentally govern another one, surfaced by the linker (with the spec's own wording) at
+  resolve/link time. The 2026-08-02 `TsonCompiledSchemaRegistry` cleanup arc closed the *type-level*
+  half of this — the meta/non-meta split, so a non-meta schema won't type-check where a governing
+  meta is required (see Done) — and now rejects a non-meta `!!meta` target at load time via
+  `loadMeta`, but the linker-level validation itself is still absent.
 
 ## Resolution & linking generality
 
@@ -280,8 +219,9 @@ everything outstanding is tracked in one place.)
 
 ## Miscellaneous
 
-- [ ] Thread-safety — currently only `synchronized` on `TsonSchemaRegistry`/`TsonCompiledRegistry`'s
-  own `register`/`get`; everything else is an open design question.
+- [ ] Thread-safety — currently only `synchronized` on `TsonSchemaRegistry`/
+  `TsonCompiledSchemaRegistry`'s own `register`/`get`/`getMeta` (its `load` deliberately isn't, to
+  avoid serializing unrelated on-demand loads); everything else is an open design question.
 - [ ] General resolver-layer structural rules as reusable primitives, rather than binding-time-only
   behavior — empty-brace resolution, the absent-vs-missing distinction.
 - [ ] Annotation access on individual fields, array/tuple elements, and map keys/values — only a
@@ -293,6 +233,20 @@ everything outstanding is tracked in one place.)
 
 ## Done
 
+- [x] **Governing-meta eligibility is now enforced at the type level — the meta/non-meta split from
+  the `TsonCompiledSchemaRegistry` cleanup arc** (2026-08-02; see CLAUDE.md's own
+  "`TsonCompiledSchemaRegistry` cleanup arc" section). Closes the *type-level* item of the old "Layer
+  boundaries / schema registry" section (its linker-level item stays open — see below).
+  `TsonCompiledSchema` is now a `sealed` base; only a meta-layer schema (its own
+  `!!meta` is meta-kernel — the ones eligible to declare `constructor: true`, per §2.2.2) compiles to
+  the `TsonCompiledMetaSchema` subtype, and `TsonCompiledSchemaRegistry.register`'s `governingMeta`
+  parameter plus `getMeta`/`loadMeta` are all typed to it. So a zero-constructor consumer schema (like
+  `TinySchemaImportsCoreTn1Test`'s own tiny schema) is a plain `TsonCompiledSchema` that won't
+  type-check where a governing meta is required, and `loadMeta(uri)` throws outright if a document's
+  own `!!meta` resolves to a non-meta schema ("`…` is not a meta-layer schema … and cannot govern
+  another schema"). But that is compiled-level plus load-time enforcement — *not* the linker-level
+  constructor-eligibility check the section's second item asked for, which stays open (see "Layer
+  boundaries / schema registry").
 - [x] **The schemaless Class-1 binder now streams — `TsonObjectReader` over `TsonDataStream`, and
   renamed from `TsonMapperReader`/`TsonMapperWriter` → `TsonObjectReader`/`TsonObjectWriter` into the
   root `io.ltr8.tson.compiler` package** (2026-07-31). Closes the one asymmetric cell in the read-side
@@ -339,7 +293,7 @@ everything outstanding is tracked in one place.)
   (`io.ltr8.tson`, the new front-door module above). `Tson.builder().build()` bootstraps meta-kernel
   → meta.tn1 → core.tn1 in one call and returns a ready `Tson`; its `.resolve(schemaText)`/
   `.compile(linked, mode)`/`.compile(schemaText, mode)` replace the hand-assembled
-  `TsonSchemaRegistry`/`TsonCompiledRegistry`/`DefaultTsonCompiledSchemaLoader` wiring
+  `TsonSchemaRegistry`/`TsonCompiledSchemaRegistry`/`DefaultTsonCompiledSchemaLoader` wiring
   `TinySchemaImportsCoreTn1Test`/`CoreSchemaImportTest` (and `tson-cli`'s own now-deleted internal
   `StandardLibrary` helper) used to hand-roll. `TsonTest` re-proves `TinySchemaImportsCoreTn1Test`'s
   exact scenario through this front door instead. Surfaced a real, non-obvious pipeline constraint
@@ -498,12 +452,14 @@ everything outstanding is tracked in one place.)
   "Atom-refinement constraint validation" item as before.
   Remaining, lower-priority cleanup identified along the way, not blocking and not yet started —
   pick up as other work happens to touch this area: removing the `config` package entirely (folding
-  `SchemaMetaNameBinder`/`TsonAtomContext`/`TsonCompiledRegistry`/`ValueReaderFactoryResolver`
-  somewhere that isn't its own separate "configuration" layer); and further polish on the facade
+  `SchemaMetaNameBinder`/`TsonAtomContext`/`ValueReaderFactoryResolver` somewhere that isn't its own
+  separate "configuration" layer — `TsonCompiledSchemaRegistry` has since moved out of `config` to the
+  root package as part of the 2026-08-02 arc, so `config` is down to those three); and further polish
+  on the facade
   interfaces themselves (`TsonCompiledSchemaLoader`/`TsonSchemaSource`/`TsonValueReaderResolver`) once
   it's clearer what a caller actually needs from them in practice.
 - [x] **Configuration/wiring classes moved out of `compiler` into a new `io.ltr8.tson.compiler.config`
-  package** — `TsonCompiledRegistry`, `SchemaMetaNameBinder`, `ValueReaderFactoryResolver`. These
+  package** — `TsonCompiledSchemaRegistry`, `SchemaMetaNameBinder`, `ValueReaderFactoryResolver`. These
   read as "how a caller configures a working environment," not compiler mechanics, and none of the
   three touched a package-private compiler class, so the move was clean. (An earlier version of
   `Tson`'s own builder, built the same day, briefly lived here too before moving one step further out
@@ -578,3 +534,66 @@ everything outstanding is tracked in one place.)
   bounds the *raw source text* memory too, not just the parsed-representation memory the Tier 2/3
   split already bounded. Verified against `LexerTest` (49/49) and the real sibling conformance suite
   (`ConformanceSuiteTest`, 111/111, ran for real against the checked-out fixtures, not skipped).
+
+## Content addressing / hash-pinned references
+
+A real, spec-mandated (MUST-level) integrity mechanism — [TSON-DATA] §2.2.1, [TSON-SCHEMA] §10.2 —
+that's currently entirely unimplemented, not just incomplete: `CanonicalIdentity.of` already strips
+a URI's query component to compute canonical identity, but the dropped query is never validated or
+checked against anything. Worth its own section since it's a coherent, well-specified area, not a
+handful of loose gaps.
+
+- [x] **SHA256 verification of fetched/imported schema content** — `ContentHash.declaredSha256(uri)`
+  parses a reference's `?sha256=<hex>` pin (rejects an unrecognized query-parameter name and a
+  malformed value, "never silently retained"), and `ContentHash.verify(bytes, uri)` throws
+  `ContentHashMismatchException` on a mismatch. `TsonCompiledSchemaRegistry.load` (the loader was later
+  folded into the registry) verifies every fetched pinned reference before use (the top `!!schema` +
+  each transitive pinned `!!import`/`!!meta`
+  at its own fetch); a plain reference resolves unverified. Verified end to end (correct pin → OK,
+  wrong pin / bad query → error). Now per-identity, not just per-fetch — see the aggregation bullet.
+- [x] **Correct content-hash computation** — `io.ltr8.tson.compiler.ContentHash` (`sha256(byte[])` /
+  `contentStart(byte[])`): SHA-256, lowercase hex, of every byte after the `!!id` line's own
+  terminator (for `CR LF`, after the `LF`); the id line is excluded, a leading BOM stripped and never
+  hashed. Exposed as **`tson hash <file>`** (`HashCommand`), which stamps the digest onto the `!!id`
+  as `?sha256=<hex>` in place (idempotent — re-running replaces the prior pin) — the first step toward
+  hash-pinning: publishing/pinning a schema. **Matching now ignores the pin** (a `?sha256` is
+  verification metadata, not identity): `TsonSchemaRegistry.canonicalIdentity(String)` is public, and
+  `ValidateCommand`'s source map + `Tson.validate`'s compile cache key by it, so a hashed schema still
+  resolves against a plain (or differently-pinned) reference. Verification of a pinned reference is
+  wired too (the bullet above).
+- [x] **Per-identity hash aggregation** ([TSON-SCHEMA] §10.2) — `TsonCompiledSchemaRegistry`
+  records each identity's content hash (canonical-keyed) on first resolution and verifies *every*
+  reference's declared digest against it, on both the fetch and cache-hit paths: an identity with no
+  digest resolves unverified; every reference to a resolved identity (pinned or plain) resolves to the
+  verified content; a reference whose pin conflicts errors (at most one digest can match the content),
+  even a *later* one to an already-resolved identity. Enablers: `TsonCompiledSchemaRegistry` now keys by
+  canonical identity (so a pinned and a plain reference share the cache entry, no double-register), and
+  `Tson.validate` calls `loader.load` on every reference so a repeat top-level `!!schema` is re-checked
+  even when its DOM compile is cached. Verified (`TsonValidateTest` + the CLI). *The "two distinct
+  digests" case surfaces as the non-matching digest's mismatch rather than a dedicated pre-check
+  diagnostic — same outcome (an error), slightly different framing than §10.2's letter.*
+- [x] **Embedded-`!!id` cross-check** ([TSON-DATA] §2.2.1) — `TsonCompiledSchemaRegistry.crossCheckId`
+  runs after parsing a fetched document: its own `!!id` canonical identity MUST equal the reference's,
+  so a source can't return content under the wrong identity (mismatch → resolver error). An id-less
+  target is an error for a hash-pinned reference and allowed for a plain one. Defensive for a general
+  fetch source (the CLI's own source is identity-keyed, so it always agrees). Verified in
+  `TsonValidateTest`.
+- [x] **Caching semantics**: a verified entry, once cached under its canonical identity, is immutable
+  (`contentHashes` uses `putIfAbsent`; `TsonSchemaRegistry.register` refuses a duplicate identity), and
+  a *failed* verification poisons nothing — `recordAndVerify` verifies a reference's pin against the
+  *freshly-computed* content hash and only records it on success, so a rejected fetch (e.g. tampered
+  content from a non-deterministic source) leaves no stale hash to fail a later, valid fetch of the
+  same identity. Guarded by `TsonValidateTest` with a call-counting flaky source (proven to fail
+  against the pre-fix store-before-verify ordering). No negative cache (the spec allows one but doesn't
+  require it); a rejected reference is simply retried.
+- [x] **Verifiable pins to the pre-loaded bootstrap schemas** — each bundled schema's `!!id` now
+  carries its own `?sha256=` content hash, and the library holds the three digests
+  (`TsonBundledSchemas.{META_KERNEL,META,CORE}_SHA256`, exposed by `declaredSha256(uri)`). The loader
+  verifies a hash-pinned reference to any of them against the held digest and checks each shipped
+  resource against its held digest on load (a mismatch = a corrupt package). The bundled chain is
+  itself pinned end to end — meta.tn's `!!meta`/`!!import` pin meta-kernel, core.tn's `!!meta` pins
+  meta.tn — so bootstrap verifies the whole chain (a wrong pin would fail the build). The one identity
+  that can never carry a pin is meta-kernel's own self-`!!meta` (its hash input would contain the pin);
+  its `!!id` is pinned, its self-`!!meta` stays plain, and `selfReferential`/matching compare by
+  canonical identity so the two agree. Verified in `BundledSchemaPinTest` (held digests == shipped
+  files; a correct pin to each verifies, a wrong one is rejected).
