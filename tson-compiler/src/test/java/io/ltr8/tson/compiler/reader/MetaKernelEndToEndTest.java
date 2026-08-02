@@ -41,9 +41,7 @@ class MetaKernelEndToEndTest {
      * the final re-wrap that method's own return value would otherwise force.
      */
     private static TsonCompiledSchema rawCompile(TsonLinkedSchema linked) {
-        TsonCompiledSchema placeholder = new TsonCompiledSchema(linked, Map.of());
-        TsonCompiledMetaSchema bootstrapMeta = new TsonCompiledMetaSchema(placeholder, ValueReaderFactoryRegistry.dom());
-        return TsonSchemaCompiler.compile(linked, bootstrapMeta);
+        return TsonSchemaCompiler.compile(linked, ValueReaderFactoryRegistry.dom());
     }
 
     /**

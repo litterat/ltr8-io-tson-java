@@ -1,7 +1,6 @@
 package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.compiler.Position;
-import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonReadException;
@@ -47,9 +46,7 @@ class PositionalReadErrorsTest {
     }
 
     private static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema) {
-        TsonCompiledSchema placeholder = new TsonCompiledSchema(linkedSchema, Map.of());
-        TsonCompiledMetaSchema bootstrapMeta = new TsonCompiledMetaSchema(placeholder, TsonSchemaCompiler.dom());
-        return TsonSchemaCompiler.compile(linkedSchema, bootstrapMeta);
+        return TsonSchemaCompiler.compile(linkedSchema, TsonSchemaCompiler.dom());
     }
 
     @Test

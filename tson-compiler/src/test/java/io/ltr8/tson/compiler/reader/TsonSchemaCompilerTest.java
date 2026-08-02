@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.reader;
 
-import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
@@ -36,9 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class TsonSchemaCompilerTest {
 
     private static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema) {
-        TsonCompiledSchema placeholder = new TsonCompiledSchema(linkedSchema, Map.of());
-        TsonCompiledMetaSchema bootstrapMeta = new TsonCompiledMetaSchema(placeholder, ValueReaderFactoryRegistry.dom());
-        return TsonSchemaCompiler.compile(linkedSchema, bootstrapMeta);
+        return TsonSchemaCompiler.compile(linkedSchema, ValueReaderFactoryRegistry.dom());
     }
 
     @Test

@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.reader;
 
-import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
@@ -29,9 +28,7 @@ class CompiledSchemaDomReadTest {
     private static TsonCompiledSchema compiled() {
         TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
         TsonLinkedSchema linked = TsonSchemaLinker.linkBootstrap(raw);
-        TsonCompiledSchema placeholder = new TsonCompiledSchema(linked, Map.of());
-        TsonCompiledMetaSchema bootstrapMeta = new TsonCompiledMetaSchema(placeholder, ValueReaderFactoryRegistry.dom());
-        return TsonSchemaCompiler.compile(linked, bootstrapMeta);
+        return TsonSchemaCompiler.compile(linked, ValueReaderFactoryRegistry.dom());
     }
 
     private static Object read(TsonCompiledSchema compiled, String source, String typeName) {

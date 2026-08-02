@@ -1,7 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
@@ -45,9 +44,7 @@ class RecordBindReaderTest {
         TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
         TsonLinkedSchema linked = TsonSchemaLinker.linkBootstrap(raw);
         DataBindContext context = SchemaMetaNameBinder.defaultContext();
-        TsonCompiledSchema placeholder = new TsonCompiledSchema(linked, Map.of());
-        TsonCompiledMetaSchema bootstrapMeta = new TsonCompiledMetaSchema(placeholder, ValueReaderFactoryRegistry.bind(context));
-        return TsonSchemaCompiler.compile(linked, bootstrapMeta);
+        return TsonSchemaCompiler.compile(linked, ValueReaderFactoryRegistry.bind(context));
     }
 
     @Test
@@ -74,9 +71,7 @@ class RecordBindReaderTest {
         TsonSchema schema = new TsonSchema("https://example.test/s.tn1", "https://example.test/meta.tn1", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
         DataBindContext context = SchemaMetaNameBinder.defaultContext();
-        TsonCompiledSchema placeholder = new TsonCompiledSchema(linkedSchema, Map.of());
-        TsonCompiledMetaSchema bootstrapMeta = new TsonCompiledMetaSchema(placeholder, ValueReaderFactoryRegistry.bind(context));
-        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(linkedSchema, bootstrapMeta);
+        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(linkedSchema, ValueReaderFactoryRegistry.bind(context));
 
         Object result = compiled.get("text_type").read("{ min_length: 3 max_length: 10 }");
 
@@ -145,9 +140,7 @@ class RecordBindReaderTest {
         TsonSchema schema = new TsonSchema("https://example.test/s.tn1", "https://example.test/meta.tn1", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
         DataBindContext context = SchemaMetaNameBinder.defaultContext();
-        TsonCompiledSchema placeholder = new TsonCompiledSchema(linkedSchema, Map.of());
-        TsonCompiledMetaSchema bootstrapMeta = new TsonCompiledMetaSchema(placeholder, ValueReaderFactoryRegistry.bind(context));
-        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(linkedSchema, bootstrapMeta);
+        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(linkedSchema, ValueReaderFactoryRegistry.bind(context));
 
         // No type-ref -- reads against text_type's own body, same as before the fix.
         Object ownResult = compiled.get("text_type").read("{ min_length: 3 }");

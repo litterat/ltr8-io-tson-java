@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.reader;
 
-import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonDataStream;
 import io.ltr8.tson.compiler.TsonReadContext;
@@ -64,9 +63,7 @@ class StreamingLazinessTest {
     }
 
     private static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema) {
-        TsonCompiledSchema placeholder = new TsonCompiledSchema(linkedSchema, Map.of());
-        TsonCompiledMetaSchema bootstrapMeta = new TsonCompiledMetaSchema(placeholder, TsonSchemaCompiler.dom());
-        return TsonSchemaCompiler.compile(linkedSchema, bootstrapMeta);
+        return TsonSchemaCompiler.compile(linkedSchema, TsonSchemaCompiler.dom());
     }
 
     @Test

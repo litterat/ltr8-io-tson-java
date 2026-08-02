@@ -25,12 +25,11 @@ import java.util.Map;
  * TsonSchemaCompiler} when it compiles a governed schema). Combining them keeps both facets scoped
  * to the same declared set.
  *
- * <p>A constructor this meta-schema does not declare falls back to the full global factory set
- * (see {@link #constructor}) -- e.g. one the schema being compiled declares itself (meta.tn
- * compiling {@code float32 => !float_type {}}, where {@code float_type} is meta.tn's own new
- * constructor, absent from meta.tn's governing meta, meta-kernel). Preferring the scoped factory
- * over this fallback is behavior-preserving today; the fallback is the seam through which
- * out-of-scope constructors are later rejected outright.
+ * <p>A constructor this meta-schema does not declare ({@link #constructor} returns {@code null}) is
+ * out of a governed schema's scope: {@link TsonSchemaCompiler} admits it only if the schema being
+ * compiled declares it itself (meta.tn compiling {@code float32 => !float_type {}}, where {@code
+ * float_type} is meta.tn's own new constructor, absent from its governing meta, meta-kernel -- sourced
+ * then from {@link #globalResolver}), and rejects it otherwise. This is where scoping is enforced.
  */
 public final class TsonCompiledMetaSchema extends TsonCompiledSchema {
 
@@ -86,16 +85,26 @@ public final class TsonCompiledMetaSchema extends TsonCompiledSchema {
     }
 
     /**
-     * The factory for constructor {@code name}: this meta-schema's own scoped vocabulary if it
-     * declares {@code name}, else the global factory set as a fallback (which itself fails for a
-     * truly unknown constructor). Mirrors {@link #reader}'s look-up-or-fail shape. The fallback is
-     * the seam a later stage tightens into rejecting an out-of-scope constructor outright, once a
-     * real governing meta is always present. Package-private: only {@link TsonSchemaCompiler}
-     * (same package) consults it.
+     * The factory for constructor {@code name} if this meta-schema declares it, else {@code null} --
+     * scoped strictly to this meta-schema's own vocabulary, with no global fallback. An absent result
+     * tells {@link TsonSchemaCompiler} the constructor is out of this governing meta's scope, to be
+     * admitted only if the schema being compiled declares it itself (sourced then from {@link
+     * #globalResolver}) and rejected otherwise. Package-private: only {@link TsonSchemaCompiler} (same
+     * package) consults it.
      */
     ValueReaderFactory constructor(String name) {
         ReaderResolver declared = constructors.get(name);
-        return declared != null ? declared.factory() : resolver.resolve(name);
+        return declared == null ? null : declared.factory();
+    }
+
+    /**
+     * The library's full factory set -- {@link TsonSchemaCompiler}'s source for a constructor the
+     * *compiling* schema declares itself (e.g. meta.tn's own {@code float_type}), one this governing
+     * meta's scoped vocabulary does not include. Package-private: only {@link TsonSchemaCompiler}
+     * consults it, and only after finding the constructor absent from {@link #constructor}.
+     */
+    ValueReaderFactoryResolver globalResolver() {
+        return resolver;
     }
 
     /**

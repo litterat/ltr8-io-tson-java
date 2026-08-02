@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.reader;
 
-import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
@@ -64,9 +63,7 @@ class VariantDomReaderTest {
     private static TsonCompiledSchema compiled() {
         TsonSchemaRegistry schemaRegistry = new TsonSchemaRegistry();
         TsonLinkedSchema registered = schemaRegistry.register(TsonSchemaLinker.link(compileableSchema(), schemaRegistry));
-        TsonCompiledSchema placeholder = new TsonCompiledSchema(registered, Map.of());
-        TsonCompiledMetaSchema bootstrapMeta = new TsonCompiledMetaSchema(placeholder, ValueReaderFactoryRegistry.dom());
-        return TsonSchemaCompiler.compile(registered, bootstrapMeta);
+        return TsonSchemaCompiler.compile(registered, ValueReaderFactoryRegistry.dom());
     }
 
     @SuppressWarnings("unchecked")

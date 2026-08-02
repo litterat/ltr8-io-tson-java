@@ -43,9 +43,9 @@ import java.util.function.Function;
  *
  * <p>Two compile modes share this eager walk, differing only in how a body's constructor name maps to
  * a factory. A <b>governed</b> compile ({@link #compile(TsonLinkedSchema, TsonCompiledMetaSchema)})
- * dispatches through the governing meta-schema's own scoped vocabulary ({@link
- * TsonCompiledMetaSchema#constructor}, which falls back to the global set for a constructor the
- * compiling schema declares itself). A <b>standalone</b> compile ({@link #compile(TsonLinkedSchema,
+ * dispatches, scoped, through the governing meta-schema ({@link #governedFactory}): its own declared
+ * vocabulary, then the global set only for a constructor the compiling schema declares itself,
+ * otherwise rejected as out of scope. A <b>standalone</b> compile ({@link #compile(TsonLinkedSchema,
  * ValueReaderFactoryResolver)}) dispatches through a factory set directly, with no scoping -- for
  * reading an already-validated schema in a chosen mode. One non-factory case is checked first in
  * both: {@link Reference} (a bare {@code name => other_name} entry, §8.3) delegates straight to the
@@ -62,14 +62,38 @@ public final class TsonSchemaCompiler {
 
     /**
      * <b>Governed compile</b>: compiles {@code linkedSchema} against {@code governingMeta}, so each
-     * body's constructor is dispatched through that meta-schema's own scoped vocabulary (see {@link
-     * TsonCompiledMetaSchema#constructor}). This is what {@code TsonCompiledRegistry} uses to compile a
-     * schema in the context of the meta that governs it. {@code governingMeta} is always an
-     * already-compiled result from a previous compile -- meta-kernel's own case aside (see {@link
-     * TsonCompiledMetaSchema#bootstrap}).
+     * body's constructor is dispatched, scoped, through that meta-schema (see {@link #governedFactory}).
+     * This is what {@code TsonCompiledRegistry} uses to compile a schema in the context of the meta that
+     * governs it. {@code governingMeta} is always an already-compiled result from a previous compile --
+     * meta-kernel's own case aside (see {@link TsonCompiledMetaSchema#bootstrap}).
      */
     public static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema, TsonCompiledMetaSchema governingMeta) {
-        return compileWith(linkedSchema, governingMeta::constructor);
+        TsonSchema schema = linkedSchema.schema();
+        return compileWith(linkedSchema, name -> governedFactory(name, schema, governingMeta));
+    }
+
+    /**
+     * Scoped factory dispatch for a governed compile: the governing meta-schema's own vocabulary first
+     * ({@link TsonCompiledMetaSchema#constructor}); then, only if the schema being compiled declares the
+     * constructor itself (a meta-schema introducing its own new constructor, e.g. meta.tn's {@code
+     * float_type}), the global factory set; otherwise the constructor is out of scope. The resulting
+     * {@link IllegalStateException} is caught per entry by {@link Compilation#resolve} and deferred into
+     * an {@link ErrorReader}, same as any other unbuildable entry -- the schema still compiles, only
+     * reading a value against that one entry fails.
+     */
+    private static ValueReaderFactory governedFactory(String constructorName, TsonSchema schema,
+                                                      TsonCompiledMetaSchema governingMeta) {
+        ValueReaderFactory inherited = governingMeta.constructor(constructorName);
+        if (inherited != null) {
+            return inherited;
+        }
+        TypeDefinition own = schema.entries().get(constructorName);
+        if (own != null && own.constructor()) {
+            return governingMeta.globalResolver().resolve(constructorName);
+        }
+        throw new IllegalStateException("constructor '" + constructorName + "' is out of scope: not in the "
+                + "vocabulary of governing meta-schema '" + governingMeta.schema().id() + "', and not declared "
+                + "by the schema being compiled");
     }
 
     /**
