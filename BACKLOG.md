@@ -9,47 +9,24 @@ yet implemented" section for the technical detail behind several of these items.
 
 ---
 
-## Tree / DOM model (`TsonNode`)
+## Tree model (`TsonNode`)
 
-A queryable, **immutable** document model — the useful result a read hands back — replacing DOM mode's
-throwaway `Map`/`List` (which is lossy: it collapses record-vs-map and array-vs-tuple, drops type-refs
-and annotations, and is discarded during validation anyway). Like Jackson's `JsonNode`, but structure-
-preserving (TSON distinguishes record/map and array/tuple, which JSON conflates) and annotation-aware.
-The data AST (`ast.CoreValue`) stays a pure, schemaless parse tree — the tree is a distinct, consumer-
-facing type set (settled: separate concepts, and the tree carries typed leaves + query ergonomics the
-AST deliberately doesn't).
+The `TsonNode` tree — an immutable, queryable, structure-preserving document model in its own pure-leaf
+`tson-tree` module (`io.ltr8.tson.tree`) — is **built**: the node model + query API, both producers (the
+schema-driven tree readers and the schemaless `TsonTreeReader`), the `TsonTreeWriter` back to text, and
+the removal of the old throwaway `Map`/`List` DOM mode all landed. What's left:
 
-**Settled design decisions:**
-- **Module** `tson-tree` (`io.ltr8.tson.tree`) — its own pure-leaf value-model module, the data-tree
-  counterpart to `tson-schema`'s `schema.meta`; `tson-compiler` depends on it, not the reverse.
-- **Immutable, "new from old"** — records + builders + copy-on-write helpers (`RecordNode.with(name,
-  node)`, `ArrayNode.with(i, node)`); no mutation. A pointer-based `set("/a/b", node) → new tree` is a
-  later nicety.
-- **Model:** `sealed interface TsonNode` carrying `Optional<String> typeRef()` + `List<Annotation>
-  annotations()` on every node. Concrete: `RecordNode` (ordered name→node), `MapNode` (ordered
-  (keyNode, valueNode)), `ArrayNode`, `TupleNode` (schema-driven only), a **single** `AtomNode(Object
-  value, Optional<String> typeRef)` (not per-atom node classes — §5's vocabulary is too large), plus
-  `NullNode` and `AbsentNode`. Token form (quoted/unquoted) is dropped (captured by the resolved leaf
-  type). `TsonNode` carries the prefix; subtypes are bare (Jackson's `JsonNode`/`ObjectNode` precedent).
-- **Query API:** `get(String)`/`get(int)`/`at(jsonPointer)` (reuse the RFC 6901 machinery from the
-  diagnostics layer)/`path(...)`; `isRecord()`/`isAtom()`/… kind tests; typed accessors (`asString`/
-  `asBigInteger`/`asInt`/`asBoolean`/`asDecimal`/`asUuid`/`asLocalDate`/…, plus generic `as(Class<T>)`
-  and raw `value()`); `fields()`/`entries()`/`elements()`.
-
-**Two producers, one node set:**
-- **Schema-driven** — rework the `*DomReader` family (`Record`/`Array`/`Map`/`Tuple`) into `*TreeReader`
-  building `TsonNode` (same streaming plumbing, now keeping type-refs/annotations and splitting tuple
-  from array). `ValueReaderFactoryRegistry.dom()` → `.tree()`; `TsonCompiledSchemaRegistry.dom(core)` →
-  `.tree(core)`; `Tson.domRegistry()` → `treeRegistry()`; `validate` uses tree mode (still discards the
-  result). Plain `Map`/`List` output goes away (`TsonNode` can offer `asMap()`/`asList()` views).
-- **Schemaless `readTree`** — walk the `DataValue`/`CoreValue` AST, base-resolve each token (+
-  `BuiltinTypeVocabulary` for a `!builtin` tag), map to the same nodes. Surfaced as `Tson.readTree(...)`.
-  No tuple distinction (grammar has none); `EmptyBrace` **defaults to an empty `RecordNode`** (settled).
-
-**Phasing:** (1) node model + query API + the schema-driven `*DomReader` → `*TreeReader` rework + rewire
-(factory/registry/`Tson`/`validate` + ~17 reader-test updates — the bulk); (2) schemaless `readTree` +
-copy-on-write transform helpers; (3) `TsonNode.toTson()` serialization, then a JSON producer (the future
-JSON stack emits the same `TsonNode`).
+- [ ] **Copy-on-write transforms + builders (parked).** The "new tree from old" editing half —
+  `RecordNode.with(name, node)`/`without(name)`, `ArrayNode.with(i, node)`/`plus(node)`/`without(i)`,
+  `RecordNode.builder()`, and a pointer-based `set("/a/b", node) → new tree`. All pure `tson-tree`
+  operations (no compiler dependency), so they belong in that module. Deferred until there's a concrete
+  produce/edit use case: `TsonTreeWriter` already closes the read→edit→write loop, so these have a real
+  payoff when wanted, but block nothing now.
+- [ ] **Wire-annotation capture in both read paths.** Every node's `annotations()` is empty today —
+  neither the schema-driven readers nor `TsonTreeReader` capture `@name`/`@name: value` wire annotations
+  (matching `TsonObjectWriter`/`TsonObjectReader`, which don't carry them either). Capturing them on the
+  node, and having `TsonTreeWriter` re-emit them, is the annotation-aware half the model was designed for
+  but doesn't yet exercise.
 
 ## Front door / ergonomics
 
@@ -70,7 +47,7 @@ JSON stack emits the same `TsonNode`).
   accidentally govern another one, surfaced by the linker (with the spec's own wording) at
   resolve/link time. The 2026-08-02 `TsonCompiledSchemaRegistry` cleanup arc closed the *type-level*
   half of this — the meta/non-meta split, so a non-meta schema won't type-check where a governing
-  meta is required (see Done) — and now rejects a non-meta `!!meta` target at load time via
+  meta is required — and now rejects a non-meta `!!meta` target at load time via
   `loadMeta`, but the linker-level validation itself is still absent.
 
 ## Resolution & linking generality
@@ -117,7 +94,7 @@ own prose (which had gone stale on at least one of them):
 
 - [ ] **Atom-refinement merging never checks that a refinement actually narrows its source** —
   `DefinitionResolver.mergeWithSource` (chained atom refinement, `!I ^ { values }`) re-serializes
-  `I`'s own already-bound constraint object to wire form via `TsonMapperWriter`, then merges it with
+  `I`'s own already-bound constraint object to wire form via `TsonObjectWriter`, then merges it with
   the new refinement's own `values` field by field: `merged.put(field.name(), field)` — a plain map
   override, explicit values simply win, with **no check that the new value is actually a valid
   narrowing** of what it replaces. Concretely: `!uint8 ^ { min: -10 max: 300 }` is not rejected, even
