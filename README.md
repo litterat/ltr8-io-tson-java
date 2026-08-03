@@ -138,10 +138,14 @@ object). That's the whole matrix:
 | You have… | You want… | Use | You get |
 |---|---|---|---|
 | a Java class | it bound, no schema | **`TsonObjectReader`** | your object |
-| nothing (schemaless) | a navigable tree | **`TsonDataParser`** | a `Document` AST |
+| nothing (schemaless) | a queryable tree | **`TsonTreeReader`** | a `TsonNode` tree |
+| nothing (schemaless) | a grammar-faithful AST | **`TsonDataParser`** | a `Document` AST |
 | nothing (schemaless) | to pull events lazily | **`TsonDataStream`** | a `TsonEvent` stream |
-| a TSON schema | validation + generic output | **`TsonValueReader`** (DOM mode) | `Map`/`List` |
+| a TSON schema | validation + a queryable tree | **`TsonValueReader`** (tree mode) | a `TsonNode` tree |
 | a TSON schema | validation + a bound object | **`TsonValueReader`** (bind mode) | your object |
+
+The write side mirrors the two "bound"/"tree" outputs: **`TsonObjectWriter`** turns a Java object back
+into TSON text, **`TsonTreeWriter`** turns a `TsonNode` tree back into TSON text.
 
 The two "bound object" rows are mirror images: `TsonObjectReader` checks the data against your Java
 class *reflectively* (the class is the schema); `TsonValueReader` checks it against a real TSON *schema
@@ -237,10 +241,13 @@ while (stream.hasNext()) {
 This is where the *schema layer* comes in: a schema document declares types, and a data document is
 validated against one of them. `Tson.builder().build()` bootstraps the standard library
 (meta-kernel/meta.tn/core.tn); `compile` turns your schema into fast, reusable per-type readers; then
-you `get` the reader for a type and `read` data against it. **DOM mode** produces plain `Map`/`List`:
+you `get` the reader for a type and `read` data against it. **Tree mode** produces an immutable,
+queryable `TsonNode` — structure-preserving (record vs map, array vs tuple), typed leaves, null-safe
+navigation, and no Java class per schema type:
 
 ```java
 import io.ltr8.tson.Tson;
+import io.ltr8.tson.compiler.tree.TsonNode;
 Tson tson = Tson.builder().build();
 
 String schema = """
@@ -251,12 +258,11 @@ String schema = """
             server => { hostname: text  port: int32 }
         }""";
 
-var compiled = tson.domRegistry().compile(tson.resolve(schema));
+var compiled = tson.treeRegistry().compile(tson.resolve(schema));
 
-@SuppressWarnings("unchecked")
-Map<String, Object> value = (Map<String, Object>)
-        compiled.get("server").read("{ hostname: \"web-01\" port: 8080 }");
-// { hostname=web-01, port=8080 } — validated against the schema; a bad port would surface as a diagnostic
+TsonNode value = compiled.get("server").read("{ hostname: \"web-01\" port: 8080 }");
+value.get("hostname").asString();          // Optional[web-01] — validated against the schema
+value.get("port").asBigInteger();          // Optional[8080] — a bad port would surface as a diagnostic
 ```
 
 ▶ Runnable: [`examples/SchemaValidation.java`](examples/SchemaValidation.java) — `java --module-path tson/build/modules --add-modules io.ltr8.tson examples/SchemaValidation.java` (also shows collecting a diagnostic)
@@ -267,16 +273,25 @@ full multi-stage pipeline behind this (parse → resolve → link → register �
 schema governed by meta.tn/core.tn is assembled, is described under [Schema pipeline](#schema-pipeline)
 below.
 
-### Writing TSON back out — `TsonObjectWriter`
+### Writing TSON back out — `TsonObjectWriter` / `TsonTreeWriter`
 
-The read-side inverse of `TsonObjectReader`: a Java object to TSON text. Mainly a debugging aid, not a
-guaranteed-lossless serializer (see [CONFORMANCE.md](CONFORMANCE.md) for exactly where it's lossy). It
-throws unchecked `TsonWriteException` on failure, symmetric to the reader's `TsonReadException` — no
-checked exceptions on either side of the object-binding pair:
+`TsonObjectWriter` is the inverse of `TsonObjectReader`: a Java object to TSON text. Mainly a debugging
+aid, not a guaranteed-lossless serializer (see [CONFORMANCE.md](CONFORMANCE.md) for exactly where it's
+lossy). It throws unchecked `TsonWriteException` on failure, symmetric to the reader's
+`TsonReadException` — no checked exceptions on either side of the object-binding pair:
 
 ```java
 String text = new TsonObjectWriter().toTson(server);
 // { hostname: "web-01" address: !ipv4 "192.0.2.10" id: !uuid "9f1c8e2a-…" deployedOn: !date "2026-01-15" }
+```
+
+`TsonTreeWriter` is the inverse of `TsonTreeReader`: a `TsonNode` tree back to TSON text. Because the
+tree keeps each node's own type-ref, it's closer to lossless than the object writer — an
+`AtomNode(42, "int32")` writes back as `!int32 42`, so an integer width survives a read/edit/write round
+trip (the object writer, holding only a bound `long`, has no way to recover it):
+
+```java
+String text = new TsonTreeWriter().toTson(node);
 ```
 
 ---
