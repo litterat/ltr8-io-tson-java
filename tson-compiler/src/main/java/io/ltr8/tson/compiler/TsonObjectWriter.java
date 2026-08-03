@@ -12,22 +12,11 @@ import io.ltr8.bind.DataClassMap;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassTuple;
 import io.ltr8.bind.DataClassUnion;
-import io.ltr8.tson.compiler.atom.*;
-import io.ltr8.tson.compiler.atom.RationalParser;
+import io.ltr8.tson.compiler.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
-import io.ltr8.tson.schema.meta.IsoDuration;
-import io.ltr8.tson.schema.meta.Rational;
 
-import java.net.Inet4Address;
-import java.net.Inet6Address;
-import java.net.URI;
-import java.time.LocalDate;
-import java.time.OffsetDateTime;
-import java.time.OffsetTime;
-import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * The write-side counterpart to {@link TsonObjectReader} -- given a Java object and its {@link
@@ -40,56 +29,19 @@ public final class TsonObjectWriter {
     private final DataBindContext context;
 
     /**
-     * The reverse of {@link BuiltinTypeVocabulary}'s
-     * name-&gt;{@code AtomType} map: which {@code AtomType} (and under what type-ref name) writes a
-     * given bound Java class's values, for {@link #toTson}. Curated by hand, not derived from
-     * {@code BuiltinTypeVocabulary} wholesale -- the integer/decimal/float family has no unique
-     * reverse mapping at all (many names, e.g. {@code int8}..{@code int256}, can bind to the same
-     * host type, so a bound {@code long} carries no way to know which one -- or whether it was
-     * typed at all -- produced it; see {@link #toTson}'s own Javadoc), so those stay on the generic
-     * default-atom path instead of appearing here.
-     *
-     * <p>A plain mutable instance field, not a shared static table -- deliberately, so a future
-     * caller wanting to extend the vocabulary with their own {@code AtomType} (registering it here
-     * the same way {@code DataBindContext#registerAtom} already lets a caller extend the read side)
-     * has an actual per-writer map to add to, not a global one to work around.
+     * The reverse of {@link BuiltinTypeVocabulary}'s name-&gt;{@code AtomType} map, keyed by bound Java
+     * class -- see {@link VocabularyAtoms}. A per-writer mutable copy so a future caller can extend it with
+     * their own {@code AtomType}, the write-side mirror of {@code DataBindContext#registerAtom}.
      */
-    private final Map<Class<?>, VocabularyAtom> vocabularyAtoms;
+    private final Map<Class<?>, VocabularyAtoms.Entry> vocabularyAtoms;
 
     public TsonObjectWriter(DataBindContext context) {
         this.context = context;
-        this.vocabularyAtoms = defaultVocabularyAtoms();
+        this.vocabularyAtoms = VocabularyAtoms.defaults();
     }
 
     public TsonObjectWriter() {
         this(TsonAtomContext.defaultContext());
-    }
-
-    /** Pairs an {@code AtomType} with the type-ref name {@link #toTson} should write it under. */
-    private record VocabularyAtom(String typeRef, AtomType<?> atomType) {
-        @SuppressWarnings("unchecked")
-        String write(Object value) {
-            return ((AtomType<Object>) atomType).write(value);
-        }
-    }
-
-    private static Map<Class<?>, VocabularyAtom> defaultVocabularyAtoms() {
-        Map<Class<?>, VocabularyAtom> atoms = new HashMap<>();
-        atoms.put(UUID.class, new VocabularyAtom(UuidParser.TYPENAME, UuidParser.UNCONSTRAINED));
-        atoms.put(URI.class, new VocabularyAtom(UriParser.TYPENAME, UriParser.UNCONSTRAINED));
-        atoms.put(Inet4Address.class, new VocabularyAtom(Ipv4Parser.TYPENAME, Ipv4Parser.UNCONSTRAINED));
-        atoms.put(Inet6Address.class, new VocabularyAtom(Ipv6Parser.TYPENAME, Ipv6Parser.UNCONSTRAINED));
-        atoms.put(LocalDate.class, new VocabularyAtom(DateParser.TYPENAME, DateParser.UNCONSTRAINED));
-        atoms.put(OffsetTime.class, new VocabularyAtom(TimeParser.TYPENAME, TimeParser.UNCONSTRAINED));
-        atoms.put(OffsetDateTime.class, new VocabularyAtom(DateTimeParser.TYPENAME, DateTimeParser.UNCONSTRAINED));
-        // base64 is an arbitrary but reasonable default -- no way to recover which of
-        // base64/base64url/base32/hex a byte[] was originally decoded from, that information
-        // doesn't survive decoding (see #toTson's own Javadoc).
-        atoms.put(byte[].class, new VocabularyAtom(BinaryParser.BASE64.typeName(), BinaryParser.BASE64));
-        atoms.put(Rational.class, new VocabularyAtom(RationalParser.TYPENAME, RationalParser.UNCONSTRAINED));
-        atoms.put(Complex.class, new VocabularyAtom(ComplexParser.TYPENAME, ComplexParser.UNCONSTRAINED));
-        atoms.put(IsoDuration.class, new VocabularyAtom(DurationParser.TYPENAME, DurationParser.UNCONSTRAINED));
-        return atoms;
     }
 
     // ── Entry point ──────────────────────────────────────────────────────
@@ -176,7 +128,7 @@ public final class TsonObjectWriter {
      * formatting difference.
      */
     private void writeAtom(Object value, TsonDataEmitter writer) throws DataBindException {
-        VocabularyAtom vocab = vocabularyAtoms.get(value.getClass());
+        VocabularyAtoms.Entry vocab = vocabularyAtoms.get(value.getClass());
         if (vocab != null) {
             writer.typeRef(vocab.typeRef()).quotedString(vocab.write(value));
         } else {

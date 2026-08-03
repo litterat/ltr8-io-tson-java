@@ -87,6 +87,11 @@ public final class Tson {
         return new TsonObjectWriter(dataBindContext);
     }
 
+    /** A {@link TsonTreeWriter} -- an immutable {@code TsonNode} tree back to TSON text, the inverse of {@link #treeReader()}. */
+    public TsonTreeWriter treeWriter() {
+        return new TsonTreeWriter();
+    }
+
     /** The {@link DataBindContext} {@link #objectReader()}/{@link #objectWriter()}/{@link #bindRegistry()} bind against -- see {@link TsonConfig#dataBindContext} to customize it. */
     public DataBindContext dataBindContext() {
         return dataBindContext;

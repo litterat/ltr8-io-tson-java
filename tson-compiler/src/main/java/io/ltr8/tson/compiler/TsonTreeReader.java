@@ -56,6 +56,9 @@ import java.util.Optional;
  */
 public final class TsonTreeReader {
 
+    public TsonTreeReader() {
+    }
+
     /** TSON text straight to a {@link TsonNode} tree. */
     public TsonNode read(String source) {
         return read(TsonReadContext.throwing(source));
