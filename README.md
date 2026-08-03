@@ -125,15 +125,15 @@ OK
 
 That's the whole loop, all from the shell: scaffold → edit → validate. See
 [Command-line interface](#command-line-interface) below for the full command reference, and
-[Reading TSON](#reading-tson-choosing-an-entry-point) for reading TSON *from Java*.
+[Reading TSON](#reading-and-writing-tson-choosing-an-entry-point) for reading TSON *from Java*.
 
 ---
 
-## Reading TSON: choosing an entry point
+## Reading and writing TSON: choosing an entry point
 
-There are two questions that pick your reader: **what drives the interpretation** (nothing, your Java
-class, or a TSON schema document), and **what you want out** (a generic tree/stream, or a bound Java
-object). That's the whole matrix:
+Two questions pick your reader: **what drives the interpretation** (nothing, your Java class, or a TSON
+schema document), and **what you want out** (a generic tree/stream, or a bound Java object). The write
+side is the mirror: a value in hand, TSON text out. That's the whole matrix:
 
 | You have… | You want… | Use | You get |
 |---|---|---|---|
@@ -143,9 +143,8 @@ object). That's the whole matrix:
 | nothing (schemaless) | to pull events lazily | **`TsonDataStream`** | a `TsonEvent` stream |
 | a TSON schema | validation + a queryable tree | **`TsonValueReader`** (tree mode) | a `TsonNode` tree |
 | a TSON schema | validation + a bound object | **`TsonValueReader`** (bind mode) | your object |
-
-The write side mirrors the two "bound"/"tree" outputs: **`TsonObjectWriter`** turns a Java object back
-into TSON text, **`TsonTreeWriter`** turns a `TsonNode` tree back into TSON text.
+| a Java object | it as TSON text | **`TsonObjectWriter`** | a `String` |
+| a `TsonNode` tree | it as TSON text | **`TsonTreeWriter`** | a `String` |
 
 The two "bound object" rows are mirror images: `TsonObjectReader` checks the data against your Java
 class *reflectively* (the class is the schema); `TsonValueReader` checks it against a real TSON *schema
@@ -312,7 +311,7 @@ are still out of scope. Details live in dedicated docs rather than crowding this
 
 ## Schema pipeline
 
-The [reader table](#reading-tson-choosing-an-entry-point) above binds data against a plain Java class
+The [reader table](#reading-and-writing-tson-choosing-an-entry-point) above binds data against a plain Java class
 with no schema involved — that's Class 1 (§1.5), TSON's schemaless mode. Part 2 layers a schema
 *system* on top: a governing document that declares types, which a data document can then be validated
 against. Turning schema source text into something a data reader can actually use goes through a
@@ -344,7 +343,7 @@ vocabulary — parse → resolve → link → register → compile → read:
    `TsonObjectReader`/`TsonDataParser` don't attempt on their own.
 
 `Tson.builder().build()` wires all of this together for the standard library and hands you a `Tson`
-whose `resolve`/`compile` run the pipeline for you (as shown in the [reader table](#reading-tson-choosing-an-entry-point)'s
+whose `resolve`/`compile` run the pipeline for you (as shown in the [reader table](#reading-and-writing-tson-choosing-an-entry-point)'s
 schema example) — so you rarely touch the individual stages directly. Under the hood, resolving and
 linking a schema both need its own *governing* schema already compiled, to resolve constructor names
 like `!enum`/`!integer_type` against — including meta-kernel itself, whose own `!!meta` names *itself*
