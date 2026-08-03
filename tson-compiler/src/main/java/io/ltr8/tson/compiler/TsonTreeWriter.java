@@ -1,15 +1,15 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.bind.DataBindException;
-import io.ltr8.tson.compiler.tree.AbsentNode;
-import io.ltr8.tson.compiler.tree.ArrayNode;
-import io.ltr8.tson.compiler.tree.AtomNode;
-import io.ltr8.tson.compiler.tree.MapNode;
-import io.ltr8.tson.compiler.tree.MissingNode;
-import io.ltr8.tson.compiler.tree.NullNode;
-import io.ltr8.tson.compiler.tree.RecordNode;
-import io.ltr8.tson.compiler.tree.TupleNode;
-import io.ltr8.tson.compiler.tree.TsonNode;
+import io.ltr8.tson.tree.AbsentNode;
+import io.ltr8.tson.tree.ArrayNode;
+import io.ltr8.tson.tree.AtomNode;
+import io.ltr8.tson.tree.MapNode;
+import io.ltr8.tson.tree.MissingNode;
+import io.ltr8.tson.tree.NullNode;
+import io.ltr8.tson.tree.RecordNode;
+import io.ltr8.tson.tree.TupleNode;
+import io.ltr8.tson.tree.TsonNode;
 
 import java.util.List;
 import java.util.Map;

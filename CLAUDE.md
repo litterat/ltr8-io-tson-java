@@ -95,14 +95,21 @@ module has a real `module-info.java`; module names mirror each module's root exp
   one structurally it declares a local stand-in (`schema.meta.Token` mirrors `ast.TokenValue`/`TokenForm`;
   `schema.meta.SourcePosition` is an interface `tson-compiler`'s `Position` implements), converted at the
   one spot that needs it.
+- **`tson-tree`** — **only** `io.ltr8.tson.tree` (the data-document *value* model — `TsonNode` and its
+  pure immutable node types, structure-preserving and query-ergonomic, the read output of tree mode). A
+  true leaf: depends on **nothing** (not even `tson-annotation` — the nodes aren't bind targets, they're
+  assembled by hand-written readers). The data-tree counterpart to `tson-schema`'s `schema.meta`: same
+  "pure value model in its own module, engine depends on it not the reverse" shape, so JPMS keeps the tree
+  from ever coupling to compiler internals. `tson-compiler` depends on it; it names no `tson-compiler` type.
 - **`tson-compiler`** — the engine: lexer, both grammars, base type resolution, the atom vocabulary,
-  schema resolution, Class 2 compilation, the compiled reader stack, the schemaless object binder, and
+  schema resolution, Class 2 compilation, the compiled reader stack (including the tree readers/`TsonTreeReader`
+  and `TsonTreeWriter` that produce/consume `tson-tree`'s `TsonNode`), the schemaless object binder, and
   config/wiring. Everything here is tightly coupled to the shared lexer/token-stream machinery, so it's
   one module. Root package `io.ltr8.tson.compiler`; exports the packages with real cross-module callers
   and keeps `reader`/`atom`/`base`/`lexer` internal.
 - **`tson`** — the small front-door module (`Tson`/`TsonConfig`) over `tson-compiler`, the way Retrofit
-  sits on OkHttp. Declares `tson-compiler`/`tson-schema`/`tson-bind` as `api` so a caller sees the real
-  classes underneath.
+  sits on OkHttp. Declares `tson-compiler`/`tson-schema`/`tson-bind`/`tson-tree` as `api` so a caller sees
+  the real classes underneath.
 - **`tson-cli`** — the `tson` command-line application. Depends on nothing depending on it (exports
   nothing).
 

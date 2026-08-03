@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.compiler.tree.TsonNode;
+import io.ltr8.tson.tree.TsonNode;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;

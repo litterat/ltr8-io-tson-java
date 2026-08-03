@@ -32,7 +32,7 @@ class CompiledSchemaTreeReadTest {
     }
 
     private static Object read(TsonCompiledSchema compiled, String source, String typeName) {
-        return Dom.of((io.ltr8.tson.compiler.tree.TsonNode) compiled.get(typeName).read(source));
+        return Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get(typeName).read(source));
     }
 
     @Test

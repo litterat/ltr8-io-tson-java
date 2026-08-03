@@ -87,7 +87,7 @@ class TsonSchemaCompilerTest {
         TsonCompiledSchema compiled = compile(linkedSchema);
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> used = (Map<String, Object>) Dom.of((io.ltr8.tson.compiler.tree.TsonNode) compiled.get("used").read("{}"));
+        Map<String, Object> used = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("used").read("{}"));
         assertTrue(used.isEmpty());
 
         // Compiling/getting "orphan" itself succeeds -- only reading an actual value against it fails.

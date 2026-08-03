@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.compiler.tree.TsonNode;
+import io.ltr8.tson.tree.TsonNode;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
 import org.junit.jupiter.api.Test;
 

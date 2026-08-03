@@ -43,7 +43,7 @@ class TupleTreeReaderTest {
 
     @SuppressWarnings("unchecked")
     private static List<Object> readTuple(TsonCompiledSchema compiled, String source) {
-        return (List<Object>) Dom.of((io.ltr8.tson.compiler.tree.TsonNode) compiled.get("pair").read(source));
+        return (List<Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("pair").read(source));
     }
 
     private static TupleBody twoRequiredSlots() {

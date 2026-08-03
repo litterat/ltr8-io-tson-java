@@ -12,6 +12,7 @@ include("tson-compiler")
 include("tson-annotation")
 include("tson-bind")
 include("tson-schema")
+include("tson-tree")
 include("tson-cli")
 include("tson")
 

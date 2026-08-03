@@ -50,7 +50,7 @@ class ArrayTreeReaderTest {
 
     @SuppressWarnings("unchecked")
     private static List<Object> readArray(TsonCompiledSchema compiled, String rootName, String source) {
-        return (List<Object>) Dom.of((io.ltr8.tson.compiler.tree.TsonNode) compiled.get(rootName).read(source));
+        return (List<Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get(rootName).read(source));
     }
 
     @Test
@@ -128,7 +128,7 @@ class ArrayTreeReaderTest {
         TsonCompiledSchema compiled = compile(extra);
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.compiler.tree.TsonNode) compiled.get("holder").read("{ items: [1 2 3] }"));
+        Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("holder").read("{ items: [1 2 3] }"));
 
         assertEquals(List.of(BigInteger.ONE, BigInteger.TWO, BigInteger.valueOf(3)), result.get("items"));
     }

@@ -247,7 +247,7 @@ navigation, and no Java class per schema type:
 
 ```java
 import io.ltr8.tson.Tson;
-import io.ltr8.tson.compiler.tree.TsonNode;
+import io.ltr8.tson.tree.TsonNode;
 Tson tson = Tson.builder().build();
 
 String schema = """

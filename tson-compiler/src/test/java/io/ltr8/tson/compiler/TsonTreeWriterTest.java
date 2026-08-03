@@ -1,10 +1,10 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.compiler.tree.ArrayNode;
-import io.ltr8.tson.compiler.tree.AtomNode;
-import io.ltr8.tson.compiler.tree.MissingNode;
-import io.ltr8.tson.compiler.tree.RecordNode;
-import io.ltr8.tson.compiler.tree.TsonNode;
+import io.ltr8.tson.tree.ArrayNode;
+import io.ltr8.tson.tree.AtomNode;
+import io.ltr8.tson.tree.MissingNode;
+import io.ltr8.tson.tree.RecordNode;
+import io.ltr8.tson.tree.TsonNode;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;

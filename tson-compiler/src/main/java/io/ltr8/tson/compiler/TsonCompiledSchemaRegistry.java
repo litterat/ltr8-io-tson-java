@@ -37,7 +37,7 @@ public final class TsonCompiledSchemaRegistry {
 
     /**
      * A registry that reads user schemas into an immutable, queryable {@link
-     * io.ltr8.tson.compiler.tree.TsonNode} tree -- structure-preserving (record vs map, array vs tuple) with
+     * io.ltr8.tson.tree.TsonNode} tree -- structure-preserving (record vs map, array vs tuple) with
      * typed leaves and null-safe navigation, and no Java class per schema type (hence no {@code
      * DataBindContext}). The recommended read mode; {@link #bind} is the object-binding alternative.
      */

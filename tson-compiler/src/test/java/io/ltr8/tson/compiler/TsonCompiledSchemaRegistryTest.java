@@ -2,7 +2,7 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
-import io.ltr8.tson.compiler.tree.TsonNode;
+import io.ltr8.tson.tree.TsonNode;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
 import io.ltr8.tson.schema.TsonBundledSchemas;

@@ -20,7 +20,8 @@ facing type set (settled: separate concepts, and the tree carries typed leaves +
 AST deliberately doesn't).
 
 **Settled design decisions:**
-- **Package** `io.ltr8.tson.compiler.tree`, exported.
+- **Module** `tson-tree` (`io.ltr8.tson.tree`) — its own pure-leaf value-model module, the data-tree
+  counterpart to `tson-schema`'s `schema.meta`; `tson-compiler` depends on it, not the reverse.
 - **Immutable, "new from old"** — records + builders + copy-on-write helpers (`RecordNode.with(name,
   node)`, `ArrayNode.with(i, node)`); no mutation. A pointer-based `set("/a/b", node) → new tree` is a
   later nicety.

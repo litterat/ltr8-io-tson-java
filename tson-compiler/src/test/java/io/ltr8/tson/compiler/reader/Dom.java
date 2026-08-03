@@ -1,11 +1,11 @@
 package io.ltr8.tson.compiler.reader;
 
-import io.ltr8.tson.compiler.tree.ArrayNode;
-import io.ltr8.tson.compiler.tree.AtomNode;
-import io.ltr8.tson.compiler.tree.MapNode;
-import io.ltr8.tson.compiler.tree.RecordNode;
-import io.ltr8.tson.compiler.tree.TsonNode;
-import io.ltr8.tson.compiler.tree.TupleNode;
+import io.ltr8.tson.tree.ArrayNode;
+import io.ltr8.tson.tree.AtomNode;
+import io.ltr8.tson.tree.MapNode;
+import io.ltr8.tson.tree.RecordNode;
+import io.ltr8.tson.tree.TsonNode;
+import io.ltr8.tson.tree.TupleNode;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;

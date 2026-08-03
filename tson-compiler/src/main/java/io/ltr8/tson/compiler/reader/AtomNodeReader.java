@@ -2,9 +2,9 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
-import io.ltr8.tson.compiler.tree.AtomNode;
-import io.ltr8.tson.compiler.tree.NullNode;
-import io.ltr8.tson.compiler.tree.TsonNode;
+import io.ltr8.tson.tree.AtomNode;
+import io.ltr8.tson.tree.NullNode;
+import io.ltr8.tson.tree.TsonNode;
 
 import java.util.List;
 import java.util.Optional;

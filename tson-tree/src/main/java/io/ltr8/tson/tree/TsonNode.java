@@ -1,4 +1,4 @@
-package io.ltr8.tson.compiler.tree;
+package io.ltr8.tson.tree;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;

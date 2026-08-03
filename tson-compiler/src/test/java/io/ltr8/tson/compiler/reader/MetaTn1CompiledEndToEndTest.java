@@ -89,7 +89,7 @@ class MetaTn1CompiledEndToEndTest {
         TsonLinkedSchema meta = registerMeta();
         TsonCompiledSchema compiled = rawCompile(meta);
 
-        Object result = Dom.of((io.ltr8.tson.compiler.tree.TsonNode) compiled.get("binary_encoding").read("BASE64"));
+        Object result = Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("binary_encoding").read("BASE64"));
 
         assertEquals("BASE64", result);
     }

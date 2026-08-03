@@ -58,7 +58,7 @@ class AtomValueReaderTest {
         TsonCompiledSchema compiled = TsonSchemaCompiler.compile(linkedSchema, ValueReaderFactoryRegistry.tree());
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.compiler.tree.TsonNode) compiled.get("holder").read(source));
+        Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("holder").read(source));
         return result.get("value");
     }
 
@@ -164,7 +164,7 @@ class AtomValueReaderTest {
         TsonCompiledSchema compiled = TsonSchemaCompiler.compile(linkedSchema, ValueReaderFactoryRegistry.tree());
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.compiler.tree.TsonNode) compiled.get("holder").read(source));
+        Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("holder").read(source));
         return result;
     }
 }

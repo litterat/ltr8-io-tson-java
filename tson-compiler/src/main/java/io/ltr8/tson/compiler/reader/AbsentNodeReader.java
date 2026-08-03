@@ -2,13 +2,13 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
-import io.ltr8.tson.compiler.tree.AbsentNode;
-import io.ltr8.tson.compiler.tree.TsonNode;
+import io.ltr8.tson.tree.AbsentNode;
+import io.ltr8.tson.tree.TsonNode;
 
 /**
  * Tree mode: reads the {@code void} unit instance -- the absent sentinel {@code _} -- consuming it via a
  * delegate {@link VoidReader} and yielding {@link AbsentNode}. Distinct from a null-yielding leaf ({@link
- * AtomNodeReader} → {@link io.ltr8.tson.compiler.tree.NullNode}), since {@code _} is "absent", not "null".
+ * AtomNodeReader} → {@link io.ltr8.tson.tree.NullNode}), since {@code _} is "absent", not "null".
  */
 final class AbsentNodeReader implements TsonValueReader<TsonNode> {
 

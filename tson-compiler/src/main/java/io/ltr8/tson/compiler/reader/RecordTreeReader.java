@@ -3,8 +3,8 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.TsonValueReaderResolver;
-import io.ltr8.tson.compiler.tree.RecordNode;
-import io.ltr8.tson.compiler.tree.TsonNode;
+import io.ltr8.tson.tree.RecordNode;
+import io.ltr8.tson.tree.TsonNode;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -20,7 +20,7 @@ import java.util.Optional;
  * shared concern (the compiled field list, shape checking, precomputed default/fixed values, single-pass
  * field reading) lives on {@link RecordAbstractReader}; this class only assembles the node. A field a read
  * doesn't produce (a missing required field, whose diagnostic is already reported) is simply omitted -- a
- * subsequent {@code get} of it yields {@link io.ltr8.tson.compiler.tree.MissingNode}.
+ * subsequent {@code get} of it yields {@link io.ltr8.tson.tree.MissingNode}.
  */
 final class RecordTreeReader extends RecordAbstractReader<TsonNode> {
 

@@ -73,7 +73,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
     }
 
     /**
-     * Tree mode: reads into an immutable {@link io.ltr8.tson.compiler.tree.TsonNode}. The container factories
+     * Tree mode: reads into an immutable {@link io.ltr8.tson.tree.TsonNode}. The container factories
      * build node containers; every atom-family/enum factory is wrapped ({@link AtomNodeFactory}) so its leaf
      * yields an {@code AtomNode}/{@code NullNode}, and {@code unit}'s {@code void} yields an {@code AbsentNode}
      * (see {@link #TREE_UNIT}). Uses the object-binding enum factory so {@code boolean} reads a real {@code

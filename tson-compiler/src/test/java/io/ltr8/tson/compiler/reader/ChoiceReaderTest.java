@@ -49,7 +49,7 @@ class ChoiceReaderTest {
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> read(TsonCompiledSchema compiled, String source) {
-        return (Map<String, Object>) Dom.of((io.ltr8.tson.compiler.tree.TsonNode) compiled.get("contact_method").read(source));
+        return (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("contact_method").read(source));
     }
 
     @Test

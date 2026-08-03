@@ -10,6 +10,7 @@ dependencies {
     api(project(":tson-compiler"))
     api(project(":tson-schema"))
     api(project(":tson-bind"))
+    api(project(":tson-tree"))
 
     testImplementation(platform("org.junit:junit-bom:6.0.3"))
     testImplementation("org.junit.jupiter:junit-jupiter")

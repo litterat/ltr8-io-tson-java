@@ -58,7 +58,7 @@ class EnumTreeReaderTest {
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> read(TsonCompiledSchema compiled, String source) {
-        return (Map<String, Object>) Dom.of((io.ltr8.tson.compiler.tree.TsonNode) compiled.get("flag_holder").read(source));
+        return (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("flag_holder").read(source));
     }
 
     @Test

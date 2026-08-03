@@ -42,7 +42,7 @@ class MapTreeReaderTest {
 
     @SuppressWarnings("unchecked")
     private static Map<Object, Object> readMap(TsonCompiledSchema compiled, String source) {
-        return (Map<Object, Object>) Dom.of((io.ltr8.tson.compiler.tree.TsonNode) compiled.get("scores").read(source));
+        return (Map<Object, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("scores").read(source));
     }
 
     @Test
