@@ -190,11 +190,29 @@ everything outstanding is tracked in one place.)
 
 ## Write side
 
-- [ ] No schema-aware (Class 2) writer exists at all. Only `TsonMapperWriter` does (Part-1-only,
-  generic, with documented lossy spots: integer width, tuple-ness, `@Annotated`-captured wire-format
-  annotations). A validating writer symmetric to the compiled reader stack (`TsonSchemaCompiler`/
-  `TsonValueReader`) is a whole missing half of the pipeline if round-tripping or producing
-  conformant documents is ever a goal.
+The read/write matrix in the README makes the asymmetry plain: the read side has a schemaless→object
+reader, a schemaless→tree reader, a schema-driven *validating* reader, a pull-event stream, and both
+fail-fast and collecting/diagnostics modes; the write side has only the two schemaless writers and is
+missing most of the mirror.
+
+- [ ] **No schema-aware (Class 2) writer — `TsonValueWriter`.** Only the schemaless `TsonObjectWriter`
+  (object → TSON) and `TsonTreeWriter` (`TsonNode` → TSON) exist, both with documented lossy spots
+  (integer width, tuple-ness, `@Annotated`-captured wire-format annotations). A writer symmetric to the
+  compiled reader stack (`TsonSchemaCompiler`/`TsonValueReader`) — checking output against a TSON schema
+  and reporting what's wrong — is a whole missing half of the pipeline, and the natural home for
+  round-tripping or producing guaranteed-conformant documents.
+- [ ] **Writers are fail-fast only, no diagnostics.** They throw `TsonWriteException` at the first
+  problem; there's no collecting mode symmetric to `TsonReadContext.collecting` → `List<Diagnostic>` on
+  the read side. The `TsonValueWriter` above especially needs this, to report every schema violation in
+  one pass the way the reader does.
+- [ ] **Writers materialize a `String`, not a stream.** `toTson(...)` returns the whole document in
+  memory — asymmetric with the readers, which accept an `InputStream` and never fully buffer. Writers
+  should also accept an `OutputStream`/`Writer`/`Appendable` and emit incrementally; the internal
+  `TsonDataEmitter` already builds into a `StringBuilder` and could target any `Appendable` instead.
+  (Same streaming theme as `Tson.validate(InputStream)` buffering the whole document to a `String`.)
+- [ ] **No public push/event writer.** The read side exposes a pull `TsonDataStream` (→ `TsonEvent`);
+  the only emitter, `TsonDataEmitter`, is internal. A public event-driven writer would let a caller emit
+  TSON without first building a whole tree or object — the write-direction peer of `TsonDataStream`.
 - [ ] A JSON writer (TSON data → valid JSON text) — the write-direction companion to
   `STRUCTURED-OUTPUT.md`'s "JSON compatibility" section, tracked here alongside the general writer
   since it's the same underlying gap (no schema-aware writer exists at all yet).
@@ -258,6 +276,11 @@ everything outstanding is tracked in one place.)
 - [ ] `@doc` annotations aren't carried through resolution into `TypeDefinition` at all right now —
   worth preserving if user docs/tooling will ever want to generate documentation from a schema,
   rather than bolting it on later and revisiting every resolution path again.
+- [ ] The README entry-point table's schema rows say "Use `TsonValueReader`", but a caller never
+  constructs one directly — they go `Tson.builder()` → `resolve` → `treeRegistry()`/`bindRegistry()` →
+  `compile` → `get(type)`. The "Use" column names the interface you get *back*, not the thing you use.
+  Best fixed by the self-describing read entry point (see *Front door / ergonomics*): a real `Tson.read`
+  would be the honest single entry the table could then name.
 
 ## Miscellaneous
 
