@@ -77,6 +77,11 @@ public final class Tson {
         return new TsonObjectReader(dataBindContext);
     }
 
+    /** A schemaless (Class 1) {@link TsonTreeReader} -- TSON text straight to an immutable, queryable {@code TsonNode} tree, no schema involved (the tree-producing peer of {@link #objectReader()}). */
+    public TsonTreeReader treeReader() {
+        return new TsonTreeReader();
+    }
+
     /** A fresh, schemaless (Class 1) {@link TsonObjectWriter} bound to {@link #dataBindContext()} -- the inverse of {@link #objectReader()}. */
     public TsonObjectWriter objectWriter() {
         return new TsonObjectWriter(dataBindContext);
