@@ -58,14 +58,15 @@ callers hand-sequencing registration themselves. These items are what's missing 
 spec-required case, found by re-auditing Part 2 against the current source rather than CLAUDE.md's
 own prose (which had gone stale on at least one of them):
 
-- [ ] **General forward-reference resolution within a schema** ([TSON-SCHEMA] §3.4.1's Pass 1/Pass
-  2) — `DefinitionResolver`/`TsonSchemaResolver.resolveSchema` are single-pass, strict source order;
-  a declaration referencing another declared *later* in the same schema fails to resolve, outside
-  `MetaKernelBootstrapResolver`'s own hand-built two-pass ordering, which is specific to
-  meta-kernel's own bootstrap and not something any other schema can rely on. `DefinitionResolver`'s
-  own Javadoc already says as much ("real forward references... need the full namespace population
-  of §3.3.2/§3.4.1's Pass 1, not implemented here") but this had never been carried into a tracked
-  item.
+- [x] **General forward-reference resolution within a schema** ([TSON-SCHEMA] §3.4.1). `SchemaResolver`
+  now resolves declarations **on demand, following dependencies** rather than strict source order, so a
+  declaration may compose or refine one declared later in the same schema. Only composition supertypes and
+  refinement/atom-refinement sources create a resolution dependency (field/variant/element types are bare
+  names, verified by the linker), so a cycle among just those (`a => b & {}` / `b => a & {}`) is rejected
+  via a `resolving` set, while ordinary recursion through field references (`x => { y: y }` / `y => { x: x }`,
+  a linked list, a tree) resolves fine. `ForwardReferenceResolutionTest`. **Not attempted** (a satisfiability
+  property, not a resolution one — `SPEC-FEEDBACK.md` #25): rejecting a *non-productive* recursive type that
+  has no finite model (required-recursive records).
 - [ ] **Automatic reference-closure resolution and import-cycle detection** ([TSON-DATA] §2.2.3,
   [TSON-SCHEMA] §3.4.1) — no code collects a schema's transitive `!!meta`/`!!import` closure,
   topologically orders it, and resolves it dependencies-first; every caller (including this
