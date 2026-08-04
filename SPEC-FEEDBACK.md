@@ -898,3 +898,67 @@ I-Regexp constructs it does not enforce, where it delegates to a host regex engi
 version its character-class semantics follow — mirroring §7.1's existing "SHOULD document which Unicode
 version they support" convention. Cross-implementation determinism cannot be assumed for `pattern`
 matching unless divergences are declared, so the spec should require them to be.
+
+---
+
+## 23. Can TSON text read an untagged choice whose scalar variants are value-set-disjoint but share a base-type class (e.g. `(positive_integer | negative_integer)`)?
+
+**Section:** Part 2 §5.4 (Tagging + Disjointness).
+
+**Problem:** §5.4 derives an encoding-independent `disjoint` fact and, for tagging, says a value MAY omit the
+`!variant` tag "unless the choice is disjoint under the active encoding's discrimination... Where the tag is
+omitted, the variant is recovered by the same form resolution the encoding already performs — for TSON text,
+the single base-type-resolution pass of [TSON-DATA] §4 — never by a second, type-directed inspection of the
+value's form. Where the encoding cannot separate the variants — variants that share a base-type class, such
+as `(email | uri)` (both the string class) — the tag is REQUIRED."
+
+Base-type resolution (§4) classifies a token only into null/boolean/number/string — it reaches the base
+*class*, not the specific variant. So for `(positive_integer | negative_integer)` — both the number class,
+and value-set-disjoint (their bound intervals don't meet) — recovering positive vs negative requires checking
+the value's sign/range against each variant, which reads exactly like the forbidden "second, type-directed
+inspection." Read strictly, the tag is therefore REQUIRED even though the variants are provably disjoint. But
+then §5.4's own baseline rule "same-family numerics are compared by their bound intervals" can *never* enable
+untagged TSON-text reading (every same-family numeric pair is the same number base class); its only consumers
+would be the `@disjoint` assertion check and non-text encodings. It is unclear whether that is intended, or
+whether TSON text is meant to use the value itself (a value inspection, not a type re-parse) to pick the
+range-disjoint variant — which the "never a second, type-directed inspection" clause appears to forbid.
+
+**Interpretation chosen:** The `disjoint` *fact* is derived regardless (kind/family/numeric-bounds/IS-A). For
+TSON-text untagged reading specifically, this implementation reads §5.4 strictly: a choice's tag is omissible
+only when its variants occupy *distinct base-type classes* (so §4's single pass discriminates them with no
+type-directed inspection); a same-base-class choice — including a value-disjoint numeric one like
+`(positive_integer | negative_integer)` — requires the tag. So the numeric-bound (and unimplemented pattern)
+disjointness rules feed the `@disjoint` check and the encoding-independent fact, but do not enable untagged
+TSON-text reads.
+
+**Suggested resolution:** State explicitly whether TSON text's discrimination may consult a scalar value's own
+resolved form (sign/magnitude for numbers, content for strings) to select among same-base-class value-disjoint
+variants, or whether — as "never a second, type-directed inspection" implies — same-base-class choices always
+require the tag. If the latter (the reading chosen here), note that the "same-family numerics compared by bound
+intervals" rule is, for TSON text, only ever consumed by `@disjoint` and other encodings, never by untagged
+reading — worth saying plainly, since a reader naturally expects `(positive_integer | negative_integer)` to be
+untagged-readable and it is not.
+
+---
+
+## 24. §5.4's "`disjoint`: true when proved, absent otherwise" doesn't accommodate the "provably not disjoint" (`false`) state the `@disjoint` refutation check requires
+
+**Section:** Part 2 §5.4 (Disjointness + The `@disjoint` assertion); meta-kernel `type_definition.disjoint: boolean?`.
+
+**Problem:** The Disjointness paragraph says the resolver "records the result in `type_definition.disjoint`:
+`true` when disjointness is proved, absent otherwise" — a two-valued description (true / absent). But the
+`@disjoint` assertion paragraph distinguishes **refuted** ("`@disjoint` present, provably not disjoint" → a
+resolver error) from **unprovable** ("neither proved nor refuted" → a warning). Telling "provably not disjoint"
+from "merely unproven" is a third state the two-valued "true / absent" field can't carry. The kernel models the
+field as `boolean?`, which does admit three states (absent / true / false), so the model can hold a `false`;
+the prose just doesn't say the derivation records one.
+
+**Interpretation chosen:** Treat `disjoint` as genuinely three-valued (`Optional<Boolean>`): `true` proved
+disjoint, `false` provably not disjoint (an IS-A variant pair, or overlapping numeric bounds), absent otherwise
+— so the `@disjoint` check can distinguish refuted (`false`) from unprovable (absent) directly from the stored
+fact, rather than recomputing.
+
+**Suggested resolution:** Amend the Disjointness paragraph to say the field records `true` (proved disjoint),
+`false` (provably not disjoint), or is absent (neither proved) — matching the `boolean?` model and the three
+cases the `@disjoint` check already enumerates. As written, "true when proved, absent otherwise" reads as
+two-valued and leaves the refuted state's storage unspecified.

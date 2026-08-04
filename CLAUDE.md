@@ -358,7 +358,11 @@ second stage.
   template — narrower than §8.2's literal text, confirmed with the user), deduped by structural equality,
   named `head_arg_hash`; `array`/`set` synthesize real bodies, others fall back to a reference
   placeholder; every `Top` variant has an exhaustive rewrite case (a new variant is a compile error, not a
-  silent miss); (3) **populate `subtypes`** (reverse of `supertypes`); (4) **validate** every reference
+  silent miss); (3) **populate `subtypes`** (reverse of `supertypes`); (3.5) **derive `disjoint`** for every
+  choice entry (`ChoiceDisjointness`, §5.4) — three-valued `Optional<Boolean>` over the cheap exact rules
+  (different kind / different atom family disjoint; same-family integers by bound interval; IS-A ⇒ not
+  disjoint); record-set and regex-pattern disjointness left absent (see `BACKLOG.md` for the "how far" view);
+  (4) **validate** every reference
   resolves, with a type-parameter exception (a bare name valid if it's the entry's own declared parameter)
   and a **constructor-eligibility** check: a locally-declared `constructor: true` entry is valid only if
   the schema's `!!meta` is exactly meta-kernel's identity (§2.2.2 — see `SPEC-FEEDBACK.md` #19). `source`

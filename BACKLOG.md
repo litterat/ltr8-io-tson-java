@@ -75,23 +75,38 @@ own prose (which had gone stale on at least one of them):
   "import cycle" diagnostic naming the actual cycle path. Distinct from the "single load-stdlib
   entry point" item above, which is scoped to just the three bundled schemas, not a general
   algorithm.
-- [ ] **Choice disjointness derivation and untagged reading** ([TSON-SCHEMA] §5.4, §8.1) —
-  `TypeDefinition.disjoint` is a real `Optional<Boolean>` field in the model, but every
-  `DefinitionResolver` construction site passes `Optional.empty()` for it — nothing computes it, at
-  all. `ChoiceReader` correspondingly always requires an explicit `!variant` type-ref tag to
-  disambiguate a union member, with no structural-recovery path for a choice a schema author has
-  declared (or that could be proven) disjoint. The `@disjoint` author-assertion annotation
-  (proved/refuted/unprovable/absent) has nothing to check against until this lands.
-  - **The regex/pattern-disjointness primitive has landed** in `tson-regex`:
-    `TsonRegex.isDisjointFrom` decides whether two I-Regexp patterns share any string (exact —
-    product `SymbolicNfa` emptiness over a `CodePointSet` alphabet algebra), the building block for
-    the §5.4 "pattern disjointness over `regex`-constrained atoms" case. What remains is the resolver
-    side: the full pairwise derivation over a choice's variants (different kinds disjoint; different
-    atom families disjoint; same-family numerics by bound interval; IS-A ⇒ not disjoint; regex atoms
-    via the new primitive, also combined with length constraints), writing `TypeDefinition.disjoint`,
-    then `ChoiceReader` using it for untagged structural recovery. No longer blocked: `!choice { ... }`
-    construction now resolves (see "Remaining Part 2 resolution gaps"), so a choice with real variants
-    can be built and derived over.
+- **Choice disjointness derivation and untagged reading** ([TSON-SCHEMA] §5.4, §8.1) — landed in part:
+  - [x] **The `disjoint` fact is derived** (`TsonSchemaLinker`'s `computeDisjointness` →
+    `ChoiceDisjointness`, a namespace-wide pass alongside `computeSubtypes`). Three-valued
+    `Optional<Boolean>` — `true` proved, `false` provably-not, absent neither — over the spec's cheap
+    exact rules: different kind disjoint; different atom family disjoint; same-family integers by bound
+    interval; IS-A ⇒ not disjoint. Also landed: `TsonRegex.isDisjointFrom` in `tson-regex` (exact
+    I-Regexp intersection-emptiness).
+  - [ ] **Two §5.4 "MAY" cases left absent:** record-set disjointness under composition, and pattern
+    disjointness over `regex`-constrained atoms. The view on how far to go (recorded so it isn't
+    relitigated): the `disjoint` *fact* is encoding-independent, but §5.4's Tagging rule makes TSON text
+    recover a variant only by the single §4 base-type-resolution pass — class-level (null/boolean/
+    number/string), never a type-directed inspection — so **two variants of the same base-type class are
+    never TSON-text-discriminable, regardless of value-set disjointness** (`(email | uri)` is the spec's
+    example). Same-family numeric-bound and regex-pattern disjointness both produce a same-base-class
+    `true`, so neither buys TSON-text *untagged reading* anything; the cheap different-class rules
+    (family/kind) are the only scalar disjointness the reader can use. Pattern disjointness is therefore
+    **not** wired into the reading-path derivation — but it is *safe* to compute and belongs in the
+    `@disjoint` checker below (an earlier "an innocuous pattern edit silently flips tag-requiredness"
+    worry is void: schemas are immutable and hash-pinned, so a revision is a new content identity —
+    existing data pins the old, still-disjoint one, and a disjointness-losing revision is a load-time
+    error under `@disjoint`, never a silent flip). Wiring `isDisjointFrom` into the fact needs a
+    dependency-inversion seam, since `tson-schema` deliberately doesn't depend on `tson-regex` — a
+    pattern-disjointness oracle injected into the linker, supplied by `tson-compiler`. See
+    `SPEC-FEEDBACK.md` #23 for the load-bearing ambiguity underneath all of this.
+  - [ ] **Reader-side untagged structural recovery** — `ChoiceReader` still always requires an explicit
+    `!variant` tag. It should drop the tag where the variants are disjoint *and* each occupies a distinct
+    base-type class (the TSON-text separability predicate above) — a small, stable check over the derived
+    fact, not the full fact.
+  - [ ] **The `@disjoint` assertion check** — an author's `@disjoint` marker checked against the derived
+    fact: proved (silent), refuted / provably-not (resolver error), unprovable (warning), absent (no
+    check). This is where exact regex-pattern disjointness (`isDisjointFrom`, via the seam above) pays
+    off — turning an otherwise-"unprovable" pattern choice into a proved-or-refuted one.
 - [ ] **Resolved-form ingest** ([TSON-SCHEMA] §8.1/§10.1) — bringing an already-resolved
   `!type_definition` document into the library (not source text), with its own integrity checks:
   `subtypes`/`disjoint` recomputed and verified, the closed-entry parameter-free rule reverified, an
