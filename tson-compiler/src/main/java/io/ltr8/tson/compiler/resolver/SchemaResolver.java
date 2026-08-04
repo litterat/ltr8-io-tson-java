@@ -13,8 +13,10 @@ import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Resolves a whole {@link SchemaDocument} into a {@link TsonSchema}: header-directive validation
@@ -60,9 +62,10 @@ public final class SchemaResolver {
     }
 
     /**
-     * Resolves every declaration in {@code document}'s body, one entry at a time, in source
-     * order, each seeing every entry resolved before it -- and carries {@code document}'s own
-     * header directives (§2.2: {@code !!id}?/{@code !!meta}/{@code !!import}*) straight into the
+     * Resolves every declaration in {@code document}'s body, on demand and dependency-following rather than
+     * strict source order (§3.4.1) -- so a declaration may compose or refine one declared later in the same
+     * schema, with a circular composition/refinement chain rejected as unresolvable -- and carries {@code
+     * document}'s own header directives (§2.2: {@code !!id}?/{@code !!meta}/{@code !!import}*) straight into the
      * result's {@link TsonSchema#id()}/{@link TsonSchema#meta()}/{@link TsonSchema#imports()}.
      *
      * <p><b>Two things are validated up front, before any declaration is resolved</b>, rather than
@@ -110,20 +113,60 @@ public final class SchemaResolver {
 
         TsonCompiledMetaSchema metaParser = loader.loadMeta(document.meta());
         Map<String, TypeDefinition> namespace = mergeImports(document);
-        DefinitionResolver definitionResolver = new DefinitionResolver(
-                (type, value) -> (Top) metaParser.reader(type)
-                        .read(TsonReadContext.throwing(new ListEventSource(DataValueEvents.of(value)))),
-                metaParser.schema().entries()::get, namespace::get);
+        Map<String, SchemaMap.Declaration> declarations = document.body().declarations();
 
-        Map<String, TypeDefinition> localOnly = new LinkedHashMap<>();
-        for (SchemaMap.Declaration declaration : document.body().declarations().values()) {
-            if (namespace.containsKey(declaration.name())) {
-                throw new TsonSchemaValidationException("'" + declaration.name()
+        // Local-vs-import collisions, up front (local names are already unique -- SchemaMap dedupes them).
+        for (String name : declarations.keySet()) {
+            if (namespace.containsKey(name)) {
+                throw new TsonSchemaValidationException("'" + name
                         + "' collides with an entry of the same name brought in by !!import");
             }
-            TypeDefinition resolved = definitionResolver.resolve(declaration);
-            namespace.put(declaration.name(), resolved);
-            localOnly.put(declaration.name(), resolved);
+        }
+
+        // Resolve on demand, following dependencies rather than source order, so a declaration may reference
+        // one declared later in the same schema (§3.4.1). Only composition supertypes and refinement/
+        // atom-refinement sources consult this namespace (a field/variant/element type is carried as a bare
+        // name, verified later by the linker), so those are the only edges that create a resolution
+        // dependency -- and the only recursion that cannot resolve. `resolving` catches such a cycle;
+        // ordinary recursion through field references (a linked list, or `x => { y: y }` / `y => { x: x }`)
+        // never enters it and resolves fine. `holder` breaks the construction cycle between the resolver and
+        // the on-demand getter it needs.
+        DefinitionResolver[] holder = new DefinitionResolver[1];
+        Set<String> resolving = new LinkedHashSet<>();
+        DefinitionGetter namespaceGetter = name -> {
+            TypeDefinition already = namespace.get(name);
+            if (already != null) {
+                return already;
+            }
+            SchemaMap.Declaration declaration = declarations.get(name);
+            if (declaration == null) {
+                return null; // not a local entry -- an as-yet-unverified reference the linker validates
+            }
+            if (!resolving.add(name)) {
+                throw new TsonSchemaValidationException("'" + name + "' is part of a circular composition/"
+                        + "refinement chain (" + String.join(" -> ", resolving) + " -> " + name + ") -- a "
+                        + "supertype or refinement source cannot depend, directly or transitively, on the type "
+                        + "it helps define");
+            }
+            try {
+                TypeDefinition resolved = holder[0].resolve(declaration);
+                namespace.put(name, resolved);
+                return resolved;
+            } finally {
+                resolving.remove(name);
+            }
+        };
+        holder[0] = new DefinitionResolver(
+                (type, value) -> (Top) metaParser.reader(type)
+                        .read(TsonReadContext.throwing(new ListEventSource(DataValueEvents.of(value)))),
+                metaParser.schema().entries()::get, namespaceGetter);
+
+        for (String name : declarations.keySet()) {
+            namespaceGetter.getTypeDefinition(name);
+        }
+        Map<String, TypeDefinition> localOnly = new LinkedHashMap<>();
+        for (String name : declarations.keySet()) {
+            localOnly.put(name, namespace.get(name));
         }
         return new TsonSchema(id, document.meta(), document.imports(), localOnly);
     }

@@ -962,3 +962,35 @@ fact, rather than recomputing.
 `false` (provably not disjoint), or is absent (neither proved) — matching the `boolean?` model and the three
 cases the `@disjoint` check already enumerates. As written, "true when proved, absent otherwise" reads as
 two-valued and leaves the refuted state's storage unspecified.
+
+---
+
+## 25. Does the spec require rejecting a non-productive (unsatisfiable) recursive type — e.g. mutually required-recursive records?
+
+**Section:** Part 2 §3.4.1 (resolution), §5.9 (composition), §8.
+
+**Problem:** A schema can declare a recursive type that no *finite* data can satisfy — e.g. `x => { y: y }` /
+`y => { x: x }` with REQUIRED fields: an `x` requires a `y`, which requires an `x`, with no base case. This is
+distinct from legitimate recursion, where a cycle is *guarded* by an optional field (`node => { next: node? }`)
+or a possibly-empty array/set (`tree => { children: [tree] }`) that provides a finite base case. §3.4.1 covers
+resolution (populating the namespace, resolving bodies, computing the IS-A graph) but says nothing about
+whether a resolver MUST/SHOULD reject a recursive type that is well-formed yet has no finite model — a
+*productivity*/satisfiability property, not a resolution one. Left unstated, two conformant implementations
+can disagree on whether such a schema is valid at all.
+
+**Interpretation chosen:** This implementation resolves and links a required-recursive record pair like
+`x => { y: y }` / `y => { x: x }` without complaint — it is structurally well-formed (every reference
+resolves), and its unsatisfiability is treated as a semantic property outside resolution's remit, the same way
+an over-constrained atom (`int8 ^ { min: 300 }`, an empty value set) is well-formed but unsatisfiable. Only
+cycles that genuinely block *resolution* are rejected: a composition/refinement-source cycle (`a => b & {}` /
+`b => a & {}`), where resolving one needs the other's resolved form (`SchemaResolver`'s own on-demand
+dependency-following resolution, §3.4.1). A productivity analysis — is every recursive cycle guarded by an
+optional or possibly-empty member? — is not implemented and is considered out of scope for resolution/linking.
+
+**Suggested resolution:** State whether a resolver MUST reject a non-productive recursive type (no finite
+model), SHOULD warn, or MAY leave it — the same tri-state §5.4's `@disjoint` handling uses. If left to the
+implementation, name it as an explicit interoperability caveat (like the shadowed-duplicate case, #21): two
+conformant processors can legitimately disagree on whether `x => { y: y }` / `y => { x: x }` is a valid schema,
+purely by whether they attempt productivity analysis. If a MUST/SHOULD is intended, the spec should also define
+what counts as "guarded" (which members provide a base case: optional fields, possibly-empty arrays/sets,
+choice variants that bottom out, and so on).
