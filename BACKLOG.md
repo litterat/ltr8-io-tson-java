@@ -206,7 +206,15 @@ I-Regexp, and `pattern:` constraints (`TextParser`/`UriParser`) now match throug
 - [ ] Subtraction.
 - [ ] Elided field types outside a tightening entry.
 - [ ] Restating a field group in a refinement body.
-- [ ] Generic type-refs beyond a bare two-argument `map<K, V>` application or a refinement source.
+- [ ] Generic type-refs beyond a bare two-argument `map<K, V>` application or a refinement source. A
+  non-simple argument (`weird<[T]>`) is currently rejected outright at resolution ("only simple type
+  arguments are resolved so far"), which incidentally masks a latent hazard: lifting this **requires a
+  materialization termination guard** (a depth/size cap or actual non-regularity detection), because
+  *non-regular* (polymorphic) recursion like `weird => <T> { next: weird<[T]>? }` / `use => weird<text>`
+  grows its type argument every level (`text` → `[text]` → `[[text]]` …). Each instantiation is structurally
+  distinct, so the linker's dedup-by-structural-equality never fires and materialization runs forever
+  (StackOverflow/OOM). Distinct from `SPEC-FEEDBACK.md` #25 (non-*productive* recursion — no finite *data*
+  model): this is no finite *type* model.
 - [ ] `= _` (absent) field modifier, and any `~`/`=` modifier on an already-`OPTIONAL` field —
   `DefinitionResolver.resolveField` rejects both today.
 - [ ] Closed-entry parameter-free check (§5.10) — nothing validates that an entry with an empty
