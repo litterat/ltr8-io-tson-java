@@ -226,6 +226,7 @@ public final class TsonSchemaLinker {
         localNames.addAll(synthesized.keySet());
 
         merged = computeSubtypes(merged, localNames);
+        merged = computeDisjointness(merged);
 
         for (Map.Entry<String, TypeDefinition> entry : merged.entrySet()) {
             validateEntry(entry.getKey(), entry.getValue(), merged, structureNamespace);
@@ -308,6 +309,25 @@ public final class TsonSchemaLinker {
         combined.addAll(newSubtypes);
         return new TypeDefinition(def.source(), def.kind(), def.parameters(), def.constructor(),
                 def.supertypes(), List.copyOf(combined), def.disjoint(), def.body());
+    }
+
+    /**
+     * Derives {@link TypeDefinition#disjoint} for every choice entry (§5.4), over the fully-merged,
+     * subtypes-populated namespace -- a namespace-wide pass, like {@link #computeSubtypes}, since a
+     * variant's own kind/family/bounds/supertypes are only knowable with every entry resolved. See {@link
+     * ChoiceDisjointness} for the derivation and its deliberately partial scope.
+     */
+    private static Map<String, TypeDefinition> computeDisjointness(Map<String, TypeDefinition> merged) {
+        Map<String, TypeDefinition> result = new LinkedHashMap<>(merged);
+        for (Map.Entry<String, TypeDefinition> entry : merged.entrySet()) {
+            if (entry.getValue().body() instanceof ChoiceBody choice) {
+                TypeDefinition def = entry.getValue();
+                result.put(entry.getKey(), new TypeDefinition(def.source(), def.kind(), def.parameters(),
+                        def.constructor(), def.supertypes(), def.subtypes(),
+                        ChoiceDisjointness.derive(choice, merged), def.body(), def.position()));
+            }
+        }
+        return result;
     }
 
     /**
