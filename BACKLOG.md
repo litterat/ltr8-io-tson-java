@@ -120,33 +120,27 @@ own prose (which had gone stale on at least one of them):
 
 TSON pins its `regex` atom to I-Regexp (RFC 9485): meta-kernel's `regex_type` fixes `spec` to
 `…/rfc9485` (a `REQUIRED_FIXED` field), and every `text_type`/`uri_type` `pattern:` field is typed
-`regex?`. **Piece 1 has landed** (the `tson-regex` module): `RegexParser` now validates well-formedness
-via `TsonRegex.parse`, so a non-I-Regexp pattern (`\d`/`\w`/`\s`, character-class subtraction,
-back-references, lookaround, Unicode blocks) is rejected at the atom rather than accepted by
-`java.util.regex`'s superset grammar. What remains is **matching**: applying a `pattern:` constraint to a
-value still delegates to `java.util.regex` (once atom-refinement validation wires it up at all), a known
-remaining non-conformance (`SPEC-FEEDBACK.md` #22) — the JVM engine matches shared constructs with
-different semantics (`.` line-terminator handling; `\p{…}` category naming) and is backtracking
-(ReDoS-prone). Piece 2 closes that.
+`regex?`. **The engine is built** (the `tson-regex` module) and fully wired: `regex` values validate as
+I-Regexp, and `pattern:` constraints (`TextParser`/`UriParser`) now match through it rather than
+`java.util.regex`, so this implementation defines I-Regexp semantics end to end.
 
 - [x] **Piece 1 — parser + AST + subset validator.** Landed as the `tson-regex` module
   (`io.ltr8.tson.regex`): `TsonRegex.parse` → a `RegexNode` AST (or `TsonRegexSyntaxException`), a
-  recursive-descent parser over the RFC 9485 ABNF whose grammar *is* the subset gate, and `RegexParser`
-  wired to it. Also unblocks two things a host `Pattern` can't provide — **choice disjointness over
-  `regex`-constrained atoms** ([TSON-SCHEMA] §5.4's "pattern disjointness", see "Resolution & linking
-  generality") and the **Tier 2 constrained-decoding backend** (`regex` atom → its own automaton,
-  `STRUCTURED-OUTPUT.md`) — both of which need the owned AST this now provides.
-- [ ] **Piece 2 — Thompson-NFA matcher.** Compile the `RegexNode` AST to an NFA and match in guaranteed
-  linear time, replacing `java.util.regex` for `pattern:` constraints. This is where the interoperability
-  guarantee and ReDoS-safety land — I-Regexp is regular (no back-refs/lookaround), so linear-time matching
-  is sound, a real security property for the LLM/untrusted-input use case and the §9.1 DoS item (see
-  "Miscellaneous" and `STRUCTURED-OUTPUT.md`). Own the *semantics*, borrow the JDK's *Unicode data* —
-  `\p{…}` maps each `RegexCategory` to `Character.getType`, the same "own the rules, use JDK tables" split
-  the lexer already makes for XID (same documented-approximation caveat).
-- **Sequencing:** build Piece 2 as part of, or just before, **atom-refinement constraint validation**
-  (above) — the first thing that actually matches a value against a `pattern`; shipping host-semantics
-  matching first bakes in an interop break that's expensive to walk back. Add I-Regexp conformance vectors
-  (RFC 9485 ships examples) in the same session, per the test-suite habit.
+  recursive-descent parser over the RFC 9485 ABNF whose grammar *is* the subset gate (`\d`/`\w`/`\s`,
+  subtraction, back-references, lookaround, Unicode blocks all rejected), and `RegexParser` wired to it.
+  The owned AST also unblocks **choice disjointness over `regex`-constrained atoms** ([TSON-SCHEMA] §5.4's
+  "pattern disjointness", see "Resolution & linking generality") and the **Tier 2 constrained-decoding
+  backend** (`regex` atom → its own automaton, `STRUCTURED-OUTPUT.md`).
+- [x] **Piece 2 — Thompson-NFA matcher.** `TsonRegex.matches` compiles the `RegexNode` AST to a Thompson
+  NFA and runs a Pike-VM simulation — full-match, linear-time, no backtracking, so no ReDoS blow-up (a
+  `(a+)+b` that hangs a backtracking engine runs linearly; proven in `TsonRegexMatchTest`). `\p{…}` maps
+  each `RegexCategory` to `Character.getType` (own the semantics, borrow the JDK's Unicode data, the same
+  XID split the lexer makes). `TextParser`/`UriParser` `pattern:` matching is wired to it, replacing
+  `java.util.regex` — closing the `SPEC-FEEDBACK.md` #22 non-conformance for both well-formedness and
+  matching. (Remaining minor items: `TextParser`/`UriParser` re-parse the pattern per value rather than
+  caching a compiled `TsonRegex`; a very large bounded quantifier `{0,N}` expands linearly in program size,
+  capped at 200k instructions. Add I-Regexp `regex`-atom vectors to the sibling test-suite when it's
+  checked out, per the test-suite habit.)
 
 ## Remaining built-in types
 

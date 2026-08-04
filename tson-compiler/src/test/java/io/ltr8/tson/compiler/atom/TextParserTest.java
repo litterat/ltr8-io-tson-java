@@ -50,6 +50,16 @@ class TextParserTest {
     }
 
     @Test
+    void patternMatchesWithIRegexpSemantics() {
+        // The pattern constraint is matched through tson-regex (RFC 9485 I-Regexp), so a Unicode category
+        // class works with I-Regexp's own \p{...} semantics rather than java.util.regex's.
+        TextParser type = new TextParser(Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.of("\\p{Nd}+"));
+        assertEquals("2026", type.read(token("2026")));
+        assertThrows(AtomValidationException.class, () -> type.read(token("12a")));
+    }
+
+    @Test
     void writeRoundTripsThroughRead() {
         assertEquals("hello", TextParser.UNCONSTRAINED.write(TextParser.UNCONSTRAINED.read(token("hello"))));
     }

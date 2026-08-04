@@ -11,14 +11,15 @@ import java.util.Objects;
  * Unicode blocks, and so on. (I-Regexp treats {@code ^} and {@code $} as ordinary literal characters, not
  * anchors, so a pattern using them parses -- as literals.)
  *
- * <p>This is the parse/validate front door; matching a string against the pattern is a separate capability
- * built on {@link #ast()}. The {@code Tson} prefix disambiguates from {@code java.util.regex} and any domain
- * {@code Regex}/{@code Pattern} at a call site.
+ * <p>{@link #matches(String)} tests a whole string against the pattern in guaranteed linear time (a Thompson
+ * NFA, no backtracking -- no ReDoS). The {@code Tson} prefix disambiguates from {@code java.util.regex} and
+ * any domain {@code Regex}/{@code Pattern} at a call site.
  */
 public final class TsonRegex {
 
     private final String pattern;
     private final RegexNode ast;
+    private NfaProgram program; // compiled lazily on first match, then reused
 
     private TsonRegex(String pattern, RegexNode ast) {
         this.pattern = pattern;
@@ -33,6 +34,21 @@ public final class TsonRegex {
     public static TsonRegex parse(String pattern) {
         Objects.requireNonNull(pattern, "pattern");
         return new TsonRegex(pattern, new IRegexParser(pattern).parse());
+    }
+
+    /**
+     * Whether {@code input} matches this pattern in its entirety (RFC 9485 §3's full-match semantics). Runs a
+     * Thompson-NFA simulation in time linear in the input length -- no backtracking, so no catastrophic
+     * blow-up on adversarial patterns. The NFA is compiled on the first call and reused.
+     */
+    public boolean matches(String input) {
+        Objects.requireNonNull(input, "input");
+        NfaProgram compiled = program;
+        if (compiled == null) {
+            compiled = NfaProgram.compile(ast, pattern);
+            program = compiled;
+        }
+        return compiled.matches(input.codePoints().toArray());
     }
 
     /** The parsed syntax tree. */

@@ -1,12 +1,12 @@
 package io.ltr8.tson.compiler.atom;
 
 import io.ltr8.tson.compiler.ast.TokenValue;
+import io.ltr8.tson.regex.TsonRegex;
 import io.ltr8.tson.schema.meta.UriType;
 
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Optional;
-import java.util.regex.Pattern;
 
 /**
  * Parses and validates against meta-kernel's {@code uri_type} constructor (§5.5's {@code uri}
@@ -71,8 +71,10 @@ public record UriParser(UriType constraints) implements AtomType<URI> {
                         "'" + text + "' is " + text.length() + " characters, more than the maximum " + max);
             }
         });
+        // Pattern is I-Regexp (RFC 9485), matched via tson-regex (linear-time, ReDoS-safe), not
+        // java.util.regex; already validated well-formed at schema resolution (see RegexParser).
         constraints.pattern().ifPresent(p -> {
-            if (!Pattern.compile(p).matcher(text).matches()) {
+            if (!TsonRegex.parse(p).matches(text)) {
                 throw new AtomValidationException("'" + text + "' does not match the required pattern " + p);
             }
         });
