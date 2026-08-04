@@ -103,8 +103,10 @@ module has a real `module-info.java`; module names mirror each module's root exp
   from ever coupling to compiler internals. `tson-compiler` depends on it; it names no `tson-compiler` type.
 - **`tson-regex`** — **only** `io.ltr8.tson.regex`: a native RFC 9485 I-Regexp engine — `TsonRegex.parse`
   builds a `RegexNode` AST (or `TsonRegexSyntaxException`), `TsonRegex.matches` runs a Thompson-NFA/Pike-VM
-  simulation (linear-time, no backtracking → ReDoS-safe; `\p{…}` via JDK `Character.getType`). A true leaf —
-  depends on **nothing**,
+  simulation (linear-time, no backtracking → ReDoS-safe; `\p{…}` via JDK `Character.getType`), and
+  `TsonRegex.isDisjointFrom` decides whether two patterns share any string (exact — a symbolic product-NFA
+  emptiness check over a `CodePointSet` interval algebra, the building block for §5.4 pattern disjointness).
+  A true leaf — depends on **nothing**,
   I-Regexp being an external standard, not TSON-specific. The *engine* counterpart to `tson-bind` (a general
   dependency-free engine), not a value model like `tson-tree`; TSON pins its `regex` atom to I-Regexp
   (`regex_type`'s `REQUIRED_FIXED spec = rfc9485`), so this owns I-Regexp semantics rather than delegating

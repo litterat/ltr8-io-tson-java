@@ -82,6 +82,16 @@ own prose (which had gone stale on at least one of them):
   disambiguate a union member, with no structural-recovery path for a choice a schema author has
   declared (or that could be proven) disjoint. The `@disjoint` author-assertion annotation
   (proved/refuted/unprovable/absent) has nothing to check against until this lands.
+  - **The regex/pattern-disjointness primitive has landed** in `tson-regex`:
+    `TsonRegex.isDisjointFrom` decides whether two I-Regexp patterns share any string (exact —
+    product `SymbolicNfa` emptiness over a `CodePointSet` alphabet algebra), the building block for
+    the §5.4 "pattern disjointness over `regex`-constrained atoms" case. What remains is the resolver
+    side: the full pairwise derivation over a choice's variants (different kinds disjoint; different
+    atom families disjoint; same-family numerics by bound interval; IS-A ⇒ not disjoint; regex atoms
+    via the new primitive, also combined with length constraints), writing `TypeDefinition.disjoint`,
+    then `ChoiceReader` using it for untagged structural recovery. Blocked on `!choice` construction
+    resolving at all (see "Remaining Part 2 resolution gaps") — can't build a choice with regex
+    variants to derive over yet.
 - [ ] **Resolved-form ingest** ([TSON-SCHEMA] §8.1/§10.1) — bringing an already-resolved
   `!type_definition` document into the library (not source text), with its own integrity checks:
   `subtypes`/`disjoint` recomputed and verified, the closed-entry parameter-free rule reverified, an

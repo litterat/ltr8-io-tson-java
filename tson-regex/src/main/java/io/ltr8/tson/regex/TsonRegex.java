@@ -51,6 +51,18 @@ public final class TsonRegex {
         return compiled.matches(input.codePoints().toArray());
     }
 
+    /**
+     * Whether this pattern and {@code other} are <b>disjoint</b> -- no string matches both. Exact (regular
+     * languages have a decidable intersection-emptiness), so this is a definitive yes/no, never "unknown".
+     * The building block for a schema resolver's §5.4 pattern-disjointness derivation over {@code
+     * regex}-constrained atoms, where two variants whose patterns are disjoint may drop their discriminating
+     * tag.
+     */
+    public boolean isDisjointFrom(TsonRegex other) {
+        Objects.requireNonNull(other, "other");
+        return RegexDisjointness.disjoint(ast, other.ast);
+    }
+
     /** The parsed syntax tree. */
     public RegexNode ast() {
         return ast;
