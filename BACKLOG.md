@@ -116,6 +116,42 @@ own prose (which had gone stale on at least one of them):
   depends on the writer. Once this dependency is gone, revisit moving them into `tson` — noted
   directly on `Tson`'s own class Javadoc too, so it isn't lost.
 
+## I-Regexp engine (RFC 9485)
+
+TSON pins its `regex` atom to I-Regexp (RFC 9485): meta-kernel's `regex_type` fixes `spec` to
+`…/rfc9485` (a `REQUIRED_FIXED` field), and every `text_type`/`uri_type` `pattern:` field is typed
+`regex?`. The current `RegexParser` validates well-formedness with `java.util.regex.Pattern.compile`
+(then discards it) and `TextParser` matches `pattern` via `java.util.regex` — delegating both to the
+host engine, a known non-conformance (`SPEC-FEEDBACK.md` #22): `java.util.regex` accepts a large
+superset of I-Regexp (`^`/`$`, back-references, lookaround, non-greedy, inline flags) and matches shared
+constructs with different semantics (`.` line-terminator handling; `\d`/`\w`/`\s` ASCII-vs-Unicode;
+`\p{…}` category naming), and is backtracking (ReDoS-prone). For *the* reference implementation this
+defines I-Regexp behaviour as "whatever the JVM does" — exactly what the spec's pin exists to prevent.
+The same principle already applied to the lexer (owns tokenisation) and `NumberGrammar` (owns number
+identification); regex is the last place a host library silently defines spec semantics. A native
+engine, staged:
+
+- [ ] **Piece 1 — parser + AST + subset validator (do first).** Parse the RFC 9485 ABNF into a
+  `RegexNode` AST and *reject* everything outside the I-Regexp subset, replacing the lax
+  `Pattern.compile` well-formedness check. Highest value per effort: it makes well-formedness conformant
+  and unblocks two things a host `Pattern` can't provide — **choice disjointness over `regex`-constrained
+  atoms** ([TSON-SCHEMA] §5.4's "pattern disjointness", see "Resolution & linking generality") and the
+  **Tier 2 constrained-decoding backend** (`regex` atom → its own automaton, `STRUCTURED-OUTPUT.md`) —
+  both of which need an owned AST.
+- [ ] **Piece 2 — Thompson-NFA matcher.** Compile the AST to an NFA and match in guaranteed linear
+  time, replacing the host matcher for `pattern:` constraints. This is where the interoperability
+  guarantee and ReDoS-safety land — I-Regexp is regular (no back-refs/lookaround), so linear-time
+  matching is sound, a real security property for the LLM/untrusted-input use case and the §9.1 DoS item
+  (see "Miscellaneous" and `STRUCTURED-OUTPUT.md`).
+- **Principle:** own the *semantics*, borrow the JDK's *Unicode data* — `\p{…}` and the class escapes
+  lean on `Character.getType`/`UnicodeScript`/`UnicodeBlock`, the same "own the rules, use JDK tables"
+  split the lexer already makes for XID (same documented-approximation caveat). Scope it as internal
+  machinery — a `regex` subpackage (parser → `RegexNode` → NFA → matcher), bare-named like `Lexer`.
+- **Sequencing:** build this as part of, or just before, **atom-refinement constraint validation**
+  (above) — the first thing that actually matches a value against a `pattern`; shipping host-semantics
+  matching first bakes in an interop break that's expensive to walk back. Add I-Regexp conformance
+  vectors (RFC 9485 ships examples) in the same session, per the test-suite habit.
+
 ## Remaining built-in types
 
 - [ ] `cidr4`/`cidr6`/`email`/`mac`/`unknown` — no compiled-parser factory yet

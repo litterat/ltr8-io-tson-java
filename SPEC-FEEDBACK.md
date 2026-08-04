@@ -853,3 +853,48 @@ shadowed occurrence." This also has a direct interoperability consequence worth 
 conformant processors reading the identical malformed-duplicate document may legitimately disagree on
 whether it's valid at all, purely as a function of their own internal parsing strategy (streaming vs.
 buffered) — worth the spec saying so plainly rather than leaving it to be discovered.
+
+---
+
+## 22. `regex` is pinned to RFC 9485 (I-Regexp), but the spec never says whether the pin is a strict subset gate — nor that an implementation must document divergence from the RFC
+
+**Section:** Part 2 — meta-kernel's `regex_type` (`spec: = "https://www.rfc-editor.org/rfc/rfc9485"`,
+a `REQUIRED_FIXED` field), the `text_type`/`uri_type` `pattern: regex?` fields, and the RFC 9485
+reference (Part 2 references table).
+
+**Problem:** The spec pins its regex atom to I-Regexp normatively — `regex_type` fixes `spec` to
+RFC 9485, and every `pattern:` constraint on `text`/`uri` is a `regex` — but leaves two things
+unstated:
+
+1. **Is the pin a strict subset gate, or just a label?** RFC 9485 defines I-Regexp as a deliberately
+   restricted *subset* of common regex syntax (no anchors `^`/`$`, no back-references, no lookaround,
+   no non-greedy quantifiers). The spec never says whether a `regex` value that steps outside that
+   subset MUST be rejected at schema load, or is tolerated. An implementation that validates
+   well-formedness by delegating to a host engine (`java.util.regex`, PCRE, ECMAScript `RegExp`) will
+   *accept* a large superset of I-Regexp, so a schema carrying a non-portable pattern loads cleanly on
+   one implementation and is rejected by a strict one — an interoperability break invisible to
+   hash-pinning, since both documents are "valid" locally.
+
+2. **Nothing requires an implementation to document where its regex semantics diverge from the RFC.**
+   Even for constructs *inside* the I-Regexp subset, a host engine diverges observably: `.`
+   line-terminator handling, `\d`/`\w`/`\s` ASCII-vs-Unicode membership, `\p{...}` category naming, and
+   backtracking-vs-linear matching (ReDoS). Because the format's whole premise is cross-implementation
+   determinism (hash-pinned schemas, "identical behavior everywhere"), an *undocumented* divergence in
+   regex semantics silently defeats it: two conformant implementations accept the same schema and the
+   same data yet disagree on whether a `pattern` matches.
+
+**Interpretation chosen:** Treat the pin as strict *intent* — a `regex` value should be valid I-Regexp
+or a resolver error — and commit to a native I-Regexp parser/AST/matcher so this implementation defines
+I-Regexp behavior, not the JVM (tracked in `BACKLOG.md`, "I-Regexp engine"). Until that lands, the
+current `RegexParser`/`TextParser` delegate well-formedness and matching to `java.util.regex`, which is
+a **known, documented non-conformance**: it accepts non-I-Regexp constructs and matches shared
+constructs with `java.util.regex` semantics, not RFC 9485's.
+
+**Suggested resolution:** Two additions. (a) State explicitly whether the RFC 9485 pin is a strict
+subset gate — recommended, consistent with the `REQUIRED_FIXED` pin and the interoperability premise: a
+`regex` value that is not valid I-Regexp is a resolver/validation error. (b) More importantly, add a
+normative requirement that **an implementation MUST document any non-conformance from RFC 9485** — which
+I-Regexp constructs it does not enforce, where it delegates to a host regex engine, and the Unicode
+version its character-class semantics follow — mirroring §7.1's existing "SHOULD document which Unicode
+version they support" convention. Cross-implementation determinism cannot be assumed for `pattern`
+matching unless divergences are declared, so the spec should require them to be.
