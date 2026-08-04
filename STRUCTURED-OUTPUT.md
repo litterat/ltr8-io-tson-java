@@ -25,8 +25,10 @@ architecture (`TsonCompiledSchema`/`TsonCompiledRegistry`) that already fits a h
 Recursive/deeply-nested schemas remain a genuinely shared hard problem either way — not something
 TSON magically avoids.
 
-**Tier 1 (validate + fast feedback) is the near-term target.** Tier 2 is real but a separate,
-much larger future effort, captured here only at a high level.
+**Tier 1 (validate + fast feedback) is the near-term target.** Tier 1.5 (validate-and-rewind at
+structural boundaries — an in-writer closed loop) and Tier 2 (constrain every token) are larger
+future efforts, captured here at the design level; Tier 1.5 turns out to share Tier 2's constraint
+backend.
 
 ### Tier 1 — validate + fast feedback
 
@@ -102,6 +104,73 @@ much larger future effort, captured here only at a high level.
   time.
 - [ ] §9.1's numeric-literal length limit (SHOULD, default 4096 digits, DoS hardening) — not
   enforced anywhere.
+
+### Tier 1.5 — validate-and-rewind at structural boundaries
+
+Between Tier 1 (validate a whole response, then retry) and Tier 2 (constrain every token) sits a
+third mode: **validate at each completed structure and rewind within a single generation.** When a
+record's closing `}` arrives, run the compiled validator over just that record; on failure, emit the
+diagnostics, roll the generation back to where the record started, and resample. An in-writer closed
+loop — finer-grained than a whole-response retry, coarser (and far cheaper to build) than per-token
+masking, and able to enforce the *semantic* constraints token-masking can't reach (cross-field,
+disjointness, uniqueness).
+
+**The crux is the interface, not the validation.** Rewinding the *writer* is trivial — the streaming
+readers already produce `Diagnostic`s incrementally (Tier 1), and the writer's own state machine pops
+back to a checkpoint for free. Rewinding the *model* means resetting its KV cache to the token where
+the record started, and that exists only if you own the decode loop. So the mode forks by inference
+stack:
+
+- **Own inference** (open weights: vLLM, SGLang, llama.cpp, HF Transformers, TensorRT-LLM) — the true
+  in-writer loop: snapshot KV state at record-start → generate the record → validate at `}` → on
+  failure `rollback(mark)` and resample. Structurally this is speculative decoding with the schema
+  validator as the verifier instead of a larger draft model.
+- **Hosted chat APIs** (Anthropic/OpenAI/Gemini) — no KV rollback available; degrades to "stop early →
+  re-prompt with the validated prefix as prefill + the diagnostic," paying prefill each retry (prompt
+  caching softens it). Same logical loop, coarser grain, no in-writer rewind.
+
+The "LLM interface" is therefore a **decoder plugin, not an API call** — three touch points: a
+per-token logits hook, a structural-boundary callback, and a KV rollback primitive. Which engines
+expose all three is the real gating fact.
+
+**Prevention beats correction — and folds this tier into Tier 2's backend.** The fastest feedback is
+never emitting the wrong token; rewind is inherently generate-wrong-then-redo. A large fraction of a
+TSON schema compiles to a *token mask*, not just the grammar: integer ranges → digit-bound automaton,
+enums → alternation, `regex` atoms → the regex, text length → counting, field presence/order →
+structural FSM (all Tier 2). So the architecture is: **mask everything maskable (prevention, zero
+rewind); use record-boundary-validate-and-rewind only for the residue** — cross-field constraints,
+`choice` disjointness, uniqueness/referential integrity, the `REQUIRED_FIXED` identity-diagonal rule —
+i.e. exactly what *can't* be a local automaton. That makes the rewind loop rare, and unifies the two
+tiers: one schema→constraint backend, split by "is this constraint a local mask or not?" TSON is
+unusually suited to this because the wire is explicitly typed — the writer always knows the expected
+type at the current position (type-ref + schema position), so both "record complete, of what type" and
+"which tokens are legal next" are decidable with no heuristics, unlike JSON.
+
+Concrete items and decisions:
+
+- [ ] **Engine-agnostic validating incremental writer + a `DecoderSession` SPI.** The library side
+  streams tokens/events through the existing lexer→event→validator pipeline (reuse the streaming
+  readers + collecting `TsonReadContext`/`Diagnostic`), hands back a checkpoint handle at each
+  structural boundary, and returns `List<Diagnostic>` on completion. The engine binding is a tiny SPI —
+  `DecoderSession { mark(); rollback(mark); applyMask(tokenMask); }` — implemented by a vLLM/llama.cpp
+  adapter in a *separate* module (or `examples/`), never in core, so TSON stays zero-runtime-dependency
+  like the leaf modules already are. Gated on the `TsonValueWriter` / streaming schema-aware validation
+  that's the top item in `BACKLOG.md`'s "Write side" — build that and Tier 1.5 is mostly wiring on top.
+- [ ] **Checkpoint granularity = the scope that owns the constraint, not the offending field.** A
+  cross-field rule lives at the record containing both fields, so the rewind point is that record's
+  start; nested records mean nested checkpoints, and a failed inner record whose real cause is an
+  earlier sibling needs *escalation* to an outer boundary. Needs a per-checkpoint retry budget +
+  escalation policy to guarantee termination.
+- [ ] **A naive rewind resamples the same wrong output.** Retrying with identical logits repeats the
+  mistake, so the retry must shift the distribution: (a) tighten the mask so the bad token is
+  impossible — best, but only for maskable constraints (another reason to fold as much as possible into
+  masks); (b) inject the diagnostic into context so the model conditions on it — the general fallback;
+  (c) raise temperature — weak alone.
+- [ ] **Sequencing.** Ship the API-portable degradation (stop-early + re-prompt) first — it needs only
+  the streaming validator, no decoder integration. The true in-writer loop targets open-weights
+  inference and shares Tier 2's constraint backend. Prior art for the adapter half: Outlines, XGrammar,
+  guidance, llama.cpp GBNF, vLLM guided decoding, plus the backtracking/speculative-decoding literature
+  for the rollback.
 
 ### Tier 2 — constrain-during-generate (kept high-level)
 
