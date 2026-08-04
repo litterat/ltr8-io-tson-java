@@ -51,6 +51,16 @@ class ForwardReferenceResolutionTest {
     }
 
     @Test
+    void aSelfRecursiveRecordResolvesWithoutFalseTrippingCycleDetection() {
+        // item references itself by field type -- a bare name, so it never enters the resolving set the way a
+        // self-composition would. Resolves fine. (Unsatisfiable with a REQUIRED field -- no finite value --
+        // which resolution deliberately doesn't police; see SPEC-FEEDBACK.md #25.)
+        TsonSchema resolved = resolve("  item => { inner: item }");
+
+        assertNotNull(resolved.entries().get("item"));
+    }
+
+    @Test
     void aCircularCompositionChainIsRejected() {
         // a composes b composes a -- resolution needs each other's resolved form, so neither can complete.
         TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
