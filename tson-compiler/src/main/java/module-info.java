@@ -9,4 +9,5 @@ module io.ltr8.tson.compiler {
     requires transitive io.ltr8.bind;
     requires transitive io.ltr8.tson.schema;
     requires transitive io.ltr8.tson.tree;
+    requires io.ltr8.tson.regex;
 }

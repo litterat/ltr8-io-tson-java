@@ -5,13 +5,9 @@ import io.ltr8.tson.compiler.ast.TokenValue;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
-import java.util.regex.Pattern;
-
-import java.util.regex.Matcher;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RegexParserTest {
 
@@ -20,28 +16,23 @@ class RegexParserTest {
     }
 
     @Test
-    void acceptsAValidJavaRegex() {
-        String text = RegexParser.UNCONSTRAINED.read(token("[a-z]+"));
-        assertEquals("[a-z]+", text);
-        assertTrue(Pattern.compile(text).matcher("abc").matches());
+    void acceptsAValidIRegexpAndReturnsItsText() {
+        assertEquals("[a-z]+", RegexParser.UNCONSTRAINED.read(token("[a-z]+")));
     }
 
     @Test
     void rejectsSyntacticallyInvalidRegex() {
-        // Unbalanced group -- invalid under java.util.regex, which is this atom's accepted contract
-        // (see RegexParser's own Javadoc on why that's not the same as RFC 9485 I-Regexp).
+        // Unbalanced character class -- invalid I-Regexp (and everything else).
         assertThrows(AtomParseException.class, () -> RegexParser.UNCONSTRAINED.read(token("[a-z")));
     }
 
     @Test
-    void acceptsJavaRegexConstructsThatAreNotValidIRegexpEitherWay() {
-        // A named group is valid java.util.regex syntax but not part of RFC 9485 -- accepted here
-        // regardless, since this atom's contract is "compiles under java.util.regex", not "is a
-        // conformant I-Regexp pattern".
-        String text = RegexParser.UNCONSTRAINED.read(token("(?<year>[0-9]{4})"));
-        Matcher m = Pattern.compile(text).matcher("2026");
-        assertTrue(m.matches());
-        assertEquals("2026", m.group("year"));
+    void rejectsConstructsOutsideTheIRegexpSubset() {
+        // A named capture group and a \d escape are valid java.util.regex but not I-Regexp -- validation
+        // goes through tson-regex (RFC 9485), so this atom rejects them rather than inheriting the JVM's
+        // laxer grammar (the whole point of the regex_type spec pin; see RegexParser's Javadoc).
+        assertThrows(AtomParseException.class, () -> RegexParser.UNCONSTRAINED.read(token("(?<year>[0-9]{4})")));
+        assertThrows(AtomParseException.class, () -> RegexParser.UNCONSTRAINED.read(token("\\d+")));
     }
 
     @Test

@@ -6,6 +6,12 @@ dependencies {
     // as the tson-schema dependency, model in its own module, engine here. Public tson-compiler signatures
     // return TsonNode, so it is `requires transitive` in module-info and re-declared `api` in the tson module.
     implementation(project(":tson-tree"))
+    // The native RFC 9485 I-Regexp engine. The atom vocabulary (RegexParser, and TextParser/UriParser via
+    // their `pattern` constraint) validates regex values against it rather than java.util.regex, so this
+    // implementation defines I-Regexp semantics rather than inheriting the JVM's. Used internally only (no
+    // public tson-compiler signature returns a tson-regex type), so `implementation` + a non-transitive
+    // `requires` in module-info.
+    implementation(project(":tson-regex"))
     // tson-bind has no dependency on tson-compiler/tson-schema (a leaf module), so depending on it
     // here directly is clean -- needed in main scope now that TsonMapperReader/TsonMapperWriter
     // (originally in the separate tson-mapper module, which depended on tson-compiler and so could

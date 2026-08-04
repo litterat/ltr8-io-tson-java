@@ -101,6 +101,13 @@ module has a real `module-info.java`; module names mirror each module's root exp
   assembled by hand-written readers). The data-tree counterpart to `tson-schema`'s `schema.meta`: same
   "pure value model in its own module, engine depends on it not the reverse" shape, so JPMS keeps the tree
   from ever coupling to compiler internals. `tson-compiler` depends on it; it names no `tson-compiler` type.
+- **`tson-regex`** — **only** `io.ltr8.tson.regex`: a native RFC 9485 I-Regexp engine (`TsonRegex.parse` →
+  a `RegexNode` AST + `TsonRegexSyntaxException`; a matcher follows). A true leaf — depends on **nothing**,
+  I-Regexp being an external standard, not TSON-specific. The *engine* counterpart to `tson-bind` (a general
+  dependency-free engine), not a value model like `tson-tree`; TSON pins its `regex` atom to I-Regexp
+  (`regex_type`'s `REQUIRED_FIXED spec = rfc9485`), so this owns I-Regexp semantics rather than delegating
+  to `java.util.regex` (a laxer superset). `tson-compiler`'s atom vocabulary depends on it; it names no
+  `tson-compiler` type.
 - **`tson-compiler`** — the engine: lexer, both grammars, base type resolution, the atom vocabulary,
   schema resolution, Class 2 compilation, the compiled reader stack (including the tree readers/`TsonTreeReader`
   and `TsonTreeWriter` that produce/consume `tson-tree`'s `TsonNode`), the schemaless object binder, and
@@ -219,9 +226,11 @@ fixed, closed name→`AtomType` table (§5).
   records directly.
 - **`RegexParser` returns `String`, and `TextType.pattern`/`UriType.pattern` are `Optional<String>`, not
   `Pattern`** — `regex` IS-A piece of text (§5.7), so its host value is `String` like every other
-  text-composing atom; the text is compiled via `Pattern.compile` only to validate it's well-formed, then
-  discarded. Keeping these as plain equatable `String` (not a compiled `Pattern`) is also what lets them
-  bind generically with no `DataBridge`.
+  text-composing atom; the text is validated as I-Regexp via `tson-regex`'s `TsonRegex.parse` (not
+  `java.util.regex`, whose grammar is a superset — `regex_type`'s `spec` is `REQUIRED_FIXED` to RFC 9485),
+  and the parsed form discarded once it's confirmed well-formed. Keeping these as plain equatable `String`
+  (not a compiled matcher) is also what lets them bind generically with no `DataBridge`. Matching a value
+  against a `pattern` (vs. validating the pattern is well-formed) is not yet wired — see `BACKLOG.md`.
 - **`unit`'s three instances are three separate parsers**, not one: `value` (runs base-type resolution to
   the natural host), `token` (raw NFC-normalized token text, unconstrained), `void` (`VoidReader`, accepts
   only the absent sentinel `_`). They resolve to the byte-identical `Unit` body — nothing in the *schema*
