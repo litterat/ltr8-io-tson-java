@@ -89,9 +89,9 @@ own prose (which had gone stale on at least one of them):
     side: the full pairwise derivation over a choice's variants (different kinds disjoint; different
     atom families disjoint; same-family numerics by bound interval; IS-A ⇒ not disjoint; regex atoms
     via the new primitive, also combined with length constraints), writing `TypeDefinition.disjoint`,
-    then `ChoiceReader` using it for untagged structural recovery. Blocked on `!choice` construction
-    resolving at all (see "Remaining Part 2 resolution gaps") — can't build a choice with regex
-    variants to derive over yet.
+    then `ChoiceReader` using it for untagged structural recovery. No longer blocked: `!choice { ... }`
+    construction now resolves (see "Remaining Part 2 resolution gaps"), so a choice with real variants
+    can be built and derived over.
 - [ ] **Resolved-form ingest** ([TSON-SCHEMA] §8.1/§10.1) — bringing an already-resolved
   `!type_definition` document into the library (not source text), with its own integrity checks:
   `subtypes`/`disjoint` recomputed and verified, the closed-entry parameter-free rule reverified, an
@@ -180,23 +180,17 @@ I-Regexp, and `pattern:` constraints (`TextParser`/`UriParser`) now match throug
   name resolving to a parameter) anywhere in its body, at any depth. Distinct from `value_param`
   *substitution* (tracked in `STRUCTURED-OUTPUT.md`) — this is a rejection rule for a malformed
   "closed" entry, not the substitution mechanism itself.
-- [ ] **`!choice { variants: [...] }` construction (§5.4) fails to resolve — a genuine bug, not just
-  an unimplemented case, confirmed empirically (2026-07-29) while designing the sibling
-  `ltr8-io-tson-test-suite` repo's own sidecar-format schemas (see "Conformance test suite" below):
-  a tagged union would have modeled `core_value`/`base_value`/each layer's own `outcome`-discriminated
-  sidecar shape far more precisely than the "one record, kind enum, every other field optional"
-  design those schemas actually ended up using, so this was worth pinning down exactly rather than
-  left as a guess. `DefinitionResolver.bindAtomInstance` throws `UnsupportedOperationException`
-  wrapping a `NullPointerException` ("Cannot invoke `Collection.isEmpty()` because `coll` is null"),
-  from `TypeRef`'s own constructor via `List.copyOf`, reached through
-  `RecordBindReader.read`/`ArrayBindReader.read` while binding `choice`'s own `variants: [type_ref]`
-  field — each variant is written as a bare, unadorned type name (`!choice { variants: [text
-  integer] }`), and something in that array-of-bare-type-ref binding path isn't defaulting
-  `TypeRef.arguments` before construction the way the equivalent single-field case already does
-  elsewhere. Narrow, likely a short fix once someone's in that code path — but real, and blocks any
-  schema (this project's own or a consumer's) from declaring a genuine tagged union at all today, not
-  just from getting `disjoint` computed for one (see "Choice disjointness derivation" under
-  "Resolution & linking generality" above, which assumes a choice already resolved).
+- [x] **`!choice { variants: [...] }` construction (§5.4) now resolves.** The bug: each bare variant
+  binds to a positional-form `type_ref` whose OPTIONAL `arguments: [type_argument]?` field is absent,
+  which the binder faithfully represents as `null` — and `schema.meta.TypeRef`'s constructor NPEd on
+  `List.copyOf(null)`, so `bindAtomInstance` rewrapped it as an `UnsupportedOperationException` and no
+  choice (this project's own or a consumer's) could be declared at all. Fixed at the source: `TypeRef`
+  already documents "empty means no `<...>`" (it conflates absent and empty — there is no wire form for
+  present-but-empty arguments), so its constructor now normalizes `null` arguments to the empty list,
+  rather than a global binder policy that would reinterpret every `[T]?` as `[T; 0..]`. Regression:
+  `ChoiceConstructionResolutionTest`. **Still open:** the `|` choice sugar (a `ChoiceRef` AST node) is a
+  separate path `DefinitionResolver` doesn't handle at all yet — only the explicit `!choice { ... }`
+  construction form resolves.
 
 (All already named in `DefinitionResolver`'s own Javadoc and `CLAUDE.md`; carried here so
 everything outstanding is tracked in one place.)
