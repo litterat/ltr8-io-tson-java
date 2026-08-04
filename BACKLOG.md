@@ -110,7 +110,21 @@ own prose (which had gone stale on at least one of them):
   - [ ] **The `@disjoint` assertion check** — an author's `@disjoint` marker checked against the derived
     fact: proved (silent), refuted / provably-not (resolver error), unprovable (warning), absent (no
     check). This is where exact regex-pattern disjointness (`isDisjointFrom`, via the seam above) pays
-    off — turning an otherwise-"unprovable" pattern choice into a proved-or-refuted one.
+    off — turning an otherwise-"unprovable" pattern choice into a proved-or-refuted one. **Blocked on
+    general annotation gathering** (below): the `@disjoint` marker is parsed (it's in the AST as one of
+    `SchemaMap.Declaration`'s annotation lists) but dropped at resolution, so the linker's disjointness
+    pass never sees it. It needs the declaration's annotations available where `disjoint` is known.
+- [ ] **General annotation gathering — carry declaration annotations through resolution into the
+  resolved model.** Author annotations on a schema declaration (`@disjoint`, `@doc`, `@alias`, §6) are
+  parsed and reach the AST (`SchemaMap.Declaration` carries `nameAnnotations` and `typeDefAnnotations`),
+  but `DefinitionResolver` drops them: `TypeDefinition` has no annotations slot (and neither does the
+  kernel `type_definition` it mirrors — annotations are §3.1 wire *attachments*, not body fields). So
+  nothing downstream can see which annotations an entry carried. The likely mechanism is an `annotations`
+  field on `TypeDefinition` (carried as implementation metadata the way `position` already is — also not
+  a kernel body field), or a parallel `name → annotations` map on `TsonSchema`, populated by the
+  resolver. One gap blocking several consumers: the **`@disjoint` assertion check** (above), user-facing
+  **`@doc`** documentation generation (see *Documentation*), and `@alias`. Get the general mechanism
+  right once rather than bolting on a per-annotation path and revisiting every resolution site again.
 - [ ] **Resolved-form ingest** ([TSON-SCHEMA] §8.1/§10.1) — bringing an already-resolved
   `!type_definition` document into the library (not source text), with its own integrity checks:
   `subtypes`/`disjoint` recomputed and verified, the closed-entry parameter-free rule reverified, an
@@ -299,9 +313,10 @@ missing most of the mirror.
 - [ ] User-facing documentation on how to use the library — today only `CLAUDE.md`'s own dense,
   session-oriented internal narrative exists.
 - [ ] AI skills for using the library.
-- [ ] `@doc` annotations aren't carried through resolution into `TypeDefinition` at all right now —
-  worth preserving if user docs/tooling will ever want to generate documentation from a schema,
-  rather than bolting it on later and revisiting every resolution path again.
+- [ ] `@doc`-driven documentation generation (render a schema's own `@doc` annotations) — depends on
+  **general annotation gathering** (see *Resolution & linking generality*): `@doc`, like `@disjoint`, is
+  dropped at resolution today, so there's nothing to render from until declaration annotations are carried
+  through into the resolved model. One mechanism unblocks both.
 - [ ] The README entry-point table's schema rows say "Use `TsonValueReader`", but a caller never
   constructs one directly — they go `Tson.builder()` → `resolve` → `treeRegistry()`/`bindRegistry()` →
   `compile` → `get(type)`. The "Use" column names the interface you get *back*, not the thing you use.
