@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryResolver;
 import io.ltr8.tson.compiler.reader.DeferredValueReader;
 import io.ltr8.tson.compiler.reader.ErrorReader;
+import io.ltr8.tson.compiler.reader.ValueReaderContext;
 import io.ltr8.tson.compiler.reader.ValueReaderFactory;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
@@ -170,7 +171,7 @@ public final class TsonSchemaCompiler {
                 return resolve(r.target().name());
             }
             ValueReaderFactory factory = factoryFor.apply(TsonCompiledMetaSchema.typenameOf(body));
-            return factory.create(name, definition, this::resolve);
+            return factory.create(name, definition, new ValueReaderContext(schema, this::resolve));
         }
     }
 }

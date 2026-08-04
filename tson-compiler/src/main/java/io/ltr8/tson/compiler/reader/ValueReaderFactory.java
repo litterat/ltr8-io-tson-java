@@ -1,7 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TsonValueReader;
-import io.ltr8.tson.compiler.TsonValueReaderResolver;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 /**
@@ -11,10 +10,10 @@ import io.ltr8.tson.schema.meta.TypeDefinition;
  * *declaration's* own name, not necessarily the constructor's -- they coincide only for a
  * meta-schema's own declarations (e.g. {@code "record"} itself); every other real declaration's own
  * name differs from its constructor (e.g. {@code "float32"} constructed via {@code "float_type"}).
- * {@code typeDefinition} is that declaration's own fully-resolved {@link TypeDefinition}, and {@code
- * resolver} is what a composite implementation calls to resolve its own child fields'/elements' own
- * readers.
+ * {@code typeDefinition} is that declaration's own fully-resolved {@link TypeDefinition}; {@code context}
+ * carries the compilation environment beyond this one entry -- the whole schema (for reaching sibling
+ * entries) and the reader resolution a composite implementation calls for its own child readers.
  */
 public interface ValueReaderFactory {
-    TsonValueReader<?> create(String name, TypeDefinition typeDefinition, TsonValueReaderResolver resolver);
+    TsonValueReader<?> create(String name, TypeDefinition typeDefinition, ValueReaderContext context);
 }

@@ -86,10 +86,10 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
     }
 
     /** Tree mode's {@code unit} factory: {@code void} → {@link AbsentNodeReader}, {@code value}/{@code token} → {@link AtomNodeReader} over {@link AtomValueReader#UNIT}'s own reader. */
-    private static final ValueReaderFactory TREE_UNIT = (name, definition, resolver) ->
+    private static final ValueReaderFactory TREE_UNIT = (name, definition, context) ->
             "void".equals(name)
-                    ? new AbsentNodeReader(AtomValueReader.UNIT.create(name, definition, resolver))
-                    : new AtomNodeReader(AtomValueReader.UNIT.create(name, definition, resolver), name);
+                    ? new AbsentNodeReader(AtomValueReader.UNIT.create(name, definition, context))
+                    : new AtomNodeReader(AtomValueReader.UNIT.create(name, definition, context), name);
 
     private static Map<String, ValueReaderFactory> baseFactories(ValueReaderFactory record, ValueReaderFactory array,
             ValueReaderFactory map, ValueReaderFactory tuple, ValueReaderFactory enumFactory,
@@ -147,7 +147,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
     }
 
     private static ValueReaderFactory notImplemented(String constructorName) {
-        return (name, typeDefinition, resolver) -> new ErrorReader(name, new UnsupportedOperationException(
+        return (name, typeDefinition, context) -> new ErrorReader(name, new UnsupportedOperationException(
                 "'" + name + "' uses the '" + constructorName + "' constructor, which has no compiled reader "
                         + "implemented yet"));
     }

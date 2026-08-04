@@ -99,7 +99,8 @@ final class MapBindReader extends MapAbstractReader<Object> {
         }
 
         @Override
-        public TsonValueReader<?> create(String name, TypeDefinition typeDefinition, TsonValueReaderResolver resolver) {
+        public TsonValueReader<?> create(String name, TypeDefinition typeDefinition, ValueReaderContext context) {
+            TsonValueReaderResolver resolver = context.readers();
             if (!(typeDefinition.body() instanceof MapBody body)) {
                 throw new IllegalArgumentException("'" + name + "' is not map-shaped: " + typeDefinition.body());
             }

@@ -1,7 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TsonValueReader;
-import io.ltr8.tson.compiler.TsonValueReaderResolver;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 /**
@@ -13,7 +12,7 @@ import io.ltr8.tson.schema.meta.TypeDefinition;
 record AtomNodeFactory(ValueReaderFactory delegate) implements ValueReaderFactory {
 
     @Override
-    public TsonValueReader<?> create(String name, TypeDefinition typeDefinition, TsonValueReaderResolver resolver) {
-        return new AtomNodeReader(delegate.create(name, typeDefinition, resolver), name);
+    public TsonValueReader<?> create(String name, TypeDefinition typeDefinition, ValueReaderContext context) {
+        return new AtomNodeReader(delegate.create(name, typeDefinition, context), name);
     }
 }

@@ -245,7 +245,8 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         }
 
         @Override
-        public TsonValueReader<?> create(String name, TypeDefinition typeDefinition, TsonValueReaderResolver resolver) {
+        public TsonValueReader<?> create(String name, TypeDefinition typeDefinition, ValueReaderContext context) {
+            TsonValueReaderResolver resolver = context.readers();
             if (!(typeDefinition.body() instanceof RecordBody body)) {
                 throw new IllegalArgumentException(
                         "'" + name + "' is not record-shaped: " + typeDefinition.body());

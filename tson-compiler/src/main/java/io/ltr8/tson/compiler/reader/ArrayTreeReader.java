@@ -31,7 +31,8 @@ final class ArrayTreeReader extends ArrayAbstractReader<TsonNode> {
     public static final class Factory implements ValueReaderFactory {
 
         @Override
-        public TsonValueReader<?> create(String name, TypeDefinition typeDefinition, TsonValueReaderResolver resolver) {
+        public TsonValueReader<?> create(String name, TypeDefinition typeDefinition, ValueReaderContext context) {
+            TsonValueReaderResolver resolver = context.readers();
             if (!(typeDefinition.body() instanceof ArrayBody body)) {
                 throw new IllegalArgumentException("'" + name + "' is not array-shaped: " + typeDefinition.body());
             }
