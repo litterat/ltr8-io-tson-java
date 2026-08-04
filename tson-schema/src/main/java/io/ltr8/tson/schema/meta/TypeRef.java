@@ -1,6 +1,7 @@
 package io.ltr8.tson.schema.meta;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * The meta-kernel's {@code type_ref} record (Part 2 §8.1): a resolved reference to a named entry
@@ -12,15 +13,22 @@ import java.util.List;
  * <p>Same name as {@code tson-compiler}'s grammar-layer {@code io.ltr8.tson.compiler.ast.schema.TypeRef}
  * -- a different package, a deliberately different concept (source-text reference vs. resolved
  * reference), matching the kernel's own choice to call both "type_ref" too.
+ *
+ * <p>{@code arguments} is bound from {@code type_ref}'s OPTIONAL {@code arguments: [type_argument]?}
+ * field, so an absent value arrives as {@code null} -- which, per the "empty means no {@code <...>}"
+ * rule above, is the same thing as no arguments. The constructor therefore normalizes {@code null} to
+ * the empty list rather than rejecting it: absent and empty are one state for a reference, and there is
+ * no wire form for "present but empty" arguments to keep distinct.
  */
 public record TypeRef(String name, List<TypeArgument> arguments) {
 
     public TypeRef {
-        arguments = List.copyOf(arguments);
+        Objects.requireNonNull(name, "name");
+        arguments = arguments == null ? List.of() : List.copyOf(arguments);
     }
 
     /** A bare reference with no type arguments, e.g. a plain field type like {@code integer}. */
     public static TypeRef of(String name) {
-        return new TypeRef(name, List.of());
+        return new TypeRef(name, null);
     }
 }
