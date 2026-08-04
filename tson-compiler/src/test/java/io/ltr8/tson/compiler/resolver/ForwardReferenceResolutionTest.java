@@ -58,4 +58,14 @@ class ForwardReferenceResolutionTest {
 
         assertTrue(thrown.getMessage().contains("circular"), thrown::getMessage);
     }
+
+    @Test
+    void aCircularCompositionChainWithFieldBodiesIsAlsoRejected() {
+        // Same cycle, now with tightening-body fields -- the cycle is in the composition (resolved before
+        // the fields), so a field body provides no escape and it's caught the same way.
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> resolve("  a => b & { p: text }\n  b => a & { q: text }"));
+
+        assertTrue(thrown.getMessage().contains("circular"), thrown::getMessage);
+    }
 }
