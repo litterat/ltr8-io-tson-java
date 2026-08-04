@@ -99,10 +99,14 @@ own prose (which had gone stale on at least one of them):
     dependency-inversion seam, since `tson-schema` deliberately doesn't depend on `tson-regex` — a
     pattern-disjointness oracle injected into the linker, supplied by `tson-compiler`. See
     `SPEC-FEEDBACK.md` #23 for the load-bearing ambiguity underneath all of this.
-  - [ ] **Reader-side untagged structural recovery** — `ChoiceReader` still always requires an explicit
-    `!variant` tag. It should drop the tag where the variants are disjoint *and* each occupies a distinct
-    base-type class (the TSON-text separability predicate above) — a small, stable check over the derived
-    fact, not the full fact.
+  - [x] **Reader-side untagged structural recovery (scalars).** `ChoiceReader` now drops the `!variant`
+    tag where the choice is proved disjoint *and* every variant is a scalar of a distinct base-type class
+    (the TSON-text separability predicate): it precomputes a `class -> variant` map (`BaseTypeClass`) and
+    `NamedDispatchReader` recovers an untagged token by `ValueParser`-classifying it. To classify variants a
+    factory needs its enclosing schema, so `ValueReaderFactory.create` gained a `ValueReaderContext` (schema
+    + child-reader resolver) — a reusable "level up" seam. **Still open:** *non-scalar* structural recovery
+    — a `{...}` record variant vs a scalar is distinguishable by wire shape, but this cut only handles
+    base-type-class scalars; a choice with any non-scalar variant keeps the tag.
   - [ ] **The `@disjoint` assertion check** — an author's `@disjoint` marker checked against the derived
     fact: proved (silent), refuted / provably-not (resolver error), unprovable (warning), absent (no
     check). This is where exact regex-pattern disjointness (`isDisjointFrom`, via the seam above) pays
