@@ -3,6 +3,7 @@ package io.ltr8.tson;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.compiler.Diagnostic;
+import io.ltr8.tson.compiler.TsonObjectReader;
 import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
@@ -119,8 +120,8 @@ class TsonReadTest {
     }
 
     @Test
-    void readObjectReturnsTheSchemaBoundObject() {
-        Point value = tsonWithPointBinding().readObject("""
+    void objectReaderReturnsTheSchemaBoundObject() {
+        Point value = tsonWithPointBinding().objectReader().read("""
                 !!schema:"https://example.test/point-1.tn"
                 !point { x: 3  y: 4 }""", Point.class);
 
@@ -128,28 +129,51 @@ class TsonReadTest {
     }
 
     @Test
-    void readObjectWithoutASchemaBindsSchemalessly() {
-        // No !!schema -> bind straight into the given class (equivalent to objectReader().read(data, type)).
-        Point value = tsonWithPointBinding().readObject("{ x: 3  y: 4 }", Point.class);
+    void objectReaderWithoutASchemaBindsSchemalessly() {
+        // No !!schema -> bind straight into the given class, driven by its descriptor.
+        Point value = tsonWithPointBinding().objectReader().read("{ x: 3  y: 4 }", Point.class);
 
         assertEquals(new Point(3, 4), value);
     }
 
     @Test
-    void readObjectWithTheWrongClassThrowsBeforeReading() {
+    void objectReaderWithTheWrongClassThrowsBeforeReading() {
         // The schema's root type `point` binds to Point, not String -- caught up front, before any value read.
-        TsonReadException thrown = assertThrows(TsonReadException.class, () -> tsonWithPointBinding().readObject("""
-                !!schema:"https://example.test/point-1.tn"
-                !point { x: 3  y: 4 }""", String.class));
+        TsonReadException thrown = assertThrows(TsonReadException.class, () -> tsonWithPointBinding().objectReader()
+                .read("""
+                        !!schema:"https://example.test/point-1.tn"
+                        !point { x: 3  y: 4 }""", String.class));
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, thrown.diagnostic().code());
     }
 
     @Test
-    void readObjectValidatesAsItBinds() {
+    void objectReaderValidatesAsItBinds() {
         // y is out of int32 range -- fail-fast, same validation the tree read applies.
-        TsonReadException thrown = assertThrows(TsonReadException.class, () -> tsonWithPointBinding().readObject("""
-                !!schema:"https://example.test/point-1.tn"
-                !point { x: 3  y: 99999999999999 }""", Point.class));
+        TsonReadException thrown = assertThrows(TsonReadException.class, () -> tsonWithPointBinding().objectReader()
+                .read("""
+                        !!schema:"https://example.test/point-1.tn"
+                        !point { x: 3  y: 99999999999999 }""", Point.class));
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, thrown.diagnostic().code());
+    }
+
+    @Test
+    void readWithoutSchemaBindsEvenWhenTheSchemaIsUnavailable() {
+        // read() would SCHEMA_ERROR (the source can't provide this URI); readWithoutSchema binds the class anyway.
+        Point value = tsonWithPointBinding().objectReader().readWithoutSchema("""
+                !!schema:"https://example.test/not-there.tn"
+                !point { x: 3  y: 4 }""", Point.class);
+
+        assertEquals(new Point(3, 4), value);
+    }
+
+    @Test
+    void aStandaloneObjectReaderIgnoresADeclaredSchema() {
+        // Built without a schema environment -> schemaless: any !!schema is ignored, binds to the class
+        // (the Jackson-style "target class is the contract" case), even a !!schema the reader couldn't resolve.
+        Point value = new TsonObjectReader(tsonWithPointBinding().dataBindContext()).read("""
+                !!schema:"https://example.test/point-1.tn"
+                !point { x: 3  y: 4 }""", Point.class);
+
+        assertEquals(new Point(3, 4), value);
     }
 }
