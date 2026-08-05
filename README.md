@@ -151,6 +151,15 @@ class *reflectively* (the class is the schema); `TsonValueReader` checks it agai
 document*. Both stream their input — a large document is never fully buffered before reading begins —
 and both accept a `String` or an `InputStream`.
 
+`TsonObjectReader` and `TsonTreeReader` also have a **schema-aware** mode. Obtained from a configured
+`Tson` facade (`tson.objectReader()` / `tson.treeReader()`) rather than constructed directly, they read a
+*self-describing* document — one that declares its own `!!schema` — validating it against that schema as
+they go (and reading schemalessly when it declares none), the object form also checking your target class
+against the schema's root type up front. It's the "hand me a document, work out whether a schema applies"
+read peer of `tson.validate`; `readWithoutSchema(…)` opts back out to a pure class/wire read. The
+standalone `new TsonObjectReader()` / `new TsonTreeReader()` used in the examples below are the schemaless
+form.
+
 > **Try any of these without a project or build tool.** Each of the four numbered examples below is a
 > runnable single-file Java 25 program in [`examples/`](examples/) that loads the library over the
 > module system. Build the module path once — `./gradlew :tson:modules` — then run any of them with

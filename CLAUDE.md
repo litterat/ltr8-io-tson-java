@@ -113,8 +113,9 @@ module has a real `module-info.java`; module names mirror each module's root exp
   to `java.util.regex` (a laxer superset). `tson-compiler`'s atom vocabulary depends on it; it names no
   `tson-compiler` type.
 - **`tson-compiler`** — the engine: lexer, both grammars, base type resolution, the atom vocabulary,
-  schema resolution, Class 2 compilation, the compiled reader stack (including the tree readers/`TsonTreeReader`
-  and `TsonTreeWriter` that produce/consume `tson-tree`'s `TsonNode`), the schemaless object binder, and
+  schema resolution, Class 2 compilation, the compiled reader stack, the schema-aware read facades
+  (`TsonTreeReader`/`TsonObjectReader`) over their schemaless `reader`-package engines
+  (`SchemalessTreeReader`/`SchemalessObjectReader`), the `TsonTreeWriter`/`TsonObjectWriter` writers, and
   config/wiring. Everything here is tightly coupled to the shared lexer/token-stream machinery, so it's
   one module. Root package `io.ltr8.tson.compiler`; exports the packages with real cross-module callers
   and keeps `reader`/`atom`/`base`/`lexer` internal.
@@ -491,19 +492,35 @@ fine-grained atom codes, `UNRECOGNIZED_FIELD`/`DUPLICATE_MAP_KEY` detection (rea
 and the parser already resolved "last value wins" before a reader sees a map), and per-field schema
 positions.
 
-### Object binder: `TsonObjectReader`/`TsonObjectWriter` (root package)
+### Read facades: `TsonObjectReader`/`TsonTreeReader` (root package) + `TsonObjectWriter`
 
-Schemaless (Class 1) binding between TSON and a Java object, driven by the target class's `tson-bind`
-`DataClass` descriptor — the reflective, class-driven counterpart to the schema-driven readers. Named for
-what a consumer holds (a Java object), matching Jackson's `ObjectReader`/`ObjectWriter`.
+`TsonObjectReader` (to a bound Java object) and `TsonTreeReader` (to a `TsonNode` tree) are the two
+consumer read front doors, named for what a consumer holds, matching Jackson's `ObjectReader`/`readTree`.
+Each is **dual-mode, fixed at construction**: built standalone (`new TsonObjectReader(ctx)` / `new
+TsonTreeReader()`) it's **schemaless** (Class 1 — the target class, or the wire, is the whole contract;
+any `!!schema` the document declares is ignored, Jackson-style); obtained from a `Tson` facade
+(`objectReader()`/`treeReader()`, carrying a configured `TsonSchemaSource`) it's **schema-aware** — a
+self-describing document is validated against its declared `!!schema` as it's read (the schema resolves
+through the source, the root type-ref selects the type), else read schemalessly. `readWithoutSchema(...)`
+forces the schemaless path on a schema-aware reader.
 
-- **`TsonObjectReader` streams events** (like the compiled readers), walking the descriptor in parallel —
-  never materializing a tree first. Problems report through a `TsonReadContext` (fail-fast throws
+- **The class-driven binding / tree-building mechanics live in the internal `reader` package**
+  (`SchemalessObjectReader`/`SchemalessTreeReader`, unexported); the public readers are thin facades that
+  peek the `DocumentStart` for a `!!schema` and dispatch to either the compiled schema registry or the
+  schemaless engine. The whole-document entry points (`read(String|InputStream, …)`) own document framing
+  (leading `DocumentStart`, trailing-content check); the low-level `read(TsonReadContext, …)` is frame-free
+  (a value at the cursor, for a caller managing their own context) and always schemaless. Their `read(ctx)`
+  matching frame-free-ness is why both engines split framing into a private `readDocument`.
+- **`TsonObjectReader`'s schema-aware `read` checks the target class up front** — the schema's root type
+  already binds to a Java class via the name binder, so a class not assignable to that is a `TYPE_MISMATCH`
+  reported *before* the value is read, not a cast failure after.
+- **`SchemalessObjectReader` streams events** (like the compiled readers), walking the descriptor in
+  parallel — never materializing a tree first. Problems report through a `TsonReadContext` (fail-fast throws
   `TsonReadException`; collecting accumulates), and a `tson-bind` `DataBindException` while narrowing /
   applying a bridge / invoking a constructor is caught and re-reported through `ctx`, so a caller sees one
-  uniform error model regardless of which layer noticed.
-- **No positional form and no schema-composed defaults** — both are schema-layer concepts a class-driven
-  bind has no equivalent for (a record must be braced; an absent required field is `FIELD_REQUIRED`).
+  uniform error model regardless of which layer noticed. **No positional form and no schema-composed
+  defaults** — both are schema-layer concepts a class-driven bind has no equivalent for (a record must be
+  braced; an absent required field is `FIELD_REQUIRED`).
 - **`TsonObjectWriter.toTson` is mainly a debugging tool**, not a guaranteed-lossless serializer (integer
   width, tuple-ness, and captured wire annotations are documented write-side losses). Both throw unchecked
   (`TsonReadException`/`TsonWriteException`), so the pair is symmetric and a caller writes neither a
@@ -534,7 +551,10 @@ Object value = compiled.get("my_type").read(dataText);
   (`SchemalessValidator`, Class 1 — base syntax plus built-in/core-vocabulary atoms). Returns every
   problem as a `List<Diagnostic>` (empty means valid) — even an unresolvable schema or unknown type comes
   back as a diagnostic, never an exception.
-- `objectReader()`/`objectWriter()` bind to this instance's `dataBindContext` (configurable via
+- `objectReader()`/`treeReader()` return **schema-aware** `TsonObjectReader`/`TsonTreeReader` over this
+  instance — the value-returning read peers of `validate`: a self-describing document is validated against
+  its declared `!!schema` (schemaless when it declares none), the object form checking the target class up
+  front. `objectReader()`/`objectWriter()` bind to this instance's `dataBindContext` (configurable via
   `TsonConfig.dataBindContext`, default `TsonAtomContext.defaultContext()`). `schemaRegistry()`/`loader()`
   reach the underlying machinery.
 
