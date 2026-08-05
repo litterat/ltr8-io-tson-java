@@ -137,14 +137,14 @@ The write side is the mirror: a value in hand, TSON text out. The matrix:
 
 | You have… | You want… | Use | You get |
 |---|---|---|---|
-| a data document | a queryable tree (validated if it self-describes) | **`tson.treeReader()`** | a `TsonNode` tree |
 | a data document + your Java class | it bound (validated if it self-describes) | **`tson.objectReader()`** | your object |
-| a data document | every problem, not the value | **`tson.validate()`** | a `List<Diagnostic>` |
+| a data document | a queryable tree (validated if it self-describes) | **`tson.treeReader()`** | a `TsonNode` tree |
 | a TSON schema + a known type name | a reusable per-type reader | **`tson.treeRegistry()`/`bindRegistry()`** → **`TsonValueReader`** | a tree / your object |
-| a data document | a grammar-faithful AST | **`TsonDataParser`** | a `Document` AST |
-| a data document | to pull events lazily | **`TsonDataStream`** | a `TsonEvent` stream |
 | a Java object | it as TSON text | **`tson.objectWriter()`** | a `String` |
 | a `TsonNode` tree | it as TSON text | **`tson.treeWriter()`** | a `String` |
+| a data document | every problem, not the value | **`tson.validate()`** | a `List<Diagnostic>` |
+| a data document | a grammar-faithful AST | **`TsonDataParser`** | a `Document` AST |
+| a data document | to pull events lazily | **`TsonDataStream`** | a `TsonEvent` stream |
 
 `tson.treeReader()` / `tson.objectReader()` and their writer peers `tson.objectWriter()` /
 `tson.treeWriter()` are the facade doors on a built `Tson`: the readers take a *self-describing* document
