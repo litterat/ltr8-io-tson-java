@@ -131,34 +131,34 @@ That's the whole loop, all from the shell: scaffold → edit → validate. See
 
 ## Reading and writing TSON: choosing an entry point
 
-Two questions pick your reader: **what drives the interpretation** (nothing, your Java class, or a TSON
-schema document), and **what you want out** (a generic tree/stream, or a bound Java object). The write
-side is the mirror: a value in hand, TSON text out. That's the whole matrix:
+Two questions pick your reader: **what drives the interpretation** — the wire alone (schemaless), your
+Java class, or a TSON schema — and **what you want out** — a generic tree/stream, or a bound Java object.
+The write side is the mirror: a value in hand, TSON text out. The matrix:
 
 | You have… | You want… | Use | You get |
 |---|---|---|---|
-| a Java class | it bound, no schema | **`TsonObjectReader`** | your object |
-| nothing (schemaless) | a queryable tree | **`TsonTreeReader`** | a `TsonNode` tree |
+| nothing (the wire is the truth) | a queryable tree | **`new TsonTreeReader()`** | a `TsonNode` tree |
+| a Java class (the class is the schema) | it bound, no schema | **`new TsonObjectReader()`** | your object |
 | nothing (schemaless) | a grammar-faithful AST | **`TsonDataParser`** | a `Document` AST |
 | nothing (schemaless) | to pull events lazily | **`TsonDataStream`** | a `TsonEvent` stream |
-| a TSON schema | validation + a queryable tree | **`TsonValueReader`** (tree mode) | a `TsonNode` tree |
-| a TSON schema | validation + a bound object | **`TsonValueReader`** (bind mode) | your object |
+| a self-describing doc (its own `!!schema`) | it validated, into a tree | **`tson.treeReader()`** | a `TsonNode` tree |
+| a self-describing doc (its own `!!schema`) | it validated, bound to your class | **`tson.objectReader()`** | your object |
+| a self-describing doc | every problem, not the value | **`tson.validate()`** | a `List<Diagnostic>` |
+| a TSON schema + a known type name | a reusable per-type reader | **`tson.treeRegistry()`/`bindRegistry()`** → **`TsonValueReader`** | a tree / your object |
 | a Java object | it as TSON text | **`TsonObjectWriter`** | a `String` |
 | a `TsonNode` tree | it as TSON text | **`TsonTreeWriter`** | a `String` |
 
-The two "bound object" rows are mirror images: `TsonObjectReader` checks the data against your Java
-class *reflectively* (the class is the schema); `TsonValueReader` checks it against a real TSON *schema
-document*. Both stream their input — a large document is never fully buffered before reading begins —
-and both accept a `String` or an `InputStream`.
-
-`TsonObjectReader` and `TsonTreeReader` also have a **schema-aware** mode. Obtained from a configured
-`Tson` facade (`tson.objectReader()` / `tson.treeReader()`) rather than constructed directly, they read a
-*self-describing* document — one that declares its own `!!schema` — validating it against that schema as
-they go (and reading schemalessly when it declares none), the object form also checking your target class
-against the schema's root type up front. It's the "hand me a document, work out whether a schema applies"
-read peer of `tson.validate`; `readWithoutSchema(…)` opts back out to a pure class/wire read. The
-standalone `new TsonObjectReader()` / `new TsonTreeReader()` used in the examples below are the schemaless
-form.
+`TsonTreeReader` and `TsonObjectReader` are each **one class in two modes**. Constructed directly (`new
+TsonTreeReader()` / `new TsonObjectReader()`) they're *schemaless* — the wire, or your Java class, is the
+whole contract and any `!!schema` the document declares is ignored (Jackson-style). Obtained from a
+configured `Tson` facade (`tson.treeReader()` / `tson.objectReader()`) they're *schema-aware* — a
+self-describing document is validated against its own `!!schema` as it's read (schemaless when it declares
+none), the object form also checking your target class against the schema's root type up front. It's the
+"hand me a document, work out whether a schema applies" read peer of `tson.validate`; `readWithoutSchema(…)`
+opts back out to a pure class/wire read. When your *data* isn't self-describing but you hold the schema out
+of band, compile it once through a registry (`tson.treeRegistry()`/`bindRegistry()`) and reuse the per-type
+`TsonValueReader`. All of these stream their input — a large document is never fully buffered before
+reading begins — and accept a `String` or an `InputStream`. The examples below use the schemaless form.
 
 > **Try any of these without a project or build tool.** Each of the four numbered examples below is a
 > runnable single-file Java 25 program in [`examples/`](examples/) that loads the library over the

@@ -402,10 +402,11 @@ door a caller holds (`T read(TsonReadContext)`, plus `read(String)`/`read(InputS
   out of scope, an `IllegalStateException` deferred into an `ErrorReader`); a **standalone** compile
   (`compile(linked, ValueReaderFactoryResolver)`) dispatches through a factory set directly, no scoping —
   for reading an already-validated schema in a chosen mode.
-- **Two output modes share each reader family** via a `*AbstractReader` base plus `*DomReader`/`*BindReader`
-  subclasses (`Record`/`Array`/`Map`/`Tuple`). DOM mode produces plain `Map`/`List`; object-binding mode
-  produces real bound Java objects via a `DataNameBinder` (`RecordBindReader` looks up each entry's
-  `DataClass` and narrows values to the field's target type). `ValueReaderFactoryRegistry.dom()` /
+- **Two output modes share each reader family** via a `*AbstractReader` base plus `*TreeReader`/`*BindReader`
+  subclasses (`Record`/`Array`/`Map`/`Tuple`). Tree mode produces an immutable `tson-tree` `TsonNode`
+  (structure-preserving, typed leaves); object-binding mode produces real bound Java objects via a
+  `DataNameBinder` (`RecordBindReader` looks up each entry's `DataClass` and narrows values to the field's
+  target type). `ValueReaderFactoryRegistry.tree()` /
   `.bind(DataBindContext)` are the two fixed factory tables; only `record`/`enum` (and, transitively, a
   record's container-typed fields) differ per mode. `ValueReaderFactoryResolver` (the `constructor
   name → factory` dispatch interface) lives in the unexported `reader` package — a consumer picks a mode
@@ -433,8 +434,8 @@ Two registries over one shared resolution core, the compiled-side counterparts t
   the linked form standalone in its own mode, cached by identity; `compile(linked)` is the uncached
   primitive.
 - **Resolution is always bind-anchored, so it is delegated to the core regardless of read mode.** A
-  schema's own `!enum`/`!integer` instances bind to `schema.meta.Top` objects — a DOM reader's `Map` can't
-  stand in — so every read registry shares the one bind-mode core for resolution; only the final compile
+  schema's own `!enum`/`!integer` instances bind to `schema.meta.Top` objects — a tree reader's `TsonNode`
+  can't stand in — so every read registry shares the one bind-mode core for resolution; only the final compile
   runs in the registry's mode (standalone: the schema's constructor usage was already validated at link
   time). The bind read registry takes the *caller's own* `DataBindContext` (their user-class name binder),
   deliberately distinct from the core's internal `SchemaMetaNameBinder`-based resolution context. A user
@@ -536,17 +537,18 @@ meta-kernel/meta.tn/core.tn into a governed environment and returns an immutable
 
 ```java
 Tson tson = Tson.builder().build();
-TsonCompiledSchema compiled = tson.domRegistry().compile(tson.resolve(schemaText));
-Object value = compiled.get("my_type").read(dataText);
+TsonCompiledSchema compiled = tson.treeRegistry().compile(tson.resolve(schemaText));
+TsonNode value = (TsonNode) compiled.get("my_type").read(dataText);
 ```
 
-- **The read mode is which registry you hold:** `domRegistry()` (plain `Map`/`List`) and `bindRegistry()`
-  (real Java objects, bound via `dataBindContext()`), both over one shared bind-mode resolution core.
+- **The read mode is which registry you hold:** `treeRegistry()` (an immutable, queryable `TsonNode` tree)
+  and `bindRegistry()` (real Java objects, bound via `dataBindContext()`), both over one shared bind-mode
+  resolution core.
   `resolve(schemaText)` resolves/links/registers and takes *no* mode — resolution is always object-binding
   internally (it binds meta instances to `schema.meta.Top`), and only a registry's own `compile`/`get`
   picks a mode.
 - **`validate(String|InputStream)` works out on its own whether a schema applies:** a `!!schema` directive
-  selects the schema (resolved through `TsonConfig.schemaSource`, compiled once in DOM mode) and the root
+  selects the schema (resolved through `TsonConfig.schemaSource`, compiled once in tree mode) and the root
   type-ref (e.g. `!person`) selects the type; with no `!!schema` it's validated schemalessly
   (`SchemalessValidator`, Class 1 — base syntax plus built-in/core-vocabulary atoms). Returns every
   problem as a `List<Diagnostic>` (empty means valid) — even an unresolvable schema or unknown type comes
@@ -599,7 +601,7 @@ the schema, the root type-ref selects the type, no `!!schema` means schemaless. 
 no `--type`.** The facade owns the whole per-document decision; the CLI just classifies files into a source
 and calls it. Exit codes: 0 all valid, 1 any data file invalid (bad value / unresolvable `!!schema` /
 unknown type / no root type-ref), 2 usage/classification (no data files, an unreadable/`!!id`-less schema).
-Also `tson compile <schema>` (checks a schema compiles, DOM mode), `tson hash <file>`, `tson init-example
+Also `tson compile <schema>` (checks a schema compiles, tree mode), `tson hash <file>`, `tson init-example
 [<dir>]` (writes a working `person.tn`/`person-data.tn`). The installed command is `tson`
 (`application.applicationName`), launched on the classpath.
 
