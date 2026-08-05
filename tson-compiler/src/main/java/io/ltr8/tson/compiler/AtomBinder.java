@@ -29,12 +29,12 @@ import java.math.BigInteger;
  * tson-compiler}) need for their own {@code read(TokenValue, Class)} -- one shared implementation
  * rather than one per caller.
  */
-final class AtomBinder {
+public final class AtomBinder {
 
     private AtomBinder() {
     }
 
-    static Object bind(BaseValue value, Class<?> target) throws DataBindException {
+    public static Object bind(BaseValue value, Class<?> target) throws DataBindException {
         return switch (value) {
             case BaseValue.NullValue ignored -> bindNull(target);
             case BaseValue.BooleanValue b -> bindBoolean(b.value(), target);

@@ -210,13 +210,13 @@ public class TsonDataParser {
      * passed in as {@code recorder} instead: {@link TsonDataParser} supplies its own {@link
      * #positions} map; a caller that doesn't track positions passes a no-op.
      */
-    static final class EventReducer {
+    public static final class EventReducer {
 
         private final List<TsonEvent> events;
         private final BiConsumer<CoreValue, Position> recorder;
         private int pos;
 
-        EventReducer(List<TsonEvent> events, BiConsumer<CoreValue, Position> recorder) {
+        public EventReducer(List<TsonEvent> events, BiConsumer<CoreValue, Position> recorder) {
             this.events = events;
             this.recorder = recorder;
         }
@@ -234,7 +234,7 @@ public class TsonDataParser {
             return new DataValue(annotations, typeRef, coreValue());
         }
 
-        Annotation annotation() {
+        public Annotation annotation() {
             AnnotationStart start = (AnnotationStart) events.get(pos++);
             Optional<DataValue> value = Optional.empty();
             if (!(events.get(pos) instanceof AnnotationEnd)) {

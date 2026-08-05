@@ -1,51 +1,19 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.annotation.Typename;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
-import io.ltr8.bind.DataClassArray;
-import io.ltr8.bind.DataClassAtom;
-import io.ltr8.bind.DataClassElement;
-import io.ltr8.bind.DataClassField;
-import io.ltr8.bind.DataClassMap;
-import io.ltr8.bind.DataClassRecord;
-import io.ltr8.bind.DataClassTuple;
-import io.ltr8.bind.DataClassUnion;
-import io.ltr8.tson.compiler.ast.Annotation;
-import io.ltr8.tson.compiler.ast.CoreValue;
-import io.ltr8.tson.compiler.ast.TokenValue;
-import io.ltr8.tson.compiler.atom.AtomType;
-import io.ltr8.tson.compiler.atom.AtomTypeException;
 import io.ltr8.tson.compiler.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.compiler.base.BaseTypeResolver;
-import io.ltr8.tson.compiler.base.BaseValue;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
-import io.ltr8.tson.compiler.reader.EventSkip;
-import io.ltr8.tson.compiler.stream.AbsentEvent;
-import io.ltr8.tson.compiler.stream.AnnotationEnd;
-import io.ltr8.tson.compiler.stream.AnnotationStart;
-import io.ltr8.tson.compiler.stream.ArrayEnd;
-import io.ltr8.tson.compiler.stream.ArrayStart;
-import io.ltr8.tson.compiler.stream.DocumentEnd;
-import io.ltr8.tson.compiler.stream.EmptyBraceEvent;
-import io.ltr8.tson.compiler.stream.FieldName;
-import io.ltr8.tson.compiler.stream.MapEnd;
-import io.ltr8.tson.compiler.stream.MapStart;
-import io.ltr8.tson.compiler.stream.RecordEnd;
-import io.ltr8.tson.compiler.stream.RecordStart;
-import io.ltr8.tson.compiler.stream.SchemaRef;
-import io.ltr8.tson.compiler.stream.TokenEvent;
+import io.ltr8.tson.compiler.reader.SchemalessObjectReader;
+import io.ltr8.tson.compiler.stream.DocumentStart;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TypeRef;
 
 import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
-import java.util.function.BiConsumer;
 
 /**
  * Binds a TSON document to a Java object -- schemaless (Class 1) binding driven by the target Java
@@ -86,14 +54,16 @@ import java.util.function.BiConsumer;
  */
 public final class TsonObjectReader {
 
-    /** {@code EventReducer} records each core-value's own source position for error reporting; annotation capture here has no use for one. */
-    private static final BiConsumer<CoreValue, Position> NO_POSITIONS = (value, position) -> {
-    };
+    private final DataBindContext dataBindContext;
+    private final TsonCompiledSchemaRegistry bind;
 
-    private final DataBindContext context;
+    public TsonObjectReader(TsonCompiledMetaRegistry core, DataBindContext dataBindContext) {
+        this.dataBindContext = dataBindContext;
+        this.bind = TsonCompiledSchemaRegistry.bind(core, dataBindContext);
+    }
 
     public TsonObjectReader(DataBindContext context) {
-        this.context = context;
+        this(new TsonCompiledMetaRegistry(context), context);
     }
 
     public TsonObjectReader() {
@@ -104,12 +74,12 @@ public final class TsonObjectReader {
 
     /** Reads {@code source}'s own root value, fail-fast, into {@code targetClass} -- throws {@link TsonReadException} on the first problem. */
     public <T> T read(String source, Class<T> targetClass) {
-        return readDocument(TsonReadContext.throwing(source), targetClass);
+        return read(new TsonDataStream(source), targetClass);
     }
 
     /** The streaming counterpart to {@link #read(String, Class)} -- binds {@code source}'s own bytes (UTF-8) genuinely, never buffering the whole document into a {@code String} first; {@code source} is not closed here. */
     public <T> T read(InputStream source, Class<T> targetClass) {
-        return readDocument(TsonReadContext.throwing(source), targetClass);
+        return read(new TsonDataStream(source), targetClass);
     }
 
     /**
@@ -119,493 +89,72 @@ public final class TsonObjectReader {
      * throwing on the first. Does not check for document framing (no trailing-content check); use
      * {@link #read(String, Class)}/{@link #read(InputStream, Class)} for a whole document.
      */
-    @SuppressWarnings("unchecked")
-    public <T> T read(TsonReadContext ctx, Class<T> targetClass) {
-        DataClass dataClass = descriptorFor(ctx, targetClass);
-        if (dataClass == null) {
-            return null;
-        }
-        return (T) bind(ctx, dataClass);
+    public <T> T read(TsonReadContext ctx, Class<T> type ) {
+        return readStream(ctx, type, false);
     }
 
-    private <T> T readDocument(TsonReadContext ctx, Class<T> targetClass) {
-        T result = read(ctx, targetClass);
-        TsonEvent trailing = ctx.next();
-        if (!(trailing instanceof DocumentEnd)) {
-            throw new IllegalStateException("unexpected trailing event after the document's value: " + trailing);
-        }
-        return result;
+    public <T> T readWithoutSchema(TsonReadContext ctx, Class<T> type ) {
+        return readStream(ctx, type, true);
     }
 
-    /** Resolves {@code targetClass}'s own descriptor; a class {@code tson-bind} can't analyze (e.g. two {@code @Annotated} components) is reported as a {@code SCHEMA_ERROR}, not silently. */
-    private DataClass descriptorFor(TsonReadContext ctx, Class<?> targetClass) {
+    private <T> T read(TsonDataStream stream, Class<T> type) {
+        return readStream(TsonReadContext.throwing(stream), type, false);
+    }
+
+    private <T> T readStream(TsonReadContext ctx, Class<T> type, boolean ignoreSchema) {
+        Objects.requireNonNull(type, "type");
+        DocumentStart start = (DocumentStart) ctx.next();
+        if (ignoreSchema || start.schema().isEmpty()) {
+            return new SchemalessObjectReader(dataBindContext).read(ctx, type);
+        }
+        RootReader root = select(start.schema().get(), ctx, bind);
+        Class<?> bound = boundClass(root.typeName());
+        if (bound != null && !type.isAssignableFrom(bound)) {
+            throw new TsonReadException(problem(Diagnostic.Code.TYPE_MISMATCH,
+                    "the schema's root type `" + root.typeName() + "` binds to " + bound.getName()
+                            + ", which is not assignable to the requested " + type.getName()));
+        }
+        Object value = root.reader().read(ctx);
+        if (value != null && !type.isInstance(value)) {
+            throw new TsonReadException(problem(Diagnostic.Code.TYPE_MISMATCH,
+                    "the schema's root type `" + root.typeName() + "` produced a " + value.getClass().getName()
+                            + ", not the requested " + type.getName()));
+        }
+        return type.cast(value);
+    }
+
+    /** The bound Java class the schema type {@code typeRefName} maps to, or {@code null} if it isn't name-bound (e.g. an atom root) -- so the before-read type check falls back to a post-read cast. */
+    private Class<?> boundClass(String typeRefName) {
         try {
-            return context.getDescriptor(targetClass);
+            return dataBindContext.getDescriptor(typeRefName).typeClass();
         } catch (DataBindException e) {
-            ctx.report(Diagnostic.Code.SCHEMA_ERROR, "cannot bind to " + targetClass + ": " + e.getMessage(),
-                    targetClass.getName(), "(unbindable)");
             return null;
         }
     }
 
-    // ── Core dispatch ────────────────────────────────────────────────────
-
-    private Object bind(TsonReadContext ctx, DataClass dataClass) {
-        Object result = switch (dataClass) {
-            case DataClassAtom atom -> bindAtom(ctx, atom);
-            case DataClassRecord record -> bindRecord(ctx, record);
-            case DataClassArray array -> bindArray(ctx, array);
-            case DataClassMap map -> bindMap(ctx, map);
-            case DataClassTuple tuple -> bindTuple(ctx, tuple);
-            case DataClassUnion union -> bindUnion(ctx, union);
-            default -> {
-                ctx.report(Diagnostic.Code.TYPE_MISMATCH, "unsupported target type " + dataClass.typeClass(),
-                        "a bindable type", String.valueOf(dataClass));
-                yield null;
-            }
-        };
-        if (result != null && dataClass.bridge().isPresent()) {
-            try {
-                return dataClass.bridge().get().toObject().invoke(result);
-            } catch (Throwable t) {
-                // A bridge conversion failure is a data problem (e.g. an unrecognized enum member,
-                // which surfaces from Enum.valueOf as IllegalArgumentException) -- reported, not
-                // rethrown, the same way the tree-based reader wrapped it as a DataBindException.
-                ctx.report(Diagnostic.Code.TYPE_MISMATCH, "cannot bind value into " + dataClass.typeClass()
-                        + ": " + t.getMessage(), String.valueOf(dataClass.typeClass()), String.valueOf(result));
-                return null;
-            }
-        }
-        return result;
+    private record RootReader(TsonValueReader<?> reader, String typeName) {
     }
 
-    // ── Atoms: built-in vocabulary (§5) or identification (BaseTypeResolver) + binding (AtomBinder) ──
 
-    private Object bindAtom(TsonReadContext ctx, DataClassAtom dataClass) {
-        Optional<String> typeRef = EventSkip.annotationsAndTypeRef(ctx);
-        TsonEvent e = ctx.peek();
-        if (e instanceof AbsentEvent) {
-            ctx.next();
-            return bindBaseValue(ctx, new BaseValue.NullValue(), dataClass.dataClass());
-        }
-        if (!(e instanceof TokenEvent token)) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a token for " + dataClass.typeClass() + ", found " + e,
-                    "a token", String.valueOf(e));
-            EventSkip.coreValue(ctx);
-            return null;
-        }
-        ctx.next();
-        TokenValue tokenValue = new TokenValue(token.text(), token.form());
-
-        if (typeRef.isPresent()) {
-            Optional<AtomType<?>> atomType = BuiltinTypeVocabulary.lookup(typeRef.get());
-            if (atomType.isEmpty()) {
-                ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF, "unrecognized type annotation '!" + typeRef.get()
-                        + "' for " + dataClass.typeClass(), "a built-in type name", "!" + typeRef.get());
-                return null;
-            }
-            return bindBuiltin(ctx, atomType.get(), tokenValue, dataClass.dataClass());
-        }
-
-        return bindBaseValue(ctx, BaseTypeResolver.resolve(tokenValue), dataClass.dataClass());
-    }
-
-    private Object bindBaseValue(TsonReadContext ctx, BaseValue value, Class<?> target) {
+    private RootReader select(String schemaUri, TsonReadContext ctx, TsonCompiledSchemaRegistry registry) {
+        TsonCompiledSchema compiled;
         try {
-            return AtomBinder.bind(value, target);
-        } catch (DataBindException e) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, e.getMessage(), "a value bindable to " + target, String.valueOf(value));
-            return null;
-        }
-    }
-
-    private Object bindBuiltin(TsonReadContext ctx, AtomType<?> atomType, TokenValue token, Class<?> target) {
-        try {
-            return atomType.read(token, target);
-        } catch (AtomTypeException e) {
-            ctx.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, e.getMessage(), "a value satisfying " + atomType, token.text());
-            return null;
-        } catch (ArithmeticException e) {
-            ctx.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, token.text() + " does not fit in " + target,
-                    "a value that fits " + target, token.text());
-            return null;
-        } catch (IllegalArgumentException e) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "cannot bind '" + token.text() + "' to " + target,
-                    String.valueOf(target), token.text());
-            return null;
-        }
-    }
-
-    // ── Records ──────────────────────────────────────────────────────────
-
-    /**
-     * A field marked {@code @Annotated} (io.ltr8.annotation) is populated not from a same-named
-     * authored field but directly from the record value's *own* wire annotations (§3.1) -- captured
-     * here into a {@link TsonAnnotations}, since {@code tson-bind} can't validate the carrier's
-     * declared type is {@link TsonAnnotations} (no dependency on this module), so that check lives at
-     * this one spot where both are visible. Field values' own annotations are never captured -- only
-     * the record value's, matching the tree-based reader's own deliberate scope limit.
-     */
-    private Object bindRecord(TsonReadContext ctx, DataClassRecord dataClass) {
-        int diagnosticsBefore = ctx.diagnostics().size();
-        DataClassField[] fields = dataClass.fields();
-        List<Annotation> captured = hasAnnotationsCarrier(fields) ? new ArrayList<>() : null;
-
-        if (captured != null) {
-            captureAnnotations(ctx, captured);
-            if (ctx.peek() instanceof TypeRef) {
-                ctx.next(); // a type-ref on a directly-bound record names nothing further -- consume and ignore
-            }
-        } else {
-            EventSkip.annotationsAndTypeRef(ctx);
-        }
-
-        boolean empty;
-        TsonEvent e = ctx.peek();
-        if (e instanceof RecordStart) {
-            ctx.next();
-            empty = false;
-        } else if (e instanceof EmptyBraceEvent) {
-            ctx.next();
-            empty = true;
-        } else {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a record for " + dataClass.typeClass() + ", found " + e,
-                    "a record", String.valueOf(e));
-            EventSkip.coreValue(ctx);
-            return null;
-        }
-
-        Map<String, Integer> indexByName = new HashMap<>();
-        for (int i = 0; i < fields.length; i++) {
-            if (!fields[i].isAnnotationsCarrier()) {
-                indexByName.put(fields[i].name(), i);
-            }
-        }
-
-        Object[] construct = new Object[fields.length];
-        boolean[] seen = new boolean[fields.length];
-
-        for (int i = 0; i < fields.length; i++) {
-            DataClassField field = fields[i];
-            if (field.isAnnotationsCarrier()) {
-                if (field.type() != TsonAnnotations.class) {
-                    ctx.report(Diagnostic.Code.TYPE_MISMATCH, "@Annotated component '" + field.name() + "' on "
-                            + dataClass.typeClass() + " must be of type TsonAnnotations, found " + field.type(),
-                            "TsonAnnotations", String.valueOf(field.type()));
-                } else {
-                    construct[field.index()] = new TsonAnnotations(captured != null ? captured : List.of());
-                }
-                seen[i] = true;
-            }
-        }
-
-        if (!empty) {
-            while (!(ctx.peek() instanceof RecordEnd)) {
-                FieldName fieldName = (FieldName) ctx.next();
-                Integer idx = indexByName.get(fieldName.name());
-                if (idx == null) {
-                    EventSkip.scopedValue(ctx); // a data field the target class doesn't declare -- discard
-                    continue;
-                }
-                if (ctx.peek() instanceof SchemaRef) {
-                    ctx.next();
-                }
-                construct[fields[idx].index()] = bindField(ctx, fields[idx]);
-                seen[idx] = true; // last occurrence wins (§2.5), reached by overwrite
-            }
-            ctx.next(); // RecordEnd
-        }
-
-        for (int i = 0; i < fields.length; i++) {
-            if (seen[i]) {
-                continue;
-            }
-            DataClassField field = fields[i];
-            if (field.isRequired()) {
-                ctx.field(field.name()).report(Diagnostic.Code.FIELD_REQUIRED,
-                        "missing required field '" + field.name() + "' for " + dataClass.typeClass(),
-                        "a value for '" + field.name() + "'", "(absent)");
-            }
-            construct[field.index()] = null;
-        }
-
-        return construct(ctx, dataClass.constructor(), construct, diagnosticsBefore, dataClass.typeClass());
-    }
-
-    /** One record field's value: the absent sentinel {@code _} binds to {@code null} (a required field left {@code _} is a {@code FIELD_REQUIRED} problem), anything else binds recursively. */
-    private Object bindField(TsonReadContext ctx, DataClassField field) {
-        if (ctx.peek() instanceof AbsentEvent) {
-            ctx.next();
-            if (field.isRequired()) {
-                ctx.field(field.name()).report(Diagnostic.Code.FIELD_REQUIRED,
-                        "required field '" + field.name() + "' is present but absent ('_')",
-                        "a value for '" + field.name() + "'", "_");
-            }
-            return null;
-        }
-        return bind(ctx.field(field.name()), field.dataClass());
-    }
-
-    // ── Arrays ───────────────────────────────────────────────────────────
-
-    private Object bindArray(TsonReadContext ctx, DataClassArray dataClass) {
-        EventSkip.annotationsAndTypeRef(ctx);
-        if (!(ctx.peek() instanceof ArrayStart)) {
-            TsonEvent e = ctx.peek();
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected an array for " + dataClass.typeClass() + ", found " + e,
-                    "an array", String.valueOf(e));
-            EventSkip.coreValue(ctx);
-            return null;
-        }
-        ctx.next();
-        DataClass elementClass = dataClass.arrayDataClass();
-        List<Object> buffered = new ArrayList<>();
-        int index = 0;
-        while (!(ctx.peek() instanceof ArrayEnd)) {
-            if (ctx.peek() instanceof SchemaRef) {
-                ctx.next();
-            }
-            buffered.add(bind(ctx.index(index), elementClass));
-            index++;
-        }
-        ctx.next(); // ArrayEnd
-
-        try {
-            Object arrayData = dataClass.constructor().invoke(buffered.size());
-            Object iterator = dataClass.iterator().invoke(arrayData);
-            for (Object element : buffered) {
-                dataClass.put().invoke(arrayData, iterator, element);
-            }
-            return arrayData;
-        } catch (RuntimeException ex) {
-            throw ex;
-        } catch (Throwable t) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "failed to build " + dataClass.typeClass() + ": " + t.getMessage(),
-                    String.valueOf(dataClass.typeClass()), "(" + buffered.size() + " elements)");
-            return null;
-        }
-    }
-
-    // ── Maps ─────────────────────────────────────────────────────────────
-
-    /**
-     * A map key is a full {@code data-value} (§2.6), bound recursively exactly like a value is.
-     * {@code {}} binds to an empty map (§2.8's deferred choice, resolved to a map here since the
-     * target says map), and the absent sentinel {@code _} in key position is rejected (§2.9).
-     */
-    private Object bindMap(TsonReadContext ctx, DataClassMap dataClass) {
-        EventSkip.annotationsAndTypeRef(ctx);
-        boolean empty;
-        TsonEvent e = ctx.peek();
-        if (e instanceof MapStart) {
-            ctx.next();
-            empty = false;
-        } else if (e instanceof EmptyBraceEvent) {
-            ctx.next();
-            empty = true;
-        } else {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a map for " + dataClass.typeClass() + ", found " + e,
-                    "a map", String.valueOf(e));
-            EventSkip.coreValue(ctx);
-            return null;
-        }
-
-        try {
-            Object mapData = dataClass.constructor().invoke(0);
-            if (empty) {
-                return mapData; // EmptyBraceEvent already consumed; no MapEnd for {}
-            }
-            DataClass keyClass = dataClass.keyDataClass();
-            DataClass valueClass = dataClass.valueDataClass();
-            while (!(ctx.peek() instanceof MapEnd)) {
-                if (ctx.peek() instanceof AbsentEvent) {
-                    ctx.next(); // the absent key itself
-                    ctx.report(Diagnostic.Code.TYPE_MISMATCH, "the absent sentinel '_' must not appear as a map key "
-                            + "(§2.9) for " + dataClass.typeClass(), "a real map key", "_");
-                    ctx.next(); // MapArrow
-                    EventSkip.scopedValue(ctx);
-                    continue;
-                }
-                Object key = bind(ctx, keyClass);
-                ctx.next(); // MapArrow
-                if (ctx.peek() instanceof SchemaRef) {
-                    ctx.next();
-                }
-                Object value = bind(ctx, valueClass);
-                dataClass.put().invoke(mapData, key, value);
-            }
-            ctx.next(); // MapEnd
-            return mapData;
-        } catch (RuntimeException ex) {
-            throw ex;
-        } catch (Throwable t) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "failed to build " + dataClass.typeClass() + ": " + t.getMessage(),
-                    String.valueOf(dataClass.typeClass()), "(map)");
-            return null;
-        }
-    }
-
-    // ── Tuples ───────────────────────────────────────────────────────────
-
-    /** A tuple is array-shaped on the wire (§5.3), not record-shaped -- so {@code {}} is never a reading, only {@code []}. Arity is fixed and exact. */
-    private Object bindTuple(TsonReadContext ctx, DataClassTuple dataClass) {
-        int diagnosticsBefore = ctx.diagnostics().size();
-        EventSkip.annotationsAndTypeRef(ctx);
-        if (!(ctx.peek() instanceof ArrayStart)) {
-            TsonEvent e = ctx.peek();
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected an array for tuple " + dataClass.typeClass() + ", found " + e,
-                    "an array", String.valueOf(e));
-            EventSkip.coreValue(ctx);
-            return null;
-        }
-        ctx.next();
-
-        DataClassElement[] slots = dataClass.elements();
-        Object[] construct = new Object[slots.length];
-        int index = 0;
-        boolean reportedExtra = false;
-        while (!(ctx.peek() instanceof ArrayEnd)) {
-            if (ctx.peek() instanceof SchemaRef) {
-                ctx.next();
-            }
-            if (index >= slots.length) {
-                if (!reportedExtra) {
-                    ctx.report(Diagnostic.Code.WRONG_ARITY, "tuple " + dataClass.typeClass() + " has " + slots.length
-                            + " elements, found more", slots.length + " elements", "more than " + slots.length);
-                    reportedExtra = true;
-                }
-                EventSkip.dataValue(ctx);
-                index++;
-                continue;
-            }
-            construct[index] = bind(ctx.index(index), slots[index].dataClass());
-            index++;
-        }
-        ctx.next(); // ArrayEnd
-        if (index < slots.length) {
-            ctx.report(Diagnostic.Code.WRONG_ARITY, "tuple " + dataClass.typeClass() + " has " + slots.length
-                    + " elements, found " + index, slots.length + " elements", String.valueOf(index));
-        }
-
-        return construct(ctx, dataClass.constructor(), construct, diagnosticsBefore, dataClass.typeClass());
-    }
-
-    // ── Unions ───────────────────────────────────────────────────────────
-
-    /**
-     * Disambiguated by the value's own type annotation (§3.2's {@code !typeName}) -- a member class's
-     * {@link Typename} gives the exact match; failing that, its simple class name matches
-     * case-insensitively (so {@code !circle} matches a Java class {@code Circle} without every fixture
-     * being annotated). The type-ref is consumed here; the value's remaining core-value is then bound
-     * as the resolved member.
-     */
-    private Object bindUnion(TsonReadContext ctx, DataClassUnion dataClass) {
-        Optional<String> typeRef = EventSkip.annotationsAndTypeRef(ctx);
-        if (typeRef.isEmpty()) {
-            TsonEvent e = ctx.peek();
-            ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF, "union type " + dataClass.typeClass()
-                    + " requires a type annotation (!typeName) to disambiguate members", "a !typeName", String.valueOf(e));
-            EventSkip.coreValue(ctx);
-            return null;
-        }
-        Class<?> member = resolveUnionMember(dataClass, typeRef.get());
-        if (member == null) {
-            ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF, "no member of union " + dataClass.typeClass()
-                    + " matches type name '" + typeRef.get() + "'", "one of " + describeMembers(dataClass), typeRef.get());
-            EventSkip.coreValue(ctx);
-            return null;
-        }
-        DataClass memberDataClass = descriptorFor(ctx, member);
-        if (memberDataClass == null) {
-            EventSkip.coreValue(ctx);
-            return null;
-        }
-        return bind(ctx, memberDataClass);
-    }
-
-    private static Class<?> resolveUnionMember(DataClassUnion dataClass, String typeName) {
-        for (Class<?> member : dataClass.memberTypes()) {
-            Typename tn = member.getAnnotation(Typename.class);
-            if (tn != null && tn.name().equals(typeName)) {
-                return member;
-            }
-        }
-        for (Class<?> member : dataClass.memberTypes()) {
-            if (member.getAnnotation(Typename.class) == null && member.getSimpleName().equalsIgnoreCase(typeName)) {
-                return member;
-            }
-        }
-        return null;
-    }
-
-    private static String describeMembers(DataClassUnion dataClass) {
-        StringBuilder sb = new StringBuilder("[");
-        Class<?>[] members = dataClass.memberTypes();
-        for (int i = 0; i < members.length; i++) {
-            if (i > 0) {
-                sb.append(", ");
-            }
-            sb.append(members[i].getSimpleName());
-        }
-        return sb.append(']').toString();
-    }
-
-    // ── Shared helpers ───────────────────────────────────────────────────
-
-    /**
-     * Invokes {@code constructor} with the assembled arguments, unless a problem was already reported
-     * while reading this value's own fields/elements (collecting mode) -- a real Java constructor
-     * can't tolerate a {@code null} argument for a primitive-typed parameter, so constructing after a
-     * failure would risk a confusing secondary {@code NullPointerException} on top of the diagnostic
-     * already recorded; the caller already has what it needs from {@code ctx.diagnostics()}.
-     */
-    private Object construct(TsonReadContext ctx, java.lang.invoke.MethodHandle constructor, Object[] arguments,
-            int diagnosticsBefore, Class<?> typeClass) {
-        if (ctx.diagnostics().size() > diagnosticsBefore) {
-            return null;
-        }
-        try {
-            return constructor.invoke(arguments);
+            compiled = registry.get(schemaUri);
         } catch (RuntimeException e) {
-            throw e;
-        } catch (Throwable t) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "failed to construct " + typeClass + ": " + t.getMessage(),
-                    String.valueOf(typeClass), "(the read field values)");
-            return null;
+            throw new TsonReadException(problem(Diagnostic.Code.SCHEMA_ERROR, e.getMessage()));
+        }
+        if (!(ctx.peek() instanceof TypeRef typeRef)) {
+            throw new TsonReadException(problem(Diagnostic.Code.VALIDATION_ERROR,
+                    "data declares a !!schema but has no root type-ref (e.g. `!person`) to select a type"));
+        }
+        try {
+            return new RootReader(compiled.get(typeRef.name()), typeRef.name());
+        } catch (RuntimeException e) {
+            throw new TsonReadException(problem(Diagnostic.Code.UNKNOWN_TYPE, e.getMessage()));
         }
     }
 
-    private static boolean hasAnnotationsCarrier(DataClassField[] fields) {
-        for (DataClassField field : fields) {
-            if (field.isAnnotationsCarrier()) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Captures each leading wire annotation -- {@code AnnotationStart} through its own matching
-     * {@code AnnotationEnd} (annotation depth-counted so a nested annotation inside an annotation's
-     * value is bracketed correctly) -- and reduces the collected events back into an {@code ast}
-     * {@link Annotation}, reusing {@link TsonDataParser}'s own {@code EventReducer}. Only a single
-     * value's own annotations are ever buffered, never the value body, so this doesn't defeat
-     * streaming.
-     */
-    private void captureAnnotations(TsonReadContext ctx, List<Annotation> out) {
-        while (ctx.peek() instanceof AnnotationStart) {
-            List<TsonEvent> events = new ArrayList<>();
-            int depth = 0;
-            do {
-                TsonEvent e = ctx.next();
-                events.add(e);
-                if (e instanceof AnnotationStart) {
-                    depth++;
-                } else if (e instanceof AnnotationEnd) {
-                    depth--;
-                }
-            } while (depth > 0);
-            out.add(new TsonDataParser.EventReducer(events, NO_POSITIONS).annotation());
-        }
+    private static Diagnostic problem(Diagnostic.Code code, String message) {
+        return new Diagnostic("", code, message, "", "", Optional.empty(), Optional.empty());
     }
 }
