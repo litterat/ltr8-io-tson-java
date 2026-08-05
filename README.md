@@ -160,7 +160,7 @@ of band, compile it once through a registry (`tson.treeRegistry()`/`bindRegistry
 `TsonValueReader`. All of these stream their input — a large document is never fully buffered before
 reading begins — and accept a `String` or an `InputStream`. The examples below use the schemaless form.
 
-> **Try any of these without a project or build tool.** Each of the four numbered examples below is a
+> **Try any of these without a project or build tool.** Each of the five numbered examples below is a
 > runnable single-file Java 25 program in [`examples/`](examples/) that loads the library over the
 > module system. Build the module path once — `./gradlew :tson:modules` — then run any of them with
 > `java --module-path tson/build/modules --add-modules io.ltr8.tson examples/<File>.java`.
@@ -280,6 +280,34 @@ value.get("port").asBigInteger();          // Optional[8080] — a bad port woul
 full multi-stage pipeline behind this (parse → resolve → link → register → compile → read), and how a
 schema governed by meta.tn/core.tn is assembled, is described under [Schema pipeline](#schema-pipeline)
 below.
+
+### 5. Read a self-describing document — `tson.treeReader()`
+
+Sections 1–4 make *you* choose the reader; this one lets the **document** choose. A schema-aware
+`TsonTreeReader` (or `TsonObjectReader`), obtained from a configured `Tson` facade rather than
+constructed directly, reads a document that declares its own `!!schema`, resolves that schema through
+your `TsonSchemaSource`, and validates against it — falling back to a schemaless read when the document
+declares none. It's the value-returning peer of `tson.validate`:
+
+```java
+Tson tson = Tson.builder()
+        .schemaSource(uri -> schema)       // the `server` schema from §4, served on demand by URI
+        .build();
+
+// Self-describing: it names its own schema and root type — no other arguments needed.
+TsonNode server = tson.treeReader().read("""
+        !!schema:"https://example.com/2026/32/app/server-1.tn"
+        !server { hostname: "web-01"  port: 8080 }""");        // validated as it builds the tree
+
+// No !!schema? The same reader reads schemalessly, straight off the wire.
+TsonNode raw = tson.treeReader().read("{ hostname: \"db-01\"  port: 5432 }");
+```
+
+`tson.objectReader().read(doc, Server.class)` is the object-binding twin — it additionally checks your
+target class against the schema's root type up front, before reading. `readWithoutSchema(…)` opts either
+one back out to a pure schemaless read.
+
+▶ Runnable: [`examples/SchemaAwareRead.java`](examples/SchemaAwareRead.java) — `java --module-path tson/build/modules --add-modules io.ltr8.tson examples/SchemaAwareRead.java`
 
 ### Writing TSON back out — `TsonObjectWriter` / `TsonTreeWriter`
 
