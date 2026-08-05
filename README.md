@@ -137,28 +137,30 @@ The write side is the mirror: a value in hand, TSON text out. The matrix:
 
 | You have… | You want… | Use | You get |
 |---|---|---|---|
-| nothing (the wire is the truth) | a queryable tree | **`new TsonTreeReader()`** | a `TsonNode` tree |
-| a Java class (the class is the schema) | it bound, no schema | **`new TsonObjectReader()`** | your object |
-| nothing (schemaless) | a grammar-faithful AST | **`TsonDataParser`** | a `Document` AST |
-| nothing (schemaless) | to pull events lazily | **`TsonDataStream`** | a `TsonEvent` stream |
-| a self-describing doc (its own `!!schema`) | it validated, into a tree | **`tson.treeReader()`** | a `TsonNode` tree |
-| a self-describing doc (its own `!!schema`) | it validated, bound to your class | **`tson.objectReader()`** | your object |
-| a self-describing doc | every problem, not the value | **`tson.validate()`** | a `List<Diagnostic>` |
+| a data document | a queryable tree (validated if it self-describes) | **`tson.treeReader()`** | a `TsonNode` tree |
+| a data document + your Java class | it bound (validated if it self-describes) | **`tson.objectReader()`** | your object |
+| a data document | every problem, not the value | **`tson.validate()`** | a `List<Diagnostic>` |
 | a TSON schema + a known type name | a reusable per-type reader | **`tson.treeRegistry()`/`bindRegistry()`** → **`TsonValueReader`** | a tree / your object |
-| a Java object | it as TSON text | **`TsonObjectWriter`** | a `String` |
-| a `TsonNode` tree | it as TSON text | **`TsonTreeWriter`** | a `String` |
+| a data document | a grammar-faithful AST | **`TsonDataParser`** | a `Document` AST |
+| a data document | to pull events lazily | **`TsonDataStream`** | a `TsonEvent` stream |
+| a Java object | it as TSON text | **`tson.objectWriter()`** | a `String` |
+| a `TsonNode` tree | it as TSON text | **`tson.treeWriter()`** | a `String` |
 
-`TsonTreeReader` and `TsonObjectReader` are each **one class in two modes**. Constructed directly (`new
-TsonTreeReader()` / `new TsonObjectReader()`) they're *schemaless* — the wire, or your Java class, is the
-whole contract and any `!!schema` the document declares is ignored (Jackson-style). Obtained from a
-configured `Tson` facade (`tson.treeReader()` / `tson.objectReader()`) they're *schema-aware* — a
-self-describing document is validated against its own `!!schema` as it's read (schemaless when it declares
-none), the object form also checking your target class against the schema's root type up front. It's the
-"hand me a document, work out whether a schema applies" read peer of `tson.validate`; `readWithoutSchema(…)`
-opts back out to a pure class/wire read. When your *data* isn't self-describing but you hold the schema out
-of band, compile it once through a registry (`tson.treeRegistry()`/`bindRegistry()`) and reuse the per-type
-`TsonValueReader`. All of these stream their input — a large document is never fully buffered before
-reading begins — and accept a `String` or an `InputStream`. The examples below use the schemaless form.
+`tson.treeReader()` / `tson.objectReader()` and their writer peers `tson.objectWriter()` /
+`tson.treeWriter()` are the facade doors on a built `Tson`: the readers take a *self-describing* document
+and validate it against its own `!!schema` as they read, falling back to a schemaless read when it
+declares none — the object form also checking your target class against the schema's root type up front.
+`readWithoutSchema(…)` opts a reader back out to a pure schemaless read. When your *data* isn't
+self-describing but you hold the schema out of band, compile it once through a registry
+(`tson.treeRegistry()`/`bindRegistry()`) and reuse the per-type `TsonValueReader`. All of these stream
+their input — a large document is never fully buffered before reading begins — and take a `String` or an
+`InputStream`.
+
+**No `Tson`?** The reader and writer classes construct directly for lightweight, schemaless (Class 1) use
+with no standard-library bootstrap — `new TsonTreeReader()`, `new TsonObjectReader()`, `new
+TsonObjectWriter()`, `new TsonTreeWriter()` — where a directly-built reader ignores any `!!schema` and
+binds to the wire, or your Java class, alone (Jackson-style). That's what the examples below do.
+`TsonDataParser` and `TsonDataStream` are always standalone and schemaless.
 
 > **Try any of these without a project or build tool.** Each of the five numbered examples below is a
 > runnable single-file Java 25 program in [`examples/`](examples/) that loads the library over the
