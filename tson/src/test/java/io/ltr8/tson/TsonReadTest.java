@@ -18,9 +18,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@link Tson#read} -- the value-returning counterpart to {@link Tson#validate}: a self-describing document
- * read into a {@link TsonNode} tree, schema-validated when it declares a {@code !!schema} and schemaless
- * otherwise, fail-fast (a bad value or a document-selection failure throws {@link TsonReadException}).
+ * {@link Tson#treeReader()} / {@link Tson#objectReader()} -- the value-returning counterparts to {@link
+ * Tson#validate}: a self-describing document read into a {@link TsonNode} tree (or a bound Java object),
+ * schema-validated when it declares a {@code !!schema} and schemaless otherwise, fail-fast (a bad value or
+ * a document-selection failure throws {@link TsonReadException}).
  */
 class TsonReadTest {
 
@@ -49,7 +50,7 @@ class TsonReadTest {
 
     @Test
     void schemaDrivenReadReturnsTheValidatedTree() {
-        TsonNode node = tsonWithPoint().read("""
+        TsonNode node = tsonWithPoint().treeReader().read("""
                 !!schema:"https://example.test/point-1.tn"
                 !point { x: 3  y: 4 }""");
 
@@ -61,7 +62,7 @@ class TsonReadTest {
 
     @Test
     void schemalessReadReturnsATree() {
-        TsonNode node = tsonWithPoint().read("{ id: !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09  n: !int32 5 }");
+        TsonNode node = tsonWithPoint().treeReader().read("{ id: !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09  n: !int32 5 }");
 
         assertTrue(node.isRecord());
         assertTrue(node.get("id").as(java.util.UUID.class).isPresent());
@@ -70,7 +71,7 @@ class TsonReadTest {
 
     @Test
     void aBadValueThrowsFailFast() {
-        TsonReadException thrown = assertThrows(TsonReadException.class, () -> tsonWithPoint().read("""
+        TsonReadException thrown = assertThrows(TsonReadException.class, () -> tsonWithPoint().treeReader().read("""
                 !!schema:"https://example.test/point-1.tn"
                 !point { x: 3  y: 99999999999999 }"""));
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, thrown.diagnostic().code());
@@ -78,7 +79,7 @@ class TsonReadTest {
 
     @Test
     void aSchemaDrivenDocumentWithNoRootTypeRefThrows() {
-        TsonReadException thrown = assertThrows(TsonReadException.class, () -> tsonWithPoint().read("""
+        TsonReadException thrown = assertThrows(TsonReadException.class, () -> tsonWithPoint().treeReader().read("""
                 !!schema:"https://example.test/point-1.tn"
                 { x: 3  y: 4 }"""));
         assertEquals(Diagnostic.Code.VALIDATION_ERROR, thrown.diagnostic().code());
@@ -87,7 +88,7 @@ class TsonReadTest {
 
     @Test
     void aSchemaTheSourceCannotProvideThrows() {
-        TsonReadException thrown = assertThrows(TsonReadException.class, () -> tsonWithPoint().read("""
+        TsonReadException thrown = assertThrows(TsonReadException.class, () -> tsonWithPoint().treeReader().read("""
                 !!schema:"https://example.test/not-there.tn"
                 !point { x: 3  y: 4 }"""));
         assertEquals(Diagnostic.Code.SCHEMA_ERROR, thrown.diagnostic().code());
@@ -95,7 +96,7 @@ class TsonReadTest {
 
     @Test
     void aRootTypeRefTheSchemaDoesNotDeclareThrows() {
-        TsonReadException thrown = assertThrows(TsonReadException.class, () -> tsonWithPoint().read("""
+        TsonReadException thrown = assertThrows(TsonReadException.class, () -> tsonWithPoint().treeReader().read("""
                 !!schema:"https://example.test/point-1.tn"
                 !no_such_type { x: 3  y: 4 }"""));
         assertEquals(Diagnostic.Code.UNKNOWN_TYPE, thrown.diagnostic().code());

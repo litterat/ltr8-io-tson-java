@@ -10,7 +10,6 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaLinker;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
-import io.ltr8.tson.tree.TsonNode;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -75,14 +74,14 @@ public final class Tson {
         return new TsonConfig();
     }
 
-    /** A fresh, schemaless (Class 1) {@link TsonObjectReader} bound to {@link #dataBindContext()} -- TSON text straight to plain Java objects, no schema involved. */
+    /** A schema-aware {@link TsonObjectReader} over this instance -- reads TSON text into bound Java objects (via {@link #dataBindContext()}), validating against a self-describing document's {@code !!schema}, schemaless when it declares none. */
     public TsonObjectReader objectReader() {
         return new TsonObjectReader(core, dataBindContext);
     }
 
-    /** A schemaless (Class 1) {@link TsonTreeReader} -- TSON text straight to an immutable, queryable {@code TsonNode} tree, no schema involved (the tree-producing peer of {@link #objectReader()}). */
+    /** A schema-aware {@link TsonTreeReader} over this instance -- reads TSON text into an immutable, queryable {@code TsonNode} tree, validating against a self-describing document's {@code !!schema}, schemaless when it declares none. The tree-producing peer of {@link #objectReader()}. */
     public TsonTreeReader treeReader() {
-        return new TsonTreeReader();
+        return new TsonTreeReader(core);
     }
 
     /** A fresh, schemaless (Class 1) {@link TsonObjectWriter} bound to {@link #dataBindContext()} -- the inverse of {@link #objectReader()}. */
@@ -180,70 +179,6 @@ public final class Tson {
             return validate(new String(data.readAllBytes(), StandardCharsets.UTF_8));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
-        }
-    }
-
-    /**
-     * Reads a self-describing data document into an immutable {@link TsonNode} tree, working out on its own
-     * whether a schema applies -- the value-returning counterpart to {@link #validate}. If the document
-     * declares a {@code !!schema}, that URI selects the schema (compiled once, in tree mode) and the
-     * document's root type-ref (e.g. {@code !person}) selects the type, so the tree is schema-validated as
-     * it is built; with no {@code !!schema} it is read schemalessly (Class 1), structure and types coming
-     * from the wire. The document need not be buffered whole -- it is read straight off the event stream.
-     *
-     * <p><b>Fail-fast:</b> the first value error throws {@link TsonReadException} (a caller wanting every
-     * problem at once uses {@link #validate} instead, which returns them all as {@link Diagnostic}s). A
-     * document-selection failure -- a {@code !!schema} the source can't provide, a missing root type-ref, a
-     * root type the schema doesn't declare -- also throws {@link TsonReadException} (carrying a {@link
-     * Diagnostic}), so a caller has one exception type to catch and never a value returned for a bad input.
-     *
-     * <p>Returns a tree; for the bound-Java-object form of this same self-describing read see {@link
-     * #readObject(String, Class)}, and to read the tree <i>schemalessly</i>, ignoring any {@code !!schema},
-     * use {@link #treeReader()}{@code .read(data)} directly.
-     */
-    public TsonNode read(String data) {
-        return read(new TsonDataStream(data));
-    }
-
-    /** {@link #read(String)} straight off a stream -- read incrementally, never buffered whole. */
-    public TsonNode read(InputStream data) {
-        return read(new TsonDataStream(data));
-    }
-
-    private TsonNode read(TsonDataStream stream) {
-        DocumentStart start = (DocumentStart) stream.next();
-        if (start.schema().isEmpty()) {
-            return new TsonTreeReader().read(TsonReadContext.throwing(stream));
-        }
-        return (TsonNode) select(start.schema().get(), stream, tree).reader().read(TsonReadContext.throwing(stream));
-    }
-
-    private record RootReader(TsonValueReader<?> reader, String typeName) {
-    }
-
-    /**
-     * Shared schema selection for {@link #read}/{@link #readObject}: resolve the {@code !!schema} and pick the
-     * root type's compiled reader off {@code registry}. Peeks the document's root type-ref but leaves it on
-     * {@code stream} for the returned reader to consume. Every failure comes back as a {@link
-     * TsonReadException}: {@link Diagnostic.Code#SCHEMA_ERROR} (the source can't provide/compile the schema),
-     * {@link Diagnostic.Code#VALIDATION_ERROR} (no root type-ref to select a type), {@link
-     * Diagnostic.Code#UNKNOWN_TYPE} (a root type the schema doesn't declare).
-     */
-    private RootReader select(String schemaUri, TsonDataStream stream, TsonCompiledSchemaRegistry registry) {
-        TsonCompiledSchema compiled;
-        try {
-            compiled = registry.get(schemaUri);
-        } catch (RuntimeException e) {
-            throw new TsonReadException(problem(Diagnostic.Code.SCHEMA_ERROR, e.getMessage()));
-        }
-        if (!(stream.peek() instanceof TypeRef typeRef)) {
-            throw new TsonReadException(problem(Diagnostic.Code.VALIDATION_ERROR,
-                    "data declares a !!schema but has no root type-ref (e.g. `!person`) to select a type"));
-        }
-        try {
-            return new RootReader(compiled.get(typeRef.name()), typeRef.name());
-        } catch (RuntimeException e) {
-            throw new TsonReadException(problem(Diagnostic.Code.UNKNOWN_TYPE, e.getMessage()));
         }
     }
 

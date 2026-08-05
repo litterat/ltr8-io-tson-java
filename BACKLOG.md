@@ -37,6 +37,20 @@ the removal of the old throwaway `Map`/`List` DOM mode all landed. What's left:
   `TsonSchemaSource` is `TsonSchemaSource.registeredOnly()` (nothing fetched); the bundled standard
   library is served internally by `TsonCompiledSchemaRegistry` from `TsonBundledSchemas`, not through
   a source.
+- [ ] **A `DiagnosticsReceiver` seam; make `TsonReadContext` internal.** The read API leaks engine
+  machinery: `TsonReadContext` (the pull cursor + RFC-6901 path tracker + diagnostics sink + the
+  fail-fast-vs-collect *policy*, all in one) is exported and appears both in the signature a consumer
+  holds from `compiled.get(name)` — `TsonValueReader.read(TsonReadContext)` — and in the low-level
+  `TsonObjectReader`/`TsonTreeReader` `read(ctx, …)` overloads. A caller shouldn't have to touch it just
+  to choose "throw" vs "collect every problem". Extract the one decision the engine already centralizes
+  (`TsonReadContext.report(...)` *alone* decides throw-vs-collect) into a public `DiagnosticsReceiver`
+  (`void report(Diagnostic)`); read methods take an optional receiver and return the (possibly partial)
+  value — the value-plus-diagnostics shape the LLM repair loop wants — with `TsonReadContext` built from
+  it internally and moved to an unexported package. This is also the natural home for the **collecting-mode
+  object read** the facades don't offer yet (today only fail-fast; `Tson.validate` is tree-mode and
+  value-less). Load-bearing cost: reworking `TsonValueReader.read(TsonReadContext)` — the central
+  compiled-reader single-method interface — which ripples through the whole `reader` stack, so it's its
+  own pass, not just an overload.
 
 ## Layer boundaries / schema registry
 

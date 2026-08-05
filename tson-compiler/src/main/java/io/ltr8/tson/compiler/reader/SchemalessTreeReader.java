@@ -63,20 +63,24 @@ public final class SchemalessTreeReader {
 
     /** TSON text straight to a {@link TsonNode} tree. */
     public TsonNode read(String source) {
-        return read(TsonReadContext.throwing(source));
+        return readDocument(TsonReadContext.throwing(source));
     }
 
     /** As {@link #read(String)}, from a stream (read incrementally off a {@link TsonDataStream}). */
     public TsonNode read(InputStream source) {
-        return read(TsonReadContext.throwing(source));
+        return readDocument(TsonReadContext.throwing(source));
     }
 
     /**
-     * Reads the one document at {@code ctx} into a tree, then confirms the document ends there. {@code ctx}
-     * is a whole-document context (its {@code DocumentStart} framing already consumed), e.g. from {@link
-     * TsonReadContext#throwing(String)}.
+     * Reads one value at {@code ctx}'s current position into a tree -- frame-free (no trailing-content
+     * check), for a caller managing their own {@link TsonReadContext}; the {@code String}/{@code
+     * InputStream} entry points wrap this with whole-document framing.
      */
     public TsonNode read(TsonReadContext ctx) {
+        return readNode(ctx);
+    }
+
+    private TsonNode readDocument(TsonReadContext ctx) {
         TsonNode root = readNode(ctx);
         TsonEvent trailing = ctx.next();
         if (!(trailing instanceof DocumentEnd)) {
