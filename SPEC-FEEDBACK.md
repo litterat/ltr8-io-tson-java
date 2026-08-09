@@ -994,3 +994,50 @@ conformant processors can legitimately disagree on whether `x => { y: y }` / `y 
 purely by whether they attempt productivity analysis. If a MUST/SHOULD is intended, the spec should also define
 what counts as "guarded" (which members provide a base case: optional fields, possibly-empty arrays/sets,
 choice variants that bottom out, and so on).
+
+---
+
+## 26. Content-hash pinning rides in the URI query (`?sha256=`), where a hash is neither a request parameter nor part of identity — external review suggests a fragment, or a structured `{ url, sha256 }` directive, instead
+
+**Section:** Part 1 §2.2.1 (canonical identity / hash-pinned references), §10.2 (per-identity verification).
+
+**Problem:** The spec pins a reference's integrity by appending a *query* parameter to its URI —
+`!!import:"…/core.tn?sha256=<hex>"` — and then defines canonical identity by **stripping** that query, so a
+pinned and a plain reference name the same identity. Two objections from external review:
+
+1. **Query is the wrong URI component for a hash.** By URI semantics (RFC 3986 §3.4) a query is part of the
+   *request* — data conveyed to the origin to identify/produce the resource — whereas a content hash is
+   *verification metadata about the retrieved bytes*, evaluated entirely client-side and never meaningfully
+   sent to a server. A *fragment* (`#sha256=<hex>`, §3.5) is the component that actually matches: it isn't sent
+   in the request, is interpreted by the client, and is already outside what a server sees. That the spec must
+   special-case *stripping* the query to recover identity is itself a symptom that the hash sits in a component
+   whose native semantics it doesn't share.
+
+2. **Integrity arguably shouldn't be in the URI at all.** A second reviewer proposes separating the locator
+   from the integrity outright — a structured directive value rather than a hash smuggled into a string:
+
+   ```
+   !!schema: { url: "https://example.com/people.tn"  sha256: "c4d5e6f7…a2b3c4d5" }
+   ```
+
+   This drops URI-parsing of hash parameters, the canonical-identity stripping rule, and the "only
+   hash-algorithm query parameters permitted, everything else rejected" special case; makes the algorithm an
+   explicit, extensible field rather than a magic query key; and mirrors how lockfiles / package managers /
+   Subresource Integrity separate *where* from *what it must hash to*. It is the larger change: directives
+   currently take a bare URI string, so this is a directive-grammar change, and `!!id` (which today carries its
+   own pin on its own line, excluded from the hash) would need an equivalent structured form.
+
+**Interpretation chosen:** This implementation follows the spec as written — the query form. `ContentHash`
+parses `?sha256=<hex>` off a reference (rejecting any other/unrecognized query parameter or malformed hex),
+`CanonicalIdentity`/`TsonSchemaRegistry` strip the query to key everything by identity, `tson hash <file>`
+stamps `?sha256=` onto the `!!id` line, and the bundled chain (meta.tn pins meta-kernel, core.tn pins meta.tn)
+is pinned end-to-end this way. No change made — flagging the design, not diverging from it.
+
+**Suggested resolution:** Choose among three. (a) Keep the query form — simplest, but semantically stretched
+and dependent on the identity-stripping rule. (b) Move the pin to a fragment (`#sha256=<hex>`) — better matches
+URI semantics, and identity can still ignore it by dropping the fragment; here a small, localized change (parse
+`#` rather than `?` in `ContentHash`, and in `tson hash`). (c) Lift integrity out of the URI into a structured
+directive (`{ url, sha256 }`) — the cleanest separation of locator from integrity, at the cost of a
+directive-grammar change plus an `!!id` equivalent; here it touches the directive grammar, `ContentHash`,
+canonical identity, `tson hash`, and every bundled `.tn`'s pin lines. If the query form stays, the spec should
+at least justify why a hash lives in the query and name the identity-stripping as its deliberate consequence.
