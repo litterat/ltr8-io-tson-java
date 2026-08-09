@@ -3,6 +3,7 @@ package io.ltr8.tson.schema.meta;
 import io.ltr8.annotation.Typename;
 
 import java.net.URI;
+import java.util.List;
 
 /**
  * The meta-kernel's {@code regex_type} constructor (Part 2 §5.7: {@code regex_type => ~text_type &
@@ -26,4 +27,19 @@ public record RegexType(TextType constraints, AtomSpecification specification) i
 
     /** {@code regex => !regex_type {}} -- the unconstrained regex type. */
     public static final RegexType UNCONSTRAINED = new RegexType(TextType.UNCONSTRAINED, new AtomSpecification(RFC_9485));
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>A regex IS-A piece of text, so the narrowing rule is {@link TextType}'s own, applied to the
+     * nested {@link #constraints}. {@link #specification} is {@code REQUIRED_FIXED} to RFC 9485 and
+     * cannot move.
+     */
+    @Override
+    public List<String> constraintsCheck(Atom refined) {
+        if (!(refined instanceof RegexType other)) {
+            return List.of("refines a regex with " + refined.getClass().getSimpleName());
+        }
+        return constraints.constraintsCheck(other.constraints);
+    }
 }

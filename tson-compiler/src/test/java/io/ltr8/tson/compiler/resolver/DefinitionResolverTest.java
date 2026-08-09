@@ -17,6 +17,7 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaLinker;
 import io.ltr8.tson.schema.meta.ArrayBody;
+import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.schema.meta.BinaryType;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.Cidr4Type;
@@ -31,6 +32,7 @@ import io.ltr8.tson.schema.meta.MacType;
 import io.ltr8.tson.schema.meta.IntegerSize;
 import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.MapBody;
+import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TupleElement;
@@ -1190,11 +1192,16 @@ class DefinitionResolverTest {
      * SPEC-FEEDBACK.md} #17): a chained refinement (refining an already-refined instance -- not
      * exercised by any real fixture declaration, but not left ambiguous by the spec either -- §5.5's
      * own worked example says an atom refinement's result "can be refined further") MUST merge with
-     * the intermediate instance's own already-bound fields, not discard them: {@code big}'s own
-     * {@code size} (inherited from {@code int8}, untouched by {@code big}'s own refinement) MUST
-     * survive, and {@code veryBig}'s own explicit {@code max} MUST override the {@code max} {@code
-     * big} itself set, while {@code big}'s own {@code min} (untouched by {@code veryBig}) survives
-     * through yet another hop.
+     * the intermediate instance's own already-bound fields, not discard them: {@code bounded}'s own
+     * {@code size} (inherited from {@code int8}, untouched by {@code bounded}'s own refinement) MUST
+     * survive, and {@code tighter}'s own explicit {@code max} MUST override the {@code max} {@code
+     * bounded} itself set, while {@code bounded}'s own {@code min} (untouched by {@code tighter})
+     * survives through yet another hop.
+     *
+     * <p>Every hop here genuinely narrows, which §5.7 requires and {@code
+     * atomRefinementRejectsBoundsThatWidenTheSource} below covers from the other side: the bounds
+     * stay inside {@code int8}'s own -128..127, and {@code tighter} only lowers a ceiling {@code
+     * bounded} already set.
      */
     @Test
     void chainedAtomRefinementMergesWithIntermediateBindingsInsteadOfDiscardingThem() {
@@ -1213,31 +1220,160 @@ class DefinitionResolverTest {
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 {
                   int8    => !integer ^ { size: { bits: 8  signed: true } }
-                  big     => !int8 ^ { min: -500  max: 5000 }
-                  veryBig => !big ^ { max: 10000 }
+                  bounded => !int8 ^ { min: -100  max: 100 }
+                  tighter => !bounded ^ { max: 50 }
                 }""").parseSchemaDocument().body();
         chainNamespace.put("int8", instanceResolver.resolve(schemaMap.declarations().get("int8")));
-        chainNamespace.put("big", instanceResolver.resolve(schemaMap.declarations().get("big")));
+        chainNamespace.put("bounded", instanceResolver.resolve(schemaMap.declarations().get("bounded")));
 
-        TypeDefinition big = chainNamespace.get("big");
-        TypeDefinition veryBig = instanceResolver.resolve(schemaMap.declarations().get("veryBig"));
+        TypeDefinition bounded = chainNamespace.get("bounded");
+        TypeDefinition tighter = instanceResolver.resolve(schemaMap.declarations().get("tighter"));
 
-        // big keeps int8's own size (untouched by big's own refinement) alongside its new bounds.
-        assertEquals(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of("integer_type")), big.source());
-        assertEquals(List.of("int8"), big.supertypes());
+        // bounded keeps int8's own size (untouched by bounded's own refinement) alongside its new bounds.
+        assertEquals(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of("integer_type")), bounded.source());
+        assertEquals(List.of("int8"), bounded.supertypes());
         assertEquals(new IntegerType(Optional.of(new IntegerSize(8, true)),
-                Optional.of(java.math.BigInteger.valueOf(-500)), Optional.empty(),
-                Optional.of(java.math.BigInteger.valueOf(5000)), Optional.empty(), Optional.empty()),
-                big.body());
+                Optional.of(java.math.BigInteger.valueOf(-100)), Optional.empty(),
+                Optional.of(java.math.BigInteger.valueOf(100)), Optional.empty(), Optional.empty()),
+                bounded.body());
 
-        // veryBig keeps int8's size AND big's min (neither touched by veryBig's own refinement),
-        // but overrides big's own max with its own.
-        assertEquals(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of("integer_type")), veryBig.source());
-        assertEquals(List.of("big"), veryBig.supertypes());
+        // tighter keeps int8's size AND bounded's min (neither touched by tighter's own refinement),
+        // but overrides bounded's own max with its own.
+        assertEquals(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of("integer_type")), tighter.source());
+        assertEquals(List.of("bounded"), tighter.supertypes());
         assertEquals(new IntegerType(Optional.of(new IntegerSize(8, true)),
-                Optional.of(java.math.BigInteger.valueOf(-500)), Optional.empty(),
-                Optional.of(java.math.BigInteger.valueOf(10000)), Optional.empty(), Optional.empty()),
-                veryBig.body());
+                Optional.of(java.math.BigInteger.valueOf(-100)), Optional.empty(),
+                Optional.of(java.math.BigInteger.valueOf(50)), Optional.empty(), Optional.empty()),
+                tighter.body());
+    }
+
+    /**
+     * §5.7's tightening rule: a refinement body that loosens a constraint instead of tightening it
+     * is a resolver error, not a silently accepted override. The two cases here are the ones a merge
+     * that just overwrites field by field cannot tell apart from a real narrowing -- a bound stated
+     * outside the range the source's own {@code size} already fixes (nothing in {@code uint8}'s own
+     * body states 0..255; its width does), and a bound stated outside one the source stated itself.
+     */
+    @Test
+    void atomRefinementRejectsBoundsThatWidenTheSource() {
+        TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
+        Map<String, TypeDefinition> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries());
+        DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
+        SchemaMap schemaMap = new TsonSchemaParser("""
+                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
+                {
+                  uint8       => !integer ^ { size: { bits: 8  signed: false } }
+                  percent     => !integer ^ { min: 0  max: 100 }
+                  escapesSize => !uint8 ^ { min: -10  max: 300 }
+                  escapesMax  => !percent ^ { max: 1000 }
+                }""").parseSchemaDocument().body();
+        chainNamespace.put("uint8", instanceResolver.resolve(schemaMap.declarations().get("uint8")));
+        chainNamespace.put("percent", instanceResolver.resolve(schemaMap.declarations().get("percent")));
+
+        TsonSchemaValidationException widerThanTheWidth = assertThrows(TsonSchemaValidationException.class,
+                () -> instanceResolver.resolve(schemaMap.declarations().get("escapesSize")));
+        assertTrue(widerThanTheWidth.getMessage().contains("widens rather than tightens"), widerThanTheWidth.getMessage());
+        assertTrue(widerThanTheWidth.getMessage().contains("min -10"), widerThanTheWidth.getMessage());
+        assertTrue(widerThanTheWidth.getMessage().contains("max 300"), widerThanTheWidth.getMessage());
+
+        TsonSchemaValidationException widerThanTheBound = assertThrows(TsonSchemaValidationException.class,
+                () -> instanceResolver.resolve(schemaMap.declarations().get("escapesMax")));
+        assertTrue(widerThanTheBound.getMessage().contains("max 1000 is above the source's own max 100"),
+                widerThanTheBound.getMessage());
+    }
+
+    /**
+     * The other side of {@code atomRefinementRejectsBoundsThatWidenTheSource}: the shapes a
+     * tightening check must NOT reject. Restating a bound unchanged, adding a width inside an
+     * already-bounded source, and tightening one end while leaving the other inherited all resolve.
+     */
+    @Test
+    void atomRefinementAcceptsBoundsThatGenuinelyTighten() {
+        TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
+        Map<String, TypeDefinition> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries());
+        DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
+        SchemaMap schemaMap = new TsonSchemaParser("""
+                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
+                {
+                  percent  => !integer ^ { min: 0  max: 100 }
+                  restated => !percent ^ { max: 100 }
+                  sized    => !percent ^ { size: { bits: 8  signed: false } }
+                  oneEnd   => !percent ^ { max: 50 }
+                }""").parseSchemaDocument().body();
+        chainNamespace.put("percent", instanceResolver.resolve(schemaMap.declarations().get("percent")));
+
+        // Restating a bound at exactly the source's own value is a no-op, not a widening.
+        assertEquals(new IntegerType(Optional.empty(), Optional.of(java.math.BigInteger.ZERO), Optional.empty(),
+                Optional.of(java.math.BigInteger.valueOf(100)), Optional.empty(), Optional.empty()),
+                instanceResolver.resolve(schemaMap.declarations().get("restated")).body());
+
+        // A width is compared against the source's own width, not its explicit bounds -- uint8's own
+        // 0..255 reaches past percent's ceiling, yet adding it to a 0..100 source still narrows.
+        assertEquals(new IntegerType(Optional.of(new IntegerSize(8, false)),
+                Optional.of(java.math.BigInteger.ZERO), Optional.empty(),
+                Optional.of(java.math.BigInteger.valueOf(100)), Optional.empty(), Optional.empty()),
+                instanceResolver.resolve(schemaMap.declarations().get("sized")).body());
+
+        // Tightening one end leaves the other inherited, which must compare equal rather than as a drop.
+        assertEquals(new IntegerType(Optional.empty(), Optional.of(java.math.BigInteger.ZERO), Optional.empty(),
+                Optional.of(java.math.BigInteger.valueOf(50)), Optional.empty(), Optional.empty()),
+                instanceResolver.resolve(schemaMap.declarations().get("oneEnd")).body());
+    }
+
+    /**
+     * A refinement inherits a field its source holds even when that field is {@code REQUIRED} with
+     * no schema default -- {@code float_type.format}, which meta.tn1 declares as a bare {@code
+     * format: ieee_format}. The merge supplies it from {@code float32}'s own bound body, so the
+     * refinement body never has to restate it.
+     *
+     * <p>This is also the case that pins the merge's shape: it has to happen on the wire record,
+     * before binding, precisely because binding the refinement body on its own would fail
+     * {@code FIELD_REQUIRED} on {@code format} with nothing to fall back to. See {@code
+     * DefinitionResolver#mergeWithSource}.
+     */
+    @Test
+    void atomRefinementInheritsARequiredFieldItsSourceAlreadyFixed() throws IOException {
+        TsonCompiledMetaSchema metaTn1Parser = metaTn1Compiled();
+        Map<String, TypeDefinition> namespace = new LinkedHashMap<>(metaTn1Parser.schema().entries());
+        DefinitionResolver resolver = definitionResolverFor(metaTn1Parser, namespace::get);
+        namespace.put("float32", resolver.resolve(schemaMapFromCoreFixture().declarations().get("float32")));
+        SchemaMap schemaMap = new TsonSchemaParser("""
+                !!meta:"https://tson.io/2026/32/m/meta.tn1"
+                { probability => !float32 ^ { min: 0.0  max: 1.0 } }""").parseSchemaDocument().body();
+
+        TypeDefinition probability = resolver.resolve(schemaMap.declarations().get("probability"));
+
+        assertEquals(new FloatType(FloatType.Format.BINARY32,
+                Optional.of(new java.math.BigDecimal("0.0")), Optional.empty(),
+                Optional.of(new java.math.BigDecimal("1.0")), Optional.empty(), true, true, true, true),
+                probability.body());
+    }
+
+    /**
+     * Narrowing is decided by the constraint family, not by a generic field comparison, so a
+     * non-numeric family enforces its own facets: text lengths here, where {@code min_length} may
+     * only rise and {@code max_length} may only fall.
+     */
+    @Test
+    void atomRefinementChecksTextLengthsThroughTheTextFamilysOwnRule() {
+        TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
+        Map<String, TypeDefinition> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries());
+        DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
+        SchemaMap schemaMap = new TsonSchemaParser("""
+                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
+                {
+                  short_text  => !text ^ { min_length: 1  max_length: 10 }
+                  shorter     => !short_text ^ { max_length: 5 }
+                  longer      => !short_text ^ { max_length: 50 }
+                }""").parseSchemaDocument().body();
+        chainNamespace.put("short_text", instanceResolver.resolve(schemaMap.declarations().get("short_text")));
+
+        assertEquals(new TextType(Optional.of(1), Optional.of(5), Optional.empty(), Optional.empty()),
+                instanceResolver.resolve(schemaMap.declarations().get("shorter")).body());
+
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> instanceResolver.resolve(schemaMap.declarations().get("longer")));
+        assertTrue(thrown.getMessage().contains("max_length 50 is above the source's own 10"), thrown.getMessage());
     }
 
     @Test

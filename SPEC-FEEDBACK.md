@@ -1041,3 +1041,56 @@ directive (`{ url, sha256 }`) — the cleanest separation of locator from integr
 directive-grammar change plus an `!!id` equivalent; here it touches the directive grammar, `ContentHash`,
 canonical identity, `tson hash`, and every bundled `.tn`'s pin lines. If the query form stays, the spec should
 at least justify why a hash lives in the query and name the identity-stripping as its deliberate consequence.
+
+## 27. §5.7 says a refinement "tightens," but core.tn's own worked examples call a *selector* swap a narrowing — leaving "tightens" undefined for any facet that doesn't order
+
+**Section:** Part 2 §5.7 (refinement), §5.5 (atom refinement), with core.tn's own `complex` declaration as the
+counterexample.
+
+**Problem:** §5.7's refinement rule is stated in terms of tightening: a refinement narrows its source's
+constraints and never loosens them. For an *ordered* facet that is unambiguous — an integer's `min`/`max`, a
+text's `min_length`/`max_length` — one value is straightforwardly more restrictive than another, and a
+refinement stating a looser one is checkable and rejectable.
+
+A constraint vocabulary also carries facets that don't order at all. They *select* among unordered
+alternatives rather than measuring anything:
+
+- `complex_type.component` (`INTEGER`/`NUMBER`/`RATIONAL`/`FLOAT32`/`FLOAT64`)
+- `float_type.format` (the IEEE format enum)
+- `binary.encoding` (`BASE64`/`BASE64URL`/`BASE32`/`HEX`)
+- `uuid_type.version`
+
+Nothing in the spec says what "tightens" means for one of these, and core.tn's own prose answers it in a way
+the §5.7 wording does not support. Its `complex` declaration reads:
+
+> Components default to `NUMBER` (exact); **a narrowing may set `component`** to another member of the closed
+> vocabulary — e.g. `!complex ^ { component: INTEGER }` for Gaussian integers, `!complex ^ { component:
+> FLOAT64 }` for floating-point complex.
+
+`complex`'s own resolved body has `component: NUMBER` (the schema default), so both examples *replace* an
+already-bound selector, and the second replaces the exact tier with an approximate one — binary64 values are
+emphatically not a subset of the exact arbitrary-precision `NUMBER` tier. The spec calls that a narrowing
+anyway. So either "tightens" is meant loosely enough to admit any selector substitution, or core.tn's own
+examples violate §5.7; the text supports neither reading over the other.
+
+The distinction is load-bearing for anything that actually enforces §5.7. A checker has to decide, per facet,
+between three behaviors: reject a substitution (treat the selector as an identity facet a refinement may
+restate but not change), accept any substitution, or accept only substitutions that shrink the underlying
+value set — and the third is not even well-defined here, since `FLOAT32` ⊂ `FLOAT64` as sets of reals while
+`INTEGER` ⊄ `FLOAT64` and neither is a subset of `NUMBER` in the direction core.tn uses.
+
+**Interpretation chosen:** Selector facets are left **unchecked**. This implementation enforces §5.7's
+tightening rule on ordered facets (bounds, lengths, digit counts, prefix lengths), on permission flags
+(`allow_nan` and friends: withdrawable, never re-grantable), and on member sets (an enum's `members` may only
+shrink) — and says nothing about a selector, so `!complex ^ { component: FLOAT64 }` resolves exactly as
+core.tn documents. Rejecting a substitution would reject the spec's own example; accepting only value-set
+shrinkage would too. The conservative choice is that a false rejection of a documented construct is worse than
+a missed error, so the hole is deliberate and documented on each affected class (`ComplexType` carries the
+reasoning, `FloatType`/`BinaryType`/`UuidType` point at it).
+
+**Suggested resolution:** State the rule per facet *kind* rather than as one word. Concretely, §5.7 should say
+which of its constraint-vocabulary fields are ordered (tightening checkable and required), which are selectors
+(substitution permitted, and whether the result must remain IS-A its source), and which are fixed (a
+refinement may restate but not change — `spec`/`specification` are already `REQUIRED_FIXED` and behave this
+way). Failing that, at minimum reconcile core.tn's "a narrowing may set `component`" with §5.7's own wording:
+if a selector swap is legal, the refinement rule cannot be stated purely as tightening.

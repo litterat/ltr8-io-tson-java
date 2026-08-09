@@ -288,9 +288,24 @@ namespace *before* any local declaration resolves.
   reader — no hand-rolled name→class table, `tson-bind`'s sealed-union resolution finds the `Top` leaf by
   `@Typename`); atom refinement (`!I ^ { ... }`, §5.5/§5.7).
 - **Chained atom refinement merges with the source, it does not replace it** (`SPEC-FEEDBACK.md` #17):
-  `big => !int8 ^ { min: -500 }` must still carry `int8`'s own `size`. `mergeWithSource` re-serializes the
+  `bounded => !int8 ^ { min: -100 }` must still carry `int8`'s own `size`. `mergeWithSource` re-serializes the
   source's bound value via `TsonObjectWriter` and merges field-by-field (explicit values win) — no
-  per-atom-class merge logic needed.
+  per-atom-class merge logic needed. **The merge runs on the wire record, before binding, and has to**: a
+  constructor field that is `REQUIRED` with no schema default (`float_type.format`, `binary.encoding`) is one
+  a refinement body has no reason to restate, so binding the body alone would fail `FIELD_REQUIRED`. This is
+  why `DefinitionResolver` still holds a `TsonObjectWriter`, and in turn why `TsonObjectReader`/
+  `TsonObjectWriter` can't move to the `tson` module (see `BACKLOG.md`).
+- **A refinement must narrow, and this is enforced** (§5.7). After binding, `checkNarrows` asks the
+  constraint family itself — `Atom.constraintsCheck(refined)`, one rule per `schema.meta` family over the
+  shared `AtomNarrowing` mechanics — whether the merged result is a valid tightening of the source's own body,
+  and throws `TsonSchemaValidationException` if not (`!uint8 ^ { min: -10 max: 300 }` is rejected). Comparing
+  the *merged* result rather than the refinement body is what lets an unmentioned facet tighten vacuously; a
+  stated bound is judged against the source's **effective** range, folding in a derived one like an integer's
+  `size` (intersecting the refinement's own bounds first would make every widening vacuous). Unchecked by
+  design, each documented on its class: `pattern` against `pattern` (regular-language containment, and
+  `tson-schema` has no `tson-regex` dependency), `duration_type`'s text bounds, and **selector** facets
+  (`component`/`format`/`encoding`/`version`) — core.tn's own prose calls a selector swap a narrowing, so
+  rejecting one would reject a documented construct (`SPEC-FEEDBACK.md` #27).
 - **Everything else throws `UnsupportedOperationException`** (elided field types outside a tightening
   entry, an `Absent` modifier value, the identity-diagonal FIXED-value invariant, a field group restated
   in a refinement body, subtraction, generic type-refs beyond a simple two-arg `map` or refinement

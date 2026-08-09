@@ -32,4 +32,16 @@ public record ComplexType(Component component) implements Atom {
 
     /** {@code complex => !complex_type {}} -- the unconstrained complex number, core.tn1's own {@code !complex}. */
     public static final ComplexType UNCONSTRAINED = new ComplexType(Component.NUMBER);
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p><b>No narrowing check.</b> {@link #component} is this family's only facet and it is a
+     * selector, not an ordered constraint -- the five members name different value sets rather than
+     * progressively smaller ones. Treating it as an identity facet a refinement may restate but not
+     * swap would reject core.tn's own documented usage, which calls {@code !complex ^ { component:
+     * FLOAT64 } } a narrowing of a {@code component: NUMBER} source even though approximate binary64
+     * values are not a subset of the exact tier. §5.7 leaves "tightens" undefined for a facet that
+     * does not order, so nothing here is decidable -- see {@code SPEC-FEEDBACK.md} #27.
+     */
 }

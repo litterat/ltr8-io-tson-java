@@ -4,6 +4,8 @@ import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Typename;
 
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -34,4 +36,23 @@ public record UriType(
     /** {@code uri => !uri_type {}} -- the unconstrained URI, §5.5's {@code !uri}. */
     public static final UriType UNCONSTRAINED = new UriType(
             Optional.empty(), Optional.empty(), Optional.empty(), new AtomSpecification(RFC_3986), Optional.empty());
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Only the length bounds are ordered. {@link #pattern} is undecidable here for the reason
+     * {@link TextType#constraintsCheck} gives; {@link #scheme} is a selector ({@link ComplexType});
+     * {@link #specification} is {@code REQUIRED_FIXED} in the schema, so a refinement cannot move it
+     * in the first place.
+     */
+    @Override
+    public List<String> constraintsCheck(Atom refined) {
+        if (!(refined instanceof UriType other)) {
+            return List.of("refines a uri with " + refined.getClass().getSimpleName());
+        }
+        List<String> violations = new ArrayList<>();
+        AtomNarrowing.checkAtLeast(violations, "min_length", minLength, other.minLength);
+        AtomNarrowing.checkAtMost(violations, "max_length", maxLength, other.maxLength);
+        return List.copyOf(violations);
+    }
 }

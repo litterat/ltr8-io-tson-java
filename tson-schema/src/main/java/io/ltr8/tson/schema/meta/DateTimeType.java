@@ -3,6 +3,8 @@ package io.ltr8.tson.schema.meta;
 import io.ltr8.annotation.Typename;
 
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -10,7 +12,7 @@ import java.util.Optional;
  * {@code date-time}). Pure constraint values, no parsing/validation behavior -- {@code
  * tson-compiler}'s {@code DateTimeParser} holds one of these and does the actual reading/writing.
  *
- * <p>Also an {@link Atom} variant (joined 2026-07-24): {@code datetime => !datetime_type {}} is a
+ * <p>Also an {@link Atom} variant: {@code datetime => !datetime_type {}} is a
  * constructor-application instance (§5.5) whose resolved body is exactly {@link #UNCONSTRAINED}.
  */
 @Typename(name = "datetime_type")
@@ -18,4 +20,21 @@ public record DateTimeType(Optional<OffsetDateTime> min, Optional<OffsetDateTime
 
     /** {@code datetime => !datetime_type {}} -- the unconstrained datetime, §5.4's {@code !datetime}. */
     public static final DateTimeType UNCONSTRAINED = new DateTimeType(Optional.empty(), Optional.empty());
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Bounds compare on {@link OffsetDateTime}'s own ordering, which compares the instant first,
+     * so two bounds written in different offsets are still comparable.
+     */
+    @Override
+    public List<String> constraintsCheck(Atom refined) {
+        if (!(refined instanceof DateTimeType other)) {
+            return List.of("refines a datetime with " + refined.getClass().getSimpleName());
+        }
+        List<String> violations = new ArrayList<>();
+        AtomNarrowing.checkAtLeast(violations, "min", min, other.min);
+        AtomNarrowing.checkAtMost(violations, "max", max, other.max);
+        return List.copyOf(violations);
+    }
 }

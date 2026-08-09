@@ -150,29 +150,53 @@ own prose (which had gone stale on at least one of them):
 
 ## Atom-refinement constraint validation
 
-- [ ] **Atom-refinement merging never checks that a refinement actually narrows its source** —
-  `DefinitionResolver.mergeWithSource` (chained atom refinement, `!I ^ { values }`) re-serializes
-  `I`'s own already-bound constraint object to wire form via `TsonObjectWriter`, then merges it with
-  the new refinement's own `values` field by field: `merged.put(field.name(), field)` — a plain map
-  override, explicit values simply win, with **no check that the new value is actually a valid
-  narrowing** of what it replaces. Concretely: `!uint8 ^ { min: -10 max: 300 }` is not rejected, even
-  though `uint8`'s own real range is 0..255 — the "refinement" *widens* rather than narrows, directly
-  contradicting §5.7's whole premise (refinement tightens, it never loosens), and nothing catches it
-  today. The right fix, per the user's own direction: each constraint-vocabulary class (`IntegerType`,
-  `TextType`, `DecimalType`, `FloatType`, ...) should own a method like `constraintsCheck(A, B)`
-  returning whether `B` is a valid narrowing of `A` — the type itself is the only thing that actually
-  knows what "more constrained" means for its own fields (an integer's `min`/`max`, a text's
-  `min_length`/`max_length`/`pattern`, and so on) — called during merge instead of the current blind,
-  generic override.
-- [ ] **Related cleanup, once the above lands**: `DefinitionResolver`'s own dependency on
-  `TsonObjectWriter` (`private final TsonObjectWriter writer`, used only for this merge's own
-  re-serialization step) should go away — a real narrowing check wouldn't need to round-trip through
-  the generic binder at all. This is also *why* `TsonObjectReader`/`TsonObjectWriter` still live in
-  `tson-compiler` (its root package, since the 2026-07-31 rename/move out of `.mapper`) rather than
-  the `tson` front-door module (see "Front door" above) — moving them to a module that depends *on*
-  `tson-compiler` would create a cycle, since `tson-compiler`'s own resolution engine genuinely
-  depends on the writer. Once this dependency is gone, revisit moving them into `tson` — noted
-  directly on `Tson`'s own class Javadoc too, so it isn't lost.
+- [x] **Atom-refinement merging now checks that a refinement actually narrows its source** (§5.7).
+  `Atom.constraintsCheck(Atom refined)` is a per-family rule returning the list of ways `refined`
+  fails to narrow the receiver (empty means valid); `DefinitionResolver.resolveAtomRefinement` calls
+  it on the source's own bound body against the merged result and throws
+  `TsonSchemaValidationException` on any violation. The backlog's own example, `!uint8 ^ { min: -10
+  max: 300 }`, is now rejected. Shape notes:
+  - **The family owns the rule**, since only it knows what "more constrained" means for its own
+    fields; `AtomNarrowing` (package-private in `schema.meta`) holds the shared mechanics — bound
+    comparison over an inclusive/exclusive pair, floor/ceiling facets, permission flags, member-set
+    subsetting — so a family only says which of its fields are which kind of facet.
+  - **Comparing the merged result, not the refinement body alone**, is what makes an unmentioned
+    facet a non-event: it still holds the source's value and tightens vacuously, so only what the
+    author actually wrote can fail.
+  - **A stated bound is judged against the source's *effective* range** (an integer folds its `size`
+    in: `uint8` states no bounds but its width fixes 0..255). Deliberately *not* the refinement's own
+    effective range — intersecting first makes every widening vacuous and nothing is ever rejected.
+  - **Three deliberate holes**, each documented on the class: `pattern`-vs-`pattern` (regular-language
+    containment, and `tson-schema` has no `tson-regex` dependency to decide it — the natural place an
+    injected oracle would plug in, same seam the linker's pattern-disjointness gap needs);
+    `duration_type`'s bounds (unparsed ISO 8601 text, and parsing lives in `tson-compiler`); and
+    **selector facets** (`complex_type.component`, `float_type.format`, `binary.encoding`,
+    `uuid_type.version`) — unchecked because core.tn's own prose calls `!complex ^ { component:
+    FLOAT64 }` a narrowing of a `NUMBER` source, so rejecting a selector swap would reject a
+    documented construct. See `SPEC-FEEDBACK.md` #27.
+  - Regression tests: `DefinitionResolverTest`'s `atomRefinementRejectsBoundsThatWidenTheSource`,
+    `atomRefinementAcceptsBoundsThatGenuinelyTighten`,
+    `atomRefinementChecksTextLengthsThroughTheTextFamilysOwnRule`.
+- [ ] **`DefinitionResolver`'s `TsonObjectWriter` dependency stays — the premise this item used to
+  carry was wrong.** It read "a real narrowing check wouldn't need to round-trip through the generic
+  binder at all"; the check landed and the round-trip is still load-bearing, because **the check and
+  the merge are separate concerns**. The check compares two already-bound constraint objects; the
+  merge is what *produces* the second one, and it has to run on the wire record *before* binding.
+  The blocker is concrete: an object-level merge would have to bind the refinement body on its own
+  first, and `float_type.format` (`format: ieee_format`, `REQUIRED` with no schema default) and
+  `binary.encoding` have nothing to fall back on, so `!float32 ^ { min: 0.0 max: 1.0 }` would fail
+  `FIELD_REQUIRED` on a field its source already fixes.
+  `DefinitionResolverTest.atomRefinementInheritsARequiredFieldItsSourceAlreadyFixed` pins that case
+  so the constraint isn't rediscovered the hard way. Nor is there a cheaper substitution:
+  `TsonObjectWriter` writes straight to a `TsonDataEmitter`, so there is no object→`DataValue` step
+  to borrow that would skip the text round-trip. Removing it for real needs each family to own its
+  own wire decoding (duplicating number-grammar handling — `0xFF`, `_` separators, quoted-vs-unquoted
+  — and bypassing the compiled reader's own defaults), which costs more than the round-trip does.
+  This is still *why* `TsonObjectReader`/`TsonObjectWriter` live in `tson-compiler`'s root package
+  rather than the `tson` front-door module (see "Front door" above) — moving them to a module that
+  depends *on* `tson-compiler` would create a cycle, since the resolution engine genuinely depends on
+  the writer. So the "revisit moving them into `tson`" note on `Tson`'s own class Javadoc is blocked
+  on a different, larger change than this item once assumed.
 
 ## I-Regexp engine (RFC 9485)
 

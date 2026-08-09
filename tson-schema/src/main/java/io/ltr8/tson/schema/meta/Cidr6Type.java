@@ -3,6 +3,7 @@ package io.ltr8.tson.schema.meta;
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Typename;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -28,4 +29,17 @@ public record Cidr6Type(String spec, @Field("min_prefix") Optional<Integer> minP
     /** {@code cidr6 => !cidr6_type {}} -- the unconstrained IPv6 network, core.tn1's own {@code !cidr6}. */
     public static final Cidr6Type UNCONSTRAINED = new Cidr6Type(
             "https://www.rfc-editor.org/rfc/rfc4291", Optional.empty(), Optional.empty(), List.of(), List.of());
+
+    /** {@inheritDoc} <p>The IPv6 twin of {@link Cidr4Type#constraintsCheck}, including its {@code excluding} gap. */
+    @Override
+    public List<String> constraintsCheck(Atom refined) {
+        if (!(refined instanceof Cidr6Type other)) {
+            return List.of("refines a cidr6 with " + refined.getClass().getSimpleName());
+        }
+        List<String> violations = new ArrayList<>();
+        AtomNarrowing.checkAtLeast(violations, "min_prefix", minPrefix, other.minPrefix);
+        AtomNarrowing.checkAtMost(violations, "max_prefix", maxPrefix, other.maxPrefix);
+        AtomNarrowing.checkSubset(violations, "within", within, other.within);
+        return List.copyOf(violations);
+    }
 }

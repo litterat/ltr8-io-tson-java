@@ -3,6 +3,7 @@ package io.ltr8.tson.schema.meta;
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Typename;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -52,4 +53,29 @@ public record Cidr4Type(String spec, @Field("min_prefix") Optional<Integer> minP
     /** {@code cidr4 => !cidr4_type {}} -- the unconstrained IPv4 network, core.tn1's own {@code !cidr4}. */
     public static final Cidr4Type UNCONSTRAINED = new Cidr4Type(
             "https://www.rfc-editor.org/rfc/rfc4632", Optional.empty(), Optional.empty(), List.of(), List.of());
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>A longer prefix is a smaller network, so the prefix bounds narrow the ordinary way: {@code
+     * min_prefix} may only rise, {@code max_prefix} may only fall. {@link #within} may only shrink,
+     * each entry being a network the value is permitted to fall inside.
+     *
+     * <p>{@link #excluding} is left unchecked: adding an exclusion narrows and removing one widens,
+     * the opposite direction from every other set facet here, and deciding it properly means
+     * comparing networks for containment rather than entries for membership -- {@code 10.0.0.0/8}
+     * subsumes an excluded {@code 10.1.0.0/16} without either list mentioning the other. That
+     * belongs with a real CIDR parser, which this family does not have.
+     */
+    @Override
+    public List<String> constraintsCheck(Atom refined) {
+        if (!(refined instanceof Cidr4Type other)) {
+            return List.of("refines a cidr4 with " + refined.getClass().getSimpleName());
+        }
+        List<String> violations = new ArrayList<>();
+        AtomNarrowing.checkAtLeast(violations, "min_prefix", minPrefix, other.minPrefix);
+        AtomNarrowing.checkAtMost(violations, "max_prefix", maxPrefix, other.maxPrefix);
+        AtomNarrowing.checkSubset(violations, "within", within, other.within);
+        return List.copyOf(violations);
+    }
 }

@@ -2,6 +2,7 @@ package io.ltr8.tson.schema.meta;
 
 import io.ltr8.annotation.Typename;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -17,5 +18,22 @@ public record EnumBody(List<String> members) implements Atom {
 
     public EnumBody {
         members = List.copyOf(members);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>An enum's value set is written out in full, so narrowing is plain subset containment: a
+     * refinement may drop members but never introduce one the source does not admit. Member order
+     * is not compared -- it is preserved for deterministic output, not semantically significant.
+     */
+    @Override
+    public List<String> constraintsCheck(Atom refined) {
+        if (!(refined instanceof EnumBody other)) {
+            return List.of("refines an enum with " + refined.getClass().getSimpleName());
+        }
+        List<String> violations = new ArrayList<>();
+        AtomNarrowing.checkSubset(violations, "members", members, other.members);
+        return List.copyOf(violations);
     }
 }

@@ -3,6 +3,8 @@ package io.ltr8.tson.schema.meta;
 import io.ltr8.annotation.Typename;
 
 import java.time.OffsetTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -10,12 +12,30 @@ import java.util.Optional;
  * full-time}). Pure constraint values, no parsing/validation behavior -- {@code tson-compiler}'s
  * {@code TimeParser} holds one of these and does the actual reading/writing.
  *
- * <p>Also an {@link Atom} variant (joined 2026-07-24): {@code time => !time_type {}} is a
- * constructor-application instance (§5.5) whose resolved body is exactly {@link #UNCONSTRAINED}.
+ * <p>Also an {@link Atom} variant: {@code time => !time_type {}} is a constructor-application
+ * instance (§5.5) whose resolved body is exactly {@link #UNCONSTRAINED}.
  */
 @Typename(name = "time_type")
 public record TimeType(Optional<OffsetTime> min, Optional<OffsetTime> max) implements Atom {
 
     /** {@code time => !time_type {}} -- the unconstrained time, §5.4's {@code !time}. */
     public static final TimeType UNCONSTRAINED = new TimeType(Optional.empty(), Optional.empty());
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Bounds compare on {@link OffsetTime}'s own ordering, which normalises to the instant on a
+     * shared day before comparing local time -- so a bound written in one offset is comparable with
+     * one written in another rather than being rejected as incomparable.
+     */
+    @Override
+    public List<String> constraintsCheck(Atom refined) {
+        if (!(refined instanceof TimeType other)) {
+            return List.of("refines a time with " + refined.getClass().getSimpleName());
+        }
+        List<String> violations = new ArrayList<>();
+        AtomNarrowing.checkAtLeast(violations, "min", min, other.min);
+        AtomNarrowing.checkAtMost(violations, "max", max, other.max);
+        return List.copyOf(violations);
+    }
 }

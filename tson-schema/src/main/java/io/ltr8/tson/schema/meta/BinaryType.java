@@ -3,6 +3,8 @@ package io.ltr8.tson.schema.meta;
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Typename;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -22,7 +24,7 @@ import java.util.Optional;
  * FloatType}'s bounds -- {@code base64 => !binary BASE64} and its three siblings in core.tn1 are all
  * unconstrained beyond {@code encoding}.
  *
- * <p>Also an {@link Atom} variant (joined 2026-07-24): {@code base64 => !binary BASE64} and its
+ * <p>Also an {@link Atom} variant: {@code base64 => !binary BASE64} and its
  * three siblings are constructor-application instances (§5.5) whose resolved bodies are exactly
  * {@link #BASE64}/{@link #BASE64URL}/{@link #BASE32}/{@link #HEX} -- each a positional-form
  * instance (§5.6: a bare token filling {@code binary}'s sole {@code REQUIRED} field, {@code
@@ -56,5 +58,23 @@ public record BinaryType(Encoding encoding, @Field("min_length") Optional<Intege
     /** §5.3's built-in annotation name for this instance's {@link #encoding}, e.g. {@code !base64}. */
     public String typeName() {
         return encoding.typeName();
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Only the length bounds are ordered facets. {@link #encoding} is a selector -- see {@link
+     * ComplexType} for why selectors are left unchecked -- and in practice unreachable by a
+     * refinement anyway, since every core.tn instance already fixes it.
+     */
+    @Override
+    public List<String> constraintsCheck(Atom refined) {
+        if (!(refined instanceof BinaryType other)) {
+            return List.of("refines a binary with " + refined.getClass().getSimpleName());
+        }
+        List<String> violations = new ArrayList<>();
+        AtomNarrowing.checkAtLeast(violations, "min_length", minLength, other.minLength);
+        AtomNarrowing.checkAtMost(violations, "max_length", maxLength, other.maxLength);
+        return List.copyOf(violations);
     }
 }

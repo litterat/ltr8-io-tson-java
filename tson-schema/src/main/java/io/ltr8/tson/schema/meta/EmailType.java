@@ -3,6 +3,7 @@ package io.ltr8.tson.schema.meta;
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Typename;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -30,4 +31,21 @@ public record EmailType(String spec, @Field("min_length") Optional<Integer> minL
     public static final EmailType UNCONSTRAINED = new EmailType(
             "https://www.rfc-editor.org/rfc/rfc5322", Optional.empty(), Optional.empty(),
             Optional.empty(), Optional.empty());
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>The same length facets {@link TextType} carries, checked the same way -- {@link #length}
+     * pins both ends and folds into the range the other two are compared against. {@link #pattern}
+     * is undecidable here (see {@link TextType#constraintsCheck}) and {@code spec} is fixed by the
+     * schema.
+     */
+    @Override
+    public List<String> constraintsCheck(Atom refined) {
+        if (!(refined instanceof EmailType other)) {
+            return List.of("refines an email with " + refined.getClass().getSimpleName());
+        }
+        return new TextType(minLength, maxLength, length, pattern)
+                .constraintsCheck(new TextType(other.minLength, other.maxLength, other.length, other.pattern));
+    }
 }

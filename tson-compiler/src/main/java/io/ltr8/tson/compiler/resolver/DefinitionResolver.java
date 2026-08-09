@@ -30,6 +30,8 @@ import io.ltr8.tson.compiler.ast.schema.TypeArg;
 import io.ltr8.tson.compiler.ast.schema.TypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeRef;
 import io.ltr8.tson.compiler.TsonObjectWriter;
+import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldState;
@@ -143,6 +145,12 @@ import java.util.Set;
  * {@link AtomRefinement} -- are both dispatched, via {@link #resolveInstance}/{@link
  * #resolveAtomRefinement} below.)
  *
+ * <p>{@link UnsupportedOperationException} means "this construct isn't implemented yet"; a genuine
+ * schema error a coverage gap can't explain is a {@link
+ * io.ltr8.tson.schema.TsonSchemaValidationException} instead. An atom refinement that loosens its
+ * source rather than tightening it ({@link #checkNarrows}) is the current case -- the schema is
+ * wrong, not unsupported.
+ *
  * <p>Declarations are resolved against two separate namespaces (§3.3.1), each exposed through a
  * required constructor parameter rather than threaded through individual method calls, since both
  * are fixed for as long as this resolver is used:
@@ -213,7 +221,11 @@ import java.util.Set;
  */
 final class DefinitionResolver {
 
-    /** Re-serializes an atom refinement's source back to wire form for {@link #mergeWithSource} -- see {@link #resolveAtomRefinement}. */
+    /**
+     * Re-serializes an atom refinement's source back to wire form for {@link #mergeWithSource} -- see
+     * {@link #resolveAtomRefinement}. Structural, not incidental: the merge has to happen on the wire
+     * record, so this is the only way to get the source's already-bound facets back into one.
+     */
     private final TsonObjectWriter writer = new TsonObjectWriter();
 
     private final DefinitionMetaReader definitionMetaReader;
@@ -385,9 +397,39 @@ final class DefinitionResolver {
 
         DataValue merged = mergeWithSource(name, source.body(), refinement.bindings(), constructorRef.name());
         Top body = bindAtomInstance(name, merged);
+        checkNarrows(name, sourceName, source.body(), body);
 
         return new TypeDefinition(Optional.of(constructorRef), source.kind(), List.of(), false,
                 List.of(sourceName), List.of(), Optional.empty(), body);
+    }
+
+    /**
+     * §5.7's tightening rule, enforced: a refinement narrows its source's constraints, so a body
+     * field that <em>loosens</em> one is a resolver error rather than a silently accepted override.
+     * Without this, {@code !uint8 ^ { min: -10  max: 300 } } resolves happily to something wider
+     * than the {@code uint8} it claims to refine.
+     *
+     * <p>Runs on the two bound constraint objects -- the source's own body and the merged result --
+     * and asks the family itself, via {@link Atom#constraintsCheck}, since only it knows what "more
+     * constrained" means for its own fields. Comparing the merged result rather than the refinement
+     * body alone is what makes the check work for a facet the body never mentioned: an inherited
+     * facet compares equal to the source's and tightens vacuously, so only what the author actually
+     * wrote can fail.
+     *
+     * <p>A non-{@link Atom} body is not reachable here -- {@link #resolveAtomRefinement} has already
+     * rejected a source that isn't an atom-family instance, and the merged value binds through that
+     * same source's own constructor -- so it is left alone rather than guarded, the same treatment
+     * every other structurally-impossible case in this class gets.
+     */
+    private void checkNarrows(String name, String sourceName, Top sourceBody, Top refinedBody) {
+        if (!(sourceBody instanceof Atom sourceAtom) || !(refinedBody instanceof Atom refinedAtom)) {
+            return;
+        }
+        List<String> violations = sourceAtom.constraintsCheck(refinedAtom);
+        if (!violations.isEmpty()) {
+            throw new TsonSchemaValidationException("'" + name + "': refinement of '!" + sourceName
+                    + "' widens rather than tightens it (§5.7): " + String.join("; ", violations));
+        }
     }
 
     /**
@@ -399,6 +441,17 @@ final class DefinitionResolver {
      * re-parsed, so this needs no per-atom-class merge logic -- it works generically for every
      * atom-constraint class the same way. Field merge is by name at the {@link RecordValue} level:
      * {@code newBindings}'s own fields win; anything only {@code sourceBody} had survives untouched.
+     *
+     * <p><b>Merging before binding, not after, is required.</b> Binding {@code newBindings} on its own
+     * and merging the two constraint objects would fail for any constructor with a {@code REQUIRED}
+     * field carrying no schema default -- {@code float_type.format}, {@code binary.encoding} -- since
+     * the refinement body has no reason to restate a facet its source already fixed, and the reader
+     * would report {@code FIELD_REQUIRED} with nothing to fall back on. Merging first means the record
+     * that reaches the reader is always complete.
+     *
+     * <p>Widening is caught after binding, by {@link #checkNarrows}, rather than here: this merge is
+     * deliberately blind, and the two bound constraint objects are what a family's own narrowing rule
+     * can actually compare.
      */
     private DataValue mergeWithSource(String name, Top sourceBody, DataValue newBindings, String constructorName) {
         Map<String, RecordValue.Field> merged = new LinkedHashMap<>();
