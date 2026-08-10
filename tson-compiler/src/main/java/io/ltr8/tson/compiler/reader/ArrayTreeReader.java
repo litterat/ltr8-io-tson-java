@@ -5,6 +5,7 @@ import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.TsonValueReaderResolver;
 import io.ltr8.tson.tree.ArrayNode;
 import io.ltr8.tson.tree.NullNode;
+import io.ltr8.tson.tree.TsonAnnotation;
 import io.ltr8.tson.tree.TsonNode;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.SourcePosition;
@@ -43,11 +44,12 @@ final class ArrayTreeReader extends ArrayAbstractReader<TsonNode> {
     @Override
     public TsonNode read(TsonReadContext ctx) {
         ctx = ctx.withSchemaPosition(schemaPosition);
+        List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx);
         if (!expectArrayStart(ctx)) {
             return null;
         }
         List<TsonNode> elements = new ArrayList<>();
         readInto(ctx, decoded -> elements.add(decoded == null ? NullNode.instance() : (TsonNode) decoded));
-        return new ArrayNode(elements, Optional.of(name), List.of());
+        return new ArrayNode(elements, Optional.of(name), annotations);
     }
 }

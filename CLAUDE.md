@@ -530,18 +530,26 @@ forces the schemaless path on a schema-aware reader.
 - **`TsonObjectReader`'s schema-aware `read` checks the target class up front** — the schema's root type
   already binds to a Java class via the name binder, so a class not assignable to that is a `TYPE_MISMATCH`
   reported *before* the value is read, not a cast failure after.
-- **`SchemalessTreeReader` captures wire annotations** onto each node's `annotations()`, at every position
-  §3.1 permits one (root, record field value, array element, both sides of a map entry, and recursively an
-  annotation's own value). An annotation's value events are buffered and replayed through the same reader
-  via `ListEventSource`, so the recursion needs no special case; `EventSkip.typeRef` is split out of
-  `annotationsAndTypeRef` so capture and discard share the framing's second half. **Schemaless only** — the
-  schema-driven tree readers still discard, because their `*AbstractReader` bases are shared with the bind
-  subclasses and consume the framing where the node isn't built (see `BACKLOG.md`; it's the same
-  "nothing flows out of a reader alongside its value" wall the `DiagnosticsReceiver` item hits).
-  **`TsonTreeWriter` re-emits them** — `TsonDataEmitter` gained `annotation`/`beginAnnotation`/
+- **Both tree read paths capture wire annotations** onto each node's `annotations()`, at every position §3.1
+  permits one (root, record field value, array element, both sides of a map entry, and recursively an
+  annotation's own value). `AnnotationCapture` (in `reader`) is the shared helper: an annotation's value
+  events are buffered and replayed through a schemaless tree read via `ListEventSource`, so the recursion
+  needs no special case, and an annotation's value is *always* read schemalessly — its type resolves one hop
+  against the governing namespace (§3.3.3), not against the compiled readers in scope. `EventSkip.typeRef`
+  is split out of `annotationsAndTypeRef` so capture and discard share the framing's second half.
+- **The schema-driven readers capture by hoisting, not by widening signatures.** A compiled tree reader
+  shares its `*AbstractReader` base with the bind subclass, and the base consumes the framing where the node
+  isn't built. Rather than thread annotations out of four shared shape-check methods (making bind mode carry
+  a field only tree mode reads), each tree reader — and the `AtomNodeReader`/`AbsentNodeReader` wrappers —
+  captures *first*, then calls the base/delegate, whose own framing call then finds nothing left. That's a
+  no-op precisely because every one of those readers **discards** the framing result rather than using it.
+  Bind mode is untouched. **Still open:** a value sitting directly at a *dispatched* position
+  (choice/variant/subtype) — the dispatcher must consume the annotations to reach the type-ref it dispatches
+  on, and can't hand them to the delegate that builds the node; its children keep theirs.
+- **`TsonTreeWriter` re-emits them** — `TsonDataEmitter` gained `annotation`/`beginAnnotation`/
   `endAnnotation` (the valueless form's trailing space is load-bearing, §3.1) and `writeNode` writes a
-  node's annotations ahead of its type-ref, per §7.4's `*annotation [type-ref] core-value` order — so a
-  schemaless tree round trips with its metadata, not just its values. `TsonObjectWriter` still drops the
+  node's annotations ahead of its type-ref, per §7.4's `*annotation [type-ref] core-value` order, so a tree
+  round trips with its metadata, not just its values. `TsonObjectWriter` still drops the
   `@Annotated`-captured ones.
 - **`SchemalessObjectReader` streams events** (like the compiled readers), walking the descriptor in
   parallel — never materializing a tree first. Problems report through a `TsonReadContext` (fail-fast throws

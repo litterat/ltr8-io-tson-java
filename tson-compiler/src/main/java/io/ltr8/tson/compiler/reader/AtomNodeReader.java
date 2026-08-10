@@ -4,6 +4,7 @@ import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.tree.AtomNode;
 import io.ltr8.tson.tree.NullNode;
+import io.ltr8.tson.tree.TsonAnnotation;
 import io.ltr8.tson.tree.TsonNode;
 
 import java.util.List;
@@ -26,9 +27,19 @@ final class AtomNodeReader implements TsonValueReader<TsonNode> {
         this.typeRef = Optional.of(typeRef);
     }
 
+    /**
+     * Captures this value's own annotations before delegating, rather than after: the delegate consumes the
+     * whole {@code annotation* type-ref?} framing itself and discards it, so taking the annotations first
+     * leaves its own call with nothing to consume and no behaviour change. That is what gets them onto the
+     * node without the leaf reader -- shared with bind mode -- having to hand anything back.
+     */
     @Override
     public TsonNode read(TsonReadContext ctx) {
+        List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx);
         Object value = delegate.read(ctx);
-        return value == null ? NullNode.instance() : new AtomNode(value, typeRef, List.of());
+        if (value == null) {
+            return annotations.isEmpty() ? NullNode.instance() : new NullNode(Optional.empty(), annotations);
+        }
+        return new AtomNode(value, typeRef, annotations);
     }
 }

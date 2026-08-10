@@ -4,6 +4,7 @@ import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.TsonValueReaderResolver;
 import io.ltr8.tson.tree.NullNode;
+import io.ltr8.tson.tree.TsonAnnotation;
 import io.ltr8.tson.tree.TsonNode;
 import io.ltr8.tson.tree.TupleNode;
 import io.ltr8.tson.schema.meta.SourcePosition;
@@ -42,6 +43,7 @@ final class TupleTreeReader extends TupleAbstractReader<TsonNode> {
     @Override
     public TsonNode read(TsonReadContext ctx) {
         ctx = ctx.withSchemaPosition(schemaPosition);
+        List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx);
         if (!expectTupleStart(ctx)) {
             return null;
         }
@@ -49,6 +51,6 @@ final class TupleTreeReader extends TupleAbstractReader<TsonNode> {
         for (Object decoded : decode(ctx)) {
             elements.add(decoded == null ? NullNode.instance() : (TsonNode) decoded);
         }
-        return new TupleNode(elements, Optional.of(name), List.of());
+        return new TupleNode(elements, Optional.of(name), annotations);
     }
 }

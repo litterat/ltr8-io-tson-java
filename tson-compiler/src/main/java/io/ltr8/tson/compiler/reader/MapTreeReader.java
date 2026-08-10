@@ -5,6 +5,7 @@ import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.TsonValueReaderResolver;
 import io.ltr8.tson.tree.MapNode;
 import io.ltr8.tson.tree.NullNode;
+import io.ltr8.tson.tree.TsonAnnotation;
 import io.ltr8.tson.tree.TsonNode;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.SourcePosition;
@@ -42,6 +43,7 @@ final class MapTreeReader extends MapAbstractReader<TsonNode> {
     @Override
     public TsonNode read(TsonReadContext ctx) {
         ctx = ctx.withSchemaPosition(schemaPosition);
+        List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx);
         Shape shape = expectMapShape(ctx);
         if (shape == Shape.MISMATCH) {
             return null;
@@ -50,7 +52,7 @@ final class MapTreeReader extends MapAbstractReader<TsonNode> {
         if (shape == Shape.ENTRIES) {
             readInto(ctx, (key, value) -> entries.add(new MapNode.Entry(node(key), node(value))));
         }
-        return new MapNode(entries, Optional.of(name), List.of());
+        return new MapNode(entries, Optional.of(name), annotations);
     }
 
     private static TsonNode node(Object decoded) {

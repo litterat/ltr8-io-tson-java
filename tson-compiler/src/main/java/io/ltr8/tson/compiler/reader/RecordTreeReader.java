@@ -4,6 +4,7 @@ import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.TsonValueReaderResolver;
 import io.ltr8.tson.tree.RecordNode;
+import io.ltr8.tson.tree.TsonAnnotation;
 import io.ltr8.tson.tree.TsonNode;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.SourcePosition;
@@ -48,6 +49,7 @@ final class RecordTreeReader extends RecordAbstractReader<TsonNode> {
     @Override
     public TsonNode read(TsonReadContext ctx) {
         ctx = ctx.withSchemaPosition(schemaPosition);
+        List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx);
         ShapeResult shapeResult = expectRecordShape(ctx);
         if (shapeResult.shape() == Shape.MISMATCH) {
             return null;
@@ -71,7 +73,7 @@ final class RecordTreeReader extends RecordAbstractReader<TsonNode> {
             putField(result, i, defaultOrRequireNonFixed(i, anchoredCtx));
         }
         validateGroups(anchoredCtx, seen);
-        return new RecordNode(result, Optional.of(name), List.of());
+        return new RecordNode(result, Optional.of(name), annotations);
     }
 
     /** Puts a decoded field value into {@code result} as a node, omitting a {@code null} (a missing field -- already reported). */

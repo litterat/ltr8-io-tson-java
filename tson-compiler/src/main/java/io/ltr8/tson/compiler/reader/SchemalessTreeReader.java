@@ -8,14 +8,11 @@ import io.ltr8.tson.compiler.atom.AtomType;
 import io.ltr8.tson.compiler.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.compiler.stream.AbsentEvent;
-import io.ltr8.tson.compiler.stream.AnnotationEnd;
-import io.ltr8.tson.compiler.stream.AnnotationStart;
 import io.ltr8.tson.compiler.stream.ArrayEnd;
 import io.ltr8.tson.compiler.stream.ArrayStart;
 import io.ltr8.tson.compiler.stream.DocumentEnd;
 import io.ltr8.tson.compiler.stream.EmptyBraceEvent;
 import io.ltr8.tson.compiler.stream.FieldName;
-import io.ltr8.tson.compiler.stream.ListEventSource;
 import io.ltr8.tson.compiler.stream.MapEnd;
 import io.ltr8.tson.compiler.stream.MapStart;
 import io.ltr8.tson.compiler.stream.RecordEnd;
@@ -101,7 +98,7 @@ public final class SchemalessTreeReader {
 
     /** Reads one data-value: its leading annotations and optional type-ref (§2.3), then its core-value. */
     private TsonNode readNode(TsonReadContext ctx) {
-        List<TsonAnnotation> annotations = readAnnotations(ctx);
+        List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx);
         Optional<String> typeRef = EventSkip.typeRef(ctx);
         TsonEvent e = ctx.peek();
         return switch (e) {
@@ -122,57 +119,6 @@ public final class SchemalessTreeReader {
             }
             default -> throw new IllegalStateException("unexpected event where a value was expected: " + e);
         };
-    }
-
-    /**
-     * Captures this value's own annotations (§3.1) in source order, repeats included -- a name MAY
-     * appear more than once and every occurrence is preserved. Empty is the overwhelmingly common
-     * case and allocates nothing.
-     */
-    private List<TsonAnnotation> readAnnotations(TsonReadContext ctx) {
-        if (!(ctx.peek() instanceof AnnotationStart)) {
-            return List.of();
-        }
-        List<TsonAnnotation> annotations = new ArrayList<>();
-        while (ctx.peek() instanceof AnnotationStart start) {
-            ctx.next();
-            annotations.add(new TsonAnnotation(start.name(), readAnnotationValue(ctx)));
-        }
-        return annotations;
-    }
-
-    /**
-     * The value of the annotation whose {@code AnnotationStart} was just consumed -- empty for the
-     * valueless form ({@code @name}, §3.1's "at least one whitespace character MUST follow").
-     *
-     * <p>An annotation's value is itself a full data-value that may carry annotations of its own
-     * ({@code @a:@b:val target}), so rather than special-casing that recursion, the value's events
-     * are buffered and replayed through this same reader: the nested annotations then fall out of
-     * the ordinary {@link #readNode} path. Nested annotations bracket properly in the stream, so the
-     * matching {@code AnnotationEnd} is the first one seen at depth zero. Only a single annotation's
-     * events are ever buffered -- never a value body of the enclosing document -- so this does not
-     * defeat streaming.
-     */
-    private Optional<TsonNode> readAnnotationValue(TsonReadContext ctx) {
-        if (ctx.peek() instanceof AnnotationEnd) {
-            ctx.next();
-            return Optional.empty();
-        }
-        List<TsonEvent> events = new ArrayList<>();
-        int depth = 0;
-        while (true) {
-            TsonEvent e = ctx.next();
-            if (e instanceof AnnotationEnd && depth == 0) {
-                break;
-            }
-            if (e instanceof AnnotationStart) {
-                depth++;
-            } else if (e instanceof AnnotationEnd) {
-                depth--;
-            }
-            events.add(e);
-        }
-        return Optional.of(read(TsonReadContext.throwing(new ListEventSource(events))));
     }
 
     private RecordNode readRecord(TsonReadContext ctx, Optional<String> typeRef, List<TsonAnnotation> annotations) {

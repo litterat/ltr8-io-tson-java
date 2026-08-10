@@ -34,17 +34,27 @@ the removal of the old throwaway `Map`/`List` DOM mode all landed. What's left:
     `SchemalessTreeAnnotationTest`. Note the model needed **no change** — every node type already had the
     slot, and `RecordNode`'s string-keyed `fields()` correctly mirrors §2.5's ban on annotating a field
     *name*.
-  - [ ] **Schema-driven tree capture.** Materially harder than the schemaless half, and deliberately not
-    attempted with it. The `*AbstractReader` bases are shared with the bind subclasses, so the framing is
-    consumed where the node is *not* built: `RecordAbstractReader.expectRecordShape` would have to widen
-    `ShapeResult` (and the Map/Array/Tuple equivalents likewise) to carry annotations the bind subclasses
-    don't want; `AtomNodeReader`/`BooleanReader`/`VoidReader` consume the framing inside a delegate the
-    node-building wrapper can't see; and `NamedDispatchReader`/`VariantSchemaReader` consume it and then
-    delegate through `TsonValueReader.read(TsonReadContext)`, which has nowhere to pass it. A per-context
-    "last captured" slot does not work — a record's own annotations would be clobbered by its fields'
-    before the node is constructed. **This is the same wall the `DiagnosticsReceiver` item hits** (nothing
-    can flow out of a reader alongside its value), so sequence it with that rather than threading
-    annotations through four shape-result types and re-threading them later.
+  - [x] **Schema-driven tree capture, except at a dispatched position.** The fix turned out to be
+    *hoisting*, not signature widening: every reader that consumes the framing here **discards** the result
+    (`RecordAbstractReader:159`, `MapAbstractReader:69`, `ArrayAbstractReader:68`, `TupleAbstractReader:68`,
+    `AtomValueReader:136`, `VoidReader:33` — none assigns it), so a tree reader can capture the annotations
+    *before* calling its base/delegate and leave that call a no-op. `RecordTreeReader`/`MapTreeReader`/
+    `ArrayTreeReader`/`TupleTreeReader` do it before their shape check; `AtomNodeReader`/`AbsentNodeReader`
+    (both tree-only wrappers) do it before delegating. **No shared signature changed and bind mode pays
+    nothing** — better than the `ShapeResult`-widening this item used to propose, which would have made
+    every mode carry a field only tree mode reads. `SchemaDrivenTreeAnnotationTest`.
+  - [ ] **Annotations on a value at a dispatched position.** The one case hoisting can't reach:
+    `NamedDispatchReader`/`VariantSchemaReader` must consume the annotations to get at the type-ref they
+    dispatch on, then delegate through `TsonValueReader.read(TsonReadContext)`, which has nowhere to carry
+    them. Narrow — only the dispatched value's *own* annotations are lost, its children keep theirs. Two
+    ways out: a handoff register on the context (safe because capture and take are adjacent — nothing runs
+    between the dispatcher stashing and the delegate's framing call — but invisible coupling, and a capture
+    nobody takes goes stale), or pushing the buffered annotation events back onto the stream so the delegate
+    consumes its own framing normally (no cross-object protocol, consistent with the buffer-and-replay idiom
+    already used, but `DefaultTsonReadContext.Cursor.events` is `final` and derived contexts share one
+    cursor, so it needs a pushback-capable source wired in at the top). **Decide alongside
+    `TsonValueReader.read`** — it's really a question about whether that interface grows a result type, the
+    same question `DiagnosticsReceiver` asks.
   - [x] **Write-side re-emission (tree).** `TsonDataEmitter` gained `annotation(name)` for the valueless
     form and a `beginAnnotation`/`endAnnotation` pair for the valued one; `TsonTreeWriter.writeNode` emits
     a node's annotations ahead of its type-ref, per §7.4's `*annotation [type-ref] core-value` order, which
@@ -158,6 +168,17 @@ own prose (which had gone stale on at least one of them):
     general annotation gathering** (below): the `@disjoint` marker is parsed (it's in the AST as one of
     `SchemaMap.Declaration`'s annotation lists) but dropped at resolution, so the linker's disjointness
     pass never sees it. It needs the declaration's annotations available where `disjoint` is known.
+- [ ] **A user schema cannot declare a map-typed field at all.** `map` is a meta-kernel constructor, and
+  neither `meta.tn` nor `core.tn` re-declares it (`grep -n "map" spec/m/core.tn` finds only the word
+  "mapping" in prose). So a user schema with `!!meta:".../meta.tn"` and `!!import:".../core.tn"` — the
+  ordinary shape — fails linking on `meta: map<text, text>` with `'map_text_text_<hash>' has an unresolved
+  reference 'map'`, from `TsonSchemaLinker.validateTypeRef`. Found while trying to exercise `MapTreeReader`
+  from a user schema; no test in this repo does, which is why it hadn't surfaced. Records, arrays and atoms
+  are all reachable, so this is specifically maps. §3.3.5's "fresh siblings" pattern is presumably the
+  intended fix — core.tn declares its own `doc`/`annotation`/`alias` as siblings of the kernel's entries for
+  exactly this reason — so core.tn arguably should declare a `map` the same way. Worth confirming against
+  the spec author before changing a bundled schema: either it's an omission in core.tn, or maps are
+  deliberately meta-layer-only and that isn't stated anywhere.
 - [ ] **General annotation gathering — carry declaration annotations through resolution into the
   resolved model.** Author annotations on a schema declaration (`@disjoint`, `@doc`, `@alias`, §6) are
   parsed and reach the AST (`SchemaMap.Declaration` carries `nameAnnotations` and `typeDefAnnotations`),
