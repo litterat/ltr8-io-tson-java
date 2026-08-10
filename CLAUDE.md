@@ -530,6 +530,15 @@ forces the schemaless path on a schema-aware reader.
 - **`TsonObjectReader`'s schema-aware `read` checks the target class up front** — the schema's root type
   already binds to a Java class via the name binder, so a class not assignable to that is a `TYPE_MISMATCH`
   reported *before* the value is read, not a cast failure after.
+- **`SchemalessTreeReader` captures wire annotations** onto each node's `annotations()`, at every position
+  §3.1 permits one (root, record field value, array element, both sides of a map entry, and recursively an
+  annotation's own value). An annotation's value events are buffered and replayed through the same reader
+  via `ListEventSource`, so the recursion needs no special case; `EventSkip.typeRef` is split out of
+  `annotationsAndTypeRef` so capture and discard share the framing's second half. **Schemaless only** — the
+  schema-driven tree readers still discard, because their `*AbstractReader` bases are shared with the bind
+  subclasses and consume the framing where the node isn't built (see `BACKLOG.md`; it's the same
+  "nothing flows out of a reader alongside its value" wall the `DiagnosticsReceiver` item hits). Neither
+  writer re-emits them yet.
 - **`SchemalessObjectReader` streams events** (like the compiled readers), walking the descriptor in
   parallel — never materializing a tree first. Problems report through a `TsonReadContext` (fail-fast throws
   `TsonReadException`; collecting accumulates), and a `tson-bind` `DataBindException` while narrowing /

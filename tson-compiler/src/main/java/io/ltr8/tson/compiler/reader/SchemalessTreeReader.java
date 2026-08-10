@@ -8,11 +8,14 @@ import io.ltr8.tson.compiler.atom.AtomType;
 import io.ltr8.tson.compiler.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.compiler.stream.AbsentEvent;
+import io.ltr8.tson.compiler.stream.AnnotationEnd;
+import io.ltr8.tson.compiler.stream.AnnotationStart;
 import io.ltr8.tson.compiler.stream.ArrayEnd;
 import io.ltr8.tson.compiler.stream.ArrayStart;
 import io.ltr8.tson.compiler.stream.DocumentEnd;
 import io.ltr8.tson.compiler.stream.EmptyBraceEvent;
 import io.ltr8.tson.compiler.stream.FieldName;
+import io.ltr8.tson.compiler.stream.ListEventSource;
 import io.ltr8.tson.compiler.stream.MapEnd;
 import io.ltr8.tson.compiler.stream.MapStart;
 import io.ltr8.tson.compiler.stream.RecordEnd;
@@ -26,6 +29,7 @@ import io.ltr8.tson.tree.AtomNode;
 import io.ltr8.tson.tree.MapNode;
 import io.ltr8.tson.tree.NullNode;
 import io.ltr8.tson.tree.RecordNode;
+import io.ltr8.tson.tree.TsonAnnotation;
 import io.ltr8.tson.tree.TsonNode;
 
 import java.io.InputStream;
@@ -53,8 +57,14 @@ import java.util.Optional;
  * only a schema-driven read produces a {@code TupleNode}), and {@code {}} resolves to an empty {@link
  * RecordNode} (§2.8 leaves this to the resolver; a tree with no schema picks record). This is a <i>read</i>,
  * not a collecting validation, so malformed syntax and an out-of-range built-in-typed value ({@code !uuid
- * nope}) throw; a caller wanting diagnostics uses {@code Tson.validate}. Wire annotations are not yet
- * captured (a node's {@code annotations()} is empty), matching the schema-driven readers.
+ * nope}) throw; a caller wanting diagnostics uses {@code Tson.validate}.
+ *
+ * <p><b>Wire annotations are captured</b> onto each node's own {@code annotations()}, at every position §3.1
+ * permits one: the root value, a record field's value, an array element, either side of a map entry (a
+ * {@code MapNode.Entry} key is a node, so an annotated key keeps its own), and recursively an annotation's
+ * own value. A record's <em>field name</em> never carries any -- §2.5 forbids annotations before a field
+ * name, so {@code RecordNode.fields()} is keyed by a plain string, matching the grammar. The schema-driven
+ * tree readers do not capture annotations yet.
  */
 public final class SchemalessTreeReader {
 
@@ -89,31 +99,83 @@ public final class SchemalessTreeReader {
         return root;
     }
 
-    /** Reads one data-value: its leading annotations (discarded) and optional type-ref, then its core-value. */
+    /** Reads one data-value: its leading annotations and optional type-ref (§2.3), then its core-value. */
     private TsonNode readNode(TsonReadContext ctx) {
-        Optional<String> typeRef = EventSkip.annotationsAndTypeRef(ctx);
+        List<TsonAnnotation> annotations = readAnnotations(ctx);
+        Optional<String> typeRef = EventSkip.typeRef(ctx);
         TsonEvent e = ctx.peek();
         return switch (e) {
-            case RecordStart ignored -> readRecord(ctx, typeRef);
-            case MapStart ignored -> readMap(ctx, typeRef);
-            case ArrayStart ignored -> readArray(ctx, typeRef);
+            case RecordStart ignored -> readRecord(ctx, typeRef, annotations);
+            case MapStart ignored -> readMap(ctx, typeRef, annotations);
+            case ArrayStart ignored -> readArray(ctx, typeRef, annotations);
             case EmptyBraceEvent ignored -> {
                 ctx.next();
-                yield new RecordNode(Map.of(), typeRef, List.of());
+                yield new RecordNode(Map.of(), typeRef, annotations);
             }
             case AbsentEvent ignored -> {
                 ctx.next();
-                yield new AbsentNode(typeRef, List.of());
+                yield new AbsentNode(typeRef, annotations);
             }
             case TokenEvent token -> {
                 ctx.next();
-                yield leaf(token, typeRef);
+                yield leaf(token, typeRef, annotations);
             }
             default -> throw new IllegalStateException("unexpected event where a value was expected: " + e);
         };
     }
 
-    private RecordNode readRecord(TsonReadContext ctx, Optional<String> typeRef) {
+    /**
+     * Captures this value's own annotations (§3.1) in source order, repeats included -- a name MAY
+     * appear more than once and every occurrence is preserved. Empty is the overwhelmingly common
+     * case and allocates nothing.
+     */
+    private List<TsonAnnotation> readAnnotations(TsonReadContext ctx) {
+        if (!(ctx.peek() instanceof AnnotationStart)) {
+            return List.of();
+        }
+        List<TsonAnnotation> annotations = new ArrayList<>();
+        while (ctx.peek() instanceof AnnotationStart start) {
+            ctx.next();
+            annotations.add(new TsonAnnotation(start.name(), readAnnotationValue(ctx)));
+        }
+        return annotations;
+    }
+
+    /**
+     * The value of the annotation whose {@code AnnotationStart} was just consumed -- empty for the
+     * valueless form ({@code @name}, §3.1's "at least one whitespace character MUST follow").
+     *
+     * <p>An annotation's value is itself a full data-value that may carry annotations of its own
+     * ({@code @a:@b:val target}), so rather than special-casing that recursion, the value's events
+     * are buffered and replayed through this same reader: the nested annotations then fall out of
+     * the ordinary {@link #readNode} path. Nested annotations bracket properly in the stream, so the
+     * matching {@code AnnotationEnd} is the first one seen at depth zero. Only a single annotation's
+     * events are ever buffered -- never a value body of the enclosing document -- so this does not
+     * defeat streaming.
+     */
+    private Optional<TsonNode> readAnnotationValue(TsonReadContext ctx) {
+        if (ctx.peek() instanceof AnnotationEnd) {
+            ctx.next();
+            return Optional.empty();
+        }
+        List<TsonEvent> events = new ArrayList<>();
+        int depth = 0;
+        while (true) {
+            TsonEvent e = ctx.next();
+            if (e instanceof AnnotationEnd && depth == 0) {
+                break;
+            }
+            if (e instanceof AnnotationStart) {
+                depth++;
+            } else if (e instanceof AnnotationEnd) {
+                depth--;
+            }
+            events.add(e);
+        }
+        return Optional.of(read(TsonReadContext.throwing(new ListEventSource(events))));
+    }
+
+    private RecordNode readRecord(TsonReadContext ctx, Optional<String> typeRef, List<TsonAnnotation> annotations) {
         ctx.next(); // RecordStart
         Map<String, TsonNode> fields = new LinkedHashMap<>();
         while (!(ctx.peek() instanceof RecordEnd)) {
@@ -124,10 +186,10 @@ public final class SchemalessTreeReader {
             fields.put(fieldName.name(), readNode(ctx));
         }
         ctx.next(); // RecordEnd
-        return new RecordNode(fields, typeRef, List.of());
+        return new RecordNode(fields, typeRef, annotations);
     }
 
-    private ArrayNode readArray(TsonReadContext ctx, Optional<String> typeRef) {
+    private ArrayNode readArray(TsonReadContext ctx, Optional<String> typeRef, List<TsonAnnotation> annotations) {
         ctx.next(); // ArrayStart
         List<TsonNode> elements = new ArrayList<>();
         while (!(ctx.peek() instanceof ArrayEnd)) {
@@ -137,10 +199,10 @@ public final class SchemalessTreeReader {
             elements.add(readNode(ctx));
         }
         ctx.next(); // ArrayEnd
-        return new ArrayNode(elements, typeRef, List.of());
+        return new ArrayNode(elements, typeRef, annotations);
     }
 
-    private MapNode readMap(TsonReadContext ctx, Optional<String> typeRef) {
+    private MapNode readMap(TsonReadContext ctx, Optional<String> typeRef, List<TsonAnnotation> annotations) {
         ctx.next(); // MapStart
         List<MapNode.Entry> entries = new ArrayList<>();
         while (!(ctx.peek() instanceof MapEnd)) {
@@ -152,15 +214,15 @@ public final class SchemalessTreeReader {
             entries.add(new MapNode.Entry(key, readNode(ctx)));
         }
         ctx.next(); // MapEnd
-        return new MapNode(entries, typeRef, List.of());
+        return new MapNode(entries, typeRef, annotations);
     }
 
     /** A token leaf: resolved via the built-in vocabulary if it carries a type-ref for one, else by base resolution. */
-    private TsonNode leaf(TokenEvent token, Optional<String> typeRef) {
+    private TsonNode leaf(TokenEvent token, Optional<String> typeRef, List<TsonAnnotation> annotations) {
         TokenValue tokenValue = new TokenValue(token.text(), token.form());
         Object value = typeRef.flatMap(BuiltinTypeVocabulary::lookup)
                 .<Object>map(atom -> ((AtomType<?>) atom).read(tokenValue))
                 .orElseGet(() -> ValueParser.INSTANCE.read(tokenValue));
-        return value == null ? new NullNode(typeRef, List.of()) : new AtomNode(value, typeRef, List.of());
+        return value == null ? new NullNode(typeRef, annotations) : new AtomNode(value, typeRef, annotations);
     }
 }

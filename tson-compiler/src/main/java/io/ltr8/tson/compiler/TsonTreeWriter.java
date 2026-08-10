@@ -31,8 +31,13 @@ import java.util.Optional;
  * <p><b>Round trip is value-preserving, not byte-identical:</b> a vocabulary value is emitted quoted ({@code
  * !uuid "..."}) whichever way it was written in the source, and a node re-read from the result yields an
  * equal tree. {@link MissingNode} is a navigation artifact, not a value, so writing one is a programming
- * error ({@link IllegalArgumentException}). Wire annotations are not re-emitted yet (matching {@link
- * TsonObjectWriter} and the readers, which don't capture them yet either).
+ * error ({@link IllegalArgumentException}).
+ *
+ * <p><b>Wire annotations are dropped.</b> A node's {@code annotations()} is not re-emitted, so a schemalessly
+ * read tree -- which does now carry them (§3.1) -- loses them on the way back out. {@code TsonDataEmitter}
+ * has no annotation-emitting form at all yet, which is the actual blocker. This is the one place the
+ * value-preserving claim above does not extend to: the values round trip, the metadata attached to them
+ * does not.
  */
 public final class TsonTreeWriter {
 

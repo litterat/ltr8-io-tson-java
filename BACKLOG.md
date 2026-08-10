@@ -22,11 +22,33 @@ the removal of the old throwaway `Map`/`List` DOM mode all landed. What's left:
   operations (no compiler dependency), so they belong in that module. Deferred until there's a concrete
   produce/edit use case: `TsonTreeWriter` already closes the read→edit→write loop, so these have a real
   payoff when wanted, but block nothing now.
-- [ ] **Wire-annotation capture in both read paths.** Every node's `annotations()` is empty today —
-  neither the schema-driven readers nor `TsonTreeReader` capture `@name`/`@name: value` wire annotations
-  (matching `TsonObjectWriter`/`TsonObjectReader`, which don't carry them either). Capturing them on the
-  node, and having `TsonTreeWriter` re-emit them, is the annotation-aware half the model was designed for
-  but doesn't yet exercise.
+- **Wire-annotation capture** — landed on the schemaless read path, still open on the schema-driven one
+  and on the write side:
+  - [x] **Schemaless tree capture.** `SchemalessTreeReader` now captures `@name`/`@name: value` onto each
+    node's own `annotations()`, at every position §3.1 permits one — root, record field value, array
+    element, both sides of a map entry (a `MapNode.Entry` key is a node, so an annotated key keeps its
+    own), and recursively an annotation's own value. The recursion needs no special case: an annotation's
+    value events are buffered and replayed through the same reader via `ListEventSource`, so nested
+    annotations fall out of the ordinary path. `EventSkip.typeRef` was split out of
+    `annotationsAndTypeRef` so capture and discard share the second half of the framing.
+    `SchemalessTreeAnnotationTest`. Note the model needed **no change** — every node type already had the
+    slot, and `RecordNode`'s string-keyed `fields()` correctly mirrors §2.5's ban on annotating a field
+    *name*.
+  - [ ] **Schema-driven tree capture.** Materially harder than the schemaless half, and deliberately not
+    attempted with it. The `*AbstractReader` bases are shared with the bind subclasses, so the framing is
+    consumed where the node is *not* built: `RecordAbstractReader.expectRecordShape` would have to widen
+    `ShapeResult` (and the Map/Array/Tuple equivalents likewise) to carry annotations the bind subclasses
+    don't want; `AtomNodeReader`/`BooleanReader`/`VoidReader` consume the framing inside a delegate the
+    node-building wrapper can't see; and `NamedDispatchReader`/`VariantSchemaReader` consume it and then
+    delegate through `TsonValueReader.read(TsonReadContext)`, which has nowhere to pass it. A per-context
+    "last captured" slot does not work — a record's own annotations would be clobbered by its fields'
+    before the node is constructed. **This is the same wall the `DiagnosticsReceiver` item hits** (nothing
+    can flow out of a reader alongside its value), so sequence it with that rather than threading
+    annotations through four shape-result types and re-threading them later.
+  - [ ] **Write-side re-emission.** `TsonDataEmitter` has no annotation-emitting form at all (no `'@'`
+    anywhere in it), so `TsonTreeWriter` drops what the reader now captures — a `read → write` round trip
+    is value-preserving but not annotation-preserving. Needs a bare `annotation(name)` plus a begin/end
+    pair for the valued form, emitted before the type-ref and core-value per §7.4's ordering.
 
 ## Front door / ergonomics
 

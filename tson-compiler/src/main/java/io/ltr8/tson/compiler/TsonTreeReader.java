@@ -30,8 +30,11 @@ import java.util.Optional;
  * <p>Either way the tree is streamed off the event source ({@link TsonDataStream}) directly, building nodes
  * as events arrive without an intermediate {@code DataValue} AST. This is a <i>read</i>, fail-fast: a
  * malformed document or an out-of-range typed value throws {@link TsonReadException} at the first problem;
- * a caller wanting every problem at once uses {@link Tson#validate}. Wire annotations are not yet captured
- * (a node's {@code annotations()} is empty).
+ * a caller wanting every problem at once uses {@link Tson#validate}.
+ *
+ * <p>Wire annotations are captured on the <b>schemaless</b> path only -- a node read that way carries its
+ * own {@code annotations()} (§3.1). A schema-driven read leaves them empty for now, so a document with a
+ * {@code !!schema} loses them unless read through {@link #readWithoutSchema}.
  */
 public final class TsonTreeReader {
 

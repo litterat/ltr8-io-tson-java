@@ -37,21 +37,35 @@ public final class EventSkip {
     }
 
     /**
-     * Consumes every leading annotation (discarded outright -- no reader consults per-value
-     * annotations today) and an optional type-ref, returning the type-ref's own name if present.
-     * Leaves the cursor positioned at the value's own core-value, whatever it turns out to be.
-     * Every reader calls this first, before making its own shape decision; only dispatch readers
-     * (record subtype/union/choice) consult the returned name, everything else ignores it, matching
-     * how a plain {@code DataValue.typeRef()} used to be ignored by every non-dispatch reader.
+     * Consumes every leading annotation (discarded) and an optional type-ref, returning the
+     * type-ref's own name if present. Leaves the cursor positioned at the value's own core-value,
+     * whatever it turns out to be. Every reader calls this first, before making its own shape
+     * decision; only dispatch readers (record subtype/union/choice) consult the returned name,
+     * everything else ignores it, matching how a plain {@code DataValue.typeRef()} used to be
+     * ignored by every non-dispatch reader.
+     *
+     * <p>Discarding is the default because most readers have nowhere to put an annotation. A reader
+     * that does -- {@code SchemalessTreeReader}, whose nodes each carry their own {@code
+     * annotations()} -- captures them itself and then calls {@link #typeRef} for the rest of the
+     * framing, rather than this method.
      */
     public static Optional<String> annotationsAndTypeRef(TsonReadContext ctx) {
         while (ctx.peek() instanceof AnnotationStart) {
             ctx.next();
             if (!(ctx.peek() instanceof AnnotationEnd)) {
-                dataValue(ctx); // the annotation's own value -- discarded, not consulted anywhere today
+                dataValue(ctx); // the annotation's own value -- discarded along with the annotation
             }
             ctx.next(); // AnnotationEnd
         }
+        return typeRef(ctx);
+    }
+
+    /**
+     * Consumes an optional type-ref, returning its own name if present -- the second half of a
+     * data-value's {@code annotation* type-ref?} framing, split out so a reader that captures the
+     * leading annotations instead of discarding them still shares this half.
+     */
+    public static Optional<String> typeRef(TsonReadContext ctx) {
         if (ctx.peek() instanceof TypeRef tr) {
             ctx.next();
             return Optional.of(tr.name());
