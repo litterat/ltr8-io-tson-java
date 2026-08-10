@@ -60,8 +60,9 @@ import java.util.Optional;
  * permits one: the root value, a record field's value, an array element, either side of a map entry (a
  * {@code MapNode.Entry} key is a node, so an annotated key keeps its own), and recursively an annotation's
  * own value. A record's <em>field name</em> never carries any -- §2.5 forbids annotations before a field
- * name, so {@code RecordNode.fields()} is keyed by a plain string, matching the grammar. The schema-driven
- * tree readers do not capture annotations yet.
+ * name, so {@code RecordNode.fields()} is keyed by a plain string, matching the grammar. Nothing is checked
+ * here -- with no governing schema there is no type to check an annotation against, which is [TSON-DATA]
+ * §3.1's Class 1 treatment; the schema-driven readers resolve and validate them ([TSON-SCHEMA] §6).
  */
 public final class SchemalessTreeReader {
 
@@ -98,7 +99,7 @@ public final class SchemalessTreeReader {
 
     /** Reads one data-value: its leading annotations and optional type-ref (§2.3), then its core-value. */
     private TsonNode readNode(TsonReadContext ctx) {
-        List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx);
+        List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx, AnnotationTypes.UNVALIDATED);
         Optional<String> typeRef = EventSkip.typeRef(ctx);
         TsonEvent e = ctx.peek();
         return switch (e) {

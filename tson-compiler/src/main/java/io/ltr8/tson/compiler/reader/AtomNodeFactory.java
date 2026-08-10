@@ -13,6 +13,6 @@ record AtomNodeFactory(ValueReaderFactory delegate) implements ValueReaderFactor
 
     @Override
     public TsonValueReader<?> create(String name, TypeDefinition typeDefinition, ValueReaderContext context) {
-        return new AtomNodeReader(delegate.create(name, typeDefinition, context), name);
+        return new AtomNodeReader(delegate.create(name, typeDefinition, context), name, AnnotationTypes.of(context));
     }
 }

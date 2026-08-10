@@ -88,8 +88,10 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
     /** Tree mode's {@code unit} factory: {@code void} → {@link AbsentNodeReader}, {@code value}/{@code token} → {@link AtomNodeReader} over {@link AtomValueReader#UNIT}'s own reader. */
     private static final ValueReaderFactory TREE_UNIT = (name, definition, context) ->
             "void".equals(name)
-                    ? new AbsentNodeReader(AtomValueReader.UNIT.create(name, definition, context))
-                    : new AtomNodeReader(AtomValueReader.UNIT.create(name, definition, context), name);
+                    ? new AbsentNodeReader(AtomValueReader.UNIT.create(name, definition, context),
+                            AnnotationTypes.of(context))
+                    : new AtomNodeReader(AtomValueReader.UNIT.create(name, definition, context), name,
+                            AnnotationTypes.of(context));
 
     private static Map<String, ValueReaderFactory> baseFactories(ValueReaderFactory record, ValueReaderFactory array,
             ValueReaderFactory map, ValueReaderFactory tuple, ValueReaderFactory enumFactory,

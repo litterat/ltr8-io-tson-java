@@ -25,9 +25,14 @@ import java.util.Optional;
 final class ArrayTreeReader extends ArrayAbstractReader<TsonNode> {
 
     public ArrayTreeReader(String name, ArrayBody body, TsonValueReaderResolver resolver,
-                           Optional<SourcePosition> schemaPosition) {
+                           Optional<SourcePosition> schemaPosition,
+                            AnnotationTypes annotationTypes) {
         super(name, body, resolver, schemaPosition);
+        this.annotationTypes = annotationTypes;
     }
+
+    /** The governing schema's annotation vocabulary, used to resolve and check this value's own annotations (§6). */
+    private final AnnotationTypes annotationTypes;
 
     public static final class Factory implements ValueReaderFactory {
 
@@ -37,14 +42,14 @@ final class ArrayTreeReader extends ArrayAbstractReader<TsonNode> {
             if (!(typeDefinition.body() instanceof ArrayBody body)) {
                 throw new IllegalArgumentException("'" + name + "' is not array-shaped: " + typeDefinition.body());
             }
-            return new ArrayTreeReader(name, body, resolver, typeDefinition.position());
+            return new ArrayTreeReader(name, body, resolver, typeDefinition.position(), AnnotationTypes.of(context));
         }
     }
 
     @Override
     public TsonNode read(TsonReadContext ctx) {
         ctx = ctx.withSchemaPosition(schemaPosition);
-        List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx);
+        List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx, annotationTypes);
         if (!expectArrayStart(ctx)) {
             return null;
         }

@@ -1196,13 +1196,20 @@ finds none anywhere. So even the preservation half of §6 has no representation 
 own entry; noting it here only because it means §6 is unenforced *and* unrepresentable, rather than merely
 one or the other.
 
-**Interpretation chosen:** This implementation captures annotations on both tree read paths (schemaless and
-schema-driven) and does **not** resolve or validate them — the name is kept as text and the value is read
-structurally, which is Part 1 §3.1's Class 1 treatment applied inside a Class 2 read. That is conformant
-precisely because §1.3 asks for nothing, and it is recorded here so the silence is not later mistaken for a
-deliberate "annotations are never validated" decision on this side. The machinery to do better already
-exists — a compiled reader is reachable by type name, and the governing schema is the one being read — so
-the blocker is the missing rule, not the plumbing.
+**Interpretation chosen:** §6 is implemented as though it were normative, because the alternative is that an
+entire section of the specification means nothing. On the schema-driven tree path an annotation's name is
+resolved against the governing schema and its value is read by that type's own compiled reader, so
+`@doc:42` against a text-targeted `doc` fails for the ordinary reason any wrong-typed value fails; a name
+the schema does not declare reports `UNKNOWN_TYPE_REF` and the annotation is then **kept**, read
+structurally, because [TSON-DATA] §1.5 requires preserving annotations a processor does not act on and
+dropping it would trade one conformance rule for another. §6's bare form is checked rather than assumed: `@T`
+is treated as `@T:_`, so a bare annotation on a type that does not admit the absent sentinel is a
+`TYPE_MISMATCH`. The schemaless path validates nothing, having no governing schema — that is Class 1's
+treatment and is correct there.
+
+This is a deliberate choice to be stricter than conformance requires, and it has a cost worth recording: a
+document whose annotations resolve nowhere now produces diagnostics where it previously read silently. The
+`@deprecated`/`@expires` case in §2.1 below is exactly that shape.
 
 **Suggested resolution:** Either add a Class 2 bullet giving §6 force, or mark §6 informative and say so. If
 it becomes normative, three things need stating that currently are not:

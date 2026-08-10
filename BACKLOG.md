@@ -43,21 +43,26 @@ the removal of the old throwaway `Map`/`List` DOM mode all landed. What's left:
     (both tree-only wrappers) do it before delegating. **No shared signature changed and bind mode pays
     nothing** — better than the `ShapeResult`-widening this item used to propose, which would have made
     every mode carry a field only tree mode reads. `SchemaDrivenTreeAnnotationTest`.
-  - [ ] **Resolve and validate an annotation against the schema (§6).** Capture keeps the name as text and
-    reads the value structurally, so a schema-driven read does not check annotations at all: `@nonexistent:"x"`
-    passes, `@doc:42` passes against a text-targeted `doc`, and a bare `@doc` isn't checked against §6's
-    "bare `@T` is shorthand for `@T:_`" rule. That is Class 1's "preserve without validating" running inside
-    a Class 2 read. The plumbing is already there — `ValueReaderContext.readers()` resolves a type name to
-    its compiled reader, and core's `doc`/`documentation`/`alias` are ordinary entries of any schema
-    importing it — so this is a small change: hold the resolver, resolve the annotation name, report
-    `UNKNOWN_TYPE_REF` when it doesn't resolve, and read the value through that reader instead of
-    schemalessly (the schemaless path passes no resolver and keeps today's behaviour). **Blocked on a
-    strictness decision**, not on the mechanism: §1.3's Class 2 conformance list imposes no annotation
-    obligation whatsoever (`SPEC-FEEDBACK.md` #29), and turning validation on rejects documents that read
-    today — including, apparently, [TSON-DATA] §2.1's own flagship example, whose `@deprecated`/`@expires`
-    resolve nowhere in core.tn. Reporting through `ctx.report` rather than throwing is the likely answer, so
-    a collecting read surfaces it and Part 1's MUST-preserve is still honoured. One thing to check first:
-    whether `TsonValueReaderResolver` is safe to call at *read* time or only during compilation.
+  - [x] **Annotations are resolved and type-checked against the schema (§6).** A schema-driven tree read now
+    resolves each annotation's name against the governing schema and reads its value with *that type's* own
+    compiled reader, so a wrong-typed value fails for the ordinary reason any wrong-typed value fails — no
+    separate validation pass. `AnnotationTypes` is the seam (`of(context)` for a compiled schema,
+    `UNVALIDATED` for the schemaless path, which has no governing schema and so checks nothing, correctly).
+    Read-time resolution is safe because `TsonSchemaCompiler.compile` is eager — every entry already has a
+    reader — and the lookup is gated on the schema's own `entries()` because the resolver throws for an
+    unknown name.
+    - **An unresolvable name reports `UNKNOWN_TYPE_REF` and the annotation is still kept**, read
+      structurally: [TSON-DATA] §1.5 requires preserving annotations a processor doesn't act on, so dropping
+      it would trade one conformance rule for another.
+    - **§6's bare form is checked, not assumed.** `@T` is shorthand for `@T:_`, so a synthetic absent is read
+      through the resolved reader; a bare annotation on a type that doesn't admit it is a `TYPE_MISMATCH`.
+    - Simplification that fell out: annotation values are now read **inline off the live cursor** rather than
+      buffered and replayed. The grammar guarantees the matching `AnnotationEnd` follows the single
+      data-value, so buffering bought nothing — and reading inline is what lets diagnostics reach the real
+      context instead of a throwaway one.
+    - Deliberately stricter than conformance requires — §1.3 imposes no annotation obligation at all
+      (`SPEC-FEEDBACK.md` #29). The cost: a document whose annotations resolve nowhere now produces
+      diagnostics where it previously read silently.
   - [ ] **Annotations on a value at a dispatched position.** The one case hoisting can't reach:
     `NamedDispatchReader`/`VariantSchemaReader` must consume the annotations to get at the type-ref they
     dispatch on, then delegate through `TsonValueReader.read(TsonReadContext)`, which has nowhere to carry

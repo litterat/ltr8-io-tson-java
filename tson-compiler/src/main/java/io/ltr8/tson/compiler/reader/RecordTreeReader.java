@@ -26,9 +26,14 @@ import java.util.Optional;
 final class RecordTreeReader extends RecordAbstractReader<TsonNode> {
 
     public RecordTreeReader(String name, RecordBody body, TsonValueReaderResolver resolver,
-                            Optional<SourcePosition> schemaPosition) {
+                            Optional<SourcePosition> schemaPosition,
+                            AnnotationTypes annotationTypes) {
         super(name, body, resolver, schemaPosition);
+        this.annotationTypes = annotationTypes;
     }
+
+    /** The governing schema's annotation vocabulary, used to resolve and check this value's own annotations (§6). */
+    private final AnnotationTypes annotationTypes;
 
     public static final class Factory implements ValueReaderFactory {
 
@@ -38,7 +43,8 @@ final class RecordTreeReader extends RecordAbstractReader<TsonNode> {
             if (!(typeDefinition.body() instanceof RecordBody body)) {
                 throw new IllegalArgumentException("'" + name + "' is not record-shaped: " + typeDefinition.body());
             }
-            RecordTreeReader ownParser = new RecordTreeReader(name, body, resolver, typeDefinition.position());
+            RecordTreeReader ownParser = new RecordTreeReader(name, body, resolver, typeDefinition.position(),
+                    AnnotationTypes.of(context));
             if (typeDefinition.subtypes().isEmpty()) {
                 return ownParser;
             }
@@ -49,7 +55,7 @@ final class RecordTreeReader extends RecordAbstractReader<TsonNode> {
     @Override
     public TsonNode read(TsonReadContext ctx) {
         ctx = ctx.withSchemaPosition(schemaPosition);
-        List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx);
+        List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx, annotationTypes);
         ShapeResult shapeResult = expectRecordShape(ctx);
         if (shapeResult.shape() == Shape.MISMATCH) {
             return null;

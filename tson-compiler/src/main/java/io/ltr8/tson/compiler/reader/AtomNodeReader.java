@@ -21,10 +21,12 @@ final class AtomNodeReader implements TsonValueReader<TsonNode> {
 
     private final TsonValueReader<?> delegate;
     private final Optional<String> typeRef;
+    private final AnnotationTypes annotationTypes;
 
-    AtomNodeReader(TsonValueReader<?> delegate, String typeRef) {
+    AtomNodeReader(TsonValueReader<?> delegate, String typeRef, AnnotationTypes annotationTypes) {
         this.delegate = delegate;
         this.typeRef = Optional.of(typeRef);
+        this.annotationTypes = annotationTypes;
     }
 
     /**
@@ -35,7 +37,7 @@ final class AtomNodeReader implements TsonValueReader<TsonNode> {
      */
     @Override
     public TsonNode read(TsonReadContext ctx) {
-        List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx);
+        List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx, annotationTypes);
         Object value = delegate.read(ctx);
         if (value == null) {
             return annotations.isEmpty() ? NullNode.instance() : new NullNode(Optional.empty(), annotations);

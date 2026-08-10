@@ -24,9 +24,14 @@ import java.util.Optional;
 final class MapTreeReader extends MapAbstractReader<TsonNode> {
 
     public MapTreeReader(String name, MapBody body, TsonValueReaderResolver resolver,
-                         Optional<SourcePosition> schemaPosition) {
+                         Optional<SourcePosition> schemaPosition,
+                            AnnotationTypes annotationTypes) {
         super(name, body, resolver, schemaPosition);
+        this.annotationTypes = annotationTypes;
     }
+
+    /** The governing schema's annotation vocabulary, used to resolve and check this value's own annotations (§6). */
+    private final AnnotationTypes annotationTypes;
 
     public static final class Factory implements ValueReaderFactory {
 
@@ -36,14 +41,14 @@ final class MapTreeReader extends MapAbstractReader<TsonNode> {
             if (!(typeDefinition.body() instanceof MapBody body)) {
                 throw new IllegalArgumentException("'" + name + "' is not map-shaped: " + typeDefinition.body());
             }
-            return new MapTreeReader(name, body, resolver, typeDefinition.position());
+            return new MapTreeReader(name, body, resolver, typeDefinition.position(), AnnotationTypes.of(context));
         }
     }
 
     @Override
     public TsonNode read(TsonReadContext ctx) {
         ctx = ctx.withSchemaPosition(schemaPosition);
-        List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx);
+        List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx, annotationTypes);
         Shape shape = expectMapShape(ctx);
         if (shape == Shape.MISMATCH) {
             return null;

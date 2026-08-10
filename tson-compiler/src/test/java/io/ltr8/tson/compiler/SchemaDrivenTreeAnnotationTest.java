@@ -7,33 +7,34 @@ import io.ltr8.tson.tree.TsonNode;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Wire-annotation capture on the <b>schema-driven</b> tree path, the peer of {@link
- * SchemalessTreeAnnotationTest}. Same §3.1 positions, reached through compiled readers rather than the
- * schemaless engine.
+ * Wire-annotation capture <b>and type checking</b> on the schema-driven tree path, the peer of {@link
+ * SchemalessTreeAnnotationTest} (which captures the same §3.1 positions but has no schema to check against).
  *
- * <p>The mechanism differs, and that is what this pins. A compiled tree reader shares its {@code
- * *AbstractReader} base with the bind-mode subclass, and that base consumes the {@code annotation*
- * type-ref?} framing where the node is <em>not</em> built. Rather than widen four shared shape-check
- * signatures with a field only tree mode reads, each tree reader captures the annotations itself before
- * calling the base -- the base's own framing call then finds nothing left, which is a no-op because it
- * discards the result anyway. {@link io.ltr8.tson.compiler.reader.AnnotationCapture} carries the reasoning.
+ * <p>Two mechanisms are pinned here. <b>Capture</b> works by hoisting: a compiled tree reader shares its
+ * {@code *AbstractReader} base with the bind-mode subclass, and that base consumes the {@code annotation*
+ * type-ref?} framing where the node is <em>not</em> built, so rather than widen four shared shape-check
+ * signatures with a field only tree mode reads, each tree reader captures first and leaves the base's own
+ * framing call a no-op. <b>Checking</b> follows [TSON-SCHEMA] §6: an annotation names a type, resolved one
+ * hop against the governing schema (§3.3.3), and its value is read by that type's own compiled reader -- so a
+ * wrong-typed value is a diagnostic simply because the right reader rejected it, with no separate validation
+ * pass.
  *
- * <p>Not covered here: a value sitting directly at a <em>dispatched</em> position (a choice/variant/subtype),
- * where the dispatcher must consume the annotations to reach the type-ref it dispatches on and has no way to
- * hand them to the delegate that builds the node. Its children still keep theirs.
+ * <p>The schema declares its own annotation types, which §3.3.3 explicitly allows ("An annotation type
+ * declared locally in a user schema is usable by that schema's <i>data documents</i>"), alongside core's own
+ * {@code doc}.
  *
- * <p>Two reader families are untested here for want of a fixture, not for want of the change -- each got the
- * identical one-line hoist. {@code TupleTreeReader}: no test in this repo builds a tuple from a schema.
- * {@code MapTreeReader}: a field typed {@code map<text, text>} does not link yet, because {@code
- * TsonSchemaLinker} gives the structure-namespace fallback only to a {@code source} reference and not to a
- * generic-application head, which §3.3.1 also lists as a constructor role -- see {@code BACKLOG.md} and
- * {@code SPEC-FEEDBACK.md} #28. {@link SchemalessTreeAnnotationTest} does cover map keys and values, on the
- * schemaless path.
+ * <p>Not covered: a value at a <em>dispatched</em> position (choice/variant/subtype), where the dispatcher
+ * must consume the annotations to reach the type-ref it dispatches on and cannot hand them to the delegate
+ * that builds the node; its children still keep theirs. {@code TupleTreeReader} and {@code MapTreeReader} got
+ * the identical change but have no fixture here -- no test in this repo builds a tuple from a schema, and a
+ * map-typed field does not link yet ({@code BACKLOG.md}, {@code SPEC-FEEDBACK.md} #28).
  */
 class SchemaDrivenTreeAnnotationTest {
 
@@ -43,24 +44,22 @@ class SchemaDrivenTreeAnnotationTest {
             !!meta:"https://tson.io/2026/32/m/meta.tn"
             !!import:"https://tson.io/2026/32/m/core.tn"
             {
+              label => @annotation text
+              checked => @annotation void
               point => { x: int32  y: int32 }
               shape => { name: text  origin: point  tags: [text] }
             }
             """;
 
-    private static final String DATA = """
+    private static final String VALID = """
             @doc:"a shape" !shape {
-              name: @label "square"
-              origin: @where { x: 1  y: 2 }
-              tags: @all [@first "a" "b"]
+              name: @label:"the name" "square"
+              origin: @checked { x: 1  y: 2 }
+              tags: @label:"all of them" [@checked "a" "b"]
             }
             """;
 
-    private static List<String> names(TsonNode node) {
-        return node.annotations().stream().map(TsonAnnotation::name).toList();
-    }
-
-    private static TsonNode readShape() {
+    private static TsonNode read(String data) {
         TsonSchemaSource source = uri -> {
             if (TsonSchemaRegistry.canonicalIdentity(uri).equals(TsonSchemaRegistry.canonicalIdentity(SCHEMA_ID))) {
                 return SCHEMA;
@@ -69,17 +68,20 @@ class SchemaDrivenTreeAnnotationTest {
         };
         TsonCompiledMetaRegistry core =
                 TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source);
-        TsonCompiledSchema compiled = TsonCompiledSchemaRegistry.tree(core).get(SCHEMA_ID);
-        return (TsonNode) compiled.get("shape").read(DATA);
+        return (TsonNode) TsonCompiledSchemaRegistry.tree(core).get(SCHEMA_ID).get("shape").read(data);
+    }
+
+    private static List<String> names(TsonNode node) {
+        return node.annotations().stream().map(TsonAnnotation::name).toList();
     }
 
     @Test
     void capturesAnnotationsThroughEveryCompiledTreeReader() {
-        TsonNode shape = readShape();
+        TsonNode shape = read(VALID);
 
-        // RecordTreeReader -- both the root and a nested record
+        // RecordTreeReader -- the root and a nested record
         assertEquals(List.of("doc"), names(shape));
-        assertEquals(List.of("where"), names(shape.get("origin")));
+        assertEquals(List.of("checked"), names(shape.get("origin")));
         assertTrue(shape.get("origin").isRecord());
 
         // AtomNodeReader -- a leaf, whose framing is consumed by the wrapped AtomValueReader
@@ -88,34 +90,77 @@ class SchemaDrivenTreeAnnotationTest {
         // ArrayTreeReader -- the array itself and, independently, one element
         TsonNode tags = shape.get("tags");
         assertTrue(tags.isArray());
-        assertEquals(List.of("all"), names(tags));
-        assertEquals(List.of("first"), names(tags.get(0)));
+        assertEquals(List.of("label"), names(tags));
+        assertEquals(List.of("checked"), names(tags.get(0)));
         assertEquals(List.of(), names(tags.get(1)));
     }
 
     @Test
-    void theSchemaTypeRefStillWinsOverTheWireOne() {
-        // Capture happens ahead of the base's own framing consumption, so the type-ref the base would have
-        // returned is still consumed and still ignored -- a schema-driven node's typeRef is its schema type
-        // name, not whatever the wire said. Guards against the hoist accidentally rerouting the type-ref.
-        TsonNode shape = readShape();
+    void anAnnotationValueIsReadByTheTypeItNames() {
+        // @doc resolves through core's doc -> documentation -> text, @label through this schema's own
+        // `label => @annotation text`. Both come back as read values, not raw tokens.
+        TsonNode shape = read(VALID);
 
-        assertEquals(java.util.Optional.of("shape"), shape.typeRef());
-        assertEquals(java.util.Optional.of("point"), shape.get("origin").typeRef());
-        assertEquals(java.util.Optional.of("text"), shape.get("name").typeRef());
+        assertEquals(Optional.of("a shape"), shape.annotations().get(0).value().orElseThrow().asString());
+        assertEquals(Optional.of("the name"),
+                shape.get("name").annotations().get(0).value().orElseThrow().asString());
+    }
+
+    @Test
+    void theSchemaTypeRefStillWinsOverTheWireOne() {
+        // Capture runs ahead of the base's own framing consumption, so the type-ref the base would have
+        // returned is still consumed and still ignored -- a schema-driven node's typeRef is its schema type
+        // name. Guards against the hoist accidentally rerouting the type-ref.
+        TsonNode shape = read(VALID);
+
+        assertEquals(Optional.of("shape"), shape.typeRef());
+        assertEquals(Optional.of("point"), shape.get("origin").typeRef());
+        assertEquals(Optional.of("text"), shape.get("name").typeRef());
+    }
+
+    @Test
+    void anAnnotationNamingNoTypeIsReported() {
+        // §6: an annotation names a type. A name the governing schema doesn't declare is an unresolved
+        // reference, not silently-accepted metadata.
+        TsonReadException thrown = assertThrows(TsonReadException.class,
+                () -> read("!shape { name: @nosuchthing:\"x\" \"square\"  origin: { x: 1  y: 2 }  tags: [] }"));
+
+        assertTrue(thrown.getMessage().contains("@nosuchthing"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("names no type"), thrown.getMessage());
+    }
+
+    @Test
+    void anAnnotationValueOfTheWrongTypeIsReported() {
+        // `label` is text-targeted, so a record where its value belongs is caught by text's own reader --
+        // the check falls out of using the right reader, not from a separate validation pass.
+        TsonReadException thrown = assertThrows(TsonReadException.class,
+                () -> read("!shape { name: @label:{ a: 1 } \"square\"  origin: { x: 1  y: 2 }  tags: [] }"));
+
+        assertTrue(thrown.getMessage().toLowerCase().contains("token"), thrown.getMessage());
+    }
+
+    @Test
+    void aBareAnnotationOnANonVoidTypeIsReported() {
+        // §6 makes bare `@T` shorthand for `@T:_`, so the type must admit the absent sentinel. `checked` is
+        // void-targeted and does (see VALID); `label` is text-targeted and does not.
+        TsonReadException thrown = assertThrows(TsonReadException.class,
+                () -> read("!shape { name: @label \"square\"  origin: { x: 1  y: 2 }  tags: [] }"));
+
+        assertTrue(thrown.getMessage().contains("@label"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("absent sentinel"), thrown.getMessage());
     }
 
     @Test
     void roundTripsThroughTheTreeWriter() {
-        TsonNode shape = readShape();
+        TsonNode shape = read(VALID);
 
         String written = new TsonTreeWriter().toTson(shape);
         TsonNode reread = new TsonTreeReader().read(written);
 
         assertEquals(List.of("doc"), names(reread));
         assertEquals(List.of("label"), names(reread.get("name")));
-        assertEquals(List.of("where"), names(reread.get("origin")));
-        assertEquals(List.of("all"), names(reread.get("tags")));
-        assertEquals(List.of("first"), names(reread.get("tags").get(0)));
+        assertEquals(List.of("checked"), names(reread.get("origin")));
+        assertEquals(List.of("label"), names(reread.get("tags")));
+        assertEquals(List.of("checked"), names(reread.get("tags").get(0)));
     }
 }

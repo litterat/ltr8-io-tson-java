@@ -17,15 +17,17 @@ import java.util.Optional;
 final class AbsentNodeReader implements TsonValueReader<TsonNode> {
 
     private final TsonValueReader<?> delegate;
+    private final AnnotationTypes annotationTypes;
 
-    AbsentNodeReader(TsonValueReader<?> delegate) {
+    AbsentNodeReader(TsonValueReader<?> delegate, AnnotationTypes annotationTypes) {
         this.delegate = delegate;
+        this.annotationTypes = annotationTypes;
     }
 
     /** Captures the annotations before delegating -- see {@link AtomNodeReader#read} for why that ordering is what works. */
     @Override
     public TsonNode read(TsonReadContext ctx) {
-        List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx);
+        List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx, annotationTypes);
         delegate.read(ctx); // consume the `_` (and let the delegate report any shape mismatch)
         return annotations.isEmpty() ? AbsentNode.instance() : new AbsentNode(Optional.empty(), annotations);
     }

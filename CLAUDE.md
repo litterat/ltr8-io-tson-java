@@ -546,6 +546,16 @@ forces the schemaless path on a schema-aware reader.
   Bind mode is untouched. **Still open:** a value sitting directly at a *dispatched* position
   (choice/variant/subtype) — the dispatcher must consume the annotations to reach the type-ref it dispatches
   on, and can't hand them to the delegate that builds the node; its children keep theirs.
+- **A schema-driven read also type-checks annotations** (§6: an annotation *names a type*). `AnnotationTypes`
+  resolves the name against the governing schema (§3.3.3's one hop — for a data document that's the
+  `!!schema` target, i.e. the very schema the readers were compiled from) and the value is read by *that
+  type's* compiled reader, so a wrong-typed value fails for the ordinary reason any wrong-typed value fails.
+  Read-time resolution is safe because `compile` is eager; the lookup is gated on `schema().entries()`
+  because the resolver throws for an unknown name. An unresolvable name reports `UNKNOWN_TYPE_REF` and the
+  annotation is **still kept** (§1.5 requires preserving what a processor doesn't act on); §6's bare `@T` is
+  checked as `@T:_` by reading a synthetic absent through the reader. The schemaless path checks nothing —
+  no governing schema, no type to check against. This is deliberately stricter than Class 2 conformance
+  requires, which asks for nothing at all here (`SPEC-FEEDBACK.md` #29).
 - **`TsonTreeWriter` re-emits them** — `TsonDataEmitter` gained `annotation`/`beginAnnotation`/
   `endAnnotation` (the valueless form's trailing space is load-bearing, §3.1) and `writeNode` writes a
   node's annotations ahead of its type-ref, per §7.4's `*annotation [type-ref] core-value` order, so a tree

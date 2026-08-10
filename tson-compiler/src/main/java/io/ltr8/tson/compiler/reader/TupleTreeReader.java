@@ -24,9 +24,14 @@ import java.util.Optional;
 final class TupleTreeReader extends TupleAbstractReader<TsonNode> {
 
     public TupleTreeReader(String name, TupleBody body, TsonValueReaderResolver resolver,
-                           Optional<SourcePosition> schemaPosition) {
+                           Optional<SourcePosition> schemaPosition,
+                            AnnotationTypes annotationTypes) {
         super(name, body, resolver, schemaPosition);
+        this.annotationTypes = annotationTypes;
     }
+
+    /** The governing schema's annotation vocabulary, used to resolve and check this value's own annotations (§6). */
+    private final AnnotationTypes annotationTypes;
 
     public static final class Factory implements ValueReaderFactory {
 
@@ -36,14 +41,14 @@ final class TupleTreeReader extends TupleAbstractReader<TsonNode> {
             if (!(typeDefinition.body() instanceof TupleBody body)) {
                 throw new IllegalArgumentException("'" + name + "' is not tuple-shaped: " + typeDefinition.body());
             }
-            return new TupleTreeReader(name, body, resolver, typeDefinition.position());
+            return new TupleTreeReader(name, body, resolver, typeDefinition.position(), AnnotationTypes.of(context));
         }
     }
 
     @Override
     public TsonNode read(TsonReadContext ctx) {
         ctx = ctx.withSchemaPosition(schemaPosition);
-        List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx);
+        List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx, annotationTypes);
         if (!expectTupleStart(ctx)) {
             return null;
         }
