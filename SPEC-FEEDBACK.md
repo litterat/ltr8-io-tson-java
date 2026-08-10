@@ -1094,3 +1094,65 @@ which of its constraint-vocabulary fields are ordered (tightening checkable and 
 refinement may restate but not change — `spec`/`specification` are already `REQUIRED_FIXED` and behave this
 way). Failing that, at minimum reconcile core.tn's "a narrowing may set `component`" with §5.7's own wording:
 if a selector swap is legal, the refinement rule cannot be stated purely as tightening.
+
+## 28. A generic-application head resolves through two namespaces with silent shadowing between them, and the precedence is stated less precisely than the equivalent rule for `!` targets
+
+**Section:** Part 2 §3.3.1 (structure namespace, "Generic-application heads"), §3.3.2 (type-name namespace
+lookup order), §5.10 (parameters).
+
+**Problem:** §3.3.1 does answer the basic question, and clearly — a generic-application head *is* a
+constructor role, with `map<text, text>` given as the literal example:
+
+> - **Generic-application heads** — the name before `<` when the name is not otherwise in scope
+>   (`map<text, text>`, `set<text>`).
+
+So a user schema whose `!!meta` is `meta.tn` can write `map<text, X>` as a field type: `meta.tn` imports the
+meta-kernel, and §3.3.1's own "Import what you expose" paragraph names that import as the delivery mechanism
+for exactly this vocabulary. No re-declaration in `core.tn` is needed. What is underspecified is everything
+around that answer.
+
+**1. The same precedence rule is written two different ways.** For `!` targets §3.3.1 is explicit and
+ordered: "`C` resolves first against the type-name namespace … and then against the structure namespace."
+For generic heads it says only "when the name is not otherwise in scope". Presumably identical intent, but
+one formulation is normative and testable and the other leaves "otherwise in scope" undefined. Reading it
+against §3.3.2, "in scope" must mean the type-name namespace, whose lookup order is *parameters, then local
+declarations, then imports* — but the reader has to assemble that themselves.
+
+**2. Shadowing is silent, unpoliced, and has no escape hatch.** Because the type-name namespace is consulted
+first, a schema that declares — or merely imports — anything named `map` silently captures every
+`map<…>` in that document. Adding an unrelated local declaration called `map` retroactively changes the
+meaning of existing field types, with no diagnostic and no syntax for naming the structure-namespace entry
+once it is shadowed. The spec clearly does care about accidental capture elsewhere: §3.3.2 requires
+`!!import` names to "be disjoint from each other and from local entries (§2.2.3)". Capture *across* the two
+namespaces is the one direction left unchecked, and it is the direction where the shadowed name is invisible
+in the document doing the shadowing.
+
+**3. Are type parameters eligible at a generic head?** §3.3.2 puts parameters *first*, ahead of local
+declarations. Taken literally that makes `weird => <map> map<text, text>` resolve `map` to the type
+parameter, applying a parameter as though it were a constructor — which has no arity, no `parameters` list,
+and no meaning under §5.10. Either parameters should be excluded from the "otherwise in scope" test at a
+generic head, or applying one should be named as a resolver error; the text supports neither today.
+
+**4. Whether the constructor gate applies depends on which namespace won.** §3.3.1 requires that "an entry
+consumed at an *author-written* constructor role MUST be a constructor (`constructor: true`)". But a head
+that *is* otherwise in scope was never at a constructor role, so the gate never fires for it — which is
+correct and necessary, since a local parameterized template (`array_min<text, 1>`, §5.10) is not a
+constructor and must remain applicable. The consequence is that one syntax carries two different validity
+rules, selected by a lookup outcome the author cannot see. That is defensible, but it reads as a
+contradiction until spelled out, and §5.10 never mentions the interaction.
+
+**Interpretation chosen:** The spec is followed as written for `!` targets and for `source`, and **this
+implementation currently gets generic heads wrong** — `TsonSchemaLinker` threads a `structureNamespace` into
+its validation pass but applies it only to a `source` reference, so a user schema's `map<text, X>` fails
+linking with `'map_text_text_<hash>' has an unresolved reference 'map'` even though §3.3.1 says it must
+resolve. That is a defect on this side, not a spec gap, and is tracked in `BACKLOG.md`. The fix is to extend
+the fallback to generic-application heads with §3.3.2's ordering (parameters, locals, imports, then the
+structure namespace), and to reject a parameter used as a generic head rather than attempting to apply it.
+
+**Suggested resolution:** State the generic-head rule with the same explicit ordering the `!`-target rule
+already uses, rather than the looser "not otherwise in scope". Say whether parameters participate in that
+lookup, and what happens when one wins. Say explicitly that the constructor gate applies only when the head
+resolved through the structure namespace, so the template-application case is visibly legal. And decide
+whether cross-namespace shadowing is intended: if it is, say so and note that a schema can capture a
+constructor name; if not, either require a diagnostic when a local name shadows a structure-namespace
+constructor that the document also applies generically, or provide a way to name the shadowed one.

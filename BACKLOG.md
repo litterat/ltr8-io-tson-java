@@ -168,17 +168,26 @@ own prose (which had gone stale on at least one of them):
     general annotation gathering** (below): the `@disjoint` marker is parsed (it's in the AST as one of
     `SchemaMap.Declaration`'s annotation lists) but dropped at resolution, so the linker's disjointness
     pass never sees it. It needs the declaration's annotations available where `disjoint` is known.
-- [ ] **A user schema cannot declare a map-typed field at all.** `map` is a meta-kernel constructor, and
-  neither `meta.tn` nor `core.tn` re-declares it (`grep -n "map" spec/m/core.tn` finds only the word
-  "mapping" in prose). So a user schema with `!!meta:".../meta.tn"` and `!!import:".../core.tn"` — the
-  ordinary shape — fails linking on `meta: map<text, text>` with `'map_text_text_<hash>' has an unresolved
-  reference 'map'`, from `TsonSchemaLinker.validateTypeRef`. Found while trying to exercise `MapTreeReader`
-  from a user schema; no test in this repo does, which is why it hadn't surfaced. Records, arrays and atoms
-  are all reachable, so this is specifically maps. §3.3.5's "fresh siblings" pattern is presumably the
-  intended fix — core.tn declares its own `doc`/`annotation`/`alias` as siblings of the kernel's entries for
-  exactly this reason — so core.tn arguably should declare a `map` the same way. Worth confirming against
-  the spec author before changing a bundled schema: either it's an omission in core.tn, or maps are
-  deliberately meta-layer-only and that isn't stated anywhere.
+- [ ] **A generic-application head doesn't get the structure-namespace fallback, so `map<text, X>` won't
+  link in a user schema.** §3.3.1 lists "generic-application heads — the name before `<` when the name is
+  not otherwise in scope" as one of the **constructor roles** where the structure namespace *is* consulted,
+  and gives `map<text, text>` as its literal example. A user schema's `!!meta` is meta.tn, meta.tn imports
+  meta-kernel, so `map` is in that schema's structure namespace and the reference must resolve.
+  `TsonSchemaLinker` already threads a `structureNamespace` through to `validateEntry`, but applies it as a
+  fallback **only for `source`** (see the comment at `TsonSchemaLinker.java:584`, "Unlike every other
+  reference below, `source` gets the structure-namespace fallback"), so a field typed `map<text, X>` fails
+  with `'map_text_text_<hash>' has an unresolved reference 'map'`.
+  - **Nothing is wrong with core.tn** — an earlier reading of this had core.tn needing to re-declare `map`
+    as a §3.3.5 "fresh sibling". It doesn't; the structure namespace is the delivery mechanism, which
+    §3.3.1's own "Import what you expose" paragraph states directly.
+  - The fix is to extend the fallback to generic-application heads using §3.3.2's ordering — parameters,
+    local declarations, imports, then the structure namespace — and to reject a *parameter* used as a
+    generic head rather than trying to apply it (a parameter has no arity).
+  - Surfaced while trying to exercise `MapTreeReader` from a user schema; no test in this repo declares a
+    map-typed field, which is why it hadn't shown up. Records, arrays and atoms are unaffected.
+  - The surrounding scoping questions this raised — how precedence is worded, silent cross-namespace
+    shadowing, whether parameters are eligible at a head, and when the `constructor: true` gate applies —
+    are `SPEC-FEEDBACK.md` #28.
 - [ ] **General annotation gathering — carry declaration annotations through resolution into the
   resolved model.** Author annotations on a schema declaration (`@disjoint`, `@doc`, `@alias`, §6) are
   parsed and reach the AST (`SchemaMap.Declaration` carries `nameAnnotations` and `typeDefAnnotations`),

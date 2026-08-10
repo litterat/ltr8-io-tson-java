@@ -29,10 +29,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>Two reader families are untested here for want of a fixture, not for want of the change -- each got the
  * identical one-line hoist. {@code TupleTreeReader}: no test in this repo builds a tuple from a schema.
- * {@code MapTreeReader}: a user schema cannot declare a map-typed field at all, because {@code map} is a
- * meta-kernel constructor that neither {@code meta.tn} nor {@code core.tn} re-declares, so {@code
- * map<text, text>} fails linking with "unresolved reference 'map'". {@link SchemalessTreeAnnotationTest}
- * does cover map keys and values, on the schemaless path.
+ * {@code MapTreeReader}: a field typed {@code map<text, text>} does not link yet, because {@code
+ * TsonSchemaLinker} gives the structure-namespace fallback only to a {@code source} reference and not to a
+ * generic-application head, which §3.3.1 also lists as a constructor role -- see {@code BACKLOG.md} and
+ * {@code SPEC-FEEDBACK.md} #28. {@link SchemalessTreeAnnotationTest} does cover map keys and values, on the
+ * schemaless path.
  */
 class SchemaDrivenTreeAnnotationTest {
 
