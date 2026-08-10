@@ -21,11 +21,19 @@ import java.util.Optional;
  * caller follows this with {@link EventSkip#typeRef} (or lets whatever it delegates to consume the type-ref
  * itself -- see the "hoisting" note below).
  *
- * <p><b>Annotation values are read schemalessly, even during a schema-driven read.</b> An annotation names a
- * type resolved one hop against the governing target's namespace ([TSON-SCHEMA] §3.3.3), which is a different
- * namespace from the one the surrounding compiled readers were built against -- there is no compiled reader
- * for an arbitrary annotation type at an arbitrary position. Reading the value structurally is the honest
- * treatment and matches Part 1's own "preserved, ordered metadata with no further interpretation".
+ * <p><b>The schema is not consulted -- a known gap, not a design choice.</b> An annotation's name is kept as
+ * text and its value is read structurally, even during a schema-driven read. [TSON-SCHEMA] §6 requires more
+ * than that: an annotation names a type, resolved one hop against the governing target's namespace (§3.3.3 --
+ * for a data document, the {@code !!schema} target, which is exactly the schema the surrounding compiled
+ * readers were built from), and its value is validated against that type's contract. So {@code
+ * @nonexistent:"x"} and {@code @doc:42} both pass here today, and a bare {@code @doc} is not checked against
+ * §6's "bare {@code @T} is shorthand for {@code @T:_}" rule.
+ *
+ * <p>The plumbing for the real treatment exists -- {@link ValueReaderContext#readers} resolves a type name to
+ * its compiled reader, and core's {@code doc}/{@code documentation}/{@code alias} are ordinary entries of any
+ * schema importing it. What is missing is the decision about strictness, because [TSON-SCHEMA] §1.3's Class 2
+ * conformance list imposes no annotation obligation at all, and turning validation on would reject documents
+ * that read today. See {@code SPEC-FEEDBACK.md} #29 and {@code BACKLOG.md}.
  *
  * <p><b>Hoisting.</b> A tree reader that wraps or extends a reader which itself consumes the framing calls
  * this <em>first</em>, then delegates: every such reader discards the framing result rather than using it, so

@@ -1156,3 +1156,65 @@ resolved through the structure namespace, so the template-application case is vi
 whether cross-namespace shadowing is intended: if it is, say so and note that a schema can capture a
 constructor name; if not, either require a diagnostic when a local name shadows a structure-namespace
 constructor that the document also applies generically, or provide a way to name the shadowed one.
+
+## 29. §6 makes annotations typed, resolved and validated, but the Class 2 conformance list requires nothing of them — so the whole section has no normative force
+
+**Section:** Part 2 §1.3 (Class 2 conformance), §6 (Annotations as Types), §3.3.3 (annotation resolution);
+[TSON-DATA] §1.5 (Class 1 conformance), §3.1.
+
+**Problem:** §6 states a strong contract:
+
+> This section defines annotation semantics: an annotation is a typed metadata attachment, **resolved and
+> validated against a type reachable through the schema chain.** … The value is validated against `T`'s
+> contract.
+
+with §3.3.3 fixing where the name resolves (one hop against the governing target's namespace — the
+`!!schema` target for a data document). Nothing in the conformance definition requires any of it. §1.3's
+Class 2 bullet list covers pre-loading the kernel, resolving type annotations, producing `type_definition`
+output, ingest, identity agreement, hash verification, and error categories. **There is no bullet about
+`@` annotations at all** — not to resolve them, not to validate a value against `T`'s contract, not to
+preserve them in resolver output.
+
+So a processor that ignores §6 in its entirety is fully Class 2 conformant, and two conforming processors can
+disagree completely on whether `@nonexistent:"x"`, `@doc:42` (where `doc` is text-targeted), or a bare
+`@doc` (where §6 makes it shorthand for `@doc:_`, which text does not admit) is valid — with nothing in the
+conformance model to settle it. That is the outcome [TSON-DATA] §1.5 explicitly designs *against* one layer
+down, in near-identical circumstances: "the vocabulary is implemented as a unit, so two conforming
+processors never disagree on whether a built-in name is meaningful."
+
+**A terminology trap makes the gap easy to miss.** §1.3's second bullet reads "MUST resolve type annotations
+through the active schema when one is in scope" — which looks like it covers this and does not. Throughout
+the series "type annotation" means `!T` (§3.2), a distinct construct from an "annotation" `@T` (§3.1); Part 1
+§1 lists "annotations, type annotations, and directives" as three separate things, and §1.5 keeps them
+separate in the same way. The bullet is about `!T` only. A reader scanning the conformance list for
+annotation obligations will find that bullet and reasonably conclude the matter is handled.
+
+**Compounding this**, §2.1 and §6 both assert that resolver output *preserves* annotations in their authored
+positions, and §6 says `field-def` annotations "map to the `record_field` in resolver output" — but the
+kernel's `record_field` and `type_definition` have no annotations field, and `grep -rn "annotations:" spec/`
+finds none anywhere. So even the preservation half of §6 has no representation to land in. That deserves its
+own entry; noting it here only because it means §6 is unenforced *and* unrepresentable, rather than merely
+one or the other.
+
+**Interpretation chosen:** This implementation captures annotations on both tree read paths (schemaless and
+schema-driven) and does **not** resolve or validate them — the name is kept as text and the value is read
+structurally, which is Part 1 §3.1's Class 1 treatment applied inside a Class 2 read. That is conformant
+precisely because §1.3 asks for nothing, and it is recorded here so the silence is not later mistaken for a
+deliberate "annotations are never validated" decision on this side. The machinery to do better already
+exists — a compiled reader is reachable by type name, and the governing schema is the one being read — so
+the blocker is the missing rule, not the plumbing.
+
+**Suggested resolution:** Either add a Class 2 bullet giving §6 force, or mark §6 informative and say so. If
+it becomes normative, three things need stating that currently are not:
+
+1. **What happens when an annotation's name does not resolve.** A resolver error, a diagnostic, or preserved
+   unvalidated? This collides with [TSON-DATA] §3.1's "MUST preserve annotations without validating them" and
+   §1.5's "MUST preserve … type annotations outside the vocabulary" — Part 1 mandates keeping what it cannot
+   interpret, so Part 2 should say whether Class 2 keeps or rejects what it cannot resolve.
+2. **Whether validation is required or permitted.** MUST and MAY give very different interoperability, and
+   §1.5's own "implemented as a unit" argument suggests MUST is the intent.
+3. **Part 1 §2.1's own example needs checking against the answer.** It writes `tier: @deprecated GOLD` and
+   `@expires:"2026-12-31"` in a *data* document. `core.tn` declares only `annotation`, `documentation`,
+   `doc`, and `alias` for data documents; `deprecated` lives in `meta.tn`, which governs schema documents.
+   Under §3.3.3 both are unresolvable unless the example's own `order.tn1` declares them locally. If §6
+   becomes enforced, the series' flagship example is the first thing a strict processor rejects.
