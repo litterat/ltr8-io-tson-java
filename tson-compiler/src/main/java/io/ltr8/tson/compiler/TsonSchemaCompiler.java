@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.compiler.reader.CompiledReaders;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryResolver;
 import io.ltr8.tson.compiler.reader.DeferredValueReader;
 import io.ltr8.tson.compiler.reader.ErrorReader;
@@ -118,7 +119,11 @@ public final class TsonSchemaCompiler {
         for (String name : linkedSchema.schema().entries().keySet()) {
             compilation.resolve(name);
         }
-        return new TsonCompiledSchema(linkedSchema, Map.copyOf(compilation.finished));
+        TsonCompiledSchema compiled = new TsonCompiledSchema(linkedSchema, Map.copyOf(compilation.finished));
+        // Hand every reader that resolves at *read* time over to the finished schema, releasing this
+        // compilation -- see CompiledReaders, and the "never escape" invariant below that this preserves.
+        compilation.readers.bind(compiled);
+        return compiled;
     }
 
     /**
@@ -126,12 +131,26 @@ public final class TsonSchemaCompiler {
      * logic -- {@code finished}/{@code building} never escape a single {@link #compile} invocation
      * (the finished map is copied into an immutable {@link TsonCompiledSchema} once compilation
      * completes; {@code building} is discarded entirely).
+     *
+     * <p>That invariant needs {@link CompiledReaders} to hold. A reader that resolves a name at <em>read</em>
+     * time -- a dispatch reader choosing a variant, an annotation resolving the type it names -- has to keep
+     * whatever it was handed for lookups, so handing it {@code this::resolve} directly would keep this whole
+     * object, and both mutable collections, reachable for as long as any reader is. The handle is what every
+     * reader gets instead, and rebinding it to the finished schema at the end of the walk is what actually
+     * makes "never escape" true rather than aspirational.
      */
     private static final class Compilation {
         private final TsonSchema schema;
         private final Function<String, ValueReaderFactory> factoryFor;
         private final Map<String, TsonValueReader<?>> finished = new LinkedHashMap<>();
         private final Set<String> building = new LinkedHashSet<>();
+
+        /**
+         * What every built reader is handed for its own name lookups. Resolves through this compilation
+         * while the walk runs, then is rebound to the finished schema so nothing here outlives the call --
+         * a reader that resolves at read time (dispatch, annotations) holds this, not {@code this}.
+         */
+        private final CompiledReaders readers = new CompiledReaders(this::resolve);
 
         Compilation(TsonSchema schema, Function<String, ValueReaderFactory> factoryFor) {
             this.schema = schema;
@@ -171,7 +190,7 @@ public final class TsonSchemaCompiler {
                 return resolve(r.target().name());
             }
             ValueReaderFactory factory = factoryFor.apply(TsonCompiledMetaSchema.typenameOf(body));
-            return factory.create(name, definition, new ValueReaderContext(schema, this::resolve));
+            return factory.create(name, definition, new ValueReaderContext(schema, readers));
         }
     }
 }

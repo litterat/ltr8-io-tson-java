@@ -1,6 +1,8 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TsonValueReader;
+import io.ltr8.tson.compiler.TsonValueReaderResolver;
+import io.ltr8.tson.schema.TsonSchema;
 
 import java.util.Optional;
 
@@ -20,28 +22,33 @@ import java.util.Optional;
  * Class 1 read preserves annotations without validating them, [TSON-DATA] §3.1), the second is an unresolved
  * reference worth a diagnostic.
  */
-record AnnotationTypes(Optional<ValueReaderContext> scope) {
+record AnnotationTypes(Optional<TsonSchema> schema, TsonValueReaderResolver readers) {
 
     /** No governing schema: every annotation is preserved as authored, none is resolved or checked. */
-    static final AnnotationTypes UNVALIDATED = new AnnotationTypes(Optional.empty());
+    static final AnnotationTypes UNVALIDATED = new AnnotationTypes(Optional.empty(), name -> null);
 
-    /** The vocabulary a compiled schema offers -- its own entries, which already include everything it imports. */
+    /**
+     * The vocabulary a compiled schema offers -- its own entries, which already include everything it
+     * imports. Takes the {@link ValueReaderContext} apart rather than storing it: that record is the
+     * <em>compile</em>-time environment, and what is wanted here outlives compilation. The resolver it
+     * carries is a {@link CompiledReaders}, so after the walk this reaches the finished schema rather than
+     * the compilation that built it.
+     */
     static AnnotationTypes of(ValueReaderContext context) {
-        return new AnnotationTypes(Optional.of(context));
+        return new AnnotationTypes(Optional.of(context.schema()), context.readers());
     }
 
     /** Whether a governing schema is in scope at all, and so whether an unresolvable name is a defect. */
     boolean validating() {
-        return scope.isPresent();
+        return schema.isPresent();
     }
 
     /**
      * The compiled reader for the type {@code name} names, or empty when nothing declares it (or when
-     * nothing is in scope to declare it). Gated on the schema's own entries because the compiler's resolver
-     * throws for a name it has no entry for, and an author's typo is a diagnostic, not an exception.
+     * nothing is in scope to declare it). Gated on the schema's own entries because resolution throws for a
+     * name it has no entry for, and an author's typo is a diagnostic, not an exception.
      */
     Optional<TsonValueReader<?>> readerFor(String name) {
-        return scope.filter(context -> context.schema().entries().containsKey(name))
-                .map(context -> context.readers().resolve(name));
+        return schema.filter(s -> s.entries().containsKey(name)).map(s -> readers.resolve(name));
     }
 }

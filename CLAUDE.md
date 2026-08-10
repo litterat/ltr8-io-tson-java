@@ -400,6 +400,16 @@ door a caller holds (`T read(TsonReadContext)`, plus `read(String)`/`read(InputS
 
 - **Eager, not lazy** — `compile` walks and resolves every entry, so a caller reading only a few types
   still gets the assurance that every entry compiles, and a broken entry surfaces at compile time.
+- **`CompiledReaders` is the name→reader handle every reader is given, and it is rebound once.** Name lookup
+  is needed in two phases with different rightful sources: during the walk only the in-progress `Compilation`
+  can answer, but a reader that resolves at *read* time (`NamedDispatchReader`/`VariantSchemaReader`/
+  `VariantBindReader` picking a variant; `AnnotationTypes` resolving the type an annotation names) should be
+  asking the finished, immutable `TsonCompiledSchema`. Handing readers `Compilation::resolve` directly — a
+  *bound* method reference — keeps its mutable `finished`/`building` collections reachable for as long as any
+  reader is, contradicting `Compilation`'s own "never escape a single compile invocation" invariant. So
+  `compileWith` binds the handle to the compiled schema as its last step, **replacing** the compile-time
+  delegate rather than falling back to it, which is what actually makes that invariant true.
+  `CompiledReadersTest` pins the handover; a second `bind` is rejected.
 - **`ErrorReader` makes eager building survive coverage gaps.** A `RuntimeException` while building one
   entry is caught and substituted with an `ErrorReader` wrapping it — the schema still compiles, only
   *reading* that entry fails, with the original message preserved. Real causes: a constructor with no
