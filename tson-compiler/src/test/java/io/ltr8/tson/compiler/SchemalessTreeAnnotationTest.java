@@ -124,6 +124,43 @@ class SchemalessTreeAnnotationTest {
     }
 
     @Test
+    void writesAnnotationsBackAheadOfTheTypeRef() {
+        // §7.4's data-value = *annotation [type-ref] core-value fixes the order, and §3.1's boundary rule
+        // is why the valueless form needs its trailing space -- without it `@deprecated` would run into
+        // the value it annotates.
+        TsonNode root = read("@doc:\"an order\" !order { tier: @deprecated GOLD }");
+
+        assertEquals("@doc:\"an order\" !order { tier: @deprecated \"GOLD\" }", new TsonTreeWriter().toTson(root));
+    }
+
+    @Test
+    void roundTripsEveryAnnotationPositionThroughTheWriter() {
+        // The end-to-end proof: read -> write -> read yields an equal tree, so nothing is lost at any of
+        // the positions the first test enumerates. Not byte-identical -- GOLD writes back quoted -- which
+        // is TsonTreeWriter's documented value-preserving (not byte-preserving) contract.
+        String source = """
+                @doc:"an order" @rev:2 !order {
+                  tier: @deprecated GOLD
+                  tags: [@first "a" "b"]
+                  discounts: { @expires:"2026-12-31" WELCOME10 => @rate "10%" }
+                  note: @a:@b:val target extra
+                  nothing: @unset _
+                }
+                """;
+        TsonNode once = read(source);
+
+        String written = new TsonTreeWriter().toTson(once);
+        TsonNode twice = read(written);
+
+        assertEquals(once, twice, () -> "round trip lost something; wrote: " + written);
+        // and spot-check that the annotations really are present after the round trip, not equally absent
+        assertEquals(List.of("doc", "rev"), names(twice));
+        assertEquals(List.of("deprecated"), names(twice.get("tier")));
+        assertEquals(List.of("unset"), names(twice.get("nothing")));
+        assertTrue(twice.get("nothing").isAbsent());
+    }
+
+    @Test
     void anUnannotatedDocumentReportsEmptyEverywhere() {
         TsonNode root = read("{ a: 1  b: [2]  c: { k => 3 } }");
 

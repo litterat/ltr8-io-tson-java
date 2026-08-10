@@ -83,6 +83,41 @@ public final class TsonDataEmitter {
         return this;
     }
 
+    // ── Annotations (§3.1) ──────────────────────────────────────────────────
+
+    /**
+     * {@code @name } -- a valueless annotation. <b>The trailing space is required, not cosmetic:</b>
+     * §3.1 makes the single character after the name the whole of the boundary rule, so with no
+     * {@code ":"} at least one whitespace character MUST follow, or the name runs into whatever
+     * comes next.
+     */
+    public TsonDataEmitter annotation(String name) {
+        out.append('@').append(name).append(' ');
+        return this;
+    }
+
+    /**
+     * {@code @name:} -- opens an annotation carrying a value; the caller writes exactly one
+     * data-value next, then calls {@link #endAnnotation()}. The {@code ":"} is emitted adjacent to
+     * the name as §7.5 requires, and nothing follows it here: whitespace after the colon is
+     * optional, and omitting it keeps the common {@code @doc:"..."} form compact.
+     */
+    public TsonDataEmitter beginAnnotation(String name) {
+        out.append('@').append(name).append(':');
+        return this;
+    }
+
+    /**
+     * Closes the annotation opened by {@link #beginAnnotation}: a single space separating its value
+     * from whatever follows -- a sibling annotation, the type-ref, or the annotated value's own
+     * core-value. An annotation's value terminates at the end of its own core value (§3.1), so
+     * separation is all that is needed; there is no closing delimiter to match.
+     */
+    public TsonDataEmitter endAnnotation() {
+        out.append(' ');
+        return this;
+    }
+
     // ── Type annotations (§3.2) ─────────────────────────────────────────────
 
     /** {@code !name }, adjacent to {@code name} per §3.2, one trailing space before the value. */

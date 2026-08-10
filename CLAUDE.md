@@ -537,8 +537,12 @@ forces the schemaless path on a schema-aware reader.
   `annotationsAndTypeRef` so capture and discard share the framing's second half. **Schemaless only** — the
   schema-driven tree readers still discard, because their `*AbstractReader` bases are shared with the bind
   subclasses and consume the framing where the node isn't built (see `BACKLOG.md`; it's the same
-  "nothing flows out of a reader alongside its value" wall the `DiagnosticsReceiver` item hits). Neither
-  writer re-emits them yet.
+  "nothing flows out of a reader alongside its value" wall the `DiagnosticsReceiver` item hits).
+  **`TsonTreeWriter` re-emits them** — `TsonDataEmitter` gained `annotation`/`beginAnnotation`/
+  `endAnnotation` (the valueless form's trailing space is load-bearing, §3.1) and `writeNode` writes a
+  node's annotations ahead of its type-ref, per §7.4's `*annotation [type-ref] core-value` order — so a
+  schemaless tree round trips with its metadata, not just its values. `TsonObjectWriter` still drops the
+  `@Annotated`-captured ones.
 - **`SchemalessObjectReader` streams events** (like the compiled readers), walking the descriptor in
   parallel — never materializing a tree first. Problems report through a `TsonReadContext` (fail-fast throws
   `TsonReadException`; collecting accumulates), and a `tson-bind` `DataBindException` while narrowing /

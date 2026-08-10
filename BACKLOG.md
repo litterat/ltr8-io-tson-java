@@ -45,10 +45,17 @@ the removal of the old throwaway `Map`/`List` DOM mode all landed. What's left:
     before the node is constructed. **This is the same wall the `DiagnosticsReceiver` item hits** (nothing
     can flow out of a reader alongside its value), so sequence it with that rather than threading
     annotations through four shape-result types and re-threading them later.
-  - [ ] **Write-side re-emission.** `TsonDataEmitter` has no annotation-emitting form at all (no `'@'`
-    anywhere in it), so `TsonTreeWriter` drops what the reader now captures — a `read → write` round trip
-    is value-preserving but not annotation-preserving. Needs a bare `annotation(name)` plus a begin/end
-    pair for the valued form, emitted before the type-ref and core-value per §7.4's ordering.
+  - [x] **Write-side re-emission (tree).** `TsonDataEmitter` gained `annotation(name)` for the valueless
+    form and a `beginAnnotation`/`endAnnotation` pair for the valued one; `TsonTreeWriter.writeNode` emits
+    a node's annotations ahead of its type-ref, per §7.4's `*annotation [type-ref] core-value` order, which
+    is why it runs once at the top of `writeNode` rather than inside each shape's own method. An
+    annotation's value is written as an ordinary node, so a nested one needs no special case. The
+    valueless form's trailing space is load-bearing, not cosmetic — §3.1 makes the character after the
+    name the whole boundary rule. `SchemalessTreeAnnotationTest` round-trips every annotatable position.
+  - [ ] **Write-side re-emission (object).** `TsonObjectWriter` still skips the `@Annotated` carrier field
+    (`TsonObjectWriter:152`), so a bound object's captured annotations are dropped. The emitter half is
+    now built, so this is just wiring — but it's on the `tson-bind` side of the annotation work, which is
+    parked.
 
 ## Front door / ergonomics
 

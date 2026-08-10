@@ -83,9 +83,9 @@ annotation to reach for any more than a schemaless reader has one to validate ag
 always write back as `!base64`, regardless of which of `base64`/`base64url`/`base32`/`hex` they were
 originally decoded from — that information doesn't survive decoding, so `!base64` is an arbitrary but
 reasonable default. Tuples write as plain arrays, with nothing marking them as tuples at all. Wire-format
-annotations aren't re-emitted by either writer — neither the ones `@Annotated` captures into a bound object
-nor the ones a schemaless tree read now captures onto every `TsonNode` — because `TsonDataEmitter` has no
-annotation-emitting form at all yet.
+annotations captured via `@Annotated` aren't re-emitted yet — that's a `toTson`/object-writer gap only;
+`TsonTreeWriter` does re-emit a node's own annotations, so a schemalessly read `TsonNode` tree round trips
+with its metadata intact.
 
 Ambiguities, inconsistencies, and errors in the spec text itself — as opposed to this implementation's own
 behavior at the edges — are tracked separately in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).

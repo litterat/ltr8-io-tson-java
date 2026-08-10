@@ -9,6 +9,7 @@ import io.ltr8.tson.tree.MissingNode;
 import io.ltr8.tson.tree.NullNode;
 import io.ltr8.tson.tree.RecordNode;
 import io.ltr8.tson.tree.TupleNode;
+import io.ltr8.tson.tree.TsonAnnotation;
 import io.ltr8.tson.tree.TsonNode;
 
 import java.util.List;
@@ -33,11 +34,12 @@ import java.util.Optional;
  * equal tree. {@link MissingNode} is a navigation artifact, not a value, so writing one is a programming
  * error ({@link IllegalArgumentException}).
  *
- * <p><b>Wire annotations are dropped.</b> A node's {@code annotations()} is not re-emitted, so a schemalessly
- * read tree -- which does now carry them (§3.1) -- loses them on the way back out. {@code TsonDataEmitter}
- * has no annotation-emitting form at all yet, which is the actual blocker. This is the one place the
- * value-preserving claim above does not extend to: the values round trip, the metadata attached to them
- * does not.
+ * <p><b>Wire annotations are re-emitted</b> (§3.1), ahead of each value's type-ref and in the order the tree
+ * holds them, repeats included -- so a schemalessly read tree survives a read/write/read round trip with its
+ * metadata intact, not just its values. An annotation's own value is written as an ordinary node, so a nested
+ * one ({@code @a:@b:val target}) needs no special handling. Only the <i>schemaless</i> reader captures
+ * annotations in the first place, so a schema-driven tree still writes back without them -- nothing is lost
+ * here, there was nothing on the node to write.
  */
 public final class TsonTreeWriter {
 
@@ -58,6 +60,7 @@ public final class TsonTreeWriter {
     }
 
     private void writeNode(TsonNode node, TsonDataEmitter out) throws DataBindException {
+        writeAnnotations(node.annotations(), out);
         switch (node) {
             case RecordNode record -> writeRecord(record, out);
             case MapNode map -> writeMap(map, out);
@@ -74,6 +77,27 @@ public final class TsonTreeWriter {
             }
             case MissingNode ignored -> throw new IllegalArgumentException(
                     "a MissingNode is a navigation artifact and cannot be written as TSON");
+        }
+    }
+
+    /**
+     * A value's own annotations, ahead of its type-ref and core-value -- the order {@code data-value =
+     * *annotation [type-ref] core-value} fixes (§7.4), which is why this runs at the top of {@link
+     * #writeNode} rather than inside each shape's own method. Order and repeats are preserved as the tree
+     * holds them, matching §3.1's rule that every occurrence survives in source order.
+     *
+     * <p>An annotation's value is written through {@link #writeNode} like any other node, so one that
+     * carries annotations of its own ({@code @a:@b:val target}) nests without a special case.
+     */
+    private void writeAnnotations(List<TsonAnnotation> annotations, TsonDataEmitter out) throws DataBindException {
+        for (TsonAnnotation annotation : annotations) {
+            if (annotation.value().isPresent()) {
+                out.beginAnnotation(annotation.name());
+                writeNode(annotation.value().get(), out);
+                out.endAnnotation();
+            } else {
+                out.annotation(annotation.name());
+            }
         }
     }
 
