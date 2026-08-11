@@ -118,7 +118,7 @@ public final class SchemaResolver {
         // bare reference or `!C value` (§5.3/§5.6 define these as desugarings; §3.3.1 names their targets).
         // Sits after `metaParser` because the expansion needs the governing meta's own constructor
         // vocabulary, and returns `document` itself when there is no sugar to expand.
-        SchemaDocument desugared = SchemaDesugarer.desugar(document);
+        SchemaDocument desugared = SchemaDesugarer.desugar(document, metaParser.schema().entries(), namespace.keySet());
         Map<String, SchemaMap.Declaration> declarations = desugared.body().declarations();
 
         // Local-vs-import collisions, up front (local names are already unique -- SchemaMap dedupes them).
