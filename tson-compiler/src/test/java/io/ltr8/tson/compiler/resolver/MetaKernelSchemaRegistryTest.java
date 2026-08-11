@@ -49,23 +49,27 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class MetaKernelSchemaRegistryTest {
 
     @Test
-    void linksTheRealMetaKernelSchemaSynthesizingEveryGenericFieldTypeRef() {
+    void linksTheRealMetaKernelSchemaWhoseGenericFieldTypeRefsTheDesugarPhaseAlreadyResolved() {
         TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
         TsonLinkedSchema linked = TsonSchemaLinker.linkBootstrap(raw);
 
-        // 49 real declarations + one synthetic entry per distinct argument-bearing application:
+        // Nothing left for the linker to materialize: the bootstrap desugars its own document, so every
+        // argument-bearing application is already a declared entry by the time linking runs.
+        assertEquals(raw.entries().keySet(), linked.schema().entries().keySet());
+
+        // 49 real declarations + one desugared entry per distinct argument-bearing application:
         // enum's own `members: set<token>`, plus one `array<X>` per distinct X used through §5.3's
         // `[X]`/`[X]?` array-sugar field types elsewhere in the fixture (`arguments: [type_argument]?`,
         // `fields: [record_field]`, `groups: [field_group]?`, `supertypes`/`subtypes`/`parameters:
         // [type_name]?`/`[param_name]?` -- three separate `[type_name]?` uses correctly dedup to a
         // single `array_type_name_*` entry, not three -- `elements: [tuple_element]`, `variants:
         // [type_ref]`, `members: [field_name]`).
-        Set<String> syntheticNames = new HashSet<>(linked.schema().entries().keySet());
-        syntheticNames.removeAll(raw.entries().keySet());
         Set<String> expectedHeads = Set.of("set_token", "array_tuple_element", "array_field_name",
                 "array_type_ref", "array_type_name", "array_type_argument", "array_param_name",
                 "array_field_group", "array_record_field");
+        Set<String> syntheticNames = new HashSet<>(linked.schema().entries().keySet());
+        syntheticNames.removeIf(name -> expectedHeads.stream().noneMatch(head -> name.startsWith(head + "_")));
         assertEquals(expectedHeads.size(), syntheticNames.size());
         for (String head : expectedHeads) {
             assertTrue(syntheticNames.stream().anyMatch(name -> name.startsWith(head + "_")),
@@ -85,8 +89,7 @@ class MetaKernelSchemaRegistryTest {
      * The raw bootstrap output, wrapped (not genuinely linked -- {@code register} only takes a
      * {@link TsonLinkedSchema} now, so there's no other way to even attempt this) is refused --
      * meta-kernel's own {@code !!meta} names itself, so nothing can resolve it the ordinary way,
-     * and this form specifically is still 49 entries, not the 58 a genuinely linked meta-kernel
-     * needs.
+     * whatever form it is in.
      */
     @Test
     void registeringTheRawBootstrapMetaKernelDirectlyIsRejected() {
@@ -115,8 +118,8 @@ class MetaKernelSchemaRegistryTest {
         assertTrue(linked.schema().bootstrap());
         assertEquals(raw.id(), linked.schema().id());
         assertEquals(raw.meta(), linked.schema().meta());
-        assertEquals(49, raw.entries().size());
-        assertEquals(58, linked.schema().entries().size(), "genuinely linked -- synthesized entries present");
+        assertEquals(58, raw.entries().size());
+        assertEquals(58, linked.schema().entries().size());
 
         assertThrows(TsonSchemaValidationException.class, () -> registry.register(new TsonLinkedSchema(raw)));
         assertThrows(TsonSchemaValidationException.class, () -> registry.register(linked));

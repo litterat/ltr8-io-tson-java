@@ -5,6 +5,7 @@ import io.ltr8.tson.compiler.TsonSchemaSource;
 import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.EmptyBrace;
+import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.ScopedValue;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.ast.schema.Instance;
@@ -12,24 +13,25 @@ import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.meta.ArrayBody;
+import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.EnumBody;
+import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.IntegerType;
+import io.ltr8.tson.schema.meta.MapBody;
+import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.RegexType;
 import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.compiler.ast.schema.GenericRef;
-import io.ltr8.tson.compiler.ast.schema.ReferenceTypeDef;
-import io.ltr8.tson.compiler.ast.schema.SimpleRef;
-import io.ltr8.tson.compiler.ast.schema.TypeArg;
-import io.ltr8.tson.schema.meta.MapBody;
-import io.ltr8.tson.schema.meta.TypeArgument;
-import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Unit;
 import io.ltr8.tson.schema.meta.UriType;
 
 import java.util.ArrayList;
+import java.util.Set;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -60,17 +62,24 @@ import java.util.Optional;
  * to bootstrap *the* real meta-kernel document (see {@link TsonBundledSchemas#META_KERNEL_ID}),
  * nothing else.
  *
+ * <p><b>{@link SchemaDesugarer} runs first, exactly as it does for every other schema</b> -- meta-kernel
+ * writes plenty of sugar ({@code fields: [record_field]}, {@code members: set<token>}, {@code schema =>
+ * map<type_name, type_definition>}) and there is no reason for the kernel to resolve a different set of
+ * forms than anything else does. The one accommodation is {@link #BOOTSTRAP_CONSTRUCTORS}: the phase needs
+ * the governing meta's constructor vocabulary to know which field each positional argument fills, and
+ * meta-kernel's governing meta is itself, so the routing for the three constructors it applies to itself is
+ * written out here. What this buys is that linking has nothing left to materialize -- the desugared entries
+ * are ordinary declarations by the time the linker sees them.
+ *
  * <p><b>Every {@code Instance} declaration resolves through {@link #instanceBody}, a closed,
  * hand-written switch</b> -- a schema-driven compiled reader can't safely bootstrap meta-kernel from
- * its own in-progress state: {@code enum}'s own {@code members: set<token>} field is
- * argument-bearing, and only a materialization pass over the *whole* schema (never run over
- * meta-kernel while meta-kernel is still being produced) makes that safe to compile a reader
- * against -- running materialization over the first-pass-only state doesn't work either, since
- * {@code integer_size => { bits: ... signed: boolean }} is itself a first-pass entry whose {@code
- * signed} field already references {@code boolean}, unresolved until the second pass. Rather than
- * deciding case by case which of meta-kernel's own instances need hand-picking, {@link
- * #instanceBody} hand-picks all of them uniformly -- meta-kernel only ever instantiates its own six
- * real constructors in two known shapes (a bare {@code {}} or a bare array of tokens).
+ * its own in-progress state: {@code integer_size => { bits: ... signed: boolean }} is a first-pass entry
+ * whose {@code signed} field already references {@code boolean}, which is not resolved until the second
+ * pass, so there is no point at which a reader could be compiled against a complete schema. Rather than
+ * deciding case by case which of meta-kernel's own instances need hand-picking, {@link #instanceBody}
+ * hand-picks all of them uniformly -- meta-kernel only ever instantiates constructors in three known
+ * shapes: a bare {@code {}}, a bare array of tokens ({@code enum}), and the binding record {@link
+ * SchemaDesugarer} emits for a container application.
  *
  * <p>{@link #getMetaKernelSchema()} reads meta-kernel.tn packaged as a classpath resource, via
  * {@link TsonBundledSchemas#fetch} (`tson-schema` -- see that class's own Javadoc for why its own
@@ -119,37 +128,37 @@ public final class MetaKernelBootstrapResolver {
     private static final DefinitionGetter EMPTY_META_DEFINITIONS = name -> null;
 
     /**
-     * meta-kernel's own {@code schema => map<type_name, type_definition>} -- the single declaration here
-     * whose body is a constructor application (§5.6). Every other document has that rewritten into
-     * {@code !map { key_type: ...  value_type: ... }} by {@code SchemaDesugarer} before resolution, but this
-     * path bypasses {@code SchemaResolver} entirely and has no governing meta to read {@code map}'s own
-     * vocabulary from -- so, like the {@code instanceBody} switch below, it is built by hand. That is what
-     * this class is for: the fixed set of one-off answers that let the kernel resolve itself.
+     * The parameter-to-field routing for the three constructors meta-kernel applies to itself, written out
+     * rather than read from a governing meta -- the same trick as {@link #instanceBody}, for the same reason.
+     * {@code SchemaDesugarer} needs a constructor's own {@code parameters()} and the {@code valueParam} each
+     * vocabulary field draws from; here those would have to come from meta-kernel's own declarations, which
+     * are what this method is in the middle of producing. Only the routing matters, so the field types are
+     * left as a bare {@code type_ref} reference: nothing reads them.
      *
-     * <p>{@code source} keeps the applied form rather than the bare constructor name, matching what this
-     * declaration has always produced.
+     * <p>Declaration order is why this cannot simply use the entries resolved so far. {@code record} applies
+     * {@code [record_field]} well before {@code array} itself is declared, which is exactly the situation
+     * §3.4.1's forward references exist for -- and the reason the linker built its own lookup namespace up
+     * front rather than relying on resolution order.
      */
-    private static Optional<TypeDefinition> mapApplication(SchemaMap.Declaration declaration) {
-        if (!(declaration.typeDef() instanceof ReferenceTypeDef reference)
-                || !(reference.ref() instanceof GenericRef generic)
-                || !generic.name().equals("map") || generic.args().size() != 2) {
-            return Optional.empty();
+    private static final Map<String, TypeDefinition> BOOTSTRAP_CONSTRUCTORS = Map.of(
+            "array", routing(List.of("T"), "element_type"),
+            "set", routing(List.of("T"), "element_type"),
+            "map", routing(List.of("K", "V"), "key_type", "value_type"));
+
+    private static TypeDefinition routing(List<String> parameters, String... fields) {
+        List<RecordField> vocabulary = new ArrayList<>();
+        for (int i = 0; i < fields.length; i++) {
+            vocabulary.add(new RecordField(fields[i], TypeRef.of("type_ref"), FieldState.REQUIRED,
+                    Optional.empty(), Optional.of(parameters.get(i))));
         }
-        List<TypeRef> arguments = new ArrayList<>();
-        for (TypeArg arg : generic.args()) {
-            if (!(arg instanceof TypeArg.Ref ref) || !(ref.ref() instanceof SimpleRef simple)) {
-                return Optional.empty();
-            }
-            arguments.add(TypeRef.of(simple.name()));
-        }
-        TypeRef applied = new TypeRef("map", List.of(
-                new TypeArgument.Ref(arguments.get(0)), new TypeArgument.Ref(arguments.get(1))));
-        return Optional.of(new TypeDefinition(Optional.of(applied), TypeKind.PRODUCT, List.of(), false,
-                List.of(), List.of(), Optional.empty(),
-                MapBody.of(arguments.get(0), arguments.get(1))));
+        return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, parameters, true, List.of(), List.of(),
+                Optional.empty(), new RecordBody(List.of(), vocabulary, List.of()));
     }
 
     private static Map<String, TypeDefinition> resolveEntries(SchemaDocument document) {
+        // Meta-kernel desugars like every other schema; it just supplies its own routing table, since the
+        // governing meta it would otherwise read is itself.
+        document = SchemaDesugarer.desugar(document, BOOTSTRAP_CONSTRUCTORS, Set.of());
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         DefinitionResolver resolver = new DefinitionResolver(NEVER_CALLED, EMPTY_META_DEFINITIONS, entries::get);
         List<SchemaMap.Declaration> instances = new ArrayList<>();
@@ -162,9 +171,7 @@ public final class MetaKernelBootstrapResolver {
                 instances.add(declaration);
                 continue;
             }
-            Optional<TypeDefinition> mapApplication = mapApplication(declaration);
-            entries.put(declaration.name(),
-                    mapApplication.orElseGet(() -> resolver.resolve(declaration)));
+            entries.put(declaration.name(), resolver.resolve(declaration));
         }
 
         for (SchemaMap.Declaration declaration : instances) {
@@ -217,6 +224,11 @@ public final class MetaKernelBootstrapResolver {
                 yield Optional.of(RegexType.UNCONSTRAINED);
             }
             case "enum" -> Optional.of(toEnumBody(instance.value()));
+            // Emitted by SchemaDesugarer above, never written by hand in the fixture. array and set differ
+            // only in the defaults set tightens (§5.7): ordered/duplicating vs unordered/unique.
+            case "array" -> Optional.of(toArrayBody(instance.value(), false));
+            case "set" -> Optional.of(toArrayBody(instance.value(), true));
+            case "map" -> Optional.of(toMapBody(instance.value()));
             default -> Optional.empty();
         };
     }
@@ -227,6 +239,31 @@ public final class MetaKernelBootstrapResolver {
             throw new IllegalStateException(
                     "expected {} for !" + instance.target() + ", found " + instance.value().coreValue());
         }
+    }
+
+    /** {@code !array { element_type: T }} / {@code !set { element_type: T }} as the body each denotes. */
+    private static ArrayBody toArrayBody(DataValue value, boolean unique) {
+        TypeRef element = TypeRef.of(bindingField(value, "element_type"));
+        return new ArrayBody(element, ElementState.REQUIRED, unique, unique, Optional.empty(), Optional.empty());
+    }
+
+    /** {@code !map { key_type: K  value_type: V }} as the body it denotes. */
+    private static MapBody toMapBody(DataValue value) {
+        return MapBody.of(TypeRef.of(bindingField(value, "key_type")),
+                TypeRef.of(bindingField(value, "value_type")));
+    }
+
+    /** One field of a desugared instance's binding record -- always a bare token naming a type. */
+    private static String bindingField(DataValue value, String name) {
+        if (!(value.coreValue() instanceof RecordValue record)) {
+            throw new IllegalStateException("expected a binding record, found " + value.coreValue());
+        }
+        for (RecordValue.Field field : record.fields()) {
+            if (field.name().equals(name) && field.value().value().coreValue() instanceof TokenValue token) {
+                return token.text();
+            }
+        }
+        throw new IllegalStateException("no '" + name + "' in " + record);
     }
 
     /**
