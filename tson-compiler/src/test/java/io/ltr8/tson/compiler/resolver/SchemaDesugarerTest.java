@@ -161,6 +161,41 @@ class SchemaDesugarerTest {
     }
 
     @Test
+    void aDeclarationsOwnApplicationBecomesTheInstanceItself() {
+        // §5.6: a declaration whose body is a fully-bound application resolves as a *construction*, so it
+        // becomes the instance in place rather than a reference to an injected one. That is what keeps
+        // `x => map<K, V>` a PRODUCT carrying a real body instead of a REFERENCE to one, and it is why
+        // declaration position is handled separately from a use site.
+        SchemaDocument document = desugar("  entries => map<text, integer>");
+
+        Instance instance = (Instance) document.body().declarations().get("entries").typeDef();
+        assertEquals("map", instance.target());
+        assertEquals("{ key_type: text  value_type: integer }", instanceBody(instance));
+        assertEquals(1, document.body().declarations().size(), "nothing injected alongside it");
+    }
+
+    @Test
+    void aSizeLessDeclarationLevelArrayIsAlsoAnApplication() {
+        // §5.6 again -- `x => [T]` is a top-level constructor application, which DefinitionResolver used to
+        // reject outright. The *sized* forms are not: they desugar to array_min/array_max/array_ranged,
+        // which are templates rather than constructors, so they stay on their existing path.
+        SchemaDocument document = desugar("  ids => [text]");
+
+        Instance instance = (Instance) document.body().declarations().get("ids").typeDef();
+        assertEquals("array", instance.target());
+        assertEquals("{ element_type: text }", instanceBody(instance));
+    }
+
+    @Test
+    void aSizedDeclarationLevelArrayIsLeftAlone() {
+        SchemaDocument document = new TsonSchemaParser("""
+                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
+                { bounded => [text; 1..5] }""").parseSchemaDocument();
+
+        assertSame(document, SchemaDesugarer.desugar(document, META, Set.of()));
+    }
+
+    @Test
     void aParameterizedDeclarationIsLeftEntirelyAlone() {
         // A template's body references its own parameters, so expanding array<T> here would inject a
         // declaration naming an unbound T. This is meta-kernel's own set/array_min/array_max/array_ranged.

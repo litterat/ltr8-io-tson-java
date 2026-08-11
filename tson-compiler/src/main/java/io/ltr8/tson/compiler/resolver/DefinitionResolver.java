@@ -536,6 +536,12 @@ final class DefinitionResolver {
      * §8.3 would add for an aliased argument (here, {@code type_name} itself aliasing {@code token})
      * is deliberately not produced, same deferral as {@link #resolveTypeRef}.
      */
+    // Reachable only from MetaKernelBootstrapResolver. Every other route resolves through SchemaResolver,
+    // where SchemaDesugarer has already rewritten a declaration-position application into an `!C value`
+    // instance -- but the bootstrap bypasses SchemaResolver entirely and has no governing meta to read a
+    // constructor's vocabulary from, so meta-kernel's own `schema => map<type_name, type_definition>` still
+    // arrives here as written. Removing this means teaching the bootstrap's own hand-written instanceBody
+    // switch about `map`, which is where that trick belongs; it is not part of this change.
     private TypeDefinition resolveGenericConstructorApplication(String name, GenericRef generic) {
         if (!generic.name().equals("map") || generic.args().size() != 2) {
             throw new UnsupportedOperationException("'" + name + "': only a fully-bound 'map<K, V>' "

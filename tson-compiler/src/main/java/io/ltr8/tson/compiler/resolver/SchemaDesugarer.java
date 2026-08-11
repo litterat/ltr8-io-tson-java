@@ -164,6 +164,13 @@ final class SchemaDesugarer {
                 if (!container.typeParams().isEmpty()) {
                     yield container;
                 }
+                // A size-less declaration-level array IS a top-level constructor application (§5.6), so it
+                // becomes the instance directly. The sized forms desugar to array_min/array_max/array_ranged,
+                // which are templates rather than constructors, and stay on their existing path.
+                Optional<Instance> instance = declarationLevelArray(container.container());
+                if (instance.isPresent()) {
+                    yield instance.get();
+                }
                 ContainerDef def = containerDef(container.container());
                 yield def == container.container() ? container
                         : new ContainerTypeDef(container.typeParams(), def);
@@ -175,6 +182,15 @@ final class SchemaDesugarer {
                     yield reference;
                 }
                 TypeRef ref = argumentsOnly(reference.ref());
+                // §5.6: a declaration whose body is a fully-bound application resolves as a construction, so
+                // it becomes the instance itself rather than a reference to an injected one -- which is what
+                // keeps `x => map<K, V>` a PRODUCT with a real body instead of a REFERENCE to one.
+                if (ref instanceof GenericRef generic) {
+                    Optional<Instance> instance = instanceFor(generic.name(), generic.args());
+                    if (instance.isPresent()) {
+                        yield instance.get();
+                    }
+                }
                 yield ref == reference.ref() ? reference : new ReferenceTypeDef(reference.typeParams(), ref);
             }
             default -> typeDef;
@@ -288,6 +304,19 @@ final class SchemaDesugarer {
         };
     }
 
+    /**
+     * A size-less declaration-level array as its own constructor application, or empty for anything this
+     * does not build -- a tuple container, a sized array, an optional element, or a non-plain element.
+     */
+    private Optional<Instance> declarationLevelArray(ContainerDef def) {
+        if (!(def instanceof ArrayContainerDef array) || array.size().isPresent()
+                || array.elementType().optional()
+                || !(array.elementType().expr() instanceof ElementType.Expr.Plain plain)) {
+            return Optional.empty();
+        }
+        return instanceFor("array", List.of(new TypeArg.Ref(typeRef(plain.typeRef()))));
+    }
+
     /** Expands only within a reference's arguments, leaving its own head in place. */
     private TypeRef argumentsOnly(TypeRef ref) {
         if (!(ref instanceof GenericRef generic)) {
@@ -313,11 +342,31 @@ final class SchemaDesugarer {
      * downstream handling rather than being turned into a differently-broken shape here.
      */
     private TypeRef apply(String head, List<TypeArg> args, TypeRef unexpanded) {
+        Optional<Instance> instance = instanceFor(head, args);
+        if (instance.isEmpty()) {
+            return unexpanded;
+        }
+        String name = syntheticName(head, args);
+        if (!imported.contains(name)) {
+            injected.computeIfAbsent(name,
+                    n -> new SchemaMap.Declaration(List.of(), n, List.of(), instance.get()));
+        }
+        return new SimpleRef(name);
+    }
+
+    /**
+     * The {@code !C { field: arg ... }} an application denotes, or empty when this is not one this phase
+     * builds: an unknown head, a non-constructor head (a template application -- §5.10, out of scope), a head
+     * whose vocabulary is not record-shaped, an arity mismatch, or an argument that did not reduce to a plain
+     * name. Each of those keeps its existing downstream handling rather than being turned into a differently
+     * broken shape here.
+     */
+    private Optional<Instance> instanceFor(String head, List<TypeArg> args) {
         TypeDefinition constructor = metaEntries.get(head);
         if (constructor == null || !constructor.constructor()
                 || !(constructor.body() instanceof RecordBody vocabulary)
                 || constructor.parameters().size() != args.size()) {
-            return unexpanded;
+            return Optional.empty();
         }
         List<RecordValue.Field> fields = new ArrayList<>();
         for (RecordField field : vocabulary.fields()) {
@@ -327,24 +376,19 @@ final class SchemaDesugarer {
             }
             int index = constructor.parameters().indexOf(parameter.get());
             if (index < 0) {
-                return unexpanded;
+                return Optional.empty();
             }
             Optional<TokenValue> token = argumentToken(args.get(index));
             if (token.isEmpty()) {
-                return unexpanded;
+                return Optional.empty();
             }
             fields.add(new RecordValue.Field(field.name(),
                     new ScopedValue(Optional.empty(), new DataValue(List.of(), Optional.empty(), token.get()))));
         }
         if (fields.isEmpty()) {
-            return unexpanded;
+            return Optional.empty();
         }
-        String name = syntheticName(head, args);
-        if (!imported.contains(name)) {
-            injected.computeIfAbsent(name, n -> new SchemaMap.Declaration(List.of(), n, List.of(),
-                    new Instance(new DataValue(List.of(), Optional.of(head), new RecordValue(fields)))));
-        }
-        return new SimpleRef(name);
+        return Optional.of(new Instance(new DataValue(List.of(), Optional.of(head), new RecordValue(fields))));
     }
 
     /** An argument reduces to a token: a plain name after expansion, or a literal value argument (a size bound). */
