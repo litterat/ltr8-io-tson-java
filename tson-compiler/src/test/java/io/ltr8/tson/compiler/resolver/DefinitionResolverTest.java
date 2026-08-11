@@ -525,24 +525,27 @@ class DefinitionResolverTest {
         assertThrows(UnsupportedOperationException.class, () -> resolveSnippet("id_list => [text]"));
     }
 
-    // ── Top-level constructor application (§5.6): map<K, V> ───────────────
-    //    schema => map<type_name, type_definition> -- a fully-bound application of the map
-    //    constructor resolves as a construction (kind PRODUCT, no supertypes), not a reference.
+    // ── An application DefinitionResolver still sees (§5.10) ─────────────
+    //    Every *constructor* application is rewritten into an `!C value` instance by SchemaDesugarer
+    //    before resolution, so what reaches here still carrying arguments is a template application --
+    //    resolved to a REFERENCE naming it, since §5.10 substitution is unimplemented. meta-kernel's own
+    //    `schema => map<...>` is the one exception, and it is handled by MetaKernelBootstrapResolver,
+    //    which bypasses SchemaResolver and so never desugars.
 
     @Test
-    void resolvesSchemasOwnMapApplicationFromTheRealMetaKernelFixture() throws IOException, DataBindException {
+    void resolvesAnUndesugaredApplicationToAReferenceNamingIt() throws IOException, DataBindException {
         SchemaMap schemaMap = new TsonSchemaParser(readFixture()).parseSchemaDocument().body();
 
         TypeDefinition schema = resolver.resolve(schemaMap.declarations().get("schema"));
 
-        assertEquals(TypeKind.PRODUCT, schema.kind());
-        assertEquals(List.of(), schema.supertypes());
+        assertEquals(TypeKind.REFERENCE, schema.kind());
         assertEquals("{ source: { name: \"map\" arguments: [ "
                         + "!ref { ref: { name: \"type_name\" arguments: [] } } "
                         + "!ref { ref: { name: \"type_definition\" arguments: [] } } ] } "
-                        + "kind: \"PRODUCT\" parameters: [] constructor: false supertypes: [] subtypes: [] "
-                        + "body: !map { key_type: { name: \"type_name\" arguments: [] } "
-                        + "value_type: { name: \"type_definition\" arguments: [] } } }",
+                        + "kind: \"REFERENCE\" parameters: [] constructor: false supertypes: [] subtypes: [] "
+                        + "body: !reference { target: { name: \"map\" arguments: [ "
+                        + "!ref { ref: { name: \"type_name\" arguments: [] } } "
+                        + "!ref { ref: { name: \"type_definition\" arguments: [] } } ] } } }",
                 write(schema));
     }
 

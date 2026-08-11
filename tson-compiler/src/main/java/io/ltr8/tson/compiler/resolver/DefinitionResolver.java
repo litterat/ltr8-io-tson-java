@@ -284,7 +284,7 @@ final class DefinitionResolver {
                 return TypeDefinition.reference(simple.name());
             }
             if (referenceTypeDef.ref() instanceof GenericRef generic) {
-                return resolveGenericConstructorApplication(name, generic);
+                return resolveTemplateApplication(name, generic);
             }
         }
         if (typeDef instanceof ContainerTypeDef containerTypeDef && containerTypeDef.typeParams().isEmpty()) {
@@ -536,28 +536,31 @@ final class DefinitionResolver {
      * §8.3 would add for an aliased argument (here, {@code type_name} itself aliasing {@code token})
      * is deliberately not produced, same deferral as {@link #resolveTypeRef}.
      */
-    // Reachable only from MetaKernelBootstrapResolver. Every other route resolves through SchemaResolver,
-    // where SchemaDesugarer has already rewritten a declaration-position application into an `!C value`
-    // instance -- but the bootstrap bypasses SchemaResolver entirely and has no governing meta to read a
-    // constructor's vocabulary from, so meta-kernel's own `schema => map<type_name, type_definition>` still
-    // arrives here as written. Removing this means teaching the bootstrap's own hand-written instanceBody
-    // switch about `map`, which is where that trick belongs; it is not part of this change.
-    private TypeDefinition resolveGenericConstructorApplication(String name, GenericRef generic) {
-        if (!generic.name().equals("map") || generic.args().size() != 2) {
-            throw new UnsupportedOperationException("'" + name + "': only a fully-bound 'map<K, V>' "
-                    + "application is resolved so far, got " + generic);
+    /**
+     * A declaration whose body is an application that {@code SchemaDesugarer} did not rewrite -- in practice
+     * a <em>template</em> application, since every constructor application is turned into an {@code !C value}
+     * instance before resolution. It resolves to a {@link TypeKind#REFERENCE} entry targeting the application
+     * as written, which is what §5.3's sized-array sugar has always produced for {@code array_min}/{@code
+     * array_max}/{@code array_ranged}. Real §5.10 parameter substitution is unimplemented, so the arguments
+     * are carried rather than applied.
+     */
+    private TypeDefinition resolveTemplateApplication(String name, GenericRef generic) {
+        List<TypeArgument> arguments = new ArrayList<>();
+        for (TypeArg arg : generic.args()) {
+            arguments.add(resolveSimpleTypeArg(name, arg));
         }
-        io.ltr8.tson.schema.meta.TypeRef keyType = resolveSimpleTypeArg(name, generic.args().get(0));
-        io.ltr8.tson.schema.meta.TypeRef valueType = resolveSimpleTypeArg(name, generic.args().get(1));
-
-        io.ltr8.tson.schema.meta.TypeRef source = new io.ltr8.tson.schema.meta.TypeRef("map",
-                List.of(new TypeArgument.Ref(keyType), new TypeArgument.Ref(valueType)));
-
-        return new TypeDefinition(Optional.of(source), TypeKind.PRODUCT, List.of(), false, List.of(),
-                List.of(), Optional.empty(), MapBody.of(keyType, valueType));
+        return TypeDefinition.reference(new io.ltr8.tson.schema.meta.TypeRef(generic.name(), arguments));
     }
 
-    private static io.ltr8.tson.schema.meta.TypeRef resolveSimpleTypeArg(String name, TypeArg arg) {
+    /** A single argument as the {@code type_argument} it denotes -- a reference, or a literal value bound. */
+    private static TypeArgument resolveSimpleTypeArg(String name, TypeArg arg) {
+        if (arg instanceof TypeArg.Value value) {
+            return new TypeArgument.Value(new Token(value.value().text(), Token.Form.UNQUOTED));
+        }
+        return new TypeArgument.Ref(resolveSimpleTypeRefArg(name, arg));
+    }
+
+    private static io.ltr8.tson.schema.meta.TypeRef resolveSimpleTypeRefArg(String name, TypeArg arg) {
         try {
             return resolveSimpleTypeArg(arg);
         } catch (UnsupportedOperationException e) {
@@ -820,7 +823,7 @@ final class DefinitionResolver {
         if (target instanceof GenericRef generic) {
             List<TypeArgument> args = new ArrayList<>();
             for (TypeArg arg : generic.args()) {
-                args.add(new TypeArgument.Ref(resolveSimpleTypeArg(name, arg)));
+                args.add(new TypeArgument.Ref(resolveSimpleTypeRefArg(name, arg)));
             }
             return new io.ltr8.tson.schema.meta.TypeRef(generic.name(), args);
         }

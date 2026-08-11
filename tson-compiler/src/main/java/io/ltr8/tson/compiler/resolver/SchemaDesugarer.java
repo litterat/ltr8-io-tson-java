@@ -24,6 +24,7 @@ import io.ltr8.tson.compiler.ast.schema.RefinedDef;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.ast.schema.SimpleRef;
+import io.ltr8.tson.compiler.ast.schema.SizeSpec;
 import io.ltr8.tson.compiler.ast.schema.StructuralDef;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.compiler.ast.schema.TupleContainerDef;
@@ -171,6 +172,10 @@ final class SchemaDesugarer {
                 if (instance.isPresent()) {
                     yield instance.get();
                 }
+                Optional<GenericRef> sized = sizedArrayApplication(container.container());
+                if (sized.isPresent()) {
+                    yield new ReferenceTypeDef(List.of(), sized.get());
+                }
                 ContainerDef def = containerDef(container.container());
                 yield def == container.container() ? container
                         : new ContainerTypeDef(container.typeParams(), def);
@@ -315,6 +320,41 @@ final class SchemaDesugarer {
             return Optional.empty();
         }
         return instanceFor("array", List.of(new TypeArg.Ref(typeRef(plain.typeRef()))));
+    }
+
+    /**
+     * §5.3's sized sugar as the template application it stands for: {@code [T; N..]} is {@code
+     * array_min<T, N>}, {@code [T; ..M]} is {@code array_max<T, M>}, {@code [T; N..M]} is {@code
+     * array_ranged<T, N, M>}, and an exact {@code [T; N]} is {@code array_ranged<T, N, N>}.
+     *
+     * <p>Purely syntactic, which is why it belongs here even though the targets are <em>templates</em>
+     * rather than constructors: this phase rewrites the spelling, and what a template application then
+     * resolves to (§5.10 substitution, unimplemented) is a separate question it does not answer. A bound is
+     * carried through as the raw token it was parsed as -- it may name a value parameter rather than a
+     * literal, which is why {@code SizeSpec} keeps them as text.
+     */
+    private Optional<GenericRef> sizedArrayApplication(ContainerDef def) {
+        if (!(def instanceof ArrayContainerDef array) || array.size().isEmpty()
+                || array.elementType().optional()
+                || !(array.elementType().expr() instanceof ElementType.Expr.Plain plain)) {
+            return Optional.empty();
+        }
+        TypeArg element = new TypeArg.Ref(typeRef(plain.typeRef()));
+        return Optional.of(switch (array.size().get()) {
+            case SizeSpec.Min min -> application("array_min", element, min.lower());
+            case SizeSpec.Max max -> application("array_max", element, max.upper());
+            case SizeSpec.Ranged ranged -> application("array_ranged", element, ranged.lower(), ranged.upper());
+            case SizeSpec.Exact exact -> application("array_ranged", element, exact.bound(), exact.bound());
+        });
+    }
+
+    private static GenericRef application(String template, TypeArg element, String... bounds) {
+        List<TypeArg> args = new ArrayList<>();
+        args.add(element);
+        for (String bound : bounds) {
+            args.add(new TypeArg.Value(new TokenValue(bound, TokenForm.UNQUOTED)));
+        }
+        return new GenericRef(template, args);
     }
 
     /** Expands only within a reference's arguments, leaving its own head in place. */

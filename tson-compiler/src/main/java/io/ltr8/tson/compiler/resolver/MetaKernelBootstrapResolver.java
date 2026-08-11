@@ -17,6 +17,13 @@ import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.RegexType;
 import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.compiler.ast.schema.GenericRef;
+import io.ltr8.tson.compiler.ast.schema.ReferenceTypeDef;
+import io.ltr8.tson.compiler.ast.schema.SimpleRef;
+import io.ltr8.tson.compiler.ast.schema.TypeArg;
+import io.ltr8.tson.schema.meta.MapBody;
+import io.ltr8.tson.schema.meta.TypeArgument;
+import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Unit;
@@ -111,6 +118,37 @@ public final class MetaKernelBootstrapResolver {
     /** Meta-kernel governs itself, so it has no separate structure namespace to fall back to -- this class's own first pass never reaches {@link DefinitionResolver#resolveInstance} at all, the one place a structure namespace is ever consulted. */
     private static final DefinitionGetter EMPTY_META_DEFINITIONS = name -> null;
 
+    /**
+     * meta-kernel's own {@code schema => map<type_name, type_definition>} -- the single declaration here
+     * whose body is a constructor application (§5.6). Every other document has that rewritten into
+     * {@code !map { key_type: ...  value_type: ... }} by {@code SchemaDesugarer} before resolution, but this
+     * path bypasses {@code SchemaResolver} entirely and has no governing meta to read {@code map}'s own
+     * vocabulary from -- so, like the {@code instanceBody} switch below, it is built by hand. That is what
+     * this class is for: the fixed set of one-off answers that let the kernel resolve itself.
+     *
+     * <p>{@code source} keeps the applied form rather than the bare constructor name, matching what this
+     * declaration has always produced.
+     */
+    private static Optional<TypeDefinition> mapApplication(SchemaMap.Declaration declaration) {
+        if (!(declaration.typeDef() instanceof ReferenceTypeDef reference)
+                || !(reference.ref() instanceof GenericRef generic)
+                || !generic.name().equals("map") || generic.args().size() != 2) {
+            return Optional.empty();
+        }
+        List<TypeRef> arguments = new ArrayList<>();
+        for (TypeArg arg : generic.args()) {
+            if (!(arg instanceof TypeArg.Ref ref) || !(ref.ref() instanceof SimpleRef simple)) {
+                return Optional.empty();
+            }
+            arguments.add(TypeRef.of(simple.name()));
+        }
+        TypeRef applied = new TypeRef("map", List.of(
+                new TypeArgument.Ref(arguments.get(0)), new TypeArgument.Ref(arguments.get(1))));
+        return Optional.of(new TypeDefinition(Optional.of(applied), TypeKind.PRODUCT, List.of(), false,
+                List.of(), List.of(), Optional.empty(),
+                MapBody.of(arguments.get(0), arguments.get(1))));
+    }
+
     private static Map<String, TypeDefinition> resolveEntries(SchemaDocument document) {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         DefinitionResolver resolver = new DefinitionResolver(NEVER_CALLED, EMPTY_META_DEFINITIONS, entries::get);
@@ -124,7 +162,9 @@ public final class MetaKernelBootstrapResolver {
                 instances.add(declaration);
                 continue;
             }
-            entries.put(declaration.name(), resolver.resolve(declaration));
+            Optional<TypeDefinition> mapApplication = mapApplication(declaration);
+            entries.put(declaration.name(),
+                    mapApplication.orElseGet(() -> resolver.resolve(declaration)));
         }
 
         for (SchemaMap.Declaration declaration : instances) {

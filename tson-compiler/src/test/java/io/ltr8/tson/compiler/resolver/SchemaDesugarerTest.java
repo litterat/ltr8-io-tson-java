@@ -187,12 +187,29 @@ class SchemaDesugarerTest {
     }
 
     @Test
-    void aSizedDeclarationLevelArrayIsLeftAlone() {
-        SchemaDocument document = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
-                { bounded => [text; 1..5] }""").parseSchemaDocument();
+    void sizedSugarBecomesTheSizeTemplateApplicationItStandsFor() {
+        // §5.3: [T; N..M] is array_ranged<T, N, M>, [T; N..] is array_min, [T; ..M] is array_max, and an
+        // exact [T; N] is array_ranged with the bound twice. Purely a change of spelling, which is why it
+        // belongs here even though the targets are templates rather than constructors -- what a template
+        // application then resolves to (§5.10 substitution) is a separate question this phase does not
+        // answer, so the result stays an application rather than becoming an instance.
+        assertEquals("array_ranged<text, 1, 5>", application(desugar("  bounded => [text; 1..5]"), "bounded"));
+        assertEquals("array_min<text, 2>", application(desugar("  atLeast => [text; 2..]"), "atLeast"));
+        assertEquals("array_max<text, 9>", application(desugar("  atMost => [text; ..9]"), "atMost"));
+        assertEquals("array_ranged<text, 3, 3>", application(desugar("  exact => [text; 3]"), "exact"));
+    }
 
-        assertSame(document, SchemaDesugarer.desugar(document, META, Set.of()));
+    /** Renders a declaration's application body as {@code head<arg, arg>} for readable assertions. */
+    private static String application(SchemaDocument document, String declaration) {
+        var ref = (io.ltr8.tson.compiler.ast.schema.ReferenceTypeDef)
+                document.body().declarations().get(declaration).typeDef();
+        var generic = (io.ltr8.tson.compiler.ast.schema.GenericRef) ref.ref();
+        List<String> args = generic.args().stream()
+                .map(a -> a instanceof io.ltr8.tson.compiler.ast.schema.TypeArg.Ref r
+                        ? ((SimpleRef) r.ref()).name()
+                        : ((io.ltr8.tson.compiler.ast.schema.TypeArg.Value) a).value().text())
+                .toList();
+        return generic.name() + "<" + String.join(", ", args) + ">";
     }
 
     @Test
