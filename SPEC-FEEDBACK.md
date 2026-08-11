@@ -1225,3 +1225,75 @@ it becomes normative, three things need stating that currently are not:
    `doc`, and `alias` for data documents; `deprecated` lives in `meta.tn`, which governs schema documents.
    Under §3.3.3 both are unresolvable unless the example's own `order.tn1` declares them locally. If §6
    becomes enforced, the series' flagship example is the first thing a strict processor rejects.
+
+## 30. An annotation's value cannot be optional — optionality is a property of a slot, and an annotation's value is not a slot
+
+**Section:** Part 2 §6 (Annotations as Types), §5.2 (field states), §12.1 (`field-type`, `element-type`,
+`group-def`, `type-def`); `spec/m/meta.tn`'s annotation vocabulary; [TSON-DATA] §2.1's worked example.
+
+**Problem:** §6 gives an annotation exactly two forms, and they are mutually exclusive:
+
+> - For `void`-targeted `T` (a type whose resolved body, after reference flattening, is `void` — such as
+>   `annotation` or `numeric`), the annotation form is `@T` with no colon and no value. Bare `@T` is shorthand
+>   for `@T:_`; the resolver fills the implicit `_` and validates against `void`'s contract (§4.2) — presence
+>   is the information.
+> - For any non-`void` `T`, the form is `@T:value`, where `value` is a single data-value conforming to `T`.
+
+There is no third case, and no way to construct one, because **optionality in TSON attaches to a slot rather
+than to a type**. The `?` marker appears in exactly three productions (§12.1):
+
+```
+field-type    = type-ref ["?"]                      ; field optionality
+element-type  = ( container-def / type-ref ) ["?"]  ; tuple element optionality
+group-def     = ... ["?"]                           ; group optionality
+```
+
+`type-def`'s own five alternatives carry none, and §12.1's own note is explicit that "the `?` in field-type
+marks FIELD optionality (§5.2)". An annotation's value is not a field, element, or group — §6 governs it
+directly by the type the annotation names — so there is nowhere for a `?` to attach. `deprecated =>
+@annotation text?` is not merely unsupported; it is ungrammatical.
+
+The consequence is that **no annotation type can accept both `@T` and `@T:value`**, which rules out the most
+common annotation shape there is: a marker that optionally carries a reason. `@Deprecated` with an optional
+message is canonical in Java, Kotlin, Rust and C#.
+
+**This bites the spec's own vocabulary.** `meta.tn` declares `deprecated => @annotation text` (and likewise
+`since`, `todo`, `lang`). Being text-targeted, §6 requires `@deprecated:"reason"` and forbids a bare
+`@deprecated`. But [TSON-DATA] §2.1's flagship example writes exactly `tier: @deprecated GOLD` — bare.
+Granting that a data document's `deprecated` resolves against the user's schema rather than `meta.tn`, an
+author who mirrors the spec's own declaration (the obvious thing to do) finds the example's syntax rejected.
+This sharpens entry #29's third point: those annotations are not only unresolvable from the standard
+library, they are written in a form the only available declaration would not accept.
+
+**Neither workaround is satisfactory.** Declaring two types — `deprecated => @annotation void` alongside
+`deprecated_because => @annotation text` — works but splits one concept across two names that every consumer
+must then check separately. The structurally correct alternative, a choice spanning `void` and the value
+type, fails twice: bare `@T` desugars to `@T:_`, so the reader must select the `void` variant from an
+untagged `_`, and §5.4's tagging rule requires an explicit `!variant` tag unless the choice is both disjoint
+and discriminable. An author would end up writing `@deprecated:!void _`, which defeats the purpose of the
+bare form entirely.
+
+**Interpretation chosen:** §6 is implemented exactly as written. A bare annotation is treated as `@T:_` and
+validated by feeding the absent sentinel to `T`'s own compiled reader, so a bare annotation on a non-void
+type is a `TYPE_MISMATCH` — meaning no optional-valued annotation is expressible here either, matching the
+spec rather than quietly extending it. (§6's "resolved body, after reference flattening, is `void`" is also a
+usable *static* test, which is worth noting: void-targeting is decidable from the schema without executing a
+reader at all.)
+
+**Suggested resolution:** Two shapes are available, and the second seems considerably better.
+
+1. **Give the annotation's value slot a state**, reusing the concept fields, elements and groups already
+   have. The cost is that the `?` would then hang off a `type-def`, where it would mean something different
+   from everywhere else it appears — optionality of *this annotation's value*, not of a field.
+2. **Make a union with `void` work as the general way to say "optional".** This adds no new concept: it
+   requires only that `_` be recoverable untagged against a choice whose variants include `void`. That is
+   better founded than §5.4's general caution suggests, because absent-versus-anything-else is *structurally*
+   decidable on the wire — a distinct event, not the same-base-type-class ambiguity §5.4 is actually
+   guarding against (see #23). It also generalises beyond annotations: union-with-`void` becomes the way to
+   express an optional value at any position that has no slot state to carry one.
+
+If (2) is taken, §5.4's untagged-reading rules should say explicitly that a `void` variant is recoverable
+from the absent sentinel, and §6's first bullet should be restated as "for `T` admitting `void`" rather than
+"for `void`-targeted `T`", so a union qualifies. Failing either, §6 should at least acknowledge that a
+marker-with-optional-reason requires two declarations, and `meta.tn`'s `deprecated`/`since`/`todo`/`lang`
+should be reconciled with [TSON-DATA] §2.1's bare usage.
