@@ -30,11 +30,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * declared locally in a user schema is usable by that schema's <i>data documents</i>"), alongside core's own
  * {@code doc}.
  *
- * <p>Not covered: a value at a <em>dispatched</em> position (choice/variant/subtype), where the dispatcher
- * must consume the annotations to reach the type-ref it dispatches on and cannot hand them to the delegate
- * that builds the node; its children still keep theirs. {@code TupleTreeReader} and {@code MapTreeReader} got
- * the identical change but have no fixture here -- no test in this repo builds a tuple from a schema, and a
- * map-typed field does not link yet ({@code BACKLOG.md}, {@code SPEC-FEEDBACK.md} #28).
+ * <p>A <em>dispatched</em> value (a subtype here, a choice variant elsewhere) needs a third mechanism: the
+ * dispatcher must consume the annotations to reach the {@code !typeName} it dispatches on, so the reader that
+ * builds the node never sees them, and they are re-attached to the finished node via {@link
+ * io.ltr8.tson.tree.TsonNode#withAnnotations}.
+ *
+ * <p>{@code TupleTreeReader} and {@code MapTreeReader} got the same treatment as the other containers but
+ * have no fixture here -- no test in this repo builds a tuple from a schema, and a map-typed field does not
+ * link yet ({@code BACKLOG.md}, {@code SPEC-FEEDBACK.md} #28).
  */
 class SchemaDrivenTreeAnnotationTest {
 
@@ -48,6 +51,7 @@ class SchemaDrivenTreeAnnotationTest {
               checked => @annotation void
               point => { x: int32  y: int32 }
               shape => { name: text  origin: point  tags: [text] }
+              circle => shape & { radius: int32 }
             }
             """;
 
@@ -148,6 +152,33 @@ class SchemaDrivenTreeAnnotationTest {
 
         assertTrue(thrown.getMessage().contains("@label"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("absent sentinel"), thrown.getMessage());
+    }
+
+    @Test
+    void annotationsSurviveDispatchToASubtype() {
+        // The hard position: `circle` is a subtype of `shape`, so VariantSchemaReader has to consume the
+        // annotations to reach the !circle that tells it which reader to use -- meaning the reader that
+        // builds the node never sees them. They are re-attached to the node afterwards, which is where they
+        // belong: they were written against this value.
+        TsonNode circle = read("""
+                @label:"tagged" @checked !circle {
+                  name: "c"  origin: { x: 1  y: 2 }  tags: []  radius: 3
+                }
+                """);
+
+        assertEquals(Optional.of("circle"), circle.typeRef());
+        assertEquals(List.of("label", "checked"), names(circle));
+        assertEquals(Optional.of("tagged"), circle.annotations().get(0).value().orElseThrow().asString());
+    }
+
+    @Test
+    void annotationsSurviveTheUndispatchedBranchToo() {
+        // Same reader, the branch where the value is the base type itself -- no type-ref, so it reads
+        // through ownParser rather than a resolved subtype. Both branches must re-attach.
+        TsonNode shape = read("@label:\"plain\" { name: \"s\"  origin: { x: 0  y: 0 }  tags: [] }");
+
+        assertEquals(List.of("label"), names(shape));
+        assertEquals(Optional.of("shape"), shape.typeRef());
     }
 
     @Test

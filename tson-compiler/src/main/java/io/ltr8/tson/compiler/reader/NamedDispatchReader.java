@@ -4,11 +4,14 @@ import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.TsonValueReaderResolver;
+import io.ltr8.tson.tree.TsonAnnotation;
+import io.ltr8.tson.tree.TsonNode;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -34,21 +37,24 @@ final class NamedDispatchReader implements TsonValueReader<Object> {
     private final Set<String> candidateNames;
     private final TsonValueReaderResolver resolver;
     private final Map<BaseTypeClass, String> untaggedRecovery;
+    private final AnnotationTypes annotationTypes;
 
     NamedDispatchReader(String positionName, String missingTypeRefMessage, String candidateNoun,
                          Set<String> candidateNames, TsonValueReaderResolver resolver,
-                         Map<BaseTypeClass, String> untaggedRecovery) {
+                         Map<BaseTypeClass, String> untaggedRecovery, AnnotationTypes annotationTypes) {
         this.positionName = positionName;
         this.missingTypeRefMessage = missingTypeRefMessage;
         this.candidateNoun = candidateNoun;
         this.candidateNames = candidateNames;
         this.resolver = resolver;
         this.untaggedRecovery = untaggedRecovery;
+        this.annotationTypes = annotationTypes;
     }
 
     @Override
     public Object read(TsonReadContext ctx) {
-        Optional<String> typeRef = EventSkip.annotationsAndTypeRef(ctx);
+        List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx, annotationTypes);
+        Optional<String> typeRef = EventSkip.typeRef(ctx);
         if (typeRef.isPresent()) {
             String ref = typeRef.get();
             if (!candidateNames.contains(ref)) {
@@ -58,10 +64,10 @@ final class NamedDispatchReader implements TsonValueReader<Object> {
                 EventSkip.coreValue(ctx);
                 return null;
             }
-            return resolver.resolve(ref).read(ctx);
+            return reattach(resolver.resolve(ref).read(ctx), annotations);
         }
         if (!untaggedRecovery.isEmpty()) {
-            return recoverUntagged(ctx);
+            return reattach(recoverUntagged(ctx), annotations);
         }
         ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF,
                 "'" + positionName + "' " + missingTypeRefMessage + ": " + candidateNames,
@@ -87,5 +93,15 @@ final class NamedDispatchReader implements TsonValueReader<Object> {
                 "one of " + candidateNames, String.valueOf(event));
         EventSkip.coreValue(ctx);
         return null;
+    }
+
+    /**
+     * The annotations written on the dispatched value, re-attached to whatever the chosen reader built.
+     * Dispatch has to consume them to reach the type-ref it dispatches on ({@code data-value = *annotation
+     * [type-ref] core-value}), so the reader that actually builds the node never sees them; a non-node result
+     * (object-binding mode) has nowhere to carry them and is returned untouched.
+     */
+    private static Object reattach(Object value, List<TsonAnnotation> annotations) {
+        return value instanceof TsonNode node ? node.withAnnotations(annotations) : value;
     }
 }

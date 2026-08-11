@@ -61,6 +61,10 @@ final class AnnotationCapture {
         if (!(ctx.peek() instanceof AnnotationStart)) {
             return List.of();
         }
+        if (!types.capture()) {
+            EventSkip.annotations(ctx);
+            return List.of();
+        }
         List<TsonAnnotation> annotations = new ArrayList<>();
         while (ctx.peek() instanceof AnnotationStart start) {
             ctx.next();

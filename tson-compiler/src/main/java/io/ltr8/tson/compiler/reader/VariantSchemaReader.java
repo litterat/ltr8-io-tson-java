@@ -4,8 +4,11 @@ import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
 import io.ltr8.tson.compiler.TsonValueReaderResolver;
+import io.ltr8.tson.tree.TsonAnnotation;
+import io.ltr8.tson.tree.TsonNode;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -43,20 +46,23 @@ final class VariantSchemaReader implements TsonValueReader<Object> {
     private final TsonValueReader<?> ownParser;
     private final Set<String> subtypeNames;
     private final TsonValueReaderResolver resolver;
+    private final AnnotationTypes annotationTypes;
 
     VariantSchemaReader(String name, TsonValueReader<?> ownParser, Collection<String> subtypeNames,
-                         TsonValueReaderResolver resolver) {
+                         TsonValueReaderResolver resolver, AnnotationTypes annotationTypes) {
         this.name = name;
         this.ownParser = ownParser;
         this.subtypeNames = Set.copyOf(subtypeNames);
         this.resolver = resolver;
+        this.annotationTypes = annotationTypes;
     }
 
     @Override
     public Object read(TsonReadContext ctx) {
-        Optional<String> typeRef = EventSkip.annotationsAndTypeRef(ctx);
+        List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx, annotationTypes);
+        Optional<String> typeRef = EventSkip.typeRef(ctx);
         if (typeRef.isEmpty() || typeRef.get().equals(name)) {
-            return ownParser.read(ctx);
+            return reattach(ownParser.read(ctx), annotations);
         }
         String ref = typeRef.get();
         if (!subtypeNames.contains(ref)) {
@@ -66,6 +72,16 @@ final class VariantSchemaReader implements TsonValueReader<Object> {
             EventSkip.coreValue(ctx);
             return null;
         }
-        return resolver.resolve(ref).read(ctx);
+        return reattach(resolver.resolve(ref).read(ctx), annotations);
+    }
+
+    /**
+     * The annotations written on the dispatched value, re-attached to whatever the chosen reader built.
+     * Dispatch has to consume them to reach the type-ref it dispatches on ({@code data-value = *annotation
+     * [type-ref] core-value}), so the reader that actually builds the node never sees them; a non-node result
+     * (object-binding mode) has nowhere to carry them and is returned untouched.
+     */
+    private static Object reattach(Object value, List<TsonAnnotation> annotations) {
+        return value instanceof TsonNode node ? node.withAnnotations(annotations) : value;
     }
 }

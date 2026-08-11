@@ -5,6 +5,7 @@ import java.math.BigInteger;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 /**
  * An immutable, queryable node in a TSON document tree -- the useful result a schema-driven read (a {@code
@@ -30,6 +31,39 @@ public sealed interface TsonNode
 
     /** This value's own annotations, in order. */
     List<TsonAnnotation> annotations();
+
+    /**
+     * A copy of this node with {@code leading} placed ahead of its own annotations, or this node unchanged
+     * when {@code leading} is empty.
+     *
+     * <p>Exists for the one position a reader cannot annotate a node as it builds it: a value whose type is
+     * chosen by a preceding {@code !typeName} (a choice variant, a record subtype). Its annotations sit
+     * <em>before</em> that type-ref in the grammar ({@code data-value = *annotation [type-ref] core-value}),
+     * so whatever consumed the type-ref to decide which reader to use has necessarily already consumed them
+     * — and the reader that ends up building the node never sees them. Attaching afterwards puts them where
+     * they belong, on the value they were written against. {@code leading} goes first because it was written
+     * first, preserving §3.1's source order.
+     *
+     * <p>{@link MissingNode} is a navigation artifact rather than a value, so it has nothing to annotate and
+     * returns itself.
+     */
+    default TsonNode withAnnotations(List<TsonAnnotation> leading) {
+        if (leading.isEmpty()) {
+            return this;
+        }
+        List<TsonAnnotation> merged =
+                Stream.concat(leading.stream(), annotations().stream()).toList();
+        return switch (this) {
+            case RecordNode n -> new RecordNode(n.fields(), n.typeRef(), merged);
+            case MapNode n -> new MapNode(n.entries(), n.typeRef(), merged);
+            case ArrayNode n -> new ArrayNode(n.elements(), n.typeRef(), merged);
+            case TupleNode n -> new TupleNode(n.elements(), n.typeRef(), merged);
+            case AtomNode n -> new AtomNode(n.value(), n.typeRef(), merged);
+            case NullNode n -> new NullNode(n.typeRef(), merged);
+            case AbsentNode n -> new AbsentNode(n.typeRef(), merged);
+            case MissingNode n -> n;
+        };
+    }
 
     // --- kind ---
 

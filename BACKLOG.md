@@ -22,8 +22,8 @@ the removal of the old throwaway `Map`/`List` DOM mode all landed. What's left:
   operations (no compiler dependency), so they belong in that module. Deferred until there's a concrete
   produce/edit use case: `TsonTreeWriter` already closes the read→edit→write loop, so these have a real
   payoff when wanted, but block nothing now.
-- **Wire-annotation capture** — landed on the schemaless read path, still open on the schema-driven one
-  and on the write side:
+- **Wire-annotation capture** — complete for the tree, both read paths and the writer; the only piece still
+  open is the object-binding writer, which is parked with the rest of the `tson-bind` annotation work:
   - [x] **Schemaless tree capture.** `SchemalessTreeReader` now captures `@name`/`@name: value` onto each
     node's own `annotations()`, at every position §3.1 permits one — root, record field value, array
     element, both sides of a map entry (a `MapNode.Entry` key is a node, so an annotated key keeps its
@@ -34,7 +34,7 @@ the removal of the old throwaway `Map`/`List` DOM mode all landed. What's left:
     `SchemalessTreeAnnotationTest`. Note the model needed **no change** — every node type already had the
     slot, and `RecordNode`'s string-keyed `fields()` correctly mirrors §2.5's ban on annotating a field
     *name*.
-  - [x] **Schema-driven tree capture, except at a dispatched position.** The fix turned out to be
+  - [x] **Schema-driven tree capture.** The fix turned out to be
     *hoisting*, not signature widening: every reader that consumes the framing here **discards** the result
     (`RecordAbstractReader:159`, `MapAbstractReader:69`, `ArrayAbstractReader:68`, `TupleAbstractReader:68`,
     `AtomValueReader:136`, `VoidReader:33` — none assigns it), so a tree reader can capture the annotations
@@ -63,18 +63,24 @@ the removal of the old throwaway `Map`/`List` DOM mode all landed. What's left:
     - Deliberately stricter than conformance requires — §1.3 imposes no annotation obligation at all
       (`SPEC-FEEDBACK.md` #29). The cost: a document whose annotations resolve nowhere now produces
       diagnostics where it previously read silently.
-  - [ ] **Annotations on a value at a dispatched position.** The one case hoisting can't reach:
-    `NamedDispatchReader`/`VariantSchemaReader` must consume the annotations to get at the type-ref they
-    dispatch on, then delegate through `TsonValueReader.read(TsonReadContext)`, which has nowhere to carry
-    them. Narrow — only the dispatched value's *own* annotations are lost, its children keep theirs. Two
-    ways out: a handoff register on the context (safe because capture and take are adjacent — nothing runs
-    between the dispatcher stashing and the delegate's framing call — but invisible coupling, and a capture
-    nobody takes goes stale), or pushing the buffered annotation events back onto the stream so the delegate
-    consumes its own framing normally (no cross-object protocol, consistent with the buffer-and-replay idiom
-    already used, but `DefaultTsonReadContext.Cursor.events` is `final` and derived contexts share one
-    cursor, so it needs a pushback-capable source wired in at the top). **Decide alongside
-    `TsonValueReader.read`** — it's really a question about whether that interface grows a result type, the
-    same question `DiagnosticsReceiver` asks.
+  - [x] **Annotations on a value at a dispatched position.** The last gap, and it needed a third mechanism
+    rather than a variant of hoisting. A dispatcher (`NamedDispatchReader` for a choice,
+    `VariantSchemaReader` for a record subtype) must consume the annotations to reach the `!typeName` it
+    dispatches on — they precede it in `data-value = *annotation [type-ref] core-value` — so the reader that
+    ends up building the node cannot see them. They are now **re-attached to the finished node** via
+    `TsonNode.withAnnotations`, which puts them on the value they were written against.
+    - **No context change and no interface change.** An earlier note here claimed this had to be decided
+      alongside `TsonValueReader.read` because that interface "has nowhere to carry them". That was wrong,
+      and the error was direction: `DiagnosticsReceiver` needs something to flow *out of* a reader beside
+      its return value, which does constrain the return type; a dispatched annotation flows *in*, and the
+      dispatcher can simply attach it to what came back. Unrelated problems.
+    - `withAnnotations` is a pure `tson-tree` operation, and the first piece of the parked copy-on-write
+      item to land — narrowly, for the one case a reader provably cannot handle as it builds.
+    - **Bind mode is unaffected**, by construction: `reattach` only acts on a `TsonNode` result. To keep
+      bind mode from validating annotations at just the few positions that route through a capturing
+      reader, `AnnotationTypes` gained a third state — `DISCARDED` (consume and drop) alongside `of(...)`
+      (check) and `UNVALIDATED` (keep). `ChoiceReader` now has a factory per mode, which is how
+      record/array/map/tuple were already registered.
   - [x] **Write-side re-emission (tree).** `TsonDataEmitter` gained `annotation(name)` for the valueless
     form and a `beginAnnotation`/`endAnnotation` pair for the valued one; `TsonTreeWriter.writeNode` emits
     a node's annotations ahead of its type-ref, per §7.4's `*annotation [type-ref] core-value` order, which

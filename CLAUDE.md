@@ -553,9 +553,15 @@ forces the schemaless path on a schema-aware reader.
   a field only tree mode reads), each tree reader — and the `AtomNodeReader`/`AbsentNodeReader` wrappers —
   captures *first*, then calls the base/delegate, whose own framing call then finds nothing left. That's a
   no-op precisely because every one of those readers **discards** the framing result rather than using it.
-  Bind mode is untouched. **Still open:** a value sitting directly at a *dispatched* position
-  (choice/variant/subtype) — the dispatcher must consume the annotations to reach the type-ref it dispatches
-  on, and can't hand them to the delegate that builds the node; its children keep theirs.
+  Bind mode is untouched.
+- **A dispatched value gets its annotations re-attached afterwards.** `NamedDispatchReader`/
+  `VariantSchemaReader` must consume the annotations to reach the `!typeName` they dispatch on, so the reader
+  that builds the node never sees them; they're put back with `TsonNode.withAnnotations` (a pure `tson-tree`
+  operation). Nothing flows through the context and `TsonValueReader.read` is unchanged — a dispatched
+  annotation flows *into* the delegate's result, which is the opposite direction from the
+  `DiagnosticsReceiver` problem. Bind mode is unaffected by construction (re-attachment only acts on a
+  `TsonNode`), and `AnnotationTypes.DISCARDED` keeps it from validating at just the positions that happen to
+  route through a capturing reader.
 - **A schema-driven read also type-checks annotations** (§6: an annotation *names a type*). `AnnotationTypes`
   resolves the name against the governing schema (§3.3.3's one hop — for a data document that's the
   `!!schema` target, i.e. the very schema the readers were compiled from) and the value is read by *that

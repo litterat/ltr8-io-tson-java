@@ -22,10 +22,18 @@ import java.util.Optional;
  * Class 1 read preserves annotations without validating them, [TSON-DATA] §3.1), the second is an unresolved
  * reference worth a diagnostic.
  */
-record AnnotationTypes(Optional<TsonSchema> schema, TsonValueReaderResolver readers) {
+record AnnotationTypes(boolean capture, Optional<TsonSchema> schema, TsonValueReaderResolver readers) {
 
     /** No governing schema: every annotation is preserved as authored, none is resolved or checked. */
-    static final AnnotationTypes UNVALIDATED = new AnnotationTypes(Optional.empty(), name -> null);
+    static final AnnotationTypes UNVALIDATED = new AnnotationTypes(true, Optional.empty(), name -> null);
+
+    /**
+     * Annotations are consumed and dropped -- object-binding mode, where a bound Java value has nowhere to
+     * carry one. Distinct from {@link #UNVALIDATED}, which keeps them without making any claim about their
+     * type: this one keeps nothing, so it also does no checking, which is what stops bind mode from
+     * validating at just the handful of positions that happen to route through a capturing reader.
+     */
+    static final AnnotationTypes DISCARDED = new AnnotationTypes(false, Optional.empty(), name -> null);
 
     /**
      * The vocabulary a compiled schema offers -- its own entries, which already include everything it
@@ -35,7 +43,7 @@ record AnnotationTypes(Optional<TsonSchema> schema, TsonValueReaderResolver read
      * the compilation that built it.
      */
     static AnnotationTypes of(ValueReaderContext context) {
-        return new AnnotationTypes(Optional.of(context.schema()), context.readers());
+        return new AnnotationTypes(true, Optional.of(context.schema()), context.readers());
     }
 
     /** Whether a governing schema is in scope at all, and so whether an unresolvable name is a defect. */

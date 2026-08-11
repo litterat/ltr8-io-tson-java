@@ -69,7 +69,8 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         return new ValueReaderFactoryRegistry(baseFactories(
                 new RecordBindReader.Factory(context), new ArrayBindReader.Factory(context),
                 new MapBindReader.Factory(context), new TupleBindReader.Factory(context),
-                AtomValueReader.ENUM_OBJECT_MODE, AtomValueReader.UNIT, UnaryOperator.identity()));
+                AtomValueReader.ENUM_OBJECT_MODE, AtomValueReader.UNIT, UnaryOperator.identity(),
+                ChoiceReader.FACTORY));
     }
 
     /**
@@ -82,7 +83,8 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
     public static ValueReaderFactoryRegistry tree() {
         return new ValueReaderFactoryRegistry(baseFactories(
                 new RecordTreeReader.Factory(), new ArrayTreeReader.Factory(), new MapTreeReader.Factory(),
-                new TupleTreeReader.Factory(), AtomValueReader.ENUM_OBJECT_MODE, TREE_UNIT, AtomNodeFactory::new));
+                new TupleTreeReader.Factory(), AtomValueReader.ENUM_OBJECT_MODE, TREE_UNIT, AtomNodeFactory::new,
+                ChoiceReader.CAPTURING_FACTORY));
     }
 
     /** Tree mode's {@code unit} factory: {@code void} → {@link AbsentNodeReader}, {@code value}/{@code token} → {@link AtomNodeReader} over {@link AtomValueReader#UNIT}'s own reader. */
@@ -95,7 +97,8 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
 
     private static Map<String, ValueReaderFactory> baseFactories(ValueReaderFactory record, ValueReaderFactory array,
             ValueReaderFactory map, ValueReaderFactory tuple, ValueReaderFactory enumFactory,
-            ValueReaderFactory unitFactory, UnaryOperator<ValueReaderFactory> leaf) {
+            ValueReaderFactory unitFactory, UnaryOperator<ValueReaderFactory> leaf,
+            ValueReaderFactory choice) {
         Map<String, ValueReaderFactory> factories = new LinkedHashMap<>();
 
         // meta-kernel.tn1
@@ -110,7 +113,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         factories.put("map", map);
         factories.put("tuple", tuple);
         factories.put("enum", leaf.apply(enumFactory));
-        factories.put("choice", ChoiceReader.FACTORY);
+        factories.put("choice", choice);
 
         // meta.tn1
         factories.put("binary", leaf.apply(AtomValueReader.BINARY));

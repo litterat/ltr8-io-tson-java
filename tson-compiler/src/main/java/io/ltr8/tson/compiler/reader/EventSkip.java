@@ -50,6 +50,16 @@ public final class EventSkip {
      * framing, rather than this method.
      */
     public static Optional<String> annotationsAndTypeRef(TsonReadContext ctx) {
+        annotations(ctx);
+        return typeRef(ctx);
+    }
+
+    /**
+     * Consumes and discards every leading annotation, stopping at the type-ref or core-value that follows --
+     * the first half of {@link #annotationsAndTypeRef}, split out so a reader that <em>captures</em>
+     * annotations ({@code AnnotationCapture}) and one that drops them still agree on where the run ends.
+     */
+    public static void annotations(TsonReadContext ctx) {
         while (ctx.peek() instanceof AnnotationStart) {
             ctx.next();
             if (!(ctx.peek() instanceof AnnotationEnd)) {
@@ -57,7 +67,6 @@ public final class EventSkip {
             }
             ctx.next(); // AnnotationEnd
         }
-        return typeRef(ctx);
     }
 
     /**
