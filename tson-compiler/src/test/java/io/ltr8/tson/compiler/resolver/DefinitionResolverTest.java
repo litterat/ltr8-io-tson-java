@@ -51,6 +51,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -1488,11 +1489,19 @@ class DefinitionResolverTest {
         return new TsonSchemaParser(readFixture()).parseSchemaDocument().body();
     }
 
+    /**
+     * Parses one declaration and resolves it, running {@link SchemaDesugarer} in between as {@code
+     * SchemaResolver} does. The phase owns the sugar forms now, so a snippet that skipped it would be
+     * resolving a shape the pipeline never produces -- and these tests assert the resulting {@link
+     * TypeDefinition}, which the move did not change.
+     */
     private TypeDefinition resolveSnippet(String declaration) {
-        SchemaMap schemaMap = new TsonSchemaParser("""
+        SchemaDocument document = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
-                { %s }""".formatted(declaration)).parseSchemaDocument().body();
-        return resolver.resolve(schemaMap.declarations().values().iterator().next());
+                { %s }""".formatted(declaration)).parseSchemaDocument();
+        SchemaMap schemaMap = SchemaDesugarer.desugar(document,
+                MetaKernelBootstrapResolver.getMetaKernelSchema().entries(), Set.of()).body();
+        return resolver.resolve(schemaMap.declarations().get(declaration.split("=>")[0].trim()));
     }
 
     @Test
