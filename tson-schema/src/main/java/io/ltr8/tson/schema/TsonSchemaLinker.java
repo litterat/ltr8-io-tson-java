@@ -511,7 +511,7 @@ public final class TsonSchemaLinker {
                                         Map<String, TypeArgument> argumentsByParameter) {
         return switch (constructorName) {
             case "array", "set" -> instantiateArray(vocabulary, argumentsByParameter);
-            default -> null;
+            default -> throw new UnsupportedOperationException("General instantiation not supported");
         };
     }
 

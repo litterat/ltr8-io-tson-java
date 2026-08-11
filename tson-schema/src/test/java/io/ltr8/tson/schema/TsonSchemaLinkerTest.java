@@ -5,6 +5,7 @@ import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldState;
+import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Token;
@@ -23,6 +24,7 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -166,6 +168,119 @@ class TsonSchemaLinkerTest {
 
         RecordBody containerBody = (RecordBody) result.schema().entries().get("container").body();
         assertEquals(TypeRef.of(syntheticName), containerBody.fields().get(0).type());
+    }
+
+    /**
+     * A minimal stand-in for meta-kernel's own real {@code map} constructor -- {@code map => <K, V> ~product &
+     * { access_pattern: ... = NAMED  size_type: ... = VARIABLE  key_type: type_ref = K  value_type: type_ref =
+     * V  min_items: integer?  max_items: integer? } }. Same modelling shortcuts as {@link
+     * #arrayConstructorEntry()}: every field's own {@code type} is a bare {@code token} reference, since an
+     * assembler reads {@code name}/{@code value}/{@code valueParam} only.
+     */
+    private static TypeDefinition mapConstructorEntry() {
+        RecordBody vocabulary = new RecordBody(List.of(), List.of(
+                new RecordField("access_pattern", TypeRef.of("token"), FieldState.REQUIRED_FIXED,
+                        Optional.of(new Token("NAMED", Token.Form.UNQUOTED)), Optional.empty()),
+                new RecordField("size_type", TypeRef.of("token"), FieldState.REQUIRED_FIXED,
+                        Optional.of(new Token("VARIABLE", Token.Form.UNQUOTED)), Optional.empty()),
+                new RecordField("key_type", TypeRef.of("token"), FieldState.REQUIRED, Optional.empty(), Optional.of("K")),
+                new RecordField("value_type", TypeRef.of("token"), FieldState.REQUIRED, Optional.empty(), Optional.of("V")),
+                new RecordField("min_items", TypeRef.of("token"), FieldState.OPTIONAL, Optional.empty(), Optional.empty()),
+                new RecordField("max_items", TypeRef.of("token"), FieldState.OPTIONAL, Optional.empty(), Optional.empty())),
+                List.of());
+        return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of("K", "V"), true, List.of(), List.of(),
+                Optional.empty(), vocabulary);
+    }
+
+    /**
+     * A loader standing in for the governing {@code !!meta} target, supplying {@code metaEntries} as the
+     * <b>structure namespace</b>. This is where a container constructor really lives: §3.3.2 keeps the
+     * structure namespace out of the type-name namespace, so a user schema can reach {@code map}/{@code array}
+     * at a constructor role (§3.3.1) but never declares them itself. Every other test here passes {@code null}
+     * and so links against an empty structure namespace.
+     */
+    private static TsonSchemaLoader metaSchemaWith(Map<String, TypeDefinition> metaEntries) {
+        TsonLinkedSchema meta = new TsonLinkedSchema(new TsonSchema(TsonBundledSchemas.META_KERNEL_ID,
+                TsonBundledSchemas.META_KERNEL_ID, List.of(), metaEntries));
+        String metaIdentity = CanonicalIdentity.of(TsonBundledSchemas.META_KERNEL_ID);
+        return identity -> metaIdentity.equals(identity) ? Optional.of(meta) : Optional.empty();
+    }
+
+    /**
+     * The control for {@link #materializesAMapApplicationWhoseConstructorLivesInTheMetaSchema}: identical
+     * setup, constructor reached the same way, and it works. {@code array} is declared only in the meta
+     * schema, so the user schema names it at a generic-application head (§3.3.1) without declaring it --
+     * materialisation's own lookup is structure-namespace-first and finds it, {@code instantiateArray} builds
+     * a real {@link ArrayBody}, and because no reference to {@code array} survives into the entry, validation
+     * never has to resolve the name at all.
+     */
+    @Test
+    void materializesAnArrayApplicationWhoseConstructorLivesInTheMetaSchema() {
+        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        entries.put("token", unitEntry());
+        entries.put("container", TypeDefinition.product(RecordBody.of(List.of(
+                RecordField.required("items", new TypeRef("array", List.of(new TypeArgument.Ref(TypeRef.of("token")))))))));
+
+        TsonLinkedSchema result = TsonSchemaLinker.link(schemaOf(entries),
+                metaSchemaWith(Map.of("array", arrayConstructorEntry())));
+
+        String syntheticName = result.schema().entries().keySet().stream()
+                .filter(name -> !Set.of("token", "container").contains(name))
+                .findFirst().orElseThrow();
+        ArrayBody body = assertInstanceOf(ArrayBody.class, result.schema().entries().get(syntheticName).body());
+        assertEquals(TypeRef.of("token"), body.elementType());
+    }
+
+    /**
+     * <b>Currently fails -- this is the defect, isolated.</b> The same shape as the {@code array} control
+     * directly above, with the one variable changed: {@code map} instead of {@code array}. Both constructors
+     * live only in the meta schema, both are reached identically, and only one of them materialises.
+     *
+     * <p>Everything upstream of the assembler works. {@code instantiate} finds {@code map} through the
+     * structure-namespace-first lookup, it is {@code constructor: true}, its body is a {@link RecordBody}, and
+     * its two parameters zip against the two arguments -- every gate passes. Then {@code instantiateBody}
+     * switches on the constructor name, handles {@code "array"}/{@code "set"}, and returns {@code null} from
+     * its {@code default}, so {@code instantiate} falls back to {@code TypeDefinition.reference(application)}.
+     *
+     * <p>That placeholder is what fails validation, and the reported "unresolved reference 'map'" is a
+     * symptom rather than the cause: the body is a {@code Reference} whose target <em>still carries the
+     * arguments</em>, so it points back at the very application being materialised and never substitutes
+     * {@code K}/{@code V}. §3.3.2 keeps the structure namespace out of the type-name namespace where that
+     * reference is then checked, so the name cannot resolve there -- but with a real assembler no reference to
+     * {@code map} would exist to check, exactly as the control demonstrates.
+     */
+    @Test
+    void materializesAMapApplicationWhoseConstructorLivesInTheMetaSchema() {
+        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        entries.put("token", unitEntry());
+        entries.put("container", TypeDefinition.product(RecordBody.of(List.of(
+                RecordField.required("entries", new TypeRef("map", List.of(
+                        new TypeArgument.Ref(TypeRef.of("token")),
+                        new TypeArgument.Ref(TypeRef.of("token")))))))));
+        TsonSchemaLoader meta = metaSchemaWith(Map.of("map", mapConstructorEntry()));
+
+        TsonLinkedSchema result;
+        try {
+            result = TsonSchemaLinker.link(schemaOf(entries), meta);
+        } catch (TsonSchemaValidationException e) {
+            throw new AssertionError("map<K, V> reached TsonSchemaLinker.instantiateBody with every gate passed "
+                    + "(constructor found in the meta schema, constructor:true, RecordBody vocabulary, arity 2 "
+                    + "zipped against 2 arguments) -- but that switch handles only \"array\"/\"set\" and returns "
+                    + "null from `default`, so instantiate fell back to a placeholder reference whose target "
+                    + "still carries the arguments. Validation then rejected that reference, since §3.3.2 keeps "
+                    + "the structure namespace out of the namespace it is checked against. The array control "
+                    + "above proves the namespace is not the variable. Linker reported: " + e.getMessage(), e);
+        }
+
+        String syntheticName = result.schema().entries().keySet().stream()
+                .filter(name -> !Set.of("token", "container").contains(name))
+                .findFirst().orElseThrow();
+        TypeDefinition synthetic = result.schema().entries().get(syntheticName);
+        MapBody body = assertInstanceOf(MapBody.class, synthetic.body(),
+                "materialised as: " + synthetic.body());
+        assertEquals(TypeRef.of("token"), body.keyType());
+        assertEquals(TypeRef.of("token"), body.valueType());
+        assertEquals(TypeRef.of("map"), synthetic.source().orElseThrow());
     }
 
     @Test
