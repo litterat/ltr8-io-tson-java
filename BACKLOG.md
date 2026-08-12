@@ -105,23 +105,20 @@ the removal of the old throwaway `Map`/`List` DOM mode all landed. What's left:
     - Still discarding at leaf and dispatched positions — a bound scalar has nowhere to put a carrier, so
       there is nothing to deliver to until the boxed carrier below exists.
 
-- [ ] **A boxed carrier, for positions that cannot hold one.** A record can declare an `Annotations`
-  component; a `String` field, an array element, a tuple position and a map key or value cannot — which is
-  why leaf and dispatched positions still discard. A generic box moves the metadata into the position's own
-  declared type: `record Annotated<T>(T value, Annotations annotations)`, so a field is declared
-  `Annotated<String> name` and the binder resolves `T`'s descriptor from the component's generic type
-  (`RecordComponentFinder` already reads it, `DataBindContext.getDescriptor(Class, Type)` already takes
-  one), reads the value as `T`, and attaches whatever the position's annotations were. This is what makes
-  wiring capture at those positions worth doing.
-  - **A different answer from the one `SPEC-FEEDBACK.md` #13 rejected**, and #13's interpretation paragraph
-    needs revisiting if it lands. #13 rejected *sibling* carriers keyed by field name, array index or map
-    key, on three grounds: a bespoke convention per container kind, no resolution of the recursive case, and
-    API surface for a rare capability. A box answers all three — one type serves every position because the
-    position's *type* is what changes, nesting composes (`Annotated<List<Annotated<String>>>`) rather than
-    needing a new convention per level, and it costs nothing where unused. #13's "structurally unreachable
-    from a typed object-binding layer, full stop" is too strong; its *spec* question stands regardless.
-  - The name is free: the `@Annotated` marker it would reuse has been deleted, the declared type having
-    replaced it as the opt-in.
+- [ ] **Annotations are still discarded at a dispatched position.** A dispatcher (`VariantBindReader` for a
+  union, `VariantSchemaReader` under bind mode) must consume the leading annotations to reach the
+  `!typeName` it dispatches on -- they precede it in `data-value = *annotation [type-ref] core-value` -- so
+  the reader that ends up building the value never sees them. Tree mode solved this by re-attaching to the
+  finished node (`TsonNode.withAnnotations`); bind mode would do the same through `DataClassAnnotated`'s
+  `constructor` handle, wrapping what came back.
+  - Not reachable today: a union member is not a boxed position, so its carrier is always empty rather than
+    wrong. Worth closing when a boxed variant becomes expressible, not before.
+- [ ] **`SchemaResolver` builds an `AnnotatedMap` directly** -- the one place outside `tson-bind` that
+  constructs a carrier. Defensible, since it is the resolver assembling its own value model rather than the
+  serialization layer building a caller's bound object, but it is the single exception to "tson-bind is the
+  only way to create a data object" and should be a known one rather than an assumed-absent one. If
+  `schema.meta` ever gains a resolved-form ingest path, this is where the two ways of building a `TsonSchema`
+  would have to agree.
 
 ## Front door / ergonomics
 
