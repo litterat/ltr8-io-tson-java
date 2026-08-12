@@ -7,13 +7,15 @@ import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassArray;
 import io.ltr8.bind.DataClassAtom;
 import io.ltr8.bind.DataClassElement;
+import io.ltr8.annotation.Annotation;
+import io.ltr8.annotation.Annotations;
+import io.ltr8.tson.tree.TsonAnnotation;
 import io.ltr8.bind.DataClassField;
 import io.ltr8.bind.DataClassMap;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassTuple;
 import io.ltr8.bind.DataClassUnion;
 import io.ltr8.tson.compiler.*;
-import io.ltr8.tson.compiler.ast.Annotation;
 import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.atom.AtomType;
@@ -240,19 +242,22 @@ public final class SchemalessObjectReader {
 
     /**
      * A field marked {@code @Annotated} (io.ltr8.annotation) is populated not from a same-named
-     * authored field but directly from the record value's *own* wire annotations (§3.1) -- captured
-     * here into a {@link TsonAnnotations}, since {@code tson-bind} can't validate the carrier's
-     * declared type is {@link TsonAnnotations} (no dependency on this module), so that check lives at
-     * this one spot where both are visible. Field values' own annotations are never captured -- only
-     * the record value's, matching the tree-based reader's own deliberate scope limit.
+     * authored field but directly from the record value's *own* wire annotations (§3.1). The record names
+     * its own carrier ({@link DataClassRecord#annotationsCarrier()}), settled during analysis, so there is
+     * nothing to detect or validate here. Field values' own annotations are never captured -- only the
+     * record value's, matching the tree-based reader's own deliberate scope limit.
      */
     private Object bindRecord(TsonReadContext ctx, DataClassRecord dataClass) {
         int diagnosticsBefore = ctx.diagnostics().size();
         DataClassField[] fields = dataClass.fields();
-        List<Annotation> captured = hasAnnotationsCarrier(fields) ? new ArrayList<>() : null;
+        DataClassField carrier = dataClass.annotationsCarrier().orElse(null);
+        Annotations captured = Annotations.empty();
 
-        if (captured != null) {
-            captureAnnotations(ctx, captured);
+        if (carrier != null) {
+            // UNVALIDATED: no governing schema on this path, so an annotation's value is read structurally
+            // and nothing is checked against a declared type -- the same treatment the schemaless tree
+            // reader gives it.
+            captured = toAnnotations(AnnotationCapture.annotations(ctx, AnnotationTypes.UNVALIDATED));
             if (ctx.peek() instanceof TypeRef) {
                 ctx.next(); // a type-ref on a directly-bound record names nothing further -- consume and ignore
             }
@@ -277,7 +282,7 @@ public final class SchemalessObjectReader {
 
         Map<String, Integer> indexByName = new HashMap<>();
         for (int i = 0; i < fields.length; i++) {
-            if (!fields[i].isAnnotationsCarrier()) {
+            if (fields[i] != carrier) {
                 indexByName.put(fields[i].name(), i);
             }
         }
@@ -285,16 +290,11 @@ public final class SchemalessObjectReader {
         Object[] construct = new Object[fields.length];
         boolean[] seen = new boolean[fields.length];
 
+        // The carrier takes no part in field matching: it is filled from what was captured above and marked
+        // seen, so the "required field never appeared" pass below skips it.
         for (int i = 0; i < fields.length; i++) {
-            DataClassField field = fields[i];
-            if (field.isAnnotationsCarrier()) {
-                if (field.type() != TsonAnnotations.class) {
-                    ctx.report(Diagnostic.Code.TYPE_MISMATCH, "@Annotated component '" + field.name() + "' on "
-                                    + dataClass.typeClass() + " must be of type TsonAnnotations, found " + field.type(),
-                            "TsonAnnotations", String.valueOf(field.type()));
-                } else {
-                    construct[field.index()] = new TsonAnnotations(captured != null ? captured : List.of());
-                }
+            if (fields[i] == carrier) {
+                construct[carrier.index()] = captured;
                 seen[i] = true;
             }
         }
@@ -575,37 +575,21 @@ public final class SchemalessObjectReader {
         }
     }
 
-    private static boolean hasAnnotationsCarrier(DataClassField[] fields) {
-        for (DataClassField field : fields) {
-            if (field.isAnnotationsCarrier()) {
-                return true;
-            }
-        }
-        return false;
-    }
 
     /**
-     * Captures each leading wire annotation -- {@code AnnotationStart} through its own matching
-     * {@code AnnotationEnd} (annotation depth-counted so a nested annotation inside an annotation's
-     * value is bracketed correctly) -- and reduces the collected events back into an {@code ast}
-     * {@link Annotation}, reusing {@link TsonDataParser}'s own {@code EventReducer}. Only a single
-     * value's own annotations are ever buffered, never the value body, so this doesn't defeat
-     * streaming.
+     * The tree reader's capture, as the binding-layer carrier. Both model the same §3.1 attachment; they
+     * differ only in the value's Java form, which {@link Annotations} deliberately leaves as {@code Object}
+     * because it depends on how the document was read -- here a {@code TsonNode}, since nothing on this path
+     * declares what an annotation's value should bind to.
      */
-    private void captureAnnotations(TsonReadContext ctx, List<Annotation> out) {
-        while (ctx.peek() instanceof AnnotationStart) {
-            List<TsonEvent> events = new ArrayList<>();
-            int depth = 0;
-            do {
-                TsonEvent e = ctx.next();
-                events.add(e);
-                if (e instanceof AnnotationStart) {
-                    depth++;
-                } else if (e instanceof AnnotationEnd) {
-                    depth--;
-                }
-            } while (depth > 0);
-            out.add(new TsonDataParser.EventReducer(events, NO_POSITIONS).annotation());
+    private static Annotations toAnnotations(List<TsonAnnotation> captured) {
+        if (captured.isEmpty()) {
+            return Annotations.empty();
         }
+        List<Annotation> values = new ArrayList<>(captured.size());
+        for (TsonAnnotation annotation : captured) {
+            values.add(new Annotation(annotation.name(), annotation.value().map(node -> (Object) node)));
+        }
+        return Annotations.of(values);
     }
 }

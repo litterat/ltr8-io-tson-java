@@ -1,6 +1,7 @@
 package io.ltr8.bind.analysis;
 
 import io.ltr8.annotation.DataBridge;
+import io.ltr8.annotation.Annotations;
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.FieldOrder;
 import io.ltr8.annotation.Record;
@@ -114,7 +115,8 @@ public class DefaultRecordBinder {
 				DataClassRecord descriptor = resolveClassRecord(context, bridge.dataClass());
 
 				return new DataClassRecord(targetClass, bridge, descriptor.isMutable(), descriptor.creator(),
-						descriptor.constructor(), descriptor.fields());
+						descriptor.constructor(), descriptor.fields(),
+						descriptor.annotationsCarrier().orElse(null));
 			} else {
 
 				DataClassRecord descriptor = resolveClassRecord(context, targetClass);
@@ -127,7 +129,8 @@ public class DefaultRecordBinder {
 				registerUnionSubclasses(context, targetClass);
 
 				return new DataClassRecord(descriptor.typeClass(), bridge, descriptor.isMutable(), descriptor.creator(),
-						descriptor.constructor(), descriptor.fields());
+						descriptor.constructor(), descriptor.fields(),
+						descriptor.annotationsCarrier().orElse(null));
 			}
 		} catch (IllegalAccessException | NoSuchMethodException | SecurityException | DataBindException e) {
 			throw new DataBindException("Failed to resolve", e);
@@ -171,19 +174,21 @@ public class DefaultRecordBinder {
 
 		// Prepare the field descriptors.
 		DataClassField[] dataComponents = new DataClassField[components.size()];
+		DataClassField annotationsCarrier = null;
 		int annotationsCarrierCount = 0;
 		for (int x = 0; x < components.size(); x++) {
 			ComponentInfo info = components.get(x);
 
 			dataComponents[x] = resolveField(context, targetClass, info, x);
-			if (dataComponents[x].isAnnotationsCarrier()) {
+			if (info.getType() == Annotations.class) {
+				annotationsCarrier = dataComponents[x];
 				annotationsCarrierCount++;
 			}
 		}
 		if (annotationsCarrierCount > 1) {
-			throw new CodeAnalysisException(
-					"At most one component may be marked @Annotated, found " + annotationsCarrierCount
-							+ " on " + targetClass);
+			throw new CodeAnalysisException("At most one component may have type " + Annotations.class.getName()
+					+ ", the carrier for this value's own wire-format annotations -- found "
+					+ annotationsCarrierCount + " on " + targetClass);
 		}
 
 		// get the correct data constructor method handle. Either a constructor or a
@@ -203,7 +208,8 @@ public class DefaultRecordBinder {
 			// ignore.
 		}
 
-		return new DataClassRecord(targetClass, null, false, creator, constructor, dataComponents);
+		return new DataClassRecord(targetClass, null, false, creator, constructor, dataComponents,
+				annotationsCarrier);
 	}
 
 	/**
@@ -321,9 +327,9 @@ public class DefaultRecordBinder {
 
 		Field fieldAnnotation = info.getField();
 
-		if (info.isAnnotated()) {
-			// @Annotated -- not bound from an authored value at all, so nothing here needs the
-			// usual context.getDescriptor() recursion. See resolveAnnotationsCarrierField.
+		if (info.getType() == Annotations.class) {
+			// The declared type is the opt-in: not bound from an authored value at all, so nothing
+			// here needs the usual context.getDescriptor() recursion. See resolveAnnotationsCarrierField.
 			component = resolveAnnotationsCarrierField(targetClass, info, index);
 		} else if (fieldAnnotation != null && fieldAnnotation.bridge() != null
 				&& fieldAnnotation.bridge() != DataBridge.class) {
@@ -348,14 +354,14 @@ public class DefaultRecordBinder {
 	}
 
 	/**
-	 * Builds the {@code DataClassField} for a component marked {@code @Annotated}
-	 * (io.ltr8.annotation). Deliberately skips {@code context.getDescriptor()} entirely -- unlike
-	 * every other field kind, this one is never bound from an authored value at all (a binder
-	 * populates it from the *enclosing* value's own wire-format annotations instead), so there's no
-	 * {@code DataClass} to resolve and {@link DataClassField#dataClass()} is left {@code null}.
-	 * {@code tson-bind} itself has no dependency on the mapper layer above it, so it can't validate
-	 * that the component's declared type is actually {@code TsonAnnotations} here -- that check
-	 * happens where the type is visible, at binding time in {@code TsonObjectReader}.
+	 * Builds the {@code DataClassField} for a component whose declared type is {@link Annotations}.
+	 * Deliberately skips {@code context.getDescriptor()} entirely -- unlike every other field kind, this one
+	 * is never bound from an authored value at all (a reader populates it from the *enclosing* value's own
+	 * wire-format annotations instead), so there is no {@code DataClass} to resolve and {@link
+	 * DataClassField#dataClass()} is left {@code null}.
+	 *
+	 * <p>The field is reported through {@link DataClassRecord#annotationsCarrier()} rather than a flag on the
+	 * field itself, so a reader can ask once, up front, instead of testing every field as it walks.
 	 */
 	private DataClassField resolveAnnotationsCarrierField(Class<?> targetClass, ComponentInfo info, int index) {
 		MethodHandle accessor = accessor(info);
@@ -364,7 +370,7 @@ public class DefaultRecordBinder {
 		MethodHandle isPresent = MethodHandles.dropArguments(
 				MethodHandles.constant(boolean.class, true), 0, targetClass);
 
-		return new DataClassField(index, fieldName, info.getType(), null, true, isPresent, accessor, null, true);
+		return new DataClassField(index, fieldName, info.getType(), null, true, isPresent, accessor, null);
 	}
 
 	/**

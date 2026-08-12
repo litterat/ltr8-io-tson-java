@@ -60,7 +60,7 @@ public final class TsonObjectWriter {
      * first place, the same reason a schemaless reader has no way to reject an out-of-range value
      * without the annotation.
      *
-     * <p>{@code @Annotated}-captured wire-format annotations are not re-emitted yet -- deferred to
+     * <p>Carrier-captured wire-format annotations are not re-emitted yet -- deferred to
      * a follow-up, not part of this first pass (values only).
      */
     public String toTson(Object value) {
@@ -139,17 +139,18 @@ public final class TsonObjectWriter {
     // ── Records ──────────────────────────────────────────────────────────
 
     /**
-     * {@code @Annotated}-captured annotations aren't re-emitted yet (see {@link #toTson}) -- that
-     * field is skipped entirely here, not written as though it were an ordinary structural value.
+     * The annotations carrier isn't re-emitted yet (see {@link #toTson}) -- that field is skipped entirely
+     * here, not written as though it were an ordinary structural value.
      * A field that isn't present ({@code Optional.empty()}, or a plain reference field holding
      * {@code null} -- both read the same way on the way in, via {@link DataClassField#isPresent}) is
      * omitted from the record entirely rather than written as {@code null}, matching how the two
      * cases are already treated identically on the read side.
      */
     private void writeRecord(Object value, DataClassRecord dataClass, TsonDataEmitter writer) throws Throwable {
+        DataClassField carrier = dataClass.annotationsCarrier().orElse(null);
         writer.beginRecord();
         for (DataClassField field : dataClass.fields()) {
-            if (field.isAnnotationsCarrier() || !field.isPresent(value)) {
+            if (field == carrier || !field.isPresent(value)) {
                 continue;
             }
             writer.field(field.name());

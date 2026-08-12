@@ -15,7 +15,6 @@
  */
 package io.ltr8.bind.analysis;
 
-import io.ltr8.annotation.Annotated;
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Union;
 
@@ -33,7 +32,7 @@ import java.util.List;
  * Each record component maps directly to one canonical-constructor argument, by position, and to
  * its own accessor method. Records have no setters; they're immutable by construction.
  *
- * <p>{@code @Field}/{@code @Union}/{@code @Annotated} are read from the accessor method, not
+ * <p>{@code @Field}/{@code @Union} are read from the accessor method, not
  * {@code RecordComponent} itself: none of the three annotations' {@code @Target} lists {@code
  * ElementType.RECORD_COMPONENT}, so per JLS 8.10.3 an annotation written on a record header
  * parameter propagates to the field, the constructor parameter, and (for a compiler-synthesized
@@ -83,9 +82,6 @@ public class RecordComponentFinder implements ComponentFinder {
                 info.setUnion(unionAnnotation);
             }
 
-            if (accessor.getAnnotation(Annotated.class) != null) {
-                info.setAnnotated(true);
-            }
 
             fields.add(info);
         }

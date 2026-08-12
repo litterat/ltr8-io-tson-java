@@ -13,7 +13,6 @@
  */
 package io.ltr8.bind.analysis;
 
-import io.ltr8.annotation.Annotated;
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Union;
 
@@ -42,7 +41,6 @@ public class ComponentInfo {
 
 	private Union union;
 
-	private boolean annotated;
 
 	public ComponentInfo(String name, Class<?> type) {
 		this.name = name;
@@ -94,13 +92,7 @@ public class ComponentInfo {
 		return this.union;
 	}
 
-	public void setAnnotated(boolean annotated) {
-		this.annotated = annotated;
-	}
 
-	public boolean isAnnotated() {
-		return this.annotated;
-	}
 
 	public Class<?> getType() {
 		return type;

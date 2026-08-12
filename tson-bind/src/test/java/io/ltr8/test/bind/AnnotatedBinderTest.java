@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import io.ltr8.annotation.Annotated;
+import io.ltr8.annotation.Annotations;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClassField;
@@ -27,17 +27,16 @@ import io.ltr8.bind.DataClassRecord;
 
 public class AnnotatedBinderTest {
 
-	// Deliberately not a resolvable atom/record/etc. -- tson-bind has no dependency on the
-	// mapper layer's real TsonAnnotations carrier type, and DefaultRecordBinder never calls
-	// context.getDescriptor() for an @Annotated component in the first place, so there's nothing
-	// for this class to need to resolve to.
-	public static class OpaqueCarrier {
+	// Declaring a component of type Annotations is the whole opt-in -- no marker, and nothing to
+	// register. Annotations is not a resolvable atom/record/etc., which is fine: DefaultRecordBinder
+	// never calls context.getDescriptor() for a carrier.
+	public record Item(Annotations meta, String name) {
 	}
 
-	public record Item(@Annotated OpaqueCarrier meta, String name) {
+	public record TwoCarriers(Annotations a, Annotations b, String name) {
 	}
 
-	public record TwoCarriers(@Annotated OpaqueCarrier a, @Annotated OpaqueCarrier b, String name) {
+	public record NoCarrier(String name) {
 	}
 
 	DataBindContext context;
@@ -48,23 +47,31 @@ public class AnnotatedBinderTest {
 	}
 
 	@Test
-	public void annotatedComponentIsFlaggedAndSkipsDescriptorResolution() throws Throwable {
+	public void theCarrierIsInferredFromItsDeclaredTypeAndSkipsDescriptorResolution() throws Throwable {
 		DataClassRecord descriptor = (DataClassRecord) context.getDescriptor(Item.class);
 
 		DataClassField[] fields = descriptor.fields();
 		Assertions.assertEquals(2, fields.length);
 
-		DataClassField meta = fields[0];
+		// The record names its own carrier, so a reader asks once rather than testing every field.
+		DataClassField meta = descriptor.annotationsCarrier().orElseThrow();
+		Assertions.assertSame(fields[0], meta);
 		Assertions.assertEquals("meta", meta.name());
-		Assertions.assertTrue(meta.isAnnotationsCarrier());
-		Assertions.assertNull(meta.dataClass());
 
-		DataClassField name = fields[1];
-		Assertions.assertFalse(name.isAnnotationsCarrier());
+		// Never bound from an authored value, so no descriptor was resolved for it -- which is what
+		// lets the carrier type be one tson-bind knows nothing about beyond its identity.
+		Assertions.assertNull(meta.dataClass());
 	}
 
 	@Test
-	public void atMostOneAnnotatedComponentAllowed() {
+	public void aRecordWithoutACarrierHasNone() throws Throwable {
+		DataClassRecord descriptor = (DataClassRecord) context.getDescriptor(NoCarrier.class);
+
+		Assertions.assertTrue(descriptor.annotationsCarrier().isEmpty());
+	}
+
+	@Test
+	public void atMostOneCarrierIsAllowed() {
 		Assertions.assertThrows(DataBindException.class, () -> context.getDescriptor(TwoCarriers.class));
 	}
 }

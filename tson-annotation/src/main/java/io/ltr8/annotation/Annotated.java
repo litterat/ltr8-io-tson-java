@@ -21,21 +21,15 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Marks a genuine Java record component as the receiver for the *bound value's own* wire-format
- * annotations (TSON §3.1's {@code @name[:value]} metadata, e.g. {@code @doc:"..."} or
- * {@code @deprecated} on the record itself) -- an opt-in carrier, since an immutable record can't
- * be retrofitted with extra state after construction the way a mutable POJO field could.
+ * <b>Unread.</b> Declaring a component of type {@link Annotations} is what opts a record into receiving its
+ * own wire-format annotations; the declared type is the signal, so this marker has nothing left to say.
  *
- * <p>Deliberately narrow, matching what a Java object model can actually represent: this recovers
- * only the annotations on the value the whole record corresponds to, not on its individual field
- * values (a bare {@code String} field, an array element, a map key -- none of those have anywhere
- * in Java to carry extra metadata of their own). Recovering *those* requires the parsed AST
- * directly ({@code DataValue#annotations()} on the field's own value), not this annotation --
- * there's no plan to add a per-field/per-element equivalent; see {@code SPEC-FEEDBACK.md} for why.
+ * <p>Kept only so the previous opt-in can be restored quickly if inference proves too loose in practice.
+ * Nothing consults it, so applying it has no effect either way.
  *
- * <p>At most one component per record may carry this annotation, and its declared type must be
- * {@code io.ltr8.tson.compiler.TsonAnnotations}.
+ * @deprecated declare a component of type {@link Annotations} instead
  */
+@Deprecated(forRemoval = true)
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ ElementType.METHOD, ElementType.PARAMETER })
 public @interface Annotated {

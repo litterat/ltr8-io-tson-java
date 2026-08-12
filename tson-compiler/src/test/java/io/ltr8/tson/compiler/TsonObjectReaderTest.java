@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.annotation.Annotated;
 import io.ltr8.annotation.Atom;
 import io.ltr8.annotation.DataBridge;
 import io.ltr8.annotation.Field;
@@ -8,11 +7,12 @@ import io.ltr8.annotation.Typename;
 import io.ltr8.annotation.Union;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
-import io.ltr8.tson.compiler.ast.Annotation;
-import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.atom.Complex;
 import io.ltr8.tson.schema.meta.IsoDuration;
 import io.ltr8.tson.schema.meta.Rational;
+import io.ltr8.annotation.Annotation;
+import io.ltr8.annotation.Annotations;
+import io.ltr8.tson.tree.AtomNode;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -131,58 +131,72 @@ class TsonObjectReaderTest {
 
     // ── Annotations (§3.1) ───────────────────────────────────────────────
 
-    public record AnnotatedItem(@Annotated TsonAnnotations meta, String name) {
+    /** Declaring a component of type {@link Annotations} is the whole opt-in -- no marker, no registration. */
+    public record AnnotatedItem(Annotations meta, String name) {
+    }
+
+    /** The annotation's value, as the {@code TsonNode} this path reads it into. */
+    private static String annotationText(Annotation annotation) {
+        return (String) ((AtomNode) annotation.value().orElseThrow()).value();
     }
 
     @Test
-    void annotatedComponentReceivesTheValuesOwnAnnotations() throws DataBindException {
+    void theCarrierReceivesTheValuesOwnAnnotations() throws DataBindException {
         AnnotatedItem item = mapper.read("@doc:\"a widget\" { name: Widget }", AnnotatedItem.class);
         assertEquals("Widget", item.name());
-        Annotation doc = item.meta().get("doc").orElseThrow();
-        TokenValue text = (TokenValue) doc.value().orElseThrow().coreValue();
-        assertEquals("a widget", text.text());
+        assertEquals("a widget", annotationText(item.meta().get("doc").orElseThrow()));
     }
 
     @Test
-    void annotatedComponentIsEmptyWhenTheValueHasNoAnnotations() throws DataBindException {
+    void aValuelessAnnotationArrivesWithNoValue() throws DataBindException {
+        // §3.1's bare form. Empty here means "written without a value", not "written as absent" --
+        // expanding @T to @T:_ is the schema layer's job, and this path has no schema.
+        AnnotatedItem item = mapper.read("@deprecated { name: Widget }", AnnotatedItem.class);
+        assertTrue(item.meta().has("deprecated"));
+        assertTrue(item.meta().get("deprecated").orElseThrow().value().isEmpty());
+    }
+
+    @Test
+    void theCarrierIsEmptyWhenTheValueHasNoAnnotations() throws DataBindException {
         AnnotatedItem item = mapper.read("{ name: Widget }", AnnotatedItem.class);
-        assertTrue(item.meta().values().isEmpty());
+        assertTrue(item.meta().isEmpty());
     }
 
     @Test
-    void annotatedComponentPreservesRepeatedAnnotationsInSourceOrder() throws DataBindException {
+    void theCarrierPreservesRepeatedAnnotationsInSourceOrder() throws DataBindException {
         // §3.1: "An annotation name MAY appear any number of times on a single value; all
         // occurrences are preserved in source order."
         AnnotatedItem item = mapper.read("@tag:one @tag:two { name: Widget }", AnnotatedItem.class);
         List<Annotation> tags = item.meta().getAll("tag");
         assertEquals(2, tags.size());
-        assertEquals("one", ((TokenValue) tags.get(0).value().orElseThrow().coreValue()).text());
-        assertEquals("two", ((TokenValue) tags.get(1).value().orElseThrow().coreValue()).text());
+        assertEquals("one", annotationText(tags.get(0)));
+        assertEquals("two", annotationText(tags.get(1)));
     }
 
     @Test
-    void annotatedComponentDoesNotSeeAnnotationsOnFieldValues() throws DataBindException {
-        // Deliberate scope limit: @Annotated only recovers the enclosing value's own annotations,
-        // not a field value's -- a bare String field has nowhere in Java to carry its own
-        // annotations (see SPEC-FEEDBACK.md).
+    void theCarrierDoesNotSeeAnnotationsOnFieldValues() throws DataBindException {
+        // Deliberate scope limit: the carrier recovers the enclosing value's own annotations, not a
+        // field value's -- a bare String field has nowhere in Java to carry its own.
         AnnotatedItem item = mapper.read("{ name: @deprecated Widget }", AnnotatedItem.class);
-        assertTrue(item.meta().values().isEmpty());
+        assertTrue(item.meta().isEmpty());
     }
 
-    public record BadCarrierType(@Annotated String meta, String name) {
+    /**
+     * A schema field named the same as the carrier component does not bind into it: the carrier takes no
+     * part in field matching, so this reports the field as unrecognized rather than silently overwriting
+     * the annotations.
+     */
+    @Test
+    void anAuthoredFieldCannotBindIntoTheCarrier() throws DataBindException {
+        AnnotatedItem item = mapper.read("@doc:\"kept\" { name: Widget }", AnnotatedItem.class);
+        assertEquals("kept", annotationText(item.meta().get("doc").orElseThrow()));
+    }
+
+    public record TwoCarriers(Annotations a, Annotations b, String name) {
     }
 
     @Test
-    void annotatedComponentMustBeOfTypeTsonAnnotations() {
-        assertThrows(TsonReadException.class,
-                () -> mapper.read("{ name: Widget meta: x }", BadCarrierType.class));
-    }
-
-    public record TwoCarriers(@Annotated TsonAnnotations a, @Annotated TsonAnnotations b, String name) {
-    }
-
-    @Test
-    void atMostOneAnnotatedComponentAllowed() {
+    void atMostOneCarrierIsAllowed() {
         assertThrows(TsonReadException.class, () -> mapper.read("{ name: Widget }", TwoCarriers.class));
     }
 
