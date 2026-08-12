@@ -113,12 +113,6 @@ the removal of the old throwaway `Map`/`List` DOM mode all landed. What's left:
   `constructor` handle, wrapping what came back.
   - Not reachable today: a union member is not a boxed position, so its carrier is always empty rather than
     wrong. Worth closing when a boxed variant becomes expressible, not before.
-- [ ] **`SchemaResolver` builds an `AnnotatedMap` directly** -- the one place outside `tson-bind` that
-  constructs a carrier. Defensible, since it is the resolver assembling its own value model rather than the
-  serialization layer building a caller's bound object, but it is the single exception to "tson-bind is the
-  only way to create a data object" and should be a known one rather than an assumed-absent one. If
-  `schema.meta` ever gains a resolved-form ingest path, this is where the two ways of building a `TsonSchema`
-  would have to agree.
 
 ## Front door / ergonomics
 
@@ -265,8 +259,11 @@ own prose (which had gone stale on at least one of them):
   `subtypes`/`disjoint` recomputed and verified, the closed-entry parameter-free rule reverified, an
   instantiation entry checked against its own `source` by recomputation, a construction's binding
   record checked for parameter-slot agreement with its `source` application. Entirely unimplemented
-  — "ingest" doesn't appear anywhere in the codebase. Lower priority than the three items above:
-  the spec marks this path explicitly **optional** ("MAY implement ingest"), not a MUST.
+  — "ingest" doesn't appear anywhere in the codebase. Note it would introduce a *second* way to build a
+  `TsonSchema` — bound from a document rather than resolved from source — and the two would have to agree,
+  including on where a declaration's annotations land (the name's on the map key, the definition's on the
+  entry). Lower priority than the three items above: the spec marks this path explicitly **optional**
+  ("MAY implement ingest"), not a MUST.
 
 ## Atom-refinement constraint validation
 
