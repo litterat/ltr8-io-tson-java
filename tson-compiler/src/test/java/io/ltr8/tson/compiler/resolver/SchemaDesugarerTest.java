@@ -146,6 +146,23 @@ class SchemaDesugarerTest {
                 instanceBody((Instance) onlyInjected(document, "map").typeDef()));
     }
 
+    /**
+     * Two structurally identical applications share one declaration, wherever in the document they appear.
+     * The name is derived from the application itself, so this falls out of naming rather than needing a
+     * separate dedup table -- and it is what §8.2 asks for ("flattened applications that are structurally
+     * equal denote the same type").
+     */
+    @Test
+    void twoStructurallyIdenticalApplicationsBecomeOneDeclaration() {
+        SchemaDocument document = desugar("""
+                  first => { xs: [text] }
+                  second => { ys: [text] }""");
+
+        String injected = onlyInjected(document, "array").name(); // asserts there is exactly one
+        assertEquals(injected, firstFieldType(document, "first"));
+        assertEquals(injected, firstFieldType(document, "second"));
+    }
+
     @Test
     void anApplicationAnImportAlreadyDeclaresIsReferencedNotRedeclared() {
         // The name is derived from the application, so an identical one in an imported schema has already

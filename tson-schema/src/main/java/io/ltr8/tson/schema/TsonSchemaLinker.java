@@ -50,50 +50,30 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Turns a resolved-but-unlinked {@link TsonSchema} into a {@link TsonLinkedSchema} -- the "pass 2"
- * a schema goes through before {@code TsonSchemaRegistry#register} will accept it (2026-07-27, renamed
- * from {@code SchemaValidator}/{@code validate} on the user's own explicit direction, borrowing
- * standard compiler vocabulary for the whole pipeline: parse -&gt; resolve -&gt; link -&gt; register
- * -&gt; compile -&gt; read). What it does hasn't changed, only what it's called and what it returns:
- * flattens every {@code type_ref} with arguments into a real, named entry (so the result has no
- * dangling/unexpanded references -- the defining trait of a linked schema, same as a linker
- * resolving external symbols and instantiating templates), populates {@code
- * TypeDefinition.subtypes} (the reverse of {@code supertypes}, for *this schema's own merged view*
- * of every entry it can see, imported or local -- see {@link #computeSubtypes}'s own Javadoc for
- * why crediting a subtype onto an imported entry's copy here never touches the imported schema's
- * own separately-registered original), then checks that every reference anywhere in the schema
- * actually resolves.
+ * Turns a resolved-but-unlinked {@link TsonSchema} into a {@link TsonLinkedSchema} -- pass 2, which a schema
+ * goes through before {@code TsonSchemaRegistry#register} will accept it. Named for the compiler stage it
+ * corresponds to in the pipeline (parse -&gt; desugar -&gt; resolve -&gt; <b>link</b> -&gt; register -&gt;
+ * compile -&gt; read): it merges every {@code !!import}'s entries into one namespace, populates {@code
+ * TypeDefinition.subtypes} (the reverse of {@code supertypes}, for *this schema's own merged view* of every
+ * entry it can see, imported or local -- see {@link #computeSubtypes}'s own Javadoc for why crediting a
+ * subtype onto an imported entry's copy here never touches the imported schema's own separately-registered
+ * original), derives choice disjointness, and checks that every reference anywhere in the schema actually
+ * resolves. A {@link TsonLinkedSchema} is the compile-time proof that all of that ran.
  *
- * <p><b>Genuinely public now, unlike its predecessor</b> -- {@code SchemaValidator} was "not part
- * of the public API," an implementation detail {@code TsonSchemaRegistry#register} ran internally and
- * nothing else was meant to call. Renaming it to a real pipeline-stage name changes that on
- * purpose: {@code link} is now something a caller orchestrating the pipeline calls directly and
- * deliberately, same as {@code parse}/{@code resolve}/{@code compile} -- including from *other*
- * modules (e.g. {@code tson-compiler}'s own {@code TsonCompiledRegistry}, which needs to link a
- * schema before registering it, exactly the same as any other caller). Moved out of {@code
- * io.ltr8.tson.schema.registry} into this package directly (2026-07-27) once that publicness was
- * settled -- living in a package whose own docs describe it as "private pass-2 machinery nothing
- * outside this module calls directly" was the one thing still contradicting it. {@link
- * CanonicalIdentity} stays behind in {@code .registry}, genuinely internal-by-convention -- it was
- * never a named pipeline stage, just an implementation detail of how registry lookups work.
+ * <p>Public, and meant to be called directly by anything orchestrating the pipeline -- including from other
+ * modules ({@code tson-compiler}'s own registries link a schema before registering it, same as any other
+ * caller). {@link CanonicalIdentity} stays in {@code .registry}, internal by convention: it was never a
+ * named pipeline stage, just how registry lookups compare identities.
  *
- * <p><b>Materialization is uniform</b> (a deliberate simplification confirmed with the user, not
- * Part 2 §8.2's literal text): *every* {@code type_ref} with a non-empty {@code arguments} list
- * gets a synthesized entry, regardless of whether the applied name is itself a constructor (like
- * {@code set}) or a genuine non-constructor template -- §8.2 says only the latter should
- * materialise. Bottom-up: a nested argument that's itself argument-bearing is materialized first,
- * so an outer entry's own synthesized name is built from an already-flattened application, and two
- * structurally-identical applications anywhere in the schema dedup to the same entry (record
- * equality on {@link TypeRef} is exactly the "flattened applications are structurally equal" test
- * §8.2 calls for). The synthesized entry's own shape is exactly {@link
- * TypeDefinition#reference(TypeRef)}'s existing one -- that method's own Javadoc already flagged
- * this gap ("this resolver doesn't materialise instantiation entries yet, so target is reused as
- * both source and (as a placeholder) body.target until that exists").
- *
- * <p><b>{@code TypeDefinition.source} is never itself materialized</b>, even when it carries
- * arguments (e.g. {@code set}'s own {@code source: array<T>}): it's provenance -- how this entry
- * was itself derived -- not a field consuming another type, so it's validated (a name must still
- * resolve) but never rewritten into a separate synthetic entry.
+ * <p><b>No materialization.</b> An argument-bearing {@code type_ref} does not become a synthesized entry
+ * here -- {@code SchemaDesugarer} (in {@code tson-compiler}) has already turned every sugar form and generic
+ * application into a real declaration plus a bare reference, one phase earlier, where the AST and the
+ * governing meta's own constructor vocabulary are both still in hand. This module cannot reach {@code
+ * tson-compiler}, so doing it here meant hand-written per-shape assemblers that covered {@code array}/{@code
+ * set} and nothing else; the phase that replaced them binds the constructor generically and so covers every
+ * shape. What survives into an entry the linker sees is therefore a bare name in every position except one:
+ * a parameterized declaration's own body, which legitimately references its own parameters ({@code
+ * array<T>}) and is validated, not rewritten.
  *
  * <p><b>Type-parameter exception:</b> a bare name is valid if it resolves in the schema's own
  * namespace, or if it's one of the checked entry's own declared {@code parameters} -- load-bearing
@@ -102,19 +82,18 @@ import java.util.Set;
  * bare name (`array<T>`), not a real other entry.
  *
  * <p><b>{@code !!import} merging (Part 2 §2.2.3).</b> The final namespace a schema is checked
- * against is built in three stages, in this order: (1) every {@code !!import}'s own entries, in
+ * against is built in two stages, in this order: (1) every {@code !!import}'s own entries, in
  * declaration order, looked up via {@code loader} by canonical identity -- shallow, per §2.2.3
  * ("only the entries declared in the imported schema's own body are imported... entries the
  * imported schema itself brought in via its own {@code !!import} directives are not transitively
  * included"), which falls out for free here since {@code loader} hands back an already-registered,
  * already-flattened {@code TsonSchema} and only *its* {@code entries()} are read, never its own
- * {@code imports()}; (2) this schema's own entries, resolved/materialized exactly as with no
- * imports; (3) every newly synthesized entry from step 2. A name collision -- between two imports,
- * or between an import and a local declaration -- is a resolver error (§2.2.3), checked as each
+ * {@code imports()}; (2) this schema's own entries, exactly as resolved. A name collision -- between two
+ * imports, or between an import and a local declaration -- is a resolver error (§2.2.3), checked as each
  * stage is merged in, not after the fact. <b>Merged entries keep their home namespace</b>: an
  * imported {@code TypeDefinition} is carried in exactly as the imported schema resolved it, never
- * re-validated or re-materialized against the importer's own namespace -- only the *importer's own*
- * new material (stage 2 and 3) gets resolved/validated here.
+ * re-validated against the importer's own namespace -- only the *importer's own* new material gets
+ * validated here.
  */
 public final class TsonSchemaLinker {
 
@@ -163,38 +142,19 @@ public final class TsonSchemaLinker {
     public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader) {
         Map<String, TypeDefinition> merged = mergeImports(schema.imports(), loader);
 
-        // Full lookup namespace for materialization's own constructor lookups (see #instantiate) --
-        // imports plus this schema's own already-resolved (pre-rewrite) entries. Deliberately built
-        // once, up front, rather than relying on materialization order within `merged`: a
-        // constructor like `array` needs to be found regardless of whether *its own* declaration
-        // has been reached yet in the loop below (it usually hasn't -- real fixtures apply array
-        // sugar on fields declared well before `array` itself).
-        Map<String, TypeDefinition> namespace = new LinkedHashMap<>(merged);
-        namespace.putAll(schema.entries());
-
-        // The governing meta-schema's own namespace, one hop via !!meta -- distinct from !!import
-        // (which flattens another schema's entries into *this* schema's own returned entries()).
-        // !!meta only says "this schema's own vocabulary/constructors come from that other schema";
-        // it never merges anything in, and (§3.3.2) it's never consulted for an ordinary type-ref --
-        // only at the constructor roles §3.3.1 lists: constructor-application targets, generic-
-        // application heads, and sugar-form desugar targets. Used as a lookup fallback in exactly
-        // those two spots: here, for materialization's own constructor lookup (every argument-bearing
-        // type-ref `instantiate` sees is, by construction, one of those roles); and, narrowly, for
-        // `source` validation below (`validateEntry`'s own `sourceLookup`) -- everywhere else
-        // (field/key/value/element types, supertypes, subtypes, choice variants) stays type-name-
-        // namespace-only (`merged`/`namespace`), per §3.3.2's explicit "NOT extended by the structure
-        // namespace". Local/imported names always win on collision, and none of this schema's own
-        // entries() ever gain a structure-namespace entry as a side effect. Empty if !!meta isn't
-        // registered yet (e.g. meta-kernel's own self-referential !!meta, mid-registration) --
-        // lookups then behave exactly as before this fallback existed.
+        // The governing meta-schema's own namespace, one hop via !!meta -- distinct from !!import (which
+        // flattens another schema's entries into *this* schema's own returned entries()). !!meta only says
+        // "this schema's own vocabulary/constructors come from that other schema"; it never merges anything
+        // in, and (§3.3.2) it's never consulted for an ordinary type-ref -- only at the constructor roles
+        // §3.3.1 lists. Used as a lookup fallback in exactly one spot now: `source` validation below
+        // (`validateEntry`'s own `sourceLookup`), a `source` naming a constructor being one of those roles.
+        // Everywhere else (field/key/value/element types, supertypes, subtypes, choice variants) stays
+        // type-name-namespace-only, per §3.3.2's explicit "NOT extended by the structure namespace". Empty
+        // if !!meta isn't registered yet (e.g. meta-kernel's own self-referential !!meta, mid-registration).
         Map<String, TypeDefinition> structureNamespace = loader == null ? Map.of()
                 : loader.load(CanonicalIdentity.of(schema.meta()))
                         .map(linked -> linked.schema().entries()).orElse(Map.of());
-        Map<String, TypeDefinition> lookup = new LinkedHashMap<>(structureNamespace);
-        lookup.putAll(namespace);
 
-        Map<TypeRef, String> materializedNames = new LinkedHashMap<>();
-        Map<String, TypeDefinition> synthesized = new LinkedHashMap<>();
         Set<String> localNames = new LinkedHashSet<>();
 
         Boolean constructorsAllowed = null;
@@ -217,13 +177,9 @@ public final class TsonSchemaLinker {
                             + "apply or refine constructors it doesn't declare itself");
                 }
             }
-            Top rewrittenBody = rewriteBody(def.body(), materializedNames, synthesized, lookup);
-            merged.put(entry.getKey(), new TypeDefinition(def.source(), def.kind(), def.parameters(),
-                    def.constructor(), def.supertypes(), def.subtypes(), def.disjoint(), rewrittenBody));
+            merged.put(entry.getKey(), def);
             localNames.add(entry.getKey());
         }
-        merged.putAll(synthesized);
-        localNames.addAll(synthesized.keySet());
 
         merged = computeSubtypes(merged, localNames);
         merged = computeDisjointness(merged);
@@ -349,231 +305,6 @@ public final class TsonSchemaLinker {
             }
         }
         return merged;
-    }
-
-    // ── Materialization ──────────────────────────────────────────────────
-
-    private static Top rewriteBody(Top body, Map<TypeRef, String> materializedNames,
-                                    Map<String, TypeDefinition> synthesized, Map<String, TypeDefinition> namespace) {
-        return switch (body) {
-            case RecordBody r -> {
-                List<RecordField> fields = new ArrayList<>(r.fields().size());
-                for (RecordField field : r.fields()) {
-                    fields.add(new RecordField(field.name(),
-                            materialize(field.type(), materializedNames, synthesized, namespace),
-                            field.state(), field.value(), field.valueParam()));
-                }
-                yield new RecordBody(r.supertypes(), fields, r.groups());
-            }
-            case Reference ref -> new Reference(materialize(ref.target(), materializedNames, synthesized, namespace));
-            case MapBody m -> new MapBody(
-                    materialize(m.keyType(), materializedNames, synthesized, namespace),
-                    materialize(m.valueType(), materializedNames, synthesized, namespace),
-                    m.minItems(), m.maxItems());
-            case ArrayBody a -> new ArrayBody(
-                    materialize(a.elementType(), materializedNames, synthesized, namespace),
-                    a.state(), a.unordered(), a.uniqueItems(), a.minItems(), a.maxItems());
-            case TupleBody t -> {
-                List<TupleElement> elements = new ArrayList<>(t.elements().size());
-                for (TupleElement element : t.elements()) {
-                    elements.add(new TupleElement(
-                            materialize(element.elementType(), materializedNames, synthesized, namespace),
-                            element.state()));
-                }
-                yield new TupleBody(elements);
-            }
-            case ChoiceBody c -> {
-                List<TypeRef> variants = new ArrayList<>(c.variants().size());
-                for (TypeRef variant : c.variants()) {
-                    variants.add(materialize(variant, materializedNames, synthesized, namespace));
-                }
-                yield new ChoiceBody(variants);
-            }
-            case Unit u -> u;
-            case EnumBody e -> e;
-            case IntegerType i -> i;
-            case TextType t -> t;
-            case UriType u -> u;
-            case RegexType r -> r;
-            case DecimalType d -> d;
-            case FloatType f -> f;
-            case RationalType r -> r;
-            case UuidType u -> u;
-            case BinaryType b -> b;
-            case DateType d -> d;
-            case TimeType t -> t;
-            case DateTimeType d -> d;
-            case DurationType d -> d;
-            case Cidr4Type c -> c;
-            case Cidr6Type c -> c;
-            case EmailType e -> e;
-            case MacType m -> m;
-            case Ipv4Type i -> i;
-            case Ipv6Type i -> i;
-            case ComplexType c -> c;
-            case UnknownType u -> u;
-            case Extern e -> e;
-        };
-    }
-
-    /** Bottom-up: rewrites {@code ref}'s own arguments first, then materializes {@code ref} itself if it still has any. */
-    private static TypeRef materialize(TypeRef ref, Map<TypeRef, String> materializedNames,
-                                        Map<String, TypeDefinition> synthesized, Map<String, TypeDefinition> namespace) {
-        List<TypeArgument> rewrittenArgs = new ArrayList<>(ref.arguments().size());
-        for (TypeArgument arg : ref.arguments()) {
-            if (arg instanceof TypeArgument.Ref nested) {
-                rewrittenArgs.add(new TypeArgument.Ref(materialize(nested.ref(), materializedNames, synthesized, namespace)));
-            } else {
-                rewrittenArgs.add(arg);
-            }
-        }
-        TypeRef flattened = new TypeRef(ref.name(), rewrittenArgs);
-        if (flattened.arguments().isEmpty()) {
-            return flattened;
-        }
-
-        String existingName = materializedNames.get(flattened);
-        if (existingName != null) {
-            return TypeRef.of(existingName);
-        }
-
-        String syntheticName = syntheticName(flattened);
-        materializedNames.put(flattened, syntheticName);
-        synthesized.put(syntheticName, instantiate(flattened, namespace));
-        return TypeRef.of(syntheticName);
-    }
-
-    /**
-     * Real instantiation for an argument-bearing application of a real constructor -- e.g. {@code
-     * array<field_name>} (from {@code [field_name]} sugar, §5.3) should materialize to a genuine
-     * {@code !array { element_type: field_name }} body, not a self-referential placeholder pointing
-     * back at the very application being materialized. Falls back to the old placeholder shape
-     * ({@link TypeDefinition#reference}) for everything this doesn't (yet) know how to build: {@code
-     * application.name()} not resolving to a real constructor in {@code namespace}, an arity
-     * mismatch between the constructor's own declared {@code parameters} and the arguments actually
-     * applied, or (see {@link #instantiateBody}) a constructor this method has no per-shape
-     * assembler for yet.
-     *
-     * <p><b>Deliberately hand-written per target shape, not routed through generic {@code tson-bind}
-     * binding</b> -- {@code tson-schema} has no dependency on {@code tson-compiler} (where {@code
-     * DefinitionResolver}'s own {@code resolveInstance}, backed by the compiled {@code
-     * Record*Reader}, already does the general version of this for an explicit {@code !C value}
-     * instance), and every field a materializable
-     * shape like {@link ArrayBody} needs is a plain {@code boolean}/{@code BigInteger}/{@code
-     * TypeRef} -- not worth a new cross-module dependency to bind generically. {@code source} on the
-     * result mirrors {@code resolveInstance}'s own convention exactly: the bare constructor name
-     * (§5.5's "construction transfers only the constructor's kind"), never the full application with
-     * its arguments.
-     */
-    private static TypeDefinition instantiate(TypeRef application, Map<String, TypeDefinition> namespace) {
-        TypeDefinition constructor = namespace.get(application.name());
-        if (constructor == null || !constructor.constructor() || !(constructor.body() instanceof RecordBody vocabulary)) {
-            return TypeDefinition.reference(application);
-        }
-        Map<String, TypeArgument> argumentsByParameter = zipParameters(constructor.parameters(), application.arguments());
-        if (argumentsByParameter == null) {
-            return TypeDefinition.reference(application);
-        }
-        Top body = instantiateBody(application.name(), vocabulary, argumentsByParameter);
-        if (body == null) {
-            return TypeDefinition.reference(application);
-        }
-        return new TypeDefinition(Optional.of(TypeRef.of(application.name())), constructor.kind(), List.of(), false,
-                List.of(), List.of(), Optional.empty(), body);
-    }
-
-    /** Positionally zips a constructor's own declared parameters to the arguments an application supplies; {@code null} on an arity mismatch. */
-    private static Map<String, TypeArgument> zipParameters(List<String> parameters, List<TypeArgument> arguments) {
-        if (parameters.size() != arguments.size()) {
-            return null;
-        }
-        Map<String, TypeArgument> byParameter = new LinkedHashMap<>();
-        for (int i = 0; i < parameters.size(); i++) {
-            byParameter.put(parameters.get(i), arguments.get(i));
-        }
-        return byParameter;
-    }
-
-    /**
-     * Per-target-shape assembly -- {@code null} means "not supported yet", handled by {@link
-     * #instantiate}'s own fallback. {@code array} and {@code set} both route through {@link
-     * #instantiateArray} -- {@code set}'s own resolved vocabulary is a {@link RecordBody} with the
-     * *identical* field shape as {@code array}'s (same field names, {@code element_type} routed via
-     * the same {@code value_param: "T"}), a structural tightening (§5.7's refinement, not a fresh
-     * composition), so the same assembler applies unmodified: it already reads {@code state}/{@code
-     * unordered}/{@code unique_items} from whatever the vocabulary's own {@link RecordField#value}
-     * actually says rather than assuming {@code array}'s own defaults, so {@code set}'s tightened
-     * {@code REQUIRED}/{@code true}/{@code true} come out correctly with no {@code set}-specific
-     * code at all. {@code map}/{@code tuple}/{@code record}/{@code choice}/any atom-family
-     * constructor still aren't wired up -- a known, explicit gap, not a silent wrong answer.
-     */
-    private static Top instantiateBody(String constructorName, RecordBody vocabulary,
-                                        Map<String, TypeArgument> argumentsByParameter) {
-        return switch (constructorName) {
-            case "array", "set" -> instantiateArray(vocabulary, argumentsByParameter);
-            default -> throw new UnsupportedOperationException("General instantiation not supported");
-        };
-    }
-
-    /**
-     * {@code array}'s (and {@code set}'s -- see {@link #instantiateBody}) own vocabulary, read
-     * field by field: {@code element_type} MUST route to a type-ref argument (§5.10's labelled-form
-     * parameter routing, {@code value_param}) -- anything else (no routing, or a literal-value
-     * argument where a type is expected) means this can't be built, {@code null} rather than a
-     * wrong guess. {@code state}/{@code unordered}/{@code unique_items} take the vocabulary's own
-     * schema-composed default {@link RecordField#value} when present (mirroring, in miniature, the
-     * compiled {@code Record*Reader}'s own schema-composed defaulting one layer up in {@code
-     * tson-compiler}) -- this is exactly what makes {@code set}'s own tightened defaults (all three {@code
-     * REQUIRED_FIXED}, unlike {@code array}'s own {@code REQUIRED_DEFAULT}/{@code
-     * REQUIRED_DEFAULT}/{@code REQUIRED_DEFAULT}) come out correctly without this method needing to
-     * know which constructor it's assembling for. {@code min_items}/{@code max_items} have no
-     * default in either vocabulary and stay absent -- {@code array_min}/{@code array_max}/{@code
-     * array_ranged} tighten them, but aren't applied via {@code <...>} sugar in any real fixture, so
-     * that case still isn't attempted.
-     */
-    private static ArrayBody instantiateArray(RecordBody vocabulary, Map<String, TypeArgument> argumentsByParameter) {
-        TypeRef elementType = null;
-        ElementState state = ElementState.REQUIRED;
-        boolean unordered = false;
-        boolean uniqueItems = false;
-        Optional<BigInteger> minItems = Optional.empty();
-        Optional<BigInteger> maxItems = Optional.empty();
-
-        for (RecordField field : vocabulary.fields()) {
-            TypeArgument routed = field.valueParam().map(argumentsByParameter::get).orElse(null);
-            switch (field.name()) {
-                case "element_type" -> {
-                    if (!(routed instanceof TypeArgument.Ref ref)) {
-                        return null;
-                    }
-                    elementType = ref.ref();
-                }
-                case "state" -> state = field.value().map(t -> ElementState.valueOf(t.text())).orElse(state);
-                case "unordered" -> unordered = field.value().map(t -> Boolean.parseBoolean(t.text())).orElse(unordered);
-                case "unique_items" -> uniqueItems = field.value().map(t -> Boolean.parseBoolean(t.text())).orElse(uniqueItems);
-                default -> {
-                    // min_items/max_items (no default to apply here) and anything else array's own
-                    // vocabulary might grow later -- left at the unconstrained default above.
-                }
-            }
-        }
-        return elementType == null ? null : new ArrayBody(elementType, state, unordered, uniqueItems, minItems, maxItems);
-    }
-
-    /**
-     * §8.2's own non-normative guidance: "a readable head plus a structural hash." Not
-     * conformance-relevant -- free to refine if a real schema's names ever collide or read badly.
-     */
-    private static String syntheticName(TypeRef flattened) {
-        StringBuilder head = new StringBuilder(flattened.name());
-        for (TypeArgument arg : flattened.arguments()) {
-            head.append('_');
-            switch (arg) {
-                case TypeArgument.Ref r -> head.append(r.ref().name());
-                case TypeArgument.Value v -> head.append(v.value().text());
-            }
-        }
-        return head + "_" + String.format("%08x", flattened.toString().hashCode());
     }
 
     // ── Validation ───────────────────────────────────────────────────────

@@ -68,12 +68,12 @@ public record TypeDefinition(Optional<TypeRef> source, TypeKind kind, List<Strin
     }
 
     /**
-     * A reference definition whose target may itself carry arguments -- a fully-bound template
-     * application like {@code array_min<T, N>} (§5.10). Per §5.10/§8.2 the resolved {@code
-     * body.target} should point at a *materialised instantiation entry*'s internal name, not at the
-     * application itself -- this resolver doesn't materialise instantiation entries yet, so {@code
-     * target} is reused as both {@code source} and (as a placeholder) {@code body.target} until
-     * that exists.
+     * A reference definition whose target may itself carry arguments -- an application of a
+     * non-constructor template like {@code box<text>} (§5.10). {@code target} is reused as both {@code
+     * source} and {@code body.target}, which points at the application rather than at a substituted
+     * entry: §5.10 parameter substitution is not implemented, so there is no such entry to point at.
+     * An application of a real <em>constructor</em> never reaches here -- the desugar phase rewrites it
+     * into a construction well before resolution.
      */
     public static TypeDefinition reference(TypeRef target) {
         return new TypeDefinition(Optional.of(target), TypeKind.REFERENCE, List.of(), false, List.of(),

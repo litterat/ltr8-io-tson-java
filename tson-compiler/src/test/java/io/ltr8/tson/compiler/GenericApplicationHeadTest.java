@@ -2,28 +2,34 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
+import io.ltr8.tson.schema.meta.ArrayBody;
+import io.ltr8.tson.schema.meta.MapBody;
+import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.tree.TsonNode;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Generic application ({@code head<args>}) in an ordinary user schema -- one governed by {@code meta.tn} and
- * importing {@code core.tn}. The end-to-end peer of {@code TsonSchemaLinkerTest}'s isolated materialisation
- * tests: this proves the user-facing symptom through the real meta.tn/core.tn chain, that one pins the cause
- * with a hand-built fixture.
+ * importing {@code core.tn} -- driven through the real bundled chain. The end-to-end peer of {@code
+ * SchemaDesugarerTest}, which pins the same rewrite against a hand-built governing meta.
  *
  * <p>[TSON-SCHEMA] §3.3.1 lists "generic-application heads -- the name before {@code <} when the name is not
  * otherwise in scope" among the <b>constructor roles</b> at which the structure namespace is consulted, and
  * gives {@code map<text, text>} as its own example. A user schema's {@code !!meta} is {@code meta.tn}, which
- * imports the meta-kernel, so {@code map} is in that schema's structure namespace and this must resolve.
+ * imports the meta-kernel, so every container constructor is in that schema's structure namespace.
  *
- * <p>It does not, and the cause is <em>not</em> a namespace problem: {@code TsonSchemaLinker.instantiateBody}
- * has per-shape assemblers only for {@code array}/{@code set}, so every other constructor falls back to a
- * placeholder reference whose target still carries its arguments and therefore never substitutes them. The
- * {@code array}/{@code set} cases below reach their constructor through the identical structure-namespace
- * path and work, which is what rules the namespace out.
+ * <p>What makes these work uniformly is that {@code SchemaDesugarer} rewrites the application into a real
+ * {@code !C value} declaration before resolution, so {@code map} takes the same path as {@code array} rather
+ * than a per-shape assembler that only some constructors have.
  */
 class GenericApplicationHeadTest {
 
@@ -50,21 +56,31 @@ class GenericApplicationHeadTest {
         return TsonCompiledSchemaRegistry.tree(core).get(ID);
     }
 
-    /**
-     * <b>Currently fails.</b> §3.3.1 requires this to resolve. It is the user-facing shape of the defect and
-     * the thing the desugar arc exists to fix; when it passes, the arc has landed.
-     */
+    /** The entry a field's type names, which every fixture here reaches the injected declaration through. */
+    private static TypeDefinition fieldTypeEntry(TsonCompiledSchema compiled, String record, String field) {
+        RecordBody body = (RecordBody) compiled.schema().entries().get(record).body();
+        String name = body.fields().stream().filter(f -> f.name().equals(field)).findFirst().orElseThrow()
+                .type().name();
+        return compiled.schema().entries().get(name);
+    }
+
+    /** The whole arc in one assertion: a {@code map}-typed field resolves, links, compiles, and reads real data. */
     @Test
-    void aMapTypedFieldLinks() {
-        assertNotNull(compile("  holder => { entries: map<text, text> }"));
+    void aMapTypedFieldReadsRealData() {
+        TsonCompiledSchema compiled = compile("  holder => { entries: map<text, text> }");
+
+        MapBody body = assertInstanceOf(MapBody.class, fieldTypeEntry(compiled, "holder", "entries").body());
+        assertEquals(TypeRef.of("text"), body.keyType());
+        assertEquals(TypeRef.of("text"), body.valueType());
+
+        TsonNode value = (TsonNode) compiled.get("holder").read("{ entries: { \"a\" => \"one\"  \"b\" => \"two\" } }");
+        assertNotNull(value);
     }
 
     @Test
     void theSameApplicationLinksAsATopLevelDeclaration() {
-        // §5.6: a declaration whose body is a fully-bound constructor application resolves as a construction,
-        // which DefinitionResolver handles directly and materialises as a real map body. So the identical
-        // application is legal one line up from where it fails -- the clearest measure of how narrow the
-        // defect is, and the asymmetry the desugar phase removes.
+        // §5.6: a declaration whose body is a fully-bound constructor application is a construction. The
+        // desugar phase makes the field position above take this exact same path.
         assertNotNull(compile("""
                   entries => map<text, text>
                   holder => { xs: entries }"""));
@@ -72,23 +88,36 @@ class GenericApplicationHeadTest {
 
     @Test
     void arraySugarAndExplicitArrayOrSetApplicationsAllLink() {
-        // The control that rules out the namespace: array and set are reached through the same
-        // structure-namespace lookup as map, and work, because instantiateBody has assemblers for them.
         assertNotNull(compile("  holder => { xs: [text] }"));
         assertNotNull(compile("  holder => { xs: array<text> }"));
         assertNotNull(compile("  holder => { xs: set<text> }"));
     }
 
     /**
-     * A non-constructor generic head -- a locally declared template -- takes a <em>different</em> fallback in
-     * {@code instantiate} ({@code !constructor.constructor()}), and produces a schema that links and compiles
-     * but cannot read: the placeholder resolves to the unsubstituted template, whose field type is the bare
-     * parameter {@code T}.
-     *
-     * <p>Recorded because it is the same broken placeholder shape surfacing at a different moment, and
-     * because it is deliberately <b>out of scope</b> for the desugar arc: real §5.10 parameter substitution is
-     * a separate feature. This asserts the read-time failure rather than the compile succeeding, so it stops
-     * reading as though template application works.
+     * {@code set} and {@code array} share a body shape, so the only thing distinguishing them is the defaults
+     * {@code set}'s own vocabulary tightens (§5.7). Binding the injected {@code !set { element_type: text }}
+     * through the compiled reader applies those schema-composed defaults, so this needs no {@code
+     * set}-specific handling anywhere -- worth pinning precisely because nothing names {@code set}.
+     */
+    @Test
+    void aSetApplicationCarriesItsOwnTightenedDefaultsNotArrays() {
+        ArrayBody asSet = assertInstanceOf(ArrayBody.class,
+                fieldTypeEntry(compile("  holder => { xs: set<text> }"), "holder", "xs").body());
+        assertTrue(asSet.unordered());
+        assertTrue(asSet.uniqueItems());
+
+        ArrayBody asArray = assertInstanceOf(ArrayBody.class,
+                fieldTypeEntry(compile("  holder => { xs: array<text> }"), "holder", "xs").body());
+        assertFalse(asArray.unordered());
+        assertFalse(asArray.uniqueItems());
+    }
+
+    /**
+     * A non-constructor generic head -- a locally declared template. Deliberately <b>out of scope</b> for the
+     * desugar phase, which passes a non-constructor head through untouched: real §5.10 parameter substitution
+     * is a separate feature. The schema links and compiles but cannot read, because the reference resolves to
+     * the unsubstituted template whose field type is the bare parameter {@code T}. Asserted as the read-time
+     * failure it is, so it stops reading as though template application works.
      */
     @Test
     void aLocallyDeclaredTemplateCompilesButCannotRead() {
