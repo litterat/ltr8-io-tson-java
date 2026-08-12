@@ -978,6 +978,18 @@ final class DefinitionResolver {
      */
     private RecordField resolveField(FieldDef field, List<String> parameters,
                                       Optional<io.ltr8.tson.schema.meta.TypeRef> inheritedType) {
+        return resolveFieldEntry(field, parameters, inheritedType)
+                .withAnnotations(annotationsOf(field.name(), field.annotations()));
+    }
+
+    /**
+     * §6 adds one annotation position to the type-definition grammar: "in {@code field-def}, annotations
+     * precede the field name and annotate the field itself, mapping to the {@code record_field} in resolver
+     * output". Unlike a declaration, there is no before/after ambiguity here -- a field has one annotation
+     * position and it is the field's own.
+     */
+    private RecordField resolveFieldEntry(FieldDef field, List<String> parameters,
+                                           Optional<io.ltr8.tson.schema.meta.TypeRef> inheritedType) {
         io.ltr8.tson.schema.meta.TypeRef type;
         if (field.type().isPresent()) {
             type = resolveTypeRef(field.type().get().typeRef());

@@ -19,7 +19,10 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import io.ltr8.annotation.Annotated;
+import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.Annotations;
+import io.ltr8.bind.DataClassAnnotated;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClassField;
@@ -37,6 +40,10 @@ public class AnnotatedBinderTest {
 	}
 
 	public record NoCarrier(String name) {
+	}
+
+	/** A boxed position: the annotations ride with the value, since a String has nowhere to hold them. */
+	public record Boxed(Annotated<String> name, int count) {
 	}
 
 	DataBindContext context;
@@ -68,6 +75,29 @@ public class AnnotatedBinderTest {
 		DataClassRecord descriptor = (DataClassRecord) context.getDescriptor(NoCarrier.class);
 
 		Assertions.assertTrue(descriptor.annotationsCarrier().isEmpty());
+	}
+
+	@Test
+	public void aBoxedFieldResolvesToItsValuesDescriptor() throws Throwable {
+		DataClassRecord descriptor = (DataClassRecord) context.getDescriptor(Boxed.class);
+
+		DataClassField name = descriptor.fields()[0];
+		DataClassAnnotated boxed = Assertions.assertInstanceOf(DataClassAnnotated.class, name.dataClass());
+		Assertions.assertEquals(String.class, boxed.valueClass().typeClass());
+
+		// A box is not a carrier: it annotates one position, not the whole record.
+		Assertions.assertTrue(descriptor.annotationsCarrier().isEmpty());
+	}
+
+	@Test
+	public void aBoxProxiesEqualityToItsValueSoItWorksAsAKey() {
+		Annotations note = Annotations.of(java.util.List.of(Annotation.of("doc", "x")));
+
+		Assertions.assertEquals(Annotated.of("a"), Annotated.of("a", note));
+		Assertions.assertEquals(Annotated.of("a").hashCode(), Annotated.of("a", note).hashCode());
+
+		java.util.Map<Annotated<String>, Integer> byName = java.util.Map.of(Annotated.of("a", note), 1);
+		Assertions.assertEquals(1, byName.get(Annotated.of("a")));
 	}
 
 	@Test

@@ -13,6 +13,9 @@ import io.ltr8.bind.DataClass;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import io.ltr8.annotation.Annotated;
+import io.ltr8.bind.DataClassAnnotated;
+import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.Collection;
 import java.util.Map;
@@ -40,6 +43,24 @@ public class DefaultClassBinder {
 		tupleBinder = new DefaultTupleBinder();
 	}
 
+	/**
+	 * The descriptor for {@code T} in {@code Annotated<T>}, taken from the declared type argument. A raw
+	 * {@code Annotated} has none to take, and is rejected rather than guessed at -- the box exists to carry a
+	 * value of a known type, so an unparameterized one has nothing to read.
+	 */
+	private static DataClass annotatedValueDescriptor(DataBindContext context, Type parameterizedType)
+			throws DataBindException {
+		if (!(parameterizedType instanceof ParameterizedType parameterized)) {
+			throw new DataBindException("Annotated must be declared with its value type (Annotated<T>), found a raw "
+					+ parameterizedType);
+		}
+		Type argument = parameterized.getActualTypeArguments()[0];
+		Class<?> valueClass = argument instanceof ParameterizedType nested
+				? (Class<?>) nested.getRawType()
+				: (Class<?>) argument;
+		return context.getDescriptor(valueClass, argument);
+	}
+
 	public DataClass resolve(DataBindContext context,  Class<?> targetClass, Type parameterizedType)
 			throws DataBindException {
 
@@ -49,7 +70,11 @@ public class DefaultClassBinder {
 		// it. If it is a code first situation then we expect this to throw an exception, and we need to
 		// first create the definition and then bind the class to that definition.
 
-		if (isTuple(targetClass)) {
+		if (targetClass == Annotated.class) {
+			// Checked before isRecord: Annotated is itself a record, and binding it as one would make its
+			// annotations an authored field rather than the framing they are.
+			result = new DataClassAnnotated(targetClass, annotatedValueDescriptor(context, parameterizedType));
+		} else if (isTuple(targetClass)) {
 			// Checked ahead of isRecord: a genuine Java record annotated @Tuple would otherwise be
 			// claimed by isRecord()'s own isRecord() check first.
 			result = tupleBinder.resolveTuple(context, targetClass);
