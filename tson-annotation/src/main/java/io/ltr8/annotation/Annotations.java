@@ -59,6 +59,27 @@ public interface Annotations {
         return values().stream().filter(a -> a.name().equals(name)).toList();
     }
 
+    /**
+     * The value of the first annotation named {@code name}, as {@code type} -- the common shape by a wide
+     * margin, since most annotations carry one scalar. Empty when there is no such annotation, and equally
+     * when there is one but it is the valueless form ({@link #has} is the query for those).
+     *
+     * @throws ClassCastException if the annotation is present with a value that is not a {@code type}
+     */
+    default <T> Optional<T> value(String name, Class<T> type) {
+        return get(name).flatMap(a -> a.valueAs(type));
+    }
+
+    /**
+     * Every value under {@code name}, as {@code type}, in source order -- §3.1 permits a name to repeat.
+     * Valueless occurrences contribute nothing.
+     *
+     * @throws ClassCastException if any occurrence has a value that is not a {@code type}
+     */
+    default <T> List<T> values(String name, Class<T> type) {
+        return getAll(name).stream().flatMap(a -> a.valueAs(type).stream()).toList();
+    }
+
     /** Whether any annotation named {@code name} is present -- the common test for a valueless marker. */
     default boolean has(String name) {
         return values().stream().anyMatch(a -> a.name().equals(name));

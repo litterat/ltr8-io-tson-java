@@ -41,6 +41,31 @@ public record Annotation(String name, Optional<Object> value) {
         }
     }
 
+    /**
+     * This annotation's value as {@code type}, or empty when it has none -- the valueless form {@code @name},
+     * where presence alone is the information.
+     *
+     * <p><b>A present value of the wrong type throws</b> rather than reading as absent, because the two mean
+     * very different things to a caller and only one of them is a data condition. The usual cause is a
+     * mismatch of read mode rather than a bad witness: with no governing schema there is no declared type to
+     * bind an annotation's value through, so it is kept structurally and every typed lookup against it would
+     * otherwise silently yield nothing.
+     *
+     * @throws ClassCastException if a value is present and is not a {@code type}
+     */
+    public <T> Optional<T> valueAs(Class<T> type) {
+        if (value.isEmpty()) {
+            return Optional.empty();
+        }
+        Object held = value.get();
+        if (!type.isInstance(held)) {
+            throw new ClassCastException("annotation '@" + name + "' holds a " + held.getClass().getName()
+                    + ", not a " + type.getName() + " -- an annotation's value takes the Java form the read "
+                    + "produced, and a read with no governing schema binds none of them");
+        }
+        return Optional.of(type.cast(held));
+    }
+
     /** The valueless form, {@code @name}. */
     public static Annotation of(String name) {
         return new Annotation(name, Optional.empty());

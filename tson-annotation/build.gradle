@@ -29,7 +29,11 @@ repositories {
 }
 
 dependencies {
-	
+    // No main dependencies -- this module is the shared vocabulary everything else reads off a class
+    // under analysis (the binding annotations, and the Annotations/Annotation carrier).
+    testImplementation platform('org.junit:junit-bom:6.0.3')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 /*
