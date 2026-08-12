@@ -28,10 +28,15 @@ record AnnotationTypes(boolean capture, Optional<TsonSchema> schema, TsonValueRe
     static final AnnotationTypes UNVALIDATED = new AnnotationTypes(true, Optional.empty(), name -> null);
 
     /**
-     * Annotations are consumed and dropped -- object-binding mode, where a bound Java value has nowhere to
-     * carry one. Distinct from {@link #UNVALIDATED}, which keeps them without making any claim about their
-     * type: this one keeps nothing, so it also does no checking, which is what stops bind mode from
-     * validating at just the handful of positions that happen to route through a capturing reader.
+     * Annotations are consumed and dropped -- the position they were written at has nowhere to put them.
+     * That is every position in object-binding mode except a record whose bound class declares an {@code
+     * Annotations} component: a bound scalar, array, map or tuple is a plain Java value with no slot for
+     * metadata, and a record without a carrier opted out by not declaring one.
+     *
+     * <p>Distinct from {@link #UNVALIDATED}, which keeps them without making any claim about their type:
+     * this one keeps nothing, so it also does no checking. That matters -- validating at just the handful of
+     * positions that happen to route through a capturing reader would report a document's annotation errors
+     * arbitrarily, depending on where in the shape they were written.
      */
     static final AnnotationTypes DISCARDED = new AnnotationTypes(false, Optional.empty(), name -> null);
 

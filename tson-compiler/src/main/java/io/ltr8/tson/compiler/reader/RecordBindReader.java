@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.annotation.Annotations;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
@@ -58,10 +59,20 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
     private final DataClassRecord descriptor;
     private final DataClassField[] targetField;
 
+    /**
+     * The component receiving this value's own wire annotations (§3.1), if the bound class declares one.
+     * Held apart from {@link #targetField}, which is keyed by <em>schema</em> field index and so has no slot
+     * for a component the schema never mentions -- the carrier is filled from the framing, not from a field.
+     */
+    private final DataClassField annotationsCarrier;
+    private final AnnotationTypes annotationTypes;
+
     public RecordBindReader(String name, RecordBody body, DataClassRecord descriptor, TsonValueReaderResolver resolver,
-                             Optional<SourcePosition> schemaPosition) {
+                             Optional<SourcePosition> schemaPosition, AnnotationTypes annotationTypes) {
         super(name, body, resolver, schemaPosition);
         this.descriptor = descriptor;
+        this.annotationsCarrier = descriptor.annotationsCarrier().orElse(null);
+        this.annotationTypes = annotationsCarrier == null ? AnnotationTypes.DISCARDED : annotationTypes;
         this.targetField = new DataClassField[fields.size()];
         for (int i = 0; i < fields.size(); i++) {
             CompiledField field = fields.get(i);
@@ -83,9 +94,14 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         }
     }
 
-    private static DataClassField findTargetField(DataClassField[] classFields, String fieldName) {
+    /**
+     * The component a schema field binds to, by name. <b>The carrier is excluded</b>: it takes no part in
+     * field matching, so a schema field that happens to share its name binds nowhere rather than overwriting
+     * the annotations with an authored value.
+     */
+    private DataClassField findTargetField(DataClassField[] classFields, String fieldName) {
         for (DataClassField classField : classFields) {
-            if (classField.name().equals(fieldName)) {
+            if (classField != annotationsCarrier && classField.name().equals(fieldName)) {
                 return classField;
             }
         }
@@ -125,12 +141,22 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
     @Override
     public Object read(TsonReadContext ctx) {
         ctx = ctx.withSchemaPosition(schemaPosition);
+        // Hoisted ahead of the shape check, like the tree readers: the base consumes the framing and
+        // discards it, so capturing first leaves that call a no-op. Nothing to capture when the bound class
+        // declares no carrier, in which case annotationTypes is DISCARDED and this consumes and drops.
+        Annotations annotations = AnnotationCapture.bound(ctx, annotationTypes);
         ShapeResult shapeResult = expectRecordShape(ctx);
         if (shapeResult.shape() == Shape.MISMATCH) {
             return null;
         }
         int diagnosticsBefore = ctx.diagnostics().size();
         Object[] arguments = new Object[descriptor.fields().length];
+        if (annotationsCarrier != null) {
+            // Always written, even when nothing was annotated: `arguments` is sized by the Java class and
+            // filled only through matched schema fields, so a component the schema never mentions would
+            // otherwise reach the constructor as null.
+            arguments[annotationsCarrier.index()] = annotations;
+        }
 
         for (int schemaIndex : fixedFieldIndices) {
             DataClassField target = targetField[schemaIndex];
@@ -254,7 +280,8 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             DataClass dataClass = descriptorFor(name);
 
             if (typeDefinition.subtypes().isEmpty()) {
-                return new RecordBindReader(name, body, requireRecord(name, dataClass), resolver, typeDefinition.position());
+                return new RecordBindReader(name, body, requireRecord(name, dataClass), resolver,
+                        typeDefinition.position(), AnnotationTypes.of(context));
             }
 
             if (dataClass instanceof DataClassUnion union) {
@@ -269,7 +296,8 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             }
 
             if (dataClass instanceof DataClassRecord record) {
-                RecordBindReader ownParser = new RecordBindReader(name, body, record, resolver, typeDefinition.position());
+                RecordBindReader ownParser = new RecordBindReader(name, body, record, resolver,
+                        typeDefinition.position(), AnnotationTypes.of(context));
                 return new VariantSchemaReader(name, ownParser, typeDefinition.subtypes(), resolver,
                         AnnotationTypes.DISCARDED);
             }

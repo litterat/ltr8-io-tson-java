@@ -1,5 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.annotation.Annotation;
+import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonValueReader;
@@ -53,33 +55,70 @@ final class AnnotationCapture {
     }
 
     /**
-     * Consumes this value's own annotations, in source order with repeats preserved (§3.1: a name MAY appear
-     * any number of times and every occurrence survives). Returns an empty list, allocating nothing, for the
-     * overwhelmingly common unannotated case.
+     * Consumes this value's own annotations as tree nodes, in source order with repeats preserved (§3.1: a
+     * name MAY appear any number of times and every occurrence survives).
      */
     static List<TsonAnnotation> annotations(TsonReadContext ctx, AnnotationTypes types) {
-        if (!(ctx.peek() instanceof AnnotationStart)) {
-            return List.of();
-        }
-        if (!types.capture()) {
-            EventSkip.annotations(ctx);
+        if (!capturing(ctx, types)) {
             return List.of();
         }
         List<TsonAnnotation> annotations = new ArrayList<>();
         while (ctx.peek() instanceof AnnotationStart start) {
             ctx.next();
-            annotations.add(new TsonAnnotation(start.name(), value(ctx, start, types)));
+            // A tree read's readers are tree readers, so a resolved annotation value is already a node; the
+            // structural fallback yields one too. Anything else is a soft failure already reported.
+            annotations.add(new TsonAnnotation(start.name(),
+                    value(ctx, start, types).filter(TsonNode.class::isInstance).map(TsonNode.class::cast)));
         }
         return annotations;
     }
 
     /**
+     * The same capture, as the binding-layer carrier a record's {@code Annotations} component receives. The
+     * only difference from {@link #annotations} is the value's Java form: object-binding readers bind an
+     * annotation's value to the type §6 says it names, so it arrives as that type's own Java object rather
+     * than a node. A name the governing schema does not declare still falls back to a structural read, so an
+     * annotation nothing can interpret is preserved rather than dropped ([TSON-DATA] §1.5) -- which is
+     * exactly why {@code Annotations} leaves the value as {@code Object}.
+     */
+    static Annotations bound(TsonReadContext ctx, AnnotationTypes types) {
+        if (!capturing(ctx, types)) {
+            return Annotations.empty();
+        }
+        Annotations.Builder annotations = new Annotations.Builder();
+        while (ctx.peek() instanceof AnnotationStart start) {
+            ctx.next();
+            annotations.add(new Annotation(start.name(), value(ctx, start, types)));
+        }
+        return annotations.build();
+    }
+
+    /**
+     * Whether there is anything to capture and this mode wants it -- consuming and discarding when it does
+     * not, so the cursor is correctly positioned either way. Returns false, allocating nothing, for the
+     * overwhelmingly common unannotated case.
+     */
+    private static boolean capturing(TsonReadContext ctx, AnnotationTypes types) {
+        if (!(ctx.peek() instanceof AnnotationStart)) {
+            return false;
+        }
+        if (!types.capture()) {
+            EventSkip.annotations(ctx);
+            return false;
+        }
+        return true;
+    }
+
+    /**
      * The value of the annotation whose {@code AnnotationStart} was just consumed, and the checking of it.
+     * Left as {@code Object} because its Java form is whatever this read's own readers produce -- a node in
+     * tree mode, a bound object in binding mode -- with the structural fallback yielding a node either way.
+     * A soft failure in collecting mode yields {@code null}, already reported, and reads as absent here.
      * Empty for the valueless form ({@code @name}), where §6 makes bare {@code @T} shorthand for {@code @T:_}
      * -- so the type still has to admit the absent sentinel, which {@link #checkBareAdmitted} verifies rather
      * than assuming.
      */
-    private static Optional<TsonNode> value(TsonReadContext ctx, AnnotationStart start, AnnotationTypes types) {
+    private static Optional<Object> value(TsonReadContext ctx, AnnotationStart start, AnnotationTypes types) {
         Optional<TsonValueReader<?>> reader = types.readerFor(start.name());
         if (types.validating() && reader.isEmpty()) {
             ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF,
@@ -91,7 +130,7 @@ final class AnnotationCapture {
             reader.ifPresent(r -> checkBareAdmitted(ctx, start, r));
             return Optional.empty();
         }
-        TsonNode value = reader.isPresent() ? asNode(reader.get().read(ctx)) : STRUCTURAL.read(ctx);
+        Object value = reader.isPresent() ? reader.get().read(ctx) : STRUCTURAL.read(ctx);
         TsonEvent end = ctx.next();
         if (!(end instanceof AnnotationEnd)) {
             throw new IllegalStateException("expected the end of annotation '@" + start.name() + "', found " + end);
@@ -127,8 +166,4 @@ final class AnnotationCapture {
         }
     }
 
-    /** A compiled tree reader yields a node; a soft failure in collecting mode yields {@code null}, already reported. */
-    private static TsonNode asNode(Object read) {
-        return read instanceof TsonNode node ? node : null;
-    }
 }
