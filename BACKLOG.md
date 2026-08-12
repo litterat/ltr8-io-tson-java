@@ -22,103 +22,15 @@ the removal of the old throwaway `Map`/`List` DOM mode all landed. What's left:
   operations (no compiler dependency), so they belong in that module. Deferred until there's a concrete
   produce/edit use case: `TsonTreeWriter` already closes the read→edit→write loop, so these have a real
   payoff when wanted, but block nothing now.
-- **Wire-annotation capture** — complete for the tree, both read paths and the writer; the only piece still
-  open is the object-binding writer, which is parked with the rest of the `tson-bind` annotation work:
-  - [x] **Schemaless tree capture.** `SchemalessTreeReader` now captures `@name`/`@name: value` onto each
-    node's own `annotations()`, at every position §3.1 permits one — root, record field value, array
-    element, both sides of a map entry (a `MapNode.Entry` key is a node, so an annotated key keeps its
-    own), and recursively an annotation's own value. The recursion needs no special case: an annotation's
-    value events are buffered and replayed through the same reader via `ListEventSource`, so nested
-    annotations fall out of the ordinary path. `EventSkip.typeRef` was split out of
-    `annotationsAndTypeRef` so capture and discard share the second half of the framing.
-    `SchemalessTreeAnnotationTest`. Note the model needed **no change** — every node type already had the
-    slot, and `RecordNode`'s string-keyed `fields()` correctly mirrors §2.5's ban on annotating a field
-    *name*.
-  - [x] **Schema-driven tree capture.** The fix turned out to be
-    *hoisting*, not signature widening: every reader that consumes the framing here **discards** the result
-    (`RecordAbstractReader:159`, `MapAbstractReader:69`, `ArrayAbstractReader:68`, `TupleAbstractReader:68`,
-    `AtomValueReader:136`, `VoidReader:33` — none assigns it), so a tree reader can capture the annotations
-    *before* calling its base/delegate and leave that call a no-op. `RecordTreeReader`/`MapTreeReader`/
-    `ArrayTreeReader`/`TupleTreeReader` do it before their shape check; `AtomNodeReader`/`AbsentNodeReader`
-    (both tree-only wrappers) do it before delegating. **No shared signature changed and bind mode pays
-    nothing** — better than the `ShapeResult`-widening this item used to propose, which would have made
-    every mode carry a field only tree mode reads. `SchemaDrivenTreeAnnotationTest`.
-  - [x] **Annotations are resolved and type-checked against the schema (§6).** A schema-driven tree read now
-    resolves each annotation's name against the governing schema and reads its value with *that type's* own
-    compiled reader, so a wrong-typed value fails for the ordinary reason any wrong-typed value fails — no
-    separate validation pass. `AnnotationTypes` is the seam (`of(context)` for a compiled schema,
-    `UNVALIDATED` for the schemaless path, which has no governing schema and so checks nothing, correctly).
-    Read-time resolution is safe because `TsonSchemaCompiler.compile` is eager — every entry already has a
-    reader — and the lookup is gated on the schema's own `entries()` because the resolver throws for an
-    unknown name.
-    - **An unresolvable name reports `UNKNOWN_TYPE_REF` and the annotation is still kept**, read
-      structurally: [TSON-DATA] §1.5 requires preserving annotations a processor doesn't act on, so dropping
-      it would trade one conformance rule for another.
-    - **§6's bare form is checked, not assumed.** `@T` is shorthand for `@T:_`, so a synthetic absent is read
-      through the resolved reader; a bare annotation on a type that doesn't admit it is a `TYPE_MISMATCH`.
-    - Simplification that fell out: annotation values are now read **inline off the live cursor** rather than
-      buffered and replayed. The grammar guarantees the matching `AnnotationEnd` follows the single
-      data-value, so buffering bought nothing — and reading inline is what lets diagnostics reach the real
-      context instead of a throwaway one.
-    - Deliberately stricter than conformance requires — §1.3 imposes no annotation obligation at all
-      (`SPEC-FEEDBACK.md` #29). The cost: a document whose annotations resolve nowhere now produces
-      diagnostics where it previously read silently.
-  - [x] **Annotations on a value at a dispatched position.** The last gap, and it needed a third mechanism
-    rather than a variant of hoisting. A dispatcher (`NamedDispatchReader` for a choice,
-    `VariantSchemaReader` for a record subtype) must consume the annotations to reach the `!typeName` it
-    dispatches on — they precede it in `data-value = *annotation [type-ref] core-value` — so the reader that
-    ends up building the node cannot see them. They are now **re-attached to the finished node** via
-    `TsonNode.withAnnotations`, which puts them on the value they were written against.
-    - **No context change and no interface change.** An earlier note here claimed this had to be decided
-      alongside `TsonValueReader.read` because that interface "has nowhere to carry them". That was wrong,
-      and the error was direction: `DiagnosticsReceiver` needs something to flow *out of* a reader beside
-      its return value, which does constrain the return type; a dispatched annotation flows *in*, and the
-      dispatcher can simply attach it to what came back. Unrelated problems.
-    - `withAnnotations` is a pure `tson-tree` operation, and the first piece of the parked copy-on-write
-      item to land — narrowly, for the one case a reader provably cannot handle as it builds.
-    - **Bind mode is unaffected**, by construction: `reattach` only acts on a `TsonNode` result. To keep
-      bind mode from validating annotations at just the few positions that route through a capturing
-      reader, `AnnotationTypes` gained a third state — `DISCARDED` (consume and drop) alongside `of(...)`
-      (check) and `UNVALIDATED` (keep). `ChoiceReader` now has a factory per mode, which is how
-      record/array/map/tuple were already registered.
-  - [x] **Write-side re-emission (tree).** `TsonDataEmitter` gained `annotation(name)` for the valueless
-    form and a `beginAnnotation`/`endAnnotation` pair for the valued one; `TsonTreeWriter.writeNode` emits
-    a node's annotations ahead of its type-ref, per §7.4's `*annotation [type-ref] core-value` order, which
-    is why it runs once at the top of `writeNode` rather than inside each shape's own method. An
-    annotation's value is written as an ordinary node, so a nested one needs no special case. The
-    valueless form's trailing space is load-bearing, not cosmetic — §3.1 makes the character after the
-    name the whole boundary rule. `SchemalessTreeAnnotationTest` round-trips every annotatable position.
-  - [x] **Object binding, both directions.** A bound class opts in by declaring a component of type
-    `io.ltr8.annotation.Annotations` — the declared type *is* the signal, which is what lets `tson-bind`
-    verify the carrier itself instead of deferring the check to a layer that can see the type. The carrier
-    is a property of the record (`DataClassRecord.annotationsCarrier()`), settled during analysis, so a
-    reader asks once rather than testing every field. Covers the schemaless and schema-driven read paths and
-    the object writer.
-    - **The arity is the load-bearing part.** The carrier occupies a constructor slot no schema field
-      matches, so `RecordBindReader` must fill it explicitly — `arguments` is sized by the Java class and
-      written only through matched fields, so the slot otherwise reaches the constructor as `null`,
-      silently. In the other direction the carrier is excluded from name matching, so a schema field
-      sharing its name binds nowhere rather than overwriting the annotations.
-    - **A schema-driven read binds an annotation's value through the type §6 says its name refers to**, so
-      `note => text` arrives as a `String`. `AnnotationCapture` needed no mode switch for this: what differs
-      is only what `readerFor(name)` returns, and that is already mode-specific.
-    - Still discarding at leaf and dispatched positions — a bound scalar has nowhere to put a carrier, so
-      there is nothing to deliver to until the boxed carrier below exists.
-
-- [ ] **Annotations are still discarded at a dispatched position.** A dispatcher (`VariantBindReader` for a
-  union, `VariantSchemaReader` under bind mode) must consume the leading annotations to reach the
-  `!typeName` it dispatches on -- they precede it in `data-value = *annotation [type-ref] core-value` -- so
-  the reader that ends up building the value never sees them. Tree mode solved this by re-attaching to the
-  finished node (`TsonNode.withAnnotations`); bind mode would do the same through `DataClassAnnotated`'s
-  `constructor` handle, wrapping what came back.
-  - Not reachable today: a union member is not a boxed position, so its carrier is always empty rather than
-    wrong. Worth closing when a boxed variant becomes expressible, not before.
 
 ## Front door / ergonomics
 
-- [ ] No `!!schema`-header auto-selection on the data side — given a data document, there's no
-  "find the right compiled reader yourself" entry point; a caller always has to already know what
-  schema position it's reading against.
+- [ ] No `Tson.read` shorthand. The *capability* landed with the schema-aware facades —
+  `tson.treeReader().read(source)` resolves the document's own `!!schema`, picks the root type-ref and
+  validates, with no type named by the caller; the object form needs a target class, which Java makes
+  unavoidable. What's absent is the one-call front door, so the shortest self-describing read is still
+  two hops through a registry accessor. (The README entry-point table's schema rows depend on this — see
+  *Documentation*.)
 - [ ] A real disk/HTTP-backed `TsonSchemaSource` with whitelist/blacklist policy — today the only
   `TsonSchemaSource` is `TsonSchemaSource.registeredOnly()` (nothing fetched); the bundled standard
   library is served internally by `TsonCompiledSchemaRegistry` from `TsonBundledSchemas`, not through
@@ -152,21 +64,12 @@ the removal of the old throwaway `Map`/`List` DOM mode all landed. What's left:
 
 ## Resolution & linking generality
 
-Every real schema resolved so far (meta-kernel, meta.tn1, core.tn1, and hand-built test fixtures)
+Every real schema resolved so far (meta-kernel, meta.tn, core.tn, and hand-built test fixtures)
 happens to fit a narrow shape this pipeline already handles — declared in dependency order, with
 callers hand-sequencing registration themselves. These items are what's missing for the *general*,
 spec-required case, found by re-auditing Part 2 against the current source rather than CLAUDE.md's
 own prose (which had gone stale on at least one of them):
 
-- [x] **General forward-reference resolution within a schema** ([TSON-SCHEMA] §3.4.1). `SchemaResolver`
-  now resolves declarations **on demand, following dependencies** rather than strict source order, so a
-  declaration may compose or refine one declared later in the same schema. Only composition supertypes and
-  refinement/atom-refinement sources create a resolution dependency (field/variant/element types are bare
-  names, verified by the linker), so a cycle among just those (`a => b & {}` / `b => a & {}`) is rejected
-  via a `resolving` set, while ordinary recursion through field references (`x => { y: y }` / `y => { x: x }`,
-  a linked list, a tree) resolves fine. `ForwardReferenceResolutionTest`. **Not attempted** (a satisfiability
-  property, not a resolution one — `SPEC-FEEDBACK.md` #25): rejecting a *non-productive* recursive type that
-  has no finite model (required-recursive records).
 - [ ] **Automatic reference-closure resolution and import-cycle detection** ([TSON-DATA] §2.2.3,
   [TSON-SCHEMA] §3.4.1) — no code collects a schema's transitive `!!meta`/`!!import` closure,
   topologically orders it, and resolves it dependencies-first; every caller (including this
@@ -177,12 +80,6 @@ own prose (which had gone stale on at least one of them):
   entry point" item above, which is scoped to just the three bundled schemas, not a general
   algorithm.
 - **Choice disjointness derivation and untagged reading** ([TSON-SCHEMA] §5.4, §8.1) — landed in part:
-  - [x] **The `disjoint` fact is derived** (`TsonSchemaLinker`'s `computeDisjointness` →
-    `ChoiceDisjointness`, a namespace-wide pass alongside `computeSubtypes`). Three-valued
-    `Optional<Boolean>` — `true` proved, `false` provably-not, absent neither — over the spec's cheap
-    exact rules: different kind disjoint; different atom family disjoint; same-family integers by bound
-    interval; IS-A ⇒ not disjoint. Also landed: `TsonRegex.isDisjointFrom` in `tson-regex` (exact
-    I-Regexp intersection-emptiness).
   - [ ] **Two §5.4 "MAY" cases left absent:** record-set disjointness under composition, and pattern
     disjointness over `regex`-constrained atoms. The view on how far to go (recorded so it isn't
     relitigated): the `disjoint` *fact* is encoding-independent, but §5.4's Tagging rule makes TSON text
@@ -200,21 +97,14 @@ own prose (which had gone stale on at least one of them):
     dependency-inversion seam, since `tson-schema` deliberately doesn't depend on `tson-regex` — a
     pattern-disjointness oracle injected into the linker, supplied by `tson-compiler`. See
     `SPEC-FEEDBACK.md` #23 for the load-bearing ambiguity underneath all of this.
-  - [x] **Reader-side untagged structural recovery (scalars).** `ChoiceReader` now drops the `!variant`
-    tag where the choice is proved disjoint *and* every variant is a scalar of a distinct base-type class
-    (the TSON-text separability predicate): it precomputes a `class -> variant` map (`BaseTypeClass`) and
-    `NamedDispatchReader` recovers an untagged token by `ValueParser`-classifying it. To classify variants a
-    factory needs its enclosing schema, so `ValueReaderFactory.create` gained a `ValueReaderContext` (schema
-    + child-reader resolver) — a reusable "level up" seam. **Still open:** *non-scalar* structural recovery
-    — a `{...}` record variant vs a scalar is distinguishable by wire shape, but this cut only handles
-    base-type-class scalars; a choice with any non-scalar variant keeps the tag.
   - [ ] **The `@disjoint` assertion check** — an author's `@disjoint` marker checked against the derived
     fact: proved (silent), refuted / provably-not (resolver error), unprovable (warning), absent (no
     check). This is where exact regex-pattern disjointness (`isDisjointFrom`, via the seam above) pays
-    off — turning an otherwise-"unprovable" pattern choice into a proved-or-refuted one. **Blocked on
-    general annotation gathering** (below): the `@disjoint` marker is parsed (it's in the AST as one of
-    `SchemaMap.Declaration`'s annotation lists) but dropped at resolution, so the linker's disjointness
-    pass never sees it. It needs the declaration's annotations available where `disjoint` is known.
+    off — turning an otherwise-"unprovable" pattern choice into a proved-or-refuted one. **No longer
+    blocked**: a declaration's annotations now reach the resolved model, on `TypeDefinition` when written
+    after `=>` and on the schema map's key when written before the name, so the linker can read a
+    `@disjoint` marker where `disjoint` is derived. Nothing in the bundled schemas actually writes one yet,
+    so the checker's own fixtures have to supply it.
 - [ ] **§5.10 substitution into a template *body*.** Half of template application works. A template that
   refines a constructor — `array_ranged => <T, MIN, MAX> array<T> ^ { min_items: = MIN  max_items: = MAX }`,
   and therefore §5.3's sized sugar — instantiates per §8.2, because its resolved vocabulary carries the same
@@ -245,15 +135,6 @@ own prose (which had gone stale on at least one of them):
   kin §8.2 gestures at — "bounds within a width-derived range, and their kin" — belong with the constraint
   families that own them, next to `AtomNarrowing`, not in a syntax rewrite. Doing that properly probably
   means the check moves out of the desugarer entirely and `checkBounds` goes with it.
-- [x] **General annotation gathering — carry declaration annotations through resolution into the
-  resolved model.** Done, in both of §6's positions and without hoisting between them: an annotation after
-  `=>` lands on the entry's own `TypeDefinition`, one before the name lands on the schema map's key, reached
-  through `AnnotatedMap.getAnnotations(name)`. Values bind through the type the annotation's name refers to,
-  so `@doc` is a `String`. This unblocks the **`@disjoint` assertion check** and **`@doc` documentation
-  generation**, neither of which has a consumer yet.
-  - The name-position half is the one that matters in practice: all 104 `@doc` annotations across the three
-    bundled schemas precede the name, and none follows `=>`. See `SPEC-FEEDBACK.md` #35 for why that
-    contradicts §6's own guidance.
 - [ ] **Resolved-form ingest** ([TSON-SCHEMA] §8.1/§10.1) — bringing an already-resolved
   `!type_definition` document into the library (not source text), with its own integrity checks:
   `subtypes`/`disjoint` recomputed and verified, the closed-entry parameter-free rule reverified, an
@@ -262,38 +143,11 @@ own prose (which had gone stale on at least one of them):
   — "ingest" doesn't appear anywhere in the codebase. Note it would introduce a *second* way to build a
   `TsonSchema` — bound from a document rather than resolved from source — and the two would have to agree,
   including on where a declaration's annotations land (the name's on the map key, the definition's on the
-  entry). Lower priority than the three items above: the spec marks this path explicitly **optional**
+  entry). Lower priority than the rest of this section: the spec marks this path explicitly **optional**
   ("MAY implement ingest"), not a MUST.
 
 ## Atom-refinement constraint validation
 
-- [x] **Atom-refinement merging now checks that a refinement actually narrows its source** (§5.7).
-  `Atom.constraintsCheck(Atom refined)` is a per-family rule returning the list of ways `refined`
-  fails to narrow the receiver (empty means valid); `DefinitionResolver.resolveAtomRefinement` calls
-  it on the source's own bound body against the merged result and throws
-  `TsonSchemaValidationException` on any violation. The backlog's own example, `!uint8 ^ { min: -10
-  max: 300 }`, is now rejected. Shape notes:
-  - **The family owns the rule**, since only it knows what "more constrained" means for its own
-    fields; `AtomNarrowing` (package-private in `schema.meta`) holds the shared mechanics — bound
-    comparison over an inclusive/exclusive pair, floor/ceiling facets, permission flags, member-set
-    subsetting — so a family only says which of its fields are which kind of facet.
-  - **Comparing the merged result, not the refinement body alone**, is what makes an unmentioned
-    facet a non-event: it still holds the source's value and tightens vacuously, so only what the
-    author actually wrote can fail.
-  - **A stated bound is judged against the source's *effective* range** (an integer folds its `size`
-    in: `uint8` states no bounds but its width fixes 0..255). Deliberately *not* the refinement's own
-    effective range — intersecting first makes every widening vacuous and nothing is ever rejected.
-  - **Three deliberate holes**, each documented on the class: `pattern`-vs-`pattern` (regular-language
-    containment, and `tson-schema` has no `tson-regex` dependency to decide it — the natural place an
-    injected oracle would plug in, same seam the linker's pattern-disjointness gap needs);
-    `duration_type`'s bounds (unparsed ISO 8601 text, and parsing lives in `tson-compiler`); and
-    **selector facets** (`complex_type.component`, `float_type.format`, `binary.encoding`,
-    `uuid_type.version`) — unchecked because core.tn's own prose calls `!complex ^ { component:
-    FLOAT64 }` a narrowing of a `NUMBER` source, so rejecting a selector swap would reject a
-    documented construct. See `SPEC-FEEDBACK.md` #27.
-  - Regression tests: `DefinitionResolverTest`'s `atomRefinementRejectsBoundsThatWidenTheSource`,
-    `atomRefinementAcceptsBoundsThatGenuinelyTighten`,
-    `atomRefinementChecksTextLengthsThroughTheTextFamilysOwnRule`.
 - [ ] **`DefinitionResolver`'s `TsonObjectWriter` dependency stays — the premise this item used to
   carry was wrong.** It read "a real narrowing check wouldn't need to round-trip through the generic
   binder at all"; the check landed and the round-trip is still load-bearing, because **the check and
@@ -314,32 +168,6 @@ own prose (which had gone stale on at least one of them):
   depends *on* `tson-compiler` would create a cycle, since the resolution engine genuinely depends on
   the writer. So the "revisit moving them into `tson`" note on `Tson`'s own class Javadoc is blocked
   on a different, larger change than this item once assumed.
-
-## I-Regexp engine (RFC 9485)
-
-TSON pins its `regex` atom to I-Regexp (RFC 9485): meta-kernel's `regex_type` fixes `spec` to
-`…/rfc9485` (a `REQUIRED_FIXED` field), and every `text_type`/`uri_type` `pattern:` field is typed
-`regex?`. **The engine is built** (the `tson-regex` module) and fully wired: `regex` values validate as
-I-Regexp, and `pattern:` constraints (`TextParser`/`UriParser`) now match through it rather than
-`java.util.regex`, so this implementation defines I-Regexp semantics end to end.
-
-- [x] **Piece 1 — parser + AST + subset validator.** Landed as the `tson-regex` module
-  (`io.ltr8.tson.regex`): `TsonRegex.parse` → a `RegexNode` AST (or `TsonRegexSyntaxException`), a
-  recursive-descent parser over the RFC 9485 ABNF whose grammar *is* the subset gate (`\d`/`\w`/`\s`,
-  subtraction, back-references, lookaround, Unicode blocks all rejected), and `RegexParser` wired to it.
-  The owned AST also unblocks **choice disjointness over `regex`-constrained atoms** ([TSON-SCHEMA] §5.4's
-  "pattern disjointness", see "Resolution & linking generality") and the **Tier 2 constrained-decoding
-  backend** (`regex` atom → its own automaton, `STRUCTURED-OUTPUT.md`).
-- [x] **Piece 2 — Thompson-NFA matcher.** `TsonRegex.matches` compiles the `RegexNode` AST to a Thompson
-  NFA and runs a Pike-VM simulation — full-match, linear-time, no backtracking, so no ReDoS blow-up (a
-  `(a+)+b` that hangs a backtracking engine runs linearly; proven in `TsonRegexMatchTest`). `\p{…}` maps
-  each `RegexCategory` to `Character.getType` (own the semantics, borrow the JDK's Unicode data, the same
-  XID split the lexer makes). `TextParser`/`UriParser` `pattern:` matching is wired to it, replacing
-  `java.util.regex` — closing the `SPEC-FEEDBACK.md` #22 non-conformance for both well-formedness and
-  matching. (Remaining minor items: `TextParser`/`UriParser` re-parse the pattern per value rather than
-  caching a compiled `TsonRegex`; a very large bounded quantifier `{0,N}` expands linearly in program size,
-  capped at 200k instructions. Add I-Regexp `regex`-atom vectors to the sibling test-suite when it's
-  checked out, per the test-suite habit.)
 
 ## Remaining built-in types
 
@@ -374,17 +202,6 @@ I-Regexp, and `pattern:` constraints (`TextParser`/`UriParser`) now match throug
   name resolving to a parameter) anywhere in its body, at any depth. Distinct from `value_param`
   *substitution* (tracked in `STRUCTURED-OUTPUT.md`) — this is a rejection rule for a malformed
   "closed" entry, not the substitution mechanism itself.
-- [x] **`!choice { variants: [...] }` construction (§5.4) now resolves.** The bug: each bare variant
-  binds to a positional-form `type_ref` whose OPTIONAL `arguments: [type_argument]?` field is absent,
-  which the binder faithfully represents as `null` — and `schema.meta.TypeRef`'s constructor NPEd on
-  `List.copyOf(null)`, so `bindAtomInstance` rewrapped it as an `UnsupportedOperationException` and no
-  choice (this project's own or a consumer's) could be declared at all. Fixed at the source: `TypeRef`
-  already documents "empty means no `<...>`" (it conflates absent and empty — there is no wire form for
-  present-but-empty arguments), so its constructor now normalizes `null` arguments to the empty list,
-  rather than a global binder policy that would reinterpret every `[T]?` as `[T; 0..]`. Regression:
-  `ChoiceConstructionResolutionTest`. **Still open:** the `|` choice sugar (a `ChoiceRef` AST node) is a
-  separate path `DefinitionResolver` doesn't handle at all yet — only the explicit `!choice { ... }`
-  construction form resolves.
 
 (All already named in `DefinitionResolver`'s own Javadoc and `CLAUDE.md`; carried here so
 everything outstanding is tracked in one place.)
@@ -474,10 +291,10 @@ missing most of the mirror.
 - [ ] User-facing documentation on how to use the library — today only `CLAUDE.md`'s own dense,
   session-oriented internal narrative exists.
 - [ ] AI skills for using the library.
-- [ ] `@doc`-driven documentation generation (render a schema's own `@doc` annotations) — depends on
-  **general annotation gathering** (see *Resolution & linking generality*): `@doc`, like `@disjoint`, is
-  dropped at resolution today, so there's nothing to render from until declaration annotations are carried
-  through into the resolved model. One mechanism unblocks both.
+- [ ] `@doc`-driven documentation generation (render a schema's own `@doc` annotations). **Unblocked**: all
+  104 `@doc` strings across the three bundled schemas now survive resolution and linking, reachable as
+  `schema.entries().getAnnotations(name).value("doc", String.class)` — every one of core.tn's 48
+  declarations is documented. What's missing is the renderer, not the data.
 - [ ] The README entry-point table's schema rows say "Use `TsonValueReader`", but a caller never
   constructs one directly — they go `Tson.builder()` → `resolve` → `treeRegistry()`/`bindRegistry()` →
   `compile` → `get(type)`. The "Use" column names the interface you get *back*, not the thing you use.
@@ -491,9 +308,17 @@ missing most of the mirror.
   avoid serializing unrelated on-demand loads); everything else is an open design question.
 - [ ] General resolver-layer structural rules as reusable primitives, rather than binding-time-only
   behavior — empty-brace resolution, the absent-vs-missing distinction.
-- [ ] Annotation access on individual fields, array/tuple elements, and map keys/values — only a
-  whole bound record's own annotations are reachable today, not its children's.
-- [ ] Confusable-character and bidi-formatting-character warnings (§9.4-adjacent security
-  hardening) — the sibling gap to the numeric-literal length limit tracked in
-  `STRUCTURED-OUTPUT.md`'s Tier 1 section; neither is enforced anywhere yet.
+- [ ] **Annotations are still discarded at a dispatched position.** A dispatcher (`VariantBindReader` for a
+  union, `VariantSchemaReader` under bind mode) must consume the leading annotations to reach the
+  `!typeName` it dispatches on -- they precede it in `data-value = *annotation [type-ref] core-value` -- so
+  the reader that ends up building the value never sees them. Tree mode solved this by re-attaching to the
+  finished node (`TsonNode.withAnnotations`); bind mode would do the same through `DataClassAnnotated`'s
+  `constructor` handle, wrapping what came back.
+  - Not reachable today: a union member is not a boxed position, so its carrier is always empty rather than
+    wrong. Worth closing when a boxed variant becomes expressible, not before.
+- [ ] Confusable-character and bidi-formatting-character warnings (§9.4-adjacent security hardening) —
+  the sibling gap to the numeric-literal length limit tracked in `STRUCTURED-OUTPUT.md`'s Tier 1 section;
+  neither is enforced anywhere yet. `SPEC-FEEDBACK.md` #34 is the fuller treatment: which UTS #39 mechanism
+  applies where, the comparison scopes TSON can actually name, and why a normative requirement would oblige
+  every implementation to ship UCD data the JDK does not expose.
 
