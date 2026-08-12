@@ -1,5 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.annotation.Annotated;
+import io.ltr8.bind.DataClassAnnotated;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
@@ -82,6 +84,9 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 continue;
             }
             TsonValueReader<?> rebound = rebindContainerIfNeeded(field, target, resolver);
+            if (target.dataClass() instanceof DataClassAnnotated boxed) {
+                rebound = boxing(rebound, boxed, annotationTypes);
+            }
             if (rebound != field.parser()) {
                 field = new CompiledField(field.schema(), rebound);
                 fields.set(i, field);
@@ -92,6 +97,24 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 precomputedValue[i] = narrow(precomputedValue[i], target.type());
             }
         }
+    }
+
+    /**
+     * A field whose bound position is {@code Annotated<T>}: capture the annotations written at that position,
+     * read {@code T} with the reader the schema already gave the field, and hand back both.
+     *
+     * <p>Wrapping the field's own reader is what keeps this out of the shared field loop -- the base reads a
+     * field by calling whatever reader it holds, so replacing that reader is enough and no signature carries
+     * annotations. The capture is the same hoist used everywhere else: it runs before the delegate, whose own
+     * framing consumption then finds nothing left.
+     */
+    private static TsonValueReader<?> boxing(TsonValueReader<?> value, DataClassAnnotated boxed,
+                                              AnnotationTypes annotationTypes) {
+        Class<?> valueType = boxed.valueClass().typeClass();
+        return ctx -> {
+            Annotations annotations = AnnotationCapture.bound(ctx, annotationTypes);
+            return new Annotated<>(narrow(value.read(ctx), valueType), annotations);
+        };
     }
 
     /**

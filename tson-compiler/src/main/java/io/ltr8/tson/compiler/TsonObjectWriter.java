@@ -3,6 +3,8 @@ package io.ltr8.tson.compiler;
 import io.ltr8.annotation.Typename;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
+import io.ltr8.annotation.Annotated;
+import io.ltr8.bind.DataClassAnnotated;
 import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.tree.TsonNode;
@@ -106,6 +108,14 @@ public final class TsonObjectWriter {
                 writer.nullValue();
                 return;
             }
+            if (dataClass instanceof DataClassAnnotated boxed) {
+                // The box is framing, not a value shape: its annotations precede the value it wraps, exactly
+                // as a record carrier's precede the record (§7.4).
+                Annotated<?> annotated = (Annotated<?>) value;
+                writeAnnotations(annotated.annotations(), writer);
+                write(annotated.value(), boxed.valueClass(), writer);
+                return;
+            }
             if (dataClass.bridge().isPresent()) {
                 value = dataClass.bridge().get().toData().invoke(value);
             }
@@ -176,6 +186,10 @@ public final class TsonObjectWriter {
         if (carrier == null || !(carrier.get(value) instanceof Annotations annotations)) {
             return;
         }
+        writeAnnotations(annotations, writer);
+    }
+
+    private void writeAnnotations(Annotations annotations, TsonDataEmitter writer) throws Throwable {
         for (Annotation annotation : annotations.values()) {
             if (annotation.value().isEmpty()) {
                 writer.annotation(annotation.name());

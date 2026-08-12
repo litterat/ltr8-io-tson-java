@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.annotation.Annotated;
 import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.bind.DataBindContext;
@@ -52,6 +53,13 @@ class SchemaDrivenBindAnnotationTest {
 
     /** The same record without a carrier -- the overwhelmingly common shape, which must be unaffected. */
     public record PlainWidget(String name) {
+    }
+
+    /**
+     * A boxed <em>field</em>: the annotations belong to the value of {@code name}, not to the record. A bare
+     * {@code String} has nowhere to carry them, so the box moves them into the position's declared type.
+     */
+    public record BoxedWidget(Annotated<String> name) {
     }
 
     private static TsonCompiledSchema compile(Class<?> widgetClass) {
@@ -142,6 +150,50 @@ class SchemaDrivenBindAnnotationTest {
                 (PlainWidget) compile(PlainWidget.class).get("widget").read("@note:\"ignored\" { name: \"Widget\" }");
 
         assertEquals("Widget", widget.name());
+    }
+
+    // ── The boxed carrier, at a field position ───────────────────────────
+
+    private static BoxedWidget readBoxed(String document) {
+        return (BoxedWidget) compile(BoxedWidget.class).get("widget").read(document);
+    }
+
+    /**
+     * The distinction the box exists for: {@code @note} here annotates the *field's value*, not the record.
+     * A record-level carrier would never see it -- that is the documented scope limit of {@link Annotations}
+     * as a component.
+     */
+    @Test
+    void aBoxedFieldReceivesTheAnnotationsWrittenAtItsOwnPosition() {
+        BoxedWidget widget = readBoxed("{ name: @note:\"the label\" \"Widget\" }");
+
+        assertEquals("Widget", widget.name().value());
+        assertEquals("the label", widget.name().annotations().value("note", String.class).orElseThrow());
+    }
+
+    @Test
+    void anUnannotatedBoxedFieldStillGetsItsValueAndAnEmptyCarrier() {
+        BoxedWidget widget = readBoxed("{ name: \"Widget\" }");
+
+        assertEquals("Widget", widget.name().value());
+        assertTrue(widget.name().annotations().isEmpty());
+    }
+
+    /** Both carriers at once, each seeing only what was written at its own position. */
+    @Test
+    void aRecordCarrierAndAFieldBoxDoNotSeeEachOthersAnnotations() {
+        Widget widget = read("@note:\"on the record\" { name: @note:\"on the field\" \"Widget\" }");
+
+        assertEquals("on the record", widget.annotations().value("note", String.class).orElseThrow());
+        // The record's own carrier is scoped to the record value; the field's annotation is not its business.
+        assertEquals(1, widget.annotations().values().size());
+    }
+
+    @Test
+    void aBoxedFieldRoundTrips() {
+        BoxedWidget widget = readBoxed("{ name: @note:\"the label\" \"Widget\" }");
+
+        assertEquals("{ name: @note:\"the label\" \"Widget\" }", new TsonObjectWriter().toTson(widget));
     }
 
     // ── Round trip (write side) ──────────────────────────────────────────

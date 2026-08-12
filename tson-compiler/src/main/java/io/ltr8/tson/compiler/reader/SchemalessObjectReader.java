@@ -7,6 +7,8 @@ import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassArray;
 import io.ltr8.bind.DataClassAtom;
 import io.ltr8.bind.DataClassElement;
+import io.ltr8.annotation.Annotated;
+import io.ltr8.bind.DataClassAnnotated;
 import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.tree.TsonAnnotation;
@@ -154,6 +156,7 @@ public final class SchemalessObjectReader {
 
     private Object bind(TsonReadContext ctx, DataClass dataClass) {
         Object result = switch (dataClass) {
+            case DataClassAnnotated boxed -> bindAnnotated(ctx, boxed);
             case DataClassAtom atom -> bindAtom(ctx, atom);
             case DataClassRecord record -> bindRecord(ctx, record);
             case DataClassArray array -> bindArray(ctx, array);
@@ -575,6 +578,18 @@ public final class SchemalessObjectReader {
         }
     }
 
+
+    /**
+     * A boxed position ({@code Annotated<T>}): capture what was written at it, then read {@code T}.
+     *
+     * <p>The order is the whole mechanism and cannot be expressed as an argument list -- the capture must run
+     * before the value's own read, so that the delegate's framing consumption finds nothing left. Reading
+     * first would consume the annotations as part of the value's framing and discard them.
+     */
+    private Object bindAnnotated(TsonReadContext ctx, DataClassAnnotated boxed) {
+        Annotations annotations = toAnnotations(AnnotationCapture.annotations(ctx, AnnotationTypes.UNVALIDATED));
+        return new Annotated<>(bind(ctx, boxed.valueClass()), annotations);
+    }
 
     /**
      * The tree reader's capture, as the binding-layer carrier. Both model the same §3.1 attachment; they

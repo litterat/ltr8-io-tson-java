@@ -10,6 +10,7 @@ import io.ltr8.bind.DataBindException;
 import io.ltr8.tson.compiler.atom.Complex;
 import io.ltr8.tson.schema.meta.IsoDuration;
 import io.ltr8.tson.schema.meta.Rational;
+import io.ltr8.annotation.Annotated;
 import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.tree.AtomNode;
@@ -203,6 +204,30 @@ class TsonObjectReaderTest {
         AnnotatedItem item = mapper.read("@doc:\"a widget\" @marker { name: Widget }", AnnotatedItem.class);
 
         assertEquals("@doc:\"a widget\" @marker { name: \"Widget\" }", new TsonObjectWriter().toTson(item));
+    }
+
+    /** A boxed field on the schemaless path: no schema, so the value is kept structurally. */
+    public record BoxedItem(Annotated<String> name) {
+    }
+
+    @Test
+    void aBoxedFieldReceivesItsOwnPositionsAnnotations() throws DataBindException {
+        BoxedItem item = mapper.read("{ name: @tag:hot \"Widget\" }", BoxedItem.class);
+
+        assertEquals("Widget", item.name().value());
+        assertTrue(item.name().annotations().has("tag"));
+    }
+
+    /**
+     * Quoted in the fixture because an unquoted token read structurally becomes a {@code String} and writes
+     * back quoted -- the same width-and-form loss {@link TsonObjectWriter#toTson} already documents, not
+     * something specific to the box.
+     */
+    @Test
+    void aBoxedFieldRoundTripsStructurally() throws DataBindException {
+        BoxedItem item = mapper.read("{ name: @tag:\"hot\" \"Widget\" }", BoxedItem.class);
+
+        assertEquals("{ name: @tag:\"hot\" \"Widget\" }", new TsonObjectWriter().toTson(item));
     }
 
     public record TwoCarriers(Annotations a, Annotations b, String name) {
