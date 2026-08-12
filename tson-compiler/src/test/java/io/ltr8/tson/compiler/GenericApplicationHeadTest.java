@@ -113,21 +113,20 @@ class GenericApplicationHeadTest {
     }
 
     /**
-     * A non-constructor generic head -- a locally declared template. Deliberately <b>out of scope</b> for the
-     * desugar phase, which passes a non-constructor head through untouched: real §5.10 parameter substitution
-     * is a separate feature. The schema links and compiles but cannot read, because the reference resolves to
-     * the unsubstituted template whose field type is the bare parameter {@code T}. Asserted as the read-time
-     * failure it is, so it stops reading as though template application works.
+     * A non-constructor generic head -- a locally declared template. §5.10 parameter substitution is a
+     * separate, unimplemented feature, so the desugar phase cannot rewrite the application; it rejects it
+     * where it is written rather than passing it through. Left alone, this schema linked and compiled and
+     * then failed on the first read that reached the field, with {@code 'T' is referenced but not present in
+     * the schema} -- an error a caller might never provoke.
      */
     @Test
-    void aLocallyDeclaredTemplateCompilesButCannotRead() {
-        TsonCompiledSchema compiled = compile("""
-                  box => <T> { v: T }
-                  holder => { b: box<text> }""");
-
+    void applyingALocallyDeclaredTemplateIsRejectedWhereItIsWritten() {
         UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
-                () -> compiled.get("holder").read("{ b: { v: \"x\" } }"));
-        assertTrue(thrown.getMessage().contains("no usable compiled reader"), thrown.getMessage());
-        assertTrue(thrown.getMessage().contains("'T' is referenced but not present"), thrown.getMessage());
+                () -> compile("""
+                          box => <T> { v: T }
+                          holder => { b: box<text> }"""));
+
+        assertTrue(thrown.getMessage().contains("'box' is a parameterized template"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("not implemented"), thrown.getMessage());
     }
 }

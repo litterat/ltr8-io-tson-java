@@ -291,9 +291,19 @@ substitution, which this phase does not answer.
   which field a given argument fills. That routing is what makes it work for *every* constructor rather
   than the ones someone hand-wrote an assembler for.
 - **The head is looked up in the structure namespace only** (the governing meta's entries) and must be
-  `constructor: true` with matching arity. A **non-constructor head is passed through untouched** — a local
-  parameterized template (`box<text>`, §5.10) is a genuine unimplemented feature, not a rewrite. The
-  precedence/shadowing consequences are `SPEC-FEEDBACK.md` #28.
+  `constructor: true` with matching arity. The precedence/shadowing consequences are `SPEC-FEEDBACK.md` #28.
+- **Applying a *template* — a parameterized non-constructor — is rejected here**
+  (`UnsupportedOperationException`), since §5.10 substitution is unimplemented and there is no rewrite to
+  perform. Both namespaces a template can live in are checked: a head this document declares (via its
+  grammar-layer `TypeDef`, the only place its parameters exist this early) and a head in the structure
+  namespace (via its resolved definition — a generic head is a §3.3.1 constructor role, so a non-constructor
+  entry with parameters sitting there is a template reached the same way). **This is what makes sized sugar
+  report its actual gap**: `[T; 1..5]` desugars to `array_ranged<T, 1, 5>`, `array_ranged` is a *template*
+  (declared without `~`), and it was reaching the linker as a body reference validated against the type-name
+  namespace only (§3.3.2), failing as `unresolved reference 'array_ranged'` — which reads as a missing name.
+  The name isn't missing: meta.tn carries it, flattened in from its own `!!import` of the meta-kernel.
+  Substitution is what's missing. Still uncaught: a template declared by an `!!import`, which would need the
+  imported entries' resolved definitions rather than the name set the phase takes.
 - **Bottom-up, so nesting needs no special case:** an inner application is hoisted first and the outer one
   is built from the already-flattened name (`map<text, [integer]>` works at any depth). The injected name
   is `head_args_hash`, derived from the application itself, so two structurally identical applications
@@ -771,10 +781,8 @@ compatibility).
   argument is nested or a value rather than a plain name. `DefinitionResolver`'s Javadoc is the exact
   current boundary.
 - **§5.10 template application** — a generic head naming a *constructor* is desugared into a real
-  declaration; one naming a local parameterized template (`box<text>`) is passed through, so the schema
-  links and compiles but fails at read with `'T' is referenced but not present in the schema`. Real
-  parameter substitution, and rejecting the application where it is written instead of deferring to a
-  read, are both in `BACKLOG.md`.
+  declaration; one naming a locally declared parameterized template (`box<text>`) is *rejected* at desugar
+  time rather than substituted. Real parameter substitution is in `BACKLOG.md`.
 - **Undocumented atom constructors** — `unknown`/`email`/`cidr4`/`cidr6`/`mac` (and `extern`, which has no
   core.tn declaration) have no compiled-parser factory, so they compile to `ErrorReader` (a schema merely
   *declaring* one still compiles). `complex`/`ipv4`/`ipv6` do have parsers.

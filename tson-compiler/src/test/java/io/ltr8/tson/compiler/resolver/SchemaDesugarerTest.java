@@ -24,6 +24,7 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -210,6 +211,10 @@ class SchemaDesugarerTest {
         // belongs here even though the targets are templates rather than constructors -- what a template
         // application then resolves to (§5.10 substitution) is a separate question this phase does not
         // answer, so the result stays an application rather than becoming an instance.
+        //
+        // Observable in isolation only because META declares no templates. Against a real governing meta the
+        // rewrite still happens and is then rejected, since array_ranged is a template -- see
+        // sizedSugarAgainstARealMetaIsRejectedAsTheTemplateApplicationItIs below.
         assertEquals("array_ranged<text, 1, 5>", application(desugar("  bounded => [text; 1..5]"), "bounded"));
         assertEquals("array_min<text, 2>", application(desugar("  atLeast => [text; 2..]"), "atLeast"));
         assertEquals("array_max<text, 9>", application(desugar("  atMost => [text; ..9]"), "atMost"));
@@ -241,15 +246,59 @@ class SchemaDesugarerTest {
     }
 
     @Test
-    void aNonConstructorHeadIsPassedThrough() {
-        // A template application (§5.10) is out of scope for this phase; `box` is not in the meta at all, so
-        // it keeps its existing downstream handling rather than being turned into a different broken shape.
+    void applyingALocallyDeclaredTemplateIsRejectedHere() {
+        // §5.10 substitution is unimplemented, so this phase cannot rewrite the application -- and leaving it
+        // alone produced a schema that linked and compiled, then failed on the first read that reached the
+        // field. Rejecting it at the application site puts the error where it can be acted on.
         SchemaDocument document = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 {
                   box => <T> { v: T }
                   holder => { b: box<text> }
                 }""").parseSchemaDocument();
+
+        UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
+                () -> SchemaDesugarer.desugar(document, META, Set.of()));
+        assertTrue(thrown.getMessage().contains("'box' is a parameterized template"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("[T]"), "names the unbound parameters: " + thrown.getMessage());
+    }
+
+    /**
+     * §5.3's sized sugar targets {@code array_ranged}, which the meta-kernel declares as a <em>template</em>
+     * (no {@code ~}), so a sized array is a template application like any other and is rejected the same way.
+     * Its head lives in the structure namespace rather than this document, which is the second of the two
+     * namespaces the check consults.
+     *
+     * <p>This is what the rejection buys concretely. Before it, the rewritten application reached the linker
+     * as a body reference to {@code array_ranged}, validated against the type-name namespace only (§3.3.2),
+     * and failed as {@code unresolved reference 'array_ranged'} -- which reads as though the name is missing.
+     * It is not: meta.tn carries it, flattened in from its own {@code !!import} of the meta-kernel. What is
+     * missing is substitution.
+     */
+    @Test
+    void sizedSugarAgainstARealMetaIsRejectedAsTheTemplateApplicationItIs() {
+        SchemaDocument document = new TsonSchemaParser("""
+                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
+                { tags => [text; 1..5] }""").parseSchemaDocument();
+        Map<String, TypeDefinition> realMeta = MetaKernelBootstrapResolver.getMetaKernelSchema().entries();
+
+        UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
+                () -> SchemaDesugarer.desugar(document, realMeta, Set.of()));
+        assertTrue(thrown.getMessage().contains("'array_ranged' is a parameterized template"),
+                thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("[T, MIN, MAX]"), thrown.getMessage());
+    }
+
+    /**
+     * The check is narrow on purpose. A head naming nothing this document declares, and nothing in the
+     * structure namespace either, is an ordinary unresolved reference the linker reports over the whole
+     * schema -- so it stays this phase's business only to leave alone.
+     */
+    @Test
+    void anUnknownHeadIsStillPassedThrough() {
+        SchemaDocument document = new TsonSchemaParser("""
+                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
+                { holder => { b: nowhere<text> } }""").parseSchemaDocument();
 
         assertSame(document, SchemaDesugarer.desugar(document, META, Set.of()));
     }

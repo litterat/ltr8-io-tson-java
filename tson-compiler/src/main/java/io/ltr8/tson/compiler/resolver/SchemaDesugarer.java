@@ -75,9 +75,12 @@ import java.util.function.UnaryOperator;
  * ({@code ReferenceTypeDef}), a refinement source, and a composition supertype. And nothing inside a
  * <em>parameterized</em> declaration is expanded at all -- a template's body references its own type
  * parameters ({@code set => <T> ~array<T> ^ { ... } }), so expanding {@code array<T>} there would inject a
- * declaration referring to an unbound {@code T}. A head that is not a constructor (a template application
- * such as {@code box<text>}) is also passed through untouched: §5.10 parameter substitution is a separate
- * feature, so that residue continues down the existing path.
+ * declaration referring to an unbound {@code T}.
+ *
+ * <p><b>Applying a locally declared template is rejected, not passed through.</b> §5.10 parameter
+ * substitution is a separate, unimplemented feature, so {@code box<text>} is not something this phase can
+ * rewrite -- and leaving it alone produced a schema that linked and compiled and then failed on the first
+ * read that reached the field. See {@link #rejectIfTemplateApplication} for what is and is not covered.
  */
 final class SchemaDesugarer {
 
@@ -96,6 +99,9 @@ final class SchemaDesugarer {
     /** Declarations synthesised for applications encountered during the walk, keyed by their generated name. */
     private final Map<String, SchemaMap.Declaration> injected = new LinkedHashMap<>();
 
+    /** This document's own declarations, for {@link #rejectIfTemplateApplication} -- set before the walk starts. */
+    private Map<String, SchemaMap.Declaration> local = Map.of();
+
     private SchemaDesugarer(Map<String, TypeDefinition> metaEntries, Set<String> imported) {
         this.metaEntries = metaEntries;
         this.imported = imported;
@@ -108,6 +114,7 @@ final class SchemaDesugarer {
     static SchemaDocument desugar(SchemaDocument document, Map<String, TypeDefinition> metaEntries,
             Set<String> imported) {
         SchemaDesugarer pass = new SchemaDesugarer(metaEntries, imported);
+        pass.local = document.body().declarations();
         SchemaMap body = pass.schemaMap(document.body());
         if (body == document.body() && pass.injected.isEmpty()) {
             return document;
@@ -174,6 +181,9 @@ final class SchemaDesugarer {
                 }
                 Optional<GenericRef> sized = sizedArrayApplication(container.container());
                 if (sized.isPresent()) {
+                    // The size templates are reached the same way any other head is, so they are subject to
+                    // the same check -- this is the one path that builds an application rather than finding one.
+                    rejectIfTemplateApplication(sized.get().name());
                     yield new ReferenceTypeDef(List.of(), sized.get());
                 }
                 ContainerDef def = containerDef(container.container());
@@ -195,6 +205,7 @@ final class SchemaDesugarer {
                     if (instance.isPresent()) {
                         yield instance.get();
                     }
+                    rejectIfTemplateApplication(generic.name());
                 }
                 yield ref == reference.ref() ? reference : new ReferenceTypeDef(reference.typeParams(), ref);
             }
@@ -384,6 +395,7 @@ final class SchemaDesugarer {
     private TypeRef apply(String head, List<TypeArg> args, TypeRef unexpanded) {
         Optional<Instance> instance = instanceFor(head, args);
         if (instance.isEmpty()) {
+            rejectIfTemplateApplication(head);
             return unexpanded;
         }
         String name = syntheticName(head, args);
@@ -392,6 +404,60 @@ final class SchemaDesugarer {
                     n -> new SchemaMap.Declaration(List.of(), n, List.of(), instance.get()));
         }
         return new SimpleRef(name);
+    }
+
+    /**
+     * Rejects an application whose head is a parameterized <em>template</em> (§5.10) rather than a
+     * constructor -- {@code box => <T> { v: T } } applied as {@code box<text>}, or the meta-kernel's own
+     * {@code array_ranged}, which §5.3's sized sugar targets. Substituting the arguments for the parameters
+     * is a real unimplemented feature rather than a rewrite this phase can perform, and without it the
+     * application resolves to the template's own body with its parameters still unbound.
+     *
+     * <p>Two namespaces are checked, for the two places a template can be declared. A head this document
+     * declares is checked against its grammar-layer {@code TypeDef}, the only place its parameters exist
+     * this early. A head in the <b>structure namespace</b> is checked against its resolved definition: a
+     * generic-application head is one of §3.3.1's constructor roles, so that is where a container
+     * constructor is found, and a non-constructor entry with parameters sitting in the same namespace is a
+     * template reached the same way.
+     *
+     * <p>Catching the structure-namespace case is what makes {@code tags => [text; 1..5]} report the gap it
+     * actually has. Left alone it reached the linker as a body reference to {@code array_ranged}, which is
+     * validated against the type-name namespace only (§3.3.2), and failed as {@code unresolved reference
+     * 'array_ranged'} -- misleading, because the name is genuinely reachable at the role it is used at; what
+     * is missing is substitution, not the name.
+     *
+     * <p>Still not covered: a template declared by an {@code !!import}. Recognising one needs the imported
+     * entries' resolved definitions, and this phase is given only their names (see {@link #imported}).
+     */
+    private void rejectIfTemplateApplication(String head) {
+        SchemaMap.Declaration declaration = local.get(head);
+        if (declaration != null) {
+            reject(head, typeParams(declaration.typeDef()));
+            return;
+        }
+        TypeDefinition meta = metaEntries.get(head);
+        if (meta != null && !meta.constructor()) {
+            reject(head, meta.parameters());
+        }
+    }
+
+    private static void reject(String head, List<String> parameters) {
+        if (parameters.isEmpty()) {
+            return;
+        }
+        throw new UnsupportedOperationException("'" + head + "' is a parameterized template, and applying one "
+                + "is not implemented -- §5.10 parameter substitution has no implementation, so '" + head
+                + "<...>' would resolve to the template's own body with its parameters " + parameters
+                + " still unbound. Declare a concrete type instead.");
+    }
+
+    private static List<String> typeParams(TypeDef typeDef) {
+        return switch (typeDef) {
+            case StructuralTypeDef structural -> structural.typeParams();
+            case ContainerTypeDef container -> container.typeParams();
+            case ReferenceTypeDef reference -> reference.typeParams();
+            default -> List.of();
+        };
     }
 
     /**

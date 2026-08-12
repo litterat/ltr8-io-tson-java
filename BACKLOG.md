@@ -194,19 +194,22 @@ own prose (which had gone stale on at least one of them):
     general annotation gathering** (below): the `@disjoint` marker is parsed (it's in the AST as one of
     `SchemaMap.Declaration`'s annotation lists) but dropped at resolution, so the linker's disjointness
     pass never sees it. It needs the declaration's annotations available where `disjoint` is known.
-- [ ] **Template application (§5.10) has no parameter substitution, and fails at read time rather than
-  resolve time.** A generic head naming a real constructor is handled — `SchemaDesugarer` rewrites
-  `map<text, X>` into a declaration plus a reference before resolution, uniformly for every constructor.
-  A head naming a **local parameterized template** (`box => <T> { v: T }`, then `box<text>`) is passed
-  through untouched, because substituting `T` is a genuine missing feature, not a rewrite. The result
-  links and compiles, then dies at read with `'T' is referenced but not present in the schema`
-  (`GenericApplicationHeadTest.aLocallyDeclaredTemplateCompilesButCannotRead` pins this).
-  - Two things to do, separable: make the failure **honest** (reject the application where it is
-    written, rather than deferring to a read that may never happen), and then implement real
-    substitution. The first is cheap and worth doing on its own.
+- [ ] **Template application (§5.10) has no parameter substitution.** A generic head naming a real
+  constructor is handled — `SchemaDesugarer` rewrites `map<text, X>` into a declaration plus a reference
+  before resolution, uniformly for every constructor. A head naming a **local parameterized template**
+  (`box => <T> { v: T }`, then `box<text>`) is *rejected* at the application site, because substituting
+  `T` is a genuine missing feature rather than a rewrite. The rejection is done; substitution is not.
   - Substitution belongs in the same phase: it is the same shape of work — rewrite an application into a
     declaration — differing only in that the body comes from the template's own AST with parameters
-    replaced, rather than from a constructor's vocabulary.
+    replaced, rather than from a constructor's vocabulary. Implementing it deletes
+    `SchemaDesugarer.rejectIfTemplateApplication`.
+  - **§5.3's sized sugar is the same feature.** `[T; N..M]` desugars to `array_ranged<T, N, M>`, and the
+    meta-kernel declares `array_ranged`/`array_min`/`array_max` without `~` — templates, not constructors.
+    So no sized array works either, and implementing substitution is what makes `[text; 1..5]` usable.
+  - **The rejection is narrower than the feature.** A head declared by the current document or present in
+    the structure namespace is caught; a template declared by an **`!!import`** still slips through to the
+    old read-time failure, because catching it needs the imported entries' resolved definitions rather
+    than the name set the phase currently takes. Worth closing when substitution lands, if not before.
   - **Requires a termination guard.** Non-regular (polymorphic) recursion like
     `weird => <T> { next: weird<[T]>? }` / `use => weird<text>` grows its argument every level
     (`text` → `[text]` → `[[text]]` …). Every instantiation is structurally distinct, so the
