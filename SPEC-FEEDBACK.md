@@ -1318,3 +1318,91 @@ from the absent sentinel, and §6's first bullet should be restated as "for `T` 
 "for `void`-targeted `T`", so a union qualifies. Failing either, §6 should at least acknowledge that a
 marker-with-optional-reason requires two declarations, and `meta.tn`'s `deprecated`/`since`/`todo`/`lang`
 should be reconciled with [TSON-DATA] §2.1's bare usage.
+
+---
+
+## 31. `inline-array` and `container-def` are two grammar productions for one construct, and `type-def` is ambiguous between them
+
+**Section:** [TSON-SCHEMA] §12.1 (`type-def`, `type-ref`, `inline-array`, `container-def`, and the notes
+following the ABNF), §5.3.
+
+**Problem:** The bracket form is defined twice. `container-def` is reachable from `type-def` directly;
+`inline-array` is reachable from `type-def` via `type-ref`. They are not disjoint — `container-def` accepts
+every shape `inline-array` accepts, plus size specifiers and element/position `?`:
+
+```abnf
+type-def = ... / [type-params] container-def / [type-params] type-ref
+type-ref = paren-type / inline-array / type-name "<" type-args ">" / type-name
+
+inline-array  = "[" type-ref ws "]" / "[" type-ref 1*(separator type-ref) "]"
+container-def = "[" element-type [ ws ";" ws size-spec ] ws "]" / "[" element-type 1*(separator element-type) "]"
+```
+
+So `xs => [text]` has **two derivations**, and the grammar does not choose between them. §12.1's own notes
+choose in prose instead:
+
+> `inline-array` and `container-def` overlap on the plain-array and all-REQUIRED-tuple shapes; at top-level
+> type-def position `container-def` is tried first, and the two parses are semantically identical there.
+
+A production ordering that only exists in prose is the defect. "Tried first" is a statement about a
+particular parsing strategy, not about the language, and it is unnecessary — the ambiguity is entirely
+self-inflicted, since one production would cover both positions.
+
+**The restriction the split enforces is real, but it is two different restrictions with two different
+justifications, and only one of them needs a separate production — which is to say, neither does.**
+
+- **Element/position `?` is principled.** It records `state: OPTIONAL` on the containing `array` or
+  `tuple_element`, so it is a property of the *slot being declared*. A type-ref position declares no slot, so
+  there is nothing for it to attach to. The spec already has the right shape for expressing this and uses it
+  one production away: `field-type = type-ref ["?"]` puts the `?` **outside** the type-ref. Element `?`
+  wants the same treatment — a modifier on the element position, not a reason to fork the bracket.
+- **The size specifier is a different argument entirely.** `[T; 1..5]` is not a slot property; it denotes a
+  different type. §5.3 says so plainly — "the dividing line is the bracket syntax itself, not expressiveness"
+  — and gives the reason the restriction is nonetheless harmless: an ordinary schema cannot name
+  `array_ranged` anyway, since the size templates are declared in the meta-kernel and neither `meta.tn` nor
+  `core.tn` re-exports them, so the sugar is the only route to a sized array and confining it to declaration
+  position forces the author to name the type. That is a defensible authoring rule. It is not a reason for a
+  second production: it is a constraint on where a *feature of one* production is admissible, exactly like
+  the `?` case, and exactly like the several other position-sensitive rules §12.1 already states as notes
+  (`removal-set` on construction heads only; `{` after a bare type-ref in type-def position; `_` invalid in
+  type-ref and type-def bodies).
+
+**The two-production shape reads like drift.** The §12.1 note quoted above does not define the split so much
+as reconcile it after the fact — it observes the overlap, declares the two parses equivalent where they
+collide, picks a winner, and then has to add that the exclusion "applies to type-ref positions only" because
+`container-def` nests within itself. That is three clarifications to keep two productions from contradicting
+each other. §5.3's "two tiers of type expression, distinguished by position" is the intent, and it is a
+statement about *where a feature is allowed*, not about there being two syntaxes.
+
+**Interpretation chosen:** Implemented as specified, prose tie-break included. `TsonSchemaParser` hard-codes
+it: at type-def position a `[` goes unconditionally to `parseContainerDef`, never to `parseTypeRef`. The
+cost is visible in the AST — `ArrayContainerDef`/`TupleContainerDef` and `InlineArrayRef`/`InlineTupleRef`
+are four node types for two concepts, and identical source text yields different nodes depending on
+position. Every consumer then has to re-establish that they mean the same thing: `SchemaDesugarer` walks
+both paths (`containerDef`/`elementType` for one, `typeRef` for the other) to produce the same
+`!array { element_type: T }`, and `SchemaDesugarerTest.inlineArraySugarBecomesTheSameShapeAsAnExplicitApplication`
+exists purely to assert that the two shapes converge. Nothing is gained for that; the four nodes carry no
+distinction anything downstream acts on.
+
+**Suggested resolution:** Collapse to one bracket production reachable from `type-ref`, and state the two
+restrictions as notes the way §12.1 already states its other position-sensitive rules:
+
+```abnf
+type-ref     = paren-type / bracket-type / type-name "<" type-args ">" / type-name
+bracket-type = "[" element-type [ ws ";" ws size-spec ] ws "]"
+             / "[" element-type 1*(separator element-type) "]"
+element-type = type-ref ["?"]
+```
+
+with: a size specifier and an element/position `?` are valid only where the bracket form is a declaration
+body or nested within one; elsewhere they are a parse error, with the diagnostic §12.1 already prescribes.
+`type-def` then loses its `container-def` alternative and reaches the bracket form through `type-ref` like
+everything else, the ambiguity and the "tried first" rule both disappear, and nesting (`[[T; N]; N]`) works
+by the recursion already present rather than by a second `container-def` reference inside `element-type`.
+Every shape legal today stays legal and every shape rejected today stays rejected — this is a
+simplification of how the rule is written, not a change to the language.
+
+If the split is deliberate and meant to stay, then §12.1 should at least say *why* two productions exist
+rather than only how to disambiguate them, since on the evidence of the notes the answer is "so that
+`type-ref` cannot reach the size specifier" — which a note on one production expresses more directly.
+

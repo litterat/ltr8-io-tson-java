@@ -264,6 +264,11 @@ materialization, no validation (those are the resolver's/linker's jobs).
   `atom-refinement` has the same `data-value`-vs-`core-value` defect as `instance` but is left as-is (its
   own note in #16). An unquoted non-numeric type-argument always parses as a type reference, never a value
   literal — a deliberate grammar-layer deferral, classified at a later semantic layer.
+- **The bracket form is parsed twice, per the spec** — `ArrayContainerDef`/`TupleContainerDef` at
+  declaration position, `InlineArrayRef`/`InlineTupleRef` at type-ref position, with `[` at type-def
+  position hard-coded to the container path (§12.1's prose tie-break; the two productions overlap and
+  `type-def` is genuinely ambiguous without it). Four node types for two concepts, and `SchemaDesugarer`
+  walks both to the same output — implemented per letter, and argued against in `SPEC-FEEDBACK.md` #31.
 
 ### Desugaring (`tson-compiler/.../resolver/SchemaDesugarer.java`)
 
