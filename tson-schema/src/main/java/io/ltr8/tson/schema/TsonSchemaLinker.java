@@ -33,6 +33,7 @@ import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TupleElement;
 import io.ltr8.tson.schema.meta.TypeArgument;
+import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Unit;
@@ -153,7 +154,7 @@ public final class TsonSchemaLinker {
         // if !!meta isn't registered yet (e.g. meta-kernel's own self-referential !!meta, mid-registration).
         Map<String, TypeDefinition> structureNamespace = loader == null ? Map.of()
                 : loader.load(CanonicalIdentity.of(schema.meta()))
-                        .map(linked -> linked.schema().entries()).orElse(Map.of());
+                        .<Map<String, TypeDefinition>>map(linked -> linked.schema().entries()).orElse(Map.of());
 
         Set<String> localNames = new LinkedHashSet<>();
 
@@ -188,7 +189,43 @@ public final class TsonSchemaLinker {
             validateEntry(entry.getKey(), entry.getValue(), merged, structureNamespace);
         }
 
-        return new TsonLinkedSchema(new TsonSchema(schema.id(), schema.meta(), schema.imports(), merged, schema.bootstrap()));
+        return new TsonLinkedSchema(new TsonSchema(schema.id(), schema.meta(), schema.imports(),
+                withNameAnnotations(merged, schema, loader), schema.bootstrap()));
+    }
+
+    /**
+     * Re-attaches the annotations each name carried, which the passes above lose by rebuilding {@code merged}
+     * as a plain map. §6 binds an annotation written before a declaration's name to that name, and a linked
+     * schema is still a map keyed by those names, so they belong on the merged result rather than being
+     * dropped at the one point every entry passes through.
+     *
+     * <p>An imported name keeps the annotations its own schema resolved, the same way its {@code
+     * TypeDefinition} is carried in as-is -- documentation travels with the declaration, not with whoever
+     * imported it.
+     */
+    private static AnnotatedMap<String, TypeDefinition> withNameAnnotations(Map<String, TypeDefinition> merged,
+            TsonSchema schema, TsonSchemaLoader loader) {
+        AnnotatedMap<String, TypeDefinition> result = AnnotatedMap.of(merged);
+        if (loader != null) {
+            for (String importUri : schema.imports()) {
+                Optional<TsonLinkedSchema> imported = loader.load(CanonicalIdentity.of(importUri));
+                if (imported.isPresent()) {
+                    result = carryOver(result, imported.get().schema().entries());
+                }
+            }
+        }
+        return carryOver(result, schema.entries());
+    }
+
+    private static AnnotatedMap<String, TypeDefinition> carryOver(AnnotatedMap<String, TypeDefinition> into,
+            AnnotatedMap<String, TypeDefinition> from) {
+        AnnotatedMap<String, TypeDefinition> result = into;
+        for (String name : from.annotatedKeys()) {
+            if (result.containsKey(name)) {
+                result = result.withAnnotations(name, from.getAnnotations(name));
+            }
+        }
+        return result;
     }
 
     /**

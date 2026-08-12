@@ -1664,15 +1664,25 @@ the ingest rules never mention it. On ingest an `@alias` in the document is eith
 nothing verifies it against the entry's actual `source`, or discarded and recomputed like its peers. The spec
 says neither.
 
-**Interpretation chosen:** Definition-bound annotations (after `=>`) are resolved onto the entry and carried
-on `TypeDefinition`; each value is bound through the type §6 says its name refers to, so `@doc:"..."` arrives
-as a `String`. They re-serialize as wire annotations ahead of the value, matching the fixtures.
-Name-bound annotations are **dropped** — deliberately, and knowing the cost: it means all 104 of the bundled
-documentation strings are lost, and this implementation's resolved form differs from the reference fixtures
-on every documented entry. The alternative, a parallel name-keyed structure on `TsonSchema`, was deferred
-rather than rejected: §6 gives name-bound annotations no consumer, §8.1 gives them no place in the output
-model, and inventing one before the spec settles which side of `=>` documentation belongs on would be
-guessing at an interface. No hoisting is performed in either direction, per §6.
+**Interpretation chosen:** Both sides are kept, and neither is hoisted -- §6's "the resolver does not hoist
+annotations from key to value" is honoured by keeping two separate homes rather than by discarding one.
+
+Definition-bound annotations (after `=>`) are carried on the entry's `TypeDefinition`, and re-serialize as
+wire annotations ahead of the value, matching the fixtures. Name-bound annotations (before the name) are
+carried on the schema map's **key**, which is where the fixtures put them and the only place §8.1's model has
+for them. Each value is bound through the type §6 says its name refers to, so `@doc:"..."` arrives as a
+`String`. All 104 of the bundled documentation strings survive resolution and linking; `core.tn` documents
+every one of its 48 declarations and every one is reachable.
+
+The key's annotations are reached through an `AnnotatedMap<String, TypeDefinition>`, which presents the plain
+`String`-keyed `Map` interface and exposes `getAnnotations(name)` beside it. Making the key type itself
+`Map<Annotated<String>, TypeDefinition>` would model §3.1 more literally but is unusable: `Map.get` takes
+`Object`, so every existing `get(plainKey)` would keep compiling and start returning `null`.
+
+**This implementation therefore treats the "must follow `=>`" sentence as the thing that is wrong**, per
+reading 2 below -- name-position documentation is preserved and usable, as the fixtures show it should be.
+Nothing depends on that reading being correct: the two sets are stored separately, so if the spec settles the
+other way the definition-bound set is already right and the name-bound set simply stops being populated.
 
 **Suggested resolution:** Decide which the spec means, and make the artifacts agree.
 

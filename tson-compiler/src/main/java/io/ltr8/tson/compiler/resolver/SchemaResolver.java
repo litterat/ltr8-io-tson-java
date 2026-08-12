@@ -1,5 +1,7 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.annotation.AnnotatedMap;
+import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
@@ -165,24 +167,31 @@ public final class SchemaResolver {
         // The same compiled reader serves both hooks; they differ in what the caller does with the result,
         // which is why they are separate types rather than one Object-returning one.
         holder[0] = new DefinitionResolver(
-                (type, value) -> (Top) readThroughMeta(metaParser, type, value),
-                (type, value) -> readThroughMeta(metaParser, type, value),
+                (type, value) -> (Top) read(metaParser.reader(type), value),
+                // An annotation names an ordinary entry, not a constructor (§6), so this goes through the
+                // compiled schema's own reader for that name rather than the constructor vocabulary.
+                (type, value) -> read(metaParser.get(type), value),
                 metaParser.schema().entries()::get, namespaceGetter);
 
         for (String name : declarations.keySet()) {
             namespaceGetter.getTypeDefinition(name);
         }
-        Map<String, TypeDefinition> localOnly = new LinkedHashMap<>();
+        // §6: an annotation written before the declared name binds to the *name*, not to the definition,
+        // and "the resolver does not hoist annotations from key to value". A resolved schema is a
+        // map<type_name, type_definition>, so the name is this map's key -- which is where they are kept.
+        // The two sets stay separate: a declaration's own annotations are on its TypeDefinition.
+        AnnotatedMap.Builder<String, TypeDefinition> localOnly = AnnotatedMap.builder();
         for (String name : declarations.keySet()) {
-            localOnly.put(name, namespace.get(name));
+            localOnly.put(name, namespace.get(name),
+                    holder[0].annotationsFor(name, declarations.get(name).nameAnnotations()));
         }
-        return new TsonSchema(id, document.meta(), document.imports(), localOnly);
+        return new TsonSchema(id, document.meta(), document.imports(), localOnly.build(), false);
     }
 
-    /** One value read through the governing meta's own compiled reader for {@code type}. */
-    private static Object readThroughMeta(TsonCompiledMetaSchema metaParser, String type,
+    /** One already-resolved {@code DataValue} replayed through a compiled reader. */
+    private static Object read(io.ltr8.tson.compiler.TsonValueReader<?> reader,
             io.ltr8.tson.compiler.ast.DataValue value) {
-        return metaParser.reader(type).read(TsonReadContext.throwing(new ListEventSource(DataValueEvents.of(value))));
+        return reader.read(TsonReadContext.throwing(new ListEventSource(DataValueEvents.of(value))));
     }
 
     /** Stage 1 of {@link #resolveSchema(SchemaDocument)} -- every {@code !!import}'s own entries, in declaration order, merged as-is (never re-resolved against the importer). Mirrors {@code TsonSchemaLinker.mergeImports} exactly, including its collision rule, since this is the same concept discovered one stage earlier. */

@@ -285,6 +285,10 @@ final class DefinitionResolver {
      * dropping the name too would lose more ([TSON-DATA] §1.5). The meta-kernel's own bootstrap is the case
      * that hits this, having no compiled reader at all while it is being produced.
      */
+    Annotations annotationsFor(String name, List<io.ltr8.tson.compiler.ast.Annotation> written) {
+        return annotationsOf(name, written);
+    }
+
     private Annotations annotationsOf(String name, List<io.ltr8.tson.compiler.ast.Annotation> written) {
         if (written.isEmpty()) {
             return Annotations.empty();

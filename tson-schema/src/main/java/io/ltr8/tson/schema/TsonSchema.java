@@ -2,6 +2,8 @@ package io.ltr8.tson.schema;
 
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
+import io.ltr8.annotation.AnnotatedMap;
+import io.ltr8.annotation.Annotations;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -60,18 +62,32 @@ import java.util.Objects;
  * still need to survive linking, so {@link TsonLinkedSchema} would need to carry it too) without
  * buying any safety a universal property like linked-ness actually needs.
  */
-public record TsonSchema(String id, String meta, List<String> imports, Map<String, TypeDefinition> entries,
+public record TsonSchema(String id, String meta, List<String> imports, AnnotatedMap<String, TypeDefinition> entries,
                           boolean bootstrap) {
 
     public TsonSchema {
         Objects.requireNonNull(id, "!!id is required");
         Objects.requireNonNull(meta, "!!meta is required");
         imports = List.copyOf(imports);
-        entries = Collections.unmodifiableMap(new LinkedHashMap<>(entries));
+    }
+
+    /**
+     * {@code entries} as a plain map -- the ordinary case, where no declaration name carries annotations.
+     * §6 binds an annotation written before a declaration's name to that name, which in resolved form is
+     * this map's key, so {@link AnnotatedMap} is what holds them; a caller with none to carry need not know.
+     */
+    public TsonSchema(String id, String meta, List<String> imports, Map<String, TypeDefinition> entries,
+                       boolean bootstrap) {
+        this(id, meta, imports, AnnotatedMap.of(entries), bootstrap);
     }
 
     /** {@code bootstrap} defaults to {@code false} -- the common case: an ordinary, non-bootstrap schema. */
     public TsonSchema(String id, String meta, List<String> imports, Map<String, TypeDefinition> entries) {
         this(id, meta, imports, entries, false);
+    }
+
+    /** This schema with {@code name}'s own annotations recorded -- everything else unchanged. */
+    public TsonSchema withNameAnnotations(String name, Annotations annotations) {
+        return new TsonSchema(id, meta, imports, entries.withAnnotations(name, annotations), bootstrap);
     }
 }

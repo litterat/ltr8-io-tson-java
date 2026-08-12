@@ -254,17 +254,15 @@ own prose (which had gone stale on at least one of them):
   kin §8.2 gestures at — "bounds within a width-derived range, and their kin" — belong with the constraint
   families that own them, next to `AtomNarrowing`, not in a syntax rewrite. Doing that properly probably
   means the check moves out of the desugarer entirely and `checkBounds` goes with it.
-- [ ] **General annotation gathering — carry declaration annotations through resolution into the
-  resolved model.** Author annotations on a schema declaration (`@disjoint`, `@doc`, `@alias`, §6) are
-  parsed and reach the AST (`SchemaMap.Declaration` carries `nameAnnotations` and `typeDefAnnotations`),
-  but `DefinitionResolver` drops them: `TypeDefinition` has no annotations slot (and neither does the
-  kernel `type_definition` it mirrors — annotations are §3.1 wire *attachments*, not body fields). So
-  nothing downstream can see which annotations an entry carried. The likely mechanism is an `annotations`
-  field on `TypeDefinition` (carried as implementation metadata the way `position` already is — also not
-  a kernel body field), or a parallel `name → annotations` map on `TsonSchema`, populated by the
-  resolver. One gap blocking several consumers: the **`@disjoint` assertion check** (above), user-facing
-  **`@doc`** documentation generation (see *Documentation*), and `@alias`. Get the general mechanism
-  right once rather than bolting on a per-annotation path and revisiting every resolution site again.
+- [x] **General annotation gathering — carry declaration annotations through resolution into the
+  resolved model.** Done, in both of §6's positions and without hoisting between them: an annotation after
+  `=>` lands on the entry's own `TypeDefinition`, one before the name lands on the schema map's key, reached
+  through `AnnotatedMap.getAnnotations(name)`. Values bind through the type the annotation's name refers to,
+  so `@doc` is a `String`. This unblocks the **`@disjoint` assertion check** and **`@doc` documentation
+  generation**, neither of which has a consumer yet.
+  - The name-position half is the one that matters in practice: all 104 `@doc` annotations across the three
+    bundled schemas precede the name, and none follows `=>`. See `SPEC-FEEDBACK.md` #35 for why that
+    contradicts §6's own guidance.
 - [ ] **Resolved-form ingest** ([TSON-SCHEMA] §8.1/§10.1) — bringing an already-resolved
   `!type_definition` document into the library (not source text), with its own integrity checks:
   `subtypes`/`disjoint` recomputed and verified, the closed-entry parameter-free rule reverified, an
