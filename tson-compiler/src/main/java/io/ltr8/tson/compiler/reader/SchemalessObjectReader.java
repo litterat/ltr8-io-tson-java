@@ -7,7 +7,6 @@ import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassArray;
 import io.ltr8.bind.DataClassAtom;
 import io.ltr8.bind.DataClassElement;
-import io.ltr8.annotation.Annotated;
 import io.ltr8.bind.DataClassAnnotated;
 import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.Annotations;
@@ -588,8 +587,16 @@ public final class SchemalessObjectReader {
      */
     private Object bindAnnotated(TsonReadContext ctx, DataClassAnnotated boxed) {
         Annotations annotations = toAnnotations(AnnotationCapture.annotations(ctx, AnnotationTypes.UNVALIDATED));
-        return new Annotated<>(bind(ctx, boxed.valueClass()), annotations);
+        Object value = bind(ctx, boxed.valueClass());
+        try {
+            return boxed.constructor().invoke(value, annotations);
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Throwable t) {
+            throw new IllegalStateException("failed to box an annotated value of " + boxed.typeClass(), t);
+        }
     }
+
 
     /**
      * The tree reader's capture, as the binding-layer carrier. Both model the same §3.1 attachment; they

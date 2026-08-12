@@ -8,6 +8,8 @@ import io.ltr8.bind.DataClassMap;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
+import io.ltr8.annotation.AnnotatedMap;
+import io.ltr8.annotation.Annotations;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.HashMap;
@@ -47,9 +49,19 @@ public class DefaultMapBinder {
 			// Produces the MethodHandles for the DataClassMap.
 			MapAccessBridge mapBridge = new MapAccessBridge(targetClass);
 
-			descriptor = new DataClassMap(targetClass, keyDataClass, valueDataClass, mapBridge.constructor(),
-					mapBridge.size(), mapBridge.iterator(), mapBridge.next(), mapBridge.key(), mapBridge.value(),
-					mapBridge.put());
+			// An AnnotatedMap is an ordinary map that also keeps its keys' annotations -- same shape, two
+			// extra handles, rather than a DataClass of its own.
+			// A map that keeps its keys' annotations needs no extra shape and no extra handles: its key is a
+			// boxed position, and the same handles are simply bound to views that carry the box -- iteration
+			// over boxed entries, and a put that takes one apart. Map.Entry.getKey() then yields the box, so
+			// key()/next()/value() are untouched.
+			boolean annotated = AnnotatedMap.class.isAssignableFrom(targetClass);
+			descriptor = new DataClassMap(targetClass,
+					annotated ? DefaultClassBinder.boxed(keyDataClass) : keyDataClass, valueDataClass,
+					mapBridge.constructor(), mapBridge.size(),
+					annotated ? mapBridge.annotatedIterator() : mapBridge.iterator(), mapBridge.next(),
+					mapBridge.key(), mapBridge.value(),
+					annotated ? mapBridge.annotatedPut() : mapBridge.put());
 
 		} catch (IllegalAccessException | NoSuchMethodException | SecurityException e) {
 			throw new CodeAnalysisException("Failed to get map descriptor", e);
@@ -176,6 +188,21 @@ public class DefaultMapBinder {
 		 */
 		public MethodHandle put() throws NoSuchMethodException, IllegalAccessException {
 			return MethodHandles.publicLookup().findVirtual(targetClass, "put",
+					MethodType.methodType(Object.class, Object.class, Object.class));
+		}
+
+		/** As {@link #iterator()}, over entries whose key is boxed with its own annotations. */
+		public MethodHandle annotatedIterator() throws NoSuchMethodException, IllegalAccessException {
+			MethodHandle entrySet = MethodHandles.publicLookup().findVirtual(AnnotatedMap.class,
+					"annotatedEntrySet", MethodType.methodType(Set.class));
+			MethodHandle setIterator = MethodHandles.publicLookup().findVirtual(Set.class, "iterator",
+					MethodType.methodType(Iterator.class));
+			return MethodHandles.filterReturnValue(entrySet, setIterator);
+		}
+
+		/** As {@link #put()}, taking a key already boxed with its annotations. */
+		public MethodHandle annotatedPut() throws NoSuchMethodException, IllegalAccessException {
+			return MethodHandles.publicLookup().findVirtual(AnnotatedMap.class, "putAnnotated",
 					MethodType.methodType(Object.class, Object.class, Object.class));
 		}
 	}

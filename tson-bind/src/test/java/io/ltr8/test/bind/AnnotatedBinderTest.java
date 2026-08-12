@@ -89,8 +89,13 @@ public class AnnotatedBinderTest {
 		Assertions.assertTrue(descriptor.annotationsCarrier().isEmpty());
 	}
 
+	/**
+	 * Metadata does not change what a value is, so two boxes holding the same value are equal however they
+	 * are annotated. The map here exercises the hash contract alongside equals -- not a recommendation to key
+	 * a map by a box, which {@code AnnotatedMap} exists to avoid.
+	 */
 	@Test
-	public void aBoxProxiesEqualityToItsValueSoItWorksAsAKey() {
+	public void aBoxProxiesEqualityAndHashToItsValue() {
 		Annotations note = Annotations.of(java.util.List.of(Annotation.of("doc", "x")));
 
 		Assertions.assertEquals(Annotated.of("a"), Annotated.of("a", note));

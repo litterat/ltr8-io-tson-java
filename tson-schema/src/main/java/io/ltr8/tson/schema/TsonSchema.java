@@ -69,6 +69,9 @@ public record TsonSchema(String id, String meta, List<String> imports, Annotated
         Objects.requireNonNull(id, "!!id is required");
         Objects.requireNonNull(meta, "!!meta is required");
         imports = List.copyOf(imports);
+        // AnnotatedMap is fillable while a binder or resolver builds one, so copy to an immutable form --
+        // entries() has always been unmodifiable and that is part of a registered schema being locked.
+        entries = AnnotatedMap.copyOf(entries);
     }
 
     /**

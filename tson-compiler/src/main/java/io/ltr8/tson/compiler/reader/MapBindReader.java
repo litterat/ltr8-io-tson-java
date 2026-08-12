@@ -56,6 +56,7 @@ final class MapBindReader extends MapAbstractReader<Object> {
         this.descriptor = descriptor;
     }
 
+
     @Override
     public Object read(TsonReadContext ctx) {
         ctx = ctx.withSchemaPosition(schemaPosition);

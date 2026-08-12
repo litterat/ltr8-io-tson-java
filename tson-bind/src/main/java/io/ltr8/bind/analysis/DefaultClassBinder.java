@@ -16,6 +16,11 @@ import java.lang.reflect.Modifier;
 import io.ltr8.annotation.Annotated;
 import io.ltr8.bind.DataClassAnnotated;
 import java.lang.reflect.ParameterizedType;
+import io.ltr8.annotation.AnnotatedMap;
+import io.ltr8.annotation.Annotations;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.lang.reflect.Type;
 import java.util.Collection;
 import java.util.Map;
@@ -41,6 +46,33 @@ public class DefaultClassBinder {
 		arrayBinder = new DefaultArrayBinder();
 		mapBinder = new DefaultMapBinder();
 		tupleBinder = new DefaultTupleBinder();
+	}
+
+	/** {@code value} presented as a boxed position -- an annotated map's key, which carries its own metadata. */
+	static DataClass boxed(DataClass value) throws DataBindException {
+		return annotatedHandles(Annotated.class, value);
+	}
+
+	/** {@code Annotated<T>}'s descriptor, with the handles a reader builds and reads a box through. */
+	private static DataClass annotatedDescriptor(DataBindContext context, Class<?> targetClass,
+			Type parameterizedType) throws DataBindException {
+		return annotatedHandles(targetClass, annotatedValueDescriptor(context, parameterizedType));
+	}
+
+	private static DataClass annotatedHandles(Class<?> targetClass, DataClass valueDescriptor)
+			throws DataBindException {
+		try {
+			MethodHandles.Lookup lookup = MethodHandles.publicLookup();
+			MethodHandle constructor = lookup.findConstructor(Annotated.class,
+					MethodType.methodType(void.class, Object.class, Annotations.class));
+			MethodHandle value = lookup.findVirtual(Annotated.class, "value",
+					MethodType.methodType(Object.class));
+			MethodHandle annotations = lookup.findVirtual(Annotated.class, "annotations",
+					MethodType.methodType(Annotations.class));
+			return new DataClassAnnotated(targetClass, valueDescriptor, constructor, value, annotations);
+		} catch (NoSuchMethodException | IllegalAccessException e) {
+			throw new CodeAnalysisException("Failed to get Annotated descriptor", e);
+		}
 	}
 
 	/**
@@ -73,7 +105,7 @@ public class DefaultClassBinder {
 		if (targetClass == Annotated.class) {
 			// Checked before isRecord: Annotated is itself a record, and binding it as one would make its
 			// annotations an authored field rather than the framing they are.
-			result = new DataClassAnnotated(targetClass, annotatedValueDescriptor(context, parameterizedType));
+			result = annotatedDescriptor(context, targetClass, parameterizedType);
 		} else if (isTuple(targetClass)) {
 			// Checked ahead of isRecord: a genuine Java record annotated @Tuple would otherwise be
 			// claimed by isRecord()'s own isRecord() check first.

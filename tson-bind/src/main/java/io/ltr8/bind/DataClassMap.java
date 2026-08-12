@@ -97,6 +97,7 @@ public class DataClassMap extends DataClass {
 	// void put( <map>, <key>, <value> );
 	private final MethodHandle put;
 
+
 	public DataClassMap(Class<?> targetType, DataClass keyDataClass, DataClass valueDataClass,
 			MethodHandle constructor, MethodHandle size, MethodHandle iterator, MethodHandle next,
 			MethodHandle key, MethodHandle value, MethodHandle put) {
@@ -112,6 +113,7 @@ public class DataClassMap extends DataClass {
 		this.value = value;
 		this.put = put;
 	}
+
 
 	/**
 	 * @return The DataClass type for the map's keys.
@@ -174,6 +176,7 @@ public class DataClassMap extends DataClass {
 	/**
 	 * @return a MethodHandle for adding an entry to the map. put( map, key, value ):void;
 	 */
+
 	public MethodHandle put() {
 		return put;
 	}

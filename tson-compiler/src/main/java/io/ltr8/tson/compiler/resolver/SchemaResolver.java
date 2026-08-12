@@ -180,12 +180,12 @@ public final class SchemaResolver {
         // and "the resolver does not hoist annotations from key to value". A resolved schema is a
         // map<type_name, type_definition>, so the name is this map's key -- which is where they are kept.
         // The two sets stay separate: a declaration's own annotations are on its TypeDefinition.
-        AnnotatedMap.Builder<String, TypeDefinition> localOnly = AnnotatedMap.builder();
+        AnnotatedMap<String, TypeDefinition> localOnly = new AnnotatedMap<>();
         for (String name : declarations.keySet()) {
             localOnly.put(name, namespace.get(name),
                     holder[0].annotationsFor(name, declarations.get(name).nameAnnotations()));
         }
-        return new TsonSchema(id, document.meta(), document.imports(), localOnly.build(), false);
+        return new TsonSchema(id, document.meta(), document.imports(), localOnly, false);
     }
 
     /** One already-resolved {@code DataValue} replayed through a compiled reader. */

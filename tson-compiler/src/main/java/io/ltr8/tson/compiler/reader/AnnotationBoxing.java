@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.reader;
 
-import io.ltr8.annotation.Annotated;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassAnnotated;
@@ -24,12 +23,21 @@ final class AnnotationBoxing {
     }
 
     static TsonValueReader<?> wrap(TsonValueReader<?> value, DataClass target, AnnotationTypes annotationTypes) {
-        if (!(target instanceof DataClassAnnotated)) {
+        if (!(target instanceof DataClassAnnotated box)) {
             return value;
         }
         return ctx -> {
             Annotations annotations = AnnotationCapture.bound(ctx, annotationTypes);
-            return new Annotated<>(value.read(ctx), annotations);
+            Object read = value.read(ctx);
+            try {
+                // Built through the descriptor's own handle, never by naming the carrier class: tson-bind is
+                // the only thing that constructs a bound object.
+                return box.constructor().invoke(read, annotations);
+            } catch (RuntimeException e) {
+                throw e;
+            } catch (Throwable t) {
+                throw new IllegalStateException("failed to box an annotated value of " + box.typeClass(), t);
+            }
         };
     }
 }

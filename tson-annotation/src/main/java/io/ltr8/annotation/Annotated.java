@@ -36,11 +36,16 @@ import java.util.Objects;
  * nothing where it is not used; a position typed {@code String} still binds to a plain {@code String}.
  *
  * <p><b>Equality and hash proxy to {@code value}</b>, deliberately. Annotations are metadata, and metadata
- * does not change what a value *is* -- the same rule that keeps them (and source positions) out of {@code
- * TypeDefinition}'s equality. That is what makes this usable in a key position: a {@code
- * Map<Annotated<String>, V>} still finds an entry by its plain name, and two entries differing only in
- * documentation remain equal. It also means a box and its bare value are *not* equal, since {@code equals}
- * is necessarily symmetric -- unwrap with {@link #value()} to compare across the boundary.
+ * does not change what a value *is* -- the same rule that keeps them, and source positions, out of {@code
+ * TypeDefinition}'s equality. So a list of boxed elements compares equal to one whose elements carry
+ * different documentation, and {@code contains} finds a boxed value by an unannotated one. It also means a
+ * box and its bare value are *not* equal, since {@code equals} is necessarily symmetric -- unwrap with
+ * {@link #value()} to compare across the boundary.
+ *
+ * <p><b>For a map key, use {@link AnnotatedMap} rather than boxing the key type.</b> {@code
+ * Map<Annotated<K>, V>} looks like it would work -- proxied equality does let a plain key find an annotated
+ * one -- but {@code Map} never hands back the stored key, so the annotations it holds are unreachable
+ * without scanning. That is the one position this type cannot serve on its own.
  *
  * <p>Not {@link Comparable}: {@code T} is unbounded, so there is nothing to delegate to. A caller ordering
  * boxed values uses {@code Comparator.comparing(Annotated::value)}, which reads better than an unchecked

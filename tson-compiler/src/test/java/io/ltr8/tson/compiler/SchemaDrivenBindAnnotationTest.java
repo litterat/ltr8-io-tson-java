@@ -1,6 +1,7 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.annotation.Annotated;
+import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.bind.DataBindContext;
@@ -11,9 +12,10 @@ import io.ltr8.tson.schema.TsonSchemaRegistry;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Map;
+
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -159,9 +161,9 @@ class SchemaDrivenBindAnnotationTest {
      * A map whose <b>keys</b> are boxed. This is the shape schema documentation actually takes: a resolved
      * schema is a {@code map<type_name, type_definition>}, and §6 binds an annotation written before a
      * declaration's name to that name -- which is the map's key. Recovering {@code @doc} on a declaration is
-     * this, applied to that map.
+     * this, applied to that map; {@code TsonSchema.entries()} is exactly this type.
      */
-    public record Catalogue(Map<Annotated<String>, String> entries) {
+    public record Catalogue(AnnotatedMap<String, String> entries) {
     }
 
     private static TsonCompiledSchema compileCatalogue() {
@@ -187,13 +189,14 @@ class SchemaDrivenBindAnnotationTest {
                 .read("{ entries: { @note:\"the first\" \"a\" => \"one\"  \"b\" => \"two\" } }");
 
         assertEquals(2, catalogue.entries().size());
-        // Proxied equality is what makes this work: the annotated key is still found by its plain value.
-        assertEquals("one", catalogue.entries().get(Annotated.of("a")));
-        assertEquals("two", catalogue.entries().get(Annotated.of("b")));
+        // The plain Map contract is intact -- keys are Strings, not boxes.
+        assertEquals("one", catalogue.entries().get("a"));
+        assertEquals("two", catalogue.entries().get("b"));
 
-        Annotated<String> annotated = catalogue.entries().keySet().stream()
-                .filter(k -> k.value().equals("a")).findFirst().orElseThrow();
-        assertEquals("the first", annotated.annotations().value("note", String.class).orElseThrow());
+        // And a key's annotations are one lookup away, not a scan.
+        assertEquals("the first",
+                catalogue.entries().getAnnotations("a").value("note", String.class).orElseThrow());
+        assertTrue(catalogue.entries().getAnnotations("b").isEmpty());
     }
 
     @Test
@@ -201,9 +204,9 @@ class SchemaDrivenBindAnnotationTest {
         Catalogue catalogue = (Catalogue) compileCatalogue().get("catalogue")
                 .read("{ entries: { \"a\" => \"one\" } }");
 
-        Annotated<String> key = catalogue.entries().keySet().iterator().next();
-        assertEquals("a", key.value());
-        assertTrue(key.annotations().isEmpty());
+        assertEquals("a", catalogue.entries().keySet().iterator().next());
+        assertTrue(catalogue.entries().getAnnotations("a").isEmpty());
+        assertFalse(catalogue.entries().hasAnnotations());
     }
 
     /** Array elements: each element position carries its own annotations. */

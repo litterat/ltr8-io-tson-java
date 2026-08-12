@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.reader;
 
-import io.ltr8.annotation.Annotated;
 import io.ltr8.bind.DataClassAnnotated;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.bind.DataBindContext;
@@ -120,10 +119,8 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
     private static TsonValueReader<?> boxing(TsonValueReader<?> value, DataClassAnnotated boxed,
                                               AnnotationTypes annotationTypes) {
         Class<?> valueType = boxed.valueClass().typeClass();
-        return ctx -> {
-            Annotations annotations = AnnotationCapture.bound(ctx, annotationTypes);
-            return new Annotated<>(narrow(value.read(ctx), valueType), annotations);
-        };
+        TsonValueReader<?> narrowing = ctx -> narrow(value.read(ctx), valueType);
+        return AnnotationBoxing.wrap(narrowing, boxed, annotationTypes);
     }
 
     /**

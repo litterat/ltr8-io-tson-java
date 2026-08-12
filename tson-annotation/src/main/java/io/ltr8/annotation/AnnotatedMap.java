@@ -52,36 +52,52 @@ public final class AnnotatedMap<K, V> extends AbstractMap<K, V> {
 
     private final Map<K, V> values;
     private final Map<K, Annotations> annotations;
+    private final boolean immutable;
 
-    private AnnotatedMap(Map<K, V> values, Map<K, Annotations> annotations) {
-        this.values = Collections.unmodifiableMap(values);
+    /** An empty, mutable map -- what a binder allocates before filling it. */
+    public AnnotatedMap() {
+        this(new LinkedHashMap<>(), new LinkedHashMap<>(), false);
+    }
+
+    /** As {@link #AnnotatedMap()}; the capacity hint matches the shape a binder's constructor handle expects. */
+    public AnnotatedMap(int capacity) {
+        this(new LinkedHashMap<>(Math.max(capacity, 1)), new LinkedHashMap<>(), false);
+    }
+
+    private AnnotatedMap(Map<K, V> values, Map<K, Annotations> annotations, boolean immutable) {
+        this.values = values;
         this.annotations = annotations;
+        this.immutable = immutable;
     }
 
-    /** A map with nothing annotated -- what every caller building one from plain entries gets. */
+    /** An immutable copy -- {@code entries}' own key annotations included when it has any. */
+    public static <K, V> AnnotatedMap<K, V> copyOf(Map<K, V> entries) {
+        Map<K, Annotations> annotations = new LinkedHashMap<>();
+        if (entries instanceof AnnotatedMap<K, V> annotated) {
+            annotations.putAll(annotated.annotations);
+        }
+        return new AnnotatedMap<>(new LinkedHashMap<>(entries), annotations, true);
+    }
+
+    /** An immutable map with nothing annotated. */
     public static <K, V> AnnotatedMap<K, V> of(Map<K, V> values) {
-        return new AnnotatedMap<>(new LinkedHashMap<>(values), Map.of());
+        return copyOf(values);
     }
 
-    /** Accumulates entries, with or without annotations, in insertion order. */
-    public static <K, V> Builder<K, V> builder() {
-        return new Builder<>();
-    }
-
-    /** This map, with {@code key}'s own annotations replaced -- every entry and every other key unchanged. */
+    /** This map, with {@code key}'s own annotations replaced -- a fresh immutable map, this one untouched. */
     public AnnotatedMap<K, V> withAnnotations(K key, Annotations forKey) {
         Objects.requireNonNull(key, "key");
-        Map<K, Annotations> updated = new LinkedHashMap<>(annotations);
+        AnnotatedMap<K, V> copy = copyOf(this);
         if (forKey.isEmpty()) {
-            updated.remove(key);
+            copy.annotations.remove(key);
         } else {
-            updated.put(key, forKey);
+            copy.annotations.put(key, forKey);
         }
-        return new AnnotatedMap<>(new LinkedHashMap<>(values), updated);
+        return copy;
     }
 
     /** The annotations written at {@code key}'s own position -- empty when it carries none. */
-    public Annotations getAnnotations(K key) {
+    public Annotations getAnnotations(Object key) {
         return annotations.getOrDefault(key, Annotations.empty());
     }
 
@@ -95,9 +111,53 @@ public final class AnnotatedMap<K, V> extends AbstractMap<K, V> {
         return Collections.unmodifiableSet(new LinkedHashSet<>(annotations.keySet()));
     }
 
+    /**
+     * Every entry with its key boxed together with that key's annotations -- the view a binder iterates, so
+     * that an ordinary {@code Map.Entry.getKey()} yields the annotations along with the key and nothing has
+     * to ask this map for them separately.
+     *
+     * <p>A boxed key is safe to hand out here, unlike in a {@code Map<Annotated<K>, V>}: the caller receives
+     * the box and can read it. What does not work is a *map keyed* by one, because a map never returns the
+     * key object it stored.
+     */
+    public Set<Map.Entry<Annotated<K>, V>> annotatedEntrySet() {
+        Map<Annotated<K>, V> boxed = new LinkedHashMap<>();
+        for (Map.Entry<K, V> entry : values.entrySet()) {
+            boxed.put(new Annotated<>(entry.getKey(), getAnnotations(entry.getKey())), entry.getValue());
+        }
+        return Collections.unmodifiableMap(boxed).entrySet();
+    }
+
+    /**
+     * Adds an entry whose key arrives boxed with its own annotations -- the fill operation a binder drives
+     * this map through, the mirror of {@link #annotatedEntrySet()}.
+     */
+    @SuppressWarnings("unchecked")
+    public V putAnnotated(Object boxedKey, V value) {
+        Annotated<K> box = (Annotated<K>) boxedKey;
+        return put(box.value(), value, box.annotations());
+    }
+
+    /** An entry whose key carries {@code forKey}. */
+    public V put(K key, V value, Annotations forKey) {
+        V previous = put(key, value);
+        if (forKey != null && !forKey.isEmpty()) {
+            annotations.put(key, forKey);
+        }
+        return previous;
+    }
+
+    @Override
+    public V put(K key, V value) {
+        if (immutable) {
+            throw new UnsupportedOperationException("this AnnotatedMap is immutable");
+        }
+        return values.put(key, value);
+    }
+
     @Override
     public Set<Map.Entry<K, V>> entrySet() {
-        return values.entrySet();
+        return immutable ? Collections.unmodifiableMap(values).entrySet() : values.entrySet();
     }
 
     @Override
@@ -108,29 +168,5 @@ public final class AnnotatedMap<K, V> extends AbstractMap<K, V> {
     @Override
     public boolean containsKey(Object key) {
         return values.containsKey(key);
-    }
-
-    /** Builds an {@link AnnotatedMap} entry by entry -- the only way to make one with annotated keys. */
-    public static final class Builder<K, V> {
-
-        private final Map<K, V> values = new LinkedHashMap<>();
-        private final Map<K, Annotations> annotations = new LinkedHashMap<>();
-
-        public Builder<K, V> put(K key, V value) {
-            values.put(key, value);
-            return this;
-        }
-
-        public Builder<K, V> put(K key, V value, Annotations forKey) {
-            values.put(key, value);
-            if (!forKey.isEmpty()) {
-                annotations.put(key, forKey);
-            }
-            return this;
-        }
-
-        public AnnotatedMap<K, V> build() {
-            return new AnnotatedMap<>(new LinkedHashMap<>(values), new LinkedHashMap<>(annotations));
-        }
     }
 }
