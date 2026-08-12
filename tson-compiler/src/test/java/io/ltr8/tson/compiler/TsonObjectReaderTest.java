@@ -230,6 +230,24 @@ class TsonObjectReaderTest {
         assertEquals("{ name: @tag:\"hot\" \"Widget\" }", new TsonObjectWriter().toTson(item));
     }
 
+    /**
+     * A tuple position, boxed independently of its sibling. Exercised schemalessly because a
+     * declaration-level tuple ({@code pair => [text, text]}) is not resolved yet, so there is no
+     * schema-driven route to a tuple at all -- the boxing itself is position-shaped and identical either way.
+     */
+    @io.ltr8.annotation.Tuple
+    public record BoxedPair(Annotated<String> first, String second) {
+    }
+
+    @Test
+    void aTuplePositionIsBoxedIndependentlyOfItsSibling() throws DataBindException {
+        BoxedPair pair = mapper.read("[ @note:\"left\" \"a\"  \"b\" ]", BoxedPair.class);
+
+        assertEquals("a", pair.first().value());
+        assertTrue(pair.first().annotations().has("note"));
+        assertEquals("b", pair.second());
+    }
+
     public record TwoCarriers(Annotations a, Annotations b, String name) {
     }
 

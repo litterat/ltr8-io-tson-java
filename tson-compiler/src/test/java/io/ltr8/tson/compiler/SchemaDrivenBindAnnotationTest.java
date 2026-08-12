@@ -46,6 +46,7 @@ class SchemaDrivenBindAnnotationTest {
               marker => void
               widget => { name: text }
               catalogue => { entries: map<text, text> }
+              basket => { items: [text] }
             }
             """;
 
@@ -203,6 +204,37 @@ class SchemaDrivenBindAnnotationTest {
         Annotated<String> key = catalogue.entries().keySet().iterator().next();
         assertEquals("a", key.value());
         assertTrue(key.annotations().isEmpty());
+    }
+
+    /** Array elements: each element position carries its own annotations. */
+    public record Basket(List<Annotated<String>> items) {
+    }
+
+    private static TsonCompiledSchema compileAs(String schemaName, Class<?> bound) {
+        DataNameBinder binder = schemaTypeName -> schemaName.equals(schemaTypeName)
+                ? bound
+                : SchemaMetaNameBinder.INSTANCE.resolve(schemaTypeName);
+        DataBindContext context =
+                TsonAtomContext.registerDefaults(DataBindContext.builder().nameBinder(binder).build());
+        TsonSchemaSource source = uri -> {
+            if (TsonSchemaRegistry.canonicalIdentity(uri).equals(TsonSchemaRegistry.canonicalIdentity(ID))) {
+                return SCHEMA;
+            }
+            throw new IllegalStateException("unexpected fetch: " + uri);
+        };
+        return TsonCompiledSchemaRegistry.bind(
+                TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source),
+                context).get(ID);
+    }
+
+    @Test
+    void anArrayElementKeepsTheAnnotationsWrittenAtItsOwnPosition() {
+        Basket basket = (Basket) compileAs("basket", Basket.class).get("basket")
+                .read("{ items: [ @note:\"first\" \"a\"  \"b\" ] }");
+
+        assertEquals(List.of("a", "b"), basket.items().stream().map(Annotated::value).toList());
+        assertEquals("first", basket.items().get(0).annotations().value("note", String.class).orElseThrow());
+        assertTrue(basket.items().get(1).annotations().isEmpty(), "the sibling element carries none");
     }
 
     // ── The boxed carrier, at a field position ───────────────────────────

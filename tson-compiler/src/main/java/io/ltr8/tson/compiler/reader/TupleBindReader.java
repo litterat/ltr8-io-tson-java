@@ -37,7 +37,16 @@ final class TupleBindReader extends TupleAbstractReader<Object> {
 
     public TupleBindReader(String name, TupleBody body, DataClassTuple descriptor, TsonValueReaderResolver resolver,
                            Optional<SourcePosition> schemaPosition) {
-        super(name, body, resolver, schemaPosition);
+        this(name, body, descriptor, resolver, schemaPosition, AnnotationTypes.DISCARDED);
+    }
+
+    public TupleBindReader(String name, TupleBody body, DataClassTuple descriptor, TsonValueReaderResolver resolver,
+                           Optional<SourcePosition> schemaPosition, AnnotationTypes annotationTypes) {
+        super(name, body, resolver, schemaPosition,
+                position -> position < descriptor.elements().length
+                        ? descriptor.elements()[position].dataClass()
+                        : null,
+                annotationTypes);
         this.descriptor = descriptor;
     }
 
@@ -85,7 +94,8 @@ final class TupleBindReader extends TupleAbstractReader<Object> {
                 throw new IllegalArgumentException("'" + name + "' resolves to " + dataClass.typeClass()
                         + ", which isn't tuple-shaped -- can't bind '" + name + "' as one");
             }
-            return new TupleBindReader(name, body, descriptor, resolver, typeDefinition.position());
+            return new TupleBindReader(name, body, descriptor, resolver, typeDefinition.position(),
+                    AnnotationTypes.of(context));
         }
 
         private DataClass descriptorFor(String name) {

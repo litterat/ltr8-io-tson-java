@@ -51,9 +51,20 @@ abstract class ArrayAbstractReader<T> implements TsonValueReader<T> {
     final Optional<SourcePosition> schemaPosition;
 
     ArrayAbstractReader(String name, ArrayBody body, TsonValueReaderResolver resolver, Optional<SourcePosition> schemaPosition) {
+        this(name, body, resolver.resolve(body.elementType().name()), schemaPosition);
+    }
+
+    /**
+     * Takes the element reader already built, so a subclass can wrap what the schema resolved -- object-
+     * binding mode does this when the bound element type is a boxed {@code Annotated<T>}. Wrapping here
+     * rather than in the element loop keeps that loop, which both modes share, free of anything only one of
+     * them needs.
+     */
+    ArrayAbstractReader(String name, ArrayBody body, TsonValueReader<?> elementParser,
+                         Optional<SourcePosition> schemaPosition) {
         this.name = name;
         this.body = body;
-        this.elementParser = resolver.resolve(body.elementType().name());
+        this.elementParser = elementParser;
         this.schemaPosition = schemaPosition;
     }
 

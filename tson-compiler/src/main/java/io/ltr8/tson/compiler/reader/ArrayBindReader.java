@@ -57,7 +57,15 @@ final class ArrayBindReader extends ArrayAbstractReader<Object> {
 
     public ArrayBindReader(String name, ArrayBody body, DataClassArray descriptor, TsonValueReaderResolver resolver,
                            Optional<SourcePosition> schemaPosition) {
-        super(name, body, resolver, schemaPosition);
+        this(name, body, descriptor, resolver, schemaPosition, AnnotationTypes.DISCARDED);
+    }
+
+    public ArrayBindReader(String name, ArrayBody body, DataClassArray descriptor, TsonValueReaderResolver resolver,
+                           Optional<SourcePosition> schemaPosition, AnnotationTypes annotationTypes) {
+        super(name, body,
+                AnnotationBoxing.wrap(resolver.resolve(body.elementType().name()), descriptor.arrayDataClass(),
+                        annotationTypes),
+                schemaPosition);
         this.descriptor = descriptor;
     }
 
@@ -158,7 +166,8 @@ final class ArrayBindReader extends ArrayAbstractReader<Object> {
                 throw new IllegalArgumentException("'" + name + "' resolves to " + dataClass.typeClass()
                         + ", which isn't array-shaped -- can't bind '" + name + "' as one");
             }
-            return new ArrayBindReader(name, body, descriptor, resolver, typeDefinition.position());
+            return new ArrayBindReader(name, body, descriptor, resolver, typeDefinition.position(),
+                    AnnotationTypes.of(context));
         }
 
         /** {@code schemaTypeName} has no real bound Java class only for a synthesized, materialized type -- see this factory's own Javadoc. */

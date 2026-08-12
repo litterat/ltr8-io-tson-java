@@ -162,7 +162,8 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             TsonValueReaderResolver resolver, AnnotationTypes annotationTypes) {
         TsonValueReader<?> parser = field.parser();
         if (target.dataClass() instanceof DataClassArray targetArray && parser instanceof ArrayBindReader existing) {
-            return new ArrayBindReader(field.schema().name(), existing.body, targetArray, resolver, existing.schemaPosition);
+            return new ArrayBindReader(field.schema().name(), existing.body, targetArray, resolver,
+                    existing.schemaPosition, annotationTypes);
         }
         if (target.dataClass() instanceof DataClassMap targetMap && parser instanceof MapBindReader existing) {
             return new MapBindReader(field.schema().name(), existing.body, targetMap, resolver,

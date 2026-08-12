@@ -14,6 +14,8 @@ import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TupleElement;
 
+import io.ltr8.bind.DataClass;
+import java.util.function.IntFunction;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -49,10 +51,25 @@ abstract class TupleAbstractReader<T> implements TsonValueReader<T> {
     final Optional<SourcePosition> schemaPosition;
 
     TupleAbstractReader(String name, TupleBody body, TsonValueReaderResolver resolver, Optional<SourcePosition> schemaPosition) {
+        this(name, body, resolver, schemaPosition, position -> null, AnnotationTypes.DISCARDED);
+    }
+
+    /**
+     * {@code boxedAt} is asked, per position, for the bound target at that position, so a subclass can wrap
+     * what the schema resolved -- object-binding mode does this when a tuple position's Java type is a boxed
+     * {@code Annotated<T>}. Per position rather than once, because a tuple's positions have independent
+     * types and any subset of them may be boxed.
+     */
+    TupleAbstractReader(String name, TupleBody body, TsonValueReaderResolver resolver,
+                         Optional<SourcePosition> schemaPosition, IntFunction<DataClass> boxedAt,
+                         AnnotationTypes annotationTypes) {
         this.name = name;
         List<CompiledSlot> slots = new ArrayList<>(body.elements().size());
-        for (TupleElement element : body.elements()) {
-            slots.add(new CompiledSlot(element, resolver.resolve(element.elementType().name())));
+        for (int position = 0; position < body.elements().size(); position++) {
+            TupleElement element = body.elements().get(position);
+            TsonValueReader<?> parser = AnnotationBoxing.wrap(resolver.resolve(element.elementType().name()),
+                    boxedAt.apply(position), annotationTypes);
+            slots.add(new CompiledSlot(element, parser));
         }
         this.slots = slots;
         this.schemaPosition = schemaPosition;
