@@ -194,26 +194,27 @@ own prose (which had gone stale on at least one of them):
     general annotation gathering** (below): the `@disjoint` marker is parsed (it's in the AST as one of
     `SchemaMap.Declaration`'s annotation lists) but dropped at resolution, so the linker's disjointness
     pass never sees it. It needs the declaration's annotations available where `disjoint` is known.
-- [ ] **A generic-application head doesn't get the structure-namespace fallback, so `map<text, X>` won't
-  link in a user schema.** §3.3.1 lists "generic-application heads — the name before `<` when the name is
-  not otherwise in scope" as one of the **constructor roles** where the structure namespace *is* consulted,
-  and gives `map<text, text>` as its literal example. A user schema's `!!meta` is meta.tn, meta.tn imports
-  meta-kernel, so `map` is in that schema's structure namespace and the reference must resolve.
-  `TsonSchemaLinker` already threads a `structureNamespace` through to `validateEntry`, but applies it as a
-  fallback **only for `source`** (see the comment at `TsonSchemaLinker.java:584`, "Unlike every other
-  reference below, `source` gets the structure-namespace fallback"), so a field typed `map<text, X>` fails
-  with `'map_text_text_<hash>' has an unresolved reference 'map'`.
-  - **Nothing is wrong with core.tn** — an earlier reading of this had core.tn needing to re-declare `map`
-    as a §3.3.5 "fresh sibling". It doesn't; the structure namespace is the delivery mechanism, which
-    §3.3.1's own "Import what you expose" paragraph states directly.
-  - The fix is to extend the fallback to generic-application heads using §3.3.2's ordering — parameters,
-    local declarations, imports, then the structure namespace — and to reject a *parameter* used as a
-    generic head rather than trying to apply it (a parameter has no arity).
-  - Surfaced while trying to exercise `MapTreeReader` from a user schema; no test in this repo declares a
-    map-typed field, which is why it hadn't shown up. Records, arrays and atoms are unaffected.
-  - The surrounding scoping questions this raised — how precedence is worded, silent cross-namespace
+- [ ] **Template application (§5.10) has no parameter substitution, and fails at read time rather than
+  resolve time.** A generic head naming a real constructor is handled — `SchemaDesugarer` rewrites
+  `map<text, X>` into a declaration plus a reference before resolution, uniformly for every constructor.
+  A head naming a **local parameterized template** (`box => <T> { v: T }`, then `box<text>`) is passed
+  through untouched, because substituting `T` is a genuine missing feature, not a rewrite. The result
+  links and compiles, then dies at read with `'T' is referenced but not present in the schema`
+  (`GenericApplicationHeadTest.aLocallyDeclaredTemplateCompilesButCannotRead` pins this).
+  - Two things to do, separable: make the failure **honest** (reject the application where it is
+    written, rather than deferring to a read that may never happen), and then implement real
+    substitution. The first is cheap and worth doing on its own.
+  - Substitution belongs in the same phase: it is the same shape of work — rewrite an application into a
+    declaration — differing only in that the body comes from the template's own AST with parameters
+    replaced, rather than from a constructor's vocabulary.
+  - **Requires a termination guard.** Non-regular (polymorphic) recursion like
+    `weird => <T> { next: weird<[T]>? }` / `use => weird<text>` grows its argument every level
+    (`text` → `[text]` → `[[text]]` …). Every instantiation is structurally distinct, so the
+    dedup-by-derived-name never fires and the walk never terminates. Distinct from `SPEC-FEEDBACK.md` #25
+    (non-*productive* recursion — no finite *data* model): this is no finite *type* model.
+  - The scoping questions around generic heads — how precedence is worded, silent cross-namespace
     shadowing, whether parameters are eligible at a head, and when the `constructor: true` gate applies —
-    are `SPEC-FEEDBACK.md` #28.
+    are `SPEC-FEEDBACK.md` #28, which also records the answers this implementation currently gives.
 - [ ] **General annotation gathering — carry declaration annotations through resolution into the
   resolved model.** Author annotations on a schema declaration (`@disjoint`, `@doc`, `@alias`, §6) are
   parsed and reach the AST (`SchemaMap.Declaration` carries `nameAnnotations` and `typeDefAnnotations`),
@@ -329,15 +330,12 @@ I-Regexp, and `pattern:` constraints (`TextParser`/`UriParser`) now match throug
 - [ ] Subtraction.
 - [ ] Elided field types outside a tightening entry.
 - [ ] Restating a field group in a refinement body.
-- [ ] Generic type-refs beyond a bare two-argument `map<K, V>` application or a refinement source. A
-  non-simple argument (`weird<[T]>`) is currently rejected outright at resolution ("only simple type
-  arguments are resolved so far"), which incidentally masks a latent hazard: lifting this **requires a
-  materialization termination guard** (a depth/size cap or actual non-regularity detection), because
-  *non-regular* (polymorphic) recursion like `weird => <T> { next: weird<[T]>? }` / `use => weird<text>`
-  grows its type argument every level (`text` → `[text]` → `[[text]]` …). Each instantiation is structurally
-  distinct, so the linker's dedup-by-structural-equality never fires and materialization runs forever
-  (StackOverflow/OOM). Distinct from `SPEC-FEEDBACK.md` #25 (non-*productive* recursion — no finite *data*
-  model): this is no finite *type* model.
+- [ ] Generic type-refs whose arguments are not simple names. A non-simple argument (`weird<[T]>`) is
+  rejected outright ("only simple type arguments are resolved so far") — `SchemaDesugarer` reduces an
+  argument that is itself an application to the name it was hoisted to, so ordinary nesting
+  (`map<text, [integer]>`) works; what is left is an argument that does not reduce to a plain name. The
+  `weird<[T]>` shape additionally sits inside a *parameterized* declaration, which the phase skips
+  entirely. Lifting this is part of the template-application item above, including its termination guard.
 - [ ] `= _` (absent) field modifier, and any `~`/`=` modifier on an already-`OPTIONAL` field —
   `DefinitionResolver.resolveField` rejects both today.
 - [ ] Closed-entry parameter-free check (§5.10) — nothing validates that an entry with an empty

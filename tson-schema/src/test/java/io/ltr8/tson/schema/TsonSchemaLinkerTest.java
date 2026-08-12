@@ -4,15 +4,14 @@ import io.ltr8.tson.schema.registry.CanonicalIdentity;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
-import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Unit;
+
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -23,6 +22,7 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -50,10 +50,9 @@ class TsonSchemaLinkerTest {
      * {@code !!meta} is {@link TsonBundledSchemas#META_KERNEL_ID} itself -- every caller passes {@code
      * null} for {@code loader}, so the structure namespace this would otherwise supply is always
      * empty regardless of what URI it names; using the real meta-kernel identity instead lets a
-     * hand-built local entry declare its own {@code constructor: true} vocabulary (e.g. {@link
-     * #arrayConstructorEntry()}/{@link #setConstructorEntry()}) without tripping {@code
-     * TsonSchemaLinker}'s own "only the meta-kernel may declare constructors" check, which compares
-     * against that exact identity, not merely "is this schema self-referencing."
+     * hand-built local entry declare its own {@code constructor: true} vocabulary without tripping
+     * {@code TsonSchemaLinker}'s own "only the meta-kernel may declare constructors" check, which
+     * compares against that exact identity, not merely "is this schema self-referencing."
      */
     private static TsonSchema schemaOf(Map<String, TypeDefinition> entries) {
         return new TsonSchema("https://example.test/s.tn1", TsonBundledSchemas.META_KERNEL_ID,
@@ -61,173 +60,27 @@ class TsonSchemaLinkerTest {
     }
 
     /**
-     * A minimal stand-in for meta-kernel's own real {@code array} constructor -- just enough
-     * vocabulary (one value_param-routed field, plus schema-composed defaults) to exercise {@code
-     * instantiateArray}. Every field's own {@code type} is a bare {@code token} reference, not the
-     * real {@code type_ref}/{@code element_state}/{@code boolean}/{@code integer} meta-kernel would
-     * use -- irrelevant to {@code instantiateArray} itself (which reads {@code name}/{@code value}/
-     * {@code valueParam} only), and using a name this minimal test schema doesn't otherwise declare
-     * would fail {@code TsonSchemaLinker}'s own reference check for no reason relevant to what's being
-     * tested here.
+     * An argument-bearing type-ref reaches the linker only from a parameterized declaration's own body --
+     * {@code SchemaDesugarer} (in {@code tson-compiler}) turns every other one into a real declaration before
+     * resolution ever runs, so there is nothing here to synthesize an entry for. This pins that: link carries
+     * the application through untouched and adds no entries at all. The behaviour it replaces -- seven tests
+     * over a materialisation pass that built {@code ArrayBody}/placeholder entries from hand-written per-shape
+     * assemblers -- now lives in {@code SchemaDesugarerTest}, one phase earlier and one module over.
      */
-    private static TypeDefinition arrayConstructorEntry() {
-        RecordBody vocabulary = new RecordBody(List.of(), List.of(
-                new RecordField("element_type", TypeRef.of("token"), FieldState.REQUIRED, Optional.empty(), Optional.of("T")),
-                new RecordField("state", TypeRef.of("token"), FieldState.REQUIRED_DEFAULT,
-                        Optional.of(new Token("REQUIRED", Token.Form.UNQUOTED)), Optional.empty()),
-                new RecordField("unordered", TypeRef.of("token"), FieldState.REQUIRED_DEFAULT,
-                        Optional.of(new Token("false", Token.Form.UNQUOTED)), Optional.empty()),
-                new RecordField("unique_items", TypeRef.of("token"), FieldState.REQUIRED_DEFAULT,
-                        Optional.of(new Token("false", Token.Form.UNQUOTED)), Optional.empty()),
-                new RecordField("min_items", TypeRef.of("token"), FieldState.OPTIONAL, Optional.empty(), Optional.empty()),
-                new RecordField("max_items", TypeRef.of("token"), FieldState.OPTIONAL, Optional.empty(), Optional.empty())),
-                List.of());
-        return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of("T"), true, List.of(), List.of(),
-                Optional.empty(), vocabulary);
-    }
-
-    /**
-     * A minimal stand-in for meta-kernel's own real {@code set} constructor -- the identical field
-     * shape as {@link #arrayConstructorEntry()} (same names, same {@code element_type} value_param
-     * routing), but with {@code state}/{@code unordered}/{@code unique_items} tightened to {@code
-     * REQUIRED_FIXED} instead of {@code array}'s own {@code REQUIRED_DEFAULT} -- deliberately
-     * different literal values too ({@code REQUIRED}/{@code true}/{@code true}, matching the real
-     * {@code set}'s own tightening), to prove {@code instantiateArray} reads them from *this*
-     * vocabulary's own {@link RecordField#value}, not {@code array}'s.
-     */
-    private static TypeDefinition setConstructorEntry() {
-        RecordBody vocabulary = new RecordBody(List.of(), List.of(
-                new RecordField("element_type", TypeRef.of("token"), FieldState.REQUIRED, Optional.empty(), Optional.of("T")),
-                new RecordField("state", TypeRef.of("token"), FieldState.REQUIRED_FIXED,
-                        Optional.of(new Token("REQUIRED", Token.Form.UNQUOTED)), Optional.empty()),
-                new RecordField("unordered", TypeRef.of("token"), FieldState.REQUIRED_FIXED,
-                        Optional.of(new Token("true", Token.Form.UNQUOTED)), Optional.empty()),
-                new RecordField("unique_items", TypeRef.of("token"), FieldState.REQUIRED_FIXED,
-                        Optional.of(new Token("true", Token.Form.UNQUOTED)), Optional.empty()),
-                new RecordField("min_items", TypeRef.of("token"), FieldState.OPTIONAL, Optional.empty(), Optional.empty()),
-                new RecordField("max_items", TypeRef.of("token"), FieldState.OPTIONAL, Optional.empty(), Optional.empty())),
-                List.of());
-        return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of("T"), true,
-                List.of(), List.of(), Optional.empty(), vocabulary);
-    }
-
     @Test
-    void materializesAFieldsGenericTypeRefIntoASyntheticEntry() {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("token", unitEntry());
-        entries.put("set", emptyRecord());
-        entries.put("container", TypeDefinition.product(RecordBody.of(List.of(
-                RecordField.required("members", new TypeRef("set", List.of(new TypeArgument.Ref(TypeRef.of("token")))))))));
-
-        TsonLinkedSchema result = TsonSchemaLinker.link(schemaOf(entries), null);
-
-        assertEquals(4, result.schema().entries().size(), "one synthetic entry beyond the original three");
-        String syntheticName = result.schema().entries().keySet().stream()
-                .filter(name -> !Set.of("token", "set", "container").contains(name))
-                .findFirst().orElseThrow();
-        assertTrue(syntheticName.startsWith("set_token_"), "readable head: " + syntheticName);
-
-        TypeDefinition synthetic = result.schema().entries().get(syntheticName);
-        assertEquals(TypeKind.REFERENCE, synthetic.kind());
-        assertEquals(new TypeRef("set", List.of(new TypeArgument.Ref(TypeRef.of("token")))),
-                synthetic.source().orElseThrow());
-
-        RecordBody containerBody = (RecordBody) result.schema().entries().get("container").body();
-        assertEquals(TypeRef.of(syntheticName), containerBody.fields().get(0).type());
-    }
-
-    @Test
-    void materializesAnArrayApplicationIntoARealArrayBodyNotAPlaceholderReference() {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("token", unitEntry());
-        entries.put("array", arrayConstructorEntry());
-        entries.put("container", TypeDefinition.product(RecordBody.of(List.of(
-                RecordField.required("items", new TypeRef("array", List.of(new TypeArgument.Ref(TypeRef.of("token")))))))));
-
-        TsonLinkedSchema result = TsonSchemaLinker.link(schemaOf(entries), null);
-
-        String syntheticName = result.schema().entries().keySet().stream()
-                .filter(name -> !Set.of("token", "array", "container").contains(name))
-                .findFirst().orElseThrow();
-        assertTrue(syntheticName.startsWith("array_token_"), "readable head: " + syntheticName);
-
-        TypeDefinition synthetic = result.schema().entries().get(syntheticName);
-        assertEquals(TypeKind.PRODUCT, synthetic.kind());
-        assertEquals(TypeRef.of("array"), synthetic.source().orElseThrow(),
-                "source is the bare constructor name, matching DefinitionResolver.resolveInstance's own convention");
-
-        ArrayBody body = (ArrayBody) synthetic.body();
-        assertEquals(TypeRef.of("token"), body.elementType());
-        assertEquals(ElementState.REQUIRED, body.state());
-        assertFalse(body.unordered());
-        assertFalse(body.uniqueItems());
-        assertTrue(body.minItems().isEmpty());
-        assertTrue(body.maxItems().isEmpty());
-
-        RecordBody containerBody = (RecordBody) result.schema().entries().get("container").body();
-        assertEquals(TypeRef.of(syntheticName), containerBody.fields().get(0).type());
-    }
-
-    @Test
-    void materializesASetApplicationTheSameWayUsingItsOwnTightenedDefaults() {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("token", unitEntry());
-        entries.put("set", setConstructorEntry());
-        entries.put("container", TypeDefinition.product(RecordBody.of(List.of(
-                RecordField.required("items", new TypeRef("set", List.of(new TypeArgument.Ref(TypeRef.of("token")))))))));
-
-        TsonLinkedSchema result = TsonSchemaLinker.link(schemaOf(entries), null);
-
-        String syntheticName = result.schema().entries().keySet().stream()
-                .filter(name -> !Set.of("token", "set", "container").contains(name))
-                .findFirst().orElseThrow();
-        assertTrue(syntheticName.startsWith("set_token_"), "readable head: " + syntheticName);
-
-        TypeDefinition synthetic = result.schema().entries().get(syntheticName);
-        assertEquals(TypeKind.PRODUCT, synthetic.kind());
-        assertEquals(TypeRef.of("set"), synthetic.source().orElseThrow());
-
-        ArrayBody body = (ArrayBody) synthetic.body();
-        assertEquals(TypeRef.of("token"), body.elementType());
-        // set's own tightened defaults -- REQUIRED/true/true -- not array's REQUIRED/false/false,
-        // confirming instantiateArray reads them from set's own vocabulary, not array's.
-        assertEquals(ElementState.REQUIRED, body.state());
-        assertTrue(body.unordered());
-        assertTrue(body.uniqueItems());
-    }
-
-    @Test
-    void fallsBackToThePlaceholderReferenceWhenTheAppliedNameIsNotARealConstructor() {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("token", unitEntry());
-        entries.put("array", emptyRecord()); // constructor: false -- not actually applicable
-        entries.put("container", TypeDefinition.product(RecordBody.of(List.of(
-                RecordField.required("items", new TypeRef("array", List.of(new TypeArgument.Ref(TypeRef.of("token")))))))));
-
-        TsonLinkedSchema result = TsonSchemaLinker.link(schemaOf(entries), null);
-
-        String syntheticName = result.schema().entries().keySet().stream()
-                .filter(name -> !Set.of("token", "array", "container").contains(name))
-                .findFirst().orElseThrow();
-        TypeDefinition synthetic = result.schema().entries().get(syntheticName);
-        assertEquals(TypeKind.REFERENCE, synthetic.kind(), "no real array constructor to instantiate from -- old placeholder shape");
-    }
-
-    @Test
-    void dedupsTwoStructurallyIdenticalApplicationsToTheSameSyntheticEntry() {
+    void anArgumentBearingFieldTypeIsCarriedThroughWithoutSynthesizingAnEntry() {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("token", unitEntry());
         entries.put("set", emptyRecord());
         TypeRef setOfToken = new TypeRef("set", List.of(new TypeArgument.Ref(TypeRef.of("token"))));
-        entries.put("first", TypeDefinition.product(RecordBody.of(List.of(RecordField.required("members", setOfToken)))));
-        entries.put("second", TypeDefinition.product(RecordBody.of(List.of(RecordField.required("members", setOfToken)))));
+        entries.put("container", TypeDefinition.product(RecordBody.of(List.of(
+                RecordField.required("members", setOfToken)))));
 
         TsonLinkedSchema result = TsonSchemaLinker.link(schemaOf(entries), null);
 
-        assertEquals(5, result.schema().entries().size(), "still only one synthetic entry, shared by both use sites");
-        TypeRef firstFieldType = ((RecordBody) result.schema().entries().get("first").body()).fields().get(0).type();
-        TypeRef secondFieldType = ((RecordBody) result.schema().entries().get("second").body()).fields().get(0).type();
-        assertEquals(firstFieldType, secondFieldType);
+        assertEquals(Set.of("token", "set", "container"), result.schema().entries().keySet());
+        RecordBody containerBody = (RecordBody) result.schema().entries().get("container").body();
+        assertEquals(setOfToken, containerBody.fields().get(0).type());
     }
 
     @Test

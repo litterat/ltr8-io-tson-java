@@ -90,11 +90,16 @@ class MetaSchemaImportTest {
     }
 
     @Test
-    void mergesMetaKernelIntoAllThirtyOneOfMetaTn1sOwnDeclarations() {
+    void mergesMetaKernelIntoAllOfMetaTn1sOwnDeclarations() {
         TsonSchemaRegistry registry = new TsonSchemaRegistry();
 
         TsonSchema meta = parseMetaTn1(registry);
-        assertEquals(31, meta.entries().size(), "expected every meta.tn1 declaration to resolve");
+        // 31 written declarations plus one the desugar phase hoists: meta.tn's `within`/`excluding` fields
+        // are `[value]`, which becomes an `array<value>` instance declaration -- one entry for all eight
+        // occurrences, since identical applications share a name. Its sibling sugar `[type_name]` adds
+        // nothing here, because the meta-kernel already declares that same application and an import in
+        // scope is referenced rather than redeclared.
+        assertEquals(32, meta.entries().size(), "expected every meta.tn1 declaration to resolve");
 
         TsonLinkedSchema registered = registry.register(TsonSchemaLinker.link(meta, registry));
 

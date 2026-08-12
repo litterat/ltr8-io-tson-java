@@ -85,22 +85,13 @@ import java.util.Set;
  *   annotation}/{@code documentation}/{@code doc}/{@code alias}'s own shape. No namespace lookup
  *   happens here either: the referenced name is carried through as a bare string, unverified,
  *   exactly like an ordinary field's type-ref.</li>
- *   <li>A field's inline array sugar {@code [T]} (§5.3) resolves in place to the {@code type_ref}
- *   value {@code { name: array  arguments: [ { name: T } ] } } -- the {@code @alias:field_name}-style
- *   annotation §8.3 would add when {@code T} is itself an aliased reference is not produced yet, so
- *   the bare form is used instead (see {@link #resolveTypeRef}). A field's type-ref may also be an
- *   ordinary generic application ({@code enum}'s own {@code members: set<token>}), resolved the same
- *   way a refinement source's arguments are ({@link #resolveSimpleTypeArg(TypeArg)}, a simple
- *   argument only). Declaration-level sized-array sugar ({@code [T; N..]}/{@code [T; ..M]}/{@code
- *   [T; N..M]}/{@code [T; N]}, §5.3) desugars to a {@code REFERENCE}-kind entry targeting {@code
- *   array_min}/{@code array_max}/{@code array_ranged} (§5.10) -- see {@link
- *   #resolveContainerTypeDef}.</li>
- *   <li>A declaration's own fully-bound top-level application of the {@code map} constructor
- *   (§5.6) -- {@code schema => map<type_name, type_definition>}'s own shape -- resolves as a
- *   construction, not a reference: {@code kind: PRODUCT} (map's family), {@code source} the
- *   applied form, {@code body: !map { key_type: ... value_type: ... }}, no supertypes -- see
- *   {@link #resolveGenericConstructorApplication}. Only {@code map} with two simple type
- *   arguments is handled so far; other constructors and nested/value arguments are not.</li>
+ *   <li><b>The sugar forms no longer arrive here.</b> {@code SchemaDesugarer} rewrites them before
+ *   resolution: {@code [T]} and any constructor application become an {@code !C value} instance
+ *   (§5.6), and the sized forms become their {@code array_min}/{@code array_max}/{@code
+ *   array_ranged} application (§5.3). What still reaches this class carrying arguments is a
+ *   <em>template</em> application, resolved to a {@code REFERENCE} naming it -- see {@link
+ *   #resolveTemplateApplication}. The one exception is {@code MetaKernelBootstrapResolver}, which
+ *   bypasses {@code SchemaResolver} and so never desugars.</li>
  *   <li>A field's default ({@code ~}) or fixed ({@code =}) modifier value (§5.2, §5.10) on a
  *   REQUIRED (non-{@code ?}) field -- see {@link #resolveField} for the full literal-vs-parameter
  *   split ({@code product_access_type = INDEX} vs. {@code type_ref = T}). Verified against the real
@@ -284,12 +275,13 @@ final class DefinitionResolver {
                 return TypeDefinition.reference(simple.name());
             }
             if (referenceTypeDef.ref() instanceof GenericRef generic) {
-                return resolveGenericConstructorApplication(name, generic);
+                return resolveTemplateApplication(name, generic);
             }
         }
-        if (typeDef instanceof ContainerTypeDef containerTypeDef && containerTypeDef.typeParams().isEmpty()) {
-            return resolveContainerTypeDef(name, containerTypeDef.container());
-        }
+        // A declaration-level container form is rewritten by SchemaDesugarer before resolution -- a sized
+        // array into its array_min/array_max/array_ranged application (§5.3), a size-less one into the
+        // `!array { ... }` construction it denotes (§5.6). Anything still here is a shape that phase does
+        // not build (a tuple container, an optional or nested element) and falls through below.
         if (typeDef instanceof Instance instance) {
             return resolveInstance(name, instance);
         }
@@ -522,36 +514,30 @@ final class DefinitionResolver {
     // ── Top-level constructor application (§5.6) ──────────────────────────
 
     /**
-     * A fully-bound top-level application of the {@code map} constructor -- {@code schema =>
-     * map<type_name, type_definition>}'s own shape -- resolves as a construction, not a reference
-     * (§5.6: "a declaration whose body is a fully-bound application of a constructor... resolves as
-     * a construction"): {@code kind} from the constructor's family ({@code map} composes with
-     * {@code product}, so {@code PRODUCT}), the applied form recorded as {@code source}, the binding
-     * record ({@code !map { key_type: ... value_type: ... }}) as {@code body}, and no supertypes
-     * (construction transfers kind only, §5.5) -- unlike a non-constructor *template* application
-     * (e.g. {@code array_min<T, N>}), which resolves to a {@code REFERENCE} instead (see {@link
-     * #resolveContainerTypeDef}). Only {@code map} with exactly two simple (non-generic) type
-     * arguments is resolved so far; other constructors (record/array/set/tuple/enum/choice) and
-     * nested/value arguments are not attempted yet. The {@code @alias:type_name}-style annotation
-     * §8.3 would add for an aliased argument (here, {@code type_name} itself aliasing {@code token})
-     * is deliberately not produced, same deferral as {@link #resolveTypeRef}.
+     * A declaration whose body is an application that {@code SchemaDesugarer} did not rewrite -- in practice
+     * a <em>template</em> application, since every constructor application is turned into an {@code !C value}
+     * instance before resolution. It resolves to a {@link TypeKind#REFERENCE} entry targeting the application
+     * as written, which is what §5.3's sized-array sugar has always produced for {@code array_min}/{@code
+     * array_max}/{@code array_ranged}. Real §5.10 parameter substitution is unimplemented, so the arguments
+     * are carried rather than applied.
      */
-    private TypeDefinition resolveGenericConstructorApplication(String name, GenericRef generic) {
-        if (!generic.name().equals("map") || generic.args().size() != 2) {
-            throw new UnsupportedOperationException("'" + name + "': only a fully-bound 'map<K, V>' "
-                    + "application is resolved so far, got " + generic);
+    private TypeDefinition resolveTemplateApplication(String name, GenericRef generic) {
+        List<TypeArgument> arguments = new ArrayList<>();
+        for (TypeArg arg : generic.args()) {
+            arguments.add(resolveSimpleTypeArg(name, arg));
         }
-        io.ltr8.tson.schema.meta.TypeRef keyType = resolveSimpleTypeArg(name, generic.args().get(0));
-        io.ltr8.tson.schema.meta.TypeRef valueType = resolveSimpleTypeArg(name, generic.args().get(1));
-
-        io.ltr8.tson.schema.meta.TypeRef source = new io.ltr8.tson.schema.meta.TypeRef("map",
-                List.of(new TypeArgument.Ref(keyType), new TypeArgument.Ref(valueType)));
-
-        return new TypeDefinition(Optional.of(source), TypeKind.PRODUCT, List.of(), false, List.of(),
-                List.of(), Optional.empty(), MapBody.of(keyType, valueType));
+        return TypeDefinition.reference(new io.ltr8.tson.schema.meta.TypeRef(generic.name(), arguments));
     }
 
-    private static io.ltr8.tson.schema.meta.TypeRef resolveSimpleTypeArg(String name, TypeArg arg) {
+    /** A single argument as the {@code type_argument} it denotes -- a reference, or a literal value bound. */
+    private static TypeArgument resolveSimpleTypeArg(String name, TypeArg arg) {
+        if (arg instanceof TypeArg.Value value) {
+            return new TypeArgument.Value(new Token(value.value().text(), Token.Form.UNQUOTED));
+        }
+        return new TypeArgument.Ref(resolveSimpleTypeRefArg(name, arg));
+    }
+
+    private static io.ltr8.tson.schema.meta.TypeRef resolveSimpleTypeRefArg(String name, TypeArg arg) {
         try {
             return resolveSimpleTypeArg(arg);
         } catch (UnsupportedOperationException e) {
@@ -567,56 +553,6 @@ final class DefinitionResolver {
     }
 
     // ── Declaration-level array size sugar (§5.3, §5.10) ──────────────────
-
-    /**
-     * {@code [T; N..]}/{@code [T; ..M]}/{@code [T; N..M]}/{@code [T; N]} desugar to the kernel's
-     * size-refinement templates -- {@code array_min<T, N>}/{@code array_max<T, M>}/{@code
-     * array_ranged<T, N, M>} (the bare-{@code N} form is {@code array_ranged<T, N, N>}, "two
-     * spellings of the same application", §5.3). All three are non-constructor templates, so a
-     * fully-bound application resolves to a {@code REFERENCE}-kind entry (§5.10) -- see {@link
-     * TypeDefinition#reference(io.ltr8.tson.schema.meta.TypeRef)}'s own Javadoc for why {@code
-     * body.target} reuses the application itself rather than a materialised instantiation entry's
-     * name. A size-less declaration-level array ({@code id_list => [text]}) is a top-level
-     * *constructor* application instead (§5.6) -- a different, not-yet-resolved case -- so it's
-     * rejected explicitly here rather than mishandled as a reference.
-     */
-    private TypeDefinition resolveContainerTypeDef(String name, ContainerDef container) {
-        if (!(container instanceof ArrayContainerDef arrayContainer)) {
-            throw new UnsupportedOperationException(
-                    "'" + name + "': only declaration-level array forms are resolved so far, got " + container.getClass().getSimpleName());
-        }
-        if (arrayContainer.size().isEmpty()) {
-            throw new UnsupportedOperationException("'" + name + "': a size-less declaration-level array "
-                    + "is a top-level constructor application (§5.6), not resolved yet");
-        }
-        ElementType elementType = arrayContainer.elementType();
-        if (elementType.optional()) {
-            throw new UnsupportedOperationException("'" + name + "': an OPTIONAL array element is not resolved yet");
-        }
-        if (!(elementType.expr() instanceof ElementType.Expr.Plain plain) || !(plain.typeRef() instanceof SimpleRef elementSimple)) {
-            throw new UnsupportedOperationException(
-                    "'" + name + "': only a simple (non-nested, non-generic) element type is resolved so far: " + elementType);
-        }
-        io.ltr8.tson.schema.meta.TypeRef element = io.ltr8.tson.schema.meta.TypeRef.of(elementSimple.name());
-
-        io.ltr8.tson.schema.meta.TypeRef applied = switch (arrayContainer.size().get()) {
-            case SizeSpec.Min min -> sizeTemplateApplication("array_min", element, min.lower());
-            case SizeSpec.Max max -> sizeTemplateApplication("array_max", element, max.upper());
-            case SizeSpec.Ranged ranged -> sizeTemplateApplication("array_ranged", element, ranged.lower(), ranged.upper());
-            case SizeSpec.Exact exact -> sizeTemplateApplication("array_ranged", element, exact.bound(), exact.bound());
-        };
-        return TypeDefinition.reference(applied);
-    }
-
-    private static io.ltr8.tson.schema.meta.TypeRef sizeTemplateApplication(
-            String templateName, io.ltr8.tson.schema.meta.TypeRef element, String... bounds) {
-        List<TypeArgument> arguments = new ArrayList<>();
-        arguments.add(new TypeArgument.Ref(element));
-        for (String bound : bounds) {
-            arguments.add(new TypeArgument.Value(new Token(bound, Token.Form.UNQUOTED)));
-        }
-        return new io.ltr8.tson.schema.meta.TypeRef(templateName, arguments);
-    }
 
     // ── Composition (§5.8) ────────────────────────────────────────────────
 
@@ -814,7 +750,7 @@ final class DefinitionResolver {
         if (target instanceof GenericRef generic) {
             List<TypeArgument> args = new ArrayList<>();
             for (TypeArg arg : generic.args()) {
-                args.add(new TypeArgument.Ref(resolveSimpleTypeArg(name, arg)));
+                args.add(new TypeArgument.Ref(resolveSimpleTypeRefArg(name, arg)));
             }
             return new io.ltr8.tson.schema.meta.TypeRef(generic.name(), args);
         }

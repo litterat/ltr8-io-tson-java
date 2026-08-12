@@ -32,7 +32,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * and all 13 {@code Instance} declarations the second pass covers (three {@code unit} instances,
  * {@code integer}, {@code text}/{@code uri}/{@code regex}, and six {@code enum} instances,
  * including one -- {@code boolean} -- declared *before* {@code enum} itself in source order)
- * resolve to the expected kind/body -- all 49 of the real fixture's declarations resolve.
+ * resolve to the expected kind/body -- all 49 of the real fixture's declarations resolve, alongside the
+ * nine entries {@link SchemaDesugarer} injects for their argument-bearing applications.
  */
 class MetaKernelBootstrapResolverTest {
 
@@ -123,11 +124,25 @@ class MetaKernelBootstrapResolverTest {
         assertEquals(RegexType.UNCONSTRAINED, regex.body());
     }
 
+    /**
+     * The bootstrap runs {@link SchemaDesugarer} over its own document like every other schema does, so
+     * its output is the 49 declarations the fixture writes plus one injected declaration per distinct
+     * argument-bearing application within them -- {@code enum}'s own {@code members: set<token>} and
+     * eight {@code array<X>} entries from §5.3's {@code [X]} field-type sugar. The nine are the same
+     * nine the linker used to synthesize; producing them here is what leaves the linker with nothing
+     * to materialize (see {@code MetaKernelSchemaRegistryTest}).
+     */
     @Test
-    void allFortyNineRealFixtureDeclarationsNowResolve() {
+    void theFortyNineRealFixtureDeclarationsResolveAlongsideNineDesugaredEntries() {
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
-        assertEquals(49, schema.entries().size());
+        assertEquals(58, schema.entries().size());
+        for (String head : List.of("set_token", "array_tuple_element", "array_field_name", "array_type_ref",
+                "array_type_name", "array_type_argument", "array_param_name", "array_field_group",
+                "array_record_field")) {
+            assertTrue(schema.entries().keySet().stream().anyMatch(name -> name.startsWith(head + "_")),
+                    "expected a desugared entry with head '" + head + "'");
+        }
     }
 
     // ── instanceBody's own defensive branches -- neither reachable through the real fixture ──
