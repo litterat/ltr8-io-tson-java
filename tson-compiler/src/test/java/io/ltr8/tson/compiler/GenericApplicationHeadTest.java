@@ -2,12 +2,22 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
+import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.Token;
+import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonNode;
+
+import java.math.BigInteger;
+
+import java.util.List;
+import java.util.Optional;
+
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -113,11 +123,71 @@ class GenericApplicationHeadTest {
     }
 
     /**
-     * A non-constructor generic head -- a locally declared template. §5.10 parameter substitution is a
-     * separate, unimplemented feature, so the desugar phase cannot rewrite the application; it rejects it
-     * where it is written rather than passing it through. Left alone, this schema linked and compiled and
-     * then failed on the first read that reached the field, with {@code 'T' is referenced but not present in
-     * the schema} -- an error a caller might never provoke.
+     * §5.3's sized sugar, end to end. {@code [text; 1..2]} desugars to {@code array_ranged<text, 1, 2>}, and
+     * {@code array_ranged} is a <em>template</em> (declared without {@code ~}), so it materialises as §8.2's
+     * instantiation entry rather than resolving in place: the body is headed at the nearest {@code ~}
+     * constructor in the source chain, and the template's own supertypes and the flattened application come
+     * through unchanged. Asserted against §8.2's own worked example shape.
+     */
+    @Test
+    void sizedSugarMaterializesTheInstantiationEntrySpecifiedByEightTwo() {
+        TsonCompiledSchema compiled = compile("""
+                  tag_list => [text; 1..2]
+                  holder => { tags: tag_list }""");
+
+        TypeDefinition entry = compiled.schema().entries().get("tag_list");
+        assertEquals(TypeKind.PRODUCT, entry.kind(), "the template's kind");
+        assertEquals(List.of(), entry.parameters(), "closed -- §5.10");
+        assertEquals(List.of("array", "product", "top"), entry.supertypes(),
+                "the template's supertypes, unchanged by substitution -- a closure of array_ranged IS-A array");
+        assertEquals(new TypeRef("array_ranged", List.of(
+                        new TypeArgument.Ref(TypeRef.of("text")),
+                        new TypeArgument.Value(new Token("1", Token.Form.UNQUOTED)),
+                        new TypeArgument.Value(new Token("2", Token.Form.UNQUOTED)))),
+                entry.source().orElseThrow(), "the flattened fully-bound application");
+
+        // !array { element_type: text  min_items: 1  max_items: 2 } -- only the parameter-routed fields; the
+        // vocabulary's own defaults (state/unordered/unique_items) stay out of the binding record (§5.6).
+        ArrayBody body = assertInstanceOf(ArrayBody.class, entry.body());
+        assertEquals(TypeRef.of("text"), body.elementType());
+        assertEquals(Optional.of(BigInteger.ONE), body.minItems());
+        assertEquals(Optional.of(BigInteger.TWO), body.maxItems());
+    }
+
+    /** And the bounds are live: the instantiation is a real array body, so the compiled reader enforces them. */
+    @Test
+    void aSizedArraysBoundsAreEnforcedWhenReading() {
+        TsonCompiledSchema compiled = compile("""
+                  tag_list => [text; 1..2]
+                  holder => { tags: tag_list }""");
+
+        assertNotNull(compiled.get("holder").read("{ tags: [\"a\" \"b\"] }"));
+        assertTrue(assertThrows(TsonReadException.class,
+                () -> compiled.get("holder").read("{ tags: [] }")).getMessage().contains("minimum 1"));
+        assertTrue(assertThrows(TsonReadException.class,
+                () -> compiled.get("holder").read("{ tags: [\"a\" \"b\" \"c\"] }")).getMessage().contains("maximum 2"));
+    }
+
+    /**
+     * §8.2 defers a family coherence rule whose operands were parameters until substitution makes them
+     * concrete, and requires "a resolver error reported at the materialising application". {@code min <= max}
+     * (§5.3) is the rule the kernel's own templates route parameters into, and the sugar is how an author
+     * reaches it.
+     */
+    @Test
+    void aSizedArrayWhoseBoundsCannotBeSatisfiedIsAResolverError() {
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> compile("  impossible => [text; 5..3]"));
+
+        assertTrue(thrown.getMessage().contains("min_items 5 above max_items 3"), thrown.getMessage());
+    }
+
+    /**
+     * A non-constructor generic head -- a locally declared <em>record</em> template. Unlike the size
+     * templates above, its parameter appears as a <em>field type</em> ({@code v: T}), so instantiating it
+     * means rewriting the body rather than routing arguments into a constructor's vocabulary -- genuine
+     * §5.10 substitution, still unimplemented. The desugar phase rejects it where it is written; left alone,
+     * this schema linked and compiled and then failed on the first read that reached the field.
      */
     @Test
     void applyingALocallyDeclaredTemplateIsRejectedWhereItIsWritten() {

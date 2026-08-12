@@ -292,18 +292,24 @@ substitution, which this phase does not answer.
   than the ones someone hand-wrote an assembler for.
 - **The head is looked up in the structure namespace only** (the governing meta's entries) and must be
   `constructor: true` with matching arity. The precedence/shadowing consequences are `SPEC-FEEDBACK.md` #28.
-- **Applying a *template* — a parameterized non-constructor — is rejected here**
-  (`UnsupportedOperationException`), since §5.10 substitution is unimplemented and there is no rewrite to
-  perform. Both namespaces a template can live in are checked: a head this document declares (via its
-  grammar-layer `TypeDef`, the only place its parameters exist this early) and a head in the structure
-  namespace (via its resolved definition — a generic head is a §3.3.1 constructor role, so a non-constructor
-  entry with parameters sitting there is a template reached the same way). **This is what makes sized sugar
-  report its actual gap**: `[T; 1..5]` desugars to `array_ranged<T, 1, 5>`, `array_ranged` is a *template*
-  (declared without `~`), and it was reaching the linker as a body reference validated against the type-name
-  namespace only (§3.3.2), failing as `unresolved reference 'array_ranged'` — which reads as a missing name.
-  The name isn't missing: meta.tn carries it, flattened in from its own `!!import` of the meta-kernel.
-  Substitution is what's missing. Still uncaught: a template declared by an `!!import`, which would need the
-  imported entries' resolved definitions rather than the name set the phase takes.
+- **A template application over a constructor is instantiated** (§8.2's one materialising form). §5.3's
+  sized sugar is the case that matters: `[T; 1..5]` → `array_ranged<T, 1, 5>`, and `array_ranged` is a
+  template (declared without `~`) whose resolved vocabulary carries the same `value_param` channels a
+  constructor's does — so the *same* routing code handles it, with one difference: the emitted binding record
+  is headed at the nearest `~` constructor in the source chain (`!array`, §5.6), not at the template. The
+  result is a `TemplateInstance` AST node — no surface syntax corresponds to it — which `DefinitionResolver`
+  completes with the two things a construction doesn't carry: §8.2's `source` (the flattened application) and
+  the template's supertypes, unchanged, which is what makes a sized array IS-A `array`. §8.2's deferred
+  `min_items <= max_items` check runs here too, at the materialising application.
+- **Applying a *record* template is still rejected here**
+  (`UnsupportedOperationException`) — `box => <T> { v: T }` puts its parameter in a *field type*, so
+  instantiating it means rewriting the body, which is real §5.10 substitution and unimplemented. Rejecting at
+  the application site beats the alternative: passing it through produced a schema that linked, compiled, and
+  then failed on the first read reaching the field. Both namespaces a template can live in are checked — a
+  head this document declares (via its grammar-layer `TypeDef`, the only place its parameters exist this
+  early) and one in the structure namespace (via its resolved definition). Still uncaught: a template
+  declared by an `!!import`, which needs the imported entries' resolved definitions rather than the name set
+  the phase takes.
 - **Bottom-up, so nesting needs no special case:** an inner application is hoisted first and the outer one
   is built from the already-flattened name (`map<text, [integer]>` works at any depth). The injected name
   is `head_args_hash`, derived from the application itself, so two structurally identical applications
@@ -780,9 +786,10 @@ compatibility).
   restated in a refinement body, the identity-diagonal FIXED-value invariant, a generic type-ref whose
   argument is nested or a value rather than a plain name. `DefinitionResolver`'s Javadoc is the exact
   current boundary.
-- **§5.10 template application** — a generic head naming a *constructor* is desugared into a real
-  declaration; one naming a locally declared parameterized template (`box<text>`) is *rejected* at desugar
-  time rather than substituted. Real parameter substitution is in `BACKLOG.md`.
+- **§5.10 parameter substitution into a template *body*** — a template that refines a constructor
+  (`array_ranged`, and so §5.3's sized sugar) instantiates via argument routing; a *record* template
+  (`box => <T> { v: T }`), whose parameter is a field type, is rejected at the application site instead.
+  `BACKLOG.md` has the shape of the remaining work.
 - **Undocumented atom constructors** — `unknown`/`email`/`cidr4`/`cidr6`/`mac` (and `extern`, which has no
   core.tn declaration) have no compiled-parser factory, so they compile to `ErrorReader` (a schema merely
   *declaring* one still compiles). `complex`/`ipv4`/`ipv6` do have parsers.

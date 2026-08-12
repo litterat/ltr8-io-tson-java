@@ -15,6 +15,11 @@ package io.ltr8.tson.compiler.ast.schema;
  *   <li>{@link ContainerTypeDef} -- {@code [type-params] container-def} (§5.3, declaration-level array/tuple)</li>
  *   <li>{@link ReferenceTypeDef} -- {@code [type-params] type-ref} (§8.3, a plain reference or inline sugar)</li>
  * </ul>
+ *
+ * <p>{@link TemplateInstance} is the one variant with no ABNF alternative behind it: §8.2's materialised
+ * template instantiation has no surface syntax, and is synthesised by {@code SchemaDesugarer} rather than
+ * parsed.
  */
-public sealed interface TypeDef permits AtomRefinement, Instance, StructuralTypeDef, ContainerTypeDef, ReferenceTypeDef {
+public sealed interface TypeDef
+        permits AtomRefinement, Instance, StructuralTypeDef, ContainerTypeDef, ReferenceTypeDef, TemplateInstance {
 }

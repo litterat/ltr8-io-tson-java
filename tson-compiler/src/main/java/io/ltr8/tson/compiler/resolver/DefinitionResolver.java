@@ -18,6 +18,7 @@ import io.ltr8.tson.compiler.ast.schema.GenericRef;
 import io.ltr8.tson.compiler.ast.schema.GroupDef;
 import io.ltr8.tson.compiler.ast.schema.InlineArrayRef;
 import io.ltr8.tson.compiler.ast.schema.Instance;
+import io.ltr8.tson.compiler.ast.schema.TemplateInstance;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.RecordEntry;
 import io.ltr8.tson.compiler.ast.schema.RefinedDef;
@@ -282,6 +283,9 @@ final class DefinitionResolver {
         // array into its array_min/array_max/array_ranged application (§5.3), a size-less one into the
         // `!array { ... }` construction it denotes (§5.6). Anything still here is a shape that phase does
         // not build (a tuple container, an optional or nested element) and falls through below.
+        if (typeDef instanceof TemplateInstance template) {
+            return resolveTemplateInstance(name, template);
+        }
         if (typeDef instanceof Instance instance) {
             return resolveInstance(name, instance);
         }
@@ -292,6 +296,36 @@ final class DefinitionResolver {
                 "'" + name + "': only fresh record constructions, composition, simple type references, "
                         + "declaration-level sized arrays, constructor application, and atom refinement are "
                         + "resolved so far, got " + typeDef.getClass().getSimpleName());
+    }
+
+    /**
+     * A materialised template instantiation (§8.2). The substituted binding record resolves as the ordinary
+     * construction it is -- {@code SchemaDesugarer} already headed it at the nearest {@code ~} constructor in
+     * the source chain (§5.6) -- and the two components a construction does not carry are recovered from the
+     * template's own entry: {@code source} is the flattened application, and {@code supertypes} are the
+     * template's, "unchanged by substitution".
+     *
+     * <p>Those supertypes are the reason this is not just an {@link Instance}. A closure of {@code
+     * array_ranged} IS-A {@code array} (§5.3), so it is substitutable where an array is expected and the
+     * linker's own reverse index credits it as a subtype; §5.5 gives a plain construction only its target's
+     * kind, which would drop that. {@code parameters} is empty because the entry is closed (§5.10).
+     */
+    private TypeDefinition resolveTemplateInstance(String name, TemplateInstance instantiation) {
+        TypeDefinition template = metaDefinitions.getTypeDefinition(instantiation.template());
+        if (template == null) {
+            throw new IllegalStateException("'" + name + "': template '" + instantiation.template()
+                    + "' is not in the structure namespace -- SchemaDesugarer only builds an instantiation "
+                    + "for a template it found there");
+        }
+        TypeDefinition construction = resolveInstance(name, instantiation.body());
+        List<TypeArgument> arguments = new ArrayList<>();
+        for (TypeArg argument : instantiation.application().args()) {
+            arguments.add(resolveSimpleTypeArg(name, argument));
+        }
+        io.ltr8.tson.schema.meta.TypeRef source =
+                new io.ltr8.tson.schema.meta.TypeRef(instantiation.template(), arguments);
+        return new TypeDefinition(Optional.of(source), template.kind(), List.of(), false,
+                template.supertypes(), List.of(), Optional.empty(), construction.body());
     }
 
     // ── Constructor application (§5.5, §5.6) ────────────────────────────────

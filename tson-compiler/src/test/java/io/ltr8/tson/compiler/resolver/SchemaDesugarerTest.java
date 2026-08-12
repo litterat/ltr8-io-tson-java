@@ -7,6 +7,7 @@ import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.ast.schema.SimpleRef;
+import io.ltr8.tson.compiler.ast.schema.TemplateInstance;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -23,6 +24,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -265,28 +267,28 @@ class SchemaDesugarerTest {
 
     /**
      * §5.3's sized sugar targets {@code array_ranged}, which the meta-kernel declares as a <em>template</em>
-     * (no {@code ~}), so a sized array is a template application like any other and is rejected the same way.
-     * Its head lives in the structure namespace rather than this document, which is the second of the two
-     * namespaces the check consults.
+     * (no {@code ~}), so a sized array materialises as §8.2's instantiation entry. Its head lives in the
+     * structure namespace rather than this document, and the emitted body is headed at {@code array} -- the
+     * nearest {@code ~} constructor in the template's source chain (§5.6), not at the template itself.
      *
-     * <p>This is what the rejection buys concretely. Before it, the rewritten application reached the linker
-     * as a body reference to {@code array_ranged}, validated against the type-name namespace only (§3.3.2),
-     * and failed as {@code unresolved reference 'array_ranged'} -- which reads as though the name is missing.
-     * It is not: meta.tn carries it, flattened in from its own {@code !!import} of the meta-kernel. What is
-     * missing is substitution.
+     * <p>Routing is the same mechanism a constructor application uses, because the template's resolved
+     * vocabulary carries the same {@code value_param} channels: {@code element_type} from {@code T}, {@code
+     * min_items} from {@code MIN}, {@code max_items} from {@code MAX}. Nothing here knows what an array is.
      */
     @Test
-    void sizedSugarAgainstARealMetaIsRejectedAsTheTemplateApplicationItIs() {
+    void sizedSugarAgainstARealMetaInstantiatesTheTemplateOntoItsConstructor() {
         SchemaDocument document = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 { tags => [text; 1..5] }""").parseSchemaDocument();
         Map<String, TypeDefinition> realMeta = MetaKernelBootstrapResolver.getMetaKernelSchema().entries();
 
-        UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
-                () -> SchemaDesugarer.desugar(document, realMeta, Set.of()));
-        assertTrue(thrown.getMessage().contains("'array_ranged' is a parameterized template"),
-                thrown.getMessage());
-        assertTrue(thrown.getMessage().contains("[T, MIN, MAX]"), thrown.getMessage());
+        SchemaDocument desugared = SchemaDesugarer.desugar(document, realMeta, Set.of());
+
+        TemplateInstance instantiation = assertInstanceOf(TemplateInstance.class,
+                desugared.body().declarations().get("tags").typeDef());
+        assertEquals("array_ranged", instantiation.template(), "the application is kept for §8.2's source");
+        assertEquals("array", instantiation.body().target(), "headed at the nearest ~ constructor");
+        assertEquals("{ element_type: text  min_items: 1  max_items: 5 }", instanceBody(instantiation.body()));
     }
 
     /**

@@ -41,6 +41,8 @@ import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Unit;
 import io.ltr8.tson.schema.meta.UnknownType;
+import io.ltr8.tson.schema.meta.Token;
+import io.ltr8.tson.schema.meta.TypeArgument;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -54,6 +56,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -440,15 +443,63 @@ class DefinitionResolverTest {
                 write(typeRefDef));
     }
 
-    // ── Declaration-level sized-array sugar (§5.3, §5.10) ──
-    //    The spelling rewrite ([T; N..M] -> array_ranged<T, N, M> and friends) is SchemaDesugarerTest's;
-    //    resolving the result is not tested here because it cannot happen -- array_min/array_max/
-    //    array_ranged are templates, and SchemaDesugarer rejects a template application outright, so no
-    //    sized form ever reaches this resolver. See SchemaDesugarerTest for both halves.
+    // ── Declaration-level sized-array sugar (§5.3, §8.2) ──
+    //    SchemaDesugarer rewrites the spelling and routes the arguments (SchemaDesugarerTest owns both);
+    //    what arrives here is a TemplateInstance, and what this covers is the entry §8.2 requires it to
+    //    become. GenericApplicationHeadTest drives the same forms through the real meta.tn/core.tn chain.
 
+    /**
+     * §8.2's own worked example, one bound apart: {@code [pixel; 1920]} is {@code array_ranged<pixel, 1920,
+     * 1920>}, materialising to a closed PRODUCT whose {@code source} is the flattened application, whose
+     * supertypes are the template's unchanged, and whose body is headed at the nearest {@code ~} constructor.
+     */
     @Test
-    void rejectsASizeLessDeclarationLevelArrayAsAConstructorApplicationNotYetResolved() {
-        assertThrows(UnsupportedOperationException.class, () -> resolveSnippet("id_list => [text]"));
+    void resolvesASizedArrayToTheInstantiationEntryEightTwoSpecifies() {
+        TypeDefinition frame = resolveSnippet("frame => [text; 1920]");
+
+        assertEquals(TypeKind.PRODUCT, frame.kind());
+        assertEquals(List.of(), frame.parameters());
+        assertEquals(List.of("array", "product", "top"), frame.supertypes());
+        assertEquals(new TypeRef("array_ranged", List.of(
+                        new TypeArgument.Ref(TypeRef.of("text")),
+                        new TypeArgument.Value(new Token("1920", Token.Form.UNQUOTED)),
+                        new TypeArgument.Value(new Token("1920", Token.Form.UNQUOTED)))),
+                frame.source().orElseThrow());
+
+        ArrayBody body = assertInstanceOf(ArrayBody.class, frame.body());
+        assertEquals(TypeRef.of("text"), body.elementType());
+        assertEquals(Optional.of(new BigInteger("1920")), body.minItems());
+        assertEquals(Optional.of(new BigInteger("1920")), body.maxItems());
+    }
+
+    /** The three spellings all land on the same shape -- only which bound each supplies differs (§5.3). */
+    @Test
+    void theOpenEndedSpellingsRouteToArrayMinAndArrayMax() {
+        ArrayBody atLeast = assertInstanceOf(ArrayBody.class, resolveSnippet("score_list => [integer; 1..]").body());
+        assertEquals(Optional.of(BigInteger.ONE), atLeast.minItems());
+        assertEquals(Optional.empty(), atLeast.maxItems());
+
+        ArrayBody atMost = assertInstanceOf(ArrayBody.class, resolveSnippet("recent => [text; ..5]").body());
+        assertEquals(Optional.empty(), atMost.minItems());
+        assertEquals(Optional.of(new BigInteger("5")), atMost.maxItems());
+    }
+
+    /**
+     * A <em>size-less</em> declaration-level array takes the other path: {@code [text]} is a plain {@code
+     * array<text>}, a constructor application, which §8.2 says never materialises an entry and §5.6 says
+     * resolves in place as a construction. So it lands on the same {@code ArrayBody} as its sized sibling
+     * but, per §5.5, carries no supertypes -- {@code id_list} is not IS-A {@code array} while {@code
+     * [text; 1..2]} is. That asymmetry is the spec's, not this implementation's; see {@code
+     * SPEC-FEEDBACK.md}.
+     */
+    @Test
+    void aSizeLessDeclarationLevelArrayIsAConstructionWithNoSupertypes() {
+        TypeDefinition idList = resolveSnippet("id_list => [text]");
+
+        assertEquals(TypeKind.PRODUCT, idList.kind());
+        assertEquals(List.of(), idList.supertypes());
+        assertEquals(TypeRef.of("array"), idList.source().orElseThrow());
+        assertEquals(TypeRef.of("text"), assertInstanceOf(ArrayBody.class, idList.body()).elementType());
     }
 
     // ── An application DefinitionResolver still sees (§5.10) ─────────────
@@ -1420,13 +1471,23 @@ class DefinitionResolverTest {
      * resolving a shape the pipeline never produces -- and these tests assert the resulting {@link
      * TypeDefinition}, which the move did not change.
      */
+    /**
+     * Desugars and resolves one declaration against the real meta-kernel as its structure namespace. Both
+     * phases get the *same* namespace, as {@code SchemaResolver} gives them in production -- a §8.2
+     * instantiation is built by one and completed by the other (the desugarer routes the arguments, the
+     * resolver recovers the template's supertypes), so a resolver looking at a different meta than the
+     * desugarer did would fail loudly rather than quietly resolve something else. The compiled form is
+     * needed because the binding record the desugarer emits is bound through the meta's own reader, the
+     * same as any other {@code !C value}.
+     */
     private TypeDefinition resolveSnippet(String declaration) {
         SchemaDocument document = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 { %s }""".formatted(declaration)).parseSchemaDocument();
-        SchemaMap schemaMap = SchemaDesugarer.desugar(document,
-                MetaKernelBootstrapResolver.getMetaKernelSchema().entries(), Set.of()).body();
-        return resolver.resolve(schemaMap.declarations().get(declaration.split("=>")[0].trim()));
+        TsonCompiledMetaSchema metaKernel = metaKernelCompiled();
+        SchemaMap schemaMap = SchemaDesugarer.desugar(document, metaKernel.schema().entries(), Set.of()).body();
+        return definitionResolverFor(metaKernel, resolved::get)
+                .resolve(schemaMap.declarations().get(declaration.split("=>")[0].trim()));
     }
 
     @Test

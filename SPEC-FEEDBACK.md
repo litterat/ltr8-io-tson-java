@@ -1406,3 +1406,89 @@ If the split is deliberate and meant to stay, then §12.1 should at least say *w
 rather than only how to disambiguate them, since on the evidence of the notes the answer is "so that
 `type-ref` cannot reach the size specifier" — which a note on one production expresses more directly.
 
+---
+
+## 32. §8.2 requires a template instantiation to keep supertypes that §3.3.2 puts out of reach of the schema carrying it
+
+**Section:** [TSON-SCHEMA] §8.2 (*Entry shape*), §3.3.2 (type-name namespace), §3.3.1 (constructor roles).
+
+**Problem:** §8.2 is explicit about what a materialised instantiation carries:
+
+> `supertypes`: the template's supertypes, unchanged by substitution (§8.1)
+
+For the kernel's own size templates that chain begins at the constructor being refined. `array_ranged =>
+<T, MIN, MAX> array<T> ^ { … }` resolves with `supertypes: [array, product, top]`, and §8.2's own worked
+example shows the instantiation carrying exactly that list. So a user schema writing `tag_list =>
+[text; 1..2]` materialises an entry naming `array`, `product` and `top`.
+
+None of those three is in that schema's type-name namespace. §3.3.2 is equally explicit that the type-name
+namespace is "NOT extended by the structure namespace", and §3.3.1's constructor roles — where the structure
+namespace *is* consulted — are author-written positions: constructor-application targets, generic-application
+heads, sugar desugar targets, refinement sources. A supertype on a resolved entry is none of those. It is not
+author-written at all; it is the residue of one, produced by substitution.
+
+So a conforming resolver following §8.2 produces an entry that a conforming validator following §3.3.2
+rejects, in the ordinary case of an ordinary schema using the spec's own sugar. The two rules never meet in
+the text: §8.2 does not say the supertypes remain resolvable, and §3.3.2 does not exempt derived references.
+
+**Not merely theoretical, and not confined to the kernel.** Any refinement template over a constructor has
+this shape, so any schema layer that publishes such templates hands the same problem to every schema that
+applies them. It is also invisible until instantiation exists: a *constructor* application (`set<text>`)
+resolves in place as a construction, and §5.5 gives a construction only its target's kind — no supertypes, so
+nothing to fail on.
+
+**Interpretation chosen:** A supertype reference gets the structure-namespace fallback, the same one `source`
+already has and for the same reason — it is derived from a §3.3.1 role rather than written at one.
+Implemented in `TsonSchemaLinker.validateEntry`. The fallback deliberately admits the whole structure
+namespace rather than only its constructors: a transitive chain runs past the constructor into the base kinds
+(`product`, `top`), which are ordinary non-constructor entries, so a constructors-only rule rejects the very
+example §8.2 prints.
+
+**Suggested resolution:** State which namespace a resolved entry's derived references are checked against.
+The cleanest reading is that §3.3.2 governs *author-written* type references — what a schema may name — while
+resolver output is checked against whatever the entry was derived from, since by construction those names
+were reachable at the point of derivation. Saying so once would also settle `source`, which has the identical
+shape and today is only reachable by the same unstated reasoning.
+
+---
+
+## 33. A sized array IS-A `array`; the same array without a size specifier is not
+
+**Section:** [TSON-SCHEMA] §5.3, §5.5, §5.6, §8.2.
+
+**Problem:** The two spellings of a declaration-level array take different resolution paths, and the paths
+disagree about subtyping:
+
+```
+id_list  => [text]        ; array<text>  -- a constructor application
+tag_list => [text; 1..2]  ; array_ranged<text, 1, 2>  -- a template application
+```
+
+`id_list` is a **construction**: §8.2 says "constructor applications never materialise entries… as declaration
+bodies, resolve in place as constructions (§5.6)", and §5.5 says construction "transfers only the
+constructor's kind" — no supertypes. `tag_list` is a **template instantiation**: §8.2 requires "the template's
+supertypes, unchanged", and `array_ranged` refines `array<T>`, so the entry IS-A `array`.
+
+Both denote an array of text. One is a subtype of `array` and the other is not, decided entirely by whether
+the author wrote a size specifier. Nothing in §5.3 suggests adding a bound changes an array's place in the
+type hierarchy, and §5.3 argues the opposite when it explains why the size templates are declared without
+`~`: "their closures are ordinary members of the array family, IS-A `array` and substitutable where arrays
+are expected." The unsized form is the one that fails that description.
+
+This is observable wherever IS-A is: `subtypes` (§8.1), substitutability, and §5.4's disjointness derivation,
+which uses IS-A to prove two variants are *not* disjoint — so `(id_list | text)` and `(tag_list | text)` can
+be classified differently for no reason an author would recognise.
+
+**Interpretation chosen:** Implemented as written — the size-less form resolves to a construction with no
+supertypes, the sized form to an instantiation carrying `[array, product, top]`. Pinned by
+`DefinitionResolverTest.aSizeLessDeclarationLevelArrayIsAConstructionWithNoSupertypes` and
+`GenericApplicationHeadTest.sizedSugarMaterializesTheInstantiationEntrySpecifiedByEightTwo` so the asymmetry
+is visible rather than incidental.
+
+**Suggested resolution:** Decide whether a construction establishes IS-A with the constructor it applies.
+Saying it does would make both spellings agree and cost little — the constructor is known at the point of
+construction, so its own supertype chain is available — and it would let §5.4 treat every closure of a
+constructor uniformly. If it genuinely should not (the reading that construction is *fresh*, §4.1), then
+§5.3's "IS-A `array` and substitutable where arrays are expected" claim needs qualifying, because it holds
+only for the sugar-declared sizes and not for the plain `[T]` sitting beside them.
+

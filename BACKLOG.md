@@ -194,30 +194,36 @@ own prose (which had gone stale on at least one of them):
     general annotation gathering** (below): the `@disjoint` marker is parsed (it's in the AST as one of
     `SchemaMap.Declaration`'s annotation lists) but dropped at resolution, so the linker's disjointness
     pass never sees it. It needs the declaration's annotations available where `disjoint` is known.
-- [ ] **Template application (§5.10) has no parameter substitution.** A generic head naming a real
-  constructor is handled — `SchemaDesugarer` rewrites `map<text, X>` into a declaration plus a reference
-  before resolution, uniformly for every constructor. A head naming a **local parameterized template**
-  (`box => <T> { v: T }`, then `box<text>`) is *rejected* at the application site, because substituting
-  `T` is a genuine missing feature rather than a rewrite. The rejection is done; substitution is not.
-  - Substitution belongs in the same phase: it is the same shape of work — rewrite an application into a
-    declaration — differing only in that the body comes from the template's own AST with parameters
-    replaced, rather than from a constructor's vocabulary. Implementing it deletes
-    `SchemaDesugarer.rejectIfTemplateApplication`.
-  - **§5.3's sized sugar is the same feature.** `[T; N..M]` desugars to `array_ranged<T, N, M>`, and the
-    meta-kernel declares `array_ranged`/`array_min`/`array_max` without `~` — templates, not constructors.
-    So no sized array works either, and implementing substitution is what makes `[text; 1..5]` usable.
-  - **The rejection is narrower than the feature.** A head declared by the current document or present in
-    the structure namespace is caught; a template declared by an **`!!import`** still slips through to the
-    old read-time failure, because catching it needs the imported entries' resolved definitions rather
-    than the name set the phase currently takes. Worth closing when substitution lands, if not before.
+- [ ] **§5.10 substitution into a template *body*.** Half of template application works. A template that
+  refines a constructor — `array_ranged => <T, MIN, MAX> array<T> ^ { min_items: = MIN  max_items: = MAX }`,
+  and therefore §5.3's sized sugar — instantiates per §8.2, because its resolved vocabulary carries the same
+  `value_param` channels a constructor's does, so the arguments route by the same mechanism and the binding
+  record is headed at the nearest `~` constructor. What is left is a template whose parameter appears as a
+  **field type** (`box => <T> { v: T }`): instantiating that means rewriting the body with `T` replaced,
+  which is substitution proper. Rejected at the application site today
+  (`SchemaDesugarer.rejectIfTemplateApplication`), so it fails where it is written rather than at a read
+  that may never happen.
+  - Belongs in the same phase, as another `TemplateInstance`-producing path: the body comes from the
+    template's own AST with parameters replaced, rather than from a vocabulary.
   - **Requires a termination guard.** Non-regular (polymorphic) recursion like
     `weird => <T> { next: weird<[T]>? }` / `use => weird<text>` grows its argument every level
     (`text` → `[text]` → `[[text]]` …). Every instantiation is structurally distinct, so the
     dedup-by-derived-name never fires and the walk never terminates. Distinct from `SPEC-FEEDBACK.md` #25
     (non-*productive* recursion — no finite *data* model): this is no finite *type* model.
+  - **The rejection is narrower than the feature.** A head declared by the current document or present in
+    the structure namespace is caught; a template declared by an **`!!import`** still slips through to the
+    old read-time failure, because catching it needs the imported entries' resolved definitions rather
+    than the name set the phase currently takes. Worth closing when substitution lands, if not before.
   - The scoping questions around generic heads — how precedence is worded, silent cross-namespace
     shadowing, whether parameters are eligible at a head, and when the `constructor: true` gate applies —
     are `SPEC-FEEDBACK.md` #28, which also records the answers this implementation currently gives.
+- [ ] **The rest of §8.2's deferred value-level checks.** Materialisation "runs the value-level checks that
+  open bounds deferred: family coherence rules whose operands were parameters". The array family's
+  `min_items <= max_items` is done, in `SchemaDesugarer.checkBounds`, because it is the only rule the
+  kernel's own templates route parameters into and the sugar (`[T; 5..3]`) is how an author reaches it. The
+  kin §8.2 gestures at — "bounds within a width-derived range, and their kin" — belong with the constraint
+  families that own them, next to `AtomNarrowing`, not in a syntax rewrite. Doing that properly probably
+  means the check moves out of the desugarer entirely and `checkBounds` goes with it.
 - [ ] **General annotation gathering — carry declaration annotations through resolution into the
   resolved model.** Author annotations on a schema declaration (`@disjoint`, `@doc`, `@alias`, §6) are
   parsed and reach the AST (`SchemaMap.Declaration` carries `nameAnnotations` and `typeDefAnnotations`),

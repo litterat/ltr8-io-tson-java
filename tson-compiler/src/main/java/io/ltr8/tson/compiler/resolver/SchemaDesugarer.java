@@ -28,13 +28,16 @@ import io.ltr8.tson.compiler.ast.schema.SizeSpec;
 import io.ltr8.tson.compiler.ast.schema.StructuralDef;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.compiler.ast.schema.TupleContainerDef;
+import io.ltr8.tson.compiler.ast.schema.TemplateInstance;
 import io.ltr8.tson.compiler.ast.schema.TypeArg;
 import io.ltr8.tson.compiler.ast.schema.TypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeRef;
+import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -175,16 +178,21 @@ final class SchemaDesugarer {
                 // A size-less declaration-level array IS a top-level constructor application (§5.6), so it
                 // becomes the instance directly. The sized forms desugar to array_min/array_max/array_ranged,
                 // which are templates rather than constructors, and stay on their existing path.
-                Optional<Instance> instance = declarationLevelArray(container.container());
+                Optional<TypeDef> instance = declarationLevelArray(container.container());
                 if (instance.isPresent()) {
                     yield instance.get();
                 }
                 Optional<GenericRef> sized = sizedArrayApplication(container.container());
                 if (sized.isPresent()) {
-                    // The size templates are reached the same way any other head is, so they are subject to
-                    // the same check -- this is the one path that builds an application rather than finding one.
-                    rejectIfTemplateApplication(sized.get().name());
-                    yield new ReferenceTypeDef(List.of(), sized.get());
+                    // The application this stands for is instantiated like any other (§8.2): array_ranged and
+                    // its siblings are templates, so this yields a TemplateInstance headed at `array`.
+                    GenericRef application = sized.get();
+                    Optional<TypeDef> instantiation = instanceFor(application.name(), application.args());
+                    if (instantiation.isPresent()) {
+                        yield instantiation.get();
+                    }
+                    rejectIfTemplateApplication(application.name());
+                    yield new ReferenceTypeDef(List.of(), application);
                 }
                 ContainerDef def = containerDef(container.container());
                 yield def == container.container() ? container
@@ -201,7 +209,7 @@ final class SchemaDesugarer {
                 // it becomes the instance itself rather than a reference to an injected one -- which is what
                 // keeps `x => map<K, V>` a PRODUCT with a real body instead of a REFERENCE to one.
                 if (ref instanceof GenericRef generic) {
-                    Optional<Instance> instance = instanceFor(generic.name(), generic.args());
+                    Optional<TypeDef> instance = instanceFor(generic.name(), generic.args());
                     if (instance.isPresent()) {
                         yield instance.get();
                     }
@@ -324,7 +332,7 @@ final class SchemaDesugarer {
      * A size-less declaration-level array as its own constructor application, or empty for anything this
      * does not build -- a tuple container, a sized array, an optional element, or a non-plain element.
      */
-    private Optional<Instance> declarationLevelArray(ContainerDef def) {
+    private Optional<TypeDef> declarationLevelArray(ContainerDef def) {
         if (!(def instanceof ArrayContainerDef array) || array.size().isPresent()
                 || array.elementType().optional()
                 || !(array.elementType().expr() instanceof ElementType.Expr.Plain plain)) {
@@ -393,7 +401,7 @@ final class SchemaDesugarer {
      * downstream handling rather than being turned into a differently-broken shape here.
      */
     private TypeRef apply(String head, List<TypeArg> args, TypeRef unexpanded) {
-        Optional<Instance> instance = instanceFor(head, args);
+        Optional<TypeDef> instance = instanceFor(head, args);
         if (instance.isEmpty()) {
             rejectIfTemplateApplication(head);
             return unexpanded;
@@ -467,11 +475,16 @@ final class SchemaDesugarer {
      * name. Each of those keeps its existing downstream handling rather than being turned into a differently
      * broken shape here.
      */
-    private Optional<Instance> instanceFor(String head, List<TypeArg> args) {
-        TypeDefinition constructor = metaEntries.get(head);
-        if (constructor == null || !constructor.constructor()
-                || !(constructor.body() instanceof RecordBody vocabulary)
-                || constructor.parameters().size() != args.size()) {
+    private Optional<TypeDef> instanceFor(String head, List<TypeArg> args) {
+        TypeDefinition applied = metaEntries.get(head);
+        if (applied == null || !(applied.body() instanceof RecordBody vocabulary)
+                || applied.parameters().size() != args.size()) {
+            return Optional.empty();
+        }
+        // A template heads its binding record at the nearest `~` constructor in its source chain (§5.6), not
+        // at itself; a constructor heads its own.
+        String constructorHead = applied.constructor() ? head : nearestConstructor(applied);
+        if (constructorHead == null) {
             return Optional.empty();
         }
         List<RecordValue.Field> fields = new ArrayList<>();
@@ -480,7 +493,7 @@ final class SchemaDesugarer {
             if (parameter.isEmpty()) {
                 continue; // a fixed or defaulted vocabulary field -- the reader supplies it
             }
-            int index = constructor.parameters().indexOf(parameter.get());
+            int index = applied.parameters().indexOf(parameter.get());
             if (index < 0) {
                 return Optional.empty();
             }
@@ -494,7 +507,64 @@ final class SchemaDesugarer {
         if (fields.isEmpty()) {
             return Optional.empty();
         }
-        return Optional.of(new Instance(new DataValue(List.of(), Optional.of(head), new RecordValue(fields))));
+        Instance body = new Instance(
+                new DataValue(List.of(), Optional.of(constructorHead), new RecordValue(fields)));
+        if (applied.constructor()) {
+            return Optional.of(body);
+        }
+        checkBounds(head, fields);
+        return Optional.of(new TemplateInstance(new GenericRef(head, args), body));
+    }
+
+    /**
+     * The nearest {@code ~} constructor in a template's source chain (§5.6) -- {@code array} for {@code
+     * array_ranged}, whose supertypes are {@code [array, product, top]} in IS-A order, so the first entry
+     * that is itself a constructor is the nearest one. {@code null} when the chain reaches none, which leaves
+     * the application unexpanded rather than guessing a head.
+     */
+    private String nearestConstructor(TypeDefinition template) {
+        for (String supertype : template.supertypes()) {
+            TypeDefinition candidate = metaEntries.get(supertype);
+            if (candidate != null && candidate.constructor()) {
+                return supertype;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * §8.2's deferred value-level check: a family coherence rule whose operands were parameters is verified
+     * once substitution makes them concrete, and a violation is "a resolver error reported at the
+     * materialising application". The array family's {@code min_items <= max_items} (§5.3) is the one rule
+     * reachable here -- it is the only one the kernel's own templates route parameters into, and the sugar
+     * spelling {@code [T; 5..3]} is the way an author hits it.
+     *
+     * <p>Deliberately not a general facility. The remaining rules §8.2 gestures at ("bounds within a
+     * width-derived range, and their kin") belong with the constraint families that own them, alongside
+     * {@code AtomNarrowing}, not in a syntax rewrite -- see {@code BACKLOG.md}.
+     */
+    private void checkBounds(String head, List<RecordValue.Field> fields) {
+        BigInteger min = null;
+        BigInteger max = null;
+        for (RecordValue.Field field : fields) {
+            if (!(field.value().value().coreValue() instanceof TokenValue token)) {
+                continue;
+            }
+            try {
+                if (field.name().equals("min_items")) {
+                    min = new BigInteger(token.text());
+                } else if (field.name().equals("max_items")) {
+                    max = new BigInteger(token.text());
+                }
+            } catch (NumberFormatException e) {
+                return; // a bound that is not a literal -- nothing concrete to compare yet
+            }
+        }
+        if (min != null && max != null && min.compareTo(max) > 0) {
+            throw new TsonSchemaValidationException("'" + head + "<...>' binds min_items " + min
+                    + " above max_items " + max + " -- an array's size range must satisfy min <= max (§5.3), "
+                    + "and no value can ever satisfy this one");
+        }
     }
 
     /** An argument reduces to a token: a plain name after expansion, or a literal value argument (a size bound). */
