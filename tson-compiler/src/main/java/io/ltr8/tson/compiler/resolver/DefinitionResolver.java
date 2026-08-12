@@ -43,6 +43,8 @@ import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeArgument;
+import io.ltr8.annotation.Annotation;
+import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 
@@ -221,12 +223,20 @@ final class DefinitionResolver {
     private final TsonObjectWriter writer = new TsonObjectWriter();
 
     private final DefinitionMetaReader definitionMetaReader;
+    private final AnnotationValueReader annotationValueReader;
     private final DefinitionGetter metaDefinitions;
     private final DefinitionGetter namespaceDefinitions;
 
+    /** No annotation reader: an annotation's name is kept, its value is out of reach. See {@link AnnotationValueReader}. */
     DefinitionResolver(DefinitionMetaReader definitionMetaReader, DefinitionGetter metaDefinitions,
                         DefinitionGetter namespaceDefinitions) {
+        this(definitionMetaReader, (type, value) -> null, metaDefinitions, namespaceDefinitions);
+    }
+
+    DefinitionResolver(DefinitionMetaReader definitionMetaReader, AnnotationValueReader annotationValueReader,
+                        DefinitionGetter metaDefinitions, DefinitionGetter namespaceDefinitions) {
         this.definitionMetaReader = Objects.requireNonNull(definitionMetaReader, "definitionMetaReader");
+        this.annotationValueReader = Objects.requireNonNull(annotationValueReader, "annotationValueReader");
         this.metaDefinitions = Objects.requireNonNull(metaDefinitions, "metaDefinitions");
         this.namespaceDefinitions = Objects.requireNonNull(namespaceDefinitions, "namespaceDefinitions");
     }
@@ -252,7 +262,53 @@ final class DefinitionResolver {
      */
     TypeDefinition resolve(SchemaMap.Declaration declaration, Optional<SourcePosition> declarationPosition) {
         TypeDefinition resolved = resolveTypeDef(declaration.name(), declaration.typeDef());
-        return declarationPosition.isPresent() ? resolved.withPosition(declarationPosition) : resolved;
+        if (declarationPosition.isPresent()) {
+            resolved = resolved.withPosition(declarationPosition);
+        }
+        Annotations annotations = annotationsOf(declaration.name(), declaration.typeDefAnnotations());
+        return annotations.isEmpty() ? resolved : resolved.withAnnotations(annotations);
+    }
+
+    /**
+     * A declaration's own annotations -- the ones written <em>after</em> {@code =>}, which §6 says annotate
+     * the definition. Those written before the name annotate the <em>name</em> instead, and §6 is explicit
+     * that a resolver "does not hoist annotations from key to value", so they are not collected here.
+     * <b>They are dropped</b>: §8.1's {@code type_definition} is what resolution produces and a name-bound
+     * annotation is not part of it, so keeping them would require a parallel name-keyed structure with no
+     * defined consumer (see {@code SPEC-FEEDBACK.md}).
+     *
+     * <p>A value is bound through the governing meta the same way §6 describes reading one: the annotation's
+     * name resolves one hop against the structure namespace, and its value is read by that type's own
+     * compiled reader -- so {@code @doc:"..."} arrives as a {@code String}. <b>When the name resolves to
+     * nothing there the annotation is kept but its value is not</b>: {@code schema.meta} is a pure value
+     * model with no dependency on the grammar layer, so there is no unbound form for it to hold, and
+     * dropping the name too would lose more ([TSON-DATA] §1.5). The meta-kernel's own bootstrap is the case
+     * that hits this, having no compiled reader at all while it is being produced.
+     */
+    private Annotations annotationsOf(String name, List<io.ltr8.tson.compiler.ast.Annotation> written) {
+        if (written.isEmpty()) {
+            return Annotations.empty();
+        }
+        Annotations.Builder annotations = new Annotations.Builder();
+        for (io.ltr8.tson.compiler.ast.Annotation annotation : written) {
+            annotations.add(new Annotation(annotation.name(), annotation.value().flatMap(
+                    value -> Optional.ofNullable(bindAnnotationValue(name, annotation.name(), value)))));
+        }
+        return annotations.build();
+    }
+
+    /** An annotation's value through the type its name refers to, or {@code null} when that type is out of reach. */
+    private Object bindAnnotationValue(String declaration, String annotationName, DataValue value) {
+        if (metaDefinitions.getTypeDefinition(annotationName) == null) {
+            return null;
+        }
+        try {
+            return annotationValueReader.read(annotationName, value);
+        } catch (RuntimeException e) {
+            throw new UnsupportedOperationException("'" + declaration + "': failed to bind the value of "
+                    + "annotation '@" + annotationName + "' via the compiled meta-schema reader: "
+                    + e.getMessage(), e);
+        }
     }
 
     private TypeDefinition resolveTypeDef(String name, TypeDef typeDef) {

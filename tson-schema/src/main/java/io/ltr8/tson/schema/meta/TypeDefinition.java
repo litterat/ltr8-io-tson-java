@@ -1,5 +1,6 @@
 package io.ltr8.tson.schema.meta;
 
+import io.ltr8.annotation.Annotations;
 import io.ltr8.annotation.Record;
 
 import java.util.List;
@@ -38,13 +39,23 @@ import java.util.Optional;
  */
 public record TypeDefinition(Optional<TypeRef> source, TypeKind kind, List<String> parameters,
                               boolean constructor, List<String> supertypes, List<String> subtypes,
-                              Optional<Boolean> disjoint, Top body, Optional<SourcePosition> position) {
+                              Optional<Boolean> disjoint, Top body, Optional<SourcePosition> position,
+                              Annotations annotations) {
 
     @Record
     public TypeDefinition {
         parameters = List.copyOf(parameters);
         supertypes = List.copyOf(supertypes);
         subtypes = List.copyOf(subtypes);
+        annotations = annotations == null ? Annotations.empty() : annotations;
+    }
+
+    /** Same as the canonical constructor with no annotations -- every caller that has none to carry. */
+    public TypeDefinition(Optional<TypeRef> source, TypeKind kind, List<String> parameters, boolean constructor,
+                           List<String> supertypes, List<String> subtypes, Optional<Boolean> disjoint, Top body,
+                           Optional<SourcePosition> position) {
+        this(source, kind, parameters, constructor, supertypes, subtypes, disjoint, body, position,
+                Annotations.empty());
     }
 
     /** Same as the canonical constructor, {@code position} defaulted to absent -- every existing caller that doesn't know its own source position. */
@@ -82,7 +93,14 @@ public record TypeDefinition(Optional<TypeRef> source, TypeKind kind, List<Strin
 
     /** A copy of this definition with {@code position} replaced -- every other component unchanged. */
     public TypeDefinition withPosition(Optional<SourcePosition> position) {
-        return new TypeDefinition(source, kind, parameters, constructor, supertypes, subtypes, disjoint, body, position);
+        return new TypeDefinition(source, kind, parameters, constructor, supertypes, subtypes, disjoint, body,
+                position, annotations);
+    }
+
+    /** A copy of this definition with {@code annotations} replaced -- every other component unchanged. */
+    public TypeDefinition withAnnotations(Annotations annotations) {
+        return new TypeDefinition(source, kind, parameters, constructor, supertypes, subtypes, disjoint, body,
+                position, annotations);
     }
 
     /** Excludes {@code position} -- see this class's own Javadoc for why. */

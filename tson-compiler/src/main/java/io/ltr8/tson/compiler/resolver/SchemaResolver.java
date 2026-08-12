@@ -162,9 +162,11 @@ public final class SchemaResolver {
                 resolving.remove(name);
             }
         };
+        // The same compiled reader serves both hooks; they differ in what the caller does with the result,
+        // which is why they are separate types rather than one Object-returning one.
         holder[0] = new DefinitionResolver(
-                (type, value) -> (Top) metaParser.reader(type)
-                        .read(TsonReadContext.throwing(new ListEventSource(DataValueEvents.of(value)))),
+                (type, value) -> (Top) readThroughMeta(metaParser, type, value),
+                (type, value) -> readThroughMeta(metaParser, type, value),
                 metaParser.schema().entries()::get, namespaceGetter);
 
         for (String name : declarations.keySet()) {
@@ -175,6 +177,12 @@ public final class SchemaResolver {
             localOnly.put(name, namespace.get(name));
         }
         return new TsonSchema(id, document.meta(), document.imports(), localOnly);
+    }
+
+    /** One value read through the governing meta's own compiled reader for {@code type}. */
+    private static Object readThroughMeta(TsonCompiledMetaSchema metaParser, String type,
+            io.ltr8.tson.compiler.ast.DataValue value) {
+        return metaParser.reader(type).read(TsonReadContext.throwing(new ListEventSource(DataValueEvents.of(value))));
     }
 
     /** Stage 1 of {@link #resolveSchema(SchemaDocument)} -- every {@code !!import}'s own entries, in declaration order, merged as-is (never re-resolved against the importer). Mirrors {@code TsonSchemaLinker.mergeImports} exactly, including its collision rule, since this is the same concept discovered one stage earlier. */

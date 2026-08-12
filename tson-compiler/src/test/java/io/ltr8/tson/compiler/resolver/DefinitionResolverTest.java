@@ -403,19 +403,20 @@ class DefinitionResolverTest {
         assertEquals(write(typeName), write(fieldName));
         assertEquals(write(typeName), write(paramName));
 
-        // annotation => @annotation void -- the @annotation marker is metadata on the type-def
-        // (SchemaMap.Declaration.typeDefAnnotations), not part of the TypeDef this resolves, so it
-        // plays no role here; resolution is identical to any other bare reference.
-        assertEquals("{ source: { name: \"void\" arguments: [] } kind: \"REFERENCE\" parameters: [] "
+        // annotation => @annotation void -- the @annotation marker is written after "=>", so §6 binds it to
+        // the definition and it is now carried on the resolved entry. It writes back as a wire annotation
+        // ahead of the record (§7.4's `*annotation [type-ref] core-value`), which is how §8.1 represents one:
+        // type_definition has no annotations field, and does not need one.
+        assertEquals("@annotation { source: { name: \"void\" arguments: [] } kind: \"REFERENCE\" parameters: [] "
                 + "constructor: false supertypes: [] subtypes: [] "
                 + "body: !reference { target: { name: \"void\" arguments: [] } } }", write(annotation));
 
         // doc => @annotation documentation => @annotation text -- a chain of references, each
         // resolved independently (no following the chain here, just the immediate target).
-        assertEquals("{ source: { name: \"text\" arguments: [] } kind: \"REFERENCE\" parameters: [] "
+        assertEquals("@annotation { source: { name: \"text\" arguments: [] } kind: \"REFERENCE\" parameters: [] "
                 + "constructor: false supertypes: [] subtypes: [] "
                 + "body: !reference { target: { name: \"text\" arguments: [] } } }", write(documentation));
-        assertEquals("{ source: { name: \"documentation\" arguments: [] } kind: \"REFERENCE\" parameters: [] "
+        assertEquals("@annotation { source: { name: \"documentation\" arguments: [] } kind: \"REFERENCE\" parameters: [] "
                 + "constructor: false supertypes: [] subtypes: [] "
                 + "body: !reference { target: { name: \"documentation\" arguments: [] } } }", write(doc));
 

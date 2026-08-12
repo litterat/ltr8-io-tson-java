@@ -1598,3 +1598,91 @@ side effect of tightening §9.4.
    cheapest place in the whole series to make confusability an error rather than advice, and the place where
    a spoofed name does the most damage, since it changes which type a document is validated against.
 
+---
+
+## 35. §6 says metadata about a definition "must follow `=>`", but every `@doc` in the spec's own schemas precedes the name — and the resolved fixtures preserve it there
+
+**Section:** [TSON-SCHEMA] §6 (Annotations as Types), §8.1 (Output Records), §10.1 (ingest);
+[TSON-DATA] §3.1.
+
+**Problem:** §6 draws a line through the declaration and tells authors which side metadata belongs on:
+
+> In schema declarations, an annotation immediately preceding the declared name binds to the name (the
+> `type_name` token at the declaration's name position), not the `type_definition` value; the resolver does
+> not hoist annotations from key to value. **Metadata about the definition must follow `=>`**:
+> `name => @doc:"..." {...}`.
+
+The spec's own bundled schemas do the opposite, without exception:
+
+| document | `@doc` before the name | `@doc` after `=>` |
+|---|---|---|
+| `meta-kernel.tn` | 23 | 0 |
+| `meta.tn` | 32 | 0 |
+| `core.tn` | 49 | 0 |
+
+Not one of the 104 is written where §6 says definition metadata must go. The universal form is
+
+```
+@doc:"Two-value boolean enumeration."
+boolean => !enum [true false]
+```
+
+and by §6's own rule that annotation is about the *name token* `boolean`, not about the type — which is not
+what any author writing it means, and not what a documentation generator consuming it would want.
+
+**And the resolved fixtures preserve it, on the key.** `meta-kernel-resolved.tn` carries 24 `@doc`
+annotations, `meta-resolved.tn` 32, `core-resolved.tn` 49 — the same counts as their sources. They appear
+exactly where they were authored, ahead of the map key, alongside definition-bound ones on the value:
+
+```
+  @doc:"Annotation type markers."
+  annotation => @annotation !type_definition {
+    kind: REFERENCE
+    source: void
+    body: !reference { target: void }
+  }
+```
+
+So name-position annotations are not a discouraged spelling the resolver may discard — they are load-bearing
+output that the reference fixtures round-trip. The `@annotation` marker on the value is the *only* kind §6's
+rule actually describes, and it is a marker, not metadata.
+
+**The normative text does not cover what the fixtures show.** §8.1 enumerates `type_definition`'s fields and
+has no annotations field, which is correct and sufficient for definition-bound annotations: [TSON-DATA] §3.1
+attachments ride on the value, as `!record_field { name: owner  type: @alias:id uuid }` demonstrates. But a
+*name*-bound annotation's only representable home is a wire annotation on the schema map's **key**, and §8.1
+never mentions key annotations, nor does §10.1's ingest paragraph — which is otherwise scrupulous, saying
+precisely what happens to `subtypes` (discard, recompute), `disjoint` (discard, recompute) and `supertypes`
+(take as input, verify). A consumer implementing §8.1 from the prose alone would not know key annotations
+exist; a consumer implementing it from the fixtures would.
+
+**A related gap in the same area: `@alias` is unclassified.** §6 has the resolver *attach* it — "when a
+reference is flattened (§8.3), the resolver attaches `@alias:name` to the resolved type" — so it is derived
+output, not authored input, with exactly the character §8.1 is careful to assign to `subtypes` ("a cache:
+fully derivable, always recomputable, never trusted") and `disjoint` ("like `subtypes` it is a cache"). Yet
+the ingest rules never mention it. On ingest an `@alias` in the document is either taken as truth, though
+nothing verifies it against the entry's actual `source`, or discarded and recomputed like its peers. The spec
+says neither.
+
+**Interpretation chosen:** Definition-bound annotations (after `=>`) are resolved onto the entry and carried
+on `TypeDefinition`; each value is bound through the type §6 says its name refers to, so `@doc:"..."` arrives
+as a `String`. They re-serialize as wire annotations ahead of the value, matching the fixtures.
+Name-bound annotations are **dropped** — deliberately, and knowing the cost: it means all 104 of the bundled
+documentation strings are lost, and this implementation's resolved form differs from the reference fixtures
+on every documented entry. The alternative, a parallel name-keyed structure on `TsonSchema`, was deferred
+rather than rejected: §6 gives name-bound annotations no consumer, §8.1 gives them no place in the output
+model, and inventing one before the spec settles which side of `=>` documentation belongs on would be
+guessing at an interface. No hoisting is performed in either direction, per §6.
+
+**Suggested resolution:** Decide which the spec means, and make the artifacts agree.
+
+1. If documentation genuinely belongs *after* `=>`, the three bundled schemas need 104 edits and the
+   resolved fixtures follow — and it is worth saying why, because the name position is where every other
+   language puts a doc comment and authors will keep reaching for it.
+2. If the name position is right — the reading the fixtures support — then §6's "must follow `=>`" should go.
+   What replaces it is a statement that an annotation on the name is metadata about the declaration, which is
+   usually what the author meant, together with §8.1 saying that the schema map's keys carry annotations in
+   resolver output and §10.1 saying what ingest does with them.
+3. Either way, classify `@alias` alongside `subtypes` and `disjoint`: derived, discarded on ingest, and
+   recomputed by re-flattening.
+
