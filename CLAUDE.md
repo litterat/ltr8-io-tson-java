@@ -133,10 +133,10 @@ not a defect. No `opens` directives — binding only ever touches public constru
 
 ## Pipeline
 
-The schema pipeline is **parse → resolve → link → register → compile → read**; the class vocabulary
-follows it (`TsonSchemaParser`, `TsonSchemaResolver`, `TsonSchemaLinker`, `TsonSchemaRegistry`,
-`TsonSchemaCompiler`, `TsonValueReader`). Data documents (Class 1, no schema) run the shorter lex → parse
-→ base-type-resolve path. The subsections below follow this order.
+The schema pipeline is **parse → desugar → resolve → link → register → compile → read**; the class
+vocabulary follows it (`TsonSchemaParser`, `SchemaDesugarer`, `TsonSchemaResolver`, `TsonSchemaLinker`,
+`TsonSchemaRegistry`, `TsonSchemaCompiler`, `TsonValueReader`). Data documents (Class 1, no schema) run the
+shorter lex → parse → base-type-resolve path. The subsections below follow this order.
 
 ### Lexer (`tson-compiler/.../lexer/`)
 
@@ -265,6 +265,46 @@ materialization, no validation (those are the resolver's/linker's jobs).
   own note in #16). An unquoted non-numeric type-argument always parses as a type reference, never a value
   literal — a deliberate grammar-layer deferral, classified at a later semantic layer.
 
+### Desugaring (`tson-compiler/.../resolver/SchemaDesugarer.java`)
+
+An AST→AST rewrite between parsing and resolution. Every sugar form (`[T]`, `[T; N..M]`, §5.3) and every
+generic application (`map<K, V>`, §5.6) becomes a `!C value` construction: at declaration position it simply
+*is* that construction, and anywhere else (a field, an element, a variant) it becomes an **injected
+declaration plus a bare reference to it**. So `DefinitionResolver` only ever sees two shapes: a bare
+reference or `!C value`. §5.3/§5.6 already *describe* these forms as desugarings and §3.3.1 calls their
+targets "the implicit desugar targets of the sugar forms" — this implements that literally instead of
+splitting it across the resolver (declaration position) and the linker (field position), which is what it
+replaces. A **sized** form desugars only as far as the size template it stands for (`[T; 1..5]` →
+`array_ranged<T, 1, 5>`, `[T; 2..]` → `array_min`, `[T; ..9]` → `array_max`, `[T; 3]` → `array_ranged` with
+the bound twice) — purely a change of spelling, which is why it belongs here, but those targets are
+*templates*, not constructors, so the result stays an application. What it then resolves to is §5.10
+substitution, which this phase does not answer.
+
+- **It runs with the governing meta in hand, not context-free.** `SchemaResolver` calls it after acquiring
+  `metaParser`, because turning `map<text, X>` into `!map { key_type: text  value_type: X }` needs `map`'s
+  own `parameters()` to zip the arguments positionally and each vocabulary field's `value_param` to know
+  which field a given argument fills. That routing is what makes it work for *every* constructor rather
+  than the ones someone hand-wrote an assembler for.
+- **The head is looked up in the structure namespace only** (the governing meta's entries) and must be
+  `constructor: true` with matching arity. A **non-constructor head is passed through untouched** — a local
+  parameterized template (`box<text>`, §5.10) is a genuine unimplemented feature, not a rewrite. The
+  precedence/shadowing consequences are `SPEC-FEEDBACK.md` #28.
+- **Bottom-up, so nesting needs no special case:** an inner application is hoisted first and the outer one
+  is built from the already-flattened name (`map<text, [integer]>` works at any depth). The injected name
+  is `head_args_hash`, derived from the application itself, so two structurally identical applications
+  anywhere in the document collapse to one declaration for free (§8.2's structural-equality rule) — and an
+  application an `!!import` already declares is **referenced, not redeclared**, which is why the phase takes
+  the imported name set (meta.tn repeats several of meta-kernel's applications; redeclaring would be a
+  local-vs-import collision).
+- **Structural sharing is load-bearing, not an optimization.** Every node not being rewritten is returned
+  by identity, because `TsonSchemaParser.declarationPositions()` is an `IdentityHashMap` — an
+  equal-but-rebuilt `Declaration` silently loses its position, and the diagnostics that report against it.
+  `SchemaDesugarerTest` asserts `assertSame` for exactly this reason.
+- **A parameterized declaration is left entirely alone** — its body legitimately references its own
+  parameters, and rewriting `array<T>` inside `array`'s own declaration would be nonsense.
+- **The meta-kernel runs this phase too**, supplying its own hand-written routing table
+  (`MetaKernelBootstrapResolver.BOOTSTRAP_CONSTRUCTORS`), since its governing meta is itself.
+
 ### Schema resolution (`tson-compiler/.../resolver/`)
 
 `DefinitionResolver` (package-private) turns one grammar-layer `SchemaMap.Declaration` into a resolved
@@ -283,8 +323,7 @@ namespace *before* any local declaration resolves.
 - **What resolves:** record construction; composition (`A & B & { ... }`, §5.8, with kind from the literal
   base-kind names in the transitive supertype chain, and tightening in the trailing body per §5.7); the
   `^` refinement operator (§5.7, copies the source's whole field set, admits no new fields); bare
-  references (§8.3); field/declaration-level array sugar (`[T]`, `[T; N..M]`, §5.3); a top-level `map<K,
-  V>` construction (§5.6); constructor application (`!C value`, §5.5, binds generically via the compiled
+  references (§8.3); constructor application (`!C value`, §5.5, binds generically via the compiled
   reader — no hand-rolled name→class table, `tson-bind`'s sealed-union resolution finds the `Top` leaf by
   `@Typename`); atom refinement (`!I ^ { ... }`, §5.5/§5.7).
 - **Chained atom refinement merges with the source, it does not replace it** (`SPEC-FEEDBACK.md` #17):
@@ -308,8 +347,8 @@ namespace *before* any local declaration resolves.
   rejecting one would reject a documented construct (`SPEC-FEEDBACK.md` #27).
 - **Everything else throws `UnsupportedOperationException`** (elided field types outside a tightening
   entry, an `Absent` modifier value, the identity-diagonal FIXED-value invariant, a field group restated
-  in a refinement body, subtraction, generic type-refs beyond a simple two-arg `map` or refinement
-  source, inter-supertype field collision) rather than silently mis-resolving. `DefinitionResolver`'s
+  in a refinement body, subtraction, a generic type-ref with a nested or value (non-simple) argument,
+  inter-supertype field collision) rather than silently mis-resolving. `DefinitionResolver`'s
   Javadoc lists the exact boundary.
 - **`TypeArgument` is a sealed interface (`Ref`/`Value`), NOT a plain record — do not "simplify" it
   back.** `TypeRef`/`TypeArgument` are mutually recursive, and `tson-bind`'s record binder eagerly resolves
@@ -344,22 +383,28 @@ file — has an entry to transfer a kind from. `TsonSchemaResolver` alone is sin
 order, so it can't handle `boolean` preceding `enum`; this two-pass ordering lives here.
 
 - **Constructor-application binding goes through a closed `instanceBody` switch, not the generic path.**
-  Meta-kernel instantiates its six constructors (`unit`/`integer_type`/`text_type`/`uri_type`/`regex_type`/
-  `enum`) in exactly two shapes — a bare `{}` (each target's `UNCONSTRAINED` constant) or a bare token
-  array (`enum`, read via `toEnumBody` reading `TokenValue.text()` directly). No compiled reader is
-  involved.
-- **Why even a compiled-reader bootstrap can't read meta-kernel from its own in-progress state:** `enum`'s
-  own field type `members: set<token>` is argument-bearing, and the compiled reader assumes every field
-  type is an already-materialized bare name — true only *after* linking, which meta-kernel (the thing
-  linking would run over) hasn't been through while it's being produced. Given how narrow and fixed
-  meta-kernel's instance shapes are, hand-picking them is simplest — "the bootstrap can do whatever tricks
-  it needs, including not compiling, just calling `new Xxx(...)`."
+  Meta-kernel instantiates constructors in exactly three shapes — a bare `{}` (each target's
+  `UNCONSTRAINED` constant), a bare token array (`enum`, via `toEnumBody` reading `TokenValue.text()`
+  directly), and the binding record `SchemaDesugarer` emits for an `array`/`set`/`map` application. No
+  compiled reader is involved.
+- **Why even a compiled-reader bootstrap can't read meta-kernel from its own in-progress state:**
+  `integer_size => { bits: ... signed: boolean }` is a first-pass entry whose `signed` field already
+  references `boolean`, which the *second* pass resolves — so there is no moment at which a reader could be
+  compiled against a complete schema. Given how narrow and fixed meta-kernel's instance shapes are,
+  hand-picking them is simplest — "the bootstrap can do whatever tricks it needs, including not compiling,
+  just calling `new Xxx(...)`."
+- **`BOOTSTRAP_CONSTRUCTORS` is the same trick one layer up.** The desugar phase needs a constructor's
+  `parameters()` and its fields' `value_param` routing; for meta-kernel those would have to come from the
+  entries this class is in the middle of producing, and declaration order rules out using the partial map
+  (`record` applies `[record_field]` long before `array` is declared). So the routing for the three
+  constructors meta-kernel applies to itself is written out by hand. The payoff is that meta-kernel's
+  linked form needs no materialization either — its nine argument-bearing applications are ordinary
+  declarations by the time the linker sees them.
 
 ### Schema registry and linking (`tson-schema/.../`, `.../registry/`)
 
 Resolution handles one declaration at a time (references carried as unverified strings, `!!import` not
-consulted, argument-bearing `type_ref`s left as written). `TsonSchemaLinker`/`TsonSchemaRegistry` add the
-second stage.
+consulted). `TsonSchemaLinker`/`TsonSchemaRegistry` add the second stage.
 
 - **`CanonicalIdentity.of(String)`** implements §2.2.1's canonical-identity algorithm — **not** general
   URI normalization. Exactly two reductions (strip scheme + `://`, strip query); everything else must
@@ -369,13 +414,9 @@ second stage.
   `TsonSchemaRegistry.canonicalIdentity`.
 - **`TsonSchemaLinker.link(schema, loader)`** is the pass-2 engine returning a `TsonLinkedSchema` (a thin
   wrapper that is a compile-time proof linking ran): (1) **merge `!!import`s** — each import's entries
-  copied in as-is, keeping their home namespace, name collisions rejected; (2) **materialize** — every
-  argument-bearing `type_ref` gets a synthesized entry (uniform, whether the head is a constructor or a
-  template — narrower than §8.2's literal text, confirmed with the user), deduped by structural equality,
-  named `head_arg_hash`; `array`/`set` synthesize real bodies, others fall back to a reference
-  placeholder; every `Top` variant has an exhaustive rewrite case (a new variant is a compile error, not a
-  silent miss); (3) **populate `subtypes`** (reverse of `supertypes`); (3.5) **derive `disjoint`** for every
-  choice entry (`ChoiceDisjointness`, §5.4) — three-valued `Optional<Boolean>` over the cheap exact rules
+  copied in as-is, keeping their home namespace, name collisions rejected; (2) **populate `subtypes`**
+  (reverse of `supertypes`); (3) **derive `disjoint`** for every choice entry (`ChoiceDisjointness`, §5.4) —
+  three-valued `Optional<Boolean>` over the cheap exact rules
   (different kind / different atom family disjoint; same-family integers by bound interval; IS-A ⇒ not
   disjoint); record-set and regex-pattern disjointness left absent (see `BACKLOG.md` for the "how far" view);
   (4) **validate** every reference
@@ -383,7 +424,10 @@ second stage.
   and a **constructor-eligibility** check: a locally-declared `constructor: true` entry is valid only if
   the schema's `!!meta` is exactly meta-kernel's identity (§2.2.2 — see `SPEC-FEEDBACK.md` #19). `source`
   validation additionally falls back to the governing meta's namespace (a `source` naming a constructor is
-  one of §3.3.1's constructor roles); no other reference does.
+  one of §3.3.1's constructor roles); no other reference does. **The linker does not materialize anything** —
+  `SchemaDesugarer` already turned every application into a real declaration, one phase earlier and in the
+  module that can bind a constructor generically. The only argument-bearing `type_ref` it ever sees is a
+  parameterized declaration's reference to its own parameter (`array<T>`), which is validated, not rewritten.
 - **`TsonSchemaRegistry.register(TsonLinkedSchema)`** computes canonical identity from `!!id`, rejects a
   duplicate identity (no overwrite — this plus `entries()` being unmodifiable *is* the "locked" guarantee)
   and any self-referential `bootstrap()==true` schema, and stores it. `get(uri)` canonicalizes internally.
@@ -718,9 +762,14 @@ compatibility).
 ## Not yet implemented
 
 - **Part 2 resolution gaps** — subtraction, elided field types outside a tightening entry, a field group
-  restated in a refinement body, the identity-diagonal FIXED-value invariant, generic type-refs beyond a
-  bare two-arg `map<K, V>` or a refinement source. `DefinitionResolver`'s Javadoc is the exact current
-  boundary.
+  restated in a refinement body, the identity-diagonal FIXED-value invariant, a generic type-ref whose
+  argument is nested or a value rather than a plain name. `DefinitionResolver`'s Javadoc is the exact
+  current boundary.
+- **§5.10 template application** — a generic head naming a *constructor* is desugared into a real
+  declaration; one naming a local parameterized template (`box<text>`) is passed through, so the schema
+  links and compiles but fails at read with `'T' is referenced but not present in the schema`. Real
+  parameter substitution, and rejecting the application where it is written instead of deferring to a
+  read, are both in `BACKLOG.md`.
 - **Undocumented atom constructors** — `unknown`/`email`/`cidr4`/`cidr6`/`mac` (and `extern`, which has no
   core.tn declaration) have no compiled-parser factory, so they compile to `ErrorReader` (a schema merely
   *declaring* one still compiles). `complex`/`ipv4`/`ipv6` do have parsers.

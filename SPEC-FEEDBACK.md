@@ -1141,13 +1141,34 @@ constructor and must remain applicable. The consequence is that one syntax carri
 rules, selected by a lookup outcome the author cannot see. That is defensible, but it reads as a
 contradiction until spelled out, and §5.10 never mentions the interaction.
 
-**Interpretation chosen:** The spec is followed as written for `!` targets and for `source`, and **this
-implementation currently gets generic heads wrong** — `TsonSchemaLinker` threads a `structureNamespace` into
-its validation pass but applies it only to a `source` reference, so a user schema's `map<text, X>` fails
-linking with `'map_text_text_<hash>' has an unresolved reference 'map'` even though §3.3.1 says it must
-resolve. That is a defect on this side, not a spec gap, and is tracked in `BACKLOG.md`. The fix is to extend
-the fallback to generic-application heads with §3.3.2's ordering (parameters, locals, imports, then the
-structure namespace), and to reject a parameter used as a generic head rather than attempting to apply it.
+**Interpretation chosen:** A generic-application head is resolved in a **desugar phase that runs before
+resolution** (`SchemaDesugarer`): `map<text, X>` is rewritten into a real declaration
+`map_text_X_<hash> => !map { key_type: text  value_type: X }` plus a bare reference to it, so by the time
+anything resolves or links, a generic head no longer exists as a distinct construct. The head is looked up
+in the governing meta's own entries (the structure namespace) and must be `constructor: true` with matching
+arity; the arguments zip positionally against the constructor's `parameters` and route to vocabulary fields
+by each field's `value_param`. That makes §3.3.1's answer mechanical for *every* constructor rather than the
+handful an implementation happens to have hand-written support for.
+
+On the four questions above, this implementation currently answers:
+
+1. **Ordering:** not implemented as stated. A head is resolved against the structure namespace **only** —
+   the type-name namespace is not consulted first. In practice the two agree, since a schema that declares
+   its own `map` is exactly the shadowing case below.
+2. **Shadowing:** silently resolves to the structure-namespace constructor, so a local or imported
+   declaration named `map` does *not* capture `map<…>`. This is the opposite of what §3.3.2's ordering
+   implies, chosen because it is the reading under which the spec's own worked example
+   (`map<text, text>` in a user schema) always works. It should follow whichever way §3.3.1 is eventually
+   worded; nothing depends on the current choice beyond this note.
+3. **Parameters at a head:** never eligible — a parameter is not in the structure namespace, so
+   `weird => <map> map<text, text>` resolves `map` to the constructor, not the parameter. Not a considered
+   answer to the question so much as a consequence of (1).
+4. **Constructor gate:** applies exactly when the head resolved to a constructor, which is the only way it
+   resolves at all here. A **non-constructor head is passed through untouched** — a local parameterized
+   template (`box<text>`, §5.10) stays a generic reference, and since §5.10 parameter substitution is not
+   implemented, such a schema links and compiles but fails at read time with `'T' is referenced but not
+   present in the schema`. Tracked in `BACKLOG.md`; the template case is the one shape this phase
+   deliberately leaves alone.
 
 **Suggested resolution:** State the generic-head rule with the same explicit ordering the `!`-target rule
 already uses, rather than the looser "not otherwise in scope". Say whether parameters participate in that
