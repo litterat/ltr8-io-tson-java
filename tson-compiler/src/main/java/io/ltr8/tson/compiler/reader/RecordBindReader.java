@@ -67,6 +67,14 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
      * for a component the schema never mentions -- the carrier is filled from the framing, not from a field.
      */
     private final DataClassField annotationsCarrier;
+
+    /**
+     * What this record captures for <em>itself</em> -- {@code DISCARDED} unless it declares a carrier.
+     * Distinct from {@link #annotationTypes}, which is the vocabulary in scope and is handed to nested
+     * positions regardless: a record with no carrier of its own may still hold a field, or a map key, that
+     * is boxed and does want them.
+     */
+    private final AnnotationTypes ownAnnotationTypes;
     private final AnnotationTypes annotationTypes;
 
     public RecordBindReader(String name, RecordBody body, DataClassRecord descriptor, TsonValueReaderResolver resolver,
@@ -74,7 +82,8 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         super(name, body, resolver, schemaPosition);
         this.descriptor = descriptor;
         this.annotationsCarrier = descriptor.annotationsCarrier().orElse(null);
-        this.annotationTypes = annotationsCarrier == null ? AnnotationTypes.DISCARDED : annotationTypes;
+        this.annotationTypes = annotationTypes;
+        this.ownAnnotationTypes = annotationsCarrier == null ? AnnotationTypes.DISCARDED : annotationTypes;
         this.targetField = new DataClassField[fields.size()];
         for (int i = 0; i < fields.size(); i++) {
             CompiledField field = fields.get(i);
@@ -83,7 +92,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             if (target == null) {
                 continue;
             }
-            TsonValueReader<?> rebound = rebindContainerIfNeeded(field, target, resolver);
+            TsonValueReader<?> rebound = rebindContainerIfNeeded(field, target, resolver, this.annotationTypes);
             if (target.dataClass() instanceof DataClassAnnotated boxed) {
                 rebound = boxing(rebound, boxed, annotationTypes);
             }
@@ -150,13 +159,14 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
      * ordinary case today.
      */
     private static TsonValueReader<?> rebindContainerIfNeeded(CompiledField field, DataClassField target,
-            TsonValueReaderResolver resolver) {
+            TsonValueReaderResolver resolver, AnnotationTypes annotationTypes) {
         TsonValueReader<?> parser = field.parser();
         if (target.dataClass() instanceof DataClassArray targetArray && parser instanceof ArrayBindReader existing) {
             return new ArrayBindReader(field.schema().name(), existing.body, targetArray, resolver, existing.schemaPosition);
         }
         if (target.dataClass() instanceof DataClassMap targetMap && parser instanceof MapBindReader existing) {
-            return new MapBindReader(field.schema().name(), existing.body, targetMap, resolver, existing.schemaPosition);
+            return new MapBindReader(field.schema().name(), existing.body, targetMap, resolver,
+                    existing.schemaPosition, annotationTypes);
         }
         return parser;
     }
@@ -167,7 +177,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         // Hoisted ahead of the shape check, like the tree readers: the base consumes the framing and
         // discards it, so capturing first leaves that call a no-op. Nothing to capture when the bound class
         // declares no carrier, in which case annotationTypes is DISCARDED and this consumes and drops.
-        Annotations annotations = AnnotationCapture.bound(ctx, annotationTypes);
+        Annotations annotations = AnnotationCapture.bound(ctx, ownAnnotationTypes);
         ShapeResult shapeResult = expectRecordShape(ctx);
         if (shapeResult.shape() == Shape.MISMATCH) {
             return null;

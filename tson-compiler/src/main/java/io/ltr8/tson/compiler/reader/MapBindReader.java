@@ -42,7 +42,17 @@ final class MapBindReader extends MapAbstractReader<Object> {
 
     public MapBindReader(String name, MapBody body, DataClassMap descriptor, TsonValueReaderResolver resolver,
                          Optional<SourcePosition> schemaPosition) {
-        super(name, body, resolver, schemaPosition);
+        this(name, body, descriptor, resolver, schemaPosition, AnnotationTypes.DISCARDED);
+    }
+
+    public MapBindReader(String name, MapBody body, DataClassMap descriptor, TsonValueReaderResolver resolver,
+                         Optional<SourcePosition> schemaPosition, AnnotationTypes annotationTypes) {
+        super(name, body,
+                AnnotationBoxing.wrap(resolver.resolve(body.keyType().name()), descriptor.keyDataClass(),
+                        annotationTypes),
+                AnnotationBoxing.wrap(resolver.resolve(body.valueType().name()), descriptor.valueDataClass(),
+                        annotationTypes),
+                schemaPosition);
         this.descriptor = descriptor;
     }
 
@@ -111,7 +121,8 @@ final class MapBindReader extends MapAbstractReader<Object> {
                 throw new IllegalArgumentException("'" + name + "' resolves to " + dataClass.typeClass()
                         + ", which isn't map-shaped -- can't bind '" + name + "' as one");
             }
-            return new MapBindReader(name, body, descriptor, resolver, typeDefinition.position());
+            return new MapBindReader(name, body, descriptor, resolver, typeDefinition.position(),
+                    AnnotationTypes.of(context));
         }
 
         /** {@code schemaTypeName} has no real bound Java class only for a synthesized, materialized type -- see this factory's own Javadoc. */

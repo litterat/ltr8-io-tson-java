@@ -51,10 +51,22 @@ abstract class MapAbstractReader<T> implements TsonValueReader<T> {
     final Optional<SourcePosition> schemaPosition;
 
     MapAbstractReader(String name, MapBody body, TsonValueReaderResolver resolver, Optional<SourcePosition> schemaPosition) {
+        this(name, body, resolver.resolve(body.keyType().name()), resolver.resolve(body.valueType().name()),
+                schemaPosition);
+    }
+
+    /**
+     * Takes the key and value readers already built, so a subclass can wrap what the schema resolved before
+     * handing them over -- object-binding mode does this when the bound map's own key or value type is a
+     * boxed {@code Annotated<T>}. Wrapping here rather than inside {@link #readInto} keeps the entry loop,
+     * which both modes share, free of anything only one of them needs.
+     */
+    MapAbstractReader(String name, MapBody body, TsonValueReader<?> keyParser, TsonValueReader<?> valueParser,
+                       Optional<SourcePosition> schemaPosition) {
         this.name = name;
         this.body = body;
-        this.keyParser = resolver.resolve(body.keyType().name());
-        this.valueParser = resolver.resolve(body.valueType().name());
+        this.keyParser = keyParser;
+        this.valueParser = valueParser;
         this.schemaPosition = schemaPosition;
     }
 
