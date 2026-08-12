@@ -88,10 +88,40 @@ the removal of the old throwaway `Map`/`List` DOM mode all landed. What's left:
     annotation's value is written as an ordinary node, so a nested one needs no special case. The
     valueless form's trailing space is load-bearing, not cosmetic — §3.1 makes the character after the
     name the whole boundary rule. `SchemalessTreeAnnotationTest` round-trips every annotatable position.
-  - [ ] **Write-side re-emission (object).** `TsonObjectWriter` still skips the `@Annotated` carrier field
-    (`TsonObjectWriter:152`), so a bound object's captured annotations are dropped. The emitter half is
-    now built, so this is just wiring — but it's on the `tson-bind` side of the annotation work, which is
-    parked.
+  - [x] **Object binding, both directions.** A bound class opts in by declaring a component of type
+    `io.ltr8.annotation.Annotations` — the declared type *is* the signal, which is what lets `tson-bind`
+    verify the carrier itself instead of deferring the check to a layer that can see the type. The carrier
+    is a property of the record (`DataClassRecord.annotationsCarrier()`), settled during analysis, so a
+    reader asks once rather than testing every field. Covers the schemaless and schema-driven read paths and
+    the object writer.
+    - **The arity is the load-bearing part.** The carrier occupies a constructor slot no schema field
+      matches, so `RecordBindReader` must fill it explicitly — `arguments` is sized by the Java class and
+      written only through matched fields, so the slot otherwise reaches the constructor as `null`,
+      silently. In the other direction the carrier is excluded from name matching, so a schema field
+      sharing its name binds nowhere rather than overwriting the annotations.
+    - **A schema-driven read binds an annotation's value through the type §6 says its name refers to**, so
+      `note => text` arrives as a `String`. `AnnotationCapture` needed no mode switch for this: what differs
+      is only what `readerFor(name)` returns, and that is already mode-specific.
+    - Still discarding at leaf and dispatched positions — a bound scalar has nowhere to put a carrier, so
+      there is nothing to deliver to until the boxed carrier below exists.
+
+- [ ] **A boxed carrier, for positions that cannot hold one.** A record can declare an `Annotations`
+  component; a `String` field, an array element, a tuple position and a map key or value cannot — which is
+  why leaf and dispatched positions still discard. A generic box moves the metadata into the position's own
+  declared type: `record Annotated<T>(T value, Annotations annotations)`, so a field is declared
+  `Annotated<String> name` and the binder resolves `T`'s descriptor from the component's generic type
+  (`RecordComponentFinder` already reads it, `DataBindContext.getDescriptor(Class, Type)` already takes
+  one), reads the value as `T`, and attaches whatever the position's annotations were. This is what makes
+  wiring capture at those positions worth doing.
+  - **A different answer from the one `SPEC-FEEDBACK.md` #13 rejected**, and #13's interpretation paragraph
+    needs revisiting if it lands. #13 rejected *sibling* carriers keyed by field name, array index or map
+    key, on three grounds: a bespoke convention per container kind, no resolution of the recursive case, and
+    API surface for a rare capability. A box answers all three — one type serves every position because the
+    position's *type* is what changes, nesting composes (`Annotated<List<Annotated<String>>>`) rather than
+    needing a new convention per level, and it costs nothing where unused. #13's "structurally unreachable
+    from a typed object-binding layer, full stop" is too strong; its *spec* question stands regardless.
+  - The name is free: the `@Annotated` marker it would reuse has been deleted, the declared type having
+    replaced it as the opt-in.
 
 ## Front door / ergonomics
 
@@ -376,7 +406,7 @@ missing most of the mirror.
 
 - [ ] **No schema-aware (Class 2) writer — `TsonValueWriter`.** Only the schemaless `TsonObjectWriter`
   (object → TSON) and `TsonTreeWriter` (`TsonNode` → TSON) exist, both with documented lossy spots
-  (integer width, tuple-ness, `@Annotated`-captured wire-format annotations). A writer symmetric to the
+  (integer width, tuple-ness). A writer symmetric to the
   compiled reader stack (`TsonSchemaCompiler`/`TsonValueReader`) — checking output against a TSON schema
   and reporting what's wrong — is a whole missing half of the pipeline, and the natural home for
   round-tripping or producing guaranteed-conformant documents.

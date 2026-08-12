@@ -84,9 +84,13 @@ Package group is `io.ltr8` (reverse-DNS identifies who *publishes* the artifact 
 implementation of the spec published under the `ltr8.io` banner, not *the* tson.io-blessed one). Every
 module has a real `module-info.java`; module names mirror each module's root exported package.
 
-- **`tson-annotation`** — `@Typename`/`@Field`/`@Record`, the binding annotations.
+- **`tson-annotation`** — `@Typename`/`@Field`/`@Record`, the binding annotations, plus `Annotations`/
+  `Annotation`, the wire-annotation carrier a bound class declares a component of. The carrier lives here
+  rather than with the engine because it is the one module `tson-bind` (which analyses classes),
+  `tson-schema` (whose `schema.meta` model is itself a bind target) and consumer code all see.
 - **`tson-bind`** — the generic `DataValue`↔Java-object binding engine (`DataBindContext`, `DataClass`
-  descriptors, `DataNameBinder`, bridges). A leaf module — depends on nothing here.
+  descriptors, `DataNameBinder`, bridges). Depends only on `tson-annotation`, whose annotations and carrier
+  types it reads off a class under analysis.
 - **`tson-schema`** — **only** `io.ltr8.tson.schema.meta` (the resolved-schema *value* model — pure
   records/sealed interfaces/enums, §8's `TypeDefinition` et al.) plus the schema registry/linker and
   `TsonBundledSchemas`. Depends only on `tson-annotation`. **`tson-compiler` depends on `tson-schema`, not
@@ -640,8 +644,12 @@ forces the schemaless path on a schema-aware reader.
 - **`TsonTreeWriter` re-emits them** — `TsonDataEmitter` gained `annotation`/`beginAnnotation`/
   `endAnnotation` (the valueless form's trailing space is load-bearing, §3.1) and `writeNode` writes a
   node's annotations ahead of its type-ref, per §7.4's `*annotation [type-ref] core-value` order, so a tree
-  round trips with its metadata, not just its values. `TsonObjectWriter` still drops the
-  `@Annotated`-captured ones.
+  round trips with its metadata, not just its values. **`TsonObjectWriter` re-emits a carrier's too** —
+  §7.4's order is why `write` splits into `write` (annotations, then the value) and `writeCore` (the shape
+  switch): `writeUnion` writes a type-ref of its own, so it emits its member's annotations *before* that and
+  goes straight to `writeCore`, rather than recursing and landing them after it. An annotation's value writes
+  back in whichever form the read produced — a bound object like any other value, a structurally-kept
+  `TsonNode` through `TsonTreeWriter`'s own node emission (package-private, both writers share a package).
 - **`SchemalessObjectReader` streams events** (like the compiled readers), walking the descriptor in
   parallel — never materializing a tree first. Problems report through a `TsonReadContext` (fail-fast throws
   `TsonReadException`; collecting accumulates), and a `tson-bind` `DataBindException` while narrowing /

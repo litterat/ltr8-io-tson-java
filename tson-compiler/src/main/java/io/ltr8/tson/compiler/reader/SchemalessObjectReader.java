@@ -139,7 +139,7 @@ public final class SchemalessObjectReader {
         return result;
     }
 
-    /** Resolves {@code targetClass}'s own descriptor; a class {@code tson-bind} can't analyze (e.g. two {@code @Annotated} components) is reported as a {@code SCHEMA_ERROR}, not silently. */
+    /** Resolves {@code targetClass}'s own descriptor; a class {@code tson-bind} can't analyze (e.g. two {@code Annotations} components) is reported as a {@code SCHEMA_ERROR}, not silently. */
     private DataClass descriptorFor(TsonReadContext ctx, Class<?> targetClass) {
         try {
             return context.getDescriptor(targetClass);
@@ -241,7 +241,7 @@ public final class SchemalessObjectReader {
     // ── Records ──────────────────────────────────────────────────────────
 
     /**
-     * A field marked {@code @Annotated} (io.ltr8.annotation) is populated not from a same-named
+     * A component whose declared type is {@code io.ltr8.annotation.Annotations} is populated not from a same-named
      * authored field but directly from the record value's *own* wire annotations (§3.1). The record names
      * its own carrier ({@link DataClassRecord#annotationsCarrier()}), settled during analysis, so there is
      * nothing to detect or validate here. Field values' own annotations are never captured -- only the

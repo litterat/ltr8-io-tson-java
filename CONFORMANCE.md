@@ -82,10 +82,9 @@ default value resolution (§4) already recovers on its own — the whole integer
 annotation to reach for any more than a schemaless reader has one to validate against. `byte[]` values
 always write back as `!base64`, regardless of which of `base64`/`base64url`/`base32`/`hex` they were
 originally decoded from — that information doesn't survive decoding, so `!base64` is an arbitrary but
-reasonable default. Tuples write as plain arrays, with nothing marking them as tuples at all. Wire-format
-annotations captured via `@Annotated` aren't re-emitted yet — that's a `toTson`/object-writer gap only;
-`TsonTreeWriter` does re-emit a node's own annotations, so a schemalessly read `TsonNode` tree round trips
-with its metadata intact.
+reasonable default. Tuples write as plain arrays, with nothing marking them as tuples at all. Wire-format annotations do
+round trip on both paths: `TsonTreeWriter` re-emits a node's own, and `TsonObjectWriter` re-emits those a
+bound class captured by declaring an `Annotations` component.
 
 Ambiguities, inconsistencies, and errors in the spec text itself — as opposed to this implementation's own
 behavior at the edges — are tracked separately in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).

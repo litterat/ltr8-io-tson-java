@@ -420,18 +420,30 @@ conventions closes, since the recursion is the whole shape of the problem. §3.1
 all, reasonably, since it's a binding-layer concern rather than a format one — but it's worth being on
 record about, since every implementation doing typed binding on top of TSON will hit the same wall.
 
-**Interpretation chosen:** `io.ltr8.annotation.Annotated`, a marker on one Java record component,
-opts a caller into recovering *only* the annotations on the value the whole record itself corresponds
-to (`TsonAnnotations`, in `io.ltr8.tson.compiler.mapper`, wrapping the raw, ordered `Annotation` list) — deliberately not
-a general "child annotations" mechanism. A record-field-keyed (or array-index-keyed, or map-key-keyed)
-carrier for children's annotations was considered and rejected: it would only push the same problem down
-one level without resolving the recursive case, needs a different bespoke convention per container kind,
-and is real API surface for a capability likely rarely exercised in practice (per the meta-kernel's own
-`core.tn1`/`meta.tn1`, annotations overwhelmingly describe *the thing itself* — `@doc:"..."
-@ordered:TOTAL` on whole type definitions — not individual scalar fields). An application that needs
-full-fidelity annotation access at positions `@Annotated` can't reach still has one: the parsed AST
-directly (`DataValue.annotations()`), which is already fully general and doesn't need a schema or a
-Java type to project onto.
+**Interpretation chosen:** A Java class opts in by declaring a component of type
+`io.ltr8.annotation.Annotations`, and receives *only* the annotations on the value the whole record itself
+corresponds to — deliberately not a general "child annotations" mechanism. It works on both read paths and
+writes back, and under a schema each annotation's value is bound through the type §6 says its name refers
+to. The declared type is the opt-in because it is the one signal the binding engine can verify on its own:
+an earlier marker-plus-separately-agreed-carrier-type arrangement left whichever layer saw only one of the
+two unable to check anything.
+
+A record-field-keyed (or array-index-keyed, or map-key-keyed) *sibling* carrier for children's annotations
+was considered and rejected: it would only push the same problem down one level without resolving the
+recursive case, needs a different bespoke convention per container kind, and is real API surface for a
+capability likely rarely exercised in practice (per the meta-kernel's own `core.tn`/`meta.tn`, annotations
+overwhelmingly describe *the thing itself* — `@doc:"..." @ordered:TOTAL` on whole type definitions — not
+individual scalar fields).
+
+**A generic box is a different answer, and it weakens the "full stop" above.** `record Annotated<T>(T value,
+Annotations annotations)`, declared at the position itself (`Annotated<String> name`), puts the metadata in
+the position's own *type* rather than in a parallel structure keyed by name or index. One type then serves
+every position, nesting composes (`Annotated<List<Annotated<String>>>`) rather than needing a new convention
+per level, and it costs nothing where unused. Not implemented — tracked in `BACKLOG.md` — but it means
+"structurally unreachable from a typed object-binding layer" overstates the case. An application needing
+full-fidelity access at positions the carrier cannot reach still has one today: the parsed AST directly
+(`DataValue.annotations()`), already fully general and needing neither a schema nor a Java type to project
+onto.
 
 **Suggested resolution:** Not a Part 1 defect — §3.1 correctly stays silent on host-language binding,
 that's out of scope by design. Flagging as guidance worth a note in a future implementer's guide, or a
