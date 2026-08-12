@@ -59,6 +59,16 @@ public final class TsonTreeWriter {
         }
     }
 
+    /**
+     * Writes {@code node} into an emitter a caller already owns, rather than into a fresh document. Exists
+     * for {@link TsonObjectWriter}, which needs it for one case only: an annotation whose name the governing
+     * schema does not declare is read structurally, so its value arrives as a node in an otherwise wholly
+     * object-bound value, and re-emitting it is exactly this method's job.
+     */
+    void write(TsonNode node, TsonDataEmitter out) throws DataBindException {
+        writeNode(node, out);
+    }
+
     private void writeNode(TsonNode node, TsonDataEmitter out) throws DataBindException {
         writeAnnotations(node.annotations(), out);
         switch (node) {

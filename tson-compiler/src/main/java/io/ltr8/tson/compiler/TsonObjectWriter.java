@@ -3,6 +3,9 @@ package io.ltr8.tson.compiler;
 import io.ltr8.annotation.Typename;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
+import io.ltr8.annotation.Annotation;
+import io.ltr8.annotation.Annotations;
+import io.ltr8.tson.tree.TsonNode;
 import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassArray;
 import io.ltr8.bind.DataClassAtom;
@@ -60,9 +63,13 @@ public final class TsonObjectWriter {
      * first place, the same reason a schemaless reader has no way to reject an out-of-range value
      * without the annotation.
      *
-     * <p>Carrier-captured wire-format annotations are not re-emitted yet -- deferred to
-     * a follow-up, not part of this first pass (values only).
+     * <p>A record whose bound class declares an {@code Annotations} component gets its wire annotations
+     * (§3.1) written back ahead of the value. An annotation's own value round-trips in whatever form the
+     * read produced -- a bound object writes like any other value, and one kept structurally (its name
+     * resolved to no declared type) writes through the tree writer.
      */
+    private final TsonTreeWriter treeWriter = new TsonTreeWriter();
+
     public String toTson(Object value) {
         try {
             TsonDataEmitter writer = new TsonDataEmitter();
@@ -102,6 +109,23 @@ public final class TsonObjectWriter {
             if (dataClass.bridge().isPresent()) {
                 value = dataClass.bridge().get().toData().invoke(value);
             }
+            writeAnnotations(value, dataClass, writer);
+            writeCore(value, dataClass, writer);
+        } catch (DataBindException e) {
+            throw e;
+        } catch (Throwable t) {
+            throw new DataBindException("failed to write value of type " + dataClass.typeClass(), t);
+        }
+    }
+
+    /**
+     * The value itself, with its annotations already emitted and any bridge already applied. Split out
+     * because §7.4 orders a data-value {@code *annotation [type-ref] core-value}, and {@link #writeUnion}
+     * writes a type-ref of its own -- so it has to emit the member's annotations *before* that type-ref and
+     * then come straight here, rather than recursing through {@link #write} and emitting them after it.
+     */
+    private void writeCore(Object value, DataClass dataClass, TsonDataEmitter writer) throws DataBindException {
+        try {
             switch (dataClass) {
                 case DataClassAtom atom -> writeAtom(value, writer);
                 case DataClassRecord record -> writeRecord(value, record, writer);
@@ -136,11 +160,52 @@ public final class TsonObjectWriter {
         }
     }
 
+    // ── Annotations (§3.1) ───────────────────────────────────────────────
+
+    /**
+     * This value's own wire annotations, ahead of any type-ref and the value itself (§7.4's {@code
+     * *annotation [type-ref] core-value}). Only a record can carry them -- a bound scalar, array, map or
+     * tuple is a plain Java value with no slot for metadata -- so this is a no-op for everything else, and
+     * for the overwhelming majority of records, which declare no carrier.
+     */
+    private void writeAnnotations(Object value, DataClass dataClass, TsonDataEmitter writer) throws Throwable {
+        if (!(dataClass instanceof DataClassRecord record)) {
+            return;
+        }
+        DataClassField carrier = record.annotationsCarrier().orElse(null);
+        if (carrier == null || !(carrier.get(value) instanceof Annotations annotations)) {
+            return;
+        }
+        for (Annotation annotation : annotations.values()) {
+            if (annotation.value().isEmpty()) {
+                writer.annotation(annotation.name());
+            } else {
+                writer.beginAnnotation(annotation.name());
+                writeAnnotationValue(annotation.value().get(), writer);
+                writer.endAnnotation();
+            }
+        }
+    }
+
+    /**
+     * An annotation's value, in whichever Java form the read produced. Ordinarily a bound object, written
+     * exactly like any other value; a {@code TsonNode} where the annotation's name resolved to no declared
+     * type and the reader kept it structurally, which the tree writer already knows how to emit.
+     */
+    private void writeAnnotationValue(Object value, TsonDataEmitter writer) throws Throwable {
+        if (value instanceof TsonNode node) {
+            treeWriter.write(node, writer);
+        } else {
+            write(value, context.getDescriptor(value.getClass()), writer);
+        }
+    }
+
     // ── Records ──────────────────────────────────────────────────────────
 
     /**
-     * The annotations carrier isn't re-emitted yet (see {@link #toTson}) -- that field is skipped entirely
-     * here, not written as though it were an ordinary structural value.
+     * The carrier is skipped here rather than written as though it were an ordinary field: its contents are
+     * emitted as annotations ahead of the record (see {@link #writeAnnotations}), which is where they came
+     * from, not as a field of it.
      * A field that isn't present ({@code Optional.empty()}, or a plain reference field holding
      * {@code null} -- both read the same way on the way in, via {@link DataClassField#isPresent}) is
      * omitted from the record entirely rather than written as {@code null}, matching how the two
@@ -223,11 +288,18 @@ public final class TsonObjectWriter {
             throw new DataBindException(
                     "value of type " + memberClass + " is not a member of union " + dataClass.typeClass());
         }
+        DataClass memberDataClass = context.getDescriptor(memberClass);
+        Object member = memberDataClass.bridge().isPresent()
+                ? memberDataClass.bridge().get().toData().invoke(value)
+                : value;
+        // The member's own annotations precede the type-ref this is about to write (§7.4), so they are
+        // emitted here rather than left to the recursion below, which starts after it.
+        writeAnnotations(member, memberDataClass, writer);
         // Lowercased when falling back to the simple class name (not the @Typename value, used
         // verbatim) -- matches this codebase's own convention of lowercase type-refs, and the read
         // side's case-insensitive fallback match means either case reads back correctly regardless.
         Typename tn = memberClass.getAnnotation(Typename.class);
         writer.typeRef(tn != null ? tn.name() : memberClass.getSimpleName().toLowerCase(Locale.ROOT));
-        write(value, context.getDescriptor(memberClass), writer);
+        writeCore(member, memberDataClass, writer);
     }
 }

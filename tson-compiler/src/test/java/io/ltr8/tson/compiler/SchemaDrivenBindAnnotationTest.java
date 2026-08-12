@@ -41,6 +41,7 @@ class SchemaDrivenBindAnnotationTest {
             {
               note => text
               rank => int32
+              marker => void
               widget => { name: text }
             }
             """;
@@ -141,6 +142,36 @@ class SchemaDrivenBindAnnotationTest {
                 (PlainWidget) compile(PlainWidget.class).get("widget").read("@note:\"ignored\" { name: \"Widget\" }");
 
         assertEquals("Widget", widget.name());
+    }
+
+    // ── Round trip (write side) ──────────────────────────────────────────
+
+    /**
+     * Read, then written back with the annotations in place -- the loop that was open until the writer
+     * learned to emit them. §7.4 orders a data-value {@code *annotation [type-ref] core-value}, so they
+     * precede the record.
+     */
+    @Test
+    void annotationsSurviveARoundTrip() {
+        Widget widget = read("@note:\"a widget\" @rank:7 { name: \"Widget\" }");
+
+        String written = new TsonObjectWriter().toTson(widget);
+
+        assertEquals("@note:\"a widget\" @rank:7 { name: \"Widget\" }", written);
+    }
+
+    @Test
+    void aValuelessAnnotationRoundTrips() {
+        // The trailing space after a valueless annotation is load-bearing, not cosmetic: §3.1 makes the
+        // character after the name the whole boundary rule.
+        Widget widget = read("@marker { name: \"Widget\" }");
+
+        assertEquals("@marker { name: \"Widget\" }", new TsonObjectWriter().toTson(widget));
+    }
+
+    @Test
+    void anUnannotatedValueWritesNoAnnotations() {
+        assertEquals("{ name: \"Widget\" }", new TsonObjectWriter().toTson(read("{ name: \"Widget\" }")));
     }
 
     /**

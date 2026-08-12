@@ -192,6 +192,19 @@ class TsonObjectReaderTest {
         assertEquals("kept", annotationText(item.meta().get("doc").orElseThrow()));
     }
 
+    /**
+     * The schemaless round trip, which exercises a case the schema-driven one cannot: with no governing
+     * schema there is no type to bind an annotation's value through, so it is kept structurally as a
+     * {@code TsonNode} -- and writing it back is the one place {@link TsonObjectWriter} hands off to the
+     * tree writer.
+     */
+    @Test
+    void structurallyKeptAnnotationValuesRoundTrip() throws DataBindException {
+        AnnotatedItem item = mapper.read("@doc:\"a widget\" @marker { name: Widget }", AnnotatedItem.class);
+
+        assertEquals("@doc:\"a widget\" @marker { name: \"Widget\" }", new TsonObjectWriter().toTson(item));
+    }
+
     public record TwoCarriers(Annotations a, Annotations b, String name) {
     }
 
