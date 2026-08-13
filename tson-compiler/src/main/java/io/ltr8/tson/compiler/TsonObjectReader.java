@@ -4,6 +4,7 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
+import io.ltr8.tson.compiler.reader.EventSkip;
 import io.ltr8.tson.compiler.reader.SchemalessObjectReader;
 import io.ltr8.tson.compiler.stream.DocumentEnd;
 import io.ltr8.tson.compiler.stream.DocumentStart;
@@ -12,7 +13,6 @@ import io.ltr8.tson.compiler.stream.TypeRef;
 
 import java.io.InputStream;
 import java.util.Objects;
-import java.util.Optional;
 
 /**
  * Binds a TSON document to a Java object of a caller-chosen target class -- the class-driven read-side
@@ -33,10 +33,14 @@ import java.util.Optional;
  * <p>Either way the class-driven binding itself is done by {@link SchemalessObjectReader}, driven by the
  * target class's own {@code tson-bind} {@link DataClass} descriptor: it streams events off a {@link
  * TsonReadContext} (never materializing a whole {@code DataValue} tree first, so a large document need not
- * be buffered before binding begins), reports through that context's one error model (a fail-fast context
- * throws {@link TsonReadException} at the first problem; a {@link TsonReadContext#collecting collecting}
- * one accumulates every independent problem and reads on), and has no positional form or schema-composed
- * defaults (a record must be written braced; an absent required field is a {@code FIELD_REQUIRED} problem).
+ * be buffered before binding begins), reports through that context's one error model, and has no positional
+ * form or schema-composed defaults (a record must be written braced; an absent required field is a {@code
+ * FIELD_REQUIRED} problem).
+ *
+ * <p>A read is fail-fast by default, throwing {@link TsonReadException} at the first problem. {@link
+ * #withDiagnostics} swaps that for any other {@link TsonDiagnosticsReceiver} -- a collector gathers every
+ * problem in one pass and still hands back the (possibly partial) object, in schema-aware and schemaless
+ * mode alike.
  */
 public final class TsonObjectReader {
 
@@ -46,23 +50,49 @@ public final class TsonObjectReader {
     /** The bind-mode compiled-schema registry a schema-aware reader validates through, or {@code null} for a schemaless reader (any {@code !!schema} is then ignored). */
     private final TsonCompiledSchemaRegistry bind;
 
+    /** Where this reader's reads report their problems -- fail-fast unless {@link #withDiagnostics} said otherwise. */
+    private final TsonDiagnosticsReceiver receiver;
+
     /** Schema-aware -- validates a self-describing document against its {@code !!schema}, resolved through {@code core}'s own source. Used by {@link Tson#objectReader()}. */
     public TsonObjectReader(TsonCompiledMetaRegistry core, DataBindContext dataBindContext) {
-        this.dataBindContext = dataBindContext;
-        this.schemaless = new SchemalessObjectReader(dataBindContext);
-        this.bind = TsonCompiledSchemaRegistry.bind(core, dataBindContext);
+        this(dataBindContext, new SchemalessObjectReader(dataBindContext),
+                TsonCompiledSchemaRegistry.bind(core, dataBindContext), TsonDiagnosticsReceiver.throwing());
     }
 
     /** Schemaless -- binds to the target class alone, ignoring any {@code !!schema} the document declares. */
     public TsonObjectReader(DataBindContext context) {
-        this.dataBindContext = context;
-        this.schemaless = new SchemalessObjectReader(context);
-        this.bind = null;
+        this(context, new SchemalessObjectReader(context), null, TsonDiagnosticsReceiver.throwing());
     }
 
     /** Schemaless, over {@link TsonAtomContext#defaultContext()}. */
     public TsonObjectReader() {
         this(TsonAtomContext.defaultContext());
+    }
+
+    /** Shares {@code bind} and {@code schemaless} rather than rebuilding them -- a derived reader must keep the original's compiled-schema cache, not start an empty one. */
+    private TsonObjectReader(DataBindContext dataBindContext, SchemalessObjectReader schemaless,
+                             TsonCompiledSchemaRegistry bind, TsonDiagnosticsReceiver receiver) {
+        this.dataBindContext = dataBindContext;
+        this.schemaless = schemaless;
+        this.bind = bind;
+        this.receiver = receiver;
+    }
+
+    /**
+     * This reader, reporting through {@code receiver} instead of throwing at the first problem -- a new reader,
+     * leaving this one unchanged, sharing its compiled-schema registry:
+     *
+     * <pre>{@code
+     * var problems = TsonDiagnosticsReceiver.collecting();
+     * Server server = tson.objectReader().withDiagnostics(problems).read(source, Server.class);
+     * problems.diagnostics();      // every problem, alongside a possibly-partial object
+     * }</pre>
+     *
+     * <p>Applies to the whole-document entry points only. {@link #read(TsonReadContext, Class)} takes a context
+     * that carries its own receiver, and that one wins.
+     */
+    public TsonObjectReader withDiagnostics(TsonDiagnosticsReceiver receiver) {
+        return new TsonObjectReader(dataBindContext, schemaless, bind, receiver);
     }
 
     // ── Whole-document entry points ──────────────────────────────────────
@@ -88,11 +118,11 @@ public final class TsonObjectReader {
     }
 
     /**
-     * Binds one value at {@code ctx}'s current position into {@code targetClass} -- the low-level form for
-     * a caller managing their own {@link TsonReadContext} (e.g. a {@link TsonReadContext#collecting
-     * collecting} one to gather every problem in one pass). Always schemaless and frame-free: it neither
-     * inspects a {@code !!schema} (an arbitrary position carries no document framing to hold one) nor
-     * checks for trailing content; use the {@code String}/{@code InputStream} entry points for a whole
+     * Binds one value at {@code ctx}'s current position into {@code targetClass} -- the low-level form for a
+     * caller managing their own {@link TsonReadContext}, whose receiver decides where problems go. Always
+     * schemaless and frame-free: it neither inspects a {@code !!schema} (an arbitrary position carries no
+     * document framing to hold one) nor checks for trailing content; use the {@code String}/{@code
+     * InputStream} entry points, with {@link #withDiagnostics} if you want to collect, for a whole
      * self-describing document.
      */
     public <T> T read(TsonReadContext ctx, Class<T> targetClass) {
@@ -103,7 +133,7 @@ public final class TsonObjectReader {
 
     private <T> T readDocument(TsonDataStream stream, Class<T> type, boolean ignoreSchema) {
         Objects.requireNonNull(type, "type");
-        TsonReadContext ctx = TsonReadContext.throwing(stream);
+        TsonReadContext ctx = TsonReadContext.of(stream, receiver);
         DocumentStart start = (DocumentStart) ctx.next();
         T result = (ignoreSchema || bind == null || start.schema().isEmpty())
                 ? schemaless.read(ctx, type)
@@ -115,21 +145,39 @@ public final class TsonObjectReader {
         return result;
     }
 
+    /**
+     * A problem reaching the schema, or a root type this target class can't hold, is reported through {@code
+     * ctx} like any other -- so a fail-fast reader still throws while a collecting one gets it as a {@link
+     * Diagnostic}, the same promise {@link Tson#validate} makes. Where the failure is noticed before the value
+     * is read, the value is skipped so the stream lands on {@code DocumentEnd}.
+     */
     private <T> T readAgainstSchema(String schemaUri, TsonReadContext ctx, Class<T> type) {
         RootReader root = select(schemaUri, ctx);
+        if (root == null) {
+            return null;
+        }
         Class<?> bound = boundClass(root.typeName());
         if (bound != null && !type.isAssignableFrom(bound)) {
-            throw new TsonReadException(problem(Diagnostic.Code.TYPE_MISMATCH,
+            return abandon(ctx, Diagnostic.Code.TYPE_MISMATCH,
                     "the schema's root type `" + root.typeName() + "` binds to " + bound.getName()
-                            + ", which is not assignable to the requested " + type.getName()));
+                            + ", which is not assignable to the requested " + type.getName());
         }
         Object value = root.reader().read(ctx);
         if (value != null && !type.isInstance(value)) {
-            throw new TsonReadException(problem(Diagnostic.Code.TYPE_MISMATCH,
+            // The value is already consumed, so there is nothing left to skip -- just report and yield none.
+            ctx.report(Diagnostic.Code.TYPE_MISMATCH,
                     "the schema's root type `" + root.typeName() + "` produced a " + value.getClass().getName()
-                            + ", not the requested " + type.getName()));
+                            + ", not the requested " + type.getName(), "", "");
+            return null;
         }
         return type.cast(value);
+    }
+
+    /** Reports {@code code}/{@code message}, discards the root value, and yields no object -- see {@link #readAgainstSchema}. */
+    private static <T> T abandon(TsonReadContext ctx, Diagnostic.Code code, String message) {
+        ctx.report(code, message, "", "");
+        EventSkip.dataValue(ctx);
+        return null;
     }
 
     /** The bound Java class the schema type {@code typeRefName} maps to, or {@code null} if it isn't name-bound (e.g. an atom root) -- the before-read type check then falls back to the post-read cast. */
@@ -141,28 +189,25 @@ public final class TsonObjectReader {
         }
     }
 
+    /** The schema's root reader, or {@code null} when the problem has been reported and the value skipped. */
     private RootReader select(String schemaUri, TsonReadContext ctx) {
         TsonCompiledSchema compiled;
         try {
             compiled = bind.get(schemaUri);
         } catch (RuntimeException e) {
-            throw new TsonReadException(problem(Diagnostic.Code.SCHEMA_ERROR, e.getMessage()));
+            return abandon(ctx, Diagnostic.Code.SCHEMA_ERROR, e.getMessage());
         }
         if (!(ctx.peek() instanceof TypeRef typeRef)) {
-            throw new TsonReadException(problem(Diagnostic.Code.VALIDATION_ERROR,
-                    "data declares a !!schema but has no root type-ref (e.g. `!person`) to select a type"));
+            return abandon(ctx, Diagnostic.Code.VALIDATION_ERROR,
+                    "data declares a !!schema but has no root type-ref (e.g. `!person`) to select a type");
         }
         try {
             return new RootReader(compiled.get(typeRef.name()), typeRef.name());
         } catch (RuntimeException e) {
-            throw new TsonReadException(problem(Diagnostic.Code.UNKNOWN_TYPE, e.getMessage()));
+            return abandon(ctx, Diagnostic.Code.UNKNOWN_TYPE, e.getMessage());
         }
     }
 
     private record RootReader(TsonValueReader<?> reader, String typeName) {
-    }
-
-    private static Diagnostic problem(Diagnostic.Code code, String message) {
-        return new Diagnostic("", code, message, "", "", Optional.empty(), Optional.empty());
     }
 }

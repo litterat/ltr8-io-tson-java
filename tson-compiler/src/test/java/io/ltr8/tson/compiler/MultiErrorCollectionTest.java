@@ -65,15 +65,16 @@ class MultiErrorCollectionTest {
                   items: [1 hello 3]
                 }
                 """;
-        TsonReadContext ctx = TsonReadContext.collecting(dataSource);
+        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("my_record").read(ctx));
+        Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode)
+                compiled.get("my_record").read(TsonReadContext.document(dataSource, problems)));
 
-        assertEquals(3, ctx.diagnostics().size(), ctx.diagnostics().toString());
+        assertEquals(3, problems.diagnostics().size(), problems.diagnostics().toString());
 
         Map<String, Diagnostic> byPath = new LinkedHashMap<>();
-        for (Diagnostic diagnostic : ctx.diagnostics()) {
+        for (Diagnostic diagnostic : problems.diagnostics()) {
             byPath.put(diagnostic.path(), diagnostic);
         }
         assertEquals(Set.of("/value", "/tag", "/items/1"), byPath.keySet());

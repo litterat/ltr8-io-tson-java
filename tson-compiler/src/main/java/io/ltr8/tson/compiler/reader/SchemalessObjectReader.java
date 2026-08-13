@@ -64,10 +64,10 @@ import java.util.function.BiConsumer;
  * TsonEvent} at a time off a {@link TsonReadContext} (in practice a {@code TsonDataStream}), never by
  * materializing a full {@code DataValue} tree first -- so a large document never has to be buffered
  * before binding can begin, memory held at any point is proportional to nesting depth. Problems are
- * reported through {@code ctx} using the same model the compiled readers use: a fail-fast context
- * throws {@link TsonReadException} at the first problem; a {@link TsonReadContext#collecting
- * collecting} context accumulates every independent problem into {@link TsonReadContext#diagnostics()}
- * and reads on. A {@code tson-bind} {@link DataBindException} thrown while narrowing a value or
+ * reported through {@code ctx} using the same model the compiled readers use: the context's own {@link
+ * io.ltr8.tson.compiler.TsonDiagnosticsReceiver} decides each problem's fate -- the fail-fast one throws
+ * {@link TsonReadException} at the first, a collecting one accumulates every independent problem and reads
+ * on. A {@code tson-bind} {@link DataBindException} thrown while narrowing a value or
  * invoking a constructor is caught and re-reported through {@code ctx} too, so a caller sees one
  * uniform error model regardless of which layer noticed the problem.
  *
@@ -250,7 +250,7 @@ public final class SchemalessObjectReader {
      * record value's, matching the tree-based reader's own deliberate scope limit.
      */
     private Object bindRecord(TsonReadContext ctx, DataClassRecord dataClass) {
-        int diagnosticsBefore = ctx.diagnostics().size();
+        int diagnosticsBefore = ctx.reported();
         DataClassField[] fields = dataClass.fields();
         DataClassField carrier = dataClass.annotationsCarrier().orElse(null);
         Annotations captured = Annotations.empty();
@@ -451,7 +451,7 @@ public final class SchemalessObjectReader {
 
     /** A tuple is array-shaped on the wire (§5.3), not record-shaped -- so {@code {}} is never a reading, only {@code []}. Arity is fixed and exact. */
     private Object bindTuple(TsonReadContext ctx, DataClassTuple dataClass) {
-        int diagnosticsBefore = ctx.diagnostics().size();
+        int diagnosticsBefore = ctx.reported();
         EventSkip.annotationsAndTypeRef(ctx);
         if (!(ctx.peek() instanceof ArrayStart)) {
             TsonEvent e = ctx.peek();
@@ -563,7 +563,7 @@ public final class SchemalessObjectReader {
      */
     private Object construct(TsonReadContext ctx, java.lang.invoke.MethodHandle constructor, Object[] arguments,
                              int diagnosticsBefore, Class<?> typeClass) {
-        if (ctx.diagnostics().size() > diagnosticsBefore) {
+        if (ctx.reported() > diagnosticsBefore) {
             return null;
         }
         try {

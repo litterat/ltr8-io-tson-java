@@ -4,18 +4,14 @@ import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TsonEventSource;
 import io.ltr8.tson.schema.meta.SourcePosition;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 import java.util.Optional;
 
 /**
- * The one backing implementation for both {@link TsonReadContext#throwing(TsonEventSource)} and
- * {@link TsonReadContext#collecting(TsonEventSource)}, parametrized by {@code failFast} rather than
- * two separate classes -- every other field is computed identically either way, only {@link #report}
- * itself branches. Package-private: a caller only ever reaches this through {@link TsonReadContext}'s
- * own static factories, never by name -- see that interface's own Javadoc for why it's an interface
- * at all.
+ * The one backing implementation of {@link TsonReadContext}. It holds no policy of its own -- {@link #report}
+ * enriches a problem with the path and positions tracked here and hands it to the read's {@link
+ * TsonDiagnosticsReceiver}, which decides what happens next. Package-private: a caller only ever reaches this
+ * through {@link TsonReadContext}'s own static factories, never by name -- see that interface's own Javadoc for
+ * why it's an interface at all.
  */
 final class DefaultTsonReadContext implements TsonReadContext {
 
@@ -23,19 +19,18 @@ final class DefaultTsonReadContext implements TsonReadContext {
      * Every scoped copy of a single read (see {@link #field}/{@link #index}/{@link
      * #withSchemaPosition}/{@link #withPosition}) shares one of these -- the real event source, its
      * own live cursor position (mutated by {@link #peek}/{@link #next} regardless of which copy made
-     * the call, since there is only ever one real cursor per read), and, in collecting mode, the
-     * accumulating diagnostic sink.
+     * the call, since there is only ever one real cursor per read), the receiver every copy reports
+     * through, and the running count of what they have reported.
      */
     private static final class Cursor {
         final TsonEventSource events;
-        final List<Diagnostic> diagnostics;
-        final boolean failFast;
+        final TsonDiagnosticsReceiver receiver;
         Optional<SourcePosition> position = Optional.empty();
+        int reported;
 
-        Cursor(TsonEventSource events, List<Diagnostic> diagnostics, boolean failFast) {
+        Cursor(TsonEventSource events, TsonDiagnosticsReceiver receiver) {
             this.events = events;
-            this.diagnostics = diagnostics;
-            this.failFast = failFast;
+            this.receiver = receiver;
         }
     }
 
@@ -52,12 +47,8 @@ final class DefaultTsonReadContext implements TsonReadContext {
         this.positionOverride = positionOverride;
     }
 
-    static TsonReadContext throwing(TsonEventSource events) {
-        return new DefaultTsonReadContext(new Cursor(events, null, true), "", Optional.empty(), Optional.empty());
-    }
-
-    static TsonReadContext collecting(TsonEventSource events) {
-        return new DefaultTsonReadContext(new Cursor(events, new ArrayList<>(), false), "", Optional.empty(), Optional.empty());
+    static TsonReadContext of(TsonEventSource events, TsonDiagnosticsReceiver receiver) {
+        return new DefaultTsonReadContext(new Cursor(events, receiver), "", Optional.empty(), Optional.empty());
     }
 
     @Override
@@ -90,11 +81,6 @@ final class DefaultTsonReadContext implements TsonReadContext {
     }
 
     @Override
-    public boolean failFast() {
-        return cursor.failFast;
-    }
-
-    @Override
     public TsonReadContext field(String name) {
         return new DefaultTsonReadContext(cursor, path + "/" + escape(name), schemaPosition, positionOverride);
     }
@@ -117,15 +103,13 @@ final class DefaultTsonReadContext implements TsonReadContext {
     @Override
     public void report(Diagnostic.Code code, String message, String expected, String actual) {
         Diagnostic diagnostic = new Diagnostic(path, code, message, expected, actual, position(), schemaPosition);
-        if (cursor.failFast) {
-            throw new TsonReadException(diagnostic);
-        }
-        cursor.diagnostics.add(diagnostic);
+        cursor.reported++;
+        cursor.receiver.report(diagnostic);
     }
 
     @Override
-    public List<Diagnostic> diagnostics() {
-        return cursor.diagnostics == null ? List.of() : Collections.unmodifiableList(cursor.diagnostics);
+    public int reported() {
+        return cursor.reported;
     }
 
     private static String escape(String name) {

@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.compiler.reader.EventSkip;
 import io.ltr8.tson.compiler.reader.SchemalessTreeReader;
 import io.ltr8.tson.compiler.stream.DocumentEnd;
 import io.ltr8.tson.compiler.stream.DocumentStart;
@@ -8,7 +9,6 @@ import io.ltr8.tson.compiler.stream.TypeRef;
 import io.ltr8.tson.tree.TsonNode;
 
 import java.io.InputStream;
-import java.util.Optional;
 
 /**
  * Reads a TSON data document into an immutable {@link TsonNode} tree -- the tree-producing read-side front
@@ -28,9 +28,11 @@ import java.util.Optional;
  * the schemaless path on a schema-aware reader.
  *
  * <p>Either way the tree is streamed off the event source ({@link TsonDataStream}) directly, building nodes
- * as events arrive without an intermediate {@code DataValue} AST. This is a <i>read</i>, fail-fast: a
- * malformed document or an out-of-range typed value throws {@link TsonReadException} at the first problem;
- * a caller wanting every problem at once uses {@link Tson#validate}.
+ * as events arrive without an intermediate {@code DataValue} AST. A read is fail-fast by default: a malformed
+ * document or an out-of-range typed value throws {@link TsonReadException} at the first problem. {@link
+ * #withDiagnostics} swaps that for any other {@link TsonDiagnosticsReceiver} -- a collector gathers every
+ * problem in one pass and still hands back the (possibly partial) tree, in schema-aware and schemaless mode
+ * alike.
  *
  * <p>Wire annotations are captured on the <b>schemaless</b> path only -- a node read that way carries its
  * own {@code annotations()} (§3.1). A schema-driven read leaves them empty for now, so a document with a
@@ -43,14 +45,40 @@ public final class TsonTreeReader {
     /** The tree-mode compiled-schema registry a schema-aware reader validates through, or {@code null} for a schemaless reader (any {@code !!schema} is then ignored). */
     private final TsonCompiledSchemaRegistry tree;
 
+    /** Where this reader's reads report their problems -- fail-fast unless {@link #withDiagnostics} said otherwise. */
+    private final TsonDiagnosticsReceiver receiver;
+
     /** Schema-aware -- validates a self-describing document against its {@code !!schema}, resolved through {@code core}'s own source. Used by {@link Tson#treeReader()}. */
     public TsonTreeReader(TsonCompiledMetaRegistry core) {
-        this.tree = TsonCompiledSchemaRegistry.tree(core);
+        this(TsonCompiledSchemaRegistry.tree(core), TsonDiagnosticsReceiver.throwing());
     }
 
     /** Schemaless (Class 1) -- reads the wire structure into a tree, ignoring any {@code !!schema} the document declares. */
     public TsonTreeReader() {
-        this.tree = null;
+        this(null, TsonDiagnosticsReceiver.throwing());
+    }
+
+    /** Shares {@code tree} rather than rebuilding it -- a derived reader must keep the original's compiled-schema cache, not start an empty one. */
+    private TsonTreeReader(TsonCompiledSchemaRegistry tree, TsonDiagnosticsReceiver receiver) {
+        this.tree = tree;
+        this.receiver = receiver;
+    }
+
+    /**
+     * This reader, reporting through {@code receiver} instead of throwing at the first problem -- a new reader,
+     * leaving this one unchanged, sharing its compiled-schema registry:
+     *
+     * <pre>{@code
+     * var problems = TsonDiagnosticsReceiver.collecting();
+     * TsonNode tree = tson.treeReader().withDiagnostics(problems).read(source);
+     * problems.diagnostics();      // every problem, alongside a possibly-partial tree
+     * }</pre>
+     *
+     * <p>Applies to the whole-document entry points only. {@link #read(TsonReadContext)} takes a context that
+     * carries its own receiver, and that one wins.
+     */
+    public TsonTreeReader withDiagnostics(TsonDiagnosticsReceiver receiver) {
+        return new TsonTreeReader(tree, receiver);
     }
 
     // ── Whole-document entry points ──────────────────────────────────────
@@ -88,7 +116,7 @@ public final class TsonTreeReader {
     // ── Internals ────────────────────────────────────────────────────────
 
     private TsonNode readDocument(TsonDataStream stream, boolean ignoreSchema) {
-        TsonReadContext ctx = TsonReadContext.throwing(stream);
+        TsonReadContext ctx = TsonReadContext.of(stream, receiver);
         DocumentStart start = (DocumentStart) ctx.next();
         TsonNode result = (ignoreSchema || tree == null || start.schema().isEmpty())
                 ? schemaless.read(ctx)
@@ -100,27 +128,36 @@ public final class TsonTreeReader {
         return result;
     }
 
+    /**
+     * A problem reaching the schema is reported through {@code ctx} like any other, so a fail-fast reader still
+     * throws while a collecting one gets it as a {@link Diagnostic} -- the same promise {@link Tson#validate}
+     * makes. The document's own value is then skipped so the stream lands on {@code DocumentEnd} and the
+     * caller's trailing-content check stays meaningful.
+     */
     private TsonNode readAgainstSchema(String schemaUri, TsonReadContext ctx) {
         TsonCompiledSchema compiled;
         try {
             compiled = tree.get(schemaUri);
         } catch (RuntimeException e) {
-            throw new TsonReadException(problem(Diagnostic.Code.SCHEMA_ERROR, e.getMessage()));
+            return abandon(ctx, Diagnostic.Code.SCHEMA_ERROR, e.getMessage());
         }
         if (!(ctx.peek() instanceof TypeRef typeRef)) {
-            throw new TsonReadException(problem(Diagnostic.Code.VALIDATION_ERROR,
-                    "data declares a !!schema but has no root type-ref (e.g. `!person`) to select a type"));
+            return abandon(ctx, Diagnostic.Code.VALIDATION_ERROR,
+                    "data declares a !!schema but has no root type-ref (e.g. `!person`) to select a type");
         }
         TsonValueReader<?> reader;
         try {
             reader = compiled.get(typeRef.name());
         } catch (RuntimeException e) {
-            throw new TsonReadException(problem(Diagnostic.Code.UNKNOWN_TYPE, e.getMessage()));
+            return abandon(ctx, Diagnostic.Code.UNKNOWN_TYPE, e.getMessage());
         }
         return (TsonNode) reader.read(ctx);
     }
 
-    private static Diagnostic problem(Diagnostic.Code code, String message) {
-        return new Diagnostic("", code, message, "", "", Optional.empty(), Optional.empty());
+    /** Reports {@code code}/{@code message}, discards the root value, and yields no tree -- see {@link #readAgainstSchema}. */
+    private static TsonNode abandon(TsonReadContext ctx, Diagnostic.Code code, String message) {
+        ctx.report(code, message, "", "");
+        EventSkip.dataValue(ctx);
+        return null;
     }
 }

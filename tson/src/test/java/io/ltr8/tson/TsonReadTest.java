@@ -3,6 +3,8 @@ package io.ltr8.tson;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.compiler.Diagnostic;
+import io.ltr8.tson.compiler.TsonDiagnosticsCollector;
+import io.ltr8.tson.compiler.TsonDiagnosticsReceiver;
 import io.ltr8.tson.compiler.TsonObjectReader;
 import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaSource;
@@ -11,9 +13,11 @@ import io.ltr8.tson.compiler.config.TsonAtomContext;
 import io.ltr8.tson.tree.TsonNode;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -176,5 +180,82 @@ class TsonReadTest {
                 !point { x: 3  y: 4 }""", Point.class);
 
         assertEquals(new Point(3, 4), value);
+    }
+
+    // ── withDiagnostics: the schema-aware collecting read ──
+
+    @Test
+    void aCollectingTreeReadValidatesAgainstTheSchemaAndReturnsEveryProblemAtOnce() {
+        // Both fields are out of int32 range. Fail-fast stops at the first; collecting reports both,
+        // against the schema -- which is the combination no route offered before.
+        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+
+        TsonNode node = tsonWithPoint().treeReader().withDiagnostics(problems).read("""
+                !!schema:"https://example.test/point-1.tn"
+                !point { x: 99999999999999  y: 88888888888888 }""");
+
+        assertEquals(2, problems.diagnostics().size(), problems.diagnostics()::toString);
+        assertEquals("/x", problems.diagnostics().get(0).path());
+        assertEquals("/y", problems.diagnostics().get(1).path());
+        assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, problems.diagnostics().get(0).code());
+        // The tree still comes back, so a caller has the partial value alongside what was wrong with it.
+        assertTrue(node.isRecord());
+    }
+
+    @Test
+    void aCollectingObjectReadValidatesAgainstTheSchemaAndReturnsEveryProblemAtOnce() {
+        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+
+        tsonWithPointBinding().objectReader().withDiagnostics(problems).read("""
+                !!schema:"https://example.test/point-1.tn"
+                !point { x: 99999999999999  y: 88888888888888 }""", Point.class);
+
+        assertEquals(2, problems.diagnostics().size(), problems.diagnostics()::toString);
+        assertEquals("/x", problems.diagnostics().get(0).path());
+        assertEquals("/y", problems.diagnostics().get(1).path());
+    }
+
+    @Test
+    void aDocumentSelectionFailureIsADiagnosticWhenCollectingAndStillThrowsWhenNot() {
+        // Reaching the schema at all can fail three ways. Under a collector each is an ordinary
+        // diagnostic, so a caller has one shape to render and never catches for a bad document.
+        record Case(String source, Diagnostic.Code code) {
+        }
+        List<Case> cases = List.of(
+                new Case("""
+                        !!schema:"https://example.test/not-there.tn"
+                        !point { x: 3  y: 4 }""", Diagnostic.Code.SCHEMA_ERROR),
+                new Case("""
+                        !!schema:"https://example.test/point-1.tn"
+                        { x: 3  y: 4 }""", Diagnostic.Code.VALIDATION_ERROR),
+                new Case("""
+                        !!schema:"https://example.test/point-1.tn"
+                        !no_such_type { x: 3  y: 4 }""", Diagnostic.Code.UNKNOWN_TYPE));
+
+        for (Case testCase : cases) {
+            TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+            TsonNode node = tsonWithPoint().treeReader().withDiagnostics(problems).read(testCase.source());
+
+            assertEquals(1, problems.diagnostics().size(), problems.diagnostics()::toString);
+            assertEquals(testCase.code(), problems.diagnostics().get(0).code());
+            assertNull(node, "no tree is produced when the schema can't be reached");
+
+            // The default reader is untouched by the derived one -- still fail-fast.
+            assertThrows(TsonReadException.class, () -> tsonWithPoint().treeReader().read(testCase.source()));
+        }
+    }
+
+    @Test
+    void withDiagnosticsReturnsANewReaderAndLeavesTheOriginalFailFast() {
+        String bad = """
+                !!schema:"https://example.test/point-1.tn"
+                !point { x: 3  y: 99999999999999 }""";
+        var reader = tsonWithPoint().treeReader();
+        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+
+        reader.withDiagnostics(problems).read(bad);
+        assertEquals(1, problems.diagnostics().size());
+
+        assertThrows(TsonReadException.class, () -> reader.read(bad));
     }
 }

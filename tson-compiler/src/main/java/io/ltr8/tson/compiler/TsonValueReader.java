@@ -59,10 +59,12 @@ public interface TsonValueReader<T> {
 
     /**
      * Convenience for a caller with real source text and no document-level metadata ({@code !!id}/
-     * {@code !!schema}) or context of their own to manage -- fail-fast, single-error, matching
-     * today's default. Reads the whole document's own root value and confirms there's no trailing
-     * content after it, the same check {@code TsonDataStream}'s own {@code RootFrame} already performs
-     * for a full document parse.
+     * {@code !!schema}) or context of their own to manage -- fail-fast, single-error. Reads the whole
+     * document's own root value and confirms there's no trailing content after it.
+     *
+     * <p>To collect every problem instead of stopping at the first, pass a context carrying a collecting
+     * receiver -- {@code read(TsonReadContext.document(source, problems))}. The policy travels on the
+     * context, so this interface needs nothing of its own to express it.
      */
     default T read(String source) {
         return readDocument(TsonReadContext.throwing(source));

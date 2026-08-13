@@ -143,6 +143,7 @@ The write side is the mirror: a value in hand, TSON text out. The matrix:
 | a Java object | it as TSON text | **`tson.objectWriter()`** | a `String` |
 | a `TsonNode` tree | it as TSON text | **`tson.treeWriter()`** | a `String` |
 | a data document | every problem, not the value | **`tson.validate()`** | a `List<Diagnostic>` |
+| a data document | the value **and** every problem | **`.withDiagnostics(…)`** on any reader | the value + a `List<Diagnostic>` |
 | a data document | a grammar-faithful AST | **`TsonDataParser`** | a `Document` AST |
 | a data document | to pull events lazily | **`TsonDataStream`** | a `TsonEvent` stream |
 
@@ -203,14 +204,32 @@ try (var in = Files.newInputStream(Path.of("server.tn"))) {
 ```
 
 On a mismatch it throws `TsonReadException` (fail-fast). To collect *every* problem in one pass instead
-of stopping at the first, hand it a collecting context:
+of stopping at the first, derive a reader with a collecting `TsonDiagnosticsReceiver` — you get the
+(possibly partial) value back *alongside* the full list, rather than one or the other:
 
 ```java
-var ctx = TsonReadContext.collecting("{ hostname: 1  address: nope }");
-new TsonObjectReader().read(ctx, Server.class);
-for (Diagnostic d : ctx.diagnostics()) {
+var problems = TsonDiagnosticsReceiver.collecting();
+
+Server server = new TsonObjectReader()
+        .withDiagnostics(problems)
+        .read("{ hostname: 1  address: nope }", Server.class);
+
+for (Diagnostic d : problems.diagnostics()) {
     System.out.println(d.path() + ": " + d.message());   // /hostname: …, /address: …
 }
+```
+
+`withDiagnostics` returns a *new* reader and leaves the original fail-fast; it works the same on
+`TsonTreeReader` and on the schema-aware readers from `tson.treeReader()`/`objectReader()`. The receiver is
+a plain `void report(Diagnostic)` sink, so a caller wanting neither built-in behaviour — write each problem
+to stdout as it arrives, stop after twenty, feed a metrics counter — implements it directly.
+
+A per-type `TsonValueReader` from a compiled schema (§4 below) has no such method — it's a single-method
+interface, and the receiver travels on the read context instead:
+
+```java
+var problems = TsonDiagnosticsReceiver.collecting();
+var value = compiled.get("server").read(TsonReadContext.document(source, problems));
 ```
 
 ### 2. Walk a generic tree — `TsonDataParser`

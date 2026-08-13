@@ -21,8 +21,9 @@ class TsonReadContextTest {
         return new TokenEvent(text, TokenForm.UNQUOTED, position);
     }
 
+    /** A context over {@code events} whose diagnostics are collected but not inspected -- for the cursor/path tests. */
     private static TsonReadContext contextOver(TsonEvent... events) {
-        return TsonReadContext.collecting(new ListEventSource(List.of(events)));
+        return TsonReadContext.of(new ListEventSource(List.of(events)), new TsonDiagnosticsCollector());
     }
 
     @Test
@@ -101,10 +102,9 @@ class TsonReadContextTest {
     }
 
     @Test
-    void throwingContextFailFastIsTrueAndThrowsImmediatelyOnReport() {
+    void theThrowingReceiverThrowsImmediatelyOnReport() {
         TsonReadContext ctx = TsonReadContext.throwing(new ListEventSource(List.of()));
 
-        assertTrue(ctx.failFast());
         TsonReadException thrown = assertThrows(TsonReadException.class,
                 () -> ctx.report(Diagnostic.Code.TYPE_MISMATCH, "boom", "a thing", "another thing"));
 
@@ -115,31 +115,52 @@ class TsonReadContextTest {
     }
 
     @Test
-    void collectingContextFailFastIsFalseAndAccumulatesWithoutThrowing() {
-        TsonReadContext ctx = TsonReadContext.collecting(new ListEventSource(List.of()));
+    void aCollectingReceiverAccumulatesWithoutThrowing() {
+        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+        TsonReadContext ctx = TsonReadContext.of(new ListEventSource(List.of()), problems);
 
-        assertFalse(ctx.failFast());
+        assertTrue(problems.isEmpty());
         ctx.report(Diagnostic.Code.FIELD_REQUIRED, "first problem", "x", "y");
         ctx.field("nested").report(Diagnostic.Code.TYPE_MISMATCH, "second problem", "a", "b");
 
-        assertEquals(2, ctx.diagnostics().size());
-        assertEquals("first problem", ctx.diagnostics().get(0).message());
-        assertEquals("", ctx.diagnostics().get(0).path());
-        assertEquals("second problem", ctx.diagnostics().get(1).message());
-        assertEquals("/nested", ctx.diagnostics().get(1).path());
+        assertEquals(2, problems.diagnostics().size());
+        assertEquals("first problem", problems.diagnostics().get(0).message());
+        assertEquals("", problems.diagnostics().get(0).path());
+        assertEquals("second problem", problems.diagnostics().get(1).message());
+        assertEquals("/nested", problems.diagnostics().get(1).path());
+    }
+
+    @Test
+    void reportedCountsEveryProblemAcrossScopedCopiesWhateverTheReceiverDoesWithThem() {
+        // A receiver that keeps nothing at all -- reported() still has to answer, since that is what the
+        // readers' own "did my children complain?" checkpoints are built on.
+        TsonReadContext ctx = TsonReadContext.of(new ListEventSource(List.of()), diagnostic -> { });
+
+        assertEquals(0, ctx.reported());
+        ctx.report(Diagnostic.Code.FIELD_REQUIRED, "first", "x", "y");
+        assertEquals(1, ctx.reported());
+
+        TsonReadContext scoped = ctx.field("nested");
+        scoped.report(Diagnostic.Code.TYPE_MISMATCH, "second", "a", "b");
+
+        // One cursor per read, so the count is shared by every copy, in both directions.
+        assertEquals(2, scoped.reported());
+        assertEquals(2, ctx.reported());
     }
 
     @Test
     void reportedDiagnosticCarriesTheCurrentPathPositionAndSchemaPosition() {
         Position dataPosition = new Position(4, 2, 30);
         SourcePosition schemaPosition = new Position(10, 1, 100);
-        TsonReadContext ctx = contextOver(token("42", dataPosition));
+        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+        TsonReadContext ctx = TsonReadContext.of(
+                new ListEventSource(List.of(token("42", dataPosition))), problems);
 
         TsonReadContext scoped = ctx.withSchemaPosition(Optional.of(schemaPosition)).field("value");
         scoped.peek();
         scoped.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, "out of range", "0..100", "200");
 
-        Diagnostic diagnostic = ctx.diagnostics().get(0);
+        Diagnostic diagnostic = problems.diagnostics().get(0);
         assertEquals("/value", diagnostic.path());
         assertEquals(Optional.of(dataPosition), diagnostic.dataPosition());
         assertEquals(Optional.of(schemaPosition), diagnostic.schemaPosition());

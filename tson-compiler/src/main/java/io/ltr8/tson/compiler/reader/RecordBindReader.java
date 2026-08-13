@@ -180,7 +180,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         if (shapeResult.shape() == Shape.MISMATCH) {
             return null;
         }
-        int diagnosticsBefore = ctx.diagnostics().size();
+        int diagnosticsBefore = ctx.reported();
         Object[] arguments = new Object[descriptor.fields().length];
         if (annotationsCarrier != null) {
             // Always written, even when nothing was annotated: `arguments` is sized by the Java class and
@@ -222,7 +222,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         }
         validateGroups(anchoredCtx, seen);
 
-        if (ctx.diagnostics().size() > diagnosticsBefore) {
+        if (ctx.reported() > diagnosticsBefore) {
             // Collecting mode, and at least one of this record's own fields already failed -- a bound
             // Java constructor (unlike a DOM Map) can't tolerate a null argument for a primitive-typed
             // parameter, so building it now would risk a confusing secondary NPE instead of the one

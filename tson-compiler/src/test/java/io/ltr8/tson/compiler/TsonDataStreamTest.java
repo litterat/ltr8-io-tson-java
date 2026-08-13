@@ -201,6 +201,14 @@ class TsonDataStreamTest {
     }
 
     @Test
+    void contentAfterTheDocumentsValueIsAParseErrorFromTheStreamItself() {
+        // RootFrame rejects it before ever emitting DocumentEnd, so no reader has to police trailing
+        // content on top -- a whole-document read reaching DocumentEnd has already been guaranteed it.
+        TsonParseException thrown = assertThrows(TsonParseException.class, () -> shape("{ a: 1 } junk"));
+        assertTrue(thrown.getMessage().contains("unexpected content after the document's value"), thrown::getMessage);
+    }
+
+    @Test
     void zeroWidthSeparationBetweenFieldsIsParseError() {
         assertThrows(TsonParseException.class, () -> shape("{ a: \"x\"b: \"y\" }"));
     }

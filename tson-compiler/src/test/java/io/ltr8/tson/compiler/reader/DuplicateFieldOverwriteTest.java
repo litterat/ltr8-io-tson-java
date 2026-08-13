@@ -2,6 +2,7 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
+import io.ltr8.tson.compiler.TsonDiagnosticsCollector;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
 import io.ltr8.tson.compiler.TsonCompiledSchemaRegistry;
@@ -53,16 +54,17 @@ class DuplicateFieldOverwriteTest {
 
         // "value" appears twice: first as 999 (out of int8's own -128..127 range), then as 42 (valid).
         String dataSource = "{ value: 999  value: 42 }";
-        TsonReadContext ctx = TsonReadContext.collecting(dataSource);
+        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("holder").read(ctx));
+        Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode)
+                compiled.get("holder").read(TsonReadContext.document(dataSource, problems)));
 
         // The malformed first occurrence was genuinely read/validated -- exactly one diagnostic,
         // for the out-of-range 999, not silently skipped the way pre-streaming backward-scan-and-
         // skip would have (it never touched a shadowed value at all).
-        assertEquals(1, ctx.diagnostics().size(), ctx.diagnostics().toString());
-        assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, ctx.diagnostics().get(0).code());
+        assertEquals(1, problems.diagnostics().size(), problems.diagnostics().toString());
+        assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, problems.diagnostics().get(0).code());
 
         // Despite that, the field's own final stored value is the second, valid occurrence --
         // forward overwrite, matching §2.5's "last value wins". DOM mode still narrows a real

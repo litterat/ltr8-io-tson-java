@@ -164,9 +164,9 @@ public final class Tson {
             return List.of(problem(Diagnostic.Code.UNKNOWN_TYPE, e.getMessage()));
         }
 
-        TsonReadContext ctx = TsonReadContext.collecting(stream);
-        reader.read(ctx);
-        return ctx.diagnostics();
+        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        reader.read(TsonReadContext.of(stream, problems));
+        return problems.diagnostics();
     }
 
     /**

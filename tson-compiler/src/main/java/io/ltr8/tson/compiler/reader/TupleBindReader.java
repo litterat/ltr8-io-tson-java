@@ -56,9 +56,9 @@ final class TupleBindReader extends TupleAbstractReader<Object> {
         if (!expectTupleStart(ctx)) {
             return null;
         }
-        int diagnosticsBefore = ctx.diagnostics().size();
+        int diagnosticsBefore = ctx.reported();
         Object[] decoded = decode(ctx);
-        if (ctx.diagnostics().size() > diagnosticsBefore) {
+        if (ctx.reported() > diagnosticsBefore) {
             // Same reasoning as RecordBindReader.read -- a bound constructor can't tolerate a null
             // argument for a primitive-typed position, so skip it once collecting mode already
             // reported a problem with one of this tuple's own elements.

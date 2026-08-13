@@ -144,17 +144,18 @@ final class AnnotationCapture {
      * @disjoint}, {@code @numeric}) and false of, say, a text-targeted {@code @doc}.
      *
      * <p>There is no value in the stream to hand the reader, so one absent event is synthesised at the
-     * annotation's own position and read through a throwaway collecting context. Only whether it complained
-     * is used -- its diagnostics carry that context's paths, not this read's, so a single reported problem
-     * here is more useful than forwarding several with misleading locations.
+     * annotation's own position and read through a throwaway context whose receiver discards what it is
+     * given. Only whether the reader complained is used -- those diagnostics carry the probe's own paths,
+     * not this read's, so a single reported problem here is more useful than forwarding several with
+     * misleading locations.
      */
     private static void checkBareAdmitted(TsonReadContext ctx, AnnotationStart start, TsonValueReader<?> reader) {
-        TsonReadContext probe =
-                TsonReadContext.collecting(new ListEventSource(List.of(new AbsentEvent(start.position()))));
+        TsonReadContext probe = TsonReadContext.of(
+                new ListEventSource(List.of(new AbsentEvent(start.position()))), diagnostic -> { });
         boolean admitted;
         try {
             reader.read(probe);
-            admitted = probe.diagnostics().isEmpty();
+            admitted = probe.reported() == 0;
         } catch (RuntimeException e) {
             admitted = false;
         }

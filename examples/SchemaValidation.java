@@ -30,11 +30,12 @@ void main() {
     IO.println("hostname: " + server.get("hostname").asString().orElseThrow());   // web-01
     IO.println("port:     " + server.at("/port").asNumber().orElseThrow());        // 8080
 
-    // A bad value surfaces as a diagnostic rather than a wrong result. Collect every problem in one
-    // pass instead of stopping at the first:
-    var ctx = TsonReadContext.collecting("{ hostname: \"web-01\"  port: 99999999999999 }");   // out of int32 range
-    reader.read(ctx);
-    for (Diagnostic d : ctx.diagnostics()) {
+    // A bad value surfaces as a diagnostic rather than a wrong result. Reading through a context built
+    // with a collecting receiver gathers every problem in one pass instead of stopping at the first:
+    var problems = TsonDiagnosticsReceiver.collecting();
+    var bad = "{ hostname: \"web-01\"  port: 99999999999999 }";   // port is out of int32 range
+    reader.read(TsonReadContext.document(bad, problems));
+    for (Diagnostic d : problems.diagnostics()) {
         IO.println("problem: " + d.path() + " -- " + d.message());
     }
 }

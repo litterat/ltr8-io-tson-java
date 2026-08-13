@@ -77,16 +77,17 @@ class TsonObjectReaderStreamingTest {
         String source = "{ first: [1]  second: [2] }";
         TsonDataStream stream = new TsonDataStream(source);
         stream.next(); // DocumentStart
-        TsonReadContext ctx = TsonReadContext.collecting(stream);
+        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+        TsonReadContext ctx = TsonReadContext.of(stream, problems);
 
         TwoFields result = new TsonObjectReader().read(ctx, TwoFields.class);
 
-        assertEquals(2, ctx.diagnostics().size(), ctx.diagnostics().toString());
-        assertEquals("/first", ctx.diagnostics().get(0).path());
-        assertEquals(Diagnostic.Code.TYPE_MISMATCH, ctx.diagnostics().get(0).code());
-        assertEquals("/second", ctx.diagnostics().get(1).path());
+        assertEquals(2, problems.diagnostics().size(), problems.diagnostics().toString());
+        assertEquals("/first", problems.diagnostics().get(0).path());
+        assertEquals(Diagnostic.Code.TYPE_MISMATCH, problems.diagnostics().get(0).code());
+        assertEquals("/second", problems.diagnostics().get(1).path());
         // A constructor can't take nulls for its primitive long parameters, so no object is built --
-        // the caller already has both problems from ctx.diagnostics().
+        // the caller already has both problems from the collector.
         assertNull(result);
     }
 }
