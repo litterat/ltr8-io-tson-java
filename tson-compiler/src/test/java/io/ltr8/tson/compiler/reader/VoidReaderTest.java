@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonReadException;
 import org.junit.jupiter.api.Test;
 
@@ -15,12 +16,13 @@ class VoidReaderTest {
 
     @Test
     void acceptsTheAbsentSentinelAndReadsAsNull() {
-        assertNull(READER.read("_"));
+        assertNull(READER.read(TsonReadContext.document("_")));
     }
 
     @Test
     void rejectsAnOrdinaryToken() {
-        TsonReadException thrown = assertThrows(TsonReadException.class, () -> READER.read("hello"));
+        TsonReadException thrown = assertThrows(TsonReadException.class, () -> READER
+                .read(TsonReadContext.document("hello")));
         assertTrue(thrown.getMessage().contains("void"));
     }
 }

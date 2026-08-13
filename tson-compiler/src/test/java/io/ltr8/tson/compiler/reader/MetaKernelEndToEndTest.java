@@ -2,6 +2,7 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
+import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -78,7 +79,8 @@ class MetaKernelEndToEndTest {
         TsonCompiledSchema compiled = compiled();
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("top").read("{}"));
+        Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("top")
+                .read(TsonReadContext.document("{}")));
 
         assertEquals(Map.of(), result);
     }
@@ -88,7 +90,8 @@ class MetaKernelEndToEndTest {
         TsonCompiledSchema compiled = compiled();
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("top").read("!top {}"));
+        Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("top")
+                .read(TsonReadContext.document("!top {}")));
 
         assertEquals(Map.of(), result);
     }
@@ -100,7 +103,8 @@ class MetaKernelEndToEndTest {
         TsonCompiledSchema compiled = compiled();
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("enum").read("{ members: [true false] }"));
+        Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("enum")
+                .read(TsonReadContext.document("{ members: [true false] }")));
 
         assertEquals(List.of("true", "false"), result.get("members"));
     }
@@ -110,7 +114,8 @@ class MetaKernelEndToEndTest {
         TsonCompiledSchema compiled = compiled();
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("integer_size").read("{ bits: 32 signed: true }"));
+        Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("integer_size")
+                .read(TsonReadContext.document("{ bits: 32 signed: true }")));
 
         assertEquals(BigInteger.valueOf(32), result.get("bits"));
         assertEquals(true, result.get("signed")); // boolean => !enum [true false] -- a real Boolean in tree mode
@@ -121,7 +126,8 @@ class MetaKernelEndToEndTest {
         TsonCompiledSchema compiled = compiled();
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("field_group").read("{ members: [foo bar] state: OPTIONAL }"));
+        Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("field_group")
+                .read(TsonReadContext.document("{ members: [foo bar] state: OPTIONAL }")));
 
         assertEquals(List.of("foo", "bar"), result.get("members"));
         assertEquals("OPTIONAL", result.get("state"));
@@ -132,7 +138,8 @@ class MetaKernelEndToEndTest {
         TsonCompiledSchema compiled = compiled();
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("tuple_element").read("{ element_type: { name: text arguments: [] } state: REQUIRED }"));
+        Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("tuple_element")
+                .read(TsonReadContext.document("{ element_type: { name: text arguments: [] } state: REQUIRED }")));
 
         assertEquals("REQUIRED", result.get("state"));
         @SuppressWarnings("unchecked")

@@ -1,6 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TsonCompiledSchema;
+import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -43,7 +44,8 @@ class TupleTreeReaderTest {
 
     @SuppressWarnings("unchecked")
     private static List<Object> readTuple(TsonCompiledSchema compiled, String source) {
-        return (List<Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("pair").read(source));
+        return (List<Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("pair")
+                .read(TsonReadContext.document(source)));
     }
 
     private static TupleBody twoRequiredSlots() {

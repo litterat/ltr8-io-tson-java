@@ -1,12 +1,13 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TsonCompiledSchema;
+import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.schema.TsonLinkedSchema;
-import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaLinker;
+import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
@@ -68,7 +69,8 @@ class VariantTreeReaderTest {
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> read(TsonCompiledSchema compiled, String rootName, String source) {
-        return (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get(rootName).read(source));
+        return (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get(rootName)
+                .read(TsonReadContext.document(source)));
     }
 
     private static Map<String, Object> read(TsonCompiledSchema compiled, String source) {

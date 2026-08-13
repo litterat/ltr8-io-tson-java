@@ -10,7 +10,6 @@ import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.compiler.stream.AbsentEvent;
 import io.ltr8.tson.compiler.stream.ArrayEnd;
 import io.ltr8.tson.compiler.stream.ArrayStart;
-import io.ltr8.tson.compiler.stream.DocumentEnd;
 import io.ltr8.tson.compiler.stream.EmptyBraceEvent;
 import io.ltr8.tson.compiler.stream.FieldName;
 import io.ltr8.tson.compiler.stream.MapEnd;
@@ -29,7 +28,6 @@ import io.ltr8.tson.tree.RecordNode;
 import io.ltr8.tson.tree.TsonAnnotation;
 import io.ltr8.tson.tree.TsonNode;
 
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -69,32 +67,13 @@ public final class SchemalessTreeReader {
     public SchemalessTreeReader() {
     }
 
-    /** TSON text straight to a {@link TsonNode} tree. */
-    public TsonNode read(String source) {
-        return readDocument(TsonReadContext.throwing(source));
-    }
-
-    /** As {@link #read(String)}, from a stream (read incrementally off a {@link TsonDataStream}). */
-    public TsonNode read(InputStream source) {
-        return readDocument(TsonReadContext.throwing(source));
-    }
-
     /**
-     * Reads one value at {@code ctx}'s current position into a tree -- frame-free (no trailing-content
-     * check), for a caller managing their own {@link TsonReadContext}; the {@code String}/{@code
-     * InputStream} entry points wrap this with whole-document framing.
+     * Reads one value at {@code ctx}'s current position into a tree -- frame-free, for a caller managing
+     * their own {@link TsonReadContext}. Whole-document framing (consuming the leading {@code
+     * DocumentStart}) belongs to {@link TsonReadContext#document}, which builds the context.
      */
     public TsonNode read(TsonReadContext ctx) {
         return readNode(ctx);
-    }
-
-    private TsonNode readDocument(TsonReadContext ctx) {
-        TsonNode root = readNode(ctx);
-        TsonEvent trailing = ctx.next();
-        if (!(trailing instanceof DocumentEnd)) {
-            throw new IllegalStateException("unexpected trailing event after the document's value: " + trailing);
-        }
-        return root;
     }
 
     /** Reads one data-value: its leading annotations and optional type-ref (§2.3), then its core-value. */

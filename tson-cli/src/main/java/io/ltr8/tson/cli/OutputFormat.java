@@ -1,6 +1,7 @@
 package io.ltr8.tson.cli;
 
 import io.ltr8.tson.compiler.TsonObjectWriter;
+import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonWriteException;
 
 import java.util.Locale;
@@ -108,7 +109,7 @@ enum OutputFormat {
         try {
             String text = new TsonObjectWriter().toTson(report);
             Object reread = DiagnosticsSchema.compiled().get("validation_report")
-                    .read(text);
+                    .read(TsonReadContext.document(text));
             if (!(reread instanceof ValidationReport)) {
                 throw new IllegalStateException("diagnostics.tn1's own validation_report read back as "
                         + reread.getClass() + ", not ValidationReport");

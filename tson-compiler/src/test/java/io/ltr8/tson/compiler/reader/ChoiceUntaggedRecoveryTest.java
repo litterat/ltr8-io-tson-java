@@ -62,7 +62,7 @@ class ChoiceUntaggedRecoveryTest {
     }
 
     private static Object read(TsonValueReader<?> reader, String data) {
-        return reader.read(TsonReadContext.throwing(data));
+        return reader.read(TsonReadContext.document(data));
     }
 
     @Test

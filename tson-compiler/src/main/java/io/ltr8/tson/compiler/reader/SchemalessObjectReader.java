@@ -30,7 +30,6 @@ import io.ltr8.tson.compiler.stream.AnnotationEnd;
 import io.ltr8.tson.compiler.stream.AnnotationStart;
 import io.ltr8.tson.compiler.stream.ArrayEnd;
 import io.ltr8.tson.compiler.stream.ArrayStart;
-import io.ltr8.tson.compiler.stream.DocumentEnd;
 import io.ltr8.tson.compiler.stream.EmptyBraceEvent;
 import io.ltr8.tson.compiler.stream.FieldName;
 import io.ltr8.tson.compiler.stream.MapEnd;
@@ -42,7 +41,6 @@ import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TypeRef;
 
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -105,22 +103,12 @@ public final class SchemalessObjectReader {
 
     // ── Entry points ─────────────────────────────────────────────────────
 
-    /** Reads {@code source}'s own root value, fail-fast, into {@code targetClass} -- throws {@link TsonReadException} on the first problem. */
-    public <T> T read(String source, Class<T> targetClass) {
-        return readDocument(TsonReadContext.throwing(source), targetClass);
-    }
-
-    /** The streaming counterpart to {@link #read(String, Class)} -- binds {@code source}'s own bytes (UTF-8) genuinely, never buffering the whole document into a {@code String} first; {@code source} is not closed here. */
-    public <T> T read(InputStream source, Class<T> targetClass) {
-        return readDocument(TsonReadContext.throwing(source), targetClass);
-    }
-
     /**
-     * Binds one value at {@code ctx}'s current position into {@code targetClass}. The general form,
-     * for a caller managing their own {@link TsonReadContext} -- e.g. a {@link
-     * TsonReadContext#collecting collecting} context to gather every problem in one pass rather than
-     * throwing on the first. Does not check for document framing (no trailing-content check); use
-     * {@link #read(String, Class)}/{@link #read(InputStream, Class)} for a whole document.
+     * Binds one value at {@code ctx}'s current position into {@code targetClass}. The general form, for a
+     * caller managing their own {@link TsonReadContext} -- one built with a collecting {@link
+     * io.ltr8.tson.compiler.TsonDiagnosticsReceiver} gathers every problem in one pass rather than throwing
+     * on the first. Frame-free: whole-document framing belongs to {@link TsonReadContext#document}, which
+     * builds the context.
      */
     @SuppressWarnings("unchecked")
     public <T> T read(TsonReadContext ctx, Class<T> targetClass) {
@@ -129,15 +117,6 @@ public final class SchemalessObjectReader {
             return null;
         }
         return (T) bind(ctx, dataClass);
-    }
-
-    private <T> T readDocument(TsonReadContext ctx, Class<T> targetClass) {
-        T result = read(ctx, targetClass);
-        TsonEvent trailing = ctx.next();
-        if (!(trailing instanceof DocumentEnd)) {
-            throw new IllegalStateException("unexpected trailing event after the document's value: " + trailing);
-        }
-        return result;
     }
 
     /** Resolves {@code targetClass}'s own descriptor; a class {@code tson-bind} can't analyze (e.g. two {@code Annotations} components) is reported as a {@code SCHEMA_ERROR}, not silently. */

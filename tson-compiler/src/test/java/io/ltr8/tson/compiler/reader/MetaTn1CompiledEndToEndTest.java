@@ -2,16 +2,17 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.*;
-import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
 import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
+import io.ltr8.tson.compiler.TsonReadContext;
+import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
+import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.resolver.SchemaResolver;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.schema.TsonSchemaLinker;
+import io.ltr8.tson.schema.TsonSchemaRegistry;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -89,7 +90,8 @@ class MetaTn1CompiledEndToEndTest {
         TsonLinkedSchema meta = registerMeta();
         TsonCompiledSchema compiled = rawCompile(meta);
 
-        Object result = Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("binary_encoding").read("BASE64"));
+        Object result = Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("binary_encoding")
+                .read(TsonReadContext.document("BASE64")));
 
         assertEquals("BASE64", result);
     }

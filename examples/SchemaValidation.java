@@ -26,7 +26,7 @@ void main() {
     var compiled = tson.treeRegistry().compile(tson.resolve(schema));
     var reader = compiled.get("server");
 
-    TsonNode server = (TsonNode) reader.read("{ hostname: \"web-01\"  port: 8080 }");
+    TsonNode server = (TsonNode) reader.read(TsonReadContext.document("{ hostname: \"web-01\"  port: 8080 }"));
     IO.println("hostname: " + server.get("hostname").asString().orElseThrow());   // web-01
     IO.println("port:     " + server.at("/port").asNumber().orElseThrow());        // 8080
 

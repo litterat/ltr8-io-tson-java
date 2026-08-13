@@ -3,10 +3,6 @@ package io.ltr8.tson.compiler;
 import io.ltr8.tson.compiler.atom.AtomType;
 import io.ltr8.tson.compiler.reader.ValueReaderFactory;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
-import io.ltr8.tson.compiler.stream.DocumentEnd;
-import io.ltr8.tson.compiler.stream.TsonEvent;
-
-import java.io.InputStream;
 
 /**
  * Reads a value at one compiled, schema-known position -- the front door a caller actually holds
@@ -30,6 +26,21 @@ import java.io.InputStream;
  * tree walk's own error sink, current path, and position tracking, shared across an entire read so a
  * problem at one field/element doesn't have to abort the whole read to be reported; see that
  * interface's own Javadoc.
+ *
+ * <p><b>One method, and no source or policy overloads.</b> Everything a whole-document read needs beyond
+ * this is carried by the context: {@link TsonReadContext#document} builds one over a {@code String} or
+ * {@code InputStream}, consuming the leading {@code DocumentStart}, and the {@link TsonDiagnosticsReceiver}
+ * it is given decides whether the first problem throws or every problem is collected.
+ *
+ * <pre>{@code
+ * var value = compiled.get("person").read(TsonReadContext.document(source));
+ *
+ * var problems = TsonDiagnosticsReceiver.collecting();
+ * var partial = compiled.get("person").read(TsonReadContext.document(source, problems));
+ * }</pre>
+ *
+ * <p>Trailing content after the document's value needs no check here -- {@code TsonDataStream}'s own root
+ * frame rejects it before ever emitting {@code DocumentEnd}.
  *
  * <p><b>Unchecked failures only, deliberately</b> -- every exception this whole read/parse stack
  * throws is a {@link RuntimeException} (the lexer's own {@code LexException}, {@code
@@ -56,37 +67,4 @@ import java.io.InputStream;
 public interface TsonValueReader<T> {
 
     T read(TsonReadContext ctx);
-
-    /**
-     * Convenience for a caller with real source text and no document-level metadata ({@code !!id}/
-     * {@code !!schema}) or context of their own to manage -- fail-fast, single-error. Reads the whole
-     * document's own root value and confirms there's no trailing content after it.
-     *
-     * <p>To collect every problem instead of stopping at the first, pass a context carrying a collecting
-     * receiver -- {@code read(TsonReadContext.document(source, problems))}. The policy travels on the
-     * context, so this interface needs nothing of its own to express it.
-     */
-    default T read(String source) {
-        return readDocument(TsonReadContext.throwing(source));
-    }
-
-    /**
-     * The streaming counterpart to {@link #read(String)} -- reads the whole document's own bytes
-     * (UTF-8) genuinely off {@code source}, never buffering it into a {@link String} first, so a
-     * large file is never fully resident. {@code source} is not closed here; a caller that opened it
-     * owns closing it.
-     */
-    default T read(InputStream source) {
-        return readDocument(TsonReadContext.throwing(source));
-    }
-
-    /** Reads the root value through {@code ctx} (already positioned past {@code DocumentStart}), then confirms the next event is {@code DocumentEnd} -- no trailing content after the document's value. */
-    private T readDocument(TsonReadContext ctx) {
-        T result = read(ctx);
-        TsonEvent trailing = ctx.next();
-        if (!(trailing instanceof DocumentEnd)) {
-            throw new IllegalStateException("unexpected trailing event after the document's value: " + trailing);
-        }
-        return result;
-    }
 }

@@ -143,7 +143,7 @@ The write side is the mirror: a value in hand, TSON text out. The matrix:
 | a Java object | it as TSON text | **`tson.objectWriter()`** | a `String` |
 | a `TsonNode` tree | it as TSON text | **`tson.treeWriter()`** | a `String` |
 | a data document | every problem, not the value | **`tson.validate()`** | a `List<Diagnostic>` |
-| a data document | the value **and** every problem | **`.withDiagnostics(…)`** on any reader | the value + a `List<Diagnostic>` |
+| a data document | the value **and** every problem | **`.withDiagnostics(…)`** on either facade reader | the value + a `List<Diagnostic>` |
 | a data document | a grammar-faithful AST | **`TsonDataParser`** | a `Document` AST |
 | a data document | to pull events lazily | **`TsonDataStream`** | a `TsonEvent` stream |
 
@@ -154,8 +154,12 @@ declares none — the object form also checking your target class against the sc
 `readWithoutSchema(…)` opts a reader back out to a pure schemaless read. When your *data* isn't
 self-describing but you hold the schema out of band, compile it once through a registry
 (`tson.treeRegistry()`/`bindRegistry()`) and reuse the per-type `TsonValueReader`. All of these stream
-their input — a large document is never fully buffered before reading begins — and take a `String` or an
-`InputStream`.
+their input — a large document is never fully buffered before reading begins.
+
+The facade readers take a `String` or an `InputStream` directly. `TsonValueReader` is a strict
+single-method interface — `T read(TsonReadContext ctx)` — so it takes neither: wrap your source with
+`TsonReadContext.document(source)`, which handles the document framing and carries the diagnostics
+receiver, keeping both the source form and the error policy off the interface itself.
 
 **No `Tson`?** The reader and writer classes construct directly for lightweight, schemaless (Class 1) use
 with no standard-library bootstrap — `new TsonTreeReader()`, `new TsonObjectReader()`, `new
@@ -289,7 +293,8 @@ String schema = """
 
 var compiled = tson.treeRegistry().compile(tson.resolve(schema));
 
-TsonNode value = compiled.get("server").read("{ hostname: \"web-01\" port: 8080 }");
+TsonNode value = (TsonNode) compiled.get("server")
+        .read(TsonReadContext.document("{ hostname: \"web-01\" port: 8080 }"));
 value.get("hostname").asString();          // Optional[web-01] — validated against the schema
 value.get("port").asBigInteger();          // Optional[8080] — a bad port would surface as a diagnostic
 ```

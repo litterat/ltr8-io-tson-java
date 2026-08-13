@@ -76,8 +76,8 @@ class ValueReaderFactoryRegistryTest {
                 .resolve("enum").create("boolean", booleanEntry, CONTEXT);
 
         // Both use the object-binding enum factory, so boolean reads as a real Boolean (tree wraps it in an AtomNode).
-        assertEquals(Boolean.TRUE, Dom.of((io.ltr8.tson.tree.TsonNode) treeReader.read("true")));
-        assertEquals(Boolean.TRUE, bindReader.read("true"));
+        assertEquals(Boolean.TRUE, Dom.of((io.ltr8.tson.tree.TsonNode) treeReader.read(TsonReadContext.document("true"))));
+        assertEquals(Boolean.TRUE, bindReader.read(TsonReadContext.document("true")));
     }
 
     @Test
@@ -90,7 +90,7 @@ class ValueReaderFactoryRegistryTest {
         TsonValueReader<?> bindReader = ValueReaderFactoryRegistry.bind(SchemaMetaNameBinder.defaultContext())
                 .resolve("enum").create("status", statusEntry, CONTEXT);
 
-        assertEquals("ACTIVE", Dom.of((io.ltr8.tson.tree.TsonNode) treeReader.read("ACTIVE")));
-        assertEquals("ACTIVE", bindReader.read("ACTIVE"));
+        assertEquals("ACTIVE", Dom.of((io.ltr8.tson.tree.TsonNode) treeReader.read(TsonReadContext.document("ACTIVE"))));
+        assertEquals("ACTIVE", bindReader.read(TsonReadContext.document("ACTIVE")));
     }
 }

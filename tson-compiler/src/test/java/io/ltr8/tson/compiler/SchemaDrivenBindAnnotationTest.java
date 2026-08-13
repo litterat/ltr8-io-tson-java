@@ -85,7 +85,7 @@ class SchemaDrivenBindAnnotationTest {
     }
 
     private static Widget read(String document) {
-        return (Widget) compile(Widget.class).get("widget").read(document);
+        return (Widget) compile(Widget.class).get("widget").read(TsonReadContext.document(document));
     }
 
     /**
@@ -152,7 +152,8 @@ class SchemaDrivenBindAnnotationTest {
     @Test
     void aClassWithoutACarrierIsUnaffected() {
         PlainWidget widget =
-                (PlainWidget) compile(PlainWidget.class).get("widget").read("@note:\"ignored\" { name: \"Widget\" }");
+                (PlainWidget) compile(PlainWidget.class).get("widget")
+                        .read(TsonReadContext.document("@note:\"ignored\" { name: \"Widget\" }"));
 
         assertEquals("Widget", widget.name());
     }
@@ -186,7 +187,7 @@ class SchemaDrivenBindAnnotationTest {
     @Test
     void anAnnotatedMapKeyKeepsItsAnnotationsAndStillResolvesByValue() {
         Catalogue catalogue = (Catalogue) compileCatalogue().get("catalogue")
-                .read("{ entries: { @note:\"the first\" \"a\" => \"one\"  \"b\" => \"two\" } }");
+                .read(TsonReadContext.document("{ entries: { @note:\"the first\" \"a\" => \"one\"  \"b\" => \"two\" } }"));
 
         assertEquals(2, catalogue.entries().size());
         // The plain Map contract is intact -- keys are Strings, not boxes.
@@ -202,7 +203,7 @@ class SchemaDrivenBindAnnotationTest {
     @Test
     void anUnannotatedMapKeyCarriesAnEmptyCarrier() {
         Catalogue catalogue = (Catalogue) compileCatalogue().get("catalogue")
-                .read("{ entries: { \"a\" => \"one\" } }");
+                .read(TsonReadContext.document("{ entries: { \"a\" => \"one\" } }"));
 
         assertEquals("a", catalogue.entries().keySet().iterator().next());
         assertTrue(catalogue.entries().getAnnotations("a").isEmpty());
@@ -233,7 +234,7 @@ class SchemaDrivenBindAnnotationTest {
     @Test
     void anArrayElementKeepsTheAnnotationsWrittenAtItsOwnPosition() {
         Basket basket = (Basket) compileAs("basket", Basket.class).get("basket")
-                .read("{ items: [ @note:\"first\" \"a\"  \"b\" ] }");
+                .read(TsonReadContext.document("{ items: [ @note:\"first\" \"a\"  \"b\" ] }"));
 
         assertEquals(List.of("a", "b"), basket.items().stream().map(Annotated::value).toList());
         assertEquals("first", basket.items().get(0).annotations().value("note", String.class).orElseThrow());
@@ -243,7 +244,7 @@ class SchemaDrivenBindAnnotationTest {
     // ── The boxed carrier, at a field position ───────────────────────────
 
     private static BoxedWidget readBoxed(String document) {
-        return (BoxedWidget) compile(BoxedWidget.class).get("widget").read(document);
+        return (BoxedWidget) compile(BoxedWidget.class).get("widget").read(TsonReadContext.document(document));
     }
 
     /**

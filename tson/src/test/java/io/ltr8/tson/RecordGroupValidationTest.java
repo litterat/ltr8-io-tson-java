@@ -1,5 +1,6 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonValueReader;
 import org.junit.jupiter.api.Test;
@@ -34,20 +35,21 @@ class RecordGroupValidationTest {
 
     @Test
     void exactlyOneMemberValidates() {
-        contactReader().read("{ name: \"Ada\"  email: \"ada@example.com\" }"); // no exception
+        contactReader().read(TsonReadContext.document("{ name: \"Ada\"  email: \"ada@example.com\" }")); // no exception
     }
 
     @Test
     void twoPresentMembersAreRejected() {
         TsonReadException e = assertThrows(TsonReadException.class,
-                () -> contactReader().read("{ name: \"Ada\"  email: \"ada@example.com\"  phone: \"111\" }"));
+                () -> contactReader()
+                        .read(TsonReadContext.document("{ name: \"Ada\"  email: \"ada@example.com\"  phone: \"111\" }")));
         assertTrue(e.getMessage().contains("at most one"), e.getMessage());
     }
 
     @Test
     void zeroPresentMembersAreRejectedForARequiredGroup() {
         TsonReadException e = assertThrows(TsonReadException.class,
-                () -> contactReader().read("{ name: \"Ada\" }"));
+                () -> contactReader().read(TsonReadContext.document("{ name: \"Ada\" }")));
         assertTrue(e.getMessage().contains("exactly one"), e.getMessage());
     }
 }

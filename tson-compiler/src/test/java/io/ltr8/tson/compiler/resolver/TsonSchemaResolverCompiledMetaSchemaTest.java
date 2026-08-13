@@ -1,13 +1,14 @@
 package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.bind.DataBindContext;
+import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
+import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
+import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
-import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
-import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
-import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
@@ -130,7 +131,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
         TsonCompiledMetaSchema compiledMeta = loader.loadMeta(coreDocument.meta());
         Object result = compiledMeta.compiledSchema().get("binary_encoding")
-                .read("BASE64");
+                .read(TsonReadContext.document("BASE64"));
 
         assertEquals("BASE64", result);
     }
@@ -164,7 +165,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
         TsonCompiledMetaSchema compiledMetaKernel = loader.loadMeta(metaDocument.meta());
         Object result = compiledMetaKernel.compiledSchema().get("product_access_type")
-                .read("INDEX");
+                .read(TsonReadContext.document("INDEX"));
 
         assertEquals("INDEX", result);
     }
@@ -374,7 +375,8 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         assertEquals(58, compiled.schema().entries().size());
         // Genuinely usable: a concrete entry reads cleanly (the marker root `top` deliberately can't be
         // read without an explicit type-ref, so it isn't the check here).
-        assertNotNull(compiled.compiledSchema().get("integer_size").read("{ bits: 8 signed: true }"));
+        assertNotNull(compiled.compiledSchema().get("integer_size")
+                .read(TsonReadContext.document("{ bits: 8 signed: true }")));
     }
 
     @Test
@@ -434,7 +436,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         TsonCompiledMetaSchema compiled = loader.loadMeta(TsonBundledSchemas.META_ID);
 
         assertEquals("BASE64", compiled.compiledSchema().get("binary_encoding")
-                .read("BASE64"));
+                .read(TsonReadContext.document("BASE64")));
         // Still there, from the explicit pre-registration step above -- meta.tn's own resolution
         // didn't need to (and doesn't) re-register it.
         assertTrue(registry.get(TsonBundledSchemas.META_KERNEL_ID).isPresent());

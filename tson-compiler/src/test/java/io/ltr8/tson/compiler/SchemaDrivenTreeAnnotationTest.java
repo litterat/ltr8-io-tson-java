@@ -72,7 +72,8 @@ class SchemaDrivenTreeAnnotationTest {
         };
         TsonCompiledMetaRegistry core =
                 TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source);
-        return (TsonNode) TsonCompiledSchemaRegistry.tree(core).get(SCHEMA_ID).get("shape").read(data);
+        return (TsonNode) TsonCompiledSchemaRegistry.tree(core).get(SCHEMA_ID).get("shape")
+                .read(TsonReadContext.document(data));
     }
 
     private static List<String> names(TsonNode node) {

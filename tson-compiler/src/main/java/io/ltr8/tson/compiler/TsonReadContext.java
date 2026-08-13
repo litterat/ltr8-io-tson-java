@@ -149,12 +149,12 @@ public interface TsonReadContext {
     }
 
     /** Fail-fast over a whole document's own source text -- {@link #document(String, TsonDiagnosticsReceiver)} with the throwing receiver. */
-    static TsonReadContext throwing(String source) {
+    static TsonReadContext document(String source) {
         return document(source, TsonDiagnosticsReceiver.throwing());
     }
 
     /** Fail-fast over a whole document's own source bytes (UTF-8) -- {@link #document(InputStream, TsonDiagnosticsReceiver)} with the throwing receiver. */
-    static TsonReadContext throwing(InputStream source) {
+    static TsonReadContext document(InputStream source) {
         return document(source, TsonDiagnosticsReceiver.throwing());
     }
 

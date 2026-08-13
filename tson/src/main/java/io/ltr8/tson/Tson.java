@@ -30,7 +30,7 @@ import java.util.Optional;
  * <pre>{@code
  * Tson tson = Tson.builder().build();
  * TsonCompiledSchema compiled = tson.treeRegistry().compile(tson.resolve(schemaText));
- * TsonNode value = compiled.get("my_type").read(dataText);   // queryable, structure-preserving, typed
+ * TsonNode value = (TsonNode) compiled.get("my_type").read(TsonReadContext.document(dataText));
  * }</pre>
  *
  * <p><b>The read mode is which registry you hold, not a parameter.</b> {@link #treeRegistry()} reads into an
