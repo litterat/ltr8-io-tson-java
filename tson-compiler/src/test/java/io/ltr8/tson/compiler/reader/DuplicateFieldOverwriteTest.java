@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonDiagnosticsCollector;
@@ -58,7 +59,7 @@ class DuplicateFieldOverwriteTest {
 
         @SuppressWarnings("unchecked")
         Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode)
-                compiled.get("holder").read(TsonReadContext.document(dataSource, problems)));
+                compiled.get("holder").read(TestDocuments.document(dataSource, problems)));
 
         // The malformed first occurrence was genuinely read/validated -- exactly one diagnostic,
         // for the out-of-range 999, not silently skipped the way pre-streaming backward-scan-and-

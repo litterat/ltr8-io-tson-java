@@ -49,7 +49,7 @@ class TreeReadTest {
     @Test
     void readsAUserSchemaIntoAStructurePreservingTree() {
         TsonCompiledSchema compiled = TsonCompiledSchemaRegistry.tree(core()).get(SCHEMA_ID);
-        TsonNode shape = (TsonNode) compiled.get("shape").read(TsonReadContext.document(DATA));
+        TsonNode shape = (TsonNode) compiled.get("shape").read(TestDocuments.document(DATA));
 
         assertTrue(shape.isRecord());
         assertEquals(Optional.of("shape"), shape.typeRef());

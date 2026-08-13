@@ -35,21 +35,21 @@ class RecordGroupValidationTest {
 
     @Test
     void exactlyOneMemberValidates() {
-        contactReader().read(TsonReadContext.document("{ name: \"Ada\"  email: \"ada@example.com\" }")); // no exception
+        contactReader().read(TestDocuments.document("{ name: \"Ada\"  email: \"ada@example.com\" }")); // no exception
     }
 
     @Test
     void twoPresentMembersAreRejected() {
         TsonReadException e = assertThrows(TsonReadException.class,
                 () -> contactReader()
-                        .read(TsonReadContext.document("{ name: \"Ada\"  email: \"ada@example.com\"  phone: \"111\" }")));
+                        .read(TestDocuments.document("{ name: \"Ada\"  email: \"ada@example.com\"  phone: \"111\" }")));
         assertTrue(e.getMessage().contains("at most one"), e.getMessage());
     }
 
     @Test
     void zeroPresentMembersAreRejectedForARequiredGroup() {
         TsonReadException e = assertThrows(TsonReadException.class,
-                () -> contactReader().read(TsonReadContext.document("{ name: \"Ada\" }")));
+                () -> contactReader().read(TestDocuments.document("{ name: \"Ada\" }")));
         assertTrue(e.getMessage().contains("exactly one"), e.getMessage());
     }
 }

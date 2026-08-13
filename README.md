@@ -139,7 +139,7 @@ The write side is the mirror: a value in hand, TSON text out. The matrix:
 |---|---|---|---|
 | a data document + your Java class | it bound (validated if it self-describes) | **`tson.objectReader()`** | your object |
 | a data document | a queryable tree (validated if it self-describes) | **`tson.treeReader()`** | a `TsonNode` tree |
-| a TSON schema + a known type name | a reusable per-type reader | **`tson.treeRegistry()`/`bindRegistry()`** → **`TsonValueReader`** | a tree / your object |
+| a data document + a schema you hold | it validated as a named type | **`.withSchema(uri).readAs(…)`** on either reader | a tree / your object |
 | a Java object | it as TSON text | **`tson.objectWriter()`** | a `String` |
 | a `TsonNode` tree | it as TSON text | **`tson.treeWriter()`** | a `String` |
 | a data document | every problem, not the value | **`tson.validate()`** | a `List<Diagnostic>` |
@@ -152,14 +152,15 @@ The write side is the mirror: a value in hand, TSON text out. The matrix:
 and validate it against its own `!!schema` as they read, falling back to a schemaless read when it
 declares none — the object form also checking your target class against the schema's root type up front.
 `readWithoutSchema(…)` opts a reader back out to a pure schemaless read. When your *data* isn't
-self-describing but you hold the schema out of band, compile it once through a registry
-(`tson.treeRegistry()`/`bindRegistry()`) and reuse the per-type `TsonValueReader`. All of these stream
-their input — a large document is never fully buffered before reading begins.
+self-describing but you hold the schema out of band, `withSchema(uri).readAs(source, type)` supplies what
+the document didn't say. All of these stream their input — a large document is never fully buffered before
+reading begins — and take a `String` or an `InputStream`.
 
-The facade readers take a `String` or an `InputStream` directly. `TsonValueReader` is a strict
-single-method interface — `T read(TsonReadContext ctx)` — so it takes neither: wrap your source with
-`TsonReadContext.document(source)`, which handles the document framing and carries the diagnostics
-receiver, keeping both the source form and the error policy off the interface itself.
+**These two readers are the whole document-reading surface.** They own the `!!schema` decision, the
+target-class check, and the framing that rejects trailing content. `tson.treeRegistry()`/`bindRegistry()`
+and the per-type `TsonValueReader` they hand back are the layer underneath — useful for compiling a schema
+once and inspecting it, but `TsonValueReader` is a strict single-method interface (`T read(TsonReadContext
+ctx)`) that reads *one value at a cursor* and polices nothing around it.
 
 **No `Tson`?** The reader and writer classes construct directly for lightweight, schemaless (Class 1) use
 with no standard-library bootstrap — `new TsonTreeReader()`, `new TsonObjectReader()`, `new
@@ -228,12 +229,11 @@ for (Diagnostic d : problems.diagnostics()) {
 a plain `void report(Diagnostic)` sink, so a caller wanting neither built-in behaviour — write each problem
 to stdout as it arrives, stop after twenty, feed a metrics counter — implements it directly.
 
-A per-type `TsonValueReader` from a compiled schema (§4 below) has no such method — it's a single-method
-interface, and the receiver travels on the read context instead:
+It composes with `withSchema(…)` too, so an out-of-band read (§4 below) collects the same way:
 
 ```java
 var problems = TsonDiagnosticsReceiver.collecting();
-var value = compiled.get("server").read(TsonReadContext.document(source, problems));
+var value = tson.treeReader().withSchema(SERVER_ID).withDiagnostics(problems).readAs(source, "server");
 ```
 
 ### 2. Walk a generic tree — `TsonDataParser`
@@ -269,14 +269,12 @@ while (stream.hasNext()) {
 
 ▶ Runnable: [`examples/EventStream.java`](examples/EventStream.java) — `java --module-path tson/build/modules --add-modules io.ltr8.tson examples/EventStream.java`
 
-### 4. Validate against a TSON schema — `TsonValueReader`
+### 4. Validate against a schema you hold out of band — `withSchema`/`readAs`
 
 This is where the *schema layer* comes in: a schema document declares types, and a data document is
-validated against one of them. `Tson.builder().build()` bootstraps the standard library
-(meta-kernel/meta.tn/core.tn); `compile` turns your schema into fast, reusable per-type readers; then
-you `get` the reader for a type and `read` data against it. **Tree mode** produces an immutable,
-queryable `TsonNode` — structure-preserving (record vs map, array vs tuple), typed leaves, null-safe
-navigation, and no Java class per schema type:
+validated against one of them. Section 5 covers the usual case, where the *document* names its own schema.
+This one is for when it doesn't — you hold the schema yourself and say which type applies. `resolve`
+registers the schema by its `!!id`; `withSchema` points a reader at it; `readAs` names the type:
 
 ```java
 import io.ltr8.tson.Tson;
@@ -291,13 +289,19 @@ String schema = """
             server => { hostname: text  port: int32 }
         }""";
 
-var compiled = tson.treeRegistry().compile(tson.resolve(schema));
+tson.resolve(schema);
 
-TsonNode value = (TsonNode) compiled.get("server")
-        .read(TsonReadContext.document("{ hostname: \"web-01\" port: 8080 }"));
+TsonNode value = tson.treeReader()
+        .withSchema("https://example.com/2026/32/app/server-1.tn")
+        .readAs("{ hostname: \"web-01\"  port: 8080 }", "server");
+
 value.get("hostname").asString();          // Optional[web-01] — validated against the schema
-value.get("port").asBigInteger();          // Optional[8080] — a bad port would surface as a diagnostic
+value.get("port").as(Number.class);        // Optional[8080] — a bad port would surface as a diagnostic
 ```
+
+You supply exactly what a `!!schema` directive and a root type-ref would have said, and the validation is
+identical either way. `tson.objectReader().withSchema(…).readAs(source, "server", Server.class)` is the
+object-binding twin, and both compose with `withDiagnostics(…)` to collect instead of throwing.
 
 ▶ Runnable: [`examples/SchemaValidation.java`](examples/SchemaValidation.java) — `java --module-path tson/build/modules --add-modules io.ltr8.tson examples/SchemaValidation.java` (also shows collecting a diagnostic)
 

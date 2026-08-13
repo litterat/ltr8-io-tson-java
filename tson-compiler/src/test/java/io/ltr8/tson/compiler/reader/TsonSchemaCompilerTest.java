@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonReadException;
@@ -56,7 +57,7 @@ class TsonSchemaCompilerTest {
 
         // Reached compilation successfully; reading an empty record against a REQUIRED field then
         // fails for the ordinary reason (missing field), not a reader failure.
-        assertThrows(TsonReadException.class, () -> compiled.get("A").read(TsonReadContext.document("{}")));
+        assertThrows(TsonReadException.class, () -> compiled.get("A").read(TestDocuments.document("{}")));
     }
 
     @Test
@@ -69,7 +70,7 @@ class TsonSchemaCompilerTest {
 
         TsonCompiledSchema compiled = compile(linkedSchema);
 
-        assertThrows(TsonReadException.class, () -> compiled.get("Node").read(TsonReadContext.document("{}")));
+        assertThrows(TsonReadException.class, () -> compiled.get("Node").read(TestDocuments.document("{}")));
     }
 
     @Test
@@ -89,13 +90,13 @@ class TsonSchemaCompilerTest {
 
         @SuppressWarnings("unchecked")
         Map<String, Object> used = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("used")
-                .read(TsonReadContext.document("{}")));
+                .read(TestDocuments.document("{}")));
         assertTrue(used.isEmpty());
 
         // Compiling/getting "orphan" itself succeeds -- only reading an actual value against it fails.
         TsonValueReader<?> orphan = compiled.get("orphan");
         UnsupportedOperationException thrown =
-                assertThrows(UnsupportedOperationException.class, () -> orphan.read(TsonReadContext.document("{}")));
+                assertThrows(UnsupportedOperationException.class, () -> orphan.read(TestDocuments.document("{}")));
         assertTrue(thrown.getMessage().contains("orphan"), thrown.getMessage());
     }
 

@@ -48,20 +48,38 @@ public final class TsonTreeReader {
     /** Where this reader's reads report their problems -- fail-fast unless {@link #withDiagnostics} said otherwise. */
     private final TsonDiagnosticsReceiver receiver;
 
+    /** The schema {@link #readAs} validates against, or {@code null} until {@link #withSchema} names one. */
+    private final String schemaUri;
+
     /** Schema-aware -- validates a self-describing document against its {@code !!schema}, resolved through {@code core}'s own source. Used by {@link Tson#treeReader()}. */
     public TsonTreeReader(TsonCompiledMetaRegistry core) {
-        this(TsonCompiledSchemaRegistry.tree(core), TsonDiagnosticsReceiver.throwing());
+        this(TsonCompiledSchemaRegistry.tree(core), TsonDiagnosticsReceiver.throwing(), null);
     }
 
     /** Schemaless (Class 1) -- reads the wire structure into a tree, ignoring any {@code !!schema} the document declares. */
     public TsonTreeReader() {
-        this(null, TsonDiagnosticsReceiver.throwing());
+        this(null, TsonDiagnosticsReceiver.throwing(), null);
     }
 
     /** Shares {@code tree} rather than rebuilding it -- a derived reader must keep the original's compiled-schema cache, not start an empty one. */
-    private TsonTreeReader(TsonCompiledSchemaRegistry tree, TsonDiagnosticsReceiver receiver) {
+    private TsonTreeReader(TsonCompiledSchemaRegistry tree, TsonDiagnosticsReceiver receiver, String schemaUri) {
         this.tree = tree;
         this.receiver = receiver;
+        this.schemaUri = schemaUri;
+    }
+
+    /**
+     * This reader bound to the schema {@code schemaUri} names, for {@link #readAs} -- a new reader, leaving
+     * this one unchanged, sharing its compiled-schema registry. The schema is resolved through the same
+     * source and cache a self-describing document's own {@code !!schema} goes through, so it must already be
+     * registered (e.g. via {@link Tson#resolve}) or be servable by the configured {@code TsonSchemaSource}.
+     */
+    public TsonTreeReader withSchema(String schemaUri) {
+        if (tree == null) {
+            throw new IllegalStateException("a schemaless TsonTreeReader has no schema environment to resolve '"
+                    + schemaUri + "' through -- obtain one from Tson.treeReader()");
+        }
+        return new TsonTreeReader(tree, receiver, schemaUri);
     }
 
     /**
@@ -78,7 +96,7 @@ public final class TsonTreeReader {
      * carries its own receiver, and that one wins.
      */
     public TsonTreeReader withDiagnostics(TsonDiagnosticsReceiver receiver) {
-        return new TsonTreeReader(tree, receiver);
+        return new TsonTreeReader(tree, receiver, schemaUri);
     }
 
     // ── Whole-document entry points ──────────────────────────────────────
@@ -104,6 +122,21 @@ public final class TsonTreeReader {
     }
 
     /**
+     * Reads {@code source} as {@code typeName}, declared by the schema {@link #withSchema} named -- for data
+     * that isn't self-describing, where you hold the schema out of band. The caller supplies what a {@code
+     * !!schema} plus a root type-ref would otherwise say, and validation is identical either way; a root
+     * type-ref the data does carry is read as part of the value, not used to select the type.
+     */
+    public TsonNode readAs(String source, String typeName) {
+        return readDocumentAs(new TsonDataStream(source), typeName);
+    }
+
+    /** {@link #readAs(String, String)} straight off a stream. */
+    public TsonNode readAs(InputStream source, String typeName) {
+        return readDocumentAs(new TsonDataStream(source), typeName);
+    }
+
+    /**
      * Reads one value at {@code ctx}'s current position into a tree -- the low-level form for a caller
      * managing their own {@link TsonReadContext}. Always schemaless and frame-free: it neither inspects a
      * {@code !!schema} (an arbitrary position carries no document framing to hold one) nor checks for
@@ -120,34 +153,64 @@ public final class TsonTreeReader {
         DocumentStart start = (DocumentStart) ctx.next();
         TsonNode result = (ignoreSchema || tree == null || start.schema().isEmpty())
                 ? schemaless.read(ctx)
-                : readAgainstSchema(start.schema().get(), ctx);
-        TsonEvent trailing = ctx.next();
-        if (!(trailing instanceof DocumentEnd)) {
-            throw new IllegalStateException("unexpected trailing event after the document's value: " + trailing);
+                : readAgainstSchema(start.schema().get(), ctx, null);
+        requireDocumentEnd(ctx);
+        return result;
+    }
+
+    private TsonNode readDocumentAs(TsonDataStream stream, String typeName) {
+        if (schemaUri == null) {
+            throw new IllegalStateException("readAs needs a schema -- call withSchema(uri) first");
         }
+        TsonReadContext ctx = TsonReadContext.of(stream, receiver);
+        ctx.next(); // DocumentStart -- any !!schema it declares is overridden by withSchema
+        TsonNode result = readAgainstSchema(schemaUri, ctx, typeName);
+        requireDocumentEnd(ctx);
         return result;
     }
 
     /**
-     * A problem reaching the schema is reported through {@code ctx} like any other, so a fail-fast reader still
-     * throws while a collecting one gets it as a {@link Diagnostic} -- the same promise {@link Tson#validate}
-     * makes. The document's own value is then skipped so the stream lands on {@code DocumentEnd} and the
-     * caller's trailing-content check stays meaningful.
+     * Pulls the event after the document's value, which must be {@code DocumentEnd}.
+     *
+     * <p><b>The pull is the point, not the assertion.</b> {@link TsonDataStream} is lazy, and its root frame
+     * is what rejects trailing content -- but only when something asks for an event past the root value. Drop
+     * this call and {@code "{ a: 1 } junk"} reads clean. The {@code instanceof} check is then belt-and-braces:
+     * the pull itself throws {@code TsonParseException} first on any real document.
      */
-    private TsonNode readAgainstSchema(String schemaUri, TsonReadContext ctx) {
+    private static void requireDocumentEnd(TsonReadContext ctx) {
+        TsonEvent trailing = ctx.next();
+        if (!(trailing instanceof DocumentEnd)) {
+            throw new IllegalStateException("unexpected trailing event after the document's value: " + trailing);
+        }
+    }
+
+    /**
+     * Reads the root value against {@code schemaUri}'s type -- {@code typeName} when {@link #readAs} supplied
+     * one, else the document's own root type-ref.
+     *
+     * <p>A problem reaching the schema is reported through {@code ctx} like any other, so a fail-fast reader
+     * still throws while a collecting one gets it as a {@link Diagnostic} -- the same promise {@link
+     * Tson#validate} makes. The document's own value is then skipped so the stream still lands on {@code
+     * DocumentEnd} and {@link #requireDocumentEnd} stays meaningful.
+     */
+    private TsonNode readAgainstSchema(String schemaUri, TsonReadContext ctx, String typeName) {
         TsonCompiledSchema compiled;
         try {
             compiled = tree.get(schemaUri);
         } catch (RuntimeException e) {
             return abandon(ctx, Diagnostic.Code.SCHEMA_ERROR, e.getMessage());
         }
-        if (!(ctx.peek() instanceof TypeRef typeRef)) {
-            return abandon(ctx, Diagnostic.Code.VALIDATION_ERROR,
-                    "data declares a !!schema but has no root type-ref (e.g. `!person`) to select a type");
+        String name = typeName;
+        if (name == null) {
+            if (!(ctx.peek() instanceof TypeRef typeRef)) {
+                return abandon(ctx, Diagnostic.Code.VALIDATION_ERROR,
+                        "data declares a !!schema but has no root type-ref (e.g. `!person`) to select a type");
+            }
+            name = typeRef.name();
         }
         TsonValueReader<?> reader;
         try {
-            reader = compiled.get(typeRef.name());
+            reader = compiled.get(name);
         } catch (RuntimeException e) {
             return abandon(ctx, Diagnostic.Code.UNKNOWN_TYPE, e.getMessage());
         }

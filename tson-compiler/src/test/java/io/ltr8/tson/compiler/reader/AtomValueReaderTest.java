@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
@@ -60,7 +61,7 @@ class AtomValueReaderTest {
 
         @SuppressWarnings("unchecked")
         Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("holder")
-                .read(TsonReadContext.document(source)));
+                .read(TestDocuments.document(source)));
         return result.get("value");
     }
 
@@ -167,7 +168,7 @@ class AtomValueReaderTest {
 
         @SuppressWarnings("unchecked")
         Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("holder")
-                .read(TsonReadContext.document(source)));
+                .read(TestDocuments.document(source)));
         return result;
     }
 }

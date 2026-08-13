@@ -111,9 +111,14 @@ public interface TsonReadContext {
 
     /**
      * A context over a <em>raw</em> {@link TsonEventSource}, reporting through {@code receiver}. Raw: no
-     * document-level framing is assumed, so a caller passing a mid-document or replay source (e.g. a
-     * {@code ListEventSource}) gets exactly the events it supplied, and a caller reading a whole document
-     * consumes its own leading {@code DocumentStart}.
+     * document-level framing is assumed or performed, so a caller passing a mid-document or replay source
+     * (e.g. a {@code ListEventSource}) gets exactly the events it supplied.
+     *
+     * <p><b>This is not a whole-document read.</b> Framing -- consuming the leading {@code DocumentStart},
+     * and pulling past the root value so a lazy {@link TsonDataStream} actually checks for trailing content
+     * -- belongs to whoever owns the document: {@link TsonTreeReader}/{@link TsonObjectReader}, which is what
+     * a consumer reads through. Driving a {@link TsonValueReader} over a raw source here reads one value at
+     * the cursor and polices nothing around it.
      */
     static TsonReadContext of(TsonEventSource events, TsonDiagnosticsReceiver receiver) {
         return DefaultTsonReadContext.of(events, receiver);
@@ -122,45 +127,5 @@ public interface TsonReadContext {
     /** {@link #of(TsonEventSource, TsonDiagnosticsReceiver)} with the fail-fast receiver -- the first problem throws {@link TsonReadException}. */
     static TsonReadContext throwing(TsonEventSource events) {
         return of(events, TsonDiagnosticsReceiver.throwing());
-    }
-
-    /**
-     * A context over a whole document's own source text, reporting through {@code receiver}. Unlike {@link
-     * #of(TsonEventSource, TsonDiagnosticsReceiver)} this handles the document framing: it builds a {@link
-     * TsonDataStream} and consumes the leading {@code DocumentStart} (no {@code !!id}/{@code !!schema} is
-     * needed for schema-validated reading), leaving the cursor on the root value's own first event.
-     *
-     * <p>This is how a per-type reader from a compiled schema collects rather than throws -- the receiver
-     * travels on the context, so {@link TsonValueReader} needs nothing of its own:
-     *
-     * <pre>{@code
-     * var problems = TsonDiagnosticsReceiver.collecting();
-     * var value = compiled.get("person").read(TsonReadContext.document(source, problems));
-     * problems.diagnostics();      // every problem, alongside a possibly-partial value
-     * }</pre>
-     */
-    static TsonReadContext document(String source, TsonDiagnosticsReceiver receiver) {
-        return document(new TsonDataStream(source), receiver);
-    }
-
-    /** {@link #document(String, TsonDiagnosticsReceiver)} over a whole document's own bytes (UTF-8) -- streams {@code source} genuinely (never buffered into a {@code String} first); {@code source} is not closed here, the caller owns that. */
-    static TsonReadContext document(InputStream source, TsonDiagnosticsReceiver receiver) {
-        return document(new TsonDataStream(source), receiver);
-    }
-
-    /** Fail-fast over a whole document's own source text -- {@link #document(String, TsonDiagnosticsReceiver)} with the throwing receiver. */
-    static TsonReadContext document(String source) {
-        return document(source, TsonDiagnosticsReceiver.throwing());
-    }
-
-    /** Fail-fast over a whole document's own source bytes (UTF-8) -- {@link #document(InputStream, TsonDiagnosticsReceiver)} with the throwing receiver. */
-    static TsonReadContext document(InputStream source) {
-        return document(source, TsonDiagnosticsReceiver.throwing());
-    }
-
-    private static TsonReadContext document(TsonDataStream stream, TsonDiagnosticsReceiver receiver) {
-        TsonReadContext ctx = of(stream, receiver);
-        ctx.next(); // DocumentStart
-        return ctx;
     }
 }

@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.Position;
 import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
@@ -85,7 +86,7 @@ class PositionalReadErrorsTest {
         TsonCompiledSchema compiled = compile(new TsonLinkedSchema(schema));
 
         String dataSource = "{}";
-        TsonReadContext ctx = TsonReadContext.document(dataSource);
+        TsonReadContext ctx = TestDocuments.document(dataSource);
         TsonReadException thrown = assertThrows(TsonReadException.class,
                 () -> compiled.get("my_record").read(ctx));
 

@@ -29,8 +29,8 @@ import java.util.Optional;
  *
  * <pre>{@code
  * Tson tson = Tson.builder().build();
- * TsonCompiledSchema compiled = tson.treeRegistry().compile(tson.resolve(schemaText));
- * TsonNode value = (TsonNode) compiled.get("my_type").read(TsonReadContext.document(dataText));
+ * tson.resolve(schemaText);                      // registers the schema by its own !!id
+ * TsonNode value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_type");
  * }</pre>
  *
  * <p><b>The read mode is which registry you hold, not a parameter.</b> {@link #treeRegistry()} reads into an

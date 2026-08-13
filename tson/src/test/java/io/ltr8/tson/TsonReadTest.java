@@ -6,6 +6,7 @@ import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonDiagnosticsCollector;
 import io.ltr8.tson.compiler.TsonDiagnosticsReceiver;
 import io.ltr8.tson.compiler.TsonObjectReader;
+import io.ltr8.tson.compiler.TsonTreeReader;
 import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
@@ -243,6 +244,73 @@ class TsonReadTest {
             // The default reader is untouched by the derived one -- still fail-fast.
             assertThrows(TsonReadException.class, () -> tsonWithPoint().treeReader().read(testCase.source()));
         }
+    }
+
+    // ── withSchema/readAs: schema held out of band, data not self-describing ──
+
+    @Test
+    void readAsValidatesAgainstTheNamedSchemaAndTypeWithNoDirectiveInTheData() {
+        Tson tson = tsonWithPoint();
+        tson.resolve(POINT_SCHEMA);
+
+        TsonNode node = tson.treeReader().withSchema(POINT_ID).readAs("{ x: 3  y: 4 }", "point");
+
+        assertTrue(node.isRecord());
+        assertEquals(3, asLong(node.at("/x")));
+
+        // Same validation as the self-describing path -- the caller supplied what !!schema + !point would.
+        assertThrows(TsonReadException.class,
+                () -> tson.treeReader().withSchema(POINT_ID).readAs("{ x: 3  y: 99999999999999 }", "point"));
+    }
+
+    @Test
+    void readAsBindsToAClassAndComposesWithWithDiagnostics() {
+        Tson tson = tsonWithPointBinding();
+        tson.resolve(POINT_SCHEMA);
+
+        assertEquals(new Point(3, 4),
+                tson.objectReader().withSchema(POINT_ID).readAs("{ x: 3  y: 4 }", "point", Point.class));
+
+        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        tson.objectReader().withSchema(POINT_ID).withDiagnostics(problems)
+                .readAs("{ x: 99999999999999  y: 88888888888888 }", "point", Point.class);
+        assertEquals(List.of("/x", "/y"), problems.diagnostics().stream().map(Diagnostic::path).toList());
+    }
+
+    @Test
+    void readAsReportsATypeTheSchemaDoesNotDeclare() {
+        Tson tson = tsonWithPoint();
+        tson.resolve(POINT_SCHEMA);
+        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+
+        tson.treeReader().withSchema(POINT_ID).withDiagnostics(problems).readAs("{ x: 3  y: 4 }", "no_such_type");
+
+        assertEquals(Diagnostic.Code.UNKNOWN_TYPE, problems.diagnostics().getFirst().code());
+    }
+
+    @Test
+    void aSchemalessReaderCannotBeGivenASchema() {
+        // No schema environment to resolve the URI through -- fail where it's written, not at the read.
+        assertThrows(IllegalStateException.class, () -> new TsonTreeReader().withSchema(POINT_ID));
+        assertThrows(IllegalStateException.class, () -> new TsonObjectReader().withSchema(POINT_ID));
+    }
+
+    /**
+     * Trailing content is rejected on every whole-document path. {@code TsonDataStream} is lazy and its root
+     * frame only checks when something pulls past the root value, so this pins that each facade entry point
+     * still does that pull -- the guarantee is invisible to a reader that simply stops reading.
+     */
+    @Test
+    void everyFacadeEntryPointRejectsContentAfterTheDocumentsValue() {
+        Tson tson = tsonWithPoint();
+        tson.resolve(POINT_SCHEMA);
+        String trailing = "{ x: 3  y: 4 } junk";
+
+        assertThrows(RuntimeException.class, () -> tson.treeReader().read(trailing));
+        assertThrows(RuntimeException.class, () -> tson.treeReader().readWithoutSchema(trailing));
+        assertThrows(RuntimeException.class, () -> tson.treeReader().withSchema(POINT_ID).readAs(trailing, "point"));
+        assertThrows(RuntimeException.class, () -> new TsonTreeReader().read(trailing));
+        assertThrows(RuntimeException.class, () -> tsonWithPointBinding().objectReader().read(trailing, Point.class));
     }
 
     @Test

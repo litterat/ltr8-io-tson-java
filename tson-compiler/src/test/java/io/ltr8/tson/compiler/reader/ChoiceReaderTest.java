@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonReadException;
@@ -51,7 +52,7 @@ class ChoiceReaderTest {
     @SuppressWarnings("unchecked")
     private static Map<String, Object> read(TsonCompiledSchema compiled, String source) {
         return (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("contact_method")
-                .read(TsonReadContext.document(source)));
+                .read(TestDocuments.document(source)));
     }
 
     @Test

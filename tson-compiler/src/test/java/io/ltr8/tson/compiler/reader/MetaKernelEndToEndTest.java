@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonReadContext;
@@ -80,7 +81,7 @@ class MetaKernelEndToEndTest {
 
         @SuppressWarnings("unchecked")
         Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("top")
-                .read(TsonReadContext.document("{}")));
+                .read(TestDocuments.document("{}")));
 
         assertEquals(Map.of(), result);
     }
@@ -91,7 +92,7 @@ class MetaKernelEndToEndTest {
 
         @SuppressWarnings("unchecked")
         Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("top")
-                .read(TsonReadContext.document("!top {}")));
+                .read(TestDocuments.document("!top {}")));
 
         assertEquals(Map.of(), result);
     }
@@ -104,7 +105,7 @@ class MetaKernelEndToEndTest {
 
         @SuppressWarnings("unchecked")
         Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("enum")
-                .read(TsonReadContext.document("{ members: [true false] }")));
+                .read(TestDocuments.document("{ members: [true false] }")));
 
         assertEquals(List.of("true", "false"), result.get("members"));
     }
@@ -115,7 +116,7 @@ class MetaKernelEndToEndTest {
 
         @SuppressWarnings("unchecked")
         Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("integer_size")
-                .read(TsonReadContext.document("{ bits: 32 signed: true }")));
+                .read(TestDocuments.document("{ bits: 32 signed: true }")));
 
         assertEquals(BigInteger.valueOf(32), result.get("bits"));
         assertEquals(true, result.get("signed")); // boolean => !enum [true false] -- a real Boolean in tree mode
@@ -127,7 +128,7 @@ class MetaKernelEndToEndTest {
 
         @SuppressWarnings("unchecked")
         Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("field_group")
-                .read(TsonReadContext.document("{ members: [foo bar] state: OPTIONAL }")));
+                .read(TestDocuments.document("{ members: [foo bar] state: OPTIONAL }")));
 
         assertEquals(List.of("foo", "bar"), result.get("members"));
         assertEquals("OPTIONAL", result.get("state"));
@@ -139,7 +140,7 @@ class MetaKernelEndToEndTest {
 
         @SuppressWarnings("unchecked")
         Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("tuple_element")
-                .read(TsonReadContext.document("{ element_type: { name: text arguments: [] } state: REQUIRED }")));
+                .read(TestDocuments.document("{ element_type: { name: text arguments: [] } state: REQUIRED }")));
 
         assertEquals("REQUIRED", result.get("state"));
         @SuppressWarnings("unchecked")

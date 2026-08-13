@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonReadException;
@@ -52,7 +53,7 @@ class ArrayTreeReaderTest {
     @SuppressWarnings("unchecked")
     private static List<Object> readArray(TsonCompiledSchema compiled, String rootName, String source) {
         return (List<Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get(rootName)
-                .read(TsonReadContext.document(source)));
+                .read(TestDocuments.document(source)));
     }
 
     @Test
@@ -131,7 +132,7 @@ class ArrayTreeReaderTest {
 
         @SuppressWarnings("unchecked")
         Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("holder")
-                .read(TsonReadContext.document("{ items: [1 2 3] }")));
+                .read(TestDocuments.document("{ items: [1 2 3] }")));
 
         assertEquals(List.of(BigInteger.ONE, BigInteger.TWO, BigInteger.valueOf(3)), result.get("items"));
     }

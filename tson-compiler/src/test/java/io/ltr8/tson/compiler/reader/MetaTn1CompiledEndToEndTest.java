@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.*;
 import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
@@ -91,7 +92,7 @@ class MetaTn1CompiledEndToEndTest {
         TsonCompiledSchema compiled = rawCompile(meta);
 
         Object result = Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("binary_encoding")
-                .read(TsonReadContext.document("BASE64")));
+                .read(TestDocuments.document("BASE64")));
 
         assertEquals("BASE64", result);
     }

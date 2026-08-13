@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonValueReader;
@@ -62,7 +63,7 @@ class ChoiceUntaggedRecoveryTest {
     }
 
     private static Object read(TsonValueReader<?> reader, String data) {
-        return reader.read(TsonReadContext.document(data));
+        return reader.read(TestDocuments.document(data));
     }
 
     @Test

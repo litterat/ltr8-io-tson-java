@@ -69,7 +69,7 @@ class MultiErrorCollectionTest {
 
         @SuppressWarnings("unchecked")
         Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode)
-                compiled.get("my_record").read(TsonReadContext.document(dataSource, problems)));
+                compiled.get("my_record").read(TestDocuments.document(dataSource, problems)));
 
         assertEquals(3, problems.diagnostics().size(), problems.diagnostics().toString());
 

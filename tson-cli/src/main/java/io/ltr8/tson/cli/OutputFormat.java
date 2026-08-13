@@ -1,7 +1,6 @@
 package io.ltr8.tson.cli;
 
 import io.ltr8.tson.compiler.TsonObjectWriter;
-import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonWriteException;
 
 import java.util.Locale;
@@ -99,22 +98,17 @@ enum OutputFormat {
     }
 
     /**
-     * Writes {@code report} via the plain, schemaless {@link TsonObjectWriter} (Class 1 -- there's
-     * no schema-aware writer yet, tracked in {@code BACKLOG.md}'s "Write side"), then reads it back
-     * through {@code diagnostics.tn}'s own compiled {@code validation_report} reader -- proving the
-     * emitted text is genuinely valid against a real TSON schema, not just structurally similar to
-     * one written by hand.
+     * Writes {@code report} via the plain, schemaless {@link TsonObjectWriter} (Class 1 -- there's no
+     * schema-aware writer yet, tracked in {@code BACKLOG.md}'s "Write side").
+     *
+     * <p>The dogfooding claim -- that what this emits is genuinely valid against {@code diagnostics.tn},
+     * not merely shaped like it -- is proven by {@code OutputFormatTest} reading every rendered report
+     * back through that schema's own compiled {@code validation_report} reader. It is an invariant of
+     * this method, so it is asserted once in a test rather than re-derived on every render.
      */
     private static String renderTson(ValidationReport report) {
         try {
-            String text = new TsonObjectWriter().toTson(report);
-            Object reread = DiagnosticsSchema.compiled().get("validation_report")
-                    .read(TsonReadContext.document(text));
-            if (!(reread instanceof ValidationReport)) {
-                throw new IllegalStateException("diagnostics.tn1's own validation_report read back as "
-                        + reread.getClass() + ", not ValidationReport");
-            }
-            return text;
+            return new TsonObjectWriter().toTson(report);
         } catch (TsonWriteException e) {
             throw new IllegalStateException("failed to render this CLI's own diagnostics as TSON", e);
         }

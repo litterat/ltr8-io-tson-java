@@ -84,7 +84,7 @@ class GenericApplicationHeadTest {
         assertEquals(TypeRef.of("text"), body.valueType());
 
         TsonNode value = (TsonNode) compiled.get("holder")
-                .read(TsonReadContext.document("{ entries: { \"a\" => \"one\"  \"b\" => \"two\" } }"));
+                .read(TestDocuments.document("{ entries: { \"a\" => \"one\"  \"b\" => \"two\" } }"));
         assertNotNull(value);
     }
 
@@ -162,13 +162,13 @@ class GenericApplicationHeadTest {
                   tag_list => [text; 1..2]
                   holder => { tags: tag_list }""");
 
-        assertNotNull(compiled.get("holder").read(TsonReadContext.document("{ tags: [\"a\" \"b\"] }")));
+        assertNotNull(compiled.get("holder").read(TestDocuments.document("{ tags: [\"a\" \"b\"] }")));
         assertTrue(assertThrows(TsonReadException.class,
                 () -> compiled.get("holder")
-                        .read(TsonReadContext.document("{ tags: [] }"))).getMessage().contains("minimum 1"));
+                        .read(TestDocuments.document("{ tags: [] }"))).getMessage().contains("minimum 1"));
         assertTrue(assertThrows(TsonReadException.class,
                 () -> compiled.get("holder")
-                        .read(TsonReadContext.document("{ tags: [\"a\" \"b\" \"c\"] }")))
+                        .read(TestDocuments.document("{ tags: [\"a\" \"b\" \"c\"] }")))
                 .getMessage().contains("maximum 2"));
     }
 

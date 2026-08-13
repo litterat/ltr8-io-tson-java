@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonReadException;
@@ -44,7 +45,7 @@ class MapTreeReaderTest {
     @SuppressWarnings("unchecked")
     private static Map<Object, Object> readMap(TsonCompiledSchema compiled, String source) {
         return (Map<Object, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("scores")
-                .read(TsonReadContext.document(source)));
+                .read(TestDocuments.document(source)));
     }
 
     @Test

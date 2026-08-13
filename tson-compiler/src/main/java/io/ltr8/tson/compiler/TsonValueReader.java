@@ -27,20 +27,12 @@ import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
  * problem at one field/element doesn't have to abort the whole read to be reported; see that
  * interface's own Javadoc.
  *
- * <p><b>One method, and no source or policy overloads.</b> Everything a whole-document read needs beyond
- * this is carried by the context: {@link TsonReadContext#document} builds one over a {@code String} or
- * {@code InputStream}, consuming the leading {@code DocumentStart}, and the {@link TsonDiagnosticsReceiver}
- * it is given decides whether the first problem throws or every problem is collected.
- *
- * <pre>{@code
- * var value = compiled.get("person").read(TsonReadContext.document(source));
- *
- * var problems = TsonDiagnosticsReceiver.collecting();
- * var partial = compiled.get("person").read(TsonReadContext.document(source, problems));
- * }</pre>
- *
- * <p>Trailing content after the document's value needs no check here -- {@code TsonDataStream}'s own root
- * frame rejects it before ever emitting {@code DocumentEnd}.
+ * <p><b>One method, and no source or policy overloads -- this reads one value at {@code ctx}'s cursor and
+ * nothing more.</b> Whole-document reading is not this interface's job: framing (consuming {@code
+ * DocumentStart}, and pulling past the root value so a lazy {@code TsonDataStream} actually rejects trailing
+ * content), the {@code !!schema} decision, and the choice of diagnostics receiver all belong to {@link
+ * TsonTreeReader}/{@link TsonObjectReader}, which is what a consumer reads through -- including for a schema
+ * held out of band, via their {@code withSchema(uri).readAs(source, typeName)}.
  *
  * <p><b>Unchecked failures only, deliberately</b> -- every exception this whole read/parse stack
  * throws is a {@link RuntimeException} (the lexer's own {@code LexException}, {@code

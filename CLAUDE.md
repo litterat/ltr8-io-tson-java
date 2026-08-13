@@ -672,8 +672,8 @@ meta-kernel/meta.tn/core.tn into a governed environment and returns an immutable
 
 ```java
 Tson tson = Tson.builder().build();
-TsonCompiledSchema compiled = tson.treeRegistry().compile(tson.resolve(schemaText));
-TsonNode value = (TsonNode) compiled.get("my_type").read(TsonReadContext.document(dataText));
+tson.resolve(schemaText);                      // registers the schema by its own !!id
+TsonNode value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_type");
 ```
 
 - **The read mode is which registry you hold:** `treeRegistry()` (an immutable, queryable `TsonNode` tree)

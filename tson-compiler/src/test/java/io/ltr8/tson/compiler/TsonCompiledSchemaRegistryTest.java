@@ -59,7 +59,7 @@ class TsonCompiledSchemaRegistryTest {
     @Test
     void treeRegistryReadsAUserSchemaIntoATree() {
         TsonCompiledSchemaRegistry tree = TsonCompiledSchemaRegistry.tree(core());
-        Object value = tree.get(SCHEMA_ID).get("my_record").read(TsonReadContext.document(DATA));
+        Object value = tree.get(SCHEMA_ID).get("my_record").read(TestDocuments.document(DATA));
         TsonNode node = assertInstanceOf(TsonNode.class, value);
         assertEquals(7, node.get("value").asNumber().orElseThrow().intValue());
     }
@@ -68,7 +68,7 @@ class TsonCompiledSchemaRegistryTest {
     void bindRegistryReadsAUserSchemaToBoundObjects() {
         DataBindContext context = TsonAtomContext.registerDefaults(DataBindContext.builder().nameBinder(MANUAL_BINDER).build());
         TsonCompiledSchemaRegistry bind = TsonCompiledSchemaRegistry.bind(core(), context);
-        Object value = bind.get(SCHEMA_ID).get("my_record").read(TsonReadContext.document(DATA));
+        Object value = bind.get(SCHEMA_ID).get("my_record").read(TestDocuments.document(DATA));
         assertEquals(new MyRecord(7), value);
     }
 
@@ -79,8 +79,8 @@ class TsonCompiledSchemaRegistryTest {
         DataBindContext context = TsonAtomContext.registerDefaults(DataBindContext.builder().nameBinder(MANUAL_BINDER).build());
         TsonCompiledSchemaRegistry bind = TsonCompiledSchemaRegistry.bind(core, context);
 
-        Object treeValue = tree.get(SCHEMA_ID).get("my_record").read(TsonReadContext.document(DATA));
-        Object bindValue = bind.get(SCHEMA_ID).get("my_record").read(TsonReadContext.document(DATA));
+        Object treeValue = tree.get(SCHEMA_ID).get("my_record").read(TestDocuments.document(DATA));
+        Object bindValue = bind.get(SCHEMA_ID).get("my_record").read(TestDocuments.document(DATA));
 
         assertInstanceOf(TsonNode.class, treeValue);
         assertEquals(new MyRecord(7), bindValue);
@@ -102,7 +102,7 @@ class TsonCompiledSchemaRegistryTest {
     @Test
     void readingAUserSchemaResolvesItInTheCoreButDoesNotCompileItThere() {
         TsonCompiledMetaRegistry core = core();
-        TsonCompiledSchemaRegistry.tree(core).get(SCHEMA_ID).get("my_record").read(TsonReadContext.document(DATA));
+        TsonCompiledSchemaRegistry.tree(core).get(SCHEMA_ID).get("my_record").read(TestDocuments.document(DATA));
 
         // The core resolved+registered the user schema -- its linked form is available -- but never
         // compiled or cached it; the read registry owns the compile, in its own mode.
