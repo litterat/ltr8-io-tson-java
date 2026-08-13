@@ -33,12 +33,17 @@ backend.
 ### Tier 1 — validate + fast feedback
 
 - [x] **A structured `Diagnostic` value, not an exception** — landed as `io.ltr8.tson.compiler.Diagnostic`
-  plus `TsonReadContext` (a collecting, non-fail-fast reading context; the `validate(...)`-shaped
-  entry point itself is `tson-cli`'s own `ValidateCommand`, not a library-level method yet). See
+  plus `TsonDiagnosticsReceiver`, the seam deciding where each one goes — `throwing()` (fail-fast),
+  `collecting()` (a `TsonDiagnosticsCollector`), or a caller's own `void report(Diagnostic)`. Both
+  library-level entry points exist: `Tson.validate(...)` returns every problem and never throws for a bad
+  document, and `tson.treeReader()/objectReader().withDiagnostics(collector).read(...)` returns the
+  (possibly partial) **value alongside** them — the shape a repair loop actually needs, which for a while
+  no route offered. `tson-cli`'s `ValidateCommand` is now just a caller of the former. See
   `CLAUDE.md`'s "Multi-error collection" section for the full design. Field by field, against the
   shape sketched below:
   - `path` — landed exactly as described, an RFC 6901 JSON Pointer accumulated by
-    `TsonReadContext.field`/`index` as a read descends.
+    `TsonReadContext.field`/`index` as a read descends (that context is still the engine's cursor; it
+    just no longer owns the throw-vs-collect decision).
   - `code` — landed as a real, closed `Diagnostic.Code` enum, not the exact starter set sketched
     below: `FIELD_REQUIRED`/`TYPE_MISMATCH`/`WRONG_ARITY`/`UNKNOWN_TYPE_REF`/`ATOM_CONSTRAINT_VIOLATION`
     are genuinely produced by a real reader today; `INTEGER_OUT_OF_RANGE`/`ENUM_MEMBER_NOT_RECOGNIZED`/
@@ -51,7 +56,9 @@ backend.
     exists yet. Still open.
   - `expected`/`actual` — landed exactly as described.
   - `dataPosition` — landed, resolved via `TsonReadContext`'s own identity-keyed position table (a
-    parser's `positions()`), not a fresh lexer-level `Position` thread.
+    parser's `positions()`), not a fresh lexer-level `Position` thread. Infrastructure-level problems (an
+    unresolvable `!!schema`, an unknown root type) now report through the same receiver rather than being
+    thrown and re-wrapped, so they arrive in the list in document order like any other.
   - `schemaPosition` — landed, but narrower than sketched: declaration-level only (`TypeDefinition.position()`,
     from the positional-errors stripe), not the finer per-`RecordBody`/`ArrayBody`/`MapBody`/`TupleBody`/
     `ChoiceBody`/atom-constraint-family granularity this bullet originally proposed deciding between —
@@ -82,11 +89,16 @@ backend.
   single ready-to-paste `message` synthesized from 1–4, which is what actually gets dropped into a
   retry prompt in practice, but should be a *rendering* of the structured fields, not
   hand-authored per site.
+  - (1)–(4) are all present today; (5) is the remaining gap, and it is the same one the `message`
+    bullet above names. Note what is *not* a gap any more: a repair loop can obtain the diagnostics
+    without giving up the value, so a retry can be built from the partial result rather than from
+    scratch.
 
 - [x] **A TSON-native idea worth pursuing** — landed as `tson-cli`'s own `diagnostics.tn`
   (`diagnostic`/`diagnostic_code`/`validation_report`) plus `DiagnosticsSchema`'s compiled reader:
-  `--output tson` writes a real `ValidationReport` via the schemaless `TsonMapperWriter`, then reads
-  it straight back through `diagnostics.tn`'s own compiled `validation_report` reader, proving the
+  `--output tson` writes a real `ValidationReport` via the schemaless `TsonObjectWriter`, and
+  `OutputFormatTest` reads every rendered report straight back through `diagnostics.tn`'s own compiled
+  `validation_report` reader, proving the
   emitted text is genuinely valid against a real TSON schema, not just structurally similar to one
   (`OutputFormatTest`'s own round-trip tests, including one exercising real, non-empty positions).
 
@@ -150,7 +162,9 @@ Concrete items and decisions:
 
 - [ ] **Engine-agnostic validating incremental writer + a `DecoderSession` SPI.** The library side
   streams tokens/events through the existing lexer→event→validator pipeline (reuse the streaming
-  readers + collecting `TsonReadContext`/`Diagnostic`), hands back a checkpoint handle at each
+  readers plus a **custom `TsonDiagnosticsReceiver`** — the push seam this needs already exists, and a
+  receiver is handed each `Diagnostic` as the read finds it rather than in a batch at the end, which is
+  exactly the incremental delivery this tier is built on), hands back a checkpoint handle at each
   structural boundary, and returns `List<Diagnostic>` on completion. The engine binding is a tiny SPI —
   `DecoderSession { mark(); rollback(mark); applyMask(tokenMask); }` — implemented by a vLLM/llama.cpp
   adapter in a *separate* module (or `examples/`), never in core, so TSON stays zero-runtime-dependency

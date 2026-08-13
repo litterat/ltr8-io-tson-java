@@ -465,7 +465,8 @@ consulted). `TsonSchemaLinker`/`TsonSchemaRegistry` add the second stage.
 `TsonSchemaCompiler.compile` turns a `TsonLinkedSchema` into a `TsonCompiledSchema` — one `TsonValueReader`
 per entry, wired as real Java references rather than name lookups at read time (except where
 `DeferredValueReader` closes a cycle with one lazy lookup). `TsonValueReader<T>` is the single-method front
-door a caller holds (`T read(TsonReadContext)`, plus `read(String)`/`read(InputStream)` conveniences).
+door a caller holds -- **strictly one method**, `T read(TsonReadContext)`. Source form, document framing
+and error policy are all the context's or the facades' concern, never overloads here.
 
 - **Eager, not lazy** — `compile` walks and resolves every entry, so a caller reading only a few types
   still gets the assurance that every entry compiles, and a broken entry surfaces at compile time.
@@ -550,9 +551,25 @@ is small and parsed once.)
 - **`TsonReadContext`** is the pull cursor: `peek()`/`next()` (over one shared `TsonEventSource`),
   `position()` derived live from the last event, `path()` (RFC 6901), `field(name)`/`index(i)` (push a
   path segment), `at`/`withSchemaPosition`/`withPosition`, `report(code, message, expected, actual)`,
-  `diagnostics()`. Two factories back one implementation: `throwing(...)` (throws `TsonReadException` at
-  the first problem) and `collecting(...)` (accumulates and reads on). **`report` alone decides
-  fail-fast-vs-collect** — no reader branches on it.
+  `reported()`. One factory, `of(events, receiver)` (plus `throwing(events)` sugar), over one
+  implementation. **The context holds no error policy**: `report` builds the `Diagnostic` from the path and
+  positions it tracks and hands it to the read's **`TsonDiagnosticsReceiver`**, which decides its fate —
+  `throwing()` raises `TsonReadException` at the first problem, `collecting()` accumulates into a
+  `TsonDiagnosticsCollector`, and a caller's own `void report(Diagnostic)` can stream them anywhere. No
+  reader branches on which. A reader needing to know whether its children complained asks `reported()` — a
+  count, so it works for a receiver that keeps no list (the `int before = ctx.reported()` checkpoint idiom
+  in `RecordBindReader`/`TupleBindReader`/`SchemalessObjectReader`/`AnnotationCapture`).
+- **`TsonReadContext` is deliberately still exported.** `TsonValueReader.read(TsonReadContext)` is the sole
+  abstract method a consumer receives from `TsonCompiledSchema.get`, so hiding the parameter type would
+  make that method uncallable and the interface unimplementable from outside — categorically worse than the
+  accepted `ValueReaderResolver` `-Xlint:exports` warning, where the hidden type is only ever *returned*.
+  What was removed instead is the conflation: `failFast()` (no callers) and `diagnostics()` (the receiver's
+  job) are gone.
+- **`of(...)` is not a whole-document read.** It assumes and performs no framing. Consuming the leading
+  `DocumentStart`, and pulling *past* the root value so a lazy `TsonDataStream`'s root frame actually
+  rejects trailing content, belong to `TsonTreeReader`/`TsonObjectReader`. That second half is easy to lose,
+  because nothing fails when you simply stop reading — `requireDocumentEnd`'s Javadoc in both facades
+  records that the pull, not the assertion after it, is the point.
 - **Continuation policy: always keep reading in collecting mode.** A failed field/element is recorded and
   a `null` placeholder kept in place (so later indices stay accurate); a shape mismatch reports
   `TYPE_MISMATCH`/`WRONG_ARITY` and returns `null` so a caller doesn't also report every child as missing.
@@ -574,8 +591,8 @@ is small and parsed once.)
 
 ### Diagnostics (`Diagnostic`, root package)
 
-`Diagnostic` is the structured value both fail-fast and collecting modes report through, identical shape
-either way: `path` (RFC 6901 JSON Pointer into the data — matches JSON Schema's `instanceLocation`), a
+`Diagnostic` is the structured value every `TsonDiagnosticsReceiver` receives, identical shape whichever
+one is in play: `path` (RFC 6901 JSON Pointer into the data — matches JSON Schema's `instanceLocation`), a
 closed `Code` enum (`FIELD_REQUIRED`/`TYPE_MISMATCH`/`WRONG_ARITY`/`UNKNOWN_TYPE_REF`/
 `ATOM_CONSTRAINT_VIOLATION` from readers; `SCHEMA_ERROR`/`UNKNOWN_TYPE`/`VALIDATION_ERROR` for
 infrastructure-level failures; `UNRECOGNIZED_FIELD`/`DUPLICATE_MAP_KEY` reserved but unproduced),
@@ -599,13 +616,27 @@ self-describing document is validated against its declared `!!schema` as it's re
 through the source, the root type-ref selects the type), else read schemalessly. `readWithoutSchema(...)`
 forces the schemaless path on a schema-aware reader.
 
+**These two are the whole document-reading surface**, and both derive Jackson-`ObjectReader`-style rather
+than taking parameters, so source form, error policy and schema selection stay orthogonal instead of
+multiplying overloads: `withDiagnostics(receiver)` swaps fail-fast for any other receiver, and
+`withSchema(uri).readAs(source, typeName)` covers data that *isn't* self-describing — the caller supplies
+what a `!!schema` plus a root type-ref would have said, and validation is identical either way. Each returns
+a new reader **sharing** the original's compiled-schema registry, never rebuilding it. A per-type
+`TsonValueReader` from a compiled schema is the layer underneath: a strict single-method interface that
+reads one value at a cursor and polices nothing around it.
+
 - **The class-driven binding / tree-building mechanics live in the internal `reader` package**
   (`SchemalessObjectReader`/`SchemalessTreeReader`, unexported); the public readers are thin facades that
   peek the `DocumentStart` for a `!!schema` and dispatch to either the compiled schema registry or the
-  schemaless engine. The whole-document entry points (`read(String|InputStream, …)`) own document framing
-  (leading `DocumentStart`, trailing-content check); the low-level `read(TsonReadContext, …)` is frame-free
-  (a value at the cursor, for a caller managing their own context) and always schemaless. Their `read(ctx)`
-  matching frame-free-ness is why both engines split framing into a private `readDocument`.
+  schemaless engine. The whole-document entry points (`read`/`readWithoutSchema`/`readAs`) own document
+  framing — consuming the leading `DocumentStart`, and the `requireDocumentEnd` pull that makes the lazy
+  stream check for trailing content; the low-level `read(TsonReadContext, …)` is frame-free (a value at the
+  cursor, for a caller managing their own context) and always schemaless.
+- **A failure reaching the schema is a diagnostic, not an exception.** An unresolvable `!!schema`, a missing
+  root type-ref, a root type the target class can't hold: each reports through the receiver and skips the
+  root value (so the stream still lands on `DocumentEnd`). Under `throwing()` that is indistinguishable from
+  the old behaviour; under a collector they arrive as `Diagnostic`s, which is what lets `Tson.validate`
+  delegate its schema-driven half to `treeReader()` instead of re-deriving it.
 - **`TsonObjectReader`'s schema-aware `read` checks the target class up front** — the schema's root type
   already binds to a Java class via the name binder, so a class not assignable to that is a `TYPE_MISMATCH`
   reported *before* the value is read, not a cast failure after.
@@ -686,8 +717,16 @@ TsonNode value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_typ
   selects the schema (resolved through `TsonConfig.schemaSource`, compiled once in tree mode) and the root
   type-ref (e.g. `!person`) selects the type; with no `!!schema` it's validated schemalessly
   (`SchemalessValidator`, Class 1 — base syntax plus built-in/core-vocabulary atoms). Returns every
-  problem as a `List<Diagnostic>` (empty means valid) — even an unresolvable schema or unknown type comes
-  back as a diagnostic, never an exception.
+  problem as a `List<Diagnostic>` (empty means valid) and **never throws for a bad input document** —
+  malformed syntax, a schema document handed in where data was expected, an unresolvable schema, an
+  unknown type all come back as diagnostics.
+  - **The schema-driven half *is* `treeReader()` with a collecting receiver**, not a parallel
+    implementation. Only the schemaless half is separate, because a schemaless tree read is a *read* and
+    throws on a bad `!uuid` where `SchemalessValidator` collects — the one thing keeping `validate` from
+    being a two-line delegation (`BACKLOG.md`).
+  - Base-syntax failures are converted by `SchemalessValidator.asBaseSyntaxError`, which is public for
+    exactly this: two of the three exception types live in the unexported `lexer` package, so `Tson` in
+    another module can't name them in a `catch`.
 - `objectReader()`/`treeReader()` return **schema-aware** `TsonObjectReader`/`TsonTreeReader` over this
   instance — the value-returning read peers of `validate`: a self-describing document is validated against
   its declared `!!schema` (schemaless when it declares none), the object form checking the target class up
@@ -805,11 +844,17 @@ compatibility).
   AtomSpecification` rather than flat, so it never receives a schema-composed default the way
   `email_type`'s flat `spec` field does. Subtype *dispatch* to them works; this is a narrower field-binding
   gap.
+- **Schema-side diagnostics** — parse → desugar → resolve → link → compile are fail-fast throughout, so a
+  broken *schema* yields one exception, flattened by `Tson.validate` into a single `SCHEMA_ERROR` with no
+  path and no position in the schema document. The read path's `TsonDiagnosticsReceiver` has no schema-side
+  counterpart yet; `BACKLOG.md`'s "Schema-side diagnostics" has the shape.
+- **A schemaless tree read throws rather than collecting** — `SchemalessTreeReader.leaf()` calls the atom
+  directly, not through `ctx.report`, so a bad `!uuid` aborts the read. `SchemalessValidator` (the AST
+  walk) is what collects, which is why `Tson.validate` still keeps a schemaless branch of its own instead
+  of delegating wholly to `treeReader()`.
 - **Deferred design questions** — `REQUIRED_FIXED`/`OPTIONAL_FIXED` value validation, `value_param` real
-  parameter substitution, thread-safety, a general disk/HTTP-backed `TsonSchemaSource` (with
-  whitelist/blacklist policy), and a library-level "read this string, auto-select the compiled reader from
-  its own `!!schema`/type-ref" entry point (the CLI does this; there's no programmatic `Tson` equivalent
-  yet).
+  parameter substitution, thread-safety, and a general disk/HTTP-backed `TsonSchemaSource` (with
+  whitelist/blacklist policy).
 - **§9.1's numeric-literal length limit** (SHOULD, DoS-hardening) — not enforced.
 - **JSON** — a future JSON reader is a whole separate stack (its own `JsonEventStream` and its own readers,
   deliberately not reusing the TSON readers). Not started, not backlogged.

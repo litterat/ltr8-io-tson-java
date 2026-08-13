@@ -25,30 +25,26 @@ the removal of the old throwaway `Map`/`List` DOM mode all landed. What's left:
 
 ## Front door / ergonomics
 
-- [ ] No `Tson.read` shorthand. The *capability* landed with the schema-aware facades —
-  `tson.treeReader().read(source)` resolves the document's own `!!schema`, picks the root type-ref and
-  validates, with no type named by the caller; the object form needs a target class, which Java makes
-  unavoidable. What's absent is the one-call front door, so the shortest self-describing read is still
-  two hops through a registry accessor. (The README entry-point table's schema rows depend on this — see
-  *Documentation*.)
+- [ ] No `Tson.read` shorthand. The *capability* is complete — `tson.treeReader().read(source)` resolves
+  the document's own `!!schema`, picks the root type-ref and validates with no type named by the caller,
+  and `withSchema(uri).readAs(source, type)` covers data that isn't self-describing; the object form needs
+  a target class, which Java makes unavoidable. What's absent is only the one-call spelling, so the
+  shortest self-describing read is still two hops (`tson.treeReader().read(…)`). Lower value than it looked:
+  the two facades are now the documented reading surface, so the second hop names the thing a caller
+  actually wants to configure (`withDiagnostics`/`withSchema` hang off it).
 - [ ] A real disk/HTTP-backed `TsonSchemaSource` with whitelist/blacklist policy — today the only
   `TsonSchemaSource` is `TsonSchemaSource.registeredOnly()` (nothing fetched); the bundled standard
   library is served internally by `TsonCompiledSchemaRegistry` from `TsonBundledSchemas`, not through
   a source.
-- [ ] **A `DiagnosticsReceiver` seam; make `TsonReadContext` internal.** The read API leaks engine
-  machinery: `TsonReadContext` (the pull cursor + RFC-6901 path tracker + diagnostics sink + the
-  fail-fast-vs-collect *policy*, all in one) is exported and appears both in the signature a consumer
-  holds from `compiled.get(name)` — `TsonValueReader.read(TsonReadContext)` — and in the low-level
-  `TsonObjectReader`/`TsonTreeReader` `read(ctx, …)` overloads. A caller shouldn't have to touch it just
-  to choose "throw" vs "collect every problem". Extract the one decision the engine already centralizes
-  (`TsonReadContext.report(...)` *alone* decides throw-vs-collect) into a public `DiagnosticsReceiver`
-  (`void report(Diagnostic)`); read methods take an optional receiver and return the (possibly partial)
-  value — the value-plus-diagnostics shape the LLM repair loop wants — with `TsonReadContext` built from
-  it internally and moved to an unexported package. This is also the natural home for the **collecting-mode
-  object read** the facades don't offer yet (today only fail-fast; `Tson.validate` is tree-mode and
-  value-less). Load-bearing cost: reworking `TsonValueReader.read(TsonReadContext)` — the central
-  compiled-reader single-method interface — which ripples through the whole `reader` stack, so it's its
-  own pass, not just an overload.
+- [ ] **A schemaless tree read collects instead of throwing.** This is the one thing keeping
+  `Tson.validate` from being a two-line delegation to `treeReader()`: its schema-driven half already *is*
+  that, but `SchemalessTreeReader` is a *read* — `leaf()` calls the atom directly rather than through
+  `ctx.report`, so a bad `!uuid nope` throws where `SchemalessValidator` collects two diagnostics. Routing
+  those through the context would let the two schemaless implementations merge and `validate` lose its last
+  branch. Note this deliberately changes what a schemaless tree read *is* (its Javadoc currently rules
+  collecting out by design), so it wants a decision, not just a patch — and the base-syntax layer beneath it
+  (`LexException`/`TsonParseException`) is still fail-fast either way, which is the same open question
+  `STRUCTURED-OUTPUT.md` tracks for the lexer.
 
 ## Layer boundaries / schema registry
 
@@ -206,6 +202,30 @@ own prose (which had gone stale on at least one of them):
 (All already named in `DefinitionResolver`'s own Javadoc and `CLAUDE.md`; carried here so
 everything outstanding is tracked in one place.)
 
+## Schema-side diagnostics
+
+The read path now reports through a `TsonDiagnosticsReceiver`; the *schema* path does not. Everything from
+parsing a schema document to compiling it is fail-fast, and a consumer sees the result flattened.
+
+- [ ] **Report schema problems as `Diagnostic`s, through the same receiver.** Today a failure anywhere in
+  parse → desugar → resolve → link → compile throws, and the one caller that must not throw
+  (`Tson.validate`) catches it and emits a single `SCHEMA_ERROR` carrying `e.getMessage()` — no path, no
+  position in the *schema* document, and only the first problem, because the pipeline stopped there. A
+  schema author gets one error per run. What's wanted is the reader treatment: several problems, each with
+  its own position, from one pass.
+  - `Diagnostic` already has the field for it. `schemaPosition` exists and is populated today only from
+    `TypeDefinition.position()` on the *read* side; schema-side diagnostics are what it was shaped for.
+  - There is a partial precedent to follow rather than invent around: `TsonSchemaCompiler` already
+    substitutes an `ErrorReader` for an entry that fails to build, so the schema still compiles and only
+    *reading* that entry fails. That is the "keep going, record the problem" instinct applied at compile
+    time; generalizing it means the resolver and linker doing the same.
+  - Comparable in size to the reader-side receiver work but spread wider, and with one real difference:
+    the readers had `TsonReadContext` already threaded everywhere to hang `report` off, while the schema
+    phases have no such shared object. That, not the receiver, is the actual design work.
+  - Payoff beyond error quality: `tson compile` could report like `tson validate` does, and a
+    schema-authoring loop (LLM or human) gets the same localized feedback `STRUCTURED-OUTPUT.md` Tier 1
+    specifies for data.
+
 ## Write side
 
 The read/write matrix in the README makes the asymmetry plain: the read side has a schemaless→object
@@ -220,9 +240,11 @@ missing most of the mirror.
   and reporting what's wrong — is a whole missing half of the pipeline, and the natural home for
   round-tripping or producing guaranteed-conformant documents.
 - [ ] **Writers are fail-fast only, no diagnostics.** They throw `TsonWriteException` at the first
-  problem; there's no collecting mode symmetric to `TsonReadContext.collecting` → `List<Diagnostic>` on
-  the read side. The `TsonValueWriter` above especially needs this, to report every schema violation in
-  one pass the way the reader does.
+  problem, with nothing symmetric to the read side's `TsonDiagnosticsReceiver`. The `TsonValueWriter`
+  above especially needs it, to report every schema violation in one pass the way the reader does — and
+  the seam already exists and is write-direction-agnostic (`Diagnostic` carries a data path and both
+  positions; nothing about `void report(Diagnostic)` assumes reading), so this is a matter of threading a
+  receiver through the emitter, not designing a second error model.
 - [ ] **Writers materialize a `String`, not a stream.** `toTson(...)` returns the whole document in
   memory — asymmetric with the readers, which accept an `InputStream` and never fully buffer. Writers
   should also accept an `OutputStream`/`Writer`/`Appendable` and emit incrementally; the internal
@@ -295,13 +317,25 @@ missing most of the mirror.
   104 `@doc` strings across the three bundled schemas now survive resolution and linking, reachable as
   `schema.entries().getAnnotations(name).value("doc", String.class)` — every one of core.tn's 48
   declarations is documented. What's missing is the renderer, not the data.
-- [ ] The README entry-point table's schema rows say "Use `TsonValueReader`", but a caller never
-  constructs one directly — they go `Tson.builder()` → `resolve` → `treeRegistry()`/`bindRegistry()` →
-  `compile` → `get(type)`. The "Use" column names the interface you get *back*, not the thing you use.
-  Best fixed by the self-describing read entry point (see *Front door / ergonomics*): a real `Tson.read`
-  would be the honest single entry the table could then name.
+- [ ] Documentation for the *diagnostics* story specifically — `TsonDiagnosticsReceiver` is the seam a
+  consumer implements to route problems anywhere (a formatter writing to stdout as they arrive, a capped
+  collector, a metrics sink), and only the two built-ins are shown anywhere today. The README covers the
+  collector; a worked custom receiver is the obvious missing example, and it is what
+  `STRUCTURED-OUTPUT.md`'s Tier 1.5 streaming consumer will be built on.
 
 ## Miscellaneous
+
+- [ ] `Tson.objectReader()`/`treeReader()` each construct a *fresh* `TsonCompiledSchemaRegistry` instead of
+  reusing the eagerly-built `this.tree`/`this.bind`, so a facade reader doesn't share the compiled-schema
+  cache with `treeRegistry()`/`bindRegistry()` and a schema can be compiled twice in one `Tson`. The
+  `withDiagnostics`/`withSchema` derivations deliberately *share* rather than rebuild, so the leak is
+  confined to the two accessors.
+- [ ] The three `TestDocuments` test helpers (one each in `tson-compiler`, `tson`, `tson-cli`) are
+  near-duplicates, because this build has no `java-test-fixtures` plugin. Either wire that up or accept the
+  repetition; it is a few lines, so this is a build-hygiene call rather than a real cost.
+- [ ] `ContentHashMismatchException` is the one unprefixed member of an otherwise consistent
+  `Tson*Exception` family (`TsonParseException`/`TsonReadException`/`TsonWriteException`/
+  `TsonUnsupportedDocumentException`). A rename, whenever the naming pass happens.
 
 - [ ] Thread-safety — currently only `synchronized` on `TsonSchemaRegistry`/
   `TsonCompiledSchemaRegistry`'s own `register`/`get`/`getMeta` (its `load` deliberately isn't, to
