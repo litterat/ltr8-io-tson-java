@@ -25,26 +25,42 @@ the removal of the old throwaway `Map`/`List` DOM mode all landed. What's left:
 
 ## Front door / ergonomics
 
-- [ ] No `Tson.read` shorthand. The *capability* is complete — `tson.treeReader().read(source)` resolves
-  the document's own `!!schema`, picks the root type-ref and validates with no type named by the caller,
-  and `withSchema(uri).readAs(source, type)` covers data that isn't self-describing; the object form needs
-  a target class, which Java makes unavoidable. What's absent is only the one-call spelling, so the
-  shortest self-describing read is still two hops (`tson.treeReader().read(…)`). Lower value than it looked:
-  the two facades are now the documented reading surface, so the second hop names the thing a caller
-  actually wants to configure (`withDiagnostics`/`withSchema` hang off it).
 - [ ] A real disk/HTTP-backed `TsonSchemaSource` with whitelist/blacklist policy — today the only
   `TsonSchemaSource` is `TsonSchemaSource.registeredOnly()` (nothing fetched); the bundled standard
   library is served internally by `TsonCompiledSchemaRegistry` from `TsonBundledSchemas`, not through
   a source.
-- [ ] **A schemaless tree read collects instead of throwing.** This is the one thing keeping
-  `Tson.validate` from being a two-line delegation to `treeReader()`: its schema-driven half already *is*
-  that, but `SchemalessTreeReader` is a *read* — `leaf()` calls the atom directly rather than through
-  `ctx.report`, so a bad `!uuid nope` throws where `SchemalessValidator` collects two diagnostics. Routing
-  those through the context would let the two schemaless implementations merge and `validate` lose its last
-  branch. Note this deliberately changes what a schemaless tree read *is* (its Javadoc currently rules
-  collecting out by design), so it wants a decision, not just a patch — and the base-syntax layer beneath it
-  (`LexException`/`TsonParseException`) is still fail-fast either way, which is the same open question
-  `STRUCTURED-OUTPUT.md` tracks for the lexer.
+- [ ] **`SchemalessTreeReader` barely validates type-refs, and that — not "collecting" — is what keeps
+  `Tson.validate` from being a two-line delegation to `treeReader()`.** Measured against
+  `SchemalessValidator` on the same inputs, the tree reader silently accepts four of five:
+
+  | input | `Tson.validate` | schemaless tree read |
+  |---|---|---|
+  | `{ a: !uuid nope }` | `ATOM_CONSTRAINT_VIOLATION` | throws (raw `AtomParseException`) |
+  | `!uuid { a: 1 }` | `TYPE_MISMATCH` | reads OK |
+  | `!date [1 2]` | `TYPE_MISMATCH` | reads OK |
+  | `{ a: !nosuchtype 1 }` | `UNKNOWN_TYPE_REF` | reads OK |
+  | `!nosuchtype { a: 1 }` | `UNKNOWN_TYPE_REF` | reads OK |
+
+  `SchemalessValidator.walk` checks `validateTypeRef` on *every* value carrying a type-ref, containers
+  included; `SchemalessTreeReader.leaf()` only consults `BuiltinTypeVocabulary` at a leaf, and falls through
+  to plain base resolution when the lookup misses. So merging the two means **adding** validation to the
+  tree reader, not re-routing what it already does.
+  - The "make it collect" half is the easy part and needs no decision, contrary to how this item read
+    before. With `TsonDiagnosticsReceiver.throwing()` as the default, reporting through `ctx.report`
+    preserves fail-fast for every existing caller (it only upgrades the raw `AtomParseException` to a
+    `TsonReadException` carrying a `Diagnostic`, matching the rest of the stack), and the placeholder
+    question is already answered: `AtomNodeReader` documents `NullNode` as the soft-failed-read node, and
+    `SchemalessTreeReader.leaf()` already ends in exactly that `value == null ? NullNode : AtomNode` shape.
+  - The base-syntax layer beneath (`LexException`/`TsonParseException`) stays fail-fast either way, and no
+    longer blocks this: `Tson.validate`'s outer catch already converts those. Whether the lexer itself should
+    feed the `Diagnostic` model is the separate question `STRUCTURED-OUTPUT.md` tracks.
+- [ ] **The three schemaless paths disagree about an unrecognized type-ref.** `SchemalessValidator` reports
+  `UNKNOWN_TYPE_REF`; `SchemalessObjectReader` treats it as a binding error on purpose (its Javadoc argues
+  the case, `SPEC-FEEDBACK.md` #7); `SchemalessTreeReader` ignores it and keeps the name on the node. One of
+  those three is wrong and it is worth deciding which *before* the merge above, since that merge would
+  otherwise silently pick the tree reader's answer. Note §5.1 requires an unrecognized annotation be
+  preserved as an uninterpreted marker, which is the argument for the tree reader's behaviour — the object
+  reader's Javadoc explains why binding to a caller-declared Java type is a different situation.
 
 ## Layer boundaries / schema registry
 
