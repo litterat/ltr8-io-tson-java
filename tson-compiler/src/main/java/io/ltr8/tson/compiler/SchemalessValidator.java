@@ -58,16 +58,30 @@ public final class SchemalessValidator {
         return diagnostics;
     }
 
-    private static Diagnostic baseSyntaxError(RuntimeException e) {
-        SourcePosition position = switch (e) {
-            case TsonParseException p -> p.position();
-            case LexException l -> l.position();
-            case TsonUnsupportedDocumentException u -> u.position();
-            default -> null;
-        };
-        return new Diagnostic("", Diagnostic.Code.VALIDATION_ERROR, e.getMessage(),
+    /**
+     * {@code e} rendered as a base-syntax {@link Diagnostic}, or empty if it isn't one.
+     *
+     * <p>Public because {@code Tson.validate} needs the same classification for its schema-driven branch and
+     * cannot make it itself: two of the three exception types live in this module's unexported {@code lexer}
+     * package, so a caller in another module can't name them in a {@code catch}.
+     */
+    public static Optional<Diagnostic> asBaseSyntaxError(RuntimeException e) {
+        SourcePosition position;
+        switch (e) {
+            case TsonParseException p -> position = p.position();
+            case LexException l -> position = l.position();
+            case TsonUnsupportedDocumentException u -> position = u.position();
+            default -> {
+                return Optional.empty();
+            }
+        }
+        return Optional.of(new Diagnostic("", Diagnostic.Code.VALIDATION_ERROR, e.getMessage(),
                 "well-formed TSON", "a base-syntax error",
-                Optional.ofNullable(position), Optional.empty());
+                Optional.ofNullable(position), Optional.empty()));
+    }
+
+    private static Diagnostic baseSyntaxError(RuntimeException e) {
+        return asBaseSyntaxError(e).orElseThrow(() -> e);
     }
 
     private static void walk(DataValue value, String path, Map<CoreValue, Position> positions,

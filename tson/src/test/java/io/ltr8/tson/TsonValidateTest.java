@@ -170,4 +170,46 @@ class TsonValidateTest {
         assertEquals(1, problems.size(), problems.toString());
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, problems.getFirst().code());
     }
+
+    /**
+     * Content after the document's value is a problem, not a pass. Easy to lose: {@code TsonDataStream} is
+     * lazy, so nothing notices unless the read pulls past the root value -- which a schema-driven validate
+     * only does because it goes through {@link Tson#treeReader()}, whose framing owns that pull.
+     */
+    @Test
+    void contentAfterTheDocumentsValueIsReported() {
+        Tson tson = tsonWithPoint();
+        String trailing = """
+                !!schema:"https://example.test/point-1.tn"
+                !point { x: 1  y: 2 } junk""";
+
+        List<Diagnostic> problems = tson.validate(trailing);
+        assertEquals(1, problems.size(), problems.toString());
+        assertEquals(Diagnostic.Code.VALIDATION_ERROR, problems.getFirst().code());
+        assertTrue(problems.getFirst().message().contains("unexpected content"), problems::toString);
+
+        // and schemalessly, where a full parse catches it instead
+        assertEquals(1, tson.validate("{ x: 1 } junk").size());
+    }
+
+    /**
+     * Nothing about a bad *input document* reaches the caller as an exception -- validate's whole contract
+     * is one shape to render. Malformed syntax and a schema document handed in where data was expected both
+     * throw out of the reader underneath; validate converts them.
+     */
+    @Test
+    void aMalformedOrWrongKindOfDocumentComesBackAsADiagnosticNotAnException() {
+        Tson tson = tsonWithPoint();
+
+        List<Diagnostic> syntax = tson.validate("""
+                !!schema:"https://example.test/point-1.tn"
+                !point { x: 1, }""");
+        assertEquals(1, syntax.size(), syntax.toString());
+        assertEquals(Diagnostic.Code.VALIDATION_ERROR, syntax.getFirst().code());
+
+        // A schema document, not data -- a well-formed document of a kind validate doesn't validate.
+        List<Diagnostic> schemaDocument = tson.validate(POINT_SCHEMA);
+        assertEquals(1, schemaDocument.size(), schemaDocument.toString());
+        assertEquals(Diagnostic.Code.VALIDATION_ERROR, schemaDocument.getFirst().code());
+    }
 }

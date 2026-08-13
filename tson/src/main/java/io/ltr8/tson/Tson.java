@@ -1,11 +1,9 @@
 package io.ltr8.tson;
 
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.bind.DataBindException;
 import io.ltr8.tson.compiler.*;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.stream.DocumentStart;
-import io.ltr8.tson.compiler.stream.TypeRef;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaLinker;
@@ -16,8 +14,6 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
 
 /**
  * The front door -- a small, curated entry point over {@code tson-compiler}'s own, larger and more
@@ -135,38 +131,30 @@ public final class Tson {
      * (Class 1: base syntax plus built-in / core-vocabulary atoms).
      *
      * <p>Returns every problem found, an empty list meaning valid. A problem specific to this document
-     * that isn't a value error -- a {@code !!schema} the source can't provide, a root type the schema
-     * doesn't declare, a missing root type-ref -- comes back as a {@link Diagnostic} in the list too,
-     * so a caller has one shape to render and never has to catch an exception for a bad input document.
+     * that isn't a value error -- malformed syntax, a schema document where data was expected, a {@code
+     * !!schema} the source can't provide, a root type the schema doesn't declare, a missing root type-ref
+     * -- comes back as a {@link Diagnostic} in the list too, so a caller has one shape to render and never
+     * has to catch an exception for a bad input document.
+     *
+     * <p>The schema-driven half <em>is</em> {@link #treeReader()} with a collecting receiver: the reader
+     * already resolves the {@code !!schema}, selects the root type, and reports every failure around that
+     * as a diagnostic. Only the schemaless half is separate, because a schemaless tree read is a read --
+     * it throws on a bad {@code !uuid} where {@link SchemalessValidator} collects.
      */
     public List<Diagnostic> validate(String data) {
-        TsonDataStream stream = new TsonDataStream(data);
-        DocumentStart start = (DocumentStart) stream.next();
-
-        if (start.schema().isEmpty()) {
-            return SchemalessValidator.validate(data);
-        }
-
-        TsonCompiledSchema compiled;
         try {
-            compiled = tree.get(start.schema().get());
+            TsonDataStream header = new TsonDataStream(data);
+            if (!(header.next() instanceof DocumentStart start) || start.schema().isEmpty()) {
+                return SchemalessValidator.validate(data);
+            }
+            TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+            treeReader().withDiagnostics(problems).read(data);
+            return problems.diagnostics();
         } catch (RuntimeException e) {
-            return List.of(problem(Diagnostic.Code.SCHEMA_ERROR, e.getMessage()));
+            // Base-syntax failures are this document's problem, so they render like any other; anything
+            // else is a real fault and propagates.
+            return List.of(SchemalessValidator.asBaseSyntaxError(e).orElseThrow(() -> e));
         }
-        if (!(stream.peek() instanceof TypeRef typeRef)) {
-            return List.of(problem(Diagnostic.Code.VALIDATION_ERROR,
-                    "data declares a !!schema but has no root type-ref (e.g. `!person`) to select a type"));
-        }
-        TsonValueReader<?> reader;
-        try {
-            reader = compiled.get(typeRef.name());
-        } catch (RuntimeException e) {
-            return List.of(problem(Diagnostic.Code.UNKNOWN_TYPE, e.getMessage()));
-        }
-
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
-        reader.read(TsonReadContext.of(stream, problems));
-        return problems.diagnostics();
     }
 
     /**
@@ -180,10 +168,6 @@ public final class Tson {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
-    }
-
-    private static Diagnostic problem(Diagnostic.Code code, String message) {
-        return new Diagnostic("", code, message, "", "", Optional.empty(), Optional.empty());
     }
 
     /** The underlying resolved-schema registry -- e.g. for {@code schemaRegistry().get(uri)} on an already-registered identity. */
