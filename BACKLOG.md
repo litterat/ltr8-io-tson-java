@@ -22,12 +22,39 @@ previously had to fully qualify. It also aligns with JEP 540's sealed `JsonValue
 `TsonRecord`+`TsonMap` staying *more* precise than `JsonObject`, which cannot distinguish the two.
 What's left:
 
+- [ ] **Convenience numeric accessors — `asInt()`/`asLong()`/`asDouble()`.** `TsonValue` offers
+  `asNumber()`/`asBigInteger()`/`asBigDecimal()`/`as(Class)`, so extracting an `int` reads
+  `node.get("age").asNumber().orElseThrow().intValue()` where JEP 540's peer reads
+  `json.get("temperature").asInt()`. This codebase's own tests show the ceremony. Default methods on the
+  sealed interface, alongside the general low-level form rather than replacing it. Borrow JEP 540's
+  conversion semantics while doing it: exact-representability required, but a syntactic fractional part
+  that *is* integral converts (`123.0` and `234.56E2` succeed as `int`, `345.6` does not), and
+  out-of-range fails rather than silently saturating or yielding infinity.
+- [ ] **A failed navigation chain says nothing about which hop failed.**
+  `at("/properties/periods/0/temperature").asInt()` yielding empty doesn't distinguish "no `properties`"
+  from "`periods` wasn't an array" from "`temperature` was text". JEP 540 solves this by *throwing* from
+  `get`, with the path and source location in the message, and offering `tryGet`/`tryValue` as the lenient
+  opt-out — it names quick exploration of unfamiliar documents as an explicit goal.
+  - **Don't copy the throwing default**; lenient-first suits this library, and the schema-driven path
+    already reports properly through `Diagnostic`.
+  - **Do consider having `TsonMissing` carry the RFC 6901 pointer at which navigation failed** — never
+    throws, adds no methods, and `at("/a/b/c")` comes back knowing it died at `/a/b`. It reuses the pointer
+    `at()` already walks. The cost is that `TsonMissing.instance()` stops being a singleton.
+  - A TSON version can carry the path but not JEP 540's "line N, position M": tree nodes hold no source
+    position. Related to `SourcePosition` naming no document, under "Schema-side diagnostics".
+
 - [ ] **Copy-on-write transforms + builders (parked).** The "new tree from old" editing half —
   `TsonRecord.with(name, value)`/`without(name)`, `TsonArray.with(i, value)`/`plus(value)`/`without(i)`,
   `TsonRecord.builder()`, and a pointer-based `set("/a/b", value) → new tree`. All pure `tson-tree`
   operations (no compiler dependency), so they belong in that module. Deferred until there's a concrete
   produce/edit use case: `TsonTreeWriter` already closes the read→edit→write loop, so these have a real
   payoff when wanted, but block nothing now.
+  - **Nothing to copy from JEP 540, and that is the useful part.** It ships no transformation API and no
+    builders at all — construction is static `of(...)` factories, which `tson-tree` already matches — and
+    its Risks section defers the area outright: "During the incubation period, we will gather more
+    information about use cases involving generating and transforming JSON documents, in order to evolve
+    these areas of the API." The JDK reached the same "wait for real use cases" conclusion independently,
+    which turns this item's deferral from a shrug into a decision.
 
 ## Front door / ergonomics
 
@@ -295,6 +322,13 @@ missing most of the mirror.
   `resolver` since). Still Part 1 (lexer/parser/§5 vocabulary) only — Part 2 (resolution, linking,
   compilation) has no conformance-suite coverage at all yet, only this repo's own unit/integration
   tests.
+- [ ] **Run the JSON front-end against the established JSON Parsing Test Suite** when it lands (the
+  `TsonJsonParser` tracked in `STRUCTURED-OUTPUT.md`). JEP 540 commits to exactly this for the JDK's own
+  parser — its own unit tests *plus* that external corpus, "which contains numerous edge-case inputs" —
+  and the reasoning is the same one this repo's sibling suite exists for: an external, language-agnostic
+  fixture set catches drift a self-authored suite agrees with. Cheap, since the corpus is pass/fail on
+  parse and the front-end's whole job is RFC 8259 conformance.
+
 - [ ] **Retrofit the ~110 existing sidecars with a real `!!schema` directive** pointing at the new
   per-layer schemas above, and fix whatever real shape mismatches that validation surfaces —
   explicitly *not* done in the same pass that wrote the schemas (see the sibling README's own note
@@ -348,6 +382,16 @@ missing most of the mirror.
   104 `@doc` strings across the three bundled schemas now survive resolution and linking, reachable as
   `schema.entries().getAnnotations(name).value("doc", String.class)` — every one of core.tn's 48
   declarations is documented. What's missing is the renderer, not the data.
+- [ ] **State the streaming contrast in README positioning.** JEP 540 makes its in-memory limit an explicit
+  design decision, not an omission: "We assume that input JSON documents can fit in memory, as either a
+  `String` or a `char` array... if we were to allow JSON sources such as files or network connections,
+  issues such as insufficient memory would be possible with large documents." That is the cleanest
+  available statement of what this library's reader stack buys — `TsonDataStream` pulls events, every
+  facade reader takes an `InputStream` and never fully buffers, and memory is proportional to nesting
+  depth rather than document size. Worth a line, because when JSON ships in the JDK the question becomes
+  "why not just use that?", and the honest answer is a short list: schema, binding, streaming, collected
+  diagnostics — each of which JEP 540 names as a non-goal.
+
 - [ ] Documentation for the *diagnostics* story specifically — `TsonDiagnosticsReceiver` is the seam a
   consumer implements to route problems anywhere (a formatter writing to stdout as they arrive, a capped
   collector, a metrics sink), and only the two built-ins are shown anywhere today. The README covers the

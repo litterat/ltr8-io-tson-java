@@ -218,6 +218,17 @@ all, with no decoder integration required.
   would be `TsonJsonParser`) that produces the *same* `DataValue`/`CoreValue` AST
   `TsonDataParser` does is what lets everything downstream — resolution, the compiled Class 2
   reader stack — be reused completely unchanged.
+- [ ] **Duplicate object member names are a genuine fork, and the JSON front-end has to pick.** TSON §2.5
+  is last-value-wins, and this implementation overwrites as it streams (`SPEC-FEEDBACK.md` #21 covers the
+  TSON side, including that a shadowed occurrence is still validated). JEP 540 goes the other way for JSON
+  and argues it at length: duplicates are an unconditional parse error, on the grounds that RFC 8259's
+  "SHOULD be unique" leaves an ambiguous object whose "behavior of software that receives such an object is
+  unpredictable", citing RFC 9413 on robust protocols, and betting the 2013-era documents that motivated
+  the leniency have since been fixed. A `TsonJsonParser` producing the same `DataValue`/`CoreValue` AST
+  inherits TSON's rule by default, silently — so this needs deciding, not discovering. Reading JSON
+  *against a TSON schema* is the case that matters: accepting a duplicate there means validating a
+  document the JDK's own parser would reject.
+
 - [ ] **Numeric compatibility is one-directional and already free on read.** Every valid JSON
   number is a valid TSON number, so JSON numbers parse through `NumberGrammar`/`BaseTypeResolver`
   with no changes needed. The reverse isn't true: TSON-only extensions (hex/binary/octal
