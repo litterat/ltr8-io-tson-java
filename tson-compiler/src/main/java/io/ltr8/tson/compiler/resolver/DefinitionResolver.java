@@ -421,8 +421,14 @@ final class DefinitionResolver {
                     + "constructor (§3.3.1) -- did you mean atom refinement ('!" + target + " ^ { ... }')?");
         }
         if (!(constructor.body() instanceof RecordBody _)) {
-            throw new UnsupportedOperationException("'" + name + "': constructor '" + target
-                    + "' has a non-record body, not resolved yet");
+            // Unreachable from anything this parser produces: §12.1 attaches `~` to a structural-def only
+            // (refined-def / construction-def / record-def), each of which resolves to a record body, and §7.2
+            // says a constructor *is* a record-shaped type. So a constructor with any other body means a
+            // malformed TypeDefinition reached the structure namespace by some route other than parsing --
+            // an invariant violation, not a schema this resolver should be explaining to an author.
+            throw new IllegalStateException("'" + name + "': constructor '" + target + "' has a "
+                    + constructor.body().getClass().getSimpleName() + " body; a constructor is record-shaped "
+                    + "(§7.2) and cannot be declared otherwise");
         }
         Top body = bindAtomInstance(name, instance.value());
         return new TypeDefinition(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of(target)), constructor.kind(),
@@ -684,8 +690,13 @@ final class DefinitionResolver {
 
         for (TypeRef supertypeRef : construction.supertypes()) {
             if (!(supertypeRef instanceof SimpleRef simple)) {
-                throw new UnsupportedOperationException(
-                        "'" + name + "': only simple supertype references are resolved so far, got " + supertypeRef);
+                // The one genuine gap in this method. §5.8's "Parameterized references" admits it
+                // (`vip => <T> customer & box<T> & { ... }`, supertypes recording head names only), but the
+                // arguments have to reach the absorbed fields, and that is §5.10 substitution into a record
+                // template's body -- unimplemented, and tracked with the rest of that work.
+                throw new UnsupportedOperationException("'" + name + "': composing with a parameterized "
+                        + "supertype (§5.8) needs §5.10 parameter substitution into the absorbed fields, which "
+                        + "is not implemented yet; got " + supertypeRef);
             }
             String supertypeName = simple.name();
             TypeDefinition supertypeDef = namespaceDefinitions.getTypeDefinition(supertypeName);
@@ -696,8 +707,14 @@ final class DefinitionResolver {
                         + "' names no type this schema declares or imports");
             }
             if (!(supertypeDef.body() instanceof RecordBody supertypeBody)) {
-                throw new UnsupportedOperationException("'" + name + "': supertype '" + supertypeName
-                        + "' does not have a record body -- composing with a non-record supertype is not resolved yet");
+                // §5.8 states no equivalent of §5.7's "Refinement requires a vocabulary body", though
+                // composition has the same need -- it copies the parent's fields, and a binding record has
+                // none to copy. Read as the author's error under the same principle; SPEC-FEEDBACK.md #38
+                // asks for the rule to be stated.
+                throw new TsonSchemaValidationException("'" + name + "': supertype '" + supertypeName
+                        + "' has no fields to contribute -- its body is a binding record, not a vocabulary, so "
+                        + "there is nothing for '&' to compose with (§5.8, and §5.7's vocabulary-body rule "
+                        + "read across). Compose with the head it derives from");
             }
 
             directSupertypes.add(supertypeName);
@@ -707,7 +724,7 @@ final class DefinitionResolver {
             }
 
             for (RecordField field : supertypeBody.fields()) {
-                requireFieldNameNotSeen(name, field.name(), seenFieldNames);
+                requireFieldNameNotSeen(name, field.name(), seenFieldNames, FieldOrigin.SUPERTYPE);
                 seenFieldNames.add(field.name());
                 inheritedFieldIndex.put(field.name(), fields.size());
                 fields.add(field);
@@ -892,8 +909,14 @@ final class DefinitionResolver {
                     + "' names no type this schema declares or imports");
         }
         if (!(sourceDef.body() instanceof RecordBody sourceBody)) {
-            throw new UnsupportedOperationException("'" + name + "': refinement source '" + sourceName
-                    + "' does not have a record body -- refining a non-record source is not resolved yet");
+            // §5.7's "Refinement requires a vocabulary body": the source of ^ MUST be a definition whose body
+            // is a !record, and one whose body is a binding record -- a top-level constructor application, a
+            // template instantiation, or an alias for either -- is *finished*, its bindings set. The author's
+            // error, not a gap: there is no vocabulary here to tighten.
+            throw new TsonSchemaValidationException("'" + name + "': refinement source '" + sourceName
+                    + "' has no vocabulary to tighten -- its body is a binding record, so it is finished and "
+                    + "'^' on it is a resolver error (§5.7). Refine the head it derives from, or, for an atom "
+                    + "instance, use atom refinement ('!" + sourceName + " ^ { ... }', §5.5)");
         }
 
         List<String> transitiveSupertypes = new ArrayList<>();
@@ -982,7 +1005,7 @@ final class DefinitionResolver {
                 if (index != null) {
                     fields.set(index, resolveTighteningField(declarationName, fieldDef, fields.get(index), parameters));
                 } else {
-                    requireFieldNameNotSeen(declarationName, fieldDef.name(), seenFieldNames);
+                    requireFieldNameNotSeen(declarationName, fieldDef.name(), seenFieldNames, FieldOrigin.BODY_FIELD);
                     RecordField field = resolveField(fieldDef, parameters, Optional.empty());
                     seenFieldNames.add(field.name());
                     fields.add(field);
@@ -991,7 +1014,8 @@ final class DefinitionResolver {
             case GroupDef groupDef -> {
                 List<String> memberNames = new ArrayList<>();
                 for (GroupDef.Member member : groupDef.members()) {
-                    requireFieldNameNotSeen(declarationName, member.name(), seenFieldNames);
+                    requireFieldNameNotSeen(declarationName, member.name(), seenFieldNames,
+                            FieldOrigin.GROUP_MEMBER);
                     RecordField field = resolveGroupMember(member);
                     seenFieldNames.add(field.name());
                     fields.add(field);
@@ -1044,16 +1068,39 @@ final class DefinitionResolver {
     }
 
     /**
-     * Rejects an inter-supertype field collision (§5.8: "supertypes MUST contribute disjoint field
-     * sets") and a genuine duplicate field/group-member name within one body -- neither is
-     * tightening (tightening a *body* field against an *inherited* one is handled separately, via
-     * {@code inheritedFieldIndex} in {@link #resolveEntry}, before this is ever consulted for that
-     * name) and neither is resolved here.
+     * Where a colliding name was written, which is the whole content of the diagnostic -- the rule broken is
+     * the same one in each case (a field name is unique across a record's plain fields, its groups' members,
+     * and everything its supertypes contribute, §5.11), but what the author has to change is not.
      */
-    private static void requireFieldNameNotSeen(String declarationName, String fieldName, Set<String> seenFieldNames) {
+    private enum FieldOrigin {
+        SUPERTYPE("two supertypes both contribute it -- supertypes MUST contribute disjoint field sets, "
+                + "including a diamond where both paths reach the same originating type (§5.8)"),
+        BODY_FIELD("this body declares it twice (§5.11: a field name is unique across a record's plain fields "
+                + "and all its groups' members)"),
+        GROUP_MEMBER("a group member repeats it -- member labels share the enclosing record's field namespace "
+                + "(§5.11)");
+
+        private final String explanation;
+
+        FieldOrigin(String explanation) {
+            this.explanation = explanation;
+        }
+    }
+
+    /**
+     * Rejects a repeated field name. Every case is the author's error under §5.11's uniqueness rule (§5.8's
+     * disjointness rule being the same rule reaching through supertypes), never a coverage gap -- so the
+     * diagnostic's job is to say <em>which</em> of the three ways it happened, since that is what decides the
+     * fix.
+     *
+     * <p>Tightening never reaches here: a body field naming an <em>inherited</em> field is routed by {@code
+     * inheritedFieldIndex} in {@link #resolveEntry} before this is consulted for that name.
+     */
+    private static void requireFieldNameNotSeen(String declarationName, String fieldName,
+                                                 Set<String> seenFieldNames, FieldOrigin origin) {
         if (seenFieldNames.contains(fieldName)) {
-            throw new UnsupportedOperationException("'" + declarationName + "': an inter-supertype field collision, "
-                    + "or a duplicate field/group-member name ('" + fieldName + "'), is not resolved yet");
+            throw new TsonSchemaValidationException((declarationName == null ? "" : "'" + declarationName + "': ")
+                    + "field '" + fieldName + "' is declared more than once -- " + origin.explanation);
         }
     }
 

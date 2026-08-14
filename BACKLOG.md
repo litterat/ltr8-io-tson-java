@@ -134,13 +134,11 @@ own prose (which had gone stale on at least one of them):
   *substitution* (tracked in `STRUCTURED-OUTPUT.md`) — this is a rejection rule for a malformed
   "closed" entry, not the substitution mechanism itself.
 
-- [ ] **Composition and refinement, beyond the simple record-over-record case.** Five sites in
-  `DefinitionResolver` reject shapes §5.7/§5.8 admit, each with its own "not resolved yet":
-  a non-simple (generic) supertype reference; a supertype whose body isn't a record; a refinement source
-  whose body isn't a record; an inter-supertype field collision (or a duplicate field/group-member name);
-  and a constructor application whose constructor has a non-record body. They share a cause — the
-  composition path assumes record-over-record with disjoint field sets — so they are likely one piece of
-  work rather than five.
+- [ ] **A parameterized supertype reference** (`vip => <T> customer & box<T> & { ... }`, §5.8's
+  "Parameterized references"). The only genuine gap left in the composition path, and it is not independent:
+  §5.8 says the applied form's arguments reach "the absorbed fields, which carry the parameters through
+  ordinary type channels", so composing with `box<T>` means substituting into a record template's body —
+  the §5.10 item above, termination guard and all. Worth doing together, not before.
 - [ ] **A field/element type that is not a simple name, a generic application, or an inline array.**
   `resolveFieldType`'s catch-all ("only simple (non-generic) type-refs, generic applications of one, and
   inline arrays of one are resolved so far"). Overlaps the template-substitution item above, but is
@@ -150,10 +148,18 @@ The classification of these throw sites is itself tracked under "Schema-side dia
 `UnsupportedOperationException`s across the codebase, three are correct use (an immutable map, an
 unreachable-by-construction guard, `ErrorReader`'s deliberate deferred failure), roughly nine are
 schema-author errors wearing a library-gap exception, and about five wrap an internal fault. Only the
-genuine gaps belong in this section — two of the nine have since been reclassified (a modifier-only entry
-with nothing to elide toward, and a refinement body field that adds rather than tightens; both are §5.7
-MUST-rejects and now raise `TsonSchemaValidationException`), which is what removing them from the list
-above means.
+genuine gaps belong in this section — six of the nine have since been reclassified, which is what removing
+them from the list above means. A modifier-only entry with nothing to elide toward, and a refinement body
+field that adds rather than tightens (§5.7 MUST-rejects). A field name two supertypes both contribute, a
+name a body declares twice, and a group member repeating one (§5.8's disjointness rule and §5.11's label
+uniqueness — one `requireFieldNameNotSeen` that now says which of the three happened, since that is what
+decides the author's fix). And a refinement source whose body is a binding record (§5.7's "finished"). All
+raise `TsonSchemaValidationException`. A seventh, composing with a *supertype* whose body is a binding
+record, is the same author error under a rule §5.8 never states — implemented per §5.7's principle, with
+`SPEC-FEEDBACK.md` #38 asking for the rule. An eighth, a constructor application whose constructor has a
+non-record body, turned out unreachable from the grammar (§12.1 attaches `~` to a structural-def only, each
+of which resolves to a record body) and is now an `IllegalStateException` — an internal-invariant guard, the
+audit's third bucket.
 
 ## Schema-side diagnostics
 

@@ -1528,6 +1528,92 @@ class DefinitionResolverTest {
                 .resolve(schemaMap.declarations().get(declaration.split("=>")[0].trim()));
     }
 
+    // ── Composition/refinement rejections (§5.7, §5.8, §5.11) ─────────────
+    //    Every one is the author's error under a MUST in the spec, so each is a
+    //    TsonSchemaValidationException. What varies is only which rule was broken,
+    //    and the message has to say which -- that is what decides the author's fix.
+
+    /** §5.8: "supertypes MUST contribute disjoint field sets" -- the message must name the supertype case. */
+    @Test
+    void rejectsAFieldNameTwoSupertypesBothContribute() {
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> resolveAll("""
+                        address => { street: text  city: text }
+                        contact => { city: text  email: text }
+                        customer => address & contact
+                        """));
+        assertTrue(thrown.getMessage().contains("'city'"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("disjoint field sets"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("§5.8"), thrown.getMessage());
+    }
+
+    /** §5.11: a name is unique across a record's plain fields -- a different fix from the supertype case. */
+    @Test
+    void rejectsAFieldNameDeclaredTwiceInOneBody() {
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> resolveAll("point => { x: integer  x: text }"));
+        assertTrue(thrown.getMessage().contains("'x'"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("declares it twice"), thrown.getMessage());
+    }
+
+    /** §5.11: "member labels share the enclosing record's field namespace" -- the third distinct wording. */
+    @Test
+    void rejectsAGroupMemberRepeatingAPlainFieldName() {
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> resolveAll("bounds => { min: integer  ( min: text | other: text ) }"));
+        assertTrue(thrown.getMessage().contains("'min'"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("group member"), thrown.getMessage());
+    }
+
+    /**
+     * §5.7's "Refinement requires a vocabulary body": a definition whose body is a binding record -- here a
+     * top-level constructor application -- is <em>finished</em>, and {@code ^} on it is a resolver error. The
+     * message points at the form that does work on an atom instance, {@code !I ^ { ... }} (§5.5), because
+     * that is what an author reaching for this actually wants.
+     */
+    @Test
+    void rejectsRefiningADefinitionWhoseBodyIsABindingRecord() {
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> resolveSnippetsAgainstMetaKernel("""
+                        bounded => integer ^ { min: = 0 }
+                        """));
+        assertTrue(thrown.getMessage().contains("finished"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("!integer ^"), thrown.getMessage());
+    }
+
+    /**
+     * The composition twin of the case above. §5.8 states no vocabulary-body rule of its own, though it needs
+     * one for the same reason -- a binding record has no fields to copy. Read as the author's error under
+     * §5.7's principle; {@code SPEC-FEEDBACK.md} #38 asks for §5.8 to say so.
+     */
+    @Test
+    void rejectsComposingWithASupertypeWhoseBodyIsABindingRecord() {
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> resolveSnippetsAgainstMetaKernel("""
+                        weird => integer & { extra: text }
+                        """));
+        assertTrue(thrown.getMessage().contains("no fields to contribute"), thrown.getMessage());
+    }
+
+    /**
+     * Resolves a hand-written body with meta-kernel's own entries as the type-name namespace, so a
+     * declaration can name a real atom instance ({@code integer => !integer_type {}}) as a source or
+     * supertype -- the shapes §5.7/§5.8 reject, which need a non-record body to exist at all.
+     */
+    private TypeDefinition resolveSnippetsAgainstMetaKernel(String body) {
+        TsonCompiledMetaSchema metaKernel = metaKernelCompiled();
+        SchemaDocument document = new TsonSchemaParser("""
+                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
+                { %s }""".formatted(body)).parseSchemaDocument();
+        Map<String, TypeDefinition> namespace = new LinkedHashMap<>(metaKernel.schema().entries());
+        TypeDefinition last = null;
+        for (SchemaMap.Declaration declaration : document.body().declarations().values()) {
+            last = definitionResolverFor(metaKernel, namespace::get).resolve(declaration);
+            namespace.put(declaration.name(), last);
+        }
+        return last;
+    }
+
     // ── Subtraction (§5.9) ────────────────────────────────────────────────
 
     private static final String ACCOUNT = "account => { name: text  email: text  password: text }";

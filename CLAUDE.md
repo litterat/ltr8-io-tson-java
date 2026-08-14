@@ -393,11 +393,17 @@ namespace *before* any local declaration resolves.
   `tson-schema` has no `tson-regex` dependency), `duration_type`'s text bounds, and **selector** facets
   (`component`/`format`/`encoding`/`version`) — core.tn's own prose calls a selector swap a narrowing, so
   rejecting one would reject a documented construct (`SPEC-FEEDBACK.md` #27).
-- **Everything else throws `UnsupportedOperationException`** (elided field types outside a tightening
-  entry, an `Absent` modifier value, the identity-diagonal FIXED-value invariant, a field group restated
-  in a refinement body, a generic type-ref with a nested or value (non-simple) argument,
-  inter-supertype field collision) rather than silently mis-resolving. `DefinitionResolver`'s
-  Javadoc lists the exact boundary.
+- **Two exception types, and which one is deliberate.** `UnsupportedOperationException` means *this library
+  hasn't implemented that yet* — an `Absent` modifier value, the identity-diagonal FIXED-value invariant, a
+  field group restated in a refinement body, a generic type-ref with a nested or value (non-simple) argument,
+  a parameterized supertype. `TsonSchemaValidationException` means *the schema is wrong*, and the spec says
+  so: a refinement that loosens rather than narrows, a refinement body field that adds, a modifier-only entry
+  with nothing to elide toward (§5.7), a field name two supertypes both contribute or a body/group declares
+  twice (§5.8/§5.11), a source or supertype whose body is a binding record and so has no vocabulary (§5.7's
+  "finished"). Telling an author their correctly-rejected schema is unsupported sends them looking for the
+  wrong fix, so the split is worth keeping honest — `IllegalStateException` is the third, for an invariant
+  only a malformed `TypeDefinition` could break (a `constructor: true` entry with a non-record body, which
+  §12.1's grammar makes unreachable). `DefinitionResolver`'s Javadoc lists the exact boundary.
 - **`TypeArgument` is a sealed interface (`Ref`/`Value`), NOT a plain record — do not "simplify" it
   back.** `TypeRef`/`TypeArgument` are mutually recursive, and `tson-bind`'s record binder eagerly resolves
   every field descriptor with no cycle protection, so a plain-record `TypeArgument` deadlocks with
@@ -951,15 +957,15 @@ compatibility).
 
 ## Not yet implemented
 
-- **Part 2 resolution gaps** — a field group restated in a refinement body,
-  the identity-diagonal FIXED-value invariant, a generic type-ref whose
-  argument is nested or a value rather than a plain name, and composition/refinement beyond the simple
-  record-over-record case (a generic or non-record supertype, a non-record refinement source, an
-  inter-supertype field collision). `DefinitionResolver`'s Javadoc is the exact current boundary, and
-  `BACKLOG.md`'s "Remaining Part 2 resolution gaps" carries the full list — an audit of the ~34
+- **Part 2 resolution gaps** — a field group restated in a refinement body, the identity-diagonal
+  FIXED-value invariant, a generic type-ref whose argument is nested or a value rather than a plain name,
+  and a parameterized supertype (`customer & box<T>`, which needs §5.10 substitution into the absorbed
+  fields and so belongs with the item below). `DefinitionResolver`'s Javadoc is the exact current boundary,
+  and `BACKLOG.md`'s "Remaining Part 2 resolution gaps" carries the full list — an audit of the ~34
   `UnsupportedOperationException` sites found nine genuine gaps that had no item, and that only about half
   of those throws are gaps at all: the rest are schema-author errors, or internal faults, wearing the
-  wrong exception type.
+  wrong exception type. Six of the nine have since been reclassified rather than implemented; the
+  composition path in particular turned out to be one real gap, not the five the backlog listed.
 - **§5.10 parameter substitution into a template *body*** — a template that refines a constructor
   (`array_ranged`, and so §5.3's sized sugar) instantiates via argument routing; a *record* template
   (`box => <T> { v: T }`), whose parameter is a field type, is rejected at the application site instead.

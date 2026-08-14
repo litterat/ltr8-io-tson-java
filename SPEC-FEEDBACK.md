@@ -1850,3 +1850,52 @@ notices §4.3's "per parent" will ask.
    declared `supertypes` against that test rather than inferring them.
 
 Either way §4.3's "revokes it" deserves the same "per parent" precision the clause before it uses.
+
+## 38. §5.7 requires the source of `^` to have a vocabulary body; §5.8 needs the same rule for `&` and does not state it
+
+**Section:** [TSON-SCHEMA] §5.8 (Supertype Composition), §5.7 (Refinement), §8.2 (Materialisation).
+
+**Problem:** §5.7 is careful about what may sit on the left of `^`, and gives the reason a name:
+
+> **Refinement requires a vocabulary body.** The source of `^` — after flattening references (§8.3) — MUST be
+> a definition whose body is a `!record` […] A definition whose body is a binding record — a top-level
+> constructor application (§5.6), a template instantiation (§8.2), or an alias resolving to either — is
+> **finished**: its bindings are set, and `^` on it is a resolver error.
+
+§5.8 says nothing equivalent about `&`, though composition has the identical need for the identical reason:
+it *copies the parent's fields*, and a binding record has no fields to copy. Nothing in §5.8 forbids
+
+```
+weird => integer & { extra: text }
+```
+
+where core's `integer => !integer_type {}` is a top-level constructor application. `integer` is finished in
+exactly §5.7's sense. Its resolved body is an `!integer_type` binding record, so there is no field set to
+merge, no `record.supertypes` lineage to extend, and no coherent kind for the result: §4.1 would take ATOM
+from the chain while the trailing body adds record fields to something that is not a product.
+
+The gap is easy to miss because every composition in the three bundled schemas has a record-bodied parent —
+`~atom & { … }`, `~text_type & atom_specification & { … }` — so an implementation built against the fixtures
+never meets the case, and the spec never rules on it.
+
+**§5.7's rule does not reach it by implication.** The two operators are defined independently, and §4.3's
+table describes composition purely in terms of what it produces ("IS-A preserved (each parent)", "Adds
+fields: yes"), never in terms of what its operands must be. An implementer applying §5.7's rule to `&` is
+generalising, not reading — which is exactly the situation where two implementations disagree.
+
+**What this implementation does:** rejects it as the author's error, wording the diagnostic from §5.7's
+principle ("its body is a binding record, not a vocabulary, so there is nothing for `&` to compose with").
+`DefinitionResolver.resolveComposition`; pinned by
+`DefinitionResolverTest.rejectsComposingWithASupertypeWhoseBodyIsABindingRecord`.
+
+**Suggested resolution:** State the requirement once, for both operators, rather than twice. §5.7's paragraph
+is already the general statement — a *vocabulary body* is what both operations consume — so the cleanest fix
+is to move it up to §4.3, where construction and refinement are introduced as families, and have §5.7 and
+§5.8 both refer to it. Failing that, a one-sentence twin in §5.8: the supertypes of `&` MUST each be a
+definition whose body is a `!record`, on the same "finished" grounds.
+
+A second question the same paragraph raises, worth settling while it is open: §5.7's list of admissible
+bodies is "a fresh or refined record, a composition, a constructor, or an open template". A **choice** body
+is absent, and so are array/map/tuple bodies other than at an application head. If that exclusion is
+deliberate — a choice has variants, not fields, so there is nothing to tighten — saying so would close the
+question for `&` at the same time.
