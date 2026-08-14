@@ -11,19 +11,19 @@ import java.util.Optional;
 /**
  * Tree mode: reads the {@code void} unit instance -- the absent sentinel {@code _} -- consuming it via a
  * delegate {@link VoidReader} and yielding {@link TsonAbsent}. Distinct from a null-yielding leaf ({@link
- * AtomNodeReader} → {@link TsonNull}), since {@code _} is "absent", not "null".
+ * AtomTreeReader} → {@link TsonNull}), since {@code _} is "absent", not "null".
  */
-final class AbsentNodeReader implements TsonTypeReader<TsonValue> {
+final class AbsentTreeReader implements TsonTypeReader<TsonValue> {
 
     private final TsonTypeReader<?> delegate;
     private final AnnotationTypes annotationTypes;
 
-    AbsentNodeReader(TsonTypeReader<?> delegate, AnnotationTypes annotationTypes) {
+    AbsentTreeReader(TsonTypeReader<?> delegate, AnnotationTypes annotationTypes) {
         this.delegate = delegate;
         this.annotationTypes = annotationTypes;
     }
 
-    /** Captures the annotations before delegating -- see {@link AtomNodeReader#read} for why that ordering is what works. */
+    /** Captures the annotations before delegating -- see {@link AtomTreeReader#read} for why that ordering is what works. */
     @Override
     public TsonValue read(TsonReadContext ctx) {
         List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx, annotationTypes);

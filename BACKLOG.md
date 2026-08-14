@@ -22,12 +22,6 @@ previously had to fully qualify. It also aligns with JEP 540's sealed `JsonValue
 `TsonRecord`+`TsonMap` staying *more* precise than `JsonObject`, which cannot distinguish the two.
 What's left:
 
-- [ ] **Three internal readers are still named after tree types that no longer exist**, and were already
-  inconsistent with their siblings before the rename made it visible: `AtomNodeReader`, `AbsentNodeReader`
-  and `AtomNodeFactory`, next to `ArrayTreeReader`/`MapTreeReader`/`RecordTreeReader`/`TupleTreeReader`.
-  `AtomTreeReader`/`AbsentTreeReader`/`AtomTreeFactory` would settle both at once. ~20 references, all in
-  the unexported `reader` package, so no consumer impact.
-
 - [ ] **Copy-on-write transforms + builders (parked).** The "new tree from old" editing half —
   `TsonRecord.with(name, value)`/`without(name)`, `TsonArray.with(i, value)`/`plus(value)`/`without(i)`,
   `TsonRecord.builder()`, and a pointer-based `set("/a/b", value) → new tree`. All pure `tson-tree`

@@ -58,7 +58,7 @@ import java.util.Optional;
  * TsonReadException} at the first, a collector gathers them all and still hands back a tree. Reporting never
  * abandons the value -- the node is still built and its children are still read, so one pass finds
  * everything; a leaf whose atom rejected the token becomes a {@link TsonNull}, the placeholder {@code
- * AtomNodeReader} uses for the same situation.
+ * AtomTreeReader} uses for the same situation.
  *
  * <p><b>Wire annotations are captured</b> onto each node's own {@code annotations()}, at every position §3.1
  * permits one: the root value, a record field's value, an array element, either side of a map entry (a

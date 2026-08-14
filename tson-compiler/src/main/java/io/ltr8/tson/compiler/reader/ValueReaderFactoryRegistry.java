@@ -76,7 +76,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
 
     /**
      * Tree mode: reads into an immutable {@link TsonValue}. The container factories
-     * build node containers; every atom-family/enum factory is wrapped ({@link AtomNodeFactory}) so its leaf
+     * build node containers; every atom-family/enum factory is wrapped ({@link AtomTreeFactory}) so its leaf
      * yields a {@code TsonAtom}/{@code TsonNull}, and {@code unit}'s {@code void} yields a {@code TsonAbsent}
      * (see {@link #TREE_UNIT}). Uses the object-binding enum factory so {@code boolean} reads a real {@code
      * Boolean} rather than the text {@code "true"}/{@code "false"}.
@@ -84,16 +84,16 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
     public static ValueReaderFactoryRegistry tree() {
         return new ValueReaderFactoryRegistry(baseFactories(
                 new RecordTreeReader.Factory(), new ArrayTreeReader.Factory(), new MapTreeReader.Factory(),
-                new TupleTreeReader.Factory(), AtomTypeReader.ENUM_OBJECT_MODE, TREE_UNIT, AtomNodeFactory::new,
+                new TupleTreeReader.Factory(), AtomTypeReader.ENUM_OBJECT_MODE, TREE_UNIT, AtomTreeFactory::new,
                 ChoiceReader.CAPTURING_FACTORY));
     }
 
-    /** Tree mode's {@code unit} factory: {@code void} → {@link AbsentNodeReader}, {@code value}/{@code token} → {@link AtomNodeReader} over {@link AtomTypeReader#UNIT}'s own reader. */
+    /** Tree mode's {@code unit} factory: {@code void} → {@link AbsentTreeReader}, {@code value}/{@code token} → {@link AtomTreeReader} over {@link AtomTypeReader#UNIT}'s own reader. */
     private static final ValueReaderFactory TREE_UNIT = (name, definition, context) ->
             "void".equals(name)
-                    ? new AbsentNodeReader(AtomTypeReader.UNIT.create(name, definition, context),
+                    ? new AbsentTreeReader(AtomTypeReader.UNIT.create(name, definition, context),
                             AnnotationTypes.of(context))
-                    : new AtomNodeReader(AtomTypeReader.UNIT.create(name, definition, context), name,
+                    : new AtomTreeReader(AtomTypeReader.UNIT.create(name, definition, context), name,
                             AnnotationTypes.of(context));
 
     private static Map<String, ValueReaderFactory> baseFactories(ValueReaderFactory record, ValueReaderFactory array,

@@ -89,7 +89,7 @@ class SchemaDrivenTreeAnnotationTest {
         assertEquals(List.of("checked"), names(shape.get("origin")));
         assertTrue(shape.get("origin").isRecord());
 
-        // AtomNodeReader -- a leaf, whose framing is consumed by the wrapped AtomTypeReader
+        // AtomTreeReader -- a leaf, whose framing is consumed by the wrapped AtomTypeReader
         assertEquals(List.of("label"), names(shape.get("name")));
 
         // ArrayTreeReader -- the array itself and, independently, one element

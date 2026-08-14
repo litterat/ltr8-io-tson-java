@@ -17,13 +17,13 @@ import java.util.Optional;
  * collecting mode -- the diagnostic carries the real problem). This is how atoms produce nodes uniformly, so
  * a container reader's children are always nodes, and reading an atom at the root is a node too.
  */
-final class AtomNodeReader implements TsonTypeReader<TsonValue> {
+final class AtomTreeReader implements TsonTypeReader<TsonValue> {
 
     private final TsonTypeReader<?> delegate;
     private final Optional<String> typeRef;
     private final AnnotationTypes annotationTypes;
 
-    AtomNodeReader(TsonTypeReader<?> delegate, String typeRef, AnnotationTypes annotationTypes) {
+    AtomTreeReader(TsonTypeReader<?> delegate, String typeRef, AnnotationTypes annotationTypes) {
         this.delegate = delegate;
         this.typeRef = Optional.of(typeRef);
         this.annotationTypes = annotationTypes;

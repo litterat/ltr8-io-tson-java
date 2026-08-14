@@ -669,7 +669,7 @@ reads one value at a cursor and polices nothing around it.
   target answers to no wire name, so `!tags [ "a" ]` into a `List<String>` is `UNKNOWN_TYPE_REF`.
 - **Reporting never abandons the value.** A reported type-ref still yields its node/object and its children
   are still read, so one collecting pass finds everything; a leaf whose atom rejected the token becomes a
-  `TsonNull` keeping its wire type-ref (the placeholder `AtomNodeReader` already uses). `SchemalessTreeReader`
+  `TsonNull` keeping its wire type-ref (the placeholder `AtomTreeReader` already uses). `SchemalessTreeReader`
   scopes `ctx.field`/`ctx.index` as it descends, so a diagnostic carries a real RFC 6901 path.
 - **`TsonObjectReader`'s schema-aware `read` checks the target class up front** — the schema's root type
   already binds to a Java class via the name binder, so a class not assignable to that is a `TYPE_MISMATCH`
@@ -684,7 +684,7 @@ reads one value at a cursor and polices nothing around it.
 - **The schema-driven readers capture by hoisting, not by widening signatures.** A compiled tree reader
   shares its `*AbstractReader` base with the bind subclass, and the base consumes the framing where the node
   isn't built. Rather than thread annotations out of four shared shape-check methods (making bind mode carry
-  a field only tree mode reads), each tree reader — and the `AtomNodeReader`/`AbsentNodeReader` wrappers —
+  a field only tree mode reads), each tree reader — and the `AtomTreeReader`/`AbsentTreeReader` wrappers —
   captures *first*, then calls the base/delegate, whose own framing call then finds nothing left. That's a
   no-op precisely because every one of those readers **discards** the framing result rather than using it.
   Bind mode is untouched.
