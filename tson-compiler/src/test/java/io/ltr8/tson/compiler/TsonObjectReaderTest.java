@@ -597,6 +597,58 @@ class TsonObjectReaderTest {
         assertThrows(TsonReadException.class, () -> mapper.read("{ value: !Int32 42 }", IntHolder.class));
     }
 
+    // ── Type-refs on a container (TypeRefCheck's rules) ─────────────────────
+
+    @Test
+    void aBuiltInTypeRefOnAContainerIsAMismatch() {
+        // !uuid names a scalar atom; a record is not one, whatever the target class says.
+        assertThrows(TsonReadException.class, () -> mapper.read("!uuid { x: 1  y: 2 }", Point.class));
+        assertThrows(TsonReadException.class, () -> mapper.read("{ tags: !date [\"a\"] }", StringListHolder.class));
+    }
+
+    @Test
+    void aTypeRefNamingTheTargetClassIsAccepted() throws DataBindException {
+        // No @Typename anywhere: the simple class name matches case-insensitively, so a document tagged
+        // with the type it actually is binds without every fixture having to be annotated.
+        assertEquals(new Point(1, 2), mapper.read("!point { x: 1  y: 2 }", Point.class));
+        assertEquals(new Point(1, 2), mapper.read("!Point { x: 1  y: 2 }", Point.class));
+    }
+
+    @Test
+    void aTypeRefNamingTheTargetsDeclaredTypenameIsAccepted() throws DataBindException {
+        assertEquals(new Square(2), mapper.read("!sq { side: 2 }", Square.class));
+    }
+
+    @Test
+    void aTypeRefOnAContainerThatNamesNothingIsReported() {
+        TsonReadException thrown = assertThrows(TsonReadException.class,
+                () -> mapper.read("!nosuchtype { x: 1  y: 2 }", Point.class));
+        assertEquals(Diagnostic.Code.UNKNOWN_TYPE_REF, thrown.diagnostic().code());
+    }
+
+    /** A collection target answers to no wire name at all, so a tagged array is reported -- the documented sharp edge. */
+    @Test
+    void aTypeRefOnACollectionTargetHasNothingToNameAndIsReported() {
+        assertThrows(TsonReadException.class, () -> mapper.read("{ tags: !tags [\"a\"] }", StringListHolder.class));
+    }
+
+    @Test
+    void preservingIgnoresATypeRefThatNamesNothing() throws DataBindException {
+        TsonObjectReader lenient = mapper.preservingUnknownTypeRefs();
+
+        assertEquals(new Point(1, 2), lenient.read("!nosuchtype { x: 1  y: 2 }", Point.class));
+        assertEquals(42, lenient.read("{ value: !notabuiltin 42 }", IntHolder.class).value());
+    }
+
+    /** Preserving relaxes the unlinked-name rule only; a built-in name is still held to its own contract. */
+    @Test
+    void preservingStillChecksBuiltInTypeRefs() {
+        TsonObjectReader lenient = mapper.preservingUnknownTypeRefs();
+
+        assertThrows(TsonReadException.class, () -> lenient.read("{ value: !uint8 300 }", IntHolder.class));
+        assertThrows(TsonReadException.class, () -> lenient.read("!uuid { x: 1  y: 2 }", Point.class));
+    }
+
     @Test
     void builtinIntegerAnnotationBindsDirectlyToTheDeclaredTarget() throws DataBindException {
         // !uint8's own contract (0..255) is checked, then narrowed straight to the declared int

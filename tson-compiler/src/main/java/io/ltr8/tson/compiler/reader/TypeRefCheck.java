@@ -71,8 +71,20 @@ final class TypeRefCheck {
      * members, so a member and a directly-bound target are recognized by one rule.
      */
     static boolean names(Class<?> target, String name) {
+        return declares(target, name)
+                || (target.getAnnotation(Typename.class) == null && target.getSimpleName().equalsIgnoreCase(name));
+    }
+
+    /**
+     * Whether {@code target} <em>declares</em> the wire name -- {@link Typename} only, no simple-name
+     * fallback. What an <b>atom</b> position uses, where the vocabulary is closed and a lookalike is a typo:
+     * {@link #names} would match a UUID-targeted {@code !Uuid} against {@code UUID} and silently disable the
+     * very check §5.1's case-sensitivity exists for. A container's wire name is a user-chosen type name, so
+     * there the looser match is what a caller means.
+     */
+    static boolean declares(Class<?> target, String name) {
         Typename typename = target.getAnnotation(Typename.class);
-        return typename != null ? typename.name().equals(name) : target.getSimpleName().equalsIgnoreCase(name);
+        return typename != null && typename.name().equals(name);
     }
 
     /** The name {@link #names} would accept for {@code target}, for a diagnostic's {@code expected}. */

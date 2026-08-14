@@ -41,6 +41,10 @@ import java.util.Objects;
  * #withDiagnostics} swaps that for any other {@link TsonDiagnosticsReceiver} -- a collector gathers every
  * problem in one pass and still hands back the (possibly partial) object, in schema-aware and schemaless
  * mode alike.
+ *
+ * <p>A schemaless bind also holds a wire type-ref to account: a built-in name must sit on a token and
+ * satisfy its atom, and any other name must name the target being bound. {@link #preservingUnknownTypeRefs}
+ * is the passthrough opt-out.
  */
 public final class TsonObjectReader {
 
@@ -111,6 +115,21 @@ public final class TsonObjectReader {
      */
     public TsonObjectReader withDiagnostics(TsonDiagnosticsReceiver receiver) {
         return new TsonObjectReader(dataBindContext, schemaless, bind, receiver, schemaUri);
+    }
+
+    /**
+     * This reader, ignoring a type-ref that links to nothing instead of reporting it -- a new reader, leaving
+     * this one unchanged, sharing its compiled-schema registry.
+     *
+     * <p>A schemaless bind reports a type-ref naming neither a built-in type nor the target being bound,
+     * rather than treating it as a marker to skip past ({@code SPEC-FEEDBACK.md} #7). This is the
+     * forward-compatible passthrough that entry asks for: a document tagged with names this reader knows
+     * nothing about still binds on the strength of the target class alone. Built-in names are still checked,
+     * so {@code !uuid nope} remains a problem. Affects the schemaless path only.
+     */
+    public TsonObjectReader preservingUnknownTypeRefs() {
+        return new TsonObjectReader(dataBindContext, SchemalessObjectReader.preserving(dataBindContext),
+                bind, receiver, schemaUri);
     }
 
     // ── Whole-document entry points ──────────────────────────────────────

@@ -69,16 +69,28 @@ import java.util.function.BiConsumer;
  * invoking a constructor is caught and re-reported through {@code ctx} too, so a caller sees one
  * uniform error model regardless of which layer noticed the problem.
  *
- * <p>Atom binding first checks whether the value carries a type-ref. If it does, {@link
- * BuiltinTypeVocabulary} must resolve it (§5) -- an unrecognized type-ref is a binding error here,
- * not silently ignored, even though the Class 1 parsing step underneath (§5.1) is required to preserve
- * an unrecognized annotation as an uninterpreted marker: that rule is about passive preservation
- * during parsing, not about what an application actively binding to a caller-declared Java type should
- * do with a marker it can't interpret (see {@code SPEC-FEEDBACK.md} #7). With no type-ref, binding
- * falls through to plain untyped resolution: {@link BaseTypeResolver} (which of null/boolean/number/
- * string) then {@link AtomBinder} (that shape into whatever concrete Java type the target field
- * declares). Both paths share the same final narrowing step ({@code NumberNarrowing}), so a plain
- * {@code 42} and a {@code !uint8 42} bind identically regardless of which path found them.
+ * <p><b>A type-ref must link to something</b>, by {@link TypeRefCheck}'s rules, wherever it is written --
+ * not just at an atom leaf. A name {@link BuiltinTypeVocabulary} resolves (§5) is a built-in atom, so it
+ * must sit on a token; any other name must name the target being bound, and one that names neither is a
+ * binding error rather than a marker to ignore. That is not a contradiction of §5.1's "preserve an
+ * unrecognized annotation as an uninterpreted marker": that rule is about passive preservation during
+ * parsing, not about what an application actively binding to a caller-declared Java type should do with a
+ * marker it can't interpret (see {@code SPEC-FEEDBACK.md} #7, whose suggested resolution this is). {@link
+ * #preserving} is the opt-in passthrough that resolution also asks for.
+ *
+ * <p>The two positions differ in how a name gets to "names the target". A <b>container</b> accepts the
+ * target's {@link io.ltr8.annotation.Typename} or, failing that, its simple class name case-insensitively --
+ * so {@code !point { x: 3  y: 4 }} binds to a Java {@code Point} with nothing annotated, the same match a
+ * union's members already get. An <b>atom</b> accepts a declared {@code @Typename} only: its vocabulary is
+ * closed, so the loose match would let a UUID-targeted {@code !Uuid} through on the strength of the class
+ * being called {@code UUID}, disabling the check §5.1's case-sensitivity exists for. This is why {@code
+ * !tags [ "a" ]} bound to a {@code List<String>} is reported -- neither {@code List} nor {@code ArrayList}
+ * answers to {@code tags} -- and {@link #preserving} is the way to ask for it anyway.
+ *
+ * <p>With no type-ref, binding falls through to plain untyped resolution: {@link BaseTypeResolver} (which
+ * of null/boolean/number/string) then {@link AtomBinder} (that shape into whatever concrete Java type the
+ * target field declares). Both paths share the same final narrowing step ({@code NumberNarrowing}), so a
+ * plain {@code 42} and a {@code !uint8 42} bind identically regardless of which path found them.
  *
  * <p><b>No positional form and no schema-composed defaults</b> -- both are schema-layer concepts a
  * schemaless, class-driven bind has no equivalent for; a record must be written braced, and an absent
@@ -93,12 +105,28 @@ public final class SchemalessObjectReader {
 
     private final DataBindContext context;
 
+    /** Whether a type-ref that links to nothing is ignored rather than reported -- see {@link #preserving}. */
+    private final boolean preserveUnknownTypeRefs;
+
     public SchemalessObjectReader(DataBindContext context) {
-        this.context = context;
+        this(context, false);
     }
 
     public SchemalessObjectReader() {
         this(TsonAtomContext.defaultContext());
+    }
+
+    private SchemalessObjectReader(DataBindContext context, boolean preserveUnknownTypeRefs) {
+        this.context = context;
+        this.preserveUnknownTypeRefs = preserveUnknownTypeRefs;
+    }
+
+    /**
+     * A reader that ignores a type-ref linking to nothing instead of reporting it -- §5.1's uninterpreted
+     * marker, for a caller who wants forward-compatible passthrough. Built-in names are still checked.
+     */
+    public static SchemalessObjectReader preserving(DataBindContext context) {
+        return new SchemalessObjectReader(context, true);
     }
 
     // ── Entry points ─────────────────────────────────────────────────────
@@ -162,6 +190,32 @@ public final class SchemalessObjectReader {
         return result;
     }
 
+    // ── Type-refs (TypeRefCheck's rules) ─────────────────────────────────
+
+    /**
+     * Consumes a container-shaped value's {@code annotation* type-ref?} framing and checks the type-ref
+     * against {@code target}: a built-in name belongs on a token, not here, and any other name must name the
+     * target. Call it where the framing would otherwise just be skipped -- the cursor is left on the
+     * core-value either way, so a reported problem never changes what is read next.
+     */
+    private void containerFraming(TsonReadContext ctx, DataClass target) {
+        Optional<String> typeRef = EventSkip.annotationsAndTypeRef(ctx);
+        checkContainerTypeRef(ctx, typeRef, target);
+    }
+
+    /** {@link #containerFraming}'s check alone, for a caller that consumed the framing itself (a record with an annotations carrier). */
+    private void checkContainerTypeRef(TsonReadContext ctx, Optional<String> typeRef, DataClass target) {
+        if (typeRef.isEmpty()) {
+            return;
+        }
+        String name = typeRef.get();
+        if (BuiltinTypeVocabulary.lookup(name).isPresent()) {
+            TypeRefCheck.notScalar(ctx, name, ctx.peek());
+        } else if (!preserveUnknownTypeRefs && !TypeRefCheck.names(target.typeClass(), name)) {
+            TypeRefCheck.unknown(ctx, name, target.typeClass());
+        }
+    }
+
     // ── Atoms: built-in vocabulary (§5) or identification (BaseTypeResolver) + binding (AtomBinder) ──
 
     private Object bindAtom(TsonReadContext ctx, DataClassAtom dataClass) {
@@ -182,12 +236,15 @@ public final class SchemalessObjectReader {
 
         if (typeRef.isPresent()) {
             Optional<AtomType<?>> atomType = BuiltinTypeVocabulary.lookup(typeRef.get());
-            if (atomType.isEmpty()) {
-                ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF, "unrecognized type annotation '!" + typeRef.get()
-                        + "' for " + dataClass.typeClass(), "a built-in type name", "!" + typeRef.get());
+            if (atomType.isPresent()) {
+                return bindBuiltin(ctx, atomType.get(), tokenValue, dataClass.dataClass());
+            }
+            // Not a built-in: only a name the target class declares outright gets through -- see the class
+            // Javadoc on why an atom position takes `declares` rather than `names`.
+            if (!preserveUnknownTypeRefs && !TypeRefCheck.declares(dataClass.typeClass(), typeRef.get())) {
+                TypeRefCheck.unknown(ctx, typeRef.get(), dataClass.typeClass());
                 return null;
             }
-            return bindBuiltin(ctx, atomType.get(), tokenValue, dataClass.dataClass());
         }
 
         return bindBaseValue(ctx, BaseTypeResolver.resolve(tokenValue), dataClass.dataClass());
@@ -239,11 +296,9 @@ public final class SchemalessObjectReader {
             // and nothing is checked against a declared type -- the same treatment the schemaless tree
             // reader gives it.
             captured = toAnnotations(AnnotationCapture.annotations(ctx, AnnotationTypes.UNVALIDATED));
-            if (ctx.peek() instanceof TypeRef) {
-                ctx.next(); // a type-ref on a directly-bound record names nothing further -- consume and ignore
-            }
+            checkContainerTypeRef(ctx, EventSkip.typeRef(ctx), dataClass);
         } else {
-            EventSkip.annotationsAndTypeRef(ctx);
+            containerFraming(ctx, dataClass);
         }
 
         boolean empty;
@@ -330,7 +385,7 @@ public final class SchemalessObjectReader {
     // ── Arrays ───────────────────────────────────────────────────────────
 
     private Object bindArray(TsonReadContext ctx, DataClassArray dataClass) {
-        EventSkip.annotationsAndTypeRef(ctx);
+        containerFraming(ctx, dataClass);
         if (!(ctx.peek() instanceof ArrayStart)) {
             TsonEvent e = ctx.peek();
             ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected an array for " + dataClass.typeClass() + ", found " + e,
@@ -375,7 +430,7 @@ public final class SchemalessObjectReader {
      * target says map), and the absent sentinel {@code _} in key position is rejected (§2.9).
      */
     private Object bindMap(TsonReadContext ctx, DataClassMap dataClass) {
-        EventSkip.annotationsAndTypeRef(ctx);
+        containerFraming(ctx, dataClass);
         boolean empty;
         TsonEvent e = ctx.peek();
         if (e instanceof MapStart) {
@@ -431,7 +486,7 @@ public final class SchemalessObjectReader {
     /** A tuple is array-shaped on the wire (§5.3), not record-shaped -- so {@code {}} is never a reading, only {@code []}. Arity is fixed and exact. */
     private Object bindTuple(TsonReadContext ctx, DataClassTuple dataClass) {
         int diagnosticsBefore = ctx.reported();
-        EventSkip.annotationsAndTypeRef(ctx);
+        containerFraming(ctx, dataClass);
         if (!(ctx.peek() instanceof ArrayStart)) {
             TsonEvent e = ctx.peek();
             ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected an array for tuple " + dataClass.typeClass() + ", found " + e,
@@ -504,15 +559,15 @@ public final class SchemalessObjectReader {
         return bind(ctx, memberDataClass);
     }
 
+    /** A declared {@code @Typename} wins over any simple-name match, so the two passes can't be collapsed into one. */
     private static Class<?> resolveUnionMember(DataClassUnion dataClass, String typeName) {
         for (Class<?> member : dataClass.memberTypes()) {
-            Typename tn = member.getAnnotation(Typename.class);
-            if (tn != null && tn.name().equals(typeName)) {
+            if (TypeRefCheck.declares(member, typeName)) {
                 return member;
             }
         }
         for (Class<?> member : dataClass.memberTypes()) {
-            if (member.getAnnotation(Typename.class) == null && member.getSimpleName().equalsIgnoreCase(typeName)) {
+            if (TypeRefCheck.names(member, typeName)) {
                 return member;
             }
         }
