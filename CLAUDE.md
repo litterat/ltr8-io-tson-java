@@ -973,7 +973,11 @@ Separate from the fine-grained unit tests, this runs every vector in the sibling
 language-agnostic, spec-derived fixture set, to catch drift against the spec. It assumes the sibling repo
 at `../../ltr8-io-tson-test-suite` and skips gracefully (via `Assumptions.assumeTrue`, reported *aborted*)
 if absent. CI doesn't check the sibling out, so it always shows skipped there — expected. **Add
-test-suite vectors in the same session as any lexer/parser/resolver work**, not after a nudge.
+test-suite vectors in the same session as any lexer/parser/resolver work**, not after a nudge — with one
+standing exception: the suite's `resolver` layer is Part 1 *base-type* resolution, and there is **no Part 2
+layer at all** (no schema-resolution, linking or compilation vectors, and no sidecar schema for them). Part 2
+work therefore has nowhere to put a vector today, and the honest move is to say so rather than wedge one into
+a Part 1 bucket. Opening that layer is its own `BACKLOG.md` item.
 
 ## Build and test
 

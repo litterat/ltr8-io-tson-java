@@ -64,7 +64,10 @@ public record Diagnostic(String path, Code code, String message, String expected
      * CLAUDE.md}'s "Positional read errors"/multi-error-collection notes for why); every {@link
      * io.ltr8.tson.compiler.atom.AtomTypeException} maps to the single {@code
      * ATOM_CONSTRAINT_VIOLATION} code for now, since {@code AtomValidationException} itself doesn't
-     * yet carry a structured code to route on. The last three ({@code SCHEMA_ERROR}/{@code
+     * yet carry a structured code to route on. That code is also, less accurately, what a
+     * <em>schema-level</em> value violation reports under -- a document contradicting a FIXED field's value
+     * (§5.2) is not an atom constraint at all, and wants a code of its own; see {@code BACKLOG.md}.
+     * The last three ({@code SCHEMA_ERROR}/{@code
      * UNKNOWN_TYPE}/{@code VALIDATION_ERROR}) are infrastructure-level fallbacks a caller (e.g.
      * {@code tson-cli}) uses for a failure that happens outside any single {@link TsonReadContext}
      * read at all -- the schema itself failed to compile, a requested type name doesn't exist in it,

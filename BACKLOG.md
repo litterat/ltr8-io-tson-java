@@ -141,22 +141,23 @@ own prose (which had gone stale on at least one of them):
   inline arrays of one are resolved so far"). Overlaps the template-substitution item above, but is
   reachable without templates.
 
-The classification of these throw sites is itself tracked under "Schema-side diagnostics": of ~34
-`UnsupportedOperationException`s across the codebase, three are correct use (an immutable map, an
-unreachable-by-construction guard, `ErrorReader`'s deliberate deferred failure), roughly nine are
-schema-author errors wearing a library-gap exception, and about five wrap an internal fault. Only the
-genuine gaps belong in this section — six of the nine have since been reclassified, which is what removing
-them from the list above means. A modifier-only entry with nothing to elide toward, and a refinement body
-field that adds rather than tightens (§5.7 MUST-rejects). A field name two supertypes both contribute, a
-name a body declares twice, and a group member repeating one (§5.8's disjointness rule and §5.11's label
-uniqueness — one `requireFieldNameNotSeen` that now says which of the three happened, since that is what
-decides the author's fix). And a refinement source whose body is a binding record (§5.7's "finished"). All
-raise `TsonSchemaValidationException`. A seventh, composing with a *supertype* whose body is a binding
-record, is the same author error under a rule §5.8 never states — implemented per §5.7's principle, with
-`SPEC-FEEDBACK.md` #38 asking for the rule. An eighth, a constructor application whose constructor has a
-non-record body, turned out unreachable from the grammar (§12.1 attaches `~` to a structural-def only, each
-of which resolves to a record body) and is now an `IllegalStateException` — an internal-invariant guard, the
-audit's third bucket.
+The classification of these throw sites is itself tracked under "Schema-side diagnostics". Of the ~34
+`UnsupportedOperationException`s the original audit found, three are correct use (an immutable map, an
+unreachable-by-construction guard, `ErrorReader`'s deliberate deferred failure) and about five wrap an
+internal fault; the rest were split between genuine gaps and schema-author errors wearing a library-gap
+exception. **`DefinitionResolver`'s share of that second group has been worked through**: a modifier-only
+entry with nothing to elide toward, a refinement body field or group that adds rather than tightens, a field
+name two supertypes contribute or one body declares twice or a group member repeats, a refinement source or
+a composition supertype whose body is a binding record, a choice or bracketed form at a supertype position,
+and a tightening outside §5.7's transition table all raise `TsonSchemaValidationException` now, each naming
+the rule it broke. A constructor with a non-record body turned out unreachable from the grammar and is an
+`IllegalStateException`. Only the genuine gaps are listed above; the same audit should still be applied to
+the throw sites outside `DefinitionResolver`.
+
+- [ ] **A FIXED-value contradiction reports as `ATOM_CONSTRAINT_VIOLATION`**, which is the closest code in
+  the closed vocabulary and not an accurate one — a document contradicting `field: type = value` (§5.2) has
+  violated a schema-level field constraint, not an atom's own parsing contract. Wants its own code, together
+  with the "fine-grained atom codes" note under Diagnostics.
 
 ## Schema-side diagnostics
 
