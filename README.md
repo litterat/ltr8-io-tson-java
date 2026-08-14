@@ -501,8 +501,10 @@ OK
   Pydantic's own `errors()`), or `tson` (the diagnostics rendered as a real, schema-validated TSON
   document — the CLI dogfooding the library).
 - **Exit codes** are Unix-conventional: `0` valid/compiled, `1` a real validation/compile failure,
-  `2` a usage error (bad arguments, an unreadable file) — so a script gets a clean pass/fail without
-  parsing prose. `validate` collects *every* problem in a file in one pass, not just the first.
+  `2` a usage error (bad arguments, an unreadable file), and `70` (`EX_SOFTWARE`) a bug in `tson` itself,
+  which prints its stack trace and is deliberately kept distinct so a script never reads a crash as
+  "your document is invalid" — so a script gets a clean pass/fail without parsing prose. `validate`
+  collects *every* problem in a file in one pass, not just the first.
 
 ## Requirements
 

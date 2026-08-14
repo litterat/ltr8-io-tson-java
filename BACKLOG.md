@@ -29,14 +29,6 @@ the removal of the old throwaway `Map`/`List` DOM mode all landed. What's left:
   `TsonSchemaSource` is `TsonSchemaSource.registeredOnly()` (nothing fetched); the bundled standard
   library is served internally by `TsonCompiledSchemaRegistry` from `TsonBundledSchemas`, not through
   a source.
-- [ ] **`tson validate` renders a library fault as a per-file `VALIDATION_ERROR`.**
-  `ValidateCommand`'s read loop catches `RuntimeException | IOException` around `Tson.validate` and turns
-  either into a `VALIDATION_ERROR` verdict for that file. The `IOException` half is right (an unreadable
-  file *is* that file's problem); the `RuntimeException` half is not, because `Tson.validate` deliberately
-  rethrows anything that isn't a base-syntax failure — see `Diagnostic.ofBaseSyntaxError` — precisely so a
-  bug in this library doesn't come back as "your document is invalid". The CLI puts that verdict back on.
-  Splitting the catch would let a genuine fault surface as a crash with its stack trace, which is the
-  honest outcome, and leaves the file-level diagnostics alone.
 
 ## Layer boundaries / schema registry
 

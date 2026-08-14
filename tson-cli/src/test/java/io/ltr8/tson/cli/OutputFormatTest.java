@@ -22,7 +22,7 @@ class OutputFormatTest {
 
     @Test
     void parseRejectsAnUnknownFormat() {
-        assertThrows(IllegalArgumentException.class, () -> OutputFormat.parse("yaml"));
+        assertThrows(UsageException.class, () -> OutputFormat.parse("yaml"));
     }
 
     @Test

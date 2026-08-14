@@ -92,11 +92,17 @@ final class ValidateCommand {
                 System.out.println("# " + dataFile);
             }
             List<CliDiagnostic> errors;
+            // IOException only: an unreadable file is that file's own problem, so it renders as a verdict
+            // and the run carries on to the next one. A RuntimeException is not -- Tson.validate returns
+            // every document-level failure as a Diagnostic and rethrows only a fault in the library, so
+            // catching it here would put that fault back into a per-file "invalid" verdict, which is what
+            // it went out of its way to avoid. It propagates to TsonCli's fault handler instead.
             try (InputStream in = Files.newInputStream(dataFile)) {
                 errors = tson.validate(in).stream().map(CliDiagnostic::from).toList();
-            } catch (RuntimeException | IOException e) {
+            } catch (IOException e) {
                 allValid = false;
-                System.out.println(format.render(ValidationReport.failed(Diagnostic.Code.VALIDATION_ERROR, e.getMessage())));
+                System.out.println(format.render(ValidationReport.failed(Diagnostic.Code.VALIDATION_ERROR,
+                        "cannot read " + dataFile + ": " + e.getMessage())));
                 continue;
             }
             if (!errors.isEmpty()) {

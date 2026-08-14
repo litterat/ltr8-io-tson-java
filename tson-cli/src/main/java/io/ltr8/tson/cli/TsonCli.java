@@ -12,10 +12,11 @@ import java.util.List;
  * flag set is small and fixed enough that a real parsing library buys nothing here.
  *
  * <p>Exit codes are Unix-conventional: 0 valid/compiled cleanly (or an explicit {@code --help}), 1 a
- * real validation/compile failure, 2 a usage error (bad arguments, a file that can't be read) -- so a
- * script or agent shelling out gets a clean pass/fail signal without parsing prose. Help requested
- * explicitly ({@code --help}/{@code -h}/{@code help}) prints to stdout and exits 0; usage shown
- * because of a mistake (no command, a bad flag) prints to stderr and exits 2.
+ * real validation/compile failure, 2 a usage error (bad arguments, a file that can't be read), and 70
+ * ({@code EX_SOFTWARE}) a fault in this library rather than anything wrong with the input -- so a script or
+ * agent shelling out gets a clean pass/fail signal without parsing prose, and never reads a bug as a
+ * verdict. Help requested explicitly ({@code --help}/{@code -h}/{@code help}) prints to stdout and exits 0;
+ * usage shown because of a mistake (no command, a bad flag) prints to stderr and exits 2.
  */
 public final class TsonCli {
 
@@ -38,7 +39,7 @@ public final class TsonCli {
               --output text|json|tson    output format (default: text)
               --help, -h                 print this help
 
-            exit codes: 0 ok, 1 validation/compile failure, 2 usage error""";
+            exit codes: 0 ok, 1 validation/compile failure, 2 usage error, 70 internal error""";
 
     private static final String VALIDATE_USAGE =
             "usage: tson validate [--output text|json|tson] <file>...";
@@ -83,11 +84,32 @@ public final class TsonCli {
                     yield 2;
                 }
             };
-        } catch (IllegalArgumentException e) {
+        } catch (UsageException e) {
             System.err.println(e.getMessage());
             System.err.println(USAGE);
             return 2;
+        } catch (RuntimeException e) {
+            return internalError(e);
         }
+    }
+
+    /**
+     * A fault in this library, reported as one: the stack trace goes to stderr and the exit code is 70
+     * ({@code EX_SOFTWARE}), distinct from every documented outcome.
+     *
+     * <p>The distinctness is the point. {@code Tson.validate} deliberately rethrows anything that isn't a
+     * base-syntax failure rather than dressing a bug up as a diagnostic, and that care is wasted if the CLI
+     * lands it on 1 -- a script reading the exit code would be told the document is invalid, and the person
+     * running it would go looking for the mistake in their own file. Nothing here can distinguish a fault
+     * from a verdict after the fact, so the two get separate codes and the trace is printed rather than
+     * summarized.
+     */
+    static int internalError(RuntimeException e) {
+        System.err.println("internal error: " + e);
+        System.err.println("This is a bug in tson, not a problem with your document."
+                + " Please report it with the stack trace below.");
+        e.printStackTrace(System.err);
+        return 70;
     }
 
     private static int runInit(List<String> args) {
@@ -96,7 +118,7 @@ public final class TsonCli {
             return 0;
         }
         if (args.size() > 1) {
-            throw new IllegalArgumentException(INIT_USAGE);
+            throw new UsageException(INIT_USAGE);
         }
         Path dir = args.isEmpty() ? Path.of(".") : Path.of(args.get(0));
         return InitCommand.run(dir);
@@ -108,7 +130,7 @@ public final class TsonCli {
             return 0;
         }
         if (args.size() != 1) {
-            throw new IllegalArgumentException(HASH_USAGE);
+            throw new UsageException(HASH_USAGE);
         }
         return HashCommand.run(Path.of(args.get(0)));
     }
@@ -130,7 +152,7 @@ public final class TsonCli {
         }
 
         if (files.isEmpty()) {
-            throw new IllegalArgumentException(VALIDATE_USAGE);
+            throw new UsageException(VALIDATE_USAGE);
         }
         return ValidateCommand.run(files, format);
     }
@@ -152,14 +174,14 @@ public final class TsonCli {
         }
 
         if (positional.size() != 1) {
-            throw new IllegalArgumentException(COMPILE_USAGE);
+            throw new UsageException(COMPILE_USAGE);
         }
         return CompileCommand.run(positional.get(0), format);
     }
 
     private static String requireValue(List<String> args, int index, String flag) {
         if (index >= args.size()) {
-            throw new IllegalArgumentException(flag + " requires a value");
+            throw new UsageException(flag + " requires a value");
         }
         return args.get(index);
     }

@@ -802,11 +802,19 @@ schema or data (a header peek — `!!id`-carrying schema vs `DocumentStart` data
 through a `TsonSchemaSource`, and validates each data file via `Tson.validate` — the `!!schema` URI selects
 the schema, the root type-ref selects the type, no `!!schema` means schemaless. **Fully self-describing:
 no `--type`.** The facade owns the whole per-document decision; the CLI just classifies files into a source
-and calls it. Exit codes: 0 all valid, 1 any data file invalid (bad value / unresolvable `!!schema` /
-unknown type / no root type-ref), 2 usage/classification (no data files, an unreadable/`!!id`-less schema).
-Also `tson compile <schema>` (checks a schema compiles, tree mode), `tson hash <file>`, `tson init-example
-[<dir>]` (writes a working `person.tn`/`person-data.tn`). The installed command is `tson`
+and calls it. Also `tson compile <schema>` (checks a schema compiles, tree mode), `tson hash <file>`, `tson
+init-example [<dir>]` (writes a working `person.tn`/`person-data.tn`). The installed command is `tson`
 (`application.applicationName`), launched on the classpath.
+
+**Exit codes: 0 all valid, 1 any data file invalid** (bad value / unresolvable `!!schema` / unknown type /
+no root type-ref), **2 usage/classification** (no data files, an unreadable/`!!id`-less schema, a bad
+flag), **70 (`EX_SOFTWARE`) a fault in the library**, whose stack trace prints to stderr. That fourth code
+is what makes `Diagnostic.ofBaseSyntaxError`'s rethrow worth anything: the read loop catches only
+`IOException` (an unreadable file *is* that file's verdict), so a `RuntimeException` — which `Tson.validate`
+raises only for a bug, never for a bad document — reaches `TsonCli`'s own handler instead of being folded
+into "invalid". `UsageException` exists for the same reason one layer up: a bare `IllegalArgumentException`
+catch would relabel a library fault as "your command line is wrong", so only this CLI's own argument
+parsing throws the type that means that.
 
 ### Configuration package (`tson-compiler/.../config/`)
 

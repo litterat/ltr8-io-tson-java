@@ -11,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TsonCliTest {
@@ -25,6 +26,31 @@ class TsonCliTest {
     void anUnknownCommandExitsTwo() throws IOException {
         String err = captureStderr(() -> assertEquals(2, TsonCli.run(new String[] {"frobnicate"})));
         assertTrue(err.contains("unknown command"), err);
+    }
+
+    @Test
+    void aBadFlagValueIsAUsageErrorWithUsagePrinted() throws IOException {
+        String err = captureStderr(() ->
+                assertEquals(2, TsonCli.run(new String[] {"validate", "--output", "yaml", "x.tn"})));
+        assertTrue(err.contains("unknown --output format"), err);
+        assertTrue(err.contains("usage:"), err);
+    }
+
+    /**
+     * A fault gets its own exit code and its stack trace, rather than being folded into 1 ("your document is
+     * invalid") or 2 ("your command line is wrong") -- the two things a caller could otherwise act on and
+     * would be misled by. {@code Tson.validate} rethrows rather than reporting exactly so this can happen.
+     */
+    @Test
+    void anInternalFaultExitsSeventyWithItsStackTrace() throws IOException {
+        String err = captureStderr(() ->
+                assertEquals(70, TsonCli.internalError(new IllegalStateException("a bug, not a bad document"))));
+
+        assertTrue(err.contains("internal error"), err);
+        assertTrue(err.contains("a bug, not a bad document"), err);
+        assertTrue(err.contains("bug in tson, not a problem with your document"), err);
+        assertTrue(err.contains("at io.ltr8.tson.cli"), err);          // a real stack trace, not a summary
+        assertFalse(err.contains("usage:"), err);                      // never mistaken for a usage error
     }
 
     @Test

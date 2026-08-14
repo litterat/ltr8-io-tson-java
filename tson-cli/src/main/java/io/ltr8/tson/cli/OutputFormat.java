@@ -20,7 +20,7 @@ enum OutputFormat {
             case "text" -> TEXT;
             case "json" -> JSON;
             case "tson" -> TSON;
-            default -> throw new IllegalArgumentException(
+            default -> throw new UsageException(
                     "unknown --output format '" + value + "' -- expected text, json, or tson");
         };
     }
