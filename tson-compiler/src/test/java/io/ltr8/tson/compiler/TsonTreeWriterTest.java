@@ -1,10 +1,7 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.tree.ArrayNode;
-import io.ltr8.tson.tree.AtomNode;
-import io.ltr8.tson.tree.MissingNode;
-import io.ltr8.tson.tree.RecordNode;
-import io.ltr8.tson.tree.TsonNode;
+import io.ltr8.tson.tree.*;
+import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
@@ -19,10 +16,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@link TsonTreeWriter}: a {@link TsonNode} tree back to TSON text. Proves a hand-built tree writes to the
+ * {@link TsonTreeWriter}: a {@link TsonValue} tree back to TSON text. Proves a hand-built tree writes to the
  * expected text, that a document reads then writes then reads back to an equal tree (value-preserving,
  * including a captured {@code !int32} width and built-in atom type-refs the object writer would drop), and
- * that a {@link MissingNode} can't be written.
+ * that a {@link TsonMissing} can't be written.
  */
 class TsonTreeWriterTest {
 
@@ -32,18 +29,18 @@ class TsonTreeWriterTest {
 
     @Test
     void writesAHandBuiltRecordWithSeparationNotCommas() {
-        Map<String, TsonNode> fields = new LinkedHashMap<>();
-        fields.put("name", AtomNode.of("Ada"));
-        fields.put("age", AtomNode.of(BigInteger.valueOf(30)));
-        fields.put("skills", ArrayNode.of(AtomNode.of("a"), AtomNode.of("b")));
-        RecordNode record = new RecordNode(fields, Optional.of("person"), java.util.List.of());
+        Map<String, TsonValue> fields = new LinkedHashMap<>();
+        fields.put("name", TsonAtom.of("Ada"));
+        fields.put("age", TsonAtom.of(BigInteger.valueOf(30)));
+        fields.put("skills", TsonArray.of(TsonAtom.of("a"), TsonAtom.of("b")));
+        TsonRecord record = new TsonRecord(fields, Optional.of("person"), java.util.List.of());
 
         assertEquals("!person { name: \"Ada\" age: 30 skills: [ \"a\" \"b\" ] }", WRITER.toTson(record));
     }
 
     @Test
     void emptyRecordWritesEmptyBraces() {
-        assertEquals("{}", WRITER.toTson(RecordNode.of(Map.of())));
+        assertEquals("{}", WRITER.toTson(TsonRecord.of(Map.of())));
     }
 
     @Test
@@ -62,8 +59,8 @@ class TsonTreeWriterTest {
                 }
                 """;
 
-        TsonNode first = READER.read(source);
-        TsonNode second = READER.read(WRITER.toTson(first));
+        TsonValue first = READER.read(source);
+        TsonValue second = READER.read(WRITER.toTson(first));
 
         assertEquals(Optional.of("person"), second.typeRef());
         assertEquals(Optional.of("Ada"), second.at("/name").asString());
@@ -80,12 +77,12 @@ class TsonTreeWriterTest {
 
     @Test
     void preservesAnIntegerWidthTypeRefTheObjectWriterWouldDrop() {
-        AtomNode typed = new AtomNode(42, Optional.of("int32"), java.util.List.of());
+        TsonAtom typed = new TsonAtom(42, Optional.of("int32"), java.util.List.of());
         assertEquals("!int32 42", WRITER.toTson(typed));
     }
 
     @Test
     void writingAMissingNodeThrows() {
-        assertThrows(IllegalArgumentException.class, () -> WRITER.toTson(MissingNode.instance()));
+        assertThrows(IllegalArgumentException.class, () -> WRITER.toTson(TsonMissing.instance()));
     }
 }

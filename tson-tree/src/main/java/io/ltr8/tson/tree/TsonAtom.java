@@ -12,23 +12,23 @@ import java.util.Optional;
  * built-in- or schema-typed one; {@link #typeRef()} names the TSON type when known (e.g. {@code "int32"}).
  * Typed access is via {@link #as(Class)} and the {@code asString}/{@code asBigInteger}/… conveniences.
  *
- * <p>The value is never {@code null} -- use {@link NullNode} for the {@code null} token and {@link AbsentNode}
+ * <p>The value is never {@code null} -- use {@link TsonNull} for the {@code null} token and {@link TsonAbsent}
  * for the {@code _} sentinel.
  */
-public record AtomNode(Object value, Optional<String> typeRef, List<TsonAnnotation> annotations)
-        implements TsonNode {
+public record TsonAtom(Object value, Optional<String> typeRef, List<TsonAnnotation> annotations)
+        implements TsonValue {
 
-    public AtomNode {
-        Objects.requireNonNull(value, "AtomNode value must not be null -- use NullNode or AbsentNode");
+    public TsonAtom {
+        Objects.requireNonNull(value, "TsonAtom value must not be null -- use TsonNull or TsonAbsent");
         annotations = List.copyOf(annotations);
     }
 
-    public static AtomNode of(Object value) {
-        return new AtomNode(value, Optional.empty(), List.of());
+    public static TsonAtom of(Object value) {
+        return new TsonAtom(value, Optional.empty(), List.of());
     }
 
-    public static AtomNode of(Object value, String typeRef) {
-        return new AtomNode(value, Optional.of(typeRef), List.of());
+    public static TsonAtom of(Object value, String typeRef) {
+        return new TsonAtom(value, Optional.of(typeRef), List.of());
     }
 
     @Override

@@ -2,13 +2,13 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
-import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaLinker;
+import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
@@ -34,7 +34,7 @@ class CompiledSchemaTreeReadTest {
     }
 
     private static Object read(TsonCompiledSchema compiled, String source, String typeName) {
-        return Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get(typeName).read(TestDocuments.document(source)));
+        return Dom.of((TsonValue) compiled.get(typeName).read(TestDocuments.document(source)));
     }
 
     @Test

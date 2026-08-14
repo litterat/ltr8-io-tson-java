@@ -8,19 +8,19 @@ import java.util.Optional;
  * §2.6), unlike a record's string field names. {@link #get(String)} is a convenience matching an entry whose
  * key is an atom equal to the given string; {@link #entries()} exposes the full, typed-key form.
  */
-public record MapNode(List<Entry> entries, Optional<String> typeRef, List<TsonAnnotation> annotations)
-        implements TsonNode {
+public record TsonMap(List<Entry> entries, Optional<String> typeRef, List<TsonAnnotation> annotations)
+        implements TsonValue {
 
-    public record Entry(TsonNode key, TsonNode value) {
+    public record Entry(TsonValue key, TsonValue value) {
     }
 
-    public MapNode {
+    public TsonMap {
         entries = List.copyOf(entries);
         annotations = List.copyOf(annotations);
     }
 
-    public static MapNode of(List<Entry> entries) {
-        return new MapNode(entries, Optional.empty(), List.of());
+    public static TsonMap of(List<Entry> entries) {
+        return new TsonMap(entries, Optional.empty(), List.of());
     }
 
     @Override
@@ -28,14 +28,14 @@ public record MapNode(List<Entry> entries, Optional<String> typeRef, List<TsonAn
         return true;
     }
 
-    /** The value whose key is a string-valued atom equal to {@code name}, or {@link MissingNode}. */
+    /** The value whose key is a string-valued atom equal to {@code name}, or {@link TsonMissing}. */
     @Override
-    public TsonNode get(String name) {
+    public TsonValue get(String name) {
         for (Entry entry : entries) {
             if (entry.key().asString().filter(name::equals).isPresent()) {
                 return entry.value();
             }
         }
-        return MissingNode.instance();
+        return TsonMissing.instance();
     }
 }

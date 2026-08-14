@@ -1,11 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
-import io.ltr8.tson.tree.ArrayNode;
-import io.ltr8.tson.tree.AtomNode;
-import io.ltr8.tson.tree.MapNode;
-import io.ltr8.tson.tree.RecordNode;
-import io.ltr8.tson.tree.TsonNode;
-import io.ltr8.tson.tree.TupleNode;
+import io.ltr8.tson.tree.*;
+import io.ltr8.tson.tree.TsonValue;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -13,7 +9,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Test-only projection of a {@link TsonNode} back to the plain {@code Map}/{@code List}/host-value shape the
+ * Test-only projection of a {@link TsonValue} back to the plain {@code Map}/{@code List}/host-value shape the
  * old DOM readers produced -- a record or map to a {@code LinkedHashMap}, an array or tuple to a {@code
  * List}, an atom to its host value, and null/absent/missing to {@code null}. Lets the reader tests that
  * predate the tree keep asserting on values and collapsed shape with a one-line change, while {@link
@@ -24,30 +20,30 @@ public final class Dom {
     private Dom() {
     }
 
-    public static Object of(TsonNode node) {
+    public static Object of(TsonValue node) {
         return switch (node) {
-            case RecordNode record -> {
+            case TsonRecord record -> {
                 Map<String, Object> map = new LinkedHashMap<>();
                 record.fields().forEach((name, value) -> map.put(name, of(value)));
                 yield map;
             }
-            case MapNode mapNode -> {
+            case TsonMap mapNode -> {
                 Map<Object, Object> map = new LinkedHashMap<>();
-                for (MapNode.Entry entry : mapNode.entries()) {
+                for (TsonMap.Entry entry : mapNode.entries()) {
                     map.put(of(entry.key()), of(entry.value()));
                 }
                 yield map;
             }
-            case ArrayNode array -> ofElements(array.elements());
-            case TupleNode tuple -> ofElements(tuple.elements());
-            case AtomNode atom -> atom.value();
-            default -> null; // NullNode / AbsentNode / MissingNode
+            case TsonArray array -> ofElements(array.elements());
+            case TsonTuple tuple -> ofElements(tuple.elements());
+            case TsonAtom atom -> atom.value();
+            default -> null; // TsonNull / TsonAbsent / TsonMissing
         };
     }
 
-    private static List<Object> ofElements(List<TsonNode> elements) {
+    private static List<Object> ofElements(List<TsonValue> elements) {
         List<Object> list = new ArrayList<>(elements.size());
-        for (TsonNode element : elements) {
+        for (TsonValue element : elements) {
             list.add(of(element));
         }
         return list;

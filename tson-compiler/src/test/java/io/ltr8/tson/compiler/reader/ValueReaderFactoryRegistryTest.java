@@ -10,6 +10,7 @@ import io.ltr8.tson.schema.meta.EmailType;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
+import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -76,8 +77,8 @@ class ValueReaderFactoryRegistryTest {
         TsonTypeReader<?> bindReader = ValueReaderFactoryRegistry.bind(SchemaMetaNameBinder.defaultContext())
                 .resolve("enum").create("boolean", booleanEntry, CONTEXT);
 
-        // Both use the object-binding enum factory, so boolean reads as a real Boolean (tree wraps it in an AtomNode).
-        assertEquals(Boolean.TRUE, Dom.of((io.ltr8.tson.tree.TsonNode) treeReader.read(TestDocuments.document("true"))));
+        // Both use the object-binding enum factory, so boolean reads as a real Boolean (tree wraps it in a TsonAtom).
+        assertEquals(Boolean.TRUE, Dom.of((TsonValue) treeReader.read(TestDocuments.document("true"))));
         assertEquals(Boolean.TRUE, bindReader.read(TestDocuments.document("true")));
     }
 
@@ -91,7 +92,7 @@ class ValueReaderFactoryRegistryTest {
         TsonTypeReader<?> bindReader = ValueReaderFactoryRegistry.bind(SchemaMetaNameBinder.defaultContext())
                 .resolve("enum").create("status", statusEntry, CONTEXT);
 
-        assertEquals("ACTIVE", Dom.of((io.ltr8.tson.tree.TsonNode) treeReader.read(TestDocuments.document("ACTIVE"))));
+        assertEquals("ACTIVE", Dom.of((TsonValue) treeReader.read(TestDocuments.document("ACTIVE"))));
         assertEquals("ACTIVE", bindReader.read(TestDocuments.document("ACTIVE")));
     }
 }

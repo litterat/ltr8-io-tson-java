@@ -2,7 +2,6 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
-import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -12,6 +11,7 @@ import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
@@ -44,7 +44,7 @@ class MapTreeReaderTest {
 
     @SuppressWarnings("unchecked")
     private static Map<Object, Object> readMap(TsonCompiledSchema compiled, String source) {
-        return (Map<Object, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("scores")
+        return (Map<Object, Object>) Dom.of((TsonValue) compiled.get("scores")
                 .read(TestDocuments.document(source)));
     }
 

@@ -1,6 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.bind.DataBindContext;
+import io.ltr8.tson.tree.TsonValue;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -31,7 +32,7 @@ import java.util.function.UnaryOperator;
  * <p><b>{@code enum}</b> uses {@link AtomTypeReader#ENUM_OBJECT_MODE} in both {@link #tree} and {@link
  * #bind} (dispatching {@code boolean} to a real {@code Boolean} via {@link BooleanReader}, every other
  * member name through the ordinary path) -- so {@code boolean} reads a genuine {@code Boolean}, not the
- * text {@code "true"}/{@code "false"}. Tree mode additionally wraps every leaf in an {@code AtomNode}.
+ * text {@code "true"}/{@code "false"}. Tree mode additionally wraps every leaf in a {@code TsonAtom}.
  *
  * <p><b>{@code choice} is shared between both modes</b>, registered once via {@link
  * ChoiceReader#FACTORY} -- see that class's own Javadoc for why it has no {@code
@@ -74,9 +75,9 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
     }
 
     /**
-     * Tree mode: reads into an immutable {@link io.ltr8.tson.tree.TsonNode}. The container factories
+     * Tree mode: reads into an immutable {@link TsonValue}. The container factories
      * build node containers; every atom-family/enum factory is wrapped ({@link AtomNodeFactory}) so its leaf
-     * yields an {@code AtomNode}/{@code NullNode}, and {@code unit}'s {@code void} yields an {@code AbsentNode}
+     * yields a {@code TsonAtom}/{@code TsonNull}, and {@code unit}'s {@code void} yields a {@code TsonAbsent}
      * (see {@link #TREE_UNIT}). Uses the object-binding enum factory so {@code boolean} reads a real {@code
      * Boolean} rather than the text {@code "true"}/{@code "false"}.
      */

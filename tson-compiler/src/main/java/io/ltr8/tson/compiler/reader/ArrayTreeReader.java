@@ -3,26 +3,25 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
-import io.ltr8.tson.tree.ArrayNode;
-import io.ltr8.tson.tree.NullNode;
-import io.ltr8.tson.tree.TsonAnnotation;
-import io.ltr8.tson.tree.TsonNode;
+import io.ltr8.tson.tree.*;
+import io.ltr8.tson.tree.TsonNull;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.tree.TsonValue;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 /**
- * Tree mode's {@code array} reader -- reads an array-shaped value into an {@link ArrayNode}, one {@link
- * TsonNode} per element in source order, the counterpart to the old DOM reader's plain {@code List}.
+ * Tree mode's {@code array} reader -- reads an array-shaped value into a {@link TsonArray}, one {@link
+ * TsonValue} per element in source order, the counterpart to the old DOM reader's plain {@code List}.
  * Distinct from {@link TupleTreeReader}, which reads a fixed-arity, positionally-typed sequence into a {@code
- * TupleNode}. A failed/mismatched element is kept as a {@link NullNode} placeholder (its diagnostic is
+ * TsonTuple}. A failed/mismatched element is kept as a {@link TsonNull} placeholder (its diagnostic is
  * already reported) so later elements' indices stay accurate.
  */
-final class ArrayTreeReader extends ArrayAbstractReader<TsonNode> {
+final class ArrayTreeReader extends ArrayAbstractReader<TsonValue> {
 
     public ArrayTreeReader(String name, ArrayBody body, TsonTypeReaderResolver resolver,
                            Optional<SourcePosition> schemaPosition,
@@ -47,14 +46,14 @@ final class ArrayTreeReader extends ArrayAbstractReader<TsonNode> {
     }
 
     @Override
-    public TsonNode read(TsonReadContext ctx) {
+    public TsonValue read(TsonReadContext ctx) {
         ctx = ctx.withSchemaPosition(schemaPosition);
         List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx, annotationTypes);
         if (!expectArrayStart(ctx)) {
             return null;
         }
-        List<TsonNode> elements = new ArrayList<>();
-        readInto(ctx, decoded -> elements.add(decoded == null ? NullNode.instance() : (TsonNode) decoded));
-        return new ArrayNode(elements, Optional.of(name), annotations);
+        List<TsonValue> elements = new ArrayList<>();
+        readInto(ctx, decoded -> elements.add(decoded == null ? TsonNull.instance() : (TsonValue) decoded));
+        return new TsonArray(elements, Optional.of(name), annotations);
     }
 }

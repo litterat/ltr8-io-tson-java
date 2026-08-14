@@ -11,7 +11,7 @@ import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
-import io.ltr8.tson.tree.TsonNode;
+import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * {@link Tson#treeReader()} / {@link Tson#objectReader()} -- the value-returning counterparts to {@link
- * Tson#validate}: a self-describing document read into a {@link TsonNode} tree (or a bound Java object),
+ * Tson#validate}: a self-describing document read into a {@link TsonValue} tree (or a bound Java object),
  * schema-validated when it declares a {@code !!schema} and schemaless otherwise, fail-fast (a bad value or
  * a document-selection failure throws {@link TsonReadException}).
  */
@@ -49,13 +49,13 @@ class TsonReadTest {
         return Tson.builder().schemaSource(source).build();
     }
 
-    private static long asLong(TsonNode node) {
+    private static long asLong(TsonValue node) {
         return node.as(Number.class).orElseThrow().longValue();
     }
 
     @Test
     void schemaDrivenReadReturnsTheValidatedTree() {
-        TsonNode node = tsonWithPoint().treeReader().read("""
+        TsonValue node = tsonWithPoint().treeReader().read("""
                 !!schema:"https://example.test/point-1.tn"
                 !point { x: 3  y: 4 }""");
 
@@ -67,7 +67,7 @@ class TsonReadTest {
 
     @Test
     void schemalessReadReturnsATree() {
-        TsonNode node = tsonWithPoint().treeReader().read("{ id: !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09  n: !int32 5 }");
+        TsonValue node = tsonWithPoint().treeReader().read("{ id: !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09  n: !int32 5 }");
 
         assertTrue(node.isRecord());
         assertTrue(node.get("id").as(java.util.UUID.class).isPresent());
@@ -191,7 +191,7 @@ class TsonReadTest {
         // against the schema -- which is the combination no route offered before.
         TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
 
-        TsonNode node = tsonWithPoint().treeReader().withDiagnostics(problems).read("""
+        TsonValue node = tsonWithPoint().treeReader().withDiagnostics(problems).read("""
                 !!schema:"https://example.test/point-1.tn"
                 !point { x: 99999999999999  y: 88888888888888 }""");
 
@@ -235,7 +235,7 @@ class TsonReadTest {
 
         for (Case testCase : cases) {
             TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
-            TsonNode node = tsonWithPoint().treeReader().withDiagnostics(problems).read(testCase.source());
+            TsonValue node = tsonWithPoint().treeReader().withDiagnostics(problems).read(testCase.source());
 
             assertEquals(1, problems.diagnostics().size(), problems.diagnostics()::toString);
             assertEquals(testCase.code(), problems.diagnostics().get(0).code());
@@ -253,7 +253,7 @@ class TsonReadTest {
         Tson tson = tsonWithPoint();
         tson.resolve(POINT_SCHEMA);
 
-        TsonNode node = tson.treeReader().withSchema(POINT_ID).readAs("{ x: 3  y: 4 }", "point");
+        TsonValue node = tson.treeReader().withSchema(POINT_ID).readAs("{ x: 3  y: 4 }", "point");
 
         assertTrue(node.isRecord());
         assertEquals(3, asLong(node.at("/x")));

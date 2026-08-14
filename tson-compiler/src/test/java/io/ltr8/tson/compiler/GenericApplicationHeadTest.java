@@ -11,7 +11,7 @@ import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.tree.TsonNode;
+import io.ltr8.tson.tree.TsonValue;
 
 import java.math.BigInteger;
 
@@ -83,7 +83,7 @@ class GenericApplicationHeadTest {
         assertEquals(TypeRef.of("text"), body.keyType());
         assertEquals(TypeRef.of("text"), body.valueType());
 
-        TsonNode value = (TsonNode) compiled.get("holder")
+        TsonValue value = (TsonValue) compiled.get("holder")
                 .read(TestDocuments.document("{ entries: { \"a\" => \"one\"  \"b\" => \"two\" } }"));
         assertNotNull(value);
     }

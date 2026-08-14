@@ -9,7 +9,7 @@
 /// `Tson.builder().build()` bootstraps the standard library (meta-kernel/meta.tn/core.tn); `resolve`
 /// registers a schema under its own `!!id`. This data isn't self-describing, so the reader is told which
 /// schema and type apply -- `withSchema(uri).readAs(source, type)`. Tree mode returns an immutable,
-/// queryable TsonNode -- no Java class involved, the TSON schema is the source of truth -- that preserves
+/// queryable TsonValue -- no Java class involved, the TSON schema is the source of truth -- that preserves
 /// structure and types and is navigable with get/at.
 import module io.ltr8.tson;
 
@@ -27,7 +27,7 @@ void main() {
     tson.resolve(schema);                       // registers it under its own !!id
     var reader = tson.treeReader().withSchema("https://example.com/2026/32/app/server-1.tn");
 
-    TsonNode server = reader.readAs("{ hostname: \"web-01\"  port: 8080 }", "server");
+    TsonValue server = reader.readAs("{ hostname: \"web-01\"  port: 8080 }", "server");
     IO.println("hostname: " + server.get("hostname").asString().orElseThrow());   // web-01
     IO.println("port:     " + server.at("/port").asNumber().orElseThrow());        // 8080
 

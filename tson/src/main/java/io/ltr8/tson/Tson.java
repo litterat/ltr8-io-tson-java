@@ -7,6 +7,7 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaLinker;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
+import io.ltr8.tson.tree.TsonValue;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -24,11 +25,11 @@ import java.util.List;
  * <pre>{@code
  * Tson tson = Tson.builder().build();
  * tson.resolve(schemaText);                      // registers the schema by its own !!id
- * TsonNode value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_type");
+ * TsonValue value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_type");
  * }</pre>
  *
  * <p><b>The read mode is which registry you hold, not a parameter.</b> {@link #treeRegistry()} reads into an
- * immutable, queryable {@code TsonNode} (structure-preserving, typed leaves -- the recommended default);
+ * immutable, queryable {@code TsonValue} (structure-preserving, typed leaves -- the recommended default);
  * {@link #bindRegistry()} reads to real Java objects (bound via {@link #dataBindContext()}). Both sit over one shared, bind-mode
  * resolution core: resolving an {@code Instance}/{@code AtomRefinement} declaration (meta.tn's/core.tn's own
  * {@code binary_encoding => !enum [...]}, {@code int32 => !integer ^ {...}}, and so on) binds it to a {@code
@@ -80,7 +81,7 @@ public final class Tson {
 
     /**
      * A schema-aware {@link TsonTreeReader} over this instance -- reads TSON text into an immutable,
-     * queryable {@code TsonNode} tree, validating against a self-describing document's {@code !!schema},
+     * queryable {@code TsonValue} tree, validating against a self-describing document's {@code !!schema},
      * schemaless when it declares none. The tree-producing peer of {@link #objectReader()}, and built over
      * {@link #treeRegistry()} on the same shared-cache terms -- which is what keeps {@link #validate}, which
      * makes a reader per call, from recompiling the schema for every document it checks.
@@ -94,7 +95,7 @@ public final class Tson {
         return new TsonObjectWriter(dataBindContext);
     }
 
-    /** A {@link TsonTreeWriter} -- an immutable {@code TsonNode} tree back to TSON text, the inverse of {@link #treeReader()}. */
+    /** A {@link TsonTreeWriter} -- an immutable {@code TsonValue} tree back to TSON text, the inverse of {@link #treeReader()}. */
     public TsonTreeWriter treeWriter() {
         return new TsonTreeWriter();
     }
@@ -120,7 +121,7 @@ public final class Tson {
 
     /**
      * The recommended read registry -- reads user schemas into an immutable, queryable {@link
-     * io.ltr8.tson.tree.TsonNode} tree: structure-preserving (record vs map, array vs tuple) with
+     * TsonValue} tree: structure-preserving (record vs map, array vs tuple) with
      * typed leaves and null-safe navigation, and no Java class per schema type. This is what {@link
      * #validate} reads through.
      */

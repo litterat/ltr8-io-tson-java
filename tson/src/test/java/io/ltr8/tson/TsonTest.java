@@ -4,10 +4,9 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonObjectReader;
-import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
-import io.ltr8.tson.tree.TsonNode;
+import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
@@ -51,11 +50,11 @@ class TsonTest {
 
         // int32 has a real bit-width (size: {bits: 32 signed: true}), so IntegerParser narrows to Integer;
         // atom reading is shared verbatim across read modes, so the tree leaf holds that same typed value.
-        TsonNode myInt = (TsonNode) compiled.get("my_int").read(TestDocuments.document("42"));
+        TsonValue myInt = (TsonValue) compiled.get("my_int").read(TestDocuments.document("42"));
         assertEquals(42, myInt.asNumber().orElseThrow().intValue());
 
         // my_percentage never sets size, so IntegerParser falls back to BigInteger.
-        TsonNode myPercentage = (TsonNode) compiled.get("my_percentage").read(TestDocuments.document("50"));
+        TsonValue myPercentage = (TsonValue) compiled.get("my_percentage").read(TestDocuments.document("50"));
         assertEquals(BigInteger.valueOf(50), myPercentage.asBigInteger().orElseThrow());
     }
 
@@ -91,7 +90,7 @@ class TsonTest {
 
         TsonCompiledSchema compiled = tson.treeRegistry().compile(tson.resolve(TINY_DOCUMENT));
 
-        TsonNode myInt = (TsonNode) compiled.get("my_int").read(TestDocuments.document("7"));
+        TsonValue myInt = (TsonValue) compiled.get("my_int").read(TestDocuments.document("7"));
         assertEquals(7, myInt.asNumber().orElseThrow().intValue());
     }
 

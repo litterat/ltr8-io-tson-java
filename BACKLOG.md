@@ -9,39 +9,28 @@ yet implemented" section for the technical detail behind several of these items.
 
 ---
 
-## Tree model (`TsonNode`)
+## Tree model (`TsonValue`)
 
-The `TsonNode` tree — an immutable, queryable, structure-preserving document model in its own pure-leaf
+The `TsonValue` tree — an immutable, queryable, structure-preserving document model in its own pure-leaf
 `tson-tree` module (`io.ltr8.tson.tree`) — is **built**: the node model + query API, both producers (the
 schema-driven tree readers and the schemaless `TsonTreeReader`), the `TsonTreeWriter` back to text, and
-the removal of the old throwaway `Map`/`List` DOM mode all landed. What's left:
+the removal of the old throwaway `Map`/`List` DOM mode all landed. The `Tson*` rename landed too
+(`TsonNode`/`RecordNode`/… → `TsonValue`/`TsonRecord`/…, dropping "Node"), resolving a real collision:
+Jackson ships `ArrayNode`, `NullNode` and `MissingNode`, so a consumer using both libraries in one file
+previously had to fully qualify. It also aligns with JEP 540's sealed `JsonValue`/`JsonObject`/`JsonArray`/
+`JsonNull` (Simple JSON API, incubating in JDK 28) — the same design this tree reached independently, with
+`TsonRecord`+`TsonMap` staying *more* precise than `JsonObject`, which cannot distinguish the two.
+What's left:
 
-- [ ] **Rename the node types to the `Tson*` prefix, dropping "Node".** `TsonNode` -> `TsonValue`,
-  `RecordNode` -> `TsonRecord`, `MapNode` -> `TsonMap`, `ArrayNode` -> `TsonArray`, `TupleNode` ->
-  `TsonTuple`, `AtomNode` -> `TsonAtom`, `NullNode` -> `TsonNull`, `AbsentNode` -> `TsonAbsent`,
-  `MissingNode` -> `TsonMissing`; `TsonAnnotation` already conforms. ~540 references.
-  - **The current names break this project's own naming rule**, and that is the argument that stands on its
-    own. The rule asks "would a consumer plausibly have their own class with this bare name?" -- and Jackson
-    ships `ArrayNode`, `NullNode`, `MissingNode` and `ObjectNode` in `com.fasterxml.jackson.databind.node`,
-    so a consumer using both libraries in one file has a literal three-way collision today and must fully
-    qualify. These are consumer-facing types; they are the case the prefix exists for.
-  - **"Node" stopped carrying information** once every type in the module is one. `RecordNode` says "record"
-    and "node"; `TsonRecord` says "record" and *whose*.
-  - **Alignment with JEP 540 (Simple JSON API, incubating in JDK 28)** is the bonus: its sealed `JsonValue` /
-    `JsonObject` / `JsonArray` / `JsonNull` is the same design this tree arrived at independently, so
-    `TsonValue`/`TsonRecord`/`TsonArray`/`TsonNull` buys familiarity for the same audience. Note
-    `TsonRecord`+`TsonMap` is *more* precise than `JsonObject`, not merely different -- JSON cannot
-    distinguish the two.
-  - **Prerequisite: done.** `TsonValueReader`/`TsonValueReaderResolver` became `TsonTypeReader`/
-    `TsonTypeReaderResolver`, freeing `TsonValue` and fixing a second name in the process (see `CLAUDE.md`'s
-    note on why "type" is the accurate half). `TsonValueWriter`, the planned schema-aware writer below,
-    should land as `TsonTypeWriter` for the same reason.
-  - Read the Javadoc on the `TsonNull`/`TsonAbsent`/`TsonMissing` trio while renaming -- three states where
-    JSON has two, and the subtlest corner of this API.
+- [ ] **Three internal readers are still named after tree types that no longer exist**, and were already
+  inconsistent with their siblings before the rename made it visible: `AtomNodeReader`, `AbsentNodeReader`
+  and `AtomNodeFactory`, next to `ArrayTreeReader`/`MapTreeReader`/`RecordTreeReader`/`TupleTreeReader`.
+  `AtomTreeReader`/`AbsentTreeReader`/`AtomTreeFactory` would settle both at once. ~20 references, all in
+  the unexported `reader` package, so no consumer impact.
 
 - [ ] **Copy-on-write transforms + builders (parked).** The "new tree from old" editing half —
-  `RecordNode.with(name, node)`/`without(name)`, `ArrayNode.with(i, node)`/`plus(node)`/`without(i)`,
-  `RecordNode.builder()`, and a pointer-based `set("/a/b", node) → new tree`. All pure `tson-tree`
+  `TsonRecord.with(name, value)`/`without(name)`, `TsonArray.with(i, value)`/`plus(value)`/`without(i)`,
+  `TsonRecord.builder()`, and a pointer-based `set("/a/b", value) → new tree`. All pure `tson-tree`
   operations (no compiler dependency), so they belong in that module. Deferred until there's a concrete
   produce/edit use case: `TsonTreeWriter` already closes the read→edit→write loop, so these have a real
   payoff when wanted, but block nothing now.
@@ -268,7 +257,7 @@ with `path: ""`, `schemaPosition: null`, and (through `validate`) a `dataPositio
   correct (each reader stamps its own atom's declaration) but with nothing saying *which file*. A consumer
   rendering a caret needs the identity too. Cheap to add alongside the schema-side work; pointless to add
   before it, since nothing else consumes the field.
-- [ ] **`expected` leaks a raw Java `toString`.** `AtomValueReader` builds it as `"a value satisfying " +
+- [ ] **`expected` leaks a raw Java `toString`.** `AtomTypeReader` builds it as `"a value satisfying " +
   delegate`, yielding `a value satisfying IntegerParser[constraints=IntegerType[size=Optional[IntegerSize[
   bits=32, signed=true]], min=Optional.empty, …]]` in a field `Diagnostic` documents as the
   machine-parseable half for an LLM retry loop. The deleted `SchemalessValidator` emitted `a value
@@ -282,7 +271,7 @@ fail-fast and collecting/diagnostics modes; the write side has only the two sche
 missing most of the mirror.
 
 - [ ] **No schema-aware (Class 2) writer — `TsonValueWriter`.** Only the schemaless `TsonObjectWriter`
-  (object → TSON) and `TsonTreeWriter` (`TsonNode` → TSON) exist, both with documented lossy spots
+  (object → TSON) and `TsonTreeWriter` (`TsonValue` → TSON) exist, both with documented lossy spots
   (integer width, tuple-ness). A writer symmetric to the
   compiled reader stack (`TsonSchemaCompiler`/`TsonTypeReader`) — checking output against a TSON schema
   and reporting what's wrong — is a whole missing half of the pipeline, and the natural home for
@@ -385,7 +374,7 @@ missing most of the mirror.
   union, `VariantSchemaReader` under bind mode) must consume the leading annotations to reach the
   `!typeName` it dispatches on -- they precede it in `data-value = *annotation [type-ref] core-value` -- so
   the reader that ends up building the value never sees them. Tree mode solved this by re-attaching to the
-  finished node (`TsonNode.withAnnotations`); bind mode would do the same through `DataClassAnnotated`'s
+  finished node (`TsonValue.withAnnotations`); bind mode would do the same through `DataClassAnnotated`'s
   `constructor` handle, wrapping what came back.
   - Not reachable today: a union member is not a boxed position, so its carrier is always empty rather than
     wrong. Worth closing when a boxed variant becomes expressible, not before.

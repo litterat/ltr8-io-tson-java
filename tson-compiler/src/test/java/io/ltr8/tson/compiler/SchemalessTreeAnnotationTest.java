@@ -1,8 +1,8 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.tree.MapNode;
+import io.ltr8.tson.tree.TsonMap;
 import io.ltr8.tson.tree.TsonAnnotation;
-import io.ltr8.tson.tree.TsonNode;
+import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -22,23 +22,23 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * states separately -- ordering, multiplicity, the valueless form, and value scope.
  *
  * <p>A record's field <em>name</em> is deliberately absent from that list: §2.5 forbids an annotation before
- * a field name, which is why {@code RecordNode.fields()} is keyed by a plain string while {@code
- * MapNode.Entry} holds a full node for its key.
+ * a field name, which is why {@code TsonRecord.fields()} is keyed by a plain string while {@code
+ * TsonMap.Entry} holds a full node for its key.
  */
 class SchemalessTreeAnnotationTest {
 
     /** Preserving, because these fixtures use custom type-refs ({@code !order}) as scenery -- a schemaless read reports one by default, which is {@code TypeRefCheck}'s business, not this test's. */
-    private static TsonNode read(String source) {
+    private static TsonValue read(String source) {
         return new TsonTreeReader().preservingUnknownTypeRefs().read(source);
     }
 
     /** The annotation names on a node, in order -- what §3.1's ordering/multiplicity rules are stated over. */
-    private static List<String> names(TsonNode node) {
+    private static List<String> names(TsonValue node) {
         return node.annotations().stream().map(TsonAnnotation::name).toList();
     }
 
     /** The single annotation named {@code name} on {@code node}. */
-    private static TsonAnnotation only(TsonNode node, String name) {
+    private static TsonAnnotation only(TsonValue node, String name) {
         List<TsonAnnotation> matching = node.annotations().stream().filter(a -> a.name().equals(name)).toList();
         assertEquals(1, matching.size(), () -> "expected exactly one @" + name + " on " + node.annotations());
         return matching.get(0);
@@ -46,7 +46,7 @@ class SchemalessTreeAnnotationTest {
 
     @Test
     void capturesAnnotationsAtEveryPositionTheGrammarPermits() {
-        TsonNode root = read("""
+        TsonValue root = read("""
                 @doc:"an order" !order {
                   tier: @deprecated GOLD
                   tags: [@first "a" "b"]
@@ -63,12 +63,12 @@ class SchemalessTreeAnnotationTest {
         assertEquals(Optional.of("GOLD"), root.get("tier").asString());
 
         // 3. an array element -- and only the annotated one
-        TsonNode tags = root.get("tags");
+        TsonValue tags = root.get("tags");
         assertEquals(List.of("first"), names(tags.get(0)));
         assertEquals(List.of(), names(tags.get(1)));
 
         // 4 & 5. either side of a map entry, annotated independently (§3.1)
-        MapNode.Entry entry = ((MapNode) root.get("discounts")).entries().get(0);
+        TsonMap.Entry entry = ((TsonMap) root.get("discounts")).entries().get(0);
         assertEquals(Optional.of("2026-12-31"), only(entry.key(), "expires").value().orElseThrow().asString());
         assertEquals(List.of("rate"), names(entry.value()));
         assertEquals(Optional.of("WELCOME10"), entry.key().asString());
@@ -79,10 +79,10 @@ class SchemalessTreeAnnotationTest {
     void aValuelessAnnotationHasNoValueRatherThanAnEmptyOne() {
         // §3.1: with no ":", presence is the whole of the information. Distinct from @name:_ , which
         // would carry the absent sentinel as a real value.
-        TsonNode bare = read("{ tier: @deprecated GOLD }").get("tier");
+        TsonValue bare = read("{ tier: @deprecated GOLD }").get("tier");
         assertEquals(Optional.empty(), only(bare, "deprecated").value());
 
-        TsonNode explicitlyAbsent = read("{ tier: @deprecated:_ GOLD }").get("tier");
+        TsonValue explicitlyAbsent = read("{ tier: @deprecated:_ GOLD }").get("tier");
         assertTrue(only(explicitlyAbsent, "deprecated").value().orElseThrow().isAbsent());
     }
 
@@ -90,7 +90,7 @@ class SchemalessTreeAnnotationTest {
     void repeatsArePreservedInSourceOrder() {
         // §3.1 Multiplicity: "An annotation name MAY appear any number of times on a single value; all
         // occurrences are preserved in source order." So this is a List, not a Map keyed by name.
-        TsonNode node = read("{ x: @tag:\"a\" @other @tag:\"b\" 1 }").get("x");
+        TsonValue node = read("{ x: @tag:\"a\" @other @tag:\"b\" 1 }").get("x");
 
         assertEquals(List.of("tag", "other", "tag"), names(node));
         assertEquals(List.of(Optional.of("a"), Optional.of("b")),
@@ -107,17 +107,17 @@ class SchemalessTreeAnnotationTest {
         // trailing `extra` is what the enclosing value takes as its own core-value; without it the outer
         // data-value has none and this is a parse error, which is SPEC-FEEDBACK.md #3 (the spec's own
         // worked example is one token short of standing alone).
-        TsonNode node = read("{ x: @a:@b:val target extra }").get("x");
+        TsonValue node = read("{ x: @a:@b:val target extra }").get("x");
 
         assertEquals(Optional.of("extra"), node.asString());
-        TsonNode aValue = only(node, "a").value().orElseThrow();
+        TsonValue aValue = only(node, "a").value().orElseThrow();
         assertEquals(Optional.of("target"), aValue.asString());
         assertEquals(Optional.of("val"), only(aValue, "b").value().orElseThrow().asString());
     }
 
     @Test
     void annotationsOnAContainerBindToTheContainerNotItsChildren() {
-        TsonNode root = read("@outer { items: @inner [1 2] }");
+        TsonValue root = read("@outer { items: @inner [1 2] }");
 
         assertEquals(List.of("outer"), names(root));
         assertEquals(List.of("inner"), names(root.get("items")));
@@ -129,7 +129,7 @@ class SchemalessTreeAnnotationTest {
         // §7.4's data-value = *annotation [type-ref] core-value fixes the order, and §3.1's boundary rule
         // is why the valueless form needs its trailing space -- without it `@deprecated` would run into
         // the value it annotates.
-        TsonNode root = read("@doc:\"an order\" !order { tier: @deprecated GOLD }");
+        TsonValue root = read("@doc:\"an order\" !order { tier: @deprecated GOLD }");
 
         assertEquals("@doc:\"an order\" !order { tier: @deprecated \"GOLD\" }", new TsonTreeWriter().toTson(root));
     }
@@ -148,10 +148,10 @@ class SchemalessTreeAnnotationTest {
                   nothing: @unset _
                 }
                 """;
-        TsonNode once = read(source);
+        TsonValue once = read(source);
 
         String written = new TsonTreeWriter().toTson(once);
-        TsonNode twice = read(written);
+        TsonValue twice = read(written);
 
         assertEquals(once, twice, () -> "round trip lost something; wrote: " + written);
         // and spot-check that the annotations really are present after the round trip, not equally absent
@@ -163,11 +163,11 @@ class SchemalessTreeAnnotationTest {
 
     @Test
     void anUnannotatedDocumentReportsEmptyEverywhere() {
-        TsonNode root = read("{ a: 1  b: [2]  c: { k => 3 } }");
+        TsonValue root = read("{ a: 1  b: [2]  c: { k => 3 } }");
 
         assertEquals(List.of(), root.annotations());
         assertEquals(List.of(), root.get("a").annotations());
         assertEquals(List.of(), root.get("b").get(0).annotations());
-        assertEquals(List.of(), ((MapNode) root.get("c")).entries().get(0).key().annotations());
+        assertEquals(List.of(), ((TsonMap) root.get("c")).entries().get(0).key().annotations());
     }
 }

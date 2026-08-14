@@ -3,10 +3,9 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
-import io.ltr8.tson.tree.NullNode;
-import io.ltr8.tson.tree.TsonAnnotation;
-import io.ltr8.tson.tree.TsonNode;
-import io.ltr8.tson.tree.TupleNode;
+import io.ltr8.tson.tree.*;
+import io.ltr8.tson.tree.TsonValue;
+import io.ltr8.tson.tree.TsonTuple;
 import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -17,11 +16,11 @@ import java.util.Optional;
 
 /**
  * Tree mode's {@code tuple} reader -- reads a fixed-arity, positionally-typed sequence into a {@link
- * TupleNode}, the counterpart to the old DOM reader's plain {@code List} and a distinct kind from {@link
+ * TsonTuple}, the counterpart to the old DOM reader's plain {@code List} and a distinct kind from {@link
  * ArrayTreeReader} (a schemaless read, which has no schema to tell tuple from array, can only produce an
- * array). A failed/out-of-arity slot is kept as a {@link NullNode} placeholder.
+ * array). A failed/out-of-arity slot is kept as a {@link TsonNull} placeholder.
  */
-final class TupleTreeReader extends TupleAbstractReader<TsonNode> {
+final class TupleTreeReader extends TupleAbstractReader<TsonValue> {
 
     public TupleTreeReader(String name, TupleBody body, TsonTypeReaderResolver resolver,
                            Optional<SourcePosition> schemaPosition,
@@ -46,16 +45,16 @@ final class TupleTreeReader extends TupleAbstractReader<TsonNode> {
     }
 
     @Override
-    public TsonNode read(TsonReadContext ctx) {
+    public TsonValue read(TsonReadContext ctx) {
         ctx = ctx.withSchemaPosition(schemaPosition);
         List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx, annotationTypes);
         if (!expectTupleStart(ctx)) {
             return null;
         }
-        List<TsonNode> elements = new ArrayList<>();
+        List<TsonValue> elements = new ArrayList<>();
         for (Object decoded : decode(ctx)) {
-            elements.add(decoded == null ? NullNode.instance() : (TsonNode) decoded);
+            elements.add(decoded == null ? TsonNull.instance() : (TsonValue) decoded);
         }
-        return new TupleNode(elements, Optional.of(name), annotations);
+        return new TsonTuple(elements, Optional.of(name), annotations);
     }
 }

@@ -24,6 +24,7 @@ import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Unit;
 import io.ltr8.tson.schema.meta.UuidType;
+import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -59,7 +60,7 @@ class AtomValueReaderTest {
         TsonCompiledSchema compiled = TsonSchemaCompiler.compile(linkedSchema, ValueReaderFactoryRegistry.tree());
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("holder")
+        Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue) compiled.get("holder")
                 .read(TestDocuments.document(source)));
         return result.get("value");
     }
@@ -166,7 +167,7 @@ class AtomValueReaderTest {
         TsonCompiledSchema compiled = TsonSchemaCompiler.compile(linkedSchema, ValueReaderFactoryRegistry.tree());
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("holder")
+        Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue) compiled.get("holder")
                 .read(TestDocuments.document(source)));
         return result;
     }

@@ -3,12 +3,12 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
-import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaLinker;
+import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
@@ -80,7 +80,7 @@ class MetaKernelEndToEndTest {
         TsonCompiledSchema compiled = compiled();
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("top")
+        Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue) compiled.get("top")
                 .read(TestDocuments.document("{}")));
 
         assertEquals(Map.of(), result);
@@ -91,7 +91,7 @@ class MetaKernelEndToEndTest {
         TsonCompiledSchema compiled = compiled();
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("top")
+        Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue) compiled.get("top")
                 .read(TestDocuments.document("!top {}")));
 
         assertEquals(Map.of(), result);
@@ -104,7 +104,7 @@ class MetaKernelEndToEndTest {
         TsonCompiledSchema compiled = compiled();
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("enum")
+        Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue) compiled.get("enum")
                 .read(TestDocuments.document("{ members: [true false] }")));
 
         assertEquals(List.of("true", "false"), result.get("members"));
@@ -115,7 +115,7 @@ class MetaKernelEndToEndTest {
         TsonCompiledSchema compiled = compiled();
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("integer_size")
+        Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue) compiled.get("integer_size")
                 .read(TestDocuments.document("{ bits: 32 signed: true }")));
 
         assertEquals(BigInteger.valueOf(32), result.get("bits"));
@@ -127,7 +127,7 @@ class MetaKernelEndToEndTest {
         TsonCompiledSchema compiled = compiled();
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("field_group")
+        Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue) compiled.get("field_group")
                 .read(TestDocuments.document("{ members: [foo bar] state: OPTIONAL }")));
 
         assertEquals(List.of("foo", "bar"), result.get("members"));
@@ -139,7 +139,7 @@ class MetaKernelEndToEndTest {
         TsonCompiledSchema compiled = compiled();
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("tuple_element")
+        Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue) compiled.get("tuple_element")
                 .read(TestDocuments.document("{ element_type: { name: text arguments: [] } state: REQUIRED }")));
 
         assertEquals("REQUIRED", result.get("state"));

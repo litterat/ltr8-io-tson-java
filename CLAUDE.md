@@ -63,7 +63,7 @@ lives in git.)
 **`Tson` is a prefix, never an infix.** A class name containing `Tson` must lead with it (`TsonSchema`,
 `TsonDataParser`, `TsonCompiledSchema`) — never buried (`CompiledTsonSchema` is wrong). The prefix is
 **not** applied to every class: most internal machinery is deliberately bare (`Lexer`,
-`RecordAbstractReader`, `DeferredValueReader`, `CanonicalIdentity`, `SchemaResolver`,
+`RecordAbstractReader`, `DeferredTypeReader`, `CanonicalIdentity`, `SchemaResolver`,
 `DefinitionResolver`). Reserve `Tson` for types a *consumer of this library* names in their own code — its
 value is disambiguation at the call site (`TsonSchema` vs. a domain `Schema`). When adding a new public,
 developer-facing type, ask "would a consumer plausibly have their own class with this bare name?" — if yes
@@ -99,7 +99,7 @@ module has a real `module-info.java`; module names mirror each module's root exp
   one structurally it declares a local stand-in (`schema.meta.Token` mirrors `ast.TokenValue`/`TokenForm`;
   `schema.meta.SourcePosition` is an interface `tson-compiler`'s `Position` implements), converted at the
   one spot that needs it.
-- **`tson-tree`** — **only** `io.ltr8.tson.tree` (the data-document *value* model — `TsonNode` and its
+- **`tson-tree`** — **only** `io.ltr8.tson.tree` (the data-document *value* model — `TsonValue` and its
   pure immutable node types, structure-preserving and query-ergonomic, the read output of tree mode). A
   true leaf: depends on **nothing** (not even `tson-annotation` — the nodes aren't bind targets, they're
   assembled by hand-written readers). The data-tree counterpart to `tson-schema`'s `schema.meta`: same
@@ -464,13 +464,13 @@ consulted). `TsonSchemaLinker`/`TsonSchemaRegistry` add the second stage.
 
 `TsonSchemaCompiler.compile` turns a `TsonLinkedSchema` into a `TsonCompiledSchema` — one `TsonTypeReader`
 per entry, wired as real Java references rather than name lookups at read time (except where
-`DeferredValueReader` closes a cycle with one lazy lookup). `TsonTypeReader<T>` is the single-method front
+`DeferredTypeReader` closes a cycle with one lazy lookup). `TsonTypeReader<T>` is the single-method front
 door a caller holds -- **strictly one method**, `T read(TsonReadContext)`. Source form, document framing
 and error policy are all the context's or the facades' concern, never overloads here.
 
 **"Type", not "value", is the accurate half of that name.** A caller reaches one via
 `TsonCompiledSchema.get(typeName)` -- it is the reader *for that declared type*, and there is exactly one
-per schema entry. What it hands back is mode-dependent (`T` is a `TsonNode` in tree mode, a bound Java
+per schema entry. What it hands back is mode-dependent (`T` is a `TsonValue` in tree mode, a bound Java
 object in bind mode), so naming it for its return type would be wrong in one mode or the other. It also
 keeps `TsonValue` free for `tson-tree`'s own root type (`BACKLOG.md`).
 
@@ -504,7 +504,7 @@ keeps `TsonValue` free for `tson-tree`'s own root type (`BACKLOG.md`).
   (`compile(linked, ValueReaderFactoryResolver)`) dispatches through a factory set directly, no scoping —
   for reading an already-validated schema in a chosen mode.
 - **Two output modes share each reader family** via a `*AbstractReader` base plus `*TreeReader`/`*BindReader`
-  subclasses (`Record`/`Array`/`Map`/`Tuple`). Tree mode produces an immutable `tson-tree` `TsonNode`
+  subclasses (`Record`/`Array`/`Map`/`Tuple`). Tree mode produces an immutable `tson-tree` `TsonValue`
   (structure-preserving, typed leaves); object-binding mode produces real bound Java objects via a
   `DataNameBinder` (`RecordBindReader` looks up each entry's `DataClass` and narrows values to the field's
   target type). `ValueReaderFactoryRegistry.tree()` /
@@ -535,7 +535,7 @@ Two registries over one shared resolution core, the compiled-side counterparts t
   the linked form standalone in its own mode, cached by identity; `compile(linked)` is the uncached
   primitive.
 - **Resolution is always bind-anchored, so it is delegated to the core regardless of read mode.** A
-  schema's own `!enum`/`!integer` instances bind to `schema.meta.Top` objects — a tree reader's `TsonNode`
+  schema's own `!enum`/`!integer` instances bind to `schema.meta.Top` objects — a tree reader's `TsonValue`
   can't stand in — so every read registry shares the one bind-mode core for resolution; only the final compile
   runs in the registry's mode (standalone: the schema's constructor usage was already validated at link
   time). The bind read registry takes the *caller's own* `DataBindContext` (their user-class name binder),
@@ -609,7 +609,7 @@ each declaration's own position into `DefinitionResolver.resolve` — so a value
 value in the data and the type it violated in the schema. Every reader stamps its own position first, so the
 one reported is the *atom's* declaration (`int32` in core.tn), not the enclosing record's; `SourcePosition`
 carries line/column/offset but no document identity, so which schema that is stays implicit (`BACKLOG.md`).
-An atom's `AtomTypeException` is caught in `AtomValueReader` and mapped to
+An atom's `AtomTypeException` is caught in `AtomTypeReader` and mapped to
 `ATOM_CONSTRAINT_VIOLATION` — `AtomType`'s own signature is untouched, since it's shared with the
 schemaless binder which has no read context. Out of scope for now: message synthesis from code + params,
 fine-grained atom codes, `UNRECOGNIZED_FIELD`/`DUPLICATE_MAP_KEY` detection (readers iterate schema fields,
@@ -618,7 +618,7 @@ positions.
 
 ### Read facades: `TsonObjectReader`/`TsonTreeReader` (root package) + `TsonObjectWriter`
 
-`TsonObjectReader` (to a bound Java object) and `TsonTreeReader` (to a `TsonNode` tree) are the two
+`TsonObjectReader` (to a bound Java object) and `TsonTreeReader` (to a `TsonValue` tree) are the two
 consumer read front doors, named for what a consumer holds, matching Jackson's `ObjectReader`/`readTree`.
 Each is **dual-mode, fixed at construction**: built standalone (`new TsonObjectReader(ctx)` / `new
 TsonTreeReader()`) it's **schemaless** (Class 1 — the target class, or the wire, is the whole contract;
@@ -669,7 +669,7 @@ reads one value at a cursor and polices nothing around it.
   target answers to no wire name, so `!tags [ "a" ]` into a `List<String>` is `UNKNOWN_TYPE_REF`.
 - **Reporting never abandons the value.** A reported type-ref still yields its node/object and its children
   are still read, so one collecting pass finds everything; a leaf whose atom rejected the token becomes a
-  `NullNode` keeping its wire type-ref (the placeholder `AtomNodeReader` already uses). `SchemalessTreeReader`
+  `TsonNull` keeping its wire type-ref (the placeholder `AtomNodeReader` already uses). `SchemalessTreeReader`
   scopes `ctx.field`/`ctx.index` as it descends, so a diagnostic carries a real RFC 6901 path.
 - **`TsonObjectReader`'s schema-aware `read` checks the target class up front** — the schema's root type
   already binds to a Java class via the name binder, so a class not assignable to that is a `TYPE_MISMATCH`
@@ -690,11 +690,11 @@ reads one value at a cursor and polices nothing around it.
   Bind mode is untouched.
 - **A dispatched value gets its annotations re-attached afterwards.** `NamedDispatchReader`/
   `VariantSchemaReader` must consume the annotations to reach the `!typeName` they dispatch on, so the reader
-  that builds the node never sees them; they're put back with `TsonNode.withAnnotations` (a pure `tson-tree`
+  that builds the node never sees them; they're put back with `TsonValue.withAnnotations` (a pure `tson-tree`
   operation). Nothing flows through the context and `TsonTypeReader.read` is unchanged — a dispatched
   annotation flows *into* the delegate's result, which is the opposite direction from the
   `DiagnosticsReceiver` problem. Bind mode is unaffected by construction (re-attachment only acts on a
-  `TsonNode`), and `AnnotationTypes.DISCARDED` keeps it from validating at just the positions that happen to
+  `TsonValue`), and `AnnotationTypes.DISCARDED` keeps it from validating at just the positions that happen to
   route through a capturing reader.
 - **A schema-driven read also type-checks annotations** (§6: an annotation *names a type*). `AnnotationTypes`
   resolves the name against the governing schema (§3.3.3's one hop — for a data document that's the
@@ -718,7 +718,7 @@ reads one value at a cursor and polices nothing around it.
   switch): `writeUnion` writes a type-ref of its own, so it emits its member's annotations *before* that and
   goes straight to `writeCore`, rather than recursing and landing them after it. An annotation's value writes
   back in whichever form the read produced — a bound object like any other value, a structurally-kept
-  `TsonNode` through `TsonTreeWriter`'s own node emission (package-private, both writers share a package).
+  `TsonValue` through `TsonTreeWriter`'s own node emission (package-private, both writers share a package).
 - **`SchemalessObjectReader` streams events** (like the compiled readers), walking the descriptor in
   parallel — never materializing a tree first. Problems report through a `TsonReadContext` (fail-fast throws
   `TsonReadException`; collecting accumulates), and a `tson-bind` `DataBindException` while narrowing /
@@ -742,10 +742,10 @@ meta-kernel/meta.tn/core.tn into a governed environment and returns an immutable
 ```java
 Tson tson = Tson.builder().build();
 tson.resolve(schemaText);                      // registers the schema by its own !!id
-TsonNode value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_type");
+TsonValue value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_type");
 ```
 
-- **The read mode is which registry you hold:** `treeRegistry()` (an immutable, queryable `TsonNode` tree)
+- **The read mode is which registry you hold:** `treeRegistry()` (an immutable, queryable `TsonValue` tree)
   and `bindRegistry()` (real Java objects, bound via `dataBindContext()`), both over one shared bind-mode
   resolution core.
   `resolve(schemaText)` resolves/links/registers and takes *no* mode — resolution is always object-binding

@@ -15,6 +15,7 @@ import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
@@ -54,7 +55,7 @@ class RecordTreeReaderTest {
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> read(TsonCompiledSchema compiled, String source) {
-        return (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("point")
+        return (Map<String, Object>) Dom.of((TsonValue) compiled.get("point")
                 .read(TestDocuments.document(source)));
     }
 

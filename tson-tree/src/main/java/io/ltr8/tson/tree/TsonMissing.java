@@ -5,15 +5,15 @@ import java.util.Optional;
 
 /**
  * The result of navigating to something that isn't in the tree -- a query artifact, not a real value, so
- * {@link #get}/{@link #at} keep returning it and a deep chain never throws. Distinct from {@link NullNode}
- * (the {@code null} token) and {@link AbsentNode} (the {@code _} sentinel), which are real present values. A
+ * {@link #get}/{@link #at} keep returning it and a deep chain never throws. Distinct from {@link TsonNull}
+ * (the {@code null} token) and {@link TsonAbsent} (the {@code _} sentinel), which are real present values. A
  * singleton via {@link #instance()}.
  */
-public record MissingNode() implements TsonNode {
+public record TsonMissing() implements TsonValue {
 
-    private static final MissingNode INSTANCE = new MissingNode();
+    private static final TsonMissing INSTANCE = new TsonMissing();
 
-    public static MissingNode instance() {
+    public static TsonMissing instance() {
         return INSTANCE;
     }
 
@@ -33,12 +33,12 @@ public record MissingNode() implements TsonNode {
     }
 
     @Override
-    public TsonNode get(String name) {
+    public TsonValue get(String name) {
         return this;
     }
 
     @Override
-    public TsonNode get(int index) {
+    public TsonValue get(int index) {
         return this;
     }
 }

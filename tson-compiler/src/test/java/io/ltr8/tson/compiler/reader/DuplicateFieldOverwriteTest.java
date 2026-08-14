@@ -4,7 +4,6 @@ import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonDiagnosticsCollector;
-import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
 import io.ltr8.tson.compiler.TsonCompiledSchemaRegistry;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
@@ -17,6 +16,7 @@ import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -58,7 +58,7 @@ class DuplicateFieldOverwriteTest {
         TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode)
+        Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue)
                 compiled.get("holder").read(TestDocuments.document(dataSource, problems)));
 
         // The malformed first occurrence was genuinely read/validated -- exactly one diagnostic,

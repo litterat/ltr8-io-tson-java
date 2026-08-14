@@ -100,7 +100,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T> {
      * The enum reader for both tree and object-binding modes: {@code boolean} reads a real {@code Boolean}
      * ({@link BooleanReader}), every other enum instance its member text ({@link EnumParser}). Dispatch is
      * keyed on the declaration's own name, the same mechanism {@link #UNIT} uses for {@code value}/{@code
-     * token}/{@code void}. (Tree mode then wraps the result in an {@code AtomNode} -- see {@link
+     * token}/{@code void}. (Tree mode then wraps the result in a {@code TsonAtom} -- see {@link
      * ValueReaderFactoryRegistry}.)
      */
     static final ValueReaderFactory ENUM_OBJECT_MODE = (name, definition, _) ->

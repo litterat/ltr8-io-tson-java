@@ -1,10 +1,10 @@
 dependencies {
     implementation(project(":tson-schema"))
     implementation(project(":tson-annotation"))
-    // The immutable TsonNode tree model, a pure leaf module. tson-compiler holds the engine that produces
+    // The immutable TsonValue tree model, a pure leaf module. tson-compiler holds the engine that produces
     // and consumes it (TsonTreeReader/TsonTreeWriter, the reader.*TreeReader family) -- the same direction
     // as the tson-schema dependency, model in its own module, engine here. Public tson-compiler signatures
-    // return TsonNode, so it is `requires transitive` in module-info and re-declared `api` in the tson module.
+    // return TsonValue, so it is `requires transitive` in module-info and re-declared `api` in the tson module.
     implementation(project(":tson-tree"))
     // The native RFC 9485 I-Regexp engine. The atom vocabulary (RegexParser, and TextParser/UriParser via
     // their `pattern` constraint) validates regex values against it rather than java.util.regex, so this

@@ -15,16 +15,16 @@ import java.util.stream.Stream;
  * tree ({@code ast.CoreValue}): a node carries typed leaf values and query ergonomics the parse tree
  * deliberately doesn't, and drops lexical detail (token quoting) the parse tree keeps.
  *
- * <p><b>Navigation never throws.</b> {@link #get}/{@link #at} return {@link MissingNode} for an absent
+ * <p><b>Navigation never throws.</b> {@link #get}/{@link #at} return {@link TsonMissing} for an absent
  * field/index, so a deep {@code node.at("/orders/3/total").asBigDecimal()} chain is null-safe. "Missing"
- * (no such node in the tree), "null" (the {@code null} token, {@link NullNode}), and "absent" (the {@code
- * _} sentinel, {@link AbsentNode}) are three distinct kinds.
+ * (no such node in the tree), "null" (the {@code null} token, {@link TsonNull}), and "absent" (the {@code
+ * _} sentinel, {@link TsonAbsent}) are three distinct kinds.
  *
  * <p>Every node carries its own {@link #typeRef()} (the wire or schema type, e.g. {@code "int32"} or
  * {@code "person"}) and {@link #annotations()}.
  */
-public sealed interface TsonNode
-        permits RecordNode, MapNode, ArrayNode, TupleNode, AtomNode, NullNode, AbsentNode, MissingNode {
+public sealed interface TsonValue
+        permits TsonRecord, TsonMap, TsonArray, TsonTuple, TsonAtom, TsonNull, TsonAbsent, TsonMissing {
 
     /** This value's own type-ref (e.g. {@code "int32"}, {@code "uuid"}, {@code "person"}), if the wire or schema gave one. */
     Optional<String> typeRef();
@@ -44,24 +44,24 @@ public sealed interface TsonNode
      * they belong, on the value they were written against. {@code leading} goes first because it was written
      * first, preserving §3.1's source order.
      *
-     * <p>{@link MissingNode} is a navigation artifact rather than a value, so it has nothing to annotate and
+     * <p>{@link TsonMissing} is a navigation artifact rather than a value, so it has nothing to annotate and
      * returns itself.
      */
-    default TsonNode withAnnotations(List<TsonAnnotation> leading) {
+    default TsonValue withAnnotations(List<TsonAnnotation> leading) {
         if (leading.isEmpty()) {
             return this;
         }
         List<TsonAnnotation> merged =
                 Stream.concat(leading.stream(), annotations().stream()).toList();
         return switch (this) {
-            case RecordNode n -> new RecordNode(n.fields(), n.typeRef(), merged);
-            case MapNode n -> new MapNode(n.entries(), n.typeRef(), merged);
-            case ArrayNode n -> new ArrayNode(n.elements(), n.typeRef(), merged);
-            case TupleNode n -> new TupleNode(n.elements(), n.typeRef(), merged);
-            case AtomNode n -> new AtomNode(n.value(), n.typeRef(), merged);
-            case NullNode n -> new NullNode(n.typeRef(), merged);
-            case AbsentNode n -> new AbsentNode(n.typeRef(), merged);
-            case MissingNode n -> n;
+            case TsonRecord n -> new TsonRecord(n.fields(), n.typeRef(), merged);
+            case TsonMap n -> new TsonMap(n.entries(), n.typeRef(), merged);
+            case TsonArray n -> new TsonArray(n.elements(), n.typeRef(), merged);
+            case TsonTuple n -> new TsonTuple(n.elements(), n.typeRef(), merged);
+            case TsonAtom n -> new TsonAtom(n.value(), n.typeRef(), merged);
+            case TsonNull n -> new TsonNull(n.typeRef(), merged);
+            case TsonAbsent n -> new TsonAbsent(n.typeRef(), merged);
+            case TsonMissing n -> n;
         };
     }
 
@@ -77,35 +77,35 @@ public sealed interface TsonNode
     default boolean isMissing()   { return false; }
     default boolean isContainer() { return isRecord() || isMap() || isArray() || isTuple(); }
 
-    // --- navigation (never throws; MissingNode when not applicable or absent) ---
+    // --- navigation (never throws; TsonMissing when not applicable or absent) ---
 
-    /** The field/entry named {@code name} (record/map), or {@link MissingNode}. */
-    default TsonNode get(String name) { return MissingNode.instance(); }
+    /** The field/entry named {@code name} (record/map), or {@link TsonMissing}. */
+    default TsonValue get(String name) { return TsonMissing.instance(); }
 
-    /** The element at {@code index} (array/tuple), or {@link MissingNode}. */
-    default TsonNode get(int index) { return MissingNode.instance(); }
+    /** The element at {@code index} (array/tuple), or {@link TsonMissing}. */
+    default TsonValue get(int index) { return TsonMissing.instance(); }
 
     /** The record fields (name → node, insertion order), or an empty map. */
-    default Map<String, TsonNode> fields() { return Map.of(); }
+    default Map<String, TsonValue> fields() { return Map.of(); }
 
     /** The array/tuple elements in order, or an empty list. */
-    default List<TsonNode> elements() { return List.of(); }
+    default List<TsonValue> elements() { return List.of(); }
 
     /**
      * RFC 6901 JSON Pointer navigation from this node: {@code ""} is this node itself, {@code "/a/b"} steps
-     * into fields/indices, and any absent step yields {@link MissingNode} (so the whole chain is null-safe).
+     * into fields/indices, and any absent step yields {@link TsonMissing} (so the whole chain is null-safe).
      * A token that parses as an integer indexes an array/tuple; anything else names a field/entry.
      *
      * @throws IllegalArgumentException if {@code pointer} is non-empty and doesn't start with {@code '/'}
      */
-    default TsonNode at(String pointer) {
+    default TsonValue at(String pointer) {
         if (pointer.isEmpty()) {
             return this;
         }
         if (pointer.charAt(0) != '/') {
             throw new IllegalArgumentException("a non-empty JSON Pointer must start with '/': \"" + pointer + "\"");
         }
-        TsonNode current = this;
+        TsonValue current = this;
         int from = 1;
         while (from <= pointer.length()) {
             int slash = pointer.indexOf('/', from);
@@ -119,18 +119,18 @@ public sealed interface TsonNode
     }
 
     /** One pointer step: an integer token indexes an array/tuple, anything else names a field/entry. */
-    private TsonNode step(String token) {
+    private TsonValue step(String token) {
         if (isArray() || isTuple()) {
             try {
                 return get(Integer.parseInt(token));
             } catch (NumberFormatException e) {
-                return MissingNode.instance();
+                return TsonMissing.instance();
             }
         }
         return get(token);
     }
 
-    // --- value (empty for a non-atom / MissingNode; AtomNode overrides as) ---
+    // --- value (empty for a non-atom / TsonMissing; TsonAtom overrides as) ---
 
     /** This node's value cast to {@code type} if it's an atom holding an instance of it, else empty. */
     default <T> Optional<T> as(Class<T> type) { return Optional.empty(); }

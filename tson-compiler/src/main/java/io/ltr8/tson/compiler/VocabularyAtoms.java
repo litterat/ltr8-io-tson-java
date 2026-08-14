@@ -18,7 +18,7 @@ import java.util.UUID;
  * The reverse of {@link BuiltinTypeVocabulary}'s name-&gt;{@link AtomType} table: which {@code AtomType}
  * (and under what type-ref name) writes a given JDK-backed host class's values. Shared by the two writers
  * that turn a value into TSON text -- {@link TsonObjectWriter} (a Java object graph) and {@link
- * TsonTreeWriter} (a {@code TsonNode} tree).
+ * TsonTreeWriter} (a {@code TsonValue} tree).
  *
  * <p>Curated by hand, not derived from {@code BuiltinTypeVocabulary} wholesale: only the vocabulary's
  * JDK-object host types appear. The integer/decimal/float family has no unique reverse mapping at all

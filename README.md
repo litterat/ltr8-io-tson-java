@@ -138,10 +138,10 @@ The write side is the mirror: a value in hand, TSON text out. The matrix:
 | You have… | You want… | Use | You get |
 |---|---|---|---|
 | a data document + your Java class | it bound (validated if it self-describes) | **`tson.objectReader()`** | your object |
-| a data document | a queryable tree (validated if it self-describes) | **`tson.treeReader()`** | a `TsonNode` tree |
+| a data document | a queryable tree (validated if it self-describes) | **`tson.treeReader()`** | a `TsonValue` tree |
 | a data document + a schema you hold | it validated as a named type | **`.withSchema(uri).readAs(…)`** on either reader | a tree / your object |
 | a Java object | it as TSON text | **`tson.objectWriter()`** | a `String` |
-| a `TsonNode` tree | it as TSON text | **`tson.treeWriter()`** | a `String` |
+| a `TsonValue` tree | it as TSON text | **`tson.treeWriter()`** | a `String` |
 | a data document | every problem, not the value | **`tson.validate()`** | a `List<Diagnostic>` |
 | a data document | the value **and** every problem | **`.withDiagnostics(…)`** on either facade reader | the value + a `List<Diagnostic>` |
 | a data document | a grammar-faithful AST | **`TsonDataParser`** | a `Document` AST |
@@ -285,7 +285,7 @@ registers the schema by its `!!id`; `withSchema` points a reader at it; `readAs`
 
 ```java
 import io.ltr8.tson.Tson;
-import io.ltr8.tson.tree.TsonNode;
+import io.ltr8.tson.tree.TsonValue;
 Tson tson = Tson.builder().build();
 
 String schema = """
@@ -298,7 +298,7 @@ String schema = """
 
 tson.resolve(schema);
 
-TsonNode value = tson.treeReader()
+TsonValue value = tson.treeReader()
         .withSchema("https://example.com/2026/32/app/server-1.tn")
         .readAs("{ hostname: \"web-01\"  port: 8080 }", "server");
 
@@ -332,12 +332,12 @@ Tson tson = Tson.builder()
         .build();
 
 // Self-describing: it names its own schema and root type — no other arguments needed.
-TsonNode server = tson.treeReader().read("""
+TsonValue server = tson.treeReader().read("""
         !!schema:"https://example.com/2026/32/app/server-1.tn"
         !server { hostname: "web-01"  port: 8080 }""");        // validated as it builds the tree
 
 // No !!schema? The same reader reads schemalessly, straight off the wire.
-TsonNode raw = tson.treeReader().read("{ hostname: \"db-01\"  port: 5432 }");
+TsonValue raw = tson.treeReader().read("{ hostname: \"db-01\"  port: 5432 }");
 ```
 
 `tson.objectReader().read(doc, Server.class)` is the object-binding twin — it additionally checks your
@@ -358,9 +358,9 @@ String text = new TsonObjectWriter().toTson(server);
 // { hostname: "web-01" address: !ipv4 "192.0.2.10" id: !uuid "9f1c8e2a-…" deployedOn: !date "2026-01-15" }
 ```
 
-`TsonTreeWriter` is the inverse of `TsonTreeReader`: a `TsonNode` tree back to TSON text. Because the
+`TsonTreeWriter` is the inverse of `TsonTreeReader`: a `TsonValue` tree back to TSON text. Because the
 tree keeps each node's own type-ref, it's closer to lossless than the object writer — an
-`AtomNode(42, "int32")` writes back as `!int32 42`, so an integer width survives a read/edit/write round
+`TsonAtom(42, "int32")` writes back as `!int32 42`, so an integer width survives a read/edit/write round
 trip (the object writer, holding only a bound `long`, has no way to recover it):
 
 ```java

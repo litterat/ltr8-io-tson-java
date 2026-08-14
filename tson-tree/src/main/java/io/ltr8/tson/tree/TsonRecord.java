@@ -11,16 +11,16 @@ import java.util.Optional;
  * {@link #fields()} exposes the ordered map. Duplicate field names are already resolved ("last value wins",
  * §2.5) before a tree is built, so names are unique here.
  */
-public record RecordNode(Map<String, TsonNode> fields, Optional<String> typeRef, List<TsonAnnotation> annotations)
-        implements TsonNode {
+public record TsonRecord(Map<String, TsonValue> fields, Optional<String> typeRef, List<TsonAnnotation> annotations)
+        implements TsonValue {
 
-    public RecordNode {
+    public TsonRecord {
         fields = Collections.unmodifiableMap(new LinkedHashMap<>(fields));
         annotations = List.copyOf(annotations);
     }
 
-    public static RecordNode of(Map<String, TsonNode> fields) {
-        return new RecordNode(fields, Optional.empty(), List.of());
+    public static TsonRecord of(Map<String, TsonValue> fields) {
+        return new TsonRecord(fields, Optional.empty(), List.of());
     }
 
     @Override
@@ -29,7 +29,7 @@ public record RecordNode(Map<String, TsonNode> fields, Optional<String> typeRef,
     }
 
     @Override
-    public TsonNode get(String name) {
-        return fields.getOrDefault(name, MissingNode.instance());
+    public TsonValue get(String name) {
+        return fields.getOrDefault(name, TsonMissing.instance());
     }
 }

@@ -5,18 +5,18 @@ import java.util.Optional;
 
 /**
  * The absent sentinel {@code _} as a node (§2.7) -- a value explicitly marked absent, distinct from {@link
- * NullNode} (the {@code null} token) and {@link MissingNode} (no such node at all). Carries its own
+ * TsonNull} (the {@code null} token) and {@link TsonMissing} (no such node at all). Carries its own
  * type-ref/annotations for the annotated case; {@link #instance()} is the bare common case.
  */
-public record AbsentNode(Optional<String> typeRef, List<TsonAnnotation> annotations) implements TsonNode {
+public record TsonAbsent(Optional<String> typeRef, List<TsonAnnotation> annotations) implements TsonValue {
 
-    private static final AbsentNode BARE = new AbsentNode(Optional.empty(), List.of());
+    private static final TsonAbsent BARE = new TsonAbsent(Optional.empty(), List.of());
 
-    public AbsentNode {
+    public TsonAbsent {
         annotations = List.copyOf(annotations);
     }
 
-    public static AbsentNode instance() {
+    public static TsonAbsent instance() {
         return BARE;
     }
 

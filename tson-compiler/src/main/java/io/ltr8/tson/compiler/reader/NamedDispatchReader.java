@@ -5,7 +5,7 @@ import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.tree.TsonAnnotation;
-import io.ltr8.tson.tree.TsonNode;
+import io.ltr8.tson.tree.TsonValue;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.compiler.stream.TokenEvent;
@@ -102,6 +102,6 @@ final class NamedDispatchReader implements TsonTypeReader<Object> {
      * (object-binding mode) has nowhere to carry them and is returned untouched.
      */
     private static Object reattach(Object value, List<TsonAnnotation> annotations) {
-        return value instanceof TsonNode node ? node.withAnnotations(annotations) : value;
+        return value instanceof TsonValue node ? node.withAnnotations(annotations) : value;
     }
 }

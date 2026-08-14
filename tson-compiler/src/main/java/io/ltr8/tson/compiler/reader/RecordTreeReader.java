@@ -3,12 +3,12 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
-import io.ltr8.tson.tree.RecordNode;
-import io.ltr8.tson.tree.TsonAnnotation;
-import io.ltr8.tson.tree.TsonNode;
+import io.ltr8.tson.tree.*;
+import io.ltr8.tson.tree.TsonRecord;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.tree.TsonValue;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -16,14 +16,14 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Tree mode's {@code record} reader -- reads a record-shaped value into a {@link RecordNode} (name → {@link
- * TsonNode}, in schema-field order), the counterpart to the old DOM reader's plain {@code Map}. Every
+ * Tree mode's {@code record} reader -- reads a record-shaped value into a {@link TsonRecord} (name → {@link
+ * TsonValue}, in schema-field order), the counterpart to the old DOM reader's plain {@code Map}. Every
  * shared concern (the compiled field list, shape checking, precomputed default/fixed values, single-pass
  * field reading) lives on {@link RecordAbstractReader}; this class only assembles the node. A field a read
  * doesn't produce (a missing required field, whose diagnostic is already reported) is simply omitted -- a
- * subsequent {@code get} of it yields {@link io.ltr8.tson.tree.MissingNode}.
+ * subsequent {@code get} of it yields {@link TsonMissing}.
  */
-final class RecordTreeReader extends RecordAbstractReader<TsonNode> {
+final class RecordTreeReader extends RecordAbstractReader<TsonValue> {
 
     public RecordTreeReader(String name, RecordBody body, TsonTypeReaderResolver resolver,
                             Optional<SourcePosition> schemaPosition,
@@ -54,14 +54,14 @@ final class RecordTreeReader extends RecordAbstractReader<TsonNode> {
     }
 
     @Override
-    public TsonNode read(TsonReadContext ctx) {
+    public TsonValue read(TsonReadContext ctx) {
         ctx = ctx.withSchemaPosition(schemaPosition);
         List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx, annotationTypes);
         ShapeResult shapeResult = expectRecordShape(ctx);
         if (shapeResult.shape() == Shape.MISMATCH) {
             return null;
         }
-        Map<String, TsonNode> result = new LinkedHashMap<>();
+        Map<String, TsonValue> result = new LinkedHashMap<>();
         for (int schemaIndex : fixedFieldIndices) {
             putField(result, schemaIndex, precomputedValue[schemaIndex]);
         }
@@ -80,13 +80,13 @@ final class RecordTreeReader extends RecordAbstractReader<TsonNode> {
             putField(result, i, defaultOrRequireNonFixed(i, anchoredCtx));
         }
         validateGroups(anchoredCtx, seen);
-        return new RecordNode(result, Optional.of(name), annotations);
+        return new TsonRecord(result, Optional.of(name), annotations);
     }
 
     /** Puts a decoded field value into {@code result} as a node, omitting a {@code null} (a missing field -- already reported). */
-    private void putField(Map<String, TsonNode> result, int schemaIndex, Object decoded) {
+    private void putField(Map<String, TsonValue> result, int schemaIndex, Object decoded) {
         if (decoded != null) {
-            result.put(fields.get(schemaIndex).schema().name(), (TsonNode) decoded);
+            result.put(fields.get(schemaIndex).schema().name(), (TsonValue) decoded);
         }
     }
 }

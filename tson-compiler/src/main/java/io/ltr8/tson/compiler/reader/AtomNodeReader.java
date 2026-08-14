@@ -2,22 +2,22 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
-import io.ltr8.tson.tree.AtomNode;
-import io.ltr8.tson.tree.NullNode;
+import io.ltr8.tson.tree.TsonAtom;
+import io.ltr8.tson.tree.TsonNull;
 import io.ltr8.tson.tree.TsonAnnotation;
-import io.ltr8.tson.tree.TsonNode;
+import io.ltr8.tson.tree.TsonValue;
 
 import java.util.List;
 import java.util.Optional;
 
 /**
  * Tree mode: wraps a leaf reader (an atom/enum reader, which produces a host value or {@code null}) so it
- * yields a {@link TsonNode} instead -- an {@link AtomNode} carrying the value and this leaf's declared
- * type-ref, or a {@link NullNode} for {@code null} (the {@code null} token, or a soft-failed read in
+ * yields a {@link TsonValue} instead -- a {@link TsonAtom} carrying the value and this leaf's declared
+ * type-ref, or a {@link TsonNull} for {@code null} (the {@code null} token, or a soft-failed read in
  * collecting mode -- the diagnostic carries the real problem). This is how atoms produce nodes uniformly, so
  * a container reader's children are always nodes, and reading an atom at the root is a node too.
  */
-final class AtomNodeReader implements TsonTypeReader<TsonNode> {
+final class AtomNodeReader implements TsonTypeReader<TsonValue> {
 
     private final TsonTypeReader<?> delegate;
     private final Optional<String> typeRef;
@@ -36,12 +36,12 @@ final class AtomNodeReader implements TsonTypeReader<TsonNode> {
      * node without the leaf reader -- shared with bind mode -- having to hand anything back.
      */
     @Override
-    public TsonNode read(TsonReadContext ctx) {
+    public TsonValue read(TsonReadContext ctx) {
         List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx, annotationTypes);
         Object value = delegate.read(ctx);
         if (value == null) {
-            return annotations.isEmpty() ? NullNode.instance() : new NullNode(Optional.empty(), annotations);
+            return annotations.isEmpty() ? TsonNull.instance() : new TsonNull(Optional.empty(), annotations);
         }
-        return new AtomNode(value, typeRef, annotations);
+        return new TsonAtom(value, typeRef, annotations);
     }
 }

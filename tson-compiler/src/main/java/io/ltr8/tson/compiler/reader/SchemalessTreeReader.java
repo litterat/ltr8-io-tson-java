@@ -20,14 +20,8 @@ import io.ltr8.tson.compiler.stream.RecordStart;
 import io.ltr8.tson.compiler.stream.SchemaRef;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
-import io.ltr8.tson.tree.AbsentNode;
-import io.ltr8.tson.tree.ArrayNode;
-import io.ltr8.tson.tree.AtomNode;
-import io.ltr8.tson.tree.MapNode;
-import io.ltr8.tson.tree.NullNode;
-import io.ltr8.tson.tree.RecordNode;
-import io.ltr8.tson.tree.TsonAnnotation;
-import io.ltr8.tson.tree.TsonNode;
+import io.ltr8.tson.tree.*;
+import io.ltr8.tson.tree.TsonValue;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -36,7 +30,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Reads a TSON data document into an immutable {@link TsonNode} tree with <b>no schema</b> -- the
+ * Reads a TSON data document into an immutable {@link TsonValue} tree with <b>no schema</b> -- the
  * schemaless (Class 1) tree-producing peer of {@link TsonObjectReader} (which produces Java objects). Like
  * Jackson's {@code readTree}: the wire structure is the source of truth. Leaves are typed by §4 base
  * resolution ({@code null}/{@code Boolean}/{@code BigInteger}/{@code BigDecimal}/{@code Double}/{@code
@@ -49,9 +43,9 @@ import java.util.Optional;
  * set (as it is for object binding), but avoiding a second representation and staying consistent with the
  * rest of the read stack.
  *
- * <p>Schemaless, so: an array is always an {@link ArrayNode} (the grammar has no array/tuple distinction --
- * only a schema-driven read produces a {@code TupleNode}), and {@code {}} resolves to an empty {@link
- * RecordNode} (§2.8 leaves this to the resolver; a tree with no schema picks record).
+ * <p>Schemaless, so: an array is always a {@link TsonArray} (the grammar has no array/tuple distinction --
+ * only a schema-driven read produces a {@code TsonTuple}), and {@code {}} resolves to an empty {@link
+ * TsonRecord} (§2.8 leaves this to the resolver; a tree with no schema picks record).
  *
  * <p><b>Type-refs are checked</b>, by {@link TypeRefCheck}'s rules: a built-in name must sit on a token and
  * that token must satisfy the atom, and with no target class to name (rule 2 is object-binding only) any
@@ -63,14 +57,14 @@ import java.util.Optional;
  * decides its fate exactly as it does for the schema-driven readers: fail-fast throws {@code
  * TsonReadException} at the first, a collector gathers them all and still hands back a tree. Reporting never
  * abandons the value -- the node is still built and its children are still read, so one pass finds
- * everything; a leaf whose atom rejected the token becomes a {@link NullNode}, the placeholder {@code
+ * everything; a leaf whose atom rejected the token becomes a {@link TsonNull}, the placeholder {@code
  * AtomNodeReader} uses for the same situation.
  *
  * <p><b>Wire annotations are captured</b> onto each node's own {@code annotations()}, at every position §3.1
  * permits one: the root value, a record field's value, an array element, either side of a map entry (a
- * {@code MapNode.Entry} key is a node, so an annotated key keeps its own), and recursively an annotation's
+ * {@code TsonMap.Entry} key is a node, so an annotated key keeps its own), and recursively an annotation's
  * own value. A record's <em>field name</em> never carries any -- §2.5 forbids annotations before a field
- * name, so {@code RecordNode.fields()} is keyed by a plain string, matching the grammar. An annotation's own
+ * name, so {@code TsonRecord.fields()} is keyed by a plain string, matching the grammar. An annotation's own
  * value is read by this same reader, so it is checked the same way the value it annotates is; nothing checks
  * the annotation's <em>name</em>, since with no governing schema there is no type to resolve it against,
  * which is [TSON-DATA] §3.1's Class 1 treatment (the schema-driven readers do resolve and validate them,
@@ -105,12 +99,12 @@ public final class SchemalessTreeReader {
      * DocumentStart}) belongs to the facades that own a document, {@code TsonTreeReader}/{@code
      * TsonObjectReader}.
      */
-    public TsonNode read(TsonReadContext ctx) {
+    public TsonValue read(TsonReadContext ctx) {
         return readNode(ctx);
     }
 
     /** Reads one data-value: its leading annotations and optional type-ref (§2.3), then its core-value. */
-    private TsonNode readNode(TsonReadContext ctx) {
+    private TsonValue readNode(TsonReadContext ctx) {
         List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx, AnnotationTypes.UNVALIDATED, this);
         Optional<String> typeRef = EventSkip.typeRef(ctx);
         TsonEvent e = ctx.peek();
@@ -121,11 +115,11 @@ public final class SchemalessTreeReader {
             case ArrayStart ignored -> readArray(ctx, typeRef, annotations);
             case EmptyBraceEvent ignored -> {
                 ctx.next();
-                yield new RecordNode(Map.of(), typeRef, annotations);
+                yield new TsonRecord(Map.of(), typeRef, annotations);
             }
             case AbsentEvent ignored -> {
                 ctx.next();
-                yield new AbsentNode(typeRef, annotations);
+                yield new TsonAbsent(typeRef, annotations);
             }
             case TokenEvent token -> {
                 ctx.next();
@@ -160,9 +154,9 @@ public final class SchemalessTreeReader {
         return atom;
     }
 
-    private RecordNode readRecord(TsonReadContext ctx, Optional<String> typeRef, List<TsonAnnotation> annotations) {
+    private TsonRecord readRecord(TsonReadContext ctx, Optional<String> typeRef, List<TsonAnnotation> annotations) {
         ctx.next(); // RecordStart
-        Map<String, TsonNode> fields = new LinkedHashMap<>();
+        Map<String, TsonValue> fields = new LinkedHashMap<>();
         while (!(ctx.peek() instanceof RecordEnd)) {
             FieldName fieldName = (FieldName) ctx.next();
             if (ctx.peek() instanceof SchemaRef) {
@@ -171,12 +165,12 @@ public final class SchemalessTreeReader {
             fields.put(fieldName.name(), readNode(ctx.field(fieldName.name())));
         }
         ctx.next(); // RecordEnd
-        return new RecordNode(fields, typeRef, annotations);
+        return new TsonRecord(fields, typeRef, annotations);
     }
 
-    private ArrayNode readArray(TsonReadContext ctx, Optional<String> typeRef, List<TsonAnnotation> annotations) {
+    private TsonArray readArray(TsonReadContext ctx, Optional<String> typeRef, List<TsonAnnotation> annotations) {
         ctx.next(); // ArrayStart
-        List<TsonNode> elements = new ArrayList<>();
+        List<TsonValue> elements = new ArrayList<>();
         while (!(ctx.peek() instanceof ArrayEnd)) {
             if (ctx.peek() instanceof SchemaRef) {
                 ctx.next();
@@ -184,7 +178,7 @@ public final class SchemalessTreeReader {
             elements.add(readNode(ctx.index(elements.size())));
         }
         ctx.next(); // ArrayEnd
-        return new ArrayNode(elements, typeRef, annotations);
+        return new TsonArray(elements, typeRef, annotations);
     }
 
     /**
@@ -193,24 +187,24 @@ public final class SchemalessTreeReader {
      * key itself is read at the map's own path -- it is not inside the entry it identifies, and it has to be
      * read before its segment can be known.
      */
-    private MapNode readMap(TsonReadContext ctx, Optional<String> typeRef, List<TsonAnnotation> annotations) {
+    private TsonMap readMap(TsonReadContext ctx, Optional<String> typeRef, List<TsonAnnotation> annotations) {
         ctx.next(); // MapStart
-        List<MapNode.Entry> entries = new ArrayList<>();
+        List<TsonMap.Entry> entries = new ArrayList<>();
         while (!(ctx.peek() instanceof MapEnd)) {
-            TsonNode key = readNode(ctx);
+            TsonValue key = readNode(ctx);
             ctx.next(); // MapArrow
             if (ctx.peek() instanceof SchemaRef) {
                 ctx.next();
             }
-            entries.add(new MapNode.Entry(key, readNode(ctx.field(keySegment(key)))));
+            entries.add(new TsonMap.Entry(key, readNode(ctx.field(keySegment(key)))));
         }
         ctx.next(); // MapEnd
-        return new MapNode(entries, typeRef, annotations);
+        return new TsonMap(entries, typeRef, annotations);
     }
 
     /** A token leaf, decoded by the built-in atom {@link #checkTypeRef} resolved, else by §4 base resolution. */
-    private TsonNode leaf(TsonReadContext ctx, TokenEvent token, Optional<String> typeRef,
-                          Optional<AtomType<?>> atom, List<TsonAnnotation> annotations) {
+    private TsonValue leaf(TsonReadContext ctx, TokenEvent token, Optional<String> typeRef,
+                           Optional<AtomType<?>> atom, List<TsonAnnotation> annotations) {
         TokenValue tokenValue = new TokenValue(token.text(), token.form());
         Object value;
         if (atom.isPresent()) {
@@ -218,16 +212,16 @@ public final class SchemalessTreeReader {
                 value = atom.get().read(tokenValue);
             } catch (AtomTypeException e) {
                 TypeRefCheck.violation(ctx, typeRef.orElseThrow(), e, token.text());
-                return new NullNode(typeRef, annotations);
+                return new TsonNull(typeRef, annotations);
             }
         } else {
             value = ValueParser.INSTANCE.read(tokenValue);
         }
-        return value == null ? new NullNode(typeRef, annotations) : new AtomNode(value, typeRef, annotations);
+        return value == null ? new TsonNull(typeRef, annotations) : new TsonAtom(value, typeRef, annotations);
     }
 
     /** A map key's own path segment: its scalar text, or {@code ?} for a key with no single text form. */
-    private static String keySegment(TsonNode key) {
-        return key instanceof AtomNode atom ? String.valueOf(atom.value()) : "?";
+    private static String keySegment(TsonValue key) {
+        return key instanceof TsonAtom atom ? String.valueOf(atom.value()) : "?";
     }
 }

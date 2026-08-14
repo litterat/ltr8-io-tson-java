@@ -70,7 +70,7 @@ public final class TsonObjectReader {
      * schemaless path, which the registry's own readers don't cover.
      *
      * @throws IllegalArgumentException if {@code bind} is a tree-mode registry, whose readers produce {@code
-     *         TsonNode}s rather than the bound objects this reader hands back
+     *         TsonValue}s rather than the bound objects this reader hands back
      */
     public TsonObjectReader(TsonCompiledSchemaRegistry bind, DataBindContext dataBindContext) {
         this(dataBindContext, new SchemalessObjectReader(dataBindContext),

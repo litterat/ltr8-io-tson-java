@@ -8,7 +8,7 @@
 ///
 /// A schema-aware `TsonTreeReader` -- from `tson.treeReader()`, over a configured schema source --
 /// reads a document's own `!!schema` directive, resolves and validates against it, and returns a
-/// queryable `TsonNode`. Handed a document that declares no `!!schema`, the same reader falls back to a
+/// queryable `TsonValue`. Handed a document that declares no `!!schema`, the same reader falls back to a
 /// schemaless read. It's the "hand me a document, work out whether a schema applies" entry point, the
 /// value-returning peer of `tson.validate`; `tson.objectReader().read(doc, YourClass.class)` is the
 /// object-binding twin (see ObjectBinding.java for the binding side).
@@ -31,14 +31,14 @@ void main() {
 
     // Self-describing: the document names its own schema and root type. No other arguments needed --
     // the reader resolves the schema, selects the `server` type, and validates as it builds the tree.
-    TsonNode server = tson.treeReader().read("""
+    TsonValue server = tson.treeReader().read("""
             !!schema:"https://example.com/2026/32/app/server-1.tn"
             !server { hostname: "web-01"  port: 8080 }""");
     IO.println("validated hostname: " + server.get("hostname").asString().orElseThrow());   // web-01
     IO.println("validated port:     " + server.at("/port").asNumber().orElseThrow());         // 8080
 
     // The same reader, given a document with no `!!schema`, reads schemalessly -- straight off the wire.
-    TsonNode raw = tson.treeReader().read("{ hostname: \"db-01\"  port: 5432 }");
+    TsonValue raw = tson.treeReader().read("{ hostname: \"db-01\"  port: 5432 }");
     IO.println("schemaless port:    " + raw.at("/port").asNumber().orElseThrow());             // 5432
 
     // A value that violates the schema is rejected fail-fast, rather than returned wrong.

@@ -6,7 +6,7 @@ import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClassAnnotated;
 import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.Annotations;
-import io.ltr8.tson.tree.TsonNode;
+import io.ltr8.tson.tree.TsonValue;
 import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassArray;
 import io.ltr8.bind.DataClassAtom;
@@ -203,11 +203,11 @@ public final class TsonObjectWriter {
 
     /**
      * An annotation's value, in whichever Java form the read produced. Ordinarily a bound object, written
-     * exactly like any other value; a {@code TsonNode} where the annotation's name resolved to no declared
+     * exactly like any other value; a {@code TsonValue} where the annotation's name resolved to no declared
      * type and the reader kept it structurally, which the tree writer already knows how to emit.
      */
     private void writeAnnotationValue(Object value, TsonDataEmitter writer) throws Throwable {
-        if (value instanceof TsonNode node) {
+        if (value instanceof TsonValue node) {
             treeWriter.write(node, writer);
         } else {
             write(value, context.getDescriptor(value.getClass()), writer);

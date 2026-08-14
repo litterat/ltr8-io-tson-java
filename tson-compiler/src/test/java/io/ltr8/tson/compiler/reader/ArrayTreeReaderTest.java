@@ -2,7 +2,6 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
-import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -15,6 +14,7 @@ import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
@@ -52,7 +52,7 @@ class ArrayTreeReaderTest {
 
     @SuppressWarnings("unchecked")
     private static List<Object> readArray(TsonCompiledSchema compiled, String rootName, String source) {
-        return (List<Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get(rootName)
+        return (List<Object>) Dom.of((TsonValue) compiled.get(rootName)
                 .read(TestDocuments.document(source)));
     }
 
@@ -131,7 +131,7 @@ class ArrayTreeReaderTest {
         TsonCompiledSchema compiled = compile(extra);
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("holder")
+        Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue) compiled.get("holder")
                 .read(TestDocuments.document("{ items: [1 2 3] }")));
 
         assertEquals(List.of(BigInteger.ONE, BigInteger.TWO, BigInteger.valueOf(3)), result.get("items"));

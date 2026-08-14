@@ -13,6 +13,7 @@ import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -68,7 +69,7 @@ class MultiErrorCollectionTest {
         TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode)
+        Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue)
                 compiled.get("my_record").read(TestDocuments.document(dataSource, problems)));
 
         assertEquals(3, problems.diagnostics().size(), problems.diagnostics().toString());

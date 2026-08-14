@@ -13,6 +13,7 @@ import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -88,7 +89,7 @@ class TsonSchemaCompilerTest {
         TsonCompiledSchema compiled = compile(linkedSchema);
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> used = (Map<String, Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("used")
+        Map<String, Object> used = (Map<String, Object>) Dom.of((TsonValue) compiled.get("used")
                 .read(TestDocuments.document("{}")));
         assertTrue(used.isEmpty());
 

@@ -2,7 +2,6 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
-import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -15,6 +14,7 @@ import io.ltr8.tson.schema.meta.TupleElement;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
@@ -45,7 +45,7 @@ class TupleTreeReaderTest {
 
     @SuppressWarnings("unchecked")
     private static List<Object> readTuple(TsonCompiledSchema compiled, String source) {
-        return (List<Object>) Dom.of((io.ltr8.tson.tree.TsonNode) compiled.get("pair")
+        return (List<Object>) Dom.of((TsonValue) compiled.get("pair")
                 .read(TestDocuments.document(source)));
     }
 

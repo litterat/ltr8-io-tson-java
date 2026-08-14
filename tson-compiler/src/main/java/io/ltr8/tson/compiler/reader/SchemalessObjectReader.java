@@ -632,7 +632,7 @@ public final class SchemalessObjectReader {
     /**
      * The tree reader's capture, as the binding-layer carrier. Both model the same §3.1 attachment; they
      * differ only in the value's Java form, which {@link Annotations} deliberately leaves as {@code Object}
-     * because it depends on how the document was read -- here a {@code TsonNode}, since nothing on this path
+     * because it depends on how the document was read -- here a {@code TsonValue}, since nothing on this path
      * declares what an annotation's value should bind to.
      */
     private static Annotations toAnnotations(List<TsonAnnotation> captured) {

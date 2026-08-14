@@ -5,6 +5,7 @@ import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
+import io.ltr8.tson.tree.TsonValue;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -15,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * compiled meta layer every schema resolves against; this holds compiled user schemas, read in one mode.
  * Built via {@link #tree} or {@link #bind} -- the read mode is which factory the registry was made with,
  * not a parameter threaded through compile, so two registries over one core read the same schema as a
- * queryable {@code TsonNode} tree or as real Java objects.
+ * queryable {@code TsonValue} tree or as real Java objects.
  *
  * <p><b>Resolution is always bind-anchored, so it is delegated to the core regardless of this registry's
  * own read mode.</b> Resolving a schema's own {@code !enum}/{@code !integer} instances binds them to
@@ -55,7 +56,7 @@ public final class TsonCompiledSchemaRegistry {
 
     /**
      * A registry that reads user schemas into an immutable, queryable {@link
-     * io.ltr8.tson.tree.TsonNode} tree -- structure-preserving (record vs map, array vs tuple) with
+     * TsonValue} tree -- structure-preserving (record vs map, array vs tuple) with
      * typed leaves and null-safe navigation, and no Java class per schema type (hence no {@code
      * DataBindContext}). The recommended read mode; {@link #bind} is the object-binding alternative.
      */

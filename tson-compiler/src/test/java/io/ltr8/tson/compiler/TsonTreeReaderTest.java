@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.tree.TsonNode;
+import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The schemaless {@link TsonTreeReader}: TSON text straight to a {@link TsonNode} tree with no schema,
+ * The schemaless {@link TsonTreeReader}: TSON text straight to a {@link TsonValue} tree with no schema,
  * structure and types coming from the wire. Proves records stay records and arrays stay arrays (no schema
  * to distinguish tuple), leaves are base-resolved (or built-in-typed when tagged), wire type-refs are
  * captured, and null/absent/empty-brace map to the right kinds.
@@ -39,7 +39,7 @@ class TsonTreeReaderTest {
 
     @Test
     void readsRecordsMapsArraysAndTypedLeavesWithNoSchema() {
-        TsonNode node = READER.read("""
+        TsonValue node = READER.read("""
                 !person {
                   name: "Ada"
                   age: 30
@@ -71,14 +71,14 @@ class TsonTreeReaderTest {
 
     @Test
     void emptyBraceReadsAsAnEmptyRecord() {
-        TsonNode node = READER.read("{}");
+        TsonValue node = READER.read("{}");
         assertTrue(node.isRecord());
         assertTrue(node.get("anything").isMissing());
     }
 
     @Test
     void readsAMapWithTypedKeys() {
-        TsonNode node = READER.read("{ \"a\" => 1  \"b\" => 2 }");
+        TsonValue node = READER.read("{ \"a\" => 1  \"b\" => 2 }");
         assertTrue(node.isMap());
         assertEquals(BigInteger.ONE, node.get("a").asBigInteger().orElseThrow());
         assertEquals(BigInteger.TWO, node.get("b").asBigInteger().orElseThrow());
@@ -157,7 +157,7 @@ class TsonTreeReaderTest {
     /** The failed leaf keeps its place and its wire type-ref; only its value is gone. */
     @Test
     void aRejectedTokenLeavesANullPlaceholderInTheTree() {
-        TsonNode node = STRICT.withDiagnostics(TsonDiagnosticsReceiver.collecting())
+        TsonValue node = STRICT.withDiagnostics(TsonDiagnosticsReceiver.collecting())
                 .read("{ a: !uuid nope  b: 2 }");
 
         assertTrue(node.at("/a").isNull());
@@ -167,7 +167,7 @@ class TsonTreeReaderTest {
 
     @Test
     void preservingKeepsAnUnlinkedTypeRefWithoutReportingIt() {
-        TsonNode node = READER.read("!person { a: !nosuchtype 1 }");
+        TsonValue node = READER.read("!person { a: !nosuchtype 1 }");
 
         assertEquals(Optional.of("person"), node.typeRef());
         assertEquals(Optional.of("nosuchtype"), node.at("/a").typeRef());

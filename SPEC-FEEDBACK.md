@@ -757,7 +757,7 @@ meta-kernel identity this implementation's own compiled-reader machinery is buil
 own `!!id`." This distinction matters beyond pedantry: every resolved `TypeDefinition.body` and every
 `!instance` construction (`!enum`, `!integer_type`, ...) is interpretable only because a matching
 type constructor is declared in *this specific* meta-kernel — the Java dispatch tables
-(`ValueReaderFactoryRegistry`/`AtomValueReader`/`RecordAbstractReader`) are hard-wired to this one meta-kernel's
+(`ValueReaderFactoryRegistry`/`AtomTypeReader`/`RecordAbstractReader`) are hard-wired to this one meta-kernel's
 own fixed vocabulary. A structurally self-referencing but otherwise unrelated schema could declare a
 completely different, incompatible `record`/`array`/... vocabulary and would pass a purely
 structural self-reference test while being meaningless to this implementation's own reader

@@ -13,7 +13,7 @@ import io.ltr8.tson.schema.meta.Rational;
 import io.ltr8.annotation.Annotated;
 import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.Annotations;
-import io.ltr8.tson.tree.AtomNode;
+import io.ltr8.tson.tree.TsonAtom;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -136,9 +136,9 @@ class TsonObjectReaderTest {
     public record AnnotatedItem(Annotations meta, String name) {
     }
 
-    /** The annotation's value, as the {@code TsonNode} this path reads it into. */
+    /** The annotation's value, as the {@code TsonValue} this path reads it into. */
     private static String annotationText(Annotation annotation) {
-        return (String) ((AtomNode) annotation.value().orElseThrow()).value();
+        return (String) ((TsonAtom) annotation.value().orElseThrow()).value();
     }
 
     @Test
@@ -196,7 +196,7 @@ class TsonObjectReaderTest {
     /**
      * The schemaless round trip, which exercises a case the schema-driven one cannot: with no governing
      * schema there is no type to bind an annotation's value through, so it is kept structurally as a
-     * {@code TsonNode} -- and writing it back is the one place {@link TsonObjectWriter} hands off to the
+     * {@code TsonValue} -- and writing it back is the one place {@link TsonObjectWriter} hands off to the
      * tree writer.
      */
     @Test

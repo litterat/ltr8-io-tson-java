@@ -11,7 +11,7 @@ import io.ltr8.tson.compiler.stream.AnnotationStart;
 import io.ltr8.tson.compiler.stream.ListEventSource;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.tree.TsonAnnotation;
-import io.ltr8.tson.tree.TsonNode;
+import io.ltr8.tson.tree.TsonValue;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -82,7 +82,7 @@ final class AnnotationCapture {
             // A tree read's readers are tree readers, so a resolved annotation value is already a node; the
             // structural fallback yields one too. Anything else is a soft failure already reported.
             annotations.add(new TsonAnnotation(start.name(),
-                    value(ctx, start, types, structural).filter(TsonNode.class::isInstance).map(TsonNode.class::cast)));
+                    value(ctx, start, types, structural).filter(TsonValue.class::isInstance).map(TsonValue.class::cast)));
         }
         return annotations;
     }
