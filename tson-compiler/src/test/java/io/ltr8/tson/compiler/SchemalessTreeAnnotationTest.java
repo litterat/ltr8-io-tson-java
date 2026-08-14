@@ -27,8 +27,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class SchemalessTreeAnnotationTest {
 
+    /** Preserving, because these fixtures use custom type-refs ({@code !order}) as scenery -- a schemaless read reports one by default, which is {@code TypeRefCheck}'s business, not this test's. */
     private static TsonNode read(String source) {
-        return new TsonTreeReader().read(source);
+        return new TsonTreeReader().preservingUnknownTypeRefs().read(source);
     }
 
     /** The annotation names on a node, in order -- what §3.1's ordering/multiplicity rules are stated over. */

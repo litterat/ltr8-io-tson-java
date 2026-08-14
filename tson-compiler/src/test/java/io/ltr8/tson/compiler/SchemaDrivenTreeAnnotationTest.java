@@ -186,8 +186,10 @@ class SchemaDrivenTreeAnnotationTest {
     void roundTripsThroughTheTreeWriter() {
         TsonNode shape = read(VALID);
 
+        // Preserving: the re-read is schemaless, and the written text carries the schema's own type-refs,
+        // which nothing is in scope to define on the way back in.
         String written = new TsonTreeWriter().toTson(shape);
-        TsonNode reread = new TsonTreeReader().read(written);
+        TsonNode reread = new TsonTreeReader().preservingUnknownTypeRefs().read(written);
 
         assertEquals(List.of("doc"), names(reread));
         assertEquals(List.of("label"), names(reread.get("name")));

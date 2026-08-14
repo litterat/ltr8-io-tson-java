@@ -26,7 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class TsonTreeWriterTest {
 
-    private static final TsonTreeReader READER = new TsonTreeReader();
+    /** Preserving: {@code !person} is scenery for the round trip, and a schemaless read reports an unlinked type-ref by default. */
+    private static final TsonTreeReader READER = new TsonTreeReader().preservingUnknownTypeRefs();
     private static final TsonTreeWriter WRITER = new TsonTreeWriter();
 
     @Test

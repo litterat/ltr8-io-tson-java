@@ -48,17 +48,31 @@ import java.util.Optional;
  */
 final class AnnotationCapture {
 
-    /** Reads an annotation's value when no schema is in scope, or when its name resolves to nothing. */
-    private static final SchemalessTreeReader STRUCTURAL = new SchemalessTreeReader();
+    /**
+     * Reads an annotation's value when its name resolves to nothing under a governing schema. Preserving,
+     * deliberately: §1.5 already keeps an annotation this read cannot interpret, so rejecting the type-refs
+     * inside its value would take back with one hand what that rule gives with the other. A read that is
+     * <em>itself</em> schemaless passes its own reader instead (see {@link #annotations(TsonReadContext,
+     * AnnotationTypes, SchemalessTreeReader)}), so an annotation value is checked exactly as strictly as the
+     * value it annotates.
+     */
+    private static final SchemalessTreeReader STRUCTURAL = SchemalessTreeReader.preserving();
 
     private AnnotationCapture() {
     }
 
+    /** {@link #annotations(TsonReadContext, AnnotationTypes, SchemalessTreeReader)} with the preserving structural fallback -- for a schema-driven reader, which has no schemaless reader of its own. */
+    static List<TsonAnnotation> annotations(TsonReadContext ctx, AnnotationTypes types) {
+        return annotations(ctx, types, STRUCTURAL);
+    }
+
     /**
      * Consumes this value's own annotations as tree nodes, in source order with repeats preserved (§3.1: a
-     * name MAY appear any number of times and every occurrence survives).
+     * name MAY appear any number of times and every occurrence survives). {@code structural} reads the value
+     * of an annotation nothing resolves.
      */
-    static List<TsonAnnotation> annotations(TsonReadContext ctx, AnnotationTypes types) {
+    static List<TsonAnnotation> annotations(TsonReadContext ctx, AnnotationTypes types,
+                                            SchemalessTreeReader structural) {
         if (!capturing(ctx, types)) {
             return List.of();
         }
@@ -68,7 +82,7 @@ final class AnnotationCapture {
             // A tree read's readers are tree readers, so a resolved annotation value is already a node; the
             // structural fallback yields one too. Anything else is a soft failure already reported.
             annotations.add(new TsonAnnotation(start.name(),
-                    value(ctx, start, types).filter(TsonNode.class::isInstance).map(TsonNode.class::cast)));
+                    value(ctx, start, types, structural).filter(TsonNode.class::isInstance).map(TsonNode.class::cast)));
         }
         return annotations;
     }
@@ -88,7 +102,7 @@ final class AnnotationCapture {
         Annotations.Builder annotations = new Annotations.Builder();
         while (ctx.peek() instanceof AnnotationStart start) {
             ctx.next();
-            annotations.add(new Annotation(start.name(), value(ctx, start, types)));
+            annotations.add(new Annotation(start.name(), value(ctx, start, types, STRUCTURAL)));
         }
         return annotations.build();
     }
@@ -118,7 +132,8 @@ final class AnnotationCapture {
      * -- so the type still has to admit the absent sentinel, which {@link #checkBareAdmitted} verifies rather
      * than assuming.
      */
-    private static Optional<Object> value(TsonReadContext ctx, AnnotationStart start, AnnotationTypes types) {
+    private static Optional<Object> value(TsonReadContext ctx, AnnotationStart start, AnnotationTypes types,
+                                          SchemalessTreeReader structural) {
         Optional<TsonValueReader<?>> reader = types.readerFor(start.name());
         if (types.validating() && reader.isEmpty()) {
             ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF,
@@ -130,7 +145,7 @@ final class AnnotationCapture {
             reader.ifPresent(r -> checkBareAdmitted(ctx, start, r));
             return Optional.empty();
         }
-        Object value = reader.isPresent() ? reader.get().read(ctx) : STRUCTURAL.read(ctx);
+        Object value = reader.isPresent() ? reader.get().read(ctx) : structural.read(ctx);
         TsonEvent end = ctx.next();
         if (!(end instanceof AnnotationEnd)) {
             throw new IllegalStateException("expected the end of annotation '@" + start.name() + "', found " + end);

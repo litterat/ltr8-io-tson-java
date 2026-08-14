@@ -32,7 +32,12 @@ import java.io.InputStream;
  * document or an out-of-range typed value throws {@link TsonReadException} at the first problem. {@link
  * #withDiagnostics} swaps that for any other {@link TsonDiagnosticsReceiver} -- a collector gathers every
  * problem in one pass and still hands back the (possibly partial) tree, in schema-aware and schemaless mode
- * alike.
+ * alike. That is what makes this reader, with a collecting receiver, exactly what {@link Tson#validate}
+ * delegates to.
+ *
+ * <p>A schemaless read also checks type-refs: a built-in name ({@code !uuid}, {@code !date}) must sit on a
+ * token and that token must satisfy the atom, and any other name -- having nothing to resolve against -- is
+ * {@code UNKNOWN_TYPE_REF}. {@link #preservingUnknownTypeRefs} opts out of that last rule.
  *
  * <p>Wire annotations are captured on the <b>schemaless</b> path only -- a node read that way carries its
  * own {@code annotations()} (§3.1). A schema-driven read leaves them empty for now, so a document with a
@@ -40,7 +45,8 @@ import java.io.InputStream;
  */
 public final class TsonTreeReader {
 
-    private final SchemalessTreeReader schemaless = new SchemalessTreeReader();
+    /** The schemaless engine this reader falls back to -- strict about type-refs unless {@link #preservingUnknownTypeRefs} said otherwise. */
+    private final SchemalessTreeReader schemaless;
 
     /** The tree-mode compiled-schema registry a schema-aware reader validates through, or {@code null} for a schemaless reader (any {@code !!schema} is then ignored). */
     private final TsonCompiledSchemaRegistry tree;
@@ -53,19 +59,21 @@ public final class TsonTreeReader {
 
     /** Schema-aware -- validates a self-describing document against its {@code !!schema}, resolved through {@code core}'s own source. Used by {@link Tson#treeReader()}. */
     public TsonTreeReader(TsonCompiledMetaRegistry core) {
-        this(TsonCompiledSchemaRegistry.tree(core), TsonDiagnosticsReceiver.throwing(), null);
+        this(TsonCompiledSchemaRegistry.tree(core), TsonDiagnosticsReceiver.throwing(), null, new SchemalessTreeReader());
     }
 
     /** Schemaless (Class 1) -- reads the wire structure into a tree, ignoring any {@code !!schema} the document declares. */
     public TsonTreeReader() {
-        this(null, TsonDiagnosticsReceiver.throwing(), null);
+        this(null, TsonDiagnosticsReceiver.throwing(), null, new SchemalessTreeReader());
     }
 
     /** Shares {@code tree} rather than rebuilding it -- a derived reader must keep the original's compiled-schema cache, not start an empty one. */
-    private TsonTreeReader(TsonCompiledSchemaRegistry tree, TsonDiagnosticsReceiver receiver, String schemaUri) {
+    private TsonTreeReader(TsonCompiledSchemaRegistry tree, TsonDiagnosticsReceiver receiver, String schemaUri,
+                           SchemalessTreeReader schemaless) {
         this.tree = tree;
         this.receiver = receiver;
         this.schemaUri = schemaUri;
+        this.schemaless = schemaless;
     }
 
     /**
@@ -79,7 +87,22 @@ public final class TsonTreeReader {
             throw new IllegalStateException("a schemaless TsonTreeReader has no schema environment to resolve '"
                     + schemaUri + "' through -- obtain one from Tson.treeReader()");
         }
-        return new TsonTreeReader(tree, receiver, schemaUri);
+        return new TsonTreeReader(tree, receiver, schemaUri, schemaless);
+    }
+
+    /**
+     * This reader, keeping a type-ref that names no built-in type instead of reporting it -- a new reader,
+     * leaving this one unchanged, sharing its compiled-schema registry.
+     *
+     * <p>A schemaless read has nothing to resolve {@code !person} against, so by default it is {@code
+     * UNKNOWN_TYPE_REF} ({@code SPEC-FEEDBACK.md} #7). This is the opt-out for a caller who wants the wire
+     * back as authored: reading the structure of a document whose {@code !!schema} defines those names but is
+     * deliberately out of scope, or round-tripping a tree through {@link TsonTreeWriter}. Built-in type-refs
+     * are still checked -- {@code !uuid nope} is a problem either way. Affects the schemaless path only; a
+     * schema-aware read resolves type-refs against its compiled schema.
+     */
+    public TsonTreeReader preservingUnknownTypeRefs() {
+        return new TsonTreeReader(tree, receiver, schemaUri, SchemalessTreeReader.preserving());
     }
 
     /**
@@ -96,7 +119,7 @@ public final class TsonTreeReader {
      * carries its own receiver, and that one wins.
      */
     public TsonTreeReader withDiagnostics(TsonDiagnosticsReceiver receiver) {
-        return new TsonTreeReader(tree, receiver, schemaUri);
+        return new TsonTreeReader(tree, receiver, schemaUri, schemaless);
     }
 
     // ── Whole-document entry points ──────────────────────────────────────
