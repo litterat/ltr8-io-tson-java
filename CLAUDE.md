@@ -400,8 +400,10 @@ namespace *before* any local declaration resolves.
   so: a refinement that loosens rather than narrows, a refinement body field that adds, a modifier-only entry
   with nothing to elide toward (§5.7), a field name two supertypes both contribute or a body/group declares
   twice (§5.8/§5.11), a source or supertype whose body is a binding record and so has no vocabulary (§5.7's
-  "finished"). Telling an author their correctly-rejected schema is unsupported sends them looking for the
-  wrong fix, so the split is worth keeping honest — `IllegalStateException` is the third, for an invariant
+  "finished"), a choice or bracketed form at a supertype position (`&` composes record types; §12.1 admits
+  these only because `construction-def` draws its operands from `type-ref` where `refined-def` takes a name
+  — `SPEC-FEEDBACK.md` #38). Telling an author their correctly-rejected schema is unsupported sends them
+  looking for the wrong fix, so the split is worth keeping honest — `IllegalStateException` is the third, for an invariant
   only a malformed `TypeDefinition` could break (a `constructor: true` entry with a non-record body, which
   §12.1's grammar makes unreachable). `DefinitionResolver`'s Javadoc lists the exact boundary.
 - **`TypeArgument` is a sealed interface (`Ref`/`Value`), NOT a plain record — do not "simplify" it

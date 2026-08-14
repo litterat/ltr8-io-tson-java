@@ -1851,51 +1851,108 @@ notices §4.3's "per parent" will ask.
 
 Either way §4.3's "revokes it" deserves the same "per parent" precision the clause before it uses.
 
-## 38. §5.7 requires the source of `^` to have a vocabulary body; §5.8 needs the same rule for `&` and does not state it
+## 38. `construction-def` draws its operands from `type-ref`, which admits forms that can never denote a record — where `refined-def` takes a name
 
-**Section:** [TSON-SCHEMA] §5.8 (Supertype Composition), §5.7 (Refinement), §8.2 (Materialisation).
+**Section:** [TSON-SCHEMA] §12.1 (Grammar), §5.8 (Supertype Composition), §5.7 (Refinement), §12.2
+(Disambiguation Summary).
 
-**Problem:** §5.7 is careful about what may sit on the left of `^`, and gives the reason a name:
+**Problem:** the two operators disagree about what may sit on their left, and the difference is in the
+productions, not the prose. §5.7's source is a name:
+
+```
+refined-def  = type-name [ws "<" type-args ">"] ws "^" ws record-def
+```
+
+§5.8's operands are full type-refs:
+
+```
+construction-def = type-ref 1*(ws "&" ws type-ref) [ws record-def] [ws removal-set]
+                 / type-ref ws "&" ws record-def [ws removal-set]
+                 / type-ref ws removal-set
+
+type-ref = paren-type / inline-array / type-name "<" type-args ">" / type-name
+```
+
+So a **choice** and an **inline array or tuple** are grammatical supertypes. Neither can denote a record: a
+choice has variants, a bracketed form has elements, and composition's entire job is to merge *field sets*.
+There is no reading under which `a & (b | c)` or `a & [b]` means anything.
+
+`refined-def` gets this right by construction — its source production simply cannot spell those forms. §5.8
+inherits them by reaching for `type-ref` where it wanted "a named type, possibly applied".
+
+**The grammar and §12.2 already contradict each other about it.** §12.2 dispatches the type-def position by
+first token:
+
+> ```
+> ;   name &        → construction-def (composition, §5.8)
+> ;   (             → paren-type (choice)
+> ;   [             → container-def (array or tuple, full syntax)
+> ```
+
+`(` and `[` are routed to paren-type and container-def outright, so a `construction-def` whose *first*
+operand is one of those is unreachable — while the production says it is fine, and the same forms remain
+reachable at every operand after the first. An implementation following the productions and one following
+the summary produce different parsers, and this one splits the difference exactly where the spec does:
+`(a | b) & { … }` is a parse error, `a & (b | c)` parses and must be caught during resolution. That
+asymmetry is not a design; it is two parts of §12.1 disagreeing.
+
+**Restricting to a bare name would be too strong**, which is presumably how `type-ref` got there. §5.8's own
+"Parameterized references" paragraph requires the applied form:
+
+> composing with a parameterized supertype works the same way: `vip => <T> customer & box<T> & { … }`
+
+`box<T>` must stay legal — provided the result is a record. `refined-def`'s source shape, `type-name`
+optionally followed by `<type-args>`, is exactly the production that admits `box<T>` and excludes the other
+two. The two operators should be spelling their operand the same way, because they want the same thing.
+
+**And the grammar alone does not finish the job.** Even restricted to names, an operand may name a real type
+whose body is not a record:
+
+```
+weird       => integer & { extra: text }             ; integer => !integer_type {}
+also_weird  => customer & array_min<text, 2>         ; instantiates to an array binding record
+```
+
+Both are grammatical under any of these productions and both must be rejected. §5.7 already has the rule and
+the vocabulary for it —
 
 > **Refinement requires a vocabulary body.** The source of `^` — after flattening references (§8.3) — MUST be
 > a definition whose body is a `!record` […] A definition whose body is a binding record — a top-level
 > constructor application (§5.6), a template instantiation (§8.2), or an alias resolving to either — is
-> **finished**: its bindings are set, and `^` on it is a resolver error.
+> **finished**
 
-§5.8 says nothing equivalent about `&`, though composition has the identical need for the identical reason:
-it *copies the parent's fields*, and a binding record has no fields to copy. Nothing in §5.8 forbids
+— and §5.8 has no equivalent, though composition needs it for the same reason: it copies the parent's fields,
+and a binding record has none to copy. The gap is easy to miss because every composition in the three bundled
+schemas has a record-bodied parent (`~atom & { … }`, `~text_type & atom_specification & { … }`), so an
+implementation built against the fixtures never meets the case.
 
-```
-weird => integer & { extra: text }
-```
-
-where core's `integer => !integer_type {}` is a top-level constructor application. `integer` is finished in
-exactly §5.7's sense. Its resolved body is an `!integer_type` binding record, so there is no field set to
-merge, no `record.supertypes` lineage to extend, and no coherent kind for the result: §4.1 would take ATOM
-from the chain while the trailing body adds record fields to something that is not a product.
-
-The gap is easy to miss because every composition in the three bundled schemas has a record-bodied parent —
-`~atom & { … }`, `~text_type & atom_specification & { … }` — so an implementation built against the fixtures
-never meets the case, and the spec never rules on it.
-
-**§5.7's rule does not reach it by implication.** The two operators are defined independently, and §4.3's
-table describes composition purely in terms of what it produces ("IS-A preserved (each parent)", "Adds
-fields: yes"), never in terms of what its operands must be. An implementer applying §5.7's rule to `&` is
-generalising, not reading — which is exactly the situation where two implementations disagree.
-
-**What this implementation does:** rejects it as the author's error, wording the diagnostic from §5.7's
-principle ("its body is a binding record, not a vocabulary, so there is nothing for `&` to compose with").
+**What this implementation does:** rejects a choice or bracketed form at a supertype position outright ("`&`
+composes record types, and this form has variants/elements, not fields"), and rejects a named operand whose
+resolved body is a binding record with §5.7's own reasoning. A parameterized supertype is accepted in
+principle but not yet implemented — §5.10 substitution has to carry the arguments into the absorbed fields
+first — so it raises the coverage-gap exception rather than the author-error one.
 `DefinitionResolver.resolveComposition`; pinned by
-`DefinitionResolverTest.rejectsComposingWithASupertypeWhoseBodyIsABindingRecord`.
+`DefinitionResolverTest.rejectsAChoiceOrABracketedFormAsASupertype` and
+`rejectsComposingWithASupertypeWhoseBodyIsABindingRecord`.
 
-**Suggested resolution:** State the requirement once, for both operators, rather than twice. §5.7's paragraph
-is already the general statement — a *vocabulary body* is what both operations consume — so the cleanest fix
-is to move it up to §4.3, where construction and refinement are introduced as families, and have §5.7 and
-§5.8 both refer to it. Failing that, a one-sentence twin in §5.8: the supertypes of `&` MUST each be a
-definition whose body is a `!record`, on the same "finished" grounds.
+**Suggested resolution:** two changes, one per layer.
 
-A second question the same paragraph raises, worth settling while it is open: §5.7's list of admissible
-bodies is "a fresh or refined record, a composition, a constructor, or an open template". A **choice** body
-is absent, and so are array/map/tuple bodies other than at an application head. If that exclusion is
-deliberate — a choice has variants, not fields, so there is nothing to tighten — saying so would close the
-question for `&` at the same time.
+1. **Grammar.** Give `construction-def` the operand shape `refined-def` already uses:
+   ```
+   supertype-ref    = type-name [ws "<" type-args ">"]
+   construction-def = supertype-ref 1*(ws "&" ws supertype-ref) [ws record-def] [ws removal-set]
+                    / …
+   ```
+   This removes `paren-type` and `inline-array` from every operand position rather than only the first,
+   which retires §12.2's disagreement instead of codifying it, and keeps `box<T>`.
+2. **Semantics.** Make §5.7's vocabulary-body requirement cover both operators. It is really a statement
+   about what construction and refinement *consume*, so §4.3 — where the two families are introduced — is
+   its natural home, with §5.7 and §5.8 referring to it. Composition then admits `box<T>` exactly when the
+   applied result is a record, and rejects `integer`, `array_min<text, 2>`, and `lookup => map<text, integer>`
+   for the one stated reason.
+
+While that paragraph is open, it is worth saying whether the omission of **choice** bodies from its list of
+admissible sources ("a fresh or refined record, a composition, a constructor, or an open template") is
+deliberate. If it is — a choice has variants, not fields, so there is nothing to tighten — saying so settles
+the same question for `&`, and makes the grammar restriction above obviously right rather than merely
+convenient.

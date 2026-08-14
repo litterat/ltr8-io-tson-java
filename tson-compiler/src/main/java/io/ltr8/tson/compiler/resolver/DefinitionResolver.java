@@ -14,6 +14,7 @@ import io.ltr8.tson.compiler.ast.schema.ContainerDef;
 import io.ltr8.tson.compiler.ast.schema.ContainerTypeDef;
 import io.ltr8.tson.compiler.ast.schema.ElementType;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
+import io.ltr8.tson.compiler.ast.schema.ChoiceRef;
 import io.ltr8.tson.compiler.ast.schema.GenericRef;
 import io.ltr8.tson.compiler.ast.schema.GroupDef;
 import io.ltr8.tson.compiler.ast.schema.RemovalSet;
@@ -689,14 +690,24 @@ final class DefinitionResolver {
         Map<String, Integer> inheritedFieldIndex = new LinkedHashMap<>();
 
         for (TypeRef supertypeRef : construction.supertypes()) {
-            if (!(supertypeRef instanceof SimpleRef simple)) {
-                // The one genuine gap in this method. §5.8's "Parameterized references" admits it
+            if (supertypeRef instanceof GenericRef generic) {
+                // The one genuine gap here. §5.8's "Parameterized references" admits this
                 // (`vip => <T> customer & box<T> & { ... }`, supertypes recording head names only), but the
                 // arguments have to reach the absorbed fields, and that is §5.10 substitution into a record
                 // template's body -- unimplemented, and tracked with the rest of that work.
-                throw new UnsupportedOperationException("'" + name + "': composing with a parameterized "
-                        + "supertype (§5.8) needs §5.10 parameter substitution into the absorbed fields, which "
-                        + "is not implemented yet; got " + supertypeRef);
+                throw new UnsupportedOperationException("'" + name + "': composing with the parameterized "
+                        + "supertype '" + generic.name() + "' (§5.8) needs §5.10 parameter substitution into "
+                        + "the absorbed fields, which is not implemented yet");
+            }
+            if (!(supertypeRef instanceof SimpleRef simple)) {
+                // A choice or an inline array/tuple at a supertype position. §12.1 lets these through only
+                // because `construction-def` draws its operands from `type-ref` where `refined-def` takes a
+                // name -- nothing here could ever denote a record, so there is no field set to compose with
+                // and no implementation to wait for. SPEC-FEEDBACK.md #38 argues the production is the defect.
+                throw new TsonSchemaValidationException("'" + name + "': a "
+                        + (supertypeRef instanceof ChoiceRef ? "choice" : "bracketed array/tuple")
+                        + " cannot be a supertype -- '&' composes record types, and this form has "
+                        + (supertypeRef instanceof ChoiceRef ? "variants" : "elements") + ", not fields (§5.8)");
             }
             String supertypeName = simple.name();
             TypeDefinition supertypeDef = namespaceDefinitions.getTypeDefinition(supertypeName);

@@ -1596,6 +1596,37 @@ class DefinitionResolverTest {
     }
 
     /**
+     * §12.1 draws {@code construction-def}'s operands from {@code type-ref}, which admits {@code paren-type}
+     * and {@code inline-array} -- where {@code refined-def} takes a name. Neither could ever denote a record,
+     * so both are rejected here as the author's error rather than deferred: there is no field set for any
+     * future implementation to compose with ({@code SPEC-FEEDBACK.md} #38 argues the production is the
+     * defect).
+     *
+     * <p>Only reachable from the <em>second</em> operand onward. At the first, §12.1's disambiguation summary
+     * sends {@code (} to paren-type and {@code [} to container-def, so {@code (a | b) & { ... }} is a parse
+     * error before resolution ever sees it -- the same form admitted after {@code &} and forbidden before it,
+     * which is half of what #38 reports.
+     */
+    @Test
+    void rejectsAChoiceOrABracketedFormAsASupertype() {
+        TsonSchemaValidationException choice = assertThrows(TsonSchemaValidationException.class,
+                () -> resolveAll("""
+                        a => { x: text }
+                        b => { y: text }
+                        odd => a & (a | b)
+                        """));
+        assertTrue(choice.getMessage().contains("choice"), choice.getMessage());
+        assertTrue(choice.getMessage().contains("variants"), choice.getMessage());
+
+        TsonSchemaValidationException bracketed = assertThrows(TsonSchemaValidationException.class,
+                () -> resolveAll("""
+                        a => { x: text }
+                        odd => a & [a]
+                        """));
+        assertTrue(bracketed.getMessage().contains("elements"), bracketed.getMessage());
+    }
+
+    /**
      * Resolves a hand-written body with meta-kernel's own entries as the type-name namespace, so a
      * declaration can name a real atom instance ({@code integer => !integer_type {}}) as a source or
      * supertype -- the shapes §5.7/§5.8 reject, which need a non-record body to exist at all.
