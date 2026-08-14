@@ -1491,13 +1491,22 @@ class DefinitionResolverTest {
                 .resolve(schemaMap.declarations().get(declaration.split("=>")[0].trim()));
     }
 
+    /**
+     * A supertype naming nothing is the schema author's error, not a gap in this resolver, so it is a
+     * {@link TsonSchemaValidationException}. It used to be an {@code UnsupportedOperationException} saying
+     * "not resolved yet (only supertypes declared earlier in the same schema map are visible so far)" --
+     * a limitation that no longer exists, since {@code SchemaResolver} resolves on demand following
+     * dependencies rather than source order (see {@code ForwardReferenceResolutionTest}).
+     */
     @Test
     void compositionRejectsAnUnresolvedSupertype() throws IOException {
         SchemaMap schemaMap = new TsonSchemaParser(readFixture()).parseSchemaDocument().body();
-        // "top" deliberately left out of the resolved map -- atom's supertype isn't visible yet
+        // "top" deliberately left out of the resolved map -- atom's supertype resolves to nothing
         // (the shared resolved field starts empty, and nothing puts "top" into it before this call).
-        assertThrows(UnsupportedOperationException.class,
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
                 () -> resolver.resolve(schemaMap.declarations().get("atom")));
+        assertTrue(thrown.getMessage().contains("names no type this schema declares or imports"),
+                thrown.getMessage());
     }
 
     private static String readFixture() throws IOException {

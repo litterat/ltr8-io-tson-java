@@ -227,14 +227,6 @@ own prose (which had gone stale on at least one of them):
   `resolveFieldType`'s catch-all ("only simple (non-generic) type-refs, generic applications of one, and
   inline arrays of one are resolved so far"). Overlaps the template-substitution item above, but is
   reachable without templates.
-- [ ] **Two "not resolved yet" messages describe a limitation that no longer exists.** An unresolvable
-  supertype and an unresolvable refinement source both say "only ... declared earlier in the same schema
-  map are visible so far" — but `SchemaResolver` resolves on demand following dependencies, not source
-  order, and `ForwardReferenceResolutionTest.composesASupertypeDeclaredLaterInTheSameSchema` pins that.
-  What actually reaches those throws now is a name that resolves to nothing, i.e. an author's typo, and
-  the message sends them to reorder declarations instead. They should say "no such type", and be author
-  errors rather than `UnsupportedOperationException` — see "Schema-side diagnostics" for the wider
-  classification pass they belong to.
 
 The classification of these throw sites is itself tracked under "Schema-side diagnostics": of ~34
 `UnsupportedOperationException`s across the codebase, three are correct use (an immutable map, an

@@ -691,8 +691,10 @@ final class DefinitionResolver {
             String supertypeName = simple.name();
             TypeDefinition supertypeDef = namespaceDefinitions.getTypeDefinition(supertypeName);
             if (supertypeDef == null) {
-                throw new UnsupportedOperationException("'" + name + "': supertype '" + supertypeName
-                        + "' is not resolved yet (only supertypes declared earlier in the same schema map are visible so far)");
+                // Not a library gap: composition copies the supertype's own fields, so the name has to
+                // resolve here rather than being left to the linker the way an ordinary field type is.
+                throw new TsonSchemaValidationException("'" + name + "': supertype '" + supertypeName
+                        + "' names no type this schema declares or imports");
             }
             if (!(supertypeDef.body() instanceof RecordBody supertypeBody)) {
                 throw new UnsupportedOperationException("'" + name + "': supertype '" + supertypeName
@@ -788,8 +790,9 @@ final class DefinitionResolver {
         String sourceName = sourceRef.name();
         TypeDefinition sourceDef = namespaceDefinitions.getTypeDefinition(sourceName);
         if (sourceDef == null) {
-            throw new UnsupportedOperationException("'" + name + "': refinement source '" + sourceName
-                    + "' is not resolved yet (only a source declared earlier in the same schema map is visible so far)");
+            // As with a supertype: a refinement reads the source's own field set, so this resolves now.
+            throw new TsonSchemaValidationException("'" + name + "': refinement source '" + sourceName
+                    + "' names no type this schema declares or imports");
         }
         if (!(sourceDef.body() instanceof RecordBody sourceBody)) {
             throw new UnsupportedOperationException("'" + name + "': refinement source '" + sourceName
