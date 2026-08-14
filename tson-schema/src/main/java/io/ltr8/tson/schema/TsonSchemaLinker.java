@@ -152,9 +152,11 @@ public final class TsonSchemaLinker {
         // Everywhere else (field/key/value/element types, supertypes, subtypes, choice variants) stays
         // type-name-namespace-only, per §3.3.2's explicit "NOT extended by the structure namespace". Empty
         // if !!meta isn't registered yet (e.g. meta-kernel's own self-referential !!meta, mid-registration).
-        Map<String, TypeDefinition> structureNamespace = loader == null ? Map.of()
-                : loader.load(CanonicalIdentity.of(schema.meta()))
-                        .<Map<String, TypeDefinition>>map(linked -> linked.schema().entries()).orElse(Map.of());
+        Optional<TsonLinkedSchema> governingMeta =
+                loader == null ? Optional.empty() : loader.load(CanonicalIdentity.of(schema.meta()));
+        checkMayGovern(schema, governingMeta);
+        Map<String, TypeDefinition> structureNamespace = governingMeta
+                .<Map<String, TypeDefinition>>map(linked -> linked.schema().entries()).orElse(Map.of());
 
         Set<String> localNames = new LinkedHashSet<>();
 
@@ -226,6 +228,60 @@ public final class TsonSchemaLinker {
             }
         }
         return result;
+    }
+
+    /**
+     * The other half of the constructor-eligibility rule: {@link #isMetaKernelGoverned} restricts which schema
+     * may <em>declare</em> a constructor, and this restricts which may be <em>named as a {@code !!meta}
+     * target</em>. Both are the same §2.2.2 question asked from the two ends, and a schema that fails this one
+     * could not supply a structure namespace anyway -- having declared no constructors, it has none to supply.
+     *
+     * <p>The failure this prevents is an ordinary type library or application schema governing another by
+     * accident. Naming one as {@code !!meta} is almost always a confusion with {@code !!import}: an import
+     * merges another schema's entries into this schema's type-name namespace, which is what a caller wanting
+     * core.tn's {@code uuid} means, while {@code !!meta} names the contract the declarations themselves are
+     * validated against and is consulted only at §3.3.1's constructor roles. Uncaught, it surfaces much later
+     * as every construction in the governed schema falling out of scope.
+     *
+     * <p>In the wiring this library ships, a schema resolved through {@code TsonCompiledMetaRegistry} reaches
+     * that registry's own {@code loadMeta} first, which asks the same question a phase earlier (it must
+     * <em>compile</em> the meta to resolve against it) and raises {@link #notAMetaSchema} itself. This is
+     * still the linker's to check: a caller driving link with their own loader gets the same verdict, and the
+     * rule belongs with the declaration-side half it mirrors rather than only in a registry.
+     *
+     * <p>Only checked when the target actually loaded. An unresolvable {@code !!meta} is left to the caller
+     * that owns fetching (and meta-kernel's self-naming {@code !!meta}, mid-registration, is exactly that
+     * case) -- absence of evidence here is not evidence of ineligibility.
+     */
+    private static void checkMayGovern(TsonSchema schema, Optional<TsonLinkedSchema> governingMeta) {
+        if (governingMeta.isEmpty() || isMetaKernelGoverned(governingMeta.get().schema())) {
+            return;
+        }
+        throw notAMetaSchema(schema.meta(), governingMeta.get().schema().meta(), schema.id());
+    }
+
+    /**
+     * The one wording for "that schema cannot govern this one", shared with {@code
+     * TsonCompiledMetaRegistry.loadMeta}, which reaches the same conclusion one layer up and knows only the
+     * target (hence the nullable {@code governedId}). Public because that caller is in another module.
+     *
+     * <p>It is a {@link TsonSchemaValidationException} rather than an {@code IllegalStateException} because
+     * it is an <b>authoring</b> error in a schema document, not a library fault: a caller wrapping {@code
+     * resolve} in the obvious {@code catch} sees it, and a CLI telling apart "your schema is wrong" from "this
+     * tool is broken" gets the right answer.
+     *
+     * @param governedId the schema naming {@code target} as its {@code !!meta}, or {@code null} where the
+     *     caller has only the target in hand
+     */
+    public static TsonSchemaValidationException notAMetaSchema(String target, String targetsOwnMeta,
+            String governedId) {
+        return new TsonSchemaValidationException("'" + target + "' is named as the !!meta"
+                + (governedId == null ? " of another schema" : " of '" + governedId + "'")
+                + " but is not a meta-schema -- its own !!meta is '" + targetsOwnMeta + "', not meta-kernel.tn, "
+                + "so it declares no type constructors and supplies no structure namespace (§2.2.2, §3.3.1). "
+                + "To use another schema's types, import it (!!import merges its entries into this schema's "
+                + "type-name namespace); !!meta names only the meta-schema the declarations are validated "
+                + "against");
     }
 
     /**

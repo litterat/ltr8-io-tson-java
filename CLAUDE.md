@@ -452,8 +452,18 @@ consulted). `TsonSchemaLinker`/`TsonSchemaRegistry` add the second stage.
   disjoint); record-set and regex-pattern disjointness left absent (see `BACKLOG.md` for the "how far" view);
   (4) **validate** every reference
   resolves, with a type-parameter exception (a bare name valid if it's the entry's own declared parameter)
-  and a **constructor-eligibility** check: a locally-declared `constructor: true` entry is valid only if
-  the schema's `!!meta` is exactly meta-kernel's identity (§2.2.2 — see `SPEC-FEEDBACK.md` #19). `source`
+  and a **constructor-eligibility** check with two halves, the same §2.2.2 question asked from both ends
+  (see `SPEC-FEEDBACK.md` #19): a locally-declared `constructor: true` entry is valid only if the schema's
+  `!!meta` is exactly meta-kernel's identity, and a schema named as this one's **`!!meta` target** is valid
+  only if *its* `!!meta` is — so an ordinary type library can't govern (naming core.tn as `!!meta` is the
+  `!!import` confusion, and core.tn declares no constructors to supply). The target half is judged only when
+  the loader actually produced the target; an unresolvable `!!meta` is left to whoever owns fetching, which
+  is also what keeps meta-kernel's self-naming `!!meta` linkable mid-registration. In the shipped wiring
+  `TsonCompiledMetaRegistry.loadMeta` reaches that verdict a phase earlier (it must *compile* the meta to
+  resolve against it) and raises the linker's own `TsonSchemaLinker.notAMetaSchema` — one wording, shared
+  across the module boundary, and a **`TsonSchemaValidationException` rather than an `IllegalStateException`**
+  because a wrong `!!meta` is an authoring error, not a library fault (which is what lets the CLI keep exit 1
+  and exit 70 apart). `source`
   validation additionally falls back to the governing meta's namespace (a `source` naming a constructor is
   one of §3.3.1's constructor roles); no other reference does. **The linker does not materialize anything** —
   `SchemaDesugarer` already turned every application into a real declaration, one phase earlier and in the

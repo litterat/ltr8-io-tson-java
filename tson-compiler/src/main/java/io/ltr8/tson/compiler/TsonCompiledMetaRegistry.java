@@ -209,8 +209,10 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
         }
         TsonLinkedSchema linked = resolveLinked(uri);
         if (!isMetaLayer(linked.schema())) {
-            throw new IllegalStateException("'" + uri + "' is not a meta-layer schema (its own !!meta is not "
-                    + "meta-kernel) and cannot govern another schema");
+            // An authoring error in whichever document named this as its !!meta, so it carries
+            // TsonSchemaLinker's own wording for the same verdict -- see notAMetaSchema on why it is a
+            // validation exception and not an IllegalStateException.
+            throw TsonSchemaLinker.notAMetaSchema(uri, linked.schema().meta(), null);
         }
         // resolveLinked already resolved this document's own !!meta into the structure namespace, so this
         // loadMeta is a cache hit, not a second compile.

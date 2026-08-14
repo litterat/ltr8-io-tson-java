@@ -31,9 +31,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * can't reach {@code MetaKernelBootstrapResolver} for a real fixture (see {@code MetaKernelSchemaRegistryTest}
  * in {@code tson-compiler} for the real end-to-end check against meta-kernel.tn1 itself).
  *
- * <p>Renamed from {@code SchemaValidatorTest} (2026-07-27, alongside {@code SchemaValidator}
- * itself becoming {@link TsonSchemaLinker}) -- what's tested hasn't changed, only the class/method
- * under test and the fact that {@link TsonSchemaLinker#link} now returns a {@link TsonLinkedSchema}.
  */
 class TsonSchemaLinkerTest {
 
@@ -166,6 +163,59 @@ class TsonSchemaLinkerTest {
                 Map.of("shared_name", emptyRecord()));
 
         assertThrows(TsonSchemaValidationException.class, () -> TsonSchemaLinker.link(local, loader));
+    }
+
+    /**
+     * The half of §2.2.2's constructor-eligibility rule that governs the target end: naming an ordinary type
+     * library as {@code !!meta} is the {@code !!import} confusion, and it fails here rather than as every
+     * construction in the governed schema later falling out of scope.
+     */
+    @Test
+    void rejectsAMetaTargetThatIsNotItselfGovernedByTheMetaKernel() {
+        // a plain type library: its own !!meta is an ordinary meta, so it declares no constructors
+        TsonLinkedSchema library = new TsonLinkedSchema(new TsonSchema("https://example.test/lib.tn",
+                "https://example.test/meta.tn1", List.of(), Map.of("uuid", unitEntry())));
+        Map<String, TsonLinkedSchema> byIdentity =
+                Map.of(CanonicalIdentity.of("https://example.test/lib.tn"), library);
+        TsonSchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
+
+        TsonSchema governed = new TsonSchema("https://example.test/app.tn",
+                "https://example.test/lib.tn", List.of(), Map.of("local", emptyRecord()));
+
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> TsonSchemaLinker.link(governed, loader));
+        // both ends named, and the fix pointed at -- this is an authoring error, not an internal one
+        assertTrue(thrown.getMessage().contains("https://example.test/lib.tn"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("https://example.test/app.tn"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("!!import"), thrown.getMessage());
+    }
+
+    @Test
+    void acceptsAMetaTargetThatChainsToTheMetaKernel() {
+        // schemaOf's own !!meta is meta-kernel, which is exactly what makes a schema a meta-schema
+        TsonLinkedSchema meta = new TsonLinkedSchema(schemaOf(Map.of("record", emptyRecord())));
+        Map<String, TsonLinkedSchema> byIdentity =
+                Map.of(CanonicalIdentity.of("https://example.test/meta.tn"), meta);
+        TsonSchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
+
+        TsonSchema governed = new TsonSchema("https://example.test/app.tn",
+                "https://example.test/meta.tn", List.of(), Map.of("local", emptyRecord()));
+
+        assertEquals(Set.of("local"), TsonSchemaLinker.link(governed, loader).schema().entries().keySet());
+    }
+
+    /**
+     * Eligibility is judged only on a target the loader actually produced. Absence of evidence isn't evidence
+     * of ineligibility -- meta-kernel's own self-naming {@code !!meta} is unresolvable mid-registration, and
+     * whether an unresolvable {@code !!meta} is an error at all belongs to whoever owns fetching.
+     */
+    @Test
+    void anUnresolvableMetaTargetIsNotJudgedHere() {
+        TsonSchemaLoader loader = id -> Optional.empty();
+        TsonSchema governed = new TsonSchema("https://example.test/app.tn",
+                "https://example.test/nowhere.tn", List.of(), Map.of("local", emptyRecord()));
+
+        assertEquals(Set.of("local"), TsonSchemaLinker.link(governed, loader).schema().entries().keySet());
     }
 
     @Test

@@ -16,18 +16,6 @@ yet implemented" section for the technical detail behind several of these items.
   library is served internally by `TsonCompiledSchemaRegistry` from `TsonBundledSchemas`, not through
   a source.
 
-## Layer boundaries / schema registry
-
-- [ ] Add the missing other half of `TsonSchemaLinker`'s existing "constructor eligibility" check —
-  a resolve/link-time *diagnostic*. That check already restricts *where* `constructor: true` can be
-  declared (only a meta-kernel-governed schema, per §2.2.2); the missing half is restricting *where a
-  schema can be used as a `!!meta` target* the same way, so an ordinary consumer schema can't
-  accidentally govern another one, surfaced by the linker (with the spec's own wording) at
-  resolve/link time. The 2026-08-02 `TsonCompiledSchemaRegistry` cleanup arc closed the *type-level*
-  half of this — the meta/non-meta split, so a non-meta schema won't type-check where a governing
-  meta is required — and now rejects a non-meta `!!meta` target at load time via
-  `loadMeta`, but the linker-level validation itself is still absent.
-
 ## Resolution & linking generality
 
 Every real schema resolved so far (meta-kernel, meta.tn, core.tn, and hand-built test fixtures)

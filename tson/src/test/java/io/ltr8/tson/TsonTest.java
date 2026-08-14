@@ -6,6 +6,7 @@ import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonObjectReader;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
+import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
@@ -15,6 +16,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -34,6 +36,28 @@ class TsonTest {
               my_percentage => !positive_integer ^ { max: 100 }
             }
             """;
+
+    /**
+     * The `!!import`-vs-`!!meta` confusion, end to end: core.tn is a type library, not a meta-schema, so it
+     * can govern nothing. This is an authoring error in the schema, which is why it arrives as a {@link
+     * TsonSchemaValidationException} a caller can catch around {@code resolve} rather than as an unchecked
+     * library-fault type — and why {@code tson validate} can tell it apart from a bug in this tool.
+     */
+    @Test
+    void rejectsASchemaThatNamesATypeLibraryAsItsMeta() {
+        Tson tson = Tson.builder().build();
+
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> tson.resolve("""
+                        !!id:"https://example.test/oops.tn"
+                        !!meta:"https://tson.io/2026/32/m/core.tn"
+                        {
+                          my_thing => uuid
+                        }
+                        """));
+        assertTrue(thrown.getMessage().contains("core.tn"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("!!import"), thrown.getMessage());
+    }
 
     @Test
     void resolvesAndCompilesATinySchemaThatImportsCoreTn1() {
