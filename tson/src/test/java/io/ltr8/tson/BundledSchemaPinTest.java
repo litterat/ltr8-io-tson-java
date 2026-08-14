@@ -1,7 +1,7 @@
 package io.ltr8.tson;
 
-import io.ltr8.tson.compiler.ContentHash;
-import io.ltr8.tson.compiler.ContentHashMismatchException;
+import io.ltr8.tson.compiler.TsonContentHash;
+import io.ltr8.tson.compiler.TsonContentHashMismatchException;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import org.junit.jupiter.api.Test;
 
@@ -40,12 +40,12 @@ class BundledSchemaPinTest {
     @Test
     void aWrongPinToABundledSchemaIsRejected() {
         Tson tson = Tson.builder().build();
-        assertThrows(ContentHashMismatchException.class, () ->
+        assertThrows(TsonContentHashMismatchException.class, () ->
                 tson.loader().resolveLinked(TsonBundledSchemas.CORE_ID + "?sha256=" + "a".repeat(64)));
     }
 
     private static void assertDigestMatches(String id, String heldDigest) {
         assertEquals(heldDigest,
-                ContentHash.sha256(TsonBundledSchemas.fetch(id).getBytes(StandardCharsets.UTF_8)), id);
+                TsonContentHash.sha256(TsonBundledSchemas.fetch(id).getBytes(StandardCharsets.UTF_8)), id);
     }
 }

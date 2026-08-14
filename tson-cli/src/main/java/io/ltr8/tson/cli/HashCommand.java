@@ -1,6 +1,6 @@
 package io.ltr8.tson.cli;
 
-import io.ltr8.tson.compiler.ContentHash;
+import io.ltr8.tson.compiler.TsonContentHash;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -31,7 +31,7 @@ final class HashCommand {
 
         int contentStart;
         try {
-            contentStart = ContentHash.contentStart(document);
+            contentStart = TsonContentHash.contentStart(document);
         } catch (RuntimeException e) {
             System.err.println(file + ": " + e.getMessage());
             return 1;
@@ -55,7 +55,7 @@ final class HashCommand {
         String uri = header.substring(openQuote + 1, closeQuote);
         int query = uri.indexOf('?');
         String base = query < 0 ? uri : uri.substring(0, query);   // drop any prior ?sha256=... (or other query)
-        String hash = ContentHash.sha256(document);
+        String hash = TsonContentHash.sha256(document);
         String pinned = base + "?sha256=" + hash;
 
         String newHeader = header.substring(0, openQuote + 1) + pinned + header.substring(closeQuote);

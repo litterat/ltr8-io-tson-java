@@ -312,10 +312,6 @@ missing most of the mirror.
 - [ ] The three `TestDocuments` test helpers (one each in `tson-compiler`, `tson`, `tson-cli`) are
   near-duplicates, because this build has no `java-test-fixtures` plugin. Either wire that up or accept the
   repetition; it is a few lines, so this is a build-hygiene call rather than a real cost.
-- [ ] `ContentHashMismatchException` is the one unprefixed member of an otherwise consistent
-  `Tson*Exception` family (`TsonParseException`/`TsonReadException`/`TsonWriteException`/
-  `TsonUnsupportedDocumentException`). A rename, whenever the naming pass happens.
-
 - [ ] Thread-safety — currently only `synchronized` on `TsonSchemaRegistry`/
   `TsonCompiledSchemaRegistry`'s own `register`/`get`/`getMeta` (its `load` deliberately isn't, to
   avoid serializing unrelated on-demand loads); everything else is an open design question.

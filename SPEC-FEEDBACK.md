@@ -1063,7 +1063,7 @@ pinned and a plain reference name the same identity. Two objections from externa
    currently take a bare URI string, so this is a directive-grammar change, and `!!id` (which today carries its
    own pin on its own line, excluded from the hash) would need an equivalent structured form.
 
-**Interpretation chosen:** This implementation follows the spec as written — the query form. `ContentHash`
+**Interpretation chosen:** This implementation follows the spec as written — the query form. `TsonContentHash`
 parses `?sha256=<hex>` off a reference (rejecting any other/unrecognized query parameter or malformed hex),
 `CanonicalIdentity`/`TsonSchemaRegistry` strip the query to key everything by identity, `tson hash <file>`
 stamps `?sha256=` onto the `!!id` line, and the bundled chain (meta.tn pins meta-kernel, core.tn pins meta.tn)
@@ -1072,9 +1072,9 @@ is pinned end-to-end this way. No change made — flagging the design, not diver
 **Suggested resolution:** Choose among three. (a) Keep the query form — simplest, but semantically stretched
 and dependent on the identity-stripping rule. (b) Move the pin to a fragment (`#sha256=<hex>`) — better matches
 URI semantics, and identity can still ignore it by dropping the fragment; here a small, localized change (parse
-`#` rather than `?` in `ContentHash`, and in `tson hash`). (c) Lift integrity out of the URI into a structured
+`#` rather than `?` in `TsonContentHash`, and in `tson hash`). (c) Lift integrity out of the URI into a structured
 directive (`{ url, sha256 }`) — the cleanest separation of locator from integrity, at the cost of a
-directive-grammar change plus an `!!id` equivalent; here it touches the directive grammar, `ContentHash`,
+directive-grammar change plus an `!!id` equivalent; here it touches the directive grammar, `TsonContentHash`,
 canonical identity, `tson hash`, and every bundled `.tn`'s pin lines. If the query form stays, the spec should
 at least justify why a hash lives in the query and name the identity-stripping as its deliberate consequence.
 

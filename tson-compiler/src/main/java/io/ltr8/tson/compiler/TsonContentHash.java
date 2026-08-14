@@ -12,9 +12,9 @@ import java.util.Optional;
  * leading byte-order mark is stripped and never enters the hash input, and a content-addressed document
  * MUST be UTF-8.
  */
-public final class ContentHash {
+public final class TsonContentHash {
 
-    private ContentHash() {
+    private TsonContentHash() {
     }
 
     /** The lowercase-hex SHA-256 over every byte from {@link #contentStart} to the end. */
@@ -92,13 +92,13 @@ public final class ContentHash {
      * the [TSON-DATA] §2.2.1 rule that a consumer holding a hashed reference MUST verify before use and
      * MUST NOT use mismatched content. A reference with no pin is a no-op (resolves unverified).
      *
-     * @throws ContentHashMismatchException if a pin is declared and the content's hash differs from it
+     * @throws TsonContentHashMismatchException if a pin is declared and the content's hash differs from it
      */
     public static void verify(byte[] content, String referenceUri) {
         declaredSha256(referenceUri).ifPresent(declared -> {
             String actual = sha256(content);
             if (!actual.equals(declared)) {
-                throw new ContentHashMismatchException("content hash mismatch for \"" + referenceUri
+                throw new TsonContentHashMismatchException("content hash mismatch for \"" + referenceUri
                         + "\": the reference declares sha256=" + declared + " but the content hashes to "
                         + actual + " -- refusing to use mismatched content ([TSON-DATA] §2.2.1)");
             }

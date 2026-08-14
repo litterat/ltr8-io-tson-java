@@ -319,7 +319,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      */
     private void crossCheckId(SchemaDocument document, String referenceUri, String identity) {
         if (document.id().isEmpty()) {
-            if (ContentHash.declaredSha256(referenceUri).isPresent()) {
+            if (TsonContentHash.declaredSha256(referenceUri).isPresent()) {
                 throw new IllegalStateException("the hash-pinned reference \"" + referenceUri
                         + "\" resolved to a document with no !!id -- a hashed reference's target must carry one "
                         + "([TSON-DATA] §2.2.1)");
@@ -342,7 +342,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      * keeps the first-resolved (known-good) hash immutable thereafter.
      */
     private void recordAndVerify(String sourceText, String uri, String identity) {
-        String contentHash = ContentHash.sha256(sourceText.getBytes(StandardCharsets.UTF_8));
+        String contentHash = TsonContentHash.sha256(sourceText.getBytes(StandardCharsets.UTF_8));
         // A pre-loaded bundled schema ships with a digest the library holds (§10.2): the shipped bytes
         // MUST match it -- the authoritative digest a pinned reference to it is checked against, and an
         // integrity check that the packaged resource is the one the library was built for.
@@ -367,9 +367,9 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
 
     /** A reference's declared {@code ?sha256=} pin, if present, MUST equal {@code contentHash}. */
     private static void checkPin(String referenceUri, String contentHash, String identity) {
-        ContentHash.declaredSha256(referenceUri).ifPresent(declared -> {
+        TsonContentHash.declaredSha256(referenceUri).ifPresent(declared -> {
             if (!declared.equals(contentHash)) {
-                throw new ContentHashMismatchException("content hash mismatch for \"" + referenceUri
+                throw new TsonContentHashMismatchException("content hash mismatch for \"" + referenceUri
                         + "\": the reference declares sha256=" + declared + " but the content for identity \""
                         + identity + "\" hashes to " + contentHash
                         + " -- refusing to use mismatched content ([TSON-DATA] §2.2.1, [TSON-SCHEMA] §10.2)");

@@ -777,14 +777,16 @@ raw source text (`fetch(uri)`), off `tson-schema`'s classpath — the `.tn` reso
 interface of the same shape). Each schema also ships a published content digest
 (`{META_KERNEL,META,CORE}_SHA256`), checked against the packaged resource on load.
 
-### Content hashing (`ContentHash`) + `tson hash`
+### Content hashing (`TsonContentHash`) + `tson hash`
 
-`ContentHash.sha256(byte[])` computes a document's content hash over every byte *past the first line's
+`TsonContentHash.sha256(byte[])` computes a document's content hash over every byte *past the first line's
 terminator* (the `!!id` line, grammar-required first, is excluded so a document can carry its own hash on
-its own id line without circularity; a leading BOM is stripped, never hashed). `ContentHash.verify(bytes,
+its own id line without circularity; a leading BOM is stripped, never hashed). `TsonContentHash.verify(bytes,
 referenceUri)` parses a reference's `?sha256=` pin (§2.2.1: only hash-algorithm parameters, never silently
 retained — an unrecognized query parameter or malformed hex throws) and checks it, throwing
-`ContentHashMismatchException` on mismatch.
+`TsonContentHashMismatchException` on mismatch. Both carry the `Tson` prefix as consumer-facing types whose
+bare names (`ContentHash`, a `hash` mismatch) a consumer plausibly has their own version of — and "content
+hash" is the spec's own term throughout §2.2.1/§10.2, never shortened to "hash".
 
 - **The pin is verification metadata, not identity** — a pinned `!!id` resolves against a plain (or
   differently-pinned) reference because everything keys by canonical identity (scheme+query stripped).

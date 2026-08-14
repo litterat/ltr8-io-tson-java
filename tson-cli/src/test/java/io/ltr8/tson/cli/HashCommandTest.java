@@ -1,6 +1,6 @@
 package io.ltr8.tson.cli;
 
-import io.ltr8.tson.compiler.ContentHash;
+import io.ltr8.tson.compiler.TsonContentHash;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -25,7 +25,7 @@ class HashCommandTest {
     @Test
     void stampsTheContentHashOntoTheId(@TempDir Path dir) throws IOException {
         Path file = writeFile(dir, "thing.tn", SCHEMA);
-        String expected = ContentHash.sha256(SCHEMA.getBytes(StandardCharsets.UTF_8));
+        String expected = TsonContentHash.sha256(SCHEMA.getBytes(StandardCharsets.UTF_8));
 
         assertEquals(0, HashCommand.run(file));
 
@@ -40,7 +40,7 @@ class HashCommandTest {
 
         // The stamped hash must equal a fresh hash of the now-on-disk file (id line excluded either way).
         byte[] onDisk = Files.readAllBytes(file);
-        String recomputed = ContentHash.sha256(onDisk);
+        String recomputed = TsonContentHash.sha256(onDisk);
         String stamped = Files.readString(file).lines().findFirst().orElseThrow()
                 .replaceAll(".*sha256=([0-9a-f]+).*", "$1");
         assertEquals(recomputed, stamped);
