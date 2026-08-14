@@ -886,8 +886,13 @@ compatibility).
 
 - **Part 2 resolution gaps** — subtraction, elided field types outside a tightening entry, a field group
   restated in a refinement body, the identity-diagonal FIXED-value invariant, a generic type-ref whose
-  argument is nested or a value rather than a plain name. `DefinitionResolver`'s Javadoc is the exact
-  current boundary.
+  argument is nested or a value rather than a plain name, and composition/refinement beyond the simple
+  record-over-record case (a generic or non-record supertype, a non-record refinement source, an
+  inter-supertype field collision). `DefinitionResolver`'s Javadoc is the exact current boundary, and
+  `BACKLOG.md`'s "Remaining Part 2 resolution gaps" carries the full list — an audit of the ~34
+  `UnsupportedOperationException` sites found nine genuine gaps that had no item, and that only about half
+  of those throws are gaps at all: the rest are schema-author errors, or internal faults, wearing the
+  wrong exception type.
 - **§5.10 parameter substitution into a template *body*** — a template that refines a constructor
   (`array_ranged`, and so §5.3's sized sugar) instantiates via argument routing; a *record* template
   (`box => <T> { v: T }`), whose parameter is a field type, is rejected at the application site instead.

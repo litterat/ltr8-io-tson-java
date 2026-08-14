@@ -216,8 +216,31 @@ own prose (which had gone stale on at least one of them):
   *substitution* (tracked in `STRUCTURED-OUTPUT.md`) — this is a rejection rule for a malformed
   "closed" entry, not the substitution mechanism itself.
 
-(All already named in `DefinitionResolver`'s own Javadoc and `CLAUDE.md`; carried here so
-everything outstanding is tracked in one place.)
+- [ ] **Composition and refinement, beyond the simple record-over-record case.** Five sites in
+  `DefinitionResolver` reject shapes §5.7/§5.8 admit, each with its own "not resolved yet":
+  a non-simple (generic) supertype reference; a supertype whose body isn't a record; a refinement source
+  whose body isn't a record; an inter-supertype field collision (or a duplicate field/group-member name);
+  and a constructor application whose constructor has a non-record body. They share a cause — the
+  composition path assumes record-over-record with disjoint field sets — so they are likely one piece of
+  work rather than five.
+- [ ] **A field/element type that is not a simple name, a generic application, or an inline array.**
+  `resolveFieldType`'s catch-all ("only simple (non-generic) type-refs, generic applications of one, and
+  inline arrays of one are resolved so far"). Overlaps the template-substitution item above, but is
+  reachable without templates.
+- [ ] **Two "not resolved yet" messages describe a limitation that no longer exists.** An unresolvable
+  supertype and an unresolvable refinement source both say "only ... declared earlier in the same schema
+  map are visible so far" — but `SchemaResolver` resolves on demand following dependencies, not source
+  order, and `ForwardReferenceResolutionTest.composesASupertypeDeclaredLaterInTheSameSchema` pins that.
+  What actually reaches those throws now is a name that resolves to nothing, i.e. an author's typo, and
+  the message sends them to reorder declarations instead. They should say "no such type", and be author
+  errors rather than `UnsupportedOperationException` — see "Schema-side diagnostics" for the wider
+  classification pass they belong to.
+
+The classification of these throw sites is itself tracked under "Schema-side diagnostics": of ~34
+`UnsupportedOperationException`s across the codebase, three are correct use (an immutable map, an
+unreachable-by-construction guard, `ErrorReader`'s deliberate deferred failure), roughly nine are
+schema-author errors wearing a library-gap exception, and about five wrap an internal fault. Only the
+genuine gaps belong in this section.
 
 ## Schema-side diagnostics
 
