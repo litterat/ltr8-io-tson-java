@@ -92,8 +92,11 @@ module has a real `module-info.java`; module names mirror each module's root exp
   descriptors, `DataNameBinder`, bridges). Depends only on `tson-annotation`, whose annotations and carrier
   types it reads off a class under analysis.
 - **`tson-schema`** — **only** `io.ltr8.tson.schema.meta` (the resolved-schema *value* model — pure
-  records/sealed interfaces/enums, §8's `TypeDefinition` et al.) plus the schema registry/linker and
-  `TsonBundledSchemas`. Depends only on `tson-annotation`. **`tson-compiler` depends on `tson-schema`, not
+  records/sealed interfaces/enums, §8's `TypeDefinition` et al.) plus the schema registry (`TsonSchemaRegistry`
+  /`TsonLinkedSchema`/`TsonSchemaLoader`/`CanonicalIdentity`) and `TsonBundledSchemas`. **The linker is not
+  here** — it is an engine, not a value model, so `TsonSchemaLinker`/`ChoiceDisjointness` live in
+  `tson-compiler` with the rest of the pipeline; what stays is storage and the identity algorithm lookups
+  compare by. Depends only on `tson-annotation`. **`tson-compiler` depends on `tson-schema`, not
   the reverse** — the opposite of what the names suggest, deliberately so the compiler's resolver can hold
   and consult `schema.meta` types directly. `schema.meta` names no `tson-compiler` type; where it needs
   one structurally it declares a local stand-in (`schema.meta.Token` mirrors `ast.TokenValue`/`TokenForm`;
@@ -482,17 +485,22 @@ order, so it can't handle `boolean` preceding `enum`; this two-pass ordering liv
   linked form needs no materialization either — its nine argument-bearing applications are ordinary
   declarations by the time the linker sees them.
 
-### Schema registry and linking (`tson-schema/.../`, `.../registry/`)
+### Schema registry and linking (`tson-compiler/TsonSchemaLinker.java`, `tson-schema/.../`, `.../registry/`)
 
 Resolution handles one declaration at a time (references carried as unverified strings, `!!import` not
-consulted). `TsonSchemaLinker`/`TsonSchemaRegistry` add the second stage.
+consulted). `TsonSchemaLinker`/`TsonSchemaRegistry` add the second stage. **They sit in different modules on
+purpose:** the linker is a pipeline stage and lives in `tson-compiler` alongside parse/desugar/resolve/compile,
+so every phase that will grow schema-side diagnostics is in one module with `Diagnostic`, and it can reach
+`tson-regex` directly (what §5.4 pattern disjointness needs, with no injected-oracle seam); the registry is
+storage over the `schema.meta` value model and stays in `tson-schema`, the leaf everything else depends on.
 
 - **`CanonicalIdentity.of(String)`** implements §2.2.1's canonical-identity algorithm — **not** general
   URI normalization. Exactly two reductions (strip scheme + `://`, strip query); everything else must
   already be canonical (lowercase host, no port, no dot-segments, no fragment, no percent-encoding of
   unreserved chars) or it's rejected. `http://` and `https://` resolve to the same identity; a `?sha256=`
   query is dropped, not validated. Internal to `tson-schema` — reach it from outside via
-  `TsonSchemaRegistry.canonicalIdentity`.
+  `TsonSchemaRegistry.canonicalIdentity`, which is how the linker itself canonicalizes now that it sits
+  across the module boundary.
 - **`TsonSchemaLinker.link(schema, loader)`** is the pass-2 engine returning a `TsonLinkedSchema` (a thin
   wrapper that is a compile-time proof linking ran): (1) **merge `!!import`s** — each import's entries
   copied in as-is, keeping their home namespace, name collisions rejected; (2) **populate `subtypes`**
@@ -510,8 +518,8 @@ consulted). `TsonSchemaLinker`/`TsonSchemaRegistry` add the second stage.
   the loader actually produced the target; an unresolvable `!!meta` is left to whoever owns fetching, which
   is also what keeps meta-kernel's self-naming `!!meta` linkable mid-registration. In the shipped wiring
   `TsonCompiledMetaRegistry.loadMeta` reaches that verdict a phase earlier (it must *compile* the meta to
-  resolve against it) and raises the linker's own `TsonSchemaLinker.notAMetaSchema` — one wording, shared
-  across the module boundary, and a **`TsonSchemaValidationException` rather than an `IllegalStateException`**
+  resolve against it) and raises the linker's own `TsonSchemaLinker.notAMetaSchema` — one wording, one module,
+  and a **`TsonSchemaValidationException` rather than an `IllegalStateException`**
   because a wrong `!!meta` is an authoring error, not a library fault (which is what lets the CLI keep exit 1
   and exit 70 apart). `source`
   validation additionally falls back to the governing meta's namespace (a `source` naming a constructor is
@@ -989,7 +997,7 @@ No system Gradle — always use the wrapper:
 ./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.lexer.LexerTest"
 ./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.TsonDataParserTest"
 ./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.ConformanceSuiteTest"  # skipped unless ../../ltr8-io-tson-test-suite exists
-./gradlew :tson-schema:test --tests "io.ltr8.tson.schema.TsonSchemaLinkerTest"
+./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.TsonSchemaLinkerTest"
 ./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.TsonCompiledSchemaRegistryTest"
 ./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.resolver.DefinitionResolverTest"
 ./gradlew :tson-cli:installDist   # then tson-cli/build/install/tson/bin/tson validate ...
@@ -1027,10 +1035,13 @@ compatibility).
   gap.
 - **Schema-side diagnostics** — parse → desugar → resolve → link → compile are fail-fast throughout, so a
   broken *schema* yields one exception per run, flattened into a single `SCHEMA_ERROR` with no path and no
-  position in the schema document. The read path's `TsonDiagnosticsReceiver` has no schema-side counterpart
-  yet, and one structural thing blocks starting: `tson-schema` requires only `io.ltr8.annotation`, so
-  `TsonSchemaLinker` — where most author-facing schema errors are raised — cannot name `Diagnostic` (in
-  `tson-compiler`) at all. `BACKLOG.md`'s "Schema-side diagnostics" has the census and the ordering.
+  position in the schema document. The read path's `TsonDiagnosticsReceiver` still has no schema-side
+  counterpart. **The structural blocker is gone**: every one of those phases now lives in `tson-compiler`
+  alongside `Diagnostic`, so `TsonSchemaLinker` — where most author-facing schema errors are raised — can
+  name it directly, and `Diagnostic` no longer has to move anywhere. What remains is the work itself:
+  classifying the throw sites (a library gap and an author error are not the same verdict) and finding the
+  shared object to hang `report` off, the resolver's per-declaration position being the closest thing to one.
+  `BACKLOG.md`'s "Schema-side diagnostics" has the census and the ordering.
 - **Deferred design questions** — `REQUIRED_FIXED`/`OPTIONAL_FIXED` value validation, `value_param` real
   parameter substitution, thread-safety, and a general disk/HTTP-backed `TsonSchemaSource` (with
   whitelist/blacklist policy).

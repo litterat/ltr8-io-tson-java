@@ -1,8 +1,6 @@
-package io.ltr8.tson.schema;
+package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.schema.registry.CanonicalIdentity;
-import io.ltr8.tson.schema.meta.ArrayBody;
-import io.ltr8.tson.schema.meta.ElementState;
+import io.ltr8.tson.schema.*;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
@@ -129,7 +127,8 @@ class TsonSchemaLinkerTest {
     @Test
     void mergesImportedEntriesBeforeLocalOnesAndValidatesTheWhole() {
         TsonLinkedSchema imported = new TsonLinkedSchema(schemaOf(Map.of("imported_a", emptyRecord())));
-        Map<String, TsonLinkedSchema> byIdentity = Map.of(CanonicalIdentity.of("https://example.test/import.tn1"), imported);
+        Map<String, TsonLinkedSchema> byIdentity =
+                Map.of(TsonSchemaRegistry.canonicalIdentity("https://example.test/import.tn1"), imported);
         TsonSchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
 
         Map<String, TypeDefinition> localEntries = new LinkedHashMap<>();
@@ -155,7 +154,8 @@ class TsonSchemaLinkerTest {
     @Test
     void rejectsACollisionBetweenALocalEntryAndAnImportedEntry() {
         TsonLinkedSchema imported = new TsonLinkedSchema(schemaOf(Map.of("shared_name", emptyRecord())));
-        Map<String, TsonLinkedSchema> byIdentity = Map.of(CanonicalIdentity.of("https://example.test/import.tn1"), imported);
+        Map<String, TsonLinkedSchema> byIdentity =
+                Map.of(TsonSchemaRegistry.canonicalIdentity("https://example.test/import.tn1"), imported);
         TsonSchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
 
         TsonSchema local = new TsonSchema("https://example.test/importer.tn1",
@@ -176,7 +176,7 @@ class TsonSchemaLinkerTest {
         TsonLinkedSchema library = new TsonLinkedSchema(new TsonSchema("https://example.test/lib.tn",
                 "https://example.test/meta.tn1", List.of(), Map.of("uuid", unitEntry())));
         Map<String, TsonLinkedSchema> byIdentity =
-                Map.of(CanonicalIdentity.of("https://example.test/lib.tn"), library);
+                Map.of(TsonSchemaRegistry.canonicalIdentity("https://example.test/lib.tn"), library);
         TsonSchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
 
         TsonSchema governed = new TsonSchema("https://example.test/app.tn",
@@ -195,7 +195,7 @@ class TsonSchemaLinkerTest {
         // schemaOf's own !!meta is meta-kernel, which is exactly what makes a schema a meta-schema
         TsonLinkedSchema meta = new TsonLinkedSchema(schemaOf(Map.of("record", emptyRecord())));
         Map<String, TsonLinkedSchema> byIdentity =
-                Map.of(CanonicalIdentity.of("https://example.test/meta.tn"), meta);
+                Map.of(TsonSchemaRegistry.canonicalIdentity("https://example.test/meta.tn"), meta);
         TsonSchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
 
         TsonSchema governed = new TsonSchema("https://example.test/app.tn",
@@ -266,8 +266,8 @@ class TsonSchemaLinkerTest {
         importedEntries.put("imported_child", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of(), false,
                 List.of("imported_base"), List.of(), Optional.empty(), RecordBody.of(List.of())));
         TsonSchema imported = schemaOf(importedEntries);
-        Map<String, TsonLinkedSchema> byIdentity =
-                Map.of(CanonicalIdentity.of("https://example.test/import.tn1"), new TsonLinkedSchema(imported));
+        Map<String, TsonLinkedSchema> byIdentity = Map.of(
+                TsonSchemaRegistry.canonicalIdentity("https://example.test/import.tn1"), new TsonLinkedSchema(imported));
         TsonSchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
 
         Map<String, TypeDefinition> localEntries = new LinkedHashMap<>();
@@ -291,8 +291,8 @@ class TsonSchemaLinkerTest {
         TsonLinkedSchema importedOne = new TsonLinkedSchema(schemaOf(Map.of("shared_name", emptyRecord())));
         TsonLinkedSchema importedTwo = new TsonLinkedSchema(schemaOf(Map.of("shared_name", emptyRecord())));
         Map<String, TsonLinkedSchema> byIdentity = Map.of(
-                CanonicalIdentity.of("https://example.test/import-one.tn1"), importedOne,
-                CanonicalIdentity.of("https://example.test/import-two.tn1"), importedTwo);
+                TsonSchemaRegistry.canonicalIdentity("https://example.test/import-one.tn1"), importedOne,
+                TsonSchemaRegistry.canonicalIdentity("https://example.test/import-two.tn1"), importedTwo);
         TsonSchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
 
         TsonSchema local = new TsonSchema("https://example.test/importer.tn1",

@@ -7,7 +7,7 @@ import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.TsonSchemaLinker;
+import io.ltr8.tson.compiler.TsonSchemaLinker;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 

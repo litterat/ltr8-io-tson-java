@@ -2,12 +2,10 @@ package io.ltr8.tson.schema;
 
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Unit;
-import io.ltr8.tson.schema.TsonSchemaLinker;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -33,17 +31,22 @@ class TsonSchemaRegistryTest {
                 "https://example.test/meta.tn1", List.of(), entries);
     }
 
-    /** Every {@code register} call site needs a linked schema now -- see {@code TsonSchemaRegistry}'s own Javadoc. */
-    private static TsonLinkedSchema linkedSchema(TsonSchemaRegistry registry) {
-        return TsonSchemaLinker.link(schemaWithARecordField(), registry);
+    /**
+     * {@code register} accepts only a linked schema, so every call site needs one. These tests are about the
+     * registry's own storage and identity behaviour, not about linking, so they wrap directly rather than
+     * running {@code TsonSchemaLinker} (which lives in {@code tson-compiler}, a module this one cannot reach);
+     * {@code TsonSchemaLinkerTest} covers what linking itself does.
+     */
+    private static TsonLinkedSchema linkedSchema() {
+        return new TsonLinkedSchema(schemaWithARecordField());
     }
 
     @Test
-    void registerRunsLinkingAndTheResultIsFindableByItsRawId() {
+    void registerStoresTheSchemaAndTheResultIsFindableByItsRawId() {
         TsonSchemaRegistry registry = new TsonSchemaRegistry();
-        TsonLinkedSchema registered = registry.register(linkedSchema(registry));
+        TsonLinkedSchema registered = registry.register(linkedSchema());
 
-        // Linking carries every entry through unchanged; register only stores what link handed it.
+        // register only stores what it was handed, entries untouched.
         assertEquals(3, registered.schema().entries().size());
 
         Optional<TsonLinkedSchema> found = registry.get("https://example.test/registry-test.tn1");
@@ -54,7 +57,7 @@ class TsonSchemaRegistryTest {
     @Test
     void aDifferentSchemeFindsTheSameRegisteredSchema() {
         TsonSchemaRegistry registry = new TsonSchemaRegistry();
-        registry.register(linkedSchema(registry));
+        registry.register(linkedSchema());
 
         assertTrue(registry.get("http://example.test/registry-test.tn1").isPresent());
     }
@@ -80,21 +83,21 @@ class TsonSchemaRegistryTest {
     @Test
     void rejectsRegisteringTheSameIdentityTwice() {
         TsonSchemaRegistry registry = new TsonSchemaRegistry();
-        registry.register(linkedSchema(registry));
+        registry.register(linkedSchema());
 
         assertThrows(TsonSchemaValidationException.class,
-                () -> registry.register(linkedSchema(registry)));
+                () -> registry.register(linkedSchema()));
     }
 
     @Test
     void rejectsRegisteringTheSameIdentityTwiceEvenUnderADifferentScheme() {
         TsonSchemaRegistry registry = new TsonSchemaRegistry();
-        registry.register(linkedSchema(registry));
+        registry.register(linkedSchema());
 
         TsonSchema sameIdentityDifferentScheme = new TsonSchema(
                 "http://example.test/registry-test.tn1", "https://example.test/meta.tn1",
                 List.of(), Map.of());
-        TsonLinkedSchema linked = TsonSchemaLinker.link(sameIdentityDifferentScheme, registry);
+        TsonLinkedSchema linked = new TsonLinkedSchema(sameIdentityDifferentScheme);
 
         assertThrows(TsonSchemaValidationException.class, () -> registry.register(linked));
     }

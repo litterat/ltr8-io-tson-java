@@ -19,8 +19,8 @@ import java.util.Optional;
  * `tson-compiler`-side class -- there's nothing left for a split class to do once both halves of
  * "what these documents are" (identity) and "where their content lives" (fetch) sit in the one
  * module that can be the single canonical source for `tson-compiler`-side consumers (e.g. {@code
- * io.ltr8.tson.compiler.resolver.DefaultTsonCompiledSchemaLoader}, {@code MetaKernelBootstrapResolver})
- * and `tson-schema`'s own {@link TsonSchemaLinker#isMetaKernelGoverned} alike, since `tson-schema`
+ * io.ltr8.tson.compiler.resolver.DefaultTsonCompiledSchemaLoader}, {@code MetaKernelBootstrapResolver},
+ * {@code TsonSchemaLinker}'s own meta-kernel-governed check), since `tson-schema`
  * has no dependency on `tson-compiler` (only the reverse). {@link #fetch} deliberately doesn't
  * implement {@code io.ltr8.tson.compiler.resolver.TsonSchemaSource} -- that interface lives in
  * `tson-compiler`, a module this one has no dependency on -- but its shape (a single {@code
@@ -40,7 +40,7 @@ public final class TsonBundledSchemas {
     /**
      * meta-kernel's own real, published identity -- see {@code spec/m/meta-kernel.tn}'s own {@code
      * !!id}. The one meta-kernel this library's own compiled-reader machinery is built against -- see
-     * {@link TsonSchemaLinker#isMetaKernelGoverned}'s own Javadoc for why that check needs this to be
+     * {@code TsonSchemaLinker.isMetaKernelGoverned}'s own Javadoc for why that check needs this to be
      * a specific, fixed identity rather than a structural "is this schema self-referencing" test.
      */
     public static final String META_KERNEL_ID = "https://tson.io/2026/32/m/meta-kernel.tn";

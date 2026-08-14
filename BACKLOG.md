@@ -9,13 +9,6 @@ yet implemented" section for the technical detail behind several of these items.
 
 ---
 
-## Front door / ergonomics
-
-- [ ] A real disk/HTTP-backed `TsonSchemaSource` with whitelist/blacklist policy — today the only
-  `TsonSchemaSource` is `TsonSchemaSource.registeredOnly()` (nothing fetched); the bundled standard
-  library is served internally by `TsonCompiledSchemaRegistry` from `TsonBundledSchemas`, not through
-  a source.
-
 ## Resolution & linking generality
 
 Every real schema resolved so far (meta-kernel, meta.tn, core.tn, and hand-built test fixtures)
@@ -47,14 +40,14 @@ own prose (which had gone stale on at least one of them):
     `@disjoint` checker below (an earlier "an innocuous pattern edit silently flips tag-requiredness"
     worry is void: schemas are immutable and hash-pinned, so a revision is a new content identity —
     existing data pins the old, still-disjoint one, and a disjointness-losing revision is a load-time
-    error under `@disjoint`, never a silent flip). Wiring `isDisjointFrom` into the fact needs a
-    dependency-inversion seam, since `tson-schema` deliberately doesn't depend on `tson-regex` — a
-    pattern-disjointness oracle injected into the linker, supplied by `tson-compiler`. See
-    `SPEC-FEEDBACK.md` #23 for the load-bearing ambiguity underneath all of this.
+    error under `@disjoint`, never a silent flip). **The dependency-inversion seam this used to need is no
+    longer required**: `ChoiceDisjointness` moved into `tson-compiler` with the linker, and that module
+    already requires `tson-regex`, so `isDisjointFrom` is a direct call rather than an oracle injected from
+    outside. See `SPEC-FEEDBACK.md` #23 for the load-bearing ambiguity underneath all of this.
   - [ ] **The `@disjoint` assertion check** — an author's `@disjoint` marker checked against the derived
     fact: proved (silent), refuted / provably-not (resolver error), unprovable (warning), absent (no
-    check). This is where exact regex-pattern disjointness (`isDisjointFrom`, via the seam above) pays
-    off — turning an otherwise-"unprovable" pattern choice into a proved-or-refuted one. **No longer
+    check). This is where exact regex-pattern disjointness (`isDisjointFrom`, called directly — see above)
+    pays off — turning an otherwise-"unprovable" pattern choice into a proved-or-refuted one. **No longer
     blocked**: a declaration's annotations now reach the resolved model, on `TypeDefinition` when written
     after `=>` and on the schema map's key when written before the name, so the linker can read a
     `@disjoint` marker where `disjoint` is derived. Nothing in the bundled schemas actually writes one yet,
@@ -184,13 +177,15 @@ with `path: ""`, `schemaPosition: null`, and (through `validate`) a `dataPositio
 - [ ] **Report schema problems as `Diagnostic`s, through the same receiver.** The remaining, larger half.
   What is wanted is the reader treatment: several problems, each positioned, from one pass. Three things
   have to be settled first, in this order:
-  - **Decide where `Diagnostic` lives.** `tson-schema`'s `module-info` requires only `io.ltr8.annotation`,
-    while `Diagnostic`/`TsonDiagnosticsReceiver` are in `tson-compiler` — so `TsonSchemaLinker`, holding
-    nine author-facing throws including the unresolved-reference one above, **cannot name `Diagnostic` at
-    all**. `Diagnostic` itself only depends on `schema.meta.SourcePosition`, so it can move down (to
-    `tson-schema`, or a leaf module in the shape of `tson-tree`/`tson-regex`); `Diagnostic.ofBaseSyntaxError`
-    names three `tson-compiler` exception types and would stay behind. This is a public-API package move
-    affecting every reader — it blocks the rest, and nothing else can start until it is decided.
+  - [x] **Decide where `Diagnostic` lives.** Settled, and it does not move: `TsonSchemaLinker` moved *up*
+    into `tson-compiler` instead, so every phase from parse to compile now sits in one module with
+    `Diagnostic`/`TsonDiagnosticsReceiver` and can name them directly. `tson-schema` goes back to being a
+    pure value-model leaf (`schema.meta` plus the registry that stores it), matching `tson-tree`/`tson-regex`.
+    This was the cheaper direction: moving `Diagnostic` down would have split `ofBaseSyntaxError` off (it
+    names three `tson-compiler` exception types) and put a read-path value in the schema value model, and it
+    would have left the §5.4 pattern-disjointness seam below still needed. The linker canonicalizes through
+    `TsonSchemaRegistry.canonicalIdentity` now, the seam that already existed for callers outside
+    `tson-schema`.
   - **Classify the throw sites; they are not one kind of thing.** Census across the schema pipeline:
     31 `UnsupportedOperationException` (mostly *library gaps* — "not resolved yet", "only … so far"),
     27 `TsonSchemaValidationException` (author errors — but 11 of those are `CanonicalIdentity` `!!id`
@@ -335,9 +330,6 @@ missing most of the mirror.
 
 ## Miscellaneous
 
-- [ ] Thread-safety — currently only `synchronized` on `TsonSchemaRegistry`/
-  `TsonCompiledSchemaRegistry`'s own `register`/`get`/`getMeta` (its `load` deliberately isn't, to
-  avoid serializing unrelated on-demand loads); everything else is an open design question.
 - [ ] General resolver-layer structural rules as reusable primitives, rather than binding-time-only
   behavior — empty-brace resolution, the absent-vs-missing distinction.
 - [ ] **Annotations are still discarded at a dispatched position.** A dispatcher (`VariantBindReader` for a
@@ -348,13 +340,16 @@ missing most of the mirror.
   `constructor` handle, wrapping what came back.
   - Not reachable today: a union member is not a boxed position, so its carrier is always empty rather than
     wrong. Worth closing when a boxed variant becomes expressible, not before.
-- [ ] Confusable-character and bidi-formatting-character warnings (§9.4-adjacent security hardening) —
-  the sibling gap to the numeric-literal length limit tracked in `STRUCTURED-OUTPUT.md`'s Tier 1 section;
-  neither is enforced anywhere yet. `SPEC-FEEDBACK.md` #34 is the fuller treatment: which UTS #39 mechanism
-  applies where, the comparison scopes TSON can actually name, and why a normative requirement would oblige
-  every implementation to ship UCD data the JDK does not expose.
+
 
 # Lower Priority
+
+## Front door / ergonomics
+
+- [ ] A real disk/HTTP-backed `TsonSchemaSource` with whitelist/blacklist policy — today the only
+  `TsonSchemaSource` is `TsonSchemaSource.registeredOnly()` (nothing fetched); the bundled standard
+  library is served internally by `TsonCompiledSchemaRegistry` from `TsonBundledSchemas`, not through
+  a source.
 
 ## Tree model (`TsonValue`)
 
@@ -372,3 +367,14 @@ The tree model itself is built and described in `CLAUDE.md`'s "Tree model" secti
       information about use cases involving generating and transforming JSON documents, in order to evolve
       these areas of the API." The JDK reached the same "wait for real use cases" conclusion independently,
       which turns this item's deferral from a shrug into a decision.
+
+## Miscellaneous
+
+- [ ] Thread-safety — currently only `synchronized` on `TsonSchemaRegistry`/
+  `TsonCompiledSchemaRegistry`'s own `register`/`get`/`getMeta` (its `load` deliberately isn't, to
+  avoid serializing unrelated on-demand loads); everything else is an open design question.
+- [ ] Confusable-character and bidi-formatting-character warnings (§9.4-adjacent security hardening) —
+  the sibling gap to the numeric-literal length limit tracked in `STRUCTURED-OUTPUT.md`'s Tier 1 section;
+  neither is enforced anywhere yet. `SPEC-FEEDBACK.md` #34 is the fuller treatment: which UTS #39 mechanism
+  applies where, the comparison scopes TSON can actually name, and why a normative requirement would oblige
+  every implementation to ship UCD data the JDK does not expose.

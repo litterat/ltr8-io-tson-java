@@ -1,6 +1,6 @@
-package io.ltr8.tson.schema;
+package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.schema.registry.CanonicalIdentity;
+import io.ltr8.tson.schema.*;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.BinaryType;
 import io.ltr8.tson.schema.meta.ChoiceBody;
@@ -11,7 +11,6 @@ import io.ltr8.tson.schema.meta.DateTimeType;
 import io.ltr8.tson.schema.meta.DateType;
 import io.ltr8.tson.schema.meta.DecimalType;
 import io.ltr8.tson.schema.meta.DurationType;
-import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.EmailType;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.Extern;
@@ -41,8 +40,6 @@ import io.ltr8.tson.schema.meta.UnknownType;
 import io.ltr8.tson.schema.meta.UriType;
 import io.ltr8.tson.schema.meta.UuidType;
 
-import java.math.BigInteger;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -61,20 +58,20 @@ import java.util.Set;
  * original), derives choice disjointness, and checks that every reference anywhere in the schema actually
  * resolves. A {@link TsonLinkedSchema} is the compile-time proof that all of that ran.
  *
- * <p>Public, and meant to be called directly by anything orchestrating the pipeline -- including from other
- * modules ({@code tson-compiler}'s own registries link a schema before registering it, same as any other
- * caller). {@link CanonicalIdentity} stays in {@code .registry}, internal by convention: it was never a
- * named pipeline stage, just how registry lookups compare identities.
+ * <p>Public, and meant to be called directly by anything orchestrating the pipeline -- the registries here
+ * link a schema before registering it, same as any other caller. Identities are canonicalized through {@link
+ * TsonSchemaRegistry#canonicalIdentity}, the sanctioned seam over {@code tson-schema}'s internal
+ * {@code CanonicalIdentity}: canonicalization is how registry lookups compare identities, not a pipeline
+ * stage of its own, so it stays with the registry that owns the comparison.
  *
  * <p><b>No materialization.</b> An argument-bearing {@code type_ref} does not become a synthesized entry
- * here -- {@code SchemaDesugarer} (in {@code tson-compiler}) has already turned every sugar form and generic
- * application into a real declaration plus a bare reference, one phase earlier, where the AST and the
- * governing meta's own constructor vocabulary are both still in hand. This module cannot reach {@code
- * tson-compiler}, so doing it here meant hand-written per-shape assemblers that covered {@code array}/{@code
- * set} and nothing else; the phase that replaced them binds the constructor generically and so covers every
- * shape. What survives into an entry the linker sees is therefore a bare name in every position except one:
- * a parameterized declaration's own body, which legitimately references its own parameters ({@code
- * array<T>}) and is validated, not rewritten.
+ * here -- {@code SchemaDesugarer} has already turned every sugar form and generic application into a real
+ * declaration plus a bare reference, one phase earlier, where the AST and the governing meta's own
+ * constructor vocabulary are both still in hand. That is what lets it bind the constructor generically and
+ * so cover every shape, rather than the per-shape assemblers a linker-side materialization would need. What
+ * survives into an entry the linker sees is therefore a bare name in every position except one: a
+ * parameterized declaration's own body, which legitimately references its own parameters ({@code array<T>})
+ * and is validated, not rewritten.
  *
  * <p><b>Type-parameter exception:</b> a bare name is valid if it resolves in the schema's own
  * namespace, or if it's one of the checked entry's own declared {@code parameters} -- load-bearing
@@ -153,7 +150,7 @@ public final class TsonSchemaLinker {
         // type-name-namespace-only, per §3.3.2's explicit "NOT extended by the structure namespace". Empty
         // if !!meta isn't registered yet (e.g. meta-kernel's own self-referential !!meta, mid-registration).
         Optional<TsonLinkedSchema> governingMeta =
-                loader == null ? Optional.empty() : loader.load(CanonicalIdentity.of(schema.meta()));
+                loader == null ? Optional.empty() : loader.load(TsonSchemaRegistry.canonicalIdentity(schema.meta()));
         checkMayGovern(schema, governingMeta);
         Map<String, TypeDefinition> structureNamespace = governingMeta
                 .<Map<String, TypeDefinition>>map(linked -> linked.schema().entries()).orElse(Map.of());
@@ -210,7 +207,7 @@ public final class TsonSchemaLinker {
         AnnotatedMap<String, TypeDefinition> result = AnnotatedMap.of(merged);
         if (loader != null) {
             for (String importUri : schema.imports()) {
-                Optional<TsonLinkedSchema> imported = loader.load(CanonicalIdentity.of(importUri));
+                Optional<TsonLinkedSchema> imported = loader.load(TsonSchemaRegistry.canonicalIdentity(importUri));
                 if (imported.isPresent()) {
                     result = carryOver(result, imported.get().schema().entries());
                 }
@@ -301,7 +298,8 @@ public final class TsonSchemaLinker {
      * meta.tn (governed one hop below it) alike.
      */
     private static boolean isMetaKernelGoverned(TsonSchema schema) {
-        return CanonicalIdentity.of(schema.meta()).equals(CanonicalIdentity.of(TsonBundledSchemas.META_KERNEL_ID));
+        return TsonSchemaRegistry.canonicalIdentity(schema.meta())
+                .equals(TsonSchemaRegistry.canonicalIdentity(TsonBundledSchemas.META_KERNEL_ID));
     }
 
     // ── Subtypes (reverse index) ─────────────────────────────────────────
@@ -386,7 +384,7 @@ public final class TsonSchemaLinker {
     private static Map<String, TypeDefinition> mergeImports(List<String> imports, TsonSchemaLoader loader) {
         Map<String, TypeDefinition> merged = new LinkedHashMap<>();
         for (String importUri : imports) {
-            String importIdentity = CanonicalIdentity.of(importUri);
+            String importIdentity = TsonSchemaRegistry.canonicalIdentity(importUri);
             TsonLinkedSchema imported = loader.load(importIdentity).orElseThrow(() -> new TsonSchemaValidationException(
                     "!!import '" + importUri + "' is not registered"));
             for (Map.Entry<String, TypeDefinition> entry : imported.schema().entries().entrySet()) {

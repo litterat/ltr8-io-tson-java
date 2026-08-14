@@ -4,8 +4,7 @@ import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.annotation.Annotations;
-import java.util.Collections;
-import java.util.LinkedHashMap;
+
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -35,10 +34,9 @@ import java.util.Objects;
  * copies both collections; a second, convenience constructor covers the common case (fresh,
  * non-bootstrap) without every caller spelling out the trailing boolean.
  *
- * <p><b>No {@code materialised} flag</b> (removed 2026-07-27, on the user's own explicit
- * direction, replacing an earlier version of this class that carried one) -- "has this schema been
- * through linking" is now a *type* distinction, not a runtime-checked boolean: {@link
- * TsonSchemaLinker#link} is the only thing that produces a {@link TsonLinkedSchema}, and {@link
+ * <p><b>No {@code materialised} flag</b> -- "has this schema been
+ * through linking" is a *type* distinction, not a runtime-checked boolean: {@code
+ * TsonSchemaLinker.link} is the only thing that produces a {@link TsonLinkedSchema}, and {@link
  * TsonSchemaRegistry#register} only accepts one, so "you can't register something that hasn't been
  * linked" is enforced at compile time, not by a flag every caller has to remember to check. See
  * {@link TsonLinkedSchema}'s own Javadoc for why it's a deliberately separate, unrelated record
@@ -52,12 +50,12 @@ import java.util.Objects;
  * itself produced (Part 2 §1.5's "one deliberate circularity in the series": meta-kernel's own
  * {@code !!meta} names its own {@code !!id}, and nothing else is allowed to). A real, stored flag,
  * not derived from {@code id().equals(meta())} -- a *derived* check can't tell "this schema really
- * was produced by reading meta-kernel.tn1 through the real two-pass bootstrap reader" apart from
+ * was produced by reading meta-kernel.tn through the real two-pass bootstrap reader" apart from
  * "this schema merely happens to have matching {@code id}/{@code meta} fields," and the whole point
- * of gating {@link TsonSchemaRegistry#register}/{@link TsonSchemaRegistry#linkBootstrap} on it is to keep
+ * of gating {@link TsonSchemaRegistry#register}/{@code TsonSchemaLinker.linkBootstrap} on it is to keep
  * proving, continuously, that the real reader is what produces whatever ever gets registered under
- * meta-kernel's own identity -- not just that something of the right shape did. Unlike {@code
- * materialised}, this one stays a flag rather than becoming a type: it's true for exactly one
+ * meta-kernel's own identity -- not just that something of the right shape did. This one stays a flag
+ * rather than becoming a type, unlike linked-ness above: it's true for exactly one
  * object in the entire system, ever, so a dedicated type would only relocate the flag (it would
  * still need to survive linking, so {@link TsonLinkedSchema} would need to carry it too) without
  * buying any safety a universal property like linked-ness actually needs.

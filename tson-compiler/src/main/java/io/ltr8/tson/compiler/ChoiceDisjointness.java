@@ -1,4 +1,4 @@
-package io.ltr8.tson.schema;
+package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.ChoiceBody;
@@ -23,11 +23,12 @@ import java.util.Optional;
  * bound intervals; a variant that IS-A another (via its transitive supertypes) is not disjoint. Two cases
  * §5.4 marks a resolver MAY prove are left absent here: record-set disjointness under composition, and
  * pattern disjointness over {@code regex}-constrained atoms. The latter is not attempted even though {@code
- * tson-regex}'s {@code TsonRegex.isDisjointFrom} could decide it exactly -- two {@code regex}/{@code
- * text}-constrained atoms are the same string base-type class, and §5.4's own Tagging rule makes a shared
- * base-type class un-discriminable for TSON text regardless of value-set disjointness (`(email | uri)` is
- * the spec's example), so proving it would give TSON-text untagged reading nothing; it also keeps this
- * module free of a {@code tson-regex} dependency. See {@code BACKLOG.md} for the fuller rationale.
+ * tson-regex}'s {@code TsonRegex.isDisjointFrom} could decide it exactly, and is reachable from this module
+ * -- two {@code regex}/{@code text}-constrained atoms are the same string base-type class, and §5.4's own
+ * Tagging rule makes a shared base-type class un-discriminable for TSON text regardless of value-set
+ * disjointness (`(email | uri)` is the spec's example), so proving it would give TSON-text untagged reading
+ * nothing. It remains worth computing for the {@code @disjoint} assertion check; see {@code BACKLOG.md} for
+ * the fuller rationale.
  */
 final class ChoiceDisjointness {
 

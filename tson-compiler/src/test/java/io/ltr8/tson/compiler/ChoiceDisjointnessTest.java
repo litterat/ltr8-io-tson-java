@@ -1,4 +1,4 @@
-package io.ltr8.tson.schema;
+package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.IntegerSize;
