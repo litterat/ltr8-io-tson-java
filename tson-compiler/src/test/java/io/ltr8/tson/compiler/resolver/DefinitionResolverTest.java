@@ -762,6 +762,32 @@ class DefinitionResolverTest {
                 write(production));
     }
 
+    /**
+     * §5.7 makes the three places a modifier-only entry cannot stand <b>the author's</b> error, not a coverage
+     * gap: "a modifier-only entry whose name matches no inherited field is a resolver error", and in a fresh
+     * record "every field MUST have an explicit type-ref, and the resolver MUST reject modifier-only entries
+     * there". So each is a {@link TsonSchemaValidationException} -- an {@code UnsupportedOperationException}
+     * would tell an author their correct-but-rejected schema is this library's fault.
+     */
+    @Test
+    void rejectsAModifierOnlyEntryWithNoInheritedFieldToTakeATypeFrom() {
+        // (1) a fresh record: nothing to elide toward at all
+        TsonSchemaValidationException fresh = assertThrows(TsonSchemaValidationException.class,
+                () -> resolveAll("config => { host: = \"localhost\" }"));
+        assertTrue(fresh.getMessage().contains("'host'"), fresh.getMessage());
+        assertTrue(fresh.getMessage().contains("§5.7"), fresh.getMessage());
+        // the AST's own toString never reaches an author-facing message
+        assertFalse(fresh.getMessage().contains("FieldDef["), fresh.getMessage());
+
+        // (2) a composition body naming no inherited field: a source exists, but declares no such field
+        TsonSchemaValidationException composed = assertThrows(TsonSchemaValidationException.class,
+                () -> resolveAll("""
+                        config => { host: text }
+                        production => config & { port: = 8080 }
+                        """));
+        assertTrue(composed.getMessage().contains("'port'"), composed.getMessage());
+    }
+
     // ── The ^ refinement operator (§5.7): set, array_min, array_max, array_ranged ──
     //    A refinement re-emits the ENTIRE inherited field set (no new fields), tightening
     //    only the fields the body actually names -- verified end-to-end against the real
@@ -870,11 +896,14 @@ class DefinitionResolverTest {
                 write(arrayRanged));
     }
 
+    /**
+     * A refinement body field naming nothing inherited is the author's error (§5.7: a refinement copies its
+     * source's whole field set and admits no new fields) -- distinct from composition, where a non-matching
+     * name is simply a new field. Hence a {@link TsonSchemaValidationException}: telling an author their
+     * schema is unsupported, when it is in fact rejected by the spec, sends them looking for the wrong fix.
+     */
     @Test
     void refinementRejectsABodyFieldThatAddsRatherThanTightens() throws IOException {
-        // A refinement body field naming nothing inherited is a resolver error (§5.7: "adding
-        // fields is a resolver error") -- distinct from composition, where a non-matching name is
-        // simply a new field.
         SchemaMap schemaMap = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 {
@@ -883,9 +912,12 @@ class DefinitionResolverTest {
                 }""").parseSchemaDocument().body();
         resolved.put("base", resolver.resolve(schemaMap.declarations().get("base")));
 
-        UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
                 () -> resolver.resolve(schemaMap.declarations().get("refined")));
-        assertTrue(thrown.getMessage().contains("adding a field"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("'extra'"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("admits no new fields"), thrown.getMessage());
+        // the AST's own toString never reaches an author-facing message
+        assertFalse(thrown.getMessage().contains("FieldDef["), thrown.getMessage());
     }
 
     // ── A field's generic type-ref (e.g. `set<token>`) ────────────────────

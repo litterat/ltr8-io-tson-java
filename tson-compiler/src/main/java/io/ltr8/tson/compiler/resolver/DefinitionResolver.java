@@ -119,7 +119,8 @@ import java.util.Set;
  *   parameterized: {@code set}'s own {@code <T> ~array<T> ^ { state: = REQUIRED ... }}. Unlike
  *   composition, a refinement copies the source's *entire* field set and admits no new fields --
  *   every body entry MUST tighten an inherited field (reusing {@link #resolveTighteningField}) or
- *   the declaration is a resolver error. {@code source} is recorded verbatim as the result's own
+ *   the declaration is a resolver error, reported as such ({@link
+ *   io.ltr8.tson.schema.TsonSchemaValidationException}) rather than as a coverage gap. {@code source} is recorded verbatim as the result's own
  *   {@code source} (unlike composition, which never sets it); {@code supertypes} accumulates by the
  *   same induction as composition ({@code [sourceName] + source.supertypes()}); the body's own
  *   {@code record.supertypes} stays empty (that field records only direct {@code &} compositions,
@@ -131,7 +132,7 @@ import java.util.Set;
  *   source, are not resolved yet.</li>
  * </ul>
  *
- * Everything else -- elided field types outside a tightening entry, an {@code Absent} modifier
+ * Everything else -- an {@code Absent} modifier
  * value ({@code = _}) or any modifier on an OPTIONAL field, the identity-diagonal value-invariant
  * for a restated FIXED field, restating a field group in a refinement body, a generic
  * type-ref with a nested or value (non-simple) argument, and an inter-supertype field collision --
@@ -916,8 +917,9 @@ final class DefinitionResolver {
             }
             Integer index = inheritedFieldIndex.get(fieldDef.name());
             if (index == null) {
-                throw new UnsupportedOperationException("'" + name + "': refinement body field '" + fieldDef.name()
-                        + "' names no inherited field -- adding a field in a refinement is a resolver error (§5.7)");
+                throw new TsonSchemaValidationException("'" + name + "': refinement body field '" + fieldDef.name()
+                        + "' names no inherited field -- a refinement copies its source's whole field set and "
+                        + "admits no new fields; composition (`&`) is what adds one (§5.7)");
             }
             fields.set(index, resolveTighteningField(name, fieldDef, fields.get(index), parameters));
         }
@@ -1075,9 +1077,11 @@ final class DefinitionResolver {
      * <p>{@code inheritedType}, supplied only from {@link #resolveTighteningField}, is used when
      * {@code field.type()} is elided ({@code field: = value}, a modifier-only entry, §5.7's own
      * "Elided type-refs": the field's type is inherited from the source declaration and only the
-     * value state changes); a fresh (non-tightening) field always passes {@code Optional.empty()}
-     * and an elided type there is still a resolver error (a fresh record has no source to elide
-     * toward, per §5.7).
+     * value state changes); a fresh (non-tightening) field always passes {@code Optional.empty()},
+     * and an elided type with nothing to inherit from is the <b>author's</b> error, not a gap -- §5.7
+     * requires the resolver to reject a modifier-only entry both in a fresh record (no source to elide
+     * toward) and in a composition body naming no inherited field, so it raises {@link
+     * io.ltr8.tson.schema.TsonSchemaValidationException}.
      */
     private RecordField resolveField(FieldDef field, List<String> parameters,
                                       Optional<io.ltr8.tson.schema.meta.TypeRef> inheritedType) {
@@ -1099,7 +1103,15 @@ final class DefinitionResolver {
         } else if (inheritedType.isPresent()) {
             type = inheritedType.get();
         } else {
-            throw new UnsupportedOperationException("an elided field type outside a tightening entry is not resolved yet: " + field);
+            // §5.7: "a modifier-only entry is always a tightening -- it names no type, so it cannot declare a
+            // new field". Reaching here means there was nothing to elide toward: either a fresh record body
+            // ("every field MUST have an explicit type-ref, and the resolver MUST reject modifier-only entries
+            // there") or a composition body entry naming no inherited field. Both are the author's error, not
+            // a gap in this resolver -- the two positions where elision *is* legal resolve above.
+            throw new TsonSchemaValidationException("field '" + field.name() + "' states only a modifier and no "
+                    + "type-ref, but names no inherited field to take a type from -- a modifier-only entry is "
+                    + "always a tightening, so it is only meaningful in a refinement or composition body, "
+                    + "against a field the source declares (§5.7)");
         }
         boolean optional = field.type().map(FieldDef.FieldType::optional).orElse(false);
 

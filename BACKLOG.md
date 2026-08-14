@@ -119,7 +119,6 @@ own prose (which had gone stale on at least one of them):
 
 ## Remaining Part 2 resolution gaps
 
-- [ ] Elided field types outside a tightening entry.
 - [ ] Restating a field group in a refinement body.
 - [ ] Generic type-refs whose arguments are not simple names. A non-simple argument (`weird<[T]>`) is
   rejected outright ("only simple type arguments are resolved so far") — `SchemaDesugarer` reduces an
@@ -151,7 +150,10 @@ The classification of these throw sites is itself tracked under "Schema-side dia
 `UnsupportedOperationException`s across the codebase, three are correct use (an immutable map, an
 unreachable-by-construction guard, `ErrorReader`'s deliberate deferred failure), roughly nine are
 schema-author errors wearing a library-gap exception, and about five wrap an internal fault. Only the
-genuine gaps belong in this section.
+genuine gaps belong in this section — two of the nine have since been reclassified (a modifier-only entry
+with nothing to elide toward, and a refinement body field that adds rather than tightens; both are §5.7
+MUST-rejects and now raise `TsonSchemaValidationException`), which is what removing them from the list
+above means.
 
 ## Schema-side diagnostics
 

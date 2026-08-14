@@ -951,8 +951,8 @@ compatibility).
 
 ## Not yet implemented
 
-- **Part 2 resolution gaps** — elided field types outside a tightening entry, a field group
-  restated in a refinement body, the identity-diagonal FIXED-value invariant, a generic type-ref whose
+- **Part 2 resolution gaps** — a field group restated in a refinement body,
+  the identity-diagonal FIXED-value invariant, a generic type-ref whose
   argument is nested or a value rather than a plain name, and composition/refinement beyond the simple
   record-over-record case (a generic or non-record supertype, a non-record refinement source, an
   inter-supertype field collision). `DefinitionResolver`'s Javadoc is the exact current boundary, and
