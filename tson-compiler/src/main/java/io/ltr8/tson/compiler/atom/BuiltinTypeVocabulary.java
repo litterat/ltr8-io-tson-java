@@ -37,7 +37,15 @@ import java.util.Optional;
  * ({@code ipv4}, §5.5) -- see {@link Ipv4Parser}'s Javadoc for why its JDK leniency gap is a real
  * SSRF-adjacent concern, not just a spec-fidelity one, and how that's handled. And with {@code
  * ipv6_type} ({@code ipv6}, §5.5) -- a hand-rolled RFC 4291 §2.2 compiler for the same reason, see
- * {@link Ipv6Parser}'s Javadoc.
+ * {@link Ipv6Parser}'s Javadoc. And with {@code mac_type} ({@code mac}, §5.5, EUI-48 per RFC 9542).
+ *
+ * <p><b>{@code email} is seeded too, which §5.5's table does not list</b> -- a known departure, the same
+ * kind as the integer ladder above. core.tn groups {@code email} with {@code uuid}/{@code ipv4}/{@code mac}
+ * under one "Network Types" banner and gives it the identical shape, §5.1 invites a reader to treat core.tn
+ * as the vocabulary's source of truth, and a real {@link EmailParser} exists -- withholding it from the
+ * schemaless path would only make the two read paths disagree about what {@code !email} means. See {@code
+ * SPEC-FEEDBACK.md} #5, which asks the spec to add the row and say what conformance to its RFC 5322 pin
+ * actually obliges.
  */
 public final class BuiltinTypeVocabulary {
 
@@ -82,6 +90,9 @@ public final class BuiltinTypeVocabulary {
         types.put(DurationParser.TYPENAME, DurationParser.UNCONSTRAINED);
 
         types.put(UriParser.TYPENAME, UriParser.UNCONSTRAINED);
+
+        types.put(MacParser.TYPENAME, MacParser.UNCONSTRAINED);
+        types.put(EmailParser.TYPENAME, EmailParser.UNCONSTRAINED);
 
         types.put(Ipv4Parser.TYPENAME, Ipv4Parser.UNCONSTRAINED);
         types.put(Ipv6Parser.TYPENAME, Ipv6Parser.UNCONSTRAINED);

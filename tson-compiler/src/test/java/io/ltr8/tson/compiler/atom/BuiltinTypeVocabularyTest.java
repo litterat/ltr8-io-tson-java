@@ -75,9 +75,25 @@ class BuiltinTypeVocabularyTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"cidr4", "cidr6", "mac", "not_a_type", "binary"})
+    @ValueSource(strings = {"cidr4", "cidr6", "not_a_type", "binary"})
     void namesFromFamiliesNotYetImplementedAreNotRegistered(String name) {
         assertFalse(BuiltinTypeVocabulary.lookup(name).isPresent());
+    }
+
+    @org.junit.jupiter.api.Test
+    void macAtomIsRegistered() {
+        assertTrue(BuiltinTypeVocabulary.lookup("mac").isPresent());
+    }
+
+    /**
+     * {@code email} is registered although §5.5's table has no row for it -- a known departure, like the
+     * integer width ladder. core.tn groups it with {@code uuid}/{@code ipv4}/{@code mac} identically, and a
+     * real parser exists, so withholding it would only make the schemaless and schema-driven paths disagree
+     * about what {@code !email} means. See {@code SPEC-FEEDBACK.md} #5.
+     */
+    @org.junit.jupiter.api.Test
+    void emailAtomIsRegisteredDespiteNotBeingInTheTable() {
+        assertTrue(BuiltinTypeVocabulary.lookup("email").isPresent());
     }
 
     @org.junit.jupiter.api.Test

@@ -897,9 +897,13 @@ compatibility).
   (`array_ranged`, and so §5.3's sized sugar) instantiates via argument routing; a *record* template
   (`box => <T> { v: T }`), whose parameter is a field type, is rejected at the application site instead.
   `BACKLOG.md` has the shape of the remaining work.
-- **Undocumented atom constructors** — `unknown`/`email`/`cidr4`/`cidr6`/`mac` (and `extern`, which has no
-  core.tn declaration) have no compiled-parser factory, so they compile to `ErrorReader` (a schema merely
-  *declaring* one still compiles). `complex`/`ipv4`/`ipv6` do have parsers.
+- **Undocumented atom constructors** — `unknown`/`cidr4`/`cidr6` (and `extern`, which has no core.tn
+  declaration) have no compiled-parser factory, so they compile to `ErrorReader` (a schema merely
+  *declaring* one still compiles). `complex`/`ipv4`/`ipv6`/`mac`/`email` do have parsers. **`email` is
+  seeded into `BuiltinTypeVocabulary` although §5.5's table has no row for it** — a known departure like the
+  integer ladder, because core.tn groups it with its siblings identically and withholding it would only make
+  the two read paths disagree (`SPEC-FEEDBACK.md` #5). Its format check is a documented subset of RFC 5322 —
+  the `dot-atom` core, without quoted local parts, domain literals or comments.
 - **`uri_type`/`regex_type` object-binding** — their RFC-citation field is nested inside `specification:
   AtomSpecification` rather than flat, so it never receives a schema-composed default the way
   `email_type`'s flat `spec` field does. Subtype *dispatch* to them works; this is a narrower field-binding

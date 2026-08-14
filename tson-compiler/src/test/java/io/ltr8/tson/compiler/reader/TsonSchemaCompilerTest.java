@@ -7,7 +7,7 @@ import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.meta.EmailType;
+import io.ltr8.tson.schema.meta.Cidr4Type;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -75,14 +75,14 @@ class TsonSchemaCompilerTest {
 
     @Test
     void anEntryWithNoRegisteredFactoryDoesNotBlockCompilingTheRestOfTheSchemaButFailsOnlyWhenActuallyRead() {
-        // "orphan" uses a constructor ("email_type") with no compiled reader at all -- TsonSchemaCompiler
+        // "orphan" uses a constructor ("cidr4_type") with no compiled reader at all -- TsonSchemaCompiler
         // .compile() still builds the whole schema eagerly, including "orphan" itself (get("orphan")
         // succeeds, unlike the old lazy behavior where it never got attempted at all until asked for);
         // "used" (which never references "orphan") reads normally either way.
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("used", TypeDefinition.product(RecordBody.of(List.of())));
         entries.put("orphan", new TypeDefinition(Optional.empty(), TypeKind.ATOM,
-                List.of(), true, List.of(), List.of(), Optional.empty(), EmailType.UNCONSTRAINED));
+                List.of(), true, List.of(), List.of(), Optional.empty(), Cidr4Type.UNCONSTRAINED));
         TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
 

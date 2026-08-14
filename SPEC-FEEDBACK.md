@@ -159,16 +159,24 @@ schema-only"), so a reader relying on core.tn1 as the built-in vocabulary's sour
 explicitly invites) would reasonably expect `!email` to exist as a schemaless annotation and be surprised
 to find it doesn't parse.
 
-**Interpretation chosen:** Treat the Part 1 §5.5 table as authoritative and exhaustive for the schemaless
-vocabulary — `!email` is not implemented as a built-in annotation in this implementation's Class 1
-resolver, matching the letter of §5.5. An unannotated email-shaped token, or one under an unrecognized
-`!email` annotation, falls through to ordinary base type resolution (§4) / uninterpreted-marker
-preservation (§3.2) respectively, same as any other non-vocabulary name.
+**Interpretation chosen:** Implement `!email` as a built-in annotation — registered in
+`BuiltinTypeVocabulary` alongside its siblings, backed by `EmailParser`, and read identically whether or
+not a schema is in scope. This is a **known, deliberate departure from §5.5's published table**, of the
+same kind as the `int8`..`int256` ladder in entry #6: core.tn is treated as the vocabulary's source of
+truth where the table and the library disagree, which is what §5.1 invites a reader to do.
 
-**Suggested resolution:** Either add an `!email` row to §5.5 (if the omission is accidental), or add a
-sentence to §5.1/§5.5 stating explicitly that `email` is deliberately schema-only and not part of the
-schemaless built-in set — RFC 5322 email validation is notoriously heavyweight/contentious to fully
-implement, which would be a reasonable rationale, but the spec doesn't currently say so.
+The alternative — honouring the table by withholding the annotation while still shipping the parser for
+schema-driven reads — was implemented first and then rejected. It buys nothing: the parser exists either
+way, and the only effect is that the schemaless and schema-driven paths disagree about what `!email`
+means, which is a worse outcome than diverging from a table that gives no reason for the omission.
+
+**Suggested resolution:** Add an `!email` row to §5.5 — and, in the same edit, say what conformance to
+its RFC 5322 pin actually requires. The row alone would not settle anything, because full RFC 5322
+`addr-spec` admits quoted local parts (`"a b"@example.com`), domain literals (`user@[192.0.2.1]`) and
+embedded comments, none of which belong in an interchange format's scalar and none of which this
+implementation accepts (see `EmailParser`, and entry #22 for the general form of this question). Naming
+the RFC without scoping it leaves every implementation to pick its own subset and call it conformant —
+which is exactly what has happened here.
 
 ---
 
@@ -920,11 +928,16 @@ unstated:
    same data yet disagree on whether a `pattern` matches.
 
 **Interpretation chosen:** Treat the pin as strict *intent* — a `regex` value should be valid I-Regexp
-or a resolver error — and commit to a native I-Regexp parser/AST/matcher so this implementation defines
-I-Regexp behavior, not the JVM (tracked in `BACKLOG.md`, "I-Regexp engine"). Until that lands, the
-current `RegexParser`/`TextParser` delegate well-formedness and matching to `java.util.regex`, which is
-a **known, documented non-conformance**: it accepts non-I-Regexp constructs and matches shared
-constructs with `java.util.regex` semantics, not RFC 9485's.
+or a resolver error. The native engine this called for has landed: `tson-regex` parses RFC 9485 to its own
+AST and matches with a Thompson-NFA/Pike-VM, so `RegexParser`/`TextParser`/`UriParser` define I-Regexp
+behaviour here rather than inheriting `java.util.regex`'s laxer superset.
+
+**`email` is the second instance of the same question**, and is answered the other way. `email_type`'s
+`spec` is `REQUIRED_FIXED` to RFC 5322, but `EmailParser` implements a documented *subset* — the
+`dot-atom "@" dot-atom` core, rejecting quoted local parts, domain literals and comments, all of which RFC
+5322 admits. Unlike I-Regexp, the full grammar here is not worth conforming to: it would admit addresses
+containing spaces and parentheses into a field consumers treat as a token. So one RFC pin is honoured
+strictly and another deliberately is not, which is exactly why the spec should say what a pin obliges.
 
 **Suggested resolution:** Two additions. (a) State explicitly whether the RFC 9485 pin is a strict
 subset gate — recommended, consistent with the `REQUIRED_FIXED` pin and the interoperability premise: a

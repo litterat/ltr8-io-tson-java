@@ -6,7 +6,7 @@ import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.meta.EmailType;
+import io.ltr8.tson.schema.meta.Cidr4Type;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
@@ -54,17 +54,22 @@ class ValueReaderFactoryRegistryTest {
         assertSame(registry.resolve("record"), registry.resolve("record"));
     }
 
+    /**
+     * {@code cidr4_type} stands in for the group with no compiled parser; {@code CoreSchemaImportTest}
+     * pins the current membership. If it ever gains one, pick another from that set rather than deleting
+     * this -- the ErrorReader-not-compile-failure behaviour is what is under test, not the constructor.
+     */
     @Test
     void aConstructorWithNoCompiledParserYetStillResolvesButFailsOnlyWhenActuallyRead() {
         ValueReaderFactoryRegistry registry = ValueReaderFactoryRegistry.tree();
         TypeDefinition entry = new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), true,
-                List.of(), List.of(), Optional.empty(), EmailType.UNCONSTRAINED);
+                List.of(), List.of(), Optional.empty(), Cidr4Type.UNCONSTRAINED);
 
-        TsonTypeReader<?> reader = registry.resolve("email_type").create("email", entry, CONTEXT);
+        TsonTypeReader<?> reader = registry.resolve("cidr4_type").create("cidr4", entry, CONTEXT);
 
         UnsupportedOperationException thrown =
                 assertThrows(UnsupportedOperationException.class, () -> reader.read((TsonReadContext) null));
-        assertEquals(true, thrown.getMessage().contains("email"));
+        assertEquals(true, thrown.getMessage().contains("cidr4"));
     }
 
     @Test

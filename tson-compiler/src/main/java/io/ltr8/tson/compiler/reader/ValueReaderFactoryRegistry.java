@@ -42,7 +42,7 @@ import java.util.function.UnaryOperator;
  * verified against both files directly, not assumed. Six of them (see {@link #notImplemented}'s own
  * call sites, deliberately grouped at the bottom of {@link #baseFactories} rather than interleaved
  * with the working entries above) still have no compiled reader at all -- {@code extern}, {@code
- * unknown_type}, {@code email_type}, {@code cidr4_type}, {@code cidr6_type}, {@code mac_type} --
+ * unknown_type}, {@code cidr4_type}, {@code cidr6_type} --
  * registered anyway, to an {@link ErrorReader}, so a schema merely *declaring* one of them still
  * compiles; only reading a value against one actually fails. {@code complex_type}/{@code
  * ipv4_type}/{@code ipv6_type} used to be in this group too -- wired up to the real {@code
@@ -128,6 +128,8 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         factories.put("duration_type", leaf.apply(AtomTypeReader.DURATION_TYPE));
         factories.put("uuid_type", leaf.apply(AtomTypeReader.UUID_TYPE));
         factories.put("complex_type", leaf.apply(AtomTypeReader.COMPLEX_TYPE));
+        factories.put("mac_type", leaf.apply(AtomTypeReader.MAC_TYPE));
+        factories.put("email_type", leaf.apply(AtomTypeReader.EMAIL_TYPE));
         factories.put("ipv4_type", leaf.apply(AtomTypeReader.IPV4_TYPE));
         factories.put("ipv6_type", leaf.apply(AtomTypeReader.IPV6_TYPE));
 
@@ -141,10 +143,8 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         // ---- schema declaring one still compiles; only reading a value against one actually fails.
         factories.put("extern", notImplemented("extern"));
         factories.put("unknown_type", notImplemented("unknown_type"));
-        factories.put("email_type", notImplemented("email_type"));
         factories.put("cidr4_type", notImplemented("cidr4_type"));
         factories.put("cidr6_type", notImplemented("cidr6_type"));
-        factories.put("mac_type", notImplemented("mac_type"));
 
         // Collections.unmodifiableMap, not Map.copyOf -- preserves the LinkedHashMap's own insertion
         // order (Map.copyOf's own iteration order is unspecified), so the "not implemented" block

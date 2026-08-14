@@ -184,9 +184,11 @@ own prose (which had gone stale on at least one of them):
 
 ## Remaining built-in types
 
-- [ ] `cidr4`/`cidr6`/`email`/`mac`/`unknown` — no compiled-parser factory yet
-  (`ValueReaderFactoryRegistry` registers these constructors to `ErrorReader`). Pinned down exactly
-  by `CoreSchemaImportTest.exactlyTheFiveUndocumentedAtomConstructorsCompileToErrorReaders`.
+- [ ] `cidr4`/`cidr6`/`unknown` — no compiled-parser factory yet (`ValueReaderFactoryRegistry` registers
+  these constructors to `ErrorReader`). Pinned down exactly by
+  `CoreSchemaImportTest.exactlyTheThreeUndocumentedAtomConstructorsCompileToErrorReaders`. `mac` and
+  `email` left this set when their parsers landed; `cidr4`/`cidr6` compose on the existing
+  `Ipv4Parser`/`Ipv6Parser` and are the natural next pair.
 - [ ] `uri_type`/`regex_type` — don't bind correctly in object-binding mode. Their RFC-citation
   field is nested inside `specification: AtomSpecification` rather than flat, so it never receives
   a schema-composed default the way `email_type`'s own flat `spec` field does.

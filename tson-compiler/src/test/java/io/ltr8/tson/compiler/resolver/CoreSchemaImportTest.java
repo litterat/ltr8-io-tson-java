@@ -103,16 +103,16 @@ class CoreSchemaImportTest {
      * deferral means a broken entry wouldn't have failed that step; it would silently have compiled to
      * an {@code ErrorReader} instead (see that class's own Javadoc), only throwing once someone
      * actually tries to {@code read} it. This confirms exactly which entries land there and pins the
-     * set down: {@code cidr4}/{@code cidr6}/{@code email}/{@code mac}/{@code unknown} -- constructed
-     * via {@code cidr4_type}/{@code cidr6_type}/{@code email_type}/{@code mac_type}/{@code
-     * unknown_type}, five of the six constructors {@link ValueReaderFactoryRegistry} registers to
-     * {@code ErrorReader} outright (the sixth, {@code extern}, has no core.tn1 declaration at all) --
+     * set down: {@code cidr4}/{@code cidr6}/{@code unknown} -- constructed via {@code cidr4_type}/{@code
+     * cidr6_type}/{@code unknown_type}, three of the four constructors {@link ValueReaderFactoryRegistry}
+     * registers to {@code ErrorReader} outright (the fourth, {@code extern}, has no core.tn declaration at
+     * all; {@code email} and {@code mac} left this set when their parsers landed) --
      * a real, already-documented, deliberate gap (see this repo's own CLAUDE.md, "Not yet
      * implemented"), not a regression to chase. Every *other* entry compiles to a genuinely usable
      * reader.
      */
     @Test
-    void exactlyTheFiveUndocumentedAtomConstructorsCompileToErrorReaders() {
+    void exactlyTheThreeUndocumentedAtomConstructorsCompileToErrorReaders() {
         Loaded loaded = loadMetaKernelMetaAndCore();
         TsonSchema core = loaded.schemaRegistry().get(TsonBundledSchemas.CORE_ID).orElseThrow().schema();
 
@@ -130,6 +130,6 @@ class CoreSchemaImportTest {
             }
         }
 
-        assertEquals(Set.of("cidr4", "cidr6", "email", "mac", "unknown"), errored);
+        assertEquals(Set.of("cidr4", "cidr6", "unknown"), errored);
     }
 }

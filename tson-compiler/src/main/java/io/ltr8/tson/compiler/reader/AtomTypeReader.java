@@ -12,11 +12,13 @@ import io.ltr8.tson.compiler.atom.DateParser;
 import io.ltr8.tson.compiler.atom.DateTimeParser;
 import io.ltr8.tson.compiler.atom.DecimalParser;
 import io.ltr8.tson.compiler.atom.DurationParser;
+import io.ltr8.tson.compiler.atom.EmailParser;
 import io.ltr8.tson.compiler.atom.EnumParser;
 import io.ltr8.tson.compiler.atom.FloatParser;
 import io.ltr8.tson.compiler.atom.IntegerParser;
 import io.ltr8.tson.compiler.atom.Ipv4Parser;
 import io.ltr8.tson.compiler.atom.Ipv6Parser;
+import io.ltr8.tson.compiler.atom.MacParser;
 import io.ltr8.tson.compiler.atom.RationalParser;
 import io.ltr8.tson.compiler.atom.RegexParser;
 import io.ltr8.tson.compiler.atom.TextParser;
@@ -31,10 +33,12 @@ import io.ltr8.tson.schema.meta.BinaryType;
 import io.ltr8.tson.schema.meta.DateTimeType;
 import io.ltr8.tson.schema.meta.DateType;
 import io.ltr8.tson.schema.meta.DecimalType;
+import io.ltr8.tson.schema.meta.EmailType;
 import io.ltr8.tson.schema.meta.DurationType;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.FloatType;
 import io.ltr8.tson.schema.meta.IntegerType;
+import io.ltr8.tson.schema.meta.MacType;
 import io.ltr8.tson.schema.meta.RationalType;
 import io.ltr8.tson.schema.meta.RegexType;
 import io.ltr8.tson.schema.meta.SourcePosition;
@@ -88,6 +92,11 @@ final class AtomTypeReader<T> implements TsonTypeReader<T> {
     static final ValueReaderFactory REGEX_TYPE = (name, definition, _) ->
             new AtomTypeReader<>(name, new RegexParser((RegexType) definition.body()), definition.position());
     /** {@code complex_type} has nothing to configure ({@code component} is fixed, not modeled -- see {@link ComplexParser}'s own Javadoc), so this ignores {@code definition}'s own body entirely (though not its position) and always wraps the one {@link ComplexParser#UNCONSTRAINED} singleton. */
+    static final ValueReaderFactory MAC_TYPE = (name, definition, _) ->
+            new AtomTypeReader<>(name, new MacParser((MacType) definition.body()), definition.position());
+    static final ValueReaderFactory EMAIL_TYPE = (name, definition, _) ->
+            new AtomTypeReader<>(name, new EmailParser((EmailType) definition.body()), definition.position());
+
     static final ValueReaderFactory COMPLEX_TYPE = (name, definition, _) ->
             new AtomTypeReader<>(name, ComplexParser.UNCONSTRAINED, definition.position());
     /** {@code within}/{@code excluding} ({@code schema.meta.Ipv4Type}'s own fields) aren't modeled by {@link Ipv4Parser} -- see its own Javadoc -- so, like {@link #COMPLEX_TYPE}, this ignores {@code definition}'s own body. */

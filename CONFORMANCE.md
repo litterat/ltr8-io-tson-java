@@ -61,13 +61,24 @@ no simple shape to shim in front of `URI`'s constructor the way a four-group hex
 and writing an RFC 3986 validator from scratch isn't worth it at this stage, so `java.net.URI`'s behavior
 is accepted as `!uri`'s actual contract for now. See `UriParser`'s Javadoc.
 
-**`RegexParser` accepts `java.util.regex.Pattern`'s own syntax, not a real RFC 9485 (I-Regexp) validator.**
-Not part of Part 1's published built-in vocabulary (`TextParser`/`RegexParser` are groundwork for Part 2,
-which doesn't yet have anything that consumes a `regex` constraint), but the same kind of conformance
-call as the `!uri` gap above: I-Regexp is a deliberately restricted, interoperable subset of a
-different regex dialect (roughly ECMA-262) than `java.util.regex`'s own Perl-derived syntax, and
-neither is a subset of the other. Writing an RFC 9485 validator from scratch is real, standalone work,
-not worth doing before anything actually needs it. See `RegexParser`'s Javadoc.
+**Two deliberate departures from the published vocabulary, both toward core.tn.** §5.6's table lists four
+integer atoms where core.tn defines the full `int8`..`int256`/`uint8`..`uint256` ladder plus four bound-only
+refinements, and §5.5's table omits `email` while listing every one of its "Network Types" siblings. Both
+are seeded here as core.tn defines them, on §5.1's own invitation to treat the core library as the
+vocabulary's source of truth. See `SPEC-FEEDBACK.md` #6 and #5.
+
+**`!email` implements a subset of RFC 5322, not the whole grammar.** `email_type`'s `spec` is
+`REQUIRED_FIXED` to RFC 5322, but `EmailParser` accepts only the `dot-atom "@" dot-atom` core; quoted local
+parts (`"a b"@example.com`), domain literals (`user@[192.0.2.1]`) and embedded comments are rejected though
+the RFC admits them. Accepting them would admit spaces, brackets and parentheses into a scalar consumers
+treat as a token. The same kind of call as the `!uri` gap above, and pinned by `EmailParserTest` so it stays
+a decision. See `SPEC-FEEDBACK.md` #5 and #22.
+
+**`RegexParser` is a real RFC 9485 (I-Regexp) validator, not `java.util.regex`.** The `tson-regex` module
+parses I-Regexp to its own AST and matches with a Thompson-NFA/Pike-VM — linear-time, so ReDoS-safe — which
+means this implementation defines I-Regexp behaviour rather than inheriting the JVM's Perl-derived superset.
+`TextParser`/`UriParser` match their `pattern` constraint through the same engine. See `RegexParser`'s
+Javadoc and `SPEC-FEEDBACK.md` #22.
 
 **One open question.** Whether `!duration` accepts ISO 8601's alternative `PnW` week form is genuinely
 ambiguous — §5.4's table shows only `PnYnMnDTnHnMnS`. This implementation rejects `PnW` as the more
