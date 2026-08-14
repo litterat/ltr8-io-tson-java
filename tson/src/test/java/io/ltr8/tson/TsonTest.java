@@ -10,6 +10,7 @@ import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -51,7 +52,7 @@ class TsonTest {
         // int32 has a real bit-width (size: {bits: 32 signed: true}), so IntegerParser narrows to Integer;
         // atom reading is shared verbatim across read modes, so the tree leaf holds that same typed value.
         TsonValue myInt = (TsonValue) compiled.get("my_int").read(TestDocuments.document("42"));
-        assertEquals(42, myInt.asNumber().orElseThrow().intValue());
+        assertEquals(Optional.of(42), myInt.as(Integer.class)); // as(Class) asserts the host type; asInt() would take either
 
         // my_percentage never sets size, so IntegerParser falls back to BigInteger.
         TsonValue myPercentage = (TsonValue) compiled.get("my_percentage").read(TestDocuments.document("50"));
@@ -91,7 +92,7 @@ class TsonTest {
         TsonCompiledSchema compiled = tson.treeRegistry().compile(tson.resolve(TINY_DOCUMENT));
 
         TsonValue myInt = (TsonValue) compiled.get("my_int").read(TestDocuments.document("7"));
-        assertEquals(7, myInt.asNumber().orElseThrow().intValue());
+        assertEquals(7, myInt.asInt().orElseThrow());
     }
 
     @Test

@@ -5,6 +5,9 @@ import java.math.BigInteger;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalDouble;
+import java.util.OptionalInt;
+import java.util.OptionalLong;
 import java.util.stream.Stream;
 
 /**
@@ -160,4 +163,93 @@ public sealed interface TsonValue
     default Optional<Number> asNumber()         { return as(Number.class); }
     default Optional<BigInteger> asBigInteger() { return as(BigInteger.class); }
     default Optional<BigDecimal> asBigDecimal() { return as(BigDecimal.class); }
+
+    // --- numeric conveniences (converting, unlike the as* above, which only cast) ---
+
+    /**
+     * This node's value as an {@code int} if it is a number that fits exactly, else empty.
+     *
+     * <p><b>Exact, so nothing is silently lost.</b> A fractional part that <em>is</em> integral converts
+     * ({@code 123.0} and {@code 234.56E2} both give an {@code int}); a real one ({@code 345.6}) does not.
+     * A magnitude outside {@code int} range fails rather than saturating or wrapping. Text is never parsed:
+     * {@code "42"} is a string per §4.4, and {@link #asString()} is what reads it.
+     *
+     * <p>These convert where {@link #asBigInteger()}/{@link #asBigDecimal()} only cast — an {@code int32}
+     * field whose host value is an {@code Integer} answers {@code asInt()} but not {@code asBigInteger()}.
+     */
+    default OptionalInt asInt() {
+        Optional<BigDecimal> decimal = asExactDecimal();
+        if (decimal.isEmpty()) {
+            return OptionalInt.empty();
+        }
+        try {
+            return OptionalInt.of(decimal.get().intValueExact());
+        } catch (ArithmeticException notExact) {
+            return OptionalInt.empty();
+        }
+    }
+
+    /** This node's value as a {@code long} if it is a number that fits exactly, else empty. See {@link #asInt()}. */
+    default OptionalLong asLong() {
+        Optional<BigDecimal> decimal = asExactDecimal();
+        if (decimal.isEmpty()) {
+            return OptionalLong.empty();
+        }
+        try {
+            return OptionalLong.of(decimal.get().longValueExact());
+        } catch (ArithmeticException notExact) {
+            return OptionalLong.empty();
+        }
+    }
+
+    /**
+     * This node's value as a finite {@code double} if it is a number, else empty.
+     *
+     * <p>Rounding to the nearest {@code double} is accepted -- that is what a binary floating-point
+     * accessor <em>means</em>, and demanding exactness would reject {@code 0.1}. What is not accepted is a
+     * magnitude too large to be finite: that yields empty rather than {@code Infinity}, so an
+     * out-of-range value can never read back as a plausible one.
+     */
+    default OptionalDouble asDouble() {
+        Optional<BigDecimal> decimal = asExactDecimal();
+        if (decimal.isEmpty()) {
+            return OptionalDouble.empty();
+        }
+        double value = decimal.get().doubleValue();
+        return Double.isFinite(value) ? OptionalDouble.of(value) : OptionalDouble.empty();
+    }
+
+    /**
+     * This node's numeric value as a {@code BigDecimal}, the one form every exactness question above can be
+     * asked of, or empty when the node isn't a finite number.
+     *
+     * <p>Each host type contributes the decimal it <em>prints</em> as rather than its exact binary
+     * expansion, so a {@code float} {@code 0.1} is {@code 0.1} and not {@code 0.100000001490116119384765625}
+     * -- the shortest form that round-trips is the one an author wrote and a writer emits.
+     */
+    private Optional<BigDecimal> asExactDecimal() {
+        return asNumber().flatMap(TsonValue::toDecimal);
+    }
+
+    private static Optional<BigDecimal> toDecimal(Number number) {
+        return switch (number) {
+            case BigDecimal value -> Optional.of(value);
+            case BigInteger value -> Optional.of(new BigDecimal(value));
+            case Double value -> Double.isFinite(value) ? Optional.of(BigDecimal.valueOf(value)) : Optional.empty();
+            case Float value -> Float.isFinite(value) ? Optional.of(new BigDecimal(value.toString())) : Optional.empty();
+            case Byte value -> Optional.of(BigDecimal.valueOf(value.longValue()));
+            case Short value -> Optional.of(BigDecimal.valueOf(value.longValue()));
+            case Integer value -> Optional.of(BigDecimal.valueOf(value.longValue()));
+            case Long value -> Optional.of(BigDecimal.valueOf(value));
+            // An atom parser may hand back any Number; take its printed form when that is a decimal at all,
+            // so a host type this model doesn't enumerate (AtomicLong, a custom fixed-point) still reads.
+            default -> {
+                try {
+                    yield Optional.of(new BigDecimal(number.toString()));
+                } catch (NumberFormatException notADecimal) {
+                    yield Optional.empty();
+                }
+            }
+        };
+    }
 }

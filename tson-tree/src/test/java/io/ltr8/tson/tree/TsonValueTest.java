@@ -2,11 +2,15 @@ package io.ltr8.tson.tree;
 
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalDouble;
+import java.util.OptionalInt;
+import java.util.OptionalLong;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -135,6 +139,46 @@ class TsonValueTest {
         assertEquals(Optional.empty(), node.asString());
         assertEquals(Optional.of(BigInteger.TEN), TsonAtom.of(BigInteger.TEN).asNumber().map(n -> BigInteger.valueOf(n.longValue())));
         assertTrue(TsonAtom.of(true).asBoolean().orElseThrow());
+    }
+
+    @Test
+    void numericConveniencesConvertExactlyOrGiveUp() {
+        // the ceremony these replace: asNumber().orElseThrow().intValue()
+        assertEquals(30, sample().get("age").asInt().orElseThrow());
+        assertEquals(30L, sample().get("age").asLong().orElseThrow());
+        assertEquals(30.0, sample().get("age").asDouble().orElseThrow());
+        // an integral fractional part converts; a real one doesn't
+        assertEquals(123, TsonAtom.of(new BigDecimal("123.0")).asInt().orElseThrow());
+        assertEquals(23456, TsonAtom.of(new BigDecimal("234.56E2")).asInt().orElseThrow());
+        assertEquals(OptionalInt.empty(), TsonAtom.of(new BigDecimal("345.6")).asInt());
+        assertEquals(3, TsonAtom.of(3.0d).asInt().orElseThrow());
+        assertEquals(OptionalInt.empty(), TsonAtom.of(0.1d).asInt());
+        // out of range fails rather than wrapping or saturating -- long still holds what int can't
+        TsonAtom big = TsonAtom.of(BigInteger.valueOf(Long.MAX_VALUE));
+        assertEquals(OptionalInt.empty(), big.asInt());
+        assertEquals(Long.MAX_VALUE, big.asLong().orElseThrow());
+        assertEquals(OptionalLong.empty(), TsonAtom.of(BigInteger.TWO.pow(80)).asLong());
+        // these convert where asBigInteger only casts: an int32 field holds an Integer
+        TsonAtom narrowed = TsonAtom.of(7, "int32");
+        assertEquals(7, narrowed.asInt().orElseThrow());
+        assertEquals(Optional.empty(), narrowed.asBigInteger());
+    }
+
+    @Test
+    void numericConveniencesRejectNonNumbersAndInfinity() {
+        // "42" is a string per §4.4 -- text is never parsed back into a number
+        assertEquals(OptionalInt.empty(), TsonAtom.of("42").asInt());
+        assertEquals(OptionalDouble.empty(), TsonAtom.of("42").asDouble());
+        assertEquals(OptionalInt.empty(), TsonAtom.of(true).asInt());
+        // a non-atom, and a node that isn't there at all
+        assertEquals(OptionalInt.empty(), sample().asInt());
+        assertEquals(OptionalLong.empty(), sample().get("nope").asLong());
+        assertEquals(OptionalDouble.empty(), TsonNull.instance().asDouble());
+        // rounding to the nearest double is what a double accessor means...
+        assertEquals(0.1d, TsonAtom.of(new BigDecimal("0.1")).asDouble().orElseThrow());
+        assertEquals(0.1d, TsonAtom.of(0.1f).asDouble().orElseThrow());
+        // ...but a magnitude that can't be finite yields empty, never Infinity
+        assertEquals(OptionalDouble.empty(), TsonAtom.of(new BigDecimal("1E400")).asDouble());
     }
 
     @Test

@@ -22,15 +22,6 @@ previously had to fully qualify. It also aligns with JEP 540's sealed `JsonValue
 `TsonRecord`+`TsonMap` staying *more* precise than `JsonObject`, which cannot distinguish the two.
 What's left:
 
-- [ ] **Convenience numeric accessors — `asInt()`/`asLong()`/`asDouble()`.** `TsonValue` offers
-  `asNumber()`/`asBigInteger()`/`asBigDecimal()`/`as(Class)`, so extracting an `int` reads
-  `node.get("age").asNumber().orElseThrow().intValue()` where JEP 540's peer reads
-  `json.get("temperature").asInt()`. This codebase's own tests show the ceremony. Default methods on the
-  sealed interface, alongside the general low-level form rather than replacing it. Borrow JEP 540's
-  conversion semantics while doing it: exact-representability required, but a syntactic fractional part
-  that *is* integral converts (`123.0` and `234.56E2` succeed as `int`, `345.6` does not), and
-  out-of-range fails rather than silently saturating or yielding infinity.
-
 - [ ] **Copy-on-write transforms + builders (parked).** The "new tree from old" editing half —
   `TsonRecord.with(name, value)`/`without(name)`, `TsonArray.with(i, value)`/`plus(value)`/`without(i)`,
   `TsonRecord.builder()`, and a pointer-based `set("/a/b", value) → new tree`. All pure `tson-tree`

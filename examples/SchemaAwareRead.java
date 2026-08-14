@@ -35,11 +35,11 @@ void main() {
             !!schema:"https://example.com/2026/32/app/server-1.tn"
             !server { hostname: "web-01"  port: 8080 }""");
     IO.println("validated hostname: " + server.get("hostname").asString().orElseThrow());   // web-01
-    IO.println("validated port:     " + server.at("/port").asNumber().orElseThrow());         // 8080
+    IO.println("validated port:     " + server.at("/port").asInt().orElseThrow());         // 8080
 
     // The same reader, given a document with no `!!schema`, reads schemalessly -- straight off the wire.
     TsonValue raw = tson.treeReader().read("{ hostname: \"db-01\"  port: 5432 }");
-    IO.println("schemaless port:    " + raw.at("/port").asNumber().orElseThrow());             // 5432
+    IO.println("schemaless port:    " + raw.at("/port").asInt().orElseThrow());             // 5432
 
     // A value that violates the schema is rejected fail-fast, rather than returned wrong.
     try {

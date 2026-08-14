@@ -303,7 +303,7 @@ TsonValue value = tson.treeReader()
         .readAs("{ hostname: \"web-01\"  port: 8080 }", "server");
 
 value.get("hostname").asString();          // Optional[web-01] — validated against the schema
-value.get("port").as(Number.class);        // Optional[8080] — a bad port would surface as a diagnostic
+value.get("port").asInt();                 // OptionalInt[8080] — a bad port would surface as a diagnostic
 ```
 
 You supply exactly what a `!!schema` directive and a root type-ref would have said, and the validation is

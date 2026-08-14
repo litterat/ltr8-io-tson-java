@@ -111,6 +111,16 @@ module has a real `module-info.java`; module names mirror each module's root exp
   missing comes from a navigation step, so there is no singleton and equality is by path; read it without a
   cast via `TsonValue.missingPath()`. The first failure sticks — stepping on past a missing returns the
   same node rather than extending its pointer.
+  **Two families of value accessor, and the split is the point:** `as(Class)`/`asString`/`asNumber`/
+  `asBigInteger`/`asBigDecimal` only ever **cast** (`isInstance`), so they answer "what host type did the
+  read produce?" — an `int32` field holding an `Integer` gives empty from `asBigInteger()`. `asInt`/
+  `asLong`/`asDouble` (`OptionalInt`/`OptionalLong`/`OptionalDouble`, so a hot path doesn't box)
+  **convert**, and answer "what number is this?" regardless of host type. Conversion is exact for the
+  integral pair — an integral fractional part converts (`123.0`, `234.56E2`), a real one doesn't, and
+  out-of-range yields empty rather than wrapping — while `asDouble` accepts nearest-double rounding
+  (demanding exactness would reject `0.1`) but rejects a magnitude that can't be finite, so nothing ever
+  reads back as `Infinity`. Text is never parsed: `"42"` is a string per §4.4. A test asserting *which*
+  host type a reader produced must therefore use `as(Class)`, not `asInt()`.
 - **`tson-regex`** — **only** `io.ltr8.tson.regex`: a native RFC 9485 I-Regexp engine — `TsonRegex.parse`
   builds a `RegexNode` AST (or `TsonRegexSyntaxException`), `TsonRegex.matches` runs a Thompson-NFA/Pike-VM
   simulation (linear-time, no backtracking → ReDoS-safe; `\p{…}` via JDK `Character.getType`), and

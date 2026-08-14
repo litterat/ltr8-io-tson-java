@@ -61,7 +61,7 @@ class TsonCompiledSchemaRegistryTest {
         TsonCompiledSchemaRegistry tree = TsonCompiledSchemaRegistry.tree(core());
         Object value = tree.get(SCHEMA_ID).get("my_record").read(TestDocuments.document(DATA));
         TsonValue node = assertInstanceOf(TsonValue.class, value);
-        assertEquals(7, node.get("value").asNumber().orElseThrow().intValue());
+        assertEquals(7, node.get("value").asInt().orElseThrow());
     }
 
     @Test

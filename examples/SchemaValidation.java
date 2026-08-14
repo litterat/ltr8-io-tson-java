@@ -29,7 +29,7 @@ void main() {
 
     TsonValue server = reader.readAs("{ hostname: \"web-01\"  port: 8080 }", "server");
     IO.println("hostname: " + server.get("hostname").asString().orElseThrow());   // web-01
-    IO.println("port:     " + server.at("/port").asNumber().orElseThrow());        // 8080
+    IO.println("port:     " + server.at("/port").asInt().orElseThrow());        // 8080
 
     // A bad value surfaces as a diagnostic rather than a wrong result. Deriving a reader with a
     // collecting receiver gathers every problem in one pass instead of stopping at the first:

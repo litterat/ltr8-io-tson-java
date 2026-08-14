@@ -59,8 +59,8 @@ class TreeReadTest {
         TsonValue origin = shape.get("origin");
         assertTrue(origin.isRecord());
         assertEquals(Optional.of("point"), origin.typeRef());
-        assertEquals(1, shape.at("/origin/x").asNumber().orElseThrow().intValue());
-        assertEquals(2, shape.at("/origin/y").asNumber().orElseThrow().intValue());
+        assertEquals(1, shape.at("/origin/x").asInt().orElseThrow());
+        assertEquals(2, shape.at("/origin/y").asInt().orElseThrow());
         assertEquals(Optional.of("int32"), shape.at("/origin/x").typeRef());
 
         // an array stays an array, with typed elements
