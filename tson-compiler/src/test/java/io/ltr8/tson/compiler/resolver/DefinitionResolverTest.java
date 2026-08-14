@@ -1641,6 +1641,69 @@ class DefinitionResolverTest {
                 bodyOf(entries.get("extended")).groups());
     }
 
+    // ── Group presence under tightening (§5.11) ───────────────────────────
+    //    "Group presence rules are checked against the refined states at schema
+    //    load: a refinement under which two members of one group are always
+    //    present (both in a REQUIRED-family state) is a resolver error."
+
+    /**
+     * The rule earns its keep: without it the declaration resolves, compiles, and then rejects every value
+     * ever written against it -- a group admits at most one member, so two that must always be there is a
+     * contract nothing can satisfy. Caught where it is written instead.
+     */
+    @Test
+    void rejectsARefinementMakingTwoGroupMembersAlwaysPresent() {
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> resolveAll(BOUNDS + "  impossible => bounds ^ { min: = 0  exclusive_min: = 1 }"));
+        assertTrue(thrown.getMessage().contains("min and exclusive_min"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("at most one"), thrown.getMessage());
+    }
+
+    /**
+     * §5.11's sentence says "a refinement", but it sits in a paragraph headed "Refinement and composition"
+     * that puts both bodies under §5.7's tightening rules -- and a composition body produces the identical
+     * unsatisfiable type, so reading it as refinement-only would leave the same defect legal by the other
+     * spelling.
+     */
+    @Test
+    void rejectsACompositionBodyMakingTwoGroupMembersAlwaysPresent() {
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> resolveAll(BOUNDS + "  impossible => bounds & { min: = 0  exclusive_min: = 1 }"));
+        assertTrue(thrown.getMessage().contains("at most one"), thrown.getMessage());
+    }
+
+    /** REQUIRED_DEFAULT counts too: a default supplies the value, so the field is there in every value. */
+    @Test
+    void aDefaultCountsAsAlwaysPresentForTheGroupRule() {
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> resolveAll(BOUNDS + "  impossible => bounds ^ { min: ~ 0  exclusive_min: = 1 }"));
+        assertTrue(thrown.getMessage().contains("min and exclusive_min"), thrown.getMessage());
+    }
+
+    /** Pinning <em>one</em> alternative is the point of tightening a member, and stays legal. */
+    @Test
+    void tighteningASingleGroupMemberIsFine() {
+        Map<String, TypeDefinition> entries = resolveAll(BOUNDS + "  pinned => bounds ^ { min: = 0 }");
+
+        RecordBody body = bodyOf(entries.get("pinned"));
+        assertEquals(FieldState.REQUIRED_FIXED, body.fields().get(1).state());
+        assertEquals(FieldState.OPTIONAL, body.fields().get(2).state());
+        assertEquals(List.of(new FieldGroup(List.of("min", "exclusive_min"), ElementState.OPTIONAL)), body.groups());
+    }
+
+    /** The rule is per group -- one always-present member in each of two groups is not a conflict. */
+    @Test
+    void oneAlwaysPresentMemberInEachOfTwoGroupsIsFine() {
+        Map<String, TypeDefinition> entries = resolveAll("""
+                ranged => { ( min: integer | exclusive_min: integer )? ( max: integer | exclusive_max: integer )? }
+                pinned => ranged ^ { min: = 0  max: = 9 }
+                """);
+
+        assertEquals(2, bodyOf(entries.get("pinned")).groups().size());
+        assertEquals(FieldState.REQUIRED_FIXED, bodyOf(entries.get("pinned")).fields().get(0).state());
+        assertEquals(FieldState.REQUIRED_FIXED, bodyOf(entries.get("pinned")).fields().get(2).state());
+    }
+
     // ── Composition/refinement rejections (§5.7, §5.8, §5.11) ─────────────
     //    Every one is the author's error under a MUST in the spec, so each is a
     //    TsonSchemaValidationException. What varies is only which rule was broken,

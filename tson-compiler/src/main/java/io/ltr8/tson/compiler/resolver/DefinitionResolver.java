@@ -755,6 +755,7 @@ final class DefinitionResolver {
         if (construction.removal().isPresent()) {
             applyRemovals(name, construction.removal().get(), bodyNames(construction), fields, groups);
         }
+        checkGroupPresence(name, fields, groups);
 
         TypeKind kind = determineKind(name, transitiveSupertypes);
         RecordBody body = new RecordBody(directSupertypes, fields, groups);
@@ -967,6 +968,7 @@ final class DefinitionResolver {
             }
             fields.set(index, resolveTighteningField(name, fieldDef, fields.get(index), parameters));
         }
+        checkGroupPresence(name, fields, groups);
 
         TypeKind kind = determineKind(name, transitiveSupertypes);
         RecordBody body = new RecordBody(List.of(), fields, groups);
@@ -1215,6 +1217,63 @@ final class DefinitionResolver {
             case MULTI_LINE_QUOTED -> Token.Form.MULTI_LINE_QUOTED;
         };
         return new Token(token.text(), form);
+    }
+
+    /**
+     * §5.11's presence rule: "Group presence rules are checked against the refined states at schema load: a
+     * refinement under which two members of one group are always present (both in a REQUIRED-family state)
+     * is a resolver error." A group means <em>at most one</em> member is present (exactly one, if REQUIRED),
+     * so two members that must always be there is a contract nothing can satisfy -- every instance of the
+     * type would fail validation, for a reason the author never wrote down.
+     *
+     * <p>Run for a composition body too, not only a refinement. The sentence says "a refinement", but it sits
+     * in a paragraph headed "Refinement and composition" whose opening line puts both bodies under §5.7's
+     * tightening rules -- and a composition body tightening two members of an inherited group produces the
+     * identical unsatisfiable type. Reading it as refinement-only would leave the same defect legal by the
+     * other spelling.
+     *
+     * <p>Only this declaration's own tightenings can trip it, by induction: a group's members are flattened
+     * as {@code OPTIONAL} when first declared (§5.11), so a source that passed this check hands on at most
+     * one always-present member. Checking the final state rather than the body's edits costs nothing and is
+     * what the rule literally asks for.
+     *
+     * <p>{@code = _} (fixed to absent) is deliberately <em>not</em> always-present: it lands in
+     * {@code OPTIONAL_FIXED}, and forbidding one alternative's value is exactly what §5.11 offers it for.
+     */
+    private static void checkGroupPresence(String declarationName, List<RecordField> fields,
+                                            List<FieldGroup> groups) {
+        for (FieldGroup group : groups) {
+            List<String> alwaysPresent = group.members().stream()
+                    .filter(member -> isAlwaysPresent(stateOf(fields, member)))
+                    .toList();
+            if (alwaysPresent.size() > 1) {
+                throw new TsonSchemaValidationException((declarationName == null ? "" : "'" + declarationName + "': ")
+                        + "members " + String.join(" and ", alwaysPresent) + " of the group ("
+                        + String.join(" | ", group.members()) + ") are both always present, but at most one "
+                        + "member of a group may be (§5.11) -- no value could satisfy this type. Leave all but "
+                        + "one in an OPTIONAL state, or fix the others to absent ('= _')");
+            }
+        }
+    }
+
+    /**
+     * Whether a field in this state is present in every conforming value: REQUIRED must be supplied, and the
+     * two REQUIRED-value states supply it themselves. The OPTIONAL pair may be absent -- {@code
+     * OPTIONAL_FIXED} pins a value <em>if</em> the field appears, which is not the same as appearing.
+     */
+    private static boolean isAlwaysPresent(FieldState state) {
+        return state == FieldState.REQUIRED || state == FieldState.REQUIRED_DEFAULT
+                || state == FieldState.REQUIRED_FIXED;
+    }
+
+    private static FieldState stateOf(List<RecordField> fields, String name) {
+        for (RecordField field : fields) {
+            if (field.name().equals(name)) {
+                return field.state();
+            }
+        }
+        throw new IllegalStateException("group member '" + name + "' has no field -- a group's members are "
+                + "flattened into the field list as they are resolved, so this cannot happen");
     }
 
     private static List<String> memberNames(GroupDef groupDef) {

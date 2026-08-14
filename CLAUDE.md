@@ -355,6 +355,14 @@ namespace *before* any local declaration resolves.
   restating a field group in a refinement or composition body (§5.11 — same member labels in the same order,
   types verbatim, state tightening OPTIONAL→REQUIRED only; only the *group's* state moves, since members
   flatten as `OPTIONAL` regardless).
+- **§5.11's group presence rule is checked after every body**, refinement and composition alike: two members
+  of one group both left in a REQUIRED-family state (`REQUIRED`/`REQUIRED_DEFAULT`/`REQUIRED_FIXED`) is a
+  resolver error, because a group admits at most one member and nothing could satisfy the result. Only this
+  declaration's own tightenings can trip it — members flatten as `OPTIONAL` when first declared, so by
+  induction a source that passed hands on at most one always-present member. `= _` is deliberately *not*
+  always-present (it lands in `OPTIONAL_FIXED`); forbidding one alternative's value is what §5.11 offers it
+  for. The spec says "a refinement" but the paragraph is headed "Refinement and composition" and a
+  composition body builds the identical unsatisfiable type, so both are checked.
 - **Subtraction runs last and breaks IS-A on purpose** (§5.9). Supertypes merge, the body adds and tightens,
   *then* removals apply to the merged field set with no regard for which supertype contributed a field
   (rule 3 — the contract is already broken, so there is none left to violate). Two things are rejected:
