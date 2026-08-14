@@ -6,15 +6,43 @@ import java.util.Optional;
 /**
  * The result of navigating to something that isn't in the tree -- a query artifact, not a real value, so
  * {@link #get}/{@link #at} keep returning it and a deep chain never throws. Distinct from {@link TsonNull}
- * (the {@code null} token) and {@link TsonAbsent} (the {@code _} sentinel), which are real present values. A
- * singleton via {@link #instance()}.
+ * (the {@code null} token) and {@link TsonAbsent} (the {@code _} sentinel), which are real present values.
+ *
+ * <p><b>It carries {@link #path()}, the RFC 6901 pointer of the step that failed</b>, so a chain that comes
+ * back empty still says where it died: {@code at("/a/b/c")} over a tree with no {@code b} yields a missing
+ * whose path is {@code "/a/b"}, not {@code "/a/b/c"}. That is the difference between "no {@code b}" and
+ * "{@code b} had no {@code c}", which the node's mere existence can't express. Once navigation has failed the
+ * path is fixed -- every further {@code get}/{@code at} returns this same node rather than extending it,
+ * because the first failure is the informative one.
+ *
+ * <p>The pointer is <b>relative to the node navigation started from</b>, which is the only frame a node has:
+ * a tree node doesn't know where it sits in its parent. So {@code root.at("/a/b")} reports {@code "/a/b"}
+ * while {@code root.get("a").get("b")} reports {@code "/b"} -- each relative to its own receiver.
+ *
+ * <p>Every instance is produced by a navigation step, so there is no shared singleton and equality is by
+ * path: two missings are equal exactly when they failed at the same place.
  */
-public record TsonMissing() implements TsonValue {
+public record TsonMissing(String path) implements TsonValue {
 
-    private static final TsonMissing INSTANCE = new TsonMissing();
+    public TsonMissing {
+        if (path == null) {
+            throw new IllegalArgumentException("a TsonMissing must carry the pointer at which navigation failed");
+        }
+    }
 
-    public static TsonMissing instance() {
-        return INSTANCE;
+    /** A missing produced by stepping into the field/entry {@code name} of the receiver. */
+    public static TsonMissing atField(String name) {
+        return new TsonMissing("/" + escape(name));
+    }
+
+    /** A missing produced by stepping into element {@code index} of the receiver. */
+    public static TsonMissing atIndex(int index) {
+        return new TsonMissing("/" + index);
+    }
+
+    /** RFC 6901 §3 escaping: {@code ~} before {@code /}, so {@code ~1} round-trips as {@code ~01}. */
+    private static String escape(String token) {
+        return token.replace("~", "~0").replace("/", "~1");
     }
 
     @Override
@@ -30,6 +58,11 @@ public record TsonMissing() implements TsonValue {
     @Override
     public boolean isMissing() {
         return true;
+    }
+
+    @Override
+    public Optional<String> missingPath() {
+        return Optional.of(path);
     }
 
     @Override

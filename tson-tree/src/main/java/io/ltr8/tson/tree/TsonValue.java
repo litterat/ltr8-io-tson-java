@@ -18,7 +18,8 @@ import java.util.stream.Stream;
  * <p><b>Navigation never throws.</b> {@link #get}/{@link #at} return {@link TsonMissing} for an absent
  * field/index, so a deep {@code node.at("/orders/3/total").asBigDecimal()} chain is null-safe. "Missing"
  * (no such node in the tree), "null" (the {@code null} token, {@link TsonNull}), and "absent" (the {@code
- * _} sentinel, {@link TsonAbsent}) are three distinct kinds.
+ * _} sentinel, {@link TsonAbsent}) are three distinct kinds. A lenient chain still says <em>where</em> it
+ * failed: the missing carries the pointer of the step that failed, readable via {@link #missingPath()}.
  *
  * <p>Every node carries its own {@link #typeRef()} (the wire or schema type, e.g. {@code "int32"} or
  * {@code "person"}) and {@link #annotations()}.
@@ -77,13 +78,19 @@ public sealed interface TsonValue
     default boolean isMissing()   { return false; }
     default boolean isContainer() { return isRecord() || isMap() || isArray() || isTuple(); }
 
+    /**
+     * The RFC 6901 pointer at which navigation failed (relative to the node it started from), or empty for
+     * any node that is really there -- the {@link TsonMissing#path()} of a missing, without the cast.
+     */
+    default Optional<String> missingPath() { return Optional.empty(); }
+
     // --- navigation (never throws; TsonMissing when not applicable or absent) ---
 
-    /** The field/entry named {@code name} (record/map), or {@link TsonMissing}. */
-    default TsonValue get(String name) { return TsonMissing.instance(); }
+    /** The field/entry named {@code name} (record/map), or a {@link TsonMissing} pointing at that step. */
+    default TsonValue get(String name) { return TsonMissing.atField(name); }
 
-    /** The element at {@code index} (array/tuple), or {@link TsonMissing}. */
-    default TsonValue get(int index) { return TsonMissing.instance(); }
+    /** The element at {@code index} (array/tuple), or a {@link TsonMissing} pointing at that step. */
+    default TsonValue get(int index) { return TsonMissing.atIndex(index); }
 
     /** The record fields (name → node, insertion order), or an empty map. */
     default Map<String, TsonValue> fields() { return Map.of(); }
@@ -96,6 +103,11 @@ public sealed interface TsonValue
      * into fields/indices, and any absent step yields {@link TsonMissing} (so the whole chain is null-safe).
      * A token that parses as an integer indexes an array/tuple; anything else names a field/entry.
      *
+     * <p>The missing returned for a failed chain carries the pointer <b>up to and including the step that
+     * failed</b>, not the whole pointer asked for -- {@code at("/a/b/c")} over a tree with no {@code b}
+     * reports {@code "/a/b"}. Walking stops there: the remaining tokens have nothing left to step into, and
+     * their outcome would say nothing about the document.
+     *
      * @throws IllegalArgumentException if {@code pointer} is non-empty and doesn't start with {@code '/'}
      */
     default TsonValue at(String pointer) {
@@ -105,6 +117,9 @@ public sealed interface TsonValue
         if (pointer.charAt(0) != '/') {
             throw new IllegalArgumentException("a non-empty JSON Pointer must start with '/': \"" + pointer + "\"");
         }
+        if (isMissing()) {
+            return this; // already records where navigation failed; a later step can only be less informative
+        }
         TsonValue current = this;
         int from = 1;
         while (from <= pointer.length()) {
@@ -113,6 +128,11 @@ public sealed interface TsonValue
             // RFC 6901 unescape: ~1 -> / first, then ~0 -> ~ (order matters, so ~01 decodes to ~1, not /).
             String token = pointer.substring(from, end).replace("~1", "/").replace("~0", "~");
             current = current.step(token);
+            if (current.isMissing()) {
+                // The step's own one-token path is relative to its receiver; re-anchor it to this node. The
+                // source text is already escaped, so the prefix needs no re-escaping.
+                return new TsonMissing(pointer.substring(0, end));
+            }
             from = end + 1;
         }
         return current;
@@ -124,7 +144,7 @@ public sealed interface TsonValue
             try {
                 return get(Integer.parseInt(token));
             } catch (NumberFormatException e) {
-                return TsonMissing.instance();
+                return TsonMissing.atField(token);
             }
         }
         return get(token);

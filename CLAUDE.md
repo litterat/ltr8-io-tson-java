@@ -105,6 +105,12 @@ module has a real `module-info.java`; module names mirror each module's root exp
   assembled by hand-written readers). The data-tree counterpart to `tson-schema`'s `schema.meta`: same
   "pure value model in its own module, engine depends on it not the reverse" shape, so JPMS keeps the tree
   from ever coupling to compiler internals. `tson-compiler` depends on it; it names no `tson-compiler` type.
+  **Navigation is lenient but not silent:** `get`/`at` never throw, and the `TsonMissing` they return
+  carries `path()` — the RFC 6901 pointer of the step that *failed*, relative to the node navigation
+  started from — so `at("/a/b/c")` distinguishes "no `b`" (`/a/b`) from "`b` had no `c`" (`/a/b/c`). Every
+  missing comes from a navigation step, so there is no singleton and equality is by path; read it without a
+  cast via `TsonValue.missingPath()`. The first failure sticks — stepping on past a missing returns the
+  same node rather than extending its pointer.
 - **`tson-regex`** — **only** `io.ltr8.tson.regex`: a native RFC 9485 I-Regexp engine — `TsonRegex.parse`
   builds a `RegexNode` AST (or `TsonRegexSyntaxException`), `TsonRegex.matches` runs a Thompson-NFA/Pike-VM
   simulation (linear-time, no backtracking → ReDoS-safe; `\p{…}` via JDK `Character.getType`), and

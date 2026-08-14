@@ -12,6 +12,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -42,7 +43,7 @@ class TsonValueTest {
         assertTrue(TsonAtom.of("x").isAtom());
         assertTrue(TsonNull.instance().isNull());
         assertTrue(TsonAbsent.instance().isAbsent());
-        assertTrue(TsonMissing.instance().isMissing());
+        assertTrue(TsonMissing.atField("nope").isMissing());
         // array and tuple are structurally alike but distinct kinds
         assertFalse(TsonTuple.of().isArray());
         assertFalse(TsonArray.of().isTuple());
@@ -83,6 +84,36 @@ class TsonValueTest {
     }
 
     @Test
+    void aMissingCarriesThePointerOfTheStepThatFailed() {
+        TsonRecord person = sample();
+        // the failing step, not the whole pointer asked for: address exists, city2 doesn't, /nope is never reached
+        assertEquals(Optional.of("/address/city2"), person.at("/address/city2/nope").missingPath());
+        assertEquals(Optional.of("/nope"), person.at("/nope/deeper").missingPath());
+        assertEquals(Optional.of("/skills/99"), person.at("/skills/99").missingPath());
+        // a non-integer token against an array fails at that token
+        assertEquals(Optional.of("/skills/first"), person.at("/skills/first").missingPath());
+        // a bare get is relative to its own receiver, the only frame a node has
+        assertEquals(Optional.of("/city2"), person.get("address").get("city2").missingPath());
+        // the first failure sticks: stepping on past it neither extends nor replaces the pointer
+        TsonValue missing = person.at("/nope");
+        assertEquals(Optional.of("/nope"), missing.get("deeper").get(0).at("/further").missingPath());
+        // a present node has no missing path, whichever kind it is
+        assertEquals(Optional.empty(), person.at("/name").missingPath());
+        assertEquals(Optional.empty(), TsonNull.instance().missingPath());
+        assertEquals(Optional.empty(), TsonAbsent.instance().missingPath());
+    }
+
+    @Test
+    void missingPathsAreEscapedAndCompareByPath() {
+        TsonRecord node = TsonRecord.of(Map.of("a", TsonAtom.of("x")));
+        // a field name containing the pointer metacharacters comes back as a well-formed pointer
+        assertEquals(Optional.of("/a~1b~0c"), node.get("a/b~c").missingPath());
+        // equality is by where navigation died, so two chains failing at the same place agree
+        assertEquals(node.get("zzz"), node.at("/zzz"));
+        assertNotEquals(node.get("zzz"), node.get("yyy"));
+    }
+
+    @Test
     void atUnescapesTildeSequences() {
         // "a/b" and "m~n" as field names, escaped per RFC 6901 as ~1 and ~0 (and ~01 decodes to ~1, not /)
         Map<String, TsonValue> fields = new LinkedHashMap<>();
@@ -113,9 +144,9 @@ class TsonValueTest {
         assertFalse(TsonNull.instance().isMissing());
         assertFalse(TsonAbsent.instance().isNull());
         assertTrue(TsonAbsent.instance().isAbsent());
-        assertFalse(TsonMissing.instance().isNull());
-        assertFalse(TsonMissing.instance().isAbsent());
-        assertTrue(TsonMissing.instance().isMissing());
+        assertFalse(TsonMissing.atField("nope").isNull());
+        assertFalse(TsonMissing.atField("nope").isAbsent());
+        assertTrue(TsonMissing.atField("nope").isMissing());
     }
 
     @Test

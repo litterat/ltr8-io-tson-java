@@ -30,6 +30,7 @@ public record TsonRecord(Map<String, TsonValue> fields, Optional<String> typeRef
 
     @Override
     public TsonValue get(String name) {
-        return fields.getOrDefault(name, TsonMissing.instance());
+        TsonValue field = fields.get(name);
+        return field != null ? field : TsonMissing.atField(name);
     }
 }

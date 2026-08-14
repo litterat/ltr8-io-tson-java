@@ -77,8 +77,9 @@ public final class TsonTreeWriter {
                 absentNode.typeRef().ifPresent(out::typeRef);
                 out.absentValue();
             }
-            case TsonMissing ignored -> throw new IllegalArgumentException(
-                    "a TsonMissing is a navigation artifact and cannot be written as TSON");
+            case TsonMissing missing -> throw new IllegalArgumentException(
+                    "a TsonMissing is a navigation artifact and cannot be written as TSON; navigation failed at \""
+                            + missing.path() + "\"");
         }
     }
 

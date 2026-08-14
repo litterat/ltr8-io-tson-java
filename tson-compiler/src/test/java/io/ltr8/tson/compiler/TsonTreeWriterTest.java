@@ -83,6 +83,6 @@ class TsonTreeWriterTest {
 
     @Test
     void writingAMissingNodeThrows() {
-        assertThrows(IllegalArgumentException.class, () -> WRITER.toTson(TsonMissing.instance()));
+        assertThrows(IllegalArgumentException.class, () -> WRITER.toTson(new TsonMissing("/nope")));
     }
 }

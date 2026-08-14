@@ -27,6 +27,6 @@ public record TsonArray(List<TsonValue> elements, Optional<String> typeRef, List
 
     @Override
     public TsonValue get(int index) {
-        return index >= 0 && index < elements.size() ? elements.get(index) : TsonMissing.instance();
+        return index >= 0 && index < elements.size() ? elements.get(index) : TsonMissing.atIndex(index);
     }
 }

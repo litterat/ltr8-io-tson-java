@@ -36,6 +36,6 @@ public record TsonMap(List<Entry> entries, Optional<String> typeRef, List<TsonAn
                 return entry.value();
             }
         }
-        return TsonMissing.instance();
+        return TsonMissing.atField(name);
     }
 }

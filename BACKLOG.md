@@ -30,18 +30,6 @@ What's left:
   conversion semantics while doing it: exact-representability required, but a syntactic fractional part
   that *is* integral converts (`123.0` and `234.56E2` succeed as `int`, `345.6` does not), and
   out-of-range fails rather than silently saturating or yielding infinity.
-- [ ] **A failed navigation chain says nothing about which hop failed.**
-  `at("/properties/periods/0/temperature").asInt()` yielding empty doesn't distinguish "no `properties`"
-  from "`periods` wasn't an array" from "`temperature` was text". JEP 540 solves this by *throwing* from
-  `get`, with the path and source location in the message, and offering `tryGet`/`tryValue` as the lenient
-  opt-out — it names quick exploration of unfamiliar documents as an explicit goal.
-  - **Don't copy the throwing default**; lenient-first suits this library, and the schema-driven path
-    already reports properly through `Diagnostic`.
-  - **Do consider having `TsonMissing` carry the RFC 6901 pointer at which navigation failed** — never
-    throws, adds no methods, and `at("/a/b/c")` comes back knowing it died at `/a/b`. It reuses the pointer
-    `at()` already walks. The cost is that `TsonMissing.instance()` stops being a singleton.
-  - A TSON version can carry the path but not JEP 540's "line N, position M": tree nodes hold no source
-    position. Related to `SourcePosition` naming no document, under "Schema-side diagnostics".
 
 - [ ] **Copy-on-write transforms + builders (parked).** The "new tree from old" editing half —
   `TsonRecord.with(name, value)`/`without(name)`, `TsonArray.with(i, value)`/`plus(value)`/`without(i)`,
