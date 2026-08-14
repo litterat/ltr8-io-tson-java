@@ -351,7 +351,20 @@ namespace *before* any local declaration resolves.
   `^` refinement operator (§5.7, copies the source's whole field set, admits no new fields); bare
   references (§8.3); constructor application (`!C value`, §5.5, binds generically via the compiled
   reader — no hand-rolled name→class table, `tson-bind`'s sealed-union resolution finds the `Top` leaf by
-  `@Typename`); atom refinement (`!I ^ { ... }`, §5.5/§5.7).
+  `@Typename`); atom refinement (`!I ^ { ... }`, §5.5/§5.7); subtraction (`A & { ... } - { f }`, §5.9).
+- **Subtraction runs last and breaks IS-A on purpose** (§5.9). Supertypes merge, the body adds and tightens,
+  *then* removals apply to the merged field set with no regard for which supertype contributed a field
+  (rule 3 — the contract is already broken, so there is none left to violate). Two things are rejected:
+  removing a name that isn't there (rule 2), and removing one this declaration's own body also states
+  (rule 4 — adding-then-removing, or tightening-then-removing, says two incompatible things), checked in
+  that order because a body-introduced field *is* in the merged set and "no such field" would be the wrong
+  diagnosis. The output splits the two supertype lists §8.1 keeps apart: `type_definition.supertypes` is
+  **emptied** (the contract — so §7.2's subsumption check won't let a subtracted type stand where its source
+  is expected), while `record.supertypes` keeps the head's list as authorial lineage. `kind` still comes off
+  the lineage chain. Groups follow §5.11: a removed member leaves `members`, a group down to one member is
+  dissolved into a plain field taking the *group's* state (members flatten as `OPTIONAL` whatever the group
+  says, so the survivor would otherwise silently lose a REQUIRED group's "exactly one"), and a group with no
+  members left is dropped — the one arity §5.11 doesn't legislate (`SPEC-FEEDBACK.md` #36).
 - **Chained atom refinement merges with the source, it does not replace it** (`SPEC-FEEDBACK.md` #17):
   `bounded => !int8 ^ { min: -100 }` must still carry `int8`'s own `size`. `mergeWithSource` re-serializes the
   source's bound value via `TsonObjectWriter` and merges field-by-field (explicit values win) — no
@@ -378,7 +391,7 @@ namespace *before* any local declaration resolves.
   rejecting one would reject a documented construct (`SPEC-FEEDBACK.md` #27).
 - **Everything else throws `UnsupportedOperationException`** (elided field types outside a tightening
   entry, an `Absent` modifier value, the identity-diagonal FIXED-value invariant, a field group restated
-  in a refinement body, subtraction, a generic type-ref with a nested or value (non-simple) argument,
+  in a refinement body, a generic type-ref with a nested or value (non-simple) argument,
   inter-supertype field collision) rather than silently mis-resolving. `DefinitionResolver`'s
   Javadoc lists the exact boundary.
 - **`TypeArgument` is a sealed interface (`Ref`/`Value`), NOT a plain record — do not "simplify" it
@@ -934,7 +947,7 @@ compatibility).
 
 ## Not yet implemented
 
-- **Part 2 resolution gaps** — subtraction, elided field types outside a tightening entry, a field group
+- **Part 2 resolution gaps** — elided field types outside a tightening entry, a field group
   restated in a refinement body, the identity-diagonal FIXED-value invariant, a generic type-ref whose
   argument is nested or a value rather than a plain name, and composition/refinement beyond the simple
   record-over-record case (a generic or non-record supertype, a non-record refinement source, an

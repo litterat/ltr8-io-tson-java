@@ -1733,3 +1733,44 @@ other way the definition-bound set is already right and the name-bound set simpl
 3. Either way, classify `@alias` alongside `subtypes` and `disjoint`: derived, discarded on ingest, and
    recomputed by re-flattening.
 
+
+## 36. §5.11 says what happens to a group reduced to one member, but not to one reduced to none
+
+**Section:** [TSON-SCHEMA] §5.11 (Field Groups), §5.9 (Subtraction).
+
+**Problem:** §5.11's last word on removal covers exactly one arity:
+
+> A removal clause naming a member (§5.9) removes it from `fields` and from its group's `members`; a group
+> reduced to one member is dissolved, and the surviving field takes the group's state (REQUIRED group →
+> field REQUIRED, OPTIONAL group → field OPTIONAL).
+
+A removal set may name several fields (§5.9's own `staff_public` names two), and nothing restricts them to
+different groups. So `bounds - { min  exclusive_min }` over
+
+```
+bounds => { a: text  ( min: integer | exclusive_min: integer ) }
+```
+
+removes both members of the one group. The reduced-to-one rule doesn't apply — there is no survivor to take
+the group's state — and no other rule does either. An implementation must still pick something, and the
+choices are not equivalent: keeping a memberless REQUIRED group means "exactly one of {} must be present",
+which no document can satisfy, so every instance of the type fails validation for a reason the author never
+wrote down.
+
+The gap widens slightly under §5.11's own "A group MUST contain at least two members." That is stated as an
+authoring rule on the group's declaration; whether it is also an invariant on resolver *output* is what
+decides this case. If it is, a zero- or one-member group is unrepresentable and both the dissolution rule and
+this case are consequences of one invariant — which is worth saying, because it also answers the same
+question for any future operation that can shrink a group.
+
+**What this implementation does:** drops the group entirely, alongside its members. `DefinitionResolver`'s
+`applyRemovals` rebuilds the group list, keeping a group with two or more survivors, dissolving one with
+exactly one (per the stated rule), and emitting nothing for one with none. An empty group has no members to
+choose between, so there is nothing left for it to constrain, and dropping it is the only reading that leaves
+the type inhabitable. Pinned by `DefinitionResolverTest.removingEveryMemberDropsTheGroupItself`.
+
+**Suggested resolution:** State the two-member minimum as an invariant on resolved output, not only on the
+declaration, and make §5.11's removal sentence cover the whole arity ladder — a group with two or more
+members left survives; one left is dissolved into a plain field carrying the group's state; none left is
+removed with its members. One extra clause, and it closes the case rather than leaving each implementation
+to reason from inhabitability.

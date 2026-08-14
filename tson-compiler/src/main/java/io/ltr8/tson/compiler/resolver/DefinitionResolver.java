@@ -16,6 +16,7 @@ import io.ltr8.tson.compiler.ast.schema.ElementType;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
 import io.ltr8.tson.compiler.ast.schema.GenericRef;
 import io.ltr8.tson.compiler.ast.schema.GroupDef;
+import io.ltr8.tson.compiler.ast.schema.RemovalSet;
 import io.ltr8.tson.compiler.ast.schema.InlineArrayRef;
 import io.ltr8.tson.compiler.ast.schema.Instance;
 import io.ltr8.tson.compiler.ast.schema.TemplateInstance;
@@ -51,6 +52,7 @@ import io.ltr8.tson.schema.meta.TypeKind;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -131,7 +133,7 @@ import java.util.Set;
  *
  * Everything else -- elided field types outside a tightening entry, an {@code Absent} modifier
  * value ({@code = _}) or any modifier on an OPTIONAL field, the identity-diagonal value-invariant
- * for a restated FIXED field, restating a field group in a refinement body, subtraction, a generic
+ * for a restated FIXED field, restating a field group in a refinement body, a generic
  * type-ref with a nested or value (non-simple) argument, and an inter-supertype field collision --
  * is explicitly out of scope for now and reported via {@link UnsupportedOperationException} rather
  * than silently mis-resolved; each is a later, separate pass. (Constructor application / atom
@@ -648,7 +650,7 @@ final class DefinitionResolver {
 
     // ── Declaration-level array size sugar (§5.3, §5.10) ──────────────────
 
-    // ── Composition (§5.8) ────────────────────────────────────────────────
+    // ── Composition (§5.8) and subtraction (§5.9) ─────────────────────────
 
     /**
      * {@code A & B & { ... }}: each supertype's fields and groups are copied into the result, left
@@ -671,10 +673,6 @@ final class DefinitionResolver {
      */
     private TypeDefinition resolveComposition(String name, ConstructionDef construction, boolean constructor,
                                                List<String> parameters) {
-        if (construction.removal().isPresent()) {
-            throw new UnsupportedOperationException("'" + name + "': subtraction is not resolved yet");
-        }
-
         List<String> directSupertypes = new ArrayList<>();
         List<String> transitiveSupertypes = new ArrayList<>();
         Set<String> seenTransitive = new HashSet<>();
@@ -722,10 +720,102 @@ final class DefinitionResolver {
             }
         }
 
+        if (construction.removal().isPresent()) {
+            applyRemovals(name, construction.removal().get(), bodyNames(construction), fields, groups);
+        }
+
         TypeKind kind = determineKind(name, transitiveSupertypes);
         RecordBody body = new RecordBody(directSupertypes, fields, groups);
-        return new TypeDefinition(Optional.empty(), kind, parameters, constructor, transitiveSupertypes, List.of(),
+        // §5.9: subtraction breaks IS-A. The contract index (type_definition.supertypes) is emptied while the
+        // body keeps `directSupertypes` as authorial lineage (record.supertypes) -- the distinction §7.2's
+        // subsumption rule reads, so a subtracted type does not stand where its source is expected. `kind` is
+        // still taken from the lineage chain: a chain that reached `product` still says what this type *is*,
+        // and §4.1's own rule over the now-empty contract index would answer PRODUCT regardless.
+        List<String> contract = construction.removal().isPresent() ? List.of() : transitiveSupertypes;
+        return new TypeDefinition(Optional.empty(), kind, parameters, constructor, contract, List.of(),
                 Optional.empty(), body);
+    }
+
+    /**
+     * Every field name this declaration's own body mentions, whether it introduces the field or tightens an
+     * inherited one. Both are what §5.9 rule 4 forbids a removal from naming, so one set answers both halves.
+     */
+    private static Set<String> bodyNames(ConstructionDef construction) {
+        Set<String> names = new LinkedHashSet<>();
+        if (construction.body().isEmpty()) {
+            return names;
+        }
+        for (RecordEntry entry : construction.body().get().entries()) {
+            switch (entry) {
+                case FieldDef fieldDef -> names.add(fieldDef.name());
+                case GroupDef groupDef -> groupDef.members().forEach(member -> names.add(member.name()));
+            }
+        }
+        return names;
+    }
+
+    /**
+     * §5.9's removal clause, applied last: supertypes merged, then the body, then this (rule 1). Removal reads
+     * the <em>merged</em> field set with no regard for which supertype contributed a field (rule 3) -- IS-A is
+     * already broken, so there is no contract left to violate.
+     *
+     * <p>Two things are rejected. A name that is nowhere in the merged set (rule 2, symmetric with
+     * refinement's existing-fields-only rule), and a name this declaration's own body mentions (rule 4) --
+     * adding a field and then removing it, or tightening a field and then removing it, says two incompatible
+     * things in one declaration, and the author meant one of them. Rule 4 is checked first: a body-introduced
+     * field <em>is</em> in the merged set, so the weaker "no such field" answer would be the wrong diagnosis.
+     *
+     * <p>Groups (§5.11): a removed member leaves its group's {@code members}, and a group left with one member
+     * is dissolved -- the survivor becomes an ordinary field taking the group's own state, since a group's
+     * members are flattened as {@code OPTIONAL} whatever the group says. Removing every member of a group
+     * drops the group with them; §5.11 speaks only of the reduced-to-one case, and there is nothing left for
+     * an empty group to constrain ({@code SPEC-FEEDBACK.md} #36).
+     */
+    private static void applyRemovals(String declarationName, RemovalSet removal, Set<String> bodyDeclared,
+                                       List<RecordField> fields, List<FieldGroup> groups) {
+        Set<String> removed = new LinkedHashSet<>();
+        for (String fieldName : removal.fieldNames()) {
+            if (bodyDeclared.contains(fieldName)) {
+                throw new TsonSchemaValidationException("'" + declarationName + "': removal names '" + fieldName
+                        + "', which this declaration's own body also declares -- a declaration cannot both state "
+                        + "a field and remove it (§5.9 rule 4)");
+            }
+            if (fields.stream().noneMatch(field -> field.name().equals(fieldName))) {
+                throw new TsonSchemaValidationException("'" + declarationName + "': removal names '" + fieldName
+                        + "', which is not a field of the composed type -- only an inherited field can be "
+                        + "removed (§5.9 rule 2)");
+            }
+            removed.add(fieldName);
+        }
+
+        List<FieldGroup> surviving = new ArrayList<>();
+        for (FieldGroup group : groups) {
+            List<String> members = group.members().stream().filter(member -> !removed.contains(member)).toList();
+            if (members.size() == group.members().size()) {
+                surviving.add(group);
+            } else if (members.size() > 1) {
+                surviving.add(new FieldGroup(members, group.state()));
+            } else if (members.size() == 1) {
+                dissolveInto(fields, members.get(0), group.state());
+            }
+        }
+        groups.clear();
+        groups.addAll(surviving);
+
+        fields.removeIf(field -> removed.contains(field.name()));
+    }
+
+    /** §5.11: the last member of a dissolved group becomes a plain field carrying the group's own state. */
+    private static void dissolveInto(List<RecordField> fields, String member, ElementState groupState) {
+        FieldState state = groupState == ElementState.OPTIONAL ? FieldState.OPTIONAL : FieldState.REQUIRED;
+        for (int i = 0; i < fields.size(); i++) {
+            RecordField field = fields.get(i);
+            if (field.name().equals(member)) {
+                fields.set(i, new RecordField(field.name(), field.type(), state, field.value(),
+                        field.valueParam(), field.annotations()));
+                return;
+            }
+        }
     }
 
     private static void addIfAbsent(List<String> list, Set<String> seen, String name) {

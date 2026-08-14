@@ -119,7 +119,6 @@ own prose (which had gone stale on at least one of them):
 
 ## Remaining Part 2 resolution gaps
 
-- [ ] Subtraction.
 - [ ] Elided field types outside a tightening entry.
 - [ ] Restating a field group in a refinement body.
 - [ ] Generic type-refs whose arguments are not simple names. A non-simple argument (`weird<[T]>`) is
@@ -330,9 +329,6 @@ missing most of the mirror.
 
 ## Miscellaneous
 
-- [ ] The three `TestDocuments` test helpers (one each in `tson-compiler`, `tson`, `tson-cli`) are
-  near-duplicates, because this build has no `java-test-fixtures` plugin. Either wire that up or accept the
-  repetition; it is a few lines, so this is a build-hygiene call rather than a real cost.
 - [ ] Thread-safety — currently only `synchronized` on `TsonSchemaRegistry`/
   `TsonCompiledSchemaRegistry`'s own `register`/`get`/`getMeta` (its `load` deliberately isn't, to
   avoid serializing unrelated on-demand loads); everything else is an open design question.

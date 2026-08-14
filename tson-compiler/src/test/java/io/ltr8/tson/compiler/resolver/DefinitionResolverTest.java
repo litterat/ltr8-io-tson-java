@@ -17,6 +17,11 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaLinker;
 import io.ltr8.tson.schema.meta.ArrayBody;
+import io.ltr8.tson.schema.meta.ElementState;
+import io.ltr8.tson.schema.meta.FieldGroup;
+import io.ltr8.tson.schema.meta.FieldState;
+import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.schema.meta.BinaryType;
 import io.ltr8.tson.schema.meta.ChoiceBody;
@@ -1489,6 +1494,171 @@ class DefinitionResolverTest {
         SchemaMap schemaMap = SchemaDesugarer.desugar(document, metaKernel.schema().entries(), Set.of()).body();
         return definitionResolverFor(metaKernel, resolved::get)
                 .resolve(schemaMap.declarations().get(declaration.split("=>")[0].trim()));
+    }
+
+    // ── Subtraction (§5.9) ────────────────────────────────────────────────
+
+    private static final String ACCOUNT = "account => { name: text  email: text  password: text }";
+
+    /** Resolves a whole hand-written schema body in declaration order, so a later entry can compose with an earlier one. */
+    private Map<String, TypeDefinition> resolveAll(String body) {
+        SchemaDocument document = new TsonSchemaParser("""
+                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
+                { %s }""".formatted(body)).parseSchemaDocument();
+        for (SchemaMap.Declaration declaration : document.body().declarations().values()) {
+            resolved.put(declaration.name(), resolver.resolve(declaration));
+        }
+        return resolved;
+    }
+
+    private static RecordBody bodyOf(TypeDefinition definition) {
+        return assertInstanceOf(RecordBody.class, definition.body());
+    }
+
+    private static List<String> fieldNames(TypeDefinition definition) {
+        return bodyOf(definition).fields().stream().map(RecordField::name).toList();
+    }
+
+    /**
+     * §5.9's headline: the removed field is gone and IS-A is <em>broken</em> -- the contract index
+     * ({@code type_definition.supertypes}) is empty, so §7.2's subsumption check will not let an
+     * {@code account_public} stand where an {@code account} is expected, while the body keeps {@code account}
+     * as authorial lineage. Getting only the field arithmetic right and leaving the supertypes alone would
+     * silently make a subtracted type substitutable for the thing it deliberately isn't.
+     */
+    @Test
+    void subtractionRemovesTheFieldAndBreaksIsAWhileKeepingLineage() {
+        Map<String, TypeDefinition> entries = resolveAll(ACCOUNT + "  account_public => account - { password }");
+
+        TypeDefinition subtracted = entries.get("account_public");
+        assertEquals(List.of("name", "email"), fieldNames(subtracted));
+        assertEquals(List.of(), subtracted.supertypes());              // contract: broken
+        assertEquals(List.of("account"), bodyOf(subtracted).supertypes()); // lineage: kept
+        assertEquals(TypeKind.PRODUCT, subtracted.kind());
+        // the source is untouched -- removal builds a new field list, it does not edit the supertype's
+        assertEquals(List.of("name", "email", "password"), fieldNames(entries.get("account")));
+    }
+
+    /**
+     * Rule 1's ordering, over §5.9's own {@code staff_public} example: supertypes merge, the body adds and
+     * tightens, and only then do removals apply. Adding one field while removing another in a single
+     * declaration is ordinary, not a conflict -- rule 4 bites only when both name the <em>same</em> field.
+     */
+    @Test
+    void removalsApplyAfterTheSupertypesAndTheBody() {
+        Map<String, TypeDefinition> entries = resolveAll(ACCOUNT
+                + "  user => { badge_id: text }"
+                + "  staff_public => account & user & { badge: text } - { password }");
+
+        TypeDefinition staff = entries.get("staff_public");
+        // inherited in supertype order (minus the removal), then the body's genuinely new field
+        assertEquals(List.of("name", "email", "badge_id", "badge"), fieldNames(staff));
+        assertEquals(List.of(), staff.supertypes());
+        assertEquals(List.of("account", "user"), bodyOf(staff).supertypes());
+    }
+
+    /** A body entry may tighten a field that survives the removal -- §5.9's own {@code account_view}. */
+    @Test
+    void aRemovalCoexistsWithATighteningOfADifferentField() {
+        Map<String, TypeDefinition> entries = resolveAll(ACCOUNT
+                + "  account_view => account & { email: text ~ \"n/a\" } - { password }");
+
+        TypeDefinition view = entries.get("account_view");
+        assertEquals(List.of("name", "email"), fieldNames(view));
+        // the tightening replaced the inherited field in place, and removal ran afterwards
+        assertEquals(FieldState.REQUIRED_DEFAULT, bodyOf(view).fields().get(1).state());
+    }
+
+    /**
+     * Rule 4: stating a field and removing it in one declaration says two incompatible things. Checked ahead
+     * of rule 2's "no such field", because a body-introduced field <em>is</em> in the merged set -- answering
+     * "there is no such field" would be a wrong diagnosis of a real, differently-shaped mistake.
+     */
+    @Test
+    void rejectsARemovalNamingAFieldTheBodyItselfIntroduces() {
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> resolveAll(ACCOUNT + "  odd => account & { badge: text } - { badge }"));
+        assertTrue(thrown.getMessage().contains("own body also declares"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("§5.9 rule 4"), thrown.getMessage());
+    }
+
+    /** Rule 4's other half: a body entry tightening a field the same declaration removes. */
+    @Test
+    void rejectsARemovalNamingAFieldTheBodyTightens() {
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> resolveAll(ACCOUNT + "  odd => account & { password: text ~ \"x\" } - { password }"));
+        assertTrue(thrown.getMessage().contains("own body also declares"), thrown.getMessage());
+    }
+
+    /** Rule 2, symmetric with refinement's existing-fields-only rule: nothing to remove is an author error. */
+    @Test
+    void rejectsARemovalNamingAFieldThatIsNotThere() {
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> resolveAll(ACCOUNT + "  odd => account - { nickname }"));
+        assertTrue(thrown.getMessage().contains("not a field of the composed type"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("§5.9 rule 2"), thrown.getMessage());
+    }
+
+    /**
+     * §5.11's group arithmetic: a removed member leaves {@code members}, and a group down to one member is
+     * dissolved, its survivor taking the <em>group's</em> state. That last step matters -- members are
+     * flattened as OPTIONAL whatever the group says, so a dissolved REQUIRED group whose survivor stayed
+     * OPTIONAL would quietly drop the "exactly one MUST be present" the author wrote.
+     */
+    @Test
+    void removingAGroupMemberDissolvesAGroupLeftWithOne() {
+        Map<String, TypeDefinition> entries = resolveAll("""
+                bounds => { a: text  ( min: integer | exclusive_min: integer ) }
+                one_bound => bounds - { exclusive_min }
+                """);
+
+        TypeDefinition dissolved = entries.get("one_bound");
+        assertEquals(List.of("a", "min"), fieldNames(dissolved));
+        assertEquals(List.of(), bodyOf(dissolved).groups());
+        assertEquals(FieldState.REQUIRED, bodyOf(dissolved).fields().get(1).state());
+        // the source still has both members and its group
+        assertEquals(List.of(new FieldGroup(List.of("min", "exclusive_min"), ElementState.REQUIRED)),
+                bodyOf(entries.get("bounds")).groups());
+    }
+
+    /** An OPTIONAL group's survivor becomes an OPTIONAL field -- the group's state, not the member's. */
+    @Test
+    void aDissolvedOptionalGroupLeavesAnOptionalField() {
+        Map<String, TypeDefinition> entries = resolveAll("""
+                bounds => { a: text  ( min: integer | exclusive_min: integer )? }
+                one_bound => bounds - { exclusive_min }
+                """);
+
+        assertEquals(FieldState.OPTIONAL, bodyOf(entries.get("one_bound")).fields().get(1).state());
+    }
+
+    /** Three members less one is still a group: two members left, state untouched. */
+    @Test
+    void aGroupWithMembersToSpareSurvivesTheRemoval() {
+        Map<String, TypeDefinition> entries = resolveAll("""
+                stamps => { ( created: text | modified: text | accessed: text )? }
+                fewer => stamps - { accessed }
+                """);
+
+        assertEquals(List.of("created", "modified"), fieldNames(entries.get("fewer")));
+        assertEquals(List.of(new FieldGroup(List.of("created", "modified"), ElementState.OPTIONAL)),
+                bodyOf(entries.get("fewer")).groups());
+    }
+
+    /**
+     * Removing every member takes the group with them. §5.11 legislates only the reduced-to-one case, so this
+     * is this implementation's reading of a gap, recorded as {@code SPEC-FEEDBACK.md} #36: an empty group has
+     * no members to choose between, and keeping a REQUIRED one would demand a member that cannot exist.
+     */
+    @Test
+    void removingEveryMemberDropsTheGroupItself() {
+        Map<String, TypeDefinition> entries = resolveAll("""
+                bounds => { a: text  ( min: integer | exclusive_min: integer ) }
+                unbounded => bounds - { min  exclusive_min }
+                """);
+
+        assertEquals(List.of("a"), fieldNames(entries.get("unbounded")));
+        assertEquals(List.of(), bodyOf(entries.get("unbounded")).groups());
     }
 
     /**
