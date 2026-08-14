@@ -1774,3 +1774,79 @@ declaration, and make §5.11's removal sentence cover the whole arity ladder —
 members left survives; one left is dissolved into a plain field carrying the group's state; none left is
 removed with its members. One extra clause, and it closes the case rather than leaving each implementation
 to reason from inhabitability.
+
+## 37. Composition grants IS-A per parent, but subtraction revokes it for all of them — including parents that contributed nothing to the removal
+
+**Section:** [TSON-SCHEMA] §5.9 (Subtraction), §4.3 (Operations), §5.8 (Composition), §7.2 (Subsumption),
+§8.1 (Output Records).
+
+**Problem:** §4.3 states the asymmetry in a single sentence, without remarking on it:
+
+> composition grants IS-A **per parent**, and subtraction revokes **it** while keeping lineage.
+
+Per parent, then — *it*. Which parent's IS-A does subtraction revoke? §5.9 answers "all of them", flatly:
+
+> `type_definition.supertypes` (the IS-A lattice) is empty — the subtracted type is not source-compatible
+
+with the operations table agreeing ("broken (lineage kept)") and rule 3 assuming the total break as its
+premise rather than deriving it ("since IS-A is already broken, there is no contract to violate").
+
+So in
+
+```
+account => { name: text  email: text  password: text }
+user    => { badge_id: text }
+staff_public => account & user - { password }
+```
+
+`staff_public` loses IS-A with `user`, whose fields it retains in full. Nothing about `user`'s contract is
+violated: every field `user` declares is present, unchanged, in `staff_public`. A value of `staff_public` is
+a perfectly good `user`, and §7.2's subsumption rule will nonetheless refuse it at a `user`-typed position.
+The information is not merely unstated — it is stated wrongly, because `supertypes` is the index §7.2 reads.
+
+**The finer rule is well-defined and cheap.** Keep an ancestor `A` in the transitive chain iff none of the
+removed names appears in `A`'s own field set. §5.8 already forbids two supertypes contributing the same field
+name, so each field has exactly one contributing parent; an ancestor declaring a removed field drops, and so
+does every descendant of it in the chain, which falls out of the same test since a descendant's field set
+contains the inherited name. It needs each ancestor's resolved definition — which the resolver necessarily
+already holds, having just copied their fields.
+
+**Two reasons the blunt rule may be deliberate**, both real, and neither stated as the reason:
+
+1. **Head-level legibility.** §5.9 sells the clause's position: "a reader of the declaration line knows the
+   contract is broken without scanning the body." Under a per-ancestor rule the reader knows only that *some*
+   contract broke; which ones survive needs every parent's field set. That is a genuine loss, and it is the
+   strongest argument for the flat rule.
+2. **Ingest must not diff.** §5.9's own closing sentence: "For ingest (§8.1), broken-IS-A-with-lineage is
+   declared by the source syntax rather than inferred by diffing field sets against the parents." A
+   per-ancestor rule is exactly that diff. But note this argues about how an *ingesting* consumer learns the
+   answer, not about what the answer is: a resolver computing `supertypes` from source already diffs nothing
+   it does not have, and §8.1 treats `subtypes` and `disjoint` as caches to recompute while taking
+   `supertypes` as input to verify — under a per-ancestor rule, verification is the same recomputation.
+
+**The workaround is good, which is why this is a question and not a defect.** Subtract first, compose second:
+
+```
+account_public => account - { password }
+staff_public   => account_public & user
+```
+
+`account_public`'s chain is empty, so `staff_public` resolves to `[account_public, user, …]` — IS-A `user`,
+IS-A `account_public`, not IS-A `account`. Exactly the lattice the one-liner should arguably have produced,
+and it arrives without any provenance reasoning. An author who wants partial IS-A can always write it.
+
+**What this implementation does:** empties `type_definition.supertypes` whenever a removal clause is present,
+per the letter of §5.9, and keeps the head's list in `record.supertypes` as lineage. `DefinitionResolver`'s
+`resolveComposition`; pinned by `DefinitionResolverTest.subtractionRemovesTheFieldAndBreaksIsAWhileKeepingLineage`.
+
+**Suggested resolution:** Say which is meant, in §5.9's Resolution paragraph, and say why — a reader who
+notices §4.3's "per parent" will ask.
+
+1. If the flat rule is intended, replace rule 3's circular "since IS-A is already broken" with the actual
+   justification: the clause is head-level, so its effect must be readable without consulting the parents'
+   field sets. One clause, and the design stops looking like an oversight.
+2. If partial retention is wanted, state the ancestor test (an ancestor survives iff it declares none of the
+   removed fields), and reconcile it with the ingest sentence — most simply by saying that ingest verifies the
+   declared `supertypes` against that test rather than inferring them.
+
+Either way §4.3's "revokes it" deserves the same "per parent" precision the clause before it uses.

@@ -361,7 +361,11 @@ namespace *before* any local declaration resolves.
   diagnosis. The output splits the two supertype lists §8.1 keeps apart: `type_definition.supertypes` is
   **emptied** (the contract — so §7.2's subsumption check won't let a subtracted type stand where its source
   is expected), while `record.supertypes` keeps the head's list as authorial lineage. `kind` still comes off
-  the lineage chain. Groups follow §5.11: a removed member leaves `members`, a group down to one member is
+  the lineage chain. **Every** supertype goes, including one that contributed nothing to the removal — `A & B
+  - { f }` with `f` from `A` drops IS-A with `B` too, though `B`'s fields all survive. That is §5.9's letter
+  against §4.3's "composition grants IS-A per parent"; `SPEC-FEEDBACK.md` #37 has the per-ancestor
+  alternative, and the workaround (subtract first, compose second) that makes an author's intent explicit.
+  Groups follow §5.11: a removed member leaves `members`, a group down to one member is
   dissolved into a plain field taking the *group's* state (members flatten as `OPTIONAL` whatever the group
   says, so the survivor would otherwise silently lose a REQUIRED group's "exactly one"), and a group with no
   members left is dropped — the one arity §5.11 doesn't legislate (`SPEC-FEEDBACK.md` #36).

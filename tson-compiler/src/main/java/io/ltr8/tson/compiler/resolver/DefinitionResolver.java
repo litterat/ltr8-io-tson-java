@@ -731,6 +731,12 @@ final class DefinitionResolver {
         // subsumption rule reads, so a subtracted type does not stand where its source is expected. `kind` is
         // still taken from the lineage chain: a chain that reached `product` still says what this type *is*,
         // and §4.1's own rule over the now-empty contract index would answer PRODUCT regardless.
+        //
+        // Emptied for EVERY supertype, including one that contributed nothing to the removal: `A & B - { f }`
+        // with `f` from A loses IS-A with B as well, though every field B declares survives untouched. That is
+        // §5.9's letter ("the IS-A lattice is empty") against §4.3's "composition grants IS-A per parent";
+        // SPEC-FEEDBACK.md #37 argues the per-ancestor alternative and why this implementation conforms
+        // anyway. An author wanting partial IS-A subtracts first and composes second, which says it outright.
         List<String> contract = construction.removal().isPresent() ? List.of() : transitiveSupertypes;
         return new TypeDefinition(Optional.empty(), kind, parameters, constructor, contract, List.of(),
                 Optional.empty(), body);
