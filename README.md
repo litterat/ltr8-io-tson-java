@@ -156,6 +156,13 @@ self-describing but you hold the schema out of band, `withSchema(uri).readAs(sou
 the document didn't say. All of these stream their input — a large document is never fully buffered before
 reading begins — and take a `String` or an `InputStream`.
 
+A schemaless read still holds a `!type-ref` to account, since it is the only contract on offer: a built-in
+name (`!uuid`, `!int32`, `!date`) must sit on a scalar and satisfy that type, and any other name must name
+the class you are binding to — one that names neither is reported, so a typo like `!Uuid` doesn't quietly
+disable the check you asked for. Add `preservingUnknownTypeRefs()` when you *want* names carried through
+uninterpreted: reading the raw wire of a document whose schema you're deliberately ignoring, or
+round-tripping a tree back out through `tson.treeWriter()`.
+
 **These two readers are the whole document-reading surface.** They own the `!!schema` decision, the
 target-class check, and the framing that rejects trailing content. `tson.treeRegistry()`/`bindRegistry()`
 and the per-type `TsonValueReader` they hand back are the layer underneath — useful for compiling a schema

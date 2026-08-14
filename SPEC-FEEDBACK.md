@@ -118,19 +118,27 @@ application-level consumer that wants to use `type-ref` for host-language type d
 resolving a Java union member from `!Circle`) has zero spec guidance today, and no way to know whether the
 eventual Part 2 rule will be case-sensitive-only (as §5.1 is, for the built-in set) or something looser.
 
-**Interpretation chosen:** `TsonMapperReader.resolveUnionMember` (`io.ltr8.tson.compiler.mapper`) treats this as purely an
+**Interpretation chosen:** `TypeRefCheck.names` (`io.ltr8.tson.compiler.reader`) treats this as purely an
 application-binding decision, not a spec-conformance one — the Class 1/Class 2 preservation requirement is
 satisfied upstream (the parser hands the type-ref through as an uninterpreted string), and everything
-downstream of that is this implementation's own policy: try an exact match against a member class's
-`@Typename` annotation first, then fall back to a case-*insensitive* match against the member's simple
-Java class name (so `!circle` matches a class named `Circle` without requiring every fixture to carry an
-explicit annotation). Note this fallback is deliberately *not* consistent with §5.1's case-sensitivity
-rule for the built-in vocabulary — there was no spec basis to be consistent with, since §5.1 doesn't
-claim to govern this case at all.
+downstream of that is this implementation's own policy: try an exact match against a class's `@Typename`
+annotation first, then fall back to a case-*insensitive* match against its simple Java class name (so
+`!circle` matches a class named `Circle` without requiring every fixture to carry an explicit annotation).
+One rule, applied both to a union's candidate members (`SchemalessObjectReader.resolveUnionMember`) and to
+a directly-bound container target. Note this fallback is deliberately *not* consistent with §5.1's
+case-sensitivity rule for the built-in vocabulary — there was no spec basis to be consistent with, since
+§5.1 doesn't claim to govern this case at all.
+
+The looseness is scoped, though, and entry #7 is where that scoping lives: an **atom** position takes
+`TypeRefCheck.declares` (`@Typename` only, no simple-name fallback) precisely *because* §5.1's
+case-sensitivity does govern there, and the fallback would otherwise let a `UUID`-targeted `!Uuid` through
+on the strength of the class being called `UUID`.
 
 **Suggested resolution:** Not a Part 1 defect to fix — flagging so that whenever Part 2 defines real
-schema-driven type-name resolution, this implementation's ad hoc `TsonMapper` heuristic gets revisited and
-either conformed to the real rule or clearly scoped as "no schema in play" fallback behavior.
+schema-driven type-name resolution, this implementation's ad hoc heuristic gets revisited and either
+conformed to the real rule or clearly scoped as "no schema in play" fallback behavior. (It is now
+explicitly the latter: the heuristic runs only on the schemaless path, never where a compiled schema is in
+scope.)
 
 ---
 
@@ -199,7 +207,7 @@ a Class 1 processor can't know the full universe of names some future schema or 
 and choking on them would make the format not forward-compatible. But the rule only addresses that
 processing step; it says nothing about what happens next. An application built on top of a Class 1
 processor that binds a value directly to a caller-declared, strongly-typed target (this implementation's
-`TsonMapper.toObject(source, MyRecord.class)`) has a real choice to make on hitting a marker it can't
+`TsonObjectReader.read(source, MyRecord.class)`) has a real choice to make on hitting a marker it can't
 interpret: treat the value as if the annotation weren't there (silently falling back to base type
 resolution), or treat an unresolvable annotation on a value it's actively trying to type-check as an
 error. Getting this wrong either way has a real cost: silently ignoring means a typo like `!Uuid`
@@ -210,19 +218,34 @@ top of TSON will face exactly this decision, and Part 1 has nothing to say about
 it's application-binding policy, not format conformance, but worth recording as a gap a future
 implementer's guide could usefully address.
 
-**Interpretation chosen:** `TsonMapper` treats an atom-typed value carrying a type-ref that
-`BuiltinTypeVocabulary` doesn't recognize as a binding error (`DataBindException`), not silent fallthrough
-to base type resolution. The Class 1 processing step itself (`tson-compiler`'s `Parser`/`BaseTypeResolver`)
-still faithfully preserves the type-ref exactly as §5.1 requires — this is a binding-layer policy choice
-layered on top, not a change to Part 1 conformance. Rationale: a mistyped or unimplemented type-ref on a
-value the caller is actively binding to a specific Java type is far more likely to be a bug worth
-surfacing than an intentional forward-compatibility signal, and `TsonMapper` has no schema layer yet to
-make "this annotation is legitimately not mine to interpret" a safe default assumption.
+**Interpretation chosen:** report by default, preserve on request — this implementation's answer to its own
+"rather than the reverse" below. `TypeRefCheck` (in `tson-compiler`'s `reader` package) states the rule once
+for both schemaless readers: given `!X`, a name `BuiltinTypeVocabulary` resolves must sit on a token and
+satisfy that atom; a name that instead *names the target being bound* is accepted; a name that links to
+neither is `UNKNOWN_TYPE_REF`. `preservingUnknownTypeRefs()` on `TsonTreeReader`/`TsonObjectReader` relaxes
+that last rule alone, which is the explicit opt-in this entry argued should exist — built-in names stay
+checked either way.
+
+The Class 1 processing step itself (`TsonDataStream`/`TsonDataParser`) still preserves every type-ref
+exactly as §5.1 requires; this is a reader-layer policy on top, not a change to Part 1 conformance.
+Rationale unchanged: a mistyped or unimplemented type-ref on a value the reader is actively type-checking is
+far more likely to be a bug worth surfacing than an intentional forward-compatibility signal, and `!Uuid`
+being case-sensitively distinct from `!uuid` (§5.1) means silence there disables exactly the validation the
+author asked for.
+
+What "names the target" means differs by position, and the split matters. A **container** accepts the
+target's `@Typename` or, failing that, its simple class name case-insensitively, so `!point { x: 3  y: 4 }`
+binds to a Java `Point` with nothing annotated. An **atom** accepts a declared `@Typename` only: the loose
+match would let a `UUID`-targeted `!Uuid` through on the strength of the class being *called* `UUID`,
+reintroducing the exact hole the rule exists to close. A tree read has no target at all, so rule 2 never
+applies there and any non-built-in name is reported unless preserved.
 
 **Suggested resolution:** Not a Part 1 defect — flagging as guidance worth a note in a future
-implementer's guide ([TSON-GUIDE]?) rather than the format spec itself: implementations binding typed
-values directly to host objects should consider failing on unrecognized type-refs by default, with
-passthrough as an explicit opt-in, rather than the reverse.
+implementer's guide ([TSON-GUIDE]?) rather than the format spec itself: an implementation that
+*type-checks* a value against anything (a host class, or the built-in vocabulary alone) should consider
+failing on unrecognized type-refs by default, with passthrough as an explicit opt-in, rather than the
+reverse. Worth stating more broadly than "binding to host objects": the same choice faces a
+schemaless-tree/validating reader, which has no host type at all and still has to decide.
 
 ---
 

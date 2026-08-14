@@ -618,7 +618,8 @@ forces the schemaless path on a schema-aware reader.
 
 **These two are the whole document-reading surface**, and both derive Jackson-`ObjectReader`-style rather
 than taking parameters, so source form, error policy and schema selection stay orthogonal instead of
-multiplying overloads: `withDiagnostics(receiver)` swaps fail-fast for any other receiver, and
+multiplying overloads: `withDiagnostics(receiver)` swaps fail-fast for any other receiver,
+`preservingUnknownTypeRefs()` relaxes the schemaless type-ref rules below, and
 `withSchema(uri).readAs(source, typeName)` covers data that *isn't* self-describing — the caller supplies
 what a `!!schema` plus a root type-ref would have said, and validation is identical either way. Each returns
 a new reader **sharing** the original's compiled-schema registry, never rebuilding it. A per-type
@@ -636,7 +637,28 @@ reads one value at a cursor and polices nothing around it.
   root type-ref, a root type the target class can't hold: each reports through the receiver and skips the
   root value (so the stream still lands on `DocumentEnd`). Under `throwing()` that is indistinguishable from
   the old behaviour; under a collector they arrive as `Diagnostic`s, which is what lets `Tson.validate`
-  delegate its schema-driven half to `treeReader()` instead of re-deriving it.
+  delegate to `treeReader()` wholesale instead of re-deriving anything.
+- **A schemaless read checks its type-refs, and `TypeRefCheck` (in `reader`) states the rules once** for
+  both engines. Given `!X` on a value: (1) `X` **is** a `BuiltinTypeVocabulary` name → it must sit on a
+  token (`TYPE_MISMATCH` otherwise) and that token must satisfy the atom
+  (`ATOM_CONSTRAINT_VIOLATION`); (2) `X` **names the target** being bound → accepted, object-binding
+  only, a tree read having no target; (3) otherwise it links to nothing → `UNKNOWN_TYPE_REF`.
+  **Rule 3 is a reader policy, not a parsing one** — the parse step still preserves every marker per §5.1;
+  what a reader *type-checking* a value does with one it can't link is the layer above, where a
+  case-sensitive typo (`!Uuid`) silently disabling the author's intended validation is the worse failure
+  (`SPEC-FEEDBACK.md` #7, whose suggested resolution this is). `preservingUnknownTypeRefs()` on either
+  facade opts out of rule 3 only — built-in names stay checked — and is what round-tripping through
+  `TsonTreeWriter`, or reading the wire of a document whose `!!schema` is deliberately out of scope, wants.
+- **Rule 2 is looser for a container than for an atom, deliberately.** `TypeRefCheck.names` (a `@Typename`,
+  else the simple class name case-insensitively — the same match `bindUnion` gives union members) is what
+  lets `!point { x: 3  y: 4 }` bind to a Java `Point` with nothing annotated. An atom position takes
+  `TypeRefCheck.declares` (`@Typename` only), because the loose match would accept a `UUID`-targeted
+  `!Uuid` on the strength of the class being *called* `UUID`. Consequence worth knowing: a collection
+  target answers to no wire name, so `!tags [ "a" ]` into a `List<String>` is `UNKNOWN_TYPE_REF`.
+- **Reporting never abandons the value.** A reported type-ref still yields its node/object and its children
+  are still read, so one collecting pass finds everything; a leaf whose atom rejected the token becomes a
+  `NullNode` keeping its wire type-ref (the placeholder `AtomNodeReader` already uses). `SchemalessTreeReader`
+  scopes `ctx.field`/`ctx.index` as it descends, so a diagnostic carries a real RFC 6901 path.
 - **`TsonObjectReader`'s schema-aware `read` checks the target class up front** — the schema's root type
   already binds to a Java class via the name binder, so a class not assignable to that is a `TYPE_MISMATCH`
   reported *before* the value is read, not a cast failure after.
@@ -669,9 +691,13 @@ reads one value at a cursor and polices nothing around it.
   Read-time resolution is safe because `compile` is eager; the lookup is gated on `schema().entries()`
   because the resolver throws for an unknown name. An unresolvable name reports `UNKNOWN_TYPE_REF` and the
   annotation is **still kept** (§1.5 requires preserving what a processor doesn't act on); §6's bare `@T` is
-  checked as `@T:_` by reading a synthetic absent through the reader. The schemaless path checks nothing —
-  no governing schema, no type to check against. This is deliberately stricter than Class 2 conformance
-  requires, which asks for nothing at all here (`SPEC-FEEDBACK.md` #29).
+  checked as `@T:_` by reading a synthetic absent through the reader. The schemaless path checks no
+  annotation *name* — no governing schema, no type to resolve against — but an annotation's **value** is a
+  data-value, so the type-ref rules above reach into it: it is read by the enclosing reader itself, hence
+  exactly as strictly. The one exception is the schema-driven *fallback* (a name the governing schema
+  doesn't declare), which reads its value through a **preserving** reader — §1.5 already keeps an annotation
+  nothing can interpret, and rejecting its innards would take that back. This is deliberately stricter than
+  Class 2 conformance requires, which asks for nothing at all here (`SPEC-FEEDBACK.md` #29).
 - **`TsonTreeWriter` re-emits them** — `TsonDataEmitter` gained `annotation`/`beginAnnotation`/
   `endAnnotation` (the valueless form's trailing space is load-bearing, §3.1) and `writeNode` writes a
   node's annotations ahead of its type-ref, per §7.4's `*annotation [type-ref] core-value` order, so a tree
@@ -713,20 +739,23 @@ TsonNode value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_typ
   `resolve(schemaText)` resolves/links/registers and takes *no* mode — resolution is always object-binding
   internally (it binds meta instances to `schema.meta.Top`), and only a registry's own `compile`/`get`
   picks a mode.
-- **`validate(String|InputStream)` works out on its own whether a schema applies:** a `!!schema` directive
-  selects the schema (resolved through `TsonConfig.schemaSource`, compiled once in tree mode) and the root
-  type-ref (e.g. `!person`) selects the type; with no `!!schema` it's validated schemalessly
-  (`SchemalessValidator`, Class 1 — base syntax plus built-in/core-vocabulary atoms). Returns every
-  problem as a `List<Diagnostic>` (empty means valid) and **never throws for a bad input document** —
-  malformed syntax, a schema document handed in where data was expected, an unresolvable schema, an
-  unknown type all come back as diagnostics.
-  - **The schema-driven half *is* `treeReader()` with a collecting receiver**, not a parallel
-    implementation. Only the schemaless half is separate, because a schemaless tree read is a *read* and
-    throws on a bad `!uuid` where `SchemalessValidator` collects — the one thing keeping `validate` from
-    being a two-line delegation (`BACKLOG.md`).
-  - Base-syntax failures are converted by `SchemalessValidator.asBaseSyntaxError`, which is public for
-    exactly this: two of the three exception types live in the unexported `lexer` package, so `Tson` in
-    another module can't name them in a `catch`.
+- **`validate(String|InputStream)` *is* `treeReader()` with a collecting receiver**, both halves of it —
+  one try/catch over one call, no second implementation. The reader already works out whether a schema
+  applies (a `!!schema` directive selects the schema through `TsonConfig.schemaSource`, compiled once in
+  tree mode, and the root type-ref selects the type; with no `!!schema` it reads schemalessly, checking
+  the wire's own type-refs), and reports every failure around all of that through the receiver. Validating
+  is that read with the tree thrown away. Returns every problem as a `List<Diagnostic>` (empty means valid)
+  and **never throws for a bad input document** — malformed syntax, a schema document handed in where data
+  was expected, an unresolvable schema, an unknown type all come back as diagnostics.
+  - **The `InputStream` overload is the body; the `String` one delegates into it.** The reader underneath
+    decodes UTF-8 bytes, and the CLI already holds a stream. (The old direction buffered stream→`String`
+    only because a separate schemaless branch had to be re-readable.)
+  - Base-syntax failures are converted by **`Diagnostic.ofBaseSyntaxError`** — in the root package because
+    two of the three exception types live in the unexported `lexer` package, so `Tson` in another module
+    can't name them in a `catch`. It returns a `Diagnostic` and **rethrows anything else**: "never throws
+    for a bad *document*" is not "never throws", and laundering a library fault into a diagnostic would
+    report a false verdict and bury the stack trace. (`tson validate` puts that verdict back on — a
+    `BACKLOG.md` item.)
 - `objectReader()`/`treeReader()` return **schema-aware** `TsonObjectReader`/`TsonTreeReader` over this
   instance — the value-returning read peers of `validate`: a self-describing document is validated against
   its declared `!!schema` (schemaless when it declares none), the object form checking the target class up
@@ -848,10 +877,6 @@ compatibility).
   broken *schema* yields one exception, flattened by `Tson.validate` into a single `SCHEMA_ERROR` with no
   path and no position in the schema document. The read path's `TsonDiagnosticsReceiver` has no schema-side
   counterpart yet; `BACKLOG.md`'s "Schema-side diagnostics" has the shape.
-- **A schemaless tree read throws rather than collecting** — `SchemalessTreeReader.leaf()` calls the atom
-  directly, not through `ctx.report`, so a bad `!uuid` aborts the read. `SchemalessValidator` (the AST
-  walk) is what collects, which is why `Tson.validate` still keeps a schemaless branch of its own instead
-  of delegating wholly to `treeReader()`.
 - **Deferred design questions** — `REQUIRED_FIXED`/`OPTIONAL_FIXED` value validation, `value_param` real
   parameter substitution, thread-safety, and a general disk/HTTP-backed `TsonSchemaSource` (with
   whitelist/blacklist policy).

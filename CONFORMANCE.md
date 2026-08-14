@@ -78,8 +78,10 @@ tool, not a guaranteed-lossless serializer: a `!typeName` type-ref is only re-em
 wouldn't read back correctly without one (the built-in vocabulary's JDK-backed host types); anything
 default value resolution (§4) already recovers on its own — the whole integer family, plain
 `number`/`float32`/`float64` — is written bare, so a field bound from `!uint8 42` writes back as plain
-`42`, indistinguishable from one that was never `!uint8`-typed at all. A schemaless writer has no
-annotation to reach for any more than a schemaless reader has one to validate against. `byte[]` values
+`42`, indistinguishable from one that was never `!uint8`-typed at all — the width lived in the wire
+annotation, and a bound `int` no longer carries it. (The read direction isn't symmetric here: a schemaless
+read *does* hold a wire annotation to account, checking `!uint8 300` against `uint8`'s own range. What the
+writer lacks is the annotation, not the vocabulary.) `byte[]` values
 always write back as `!base64`, regardless of which of `base64`/`base64url`/`base32`/`hex` they were
 originally decoded from — that information doesn't survive decoding, so `!base64` is an arbitrary but
 reasonable default. Tuples write as plain arrays, with nothing marking them as tuples at all. Wire-format annotations do
