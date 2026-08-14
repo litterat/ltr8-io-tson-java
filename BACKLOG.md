@@ -368,16 +368,7 @@ missing most of the mirror.
 
 ## Tree model (`TsonValue`)
 
-The `TsonValue` tree — an immutable, queryable, structure-preserving document model in its own pure-leaf
-`tson-tree` module (`io.ltr8.tson.tree`) — is **built**: the node model + query API, both producers (the
-schema-driven tree readers and the schemaless `TsonTreeReader`), the `TsonTreeWriter` back to text, and
-the removal of the old throwaway `Map`/`List` DOM mode all landed. The `Tson*` rename landed too
-(`TsonNode`/`RecordNode`/… → `TsonValue`/`TsonRecord`/…, dropping "Node"), resolving a real collision:
-Jackson ships `ArrayNode`, `NullNode` and `MissingNode`, so a consumer using both libraries in one file
-previously had to fully qualify. It also aligns with JEP 540's sealed `JsonValue`/`JsonObject`/`JsonArray`/
-`JsonNull` (Simple JSON API, incubating in JDK 28) — the same design this tree reached independently, with
-`TsonRecord`+`TsonMap` staying *more* precise than `JsonObject`, which cannot distinguish the two.
-What's left:
+The tree model itself is built and described in `CLAUDE.md`'s "Tree model" section. What's left:
 
 - [ ] **Copy-on-write transforms + builders (parked).** The "new tree from old" editing half —
   `TsonRecord.with(name, value)`/`without(name)`, `TsonArray.with(i, value)`/`plus(value)`/`without(i)`,

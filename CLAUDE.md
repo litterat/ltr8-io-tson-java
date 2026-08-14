@@ -105,22 +105,7 @@ module has a real `module-info.java`; module names mirror each module's root exp
   assembled by hand-written readers). The data-tree counterpart to `tson-schema`'s `schema.meta`: same
   "pure value model in its own module, engine depends on it not the reverse" shape, so JPMS keeps the tree
   from ever coupling to compiler internals. `tson-compiler` depends on it; it names no `tson-compiler` type.
-  **Navigation is lenient but not silent:** `get`/`at` never throw, and the `TsonMissing` they return
-  carries `path()` — the RFC 6901 pointer of the step that *failed*, relative to the node navigation
-  started from — so `at("/a/b/c")` distinguishes "no `b`" (`/a/b`) from "`b` had no `c`" (`/a/b/c`). Every
-  missing comes from a navigation step, so there is no singleton and equality is by path; read it without a
-  cast via `TsonValue.missingPath()`. The first failure sticks — stepping on past a missing returns the
-  same node rather than extending its pointer.
-  **Two families of value accessor, and the split is the point:** `as(Class)`/`asString`/`asNumber`/
-  `asBigInteger`/`asBigDecimal` only ever **cast** (`isInstance`), so they answer "what host type did the
-  read produce?" — an `int32` field holding an `Integer` gives empty from `asBigInteger()`. `asInt`/
-  `asLong`/`asDouble` (`OptionalInt`/`OptionalLong`/`OptionalDouble`, so a hot path doesn't box)
-  **convert**, and answer "what number is this?" regardless of host type. Conversion is exact for the
-  integral pair — an integral fractional part converts (`123.0`, `234.56E2`), a real one doesn't, and
-  out-of-range yields empty rather than wrapping — while `asDouble` accepts nearest-double rounding
-  (demanding exactness would reject `0.1`) but rejects a magnitude that can't be finite, so nothing ever
-  reads back as `Infinity`. Text is never parsed: `"42"` is a string per §4.4. A test asserting *which*
-  host type a reader produced must therefore use `as(Class)`, not `asInt()`.
+  The node types and their query API are described under "Tree model" below.
 - **`tson-regex`** — **only** `io.ltr8.tson.regex`: a native RFC 9485 I-Regexp engine — `TsonRegex.parse`
   builds a `RegexNode` AST (or `TsonRegexSyntaxException`), `TsonRegex.matches` runs a Thompson-NFA/Pike-VM
   simulation (linear-time, no backtracking → ReDoS-safe; `\p{…}` via JDK `Character.getType`), and
@@ -754,6 +739,40 @@ reads one value at a cursor and polices nothing around it.
 - These live in `tson-compiler`'s root package (not a separate module) because `DefinitionResolver`
   depends on `TsonObjectWriter` (atom-refinement merging) — a module depending *on* `tson-compiler`
   couldn't provide them without a cycle. `tson-bind` (what they're built on) has no such dependency.
+
+### Tree model: `TsonValue` (`tson-tree` module)
+
+What every tree read hands back — the compiled tree readers above and the schemaless `TsonTreeReader`
+alike. A sealed `TsonValue` over eight pure immutable node types (`TsonRecord`/`TsonMap`/`TsonArray`/
+`TsonTuple`/`TsonAtom`/`TsonNull`/`TsonAbsent`/`TsonMissing`), **structure-preserving** — TSON's
+record-vs-map and array-vs-tuple distinctions survive into the model, where JSON's would collapse — and
+annotation-aware, every node carrying its own `typeRef()` and `annotations()`.
+
+- **The names are chosen against Jackson, not in a vacuum.** No node carries a `Node` suffix, because
+  Jackson ships `ArrayNode`, `NullNode` and `MissingNode` — a consumer using both libraries in one file
+  would otherwise fully qualify every one. The sealed shape independently matches JEP 540's
+  `JsonValue`/`JsonObject`/`JsonArray`/`JsonNull` (Simple JSON API, incubating in JDK 28), with
+  `TsonRecord` + `TsonMap` staying *more* precise than `JsonObject`, which cannot distinguish the two.
+- **Navigation is lenient but not silent.** `get`/`at` never throw, and the `TsonMissing` they return
+  carries `path()` — the RFC 6901 pointer of the step that *failed*, relative to the node navigation
+  started from — so `at("/a/b/c")` distinguishes "no `b`" (`/a/b`) from "`b` had no `c`" (`/a/b/c`). Every
+  missing comes from a navigation step, so there is no singleton and equality is by path; read it without a
+  cast via `TsonValue.missingPath()`. The first failure sticks — stepping on past a missing returns the
+  same node rather than extending its pointer. "Missing" (not in the tree), "null" (the `null` token) and
+  "absent" (the `_` sentinel) stay three distinct kinds.
+- **Two families of value accessor, and the split is the point.** `as(Class)`/`asString`/`asNumber`/
+  `asBigInteger`/`asBigDecimal` only ever **cast** (`isInstance`), so they answer "what host type did the
+  read produce?" — an `int32` field holding an `Integer` gives empty from `asBigInteger()`. `asInt`/
+  `asLong`/`asDouble` (`OptionalInt`/`OptionalLong`/`OptionalDouble`, so a hot path doesn't box)
+  **convert**, and answer "what number is this?" regardless of host type. Conversion is exact for the
+  integral pair — an integral fractional part converts (`123.0`, `234.56E2`), a real one doesn't, and
+  out-of-range yields empty rather than wrapping — while `asDouble` accepts nearest-double rounding
+  (demanding exactness would reject `0.1`) but rejects a magnitude that can't be finite, so nothing ever
+  reads back as `Infinity`. Text is never parsed: `"42"` is a string per §4.4. A test asserting *which*
+  host type a reader produced must therefore use `as(Class)`, not `asInt()`.
+- **Read-side only, deliberately.** There are no copy-on-write transforms and no builders; construction is
+  the static `of(...)` factories. `TsonTreeWriter` already closes the read→edit→write loop, so an editing
+  API waits on a concrete produce/edit use case (`BACKLOG.md`).
 
 ### Front door: `Tson`/`TsonConfig` (`tson` module)
 
