@@ -355,6 +355,18 @@ namespace *before* any local declaration resolves.
   restating a field group in a refinement or composition body (§5.11 — same member labels in the same order,
   types verbatim, state tightening OPTIONAL→REQUIRED only; only the *group's* state moves, since members
   flatten as `OPTIONAL` regardless).
+- **All six of §5.2's field-state spellings resolve**, including `field: type? = _` — `OPTIONAL_FIXED`
+  carrying *no* value, so §8.1 writes a `record_field` without a `value` member and the field must be
+  omitted or written `_`. Its three resolver errors are enforced: `~ _` on any field, `= _` on a REQUIRED
+  one, and `type? ~ value`. **Presence comes from the entry's own `?` when it restates a type, else from the
+  field it tightens** — §5.2 makes `= _` valid on a field "declared with `?` *or inherited as OPTIONAL*",
+  and a modifier-only entry has no `?` to read. That is why `resolveField` takes the whole inherited
+  `RecordField`, not just its type. A consequence worth knowing: a modifier-only tightening moves only the
+  *mutability* axis (§5.7's "only the value state changes"), so an inherited-OPTIONAL field pinned with
+  `= 0` lands in `OPTIONAL_FIXED`, not `REQUIRED_FIXED` — promoting it to always-present takes restating the
+  type (`min: integer = 0`). The exception is a **parametric** modifier, which §5.7's "Open modifiers" puts
+  in a REQUIRED-family state whatever the presence axis says (that is what makes `array_min`'s `min_items:
+  = MIN` mandatory), so the parameter branch sits ahead of the `OPTIONAL_FIXED` one.
 - **§5.11's group presence rule is checked after every body**, refinement and composition alike: two members
   of one group both left in a REQUIRED-family state (`REQUIRED`/`REQUIRED_DEFAULT`/`REQUIRED_FIXED`) is a
   resolver error, because a group admits at most one member and nothing could satisfy the result. Only this
@@ -405,10 +417,10 @@ namespace *before* any local declaration resolves.
   (`component`/`format`/`encoding`/`version`) — core.tn's own prose calls a selector swap a narrowing, so
   rejecting one would reject a documented construct (`SPEC-FEEDBACK.md` #27).
 - **Two exception types, and which one is deliberate.** `UnsupportedOperationException` means *this library
-  hasn't implemented that yet* — an `Absent` modifier value, the identity-diagonal FIXED-value invariant, a
-  generic type-ref with a nested or value (non-simple) argument, a parameterized supertype.
-  `TsonSchemaValidationException` means *the schema is wrong*, and the spec says so: a refinement that
-  loosens rather than narrows, a refinement body field (or group) that adds rather than tightens, a
+  hasn't implemented that yet* — the identity-diagonal FIXED-value invariant, a generic type-ref with a
+  nested or value (non-simple) argument, a parameterized supertype.
+  `TsonSchemaValidationException` means *the schema is wrong*, and the spec says so: a tightening outside
+  §5.7's transition table, a refinement body field (or group) that adds rather than tightens, a
   modifier-only entry with nothing to elide toward (§5.7), a field name two supertypes both contribute or a
   body/group declares twice (§5.8/§5.11), a group restatement that reorders, retypes, changes membership or
   loosens REQUIRED→OPTIONAL (§5.11), a source or supertype whose body is a binding record and so has no

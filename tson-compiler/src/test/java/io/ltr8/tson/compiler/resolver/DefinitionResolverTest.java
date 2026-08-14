@@ -734,9 +734,9 @@ class DefinitionResolverTest {
                 }""").parseSchemaDocument().body();
         resolved.put("base", resolver.resolve(schemaMap.declarations().get("base")));
 
-        UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
                 () -> resolver.resolve(schemaMap.declarations().get("loosened")));
-        assertTrue(thrown.getMessage().contains("permitted"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("can only restrict, never expand"), thrown.getMessage());
     }
 
     @Test
@@ -1641,6 +1641,109 @@ class DefinitionResolverTest {
                 bodyOf(entries.get("extended")).groups());
     }
 
+    // ── The six field-state spellings (§5.2) ──────────────────────────────
+
+    /** §5.2's table, end to end: five states across six spellings, in one record. */
+    @Test
+    void resolvesAllSixFieldStateSpellings() {
+        RecordBody body = bodyOf(resolveAll("""
+                config => {
+                  host:   text
+                  port:   integer ~ 8080
+                  debug:  boolean = false
+                  label:  text?
+                  format: text? = json
+                  extra:  text? = _
+                }
+                """).get("config"));
+
+        assertEquals(FieldState.REQUIRED, body.fields().get(0).state());
+        assertEquals(FieldState.REQUIRED_DEFAULT, body.fields().get(1).state());
+        assertEquals(FieldState.REQUIRED_FIXED, body.fields().get(2).state());
+        assertEquals(FieldState.OPTIONAL, body.fields().get(3).state());
+        assertEquals(FieldState.OPTIONAL_FIXED, body.fields().get(4).state());
+        // the sixth spelling: OPTIONAL_FIXED carrying no value at all, so §8.1 writes a record_field
+        // *without* a `value` member -- the field must be omitted or written as `_`
+        assertEquals(FieldState.OPTIONAL_FIXED, body.fields().get(5).state());
+        assertEquals(Optional.empty(), body.fields().get(5).value());
+        assertTrue(body.fields().get(4).value().isPresent());
+    }
+
+    /**
+     * §5.2 makes {@code = _} valid on a field "declared with {@code ?} <b>or inherited as OPTIONAL</b>", and
+     * a modifier-only tightening entry has no {@code ?} of its own -- so presence has to be read off the
+     * field being tightened. This is §5.9's IS-A-preserving counterpart to removal: the field stays in the
+     * contract, its value is forbidden.
+     */
+    @Test
+    void fixesAnInheritedOptionalFieldToAbsent() {
+        Map<String, TypeDefinition> entries = resolveAll("""
+                base => { name: text  nickname: text? }
+                anonymous => base ^ { nickname: = _ }
+                """);
+
+        RecordField nickname = bodyOf(entries.get("anonymous")).fields().get(1);
+        assertEquals(FieldState.OPTIONAL_FIXED, nickname.state());
+        assertEquals(Optional.empty(), nickname.value());
+        // unlike removal (§5.9), IS-A survives -- the field is still in the contract
+        assertEquals(List.of("base"), entries.get("anonymous").supertypes());
+        assertEquals(List.of("name", "nickname"), fieldNames(entries.get("anonymous")));
+    }
+
+    /** §5.2: "`~ _` (any field) -- a required field cannot fall back to not-being-filled." */
+    @Test
+    void rejectsAnAbsentDefault() {
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> resolveAll("config => { label: text? ~ _ }"));
+        assertTrue(thrown.getMessage().contains("'~ _'"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("§5.2"), thrown.getMessage());
+    }
+
+    /** §5.2: "`= _` on a REQUIRED field -- a field cannot be required and fixed to not-being-present." */
+    @Test
+    void rejectsFixingARequiredFieldToAbsent() {
+        TsonSchemaValidationException fresh = assertThrows(TsonSchemaValidationException.class,
+                () -> resolveAll("config => { label: text = _ }"));
+        assertTrue(fresh.getMessage().contains("required"), fresh.getMessage());
+
+        // and through inheritance: the source declares it REQUIRED, so the tightening entry inherits that
+        TsonSchemaValidationException inherited = assertThrows(TsonSchemaValidationException.class,
+                () -> resolveAll("""
+                        base => { name: text }
+                        odd => base ^ { name: = _ }
+                        """));
+        assertTrue(inherited.getMessage().contains("required"), inherited.getMessage());
+    }
+
+    /** §5.2: "`type? ~ value` -- a default implies the field is always present, contradicting optional." */
+    @Test
+    void rejectsADefaultOnAnOptionalField() {
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> resolveAll("config => { label: text? ~ none }"));
+        assertTrue(thrown.getMessage().contains("contradicts optional"), thrown.getMessage());
+        // the message offers all three spellings the author might have meant
+        assertTrue(thrown.getMessage().contains("'type ~ value'"), thrown.getMessage());
+    }
+
+    /**
+     * A parametric modifier lands in a REQUIRED-family state whatever the presence axis says (§5.7's "Open
+     * modifiers": "a parametric `= P` places the field in REQUIRED -- from OPTIONAL this is the table's
+     * ordinary OPTIONAL → REQUIRED tightening"). That is what makes {@code array_min}'s {@code min_items: =
+     * MIN} mandatory, so the parameter branch has to sit ahead of the OPTIONAL_FIXED one.
+     */
+    @Test
+    void aParametricModifierOnAnInheritedOptionalFieldStillLandsInRequired() {
+        Map<String, TypeDefinition> entries = resolveAll("""
+                base => { bound: integer? }
+                bounded => <MIN> base ^ { bound: = MIN }
+                """);
+
+        RecordField bound = bodyOf(entries.get("bounded")).fields().get(0);
+        assertEquals(FieldState.REQUIRED, bound.state());
+        assertEquals(Optional.of("MIN"), bound.valueParam());
+        assertEquals(Optional.empty(), bound.value());
+    }
+
     // ── Group presence under tightening (§5.11) ───────────────────────────
     //    "Group presence rules are checked against the refined states at schema
     //    load: a refinement under which two members of one group are always
@@ -1654,7 +1757,8 @@ class DefinitionResolverTest {
     @Test
     void rejectsARefinementMakingTwoGroupMembersAlwaysPresent() {
         TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
-                () -> resolveAll(BOUNDS + "  impossible => bounds ^ { min: = 0  exclusive_min: = 1 }"));
+                () -> resolveAll(BOUNDS
+                        + "  impossible => bounds ^ { min: integer = 0  exclusive_min: integer = 1 }"));
         assertTrue(thrown.getMessage().contains("min and exclusive_min"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("at most one"), thrown.getMessage());
     }
@@ -1668,7 +1772,8 @@ class DefinitionResolverTest {
     @Test
     void rejectsACompositionBodyMakingTwoGroupMembersAlwaysPresent() {
         TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
-                () -> resolveAll(BOUNDS + "  impossible => bounds & { min: = 0  exclusive_min: = 1 }"));
+                () -> resolveAll(BOUNDS
+                        + "  impossible => bounds & { min: integer = 0  exclusive_min: integer = 1 }"));
         assertTrue(thrown.getMessage().contains("at most one"), thrown.getMessage());
     }
 
@@ -1676,17 +1781,24 @@ class DefinitionResolverTest {
     @Test
     void aDefaultCountsAsAlwaysPresentForTheGroupRule() {
         TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
-                () -> resolveAll(BOUNDS + "  impossible => bounds ^ { min: ~ 0  exclusive_min: = 1 }"));
+                () -> resolveAll(BOUNDS
+                        + "  impossible => bounds ^ { min: integer ~ 0  exclusive_min: integer = 1 }"));
         assertTrue(thrown.getMessage().contains("min and exclusive_min"), thrown.getMessage());
     }
 
-    /** Pinning <em>one</em> alternative is the point of tightening a member, and stays legal. */
+    /**
+     * Pinning <em>one</em> alternative is the point of tightening a member, and stays legal. It also shows
+     * the two spellings apart: a modifier-only entry moves only the mutability axis (§5.7's "only the value
+     * state changes"), so an inherited-OPTIONAL member pinned with {@code = 0} lands in OPTIONAL_FIXED and
+     * stays absent-able -- which for a group member is exactly right, since the sibling alternative has to
+     * remain reachable.
+     */
     @Test
     void tighteningASingleGroupMemberIsFine() {
         Map<String, TypeDefinition> entries = resolveAll(BOUNDS + "  pinned => bounds ^ { min: = 0 }");
 
         RecordBody body = bodyOf(entries.get("pinned"));
-        assertEquals(FieldState.REQUIRED_FIXED, body.fields().get(1).state());
+        assertEquals(FieldState.OPTIONAL_FIXED, body.fields().get(1).state());
         assertEquals(FieldState.OPTIONAL, body.fields().get(2).state());
         assertEquals(List.of(new FieldGroup(List.of("min", "exclusive_min"), ElementState.OPTIONAL)), body.groups());
     }
@@ -1696,7 +1808,7 @@ class DefinitionResolverTest {
     void oneAlwaysPresentMemberInEachOfTwoGroupsIsFine() {
         Map<String, TypeDefinition> entries = resolveAll("""
                 ranged => { ( min: integer | exclusive_min: integer )? ( max: integer | exclusive_max: integer )? }
-                pinned => ranged ^ { min: = 0  max: = 9 }
+                pinned => ranged ^ { min: integer = 0  max: integer = 9 }
                 """);
 
         assertEquals(2, bodyOf(entries.get("pinned")).groups().size());

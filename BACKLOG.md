@@ -125,8 +125,6 @@ own prose (which had gone stale on at least one of them):
   (`map<text, [integer]>`) works; what is left is an argument that does not reduce to a plain name. The
   `weird<[T]>` shape additionally sits inside a *parameterized* declaration, which the phase skips
   entirely. Lifting this is part of the template-application item above, including its termination guard.
-- [ ] `= _` (absent) field modifier, and any `~`/`=` modifier on an already-`OPTIONAL` field —
-  `DefinitionResolver.resolveField` rejects both today.
 - [ ] Closed-entry parameter-free check (§5.10) — nothing validates that an entry with an empty
   `parameters` list truly contains no parameter references (`value_param` members, or a reference
   name resolving to a parameter) anywhere in its body, at any depth. Distinct from `value_param`

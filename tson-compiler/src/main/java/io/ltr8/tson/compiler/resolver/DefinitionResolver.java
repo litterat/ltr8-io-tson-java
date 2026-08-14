@@ -135,8 +135,7 @@ import java.util.Set;
  *   types verbatim, state tightening OPTIONAL&#8594;REQUIRED only.</li>
  * </ul>
  *
- * Everything else -- an {@code Absent} modifier
- * value ({@code = _}) or any modifier on an OPTIONAL field, the identity-diagonal value-invariant
+ * Everything else -- the identity-diagonal value-invariant
  * for a restated FIXED field, a generic type-ref with a nested or value (non-simple) argument, and a
  * parameterized supertype ({@code customer & box<T>}, §5.8, which needs §5.10 substitution into the
  * absorbed fields) -- is explicitly out of scope for now and reported via {@link
@@ -1067,11 +1066,14 @@ final class DefinitionResolver {
      */
     private RecordField resolveTighteningField(String declarationName, FieldDef fieldDef, RecordField inherited,
                                                 List<String> parameters) {
-        RecordField tightened = resolveField(fieldDef, parameters, Optional.of(inherited.type()));
+        RecordField tightened = resolveField(fieldDef, parameters, Optional.of(inherited));
         if (!isValidTighteningTransition(inherited.state(), tightened.state())) {
-            throw new UnsupportedOperationException("'" + declarationName + "': tightening '" + fieldDef.name()
+            // §5.7's table is a rule about schemas, not a coverage boundary: "refinement can only restrict,
+            // never expand -- FIXED states are terminal, and loosening a required field to optional is a
+            // resolver error".
+            throw new TsonSchemaValidationException("'" + declarationName + "': tightening '" + fieldDef.name()
                     + "' from " + inherited.state() + " to " + tightened.state() + " is not a permitted state "
-                    + "transition (§5.7)");
+                    + "transition -- a refinement can only restrict, never expand (§5.7)");
         }
         return tightened;
     }
@@ -1142,23 +1144,24 @@ final class DefinitionResolver {
      * {@code state} entirely in output); a parametric {@code ~} still promotes to {@link
      * FieldState#REQUIRED_DEFAULT}, identically to a literal default. Any other modifier token is an
      * ordinary literal, recorded as {@code value} with {@code state} promoted to {@link
-     * FieldState#REQUIRED_DEFAULT} ({@code ~}) or {@link FieldState#REQUIRED_FIXED} ({@code =}). An
-     * {@code Absent} modifier value ({@code = _}, valid only on an OPTIONAL field) and a modifier on
-     * an OPTIONAL field at all ({@link FieldState#OPTIONAL_FIXED}) are not resolved yet -- no real
-     * fixture declaration needs either so far.
+     * FieldState#REQUIRED_DEFAULT} ({@code ~}) or {@link FieldState#REQUIRED_FIXED} ({@code =}) -- or, on
+     * an optional field, to {@link FieldState#OPTIONAL_FIXED}. The absent sentinel ({@code = _}) is §5.2's
+     * sixth spelling: {@code OPTIONAL_FIXED} carrying no value, forbidding the field's value while keeping
+     * it in the contract.
      *
-     * <p>{@code inheritedType}, supplied only from {@link #resolveTighteningField}, is used when
-     * {@code field.type()} is elided ({@code field: = value}, a modifier-only entry, §5.7's own
-     * "Elided type-refs": the field's type is inherited from the source declaration and only the
-     * value state changes); a fresh (non-tightening) field always passes {@code Optional.empty()},
+     * <p>{@code inherited}, supplied only from {@link #resolveTighteningField}, is the field this entry
+     * tightens. Two things are read off it: its <b>type</b>, when {@code field.type()} is elided ({@code
+     * field: = value}, a modifier-only entry, §5.7's "Elided type-refs"), and its <b>state</b>, because §5.2
+     * makes {@code = _} valid on a field "declared with {@code ?} <em>or inherited as OPTIONAL</em>" and a
+     * modifier-only entry has no {@code ?} of its own to read. A fresh (non-tightening) field always passes
+     * {@code Optional.empty()},
      * and an elided type with nothing to inherit from is the <b>author's</b> error, not a gap -- §5.7
      * requires the resolver to reject a modifier-only entry both in a fresh record (no source to elide
      * toward) and in a composition body naming no inherited field, so it raises {@link
      * io.ltr8.tson.schema.TsonSchemaValidationException}.
      */
-    private RecordField resolveField(FieldDef field, List<String> parameters,
-                                      Optional<io.ltr8.tson.schema.meta.TypeRef> inheritedType) {
-        return resolveFieldEntry(field, parameters, inheritedType)
+    private RecordField resolveField(FieldDef field, List<String> parameters, Optional<RecordField> inherited) {
+        return resolveFieldEntry(field, parameters, inherited)
                 .withAnnotations(annotationsOf(field.name(), field.annotations()));
     }
 
@@ -1169,12 +1172,12 @@ final class DefinitionResolver {
      * position and it is the field's own.
      */
     private RecordField resolveFieldEntry(FieldDef field, List<String> parameters,
-                                           Optional<io.ltr8.tson.schema.meta.TypeRef> inheritedType) {
+                                           Optional<RecordField> inherited) {
         io.ltr8.tson.schema.meta.TypeRef type;
         if (field.type().isPresent()) {
             type = resolveTypeRef(field.type().get().typeRef());
-        } else if (inheritedType.isPresent()) {
-            type = inheritedType.get();
+        } else if (inherited.isPresent()) {
+            type = inherited.get().type();
         } else {
             // §5.7: "a modifier-only entry is always a tightening -- it names no type, so it cannot declare a
             // new field". Reaching here means there was nothing to elide toward: either a fresh record body
@@ -1186,27 +1189,61 @@ final class DefinitionResolver {
                     + "always a tightening, so it is only meaningful in a refinement or composition body, "
                     + "against a field the source declares (§5.7)");
         }
-        boolean optional = field.type().map(FieldDef.FieldType::optional).orElse(false);
+        // §5.2's presence axis: the entry's own `?` when it restates a type, otherwise the state it inherits
+        // -- `= _` is "valid only when the field is OPTIONAL (declared with `?` OR inherited as OPTIONAL)",
+        // and a modifier-only tightening entry (`min: = _`) has no `?` of its own to read.
+        boolean optional = field.type().isPresent()
+                ? field.type().get().optional()
+                : inherited.map(source -> isOptionalState(source.state())).orElse(false);
 
         if (field.modifier().isEmpty()) {
             FieldState state = optional ? FieldState.OPTIONAL : FieldState.REQUIRED;
             return new RecordField(field.name(), type, state, Optional.empty(), Optional.empty());
         }
         FieldDef.Modifier modifier = field.modifier().get();
-        if (!(modifier.value() instanceof FieldDef.Modifier.Value.Literal literal)) {
-            throw new UnsupportedOperationException("an absent field-modifier value ('= _') is not resolved yet: " + field);
+        boolean fixed = modifier.kind() == FieldDef.Modifier.Kind.FIXED;
+
+        if (modifier.value() instanceof FieldDef.Modifier.Value.Absent) {
+            // §5.2's sixth spelling, `field: type? = _`: OPTIONAL_FIXED carrying no value at all, so the
+            // field MUST be omitted or written as `_`. Its output encoding is a record_field *without* a
+            // `value` member (§8.1), which Optional.empty() gives directly.
+            if (!fixed) {
+                throw new TsonSchemaValidationException("field '" + field.name() + "' uses '~ _' -- a required "
+                        + "field cannot fall back to not-being-filled, so an absent default is a resolver "
+                        + "error on any field (§5.2). Write 'type?' for a field that may be absent");
+            }
+            if (!optional) {
+                throw new TsonSchemaValidationException("field '" + field.name() + "' fixes a required field to "
+                        + "absent ('= _') -- a field cannot be both required and forbidden from being present "
+                        + "(§5.2). Make it optional ('" + field.name() + ": type? = _') to forbid its value "
+                        + "while keeping it in the contract");
+            }
+            return new RecordField(field.name(), type, FieldState.OPTIONAL_FIXED, Optional.empty(),
+                    Optional.empty());
         }
-        if (optional) {
-            throw new UnsupportedOperationException("a default/fixed value on an OPTIONAL field is not resolved yet: " + field);
+
+        FieldDef.Modifier.Value.Literal literal = (FieldDef.Modifier.Value.Literal) modifier.value();
+        if (optional && !fixed) {
+            throw new TsonSchemaValidationException("field '" + field.name() + "' gives an optional field a "
+                    + "default ('type? ~ value') -- a default implies the field is always present, which "
+                    + "contradicts optional (§5.2). Use 'type ~ value' for a fallback, 'type?' for absence, "
+                    + "or 'type? = value' for present-implies-value");
         }
-        boolean isParameterReference = parameters.contains(literal.token().text());
-        if (isParameterReference) {
-            FieldState state = modifier.kind() == FieldDef.Modifier.Kind.DEFAULT ? FieldState.REQUIRED_DEFAULT : FieldState.REQUIRED;
+        // §5.7's "Open modifiers": a parametric modifier lands in a REQUIRED-family state whatever the
+        // presence axis says, because nothing is fixed at declaration -- the value arrives at application,
+        // and every application MUST bind every parameter.
+        if (parameters.contains(literal.token().text())) {
+            FieldState state = fixed ? FieldState.REQUIRED : FieldState.REQUIRED_DEFAULT;
             return new RecordField(field.name(), type, state, Optional.empty(), Optional.of(literal.token().text()));
         }
-        FieldState state = modifier.kind() == FieldDef.Modifier.Kind.DEFAULT
-                ? FieldState.REQUIRED_DEFAULT : FieldState.REQUIRED_FIXED;
+        FieldState state = optional ? FieldState.OPTIONAL_FIXED
+                : (fixed ? FieldState.REQUIRED_FIXED : FieldState.REQUIRED_DEFAULT);
         return new RecordField(field.name(), type, state, Optional.of(toMetaToken(literal.token())), Optional.empty());
+    }
+
+    /** §5.2's presence axis: the two states under which a conforming value may leave the field out. */
+    private static boolean isOptionalState(FieldState state) {
+        return state == FieldState.OPTIONAL || state == FieldState.OPTIONAL_FIXED;
     }
 
     /** {@code schema.meta} has no dependency on {@code tson-compiler}, so it can't reuse {@link TokenValue} directly (see {@link Token}'s own Javadoc) -- this converts field by field instead. */
