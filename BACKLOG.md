@@ -29,38 +29,14 @@ the removal of the old throwaway `Map`/`List` DOM mode all landed. What's left:
   `TsonSchemaSource` is `TsonSchemaSource.registeredOnly()` (nothing fetched); the bundled standard
   library is served internally by `TsonCompiledSchemaRegistry` from `TsonBundledSchemas`, not through
   a source.
-- [ ] **`SchemalessTreeReader` barely validates type-refs, and that — not "collecting" — is what keeps
-  `Tson.validate` from being a two-line delegation to `treeReader()`.** Measured against
-  `SchemalessValidator` on the same inputs, the tree reader silently accepts four of five:
-
-  | input | `Tson.validate` | schemaless tree read |
-  |---|---|---|
-  | `{ a: !uuid nope }` | `ATOM_CONSTRAINT_VIOLATION` | throws (raw `AtomParseException`) |
-  | `!uuid { a: 1 }` | `TYPE_MISMATCH` | reads OK |
-  | `!date [1 2]` | `TYPE_MISMATCH` | reads OK |
-  | `{ a: !nosuchtype 1 }` | `UNKNOWN_TYPE_REF` | reads OK |
-  | `!nosuchtype { a: 1 }` | `UNKNOWN_TYPE_REF` | reads OK |
-
-  `SchemalessValidator.walk` checks `validateTypeRef` on *every* value carrying a type-ref, containers
-  included; `SchemalessTreeReader.leaf()` only consults `BuiltinTypeVocabulary` at a leaf, and falls through
-  to plain base resolution when the lookup misses. So merging the two means **adding** validation to the
-  tree reader, not re-routing what it already does.
-  - The "make it collect" half is the easy part and needs no decision, contrary to how this item read
-    before. With `TsonDiagnosticsReceiver.throwing()` as the default, reporting through `ctx.report`
-    preserves fail-fast for every existing caller (it only upgrades the raw `AtomParseException` to a
-    `TsonReadException` carrying a `Diagnostic`, matching the rest of the stack), and the placeholder
-    question is already answered: `AtomNodeReader` documents `NullNode` as the soft-failed-read node, and
-    `SchemalessTreeReader.leaf()` already ends in exactly that `value == null ? NullNode : AtomNode` shape.
-  - The base-syntax layer beneath (`LexException`/`TsonParseException`) stays fail-fast either way, and no
-    longer blocks this: `Tson.validate`'s outer catch already converts those. Whether the lexer itself should
-    feed the `Diagnostic` model is the separate question `STRUCTURED-OUTPUT.md` tracks.
-- [ ] **The three schemaless paths disagree about an unrecognized type-ref.** `SchemalessValidator` reports
-  `UNKNOWN_TYPE_REF`; `SchemalessObjectReader` treats it as a binding error on purpose (its Javadoc argues
-  the case, `SPEC-FEEDBACK.md` #7); `SchemalessTreeReader` ignores it and keeps the name on the node. One of
-  those three is wrong and it is worth deciding which *before* the merge above, since that merge would
-  otherwise silently pick the tree reader's answer. Note §5.1 requires an unrecognized annotation be
-  preserved as an uninterpreted marker, which is the argument for the tree reader's behaviour — the object
-  reader's Javadoc explains why binding to a caller-declared Java type is a different situation.
+- [ ] **`tson validate` renders a library fault as a per-file `VALIDATION_ERROR`.**
+  `ValidateCommand`'s read loop catches `RuntimeException | IOException` around `Tson.validate` and turns
+  either into a `VALIDATION_ERROR` verdict for that file. The `IOException` half is right (an unreadable
+  file *is* that file's problem); the `RuntimeException` half is not, because `Tson.validate` deliberately
+  rethrows anything that isn't a base-syntax failure — see `Diagnostic.ofBaseSyntaxError` — precisely so a
+  bug in this library doesn't come back as "your document is invalid". The CLI puts that verdict back on.
+  Splitting the catch would let a genuine fault surface as a crash with its stack trace, which is the
+  honest outcome, and leaves the file-level diagnostics alone.
 
 ## Layer boundaries / schema registry
 

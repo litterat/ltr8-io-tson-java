@@ -29,6 +29,35 @@ public record Diagnostic(String path, Code code, String message, String expected
                           Optional<SourcePosition> dataPosition, Optional<SourcePosition> schemaPosition) {
 
     /**
+     * {@code e} as a base-syntax {@link Code#VALIDATION_ERROR} -- the three ways a document can fail before
+     * any reader sees a value: it doesn't lex, it doesn't parse, or it's a well-formed document of a kind
+     * this parser doesn't implement (§8.1 requires that last distinction be visible rather than folded into
+     * "malformed").
+     *
+     * <p><b>Anything else is rethrown, deliberately.</b> {@code Tson.validate} promises never to throw for a
+     * bad input <i>document</i>, which is not the same as never throwing: an exception that isn't one of
+     * these three is a fault in this library, and turning it into a diagnostic would tell a caller their
+     * document is invalid when it isn't -- burying the real failure and its stack trace behind a false
+     * verdict. Classifying or rethrowing is one decision, so it is made here rather than handed back as an
+     * {@code Optional} every call site has to unwrap the same way.
+     *
+     * <p>Lives here rather than on a validator because two of the three exception types are in the unexported
+     * {@code lexer} package: a caller in another module cannot name them in a {@code catch} and so cannot
+     * make this classification itself.
+     */
+    public static Diagnostic ofBaseSyntaxError(RuntimeException e) {
+        SourcePosition position;
+        switch (e) {
+            case TsonParseException p -> position = p.position();
+            case io.ltr8.tson.compiler.lexer.LexException l -> position = l.position();
+            case TsonUnsupportedDocumentException u -> position = u.position();
+            default -> throw e;
+        }
+        return new Diagnostic("", Code.VALIDATION_ERROR, e.getMessage(),
+                "well-formed TSON", "a base-syntax error", Optional.ofNullable(position), Optional.empty());
+    }
+
+    /**
      * A stable, machine-readable identifier from a closed vocabulary -- not a free string. The first
      * seven members are produced by an actual reader against real data; {@code UNRECOGNIZED_FIELD}/
      * {@code DUPLICATE_MAP_KEY} are reserved but not yet produced by any reader (see {@code

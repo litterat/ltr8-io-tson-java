@@ -3,15 +3,13 @@ package io.ltr8.tson;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.*;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
-import io.ltr8.tson.compiler.stream.DocumentStart;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaLinker;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
 
-import java.io.IOException;
+import java.io.ByteArrayInputStream;
 import java.io.InputStream;
-import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
@@ -128,7 +126,7 @@ public final class Tson {
      * declares a {@code !!schema}, that URI selects the schema (resolved through this instance's own
      * {@link TsonConfig#schemaSource} and compiled once, in tree mode) and the document's root type-ref
      * (e.g. {@code !person}) selects the type; with no {@code !!schema} it's validated schemalessly
-     * (Class 1: base syntax plus built-in / core-vocabulary atoms).
+     * (Class 1: base syntax, plus the built-in type vocabulary for whatever the wire tags).
      *
      * <p>Returns every problem found, an empty list meaning valid. A problem specific to this document
      * that isn't a value error -- malformed syntax, a schema document where data was expected, a {@code
@@ -136,38 +134,30 @@ public final class Tson {
      * -- comes back as a {@link Diagnostic} in the list too, so a caller has one shape to render and never
      * has to catch an exception for a bad input document.
      *
-     * <p>The schema-driven half <em>is</em> {@link #treeReader()} with a collecting receiver: the reader
-     * already resolves the {@code !!schema}, selects the root type, and reports every failure around that
-     * as a diagnostic. Only the schemaless half is separate, because a schemaless tree read is a read --
-     * it throws on a bad {@code !uuid} where {@link SchemalessValidator} collects.
+     * <p><b>This <em>is</em> {@link #treeReader()} with a collecting receiver</b>, both halves of it. The
+     * reader already resolves a {@code !!schema}, selects the root type, checks a schemaless document's own
+     * type-refs, and reports every failure around all of that as a diagnostic; validating is that read with
+     * its result thrown away. There is no second implementation to drift from this one.
      */
     public List<Diagnostic> validate(String data) {
-        try {
-            TsonDataStream header = new TsonDataStream(data);
-            if (!(header.next() instanceof DocumentStart start) || start.schema().isEmpty()) {
-                return SchemalessValidator.validate(data);
-            }
-            TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
-            treeReader().withDiagnostics(problems).read(data);
-            return problems.diagnostics();
-        } catch (RuntimeException e) {
-            // Base-syntax failures are this document's problem, so they render like any other; anything
-            // else is a real fault and propagates.
-            return List.of(SchemalessValidator.asBaseSyntaxError(e).orElseThrow(() -> e));
-        }
+        return validate(new ByteArrayInputStream(data.getBytes(StandardCharsets.UTF_8)));
     }
 
     /**
-     * {@link #validate(String)} from a stream. The document is read into memory first -- validation
-     * reads the whole document anyway (collecting mode never stops early, and the schemaless path
-     * builds the full tree), and it must be re-readable for the schemaless branch.
+     * {@link #validate(String)} straight off a stream -- the real body, since the reader underneath decodes
+     * UTF-8 bytes rather than characters and every non-trivial caller (the CLI included) already holds a
+     * stream. {@code data} is read incrementally and is not closed here.
      */
     public List<Diagnostic> validate(InputStream data) {
+        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
         try {
-            return validate(new String(data.readAllBytes(), StandardCharsets.UTF_8));
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+            treeReader().withDiagnostics(problems).read(data);
+        } catch (RuntimeException e) {
+            // A base-syntax failure is this document's problem, so it renders like any other; anything else
+            // is a fault in this library and rethrows itself from here.
+            return List.of(Diagnostic.ofBaseSyntaxError(e));
         }
+        return problems.diagnostics();
     }
 
     /** The underlying resolved-schema registry -- e.g. for {@code schemaRegistry().get(uri)} on an already-registered identity. */

@@ -171,6 +171,41 @@ class TsonValidateTest {
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, problems.getFirst().code());
     }
 
+    /** Every type-ref problem a schemaless document can carry, each reported once, at its own path. */
+    @Test
+    void aSchemalessDocumentsTypeRefsAreCheckedWhereverTheyAreWritten() {
+        Tson tson = tsonWithPoint();
+
+        assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, only(tson, "{ a: !uuid nope }").code());
+        assertEquals(Diagnostic.Code.TYPE_MISMATCH, only(tson, "!uuid { a: 1 }").code());
+        assertEquals(Diagnostic.Code.TYPE_MISMATCH, only(tson, "!date [1 2]").code());
+        assertEquals(Diagnostic.Code.UNKNOWN_TYPE_REF, only(tson, "{ a: !nosuchtype 1 }").code());
+        assertEquals(Diagnostic.Code.UNKNOWN_TYPE_REF, only(tson, "!nosuchtype { a: 1 }").code());
+
+        assertEquals("/a", only(tson, "{ a: !uuid nope }").path());
+    }
+
+    /** An annotation's value is a data-value (§3.1), so validation reaches inside it. */
+    @Test
+    void anAnnotationsOwnValueIsValidatedToo() {
+        assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION,
+                only(tsonWithPoint(), "{ a: @since:!date nope 1 }").code());
+    }
+
+    /** Several independent problems come back from one pass, not just the first. */
+    @Test
+    void everyProblemInOneDocumentIsCollected() {
+        List<Diagnostic> problems = tsonWithPoint().validate("{ a: !uuid nope  b: !nosuchtype 1  c: !int8 999 }");
+        assertEquals(3, problems.size(), problems.toString());
+    }
+
+    /** The sole diagnostic {@code source} produces -- asserts there is exactly one, then hands it over. */
+    private static Diagnostic only(Tson tson, String source) {
+        List<Diagnostic> problems = tson.validate(source);
+        assertEquals(1, problems.size(), problems.toString());
+        return problems.getFirst();
+    }
+
     /**
      * Content after the document's value is a problem, not a pass. Easy to lose: {@code TsonDataStream} is
      * lazy, so nothing notices unless the read pulls past the root value -- which a schema-driven validate
