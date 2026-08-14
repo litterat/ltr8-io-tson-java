@@ -119,7 +119,6 @@ own prose (which had gone stale on at least one of them):
 
 ## Remaining Part 2 resolution gaps
 
-- [ ] Restating a field group in a refinement body.
 - [ ] Generic type-refs whose arguments are not simple names. A non-simple argument (`weird<[T]>`) is
   rejected outright ("only simple type arguments are resolved so far") — `SchemaDesugarer` reduces an
   argument that is itself an application to the name it was hoisted to, so ordinary nesting

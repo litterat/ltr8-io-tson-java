@@ -121,7 +121,8 @@ import java.util.Set;
  *   composition, a refinement copies the source's *entire* field set and admits no new fields --
  *   every body entry MUST tighten an inherited field (reusing {@link #resolveTighteningField}) or
  *   the declaration is a resolver error, reported as such ({@link
- *   io.ltr8.tson.schema.TsonSchemaValidationException}) rather than as a coverage gap. {@code source} is recorded verbatim as the result's own
+ *   io.ltr8.tson.schema.TsonSchemaValidationException}) rather than as a coverage gap. {@code source} is
+ *   recorded verbatim as the result's own
  *   {@code source} (unlike composition, which never sets it); {@code supertypes} accumulates by the
  *   same induction as composition ({@code [sourceName] + source.supertypes()}); the body's own
  *   {@code record.supertypes} stays empty (that field records only direct {@code &} compositions,
@@ -129,16 +130,18 @@ import java.util.Set;
  *   (refining {@code array}, tightening {@code REQUIRED_DEFAULT} fields to {@code REQUIRED_FIXED})
  *   and {@code array_min}/{@code array_ranged} (each routing an inherited OPTIONAL field to
  *   {@code REQUIRED} by its own value parameter -- an {@code OPTIONAL -&gt; REQUIRED} tightening,
- *   §5.7's table). Restating a field group in a refinement body, and a non-record refinement
- *   source, are not resolved yet.</li>
+ *   §5.7's table). A body entry may also <b>restate a group</b> (§5.11, via {@link
+ *   #restatesInheritedGroup}, shared with the composition path): same member labels in the same order,
+ *   types verbatim, state tightening OPTIONAL&#8594;REQUIRED only.</li>
  * </ul>
  *
  * Everything else -- an {@code Absent} modifier
  * value ({@code = _}) or any modifier on an OPTIONAL field, the identity-diagonal value-invariant
- * for a restated FIXED field, restating a field group in a refinement body, a generic
- * type-ref with a nested or value (non-simple) argument, and an inter-supertype field collision --
- * is explicitly out of scope for now and reported via {@link UnsupportedOperationException} rather
- * than silently mis-resolved; each is a later, separate pass. (Constructor application / atom
+ * for a restated FIXED field, a generic type-ref with a nested or value (non-simple) argument, and a
+ * parameterized supertype ({@code customer & box<T>}, §5.8, which needs §5.10 substitution into the
+ * absorbed fields) -- is explicitly out of scope for now and reported via {@link
+ * UnsupportedOperationException} rather than silently mis-resolved; each is a later, separate pass.
+ * (Constructor application / atom
  * instances -- {@code !C value}, {@link Instance} -- and atom refinement -- {@code !I ^ { ... }},
  * {@link AtomRefinement} -- are both dispatched, via {@link #resolveInstance}/{@link
  * #resolveAtomRefinement} below.)
@@ -898,7 +901,8 @@ final class DefinitionResolver {
      * composition, refinement never adds fields, so every body entry MUST tighten one of them
      * ({@link #resolveTighteningField}, the same machinery composition-body tightening uses); a
      * body field naming nothing inherited is a resolver error (§5.7: "adding fields is a resolver
-     * error"), and restating a field group in a refinement body is not resolved yet. {@code source}
+     * error"), as is a group naming no inherited group. A group that <em>does</em> name one restates it
+     * (§5.11, {@link #restatesInheritedGroup}). {@code source}
      * itself -- a bare name or, as here, a generic application ({@code array<T>}) -- is recorded
      * verbatim as the result's {@code source} (§8.1's "a `^` refinement records the source name");
      * unlike composition (which never sets {@code source}), a refinement always does. {@code
@@ -945,10 +949,16 @@ final class DefinitionResolver {
         }
 
         for (RecordEntry entry : refined.body().entries()) {
-            if (!(entry instanceof FieldDef fieldDef)) {
-                throw new UnsupportedOperationException(
-                        "'" + name + "': restating a field group in a refinement body is not resolved yet");
+            if (entry instanceof GroupDef groupDef) {
+                if (!restatesInheritedGroup(name, groupDef, fields, groups, inheritedFieldIndex)) {
+                    throw new TsonSchemaValidationException("'" + name + "': the group ("
+                            + String.join(" | ", memberNames(groupDef)) + ") names no inherited group -- a "
+                            + "refinement copies its source's whole field set and admits no new fields or "
+                            + "groups; composition (`&`) is what adds one (§5.7, §5.11)");
+                }
+                continue;
             }
+            FieldDef fieldDef = (FieldDef) entry;
             Integer index = inheritedFieldIndex.get(fieldDef.name());
             if (index == null) {
                 throw new TsonSchemaValidationException("'" + name + "': refinement body field '" + fieldDef.name()
@@ -1023,6 +1033,9 @@ final class DefinitionResolver {
                 }
             }
             case GroupDef groupDef -> {
+                if (restatesInheritedGroup(declarationName, groupDef, fields, groups, inheritedFieldIndex)) {
+                    return;
+                }
                 List<String> memberNames = new ArrayList<>();
                 for (GroupDef.Member member : groupDef.members()) {
                     requireFieldNameNotSeen(declarationName, member.name(), seenFieldNames,
@@ -1202,6 +1215,81 @@ final class DefinitionResolver {
             case MULTI_LINE_QUOTED -> Token.Form.MULTI_LINE_QUOTED;
         };
         return new Token(token.text(), form);
+    }
+
+    private static List<String> memberNames(GroupDef groupDef) {
+        return groupDef.members().stream().map(GroupDef.Member::name).toList();
+    }
+
+    /**
+     * §5.11's group restatement, shared by a refinement body and a composition body -- "a body entry may also
+     * restate a group: the restated group MUST have the same member labels in the same order (member
+     * type-refs restated verbatim), and may tighten state OPTIONAL→REQUIRED; REQUIRED→OPTIONAL is a resolver
+     * error, and changing membership is a resolver error."
+     *
+     * <p>Returns {@code true} having applied the restatement, or {@code false} when this group names nothing
+     * inherited and is therefore a genuinely new one -- which a composition body appends and a refinement
+     * body rejects, each at its own call site. A fresh record reaches here with an empty {@code
+     * inheritedFieldIndex} and so always takes the {@code false} path.
+     *
+     * <p>Only the <em>group's</em> state changes. Members flatten as {@code OPTIONAL} whatever the group says
+     * (§5.11), so a restatement never rewrites the member fields; tightening an individual member is the
+     * separate, already-supported gesture of naming it as an ordinary field.
+     *
+     * <p>Everything checked here is the author's error under a MUST, so each is a {@link
+     * TsonSchemaValidationException} -- and each says which of the four rules was broken, since a
+     * restatement that got the order wrong and one that changed a member's type need different fixes.
+     */
+    private boolean restatesInheritedGroup(String declarationName, GroupDef groupDef, List<RecordField> fields,
+                                            List<FieldGroup> groups, Map<String, Integer> inheritedFieldIndex) {
+        List<String> restated = memberNames(groupDef);
+        List<String> inheritedMembers = restated.stream().filter(inheritedFieldIndex::containsKey).toList();
+        if (inheritedMembers.isEmpty()) {
+            return false;
+        }
+        String prefix = (declarationName == null ? "" : "'" + declarationName + "': ") + "the restated group ("
+                + String.join(" | ", restated) + ") ";
+        if (inheritedMembers.size() != restated.size()) {
+            throw new TsonSchemaValidationException(prefix + "adds a member the source does not declare -- "
+                    + "changing membership is a resolver error (§5.11)");
+        }
+
+        int index = -1;
+        for (int i = 0; i < groups.size(); i++) {
+            if (groups.get(i).members().contains(restated.get(0))) {
+                index = i;
+                break;
+            }
+        }
+        if (index < 0) {
+            throw new TsonSchemaValidationException(prefix + "names inherited fields that are not a group -- "
+                    + "a group can only restate one the source declares as a group (§5.11)");
+        }
+        FieldGroup inherited = groups.get(index);
+        if (!inherited.members().equals(restated)) {
+            throw new TsonSchemaValidationException(prefix + "does not match the inherited group ("
+                    + String.join(" | ", inherited.members()) + ") -- a restatement MUST have the same member "
+                    + "labels in the same order, and changing membership is a resolver error (§5.11)");
+        }
+        for (GroupDef.Member member : groupDef.members()) {
+            io.ltr8.tson.schema.meta.TypeRef restatedType = resolveTypeRef(member.typeRef());
+            io.ltr8.tson.schema.meta.TypeRef inheritedType =
+                    fields.get(inheritedFieldIndex.get(member.name())).type();
+            if (!restatedType.equals(inheritedType)) {
+                throw new TsonSchemaValidationException(prefix + "gives member '" + member.name() + "' the type "
+                        + "'" + restatedType.name() + "' where the source declares '" + inheritedType.name()
+                        + "' -- member type-refs are restated verbatim (§5.11); narrowing a member's type is "
+                        + "done by naming it as an ordinary field");
+            }
+        }
+
+        ElementState state = groupDef.optional() ? ElementState.OPTIONAL : ElementState.REQUIRED;
+        if (inherited.state() == ElementState.REQUIRED && state == ElementState.OPTIONAL) {
+            throw new TsonSchemaValidationException(prefix + "loosens a REQUIRED group to OPTIONAL -- a "
+                    + "restatement may only tighten OPTIONAL→REQUIRED (§5.11)");
+        }
+        groups.set(index, new FieldGroup(inherited.members(), state));
+        return true;
     }
 
     private RecordField resolveGroupMember(GroupDef.Member member) {

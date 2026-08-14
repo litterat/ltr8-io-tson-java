@@ -1528,6 +1528,119 @@ class DefinitionResolverTest {
                 .resolve(schemaMap.declarations().get(declaration.split("=>")[0].trim()));
     }
 
+    // ── Restating a field group (§5.11) ───────────────────────────────────
+    //    "A body entry may also restate a group: the restated group MUST have the
+    //    same member labels in the same order (member type-refs restated verbatim),
+    //    and may tighten state OPTIONAL→REQUIRED; REQUIRED→OPTIONAL is a resolver
+    //    error, and changing membership is a resolver error."
+
+    private static final String BOUNDS =
+            "bounds => { a: text  ( min: integer | exclusive_min: integer )? }";
+
+    /**
+     * Only the group's state moves. Members stay OPTIONAL in {@code fields} -- §5.11 flattens them that way
+     * whatever the group says.
+     */
+    @Test
+    void restatingAGroupInARefinementBodyTightensItsStateOnly() {
+        Map<String, TypeDefinition> entries = resolveAll(BOUNDS
+                + "  strict => bounds ^ { ( min: integer | exclusive_min: integer ) }");
+
+        RecordBody body = bodyOf(entries.get("strict"));
+        assertEquals(List.of(new FieldGroup(List.of("min", "exclusive_min"), ElementState.REQUIRED)), body.groups());
+        assertEquals(List.of("a", "min", "exclusive_min"), fieldNames(entries.get("strict")));
+        assertEquals(FieldState.OPTIONAL, body.fields().get(1).state());
+        assertEquals(FieldState.OPTIONAL, body.fields().get(2).state());
+        // the source keeps its own OPTIONAL group -- the restatement builds a new list, it does not edit it
+        assertEquals(ElementState.OPTIONAL, bodyOf(entries.get("bounds")).groups().get(0).state());
+    }
+
+    /**
+     * §5.11 says "in a refinement <em>or composition</em> body", and the composition side was not merely
+     * unimplemented -- it rejected a legal restatement as a duplicate member name, citing the paragraph that
+     * permits it. The restatement replaces the inherited group in place rather than appending a second one.
+     */
+    @Test
+    void restatingAGroupInACompositionBodyTightensItInPlace() {
+        Map<String, TypeDefinition> entries = resolveAll(BOUNDS
+                + "  strict => bounds & { ( min: integer | exclusive_min: integer )  extra: text }");
+
+        RecordBody body = bodyOf(entries.get("strict"));
+        assertEquals(List.of(new FieldGroup(List.of("min", "exclusive_min"), ElementState.REQUIRED)), body.groups());
+        // the new field still appends after the inherited ones (§5.8's ordering rule)
+        assertEquals(List.of("a", "min", "exclusive_min", "extra"), fieldNames(entries.get("strict")));
+    }
+
+    /** Restating at the same state is the identity case, and must not be mistaken for a new group. */
+    @Test
+    void restatingAGroupWithoutChangingItsStateIsANoOp() {
+        Map<String, TypeDefinition> entries = resolveAll(BOUNDS
+                + "  same => bounds ^ { ( min: integer | exclusive_min: integer )? }");
+
+        assertEquals(List.of(new FieldGroup(List.of("min", "exclusive_min"), ElementState.OPTIONAL)),
+                bodyOf(entries.get("same")).groups());
+    }
+
+    @Test
+    void rejectsARestatementThatLoosensARequiredGroup() {
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> resolveAll("bounds => { ( min: integer | exclusive_min: integer ) }"
+                        + "  loose => bounds ^ { ( min: integer | exclusive_min: integer )? }"));
+        assertTrue(thrown.getMessage().contains("OPTIONAL→REQUIRED"), thrown.getMessage());
+    }
+
+    @Test
+    void rejectsARestatementThatReordersOrDropsAMember() {
+        TsonSchemaValidationException reordered = assertThrows(TsonSchemaValidationException.class,
+                () -> resolveAll(BOUNDS
+                        + "  odd => bounds ^ { ( exclusive_min: integer | min: integer ) }"));
+        assertTrue(reordered.getMessage().contains("same member labels in the same order"), reordered.getMessage());
+
+        TsonSchemaValidationException added = assertThrows(TsonSchemaValidationException.class,
+                () -> resolveAll(BOUNDS
+                        + "  odd => bounds ^ { ( min: integer | exclusive_min: integer | other: integer ) }"));
+        assertTrue(added.getMessage().contains("changing membership"), added.getMessage());
+    }
+
+    /** "Member type-refs restated verbatim" -- narrowing a member's type is done by naming it as a field. */
+    @Test
+    void rejectsARestatementThatChangesAMembersType() {
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> resolveAll(BOUNDS
+                        + "  odd => bounds ^ { ( min: text | exclusive_min: integer ) }"));
+        assertTrue(thrown.getMessage().contains("restated verbatim"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("'min'"), thrown.getMessage());
+    }
+
+    /** A group whose members are inherited plain fields is not a restatement of anything. */
+    @Test
+    void rejectsAGroupOverInheritedFieldsThatWereNeverAGroup() {
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> resolveAll("pair => { x: integer  y: integer }"
+                        + "  odd => pair ^ { ( x: integer | y: integer ) }"));
+        assertTrue(thrown.getMessage().contains("not a group"), thrown.getMessage());
+    }
+
+    /** A refinement adds nothing, groups included -- the group analogue of the no-new-fields rule. */
+    @Test
+    void rejectsAWhollyNewGroupInARefinementBody() {
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> resolveAll("bounds => { a: text }"
+                        + "  odd => bounds ^ { ( p: integer | q: integer ) }"));
+        assertTrue(thrown.getMessage().contains("names no inherited group"), thrown.getMessage());
+    }
+
+    /** A composition body may still introduce a genuinely new group -- the false branch of the same check. */
+    @Test
+    void aCompositionBodyStillAddsAWhollyNewGroup() {
+        Map<String, TypeDefinition> entries = resolveAll("base => { a: text }"
+                + "  extended => base & { ( p: integer | q: integer )? }");
+
+        assertEquals(List.of("a", "p", "q"), fieldNames(entries.get("extended")));
+        assertEquals(List.of(new FieldGroup(List.of("p", "q"), ElementState.OPTIONAL)),
+                bodyOf(entries.get("extended")).groups());
+    }
+
     // ── Composition/refinement rejections (§5.7, §5.8, §5.11) ─────────────
     //    Every one is the author's error under a MUST in the spec, so each is a
     //    TsonSchemaValidationException. What varies is only which rule was broken,

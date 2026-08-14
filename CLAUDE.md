@@ -351,7 +351,10 @@ namespace *before* any local declaration resolves.
   `^` refinement operator (§5.7, copies the source's whole field set, admits no new fields); bare
   references (§8.3); constructor application (`!C value`, §5.5, binds generically via the compiled
   reader — no hand-rolled name→class table, `tson-bind`'s sealed-union resolution finds the `Top` leaf by
-  `@Typename`); atom refinement (`!I ^ { ... }`, §5.5/§5.7); subtraction (`A & { ... } - { f }`, §5.9).
+  `@Typename`); atom refinement (`!I ^ { ... }`, §5.5/§5.7); subtraction (`A & { ... } - { f }`, §5.9);
+  restating a field group in a refinement or composition body (§5.11 — same member labels in the same order,
+  types verbatim, state tightening OPTIONAL→REQUIRED only; only the *group's* state moves, since members
+  flatten as `OPTIONAL` regardless).
 - **Subtraction runs last and breaks IS-A on purpose** (§5.9). Supertypes merge, the body adds and tightens,
   *then* removals apply to the merged field set with no regard for which supertype contributed a field
   (rule 3 — the contract is already broken, so there is none left to violate). Two things are rejected:
@@ -395,17 +398,19 @@ namespace *before* any local declaration resolves.
   rejecting one would reject a documented construct (`SPEC-FEEDBACK.md` #27).
 - **Two exception types, and which one is deliberate.** `UnsupportedOperationException` means *this library
   hasn't implemented that yet* — an `Absent` modifier value, the identity-diagonal FIXED-value invariant, a
-  field group restated in a refinement body, a generic type-ref with a nested or value (non-simple) argument,
-  a parameterized supertype. `TsonSchemaValidationException` means *the schema is wrong*, and the spec says
-  so: a refinement that loosens rather than narrows, a refinement body field that adds, a modifier-only entry
-  with nothing to elide toward (§5.7), a field name two supertypes both contribute or a body/group declares
-  twice (§5.8/§5.11), a source or supertype whose body is a binding record and so has no vocabulary (§5.7's
-  "finished"), a choice or bracketed form at a supertype position (`&` composes record types; §12.1 admits
-  these only because `construction-def` draws its operands from `type-ref` where `refined-def` takes a name
-  — `SPEC-FEEDBACK.md` #38). Telling an author their correctly-rejected schema is unsupported sends them
-  looking for the wrong fix, so the split is worth keeping honest — `IllegalStateException` is the third, for an invariant
-  only a malformed `TypeDefinition` could break (a `constructor: true` entry with a non-record body, which
-  §12.1's grammar makes unreachable). `DefinitionResolver`'s Javadoc lists the exact boundary.
+  generic type-ref with a nested or value (non-simple) argument, a parameterized supertype.
+  `TsonSchemaValidationException` means *the schema is wrong*, and the spec says so: a refinement that
+  loosens rather than narrows, a refinement body field (or group) that adds rather than tightens, a
+  modifier-only entry with nothing to elide toward (§5.7), a field name two supertypes both contribute or a
+  body/group declares twice (§5.8/§5.11), a group restatement that reorders, retypes, changes membership or
+  loosens REQUIRED→OPTIONAL (§5.11), a source or supertype whose body is a binding record and so has no
+  vocabulary (§5.7's "finished"), a choice or bracketed form at a supertype position (`&` composes record
+  types; §12.1 admits these only because `construction-def` draws its operands from `type-ref` where
+  `refined-def` takes a name — `SPEC-FEEDBACK.md` #38). Telling an author their correctly-rejected schema is
+  unsupported sends them looking for the wrong fix, so the split is worth keeping honest —
+  `IllegalStateException` is the third, for an invariant only a malformed `TypeDefinition` could break (a
+  `constructor: true` entry with a non-record body, which §12.1's grammar makes unreachable).
+  `DefinitionResolver`'s Javadoc lists the exact boundary.
 - **`TypeArgument` is a sealed interface (`Ref`/`Value`), NOT a plain record — do not "simplify" it
   back.** `TypeRef`/`TypeArgument` are mutually recursive, and `tson-bind`'s record binder eagerly resolves
   every field descriptor with no cycle protection, so a plain-record `TypeArgument` deadlocks with
@@ -959,7 +964,7 @@ compatibility).
 
 ## Not yet implemented
 
-- **Part 2 resolution gaps** — a field group restated in a refinement body, the identity-diagonal
+- **Part 2 resolution gaps** — the identity-diagonal
   FIXED-value invariant, a generic type-ref whose argument is nested or a value rather than a plain name,
   and a parameterized supertype (`customer & box<T>`, which needs §5.10 substitution into the absorbed
   fields and so belongs with the item below). `DefinitionResolver`'s Javadoc is the exact current boundary,
