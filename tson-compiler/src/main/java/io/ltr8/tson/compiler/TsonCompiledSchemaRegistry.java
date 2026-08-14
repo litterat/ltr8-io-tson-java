@@ -26,13 +26,31 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class TsonCompiledSchemaRegistry {
 
+    /**
+     * Which of the two factory sets this registry was built with. The read mode is otherwise invisible in
+     * the type -- both modes are a {@code TsonCompiledSchemaRegistry} -- so a reader handed one can check
+     * that it is the mode it can actually consume, rather than casting whatever comes back and failing at
+     * the first value read. Package-private: a consumer picks a mode by calling {@link #tree} or {@link
+     * #bind}, and never needs to ask afterwards.
+     */
+    enum Mode {
+        TREE, BIND
+    }
+
     private final TsonCompiledMetaRegistry core;
     private final ValueReaderFactoryResolver factories;
+    private final Mode mode;
     private final Map<String, TsonCompiledSchema> compiled = new ConcurrentHashMap<>();
 
-    private TsonCompiledSchemaRegistry(TsonCompiledMetaRegistry core, ValueReaderFactoryResolver factories) {
+    private TsonCompiledSchemaRegistry(TsonCompiledMetaRegistry core, ValueReaderFactoryResolver factories, Mode mode) {
         this.core = core;
         this.factories = factories;
+        this.mode = mode;
+    }
+
+    /** The read mode this registry compiles in -- see {@link Mode}. */
+    Mode mode() {
+        return mode;
     }
 
     /**
@@ -42,7 +60,7 @@ public final class TsonCompiledSchemaRegistry {
      * DataBindContext}). The recommended read mode; {@link #bind} is the object-binding alternative.
      */
     public static TsonCompiledSchemaRegistry tree(TsonCompiledMetaRegistry core) {
-        return new TsonCompiledSchemaRegistry(core, ValueReaderFactoryRegistry.tree());
+        return new TsonCompiledSchemaRegistry(core, ValueReaderFactoryRegistry.tree(), Mode.TREE);
     }
 
     /**
@@ -55,7 +73,7 @@ public final class TsonCompiledSchemaRegistry {
      * that mapping.
      */
     public static TsonCompiledSchemaRegistry bind(TsonCompiledMetaRegistry core, DataBindContext context) {
-        return new TsonCompiledSchemaRegistry(core, ValueReaderFactoryRegistry.bind(context));
+        return new TsonCompiledSchemaRegistry(core, ValueReaderFactoryRegistry.bind(context), Mode.BIND);
     }
 
     /**

@@ -171,6 +171,23 @@ class TsonValidateTest {
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, problems.getFirst().code());
     }
 
+    /**
+     * Repeated calls share one compiled-schema cache (each {@code validate} builds a reader over the
+     * instance's own {@code treeRegistry()}), so this is the guard on that sharing: a verdict must not
+     * depend on what was validated before it, in either direction.
+     */
+    @Test
+    void repeatedValidationsOnOneInstanceAreIndependentOfEachOther() {
+        Tson tson = tsonWithPoint();
+        String valid = "!!schema:\"" + POINT_ID + "\"\n!point { x: 1  y: 2 }";
+        String invalid = "!!schema:\"" + POINT_ID + "\"\n!point { x: 1 }";
+
+        assertEquals(List.of(), tson.validate(valid));
+        assertEquals(Diagnostic.Code.FIELD_REQUIRED, only(tson, invalid).code());
+        assertEquals(List.of(), tson.validate(valid));            // an earlier failure left nothing behind
+        assertEquals(Diagnostic.Code.FIELD_REQUIRED, only(tson, invalid).code());
+    }
+
     /** Every type-ref problem a schemaless document can carry, each reported once, at its own path. */
     @Test
     void aSchemalessDocumentsTypeRefsAreCheckedWhereverTheyAreWritten() {

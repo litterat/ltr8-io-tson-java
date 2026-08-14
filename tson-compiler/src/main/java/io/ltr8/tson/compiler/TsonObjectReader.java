@@ -19,7 +19,7 @@ import java.util.Objects;
  * front door, the inverse of {@link TsonObjectWriter} and the object-shaped peer of {@link TsonTreeReader}.
  *
  * <p><b>Two modes, fixed at construction.</b> A reader from {@link Tson#objectReader()} (the {@code
- * (TsonCompiledMetaRegistry, DataBindContext)} constructor) is <i>schema-aware</i>: a document that
+ * (TsonCompiledSchemaRegistry, DataBindContext)} constructor) is <i>schema-aware</i>: a document that
  * declares a {@code !!schema} is validated against it as it binds -- the schema resolves through that
  * environment's own source, the document's root type-ref (e.g. {@code !person}) selects the type, and a
  * target class the schema's root type does not bind to is rejected up front, before the value is read
@@ -60,10 +60,39 @@ public final class TsonObjectReader {
     /** The schema {@link #readAs} validates against, or {@code null} until {@link #withSchema} names one. */
     private final String schemaUri;
 
-    /** Schema-aware -- validates a self-describing document against its {@code !!schema}, resolved through {@code core}'s own source. Used by {@link Tson#objectReader()}. */
-    public TsonObjectReader(TsonCompiledMetaRegistry core, DataBindContext dataBindContext) {
+    /**
+     * Schema-aware -- validates a self-describing document against its {@code !!schema}, resolved and
+     * compiled through {@code bind}. Used by {@link Tson#objectReader()}.
+     *
+     * <p><b>Takes the registry rather than building one</b>, so a caller holding a registry shares its
+     * compiled-schema cache with every reader made from it instead of each reader compiling the same schema
+     * again. {@code dataBindContext} should be the one {@code bind} was built with -- it binds the
+     * schemaless path, which the registry's own readers don't cover.
+     *
+     * @throws IllegalArgumentException if {@code bind} is a tree-mode registry, whose readers produce {@code
+     *         TsonNode}s rather than the bound objects this reader hands back
+     */
+    public TsonObjectReader(TsonCompiledSchemaRegistry bind, DataBindContext dataBindContext) {
         this(dataBindContext, new SchemalessObjectReader(dataBindContext),
-                TsonCompiledSchemaRegistry.bind(core, dataBindContext), TsonDiagnosticsReceiver.throwing(), null);
+                requireBindMode(bind), TsonDiagnosticsReceiver.throwing(), null);
+    }
+
+    /**
+     * The compiled-schema registry this reader validates through, or {@code null} if it is schemaless.
+     * Package-private, for the same reason as {@link TsonTreeReader#compiledSchemas()}: sharing one cache
+     * is otherwise unobservable, since compiling twice differs from compiling once only in cost.
+     */
+    TsonCompiledSchemaRegistry compiledSchemas() {
+        return bind;
+    }
+
+    /** Rejects a wrong-mode registry where it is handed over, rather than at the first value it fails to bind. */
+    private static TsonCompiledSchemaRegistry requireBindMode(TsonCompiledSchemaRegistry bind) {
+        if (bind.mode() != TsonCompiledSchemaRegistry.Mode.BIND) {
+            throw new IllegalArgumentException("a TsonObjectReader needs an object-binding registry "
+                    + "(TsonCompiledSchemaRegistry.bind(core, context)) -- a tree-mode one reads to TsonNodes");
+        }
+        return bind;
     }
 
     /** Schemaless -- binds to the target class alone, ignoring any {@code !!schema} the document declares. */

@@ -16,7 +16,7 @@ import java.io.InputStream;
  * produces bound Java objects). Like Jackson's {@code readTree}.
  *
  * <p><b>Two modes, fixed at construction.</b> A reader from {@link Tson#treeReader()} (the {@code
- * (TsonCompiledMetaRegistry)} constructor) is <i>schema-aware</i>: a document that declares a {@code
+ * (TsonCompiledSchemaRegistry)} constructor) is <i>schema-aware</i>: a document that declares a {@code
  * !!schema} is validated against it as the tree is built -- the schema resolves through that environment's
  * own source and the document's root type-ref (e.g. {@code !person}) selects the type, so the tree is
  * structure-preserving (record vs map, array vs tuple) with the schema's own leaf types. A reader built
@@ -57,9 +57,39 @@ public final class TsonTreeReader {
     /** The schema {@link #readAs} validates against, or {@code null} until {@link #withSchema} names one. */
     private final String schemaUri;
 
-    /** Schema-aware -- validates a self-describing document against its {@code !!schema}, resolved through {@code core}'s own source. Used by {@link Tson#treeReader()}. */
-    public TsonTreeReader(TsonCompiledMetaRegistry core) {
-        this(TsonCompiledSchemaRegistry.tree(core), TsonDiagnosticsReceiver.throwing(), null, new SchemalessTreeReader());
+    /**
+     * Schema-aware -- validates a self-describing document against its {@code !!schema}, resolved and
+     * compiled through {@code tree}. Used by {@link Tson#treeReader()}.
+     *
+     * <p><b>Takes the registry rather than building one</b>, so a caller holding a registry shares its
+     * compiled-schema cache with every reader made from it instead of each reader compiling the same schema
+     * again. That matters most where readers are cheap and frequent: {@link Tson#validate} makes one per
+     * call, and a reader that built its own cache would recompile the schema for every document validated.
+     *
+     * @throws IllegalArgumentException if {@code tree} is an object-binding registry, whose readers produce
+     *         bound objects this reader cannot assemble into a tree
+     */
+    public TsonTreeReader(TsonCompiledSchemaRegistry tree) {
+        this(requireTreeMode(tree), TsonDiagnosticsReceiver.throwing(), null, new SchemalessTreeReader());
+    }
+
+    /**
+     * The compiled-schema registry this reader validates through, or {@code null} if it is schemaless.
+     * Package-private: a consumer picks a registry by which one they pass in, and the interesting property
+     * -- that every reader derived from this one keeps the same instance, so a schema compiles once -- is
+     * otherwise unobservable, since compiling twice differs from compiling once only in cost.
+     */
+    TsonCompiledSchemaRegistry compiledSchemas() {
+        return tree;
+    }
+
+    /** Rejects a wrong-mode registry where it is handed over, rather than at the first value it fails to produce a node for. */
+    private static TsonCompiledSchemaRegistry requireTreeMode(TsonCompiledSchemaRegistry tree) {
+        if (tree.mode() != TsonCompiledSchemaRegistry.Mode.TREE) {
+            throw new IllegalArgumentException("a TsonTreeReader needs a tree-mode registry (TsonCompiledSchemaRegistry"
+                    + ".tree(core)) -- an object-binding one reads to bound Java objects, not TsonNodes");
+        }
+        return tree;
     }
 
     /** Schemaless (Class 1) -- reads the wire structure into a tree, ignoring any {@code !!schema} the document declares. */

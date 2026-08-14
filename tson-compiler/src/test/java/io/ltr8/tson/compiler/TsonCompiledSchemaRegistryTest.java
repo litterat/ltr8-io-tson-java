@@ -13,6 +13,8 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -97,6 +99,50 @@ class TsonCompiledSchemaRegistryTest {
         // core.tn is not a meta (its !!meta is meta.tn) -- resolved+registered, but never compiled here.
         assertTrue(core.schemaRegistry().get(TsonBundledSchemas.CORE_ID).isPresent());
         assertTrue(core.get(TsonBundledSchemas.CORE_ID).isEmpty());
+    }
+
+    // ── Facade readers over a registry (one compiled-schema cache, not one per reader) ──
+
+    @Test
+    void aFacadeReaderKeepsTheRegistryItWasGivenRatherThanBuildingOne() {
+        TsonCompiledSchemaRegistry tree = TsonCompiledSchemaRegistry.tree(core());
+
+        assertSame(tree, new TsonTreeReader(tree).compiledSchemas());
+    }
+
+    /** Every derivation shares it too, so deriving a reader never costs a recompile of the same schema. */
+    @Test
+    void everyDerivedReaderSharesThatSameRegistry() {
+        TsonCompiledSchemaRegistry tree = TsonCompiledSchemaRegistry.tree(core());
+        TsonTreeReader reader = new TsonTreeReader(tree);
+
+        assertSame(tree, reader.withDiagnostics(TsonDiagnosticsReceiver.collecting()).compiledSchemas());
+        assertSame(tree, reader.withSchema(SCHEMA_ID).compiledSchemas());
+        assertSame(tree, reader.preservingUnknownTypeRefs().compiledSchemas());
+    }
+
+    @Test
+    void anObjectReaderKeepsItsRegistryToo() {
+        DataBindContext context = TsonAtomContext.registerDefaults(DataBindContext.builder().nameBinder(MANUAL_BINDER).build());
+        TsonCompiledSchemaRegistry bind = TsonCompiledSchemaRegistry.bind(core(), context);
+
+        assertSame(bind, new TsonObjectReader(bind, context).compiledSchemas());
+    }
+
+    /**
+     * The mode is invisible in the registry's type, so each reader checks the one it is handed. Without
+     * this a tree-mode registry in an object reader would read cleanly right up to the first value, then
+     * fail on a cast nothing in the message would connect back to the registry choice.
+     */
+    @Test
+    void aReaderRejectsARegistryOfTheWrongMode() {
+        TsonCompiledMetaRegistry core = core();
+        DataBindContext context = TsonAtomContext.registerDefaults(DataBindContext.builder().nameBinder(MANUAL_BINDER).build());
+        TsonCompiledSchemaRegistry tree = TsonCompiledSchemaRegistry.tree(core);
+        TsonCompiledSchemaRegistry bind = TsonCompiledSchemaRegistry.bind(core, context);
+
+        assertThrows(IllegalArgumentException.class, () -> new TsonTreeReader(bind));
+        assertThrows(IllegalArgumentException.class, () -> new TsonObjectReader(tree, context));
     }
 
     @Test

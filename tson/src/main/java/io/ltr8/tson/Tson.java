@@ -68,14 +68,25 @@ public final class Tson {
         return new TsonConfig();
     }
 
-    /** A schema-aware {@link TsonObjectReader} over this instance -- reads TSON text into bound Java objects (via {@link #dataBindContext()}), validating against a self-describing document's {@code !!schema}, schemaless when it declares none. */
+    /**
+     * A schema-aware {@link TsonObjectReader} over this instance -- reads TSON text into bound Java objects
+     * (via {@link #dataBindContext()}), validating against a self-describing document's {@code !!schema},
+     * schemaless when it declares none. Built over {@link #bindRegistry()}, so every reader from this
+     * instance shares one compiled-schema cache: a schema is compiled once here, not once per reader.
+     */
     public TsonObjectReader objectReader() {
-        return new TsonObjectReader(core, dataBindContext);
+        return new TsonObjectReader(bind, dataBindContext);
     }
 
-    /** A schema-aware {@link TsonTreeReader} over this instance -- reads TSON text into an immutable, queryable {@code TsonNode} tree, validating against a self-describing document's {@code !!schema}, schemaless when it declares none. The tree-producing peer of {@link #objectReader()}. */
+    /**
+     * A schema-aware {@link TsonTreeReader} over this instance -- reads TSON text into an immutable,
+     * queryable {@code TsonNode} tree, validating against a self-describing document's {@code !!schema},
+     * schemaless when it declares none. The tree-producing peer of {@link #objectReader()}, and built over
+     * {@link #treeRegistry()} on the same shared-cache terms -- which is what keeps {@link #validate}, which
+     * makes a reader per call, from recompiling the schema for every document it checks.
+     */
     public TsonTreeReader treeReader() {
-        return new TsonTreeReader(core);
+        return new TsonTreeReader(tree);
     }
 
     /** A fresh, schemaless (Class 1) {@link TsonObjectWriter} bound to {@link #dataBindContext()} -- the inverse of {@link #objectReader()}. */

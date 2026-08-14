@@ -309,11 +309,6 @@ missing most of the mirror.
 
 ## Miscellaneous
 
-- [ ] `Tson.objectReader()`/`treeReader()` each construct a *fresh* `TsonCompiledSchemaRegistry` instead of
-  reusing the eagerly-built `this.tree`/`this.bind`, so a facade reader doesn't share the compiled-schema
-  cache with `treeRegistry()`/`bindRegistry()` and a schema can be compiled twice in one `Tson`. The
-  `withDiagnostics`/`withSchema` derivations deliberately *share* rather than rebuild, so the leak is
-  confined to the two accessors.
 - [ ] The three `TestDocuments` test helpers (one each in `tson-compiler`, `tson`, `tson-cli`) are
   near-duplicates, because this build has no `java-test-fixtures` plugin. Either wire that up or accept the
   repetition; it is a few lines, so this is a build-hygiene call rather than a real cost.

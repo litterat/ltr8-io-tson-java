@@ -759,7 +759,11 @@ TsonNode value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_typ
 - `objectReader()`/`treeReader()` return **schema-aware** `TsonObjectReader`/`TsonTreeReader` over this
   instance — the value-returning read peers of `validate`: a self-describing document is validated against
   its declared `!!schema` (schemaless when it declares none), the object form checking the target class up
-  front. `objectReader()`/`objectWriter()` bind to this instance's `dataBindContext` (configurable via
+  front. **Both are built over this instance's own `treeRegistry()`/`bindRegistry()`, so every reader shares
+  one compiled-schema cache** — a schema compiles once per `Tson`, not once per reader. The readers take a
+  `TsonCompiledSchemaRegistry` rather than a `TsonCompiledMetaRegistry` for exactly that reason; since the
+  read mode isn't visible in the registry's type, each constructor checks a package-private `mode()` and
+  rejects the wrong one up front instead of failing on a cast at the first value. `objectReader()`/`objectWriter()` bind to this instance's `dataBindContext` (configurable via
   `TsonConfig.dataBindContext`, default `TsonAtomContext.defaultContext()`). `schemaRegistry()`/`loader()`
   reach the underlying machinery.
 
