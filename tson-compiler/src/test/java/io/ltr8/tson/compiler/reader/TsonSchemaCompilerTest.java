@@ -2,10 +2,9 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
-import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
-import io.ltr8.tson.compiler.TsonValueReader;
+import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.EmailType;
@@ -27,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Direct coverage of {@link TsonSchemaCompiler}/{@link TsonCompiledSchema}'s own cycle detection
- * (the reason {@link DeferredValueReader} exists at all) and eager,
+ * (the reason {@link DeferredTypeReader} exists at all) and eager,
  * whole-schema build (every entry is built as soon as {@link TsonSchemaCompiler#compile} returns,
  * not deferred to whenever {@link TsonCompiledSchema#get} first asks for a given name -- see that
  * class's own "Eager, not lazy" note). {@link RecordTreeReaderTest}/{@link VariantTreeReaderTest}/
@@ -44,7 +43,7 @@ class TsonSchemaCompilerTest {
     void mutualCycleCompilesWithoutStackOverflow() {
         // A -> B -> A. Compiling "A" at all (without a StackOverflowError) is what this proves --
         // B's own field circles back to A while A is still mid-construction, exactly the edge
-        // DeferredValueReader exists for.
+        // DeferredTypeReader exists for.
         RecordBody bodyA = RecordBody.of(List.of(RecordField.required("b", TypeRef.of("B"))));
         RecordBody bodyB = RecordBody.of(List.of(RecordField.required("a", TypeRef.of("A"))));
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
@@ -94,7 +93,7 @@ class TsonSchemaCompilerTest {
         assertTrue(used.isEmpty());
 
         // Compiling/getting "orphan" itself succeeds -- only reading an actual value against it fails.
-        TsonValueReader<?> orphan = compiled.get("orphan");
+        TsonTypeReader<?> orphan = compiled.get("orphan");
         UnsupportedOperationException thrown =
                 assertThrows(UnsupportedOperationException.class, () -> orphan.read(TestDocuments.document("{}")));
         assertTrue(thrown.getMessage().contains("orphan"), thrown.getMessage());

@@ -189,7 +189,7 @@ Concrete items and decisions:
 ### Tier 2 — constrain-during-generate (kept high-level)
 
 - [ ] A schema→grammar/automaton compilation backend — a new compiler backend symmetric to
-  `TsonValueReader`, but targeting a CFG/regex/automaton instead of a reader. TSON's tagged unions
+  `TsonTypeReader`, but targeting a CFG/regex/automaton instead of a reader. TSON's tagged unions
   (`!C value`) and bounded atoms (exact bit-width integers) compile more cleanly than JSON Schema's
   untagged `oneOf`/arbitrary `minimum`/`maximum` — but recursive schemas still need a real PDA/CFG,
   not a flat FSM, same as JSON Schema's recursive `$ref`; not a free win.

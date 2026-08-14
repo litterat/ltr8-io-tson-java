@@ -2,7 +2,7 @@ package io.ltr8.tson.compiler;
 
 /**
  * Positions a {@link TsonReadContext} at a whole document's root value, so a unit test can drive one
- * compiled {@link TsonValueReader} in isolation rather than through {@link TsonTreeReader}/{@link
+ * compiled {@link TsonTypeReader} in isolation rather than through {@link TsonTreeReader}/{@link
  * TsonObjectReader}.
  *
  * <p><b>A test affordance, not a missing library method.</b> Document reading is the two facades' job --

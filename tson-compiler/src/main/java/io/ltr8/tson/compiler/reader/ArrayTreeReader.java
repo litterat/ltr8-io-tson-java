@@ -1,8 +1,8 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TsonReadContext;
-import io.ltr8.tson.compiler.TsonValueReader;
-import io.ltr8.tson.compiler.TsonValueReaderResolver;
+import io.ltr8.tson.compiler.TsonTypeReader;
+import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.tree.ArrayNode;
 import io.ltr8.tson.tree.NullNode;
 import io.ltr8.tson.tree.TsonAnnotation;
@@ -24,7 +24,7 @@ import java.util.Optional;
  */
 final class ArrayTreeReader extends ArrayAbstractReader<TsonNode> {
 
-    public ArrayTreeReader(String name, ArrayBody body, TsonValueReaderResolver resolver,
+    public ArrayTreeReader(String name, ArrayBody body, TsonTypeReaderResolver resolver,
                            Optional<SourcePosition> schemaPosition,
                             AnnotationTypes annotationTypes) {
         super(name, body, resolver, schemaPosition);
@@ -37,8 +37,8 @@ final class ArrayTreeReader extends ArrayAbstractReader<TsonNode> {
     public static final class Factory implements ValueReaderFactory {
 
         @Override
-        public TsonValueReader<?> create(String name, TypeDefinition typeDefinition, ValueReaderContext context) {
-            TsonValueReaderResolver resolver = context.readers();
+        public TsonTypeReader<?> create(String name, TypeDefinition typeDefinition, ValueReaderContext context) {
+            TsonTypeReaderResolver resolver = context.readers();
             if (!(typeDefinition.body() instanceof ArrayBody body)) {
                 throw new IllegalArgumentException("'" + name + "' is not array-shaped: " + typeDefinition.body());
             }

@@ -2,8 +2,8 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonReadContext;
-import io.ltr8.tson.compiler.TsonValueReader;
-import io.ltr8.tson.compiler.TsonValueReaderResolver;
+import io.ltr8.tson.compiler.TsonTypeReader;
+import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.stream.AbsentEvent;
 import io.ltr8.tson.compiler.stream.ArrayEnd;
 import io.ltr8.tson.compiler.stream.ArrayStart;
@@ -41,16 +41,16 @@ import java.util.Optional;
  * correctly positioned for {@code ArrayEnd}), and {@code ArrayEnd} arriving before every slot got a
  * value reports {@code WRONG_ARITY} too.
  */
-abstract class TupleAbstractReader<T> implements TsonValueReader<T> {
+abstract class TupleAbstractReader<T> implements TsonTypeReader<T> {
 
-    record CompiledSlot(TupleElement schema, TsonValueReader<?> parser) {
+    record CompiledSlot(TupleElement schema, TsonTypeReader<?> parser) {
     }
 
     final String name;
     final List<CompiledSlot> slots;
     final Optional<SourcePosition> schemaPosition;
 
-    TupleAbstractReader(String name, TupleBody body, TsonValueReaderResolver resolver, Optional<SourcePosition> schemaPosition) {
+    TupleAbstractReader(String name, TupleBody body, TsonTypeReaderResolver resolver, Optional<SourcePosition> schemaPosition) {
         this(name, body, resolver, schemaPosition, position -> null, AnnotationTypes.DISCARDED);
     }
 
@@ -60,14 +60,14 @@ abstract class TupleAbstractReader<T> implements TsonValueReader<T> {
      * {@code Annotated<T>}. Per position rather than once, because a tuple's positions have independent
      * types and any subset of them may be boxed.
      */
-    TupleAbstractReader(String name, TupleBody body, TsonValueReaderResolver resolver,
+    TupleAbstractReader(String name, TupleBody body, TsonTypeReaderResolver resolver,
                          Optional<SourcePosition> schemaPosition, IntFunction<DataClass> boxedAt,
                          AnnotationTypes annotationTypes) {
         this.name = name;
         List<CompiledSlot> slots = new ArrayList<>(body.elements().size());
         for (int position = 0; position < body.elements().size(); position++) {
             TupleElement element = body.elements().get(position);
-            TsonValueReader<?> parser = AnnotationBoxing.wrap(resolver.resolve(element.elementType().name()),
+            TsonTypeReader<?> parser = AnnotationBoxing.wrap(resolver.resolve(element.elementType().name()),
                     boxedAt.apply(position), annotationTypes);
             slots.add(new CompiledSlot(element, parser));
         }

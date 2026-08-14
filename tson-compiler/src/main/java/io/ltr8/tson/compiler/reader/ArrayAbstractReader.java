@@ -2,8 +2,8 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonReadContext;
-import io.ltr8.tson.compiler.TsonValueReader;
-import io.ltr8.tson.compiler.TsonValueReaderResolver;
+import io.ltr8.tson.compiler.TsonTypeReader;
+import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.stream.AbsentEvent;
 import io.ltr8.tson.compiler.stream.ArrayEnd;
 import io.ltr8.tson.compiler.stream.ArrayStart;
@@ -43,14 +43,14 @@ import java.util.function.Consumer;
  * fast the instant the limit is crossed. Correctness is unaffected either way; only how much of an
  * already-too-large array gets read before reporting it.
  */
-abstract class ArrayAbstractReader<T> implements TsonValueReader<T> {
+abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
 
     final String name;
     final ArrayBody body;
-    final TsonValueReader<?> elementParser;
+    final TsonTypeReader<?> elementParser;
     final Optional<SourcePosition> schemaPosition;
 
-    ArrayAbstractReader(String name, ArrayBody body, TsonValueReaderResolver resolver, Optional<SourcePosition> schemaPosition) {
+    ArrayAbstractReader(String name, ArrayBody body, TsonTypeReaderResolver resolver, Optional<SourcePosition> schemaPosition) {
         this(name, body, resolver.resolve(body.elementType().name()), schemaPosition);
     }
 
@@ -60,7 +60,7 @@ abstract class ArrayAbstractReader<T> implements TsonValueReader<T> {
      * rather than in the element loop keeps that loop, which both modes share, free of anything only one of
      * them needs.
      */
-    ArrayAbstractReader(String name, ArrayBody body, TsonValueReader<?> elementParser,
+    ArrayAbstractReader(String name, ArrayBody body, TsonTypeReader<?> elementParser,
                          Optional<SourcePosition> schemaPosition) {
         this.name = name;
         this.body = body;

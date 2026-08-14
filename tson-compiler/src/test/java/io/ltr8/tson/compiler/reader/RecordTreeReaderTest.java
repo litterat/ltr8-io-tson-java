@@ -2,7 +2,6 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
-import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -31,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * End-to-end proof of the compiled-schema-reader sketch against the real {@link RecordTreeReader} and
- * {@link AtomValueReader#INTEGER_TYPE} -- a real (hand-built, but shaped exactly like a materialized
+ * {@link AtomTypeReader#INTEGER_TYPE} -- a real (hand-built, but shaped exactly like a materialized
  * {@link TsonSchema} would be) schema compiled with the real DOM-mode factory registry, read against
  * real TSON data source text through the real compiled reader.
  */

@@ -4,8 +4,8 @@ import io.ltr8.annotation.Typename;
 import io.ltr8.bind.DataClassUnion;
 import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonReadContext;
-import io.ltr8.tson.compiler.TsonValueReader;
-import io.ltr8.tson.compiler.TsonValueReaderResolver;
+import io.ltr8.tson.compiler.TsonTypeReader;
+import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 
 import java.util.Optional;
 
@@ -57,15 +57,15 @@ import java.util.Optional;
  * -- {@code ownParser} still calls it again on delegation (every reader does, as its own first step),
  * which is a safe no-op once nothing's left to consume.
  */
-final class VariantBindReader implements TsonValueReader<Object> {
+final class VariantBindReader implements TsonTypeReader<Object> {
 
     private final String name;
-    private final TsonValueReader<?> ownParser;
+    private final TsonTypeReader<?> ownParser;
     private final DataClassUnion descriptor;
-    private final TsonValueReaderResolver resolver;
+    private final TsonTypeReaderResolver resolver;
 
-    VariantBindReader(String name, TsonValueReader<?> ownParser, DataClassUnion descriptor,
-                       TsonValueReaderResolver resolver) {
+    VariantBindReader(String name, TsonTypeReader<?> ownParser, DataClassUnion descriptor,
+                      TsonTypeReaderResolver resolver) {
         this.name = name;
         this.ownParser = ownParser;
         this.descriptor = descriptor;

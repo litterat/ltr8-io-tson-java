@@ -8,7 +8,7 @@ import java.util.Optional;
 
 /**
  * The "compile" stage's own noun -- an already-built, immutable {@code Map<String,
- * TsonValueReader<?>>} paired with the {@link TsonLinkedSchema} it was compiled from, produced by
+ * TsonTypeReader<?>>} paired with the {@link TsonLinkedSchema} it was compiled from, produced by
  * {@link TsonSchemaCompiler#compile} and never constructed directly outside this package. Holds no
  * build logic of its own; all the actual compile-time work (the eager walk, cycle detection,
  * per-entry build-failure deferral) lives in {@link TsonSchemaCompiler} itself, matching the
@@ -29,9 +29,9 @@ import java.util.Optional;
 public sealed class TsonCompiledSchema permits TsonCompiledMetaSchema {
 
     private final TsonLinkedSchema linkedSchema;
-    private final Map<String, TsonValueReader<?>> entries;
+    private final Map<String, TsonTypeReader<?>> entries;
 
-    public TsonCompiledSchema(TsonLinkedSchema linkedSchema, Map<String, TsonValueReader<?>> entries) {
+    public TsonCompiledSchema(TsonLinkedSchema linkedSchema, Map<String, TsonTypeReader<?>> entries) {
         this.linkedSchema = linkedSchema;
         this.entries = entries;
     }
@@ -48,12 +48,12 @@ public sealed class TsonCompiledSchema permits TsonCompiledMetaSchema {
      * The compiled readers, by entry name -- package-private, same reason as {@link #linkedSchema()}. The map
      * is already immutable ({@link TsonSchemaCompiler} copies it before construction).
      */
-    Map<String, TsonValueReader<?>> entries() {
+    Map<String, TsonTypeReader<?>> entries() {
         return entries;
     }
 
-    public TsonValueReader<?> get(String typeName) {
-        TsonValueReader<?> parser = entries.get(typeName);
+    public TsonTypeReader<?> get(String typeName) {
+        TsonTypeReader<?> parser = entries.get(typeName);
         if (parser == null) {
             throw new IllegalArgumentException("'" + typeName + "' is not in this compiled schema");
         }
@@ -66,7 +66,7 @@ public sealed class TsonCompiledSchema permits TsonCompiledMetaSchema {
      * (e.g. building a governing meta's scoped constructor vocabulary, where a placeholder schema
      * legitimately has no readers yet).
      */
-    public Optional<TsonValueReader<?>> find(String typeName) {
+    public Optional<TsonTypeReader<?>> find(String typeName) {
         return Optional.ofNullable(entries.get(typeName));
     }
 

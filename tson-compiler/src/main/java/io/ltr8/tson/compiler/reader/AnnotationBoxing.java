@@ -3,7 +3,7 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassAnnotated;
-import io.ltr8.tson.compiler.TsonValueReader;
+import io.ltr8.tson.compiler.TsonTypeReader;
 
 /**
  * Turns the reader for a value into the reader for that value <em>boxed with the annotations written at its
@@ -22,7 +22,7 @@ final class AnnotationBoxing {
     private AnnotationBoxing() {
     }
 
-    static TsonValueReader<?> wrap(TsonValueReader<?> value, DataClass target, AnnotationTypes annotationTypes) {
+    static TsonTypeReader<?> wrap(TsonTypeReader<?> value, DataClass target, AnnotationTypes annotationTypes) {
         if (!(target instanceof DataClassAnnotated box)) {
             return value;
         }

@@ -2,8 +2,8 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonReadContext;
-import io.ltr8.tson.compiler.TsonValueReader;
-import io.ltr8.tson.compiler.TsonValueReaderResolver;
+import io.ltr8.tson.compiler.TsonTypeReader;
+import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.tree.TsonAnnotation;
 import io.ltr8.tson.tree.TsonNode;
 import io.ltr8.tson.compiler.ast.TokenValue;
@@ -29,18 +29,18 @@ import java.util.Set;
  * <p>{@code positionName}/{@code candidateNoun} keep the error messages accurate to whichever dispatch this
  * is (currently only {@link ChoiceReader}'s declared-variant list) without the dispatch logic knowing.
  */
-final class NamedDispatchReader implements TsonValueReader<Object> {
+final class NamedDispatchReader implements TsonTypeReader<Object> {
 
     private final String positionName;
     private final String missingTypeRefMessage;
     private final String candidateNoun;
     private final Set<String> candidateNames;
-    private final TsonValueReaderResolver resolver;
+    private final TsonTypeReaderResolver resolver;
     private final Map<BaseTypeClass, String> untaggedRecovery;
     private final AnnotationTypes annotationTypes;
 
     NamedDispatchReader(String positionName, String missingTypeRefMessage, String candidateNoun,
-                         Set<String> candidateNames, TsonValueReaderResolver resolver,
+                         Set<String> candidateNames, TsonTypeReaderResolver resolver,
                          Map<BaseTypeClass, String> untaggedRecovery, AnnotationTypes annotationTypes) {
         this.positionName = positionName;
         this.missingTypeRefMessage = missingTypeRefMessage;

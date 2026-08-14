@@ -1,10 +1,10 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TsonReadContext;
-import io.ltr8.tson.compiler.TsonValueReader;
+import io.ltr8.tson.compiler.TsonTypeReader;
 
 /**
- * A stand-in {@link TsonValueReader} for a constructor with no compiled reader implemented yet --
+ * A stand-in {@link TsonTypeReader} for a constructor with no compiled reader implemented yet --
  * this package's own copy of {@code reader.ErrorReader}. Registering one directly (see {@link
  * ValueReaderFactoryRegistry}'s own trailing, clearly-marked block of these) lets a schema that
  * merely *declares* one of these constructors still compile successfully; only actually {@link
@@ -16,7 +16,7 @@ import io.ltr8.tson.compiler.TsonValueReader;
  * not a per-document data problem; a caller can't fix it by correcting their data, so silently
  * collecting it as one more {@link io.ltr8.tson.compiler.Diagnostic} among many would be misleading.
  */
-final public class ErrorReader implements TsonValueReader<Object> {
+final public class ErrorReader implements TsonTypeReader<Object> {
 
     private final String name;
     private final RuntimeException cause;

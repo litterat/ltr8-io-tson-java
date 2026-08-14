@@ -2,7 +2,7 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonReadContext;
-import io.ltr8.tson.compiler.TsonValueReader;
+import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.schema.meta.SourcePosition;
@@ -13,10 +13,10 @@ import java.util.Optional;
  * Reads meta-kernel's {@code boolean => !enum [true false]} as a genuine Java {@code Boolean} rather than
  * raw member text -- the one real enum instance whose members are meant to stand in for the two boolean
  * values. Every other enum instance is read via the ordinary {@code EnumParser} (through {@link
- * AtomValueReader#ENUM_OBJECT_MODE}), taking the member token's own text as a {@code String} -- exactly
+ * AtomTypeReader#ENUM_OBJECT_MODE}), taking the member token's own text as a {@code String} -- exactly
  * right for an arbitrary, user-defined enum label, and exactly wrong for {@code boolean} specifically.
  */
-final class BooleanReader implements TsonValueReader<Boolean> {
+final class BooleanReader implements TsonTypeReader<Boolean> {
 
     private final Optional<SourcePosition> schemaPosition;
 

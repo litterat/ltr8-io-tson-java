@@ -1,11 +1,7 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.compiler.reader.CompiledReaders;
-import io.ltr8.tson.compiler.reader.ValueReaderFactoryResolver;
-import io.ltr8.tson.compiler.reader.DeferredValueReader;
-import io.ltr8.tson.compiler.reader.ErrorReader;
-import io.ltr8.tson.compiler.reader.ValueReaderContext;
-import io.ltr8.tson.compiler.reader.ValueReaderFactory;
+import io.ltr8.tson.compiler.reader.*;
+import io.ltr8.tson.compiler.reader.DeferredTypeReader;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Reference;
@@ -142,7 +138,7 @@ public final class TsonSchemaCompiler {
     private static final class Compilation {
         private final TsonSchema schema;
         private final Function<String, ValueReaderFactory> factoryFor;
-        private final Map<String, TsonValueReader<?>> finished = new LinkedHashMap<>();
+        private final Map<String, TsonTypeReader<?>> finished = new LinkedHashMap<>();
         private final Set<String> building = new LinkedHashSet<>();
 
         /**
@@ -157,13 +153,13 @@ public final class TsonSchemaCompiler {
             this.factoryFor = factoryFor;
         }
 
-        TsonValueReader<?> resolve(String name) {
-            TsonValueReader<?> done = finished.get(name);
+        TsonTypeReader<?> resolve(String name) {
+            TsonTypeReader<?> done = finished.get(name);
             if (done != null) {
                 return done;
             }
             if (!building.add(name)) {
-                return new DeferredValueReader<>(name, finished);
+                return new DeferredTypeReader<>(name, finished);
             }
             try {
                 TypeDefinition definition = schema.entries().get(name);
@@ -171,7 +167,7 @@ public final class TsonSchemaCompiler {
                     throw new IllegalStateException("'" + name + "' is referenced but not present in the schema -- "
                             + "TsonSchemaLinker should already have rejected this before compilation ever started");
                 }
-                TsonValueReader<?> built;
+                TsonTypeReader<?> built;
                 try {
                     built = build(name, definition);
                 } catch (RuntimeException e) {
@@ -184,7 +180,7 @@ public final class TsonSchemaCompiler {
             }
         }
 
-        private TsonValueReader<?> build(String name, TypeDefinition definition) {
+        private TsonTypeReader<?> build(String name, TypeDefinition definition) {
             Top body = definition.body();
             if (body instanceof Reference r) {
                 return resolve(r.target().name());

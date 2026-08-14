@@ -1,10 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
-import io.ltr8.tson.compiler.TestDocuments;
-import io.ltr8.tson.compiler.TsonReadContext;
-import io.ltr8.tson.compiler.TsonReadException;
-import io.ltr8.tson.compiler.TsonValueReader;
-import io.ltr8.tson.compiler.TsonValueReaderResolver;
+import io.ltr8.tson.compiler.*;
+import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.IntegerSize;
@@ -37,9 +34,9 @@ class ChoiceUntaggedRecoveryTest {
     private final Map<String, TypeDefinition> entries = new LinkedHashMap<>();
 
     /** Each variant's stub reader consumes its value and echoes the variant name it was dispatched to. */
-    private final TsonValueReaderResolver readers = new TsonValueReaderResolver() {
+    private final TsonTypeReaderResolver readers = new TsonTypeReaderResolver() {
         @Override
-        public TsonValueReader<?> resolve(String name) {
+        public TsonTypeReader<?> resolve(String name) {
             return ctx -> {
                 EventSkip.annotationsAndTypeRef(ctx);
                 EventSkip.coreValue(ctx);
@@ -53,7 +50,7 @@ class ChoiceUntaggedRecoveryTest {
                 List.of(), List.of(), Optional.empty(), body));
     }
 
-    private TsonValueReader<?> choice(Optional<Boolean> disjoint, String... variants) {
+    private TsonTypeReader<?> choice(Optional<Boolean> disjoint, String... variants) {
         List<TypeRef> refs = List.of(variants).stream().map(TypeRef::of).toList();
         TypeDefinition choiceDef = new TypeDefinition(Optional.empty(), TypeKind.SUM, List.of(), false,
                 List.of(), List.of(), disjoint, new ChoiceBody(refs));
@@ -62,7 +59,7 @@ class ChoiceUntaggedRecoveryTest {
         return ChoiceReader.FACTORY.create("contact", choiceDef, context);
     }
 
-    private static Object read(TsonValueReader<?> reader, String data) {
+    private static Object read(TsonTypeReader<?> reader, String data) {
         return reader.read(TestDocuments.document(data));
     }
 
@@ -70,7 +67,7 @@ class ChoiceUntaggedRecoveryTest {
     void recoversAnUntaggedScalarByItsBaseTypeClass() {
         variant("int32", TypeKind.ATOM, new IntegerType(new IntegerSize(32, true)));
         variant("text", TypeKind.ATOM, TextType.UNCONSTRAINED);
-        TsonValueReader<?> reader = choice(Optional.of(true), "int32", "text");
+        TsonTypeReader<?> reader = choice(Optional.of(true), "int32", "text");
 
         assertEquals("int32", read(reader, "42"));       // number class -> int32
         assertEquals("text", read(reader, "\"hi\""));    // string class -> text
@@ -80,7 +77,7 @@ class ChoiceUntaggedRecoveryTest {
     void anExplicitTagStillDispatchesEvenWhenRecoveryIsAvailable() {
         variant("int32", TypeKind.ATOM, new IntegerType(new IntegerSize(32, true)));
         variant("text", TypeKind.ATOM, TextType.UNCONSTRAINED);
-        TsonValueReader<?> reader = choice(Optional.of(true), "int32", "text");
+        TsonTypeReader<?> reader = choice(Optional.of(true), "int32", "text");
 
         assertEquals("int32", read(reader, "!int32 42"));
         assertEquals("text", read(reader, "!text \"hi\""));
@@ -90,7 +87,7 @@ class ChoiceUntaggedRecoveryTest {
     void anUntaggedValueOfNoVariantsClassIsAnError() {
         variant("int32", TypeKind.ATOM, new IntegerType(new IntegerSize(32, true)));
         variant("text", TypeKind.ATOM, TextType.UNCONSTRAINED);
-        TsonValueReader<?> reader = choice(Optional.of(true), "int32", "text");
+        TsonTypeReader<?> reader = choice(Optional.of(true), "int32", "text");
 
         // 'true' is the boolean class; the choice has no boolean variant.
         assertThrows(TsonReadException.class, () -> read(reader, "true"));
@@ -100,7 +97,7 @@ class ChoiceUntaggedRecoveryTest {
     void aChoiceNotProvedDisjointKeepsTheTagRequired() {
         variant("int32", TypeKind.ATOM, new IntegerType(new IntegerSize(32, true)));
         variant("text", TypeKind.ATOM, TextType.UNCONSTRAINED);
-        TsonValueReader<?> reader = choice(Optional.empty(), "int32", "text");
+        TsonTypeReader<?> reader = choice(Optional.empty(), "int32", "text");
 
         assertThrows(TsonReadException.class, () -> read(reader, "42"));
         assertEquals("int32", read(reader, "!int32 42")); // tagged still works
@@ -111,7 +108,7 @@ class ChoiceUntaggedRecoveryTest {
         variant("int32", TypeKind.ATOM, new IntegerType(new IntegerSize(32, true)));
         variant("point", TypeKind.PRODUCT, new RecordBody(List.of(), List.of(), List.of()));
         // Disjoint (different kinds), but a record isn't a base-type-class scalar -- no structural recovery here.
-        TsonValueReader<?> reader = choice(Optional.of(true), "int32", "point");
+        TsonTypeReader<?> reader = choice(Optional.of(true), "int32", "point");
 
         assertThrows(TsonReadException.class, () -> read(reader, "42"));
     }

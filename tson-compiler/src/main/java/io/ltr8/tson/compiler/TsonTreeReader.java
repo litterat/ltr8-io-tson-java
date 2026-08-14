@@ -261,7 +261,7 @@ public final class TsonTreeReader {
             }
             name = typeRef.name();
         }
-        TsonValueReader<?> reader;
+        TsonTypeReader<?> reader;
         try {
             reader = compiled.get(name);
         } catch (RuntimeException e) {

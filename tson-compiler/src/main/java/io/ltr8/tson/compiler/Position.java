@@ -11,7 +11,7 @@ import io.ltr8.tson.schema.meta.SourcePosition;
  * <p>Lives in the root package, not {@code lexer} where it's actually produced -- {@link
  * TsonParseException}/{@link TsonUnsupportedDocumentException} carry one in their own public
  * {@code position()} accessor, and the root package is this module's real, exported front door
- * ({@link TsonDataParser}/{@link TsonSchemaParser}/{@link TsonValueReader}); {@code lexer} itself
+ * ({@link TsonDataParser}/{@link TsonSchemaParser}/{@link TsonTypeReader}); {@code lexer} itself
  * (the scanner, its tokens) is internal machinery a consumer never names directly.
  *
  * <p>Implements {@link SourcePosition} directly (no adapter class) so a resolved {@code

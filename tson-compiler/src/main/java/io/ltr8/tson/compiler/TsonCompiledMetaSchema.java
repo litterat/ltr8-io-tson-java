@@ -3,7 +3,6 @@ package io.ltr8.tson.compiler;
 import io.ltr8.annotation.Typename;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryResolver;
 import io.ltr8.tson.compiler.reader.ValueReaderFactory;
-import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
@@ -59,7 +58,7 @@ public final class TsonCompiledMetaSchema extends TsonCompiledSchema {
      * resolved body's own constructor name (though for every real meta-kernel/meta-schema
      * declaration today the two are identical).
      */
-    public TsonValueReader<?> reader(String name) {
+    public TsonTypeReader<?> reader(String name) {
         ReaderResolver constructor = constructors.get(name);
         if (constructor == null) {
             throw new IllegalArgumentException(
@@ -137,6 +136,6 @@ public final class TsonCompiledMetaSchema extends TsonCompiledSchema {
      * builds a reader for an entry that *is* a construction of it ({@link #constructor}). A private
      * convenience -- neither the record nor its facet split leaks past this class.
      */
-    private record ReaderResolver(TsonValueReader<?> instanceReader, ValueReaderFactory factory) {
+    private record ReaderResolver(TsonTypeReader<?> instanceReader, ValueReaderFactory factory) {
     }
 }

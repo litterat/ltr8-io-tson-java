@@ -4,18 +4,17 @@ import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TsonEventSource;
 import io.ltr8.tson.schema.meta.SourcePosition;
 
-import java.io.InputStream;
 import java.util.Optional;
 
 /**
- * Carried through every {@link TsonValueReader#read(TsonReadContext)} call -- the read's own pull
+ * Carried through every {@link TsonTypeReader#read(TsonReadContext)} call -- the read's own pull
  * cursor over a {@link TsonEventSource}, error sink, current path, and position tracking. Orthogonal
  * to DOM vs. object-binding mode: both share the same composite readers (record/array/map/tuple/
  * atom), which are the only things that ever touch this.
  *
  * <p>An interface, not a concrete class, deliberately -- the backing implementation can change later
  * (e.g. a different {@link TsonEventSource}) without breaking this contract. Kept in mind but not
- * built yet: {@link TsonValueReader#read} could eventually take *only* a {@code TsonReadContext} with
+ * built yet: {@link TsonTypeReader#read} could eventually take *only* a {@code TsonReadContext} with
  * no separate value parameter at all if every remaining caller moved to pull-based reading; today's
  * shape (a single {@code ctx} parameter already) is the step that got taken.
  *
@@ -117,7 +116,7 @@ public interface TsonReadContext {
      * <p><b>This is not a whole-document read.</b> Framing -- consuming the leading {@code DocumentStart},
      * and pulling past the root value so a lazy {@link TsonDataStream} actually checks for trailing content
      * -- belongs to whoever owns the document: {@link TsonTreeReader}/{@link TsonObjectReader}, which is what
-     * a consumer reads through. Driving a {@link TsonValueReader} over a raw source here reads one value at
+     * a consumer reads through. Driving a {@link TsonTypeReader} over a raw source here reads one value at
      * the cursor and polices nothing around it.
      */
     static TsonReadContext of(TsonEventSource events, TsonDiagnosticsReceiver receiver) {

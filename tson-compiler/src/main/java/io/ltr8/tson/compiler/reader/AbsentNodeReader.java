@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TsonReadContext;
-import io.ltr8.tson.compiler.TsonValueReader;
+import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.tree.AbsentNode;
 import io.ltr8.tson.tree.TsonAnnotation;
 import io.ltr8.tson.tree.TsonNode;
@@ -14,12 +14,12 @@ import java.util.Optional;
  * delegate {@link VoidReader} and yielding {@link AbsentNode}. Distinct from a null-yielding leaf ({@link
  * AtomNodeReader} → {@link io.ltr8.tson.tree.NullNode}), since {@code _} is "absent", not "null".
  */
-final class AbsentNodeReader implements TsonValueReader<TsonNode> {
+final class AbsentNodeReader implements TsonTypeReader<TsonNode> {
 
-    private final TsonValueReader<?> delegate;
+    private final TsonTypeReader<?> delegate;
     private final AnnotationTypes annotationTypes;
 
-    AbsentNodeReader(TsonValueReader<?> delegate, AnnotationTypes annotationTypes) {
+    AbsentNodeReader(TsonTypeReader<?> delegate, AnnotationTypes annotationTypes) {
         this.delegate = delegate;
         this.annotationTypes = annotationTypes;
     }

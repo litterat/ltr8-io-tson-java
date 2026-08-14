@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
-import io.ltr8.tson.compiler.TsonValueReaderResolver;
+import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.schema.TsonSchema;
 
 /**
@@ -13,5 +13,5 @@ import io.ltr8.tson.schema.TsonSchema;
  * <p>A context object rather than a widening parameter list: a factory that later needs a further handle
  * gains a field here instead of every factory's signature churning.
  */
-public record ValueReaderContext(TsonSchema schema, TsonValueReaderResolver readers) {
+public record ValueReaderContext(TsonSchema schema, TsonTypeReaderResolver readers) {
 }

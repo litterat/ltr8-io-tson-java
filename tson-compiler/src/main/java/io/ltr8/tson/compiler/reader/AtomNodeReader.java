@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TsonReadContext;
-import io.ltr8.tson.compiler.TsonValueReader;
+import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.tree.AtomNode;
 import io.ltr8.tson.tree.NullNode;
 import io.ltr8.tson.tree.TsonAnnotation;
@@ -17,13 +17,13 @@ import java.util.Optional;
  * collecting mode -- the diagnostic carries the real problem). This is how atoms produce nodes uniformly, so
  * a container reader's children are always nodes, and reading an atom at the root is a node too.
  */
-final class AtomNodeReader implements TsonValueReader<TsonNode> {
+final class AtomNodeReader implements TsonTypeReader<TsonNode> {
 
-    private final TsonValueReader<?> delegate;
+    private final TsonTypeReader<?> delegate;
     private final Optional<String> typeRef;
     private final AnnotationTypes annotationTypes;
 
-    AtomNodeReader(TsonValueReader<?> delegate, String typeRef, AnnotationTypes annotationTypes) {
+    AtomNodeReader(TsonTypeReader<?> delegate, String typeRef, AnnotationTypes annotationTypes) {
         this.delegate = delegate;
         this.typeRef = Optional.of(typeRef);
         this.annotationTypes = annotationTypes;

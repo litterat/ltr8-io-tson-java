@@ -16,6 +16,29 @@ The `TsonNode` tree — an immutable, queryable, structure-preserving document m
 schema-driven tree readers and the schemaless `TsonTreeReader`), the `TsonTreeWriter` back to text, and
 the removal of the old throwaway `Map`/`List` DOM mode all landed. What's left:
 
+- [ ] **Rename the node types to the `Tson*` prefix, dropping "Node".** `TsonNode` -> `TsonValue`,
+  `RecordNode` -> `TsonRecord`, `MapNode` -> `TsonMap`, `ArrayNode` -> `TsonArray`, `TupleNode` ->
+  `TsonTuple`, `AtomNode` -> `TsonAtom`, `NullNode` -> `TsonNull`, `AbsentNode` -> `TsonAbsent`,
+  `MissingNode` -> `TsonMissing`; `TsonAnnotation` already conforms. ~540 references.
+  - **The current names break this project's own naming rule**, and that is the argument that stands on its
+    own. The rule asks "would a consumer plausibly have their own class with this bare name?" -- and Jackson
+    ships `ArrayNode`, `NullNode`, `MissingNode` and `ObjectNode` in `com.fasterxml.jackson.databind.node`,
+    so a consumer using both libraries in one file has a literal three-way collision today and must fully
+    qualify. These are consumer-facing types; they are the case the prefix exists for.
+  - **"Node" stopped carrying information** once every type in the module is one. `RecordNode` says "record"
+    and "node"; `TsonRecord` says "record" and *whose*.
+  - **Alignment with JEP 540 (Simple JSON API, incubating in JDK 28)** is the bonus: its sealed `JsonValue` /
+    `JsonObject` / `JsonArray` / `JsonNull` is the same design this tree arrived at independently, so
+    `TsonValue`/`TsonRecord`/`TsonArray`/`TsonNull` buys familiarity for the same audience. Note
+    `TsonRecord`+`TsonMap` is *more* precise than `JsonObject`, not merely different -- JSON cannot
+    distinguish the two.
+  - **Prerequisite: done.** `TsonValueReader`/`TsonValueReaderResolver` became `TsonTypeReader`/
+    `TsonTypeReaderResolver`, freeing `TsonValue` and fixing a second name in the process (see `CLAUDE.md`'s
+    note on why "type" is the accurate half). `TsonValueWriter`, the planned schema-aware writer below,
+    should land as `TsonTypeWriter` for the same reason.
+  - Read the Javadoc on the `TsonNull`/`TsonAbsent`/`TsonMissing` trio while renaming -- three states where
+    JSON has two, and the subtlest corner of this API.
+
 - [ ] **Copy-on-write transforms + builders (parked).** The "new tree from old" editing half —
   `RecordNode.with(name, node)`/`without(name)`, `ArrayNode.with(i, node)`/`plus(node)`/`without(i)`,
   `RecordNode.builder()`, and a pointer-based `set("/a/b", node) → new tree`. All pure `tson-tree`
@@ -261,7 +284,7 @@ missing most of the mirror.
 - [ ] **No schema-aware (Class 2) writer — `TsonValueWriter`.** Only the schemaless `TsonObjectWriter`
   (object → TSON) and `TsonTreeWriter` (`TsonNode` → TSON) exist, both with documented lossy spots
   (integer width, tuple-ness). A writer symmetric to the
-  compiled reader stack (`TsonSchemaCompiler`/`TsonValueReader`) — checking output against a TSON schema
+  compiled reader stack (`TsonSchemaCompiler`/`TsonTypeReader`) — checking output against a TSON schema
   and reporting what's wrong — is a whole missing half of the pipeline, and the natural home for
   round-tripping or producing guaranteed-conformant documents.
 - [ ] **Writers are fail-fast only, no diagnostics.** They throw `TsonWriteException` at the first

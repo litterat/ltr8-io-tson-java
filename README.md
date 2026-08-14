@@ -165,9 +165,9 @@ round-tripping a tree back out through `tson.treeWriter()`.
 
 **These two readers are the whole document-reading surface.** They own the `!!schema` decision, the
 target-class check, and the framing that rejects trailing content. `tson.treeRegistry()`/`bindRegistry()`
-and the per-type `TsonValueReader` they hand back are the layer underneath — useful for compiling a schema
-once and inspecting it, but `TsonValueReader` is a strict single-method interface (`T read(TsonReadContext
-ctx)`) that reads *one value at a cursor* and polices nothing around it.
+and the `TsonTypeReader` they hand back for a named type are the layer underneath — useful for compiling a
+schema once and inspecting it, but `TsonTypeReader` is a strict single-method interface (`T
+read(TsonReadContext ctx)`) that reads *one value at a cursor* and polices nothing around it.
 
 **No `Tson`?** The reader and writer classes construct directly for lightweight, schemaless (Class 1) use
 with no standard-library bootstrap — `new TsonTreeReader()`, `new TsonObjectReader()`, `new
@@ -412,7 +412,7 @@ vocabulary — parse → resolve → link → register → compile → read:
 5. **Compile** (`TsonSchemaCompiler`) — turns a registered schema's `Map<String, TypeDefinition>` into
    a `TsonCompiledSchema`: real Java object references between per-type parsers rather than further
    name lookups, built once, reused for every document read against it.
-6. **Read** (`TsonValueReader`) — the compiled schema validates and binds actual TSON *data* documents
+6. **Read** (`TsonTypeReader`) — the compiled schema validates and binds actual TSON *data* documents
    against one of its own types — the schema-validating reader (Class 2) that the schemaless
    `TsonObjectReader`/`TsonDataParser` don't attempt on their own.
 

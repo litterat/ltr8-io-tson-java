@@ -1,8 +1,8 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TsonReadContext;
-import io.ltr8.tson.compiler.TsonValueReader;
-import io.ltr8.tson.compiler.TsonValueReaderResolver;
+import io.ltr8.tson.compiler.TsonTypeReader;
+import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.tree.RecordNode;
 import io.ltr8.tson.tree.TsonAnnotation;
 import io.ltr8.tson.tree.TsonNode;
@@ -25,7 +25,7 @@ import java.util.Optional;
  */
 final class RecordTreeReader extends RecordAbstractReader<TsonNode> {
 
-    public RecordTreeReader(String name, RecordBody body, TsonValueReaderResolver resolver,
+    public RecordTreeReader(String name, RecordBody body, TsonTypeReaderResolver resolver,
                             Optional<SourcePosition> schemaPosition,
                             AnnotationTypes annotationTypes) {
         super(name, body, resolver, schemaPosition);
@@ -38,8 +38,8 @@ final class RecordTreeReader extends RecordAbstractReader<TsonNode> {
     public static final class Factory implements ValueReaderFactory {
 
         @Override
-        public TsonValueReader<?> create(String name, TypeDefinition typeDefinition, ValueReaderContext context) {
-            TsonValueReaderResolver resolver = context.readers();
+        public TsonTypeReader<?> create(String name, TypeDefinition typeDefinition, ValueReaderContext context) {
+            TsonTypeReaderResolver resolver = context.readers();
             if (!(typeDefinition.body() instanceof RecordBody body)) {
                 throw new IllegalArgumentException("'" + name + "' is not record-shaped: " + typeDefinition.body());
             }

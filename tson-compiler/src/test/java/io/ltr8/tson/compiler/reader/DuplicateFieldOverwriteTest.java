@@ -69,7 +69,7 @@ class DuplicateFieldOverwriteTest {
 
         // Despite that, the field's own final stored value is the second, valid occurrence --
         // forward overwrite, matching §2.5's "last value wins". DOM mode still narrows a real
-        // int8-typed atom down to a Java byte (AtomValueReader.INTEGER_TYPE, unrelated to this test).
+        // int8-typed atom down to a Java byte (AtomTypeReader.INTEGER_TYPE, unrelated to this test).
         assertEquals((byte) 42, result.get("value"));
     }
 }

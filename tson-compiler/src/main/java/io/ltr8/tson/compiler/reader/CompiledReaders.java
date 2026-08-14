@@ -1,8 +1,8 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TsonCompiledSchema;
-import io.ltr8.tson.compiler.TsonValueReader;
-import io.ltr8.tson.compiler.TsonValueReaderResolver;
+import io.ltr8.tson.compiler.TsonTypeReader;
+import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 
 import java.util.Objects;
 
@@ -28,7 +28,7 @@ import java.util.Objects;
  * it, which is the point: the compilation becomes unreachable the moment the schema exists, and what every
  * reader retains from then on is one reference to an immutable map.
  */
-public final class CompiledReaders implements TsonValueReaderResolver {
+public final class CompiledReaders implements TsonTypeReaderResolver {
 
     /**
      * Volatile because the write in {@link #bind} happens on the compiling thread and the reads happen on
@@ -36,15 +36,15 @@ public final class CompiledReaders implements TsonValueReaderResolver {
      * declares, so a stale read would still be correct -- this is for safe publication of the {@link
      * TsonCompiledSchema} the bound delegate closes over, not for correctness of the switch itself.
      */
-    private volatile TsonValueReaderResolver delegate;
+    private volatile TsonTypeReaderResolver delegate;
 
     /** Starts out resolving through {@code whileCompiling} -- the compilation's own recursive, cycle-aware build. */
-    public CompiledReaders(TsonValueReaderResolver whileCompiling) {
+    public CompiledReaders(TsonTypeReaderResolver whileCompiling) {
         this.delegate = Objects.requireNonNull(whileCompiling, "whileCompiling");
     }
 
     @Override
-    public TsonValueReader<?> resolve(String typeName) {
+    public TsonTypeReader<?> resolve(String typeName) {
         return delegate.resolve(typeName);
     }
 
@@ -63,10 +63,10 @@ public final class CompiledReaders implements TsonValueReaderResolver {
     }
 
     /** A named type rather than a lambda, so {@link #bind} can tell a bound handle from an unbound one. */
-    private record CompiledSchemaResolver(TsonCompiledSchema compiled) implements TsonValueReaderResolver {
+    private record CompiledSchemaResolver(TsonCompiledSchema compiled) implements TsonTypeReaderResolver {
 
         @Override
-        public TsonValueReader<?> resolve(String typeName) {
+        public TsonTypeReader<?> resolve(String typeName) {
             return compiled.get(typeName);
         }
     }

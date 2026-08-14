@@ -2,8 +2,7 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonReadContext;
-import io.ltr8.tson.compiler.TsonValueReader;
-import io.ltr8.tson.compiler.TsonValueReaderResolver;
+import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import org.junit.jupiter.api.Test;
@@ -28,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class CompiledReadersTest {
 
     /** A reader identifiable by which phase produced it; never actually read from. */
-    private record Marker(String from) implements TsonValueReader<String> {
+    private record Marker(String from) implements TsonTypeReader<String> {
 
         @Override
         public String read(TsonReadContext ctx) {
@@ -36,7 +35,7 @@ class CompiledReadersTest {
         }
     }
 
-    private static TsonCompiledSchema compiledWith(String name, TsonValueReader<?> reader) {
+    private static TsonCompiledSchema compiledWith(String name, TsonTypeReader<?> reader) {
         TsonSchema schema = new TsonSchema("id", "meta", List.of(), Map.of());
         return new TsonCompiledSchema(new TsonLinkedSchema(schema), Map.of(name, reader));
     }
@@ -50,7 +49,7 @@ class CompiledReadersTest {
 
     @Test
     void bindHandsResolutionToTheFinishedSchema() {
-        TsonValueReader<?> fromSchema = new Marker("compiled");
+        TsonTypeReader<?> fromSchema = new Marker("compiled");
         CompiledReaders readers = new CompiledReaders(name -> new Marker("compiling"));
 
         readers.bind(compiledWith("point", fromSchema));

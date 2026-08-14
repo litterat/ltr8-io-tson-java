@@ -1,12 +1,8 @@
 package io.ltr8.tson.compiler.resolver;
 
-import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
-import io.ltr8.tson.compiler.TsonSchemaParser;
-import io.ltr8.tson.compiler.TsonValueReader;
+import io.ltr8.tson.compiler.*;
+import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
-import io.ltr8.tson.compiler.TsonCompiledSchema;
-import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
-import io.ltr8.tson.compiler.TsonCompiledSchemaRegistry;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
@@ -128,7 +124,7 @@ class CoreSchemaImportTest {
 
         Set<String> errored = new TreeSet<>();
         for (String name : core.entries().keySet()) {
-            TsonValueReader<?> reader = compiledCore.get(name);
+            TsonTypeReader<?> reader = compiledCore.get(name);
             if (reader.getClass().getSimpleName().equals("ErrorReader")) {
                 errored.add(name);
             }

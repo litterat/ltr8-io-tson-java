@@ -4,7 +4,7 @@ import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonReadContext;
-import io.ltr8.tson.compiler.TsonValueReader;
+import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.stream.AbsentEvent;
 import io.ltr8.tson.compiler.stream.AnnotationEnd;
 import io.ltr8.tson.compiler.stream.AnnotationStart;
@@ -134,7 +134,7 @@ final class AnnotationCapture {
      */
     private static Optional<Object> value(TsonReadContext ctx, AnnotationStart start, AnnotationTypes types,
                                           SchemalessTreeReader structural) {
-        Optional<TsonValueReader<?>> reader = types.readerFor(start.name());
+        Optional<TsonTypeReader<?>> reader = types.readerFor(start.name());
         if (types.validating() && reader.isEmpty()) {
             ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF,
                     "annotation '@" + start.name() + "' names no type the governing schema declares (§6)",
@@ -164,7 +164,7 @@ final class AnnotationCapture {
      * not this read's, so a single reported problem here is more useful than forwarding several with
      * misleading locations.
      */
-    private static void checkBareAdmitted(TsonReadContext ctx, AnnotationStart start, TsonValueReader<?> reader) {
+    private static void checkBareAdmitted(TsonReadContext ctx, AnnotationStart start, TsonTypeReader<?> reader) {
         TsonReadContext probe = TsonReadContext.of(
                 new ListEventSource(List.of(new AbsentEvent(start.position()))), diagnostic -> { });
         boolean admitted;

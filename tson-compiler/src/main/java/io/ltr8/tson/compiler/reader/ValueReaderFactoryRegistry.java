@@ -13,7 +13,7 @@ import java.util.function.UnaryOperator;
  *
  * <p><b>Fully self-contained within this package</b> -- every entry is either this package's own
  * composite factory ({@code record}/{@code array}/{@code map}/{@code tuple}) or one of {@link
- * AtomValueReader}'s own constants, this package's own copy of the atom-family adapters. No
+ * AtomTypeReader}'s own constants, this package's own copy of the atom-family adapters. No
  * dependency on {@code reader.TsonParserFactoryRegistry} (which is going away) or anything else in
  * {@code reader} -- deliberate, while this package's own shape is still settling.
  *
@@ -28,7 +28,7 @@ import java.util.function.UnaryOperator;
  * RecordBindReader.Factory}'s own Javadoc deliberately does not attempt for any composite kind but
  * {@code record}.
  *
- * <p><b>{@code enum}</b> uses {@link AtomValueReader#ENUM_OBJECT_MODE} in both {@link #tree} and {@link
+ * <p><b>{@code enum}</b> uses {@link AtomTypeReader#ENUM_OBJECT_MODE} in both {@link #tree} and {@link
  * #bind} (dispatching {@code boolean} to a real {@code Boolean} via {@link BooleanReader}, every other
  * member name through the ordinary path) -- so {@code boolean} reads a genuine {@code Boolean}, not the
  * text {@code "true"}/{@code "false"}. Tree mode additionally wraps every leaf in an {@code AtomNode}.
@@ -69,7 +69,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         return new ValueReaderFactoryRegistry(baseFactories(
                 new RecordBindReader.Factory(context), new ArrayBindReader.Factory(context),
                 new MapBindReader.Factory(context), new TupleBindReader.Factory(context),
-                AtomValueReader.ENUM_OBJECT_MODE, AtomValueReader.UNIT, UnaryOperator.identity(),
+                AtomTypeReader.ENUM_OBJECT_MODE, AtomTypeReader.UNIT, UnaryOperator.identity(),
                 ChoiceReader.FACTORY));
     }
 
@@ -83,16 +83,16 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
     public static ValueReaderFactoryRegistry tree() {
         return new ValueReaderFactoryRegistry(baseFactories(
                 new RecordTreeReader.Factory(), new ArrayTreeReader.Factory(), new MapTreeReader.Factory(),
-                new TupleTreeReader.Factory(), AtomValueReader.ENUM_OBJECT_MODE, TREE_UNIT, AtomNodeFactory::new,
+                new TupleTreeReader.Factory(), AtomTypeReader.ENUM_OBJECT_MODE, TREE_UNIT, AtomNodeFactory::new,
                 ChoiceReader.CAPTURING_FACTORY));
     }
 
-    /** Tree mode's {@code unit} factory: {@code void} → {@link AbsentNodeReader}, {@code value}/{@code token} → {@link AtomNodeReader} over {@link AtomValueReader#UNIT}'s own reader. */
+    /** Tree mode's {@code unit} factory: {@code void} → {@link AbsentNodeReader}, {@code value}/{@code token} → {@link AtomNodeReader} over {@link AtomTypeReader#UNIT}'s own reader. */
     private static final ValueReaderFactory TREE_UNIT = (name, definition, context) ->
             "void".equals(name)
-                    ? new AbsentNodeReader(AtomValueReader.UNIT.create(name, definition, context),
+                    ? new AbsentNodeReader(AtomTypeReader.UNIT.create(name, definition, context),
                             AnnotationTypes.of(context))
-                    : new AtomNodeReader(AtomValueReader.UNIT.create(name, definition, context), name,
+                    : new AtomNodeReader(AtomTypeReader.UNIT.create(name, definition, context), name,
                             AnnotationTypes.of(context));
 
     private static Map<String, ValueReaderFactory> baseFactories(ValueReaderFactory record, ValueReaderFactory array,
@@ -103,10 +103,10 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
 
         // meta-kernel.tn1
         factories.put("unit", unitFactory);
-        factories.put("integer_type", leaf.apply(AtomValueReader.INTEGER_TYPE));
-        factories.put("text_type", leaf.apply(AtomValueReader.TEXT_TYPE));
-        factories.put("uri_type", leaf.apply(AtomValueReader.URI_TYPE));
-        factories.put("regex_type", leaf.apply(AtomValueReader.REGEX_TYPE));
+        factories.put("integer_type", leaf.apply(AtomTypeReader.INTEGER_TYPE));
+        factories.put("text_type", leaf.apply(AtomTypeReader.TEXT_TYPE));
+        factories.put("uri_type", leaf.apply(AtomTypeReader.URI_TYPE));
+        factories.put("regex_type", leaf.apply(AtomTypeReader.REGEX_TYPE));
         factories.put("record", record);
         factories.put("array", array);
         factories.put("set", array);
@@ -116,19 +116,19 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         factories.put("choice", choice);
 
         // meta.tn1
-        factories.put("binary", leaf.apply(AtomValueReader.BINARY));
+        factories.put("binary", leaf.apply(AtomTypeReader.BINARY));
         factories.put("vector", array);
-        factories.put("float_type", leaf.apply(AtomValueReader.FLOAT_TYPE));
-        factories.put("decimal_type", leaf.apply(AtomValueReader.DECIMAL_TYPE));
-        factories.put("rational_type", leaf.apply(AtomValueReader.RATIONAL_TYPE));
-        factories.put("date_type", leaf.apply(AtomValueReader.DATE_TYPE));
-        factories.put("time_type", leaf.apply(AtomValueReader.TIME_TYPE));
-        factories.put("datetime_type", leaf.apply(AtomValueReader.DATETIME_TYPE));
-        factories.put("duration_type", leaf.apply(AtomValueReader.DURATION_TYPE));
-        factories.put("uuid_type", leaf.apply(AtomValueReader.UUID_TYPE));
-        factories.put("complex_type", leaf.apply(AtomValueReader.COMPLEX_TYPE));
-        factories.put("ipv4_type", leaf.apply(AtomValueReader.IPV4_TYPE));
-        factories.put("ipv6_type", leaf.apply(AtomValueReader.IPV6_TYPE));
+        factories.put("float_type", leaf.apply(AtomTypeReader.FLOAT_TYPE));
+        factories.put("decimal_type", leaf.apply(AtomTypeReader.DECIMAL_TYPE));
+        factories.put("rational_type", leaf.apply(AtomTypeReader.RATIONAL_TYPE));
+        factories.put("date_type", leaf.apply(AtomTypeReader.DATE_TYPE));
+        factories.put("time_type", leaf.apply(AtomTypeReader.TIME_TYPE));
+        factories.put("datetime_type", leaf.apply(AtomTypeReader.DATETIME_TYPE));
+        factories.put("duration_type", leaf.apply(AtomTypeReader.DURATION_TYPE));
+        factories.put("uuid_type", leaf.apply(AtomTypeReader.UUID_TYPE));
+        factories.put("complex_type", leaf.apply(AtomTypeReader.COMPLEX_TYPE));
+        factories.put("ipv4_type", leaf.apply(AtomTypeReader.IPV4_TYPE));
+        factories.put("ipv6_type", leaf.apply(AtomTypeReader.IPV6_TYPE));
 
         // Sugar/alias names -- not their own `~`-marked constructors, kept for lookup convenience only.
         factories.put("array_min", array);

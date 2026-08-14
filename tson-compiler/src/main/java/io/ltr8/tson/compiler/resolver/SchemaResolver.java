@@ -1,9 +1,9 @@
 package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.annotation.AnnotatedMap;
-import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
 import io.ltr8.tson.compiler.TsonReadContext;
+import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
@@ -212,8 +212,8 @@ public final class SchemaResolver {
     }
 
     /** One already-resolved {@code DataValue} replayed through a compiled reader. */
-    private static Object read(io.ltr8.tson.compiler.TsonValueReader<?> reader,
-            io.ltr8.tson.compiler.ast.DataValue value) {
+    private static Object read(TsonTypeReader<?> reader,
+                               io.ltr8.tson.compiler.ast.DataValue value) {
         return reader.read(TsonReadContext.throwing(new ListEventSource(DataValueEvents.of(value))));
     }
 

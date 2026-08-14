@@ -12,8 +12,8 @@ import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassUnion;
 import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonReadContext;
-import io.ltr8.tson.compiler.TsonValueReader;
-import io.ltr8.tson.compiler.TsonValueReaderResolver;
+import io.ltr8.tson.compiler.TsonTypeReader;
+import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.base.NumberNarrowing;
 import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -76,7 +76,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
     private final AnnotationTypes ownAnnotationTypes;
     private final AnnotationTypes annotationTypes;
 
-    public RecordBindReader(String name, RecordBody body, DataClassRecord descriptor, TsonValueReaderResolver resolver,
+    public RecordBindReader(String name, RecordBody body, DataClassRecord descriptor, TsonTypeReaderResolver resolver,
                              Optional<SourcePosition> schemaPosition, AnnotationTypes annotationTypes) {
         super(name, body, resolver, schemaPosition);
         this.descriptor = descriptor;
@@ -91,7 +91,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             if (target == null) {
                 continue;
             }
-            TsonValueReader<?> rebound = rebindContainerIfNeeded(field, target, resolver, this.annotationTypes);
+            TsonTypeReader<?> rebound = rebindContainerIfNeeded(field, target, resolver, this.annotationTypes);
             if (target.dataClass() instanceof DataClassAnnotated boxed) {
                 rebound = boxing(rebound, boxed, annotationTypes);
             }
@@ -116,10 +116,10 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
      * annotations. The capture is the same hoist used everywhere else: it runs before the delegate, whose own
      * framing consumption then finds nothing left.
      */
-    private static TsonValueReader<?> boxing(TsonValueReader<?> value, DataClassAnnotated boxed,
-                                              AnnotationTypes annotationTypes) {
+    private static TsonTypeReader<?> boxing(TsonTypeReader<?> value, DataClassAnnotated boxed,
+                                            AnnotationTypes annotationTypes) {
         Class<?> valueType = boxed.valueClass().typeClass();
-        TsonValueReader<?> narrowing = ctx -> narrow(value.read(ctx), valueType);
+        TsonTypeReader<?> narrowing = ctx -> narrow(value.read(ctx), valueType);
         return AnnotationBoxing.wrap(narrowing, boxed, annotationTypes);
     }
 
@@ -155,9 +155,9 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
      * every field whose target type isn't itself a collection {@link DataClass}, which is every
      * ordinary case today.
      */
-    private static TsonValueReader<?> rebindContainerIfNeeded(CompiledField field, DataClassField target,
-            TsonValueReaderResolver resolver, AnnotationTypes annotationTypes) {
-        TsonValueReader<?> parser = field.parser();
+    private static TsonTypeReader<?> rebindContainerIfNeeded(CompiledField field, DataClassField target,
+                                                             TsonTypeReaderResolver resolver, AnnotationTypes annotationTypes) {
+        TsonTypeReader<?> parser = field.parser();
         if (target.dataClass() instanceof DataClassArray targetArray && parser instanceof ArrayBindReader existing) {
             return new ArrayBindReader(field.schema().name(), existing.body, targetArray, resolver,
                     existing.schemaPosition, annotationTypes);
@@ -302,8 +302,8 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         }
 
         @Override
-        public TsonValueReader<?> create(String name, TypeDefinition typeDefinition, ValueReaderContext context) {
-            TsonValueReaderResolver resolver = context.readers();
+        public TsonTypeReader<?> create(String name, TypeDefinition typeDefinition, ValueReaderContext context) {
+            TsonTypeReaderResolver resolver = context.readers();
             if (!(typeDefinition.body() instanceof RecordBody body)) {
                 throw new IllegalArgumentException(
                         "'" + name + "' is not record-shaped: " + typeDefinition.body());
@@ -316,7 +316,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             }
 
             if (dataClass instanceof DataClassUnion union) {
-                TsonValueReader<?> noOwnData = ctx -> {
+                TsonTypeReader<?> noOwnData = ctx -> {
                     ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF,
                             "'" + name + "' has no data of its own to bind -- provide an explicit type annotation "
                                     + "(!typeName) naming one of its subtypes " + typeDefinition.subtypes(),

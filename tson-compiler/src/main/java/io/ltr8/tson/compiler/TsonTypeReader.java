@@ -56,7 +56,7 @@ import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
  *            whatever the compiling {@link ValueReaderFactory} chose to produce for a composite: a
  *            bound Java object, a generic DOM-shaped value, a validation result, and so on.
  */
-public interface TsonValueReader<T> {
+public interface TsonTypeReader<T> {
 
     T read(TsonReadContext ctx);
 }

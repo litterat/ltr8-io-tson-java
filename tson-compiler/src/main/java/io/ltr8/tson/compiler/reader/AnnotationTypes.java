@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
-import io.ltr8.tson.compiler.TsonValueReader;
-import io.ltr8.tson.compiler.TsonValueReaderResolver;
+import io.ltr8.tson.compiler.TsonTypeReader;
+import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.schema.TsonSchema;
 
 import java.util.Optional;
@@ -22,7 +22,7 @@ import java.util.Optional;
  * Class 1 read preserves annotations without validating them, [TSON-DATA] §3.1), the second is an unresolved
  * reference worth a diagnostic.
  */
-record AnnotationTypes(boolean capture, Optional<TsonSchema> schema, TsonValueReaderResolver readers) {
+record AnnotationTypes(boolean capture, Optional<TsonSchema> schema, TsonTypeReaderResolver readers) {
 
     /** No governing schema: every annotation is preserved as authored, none is resolved or checked. */
     static final AnnotationTypes UNVALIDATED = new AnnotationTypes(true, Optional.empty(), name -> null);
@@ -61,7 +61,7 @@ record AnnotationTypes(boolean capture, Optional<TsonSchema> schema, TsonValueRe
      * nothing is in scope to declare it). Gated on the schema's own entries because resolution throws for a
      * name it has no entry for, and an author's typo is a diagnostic, not an exception.
      */
-    Optional<TsonValueReader<?>> readerFor(String name) {
+    Optional<TsonTypeReader<?>> readerFor(String name) {
         return schema.filter(s -> s.entries().containsKey(name)).map(s -> readers.resolve(name));
     }
 }

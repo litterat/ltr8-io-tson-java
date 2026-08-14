@@ -1,8 +1,7 @@
 package io.ltr8.tson;
 
-import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonReadException;
-import io.ltr8.tson.compiler.TsonValueReader;
+import io.ltr8.tson.compiler.TsonTypeReader;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -18,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class RecordGroupValidationTest {
 
     /** {@code contact} has a bare (REQUIRED) group: exactly one of email/phone must be present. */
-    private static TsonValueReader<?> contactReader() {
+    private static TsonTypeReader<?> contactReader() {
         String schema = """
                 !!id:"https://example.test/group-1.tn"
                 !!meta:"https://tson.io/2026/32/m/meta.tn"

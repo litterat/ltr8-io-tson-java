@@ -2,8 +2,8 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonReadContext;
-import io.ltr8.tson.compiler.TsonValueReader;
-import io.ltr8.tson.compiler.TsonValueReaderResolver;
+import io.ltr8.tson.compiler.TsonTypeReader;
+import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.tree.TsonAnnotation;
 import io.ltr8.tson.tree.TsonNode;
 
@@ -40,16 +40,16 @@ import java.util.Set;
  * -- {@code ownParser} still calls it again on delegation (every reader does, as its own first step),
  * which is a safe no-op once nothing's left to consume.
  */
-final class VariantSchemaReader implements TsonValueReader<Object> {
+final class VariantSchemaReader implements TsonTypeReader<Object> {
 
     private final String name;
-    private final TsonValueReader<?> ownParser;
+    private final TsonTypeReader<?> ownParser;
     private final Set<String> subtypeNames;
-    private final TsonValueReaderResolver resolver;
+    private final TsonTypeReaderResolver resolver;
     private final AnnotationTypes annotationTypes;
 
-    VariantSchemaReader(String name, TsonValueReader<?> ownParser, Collection<String> subtypeNames,
-                         TsonValueReaderResolver resolver, AnnotationTypes annotationTypes) {
+    VariantSchemaReader(String name, TsonTypeReader<?> ownParser, Collection<String> subtypeNames,
+                        TsonTypeReaderResolver resolver, AnnotationTypes annotationTypes) {
         this.name = name;
         this.ownParser = ownParser;
         this.subtypeNames = Set.copyOf(subtypeNames);

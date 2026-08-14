@@ -320,6 +320,6 @@ public final class TsonObjectReader {
         }
     }
 
-    private record RootReader(TsonValueReader<?> reader, String typeName) {
+    private record RootReader(TsonTypeReader<?> reader, String typeName) {
     }
 }

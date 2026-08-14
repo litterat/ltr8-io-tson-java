@@ -2,8 +2,8 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.TsonReadContext;
-import io.ltr8.tson.compiler.TsonValueReader;
-import io.ltr8.tson.compiler.TsonValueReaderResolver;
+import io.ltr8.tson.compiler.TsonTypeReader;
+import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.EmailType;
@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  */
 class ValueReaderFactoryRegistryTest {
 
-    private static final TsonValueReaderResolver NEVER_CALLED = name -> {
+    private static final TsonTypeReaderResolver NEVER_CALLED = name -> {
         throw new UnsupportedOperationException("resolver not expected to be consulted for '" + name + "'");
     };
 
@@ -59,7 +59,7 @@ class ValueReaderFactoryRegistryTest {
         TypeDefinition entry = new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), true,
                 List.of(), List.of(), Optional.empty(), EmailType.UNCONSTRAINED);
 
-        TsonValueReader<?> reader = registry.resolve("email_type").create("email", entry, CONTEXT);
+        TsonTypeReader<?> reader = registry.resolve("email_type").create("email", entry, CONTEXT);
 
         UnsupportedOperationException thrown =
                 assertThrows(UnsupportedOperationException.class, () -> reader.read((TsonReadContext) null));
@@ -71,9 +71,9 @@ class ValueReaderFactoryRegistryTest {
         TypeDefinition booleanEntry = new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), true,
                 List.of(), List.of(), Optional.empty(), new EnumBody(List.of("true", "false")));
 
-        TsonValueReader<?> treeReader = ValueReaderFactoryRegistry.tree().resolve("enum")
+        TsonTypeReader<?> treeReader = ValueReaderFactoryRegistry.tree().resolve("enum")
                 .create("boolean", booleanEntry, CONTEXT);
-        TsonValueReader<?> bindReader = ValueReaderFactoryRegistry.bind(SchemaMetaNameBinder.defaultContext())
+        TsonTypeReader<?> bindReader = ValueReaderFactoryRegistry.bind(SchemaMetaNameBinder.defaultContext())
                 .resolve("enum").create("boolean", booleanEntry, CONTEXT);
 
         // Both use the object-binding enum factory, so boolean reads as a real Boolean (tree wraps it in an AtomNode).
@@ -86,9 +86,9 @@ class ValueReaderFactoryRegistryTest {
         TypeDefinition statusEntry = new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), true,
                 List.of(), List.of(), Optional.empty(), new EnumBody(List.of("ACTIVE", "INACTIVE")));
 
-        TsonValueReader<?> treeReader = ValueReaderFactoryRegistry.tree().resolve("enum")
+        TsonTypeReader<?> treeReader = ValueReaderFactoryRegistry.tree().resolve("enum")
                 .create("status", statusEntry, CONTEXT);
-        TsonValueReader<?> bindReader = ValueReaderFactoryRegistry.bind(SchemaMetaNameBinder.defaultContext())
+        TsonTypeReader<?> bindReader = ValueReaderFactoryRegistry.bind(SchemaMetaNameBinder.defaultContext())
                 .resolve("enum").create("status", statusEntry, CONTEXT);
 
         assertEquals("ACTIVE", Dom.of((io.ltr8.tson.tree.TsonNode) treeReader.read(TestDocuments.document("ACTIVE"))));

@@ -26,7 +26,7 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
       and back again (`toTson`) — mainly a debugging tool, not a guaranteed-lossless round trip
       (e.g. the integer family's exact width isn't recoverable schemaless; see [CONFORMANCE.md](CONFORMANCE.md))
 - [x] Streaming reads throughout — the lexer reads from an `InputStream`, and both the schemaless
-      binder (`TsonObjectReader`) and the schema-validating reader (`TsonValueReader`) pull events one
+      binder (`TsonObjectReader`) and the schema-validating reader (`TsonTypeReader`) pull events one
       at a time rather than materializing a whole document tree first
 - [x] Part 2 schema grammar — full schema document parsing into a faithful AST (records, compositions,
       refinements, generic/array-sugar type-refs, field groups, and more), verified end-to-end against

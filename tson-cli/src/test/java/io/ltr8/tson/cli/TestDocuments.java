@@ -6,7 +6,7 @@ import io.ltr8.tson.compiler.TsonReadContext;
 
 /**
  * Positions a {@link TsonReadContext} at a whole document's root value, so a test can drive one compiled
- * {@code TsonValueReader} in isolation rather than through {@code TsonTreeReader}/{@code TsonObjectReader}.
+ * {@code TsonTypeReader} in isolation rather than through {@code TsonTreeReader}/{@code TsonObjectReader}.
  *
  * <p><b>A test affordance, not a missing library method</b> -- document reading is the two facades' job.
  * See {@code io.ltr8.tson.compiler.TestDocuments}, of which this is the peer for this module's own tests

@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TsonReadContext;
-import io.ltr8.tson.compiler.TsonValueReader;
+import io.ltr8.tson.compiler.TsonTypeReader;
 
 import java.util.Map;
 
@@ -15,12 +15,12 @@ import java.util.Map;
  * compilation is eager (every entry resolved before {@code compile} returns), so {@code typeName}'s
  * own entry is guaranteed to already be in {@code registry}.
  */
-public record DeferredValueReader<T>(String typeName, Map<String, TsonValueReader<?>> registry) implements TsonValueReader<T> {
+public record DeferredTypeReader<T>(String typeName, Map<String, TsonTypeReader<?>> registry) implements TsonTypeReader<T> {
 
     @Override
     @SuppressWarnings("unchecked")
     public T read(TsonReadContext ctx) {
-        TsonValueReader<?> resolved = registry.get(typeName);
+        TsonTypeReader<?> resolved = registry.get(typeName);
         if (resolved == null) {
             throw new IllegalStateException("'" + typeName + "' has no compiled reader -- a deferred lookup "
                     + "is only ever created for a name that IS in the schema (a cycle back to an "

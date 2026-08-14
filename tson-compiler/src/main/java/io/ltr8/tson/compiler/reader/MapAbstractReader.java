@@ -2,8 +2,8 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonReadContext;
-import io.ltr8.tson.compiler.TsonValueReader;
-import io.ltr8.tson.compiler.TsonValueReaderResolver;
+import io.ltr8.tson.compiler.TsonTypeReader;
+import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.stream.AbsentEvent;
 import io.ltr8.tson.compiler.stream.EmptyBraceEvent;
 import io.ltr8.tson.compiler.stream.MapEnd;
@@ -40,17 +40,17 @@ import java.util.function.BiConsumer;
  * narrowing for this pass rather than adding a "peek past annotations without consuming" capability
  * for a cosmetic-only purpose.
  */
-abstract class MapAbstractReader<T> implements TsonValueReader<T> {
+abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
 
     enum Shape { ENTRIES, EMPTY, MISMATCH }
 
     final String name;
     final MapBody body;
-    final TsonValueReader<?> keyParser;
-    final TsonValueReader<?> valueParser;
+    final TsonTypeReader<?> keyParser;
+    final TsonTypeReader<?> valueParser;
     final Optional<SourcePosition> schemaPosition;
 
-    MapAbstractReader(String name, MapBody body, TsonValueReaderResolver resolver, Optional<SourcePosition> schemaPosition) {
+    MapAbstractReader(String name, MapBody body, TsonTypeReaderResolver resolver, Optional<SourcePosition> schemaPosition) {
         this(name, body, resolver.resolve(body.keyType().name()), resolver.resolve(body.valueType().name()),
                 schemaPosition);
     }
@@ -61,8 +61,8 @@ abstract class MapAbstractReader<T> implements TsonValueReader<T> {
      * boxed {@code Annotated<T>}. Wrapping here rather than inside {@link #readInto} keeps the entry loop,
      * which both modes share, free of anything only one of them needs.
      */
-    MapAbstractReader(String name, MapBody body, TsonValueReader<?> keyParser, TsonValueReader<?> valueParser,
-                       Optional<SourcePosition> schemaPosition) {
+    MapAbstractReader(String name, MapBody body, TsonTypeReader<?> keyParser, TsonTypeReader<?> valueParser,
+                      Optional<SourcePosition> schemaPosition) {
         this.name = name;
         this.body = body;
         this.keyParser = keyParser;

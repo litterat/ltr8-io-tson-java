@@ -26,8 +26,6 @@ import io.ltr8.tson.compiler.base.BaseTypeResolver;
 import io.ltr8.tson.compiler.base.BaseValue;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
 import io.ltr8.tson.compiler.stream.AbsentEvent;
-import io.ltr8.tson.compiler.stream.AnnotationEnd;
-import io.ltr8.tson.compiler.stream.AnnotationStart;
 import io.ltr8.tson.compiler.stream.ArrayEnd;
 import io.ltr8.tson.compiler.stream.ArrayStart;
 import io.ltr8.tson.compiler.stream.EmptyBraceEvent;
@@ -39,7 +37,6 @@ import io.ltr8.tson.compiler.stream.RecordStart;
 import io.ltr8.tson.compiler.stream.SchemaRef;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
-import io.ltr8.tson.compiler.stream.TypeRef;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -51,14 +48,14 @@ import java.util.function.BiConsumer;
 /**
  * Binds a TSON document to a Java object -- schemaless (Class 1) binding driven by the target Java
  * class's own {@code tson-bind} {@link DataClass} descriptor, which is in effect the schema the data
- * must satisfy. The reflective, class-driven counterpart to the schema-driven {@link TsonValueReader}
+ * must satisfy. The reflective, class-driven counterpart to the schema-driven {@link TsonTypeReader}
  * (which validates against a resolved TSON schema instead), and the read-side inverse of {@link
  * TsonObjectWriter}. {@code tson-bind}, what this is built on, has no dependency on {@code
  * tson-compiler}/{@code tson-schema} at all, so depending on it directly here is clean -- which is
  * also what lets schema resolution (constructor application, atom refinement, §5.5) use this binding
  * layer directly, in the same module, without a cycle.
  *
- * <p><b>Streams its events, like {@link TsonValueReader}.</b> The value is read one {@link
+ * <p><b>Streams its events, like {@link TsonTypeReader}.</b> The value is read one {@link
  * TsonEvent} at a time off a {@link TsonReadContext} (in practice a {@code TsonDataStream}), never by
  * materializing a full {@code DataValue} tree first -- so a large document never has to be buffered
  * before binding can begin, memory held at any point is proportional to nesting depth. Problems are
@@ -95,7 +92,7 @@ import java.util.function.BiConsumer;
  * <p><b>No positional form and no schema-composed defaults</b> -- both are schema-layer concepts a
  * schemaless, class-driven bind has no equivalent for; a record must be written braced, and an absent
  * required field is a {@code FIELD_REQUIRED} problem. Duplicate field names resolve last-value-wins
- * (§2.5) by overwriting as they stream, the same as {@link TsonValueReader}'s own record readers.
+ * (§2.5) by overwriting as they stream, the same as {@link TsonTypeReader}'s own record readers.
  */
 public final class SchemalessObjectReader {
 

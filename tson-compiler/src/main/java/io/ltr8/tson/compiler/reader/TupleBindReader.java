@@ -5,8 +5,8 @@ import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassTuple;
 import io.ltr8.tson.compiler.TsonReadContext;
-import io.ltr8.tson.compiler.TsonValueReader;
-import io.ltr8.tson.compiler.TsonValueReaderResolver;
+import io.ltr8.tson.compiler.TsonTypeReader;
+import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -35,12 +35,12 @@ final class TupleBindReader extends TupleAbstractReader<Object> {
 
     private final DataClassTuple descriptor;
 
-    public TupleBindReader(String name, TupleBody body, DataClassTuple descriptor, TsonValueReaderResolver resolver,
+    public TupleBindReader(String name, TupleBody body, DataClassTuple descriptor, TsonTypeReaderResolver resolver,
                            Optional<SourcePosition> schemaPosition) {
         this(name, body, descriptor, resolver, schemaPosition, AnnotationTypes.DISCARDED);
     }
 
-    public TupleBindReader(String name, TupleBody body, DataClassTuple descriptor, TsonValueReaderResolver resolver,
+    public TupleBindReader(String name, TupleBody body, DataClassTuple descriptor, TsonTypeReaderResolver resolver,
                            Optional<SourcePosition> schemaPosition, AnnotationTypes annotationTypes) {
         super(name, body, resolver, schemaPosition,
                 position -> position < descriptor.elements().length
@@ -84,8 +84,8 @@ final class TupleBindReader extends TupleAbstractReader<Object> {
         }
 
         @Override
-        public TsonValueReader<?> create(String name, TypeDefinition typeDefinition, ValueReaderContext context) {
-            TsonValueReaderResolver resolver = context.readers();
+        public TsonTypeReader<?> create(String name, TypeDefinition typeDefinition, ValueReaderContext context) {
+            TsonTypeReaderResolver resolver = context.readers();
             if (!(typeDefinition.body() instanceof TupleBody body)) {
                 throw new IllegalArgumentException("'" + name + "' is not tuple-shaped: " + typeDefinition.body());
             }

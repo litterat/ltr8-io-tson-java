@@ -6,8 +6,8 @@ import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassArray;
 import io.ltr8.bind.DataParameterizedType;
 import io.ltr8.tson.compiler.TsonReadContext;
-import io.ltr8.tson.compiler.TsonValueReader;
-import io.ltr8.tson.compiler.TsonValueReaderResolver;
+import io.ltr8.tson.compiler.TsonTypeReader;
+import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -55,12 +55,12 @@ final class ArrayBindReader extends ArrayAbstractReader<Object> {
 
     private final DataClassArray descriptor;
 
-    public ArrayBindReader(String name, ArrayBody body, DataClassArray descriptor, TsonValueReaderResolver resolver,
+    public ArrayBindReader(String name, ArrayBody body, DataClassArray descriptor, TsonTypeReaderResolver resolver,
                            Optional<SourcePosition> schemaPosition) {
         this(name, body, descriptor, resolver, schemaPosition, AnnotationTypes.DISCARDED);
     }
 
-    public ArrayBindReader(String name, ArrayBody body, DataClassArray descriptor, TsonValueReaderResolver resolver,
+    public ArrayBindReader(String name, ArrayBody body, DataClassArray descriptor, TsonTypeReaderResolver resolver,
                            Optional<SourcePosition> schemaPosition, AnnotationTypes annotationTypes) {
         super(name, body,
                 AnnotationBoxing.wrap(resolver.resolve(body.elementType().name()), descriptor.arrayDataClass(),
@@ -155,8 +155,8 @@ final class ArrayBindReader extends ArrayAbstractReader<Object> {
         }
 
         @Override
-        public TsonValueReader<?> create(String name, TypeDefinition typeDefinition, ValueReaderContext context) {
-            TsonValueReaderResolver resolver = context.readers();
+        public TsonTypeReader<?> create(String name, TypeDefinition typeDefinition, ValueReaderContext context) {
+            TsonTypeReaderResolver resolver = context.readers();
             if (!(typeDefinition.body() instanceof ArrayBody body)) {
                 throw new IllegalArgumentException("'" + name + "' is not array-shaped: " + typeDefinition.body());
             }

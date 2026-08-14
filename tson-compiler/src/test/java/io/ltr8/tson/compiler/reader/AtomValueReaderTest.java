@@ -2,7 +2,6 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
-import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.atom.DurationParser;
 import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
@@ -38,7 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * Real data text, for each atom-family body in {@code schema.meta} -- one small {@code holder}
  * record per family, reusing the exact literal each family's own {@code atom} test already proved
  * valid, read through the real compiled reader (not by
- * constructing a {@code TokenValue} directly). Dispatch to the right {@link AtomValueReader}
+ * constructing a {@code TokenValue} directly). Dispatch to the right {@link AtomTypeReader}
  * constant happens automatically, keyed by each body's own {@code @Typename} (see {@link
  * ValueReaderFactoryRegistry}'s own registration table) -- so a real wiring mistake (e.g.
  * registering under the wrong constructor name, as {@link BinaryType}'s own {@code "binary"}-not-
@@ -131,7 +130,7 @@ class AtomValueReaderTest {
 
     /**
      * {@code uri_type}/{@code regex_type} are the one known exception discussed in {@link
-     * AtomValueReader}'s own Javadoc -- their RFC citation is a *schema-composed* default that
+     * AtomTypeReader}'s own Javadoc -- their RFC citation is a *schema-composed* default that
      * generic binding can't fill in during schema *resolution*, so {@code MetaKernelBootstrapResolver} hand-
      * picks their binding instead. That gap is upstream of this layer entirely: by the time the
      * real {@code uri}/{@code regex} entries reach here, their constraints are already correctly

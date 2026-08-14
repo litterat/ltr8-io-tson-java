@@ -1,10 +1,10 @@
 package io.ltr8.tson.compiler.reader;
 
-import io.ltr8.tson.compiler.TsonValueReader;
+import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 /**
- * Builds the {@link TsonValueReader} for one resolved schema entry -- the unit of work {@link
+ * Builds the {@link TsonTypeReader} for one resolved schema entry -- the unit of work {@link
  * ValueReaderFactoryRegistry} dispatches to, keyed by the entry's own resolved body's constructor
  * name (e.g. {@code "record"}, {@code "array"}, {@code "integer_type"}). {@code name} is the
  * *declaration's* own name, not necessarily the constructor's -- they coincide only for a
@@ -15,5 +15,5 @@ import io.ltr8.tson.schema.meta.TypeDefinition;
  * entries) and the reader resolution a composite implementation calls for its own child readers.
  */
 public interface ValueReaderFactory {
-    TsonValueReader<?> create(String name, TypeDefinition typeDefinition, ValueReaderContext context);
+    TsonTypeReader<?> create(String name, TypeDefinition typeDefinition, ValueReaderContext context);
 }

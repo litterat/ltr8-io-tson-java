@@ -2,7 +2,7 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonReadContext;
-import io.ltr8.tson.compiler.TsonValueReader;
+import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.atom.AtomType;
 import io.ltr8.tson.compiler.atom.AtomTypeException;
@@ -46,7 +46,7 @@ import io.ltr8.tson.schema.meta.UuidType;
 import java.util.Optional;
 
 /**
- * Adapts an {@code atom} {@link AtomType} into a {@link TsonValueReader} -- this package's own copy
+ * Adapts an {@code atom} {@link AtomType} into a {@link TsonTypeReader} -- this package's own copy
  * of {@code reader.AtomTypeParser}, not a reuse of it. Deliberately duplicated rather than shared:
  * {@code reader.TsonParserFactoryRegistry} is going away and some of these classes may move again
  * before this package settles, so everything it needs stays self-contained here in the meantime
@@ -58,44 +58,44 @@ import java.util.Optional;
  * resolve a child), and {@code name} only by {@link #ENUM_OBJECT_MODE}/{@link #UNIT}, both keyed on
  * the declaration's own name rather than its resolved shape -- see each one's own note.
  */
-final class AtomValueReader<T> implements TsonValueReader<T> {
+final class AtomTypeReader<T> implements TsonTypeReader<T> {
 
     static final ValueReaderFactory INTEGER_TYPE = (_, definition, _) ->
-            new AtomValueReader<>(new IntegerParser((IntegerType) definition.body()), definition.position());
+            new AtomTypeReader<>(new IntegerParser((IntegerType) definition.body()), definition.position());
     static final ValueReaderFactory TEXT_TYPE = (_, definition, _) ->
-            new AtomValueReader<>(new TextParser((TextType) definition.body()), definition.position());
+            new AtomTypeReader<>(new TextParser((TextType) definition.body()), definition.position());
     static final ValueReaderFactory DECIMAL_TYPE = (_, definition, _) ->
-            new AtomValueReader<>(new DecimalParser((DecimalType) definition.body()), definition.position());
+            new AtomTypeReader<>(new DecimalParser((DecimalType) definition.body()), definition.position());
     static final ValueReaderFactory FLOAT_TYPE = (_, definition, _) ->
-            new AtomValueReader<>(new FloatParser((FloatType) definition.body()), definition.position());
+            new AtomTypeReader<>(new FloatParser((FloatType) definition.body()), definition.position());
     static final ValueReaderFactory RATIONAL_TYPE = (_, definition, _) ->
-            new AtomValueReader<>(new RationalParser((RationalType) definition.body()), definition.position());
+            new AtomTypeReader<>(new RationalParser((RationalType) definition.body()), definition.position());
     static final ValueReaderFactory UUID_TYPE = (_, definition, _) ->
-            new AtomValueReader<>(new UuidParser((UuidType) definition.body()), definition.position());
+            new AtomTypeReader<>(new UuidParser((UuidType) definition.body()), definition.position());
     /** Registered under {@code "binary"}, not {@code "binary_type"} -- {@link BinaryType}'s own {@code @Typename} matches the real spec constructor name. */
     static final ValueReaderFactory BINARY = (_, definition, _) ->
-            new AtomValueReader<>(new BinaryParser((BinaryType) definition.body()), definition.position());
+            new AtomTypeReader<>(new BinaryParser((BinaryType) definition.body()), definition.position());
     static final ValueReaderFactory DATE_TYPE = (_, definition, _) ->
-            new AtomValueReader<>(new DateParser((DateType) definition.body()), definition.position());
+            new AtomTypeReader<>(new DateParser((DateType) definition.body()), definition.position());
     static final ValueReaderFactory TIME_TYPE = (_, definition, _) ->
-            new AtomValueReader<>(new TimeParser((TimeType) definition.body()), definition.position());
+            new AtomTypeReader<>(new TimeParser((TimeType) definition.body()), definition.position());
     static final ValueReaderFactory DATETIME_TYPE = (_, definition, _) ->
-            new AtomValueReader<>(new DateTimeParser((DateTimeType) definition.body()), definition.position());
+            new AtomTypeReader<>(new DateTimeParser((DateTimeType) definition.body()), definition.position());
     static final ValueReaderFactory DURATION_TYPE = (_, definition, _) ->
-            new AtomValueReader<>(new DurationParser((DurationType) definition.body()), definition.position());
+            new AtomTypeReader<>(new DurationParser((DurationType) definition.body()), definition.position());
     static final ValueReaderFactory URI_TYPE = (_, definition, _) ->
-            new AtomValueReader<>(new UriParser((UriType) definition.body()), definition.position());
+            new AtomTypeReader<>(new UriParser((UriType) definition.body()), definition.position());
     static final ValueReaderFactory REGEX_TYPE = (_, definition, _) ->
-            new AtomValueReader<>(new RegexParser((RegexType) definition.body()), definition.position());
+            new AtomTypeReader<>(new RegexParser((RegexType) definition.body()), definition.position());
     /** {@code complex_type} has nothing to configure ({@code component} is fixed, not modeled -- see {@link ComplexParser}'s own Javadoc), so this ignores {@code definition}'s own body entirely (though not its position) and always wraps the one {@link ComplexParser#UNCONSTRAINED} singleton. */
     static final ValueReaderFactory COMPLEX_TYPE = (_, definition, _) ->
-            new AtomValueReader<>(ComplexParser.UNCONSTRAINED, definition.position());
+            new AtomTypeReader<>(ComplexParser.UNCONSTRAINED, definition.position());
     /** {@code within}/{@code excluding} ({@code schema.meta.Ipv4Type}'s own fields) aren't modeled by {@link Ipv4Parser} -- see its own Javadoc -- so, like {@link #COMPLEX_TYPE}, this ignores {@code definition}'s own body. */
     static final ValueReaderFactory IPV4_TYPE = (_, definition, _) ->
-            new AtomValueReader<>(Ipv4Parser.UNCONSTRAINED, definition.position());
+            new AtomTypeReader<>(Ipv4Parser.UNCONSTRAINED, definition.position());
     /** Same reasoning as {@link #IPV4_TYPE}, for {@link Ipv6Parser}. */
     static final ValueReaderFactory IPV6_TYPE = (_, definition, _) ->
-            new AtomValueReader<>(Ipv6Parser.UNCONSTRAINED, definition.position());
+            new AtomTypeReader<>(Ipv6Parser.UNCONSTRAINED, definition.position());
     /**
      * The enum reader for both tree and object-binding modes: {@code boolean} reads a real {@code Boolean}
      * ({@link BooleanReader}), every other enum instance its member text ({@link EnumParser}). Dispatch is
@@ -106,7 +106,7 @@ final class AtomValueReader<T> implements TsonValueReader<T> {
     static final ValueReaderFactory ENUM_OBJECT_MODE = (name, definition, _) ->
             "boolean".equals(name)
                     ? new BooleanReader(definition.position())
-                    : new AtomValueReader<>(new EnumParser((EnumBody) definition.body()), definition.position());
+                    : new AtomTypeReader<>(new EnumParser((EnumBody) definition.body()), definition.position());
     /**
      * {@code unit}'s three real instances -- {@code value}/{@code token}/{@code void} -- all
      * resolve to the identical empty body, so, per the kernel's own doc ("distinguished by name and
@@ -118,14 +118,14 @@ final class AtomValueReader<T> implements TsonValueReader<T> {
      */
     static final ValueReaderFactory UNIT = (name, definition, _) -> switch (name) {
         case "void" -> new VoidReader(definition.position());
-        case "value" -> new AtomValueReader<>(ValueParser.INSTANCE, definition.position());
-        default -> new AtomValueReader<>(TokenParser.INSTANCE, definition.position());
+        case "value" -> new AtomTypeReader<>(ValueParser.INSTANCE, definition.position());
+        default -> new AtomTypeReader<>(TokenParser.INSTANCE, definition.position());
     };
 
     private final AtomType<T> delegate;
     private final Optional<SourcePosition> schemaPosition;
 
-    private AtomValueReader(AtomType<T> delegate, Optional<SourcePosition> schemaPosition) {
+    private AtomTypeReader(AtomType<T> delegate, Optional<SourcePosition> schemaPosition) {
         this.delegate = delegate;
         this.schemaPosition = schemaPosition;
     }

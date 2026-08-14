@@ -6,8 +6,8 @@ import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassMap;
 import io.ltr8.bind.DataParameterizedType;
 import io.ltr8.tson.compiler.TsonReadContext;
-import io.ltr8.tson.compiler.TsonValueReader;
-import io.ltr8.tson.compiler.TsonValueReaderResolver;
+import io.ltr8.tson.compiler.TsonTypeReader;
+import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -40,12 +40,12 @@ final class MapBindReader extends MapAbstractReader<Object> {
 
     private final DataClassMap descriptor;
 
-    public MapBindReader(String name, MapBody body, DataClassMap descriptor, TsonValueReaderResolver resolver,
+    public MapBindReader(String name, MapBody body, DataClassMap descriptor, TsonTypeReaderResolver resolver,
                          Optional<SourcePosition> schemaPosition) {
         this(name, body, descriptor, resolver, schemaPosition, AnnotationTypes.DISCARDED);
     }
 
-    public MapBindReader(String name, MapBody body, DataClassMap descriptor, TsonValueReaderResolver resolver,
+    public MapBindReader(String name, MapBody body, DataClassMap descriptor, TsonTypeReaderResolver resolver,
                          Optional<SourcePosition> schemaPosition, AnnotationTypes annotationTypes) {
         super(name, body,
                 AnnotationBoxing.wrap(resolver.resolve(body.keyType().name()), descriptor.keyDataClass(),
@@ -110,8 +110,8 @@ final class MapBindReader extends MapAbstractReader<Object> {
         }
 
         @Override
-        public TsonValueReader<?> create(String name, TypeDefinition typeDefinition, ValueReaderContext context) {
-            TsonValueReaderResolver resolver = context.readers();
+        public TsonTypeReader<?> create(String name, TypeDefinition typeDefinition, ValueReaderContext context) {
+            TsonTypeReaderResolver resolver = context.readers();
             if (!(typeDefinition.body() instanceof MapBody body)) {
                 throw new IllegalArgumentException("'" + name + "' is not map-shaped: " + typeDefinition.body());
             }

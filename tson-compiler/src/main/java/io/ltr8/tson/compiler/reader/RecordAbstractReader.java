@@ -3,8 +3,8 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.Position;
 import io.ltr8.tson.compiler.TsonReadContext;
-import io.ltr8.tson.compiler.TsonValueReader;
-import io.ltr8.tson.compiler.TsonValueReaderResolver;
+import io.ltr8.tson.compiler.TsonTypeReader;
+import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.stream.AbsentEvent;
 import io.ltr8.tson.compiler.stream.EmptyBraceEvent;
@@ -74,9 +74,9 @@ import java.util.Optional;
  * reads whatever's already sitting at the cursor directly as that single field's own value, with no
  * synthetic wrapping needed at all.
  */
-abstract class RecordAbstractReader<T> implements TsonValueReader<T> {
+abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
 
-    record CompiledField(RecordField schema, TsonValueReader<?> parser) {
+    record CompiledField(RecordField schema, TsonTypeReader<?> parser) {
     }
 
     /** Called once per recognized, non-fixed field {@link #readFields}/{@link #readPositional} decode -- may be called more than once for the same {@code schemaIndex} on a duplicate field name; the last call wins. */
@@ -106,7 +106,7 @@ abstract class RecordAbstractReader<T> implements TsonValueReader<T> {
     final int positionalFieldIndex;
     final Optional<SourcePosition> schemaPosition;
 
-    RecordAbstractReader(String name, RecordBody body, TsonValueReaderResolver resolver,
+    RecordAbstractReader(String name, RecordBody body, TsonTypeReaderResolver resolver,
                           Optional<SourcePosition> schemaPosition) {
         this.name = name;
         this.schemaPosition = schemaPosition;
@@ -137,7 +137,7 @@ abstract class RecordAbstractReader<T> implements TsonValueReader<T> {
         this.positionalFieldIndex = bareRequiredCount == 1 ? solePositionalField : -1;
     }
 
-    private static List<CompiledField> buildFields(RecordBody body, TsonValueReaderResolver resolver) {
+    private static List<CompiledField> buildFields(RecordBody body, TsonTypeReaderResolver resolver) {
         List<CompiledField> fields = new ArrayList<>(body.fields().size());
         for (RecordField field : body.fields()) {
             fields.add(new CompiledField(field, resolver.resolve(field.type().name())));

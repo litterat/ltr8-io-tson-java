@@ -1,8 +1,8 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TsonReadContext;
-import io.ltr8.tson.compiler.TsonValueReader;
-import io.ltr8.tson.compiler.TsonValueReaderResolver;
+import io.ltr8.tson.compiler.TsonTypeReader;
+import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.tree.NullNode;
 import io.ltr8.tson.tree.TsonAnnotation;
 import io.ltr8.tson.tree.TsonNode;
@@ -23,7 +23,7 @@ import java.util.Optional;
  */
 final class TupleTreeReader extends TupleAbstractReader<TsonNode> {
 
-    public TupleTreeReader(String name, TupleBody body, TsonValueReaderResolver resolver,
+    public TupleTreeReader(String name, TupleBody body, TsonTypeReaderResolver resolver,
                            Optional<SourcePosition> schemaPosition,
                             AnnotationTypes annotationTypes) {
         super(name, body, resolver, schemaPosition);
@@ -36,8 +36,8 @@ final class TupleTreeReader extends TupleAbstractReader<TsonNode> {
     public static final class Factory implements ValueReaderFactory {
 
         @Override
-        public TsonValueReader<?> create(String name, TypeDefinition typeDefinition, ValueReaderContext context) {
-            TsonValueReaderResolver resolver = context.readers();
+        public TsonTypeReader<?> create(String name, TypeDefinition typeDefinition, ValueReaderContext context) {
+            TsonTypeReaderResolver resolver = context.readers();
             if (!(typeDefinition.body() instanceof TupleBody body)) {
                 throw new IllegalArgumentException("'" + name + "' is not tuple-shaped: " + typeDefinition.body());
             }

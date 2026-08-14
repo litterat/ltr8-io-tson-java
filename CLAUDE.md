@@ -139,7 +139,7 @@ not a defect. No `opens` directives — binding only ever touches public constru
 
 The schema pipeline is **parse → desugar → resolve → link → register → compile → read**; the class
 vocabulary follows it (`TsonSchemaParser`, `SchemaDesugarer`, `TsonSchemaResolver`, `TsonSchemaLinker`,
-`TsonSchemaRegistry`, `TsonSchemaCompiler`, `TsonValueReader`). Data documents (Class 1, no schema) run the
+`TsonSchemaRegistry`, `TsonSchemaCompiler`, `TsonTypeReader`). Data documents (Class 1, no schema) run the
 shorter lex → parse → base-type-resolve path. The subsections below follow this order.
 
 ### Lexer (`tson-compiler/.../lexer/`)
@@ -462,11 +462,17 @@ consulted). `TsonSchemaLinker`/`TsonSchemaRegistry` add the second stage.
 
 ### Class 2 compilation (`tson-compiler/TsonSchemaCompiler.java`, `.../reader/`)
 
-`TsonSchemaCompiler.compile` turns a `TsonLinkedSchema` into a `TsonCompiledSchema` — one `TsonValueReader`
+`TsonSchemaCompiler.compile` turns a `TsonLinkedSchema` into a `TsonCompiledSchema` — one `TsonTypeReader`
 per entry, wired as real Java references rather than name lookups at read time (except where
-`DeferredValueReader` closes a cycle with one lazy lookup). `TsonValueReader<T>` is the single-method front
+`DeferredValueReader` closes a cycle with one lazy lookup). `TsonTypeReader<T>` is the single-method front
 door a caller holds -- **strictly one method**, `T read(TsonReadContext)`. Source form, document framing
 and error policy are all the context's or the facades' concern, never overloads here.
+
+**"Type", not "value", is the accurate half of that name.** A caller reaches one via
+`TsonCompiledSchema.get(typeName)` -- it is the reader *for that declared type*, and there is exactly one
+per schema entry. What it hands back is mode-dependent (`T` is a `TsonNode` in tree mode, a bound Java
+object in bind mode), so naming it for its return type would be wrong in one mode or the other. It also
+keeps `TsonValue` free for `tson-tree`'s own root type (`BACKLOG.md`).
 
 - **Eager, not lazy** — `compile` walks and resolves every entry, so a caller reading only a few types
   still gets the assurance that every entry compiles, and a broken entry surfaces at compile time.
@@ -559,7 +565,7 @@ is small and parsed once.)
   reader branches on which. A reader needing to know whether its children complained asks `reported()` — a
   count, so it works for a receiver that keeps no list (the `int before = ctx.reported()` checkpoint idiom
   in `RecordBindReader`/`TupleBindReader`/`SchemalessObjectReader`/`AnnotationCapture`).
-- **`TsonReadContext` is deliberately still exported.** `TsonValueReader.read(TsonReadContext)` is the sole
+- **`TsonReadContext` is deliberately still exported.** `TsonTypeReader.read(TsonReadContext)` is the sole
   abstract method a consumer receives from `TsonCompiledSchema.get`, so hiding the parameter type would
   make that method uncallable and the interface unimplementable from outside — categorically worse than the
   accepted `ValueReaderFactoryResolver` `-Xlint:exports` warning, where the hidden type is only ever *returned*.
@@ -628,8 +634,8 @@ multiplying overloads: `withDiagnostics(receiver)` swaps fail-fast for any other
 `preservingUnknownTypeRefs()` relaxes the schemaless type-ref rules below, and
 `withSchema(uri).readAs(source, typeName)` covers data that *isn't* self-describing — the caller supplies
 what a `!!schema` plus a root type-ref would have said, and validation is identical either way. Each returns
-a new reader **sharing** the original's compiled-schema registry, never rebuilding it. A per-type
-`TsonValueReader` from a compiled schema is the layer underneath: a strict single-method interface that
+a new reader **sharing** the original's compiled-schema registry, never rebuilding it. A
+`TsonTypeReader` from a compiled schema is the layer underneath: a strict single-method interface that
 reads one value at a cursor and polices nothing around it.
 
 - **The class-driven binding / tree-building mechanics live in the internal `reader` package**
@@ -685,7 +691,7 @@ reads one value at a cursor and polices nothing around it.
 - **A dispatched value gets its annotations re-attached afterwards.** `NamedDispatchReader`/
   `VariantSchemaReader` must consume the annotations to reach the `!typeName` they dispatch on, so the reader
   that builds the node never sees them; they're put back with `TsonNode.withAnnotations` (a pure `tson-tree`
-  operation). Nothing flows through the context and `TsonValueReader.read` is unchanged — a dispatched
+  operation). Nothing flows through the context and `TsonTypeReader.read` is unchanged — a dispatched
   annotation flows *into* the delegate's result, which is the opposite direction from the
   `DiagnosticsReceiver` problem. Bind mode is unaffected by construction (re-attachment only acts on a
   `TsonNode`), and `AnnotationTypes.DISCARDED` keeps it from validating at just the positions that happen to
