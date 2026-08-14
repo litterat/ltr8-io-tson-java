@@ -189,13 +189,6 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             arguments[annotationsCarrier.index()] = annotations;
         }
 
-        for (int schemaIndex : fixedFieldIndices) {
-            DataClassField target = targetField[schemaIndex];
-            if (target != null) {
-                arguments[target.index()] = precomputedValue[schemaIndex];
-            }
-        }
-
         FieldSink sink = (schemaIndex, decoded) -> {
             DataClassField target = targetField[schemaIndex];
             if (target != null) {
@@ -211,11 +204,11 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
 
         TsonReadContext anchoredCtx = ctx.withPosition(shapeResult.anchor());
         for (int i = 0; i < fields.size(); i++) {
-            if (isFixed(fields.get(i).schema().state()) || seen[i]) {
+            if (seen[i]) {
                 continue;
             }
             DataClassField target = targetField[i];
-            Object defaulted = defaultOrRequireNonFixed(i, anchoredCtx);
+            Object defaulted = valueForAbsentField(i, anchoredCtx);
             if (target != null) {
                 arguments[target.index()] = defaulted;
             }

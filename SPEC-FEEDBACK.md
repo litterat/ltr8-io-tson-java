@@ -1956,3 +1956,81 @@ admissible sources ("a fresh or refined record, a composition, a constructor, or
 deliberate. If it is — a choice has variants, not fields, so there is nothing to tighten — saying so settles
 the same question for `&`, and makes the grammar restriction above obviously right rather than merely
 convenient.
+
+## 39. §5.2 never says whether OPTIONAL_FIXED is injected — which is the entire difference between it and REQUIRED_FIXED
+
+**Section:** [TSON-SCHEMA] §5.2 (Field States), §5.7 (Refinement), §5.11 (Field Groups), §7.6.
+
+**Problem:** `REQUIRED_FIXED` and `OPTIONAL_FIXED` (valued) differ in exactly one observable way, and §5.2
+specifies it for one of them only. The Default injection paragraph enumerates:
+
+> When a field has `state: REQUIRED_DEFAULT` (or `REQUIRED_FIXED`) and the data does not provide a value, the
+> decoder injects the default (or fixed) value into the output: decoded values are fully populated, and
+> consumers do not consult the schema to retrieve defaults.
+
+and the data paragraph likewise:
+
+> In data, a REQUIRED_FIXED field may be provided with a value matching the fixed value, or omitted (the fixed
+> value is used). A contradicting value is a validation error.
+
+`OPTIONAL_FIXED` appears in neither. Its whole read-time specification is one table cell — "If present, must
+be this value" — which says what is *valid* and not what the decoder *produces* when the field is omitted.
+Two readings are available and neither is contradicted:
+
+- **Not injected.** Omission leaves the field absent. The field's *presence* is the information; the value is
+  pinned. This is the reading that makes the state worth having.
+- **Injected**, by extending the enumeration to the other FIXED state, on the grounds that a fixed value is
+  knowable from the schema in both cases and "decoded values are fully populated" is stated as a general
+  principle.
+
+Under the second reading `OPTIONAL_FIXED` and `REQUIRED_FIXED` become behaviourally identical, and the `?`
+that distinguishes them decides nothing. Two conformant implementations return different decoded documents
+for the same bytes and the same schema. **This implementation took the second reading and did not notice for
+some time** — the enumeration did not include the state, and extending it looked as reasonable as not.
+
+**The confusion is not incidental to the wording; it is what the wording invites.** "If present, must be this
+value" reads as a mechanical variant of REQUIRED_FIXED's "may be provided with a value matching the fixed
+value, or omitted", so an implementer naturally asks which of two similar states applies rather than what
+each one is *for*. Under the first reading they are not variants at all: REQUIRED_FIXED pins a value the
+document need not carry, while OPTIONAL_FIXED makes the field's *appearance* meaningful and its value inert.
+
+**Why the state must be kept even so.** The obvious simplification — drop `OPTIONAL_FIXED` and let any `=`
+assignment land in `REQUIRED_FIXED`, from OPTIONAL and REQUIRED alike — fails on two counts:
+
+1. **`= _` has nowhere else to live.** §5.7 calls it "the IS-A-preserving counterpart of removal (§5.9)", and
+   §5.11 relies on it for groups: "an inherited member is OPTIONAL, so it may be tightened to any state the
+   transition table permits, including `= _` (forbidding that alternative's value)". A `REQUIRED_FIXED`
+   fixed-to-absent is self-contradictory — §5.2 already makes `= _` on a REQUIRED field an error, correctly.
+   Without `OPTIONAL_FIXED` the only way to say "this subtype does not use that alternative" is subtraction,
+   which breaks IS-A and so cannot express it.
+2. **In a group, presence is the payload.** Given `( min: integer | exclusive_min: integer )`, a refinement
+   writing `min: = 0` means "either `min`, which is always 0, or `exclusive_min`, which is free" — a tag.
+   Upgrade that to REQUIRED_FIXED and `min` is injected into every document, so the group's own count sees two
+   members whenever `exclusive_min` is used, and the alternative becomes unreachable. A refinement meant to
+   narrow the choice would silently collapse it.
+
+Outside a group the simplification is more tempting — a plain `field: type? = value` can only ever be absent
+or the single value the schema already names, so it carries no information in either state — but that is an
+argument about one spelling's usefulness, not grounds for removing the state its sibling form depends on.
+
+**A third gap in the same area, affecting REQUIRED_FIXED directly.** "A contradicting value is a validation
+error" states the rule but no section says what the decoder yields for a *conforming* document that writes
+the fixed value explicitly, versus omitting it. That is harmless while the values agree, but it leaves the
+verification step implicit, and an implementation that seeds fixed fields up front and never re-checks the
+written token will silently replace a contradicting value instead of rejecting it — producing a decoded
+document that differs from the bytes with no diagnostic. (That is exactly the bug this implementation had.)
+
+**Suggested resolution:**
+
+1. **Say whether each state is injected, for all five, in one place.** The Default injection paragraph should
+   name `OPTIONAL_FIXED` explicitly and say it is *not* injected: an omitted OPTIONAL_FIXED field is absent
+   in the decoded output. One sentence, and the state stops being a near-duplicate.
+2. **Say what OPTIONAL_FIXED is for**, next to the table row: the state where the field's *presence* carries
+   the information and its value is pinned — which is why it is useful on a group member and nearly
+   contentless on a plain field.
+3. **Make the fixed-value check explicit**: a document that writes a FIXED field MUST have its token verified
+   against the fixed value, and a mismatch is a validation error — not a value the decoder overwrites.
+4. **Retire the "two independent axes" framing** in §5.2's opening. Six combinations, five states, one state
+   with two forms, and three carve-out errors (`~ _` anywhere, `= _` on REQUIRED, `type? ~ value`): presence
+   and mutability visibly are not independent, and presenting them as such is what makes `type? = value` look
+   like a mechanical variant of `type = value` rather than a different intent.

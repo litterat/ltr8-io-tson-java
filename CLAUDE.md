@@ -642,6 +642,19 @@ is small and parsed once.)
   rejects trailing content, belong to `TsonTreeReader`/`TsonObjectReader`. That second half is easy to lose,
   because nothing fails when you simply stop reading — `requireDocumentEnd`'s Javadoc in both facades
   records that the pull, not the assertion after it, is the point.
+- **A FIXED field's value comes from the schema, and a document that states it is checked, not obeyed**
+  (§5.2). `RecordAbstractReader.verifyFixed` decodes the written token and compares it to the schema's
+  value: a contradiction is `ATOM_CONSTRAINT_VIOLATION`, and the field still resolves to the *schema's*
+  value. Skipping it unread — the old behaviour — let a document say one thing and decode to another in
+  silence. The comparison uses a raw parsed value and the **pre-rebind** parser (`FixedCheck`), because bind
+  mode narrows `precomputedValue` in place and comparing across that narrowing would flag every conforming
+  document. **The two FIXED states differ in exactly one thing:** §5.2's injection rule names
+  `REQUIRED_DEFAULT` and `REQUIRED_FIXED` and *not* `OPTIONAL_FIXED`, so an omitted `OPTIONAL_FIXED` field
+  stays **absent** while an omitted `REQUIRED_FIXED` one is injected. Reading it the other way makes the two
+  states indistinguishable and the `?` decide nothing (`SPEC-FEEDBACK.md` #39). `_` is a validation error at
+  `REQUIRED_FIXED`, fine at `OPTIONAL_FIXED`; a `= _` field (`OPTIONAL_FIXED` with no value) admits only
+  omission or `_`. There is no pre-seeding pass any more: every field the document didn't state goes through
+  one `valueForAbsentField` switch over all five states.
 - **Continuation policy: always keep reading in collecting mode.** A failed field/element is recorded and
   a `null` placeholder kept in place (so later indices stay accurate); a shape mismatch reports
   `TYPE_MISMATCH`/`WRONG_ARITY` and returns `null` so a caller doesn't also report every child as missing.

@@ -62,9 +62,6 @@ final class RecordTreeReader extends RecordAbstractReader<TsonValue> {
             return null;
         }
         Map<String, TsonValue> result = new LinkedHashMap<>();
-        for (int schemaIndex : fixedFieldIndices) {
-            putField(result, schemaIndex, precomputedValue[schemaIndex]);
-        }
         FieldSink fieldSink = (schemaIndex, decoded) -> putField(result, schemaIndex, decoded);
         boolean[] seen = switch (shapeResult.shape()) {
             case FIELDS -> readFields(ctx, fieldSink);
@@ -74,10 +71,9 @@ final class RecordTreeReader extends RecordAbstractReader<TsonValue> {
         };
         TsonReadContext anchoredCtx = ctx.withPosition(shapeResult.anchor());
         for (int i = 0; i < fields.size(); i++) {
-            if (isFixed(fields.get(i).schema().state()) || seen[i]) {
-                continue;
+            if (!seen[i]) {
+                putField(result, i, valueForAbsentField(i, anchoredCtx));
             }
-            putField(result, i, defaultOrRequireNonFixed(i, anchoredCtx));
         }
         validateGroups(anchoredCtx, seen);
         return new TsonRecord(result, Optional.of(name), annotations);

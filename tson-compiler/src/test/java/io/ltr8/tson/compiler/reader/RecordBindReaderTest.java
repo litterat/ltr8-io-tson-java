@@ -29,6 +29,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Proves object-binding mode ({@link ValueReaderFactoryRegistry#bind}) genuinely produces real,
@@ -79,6 +80,48 @@ class RecordBindReaderTest {
 
         TextType textType = assertInstanceOf(TextType.class, result);
         assertEquals(new TextType(Optional.of(3), Optional.of(10), Optional.empty(), Optional.empty()), textType);
+    }
+
+    /**
+     * A FIXED field's check has to compare like with like. Bind mode narrows {@code precomputedValue} in
+     * place -- here the schema's own {@code integer} atom gives a {@link BigInteger} while {@code
+     * TextType.minLength} is an {@code Optional<Integer>} -- so comparing a freshly-parsed token against
+     * the narrowed copy would report every conforming document as contradicting its own schema. The check
+     * keeps the raw value and the pre-rebind parser for exactly that reason; this pins both directions.
+     */
+    @Test
+    void aFixedFieldChecksTheWrittenValueAgainstTheRawSchemaValueNotTheNarrowedOne() {
+        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        entries.put("integer", new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), false, List.of(),
+                List.of(), Optional.empty(), IntegerType.UNCONSTRAINED));
+        entries.put("text", new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), false, List.of(),
+                List.of(), Optional.empty(), TextType.UNCONSTRAINED));
+        io.ltr8.tson.schema.meta.FieldState optional = io.ltr8.tson.schema.meta.FieldState.OPTIONAL;
+        entries.put("text_type", TypeDefinition.product(RecordBody.of(List.of(
+                new RecordField("min_length", TypeRef.of("integer"),
+                        io.ltr8.tson.schema.meta.FieldState.REQUIRED_FIXED,
+                        Optional.of(new io.ltr8.tson.schema.meta.Token("3",
+                                io.ltr8.tson.schema.meta.Token.Form.UNQUOTED)), Optional.empty()),
+                new RecordField("max_length", TypeRef.of("integer"), optional, Optional.empty(), Optional.empty()),
+                new RecordField("length", TypeRef.of("integer"), optional, Optional.empty(), Optional.empty()),
+                new RecordField("pattern", TypeRef.of("text"), optional, Optional.empty(), Optional.empty())))));
+        TsonCompiledSchema compiled = TsonSchemaCompiler.compile(
+                new TsonLinkedSchema(new TsonSchema("https://example.test/s.tn1",
+                        "https://example.test/meta.tn1", List.of(), entries)),
+                ValueReaderFactoryRegistry.bind(SchemaMetaNameBinder.defaultContext()));
+
+        // stating the fixed value is fine, and the bound field still gets the narrowed Integer
+        TextType stated = assertInstanceOf(TextType.class,
+                compiled.get("text_type").read(TestDocuments.document("{ min_length: 3 }")));
+        assertEquals(Optional.of(3), stated.minLength());
+        // omitting it injects the same thing
+        TextType omitted = assertInstanceOf(TextType.class,
+                compiled.get("text_type").read(TestDocuments.document("{}")));
+        assertEquals(Optional.of(3), omitted.minLength());
+        // and contradicting it is still caught
+        TsonReadException thrown = assertThrows(TsonReadException.class,
+                () -> compiled.get("text_type").read(TestDocuments.document("{ min_length: 4 }")));
+        assertTrue(thrown.getMessage().contains("cannot be given another value"), thrown.getMessage());
     }
 
     @Test

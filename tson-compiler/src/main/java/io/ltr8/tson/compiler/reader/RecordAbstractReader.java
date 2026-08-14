@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -41,7 +42,9 @@ import java.util.Optional;
  * <p>{@link #precomputedValue} is stored raw here -- the natural host value {@code readSchemaDefault}
  * produces, with no narrowing applied. {@link RecordBindReader} overwrites its own entries in place,
  * once, right after calling this class's own constructor, narrowing each one to its bound field's
- * target type; {@link RecordTreeReader} leaves them exactly as this class computed them.
+ * target type; {@link RecordTreeReader} leaves them exactly as this class computed them. A field's
+ * {@code FixedCheck} keeps the pre-rebind parser for exactly that reason: a written token has to be
+ * decoded the same way the schema's own value was, or comparing them would compare across the narrowing.
  *
  * <p><b>Forward, single-pass, with overwrite on a duplicate field name</b> (a deliberate behavior
  * change from this class's own pre-streaming design, which scanned backward specifically so a
@@ -55,11 +58,11 @@ import java.util.Optional;
  * (fail-fast: an exception; collecting: a reported problem) even though its own decoded value is
  * ultimately discarded, where it previously went entirely unvalidated.
  *
- * <p>A field name with no match in the compiled field list, and a field the schema itself marks
- * {@code REQUIRED_FIXED}/{@code OPTIONAL_FIXED} (whose value can never come from data -- {@link
- * #precomputedValue} already won, immutably, before {@link #readFields} ever runs), are both
- * discarded unread via {@link EventSkip}, keeping the stream correctly positioned without validating
- * or ever handing either to {@code sink}.
+ * <p>A field name with no match in the compiled field list is discarded unread via {@link EventSkip},
+ * keeping the stream correctly positioned. A FIXED field the document <em>does</em> state is a different
+ * case: its value still comes from {@link #precomputedValue} and never from the data, but the stated token
+ * is decoded and checked against the fixed one, because §5.2 makes a contradicting value a validation
+ * error. Skipping it unread would let a document say one thing and decode to another in silence.
  *
  * <p><b>Positional form (§5.6):</b> a record whose fields include exactly one bare {@code REQUIRED}
  * one (never {@code REQUIRED_DEFAULT}/{@code REQUIRED_FIXED}/{@code OPTIONAL}/{@code
@@ -77,6 +80,19 @@ import java.util.Optional;
 abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
 
     record CompiledField(RecordField schema, TsonTypeReader<?> parser) {
+    }
+
+    /**
+     * What a written value at a FIXED field is checked against (§5.2: "A contradicting value is a validation
+     * error"). Holds the field's <em>schema-level</em> parser, captured before any subclass rebinds it, so
+     * the token in the document is decoded the same way {@link #precomputedValue} was and the two are
+     * comparable in either read mode. {@code value} is likewise the <em>raw</em> parsed value, not the
+     * {@link #precomputedValue} entry that {@link RecordBindReader} narrows in place -- comparing a
+     * raw-parsed token against a narrowed one would report a contradiction between two spellings of the same
+     * number. {@code mustBeAbsent} is §5.2's {@code type? = _}: no value exists to compare against, and only
+     * omission or {@code _} conforms.
+     */
+    private record FixedCheck(boolean mustBeAbsent, Object value, TsonTypeReader<?> parser) {
     }
 
     /** Called once per recognized, non-fixed field {@link #readFields}/{@link #readPositional} decode -- may be called more than once for the same {@code schemaIndex} on a duplicate field name; the last call wins. */
@@ -102,7 +118,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     final Map<String, Integer> fieldIndex;
     final List<FieldGroup> groups;
     final Object[] precomputedValue;
-    final int[] fixedFieldIndices;
+    private final FixedCheck[] fixedCheck;
     final int positionalFieldIndex;
     final Optional<SourcePosition> schemaPosition;
 
@@ -114,7 +130,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         this.groups = body.groups();
         this.fieldIndex = new HashMap<>();
         this.precomputedValue = new Object[fields.size()];
-        List<Integer> fixedIndices = new ArrayList<>();
+        FixedCheck[] fixedChecks = new FixedCheck[fields.size()];
         int solePositionalField = -1;
         int bareRequiredCount = 0;
         for (int i = 0; i < fields.size(); i++) {
@@ -122,18 +138,21 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             fieldIndex.put(field.schema().name(), i);
             FieldState state = field.schema().state();
             if (state == FieldState.REQUIRED_DEFAULT || state == FieldState.REQUIRED_FIXED
-                    || state == FieldState.OPTIONAL_FIXED) {
+                    || (state == FieldState.OPTIONAL_FIXED && field.schema().value().isPresent())) {
                 precomputedValue[i] = readSchemaDefault(field);
             }
-            if (state == FieldState.REQUIRED_FIXED || state == FieldState.OPTIONAL_FIXED) {
-                fixedIndices.add(i);
+            if (isFixed(state)) {
+                // §5.2's sixth spelling (`type? = _`) is OPTIONAL_FIXED with no value at all: nothing to
+                // parse, and the only conforming document is one that omits the field or writes `_`.
+                fixedChecks[i] = new FixedCheck(field.schema().value().isEmpty(), precomputedValue[i],
+                        field.parser());
             }
             if (state == FieldState.REQUIRED) {
                 bareRequiredCount++;
                 solePositionalField = i;
             }
         }
-        this.fixedFieldIndices = fixedIndices.stream().mapToInt(Integer::intValue).toArray();
+        this.fixedCheck = fixedChecks;
         this.positionalFieldIndex = bareRequiredCount == 1 ? solePositionalField : -1;
     }
 
@@ -189,8 +208,18 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         while (!(ctx.peek() instanceof RecordEnd)) {
             FieldName fieldName = (FieldName) ctx.next();
             Integer schemaIndex = fieldIndex.get(fieldName.name());
-            if (schemaIndex == null || isFixed(fields.get(schemaIndex).schema().state())) {
+            if (schemaIndex == null) {
                 EventSkip.scopedValue(ctx);
+                continue;
+            }
+            if (fixedCheck[schemaIndex] != null) {
+                // A FIXED field's value comes from the schema, never the data -- but the data may still
+                // *state* it, and §5.2 makes a contradicting statement a validation error. Skipping it
+                // unread (what this did before) meant a document could say one thing and decode to another
+                // with no diagnostic at all. `seen` is set either way: the field appeared, which is what
+                // §5.11's group count is counting.
+                verifyFixed(ctx, schemaIndex, sink, fieldName.name());
+                seen[schemaIndex] = true;
                 continue;
             }
             if (ctx.peek() instanceof SchemaRef) {
@@ -199,7 +228,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             Object decoded;
             if (ctx.peek() instanceof AbsentEvent) {
                 ctx.next();
-                decoded = defaultOrRequireNonFixed(schemaIndex, ctx);
+                decoded = valueForAbsentField(schemaIndex, ctx);
             } else {
                 decoded = fields.get(schemaIndex).parser().read(ctx.field(fieldName.name()));
             }
@@ -257,9 +286,10 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     }
 
     /**
-     * {@code REQUIRED_FIXED}/{@code OPTIONAL_FIXED} fields are pre-seeded from {@link
-     * #fixedFieldIndices} before this can ever be reached for them. {@code ctx} is expected to still
-     * be scoped to the *enclosing* record (not yet descended into the missing field) -- this itself
+     * The value a field takes when the document never stated it -- §5.2's five states answered in one place,
+     * which is what lets both subclasses run a single "everything not seen" pass instead of pre-seeding some
+     * states and defaulting the rest. {@code ctx} is expected to still be scoped to the *enclosing* record
+     * (not yet descended into the missing field) -- this itself
      * descends one level via {@link TsonReadContext#field}, so the reported {@link Diagnostic#path()}
      * still names the missing field while its own {@link Diagnostic#dataPosition()} reflects {@code
      * ctx}'s own {@link TsonReadContext#position()} -- both {@link #readFields}'s own callers pass a
@@ -268,7 +298,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      * TsonReadContext#withPosition}) for the second "never mentioned at all" pass, where the live
      * cursor has already moved past the whole record.
      */
-    final Object defaultOrRequireNonFixed(int schemaIndex, TsonReadContext ctx) {
+    final Object valueForAbsentField(int schemaIndex, TsonReadContext ctx) {
         RecordField schema = fields.get(schemaIndex).schema();
         return switch (schema.state()) {
             case REQUIRED -> {
@@ -278,10 +308,61 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                 yield null;
             }
             case OPTIONAL -> null;
-            case REQUIRED_DEFAULT -> precomputedValue[schemaIndex];
-            case REQUIRED_FIXED, OPTIONAL_FIXED -> throw new IllegalStateException("unreachable: '" + schema.name()
-                    + "' is fixed and is always pre-seeded before this fallback runs");
+            // §5.2's Default injection: "when a field has state REQUIRED_DEFAULT (or REQUIRED_FIXED) and the
+            // data does not provide a value, the decoder injects the default (or fixed) value".
+            case REQUIRED_DEFAULT, REQUIRED_FIXED -> precomputedValue[schemaIndex];
+            // OPTIONAL_FIXED is *not* on that list, and that omission is the whole difference between it and
+            // REQUIRED_FIXED: an omitted OPTIONAL_FIXED field stays absent rather than materialising a value
+            // the document never wrote. The spec never says so outright -- SPEC-FEEDBACK.md #39 asks it to.
+            case OPTIONAL_FIXED -> null;
         };
+    }
+
+    /**
+     * Checks a FIXED field the document actually stated, and re-emits the <em>schema's</em> value for it
+     * (§5.2: a REQUIRED_FIXED field "may be provided with a value matching the fixed value, or omitted").
+     * The document's token decides only whether the document is valid; it never becomes the field's value.
+     *
+     * <p>Three outcomes are wrong and each is reported: a value contradicting the fixed one, any value at a
+     * {@code = _} field (§5.2: "the field MUST either be omitted or be the absent sentinel"), and {@code _}
+     * at a REQUIRED_FIXED field ("at a plain REQUIRED or a REQUIRED_FIXED field, `_` is a validation
+     * error"). {@code _} at an OPTIONAL_FIXED field is fine -- the field may be absent, which is what it
+     * asserts.
+     */
+    private void verifyFixed(TsonReadContext ctx, int schemaIndex, FieldSink sink, String fieldName) {
+        if (ctx.peek() instanceof SchemaRef) {
+            ctx.next();
+        }
+        FixedCheck check = fixedCheck[schemaIndex];
+        RecordField schema = fields.get(schemaIndex).schema();
+        TsonReadContext fieldCtx = ctx.field(fieldName);
+        if (ctx.peek() instanceof AbsentEvent) {
+            ctx.next();
+            if (schema.state() == FieldState.REQUIRED_FIXED) {
+                fieldCtx.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION,
+                        "'" + fieldName + "' is fixed on '" + name + "' and cannot be absent",
+                        String.valueOf(check.value()), "_");
+                return;
+            }
+            return; // OPTIONAL_FIXED, valued or `= _`: absence is exactly what it permits
+        }
+        if (check.mustBeAbsent()) {
+            EventSkip.scopedValue(ctx);
+            fieldCtx.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION,
+                    "'" + fieldName + "' is fixed to absent on '" + name + "' and may only be omitted or "
+                            + "written as '_'", "_", "a value");
+            return;
+        }
+        Object written = check.parser().read(fieldCtx);
+        if (!Objects.equals(written, check.value())) {
+            fieldCtx.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION,
+                    "'" + fieldName + "' is fixed on '" + name + "' and cannot be given another value",
+                    String.valueOf(check.value()), String.valueOf(written));
+            return;
+        }
+        // The raw value, not the narrowed precomputed one -- every other field reaches the sink raw and is
+        // narrowed there, and this one must not be narrowed twice.
+        sink.accept(schemaIndex, check.value());
     }
 
     /**

@@ -96,6 +96,94 @@ class RecordTreeReaderTest {
         assertNull(read(compiled, "{ value: _ }").get("value"));
     }
 
+    private static RecordField fixed(FieldState state, String token) {
+        return new RecordField("value", TypeRef.of("integer"), state,
+                token == null ? Optional.empty() : Optional.of(new Token(token, Token.Form.UNQUOTED)),
+                Optional.empty());
+    }
+
+    /**
+     * §5.2: a REQUIRED_FIXED field "may be provided with a value matching the fixed value, or omitted (the
+     * fixed value is used)". Both routes land on the schema's value -- the document's own token is never the
+     * source, only a claim to be checked.
+     */
+    @Test
+    void requiredFixedFieldInjectsWhenAbsentAndAcceptsAMatchingValue() {
+        TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED),
+                fixed(FieldState.REQUIRED_FIXED, "7")));
+
+        assertEquals(BigInteger.valueOf(7), read(compiled, "{}").get("value"));
+        assertEquals(BigInteger.valueOf(7), read(compiled, "{ value: 7 }").get("value"));
+    }
+
+    /**
+     * §5.2: "A contradicting value is a validation error." The reader used to skip a written fixed field
+     * unread, so the document said 9, the reader returned 7, and nothing was reported -- a decoded document
+     * that differs from its own bytes in silence.
+     */
+    @Test
+    void requiredFixedFieldRejectsAContradictingValue() {
+        TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED),
+                fixed(FieldState.REQUIRED_FIXED, "7")));
+
+        TsonReadException thrown = assertThrows(TsonReadException.class, () -> read(compiled, "{ value: 9 }"));
+        assertTrue(thrown.getMessage().contains("cannot be given another value"), thrown.getMessage());
+    }
+
+    /** §5.2: "At a plain REQUIRED or a REQUIRED_FIXED field, `_` is a validation error." */
+    @Test
+    void requiredFixedFieldRejectsTheAbsentSentinel() {
+        TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED),
+                fixed(FieldState.REQUIRED_FIXED, "7")));
+
+        TsonReadException thrown = assertThrows(TsonReadException.class, () -> read(compiled, "{ value: _ }"));
+        assertTrue(thrown.getMessage().contains("cannot be absent"), thrown.getMessage());
+    }
+
+    /**
+     * The one observable difference between the two FIXED states, and the reason both exist: §5.2's
+     * injection rule names REQUIRED_DEFAULT and REQUIRED_FIXED and <em>not</em> OPTIONAL_FIXED, so an
+     * omitted OPTIONAL_FIXED field stays absent instead of materialising a value the document never wrote.
+     * Reading it as injected made the two states indistinguishable and the {@code ?} decide nothing
+     * ({@code SPEC-FEEDBACK.md} #39 asks the spec to say this outright).
+     */
+    @Test
+    void optionalFixedFieldStaysAbsentWhenOmittedButIsPresentWhenWritten() {
+        TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED),
+                fixed(FieldState.OPTIONAL_FIXED, "7")));
+
+        assertNull(read(compiled, "{}").get("value"));
+        assertNull(read(compiled, "{ value: _ }").get("value")); // optional: absence is what it permits
+        assertEquals(BigInteger.valueOf(7), read(compiled, "{ value: 7 }").get("value"));
+    }
+
+    /** Optional does not mean unconstrained: if the field is there at all, it must carry the fixed value. */
+    @Test
+    void optionalFixedFieldRejectsAContradictingValue() {
+        TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED),
+                fixed(FieldState.OPTIONAL_FIXED, "7")));
+
+        TsonReadException thrown = assertThrows(TsonReadException.class, () -> read(compiled, "{ value: 9 }"));
+        assertTrue(thrown.getMessage().contains("cannot be given another value"), thrown.getMessage());
+    }
+
+    /**
+     * §5.2's sixth spelling, {@code field: type? = _}: OPTIONAL_FIXED carrying no value at all, so "the field
+     * MUST either be omitted or be the absent sentinel in conforming data; any other value is a validation
+     * error". There is nothing to inject and nothing to compare against -- only presence is checked.
+     */
+    @Test
+    void optionalFixedWithNoValueAdmitsOnlyOmissionOrTheAbsentSentinel() {
+        TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED),
+                fixed(FieldState.OPTIONAL_FIXED, null)));
+
+        assertNull(read(compiled, "{}").get("value"));
+        assertNull(read(compiled, "{ value: _ }").get("value"));
+
+        TsonReadException thrown = assertThrows(TsonReadException.class, () -> read(compiled, "{ value: 7 }"));
+        assertTrue(thrown.getMessage().contains("fixed to absent"), thrown.getMessage());
+    }
+
     @Test
     void requiredDefaultFieldFillsFromTheSchemaWhenAbsentButExplicitValueStillWins() {
         RecordField defaulted = new RecordField("value", TypeRef.of("integer"), FieldState.REQUIRED_DEFAULT,
