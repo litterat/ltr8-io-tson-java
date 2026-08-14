@@ -188,6 +188,26 @@ class TsonValidateTest {
         assertEquals(Diagnostic.Code.FIELD_REQUIRED, only(tson, invalid).code());
     }
 
+    /**
+     * A value error points at both ends: where the value is in the data, and where the type it violated was
+     * declared in a schema. The second half is only non-empty because {@code Tson.resolve}/the loader pass
+     * declaration positions through resolution -- {@code schemaPosition} was dead in production until they did.
+     *
+     * <p>The position is the <em>atom's</em> own declaration ({@code int32}, in core.tn), not {@code point}'s,
+     * because each reader stamps its own schema position before descending -- so a diagnostic from inside an
+     * atom carries that atom's declaration, which is the one that defines the constraint being violated.
+     */
+    @Test
+    void aValueErrorCarriesTheDeclaringTypesOwnSchemaPosition() {
+        Diagnostic problem = only(tsonWithPoint(), """
+                !!schema:"https://example.test/point-1.tn"
+                !point { x: 3  y: 99999999999999 }""");
+
+        assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, problem.code());
+        assertTrue(problem.dataPosition().isPresent(), "the value's own position in the data");
+        assertTrue(problem.schemaPosition().isPresent(), "where int32 is declared");
+    }
+
     /** Every type-ref problem a schemaless document can carry, each reported once, at its own path. */
     @Test
     void aSchemalessDocumentsTypeRefsAreCheckedWhereverTheyAreWritten() {

@@ -112,8 +112,9 @@ public final class Tson {
      * mode this always used internally.
      */
     public TsonLinkedSchema resolve(String schemaText) {
-        SchemaDocument document = new TsonSchemaParser(schemaText).parseSchemaDocument();
-        TsonSchema resolved = new TsonSchemaResolver(core).resolveSchema(document);
+        TsonSchemaParser parser = new TsonSchemaParser(schemaText);
+        SchemaDocument document = parser.parseSchemaDocument();
+        TsonSchema resolved = new TsonSchemaResolver(core).resolveSchema(document, parser.declarationPositions());
         return core.schemaRegistry().register(TsonSchemaLinker.link(resolved, core.schemaRegistry()));
     }
 

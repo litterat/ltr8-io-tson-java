@@ -164,8 +164,9 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
     private void registerBundled(String id) {
         String sourceText = TsonBundledSchemas.fetch(id);
         recordAndVerify(sourceText, id, TsonSchemaRegistry.canonicalIdentity(id));
-        SchemaDocument document = new TsonSchemaParser(sourceText).parseSchemaDocument();
-        TsonSchema resolved = new SchemaResolver(this).resolveSchema(document);
+        TsonSchemaParser parser = new TsonSchemaParser(sourceText);
+        SchemaDocument document = parser.parseSchemaDocument();
+        TsonSchema resolved = new SchemaResolver(this).resolveSchema(document, parser.declarationPositions());
         if (isMetaLayer(resolved)) {
             register(resolved, loadMeta(document.meta()));
         } else {
@@ -242,9 +243,10 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
         // it -- §2.2.1's MUST-verify rule. A transitive pinned !!import/!!meta is verified likewise when
         // its own resolveLinked/load reaches here.
         recordAndVerify(sourceText, uri, identity);
-        SchemaDocument document = new TsonSchemaParser(sourceText).parseSchemaDocument();
+        TsonSchemaParser parser = new TsonSchemaParser(sourceText);
+        SchemaDocument document = parser.parseSchemaDocument();
         crossCheckId(document, uri, identity);
-        TsonSchema resolved = new SchemaResolver(this).resolveSchema(document);
+        TsonSchema resolved = new SchemaResolver(this).resolveSchema(document, parser.declarationPositions());
         return schemaRegistry.register(TsonSchemaLinker.link(resolved, schemaRegistry));
     }
 

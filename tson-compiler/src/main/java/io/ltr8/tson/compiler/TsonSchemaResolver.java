@@ -1,8 +1,12 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
+import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.resolver.SchemaResolver;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.meta.SourcePosition;
+
+import java.util.Map;
 
 /**
  * The public front door for the "resolve" stage of this project's own parse -&gt; resolve -&gt; link
@@ -30,9 +34,20 @@ public class TsonSchemaResolver {
 
     /**
      * Resolves {@code document}'s own header directives and every declaration in its body -- see {@link
-     * SchemaResolver#resolveSchema}'s own Javadoc for the full contract.
+     * SchemaResolver#resolveSchema}'s own Javadoc for the full contract. Every resolved definition carries
+     * no source position; use {@link #resolveSchema(SchemaDocument, Map)} to keep them.
      */
     public TsonSchema resolveSchema(SchemaDocument document) {
         return this.resolver.resolveSchema(document);
+    }
+
+    /**
+     * {@link #resolveSchema(SchemaDocument)} keeping each declaration's own position, so a diagnostic can
+     * point at where a type was declared -- pass {@link TsonSchemaParser#declarationPositions()} for the
+     * same document.
+     */
+    public TsonSchema resolveSchema(SchemaDocument document,
+                                    Map<SchemaMap.Declaration, ? extends SourcePosition> declarationPositions) {
+        return this.resolver.resolveSchema(document, declarationPositions);
     }
 }

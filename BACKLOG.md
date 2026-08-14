@@ -188,27 +188,68 @@ everything outstanding is tracked in one place.)
 
 ## Schema-side diagnostics
 
-The read path now reports through a `TsonDiagnosticsReceiver`; the *schema* path does not. Everything from
+The read path reports through a `TsonDiagnosticsReceiver`; the *schema* path does not. Everything from
 parsing a schema document to compiling it is fail-fast, and a consumer sees the result flattened.
 
-- [ ] **Report schema problems as `Diagnostic`s, through the same receiver.** Today a failure anywhere in
-  parse → desugar → resolve → link → compile throws, and the one caller that must not throw
-  (`Tson.validate`) catches it and emits a single `SCHEMA_ERROR` carrying `e.getMessage()` — no path, no
-  position in the *schema* document, and only the first problem, because the pipeline stopped there. A
-  schema author gets one error per run. What's wanted is the reader treatment: several problems, each with
-  its own position, from one pass.
-  - `Diagnostic` already has the field for it. `schemaPosition` exists and is populated today only from
-    `TypeDefinition.position()` on the *read* side; schema-side diagnostics are what it was shaped for.
-  - There is a partial precedent to follow rather than invent around: `TsonSchemaCompiler` already
-    substitutes an `ErrorReader` for an entry that fails to build, so the schema still compiles and only
-    *reading* that entry fails. That is the "keep going, record the problem" instinct applied at compile
-    time; generalizing it means the resolver and linker doing the same.
-  - Comparable in size to the reader-side receiver work but spread wider, and with one real difference:
-    the readers had `TsonReadContext` already threaded everywhere to hang `report` off, while the schema
-    phases have no such shared object. That, not the receiver, is the actual design work.
+Baseline, measured rather than assumed — a schema with two unresolved references reports one:
+
+```
+[SCHEMA_ERROR] 'a' field 'x' has an unresolved reference 'no_such_type'
+```
+
+with `path: ""`, `schemaPosition: null`, and (through `validate`) a `dataPosition` pointing at 1:1 of the
+*data* file for a problem in the *schema*. Fix `a`, rerun, meet `b`.
+
+- [x] **Carry each declaration's source position through resolution.** Landed. `SchemaResolver.resolveSchema`
+  gained a position-taking overload, wired from `TsonSchemaParser.declarationPositions()` at all three
+  production call sites (`Tson.resolve`, `TsonCompiledMetaRegistry`'s bundled + on-demand paths). Before
+  this, `DefinitionResolver`'s position-carrying `resolve` overload existed with **exactly one caller, a
+  test** — so every `TypeDefinition.position()` was empty in production, and with it every `schemaPosition`
+  on every read diagnostic. A value error now points at both ends: where the value is, and where the type it
+  violated was declared. This also gives `SchemaDesugarer`'s structural-sharing invariant something real to
+  protect (an identity-keyed map nothing in production read).
+- [ ] **Report schema problems as `Diagnostic`s, through the same receiver.** The remaining, larger half.
+  What is wanted is the reader treatment: several problems, each positioned, from one pass. Three things
+  have to be settled first, in this order:
+  - **Decide where `Diagnostic` lives.** `tson-schema`'s `module-info` requires only `io.ltr8.annotation`,
+    while `Diagnostic`/`TsonDiagnosticsReceiver` are in `tson-compiler` — so `TsonSchemaLinker`, holding
+    nine author-facing throws including the unresolved-reference one above, **cannot name `Diagnostic` at
+    all**. `Diagnostic` itself only depends on `schema.meta.SourcePosition`, so it can move down (to
+    `tson-schema`, or a leaf module in the shape of `tson-tree`/`tson-regex`); `Diagnostic.ofBaseSyntaxError`
+    names three `tson-compiler` exception types and would stay behind. This is a public-API package move
+    affecting every reader — it blocks the rest, and nothing else can start until it is decided.
+  - **Classify the throw sites; they are not one kind of thing.** Census across the schema pipeline:
+    31 `UnsupportedOperationException` (mostly *library gaps* — "not resolved yet", "only … so far"),
+    27 `TsonSchemaValidationException` (author errors — but 11 of those are `CanonicalIdentity` `!!id`
+    string checks, inherently positionless), 10 `IllegalStateException` (invariants/faults), 3
+    `TsonParseException` (schema syntax, already positioned). Reporting a library gap as "your schema is
+    wrong" is the same mistake the CLI made in reporting a library fault as an invalid document — a gap and
+    a fault are not verdicts. Some sites are mislabelled today in both directions: `DefinitionResolver`
+    throws `UnsupportedOperationException` for *"'!x' does not resolve to a constructor (§3.3.1) — did you
+    mean atom refinement?"*, which is an author error with a helpful hint wearing a library-gap exception.
+  - **Find the shared object.** The readers had `TsonReadContext` threaded everywhere to hang `report` off;
+    the schema phases have no equivalent. The resolver is better placed than it looks (it already takes a
+    declaration position per call, see above); the linker and `CanonicalIdentity` are not.
+  - Precedent worth following rather than inventing around: `TsonSchemaCompiler` already substitutes an
+    `ErrorReader` for an entry that fails to build, so the schema still compiles and only *reading* that
+    entry fails. That is "keep going, record the problem" at compile time; generalizing means the resolver
+    and linker doing the same.
+  - Granularity ceiling to know up front: positions are **per declaration**, from the declaration's own name
+    token. Sub-declaration positions (which field, which supertype) do not exist and would be their own
+    parser work.
   - Payoff beyond error quality: `tson compile` could report like `tson validate` does, and a
-    schema-authoring loop (LLM or human) gets the same localized feedback `STRUCTURED-OUTPUT.md` Tier 1
-    specifies for data.
+    schema-authoring loop (LLM or human) gets the localized feedback `STRUCTURED-OUTPUT.md` Tier 1 specifies
+    for data.
+- [ ] **`SourcePosition` names no document.** Now that `schemaPosition` is populated it is ambiguous across
+  schemas: a value error against a user schema reports `110:3:4858`, which is core.tn's line for `int32` —
+  correct (each reader stamps its own atom's declaration) but with nothing saying *which file*. A consumer
+  rendering a caret needs the identity too. Cheap to add alongside the schema-side work; pointless to add
+  before it, since nothing else consumes the field.
+- [ ] **`expected` leaks a raw Java `toString`.** `AtomValueReader` builds it as `"a value satisfying " +
+  delegate`, yielding `a value satisfying IntegerParser[constraints=IntegerType[size=Optional[IntegerSize[
+  bits=32, signed=true]], min=Optional.empty, …]]` in a field `Diagnostic` documents as the
+  machine-parseable half for an LLM retry loop. The deleted `SchemalessValidator` emitted `a value
+  satisfying !int32` for the same case; the atom knows its own type name and should use it.
 
 ## Write side
 

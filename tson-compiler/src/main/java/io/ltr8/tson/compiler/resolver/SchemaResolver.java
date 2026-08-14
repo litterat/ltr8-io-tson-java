@@ -11,6 +11,7 @@ import io.ltr8.tson.compiler.stream.ListEventSource;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
@@ -18,6 +19,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -106,6 +108,26 @@ public final class SchemaResolver {
      * from {@code TsonSchemaRegistry.register}'s own eventual output instead.
      */
     public TsonSchema resolveSchema(SchemaDocument document) {
+        return resolveSchema(document, Map.of());
+    }
+
+    /**
+     * {@link #resolveSchema(SchemaDocument)} with each declaration's own source position, so every resolved
+     * {@link TypeDefinition} carries where it was declared -- {@code TsonSchemaParser#declarationPositions()}
+     * for the same document is what a caller passes.
+     *
+     * <p><b>Identity-keyed, and that is why {@code SchemaDesugarer} shares structure.</b> The map comes from
+     * an {@code IdentityHashMap}, so only a declaration the parser itself built is found in it; a desugared
+     * or injected one resolves with no position, which is correct -- it has no source text of its own. A
+     * desugar phase that rebuilt an equal-but-distinct declaration would silently lose the position here,
+     * which is the invariant {@code SchemaDesugarerTest}'s {@code assertSame} checks.
+     *
+     * <p>The position reaches a diagnostic two ways: {@code TypeDefinition.position()} is what a read-time
+     * {@code Diagnostic}'s {@code schemaPosition} is populated from, so a value error can say where the type
+     * it violated was declared; and it is what schema-side reporting will attach its own problems to.
+     */
+    public TsonSchema resolveSchema(SchemaDocument document,
+                                    Map<SchemaMap.Declaration, ? extends SourcePosition> declarationPositions) {
         String id = document.id().orElseThrow(() -> new IllegalStateException(
                 "'" + document.meta() + "': !!id is required to register this schema, but is absent"));
         TsonSchemaRegistry.validateIdentity(id);
@@ -157,7 +179,8 @@ public final class SchemaResolver {
                         + "it helps define");
             }
             try {
-                TypeDefinition resolved = holder[0].resolve(declaration);
+                TypeDefinition resolved = holder[0].resolve(declaration,
+                        Optional.ofNullable(declarationPositions.get(declaration)));
                 namespace.put(name, resolved);
                 return resolved;
             } finally {

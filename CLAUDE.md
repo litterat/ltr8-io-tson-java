@@ -597,7 +597,13 @@ closed `Code` enum (`FIELD_REQUIRED`/`TYPE_MISMATCH`/`WRONG_ARITY`/`UNKNOWN_TYPE
 `ATOM_CONSTRAINT_VIOLATION` from readers; `SCHEMA_ERROR`/`UNKNOWN_TYPE`/`VALIDATION_ERROR` for
 infrastructure-level failures; `UNRECOGNIZED_FIELD`/`DUPLICATE_MAP_KEY` reserved but unproduced),
 `message` (hand-composed per call site), `expected`/`actual` (machine-parseable), and
-`dataPosition`/`schemaPosition`. An atom's `AtomTypeException` is caught in `AtomValueReader` and mapped to
+`dataPosition`/`schemaPosition`. **`schemaPosition` comes from `TypeDefinition.position()`**, which is
+populated because `SchemaResolver.resolveSchema` takes `TsonSchemaParser.declarationPositions()` and passes
+each declaration's own position into `DefinitionResolver.resolve` — so a value error points at both ends, the
+value in the data and the type it violated in the schema. Every reader stamps its own position first, so the
+one reported is the *atom's* declaration (`int32` in core.tn), not the enclosing record's; `SourcePosition`
+carries line/column/offset but no document identity, so which schema that is stays implicit (`BACKLOG.md`).
+An atom's `AtomTypeException` is caught in `AtomValueReader` and mapped to
 `ATOM_CONSTRAINT_VIOLATION` — `AtomType`'s own signature is untouched, since it's shared with the
 schemaless binder which has no read context. Out of scope for now: message synthesis from code + params,
 fine-grained atom codes, `UNRECOGNIZED_FIELD`/`DUPLICATE_MAP_KEY` detection (readers iterate schema fields,
@@ -888,9 +894,11 @@ compatibility).
   `email_type`'s flat `spec` field does. Subtype *dispatch* to them works; this is a narrower field-binding
   gap.
 - **Schema-side diagnostics** — parse → desugar → resolve → link → compile are fail-fast throughout, so a
-  broken *schema* yields one exception, flattened by `Tson.validate` into a single `SCHEMA_ERROR` with no
-  path and no position in the schema document. The read path's `TsonDiagnosticsReceiver` has no schema-side
-  counterpart yet; `BACKLOG.md`'s "Schema-side diagnostics" has the shape.
+  broken *schema* yields one exception per run, flattened into a single `SCHEMA_ERROR` with no path and no
+  position in the schema document. The read path's `TsonDiagnosticsReceiver` has no schema-side counterpart
+  yet, and one structural thing blocks starting: `tson-schema` requires only `io.ltr8.annotation`, so
+  `TsonSchemaLinker` — where most author-facing schema errors are raised — cannot name `Diagnostic` (in
+  `tson-compiler`) at all. `BACKLOG.md`'s "Schema-side diagnostics" has the census and the ordering.
 - **Deferred design questions** — `REQUIRED_FIXED`/`OPTIONAL_FIXED` value validation, `value_param` real
   parameter substitution, thread-safety, and a general disk/HTTP-backed `TsonSchemaSource` (with
   whitelist/blacklist policy).
