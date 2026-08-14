@@ -88,8 +88,8 @@ abstract class TupleAbstractReader<T> implements TsonTypeReader<T> {
             return true;
         }
         TsonEvent e = ctx.peek();
-        ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a tuple (array-shaped) for '" + name + "', found " + e,
-                "a tuple (array-shaped)", String.valueOf(e));
+        ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a tuple (array-shaped) for '" + name + "', found " + TypeRefCheck.describe(e),
+                "a tuple (array-shaped)", TypeRefCheck.describe(e));
         EventSkip.coreValue(ctx);
         return false;
     }

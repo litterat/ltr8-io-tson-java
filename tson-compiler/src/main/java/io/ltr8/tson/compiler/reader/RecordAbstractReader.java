@@ -170,8 +170,8 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         if (positionalFieldIndex >= 0) {
             return new ShapeResult(Shape.POSITIONAL, anchor);
         }
-        ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a record for '" + name + "', found " + e,
-                "a record", String.valueOf(e));
+        ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a record for '" + name + "', found " + TypeRefCheck.describe(e),
+                "a record", TypeRefCheck.describe(e));
         EventSkip.coreValue(ctx);
         return new ShapeResult(Shape.MISMATCH, anchor);
     }

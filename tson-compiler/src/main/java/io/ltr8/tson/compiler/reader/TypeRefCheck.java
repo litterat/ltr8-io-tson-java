@@ -93,8 +93,8 @@ final class TypeRefCheck {
         return typename != null ? typename.name() : target.getSimpleName();
     }
 
-    /** A core-value's shape as a word, for a diagnostic's {@code actual}. */
-    private static String describe(TsonEvent core) {
+    /** A core-value's shape as a word, for a diagnostic's {@code actual} -- shared with {@link AtomTypeReader}. */
+    static String describe(TsonEvent core) {
         return switch (core) {
             case RecordStart ignored -> "a record";
             case MapStart ignored -> "a map";

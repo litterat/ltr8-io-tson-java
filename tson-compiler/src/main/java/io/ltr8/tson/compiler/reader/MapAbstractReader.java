@@ -88,8 +88,8 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
             ctx.next();
             return Shape.EMPTY;
         }
-        ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a map for '" + name + "', found " + e,
-                "a map", String.valueOf(e));
+        ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a map for '" + name + "', found " + TypeRefCheck.describe(e),
+                "a map", TypeRefCheck.describe(e));
         EventSkip.coreValue(ctx);
         return Shape.MISMATCH;
     }
@@ -129,11 +129,12 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
         validateSize(count, ctx);
     }
 
+    /** A map key's own path segment: its scalar text, or {@code ?} for a key with no single text form -- the same fallback {@code SchemalessTreeReader.keySegment} uses. A raw event's {@code toString()} has no business in an RFC 6901 path. */
     private static String keySegmentFor(TsonEvent e) {
         if (e instanceof TokenEvent token) {
             return token.text();
         }
-        return String.valueOf(e);
+        return "?";
     }
 
     private void validateSize(int size, TsonReadContext ctx) {

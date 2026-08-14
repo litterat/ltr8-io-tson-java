@@ -649,6 +649,21 @@ class TsonObjectReaderTest {
         assertThrows(TsonReadException.class, () -> lenient.read("!uuid { x: 1  y: 2 }", Point.class));
     }
 
+    /**
+     * {@code expected} names the wire type-ref, not the parser object. It used to concatenate the {@code
+     * AtomType}, and every one is a Java record, so its generated {@code toString()} dumped the whole
+     * constraint graph into the field {@code Diagnostic} documents as the machine-parseable half.
+     */
+    @Test
+    void aBuiltinConstraintViolationNamesTheTypeRefRatherThanDumpingTheParser() {
+        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        mapper.withDiagnostics(problems).read("{ value: !uint8 300 }", IntHolder.class);
+
+        assertEquals(1, problems.diagnostics().size(), problems.diagnostics().toString());
+        assertEquals("a value satisfying !uint8", problems.diagnostics().getFirst().expected());
+        assertEquals("300", problems.diagnostics().getFirst().actual());
+    }
+
     @Test
     void builtinIntegerAnnotationBindsDirectlyToTheDeclaredTarget() throws DataBindException {
         // !uint8's own contract (0..255) is checked, then narrowed straight to the declared int

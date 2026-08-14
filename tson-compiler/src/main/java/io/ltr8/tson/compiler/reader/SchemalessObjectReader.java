@@ -223,8 +223,8 @@ public final class SchemalessObjectReader {
             return bindBaseValue(ctx, new BaseValue.NullValue(), dataClass.dataClass());
         }
         if (!(e instanceof TokenEvent token)) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a token for " + dataClass.typeClass() + ", found " + e,
-                    "a token", String.valueOf(e));
+            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a token for " + dataClass.typeClass() + ", found " + TypeRefCheck.describe(e),
+                    "a token", TypeRefCheck.describe(e));
             EventSkip.coreValue(ctx);
             return null;
         }
@@ -234,7 +234,7 @@ public final class SchemalessObjectReader {
         if (typeRef.isPresent()) {
             Optional<AtomType<?>> atomType = BuiltinTypeVocabulary.lookup(typeRef.get());
             if (atomType.isPresent()) {
-                return bindBuiltin(ctx, atomType.get(), tokenValue, dataClass.dataClass());
+                return bindBuiltin(ctx, atomType.get(), typeRef.get(), tokenValue, dataClass.dataClass());
             }
             // Not a built-in: only a name the target class declares outright gets through -- see the class
             // Javadoc on why an atom position takes `declares` rather than `names`.
@@ -256,11 +256,14 @@ public final class SchemalessObjectReader {
         }
     }
 
-    private Object bindBuiltin(TsonReadContext ctx, AtomType<?> atomType, TokenValue token, Class<?> target) {
+    /** {@code typeName} is the wire type-ref this atom was resolved from -- the name an author wrote, not the parser's {@code toString()}. */
+    private Object bindBuiltin(TsonReadContext ctx, AtomType<?> atomType, String typeName, TokenValue token,
+                               Class<?> target) {
         try {
             return atomType.read(token, target);
         } catch (AtomTypeException e) {
-            ctx.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, e.getMessage(), "a value satisfying " + atomType, token.text());
+            ctx.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, e.getMessage(), "a value satisfying !" + typeName,
+                    token.text());
             return null;
         } catch (ArithmeticException e) {
             ctx.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, token.text() + " does not fit in " + target,
@@ -307,8 +310,8 @@ public final class SchemalessObjectReader {
             ctx.next();
             empty = true;
         } else {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a record for " + dataClass.typeClass() + ", found " + e,
-                    "a record", String.valueOf(e));
+            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a record for " + dataClass.typeClass() + ", found " + TypeRefCheck.describe(e),
+                    "a record", TypeRefCheck.describe(e));
             EventSkip.coreValue(ctx);
             return null;
         }
@@ -385,8 +388,8 @@ public final class SchemalessObjectReader {
         containerFraming(ctx, dataClass);
         if (!(ctx.peek() instanceof ArrayStart)) {
             TsonEvent e = ctx.peek();
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected an array for " + dataClass.typeClass() + ", found " + e,
-                    "an array", String.valueOf(e));
+            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected an array for " + dataClass.typeClass() + ", found " + TypeRefCheck.describe(e),
+                    "an array", TypeRefCheck.describe(e));
             EventSkip.coreValue(ctx);
             return null;
         }
@@ -437,8 +440,8 @@ public final class SchemalessObjectReader {
             ctx.next();
             empty = true;
         } else {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a map for " + dataClass.typeClass() + ", found " + e,
-                    "a map", String.valueOf(e));
+            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a map for " + dataClass.typeClass() + ", found " + TypeRefCheck.describe(e),
+                    "a map", TypeRefCheck.describe(e));
             EventSkip.coreValue(ctx);
             return null;
         }
@@ -486,8 +489,8 @@ public final class SchemalessObjectReader {
         containerFraming(ctx, dataClass);
         if (!(ctx.peek() instanceof ArrayStart)) {
             TsonEvent e = ctx.peek();
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected an array for tuple " + dataClass.typeClass() + ", found " + e,
-                    "an array", String.valueOf(e));
+            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected an array for tuple " + dataClass.typeClass() + ", found " + TypeRefCheck.describe(e),
+                    "an array", TypeRefCheck.describe(e));
             EventSkip.coreValue(ctx);
             return null;
         }
@@ -537,7 +540,7 @@ public final class SchemalessObjectReader {
         if (typeRef.isEmpty()) {
             TsonEvent e = ctx.peek();
             ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF, "union type " + dataClass.typeClass()
-                    + " requires a type annotation (!typeName) to disambiguate members", "a !typeName", String.valueOf(e));
+                    + " requires a type annotation (!typeName) to disambiguate members", "a !typeName", TypeRefCheck.describe(e));
             EventSkip.coreValue(ctx);
             return null;
         }

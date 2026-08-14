@@ -30,8 +30,8 @@ final class BooleanReader implements TsonTypeReader<Boolean> {
         EventSkip.annotationsAndTypeRef(ctx);
         TsonEvent e = ctx.peek();
         if (!(e instanceof TokenEvent token)) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a token for 'boolean', found " + e,
-                    "a token", String.valueOf(e));
+            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a token for 'boolean', found " + TypeRefCheck.describe(e),
+                    "a token", TypeRefCheck.describe(e));
             EventSkip.coreValue(ctx);
             return null;
         }

@@ -33,8 +33,8 @@ final class VoidReader implements TsonTypeReader<Object> {
         EventSkip.annotationsAndTypeRef(ctx);
         TsonEvent e = ctx.peek();
         if (!(e instanceof AbsentEvent)) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected the absent sentinel '_' for void, found " + e,
-                    "the absent sentinel '_'", String.valueOf(e));
+            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected the absent sentinel '_' for void, found " + TypeRefCheck.describe(e),
+                    "the absent sentinel '_'", TypeRefCheck.describe(e));
             EventSkip.coreValue(ctx);
             return null;
         }

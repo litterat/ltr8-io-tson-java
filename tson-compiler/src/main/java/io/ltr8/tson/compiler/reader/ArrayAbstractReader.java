@@ -82,8 +82,8 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
             return true;
         }
         TsonEvent e = ctx.peek();
-        ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected an array for '" + name + "', found " + e,
-                "an array", String.valueOf(e));
+        ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected an array for '" + name + "', found " + TypeRefCheck.describe(e),
+                "an array", TypeRefCheck.describe(e));
         EventSkip.coreValue(ctx);
         return false;
     }

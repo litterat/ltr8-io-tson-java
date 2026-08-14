@@ -278,11 +278,6 @@ with `path: ""`, `schemaPosition: null`, and (through `validate`) a `dataPositio
   correct (each reader stamps its own atom's declaration) but with nothing saying *which file*. A consumer
   rendering a caret needs the identity too. Cheap to add alongside the schema-side work; pointless to add
   before it, since nothing else consumes the field.
-- [ ] **`expected` leaks a raw Java `toString`.** `AtomTypeReader` builds it as `"a value satisfying " +
-  delegate`, yielding `a value satisfying IntegerParser[constraints=IntegerType[size=Optional[IntegerSize[
-  bits=32, signed=true]], min=Optional.empty, …]]` in a field `Diagnostic` documents as the
-  machine-parseable half for an LLM retry loop. The deleted `SchemalessValidator` emitted `a value
-  satisfying !int32` for the same case; the atom knows its own type name and should use it.
 
 ## Write side
 

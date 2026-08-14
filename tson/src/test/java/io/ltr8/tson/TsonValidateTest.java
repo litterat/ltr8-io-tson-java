@@ -208,6 +208,79 @@ class TsonValidateTest {
         assertTrue(problem.schemaPosition().isPresent(), "where int32 is declared");
     }
 
+    // ── Diagnostic field quality ─────────────────────────────────────────
+
+    /**
+     * {@code expected} is documented as the machine-parseable half a caller builds its own message from, so
+     * it carries the type's <em>name</em>. It used to concatenate the parser object, and since every
+     * {@code AtomType} is a Java record that meant its generated {@code toString()} -- the whole constraint
+     * graph, {@code Optional.empty} facets and all -- landing in the field an LLM retry loop reads.
+     */
+    @Test
+    void aConstraintViolationNamesTheTypeRatherThanDumpingTheParser() {
+        Diagnostic problem = only(tsonWithPoint(), """
+                !!schema:"https://example.test/point-1.tn"
+                !point { x: 3  y: 99999999999999 }""");
+
+        assertEquals("a value satisfying int32", problem.expected());
+        assertEquals("99999999999999", problem.actual());
+    }
+
+    /** The <em>declaration's</em> name, not the built-in it refines -- the name its author wrote and can act on. */
+    @Test
+    void aRefinementIsNamedByItsOwnDeclarationNotItsSource() {
+        String schemaId = "https://example.test/pct-1.tn";
+        String schema = """
+                !!id:"https://example.test/pct-1.tn"
+                !!meta:"https://tson.io/2026/32/m/meta.tn"
+                !!import:"https://tson.io/2026/32/m/core.tn"
+                {
+                  my_percentage => !positive_integer ^ { max: 100 }
+                  reading => { pct: my_percentage }
+                }
+                """;
+        Tson tson = Tson.builder().schemaSource(uri -> {
+            if (uri.equals(schemaId)) {
+                return schema;
+            }
+            throw new IllegalStateException("no schema for " + uri);
+        }).build();
+
+        Diagnostic problem = only(tson, "!!schema:\"" + schemaId + "\"\n!reading { pct: 500 }");
+
+        assertEquals("a value satisfying my_percentage", problem.expected());
+    }
+
+    /** The shape-mismatch path leaked twice -- the parser into {@code message}, and a raw event into {@code actual}. */
+    @Test
+    void aShapeMismatchAtAnAtomNamesTheTypeAndTheShape() {
+        Diagnostic problem = only(tsonWithPoint(), """
+                !!schema:"https://example.test/point-1.tn"
+                !point { x: 3  y: { nested: 1 } }""");
+
+        assertEquals(Diagnostic.Code.TYPE_MISMATCH, problem.code());
+        assertEquals("a token for int32", problem.expected());
+        assertEquals("a record", problem.actual());
+        assertTrue(problem.message().contains("int32"), problem.message());
+    }
+
+    /**
+     * The shape word, not the event. Every container reader reported {@code found
+     * ArrayStart[position=Position[line=2, column=8, byteOffset=50]]} and put the same in {@code actual};
+     * one {@code TypeRefCheck.describe} now serves all of them.
+     */
+    @Test
+    void aContainerShapeMismatchNamesTheShapeNotTheEvent() {
+        Diagnostic problem = only(tsonWithPoint(), """
+                !!schema:"https://example.test/point-1.tn"
+                !point [1 2]""");
+
+        assertEquals(Diagnostic.Code.TYPE_MISMATCH, problem.code());
+        assertEquals("a record", problem.expected());
+        assertEquals("an array", problem.actual());
+        assertTrue(problem.message().endsWith("found an array"), problem.message());
+    }
+
     /** Every type-ref problem a schemaless document can carry, each reported once, at its own path. */
     @Test
     void aSchemalessDocumentsTypeRefsAreCheckedWhereverTheyAreWritten() {
