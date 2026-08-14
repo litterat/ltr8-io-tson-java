@@ -7,6 +7,7 @@ import io.ltr8.tson.compiler.reader.ValueReaderFactoryResolver;
 import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
 import io.ltr8.tson.compiler.resolver.SchemaResolver;
 import io.ltr8.tson.schema.TsonBundledSchemas;
+import io.ltr8.tson.schema.TsonCanonicalIdentity;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
@@ -42,7 +43,7 @@ import java.util.Optional;
  * registry empty, for a caller that populates it itself. Any schema governed by (or importing) the
  * bundled three then reuses what's already in {@link #get} rather than recompiling its chain.
  *
- * <p><b>Keyed by canonical identity</b> ({@link TsonSchemaRegistry#canonicalIdentity}, scheme and query
+ * <p><b>Keyed by canonical identity</b> ({@link TsonCanonicalIdentity#canonicalize}, scheme and query
  * stripped), matching the paired {@link TsonSchemaRegistry}. So two differently-spelled-but-equivalent
  * URIs for one schema -- in particular a hash-pinned {@code ?sha256=} reference and a plain one -- find
  * the same entry, which is what lets a pinned reference resolve against an already-registered schema
@@ -56,7 +57,7 @@ import java.util.Optional;
 public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader {
 
     private static final String META_KERNEL_IDENTITY =
-            TsonSchemaRegistry.canonicalIdentity(TsonBundledSchemas.META_KERNEL_ID);
+            TsonCanonicalIdentity.canonicalize(TsonBundledSchemas.META_KERNEL_ID);
 
     private final TsonSchemaRegistry schemaRegistry;
     private final ValueReaderFactoryResolver resolver;
@@ -162,7 +163,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      */
     private void registerBundled(String id) {
         String sourceText = TsonBundledSchemas.fetch(id);
-        recordAndVerify(sourceText, id, TsonSchemaRegistry.canonicalIdentity(id));
+        recordAndVerify(sourceText, id, TsonCanonicalIdentity.canonicalize(id));
         TsonSchemaParser parser = new TsonSchemaParser(sourceText);
         SchemaDocument document = parser.parseSchemaDocument();
         TsonSchema resolved = new SchemaResolver(this).resolveSchema(document, parser.declarationPositions());
@@ -183,7 +184,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      */
     @Override
     public TsonCompiledMetaSchema loadMeta(String uri) {
-        String identity = TsonSchemaRegistry.canonicalIdentity(uri);
+        String identity = TsonCanonicalIdentity.canonicalize(uri);
         Optional<TsonCompiledMetaSchema> cached = get(uri);
         if (cached.isPresent()) {
             // Already compiled: verify *this* reference's own pin against the identity's content hash. A
@@ -233,7 +234,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      */
     @Override
     public TsonLinkedSchema resolveLinked(String uri) {
-        String identity = TsonSchemaRegistry.canonicalIdentity(uri);
+        String identity = TsonCanonicalIdentity.canonicalize(uri);
         Optional<TsonLinkedSchema> cached = schemaRegistry.get(uri);
         if (cached.isPresent()) {
             verifyPin(uri, identity);
@@ -290,18 +291,18 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
                                                                 TsonCompiledMetaSchema governingMeta) {
         TsonCompiledMetaSchema result = new TsonCompiledMetaSchema(
                 TsonSchemaCompiler.compile(registered, governingMeta), resolver);
-        compiled.put(TsonSchemaRegistry.canonicalIdentity(registered.schema().id()), result);
+        compiled.put(TsonCanonicalIdentity.canonicalize(registered.schema().id()), result);
         return result;
     }
 
     /**
      * The compiled governing meta-schema registered under {@code id}, if any -- matched by canonical
-     * identity ({@link TsonSchemaRegistry#canonicalIdentity}), so any spelling (pinned or plain) of a
+     * identity ({@link TsonCanonicalIdentity#canonicalize}), so any spelling (pinned or plain) of a
      * registered schema's own {@code !!id} finds it. Only meta-layer schemas are ever stored here, so a
      * non-meta schema is never handed back where a governing meta is required.
      */
     public synchronized Optional<TsonCompiledMetaSchema> get(String id) {
-        return Optional.ofNullable(compiled.get(TsonSchemaRegistry.canonicalIdentity(id)));
+        return Optional.ofNullable(compiled.get(TsonCanonicalIdentity.canonicalize(id)));
     }
 
     /**
@@ -309,8 +310,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      * meta). Only such a schema compiles to a {@link TsonCompiledMetaSchema} and may govern others.
      */
     private static boolean isMetaLayer(TsonSchema schema) {
-        return TsonSchemaRegistry.canonicalIdentity(schema.meta())
-                .equals(TsonSchemaRegistry.canonicalIdentity(TsonBundledSchemas.META_KERNEL_ID));
+        return TsonCanonicalIdentity.sameIdentity(schema.meta(), TsonBundledSchemas.META_KERNEL_ID);
     }
 
     /**
@@ -329,7 +329,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
             }
             return;
         }
-        String embedded = TsonSchemaRegistry.canonicalIdentity(document.id().get());
+        String embedded = TsonCanonicalIdentity.canonicalize(document.id().get());
         if (!embedded.equals(identity)) {
             throw new IllegalStateException("identity mismatch: reference \"" + referenceUri + "\" (identity \""
                     + identity + "\") resolved to a document whose own !!id is \"" + document.id().get()

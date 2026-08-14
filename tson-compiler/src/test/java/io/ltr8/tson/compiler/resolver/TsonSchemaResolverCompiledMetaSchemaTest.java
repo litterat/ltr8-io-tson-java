@@ -10,6 +10,7 @@ import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.schema.TsonBundledSchemas;
+import io.ltr8.tson.schema.TsonCanonicalIdentity;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
@@ -114,8 +115,8 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         SchemaDocument coreDocument = new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.CORE_ID)).parseSchemaDocument();
 
         // core's own !!meta now names meta.tn with a ?sha256= pin -- compare by identity.
-        assertEquals(TsonSchemaRegistry.canonicalIdentity(TsonBundledSchemas.META_ID),
-                TsonSchemaRegistry.canonicalIdentity(coreDocument.meta()));
+        assertEquals(TsonCanonicalIdentity.canonicalize(TsonBundledSchemas.META_ID),
+                TsonCanonicalIdentity.canonicalize(coreDocument.meta()));
 
         TsonCompiledMetaSchema compiledMeta = loader.loadMeta(coreDocument.meta());
 
@@ -145,8 +146,8 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
                 new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.META_ID)).parseSchemaDocument();
 
         // meta's own !!meta now names meta-kernel with a ?sha256= pin -- compare by identity.
-        assertEquals(TsonSchemaRegistry.canonicalIdentity(TsonBundledSchemas.META_KERNEL_ID),
-                TsonSchemaRegistry.canonicalIdentity(metaDocument.meta()));
+        assertEquals(TsonCanonicalIdentity.canonicalize(TsonBundledSchemas.META_KERNEL_ID),
+                TsonCanonicalIdentity.canonicalize(metaDocument.meta()));
 
         TsonCompiledMetaSchema compiledMetaKernel = loader.loadMeta(metaDocument.meta());
 
@@ -255,7 +256,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         SchemaDocument malformedIdDocument = new TsonSchemaParser(MINI_DOCUMENT_MALFORMED_ID).parseSchemaDocument();
 
         // "mini.tn1" alone is a syntactically valid relative-reference URI, but has no scheme --
-        // CanonicalIdentity.of's own rejection, surfaced here via TsonSchemaRegistry.validateIdentity.
+        // TsonCanonicalIdentity.canonicalize's own rejection, surfaced here via TsonCanonicalIdentity.validate.
         assertThrows(TsonSchemaValidationException.class, () -> resolver.resolveSchema(malformedIdDocument));
     }
 

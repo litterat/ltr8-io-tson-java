@@ -59,10 +59,8 @@ import java.util.Set;
  * resolves. A {@link TsonLinkedSchema} is the compile-time proof that all of that ran.
  *
  * <p>Public, and meant to be called directly by anything orchestrating the pipeline -- the registries here
- * link a schema before registering it, same as any other caller. Identities are canonicalized through {@link
- * TsonSchemaRegistry#canonicalIdentity}, the sanctioned seam over {@code tson-schema}'s internal
- * {@code CanonicalIdentity}: canonicalization is how registry lookups compare identities, not a pipeline
- * stage of its own, so it stays with the registry that owns the comparison.
+ * link a schema before registering it, same as any other caller. Identities are canonicalized through
+ * {@link TsonCanonicalIdentity}, which stays in {@code tson-schema} beside the registry that keys on it.
  *
  * <p><b>No materialization.</b> An argument-bearing {@code type_ref} does not become a synthesized entry
  * here -- {@code SchemaDesugarer} has already turned every sugar form and generic application into a real
@@ -150,7 +148,7 @@ public final class TsonSchemaLinker {
         // type-name-namespace-only, per §3.3.2's explicit "NOT extended by the structure namespace". Empty
         // if !!meta isn't registered yet (e.g. meta-kernel's own self-referential !!meta, mid-registration).
         Optional<TsonLinkedSchema> governingMeta =
-                loader == null ? Optional.empty() : loader.load(TsonSchemaRegistry.canonicalIdentity(schema.meta()));
+                loader == null ? Optional.empty() : loader.load(TsonCanonicalIdentity.canonicalize(schema.meta()));
         checkMayGovern(schema, governingMeta);
         Map<String, TypeDefinition> structureNamespace = governingMeta
                 .<Map<String, TypeDefinition>>map(linked -> linked.schema().entries()).orElse(Map.of());
@@ -207,7 +205,7 @@ public final class TsonSchemaLinker {
         AnnotatedMap<String, TypeDefinition> result = AnnotatedMap.of(merged);
         if (loader != null) {
             for (String importUri : schema.imports()) {
-                Optional<TsonLinkedSchema> imported = loader.load(TsonSchemaRegistry.canonicalIdentity(importUri));
+                Optional<TsonLinkedSchema> imported = loader.load(TsonCanonicalIdentity.canonicalize(importUri));
                 if (imported.isPresent()) {
                     result = carryOver(result, imported.get().schema().entries());
                 }
@@ -298,8 +296,7 @@ public final class TsonSchemaLinker {
      * meta.tn (governed one hop below it) alike.
      */
     private static boolean isMetaKernelGoverned(TsonSchema schema) {
-        return TsonSchemaRegistry.canonicalIdentity(schema.meta())
-                .equals(TsonSchemaRegistry.canonicalIdentity(TsonBundledSchemas.META_KERNEL_ID));
+        return TsonCanonicalIdentity.sameIdentity(schema.meta(), TsonBundledSchemas.META_KERNEL_ID);
     }
 
     // ── Subtypes (reverse index) ─────────────────────────────────────────
@@ -384,7 +381,7 @@ public final class TsonSchemaLinker {
     private static Map<String, TypeDefinition> mergeImports(List<String> imports, TsonSchemaLoader loader) {
         Map<String, TypeDefinition> merged = new LinkedHashMap<>();
         for (String importUri : imports) {
-            String importIdentity = TsonSchemaRegistry.canonicalIdentity(importUri);
+            String importIdentity = TsonCanonicalIdentity.canonicalize(importUri);
             TsonLinkedSchema imported = loader.load(importIdentity).orElseThrow(() -> new TsonSchemaValidationException(
                     "!!import '" + importUri + "' is not registered"));
             for (Map.Entry<String, TypeDefinition> entry : imported.schema().entries().entrySet()) {

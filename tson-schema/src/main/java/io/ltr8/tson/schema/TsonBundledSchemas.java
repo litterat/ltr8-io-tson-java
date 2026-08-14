@@ -71,9 +71,9 @@ public final class TsonBundledSchemas {
             CORE_ID, "/core.tn");
 
     private static final Map<String, String> DIGESTS = Map.of(
-            TsonSchemaRegistry.canonicalIdentity(META_KERNEL_ID), META_KERNEL_SHA256,
-            TsonSchemaRegistry.canonicalIdentity(META_ID), META_SHA256,
-            TsonSchemaRegistry.canonicalIdentity(CORE_ID), CORE_SHA256);
+            TsonCanonicalIdentity.canonicalize(META_KERNEL_ID), META_KERNEL_SHA256,
+            TsonCanonicalIdentity.canonicalize(META_ID), META_SHA256,
+            TsonCanonicalIdentity.canonicalize(CORE_ID), CORE_SHA256);
 
     private TsonBundledSchemas() {
     }
@@ -84,7 +84,7 @@ public final class TsonBundledSchemas {
      * {@code ?sha256=}-pinned reference both find it.
      */
     public static Optional<String> declaredSha256(String uri) {
-        return Optional.ofNullable(DIGESTS.get(TsonSchemaRegistry.canonicalIdentity(uri)));
+        return Optional.ofNullable(DIGESTS.get(TsonCanonicalIdentity.canonicalize(uri)));
     }
 
     /**

@@ -3,8 +3,8 @@ package io.ltr8.tson.compiler;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryResolver;
+import io.ltr8.tson.schema.TsonCanonicalIdentity;
 import io.ltr8.tson.schema.TsonLinkedSchema;
-import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.tree.TsonValue;
 
 import java.util.Map;
@@ -88,7 +88,7 @@ public final class TsonCompiledSchemaRegistry {
      */
     public TsonCompiledSchema get(String uri) {
         TsonLinkedSchema linked = core.resolveLinked(uri);
-        return compiled.computeIfAbsent(TsonSchemaRegistry.canonicalIdentity(uri), id -> compile(linked));
+        return compiled.computeIfAbsent(TsonCanonicalIdentity.canonicalize(uri), id -> compile(linked));
     }
 
     /** Compiles an already-resolved, already-linked schema in this registry's mode -- standalone, uncached. */

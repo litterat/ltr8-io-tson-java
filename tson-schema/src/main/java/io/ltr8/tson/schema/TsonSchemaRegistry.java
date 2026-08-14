@@ -1,7 +1,5 @@
 package io.ltr8.tson.schema;
 
-import io.ltr8.tson.schema.registry.CanonicalIdentity;
-
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -73,7 +71,7 @@ public final class TsonSchemaRegistry implements TsonSchemaLoader {
                     + " which never sets bootstrap), never the bootstrap-produced form directly, "
                     + "materialized or not");
         }
-        String identity = CanonicalIdentity.of(unwrapped.id());
+        String identity = TsonCanonicalIdentity.canonicalize(unwrapped.id());
         if (schemas.containsKey(identity)) {
             throw new TsonSchemaValidationException("a schema is already registered under '" + identity + "'");
         }
@@ -88,7 +86,7 @@ public final class TsonSchemaRegistry implements TsonSchemaLoader {
      * would be circular, §2.2.1), so the two differ as strings but name the same identity.
      */
     private static boolean selfReferential(TsonSchema schema) {
-        return CanonicalIdentity.of(schema.id()).equals(CanonicalIdentity.of(schema.meta()));
+        return TsonCanonicalIdentity.sameIdentity(schema.id(), schema.meta());
     }
 
     @Override
@@ -97,35 +95,7 @@ public final class TsonSchemaRegistry implements TsonSchemaLoader {
     }
 
     public synchronized Optional<TsonLinkedSchema> get(String uri) {
-        return lookupByCanonicalIdentity(CanonicalIdentity.of(uri));
-    }
-
-    /**
-     * Validates that {@code uri} is a well-formed canonical-identity candidate -- the same check
-     * {@link #register}/{@link #get} already run internally on every {@code !!id}/lookup URI they
-     * see, exposed on its own for a caller that wants to validate a candidate {@code !!id} up front
-     * (e.g. before attempting to resolve a whole document that will eventually need one) without
-     * triggering an actual lookup or registration. A thin wrapper, not a duplicate: {@link
-     * CanonicalIdentity} stays internal-by-convention to this module (see that class's own Javadoc)
-     * -- this is the sanctioned way for a caller outside it to run the same check.
-     *
-     * @throws TsonSchemaValidationException if {@code uri} isn't a valid canonical-identity candidate
-     */
-    public static void validateIdentity(String uri) {
-        CanonicalIdentity.of(uri);
-    }
-
-    /**
-     * The canonical identity of {@code uri} ([TSON-DATA] §2.2.1) -- scheme and query stripped, the rest
-     * required already canonical. This is the identity references are matched by, so a {@code ?sha256=}
-     * hash (verification metadata, not identity) doesn't distinguish a pinned reference from a plain one.
-     * The sanctioned way to canonicalize from outside this module, where {@link CanonicalIdentity} stays
-     * internal-by-convention.
-     *
-     * @throws TsonSchemaValidationException if {@code uri} isn't a valid canonical-identity candidate
-     */
-    public static String canonicalIdentity(String uri) {
-        return CanonicalIdentity.of(uri);
+        return lookupByCanonicalIdentity(TsonCanonicalIdentity.canonicalize(uri));
     }
 
     private synchronized Optional<TsonLinkedSchema> lookupByCanonicalIdentity(String canonicalIdentity) {

@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.schema.TsonSchemaRegistry;
+import io.ltr8.tson.schema.TsonCanonicalIdentity;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.MapBody;
@@ -56,7 +56,7 @@ class GenericApplicationHeadTest {
                 }
                 """.formatted(declarations);
         TsonSchemaSource source = uri -> {
-            if (TsonSchemaRegistry.canonicalIdentity(uri).equals(TsonSchemaRegistry.canonicalIdentity(ID))) {
+            if (TsonCanonicalIdentity.sameIdentity(uri, ID)) {
                 return schema;
             }
             throw new IllegalStateException("unexpected fetch: " + uri);

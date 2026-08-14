@@ -102,34 +102,4 @@ class TsonSchemaRegistryTest {
         assertThrows(TsonSchemaValidationException.class, () -> registry.register(linked));
     }
 
-    @Test
-    void validateIdentityAcceptsAWellFormedCandidateSilently() {
-        TsonSchemaRegistry.validateIdentity("https://example.test/registry-test.tn1");
-        // No exception -- that's the whole assertion.
-    }
-
-    @Test
-    void validateIdentityRejectsAUriWithNoScheme() {
-        assertThrows(TsonSchemaValidationException.class, () -> TsonSchemaRegistry.validateIdentity("registry-test.tn1"));
-    }
-
-    @Test
-    void validateIdentityRejectsAUriCarryingAPort() {
-        assertThrows(TsonSchemaValidationException.class,
-                () -> TsonSchemaRegistry.validateIdentity("https://example.test:8080/registry-test.tn1"));
-    }
-
-    @Test
-    void canonicalIdentityStripsSchemeAndQuery() {
-        assertEquals("example.test/registry-test.tn1",
-                TsonSchemaRegistry.canonicalIdentity("https://example.test/registry-test.tn1"));
-    }
-
-    @Test
-    void aSha256PinDoesNotChangeTheIdentity() {
-        // The hash is verification metadata, not identity -- a pinned and a plain reference match.
-        assertEquals(
-                TsonSchemaRegistry.canonicalIdentity("https://example.test/registry-test.tn1"),
-                TsonSchemaRegistry.canonicalIdentity("https://example.test/registry-test.tn1?sha256=" + "a".repeat(64)));
-    }
 }

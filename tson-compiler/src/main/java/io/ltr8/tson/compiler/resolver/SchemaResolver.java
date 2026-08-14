@@ -8,6 +8,7 @@ import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.stream.ListEventSource;
+import io.ltr8.tson.schema.TsonCanonicalIdentity;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
@@ -77,7 +78,7 @@ public final class SchemaResolver {
      * {@code document.id()} must be present -- required by policy for a publishable schema (§2.2.1:
      * "publishing a schema... REQUIRES !!id"), and this resolver is about to treat {@code document}
      * as one that's going to *be* registered; (2) that {@code !!id} must be a well-formed
-     * canonical-identity candidate ({@link TsonSchemaRegistry#validateIdentity}) -- the same check
+     * canonical-identity candidate ({@link TsonCanonicalIdentity#validate}) -- the same check
      * {@link TsonSchemaRegistry#register} would run anyway, just surfaced here, before resolution
      * work is spent on a document that could never actually be registered. Both throw {@link
      * IllegalStateException} (or, for (2), {@link TsonSchemaValidationException}, in an already-
@@ -130,9 +131,9 @@ public final class SchemaResolver {
                                     Map<SchemaMap.Declaration, ? extends SourcePosition> declarationPositions) {
         String id = document.id().orElseThrow(() -> new IllegalStateException(
                 "'" + document.meta() + "': !!id is required to register this schema, but is absent"));
-        TsonSchemaRegistry.validateIdentity(id);
+        TsonCanonicalIdentity.validate(id);
         for (String importUri : document.imports()) {
-            TsonSchemaRegistry.validateIdentity(importUri);
+            TsonCanonicalIdentity.validate(importUri);
         }
 
         TsonCompiledMetaSchema metaParser = loader.loadMeta(document.meta());

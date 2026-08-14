@@ -1,6 +1,4 @@
-package io.ltr8.tson.schema.registry;
-
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+package io.ltr8.tson.schema;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -17,25 +15,35 @@ import java.util.Locale;
  * (default or otherwise), no percent-encoding of unreserved characters, no dot-segments, and no
  * fragment -- and that an identifier failing any of these is an *error*, not something to fix up:
  * "no case folding, path resolution, or percent-decoding is ever performed at comparison time."
- * {@link #of(String)} therefore only ever performs the two reductions the spec actually names;
- * every other check is a rejection, never a rewrite.
+ * {@link #canonicalize(String)} therefore only ever performs the two reductions the spec actually
+ * names; every other check is a rejection, never a rewrite.
  *
- * <p><b>Not part of the public API</b> -- {@code io.ltr8.tson.schema.registry} is this module's
- * internal-by-convention package (`TsonSchemaRegistry`/`TsonSchemaLoader`/`TsonSchemaValidationException` are
- * the user-facing surface, in `io.ltr8.tson.schema` proper). This class is `public` only because
- * `tson-schema` has no `module-info.java` yet, so there's no compiler-enforced way to hide it from
- * a cross-package caller (`TsonSchemaRegistry`) without also hiding it from `TsonSchemaRegistry` itself --
- * a caller outside this module should go through {@code TsonSchemaRegistry} instead of depending on this
- * class directly.
+ * <p><b>Public, and part of the contract of every identity-bearing seam.</b> {@link
+ * TsonSchemaLoader#load} takes a canonical identity as its argument, and a {@code TsonSchemaSource}
+ * is asked for a document by one, so anything implementing either has to derive and compare
+ * identities exactly the way the library does -- which is this class. The half of §2.2.1 that reads
+ * the {@code ?sha256=} pin this one strips lives in {@code TsonContentHash}.
+ *
+ * <p>The methods return and compare plain {@code String}s rather than instances of this type: a
+ * canonical identity is a map key throughout the registries, and wrapping it would buy type-safety
+ * only if every identity-carrying signature were converted at once.
  */
-public final class CanonicalIdentity {
+public final class TsonCanonicalIdentity {
 
     private static final String UNRESERVED = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
 
-    private CanonicalIdentity() {
+    private TsonCanonicalIdentity() {
     }
 
-    public static String of(String uriString) {
+    /**
+     * The canonical identity of {@code uriString} -- scheme and query stripped, the rest required already
+     * canonical. This is the identity references are matched by, so a {@code ?sha256=} pin (verification
+     * metadata, not identity) doesn't distinguish a pinned reference from a plain one, and {@code http://}
+     * and {@code https://} spellings name the same thing.
+     *
+     * @throws TsonSchemaValidationException if {@code uriString} isn't a valid canonical-identity candidate
+     */
+    public static String canonicalize(String uriString) {
         URI uri;
         try {
             uri = new URI(uriString);
@@ -78,6 +86,29 @@ public final class CanonicalIdentity {
         requireNoPercentEncodedUnreservedCharacters(uriString, rawPath);
 
         return host + rawPath;
+    }
+
+    /**
+     * Runs {@link #canonicalize}'s checks and discards the identity -- for a caller validating a candidate
+     * {@code !!id} up front (before resolving a whole document that will eventually need one) rather than
+     * looking anything up. Exists so that intent reads at the call site, where computing an identity only to
+     * throw it away would not.
+     *
+     * @throws TsonSchemaValidationException if {@code uriString} isn't a valid canonical-identity candidate
+     */
+    public static void validate(String uriString) {
+        canonicalize(uriString);
+    }
+
+    /**
+     * Whether two URIs name one identity -- {@link #canonicalize} applied to both, then compared. The
+     * spelling-insensitive comparison §2.2.1 calls for: scheme and {@code ?sha256=} pin differences don't
+     * make two references distinct.
+     *
+     * @throws TsonSchemaValidationException if either argument isn't a valid canonical-identity candidate
+     */
+    public static boolean sameIdentity(String uriString, String otherUriString) {
+        return canonicalize(uriString).equals(canonicalize(otherUriString));
     }
 
     /** RFC 3986 §2.3's unreserved characters MUST NOT be percent-encoded; anything else may be. */

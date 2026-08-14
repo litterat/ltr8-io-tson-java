@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.schema.TsonSchemaRegistry;
+import io.ltr8.tson.schema.TsonCanonicalIdentity;
 import io.ltr8.tson.tree.TsonAnnotation;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
@@ -65,7 +65,7 @@ class SchemaDrivenTreeAnnotationTest {
 
     private static TsonValue read(String data) {
         TsonSchemaSource source = uri -> {
-            if (TsonSchemaRegistry.canonicalIdentity(uri).equals(TsonSchemaRegistry.canonicalIdentity(SCHEMA_ID))) {
+            if (TsonCanonicalIdentity.sameIdentity(uri, SCHEMA_ID)) {
                 return SCHEMA;
             }
             throw new IllegalStateException("unexpected fetch: " + uri);

@@ -184,11 +184,12 @@ with `path: ""`, `schemaPosition: null`, and (through `validate`) a `dataPositio
     This was the cheaper direction: moving `Diagnostic` down would have split `ofBaseSyntaxError` off (it
     names three `tson-compiler` exception types) and put a read-path value in the schema value model, and it
     would have left the §5.4 pattern-disjointness seam below still needed. The linker canonicalizes through
-    `TsonSchemaRegistry.canonicalIdentity` now, the seam that already existed for callers outside
-    `tson-schema`.
+    `TsonCanonicalIdentity`, which was made public in the same pass — it was hidden in a one-class
+    `schema.registry` package behind two `TsonSchemaRegistry` delegations, though `TsonSchemaLoader.load`
+    takes a canonical identity as its argument, so implementing that seam always required it.
   - **Classify the throw sites; they are not one kind of thing.** Census across the schema pipeline:
     31 `UnsupportedOperationException` (mostly *library gaps* — "not resolved yet", "only … so far"),
-    27 `TsonSchemaValidationException` (author errors — but 11 of those are `CanonicalIdentity` `!!id`
+    27 `TsonSchemaValidationException` (author errors — but 11 of those are `TsonCanonicalIdentity` `!!id`
     string checks, inherently positionless), 10 `IllegalStateException` (invariants/faults), 3
     `TsonParseException` (schema syntax, already positioned). Reporting a library gap as "your schema is
     wrong" is the same mistake the CLI made in reporting a library fault as an invalid document — a gap and
@@ -197,7 +198,7 @@ with `path: ""`, `schemaPosition: null`, and (through `validate`) a `dataPositio
     mean atom refinement?"*, which is an author error with a helpful hint wearing a library-gap exception.
   - **Find the shared object.** The readers had `TsonReadContext` threaded everywhere to hang `report` off;
     the schema phases have no equivalent. The resolver is better placed than it looks (it already takes a
-    declaration position per call, see above); the linker and `CanonicalIdentity` are not.
+    declaration position per call, see above); the linker and `TsonCanonicalIdentity` are not.
   - Precedent worth following rather than inventing around: `TsonSchemaCompiler` already substitutes an
     `ErrorReader` for an entry that fails to build, so the schema still compiles and only *reading* that
     entry fails. That is "keep going, record the problem" at compile time; generalizing means the resolver

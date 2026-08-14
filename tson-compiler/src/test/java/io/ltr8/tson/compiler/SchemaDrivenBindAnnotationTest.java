@@ -8,7 +8,7 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
-import io.ltr8.tson.schema.TsonSchemaRegistry;
+import io.ltr8.tson.schema.TsonCanonicalIdentity;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -74,7 +74,7 @@ class SchemaDrivenBindAnnotationTest {
         DataBindContext context =
                 TsonAtomContext.registerDefaults(DataBindContext.builder().nameBinder(binder).build());
         TsonSchemaSource source = uri -> {
-            if (TsonSchemaRegistry.canonicalIdentity(uri).equals(TsonSchemaRegistry.canonicalIdentity(ID))) {
+            if (TsonCanonicalIdentity.sameIdentity(uri, ID)) {
                 return SCHEMA;
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
@@ -174,7 +174,7 @@ class SchemaDrivenBindAnnotationTest {
         DataBindContext context =
                 TsonAtomContext.registerDefaults(DataBindContext.builder().nameBinder(binder).build());
         TsonSchemaSource source = uri -> {
-            if (TsonSchemaRegistry.canonicalIdentity(uri).equals(TsonSchemaRegistry.canonicalIdentity(ID))) {
+            if (TsonCanonicalIdentity.sameIdentity(uri, ID)) {
                 return SCHEMA;
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
@@ -221,7 +221,7 @@ class SchemaDrivenBindAnnotationTest {
         DataBindContext context =
                 TsonAtomContext.registerDefaults(DataBindContext.builder().nameBinder(binder).build());
         TsonSchemaSource source = uri -> {
-            if (TsonSchemaRegistry.canonicalIdentity(uri).equals(TsonSchemaRegistry.canonicalIdentity(ID))) {
+            if (TsonCanonicalIdentity.sameIdentity(uri, ID)) {
                 return SCHEMA;
             }
             throw new IllegalStateException("unexpected fetch: " + uri);

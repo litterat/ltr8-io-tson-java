@@ -63,7 +63,7 @@ lives in git.)
 **`Tson` is a prefix, never an infix.** A class name containing `Tson` must lead with it (`TsonSchema`,
 `TsonDataParser`, `TsonCompiledSchema`) — never buried (`CompiledTsonSchema` is wrong). The prefix is
 **not** applied to every class: most internal machinery is deliberately bare (`Lexer`,
-`RecordAbstractReader`, `DeferredTypeReader`, `CanonicalIdentity`, `SchemaResolver`,
+`RecordAbstractReader`, `DeferredTypeReader`, `ChoiceDisjointness`, `SchemaResolver`,
 `DefinitionResolver`). Reserve `Tson` for types a *consumer of this library* names in their own code — its
 value is disambiguation at the call site (`TsonSchema` vs. a domain `Schema`). When adding a new public,
 developer-facing type, ask "would a consumer plausibly have their own class with this bare name?" — if yes
@@ -93,7 +93,7 @@ module has a real `module-info.java`; module names mirror each module's root exp
   types it reads off a class under analysis.
 - **`tson-schema`** — **only** `io.ltr8.tson.schema.meta` (the resolved-schema *value* model — pure
   records/sealed interfaces/enums, §8's `TypeDefinition` et al.) plus the schema registry (`TsonSchemaRegistry`
-  /`TsonLinkedSchema`/`TsonSchemaLoader`/`CanonicalIdentity`) and `TsonBundledSchemas`. **The linker is not
+  /`TsonLinkedSchema`/`TsonSchemaLoader`/`TsonCanonicalIdentity`) and `TsonBundledSchemas`. **The linker is not
   here** — it is an engine, not a value model, so `TsonSchemaLinker`/`ChoiceDisjointness` live in
   `tson-compiler` with the rest of the pipeline; what stays is storage and the identity algorithm lookups
   compare by. Depends only on `tson-annotation`. **`tson-compiler` depends on `tson-schema`, not
@@ -494,13 +494,17 @@ so every phase that will grow schema-side diagnostics is in one module with `Dia
 `tson-regex` directly (what §5.4 pattern disjointness needs, with no injected-oracle seam); the registry is
 storage over the `schema.meta` value model and stays in `tson-schema`, the leaf everything else depends on.
 
-- **`CanonicalIdentity.of(String)`** implements §2.2.1's canonical-identity algorithm — **not** general
-  URI normalization. Exactly two reductions (strip scheme + `://`, strip query); everything else must
+- **`TsonCanonicalIdentity.canonicalize(String)`** implements §2.2.1's canonical-identity algorithm — **not**
+  general URI normalization. Exactly two reductions (strip scheme + `://`, strip query); everything else must
   already be canonical (lowercase host, no port, no dot-segments, no fragment, no percent-encoding of
   unreserved chars) or it's rejected. `http://` and `https://` resolve to the same identity; a `?sha256=`
-  query is dropped, not validated. Internal to `tson-schema` — reach it from outside via
-  `TsonSchemaRegistry.canonicalIdentity`, which is how the linker itself canonicalizes now that it sits
-  across the module boundary.
+  query is dropped, not validated. Two companions: `validate` runs the same checks and discards the result
+  (so a caller checking a candidate `!!id` up front reads as such), and `sameIdentity(a, b)` canonicalizes
+  both and compares — the recurring question, since a pin or a scheme never distinguishes two references.
+  **Public API, not internal machinery**: `TsonSchemaLoader.load` takes a canonical identity as its
+  argument, so anything implementing that seam or a `TsonSchemaSource` has to derive them the same way. It
+  is the identity half of §2.2.1; `TsonContentHash` is the `?sha256=` half this one strips. Prefixed for
+  the reason `TsonContentHash` is — a consumer plausibly has their own `CanonicalIdentity`.
 - **`TsonSchemaLinker.link(schema, loader)`** is the pass-2 engine returning a `TsonLinkedSchema` (a thin
   wrapper that is a compile-time proof linking ran): (1) **merge `!!import`s** — each import's entries
   copied in as-is, keeping their home namespace, name collisions rejected; (2) **populate `subtypes`**
