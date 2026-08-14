@@ -9,32 +9,6 @@ yet implemented" section for the technical detail behind several of these items.
 
 ---
 
-## Tree model (`TsonValue`)
-
-The `TsonValue` tree — an immutable, queryable, structure-preserving document model in its own pure-leaf
-`tson-tree` module (`io.ltr8.tson.tree`) — is **built**: the node model + query API, both producers (the
-schema-driven tree readers and the schemaless `TsonTreeReader`), the `TsonTreeWriter` back to text, and
-the removal of the old throwaway `Map`/`List` DOM mode all landed. The `Tson*` rename landed too
-(`TsonNode`/`RecordNode`/… → `TsonValue`/`TsonRecord`/…, dropping "Node"), resolving a real collision:
-Jackson ships `ArrayNode`, `NullNode` and `MissingNode`, so a consumer using both libraries in one file
-previously had to fully qualify. It also aligns with JEP 540's sealed `JsonValue`/`JsonObject`/`JsonArray`/
-`JsonNull` (Simple JSON API, incubating in JDK 28) — the same design this tree reached independently, with
-`TsonRecord`+`TsonMap` staying *more* precise than `JsonObject`, which cannot distinguish the two.
-What's left:
-
-- [ ] **Copy-on-write transforms + builders (parked).** The "new tree from old" editing half —
-  `TsonRecord.with(name, value)`/`without(name)`, `TsonArray.with(i, value)`/`plus(value)`/`without(i)`,
-  `TsonRecord.builder()`, and a pointer-based `set("/a/b", value) → new tree`. All pure `tson-tree`
-  operations (no compiler dependency), so they belong in that module. Deferred until there's a concrete
-  produce/edit use case: `TsonTreeWriter` already closes the read→edit→write loop, so these have a real
-  payoff when wanted, but block nothing now.
-  - **Nothing to copy from JEP 540, and that is the useful part.** It ships no transformation API and no
-    builders at all — construction is static `of(...)` factories, which `tson-tree` already matches — and
-    its Risks section defers the area outright: "During the incubation period, we will gather more
-    information about use cases involving generating and transforming JSON documents, in order to evolve
-    these areas of the API." The JDK reached the same "wait for real use cases" conclusion independently,
-    which turns this item's deferral from a shrug into a decision.
-
 ## Front door / ergonomics
 
 - [ ] A real disk/HTTP-backed `TsonSchemaSource` with whitelist/blacklist policy — today the only
@@ -137,29 +111,6 @@ own prose (which had gone stale on at least one of them):
   including on where a declaration's annotations land (the name's on the map key, the definition's on the
   entry). Lower priority than the rest of this section: the spec marks this path explicitly **optional**
   ("MAY implement ingest"), not a MUST.
-
-## Atom-refinement constraint validation
-
-- [ ] **`DefinitionResolver`'s `TsonObjectWriter` dependency stays — the premise this item used to
-  carry was wrong.** It read "a real narrowing check wouldn't need to round-trip through the generic
-  binder at all"; the check landed and the round-trip is still load-bearing, because **the check and
-  the merge are separate concerns**. The check compares two already-bound constraint objects; the
-  merge is what *produces* the second one, and it has to run on the wire record *before* binding.
-  The blocker is concrete: an object-level merge would have to bind the refinement body on its own
-  first, and `float_type.format` (`format: ieee_format`, `REQUIRED` with no schema default) and
-  `binary.encoding` have nothing to fall back on, so `!float32 ^ { min: 0.0 max: 1.0 }` would fail
-  `FIELD_REQUIRED` on a field its source already fixes.
-  `DefinitionResolverTest.atomRefinementInheritsARequiredFieldItsSourceAlreadyFixed` pins that case
-  so the constraint isn't rediscovered the hard way. Nor is there a cheaper substitution:
-  `TsonObjectWriter` writes straight to a `TsonDataEmitter`, so there is no object→`DataValue` step
-  to borrow that would skip the text round-trip. Removing it for real needs each family to own its
-  own wire decoding (duplicating number-grammar handling — `0xFF`, `_` separators, quoted-vs-unquoted
-  — and bypassing the compiled reader's own defaults), which costs more than the round-trip does.
-  This is still *why* `TsonObjectReader`/`TsonObjectWriter` live in `tson-compiler`'s root package
-  rather than the `tson` front-door module (see "Front door" above) — moving them to a module that
-  depends *on* `tson-compiler` would create a cycle, since the resolution engine genuinely depends on
-  the writer. So the "revisit moving them into `tson`" note on `Tson`'s own class Javadoc is blocked
-  on a different, larger change than this item once assumed.
 
 ## Remaining built-in types
 
@@ -413,3 +364,30 @@ missing most of the mirror.
   applies where, the comparison scopes TSON can actually name, and why a normative requirement would oblige
   every implementation to ship UCD data the JDK does not expose.
 
+# Lower Priority
+
+## Tree model (`TsonValue`)
+
+The `TsonValue` tree — an immutable, queryable, structure-preserving document model in its own pure-leaf
+`tson-tree` module (`io.ltr8.tson.tree`) — is **built**: the node model + query API, both producers (the
+schema-driven tree readers and the schemaless `TsonTreeReader`), the `TsonTreeWriter` back to text, and
+the removal of the old throwaway `Map`/`List` DOM mode all landed. The `Tson*` rename landed too
+(`TsonNode`/`RecordNode`/… → `TsonValue`/`TsonRecord`/…, dropping "Node"), resolving a real collision:
+Jackson ships `ArrayNode`, `NullNode` and `MissingNode`, so a consumer using both libraries in one file
+previously had to fully qualify. It also aligns with JEP 540's sealed `JsonValue`/`JsonObject`/`JsonArray`/
+`JsonNull` (Simple JSON API, incubating in JDK 28) — the same design this tree reached independently, with
+`TsonRecord`+`TsonMap` staying *more* precise than `JsonObject`, which cannot distinguish the two.
+What's left:
+
+- [ ] **Copy-on-write transforms + builders (parked).** The "new tree from old" editing half —
+  `TsonRecord.with(name, value)`/`without(name)`, `TsonArray.with(i, value)`/`plus(value)`/`without(i)`,
+  `TsonRecord.builder()`, and a pointer-based `set("/a/b", value) → new tree`. All pure `tson-tree`
+  operations (no compiler dependency), so they belong in that module. Deferred until there's a concrete
+  produce/edit use case: `TsonTreeWriter` already closes the read→edit→write loop, so these have a real
+  payoff when wanted, but block nothing now.
+    - **Nothing to copy from JEP 540, and that is the useful part.** It ships no transformation API and no
+      builders at all — construction is static `of(...)` factories, which `tson-tree` already matches — and
+      its Risks section defers the area outright: "During the incubation period, we will gather more
+      information about use cases involving generating and transforming JSON documents, in order to evolve
+      these areas of the API." The JDK reached the same "wait for real use cases" conclusion independently,
+      which turns this item's deferral from a shrug into a decision.

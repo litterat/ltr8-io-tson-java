@@ -372,9 +372,14 @@ namespace *before* any local declaration resolves.
   source's bound value via `TsonObjectWriter` and merges field-by-field (explicit values win) — no
   per-atom-class merge logic needed. **The merge runs on the wire record, before binding, and has to**: a
   constructor field that is `REQUIRED` with no schema default (`float_type.format`, `binary.encoding`) is one
-  a refinement body has no reason to restate, so binding the body alone would fail `FIELD_REQUIRED`. This is
+  a refinement body has no reason to restate, so binding the body alone would fail `FIELD_REQUIRED`
+  (`DefinitionResolverTest.atomRefinementInheritsARequiredFieldItsSourceAlreadyFixed` pins that case). This is
   why `DefinitionResolver` still holds a `TsonObjectWriter`, and in turn why `TsonObjectReader`/
-  `TsonObjectWriter` can't move to the `tson` module (see `BACKLOG.md`).
+  `TsonObjectWriter` can't move to the `tson` module. **The text round-trip has no cheaper substitute**:
+  `TsonObjectWriter` emits straight to a `TsonDataEmitter`, so there is no object→`DataValue` step to borrow
+  that would skip it. Removing it for real would mean each constraint family owning its own wire decoding —
+  duplicating number-grammar handling (`0xFF`, `_` separators, quoted-vs-unquoted) and bypassing the compiled
+  reader's own defaults — which costs more than the round-trip does.
 - **A refinement must narrow, and this is enforced** (§5.7). After binding, `checkNarrows` asks the
   constraint family itself — `Atom.constraintsCheck(refined)`, one rule per `schema.meta` family over the
   shared `AtomNarrowing` mechanics — whether the merged result is a valid tightening of the source's own body,
