@@ -186,9 +186,9 @@ that the missing twelve are an oversight in the published table, not a deliberat
 schemaless surface relative to the core type library.
 
 **Interpretation chosen:** `tson-compiler`'s built-in vocabulary (`BuiltinTypeVocabulary`,
-`resolver.vocab` package) implements the full sixteen-instance `integer_type` family from `core.tn1` —
+`atom` package) implements the full sixteen-instance `integer_type` family from `core.tn1` —
 `int8` through `int256`, `uint8` through `uint256`, and all four bound-only refinements — not just the
-four §5.6 currently lists. `IntegerType`/`IntegerConstraints`/`IntegerSize` are written generically
+four §5.6 currently lists. `IntegerType`/`IntegerSize`/`IntegerParser` are written generically
 against the constructor (arbitrary width, arbitrary signedness, optional bounds), so this cost nothing
 beyond populating the map with twelve more entries.
 
@@ -272,9 +272,10 @@ descriptions — most plausibly because §5.2 is using "parse error" in the ordi
 token failed to be interpreted"), written without cross-checking §8.1's stricter technical claim that the
 exact phrase is a fixed mapping to one specific processing-layer category.
 
-**Interpretation chosen:** This implementation's atom types (`resolver.vocab.AtomParseException`) live in
-`tson-compiler`'s resolver package, architecturally alongside — not inside — the structural parser
-(`Parser`/`ParseException`), and are raised only from atom-type `read()` calls, never from `Parser` itself.
+**Interpretation chosen:** This implementation's atom types (`atom.AtomParseException`) live in
+`tson-compiler`'s own `atom` package, architecturally alongside — not inside — the structural parser
+(`TsonDataParser`/`TsonParseException`), and are raised only from atom-type `read()` calls, never from
+`TsonDataParser` itself.
 For the conformance test suite (`ltr8-io-tson-test-suite`'s `vocabulary/invalid` vectors), this failure
 mode is tagged `category: resolver`, not `parser`, as the more architecturally coherent reading — but each
 such vector's own `description` flags this as provisional, and the suite's README documents the ambiguity
@@ -377,7 +378,7 @@ has `min_length`/`max_length` fields playing exactly the same constraint-vocabul
 `extern` rather than with the nineteen `_type` constructors it otherwise resembles.
 
 **Interpretation chosen:** Treated as the same constructor either way -- this implementation's
-`BinaryType` class (in `tson-compiler`'s `resolver.vocab` package) is named to match the established
+`BinaryType` class (in `tson-schema`'s `schema.meta` package) is named to match the established
 `_type`-suffix convention of its siblings (`IntegerType`, `FloatType`, ...) rather than mirror `binary`'s
 own unsuffixed spelling, since the naming asymmetry doesn't appear to carry semantic weight for an
 implementation (it's still one atom constructor, `~atom`, with a constraint-vocabulary-shaped field set).
@@ -584,9 +585,9 @@ field alongside a full-generality `value: DataValue` (the redundancy that surfac
 `SchemaResolver`'s generalized constructor-application resolution — `target` and `DataValue.typeRef()`
 were two fields saying the same thing). Instead `Instance(DataValue value)` wraps a `DataValue`
 constructed directly from the parsed `core-value`, with `typeRef` pre-set to the constructor name and
-`annotations` always empty; `target()` is a thin accessor over `value.typeRef()`. `SchemaParser` widened
-`Parser.parseCoreValue()` from `private` to package-private (the same treatment every other grammar
-primitive `SchemaParser` reuses from `Parser` already has) to reach the bare production directly instead
+`annotations` always empty; `target()` is a thin accessor over `value.typeRef()`. `TsonSchemaParser` widened
+`TsonDataParser.parseCoreValue()` from `private` to package-private (the same treatment every other grammar
+primitive `TsonSchemaParser` reuses from `TsonDataParser` already has) to reach the bare production instead
 of going through `parseDataValue()`.
 
 `atom-refinement` is left as `DataValue` (not narrowed to `record-def`) for now — a real, still-open
@@ -645,8 +646,8 @@ section family, and explicitly said to support further chaining (§5.5: "`age`..
 further") -- should behave in the *opposite* way (full replacement) rather than the same way
 (tightening: explicit values override, everything else survives).
 
-**Interpretation chosen:** Merge, not replace. `tson-compiler`'s `SchemaResolver.resolveAtomRefinement`
-re-serializes `I`'s own already-bound value back to wire form (reusing `TsonMapperWriter`, so no
+**Interpretation chosen:** Merge, not replace. `tson-compiler`'s `DefinitionResolver.resolveAtomRefinement`
+re-serializes `I`'s own already-bound value back to wire form (reusing `TsonObjectWriter`, so no
 hand-written per-type merge logic is needed for any of the many atom-constraint classes), merges it
 field-by-field with the new refinement's own `values` (explicit values in `values` win; every field
 `I` itself already bound but the new refinement doesn't mention keeps `I`'s own value), and binds
@@ -752,11 +753,11 @@ conforming implementation MUST reject a hypothetical core.tn1 that *did* declare
 self-referencing": an entry with `constructor: true` is only valid if the declaring schema's own
 `!!meta` target is *exactly* `https://tson.io/2026/32/m/meta-kernel.tn1` — the one specific
 meta-kernel identity this implementation's own compiled-reader machinery is built against
-(`TsonSchemaLinker.META_KERNEL_ID`), not merely "some schema whose own `!!meta` happens to equal its
+(`TsonBundledSchemas.META_KERNEL_ID`), not merely "some schema whose own `!!meta` happens to equal its
 own `!!id`." This distinction matters beyond pedantry: every resolved `TypeDefinition.body` and every
 `!instance` construction (`!enum`, `!integer_type`, ...) is interpretable only because a matching
 type constructor is declared in *this specific* meta-kernel — the Java dispatch tables
-(`TsonParserFactoryRegistry`/`AtomTypeParser`/`RecordParser`) are hard-wired to this one meta-kernel's
+(`ValueReaderFactoryRegistry`/`AtomValueReader`/`RecordAbstractReader`) are hard-wired to this one meta-kernel's
 own fixed vocabulary. A structurally self-referencing but otherwise unrelated schema could declare a
 completely different, incompatible `record`/`array`/... vocabulary and would pass a purely
 structural self-reference test while being meaningless to this implementation's own reader

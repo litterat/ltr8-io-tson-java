@@ -13,10 +13,10 @@ dependencies {
     // `requires` in module-info.
     implementation(project(":tson-regex"))
     // tson-bind has no dependency on tson-compiler/tson-schema (a leaf module), so depending on it
-    // here directly is clean -- needed in main scope now that TsonMapperReader/TsonMapperWriter
-    // (originally in the separate tson-mapper module, which depended on tson-compiler and so could
-    // never be depended on back) live in this module instead, so schema resolution can bind a
-    // DataValue onto a schema.meta class without a module cycle.
+    // here directly is clean -- needed in main scope because the class-driven read/write front doors
+    // (TsonObjectReader/TsonObjectWriter, and the SchemalessObjectReader engine under them) live in
+    // this module, so schema resolution can bind a DataValue onto a schema.meta class without a
+    // module cycle. DefinitionResolver's atom-refinement merge is the caller that forces it.
     implementation(project(":tson-bind"))
 
     testImplementation(platform("org.junit:junit-bom:6.0.3"))

@@ -132,7 +132,7 @@ module has a real `module-info.java`; module names mirror each module's root exp
 **JPMS enforcement is real, not just convention.** An unexported package is genuinely unreachable from
 other modules (verified by scratch-importing across a boundary and watching it fail). Internal dispatch
 types kept in unexported packages but referenced by a public method signature produce an accepted
-`-Xlint:exports` warning (e.g. `ValueReaderResolver`, `ValueReaderFactoryResolver`); this is deliberate,
+`-Xlint:exports` warning (e.g. `ValueReaderFactoryResolver`); this is deliberate,
 not a defect. No `opens` directives — binding only ever touches public constructors/methods.
 
 ## Pipeline
@@ -562,7 +562,7 @@ is small and parsed once.)
 - **`TsonReadContext` is deliberately still exported.** `TsonValueReader.read(TsonReadContext)` is the sole
   abstract method a consumer receives from `TsonCompiledSchema.get`, so hiding the parameter type would
   make that method uncallable and the interface unimplementable from outside — categorically worse than the
-  accepted `ValueReaderResolver` `-Xlint:exports` warning, where the hidden type is only ever *returned*.
+  accepted `ValueReaderFactoryResolver` `-Xlint:exports` warning, where the hidden type is only ever *returned*.
   What was removed instead is the conflation: `failFast()` (no callers) and `diagnostics()` (the receiver's
   job) are gone.
 - **`of(...)` is not a whole-document read.** It assumes and performs no framing. Consuming the leading
