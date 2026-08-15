@@ -2,6 +2,8 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
+import io.ltr8.tson.compiler.TsonDiagnosticsCollector;
+import io.ltr8.tson.compiler.TsonDiagnosticsReceiver;
 import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -128,6 +130,41 @@ class RecordTreeReaderTest {
 
         TsonReadException thrown = assertThrows(TsonReadException.class, () -> read(compiled, "{ value: 9 }"));
         assertTrue(thrown.getMessage().contains("cannot be given another value"), thrown.getMessage());
+    }
+
+    /**
+     * A token that isn't a value of the field's own type is one problem, not two. Decoding it reports (here:
+     * 300 doesn't fit int8), and the contradiction check that follows would otherwise report again at the
+     * same path, on the strength of whatever the failed decode handed back.
+     */
+    @Test
+    void aFixedFieldWhoseStatedTokenIsMalformedReportsOnce() {
+        TsonCompiledSchema compiled = compile(pointSchema(atomEntry(new IntegerType(new IntegerSize(8, true))),
+                fixed(FieldState.REQUIRED_FIXED, "7")));
+        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+
+        compiled.get("point").read(TestDocuments.document("{ value: 300 }", problems));
+
+        assertEquals(1, problems.diagnostics().size(), problems.diagnostics().toString());
+        assertTrue(problems.diagnostics().getFirst().message().contains("300"),
+                problems.diagnostics().toString());
+    }
+
+    /**
+     * The other half of the same rule: a token that decodes cleanly and merely says something else is still a
+     * contradiction, and is still reported -- exactly once, so the skip above doesn't swallow the real check.
+     */
+    @Test
+    void aWellFormedContradictingTokenStillReportsOnce() {
+        TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED),
+                fixed(FieldState.REQUIRED_FIXED, "7")));
+        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+
+        compiled.get("point").read(TestDocuments.document("{ value: 9 }", problems));
+
+        assertEquals(1, problems.diagnostics().size(), problems.diagnostics().toString());
+        assertTrue(problems.diagnostics().getFirst().message().contains("cannot be given another value"),
+                problems.diagnostics().toString());
     }
 
     /** §5.2: "At a plain REQUIRED or a REQUIRED_FIXED field, `_` is a validation error." */

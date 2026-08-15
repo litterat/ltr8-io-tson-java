@@ -151,12 +151,6 @@ choice this list once called it.
   object is constructible. Fixing it means distinguishing "one of my own fields failed" from "something
   below me did", which is a change to the `int before = ctx.reported()` checkpoint idiom shared with
   `TupleBindReader`/`SchemalessObjectReader`. Tree mode already keeps the value.
-- [ ] **A stated FIXED field double-reports when its token is also malformed.**
-  `RecordAbstractReader.verifyFixed` reads the written token through the field's own parser — which reports
-  (an enum non-member, say) — and then the `Objects.equals` mismatch against the schema's value reports
-  again at the same path, so one wrong token yields two diagnostics, the second derived from a parse that
-  already failed. The `int before = ctx.reported()` checkpoint idiom the reader stack already uses is the
-  fix: skip the contradiction report when the parse itself reported.
 
 ## Remaining built-in types
 
