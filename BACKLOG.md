@@ -122,8 +122,9 @@ choice this list once called it.
 
 ## Diagnostics: no severity axis, so two SHOULD-level rules are unreportable
 
-- [ ] **`Diagnostic` can only say "error".** Every one makes `Tson.validate` return non-empty and the CLI
-  exit 1, so a rule the spec states as SHOULD has nowhere to land. Two of them:
+- [ ] **`Diagnostic` can only say "error"** ([#6](https://github.com/litterat/ltr8-io-tson-java/issues/6)).
+  Every one makes `Tson.validate` return non-empty and the CLI exit 1, so a rule the spec states as SHOULD
+  has nowhere to land. Two of them:
   - **Duplicate map keys** ([TSON-DATA] §2.6): "Duplicate keys SHOULD NOT be present. If duplicate keys
     are present, the last value wins. The parser SHOULD **warn**."
   - **Duplicate record field names** (§2.5): the same shape — SHOULD be unique, last value wins.
@@ -141,7 +142,8 @@ choice this list once called it.
 
 ## Reader behaviour
 
-- [ ] **A reported record binds to `null` in object mode, however small the problem.** `RecordBindReader`
+- [ ] **A reported record binds to `null` in object mode, however small the problem**
+  ([#7](https://github.com/litterat/ltr8-io-tson-java/issues/7)). `RecordBindReader`
   returns `null` whenever `ctx.reported()` moved while it was reading, on the grounds that a bound
   constructor cannot take a null argument for a primitive-typed parameter. But the counter is per *read*,
   not per record, so a diagnostic anywhere in a subtree also collapses every record above it — and for a
