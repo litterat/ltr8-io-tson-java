@@ -84,6 +84,24 @@ class TsonValidateTest {
     }
 
     @Test
+    void anUnknownRootTypeNamesWhatTheSchemaDoesDeclare() {
+        // The root-position analogue of UNRECOGNIZED_FIELD: the prose suggests the nearest declared name and
+        // `expected` carries the whole closed set, including the ~47 core.tn entries the !!import flattens
+        // in -- which is why the prose lists only a few of them rather than all.
+        List<Diagnostic> problems = tsonWithPoint().validate("""
+                !!schema:"https://example.test/point-1.tn"
+                !pont { x: 3  y: 4 }""");
+        assertEquals(1, problems.size(), problems.toString());
+        Diagnostic problem = problems.getFirst();
+        assertEquals(Diagnostic.Code.UNKNOWN_TYPE, problem.code());
+        assertTrue(problem.message().contains("did you mean 'point'?"), problem.message());
+        assertTrue(problem.message().contains("and 41 more"), problem.message());
+        assertEquals("pont", problem.actual());
+        assertTrue(problem.expected().endsWith("| point"), problem.expected());
+        assertTrue(problem.expected().contains("int32"), problem.expected());
+    }
+
+    @Test
     void plainAndPinnedReferencesToOneSchemaBothResolve() {
         // Two references differing only by a ?sha256= pin are one identity: the schema resolves and
         // registers once, so both validate rather than the second double-registering. (Both use the

@@ -283,7 +283,13 @@ public final class TsonObjectReader {
 
     /** Reports {@code code}/{@code message}, discards the root value, and yields no object -- see {@link #readAgainstSchema}. */
     private static <T> T abandon(TsonReadContext ctx, Diagnostic.Code code, String message) {
-        ctx.report(code, message, "", "");
+        return abandon(ctx, code, message, "", "");
+    }
+
+    /** {@link #abandon(TsonReadContext, Diagnostic.Code, String)} for a problem with machine-readable ends. */
+    private static <T> T abandon(TsonReadContext ctx, Diagnostic.Code code, String message, String expected,
+            String actual) {
+        ctx.report(code, message, expected, actual);
         EventSkip.dataValue(ctx);
         return null;
     }
@@ -320,11 +326,14 @@ public final class TsonObjectReader {
             }
             name = typeRef.name();
         }
-        try {
-            return new RootReader(compiled.get(name), name);
-        } catch (RuntimeException e) {
-            return abandon(ctx, Diagnostic.Code.UNKNOWN_TYPE, e.getMessage());
+        TsonTypeReader<?> reader = compiled.find(name).orElse(null);
+        if (reader == null) {
+            // The root-position analogue of an unrecognized field, answered the same way: the prose names
+            // the nearest declared type, and `expected` carries the closed set the ref could have named.
+            return abandon(ctx, Diagnostic.Code.UNKNOWN_TYPE, compiled.unknownTypeMessage(name),
+                    compiled.declaredTypeNames(), name);
         }
+        return new RootReader(reader, name);
     }
 
     private record RootReader(TsonTypeReader<?> reader, String typeName) {

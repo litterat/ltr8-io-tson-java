@@ -290,11 +290,6 @@ left:
   tell them apart, and neither can a renderer: `CliDiagnostic` maps `schemaId`/`expected`/`actual` to
   absent when empty but has to leave `path`/`schemaPointer` as plain strings for exactly this reason.
   Making the two pointers `Optional<String>` on `Diagnostic` itself would settle it at the source.
-- [ ] **`UNKNOWN_TYPE` doesn't enumerate, unlike its sibling.** A typo'd root type-ref reports
-  `'meeting_note' is not in this compiled schema` and stops there, where `UNRECOGNIZED_FIELD` lists the
-  closed field set that makes the fix one-shot. The message originates as `TsonCompiledSchema.get`'s
-  `IllegalArgumentException`, and the compiled schema knows its `entries()` — listing the declared type
-  names (the root position's exact analogue of a record's field list) costs nothing.
 
 ## Write side
 
