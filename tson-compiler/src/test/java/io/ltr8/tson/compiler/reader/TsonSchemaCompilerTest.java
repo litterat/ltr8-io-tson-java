@@ -107,6 +107,19 @@ class TsonSchemaCompilerTest {
         TsonCompiledSchema compiled = compile(linkedSchema);
 
         IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class, () -> compiled.get("nope"));
-        assertEquals("'nope' is not in this compiled schema", thrown.getMessage());
+        assertEquals("'nope' is not in this compiled schema, whose types are ()", thrown.getMessage());
+    }
+
+    @Test
+    void getOnAnUnknownNameEnumeratesTheTypesTheSchemaDoesDeclare() {
+        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        entries.put("first", TypeDefinition.product(RecordBody.of(List.of())));
+        entries.put("second", TypeDefinition.product(RecordBody.of(List.of())));
+        TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), entries);
+        TsonCompiledSchema compiled = compile(new TsonLinkedSchema(schema));
+
+        IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class, () -> compiled.get("frist"));
+        assertEquals("'frist' is not in this compiled schema, whose types are (first | second) -- did you "
+                + "mean 'first'?", thrown.getMessage());
     }
 }

@@ -3,6 +3,8 @@ package io.ltr8.tson.compiler;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -27,6 +29,9 @@ import java.util.Optional;
  * (§3.3.1's structure-namespace rule).
  */
 public sealed class TsonCompiledSchema permits TsonCompiledMetaSchema {
+
+    /** How many declared names {@link #unknownTypeMessage} spells out before summarizing the rest. */
+    private static final int NAMES_IN_MESSAGE = 8;
 
     private final TsonLinkedSchema linkedSchema;
     private final Map<String, TsonTypeReader<?>> entries;
@@ -55,9 +60,92 @@ public sealed class TsonCompiledSchema permits TsonCompiledMetaSchema {
     public TsonTypeReader<?> get(String typeName) {
         TsonTypeReader<?> parser = entries.get(typeName);
         if (parser == null) {
-            throw new IllegalArgumentException("'" + typeName + "' is not in this compiled schema");
+            throw new IllegalArgumentException(unknownTypeMessage(typeName));
         }
         return parser;
+    }
+
+    /**
+     * Every declared type name, in schema order, joined the way a record reader joins its own closed field
+     * list -- the closed set a type-ref at a root position may name, for a diagnostic's machine-readable
+     * {@code expected}. Order comes from the resolved schema's entries (insertion-ordered), not from
+     * {@link #entries}, which is an unordered immutable copy of the same name set.
+     */
+    String declaredTypeNames() {
+        return String.join(" | ", schema().entries().keySet());
+    }
+
+    /**
+     * Why {@code typeName} doesn't resolve, told the way an unrecognized record field is told (§7.2's closed
+     * field list): name what <em>is</em> declared, so the fix takes one step instead of a guess.
+     *
+     * <p>Unlike a record's field list, this namespace is not necessarily small -- an {@code !!import}
+     * flattens the imported schema's entries into this one, so a schema declaring one type over core.tn has
+     * ~50 names, and spelling all of them buries the one the author wrote. So the prose leads with the
+     * nearest declared name when there is one, and lists only the first few. The full set stays available
+     * through {@link #declaredTypeNames} for the machine-readable end of a {@code Diagnostic}.
+     */
+    String unknownTypeMessage(String typeName) {
+        Collection<String> names = schema().entries().keySet();
+        List<String> shown = names.stream().limit(NAMES_IN_MESSAGE).toList();
+        StringBuilder message = new StringBuilder("'").append(typeName)
+                .append("' is not in this compiled schema, whose types are (").append(String.join(" | ", shown));
+        if (names.size() > shown.size()) {
+            message.append(", and ").append(names.size() - shown.size()).append(" more");
+        }
+        message.append(")");
+        nearestTypeName(typeName).ifPresent(near -> message.append(" -- did you mean '").append(near).append("'?"));
+        return message.toString();
+    }
+
+    /**
+     * The declared name closest to {@code typeName} by edit distance, if one is close enough to be worth
+     * suggesting -- a typo, not a different name that happens to share a few letters. The tolerance grows
+     * with the name's own length (one edit for a short name, at most three for any), which is the same shape
+     * javac and rustc use for their own "did you mean". Ties go to the first in declaration order.
+     */
+    private Optional<String> nearestTypeName(String typeName) {
+        int tolerance = Math.clamp(typeName.length() / 3, 1, 3);
+        String nearest = null;
+        int best = tolerance + 1;
+        for (String candidate : schema().entries().keySet()) {
+            int distance = editDistance(typeName, candidate);
+            if (distance < best) {
+                best = distance;
+                nearest = candidate;
+            }
+        }
+        return Optional.ofNullable(nearest);
+    }
+
+    /**
+     * Optimal string alignment distance -- Levenshtein plus a one-edit transposition, because swapping two
+     * adjacent characters ({@code frist} for {@code first}) is the typo a suggestion most needs to forgive
+     * and plain Levenshtein charges two edits for. Three rolling rows rather than a full matrix; only ever
+     * run on a failed lookup, which is already on its way to an error.
+     */
+    private static int editDistance(String a, String b) {
+        int[] beforePrevious = new int[b.length() + 1];
+        int[] previous = new int[b.length() + 1];
+        int[] current = new int[b.length() + 1];
+        for (int j = 0; j <= b.length(); j++) {
+            previous[j] = j;
+        }
+        for (int i = 1; i <= a.length(); i++) {
+            current[0] = i;
+            for (int j = 1; j <= b.length(); j++) {
+                int substitution = previous[j - 1] + (a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1);
+                current[j] = Math.min(substitution, Math.min(previous[j] + 1, current[j - 1] + 1));
+                if (i > 1 && j > 1 && a.charAt(i - 1) == b.charAt(j - 2) && a.charAt(i - 2) == b.charAt(j - 1)) {
+                    current[j] = Math.min(current[j], beforePrevious[j - 2] + 1);
+                }
+            }
+            int[] swap = beforePrevious;
+            beforePrevious = previous;
+            previous = current;
+            current = swap;
+        }
+        return previous[b.length()];
     }
 
     /**
