@@ -161,8 +161,10 @@ Only genuine gaps are listed above — a throw that means "your schema is wrong"
 ## Schema-side diagnostics
 
 Resolution and linking report every independent problem in one pass through a `TsonDiagnosticsReceiver`
-(issue #3, PR #4); `CLAUDE.md`'s "Schema-side diagnostics" section describes the shape and the decisions
-behind it. What is left:
+(issue #3, PR #4), whether reached by `tson compile`/`Tson.validateSchema` or by a *data* read whose
+`!!schema` names a schema that doesn't resolve — both give the same account of the same broken schema.
+`CLAUDE.md`'s "Schema-side diagnostics" section describes the shape and the decisions behind it. What is
+left:
 
 - [ ] **Desugaring is still fail-fast**, so a sugar-form error (`[T; 5..3]`, an unsupported template
   application) aborts before resolution reports anything. The same per-declaration treatment applies and

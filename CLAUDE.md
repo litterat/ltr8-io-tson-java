@@ -805,6 +805,15 @@ reads one value at a cursor and polices nothing around it.
   root value (so the stream still lands on `DocumentEnd`). Under `throwing()` that is indistinguishable from
   the old behaviour; under a collector they arrive as `Diagnostic`s, which is what lets `Tson.validate`
   delegate to `treeReader()` wholesale instead of re-deriving anything.
+- **A schema that *resolves* badly reports like one, even mid-read.** `tree.get(uri, receiver)` /
+  `bind.get(uri, receiver)` (over `TsonCompiledMetaRegistry.resolveLinked(uri, receiver)`) resolve and link
+  the named schema collecting, so validating a data document against a broken schema reports **every**
+  declaration at fault — the same account `tson compile` gives, since the schema is equally broken either
+  way. Those diagnostics go to the **facade's own receiver, not through `ctx.report`**, which would rebuild
+  them from the *data* cursor: stamping a data position on a problem that is in a schema and discarding the
+  `schemaPointer`. The registry caches nothing for a schema that reported, so a second read reports again
+  rather than appearing to succeed. Distinct from the bullet above: a schema that can't be *reached* (no
+  such URI, malformed, wrong `!!id`) is still one diagnostic, because there is nothing to enumerate.
 - **A schemaless read checks its type-refs, and `TypeRefCheck` (in `reader`) states the rules once** for
   both engines. Given `!X` on a value: (1) `X` **is** a `BuiltinTypeVocabulary` name → it must sit on a
   token (`TYPE_MISMATCH` otherwise) and that token must satisfy the atom

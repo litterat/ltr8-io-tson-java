@@ -301,9 +301,16 @@ public final class TsonObjectReader {
     private RootReader select(String schemaUri, TsonReadContext ctx, String typeName) {
         TsonCompiledSchema compiled;
         try {
-            compiled = bind.get(schemaUri);
+            // See TsonTreeReader.readAgainstSchema: every problem with the schema, reported to this reader's
+            // own receiver so each keeps the declaration and position it belongs to rather than being
+            // rebuilt from the data cursor.
+            compiled = bind.get(schemaUri, receiver);
         } catch (RuntimeException e) {
             return abandon(ctx, Diagnostic.Code.SCHEMA_ERROR, e.getMessage());
+        }
+        if (compiled == null) {
+            EventSkip.dataValue(ctx);
+            return null;
         }
         String name = typeName;
         if (name == null) {
