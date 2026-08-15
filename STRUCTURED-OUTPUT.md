@@ -49,8 +49,11 @@ backend.
     are genuinely produced by a real reader today; `INTEGER_OUT_OF_RANGE`/`ENUM_MEMBER_NOT_RECOGNIZED`/
     `PATTERN_MISMATCH` never landed as their own codes — every atom-constraint violation maps to the
     one general `ATOM_CONSTRAINT_VIOLATION` instead, since `AtomValidationException` itself doesn't
-    carry a structured code to route on yet (still open, see below); `UNRECOGNIZED_FIELD`/
-    `DUPLICATE_MAP_KEY` exist on the enum but are reserved, unused (also still open, see below).
+    carry a structured code to route on yet (still open, see below); `UNRECOGNIZED_FIELD` now lands too,
+    carrying the type's real field list in `expected` (§7.2's record closure — the one place `expected`
+    already says what this bullet's item (4) asks for); `DUPLICATE_MAP_KEY` exists on the enum but is
+    reserved, blocked on `Diagnostic` having no severity axis — §2.6 wants a *warning* for a duplicate key,
+    and every `Diagnostic` today fails the document (`BACKLOG.md`).
   - `message` — landed, but still **hand-composed at each call site**, not synthesized from `code` +
     params as this bullet originally called for — that needs a richer per-code parameter shape than
     exists yet. Still open.

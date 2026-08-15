@@ -1,7 +1,6 @@
 package io.ltr8.tson.cli;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -16,7 +15,9 @@ import java.nio.file.Path;
  * walks through.
  *
  * <p>Refuses to overwrite either file if it already exists (exit 1) -- this is a scaffold, not
- * something that should ever clobber a user's own edits when re-run.
+ * something that should ever clobber a user's own edits when re-run. A target directory that does not
+ * exist yet is created; anything else that stops the files being written is also exit 1, never the
+ * exit 70 this CLI reserves for a fault in the library itself.
  */
 final class InitCommand {
 
@@ -81,10 +82,21 @@ final class InitCommand {
         }
 
         try {
+            // Naming a directory that doesn't exist yet is how every other scaffolding command is used
+            // (`git init dir`, `cargo new dir`), so create it rather than failing on the first write.
+            Files.createDirectories(dir);
             Files.writeString(schema, SCHEMA);
             Files.writeString(data, DATA);
         } catch (IOException e) {
-            throw new UncheckedIOException(e);
+            // An unwritable target is the *user's* problem -- a read-only directory, a name already taken by
+            // a regular file -- so it is this command's own exit 1, as documented above. Letting it out as an
+            // UncheckedIOException would reach TsonCli's fault handler and print "this is a bug in tson" with
+            // a stack trace over `tson init-example /nope`, which is the first command a newcomer runs.
+            // `e` rather than `e.getMessage()`: an NIO filesystem exception's message is usually just the
+            // path again, so the exception's own type is the only thing that says what went wrong -- the
+            // name is taken by a regular file, the directory is read-only, and so on.
+            System.err.println("could not write the example files to " + dir + " -- " + e);
+            return 1;
         }
 
         System.out.println("Wrote " + schema + " and " + data + ".");

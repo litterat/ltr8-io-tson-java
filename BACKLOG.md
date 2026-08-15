@@ -110,41 +110,47 @@ own prose (which had gone stale on at least one of them):
 
 ## Validation correctness — cases that report OK when they shouldn't
 
-Everything else in this file is work not done. These are places the library actively gives a **wrong
-verdict**, which is a different and worse category: a gap costs a retry, a false OK ships a validator that
-doesn't validate. Found by driving the CLI the way the LLM use case in `STRUCTURED-OUTPUT.md` would
-(2026-08-15).
+**Empty.** The membership rule is strict and worth keeping that way: *the library returns a wrong verdict*
+— it says OK to something it should reject. Nothing else. An error reported with too little detail, an
+over-strict return value, a bad exit code: those are real, but they belong to the sections that own them.
+The section grew to four items once by collecting everything one investigation turned up, and three of the
+four never matched this header at all.
 
-- [ ] **An unknown member in a refinement or construction body is silently ignored** — the most damaging
-  bug currently known, because it disables validation while reporting success. A JSON-Schema-shaped
-  refinement compiles clean and then enforces nothing:
+Record closure closed it out — the unknown member in a refinement body and the unknown field in data were
+one discard in `RecordAbstractReader.readFields`, and §7.2 settles it as a MUST rather than the policy
+choice this list once called it.
 
-  ```
-  quantity_t => !integer ^ { minimum: 1  maximum: 100 }     # TSON's facets are min/max
-  ```
+## Diagnostics: no severity axis, so two SHOULD-level rules are unreportable
 
-  `tson compile` reports `OK`, and `quantity: 99999` then validates `OK`. Not specific to those names —
-  `!integer ^ { totally_made_up: 42  another_bogus: "x" }` also compiles clean. The body is bound against
-  the constructor's declared vocabulary and unmatched members simply don't map to anything, so nothing
-  notices.
-  - **Why it matters disproportionately for the LLM use case**: a model authoring schemas reaches for
-    JSON Schema vocabulary constantly (`minimum`/`maximum`, `maxLength`, `required`, `pattern` at the
-    wrong level), and today every one of those is a silent no-op that passes. The author ships a schema
-    they believe constrains, and the validator agrees with data it was written to reject.
-  - Should be a resolver error naming the member and, ideally, listing the constructor's real vocabulary
-    (`integer_type` has `size`/`min`/`max`/`exclusive_min`/`exclusive_max`), which is exactly the
-    information that turns this into a one-shot fix.
-  - Worth a `SPEC-FEEDBACK.md` entry alongside: §5.5/§5.7 describe binding a body against a
-    constructor's vocabulary but do not obviously *say* an unknown member is an error, and an
-    implementation reading only the prose could plausibly land where this one did.
-- [ ] **`UNRECOGNIZED_FIELD` is on the `Code` enum but never produced**, so a field in *data* that the
-  schema doesn't declare is silently accepted (`hallucinated_field: "nope"` on a closed record validates
-  `OK`). Much less severe than the above — a hallucinated data field is usually inert where a hallucinated
-  schema facet disables a constraint — but it is the same "we said OK" shape, and for a repair loop it is
-  the difference between the model learning the field doesn't exist and believing it was stored.
-  - Genuinely a policy decision, not just an omission: strict-by-default versus lenient, and whether it is
-    per-read configurable. Readers iterate the *schema's* fields today, so nothing currently walks the
-    data's leftovers — this needs a real pass, not just an unused code being wired up.
+- [ ] **`Diagnostic` can only say "error"** ([#6](https://github.com/litterat/ltr8-io-tson-java/issues/6)).
+  Every one makes `Tson.validate` return non-empty and the CLI exit 1, so a rule the spec states as SHOULD
+  has nowhere to land. Two of them:
+  - **Duplicate map keys** ([TSON-DATA] §2.6): "Duplicate keys SHOULD NOT be present. If duplicate keys
+    are present, the last value wins. The parser SHOULD **warn**."
+  - **Duplicate record field names** (§2.5): the same shape — SHOULD be unique, last value wins.
+
+  Both are *detectable today, cheaply* — correcting a claim this file and `Diagnostic`'s own Javadoc used
+  to make: the parser does **not** collapse duplicates before a reader sees them. `MapAbstractReader.readInto`
+  walks every entry off the event stream and the duplicate disappears only at the sink's `Map.put`, and
+  `RecordAbstractReader.readFields` decodes every occurrence of a repeated field name by design
+  (`SPEC-FEEDBACK.md` #21). Detection is a `HashSet` at either loop. What is missing is a way to say
+  "warning": emitting `DUPLICATE_MAP_KEY` as things stand would fail a document the spec calls conforming,
+  which is the opposite defect and a worse one.
+  - The work is the model, not the detection: a severity on `Diagnostic`, a decision on how `validate` and
+    the CLI's exit codes treat a warning (exit 0 with output, presumably, and a `--strict` to promote), and
+    a `diagnostics-N.tn` bump for the wire shape.
+
+## Reader behaviour
+
+- [ ] **A reported record binds to `null` in object mode, however small the problem**
+  ([#7](https://github.com/litterat/ltr8-io-tson-java/issues/7)). `RecordBindReader`
+  returns `null` whenever `ctx.reported()` moved while it was reading, on the grounds that a bound
+  constructor cannot take a null argument for a primitive-typed parameter. But the counter is per *read*,
+  not per record, so a diagnostic anywhere in a subtree also collapses every record above it — and for a
+  closure violation the reasoning does not apply at all, since every declared field is intact and the
+  object is constructible. Fixing it means distinguishing "one of my own fields failed" from "something
+  below me did", which is a change to the `int before = ctx.reported()` checkpoint idiom shared with
+  `TupleBindReader`/`SchemalessObjectReader`. Tree mode already keeps the value.
 
 ## Remaining built-in types
 

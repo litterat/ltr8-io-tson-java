@@ -52,6 +52,18 @@ class SchemalessValidationTest {
         assertEquals(List.of(), validate("{ a: 1  b: hello  c: [x y z]  d: 3.14 }"));
     }
 
+    /**
+     * [TSON-SCHEMA] §7.2 closes a record under its type and then says, in the same paragraph, "Schemaless
+     * records have no closure rule" -- there is no type to be closed under. So no field name is ever
+     * unrecognized here, however unlikely it looks, and the exemption costs nothing to honour: closure lives
+     * in {@code RecordAbstractReader}, which only a compiled, schema-driven read reaches. Pinned so the rule
+     * is not later "completed" by extending it to this path.
+     */
+    @Test
+    void aSchemalessRecordIsNeverClosedUnderAnything() {
+        assertEquals(List.of(), validate("{ name: \"a\"  hallucinated_field: \"nope\" }"));
+    }
+
     @Test
     void aBadBuiltinAtomIsAnAtomConstraintViolationWithAPath() {
         List<Diagnostic> diagnostics = validate("{ id: !uuid nope  count: !int32 twelve }");

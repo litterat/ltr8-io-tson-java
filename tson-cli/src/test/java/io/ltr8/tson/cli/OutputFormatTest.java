@@ -44,6 +44,35 @@ class OutputFormatTest {
         assertEquals("[FIELD_REQUIRED] /value: missing", rendered);
     }
 
+    /**
+     * [TSON-DATA] §8.1 requires source position in *all* error reports, and a pointer on its own does not
+     * tell a human which line to open. The JSON output has carried both ends all along; this is the text
+     * renderer catching up.
+     */
+    @Test
+    void textIncludesThePositionAlongsideThePath() {
+        CliDiagnostic diagnostic = new CliDiagnostic("/address/city", "", "", Diagnostic.Code.TYPE_MISMATCH,
+                "expected text", "text", "42", Optional.of("3:12:47"), Optional.empty());
+
+        assertEquals("[TYPE_MISMATCH] /address/city (3:12:47): expected text",
+                OutputFormat.TEXT.render(new ValidationReport(false, List.of(diagnostic))));
+    }
+
+    /**
+     * A base-syntax error has no path into a document that would not parse, but it does know where it gave
+     * up -- and the byte offset appears nowhere else, the exception's own message carrying line and column
+     * only. Printing the position with no pointer is what keeps every diagnostic locatable by the same rule.
+     */
+    @Test
+    void textIncludesAPositionThatHasNoPointerToHangOn() {
+        CliDiagnostic diagnostic = new CliDiagnostic("", "", "", Diagnostic.Code.VALIDATION_ERROR,
+                "unterminated record", "well-formed TSON", "a base-syntax error", Optional.of("2:1:7"),
+                Optional.empty());
+
+        assertEquals("[VALIDATION_ERROR] (2:1:7): unterminated record",
+                OutputFormat.TEXT.render(new ValidationReport(false, List.of(diagnostic))));
+    }
+
     @Test
     void jsonRendersAWellShapedObject() {
         String rendered = OutputFormat.JSON.render(ValidationReport.failed(Diagnostic.Code.VALIDATION_ERROR, "bad \"quote\""));

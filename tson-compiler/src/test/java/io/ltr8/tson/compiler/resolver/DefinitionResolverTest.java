@@ -1394,6 +1394,73 @@ class DefinitionResolverTest {
         assertTrue(thrown.getMessage().contains("max_length 50 is above the source's own 10"), thrown.getMessage());
     }
 
+    /**
+     * A body the constructor's vocabulary rejects is the author's error, so it has to arrive as a {@link
+     * TsonSchemaValidationException} -- the only exception type {@code SchemaResolver}'s reporting overload
+     * collects into a diagnostic. An {@code UnsupportedOperationException} here (what the blanket
+     * {@code catch (RuntimeException)} used to produce) aborts the whole run and prints a "this is a bug in
+     * tson" banner over a plain typo, so the assertion is on the exception <em>type</em> first and the
+     * message second.
+     */
+    @Test
+    void aWrongTypedMemberInARefinementBodyIsASchemaErrorNotALibraryGap() {
+        TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
+        Map<String, TypeDefinition> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries());
+        DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
+        SchemaMap schemaMap = new TsonSchemaParser("""
+                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
+                { bad => !integer ^ { min: "abc" } }""").parseSchemaDocument().body();
+
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> instanceResolver.resolve(schemaMap.declarations().get("bad")));
+        assertTrue(thrown.getMessage().contains("not valid data for 'integer_type'"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("'abc' is not a valid integer"), thrown.getMessage());
+    }
+
+    /**
+     * The headline case: a JSON-Schema-shaped refinement. {@code minimum}/{@code maximum} are not TSON's
+     * facets, and before closure was enforced this compiled clean and then constrained nothing -- a schema
+     * that reports success while switching validation off, which is strictly worse than one that fails.
+     * A record is closed under its type (§7.2), and a constructor body is a record of that constructor's
+     * constraint vocabulary, so the unknown member is caught by the same rule that catches one in data.
+     *
+     * <p>The diagnostic has to carry the real vocabulary, because that is the whole repair: an author (or a
+     * model) reaching for {@code minimum} cannot guess {@code min} from a rejection alone.
+     */
+    @Test
+    void aJsonSchemaShapedFacetInARefinementBodyIsRejectedAndAnsweredWithTheRealVocabulary() {
+        TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
+        Map<String, TypeDefinition> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries());
+        DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
+        SchemaMap schemaMap = new TsonSchemaParser("""
+                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
+                { quantity_t => !integer ^ { minimum: 1  maximum: 100 } }""").parseSchemaDocument().body();
+
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> instanceResolver.resolve(schemaMap.declarations().get("quantity_t")));
+        assertTrue(thrown.getMessage().contains("unknown field 'minimum' on 'integer_type'"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("min | max"), thrown.getMessage());
+    }
+
+    /**
+     * The other side of the split: a failure that is <em>not</em> the reader reporting on the body keeps the
+     * {@code UnsupportedOperationException} gap wrapper. {@link #NEVER_CALLED} stands in for any such
+     * mechanical failure -- the classification turns on which exception the meta reader raised, not on which
+     * declaration reached it.
+     */
+    @Test
+    void aMetaReaderFailureThatIsNotAReadDiagnosticStaysALibraryGap() {
+        SchemaMap schemaMap = new TsonSchemaParser("""
+                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
+                { bad => !integer ^ { min: 1 } }""").parseSchemaDocument().body();
+        Map<String, TypeDefinition> namespace = new LinkedHashMap<>(metaKernelCompiled().schema().entries());
+        DefinitionResolver gapResolver = new DefinitionResolver(NEVER_CALLED, namespace::get, namespace::get);
+
+        UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
+                () -> gapResolver.resolve(schemaMap.declarations().get("bad")));
+        assertTrue(thrown.getMessage().contains("failed to bind 'integer_type'"), thrown.getMessage());
+    }
+
     @Test
     void atomRefinementNeverConsultsTheStructureNamespace() {
         // integer_type is real and present in `metaKernelEntries` -- an Instance target would find

@@ -2034,3 +2034,69 @@ document that differs from the bytes with no diagnostic. (That is exactly the bu
    with two forms, and three carve-out errors (`~ _` anywhere, `= _` on REQUIRED, `type? ~ value`): presence
    and mutability visibly are not independent, and presenting them as such is what makes `type? = value` look
    like a mechanical variant of `type = value` rather than a different intent.
+
+## 40. Closure is stated for data records only, so an unknown member in a *schema's* constructor body has no stated verdict — and the silent reading is the dangerous one
+
+**Section:** [TSON-SCHEMA] §7.2 (Type Annotation Resolution), §5.5 (Type Constructors and Application),
+§5.7 (Refinement).
+
+**Problem:** §7.2 states record closure clearly, and states it for data:
+
+> **Records are closed under their type.** When a schema is in scope and a record's type is known, the record
+> MUST contain only fields defined by its type; fields not present in the type definition are validation
+> errors. This applies to directly-typed records (`!person { ... }`) and structurally-positioned records (a
+> record at a record-typed field position). Schemaless records have no closure rule.
+
+A constructor application or atom refinement in a *schema* document writes a record too — `!integer ^ { min:
+0  max: 255 }` — and §5.5/§5.7 describe binding it against the constructor's vocabulary. Neither section says
+what happens to a member the vocabulary does not declare. The rule that answers it is two chapters away, in a
+section about data values, and reaches this case only through an inference the reader has to make
+unprompted: that a constructor body *is* a record whose type is known, so §7.2 governs it.
+
+§7.2 does supply the premise, in a sentence about validating data:
+
+> A **constructor** is a record-shaped type, so it validates a record against its constraint-field
+> vocabulary: `!integer_type { min: 0  max: 255 }` is a record conforming to `integer_type`'s fields,
+> receiving ordinary record validation.
+
+But that is stated where a reader is thinking about `!integer_type` appearing in a *data* document (the
+paragraph's subject is resolved-form output), not about `!integer ^ { … }` in the schema they are writing.
+Nothing at the schema-authoring sections points here.
+
+**Why the omission is worse than a normal gap.** The two readings are not symmetric. Reject-unknown fails
+loudly and is trivially correctable. Ignore-unknown *reports success* while silently discarding the
+constraint the author wrote — the schema compiles, validates, and enforces nothing at that facet. An
+implementation that binds a body field-by-field against the vocabulary lands on ignore-unknown by
+construction, because unmatched members simply never map to anything; nothing has to go wrong for the wrong
+behaviour to appear. **This implementation shipped exactly that**, and it was invisible until someone wrote a
+schema with the wrong facet names on purpose.
+
+**The wrong facet names are not a contrived case.** The vocabulary an author is most likely to reach for by
+mistake is JSON Schema's — `minimum`/`maximum` for `min`/`max`, `maxLength` for `max_length`, `required`,
+`pattern` at the wrong level. Every one of those spellings is plausible, and under ignore-unknown every one
+is a silent no-op:
+
+```
+quantity_t => !integer ^ { minimum: 1  maximum: 100 }     # compiles clean; constrains nothing
+```
+
+This matters more as TSON schemas are authored by language models, which reach for JSON Schema vocabulary
+constantly. A validator that accepts a schema it does not enforce is worse than one that rejects it, because
+the author stops looking.
+
+**Interpretation chosen:** unknown member is a resolver error, on the strength of §7.2's closure rule read
+together with its "ordinary record validation" sentence. This implementation enforces closure at one place —
+the compiled record reader — which covers data records and constructor bodies alike, since a body is bound by
+replaying it through the governing meta's own compiled reader. The diagnostic names the member and lists the
+constructor's real vocabulary, which is the part that makes the error correctable in one attempt.
+
+**Suggested resolution:**
+
+1. **State closure where bodies are written.** §5.5 and §5.7 should say that a construction or refinement
+   body is validated against the constructor's vocabulary as an ordinary closed record, and that a member the
+   vocabulary does not declare is a resolver error — or, at minimum, cross-reference §7.2 from both.
+2. **Move or duplicate the "constructor is a record-shaped type" sentence** so it appears in the schema
+   chapters, not only in the data chapter where its example is a resolved-form document.
+3. **Say it is an error, explicitly, rather than leaving it to the closure rule.** The failure mode here is
+   an implementation that never asks the question, so the rule needs to be stated where an implementer of
+   body binding is looking, in the imperative.

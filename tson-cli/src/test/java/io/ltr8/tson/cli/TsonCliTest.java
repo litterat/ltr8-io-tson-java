@@ -123,6 +123,34 @@ class TsonCliTest {
                 "validate", schema.toString(), data.toString()}));
     }
 
+    /**
+     * Naming a directory that does not exist yet is how a scaffolding command is normally used. It used to
+     * escape as an {@code UncheckedIOException}, so the very first command a newcomer runs printed a stack
+     * trace under "this is a bug in tson" and exited 70 -- the code reserved for a fault in the library.
+     */
+    @Test
+    void initCreatesATargetDirectoryThatDoesNotExistYet(@TempDir Path dir) {
+        Path fresh = dir.resolve("brand").resolve("new");
+
+        assertEquals(0, TsonCli.run(new String[] {"init-example", fresh.toString()}));
+
+        assertTrue(Files.exists(fresh.resolve("person.tn")), "person.tn written into a created directory");
+        assertEquals(0, TsonCli.run(new String[] {
+                "validate", fresh.resolve("person.tn").toString(), fresh.resolve("person-data.tn").toString()}));
+    }
+
+    /** An unwritable target is the user's problem, so it is exit 1 with a message -- never the library-fault code. */
+    @Test
+    void initReportsAnUnwritableTargetAsExitOne(@TempDir Path dir) throws IOException {
+        Path takenByAFile = dir.resolve("not-a-directory");
+        Files.writeString(takenByAFile, "");
+
+        String err = captureStderr(() ->
+                assertEquals(1, TsonCli.run(new String[] {"init-example", takenByAFile.toString()})));
+
+        assertTrue(err.contains("could not write the example files"), err);
+    }
+
     @Test
     void initRefusesToOverwriteExistingFiles(@TempDir Path dir) throws IOException {
         assertEquals(0, TsonCli.run(new String[] {"init-example", dir.toString()}));

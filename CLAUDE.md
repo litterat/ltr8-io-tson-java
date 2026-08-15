@@ -430,9 +430,14 @@ namespace *before* any local declaration resolves.
   vocabulary (§5.7's "finished"), a choice or bracketed form at a supertype position (`&` composes record
   types; §12.1 admits these only because `construction-def` draws its operands from `type-ref` where
   `refined-def` takes a name — `SPEC-FEEDBACK.md` #38), a name in a `!` position resolving in neither
-  namespace (the plain typo, §3.3.1), and a `!` form aimed at the wrong kind of target — refining a
+  namespace (the plain typo, §3.3.1), a `!` form aimed at the wrong kind of target — refining a
   constructor, applying a non-constructor, refining a non-atom — each answered with the form the author
-  probably meant. Telling an author their correctly-rejected schema is
+  probably meant, and **a body the constructor's own vocabulary rejects** (an unknown member, a wrong-typed
+  one), which arrives from the compiled meta reader as a `TsonReadException` and is restated here rather
+  than passed on in the reader's currency — the read `Diagnostic` itself is dropped, since it was produced
+  against a `DataValueEvents` replay whose positions are all the `(0,0,0)` placeholder and whose `path`
+  points into a synthetic body; the declaration's real position comes from `SchemaResolver`'s catch.
+  Telling an author their correctly-rejected schema is
   unsupported sends them looking for the wrong fix, and now costs more than clarity: only the validation
   exception is collected into a `Diagnostic`, so a misfiled author error also aborts the run instead of
   joining the other problems. The useful test is that **a schema error's verdict doesn't change when this
@@ -680,6 +685,18 @@ is small and parsed once.)
   a diagnostic from inside an atom carries *that atom's* declared position. A record field never mentioned
   by the data can only be noticed after the record is consumed, so its `FIELD_REQUIRED` reports against
   the record's *opening* position (captured up front) via `withPosition`, not the live cursor.
+- **Records are closed under their type** ([TSON-SCHEMA] §7.2, `RecordAbstractReader.readFields`): a field
+  name the type doesn't declare is `UNRECOGNIZED_FIELD`, reported and then skipped, so a collecting pass
+  finds every stray name and the value still comes back whole. The diagnostic carries the type's real field
+  names in schema order (message *and* `expected`) — the information that turns a retry into a one-shot
+  fix. **Not configurable**: §7.2 makes closure a MUST wherever a schema is in scope and exempts only
+  schemaless records, which are read by `SchemalessObjectReader`/`SchemalessTreeReader` and never reach
+  this code. **The same rule polices schema authoring**, through the same line: a constructor body is bound
+  by replaying it through the governing meta's compiled reader, so `!integer ^ { minimum: 1 }` (JSON
+  Schema's spelling of `min`) is rejected instead of compiling clean and constraining nothing — §5.5/§5.7
+  never say so themselves, which is `SPEC-FEEDBACK.md` #40. In bind
+  mode a reported record still binds to `null`, which is `RecordBindReader`'s standing rule for *any*
+  diagnostic raised while it reads (`ctx.reported()` counts a whole read), not something closure chose.
 - **Forward, single-pass, overwrite on a duplicate record field name** (`SPEC-FEEDBACK.md` #21) — a
   single-pass pull stream can't know a name recurs without buffering, so every occurrence is decoded
   (hence validated) and a later one overwrites an earlier (§2.5's "last value wins" by overwrite, not
@@ -696,8 +713,8 @@ is small and parsed once.)
 
 `Diagnostic` is the structured value every `TsonDiagnosticsReceiver` receives, identical shape whichever
 one is in play: a closed `Code` enum (`FIELD_REQUIRED`/`TYPE_MISMATCH`/`WRONG_ARITY`/`UNKNOWN_TYPE_REF`/
-`ATOM_CONSTRAINT_VIOLATION` from readers; `SCHEMA_ERROR`/`UNKNOWN_TYPE`/`VALIDATION_ERROR` for
-infrastructure-level failures; `UNRECOGNIZED_FIELD`/`DUPLICATE_MAP_KEY` reserved but unproduced),
+`ATOM_CONSTRAINT_VIOLATION`/`UNRECOGNIZED_FIELD` from readers; `SCHEMA_ERROR`/`UNKNOWN_TYPE`/
+`VALIDATION_ERROR` for infrastructure-level failures; `DUPLICATE_MAP_KEY` reserved but unproduced),
 `message` (hand-composed per call site), `expected`/`actual` (machine-parseable), and **four location
 components covering two ends** — the value in the data, and the rule in the schema.
 
@@ -722,9 +739,10 @@ is still implicit; the schema path populates all three (`BACKLOG.md`).
 An atom's `AtomTypeException` is caught in `AtomTypeReader` and mapped to
 `ATOM_CONSTRAINT_VIOLATION` — `AtomType`'s own signature is untouched, since it's shared with the
 schemaless binder which has no read context. Out of scope for now: message synthesis from code + params,
-fine-grained atom codes, `UNRECOGNIZED_FIELD`/`DUPLICATE_MAP_KEY` detection (readers iterate schema fields,
-and the parser already resolved "last value wins" before a reader sees a map), and per-field schema
-positions.
+fine-grained atom codes, `DUPLICATE_MAP_KEY` (detectable at `MapAbstractReader.readInto`, which sees every
+entry — but §2.6 makes a duplicate key a SHOULD NOT that *warns*, and `Diagnostic` has no severity axis, so
+reporting one would fail a conforming document; `BACKLOG.md` has the shape of that work), and per-field
+schema positions.
 
 ### Schema-side diagnostics (`SchemaResolver`, `TsonSchemaLinker`, `Tson.validateSchema`)
 

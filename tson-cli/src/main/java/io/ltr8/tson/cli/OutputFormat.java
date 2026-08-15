@@ -40,19 +40,33 @@ enum OutputFormat {
         StringBuilder text = new StringBuilder();
         for (CliDiagnostic error : report.errors()) {
             text.append('[').append(error.code()).append("] ");
-            // The data location if there is one, else the schema's: a problem in a schema has no data path,
-            // and printing it with no location at all would drop the position [TSON-DATA] §8.1 requires every
-            // error report to carry. A value error keeps showing its data path, unchanged.
-            if (!error.path().isEmpty()) {
-                text.append(error.path()).append(": ");
-            } else if (!error.schemaPointer().isEmpty()) {
-                text.append(error.schemaPointer());
-                error.schemaPosition().ifPresent(position -> text.append(" (").append(position).append(')'));
-                text.append(": ");
+            // The data location if there is one, else the schema's: a problem in a schema has no data end,
+            // and one found while reading a document has no schema pointer. Whichever end answers, both its
+            // halves print -- [TSON-DATA] §8.1 requires source position in *all* error reports, and a
+            // pointer alone ("/address/nested_bogus") does not tell a human which line to open.
+            String location = location(error.path(), error.dataPosition());
+            if (location.isEmpty()) {
+                location = location(error.schemaPointer(), error.schemaPosition());
+            }
+            if (!location.isEmpty()) {
+                text.append(location).append(": ");
             }
             text.append(error.message()).append(System.lineSeparator());
         }
         return text.toString().stripTrailing();
+    }
+
+    /**
+     * One end of a {@link CliDiagnostic}'s location, as {@code pointer (line:column:byteOffset)} -- either
+     * half may be missing, and an end with neither renders empty so the caller can fall through to the other.
+     * A position with no pointer is worth printing on its own: a base-syntax error has no path into a
+     * document it could not parse, but it does know where it gave up.
+     */
+    private static String location(String pointer, Optional<String> position) {
+        if (position.isEmpty()) {
+            return pointer;
+        }
+        return pointer.isEmpty() ? "(" + position.get() + ")" : pointer + " (" + position.get() + ")";
     }
 
     /** Every {@link CliDiagnostic} field, not just {@code code}/{@code message} -- the primary alignment target this shape maps to, Pydantic v2's own {@code ValidationError.errors()} ({@code type}/{@code loc}/{@code msg}/{@code input}/{@code ctx}), needs all of it. */
