@@ -112,39 +112,30 @@ own prose (which had gone stale on at least one of them):
 
 Everything else in this file is work not done. These are places the library actively gives a **wrong
 verdict**, which is a different and worse category: a gap costs a retry, a false OK ships a validator that
-doesn't validate. Found by driving the CLI the way the LLM use case in `STRUCTURED-OUTPUT.md` would
-(2026-08-15).
+doesn't validate. Found by driving the CLI the way the LLM use case in `STRUCTURED-OUTPUT.md` would.
 
-- [ ] **An unknown member in a refinement or construction body is silently ignored** — the most damaging
-  bug currently known, because it disables validation while reporting success. A JSON-Schema-shaped
-  refinement compiles clean and then enforces nothing:
+Record closure is done (both the unknown member in a refinement body and the unknown field in data — one
+discard in `RecordAbstractReader.readFields`, and §7.2 settles it as a MUST rather than the policy choice
+this list once called it). What is left:
 
-  ```
-  quantity_t => !integer ^ { minimum: 1  maximum: 100 }     # TSON's facets are min/max
-  ```
-
-  `tson compile` reports `OK`, and `quantity: 99999` then validates `OK`. Not specific to those names —
-  `!integer ^ { totally_made_up: 42  another_bogus: "x" }` also compiles clean. The body is bound against
-  the constructor's declared vocabulary and unmatched members simply don't map to anything, so nothing
-  notices.
-  - **Why it matters disproportionately for the LLM use case**: a model authoring schemas reaches for
-    JSON Schema vocabulary constantly (`minimum`/`maximum`, `maxLength`, `required`, `pattern` at the
-    wrong level), and today every one of those is a silent no-op that passes. The author ships a schema
-    they believe constrains, and the validator agrees with data it was written to reject.
-  - Should be a resolver error naming the member and, ideally, listing the constructor's real vocabulary
-    (`integer_type` has `size`/`min`/`max`/`exclusive_min`/`exclusive_max`), which is exactly the
-    information that turns this into a one-shot fix.
-  - Worth a `SPEC-FEEDBACK.md` entry alongside: §5.5/§5.7 describe binding a body against a
-    constructor's vocabulary but do not obviously *say* an unknown member is an error, and an
-    implementation reading only the prose could plausibly land where this one did.
-- [ ] **`UNRECOGNIZED_FIELD` is on the `Code` enum but never produced**, so a field in *data* that the
-  schema doesn't declare is silently accepted (`hallucinated_field: "nope"` on a closed record validates
-  `OK`). Much less severe than the above — a hallucinated data field is usually inert where a hallucinated
-  schema facet disables a constraint — but it is the same "we said OK" shape, and for a repair loop it is
-  the difference between the model learning the field doesn't exist and believing it was stored.
-  - Genuinely a policy decision, not just an omission: strict-by-default versus lenient, and whether it is
-    per-read configurable. Readers iterate the *schema's* fields today, so nothing currently walks the
-    data's leftovers — this needs a real pass, not just an unused code being wired up.
+- [ ] **A stray field in *bind* mode collapses the whole record to `null`.** `RecordBindReader` returns
+  `null` whenever `ctx.reported()` moved while it was reading, because a bound constructor can't take a
+  null argument for a primitive-typed parameter. That reasoning doesn't hold for a closure violation —
+  every declared field is intact and the object is constructible — but the counter is per *read*, not per
+  record, so any diagnostic anywhere below also collapses every record above it. Fixing it properly means
+  distinguishing "one of my own fields failed" from "something in my subtree did", which is a change to
+  the checkpoint idiom, not to closure. Tree mode keeps the value already.
+- [ ] **`DUPLICATE_MAP_KEY` is on the `Code` enum but never produced.** Not the same shape as closure was:
+  the parser resolves §2.6's "last value wins" before any reader sees a map, so detecting it needs a
+  different mechanism rather than a report at an existing branch.
+- [ ] **The TEXT output drops `dataPosition`.** `OutputFormat.renderText` prints a data diagnostic's RFC
+  6901 path and falls back to the schema pointer/position only when that path is empty — so a human sees
+  no line:column for a value error, while `--output json` carries it. [TSON-DATA] §8.1 requires source
+  position in all error reports; the data is already on the `Diagnostic` and only the renderer drops it.
+- [ ] **`tson init-example <dir>` exits 70 on a directory that doesn't exist.** `InitCommand.run` lets a
+  `NoSuchFileException` escape as an `UncheckedIOException`, so the "this is a bug in tson" banner and a
+  stack trace print for what is either a usage error or a directory the command should create. It is the
+  first command a new user runs.
 
 ## Remaining built-in types
 
