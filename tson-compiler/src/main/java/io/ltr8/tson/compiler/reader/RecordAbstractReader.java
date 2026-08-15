@@ -352,6 +352,12 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      * at a REQUIRED_FIXED field ("at a plain REQUIRED or a REQUIRED_FIXED field, `_` is a validation
      * error"). {@code _} at an OPTIONAL_FIXED field is fine -- the field may be absent, which is what it
      * asserts.
+     *
+     * <p><b>One wrong token yields one diagnostic.</b> The stated token is decoded through the field's own
+     * parser, which reports for its own reasons (an out-of-range integer, an enum non-member) and then hands
+     * back whatever a failed parse returns. Comparing that to the fixed value would report a contradiction
+     * inferred from a parse that already failed, so the {@code ctx.reported()} checkpoint idiom this reader
+     * stack uses everywhere else applies here too: if decoding reported, the contradiction check is skipped.
      */
     private void verifyFixed(TsonReadContext ctx, int schemaIndex, FieldSink sink, String fieldName) {
         if (ctx.peek() instanceof SchemaRef) {
@@ -377,7 +383,16 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                             + "written as '_'", "_", "a value");
             return;
         }
+        int before = ctx.reported();
         Object written = check.parser().read(fieldCtx);
+        if (ctx.reported() > before) {
+            // The token isn't a value of the field's own type at all, and that has just been reported against
+            // this same path. Whatever `read` handed back is what a failed parse returned, not what the
+            // document says, so comparing it to the fixed value would report a contradiction derived from a
+            // parse that already failed -- two diagnostics for one wrong token, the second of them evidence
+            // of nothing.
+            return;
+        }
         if (!Objects.equals(written, check.value())) {
             fieldCtx.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION,
                     "'" + fieldName + "' is fixed on '" + name + "' and cannot be given another value",
