@@ -108,6 +108,44 @@ own prose (which had gone stale on at least one of them):
   entry). Lower priority than the rest of this section: the spec marks this path explicitly **optional**
   ("MAY implement ingest"), not a MUST.
 
+## Validation correctness — cases that report OK when they shouldn't
+
+Everything else in this file is work not done. These are places the library actively gives a **wrong
+verdict**, which is a different and worse category: a gap costs a retry, a false OK ships a validator that
+doesn't validate. Found by driving the CLI the way the LLM use case in `STRUCTURED-OUTPUT.md` would
+(2026-08-15).
+
+- [ ] **An unknown member in a refinement or construction body is silently ignored** — the most damaging
+  bug currently known, because it disables validation while reporting success. A JSON-Schema-shaped
+  refinement compiles clean and then enforces nothing:
+
+  ```
+  quantity_t => !integer ^ { minimum: 1  maximum: 100 }     # TSON's facets are min/max
+  ```
+
+  `tson compile` reports `OK`, and `quantity: 99999` then validates `OK`. Not specific to those names —
+  `!integer ^ { totally_made_up: 42  another_bogus: "x" }` also compiles clean. The body is bound against
+  the constructor's declared vocabulary and unmatched members simply don't map to anything, so nothing
+  notices.
+  - **Why it matters disproportionately for the LLM use case**: a model authoring schemas reaches for
+    JSON Schema vocabulary constantly (`minimum`/`maximum`, `maxLength`, `required`, `pattern` at the
+    wrong level), and today every one of those is a silent no-op that passes. The author ships a schema
+    they believe constrains, and the validator agrees with data it was written to reject.
+  - Should be a resolver error naming the member and, ideally, listing the constructor's real vocabulary
+    (`integer_type` has `size`/`min`/`max`/`exclusive_min`/`exclusive_max`), which is exactly the
+    information that turns this into a one-shot fix.
+  - Worth a `SPEC-FEEDBACK.md` entry alongside: §5.5/§5.7 describe binding a body against a
+    constructor's vocabulary but do not obviously *say* an unknown member is an error, and an
+    implementation reading only the prose could plausibly land where this one did.
+- [ ] **`UNRECOGNIZED_FIELD` is on the `Code` enum but never produced**, so a field in *data* that the
+  schema doesn't declare is silently accepted (`hallucinated_field: "nope"` on a closed record validates
+  `OK`). Much less severe than the above — a hallucinated data field is usually inert where a hallucinated
+  schema facet disables a constraint — but it is the same "we said OK" shape, and for a repair loop it is
+  the difference between the model learning the field doesn't exist and believing it was stored.
+  - Genuinely a policy decision, not just an omission: strict-by-default versus lenient, and whether it is
+    per-read configurable. Readers iterate the *schema's* fields today, so nothing currently walks the
+    data's leftovers — this needs a real pass, not just an unused code being wired up.
+
 ## Remaining built-in types
 
 - [ ] `cidr4`/`cidr6`/`unknown` — no compiled-parser factory yet (`ValueReaderFactoryRegistry` registers
@@ -183,10 +221,47 @@ left:
   `expression_too_complex`: **a schema error's verdict doesn't change when the library improves; a gap's
   does.** `DefinitionResolver`'s `!`-position sites and `TsonSchemaSource.registeredOnly` are done;
   everywhere else still wants the pass.
+- [ ] **A schema *parse* error is still fail-fast, and names a token class rather than a construct.**
+  Everything downstream of parsing now reports many problems; parsing itself reports one and stops, so an
+  author fixes a syntax error, re-runs, and meets the next. The message is also pitched at the wrong level
+  for the person reading it: an atom refinement written inline at a field position (`quantity: !integer ^ {
+  min: 1 }`, a natural thing to try) gives
+
+  ```
+  [VALIDATION_ERROR] expected UNQUOTED (a type reference), found '!' (BANG) at line 8, column 15
+  ```
+
+  which is accurate about tokens and silent about the fix — hoist the refinement to its own declaration and
+  reference it. Naming the construct that *is* admissible at the failing position would turn a guess into a
+  one-shot correction. Related: `STRUCTURED-OUTPUT.md` tracks the same fail-fast gap one layer further down,
+  in the lexer.
 - Granularity ceiling to know before starting any of these: positions are **per declaration**, from the
   declaration's own name token. Sub-declaration positions (which field, which supertype) do not exist and
   would be their own parser work — visible today as a diagnostic pointing at `/my_type` when the problem is
   one of its fields.
+
+## Diagnostic quality for machine consumers
+
+- [ ] **`expected` names the type, not the constraint that failed**, so the structured fields carry strictly
+  less than the prose does — the opposite of the intent. Measured on real output:
+
+  | field | value |
+  |---|---|
+  | `message` | `'99999' is greater than the maximum 100` |
+  | `expected` | `a value satisfying quantity_t` |
+  | `actual` | `99999` |
+
+  Same for an enum: the message lists `[PENDING, SHIPPED, DELIVERED]`, `expected` says `a value satisfying
+  status`. A consumer reading the structured fields has to fall back to regexing `message` to recover the
+  bound or the member list, which is exactly what `Diagnostic` exists to avoid, and what the JDK's own
+  `javax.tools.Diagnostic` is criticised for in issue #3's research notes.
+  `STRUCTURED-OUTPUT.md`'s Tier 1 asks for precisely this — *"turns 'too large' into 'must be ≤ 100'"* — and
+  records the field as landed, which is optimistic: the field exists, the content doesn't.
+  - Cheapest useful version: have each atom's constraint check populate `expected` from the facet it
+    violated. That is where the bound already is; nothing needs to be plumbed to reach it.
+  - The fuller version is the standing `message`-synthesis item (compose the sentence *from* `code` +
+    params rather than hand-writing it per call site), which would make the two consistent by construction
+    instead of by discipline.
 
 ## Write side
 
