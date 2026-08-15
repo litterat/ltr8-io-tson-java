@@ -27,6 +27,11 @@ import java.util.Map;
  * out on its own whether the data's {@code !!schema} selects a schema or whether it's validated
  * schemalessly (base syntax + built-in atoms). This command only turns the argument list into a
  * source + a list of data files, then renders the diagnostics.
+ *
+ * <p><b>One {@link ValidationRun} per invocation, whatever the file count.</b> Each data file's
+ * verdict is a named {@link FileReport} inside it, so {@code --output json}/{@code tson} emit a
+ * single parseable document with the filenames in it rather than reports separated by labels a
+ * machine consumer would have to reassemble.
  */
 final class ValidateCommand {
 
@@ -42,7 +47,7 @@ final class ValidateCommand {
             try {
                 schema = isSchemaDocument(file);
             } catch (IOException e) {
-                System.out.println(format.render(ValidationReport.failed(Diagnostic.Code.VALIDATION_ERROR,
+                System.out.println(format.render(ValidationRun.failed(Diagnostic.Code.VALIDATION_ERROR,
                         "cannot read " + file + ": " + e.getMessage())));
                 return 2;
             }
@@ -60,7 +65,7 @@ final class ValidateCommand {
                         schemas.put(TsonCanonicalIdentity.canonicalize(id), text);
                     }
                 } catch (RuntimeException e) {
-                    System.out.println(format.render(ValidationReport.failed(Diagnostic.Code.SCHEMA_ERROR,
+                    System.out.println(format.render(ValidationRun.failed(Diagnostic.Code.SCHEMA_ERROR,
                             file + ": " + e.getMessage())));
                     return 2;
                 }
@@ -70,7 +75,7 @@ final class ValidateCommand {
         }
 
         if (dataFiles.isEmpty()) {
-            System.out.println(format.render(ValidationReport.failed(Diagnostic.Code.VALIDATION_ERROR,
+            System.out.println(format.render(ValidationRun.failed(Diagnostic.Code.VALIDATION_ERROR,
                     "no data files to validate (only schema files were given)")));
             return 2;
         }
@@ -86,11 +91,10 @@ final class ValidateCommand {
         };
         Tson tson = Tson.builder().schemaSource(source).build();
 
-        boolean allValid = true;
+        // Every file's report is collected before anything is printed: the envelope's own verdict is the
+        // AND across the files, so there is nothing to emit until the last one is in.
+        List<FileReport> reports = new ArrayList<>();
         for (Path dataFile : dataFiles) {
-            if (dataFiles.size() > 1) {
-                System.out.println("# " + dataFile);
-            }
             List<CliDiagnostic> errors;
             // IOException only: an unreadable file is that file's own problem, so it renders as a verdict
             // and the run carries on to the next one. A RuntimeException is not -- Tson.validate returns
@@ -100,17 +104,15 @@ final class ValidateCommand {
             try (InputStream in = Files.newInputStream(dataFile)) {
                 errors = tson.validate(in).stream().map(CliDiagnostic::from).toList();
             } catch (IOException e) {
-                allValid = false;
-                System.out.println(format.render(ValidationReport.failed(Diagnostic.Code.VALIDATION_ERROR,
-                        "cannot read " + dataFile + ": " + e.getMessage())));
-                continue;
+                errors = List.of(CliDiagnostic.minimal(Diagnostic.Code.VALIDATION_ERROR,
+                        "cannot read " + dataFile + ": " + e.getMessage()));
             }
-            if (!errors.isEmpty()) {
-                allValid = false;
-            }
-            System.out.println(format.render(new ValidationReport(errors.isEmpty(), errors)));
+            reports.add(FileReport.of(dataFile.toString(), errors));
         }
-        return allValid ? 0 : 1;
+
+        ValidationRun run = ValidationRun.of(reports);
+        System.out.println(format.render(run));
+        return run.valid() ? 0 : 1;
     }
 
     /** The three bundled standard-library identities, which {@code TsonConfig} always serves from its own resources. */

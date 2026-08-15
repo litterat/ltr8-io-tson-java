@@ -1040,6 +1040,18 @@ and calls it. Also `tson compile <schema>` (checks a schema compiles, tree mode)
 init-example [<dir>]` (writes a working `person.tn`/`person-data.tn`). The installed command is `tson`
 (`application.applicationName`), launched on the classpath.
 
+**`validate` emits one `ValidationRun` envelope per invocation, whatever the file count** — `{ valid, files:
+[{ file, valid, errors }], errors }`, so `--output json`/`tson` is a single parseable document with each
+verdict's filename *inside* it. Only `--output text` keeps the `# <file>` header (and only when there's more
+than one file): a label outside the object is right for a person and is exactly what made the machine
+formats unparseable. **The two error lists are the two exit codes**: run-level `errors` holds only what
+stops the invocation before any document is read (an unreadable file during classification, a schema with no
+`!!id`, no data files at all) and is exit 2, while a document that read but didn't validate lands in its own
+`FileReport` at exit 1 — so a consumer tells "your invocation was wrong" from "your document was" without
+reading messages. `compile` renders a bare `ValidationReport` instead, having one schema and nothing to
+name. Every file's report is collected before anything prints, since the envelope's verdict is the AND
+across them.
+
 **Exit codes: 0 all valid, 1 any data file invalid** (bad value / unresolvable `!!schema` / unknown type /
 no root type-ref), **2 usage/classification** (no data files, an unreadable/`!!id`-less schema, a bad
 flag), **70 (`EX_SOFTWARE`) a fault in the library**, whose stack trace prints to stderr. That fourth code

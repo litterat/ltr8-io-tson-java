@@ -495,14 +495,20 @@ $ tson validate person.tn ada.tn      # ada.tn = !!schema:"…/person-1.tn" !per
 OK
 
 $ tson validate --output json person.tn bad.tn   # bad.tn = !!schema:"…/person-1.tn" !person { age: 30 }
-{"valid":false,"errors":[{"path":"/name","code":"FIELD_REQUIRED",
+{"valid":false,"files":[{"file":"bad.tn","valid":false,"errors":[{"path":"/name",
+  "schemaPointer":"","schemaId":"","code":"FIELD_REQUIRED",
   "message":"missing required field 'name' for 'person'","expected":"a value for 'name'",
-  "actual":"(absent)","dataPosition":"2:1:…","schemaPosition":null}]}
+  "actual":"(absent)","dataPosition":"2:1:…","schemaPosition":null}]}],"errors":[]}
 
 $ tson compile person.tn
 OK
 ```
 
+- **`--output json`/`tson` is one document per invocation**, one file or twenty: a `files` array with each
+  data file's own `file`/`valid`/`errors`, wrapped in the run's own verdict. Nothing to reassemble, and
+  no branch on file count. The top-level `errors` carries only what stopped the run before any document
+  was read (exit 2); a document that read but didn't validate reports inside its own entry (exit 1).
+  `--output text` keeps the human-facing `# <file>` headers instead.
 - **Schema selection** is entirely the data's own doing: its `!!schema` names the schema and its root
   type-ref (`!person`) names the type. If a data file's `!!schema` names a schema you didn't pass,
   that's a `SCHEMA_ERROR`. There's no URL *fetching* — schemas come from the files you list (a

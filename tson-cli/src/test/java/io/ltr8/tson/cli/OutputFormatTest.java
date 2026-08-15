@@ -143,6 +143,87 @@ class OutputFormatTest {
         assertTrue(rendered.contains("second problem"));
     }
 
+    // --- the run envelope (what `validate` emits, whatever the file count) ---
+
+    @Test
+    void jsonRendersTheEnvelopeForASingleFileToo() {
+        ValidationRun run = ValidationRun.of(List.of(FileReport.of("a.tn", List.of())));
+
+        assertEquals("{\"valid\":true,\"files\":[{\"file\":\"a.tn\",\"valid\":true,\"errors\":[]}],\"errors\":[]}",
+                OutputFormat.JSON.render(run));
+    }
+
+    @Test
+    void jsonNamesEachFileAndCarriesItsOwnVerdict() {
+        ValidationRun run = ValidationRun.of(List.of(
+                FileReport.of("good.tn", List.of()),
+                FileReport.of("bad.tn", List.of(CliDiagnostic.minimal(Diagnostic.Code.TYPE_MISMATCH, "nope")))));
+
+        String rendered = OutputFormat.JSON.render(run);
+
+        assertEquals("{\"valid\":false,\"files\":["
+                + "{\"file\":\"good.tn\",\"valid\":true,\"errors\":[]},"
+                + "{\"file\":\"bad.tn\",\"valid\":false,\"errors\":[{\"path\":\"\",\"schemaPointer\":\"\","
+                + "\"schemaId\":\"\",\"code\":\"TYPE_MISMATCH\",\"message\":\"nope\",\"expected\":\"\","
+                + "\"actual\":\"\",\"dataPosition\":null,\"schemaPosition\":null}]}"
+                + "],\"errors\":[]}", rendered);
+    }
+
+    /**
+     * A run-level failure -- one that stopped the invocation before any document was read -- keeps the
+     * same envelope, with no files in it. That is the shape a consumer meets on exit 2, and meeting a
+     * second shape there is exactly what this envelope exists to prevent.
+     */
+    @Test
+    void jsonRendersARunThatNeverReachedADocument() {
+        ValidationRun run = ValidationRun.failed(Diagnostic.Code.VALIDATION_ERROR, "no data files");
+
+        String rendered = OutputFormat.JSON.render(run);
+
+        assertTrue(rendered.startsWith("{\"valid\":false,\"files\":[],\"errors\":[{"), rendered);
+        assertTrue(rendered.contains("\"message\":\"no data files\""), rendered);
+    }
+
+    /** The {@code # <file>} label is text-only, and only when there is more than one file to tell apart. */
+    @Test
+    void textLabelsEachFileOnlyWhenThereIsMoreThanOne() {
+        FileReport bad = FileReport.of("bad.tn", List.of(
+                CliDiagnostic.minimal(Diagnostic.Code.TYPE_MISMATCH, "nope")));
+
+        assertEquals("[TYPE_MISMATCH] nope", OutputFormat.TEXT.render(ValidationRun.of(List.of(bad))));
+        assertEquals("# good.tn" + System.lineSeparator() + "OK" + System.lineSeparator()
+                        + "# bad.tn" + System.lineSeparator() + "[TYPE_MISMATCH] nope",
+                OutputFormat.TEXT.render(ValidationRun.of(List.of(FileReport.of("good.tn", List.of()), bad))));
+    }
+
+    @Test
+    void tsonOutputRoundTripsARunThroughTheDiagnosticsSchema() {
+        ValidationRun original = ValidationRun.of(List.of(
+                FileReport.of("good.tn", List.of()),
+                FileReport.of("bad.tn", List.of(new CliDiagnostic("/a", "", "", Diagnostic.Code.FIELD_REQUIRED,
+                        "missing required field 'a'", "a value", "(absent)", Optional.of("1:1:0"),
+                        Optional.of("6:3:42"))))));
+
+        String rendered = OutputFormat.TSON.render(original);
+
+        Object reread = DiagnosticsSchema.compiled().get("validation_run")
+                .read(TestDocuments.document(rendered));
+
+        assertEquals(original, reread);
+    }
+
+    @Test
+    void tsonOutputRoundTripsARunThatNeverReachedADocument() {
+        ValidationRun original = ValidationRun.failed(Diagnostic.Code.VALIDATION_ERROR, "no data files");
+
+        String rendered = OutputFormat.TSON.render(original);
+
+        Object reread = DiagnosticsSchema.compiled().get("validation_run")
+                .read(TestDocuments.document(rendered));
+
+        assertEquals(original, reread);
+    }
+
     @Test
     void tsonOutputRoundTripsRealPositions() {
         ValidationReport original = new ValidationReport(false, List.of(

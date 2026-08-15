@@ -12,6 +12,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -179,6 +180,71 @@ class ValidateCommandTest {
 
         assertTrue(output.contains("\"valid\":false"), output);
         assertTrue(output.contains("\"code\":\"ATOM_CONSTRAINT_VIOLATION\""), output);
+    }
+
+    /**
+     * The whole point of the envelope: whatever the file count, {@code --output json} is one document a
+     * harness can parse, with the filename each verdict belongs to <i>inside</i> it. The old shape put a
+     * bare {@code # <file>} line between per-file objects, which is neither JSON nor JSONL.
+     */
+    @Test
+    void multiFileJsonOutputIsOneParseableDocument(@TempDir Path dir) throws IOException {
+        Path schema = writeFile(dir, "schema.tn1", RECORD_SCHEMA);
+        Path good = writeFile(dir, "good.tson", selfDescribing("{ a: 1  b: 2 }"));
+        Path bad = writeFile(dir, "bad.tson", selfDescribing("{ a: 1 }"));
+
+        String output = captureStdout(() ->
+                assertEquals(1, ValidateCommand.run(List.of(schema, good, bad), OutputFormat.JSON)));
+
+        assertEquals(1, output.strip().lines().count(), output);
+        assertFalse(output.contains("# "), output);
+        assertTrue(output.startsWith("{\"valid\":false,\"files\":["), output);
+        assertTrue(output.contains("\"file\":\"" + good + "\",\"valid\":true,\"errors\":[]"), output);
+        assertTrue(output.contains("\"file\":\"" + bad + "\",\"valid\":false"), output);
+        assertTrue(output.contains("\"code\":\"FIELD_REQUIRED\""), output);
+    }
+
+    /** A single file gets the same envelope, so a consumer never branches on file count. */
+    @Test
+    void aSingleFileGetsTheSameEnvelope(@TempDir Path dir) throws IOException {
+        Path data = writeFile(dir, "data.tson", "42");
+
+        String output = captureStdout(() ->
+                assertEquals(0, ValidateCommand.run(List.of(data), OutputFormat.JSON)));
+
+        assertEquals("{\"valid\":true,\"files\":[{\"file\":\"" + data + "\",\"valid\":true,\"errors\":[]}],"
+                + "\"errors\":[]}", output.strip());
+    }
+
+    /**
+     * A failure that stops the run before any document is read (here: no data files at all) keeps the
+     * envelope too, with an empty {@code files} and the problem at run level -- so the exit-2 path
+     * doesn't hand a machine consumer a second shape to parse.
+     */
+    @Test
+    void aRunLevelFailureKeepsTheEnvelopeWithNoFilesInIt(@TempDir Path dir) throws IOException {
+        Path schema = writeFile(dir, "schema.tn1", RECORD_SCHEMA);
+
+        String output = captureStdout(() ->
+                assertEquals(2, ValidateCommand.run(List.of(schema), OutputFormat.JSON)));
+
+        assertTrue(output.strip().startsWith("{\"valid\":false,\"files\":[],\"errors\":[{"), output);
+        assertTrue(output.contains("no data files"), output);
+    }
+
+    /** Text keeps the per-file header, and keeps printing it only when there is more than one file. */
+    @Test
+    void textStillLabelsEachFileWhenThereIsMoreThanOne(@TempDir Path dir) throws IOException {
+        Path schema = writeFile(dir, "schema.tn1", RECORD_SCHEMA);
+        Path good = writeFile(dir, "good.tson", selfDescribing("{ a: 1  b: 2 }"));
+        Path bad = writeFile(dir, "bad.tson", selfDescribing("{ a: 1 }"));
+
+        String output = captureStdout(() ->
+                assertEquals(1, ValidateCommand.run(List.of(schema, good, bad), OutputFormat.TEXT)));
+
+        assertTrue(output.contains("# " + good), output);
+        assertTrue(output.contains("# " + bad), output);
+        assertTrue(output.contains("[FIELD_REQUIRED]"), output);
     }
 
     @Test
