@@ -6,12 +6,14 @@ import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
+import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.tree.TsonValue;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * The front door -- a small, curated entry point over {@code tson-compiler}'s own, larger and more
@@ -168,6 +170,54 @@ public final class Tson {
             // A base-syntax failure is this document's problem, so it renders like any other; anything else
             // is a fault in this library and rethrows itself from here.
             return List.of(Diagnostic.ofBaseSyntaxError(e));
+        }
+        return problems.diagnostics();
+    }
+
+    /**
+     * Validates a *schema* document, the schema-side peer of {@link #validate(String)}: resolves, links,
+     * registers and compiles it, and returns every problem found, an empty list meaning it is sound. Like
+     * {@link #validate}, it never throws for a bad input document -- malformed syntax, a broken declaration,
+     * an unresolved reference and an unloadable {@code !!import} all come back as {@link Diagnostic}s.
+     *
+     * <p><b>It stops at the first phase that reports anything</b> ([TSON-DATA] §8.1's four error categories
+     * are per layer, and this is the resolver layer). Every declaration is resolved before the verdict is
+     * given, and only if resolution was clean does linking run -- so a schema with three broken declarations
+     * reports three, but a schema with a broken declaration *and* an unresolved reference reports only the
+     * former, since the reference may well resolve once the declaration does. Both javac and Swift draw the
+     * boundary here: javac attributes every entry before {@code shouldStopPolicyIfError} blocks the next
+     * phase, and Swift never reaches SILGen after a Sema error. The alternative -- carrying placeholders
+     * forward -- reports consequences of the first error as though they were independent problems.
+     *
+     * <p><b>A schema is registered only if it is sound.</b> Nothing is added to this instance's registry when
+     * the returned list is non-empty, so a failed call leaves no half-resolved entry behind for a later one
+     * to trip over.
+     */
+    public List<Diagnostic> validateSchema(String schemaText) {
+        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        try {
+            TsonSchemaParser parser = new TsonSchemaParser(schemaText);
+            SchemaDocument document = parser.parseSchemaDocument();
+
+            TsonSchema resolved = new TsonSchemaResolver(core)
+                    .resolveSchema(document, parser.declarationPositions(), problems);
+            if (!problems.isEmpty()) {
+                return problems.diagnostics();
+            }
+            TsonLinkedSchema linked = TsonSchemaLinker.link(resolved, core.schemaRegistry(), problems);
+            if (!problems.isEmpty()) {
+                return problems.diagnostics();
+            }
+            treeRegistry().compile(core.schemaRegistry().register(linked));
+        } catch (TsonSchemaValidationException e) {
+            // Whatever the phases still raise rather than report: a document with no !!id, an !!import that
+            // will not load, a !!meta that may not govern. Author errors about the document as a whole, so
+            // they carry the root pointer rather than naming a declaration.
+            problems.report(Diagnostic.ofSchemaError("", "", e.getMessage(), Optional.empty()));
+        } catch (RuntimeException e) {
+            // Base syntax is this document's problem; anything else is a fault in this library and rethrows
+            // itself from here rather than being laundered into a false verdict.
+            problems.report(Diagnostic.ofBaseSyntaxError(e));
         }
         return problems.diagnostics();
     }

@@ -40,8 +40,15 @@ enum OutputFormat {
         StringBuilder text = new StringBuilder();
         for (CliDiagnostic error : report.errors()) {
             text.append('[').append(error.code()).append("] ");
+            // The data location if there is one, else the schema's: a problem in a schema has no data path,
+            // and printing it with no location at all would drop the position [TSON-DATA] §8.1 requires every
+            // error report to carry. A value error keeps showing its data path, unchanged.
             if (!error.path().isEmpty()) {
                 text.append(error.path()).append(": ");
+            } else if (!error.schemaPointer().isEmpty()) {
+                text.append(error.schemaPointer());
+                error.schemaPosition().ifPresent(position -> text.append(" (").append(position).append(')'));
+                text.append(": ");
             }
             text.append(error.message()).append(System.lineSeparator());
         }
@@ -58,6 +65,8 @@ enum OutputFormat {
             }
             CliDiagnostic error = report.errors().get(i);
             json.append("{\"path\":").append(jsonString(error.path()))
+                    .append(",\"schemaPointer\":").append(jsonString(error.schemaPointer()))
+                    .append(",\"schemaId\":").append(jsonString(error.schemaId()))
                     .append(",\"code\":").append(jsonString(error.code().name()))
                     .append(",\"message\":").append(jsonString(error.message()))
                     .append(",\"expected\":").append(jsonString(error.expected()))

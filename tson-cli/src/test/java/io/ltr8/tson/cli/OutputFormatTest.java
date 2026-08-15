@@ -38,7 +38,7 @@ class OutputFormatTest {
 
     @Test
     void textIncludesThePathWhenPresent() {
-        CliDiagnostic diagnostic = new CliDiagnostic("/value", Diagnostic.Code.FIELD_REQUIRED, "missing", "a value",
+        CliDiagnostic diagnostic = new CliDiagnostic("/value", "", "", Diagnostic.Code.FIELD_REQUIRED, "missing", "a value",
                 "(absent)", Optional.empty(), Optional.empty());
         String rendered = OutputFormat.TEXT.render(new ValidationReport(false, List.of(diagnostic)));
         assertEquals("[FIELD_REQUIRED] /value: missing", rendered);
@@ -47,7 +47,8 @@ class OutputFormatTest {
     @Test
     void jsonRendersAWellShapedObject() {
         String rendered = OutputFormat.JSON.render(ValidationReport.failed(Diagnostic.Code.VALIDATION_ERROR, "bad \"quote\""));
-        assertEquals("{\"valid\":false,\"errors\":[{\"path\":\"\",\"code\":\"VALIDATION_ERROR\","
+        assertEquals("{\"valid\":false,\"errors\":[{\"path\":\"\",\"schemaPointer\":\"\",\"schemaId\":\"\","
+                + "\"code\":\"VALIDATION_ERROR\","
                 + "\"message\":\"bad \\\"quote\\\"\",\"expected\":\"\",\"actual\":\"\","
                 + "\"dataPosition\":null,\"schemaPosition\":null}]}", rendered);
     }
@@ -59,7 +60,7 @@ class OutputFormatTest {
 
     @Test
     void jsonRendersPositionsWhenPresent() {
-        CliDiagnostic diagnostic = new CliDiagnostic("/value", Diagnostic.Code.FIELD_REQUIRED, "missing", "a value",
+        CliDiagnostic diagnostic = new CliDiagnostic("/value", "", "", Diagnostic.Code.FIELD_REQUIRED, "missing", "a value",
                 "(absent)", Optional.of("1:1:0"), Optional.of("6:3:42"));
         String rendered = OutputFormat.JSON.render(new ValidationReport(false, List.of(diagnostic)));
         assertTrue(rendered.contains("\"dataPosition\":\"1:1:0\""), rendered);
@@ -98,9 +99,9 @@ class OutputFormatTest {
     @Test
     void tsonOutputRoundTripsMultipleErrors() {
         ValidationReport original = new ValidationReport(false, List.of(
-                new CliDiagnostic("/a", Diagnostic.Code.VALIDATION_ERROR, "first problem", "", "",
+                new CliDiagnostic("/a", "", "", Diagnostic.Code.VALIDATION_ERROR, "first problem", "", "",
                         Optional.empty(), Optional.empty()),
-                new CliDiagnostic("/b", Diagnostic.Code.VALIDATION_ERROR, "second problem", "", "",
+                new CliDiagnostic("/b", "", "", Diagnostic.Code.VALIDATION_ERROR, "second problem", "", "",
                         Optional.empty(), Optional.empty())));
 
         String rendered = OutputFormat.TSON.render(original);
@@ -116,7 +117,7 @@ class OutputFormatTest {
     @Test
     void tsonOutputRoundTripsRealPositions() {
         ValidationReport original = new ValidationReport(false, List.of(
-                new CliDiagnostic("/value", Diagnostic.Code.FIELD_REQUIRED, "missing required field 'value'",
+                new CliDiagnostic("/value", "", "", Diagnostic.Code.FIELD_REQUIRED, "missing required field 'value'",
                         "a value", "(absent)", Optional.of("1:1:0"), Optional.of("6:3:42"))));
 
         String rendered = OutputFormat.TSON.render(original);

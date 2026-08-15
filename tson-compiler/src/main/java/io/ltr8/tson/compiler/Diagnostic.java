@@ -83,14 +83,18 @@ public record Diagnostic(String path, String schemaPointer, String schemaId, Cod
      * makes a schema fail to load or ingest"). The data end is empty because there is no data: this is
      * raised while the schema itself is being processed, before any document is read against it.
      *
-     * @param schemaId    canonical identity of the schema the problem is in
-     * @param declaration the declared type name, which becomes the {@code /name} schema pointer
+     * @param schemaId    canonical identity of the schema the problem is in, empty if it isn't known (the
+     *                    document may have failed before its own {@code !!id} could be read)
+     * @param declaration the declared type name, which becomes the {@code /name} schema pointer. Empty for a
+     *                    problem with the document as a whole rather than one of its declarations -- an
+     *                    unloadable {@code !!import}, say -- which leaves the pointer {@code ""}, RFC 6901's
+     *                    own spelling of "the whole document"
      * @param position    where that declaration begins in the schema source, absent for a synthesized entry
      */
     public static Diagnostic ofSchemaError(String schemaId, String declaration, String message,
                                            Optional<SourcePosition> position) {
-        return new Diagnostic("", "/" + declaration, schemaId, Code.SCHEMA_ERROR, message,
-                "", "", Optional.empty(), position);
+        return new Diagnostic("", declaration.isEmpty() ? "" : "/" + declaration, schemaId, Code.SCHEMA_ERROR,
+                message, "", "", Optional.empty(), position);
     }
 
     /**

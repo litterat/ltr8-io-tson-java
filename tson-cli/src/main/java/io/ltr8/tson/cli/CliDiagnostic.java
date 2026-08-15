@@ -17,18 +17,21 @@ import java.util.Optional;
  * the real {@link Diagnostic.Code} enum, since enum narrowing *is* a proven, already-used binding
  * path elsewhere in this codebase.
  */
-public record CliDiagnostic(String path, Diagnostic.Code code, String message, String expected, String actual,
+public record CliDiagnostic(String path, @Field("schema_pointer") String schemaPointer,
+                             @Field("schema_id") String schemaId,
+                             Diagnostic.Code code, String message, String expected, String actual,
                              @Field("data_position") Optional<String> dataPosition,
                              @Field("schema_position") Optional<String> schemaPosition) {
 
     static CliDiagnostic from(Diagnostic diagnostic) {
-        return new CliDiagnostic(diagnostic.path(), diagnostic.code(), diagnostic.message(), diagnostic.expected(),
+        return new CliDiagnostic(diagnostic.path(), diagnostic.schemaPointer(), diagnostic.schemaId(),
+                diagnostic.code(), diagnostic.message(), diagnostic.expected(),
                 diagnostic.actual(), diagnostic.dataPosition().map(CliDiagnostic::render),
                 diagnostic.schemaPosition().map(CliDiagnostic::render));
     }
 
     static CliDiagnostic minimal(Diagnostic.Code code, String message) {
-        return new CliDiagnostic("", code, message, "", "", Optional.empty(), Optional.empty());
+        return new CliDiagnostic("", "", "", code, message, "", "", Optional.empty(), Optional.empty());
     }
 
     private static String render(SourcePosition position) {
