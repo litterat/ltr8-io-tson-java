@@ -739,8 +739,9 @@ is still implicit; the schema path populates all three (`BACKLOG.md`).
 An atom's `AtomTypeException` is caught in `AtomTypeReader` and mapped to
 `ATOM_CONSTRAINT_VIOLATION` — `AtomType`'s own signature is untouched, since it's shared with the
 schemaless binder which has no read context. Out of scope for now: message synthesis from code + params,
-fine-grained atom codes, `DUPLICATE_MAP_KEY` detection (the parser already resolved "last value wins"
-before a reader sees a map, so this needs a different mechanism than record closure did), and per-field
+fine-grained atom codes, `DUPLICATE_MAP_KEY` (detectable at `MapAbstractReader.readInto`, which sees every
+entry — but §2.6 makes a duplicate key a SHOULD NOT that *warns*, and `Diagnostic` has no severity axis, so
+reporting one would fail a conforming document; `BACKLOG.md` has the shape of that work), and per-field
 schema positions.
 
 ### Schema-side diagnostics (`SchemaResolver`, `TsonSchemaLinker`, `Tson.validateSchema`)

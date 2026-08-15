@@ -101,9 +101,12 @@ public record Diagnostic(String path, String schemaPointer, String schemaId, Cod
      * A stable, machine-readable identifier from a closed vocabulary -- not a free string. The first six
      * members are produced by an actual reader against real data; {@code UNRECOGNIZED_FIELD} carries
      * [TSON-SCHEMA] §7.2's record closure, so its {@code expected} is the type's own field list.
-     * {@code DUPLICATE_MAP_KEY} is reserved and not yet produced by any reader -- the parser has already
-     * applied §2.6's "last value wins" by the time a reader sees a map, so it needs a mechanism of its own
-     * rather than a report at an existing branch. Every {@link
+     * {@code DUPLICATE_MAP_KEY} is reserved and not yet produced by any reader -- not for want of a place
+     * to detect one ({@code MapAbstractReader.readInto} sees every entry; the duplicate disappears only at
+     * the sink's {@code put}) but because [TSON-DATA] §2.6 makes a duplicate key a SHOULD NOT with defined
+     * recovery, asking the parser to <em>warn</em>, and this type has no severity axis: every {@code
+     * Diagnostic} is an error that fails the document. Reporting one today would reject data the spec calls
+     * conforming. See {@code BACKLOG.md}. Every {@link
      * io.ltr8.tson.compiler.atom.AtomTypeException} maps to the single {@code
      * ATOM_CONSTRAINT_VIOLATION} code for now, since {@code AtomValidationException} itself doesn't
      * yet carry a structured code to route on. That code is also, less accurately, what a

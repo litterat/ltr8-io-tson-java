@@ -110,32 +110,45 @@ own prose (which had gone stale on at least one of them):
 
 ## Validation correctness — cases that report OK when they shouldn't
 
-Everything else in this file is work not done. These are places the library actively gives a **wrong
-verdict**, which is a different and worse category: a gap costs a retry, a false OK ships a validator that
-doesn't validate. Found by driving the CLI the way the LLM use case in `STRUCTURED-OUTPUT.md` would.
+**Empty.** The membership rule is strict and worth keeping that way: *the library returns a wrong verdict*
+— it says OK to something it should reject. Nothing else. An error reported with too little detail, an
+over-strict return value, a bad exit code: those are real, but they belong to the sections that own them.
+The section grew to four items once by collecting everything one investigation turned up, and three of the
+four never matched this header at all.
 
-Record closure is done (both the unknown member in a refinement body and the unknown field in data — one
-discard in `RecordAbstractReader.readFields`, and §7.2 settles it as a MUST rather than the policy choice
-this list once called it). What is left:
+Record closure closed it out — the unknown member in a refinement body and the unknown field in data were
+one discard in `RecordAbstractReader.readFields`, and §7.2 settles it as a MUST rather than the policy
+choice this list once called it.
 
-- [ ] **A stray field in *bind* mode collapses the whole record to `null`.** `RecordBindReader` returns
-  `null` whenever `ctx.reported()` moved while it was reading, because a bound constructor can't take a
-  null argument for a primitive-typed parameter. That reasoning doesn't hold for a closure violation —
-  every declared field is intact and the object is constructible — but the counter is per *read*, not per
-  record, so any diagnostic anywhere below also collapses every record above it. Fixing it properly means
-  distinguishing "one of my own fields failed" from "something in my subtree did", which is a change to
-  the checkpoint idiom, not to closure. Tree mode keeps the value already.
-- [ ] **`DUPLICATE_MAP_KEY` is on the `Code` enum but never produced.** Not the same shape as closure was:
-  the parser resolves §2.6's "last value wins" before any reader sees a map, so detecting it needs a
-  different mechanism rather than a report at an existing branch.
-- [ ] **The TEXT output drops `dataPosition`.** `OutputFormat.renderText` prints a data diagnostic's RFC
-  6901 path and falls back to the schema pointer/position only when that path is empty — so a human sees
-  no line:column for a value error, while `--output json` carries it. [TSON-DATA] §8.1 requires source
-  position in all error reports; the data is already on the `Diagnostic` and only the renderer drops it.
-- [ ] **`tson init-example <dir>` exits 70 on a directory that doesn't exist.** `InitCommand.run` lets a
-  `NoSuchFileException` escape as an `UncheckedIOException`, so the "this is a bug in tson" banner and a
-  stack trace print for what is either a usage error or a directory the command should create. It is the
-  first command a new user runs.
+## Diagnostics: no severity axis, so two SHOULD-level rules are unreportable
+
+- [ ] **`Diagnostic` can only say "error".** Every one makes `Tson.validate` return non-empty and the CLI
+  exit 1, so a rule the spec states as SHOULD has nowhere to land. Two of them:
+  - **Duplicate map keys** ([TSON-DATA] §2.6): "Duplicate keys SHOULD NOT be present. If duplicate keys
+    are present, the last value wins. The parser SHOULD **warn**."
+  - **Duplicate record field names** (§2.5): the same shape — SHOULD be unique, last value wins.
+
+  Both are *detectable today, cheaply* — correcting a claim this file and `Diagnostic`'s own Javadoc used
+  to make: the parser does **not** collapse duplicates before a reader sees them. `MapAbstractReader.readInto`
+  walks every entry off the event stream and the duplicate disappears only at the sink's `Map.put`, and
+  `RecordAbstractReader.readFields` decodes every occurrence of a repeated field name by design
+  (`SPEC-FEEDBACK.md` #21). Detection is a `HashSet` at either loop. What is missing is a way to say
+  "warning": emitting `DUPLICATE_MAP_KEY` as things stand would fail a document the spec calls conforming,
+  which is the opposite defect and a worse one.
+  - The work is the model, not the detection: a severity on `Diagnostic`, a decision on how `validate` and
+    the CLI's exit codes treat a warning (exit 0 with output, presumably, and a `--strict` to promote), and
+    a `diagnostics-N.tn` bump for the wire shape.
+
+## Reader behaviour
+
+- [ ] **A reported record binds to `null` in object mode, however small the problem.** `RecordBindReader`
+  returns `null` whenever `ctx.reported()` moved while it was reading, on the grounds that a bound
+  constructor cannot take a null argument for a primitive-typed parameter. But the counter is per *read*,
+  not per record, so a diagnostic anywhere in a subtree also collapses every record above it — and for a
+  closure violation the reasoning does not apply at all, since every declared field is intact and the
+  object is constructible. Fixing it means distinguishing "one of my own fields failed" from "something
+  below me did", which is a change to the `int before = ctx.reported()` checkpoint idiom shared with
+  `TupleBindReader`/`SchemalessObjectReader`. Tree mode already keeps the value.
 
 ## Remaining built-in types
 
