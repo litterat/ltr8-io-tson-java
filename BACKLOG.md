@@ -431,17 +431,6 @@ missing most of the mirror.
   collector; a worked custom receiver is the obvious missing example, and it is what
   `STRUCTURED-OUTPUT.md`'s Tier 1.5 streaming consumer will be built on.
 
-## Build
-
-- [ ] **`./gradlew javadoc` fails, and has for a while.** 20 errors across three modules: 2 in
-  `tson-schema` (`RecordBody`, a bare `&` in Javadoc), 15 in `tson-compiler` (mostly `{@link}`s to members
-  that don't exist — `TsonCompiledMetaSchema#bootstrap`, several in `TsonTreeReader`/`TsonObjectReader` —
-  plus a bare `` `array<T>` `` read as a tag and an unterminated inline tag in `TsonDataStream`), 3 in
-  `tson-bind` (malformed HTML). Individually trivial; the reason they accumulated is worth knowing:
-  **`javadoc` is not part of `build`**, and when run directly Gradle stops at the first failing module, so
-  `tson-compiler`'s 15 were invisible behind `tson-schema`'s 2 until someone ran the modules separately.
-  Fixing the errors without also wiring `javadoc` into CI just resets the clock.
-
 ## Miscellaneous
 
 - [ ] General resolver-layer structural rules as reusable primitives, rather than binding-time-only

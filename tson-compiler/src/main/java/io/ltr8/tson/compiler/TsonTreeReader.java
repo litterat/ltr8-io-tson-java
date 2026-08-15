@@ -17,7 +17,7 @@ import java.io.InputStream;
  * door, the inverse of {@link TsonTreeWriter} and the tree-shaped peer of {@link TsonObjectReader} (which
  * produces bound Java objects). Like Jackson's {@code readTree}.
  *
- * <p><b>Two modes, fixed at construction.</b> A reader from {@link Tson#treeReader()} (the {@code
+ * <p><b>Two modes, fixed at construction.</b> A reader from {@code Tson#treeReader()} (the {@code
  * (TsonCompiledSchemaRegistry)} constructor) is <i>schema-aware</i>: a document that declares a {@code
  * !!schema} is validated against it as the tree is built -- the schema resolves through that environment's
  * own source and the document's root type-ref (e.g. {@code !person}) selects the type, so the tree is
@@ -34,7 +34,7 @@ import java.io.InputStream;
  * document or an out-of-range typed value throws {@link TsonReadException} at the first problem. {@link
  * #withDiagnostics} swaps that for any other {@link TsonDiagnosticsReceiver} -- a collector gathers every
  * problem in one pass and still hands back the (possibly partial) tree, in schema-aware and schemaless mode
- * alike. That is what makes this reader, with a collecting receiver, exactly what {@link Tson#validate}
+ * alike. That is what makes this reader, with a collecting receiver, exactly what {@code Tson#validate}
  * delegates to.
  *
  * <p>A schemaless read also checks type-refs: a built-in name ({@code !uuid}, {@code !date}) must sit on a
@@ -61,11 +61,11 @@ public final class TsonTreeReader {
 
     /**
      * Schema-aware -- validates a self-describing document against its {@code !!schema}, resolved and
-     * compiled through {@code tree}. Used by {@link Tson#treeReader()}.
+     * compiled through {@code tree}. Used by {@code Tson#treeReader()}.
      *
      * <p><b>Takes the registry rather than building one</b>, so a caller holding a registry shares its
      * compiled-schema cache with every reader made from it instead of each reader compiling the same schema
-     * again. That matters most where readers are cheap and frequent: {@link Tson#validate} makes one per
+     * again. That matters most where readers are cheap and frequent: {@code Tson#validate} makes one per
      * call, and a reader that built its own cache would recompile the schema for every document validated.
      *
      * @throws IllegalArgumentException if {@code tree} is an object-binding registry, whose readers produce
@@ -112,7 +112,7 @@ public final class TsonTreeReader {
      * This reader bound to the schema {@code schemaUri} names, for {@link #readAs} -- a new reader, leaving
      * this one unchanged, sharing its compiled-schema registry. The schema is resolved through the same
      * source and cache a self-describing document's own {@code !!schema} goes through, so it must already be
-     * registered (e.g. via {@link Tson#resolve}) or be servable by the configured {@code TsonSchemaSource}.
+     * registered (e.g. via {@code Tson#resolve}) or be servable by the configured {@code TsonSchemaSource}.
      */
     public TsonTreeReader withSchema(String schemaUri) {
         if (tree == null) {

@@ -24,41 +24,39 @@ import java.lang.invoke.MethodHandle;
  * implementation.
  * <p>
  * Extracting the values from an array object:
- * <p>
- * <pre>
+ * <pre>{@code
  * DataClassArray arrayClass = (DataClassArray) dataClass;
- * 
+ *
  * int length = (int) arrayClass.size().invoke(arrayData);
  * Object[] outputArray = new Object[length];
  * Object iterator = arrayClass.iterator().invoke(arrayData);
- * 
+ *
  * DataClassRecord arrayDataClass = arrayClass.arrayDataClass();
- * 
+ *
  * for (int x = 0; x < length; x++) {
- * 	Object av = arrayClass.get().invoke(iterator, arrayData);
- * 	outputArray[x] = toMap(arrayDataClass, av);
+ *     Object av = arrayClass.get().invoke(iterator, arrayData);
+ *     outputArray[x] = toMap(arrayDataClass, av);
  * }
- * </pre>
+ * }</pre>
  * <p>
  * Instantiating and loading values to the array:
- * <p>
- * <pre>
+ * <pre>{@code
  * DataClassArray arrayClass = (DataClassArray) dataClass;
  * Object[] inputArray = (Object[]) data;
- * 
+ *
  * int length = inputArray.length;
  * Object arrayData = arrayClass.constructor().invoke(length);
  * Object iterator = arrayClass.iterator().invoke(arrayData);
- * 
+ *
  * DataClassRecord arrayDataClass = arrayClass.arrayDataClass();
- * 
+ *
  * for (int x = 0; x < length; x++) {
- * 	arrayClass.put().invoke(iterator, arrayData, toObject(arrayDataClass, inputArray[x]));
+ *     arrayClass.put().invoke(iterator, arrayData, toObject(arrayDataClass, inputArray[x]));
  * }
- * 
+ *
  * v = arrayData;
- * </pre>
- * 
+ * }</pre>
+ *
  * The MethodHandle signatures are:
  * <ul>
  * <li>constructor( int size ):Array;

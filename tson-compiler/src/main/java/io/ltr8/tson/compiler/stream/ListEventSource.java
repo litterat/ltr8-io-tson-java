@@ -7,7 +7,7 @@ import java.util.NoSuchElementException;
  * A fixed, in-memory {@link TsonEventSource} replaying a pre-built list of events in order --
  * for a synthetic or already-fully-decoded value with no real lazy stream behind it (e.g. a
  * schema-composed literal default, or an already-parsed value tree being replayed through a
- * compiled reader). Every position carries its own {@link Position}, same as a real {@link
+ * compiled reader). Every position carries its own {@link io.ltr8.tson.compiler.Position}, same as a real {@link
  * io.ltr8.tson.compiler.TsonDataStream}-backed source -- a caller synthesizing events with no
  * genuine source position to report is free to use a placeholder one, since nothing here
  * requires it to be meaningful.

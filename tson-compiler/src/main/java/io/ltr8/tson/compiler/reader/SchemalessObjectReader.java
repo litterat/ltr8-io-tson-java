@@ -132,8 +132,8 @@ public final class SchemalessObjectReader {
      * Binds one value at {@code ctx}'s current position into {@code targetClass}. The general form, for a
      * caller managing their own {@link TsonReadContext} -- one built with a collecting {@link
      * io.ltr8.tson.compiler.TsonDiagnosticsReceiver} gathers every problem in one pass rather than throwing
-     * on the first. Frame-free: whole-document framing belongs to {@link TsonReadContext#document}, which
-     * builds the context.
+     * on the first. Frame-free: whole-document framing belongs to whoever owns the document --
+     * {@link io.ltr8.tson.compiler.TsonObjectReader}, which builds the context.
      */
     @SuppressWarnings("unchecked")
     public <T> T read(TsonReadContext ctx, Class<T> targetClass) {

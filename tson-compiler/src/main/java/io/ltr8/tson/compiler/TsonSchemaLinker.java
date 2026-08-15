@@ -74,9 +74,9 @@ import java.util.Set;
  *
  * <p><b>Type-parameter exception:</b> a bare name is valid if it resolves in the schema's own
  * namespace, or if it's one of the checked entry's own declared {@code parameters} -- load-bearing
- * for every parameterized declaration (`array`, `set`, `map`, `array_min`, `array_max`,
- * `array_ranged`), whose own {@code source}/body positions reference their own type parameter by
- * bare name (`array<T>`), not a real other entry.
+ * for every parameterized declaration ({@code array}, {@code set}, {@code map}, {@code array_min},
+ * {@code array_max}, {@code array_ranged}), whose own {@code source}/body positions reference their own
+ * type parameter by bare name ({@code array<T>}), not a real other entry.
  *
  * <p><b>{@code !!import} merging (Part 2 §2.2.3).</b> The final namespace a schema is checked
  * against is built in two stages, in this order: (1) every {@code !!import}'s own entries, in

@@ -299,7 +299,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      * it again.
      *
      * @param governingMeta the already-compiled meta-schema {@code schema.meta()} names -- meta-
-     *                       kernel's own case aside (see {@link TsonCompiledMetaSchema#bootstrap}),
+     *                       kernel's own case aside (see {@link TsonSchema#bootstrap()}),
      *                       always a previous call's own {@link #get} result
      */
     public synchronized TsonCompiledMetaSchema register(TsonSchema schema, TsonCompiledMetaSchema governingMeta) {

@@ -6,9 +6,9 @@ import java.util.List;
 
 /**
  * The kernel's {@code record} constructor's own vocabulary, resolved (Part 2 §5.2, §8.1): {@code
- * access_pattern}/{@code size_type} are fixed by the constructor itself (`NAMED`/`FIXED`) and never
- * appear in output; {@code supertypes} is populated only when the source composed with `&` (e.g.
- * `atom => top & {}`) -- empty here ideally means a fresh record with no listed supertypes, omitted
+ * access_pattern}/{@code size_type} are fixed by the constructor itself ({@code NAMED}/{@code FIXED}) and
+ * never appear in output; {@code supertypes} is populated only when the source composed with {@code &}
+ * (e.g. {@code atom => top & {}}) -- empty here ideally means a fresh record with no listed supertypes, omitted
  * from output the same way; {@code groups} similarly for a record with no field groups. In
  * practice, bound through plain {@code TsonObjectWriter.toTson} rather than a hand-written writer (see
  * {@code TypeDefinition}'s own Javadoc), both currently render as {@code []} rather than being

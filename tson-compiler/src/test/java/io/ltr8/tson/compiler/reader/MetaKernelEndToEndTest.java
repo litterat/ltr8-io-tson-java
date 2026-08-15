@@ -39,8 +39,8 @@ class MetaKernelEndToEndTest {
      * unlike {@link TsonCompiledMetaSchema#reader}, {@link TsonCompiledSchema#get} reads *any*
      * entry, not just the ones with {@code constructor() == true}, which every test in this class
      * needs (e.g. {@code integer_size}, {@code field_group}, ordinary records with no constructor of
-     * their own). Mirrors {@link TsonCompiledMetaSchema#bootstrap}'s own first step exactly, without
-     * the final re-wrap that method's own return value would otherwise force.
+     * their own). Mirrors {@link io.ltr8.tson.compiler.TsonCompiledMetaRegistry#bootstrap}'s own first
+     * step exactly, without the final re-wrap that method's own return value would otherwise force.
      */
     private static TsonCompiledSchema rawCompile(TsonLinkedSchema linked) {
         return TsonSchemaCompiler.compile(linked, ValueReaderFactoryRegistry.tree());
