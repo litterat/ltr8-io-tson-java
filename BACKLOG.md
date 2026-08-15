@@ -151,6 +151,12 @@ choice this list once called it.
   object is constructible. Fixing it means distinguishing "one of my own fields failed" from "something
   below me did", which is a change to the `int before = ctx.reported()` checkpoint idiom shared with
   `TupleBindReader`/`SchemalessObjectReader`. Tree mode already keeps the value.
+- [ ] **A stated FIXED field double-reports when its token is also malformed.**
+  `RecordAbstractReader.verifyFixed` reads the written token through the field's own parser — which reports
+  (an enum non-member, say) — and then the `Objects.equals` mismatch against the schema's value reports
+  again at the same path, so one wrong token yields two diagnostics, the second derived from a parse that
+  already failed. The `int before = ctx.reported()` checkpoint idiom the reader stack already uses is the
+  fix: skip the contradiction report when the parse itself reported.
 
 ## Remaining built-in types
 
@@ -201,6 +207,11 @@ Only genuine gaps are listed above — a throw that means "your schema is wrong"
   the closed vocabulary and not an accurate one — a document contradicting `field: type = value` (§5.2) has
   violated a schema-level field constraint, not an atom's own parsing contract. Wants its own code, together
   with the "fine-grained atom codes" note under Diagnostics.
+  - The message is also the natural place for an authoring hint: `=` reads as "default" to anyone arriving
+    from JSON Schema, so `priority: priority = medium` is a plausible mis-spelling of `~ medium` — and the
+    author only discovers it when the reader rejects every data value that dared to differ. A trailing
+    "the schema declares this field with `=` (fixed); for a default the data may override, use `~`" turns
+    that discovery into a one-step fix.
 
 ## Schema-side diagnostics
 
@@ -268,6 +279,43 @@ left:
   - The fuller version is the standing `message`-synthesis item (compose the sentence *from* `code` +
     params rather than hand-writing it per call site), which would make the two consistent by construction
     instead of by discipline.
+- [ ] **`UNKNOWN_TYPE` doesn't enumerate, unlike its sibling.** A typo'd root type-ref reports
+  `'meeting_note' is not in this compiled schema` and stops there, where `UNRECOGNIZED_FIELD` lists the
+  closed field set that makes the fix one-shot. The message originates as `TsonCompiledSchema.get`'s
+  `IllegalArgumentException`, and the compiled schema knows its `entries()` — listing the declared type
+  names (the root position's exact analogue of a record's field list) costs nothing.
+
+## CLI
+
+Findings from running the structured-output loop end to end the way an LLM harness would (author a schema,
+generate data, iterate on `tson validate`'s diagnostics, consume `--output json`) — the loop itself works,
+including a whole JSON-flavored document (quoted field names, commas, quoted enum members) validating
+clean; these are the friction points the run surfaced. The exercise's biggest finding, a read-path
+diagnostic whose `schemaPosition` points into core.tn with no `schemaId` saying so, was already tracked
+under "Schema-side diagnostics".
+
+- [ ] **Multi-file `--output json` is not parseable as JSON.** `ValidateCommand.run` prints a `# <file>`
+  header line between per-file JSON objects whenever more than one data file is given, so a harness cannot
+  parse the output as JSON — the labels sit outside the objects, and `--output tson` has the same shape.
+  Either one envelope (`{ files: [ { file: ... valid: ... errors: [...] } ] }`) or JSONL with the filename
+  inside each object; whether the single-file form stays a bare object or gains the same `file` field is
+  the one design decision.
+- [ ] **No stdin, and the refusal is unhelpful.** An LLM harness holds the candidate document in memory;
+  today it must write a temp file per attempt, and `tson validate schema.tn -` dies with `cannot read -: -`
+  (exit 2 — the message is `Files.newInputStream` failing on a literal `-` path). Accept `-` as "read one
+  data document from stdin" (schemas stay files — classification re-reads, which stdin can't), and fix the
+  message regardless.
+- [ ] **`no schema file provided for !!schema "…"` should say what *was* provided.** Classification keys a
+  supplied schema file by its embedded `!!id`, not its filename (correct — §2.2.1), so a schema file whose
+  `!!id` differs from the data's `!!schema` produces this message while the author stares at the very file
+  they passed. Appending the supplied schemas' identities (`supplied schema files declare: [...]`) defuses
+  it; the `TsonSchemaSource` lambda in `ValidateCommand` already closes over the map it would list.
+- [ ] **Rendering polish**, three small ones from the same run: absent fields render inconsistently in JSON
+  (`schemaId`/`schemaPointer` come out `""`, being plain `String`s on `Diagnostic`, but the positions come
+  out `null`, being `Optional` on `CliDiagnostic`); the `line:column:byteOffset` position format is
+  documented only in `CliDiagnostic`'s Javadoc, nowhere a consumer of the JSON would look; and a
+  base-syntax diagnostic states its position twice (`(7:3:183): … found ']' (RBRACKET) at line 7, column
+  3` — the parser message embeds what the diagnostic also carries structurally as `dataPosition`).
 
 ## Write side
 
