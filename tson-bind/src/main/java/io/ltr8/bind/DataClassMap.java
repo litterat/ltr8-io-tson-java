@@ -31,7 +31,6 @@ import java.lang.invoke.MethodHandle;
  * times on the same entry).
  * <p>
  * Extracting the entries from a map object:
- * <p>
  * <pre>
  * DataClassMap mapClass = (DataClassMap) dataClass;
  *
@@ -45,7 +44,6 @@ import java.lang.invoke.MethodHandle;
  * </pre>
  * <p>
  * Instantiating and loading entries into the map:
- * <p>
  * <pre>
  * DataClassMap mapClass = (DataClassMap) dataClass;
  *

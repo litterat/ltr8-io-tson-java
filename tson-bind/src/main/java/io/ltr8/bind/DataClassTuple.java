@@ -35,7 +35,6 @@ import java.util.Arrays;
  * the way {@code DataClassArray}'s single element type lets {@code get(array, iter)} work.
  * <p>
  * Constructing from a positional value array:
- * <p>
  * <pre>
  * DataClassTuple tupleClass = (DataClassTuple) dataClass;
  * DataClassElement[] elements = tupleClass.elements();
