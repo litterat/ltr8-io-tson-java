@@ -23,10 +23,25 @@ own prose (which had gone stale on at least one of them):
   session's own `TinySchemaImportsCoreTn1Test`) has to already know and hand-sequence the correct
   registration order itself. A real import cycle is only caught incidentally today, as an opaque
   "not registered" error from `TsonSchemaLinker.mergeImports` — never with the spec's own required
-  "import cycle" diagnostic naming the actual cycle path. Distinct from the "single load-stdlib
-  entry point" item above, which is scoped to just the three bundled schemas, not a general
-  algorithm.
-- **Choice disjointness derivation and untagged reading** ([TSON-SCHEMA] §5.4, §8.1) — landed in part:
+  "import cycle" diagnostic naming the actual cycle path. Distinct from what
+  `TsonCompiledMetaRegistry.withStandardLibrary` already does, which is scoped to just the three bundled
+  schemas in a known order, not a general algorithm.
+- [ ] **A choice type doesn't resolve at all** ([TSON-SCHEMA] §5.4) — the gap underneath every other choice
+  item here, and not previously listed. `ChoiceBody` is **never constructed anywhere in main code**:
+  `DefinitionResolver` recognizes `ChoiceRef` only far enough to *reject* it at a supertype position, and
+  neither the `(a | b)` form nor `!choice { variants: [...] }` produces an entry. So no schema resolved from
+  source has a choice entry at all.
+  - The consequence is that two finished pieces of machinery have no live input. `ChoiceReader` is a
+    complete factory — dispatching on `!typeName` via `NamedDispatchReader`, precomputing §5.4's untagged
+    structural recovery where every variant occupies a distinct base-type class — and nothing can reach it.
+    `ChoiceDisjointness` likewise derives `disjoint` for choice entries the linker never sees; both are
+    exercised only by tests that hand-build a `ChoiceBody`.
+  - So the two sub-items below are **not** the remaining work on choice, and were misleading as written:
+    they refine a fact that is currently computed for nothing. Resolution has to come first.
+  - Blocks the conformance-suite sidecar reshape too (see "Conformance test suite" below, where `!choice`
+    is cited twice as the thing that would make a precise `outcome`-correlated shape expressible).
+- **Choice disjointness derivation and untagged reading** ([TSON-SCHEMA] §5.4, §8.1) — the derivation code
+  exists and is unit-tested, but per the item above it has no live producer until choice resolves:
   - [ ] **Two §5.4 "MAY" cases left absent:** record-set disjointness under composition, and pattern
     disjointness over `regex`-constrained atoms. The view on how far to go (recorded so it isn't
     relitigated): the `disjoint` *fact* is encoding-independent, but §5.4's Tagging rule makes TSON text
@@ -103,8 +118,8 @@ own prose (which had gone stale on at least one of them):
 - [ ] `uri_type`/`regex_type` — don't bind correctly in object-binding mode. Their RFC-citation
   field is nested inside `specification: AtomSpecification` rather than flat, so it never receives
   a schema-composed default the way `email_type`'s own flat `spec` field does.
-- [ ] `extern` ([TSON-SCHEMA] §7.8) — materially bigger than the four items above, which just need
-  an ordinary atom parser. `Extern` (`schema.meta`) is a record-only placeholder with no
+- [ ] `extern` ([TSON-SCHEMA] §7.8) — materially bigger than the two items above, which just need
+  an ordinary atom parser or a binding fix. `Extern` (`schema.meta`) is a record-only placeholder with no
   parsing/validation behavior at all (its own Javadoc says so explicitly: "not to add real
   cross-schema reference resolution"); the real mechanism — a value at an extern-matched position
   carrying its own scoped `!!schema` plus a mandatory `!type` tag, switching schema scope
@@ -134,18 +149,9 @@ own prose (which had gone stale on at least one of them):
   inline arrays of one are resolved so far"). Overlaps the template-substitution item above, but is
   reachable without templates.
 
-The classification of these throw sites is itself tracked under "Schema-side diagnostics". Of the ~34
-`UnsupportedOperationException`s the original audit found, three are correct use (an immutable map, an
-unreachable-by-construction guard, `ErrorReader`'s deliberate deferred failure) and about five wrap an
-internal fault; the rest were split between genuine gaps and schema-author errors wearing a library-gap
-exception. **`DefinitionResolver`'s share of that second group has been worked through**: a modifier-only
-entry with nothing to elide toward, a refinement body field or group that adds rather than tightens, a field
-name two supertypes contribute or one body declares twice or a group member repeats, a refinement source or
-a composition supertype whose body is a binding record, a choice or bracketed form at a supertype position,
-and a tightening outside §5.7's transition table all raise `TsonSchemaValidationException` now, each naming
-the rule it broke. A constructor with a non-record body turned out unreachable from the grammar and is an
-`IllegalStateException`. Only the genuine gaps are listed above; the same audit should still be applied to
-the throw sites outside `DefinitionResolver`.
+Only genuine gaps are listed above — a throw that means "your schema is wrong" is not one, and
+`DefinitionResolver`'s have been separated out already. The remaining classification work is tracked under
+"Schema-side diagnostics", which carries the current census.
 
 - [ ] **A FIXED-value contradiction reports as `ATOM_CONSTRAINT_VIOLATION`**, which is the closest code in
   the closed vocabulary and not an accurate one — a document contradicting `field: type = value` (§5.2) has
@@ -154,85 +160,31 @@ the throw sites outside `DefinitionResolver`.
 
 ## Schema-side diagnostics
 
-**Resolution and linking report through a `TsonDiagnosticsReceiver` now** (issue #3) — `CLAUDE.md`'s
-"Schema-side diagnostics" section describes the shape. The old baseline, kept because it is what the
-remaining items are measured against, was that a schema with two unresolved references reported one:
+Resolution and linking report every independent problem in one pass through a `TsonDiagnosticsReceiver`
+(issue #3, PR #4); `CLAUDE.md`'s "Schema-side diagnostics" section describes the shape and the decisions
+behind it. What is left:
 
-```
-[SCHEMA_ERROR] 'a' field 'x' has an unresolved reference 'no_such_type'
-```
-
-with `path: ""`, `schemaPosition: null`, and (through `validate`) a `dataPosition` pointing at 1:1 of the
-*data* file for a problem in the *schema*. Today the same schema reports both, each naming its declaration
-and where that declaration is in the source:
-
-```
-[SCHEMA_ERROR] /a (5:3:132): 'a' field 'x' has an unresolved reference 'no_such_type'
-[SCHEMA_ERROR] /b (6:3:159): 'b' field 'y' has an unresolved reference 'also_missing'
-```
-
-What is left is desugaring (still fail-fast), the read path's missing schema identity, and the throw-site
-classification outside `DefinitionResolver`.
-
-- [x] **Carry each declaration's source position through resolution.** Landed. `SchemaResolver.resolveSchema`
-  gained a position-taking overload, wired from `TsonSchemaParser.declarationPositions()` at all three
-  production call sites (`Tson.resolve`, `TsonCompiledMetaRegistry`'s bundled + on-demand paths). Before
-  this, `DefinitionResolver`'s position-carrying `resolve` overload existed with **exactly one caller, a
-  test** — so every `TypeDefinition.position()` was empty in production, and with it every `schemaPosition`
-  on every read diagnostic. A value error now points at both ends: where the value is, and where the type it
-  violated was declared. This also gives `SchemaDesugarer`'s structural-sharing invariant something real to
-  protect (an identity-keyed map nothing in production read).
-- [x] **Report schema problems as `Diagnostic`s, through the same receiver.** Landed for **resolution and
-  linking** (issue #3): each reports every independent problem in one pass, positioned, through the same
-  `TsonDiagnosticsReceiver`, and `Tson.validateSchema` composes the two with the phase boundary (resolve
-  everything; link only if resolution was clean). `Diagnostic` gained `schemaPointer`/`schemaId`, completing
-  JSON Schema §12's output-unit shape rather than inventing one. Sub-items below record what was settled and
-  what is left:
-  - [x] **Decide where `Diagnostic` lives.** Settled, and it does not move: `TsonSchemaLinker` moved *up*
-    into `tson-compiler` instead, so every phase from parse to compile now sits in one module with
-    `Diagnostic`/`TsonDiagnosticsReceiver` and can name them directly. `tson-schema` goes back to being a
-    pure value-model leaf (`schema.meta` plus the registry that stores it), matching `tson-tree`/`tson-regex`.
-    This was the cheaper direction: moving `Diagnostic` down would have split `ofBaseSyntaxError` off (it
-    names three `tson-compiler` exception types) and put a read-path value in the schema value model, and it
-    would have left the §5.4 pattern-disjointness seam below still needed. The linker canonicalizes through
-    `TsonCanonicalIdentity`, which was made public in the same pass — it was hidden in a one-class
-    `schema.registry` package behind two `TsonSchemaRegistry` delegations, though `TsonSchemaLoader.load`
-    takes a canonical identity as its argument, so implementing that seam always required it.
-  - **Classify the throw sites; they are not one kind of thing.** Census across the schema pipeline
-    (parser, desugarer, resolvers, linker, compiler, registries, `TsonCanonicalIdentity`), recounted after
-    the reclassification below: 13 `UnsupportedOperationException` (*library gaps* — "not resolved yet",
-    "only … so far"), 52 `TsonSchemaValidationException` (author errors — but 11 of those are
-    `TsonCanonicalIdentity` `!!id` string checks, inherently positionless), 16 `IllegalStateException`
-    (invariants/faults), 3 `TsonParseException` (schema syntax, already positioned). Reporting a library gap
-    as "your schema is wrong" is the same mistake the CLI made in reporting a library fault as an invalid
-    document — a gap and a fault are not verdicts. **`DefinitionResolver`'s `!`-position sites are done**: a
-    name resolving in
-    neither namespace (the plain typo), and a `!` form aimed at the wrong kind of target — refining a
-    constructor, applying a non-constructor, refining a non-atom — all raise `TsonSchemaValidationException`
-    now, including the *"'!x' does not resolve to a constructor (§3.3.1) — did you mean atom refinement?"*
-    case this bullet used to cite. The one left beside them is deliberate: an atom instance with no recorded
-    constructor is a malformed `TypeDefinition`, not a schema anyone wrote. The useful test, from Swift's
-    treatment of `expression_too_complex`: **a schema error's verdict doesn't change when the library
-    improves; a gap's does.** `TsonSchemaSource.registeredOnly` was reclassified on the same grounds — an
-    unloadable `!!import` was an `IllegalStateException`, so the CLI reported a mistyped URL as a fault in
-    the library (exit 70) rather than a problem with the document (exit 1). The remaining sites outside
-    `DefinitionResolver` still want the same pass.
-  - [x] **Find the shared object.** No new one was needed. The resolver's on-demand `namespaceGetter` and
-    the linker's per-entry validation loop are each already the natural boundary, and both are memoized or
-    single-pass, so one report per declaration falls out rather than needing dedup. The precedent followed
-    was `TsonSchemaCompiler`'s own `ErrorReader` substitution — "keep going, record the problem" — with the
-    resolver's placeholder taking javac's universally-absorbing contract rather than Swift's check-first one.
-  - [ ] **Desugaring is still fail-fast**, so a sugar-form error (`[T; 5..3]`, a template application that
-    isn't supported) aborts before resolution reports anything. The same per-declaration treatment applies;
-    `SchemaDesugarer` has the declaration in hand, so this is the cheapest remaining piece.
-  - [ ] **The read path carries `schemaPosition` but not `schemaId`/`schemaPointer`** — a reader knows the
-    declaration position it stamped, not which entry of which schema produced it, so a value error still
-    reports `110:3:4858` with nothing saying that is core.tn's line for `int32`. Threading the compiled
-    schema's identity down the reader stack is what closes it. (This subsumes the old "`SourcePosition` names
-    no document" item: the *field* now exists and the schema path populates it; only the read path doesn't.)
-  - Granularity ceiling, unchanged: positions are **per declaration**, from the declaration's own name
-    token. Sub-declaration positions (which field, which supertype) do not exist and would be their own
-    parser work — visible today as a diagnostic pointing at `/my_type` when the problem is one of its fields.
+- [ ] **Desugaring is still fail-fast**, so a sugar-form error (`[T; 5..3]`, an unsupported template
+  application) aborts before resolution reports anything. The same per-declaration treatment applies and
+  `SchemaDesugarer` has the declaration in hand, so this is the cheapest remaining piece.
+- [ ] **The read path carries `schemaPosition` but not `schemaId`/`schemaPointer`** — a reader knows the
+  declaration position it stamped, not which entry of which schema produced it, so a value error reports
+  `110:3:4858` with nothing saying that is core.tn's line for `int32`. Threading the compiled schema's
+  identity down the reader stack is what closes it.
+- [ ] **Finish classifying the throw sites outside `DefinitionResolver`.** Census across the schema pipeline
+  (parser, desugarer, resolvers, linker, compiler, registries, `TsonCanonicalIdentity`): 13
+  `UnsupportedOperationException` (*library gaps*), 52 `TsonSchemaValidationException` (author errors —
+  though 11 are `TsonCanonicalIdentity` `!!id` string checks, inherently positionless), 16
+  `IllegalStateException` (invariants/faults), 3 `TsonParseException` (schema syntax, already positioned).
+  Only a validation exception is collected into a `Diagnostic`, so a misfiled author error both aborts the
+  run and tells the author their correct schema is this library's fault. The test, from Swift's treatment of
+  `expression_too_complex`: **a schema error's verdict doesn't change when the library improves; a gap's
+  does.** `DefinitionResolver`'s `!`-position sites and `TsonSchemaSource.registeredOnly` are done;
+  everywhere else still wants the pass.
+- Granularity ceiling to know before starting any of these: positions are **per declaration**, from the
+  declaration's own name token. Sub-declaration positions (which field, which supertype) do not exist and
+  would be their own parser work — visible today as a diagnostic pointing at `/my_type` when the problem is
+  one of its fields.
 
 ## Write side
 
@@ -293,10 +245,10 @@ missing most of the mirror.
   implies `form`/`text` present and `fields`/`entries`/`elements` absent, and so on. Three ways to
   actually get that enforcement, discussed with the user 2026-07-29, in order of how much the real
   wire format would have to change:
-  - `!choice { variants: [...] }` — doesn't resolve at all today (see the new item above); even once
-    fixed, a schema built on it typically still needs a `!variant` tag or a discriminator convention
-    to disambiguate on read (`ChoiceReader`'s own "no structural-recovery path" gap, "Resolution &
-    linking generality" above) — not free once the construction bug itself is fixed.
+  - `!choice { variants: [...] }` — blocked on "A choice type doesn't resolve at all" under
+    "Resolution & linking generality" above. Even once that lands, a schema built on it needs a
+    `!typeName` tag unless every variant occupies a distinct base-type class, which `ChoiceReader`
+    already precomputes — so `core_value`'s variants, all records, would still be tagged on the wire.
   - **Field groups** (§5.11) — confirmed empirically to work today, including with a record-typed
     member (`core_value => { ( token: core_value_token | record: core_value_record | ... ) }`,
     resolves cleanly, each member individually `OPTIONAL`, mutual exclusivity captured in the
@@ -347,6 +299,17 @@ missing most of the mirror.
   collector, a metrics sink), and only the two built-ins are shown anywhere today. The README covers the
   collector; a worked custom receiver is the obvious missing example, and it is what
   `STRUCTURED-OUTPUT.md`'s Tier 1.5 streaming consumer will be built on.
+
+## Build
+
+- [ ] **`./gradlew javadoc` fails, and has for a while.** 20 errors across three modules: 2 in
+  `tson-schema` (`RecordBody`, a bare `&` in Javadoc), 15 in `tson-compiler` (mostly `{@link}`s to members
+  that don't exist — `TsonCompiledMetaSchema#bootstrap`, several in `TsonTreeReader`/`TsonObjectReader` —
+  plus a bare `` `array<T>` `` read as a tag and an unterminated inline tag in `TsonDataStream`), 3 in
+  `tson-bind` (malformed HTML). Individually trivial; the reason they accumulated is worth knowing:
+  **`javadoc` is not part of `build`**, and when run directly Gradle stops at the first failing module, so
+  `tson-compiler`'s 15 were invisible behind `tson-schema`'s 2 until someone ran the modules separately.
+  Fixing the errors without also wiring `javadoc` into CI just resets the clock.
 
 ## Miscellaneous
 
