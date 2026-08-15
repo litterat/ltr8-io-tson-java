@@ -47,6 +47,10 @@ final class ValidateCommand {
     /** @return exit code: 0 every data file valid, 1 at least one invalid, 2 a usage/classification failure */
     static int run(List<ValidateInput> inputs, OutputFormat format) {
         Map<String, String> schemas = new HashMap<>();
+        // The !!id each schema file declares, verbatim and in argument order -- what an unmatched
+        // !!schema is reported against. Kept apart from the lookup map, whose keys are canonicalized
+        // (scheme and ?sha256= stripped) and so would not be the string the author actually wrote.
+        List<String> declaredIds = new ArrayList<>();
         List<ValidateInput> dataInputs = new ArrayList<>();
         for (ValidateInput input : inputs) {
             // Standard input is a data document by definition -- classification opens the document a second
@@ -75,6 +79,7 @@ final class ValidateCommand {
                         // Key by canonical identity so a data file's plain !!schema resolves against a
                         // schema whose !!id carries a ?sha256= pin (the hash is not identity, §2.2.1).
                         schemas.put(TsonCanonicalIdentity.canonicalize(id), text);
+                        declaredIds.add(id);
                     }
                 } catch (RuntimeException e) {
                     System.out.println(format.render(ValidationRun.failed(Diagnostic.Code.SCHEMA_ERROR,
@@ -97,7 +102,8 @@ final class ValidateCommand {
         TsonSchemaSource source = uri -> {
             String text = schemas.get(TsonCanonicalIdentity.canonicalize(uri));
             if (text == null) {
-                throw new IllegalStateException("no schema file provided for !!schema \"" + uri + "\"");
+                throw new IllegalStateException("no schema file provided for !!schema \"" + uri + "\""
+                        + supplied(declaredIds));
             }
             return text;
         };
@@ -125,6 +131,22 @@ final class ValidateCommand {
         ValidationRun run = ValidationRun.of(reports);
         System.out.println(format.render(run));
         return run.valid() ? 0 : 1;
+    }
+
+    /**
+     * What the supplied schema files actually declare, appended to an unmatched {@code !!schema}.
+     *
+     * <p>A schema file is matched by the {@code !!id} inside it, never by its filename ([TSON-DATA]
+     * §2.2.1), so the mismatch an author hits most is passing the right file with the wrong identity in
+     * it -- and the bare "no schema file provided" then reads as though the file were missing, while they
+     * are looking straight at it. Listing the identities puts the two strings side by side, which is
+     * usually the whole diagnosis.
+     */
+    private static String supplied(List<String> declaredIds) {
+        if (declaredIds.isEmpty()) {
+            return " (no schema files were given)";
+        }
+        return " (the schema files given declare: " + String.join(", ", declaredIds) + ")";
     }
 
     /**

@@ -1045,7 +1045,18 @@ schemas stay files, and that rule is a consequence of the design rather than a r
 second `-` is a `UsageException`: one stream, consumed by the first read, so the second could only ever
 report an empty document as valid. Only the bare argument matches, leaving `./-` for a file actually named
 `-`. `cannotRead` names the failure kind (`NoSuchFileException` and friends carry it in the exception type,
-not the message, so the obvious concatenation renders `cannot read x: x`). The facade owns the whole per-document decision; the CLI just classifies files into a source
+not the message, so the obvious concatenation renders `cannot read x: x`). An unmatched `!!schema` lists
+what the supplied files *declare* — matching is by embedded `!!id`, never filename (§2.2.1), so the common
+failure is the right file with the wrong identity in it; `declaredIds` keeps the ids verbatim and in
+argument order, deliberately apart from the lookup map whose keys are canonicalized.
+
+**`CliDiagnostic` renders an absent field as absent.** `Diagnostic` spells "nothing to say" as `""` for its
+strings and as an empty `Optional` for its positions, so the output used to show both `""` and `null` for
+one idea; `schemaId`/`expected`/`actual` are now `Optional` and render `null`. **`path` and `schemaPointer`
+stay plain strings**, because for an RFC 6901 pointer `""` is the *root*, not an absence — `Tson.validateSchema`
+genuinely reports a document-level problem against it, and a base-syntax failure genuinely locates itself at
+the data root. That `""` means both things is a `Diagnostic`-level overload, not a rendering one, and is
+tracked in `BACKLOG.md` rather than papered over here. The facade owns the whole per-document decision; the CLI just classifies files into a source
 and calls it. Also `tson compile <schema>` (checks a schema compiles, tree mode), `tson hash <file>`, `tson
 init-example [<dir>]` (writes a working `person.tn`/`person-data.tn`). The installed command is `tson`
 (`application.applicationName`), launched on the classpath.

@@ -508,7 +508,7 @@ OK
 
 $ tson validate --output json person.tn bad.tn   # bad.tn = !!schema:"…/person-1.tn" !person { age: 30 }
 {"valid":false,"files":[{"file":"bad.tn","valid":false,"errors":[{"path":"/name",
-  "schemaPointer":"","schemaId":"","code":"FIELD_REQUIRED",
+  "schemaPointer":"","schemaId":null,"code":"FIELD_REQUIRED",
   "message":"missing required field 'name' for 'person'","expected":"a value for 'name'",
   "actual":"(absent)","dataPosition":"2:1:…","schemaPosition":null}]}],"errors":[]}
 
@@ -521,6 +521,13 @@ OK
   no branch on file count. The top-level `errors` carries only what stopped the run before any document
   was read (exit 2); a document that read but didn't validate reports inside its own entry (exit 1).
   `--output text` keeps the human-facing `# <file>` headers instead.
+- **A diagnostic locates a problem at up to two ends** — the value in the data (`path`, `dataPosition`)
+  and the rule in the schema (`schemaId`, `schemaPointer`, `schemaPosition`) — and either end may be
+  absent. A field with nothing to say is `null`, never `""`; the two pointers are the exception and are
+  always present, because for an RFC 6901 pointer `""` is the root rather than an absence. A position is
+  `line:column:byteOffset`, the first two 1-based and the offset counting UTF-8 bytes from 0. The whole
+  shape is declared as a real schema in `tson-cli`'s own `diagnostics.tn`, which `--output tson` is
+  validated against.
 - **Schema selection** is entirely the data's own doing: its `!!schema` names the schema and its root
   type-ref (`!person`) names the type. If a data file's `!!schema` names a schema you didn't pass,
   that's a `SCHEMA_ERROR`. There's no URL *fetching* — schemas come from the files you list (a

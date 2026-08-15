@@ -148,11 +148,11 @@ enum OutputFormat {
             CliDiagnostic error = errors.get(i);
             json.append("{\"path\":").append(jsonString(error.path()))
                     .append(",\"schemaPointer\":").append(jsonString(error.schemaPointer()))
-                    .append(",\"schemaId\":").append(jsonString(error.schemaId()))
+                    .append(",\"schemaId\":").append(jsonStringOrNull(error.schemaId()))
                     .append(",\"code\":").append(jsonString(error.code().name()))
                     .append(",\"message\":").append(jsonString(error.message()))
-                    .append(",\"expected\":").append(jsonString(error.expected()))
-                    .append(",\"actual\":").append(jsonString(error.actual()))
+                    .append(",\"expected\":").append(jsonStringOrNull(error.expected()))
+                    .append(",\"actual\":").append(jsonStringOrNull(error.actual()))
                     .append(",\"dataPosition\":").append(jsonStringOrNull(error.dataPosition()))
                     .append(",\"schemaPosition\":").append(jsonStringOrNull(error.schemaPosition()))
                     .append('}');

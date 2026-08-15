@@ -108,6 +108,39 @@ class ValidateCommandTest {
         assertTrue(output.contains("not-provided"), output);
     }
 
+    /**
+     * The mismatch an author actually hits: the right file passed, but its {@code !!id} isn't the identity
+     * the data names. Matching is by embedded identity, never by filename (§2.2.1), so the bare "no schema
+     * file provided" reads as though the file were missing while they are looking straight at it. Listing
+     * what the supplied files declare puts the two strings side by side.
+     */
+    @Test
+    void anUnmatchedSchemaSaysWhatTheSuppliedFilesDeclare(@TempDir Path dir) throws IOException {
+        Path schema = writeFile(dir, "schema.tn1", RECORD_SCHEMA);   // declares .../cli-validate.tn1
+        Path data = writeFile(dir, "data.tson",
+                "!!schema:\"https://example.test/typo.tn1\"\n!my_record { a: 1  b: 2 }\n");
+
+        String output = captureStdout(() ->
+                assertEquals(1, ValidateCommand.run(inputs(schema, data), OutputFormat.TEXT)));
+
+        assertTrue(output.contains("no schema file provided for !!schema \"https://example.test/typo.tn1\""),
+                output);
+        assertTrue(output.contains("the schema files given declare: https://example.test/cli-validate.tn1"),
+                output);
+    }
+
+    /** With no schema files at all, the message says that rather than listing an empty set. */
+    @Test
+    void anUnmatchedSchemaWithNoSchemaFilesSaysSo(@TempDir Path dir) throws IOException {
+        Path data = writeFile(dir, "data.tson",
+                "!!schema:\"https://example.test/absent.tn1\"\n!my_record { a: 1 }\n");
+
+        String output = captureStdout(() ->
+                assertEquals(1, ValidateCommand.run(inputs(data), OutputFormat.TEXT)));
+
+        assertTrue(output.contains("no schema files were given"), output);
+    }
+
     @Test
     void aRootTypeRefTheSchemaDoesNotDeclareIsAnUnknownType(@TempDir Path dir) throws IOException {
         Path schema = writeFile(dir, "schema.tn1", RECORD_SCHEMA);

@@ -38,8 +38,8 @@ class OutputFormatTest {
 
     @Test
     void textIncludesThePathWhenPresent() {
-        CliDiagnostic diagnostic = new CliDiagnostic("/value", "", "", Diagnostic.Code.FIELD_REQUIRED, "missing", "a value",
-                "(absent)", Optional.empty(), Optional.empty());
+        CliDiagnostic diagnostic = new CliDiagnostic("/value", "", Optional.empty(), Diagnostic.Code.FIELD_REQUIRED, "missing",
+                Optional.of("a value"), Optional.of("(absent)"), Optional.empty(), Optional.empty());
         String rendered = OutputFormat.TEXT.render(new ValidationReport(false, List.of(diagnostic)));
         assertEquals("[FIELD_REQUIRED] /value: missing", rendered);
     }
@@ -51,8 +51,8 @@ class OutputFormatTest {
      */
     @Test
     void textIncludesThePositionAlongsideThePath() {
-        CliDiagnostic diagnostic = new CliDiagnostic("/address/city", "", "", Diagnostic.Code.TYPE_MISMATCH,
-                "expected text", "text", "42", Optional.of("3:12:47"), Optional.empty());
+        CliDiagnostic diagnostic = new CliDiagnostic("/address/city", "", Optional.empty(), Diagnostic.Code.TYPE_MISMATCH,
+                "expected text", Optional.of("text"), Optional.of("42"), Optional.of("3:12:47"), Optional.empty());
 
         assertEquals("[TYPE_MISMATCH] /address/city (3:12:47): expected text",
                 OutputFormat.TEXT.render(new ValidationReport(false, List.of(diagnostic))));
@@ -65,21 +65,38 @@ class OutputFormatTest {
      */
     @Test
     void textIncludesAPositionThatHasNoPointerToHangOn() {
-        CliDiagnostic diagnostic = new CliDiagnostic("", "", "", Diagnostic.Code.VALIDATION_ERROR,
-                "unterminated record", "well-formed TSON", "a base-syntax error", Optional.of("2:1:7"),
-                Optional.empty());
+        CliDiagnostic diagnostic = new CliDiagnostic("", "", Optional.empty(), Diagnostic.Code.VALIDATION_ERROR,
+                "unterminated record", Optional.of("well-formed TSON"), Optional.of("a base-syntax error"),
+                Optional.of("2:1:7"), Optional.empty());
 
         assertEquals("[VALIDATION_ERROR] (2:1:7): unterminated record",
                 OutputFormat.TEXT.render(new ValidationReport(false, List.of(diagnostic))));
     }
 
+    /**
+     * Everything with nothing to say renders {@code null}, not {@code ""} -- except {@code path} and
+     * {@code schemaPointer}, which are RFC 6901 pointers where {@code ""} is the root and so a real value.
+     */
     @Test
     void jsonRendersAWellShapedObject() {
         String rendered = OutputFormat.JSON.render(ValidationReport.failed(Diagnostic.Code.VALIDATION_ERROR, "bad \"quote\""));
-        assertEquals("{\"valid\":false,\"errors\":[{\"path\":\"\",\"schemaPointer\":\"\",\"schemaId\":\"\","
+        assertEquals("{\"valid\":false,\"errors\":[{\"path\":\"\",\"schemaPointer\":\"\",\"schemaId\":null,"
                 + "\"code\":\"VALIDATION_ERROR\","
-                + "\"message\":\"bad \\\"quote\\\"\",\"expected\":\"\",\"actual\":\"\","
+                + "\"message\":\"bad \\\"quote\\\"\",\"expected\":null,\"actual\":null,"
                 + "\"dataPosition\":null,\"schemaPosition\":null}]}", rendered);
+    }
+
+    /** An empty string from {@link Diagnostic} is an absence, and crosses over as one. */
+    @Test
+    void anEmptyDiagnosticFieldBecomesAnAbsentOne() {
+        CliDiagnostic converted = CliDiagnostic.from(new Diagnostic("", "", "", Diagnostic.Code.TYPE_MISMATCH,
+                "nope", "", "", Optional.empty(), Optional.empty()));
+
+        assertEquals(Optional.empty(), converted.schemaId());
+        assertEquals(Optional.empty(), converted.expected());
+        assertEquals(Optional.empty(), converted.actual());
+        assertEquals("", converted.path());                 // the root pointer, not an absence
+        assertEquals("", converted.schemaPointer());
     }
 
     @Test
@@ -89,8 +106,8 @@ class OutputFormatTest {
 
     @Test
     void jsonRendersPositionsWhenPresent() {
-        CliDiagnostic diagnostic = new CliDiagnostic("/value", "", "", Diagnostic.Code.FIELD_REQUIRED, "missing", "a value",
-                "(absent)", Optional.of("1:1:0"), Optional.of("6:3:42"));
+        CliDiagnostic diagnostic = new CliDiagnostic("/value", "", Optional.empty(), Diagnostic.Code.FIELD_REQUIRED, "missing",
+                Optional.of("a value"), Optional.of("(absent)"), Optional.of("1:1:0"), Optional.of("6:3:42"));
         String rendered = OutputFormat.JSON.render(new ValidationReport(false, List.of(diagnostic)));
         assertTrue(rendered.contains("\"dataPosition\":\"1:1:0\""), rendered);
         assertTrue(rendered.contains("\"schemaPosition\":\"6:3:42\""), rendered);
@@ -128,10 +145,10 @@ class OutputFormatTest {
     @Test
     void tsonOutputRoundTripsMultipleErrors() {
         ValidationReport original = new ValidationReport(false, List.of(
-                new CliDiagnostic("/a", "", "", Diagnostic.Code.VALIDATION_ERROR, "first problem", "", "",
-                        Optional.empty(), Optional.empty()),
-                new CliDiagnostic("/b", "", "", Diagnostic.Code.VALIDATION_ERROR, "second problem", "", "",
-                        Optional.empty(), Optional.empty())));
+                new CliDiagnostic("/a", "", Optional.empty(), Diagnostic.Code.VALIDATION_ERROR, "first problem",
+                        Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()),
+                new CliDiagnostic("/b", "", Optional.empty(), Diagnostic.Code.VALIDATION_ERROR, "second problem",
+                        Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty())));
 
         String rendered = OutputFormat.TSON.render(original);
 
@@ -164,8 +181,8 @@ class OutputFormatTest {
         assertEquals("{\"valid\":false,\"files\":["
                 + "{\"file\":\"good.tn\",\"valid\":true,\"errors\":[]},"
                 + "{\"file\":\"bad.tn\",\"valid\":false,\"errors\":[{\"path\":\"\",\"schemaPointer\":\"\","
-                + "\"schemaId\":\"\",\"code\":\"TYPE_MISMATCH\",\"message\":\"nope\",\"expected\":\"\","
-                + "\"actual\":\"\",\"dataPosition\":null,\"schemaPosition\":null}]}"
+                + "\"schemaId\":null,\"code\":\"TYPE_MISMATCH\",\"message\":\"nope\",\"expected\":null,"
+                + "\"actual\":null,\"dataPosition\":null,\"schemaPosition\":null}]}"
                 + "],\"errors\":[]}", rendered);
     }
 
@@ -200,9 +217,9 @@ class OutputFormatTest {
     void tsonOutputRoundTripsARunThroughTheDiagnosticsSchema() {
         ValidationRun original = ValidationRun.of(List.of(
                 FileReport.of("good.tn", List.of()),
-                FileReport.of("bad.tn", List.of(new CliDiagnostic("/a", "", "", Diagnostic.Code.FIELD_REQUIRED,
-                        "missing required field 'a'", "a value", "(absent)", Optional.of("1:1:0"),
-                        Optional.of("6:3:42"))))));
+                FileReport.of("bad.tn", List.of(new CliDiagnostic("/a", "", Optional.empty(), Diagnostic.Code.FIELD_REQUIRED,
+                        "missing required field 'a'", Optional.of("a value"), Optional.of("(absent)"),
+                        Optional.of("1:1:0"), Optional.of("6:3:42"))))));
 
         String rendered = OutputFormat.TSON.render(original);
 
@@ -227,8 +244,9 @@ class OutputFormatTest {
     @Test
     void tsonOutputRoundTripsRealPositions() {
         ValidationReport original = new ValidationReport(false, List.of(
-                new CliDiagnostic("/value", "", "", Diagnostic.Code.FIELD_REQUIRED, "missing required field 'value'",
-                        "a value", "(absent)", Optional.of("1:1:0"), Optional.of("6:3:42"))));
+                new CliDiagnostic("/value", "", Optional.empty(), Diagnostic.Code.FIELD_REQUIRED,
+                        "missing required field 'value'", Optional.of("a value"), Optional.of("(absent)"),
+                        Optional.of("1:1:0"), Optional.of("6:3:42"))));
 
         String rendered = OutputFormat.TSON.render(original);
 
