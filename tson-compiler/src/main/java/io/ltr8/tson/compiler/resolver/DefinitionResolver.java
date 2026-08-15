@@ -147,9 +147,16 @@ import java.util.Set;
  *
  * <p>{@link UnsupportedOperationException} means "this construct isn't implemented yet"; a genuine
  * schema error a coverage gap can't explain is a {@link
- * io.ltr8.tson.schema.TsonSchemaValidationException} instead. An atom refinement that loosens its
- * source rather than tightening it ({@link #checkNarrows}) is the current case -- the schema is
- * wrong, not unsupported.
+ * io.ltr8.tson.schema.TsonSchemaValidationException} instead. The distinction is not cosmetic: only the
+ * validation exception is collected into a {@code Diagnostic} by {@code SchemaResolver}'s reporting
+ * overload, so misfiling an author error as a gap both aborts the run and tells the author their correct
+ * understanding of the spec is this library's fault. A useful test for which is which: <b>a schema error's
+ * verdict does not change when this library improves; a gap's does.</b> Cases: an atom refinement that
+ * loosens its source rather than tightening it ({@link #checkNarrows}); a name in a {@code !} position that
+ * resolves in neither namespace ({@link #resolveConstructorTarget}, {@link #resolveAtomRefinement}); and a
+ * {@code !} form used against the wrong kind of target -- refining a constructor, applying a
+ * non-constructor, or refining a non-atom -- each of which the message answers with the form the author
+ * probably meant.
  *
  * <p>Declarations are resolved against two separate namespaces (§3.3.1), each exposed through a
  * required constructor parameter rather than threaded through individual method calls, since both
@@ -420,7 +427,7 @@ final class DefinitionResolver {
         String target = instance.target();
         TypeDefinition constructor = resolveConstructorTarget(name, target);
         if (!constructor.constructor()) {
-            throw new UnsupportedOperationException("'" + name + "': '!" + target + "' does not resolve to a "
+            throw new TsonSchemaValidationException("'" + name + "': '!" + target + "' does not resolve to a "
                     + "constructor (§3.3.1) -- did you mean atom refinement ('!" + target + " ^ { ... }')?");
         }
         if (!(constructor.body() instanceof RecordBody _)) {
@@ -477,18 +484,22 @@ final class DefinitionResolver {
         String sourceName = refinement.target();
         TypeDefinition source = namespaceDefinitions.getTypeDefinition(sourceName);
         if (source == null) {
-            throw new UnsupportedOperationException("'" + name + "': '!" + sourceName
+            throw new TsonSchemaValidationException("'" + name + "': '!" + sourceName
                     + "' does not resolve against the type-name namespace (§3.3.1)");
         }
         if (source.constructor()) {
-            throw new UnsupportedOperationException("'" + name + "': '!" + sourceName + " ^ { ... }' refines a "
+            throw new TsonSchemaValidationException("'" + name + "': '!" + sourceName + " ^ { ... }' refines a "
                     + "constructor, not an instance (§3.3.1) -- did you mean constructor application ('!"
                     + sourceName + " { ... }')?");
         }
         if (source.kind() != TypeKind.ATOM) {
-            throw new UnsupportedOperationException("'" + name + "': '!" + sourceName
+            throw new TsonSchemaValidationException("'" + name + "': '!" + sourceName
                     + "' is not an atom-family instance (§5.5), kind=" + source.kind());
         }
+        // Not an author error, unlike the three checks above: an atom-family instance always records the
+        // constructor it came from, so one that doesn't is a malformed TypeDefinition, not a schema anyone
+        // wrote. It stays a library-fault type so it propagates rather than being reported as a verdict on
+        // the author's schema.
         io.ltr8.tson.schema.meta.TypeRef constructorRef = source.source().orElseThrow(() ->
                 new UnsupportedOperationException("'" + name + "': '!" + sourceName
                         + "' has no recorded constructor to refine through"));
@@ -593,7 +604,7 @@ final class DefinitionResolver {
         if (structural != null) {
             return structural;
         }
-        throw new UnsupportedOperationException("'" + name + "': '!" + target
+        throw new TsonSchemaValidationException("'" + name + "': '!" + target
                 + "' does not resolve against the structure namespace (§3.3.1)");
     }
 

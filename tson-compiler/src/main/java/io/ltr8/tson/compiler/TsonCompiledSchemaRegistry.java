@@ -91,6 +91,23 @@ public final class TsonCompiledSchemaRegistry {
         return compiled.computeIfAbsent(TsonCanonicalIdentity.canonicalize(uri), id -> compile(linked));
     }
 
+    /**
+     * {@link #get(String)} reporting every problem in the schema through {@code receiver} rather than
+     * throwing at the first, returning {@code null} when anything was reported.
+     *
+     * <p>What a *data* read uses to say what is wrong with the schema the document names, so `tson validate`
+     * and `tson compile` give the same account of the same broken schema instead of one flattening it to its
+     * first error. Nothing is cached for a schema that reported: only a schema that resolved, linked and
+     * compiled cleanly gets an entry.
+     */
+    public TsonCompiledSchema get(String uri, TsonDiagnosticsReceiver receiver) {
+        TsonLinkedSchema linked = core.resolveLinked(uri, receiver);
+        if (linked == null) {
+            return null;
+        }
+        return compiled.computeIfAbsent(TsonCanonicalIdentity.canonicalize(uri), id -> compile(linked));
+    }
+
     /** Compiles an already-resolved, already-linked schema in this registry's mode -- standalone, uncached. */
     public TsonCompiledSchema compile(TsonLinkedSchema linked) {
         return TsonSchemaCompiler.compile(linked, factories);

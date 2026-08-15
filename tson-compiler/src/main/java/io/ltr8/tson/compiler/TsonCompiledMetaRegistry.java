@@ -234,6 +234,24 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      */
     @Override
     public TsonLinkedSchema resolveLinked(String uri) {
+        return resolveLinked(uri, null);
+    }
+
+    /**
+     * {@link #resolveLinked(String)} reporting every problem in the schema through {@code receiver} rather
+     * than throwing at the first, with the same phase boundary {@code Tson.validateSchema} draws: every
+     * declaration resolves before a verdict, and linking runs only if resolution was clean.
+     *
+     * <p>Exists so a *read* of a data document can say what is wrong with the schema it names. Without it a
+     * reader can only catch the first exception and flatten it, losing the other problems along with the
+     * declaration each belongs to.
+     *
+     * <p><b>Returns {@code null} when anything was reported</b>, rather than a partly-resolved schema: the
+     * placeholders resolution leaves behind are not a schema anyone should read against, and the caller has
+     * the diagnostics that say why. A caller passing {@code null} for {@code receiver} gets the fail-fast
+     * behaviour of the other overload, which never returns {@code null}.
+     */
+    public TsonLinkedSchema resolveLinked(String uri, TsonDiagnosticsReceiver receiver) {
         String identity = TsonCanonicalIdentity.canonicalize(uri);
         Optional<TsonLinkedSchema> cached = schemaRegistry.get(uri);
         if (cached.isPresent()) {
@@ -248,8 +266,21 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
         TsonSchemaParser parser = new TsonSchemaParser(sourceText);
         SchemaDocument document = parser.parseSchemaDocument();
         crossCheckId(document, uri, identity);
-        TsonSchema resolved = new SchemaResolver(this).resolveSchema(document, parser.declarationPositions());
-        return schemaRegistry.register(TsonSchemaLinker.link(resolved, schemaRegistry));
+        if (receiver == null) {
+            TsonSchema resolved = new SchemaResolver(this).resolveSchema(document, parser.declarationPositions());
+            return schemaRegistry.register(TsonSchemaLinker.link(resolved, schemaRegistry));
+        }
+        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        TsonSchema resolved = new SchemaResolver(this)
+                .resolveSchema(document, parser.declarationPositions(), problems);
+        if (problems.isEmpty()) {
+            TsonLinkedSchema linked = TsonSchemaLinker.link(resolved, schemaRegistry, problems);
+            if (problems.isEmpty()) {
+                return schemaRegistry.register(linked);
+            }
+        }
+        problems.diagnostics().forEach(receiver::report);
+        return null;
     }
 
     /**

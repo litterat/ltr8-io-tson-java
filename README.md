@@ -123,6 +123,15 @@ $ tson compile person.tn
 OK
 ```
 
+If the schema is wrong, you get **every** problem in one pass — each naming the declaration it came from
+and where that declaration is in the file, the same treatment `tson validate` gives a data document:
+
+```
+$ tson compile broken.tn
+[SCHEMA_ERROR] /a (5:3:132): 'a' field 'x' has an unresolved reference 'no_such_type'
+[SCHEMA_ERROR] /b (6:3:159): 'b' field 'y' has an unresolved reference 'also_missing'
+```
+
 That's the whole loop, all from the shell: scaffold → edit → validate. See
 [Command-line interface](#command-line-interface) below for the full command reference, and
 [Reading TSON](#reading-and-writing-tson-choosing-an-entry-point) for reading TSON *from Java*.
@@ -143,6 +152,7 @@ The write side is the mirror: a value in hand, TSON text out. The matrix:
 | a Java object | it as TSON text | **`tson.objectWriter()`** | a `String` |
 | a `TsonValue` tree | it as TSON text | **`tson.treeWriter()`** | a `String` |
 | a data document | every problem, not the value | **`tson.validate()`** | a `List<Diagnostic>` |
+| a *schema* document | every problem with the schema itself | **`tson.validateSchema()`** | a `List<Diagnostic>` |
 | a data document | the value **and** every problem | **`.withDiagnostics(…)`** on either facade reader | the value + a `List<Diagnostic>` |
 | a data document | a grammar-faithful AST | **`TsonDataParser`** | a `Document` AST |
 | a data document | to pull events lazily | **`TsonDataStream`** | a `TsonEvent` stream |

@@ -429,8 +429,14 @@ namespace *before* any local declaration resolves.
   loosens REQUIRED→OPTIONAL (§5.11), a source or supertype whose body is a binding record and so has no
   vocabulary (§5.7's "finished"), a choice or bracketed form at a supertype position (`&` composes record
   types; §12.1 admits these only because `construction-def` draws its operands from `type-ref` where
-  `refined-def` takes a name — `SPEC-FEEDBACK.md` #38). Telling an author their correctly-rejected schema is
-  unsupported sends them looking for the wrong fix, so the split is worth keeping honest —
+  `refined-def` takes a name — `SPEC-FEEDBACK.md` #38), a name in a `!` position resolving in neither
+  namespace (the plain typo, §3.3.1), and a `!` form aimed at the wrong kind of target — refining a
+  constructor, applying a non-constructor, refining a non-atom — each answered with the form the author
+  probably meant. Telling an author their correctly-rejected schema is
+  unsupported sends them looking for the wrong fix, and now costs more than clarity: only the validation
+  exception is collected into a `Diagnostic`, so a misfiled author error also aborts the run instead of
+  joining the other problems. The useful test is that **a schema error's verdict doesn't change when this
+  library improves; a gap's does.** The split is worth keeping honest —
   `IllegalStateException` is the third, for an invariant only a malformed `TypeDefinition` could break (a
   `constructor: true` entry with a non-record body, which §12.1's grammar makes unreachable).
   `DefinitionResolver`'s Javadoc lists the exact boundary.
@@ -689,23 +695,81 @@ is small and parsed once.)
 ### Diagnostics (`Diagnostic`, root package)
 
 `Diagnostic` is the structured value every `TsonDiagnosticsReceiver` receives, identical shape whichever
-one is in play: `path` (RFC 6901 JSON Pointer into the data — matches JSON Schema's `instanceLocation`), a
-closed `Code` enum (`FIELD_REQUIRED`/`TYPE_MISMATCH`/`WRONG_ARITY`/`UNKNOWN_TYPE_REF`/
+one is in play: a closed `Code` enum (`FIELD_REQUIRED`/`TYPE_MISMATCH`/`WRONG_ARITY`/`UNKNOWN_TYPE_REF`/
 `ATOM_CONSTRAINT_VIOLATION` from readers; `SCHEMA_ERROR`/`UNKNOWN_TYPE`/`VALIDATION_ERROR` for
 infrastructure-level failures; `UNRECOGNIZED_FIELD`/`DUPLICATE_MAP_KEY` reserved but unproduced),
-`message` (hand-composed per call site), `expected`/`actual` (machine-parseable), and
-`dataPosition`/`schemaPosition`. **`schemaPosition` comes from `TypeDefinition.position()`**, which is
+`message` (hand-composed per call site), `expected`/`actual` (machine-parseable), and **four location
+components covering two ends** — the value in the data, and the rule in the schema.
+
+**The four are JSON Schema 2020-12 §12's own output unit**, deliberately: `path` is `instanceLocation` (an
+RFC 6901 pointer into the data), `schemaPointer` is `keywordLocation` (an RFC 6901 pointer into the schema's
+`map<type_name, type_definition>`, `/my_type`), `schemaId` plus `schemaPointer` are
+`absoluteKeywordLocation`, and `dataPosition`/`schemaPosition` add the line/column/byte-offset TSON needs and
+JSON Schema has no equivalent of. **One record rather than separate data- and schema-diagnostic types,
+because the variation is locational, not categorical** — a value violating `int32` as core.tn declares it
+populates both ends at once, and `javax.tools.Diagnostic`, LSP's `Diagnostic` and rustc's `DiagInner` all
+model it the same way (rustc's `MultiSpan` being the mature form of the same idea).
+
+Either end may be empty: a schema-side problem has no data, and a schemaless read has no schema.
+**`schemaPosition` comes from `TypeDefinition.position()`**, which is
 populated because `SchemaResolver.resolveSchema` takes `TsonSchemaParser.declarationPositions()` and passes
 each declaration's own position into `DefinitionResolver.resolve` — so a value error points at both ends, the
 value in the data and the type it violated in the schema. Every reader stamps its own position first, so the
-one reported is the *atom's* declaration (`int32` in core.tn), not the enclosing record's; `SourcePosition`
-carries line/column/offset but no document identity, so which schema that is stays implicit (`BACKLOG.md`).
+one reported is the *atom's* declaration (`int32` in core.tn), not the enclosing record's. **The read path
+populates `schemaPosition` but not `schemaId`/`schemaPointer`** — a reader knows the declaration position it
+stamped, not which entry of which schema it came from, so which schema a read diagnostic's position refers to
+is still implicit; the schema path populates all three (`BACKLOG.md`).
 An atom's `AtomTypeException` is caught in `AtomTypeReader` and mapped to
 `ATOM_CONSTRAINT_VIOLATION` — `AtomType`'s own signature is untouched, since it's shared with the
 schemaless binder which has no read context. Out of scope for now: message synthesis from code + params,
 fine-grained atom codes, `UNRECOGNIZED_FIELD`/`DUPLICATE_MAP_KEY` detection (readers iterate schema fields,
 and the parser already resolved "last value wins" before a reader sees a map), and per-field schema
 positions.
+
+### Schema-side diagnostics (`SchemaResolver`, `TsonSchemaLinker`, `Tson.validateSchema`)
+
+A broken *schema* reports every independent problem in one pass, through the same
+`TsonDiagnosticsReceiver` the read path uses. §8.1 asks for both halves of this: implementations MUST carry
+source position in **all** error reports, and SHOULD "continue processing after an error to report multiple
+issues in a single pass" — and it explicitly puts schema resolution/compilation failures in the *resolver
+error* category, so this is the same layer, not a new one.
+
+- **Two reporting overloads, `SchemaResolver.resolveSchema(document, positions, receiver)` and
+  `TsonSchemaLinker.link(schema, loader, receiver)`.** The existing overloads are untouched and still throw
+  at the first problem. **The fail-fast paths deliberately do not route through
+  `TsonDiagnosticsReceiver.throwing()`** — that raises `TsonReadException`, and a schema that fails to
+  resolve is not a read failure; the CLI's exit 1 against exit 70 turns on the distinction. They rethrow the
+  original untouched.
+- **The resolver catches inside its memoized `namespaceGetter`, not around the driving loop.** Resolution
+  follows dependencies, not source order, so a failure usually happens inside a *nested* resolve; catching at
+  the loop would attribute it to whichever declaration triggered it and then report the real one a second
+  time. The memo makes it exactly once, against itself. Same shape as
+  `TsonSchemaCompiler.Compilation.resolve` substituting an `ErrorReader` one phase later.
+- **A failed declaration leaves an empty-record placeholder**, so its dependents still resolve. That is
+  javac's error-type contract (it answers every question) rather than Swift's (every questioner must check
+  first), and the choice is load-bearing: a `Sum`-bodied placeholder makes `parent => child & { ... }` fail
+  *because* `child` did, reporting a consequence beside its cause. Swift's other half is kept — producing one
+  means a diagnostic was already reported. It never escapes a reporting resolve, so it needs no `TypeKind`
+  of its own.
+- **`Tson.validateSchema(schemaText)` is the front door and owns the phase boundary** — the schema-side peer
+  of `validate`, and the only caller that composes the two phases. Every declaration resolves before a
+  verdict; linking runs only if resolution was clean, so a schema with a broken declaration *and* an
+  unresolved reference reports the declaration alone (the reference may well resolve once the declaration
+  does). This is where javac and Swift both draw it: javac attributes every entry before
+  `shouldStopPolicyIfError` blocks the next phase, Swift never reaches SILGen after a Sema error. **A schema
+  that reported anything is never registered.**
+- **Only `TsonSchemaValidationException` becomes a diagnostic.** An `UnsupportedOperationException` is a
+  library gap and keeps propagating — a gap is not a verdict on the author's schema. The test for which is
+  which, from Swift's treatment of `expression_too_complex`: *a schema error's verdict doesn't change when
+  this library improves; a gap's does.*
+- **What still throws even with a receiver:** an `!!import` that won't load, or a `!!meta` that may not
+  govern. Those make the namespace itself unusable rather than one entry wrong, and continuing would report
+  a page of unresolved references that are all consequences of the one real problem. `Tson.validateSchema`
+  catches them and reports against RFC 6901's root pointer (`""`), since they concern the document rather
+  than any declaration.
+- **Still fail-fast:** desugaring and compilation. Compilation already keeps going via `ErrorReader`, but
+  that marks a *library gap* (an unregistered atom factory), which is a different question from an author
+  error.
 
 ### Read facades: `TsonObjectReader`/`TsonTreeReader` (root package) + `TsonObjectWriter`
 
@@ -741,6 +805,15 @@ reads one value at a cursor and polices nothing around it.
   root value (so the stream still lands on `DocumentEnd`). Under `throwing()` that is indistinguishable from
   the old behaviour; under a collector they arrive as `Diagnostic`s, which is what lets `Tson.validate`
   delegate to `treeReader()` wholesale instead of re-deriving anything.
+- **A schema that *resolves* badly reports like one, even mid-read.** `tree.get(uri, receiver)` /
+  `bind.get(uri, receiver)` (over `TsonCompiledMetaRegistry.resolveLinked(uri, receiver)`) resolve and link
+  the named schema collecting, so validating a data document against a broken schema reports **every**
+  declaration at fault — the same account `tson compile` gives, since the schema is equally broken either
+  way. Those diagnostics go to the **facade's own receiver, not through `ctx.report`**, which would rebuild
+  them from the *data* cursor: stamping a data position on a problem that is in a schema and discarding the
+  `schemaPointer`. The registry caches nothing for a schema that reported, so a second read reports again
+  rather than appearing to succeed. Distinct from the bullet above: a schema that can't be *reached* (no
+  such URI, malformed, wrong `!!id`) is still one diagnostic, because there is nothing to enumerate.
 - **A schemaless read checks its type-refs, and `TypeRefCheck` (in `reader`) states the rules once** for
   both engines. Given `!X` on a value: (1) `X` **is** a `BuiltinTypeVocabulary` name → it must sit on a
   token (`TYPE_MISMATCH` otherwise) and that token must satisfy the atom
@@ -1037,15 +1110,12 @@ compatibility).
   AtomSpecification` rather than flat, so it never receives a schema-composed default the way
   `email_type`'s flat `spec` field does. Subtype *dispatch* to them works; this is a narrower field-binding
   gap.
-- **Schema-side diagnostics** — parse → desugar → resolve → link → compile are fail-fast throughout, so a
-  broken *schema* yields one exception per run, flattened into a single `SCHEMA_ERROR` with no path and no
-  position in the schema document. The read path's `TsonDiagnosticsReceiver` still has no schema-side
-  counterpart. **The structural blocker is gone**: every one of those phases now lives in `tson-compiler`
-  alongside `Diagnostic`, so `TsonSchemaLinker` — where most author-facing schema errors are raised — can
-  name it directly, and `Diagnostic` no longer has to move anywhere. What remains is the work itself:
-  classifying the throw sites (a library gap and an author error are not the same verdict) and finding the
-  shared object to hang `report` off, the resolver's per-declaration position being the closest thing to one.
-  `BACKLOG.md`'s "Schema-side diagnostics" has the census and the ordering.
+- **Schema-side diagnostics, the remainder** — resolution and linking report through a
+  `TsonDiagnosticsReceiver` now (see "Schema-side diagnostics" above); three things are left. **Desugaring
+  is still fail-fast**, so a sugar-form error aborts before resolution reports anything. **A read-path
+  diagnostic carries `schemaPosition` but no `schemaId`/`schemaPointer`**, which needs the compiled schema's
+  identity threaded down the reader stack. And **the throw-site classification is only done inside
+  `DefinitionResolver`** — the same pass is still owed everywhere else. `BACKLOG.md` has the census.
 - **Deferred design questions** — `REQUIRED_FIXED`/`OPTIONAL_FIXED` value validation, `value_param` real
   parameter substitution, thread-safety, and a general disk/HTTP-backed `TsonSchemaSource` (with
   whitelist/blacklist policy).

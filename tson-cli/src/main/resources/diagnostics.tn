@@ -1,13 +1,13 @@
-!!id:"https://tson.io/2026/32/ltr8/cli/diagnostics-2.tn"
+!!id:"https://tson.io/2026/32/ltr8/cli/diagnostics-3.tn"
 !!meta:"https://tson.io/2026/32/m/meta.tn"
 !!import:"https://tson.io/2026/32/m/core.tn"
 @doc:"""
   This project's own schema !!id convention (see CLAUDE.md's "Project-owned schema !!id
   convention"): /2026/32 is the spec revision this schema is written against, ltr8 is the
-  publishing org, cli is this module's own schema group, and the trailing -2 is this schema's
-  own version -- bumped from -1 once multi-error collection needed path/expected/actual/position
-  fields on diagnostic, per that same convention's "bump it, under a new name" rule; never edit a
-  published schema's own content in place.
+  publishing org, cli is this module's own schema group, and the trailing -3 is this schema's
+  own version -- bumped when schema_id/schema_pointer were added to diagnostic, so a problem in a
+  schema can say which schema and which declaration, per that same convention's "bump it, under a
+  new name" rule; never edit a published schema's own content in place.
   """
 {
   diagnostic_code => !enum [
@@ -16,6 +16,8 @@
   ]
   diagnostic => {
     path: text
+    schema_pointer: text
+    schema_id: text
     code: diagnostic_code
     message: text
     expected: text

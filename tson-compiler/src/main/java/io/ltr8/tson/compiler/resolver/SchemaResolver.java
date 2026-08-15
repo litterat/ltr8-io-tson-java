@@ -1,7 +1,10 @@
 package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.annotation.AnnotatedMap;
+import io.ltr8.annotation.Annotations;
+import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
+import io.ltr8.tson.compiler.TsonDiagnosticsReceiver;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
@@ -12,12 +15,15 @@ import io.ltr8.tson.schema.TsonCanonicalIdentity;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.TypeKind;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -129,6 +135,46 @@ public final class SchemaResolver {
      */
     public TsonSchema resolveSchema(SchemaDocument document,
                                     Map<SchemaMap.Declaration, ? extends SourcePosition> declarationPositions) {
+        return resolve(document, declarationPositions, null);
+    }
+
+    /**
+     * {@link #resolveSchema(SchemaDocument, Map)} reporting each declaration that fails to resolve through
+     * {@code receiver} instead of throwing at the first one ([TSON-DATA] §8.1: implementations SHOULD
+     * "continue processing after an error to report multiple issues in a single pass"). Every declaration is
+     * attempted; a failed one is reported and replaced with a placeholder so its siblings and dependents still
+     * resolve, and the schema comes back with as much resolved as could be.
+     *
+     * <p><b>The result is only trustworthy if nothing was reported.</b> A schema that produced diagnostics
+     * contains placeholder entries and must not be linked, registered or compiled -- the caller checks the
+     * receiver and stops, which is the phase boundary javac and Swift both draw (javac attributes every entry
+     * before {@code shouldStopPolicyIfError} blocks the next phase; Swift never reaches SILGen after a Sema
+     * error). {@link TsonDiagnosticsReceiver#throwing()}, the default the other overloads pass, makes the
+     * first failure an exception again and so keeps that impossible by construction.
+     *
+     * <p>Only a {@link TsonSchemaValidationException} -- the schema is wrong -- becomes a diagnostic. An
+     * {@code UnsupportedOperationException} means this library hasn't implemented the construct and keeps
+     * propagating: a gap is not a verdict on the author's schema, and reporting it as one sends them looking
+     * for a fix that doesn't exist.
+     *
+     * <p><b>The fail-fast overloads do not route through {@link TsonDiagnosticsReceiver#throwing()}</b>, which
+     * would raise {@code TsonReadException} and so quietly change the exception type every existing caller
+     * sees -- a schema that fails to resolve is not a read failure, and the CLI's own exit codes turn on that
+     * distinction. They rethrow the original instead, unwrapped and with its stack intact.
+     *
+     * @param receiver where a failed declaration is reported; must not be {@code null}
+     */
+    public TsonSchema resolveSchema(SchemaDocument document,
+                                    Map<SchemaMap.Declaration, ? extends SourcePosition> declarationPositions,
+                                    TsonDiagnosticsReceiver receiver) {
+        Objects.requireNonNull(receiver, "receiver");
+        return resolve(document, declarationPositions, receiver);
+    }
+
+    /** The shared body; {@code receiver} is {@code null} for the fail-fast overloads, which rethrow instead. */
+    private TsonSchema resolve(SchemaDocument document,
+                               Map<SchemaMap.Declaration, ? extends SourcePosition> declarationPositions,
+                               TsonDiagnosticsReceiver receiver) {
         String id = document.id().orElseThrow(() -> new IllegalStateException(
                 "'" + document.meta() + "': !!id is required to register this schema, but is absent"));
         TsonCanonicalIdentity.validate(id);
@@ -179,11 +225,25 @@ public final class SchemaResolver {
                         + "supertype or refinement source cannot depend, directly or transitively, on the type "
                         + "it helps define");
             }
+            Optional<SourcePosition> position = Optional.ofNullable(declarationPositions.get(declaration));
             try {
-                TypeDefinition resolved = holder[0].resolve(declaration,
-                        Optional.ofNullable(declarationPositions.get(declaration)));
+                TypeDefinition resolved = holder[0].resolve(declaration, position);
                 namespace.put(name, resolved);
                 return resolved;
+            } catch (TsonSchemaValidationException e) {
+                if (receiver == null) {
+                    throw e;
+                }
+                // Report and carry on, rather than abandoning the other declarations. Catching *here*, inside
+                // the memoized getter, rather than around the driving loop below, is what makes that correct:
+                // resolution follows dependencies, not source order, so a failure often happens inside a
+                // nested resolve -- the loop would attribute it to whichever declaration triggered it, then
+                // reach the real one and report it a second time. The memo makes it exactly once, against
+                // itself. Same shape as TsonSchemaCompiler.Compilation.resolve substituting an ErrorReader.
+                receiver.report(Diagnostic.ofSchemaError(TsonCanonicalIdentity.canonicalize(id), name,
+                        e.getMessage(), position));
+                namespace.put(name, unresolved(position));
+                return namespace.get(name);
             } finally {
                 resolving.remove(name);
             }
@@ -210,6 +270,32 @@ public final class SchemaResolver {
                     holder[0].annotationsFor(name, declarations.get(name).nameAnnotations()));
         }
         return new TsonSchema(id, document.meta(), document.imports(), localOnly, false);
+    }
+
+    /**
+     * The placeholder a declaration that failed to resolve leaves behind, so the declarations that reference
+     * it -- and the ones merely queued after it -- still resolve instead of collapsing into a cascade of
+     * consequences of one original error. The counterpart of {@code TsonSchemaCompiler}'s {@link
+     * io.ltr8.tson.compiler.reader.ErrorReader} one phase later.
+     *
+     * <p><b>Producing one means a diagnostic has already been reported</b> (Swift's {@code ErrorType}
+     * obligation). It is not a resolution and must never be linked, registered or compiled -- guaranteed
+     * structurally rather than by inspection, because the only overload that can produce one ({@link
+     * #resolveSchema(SchemaDocument, Map, TsonDiagnosticsReceiver)}) hands the caller a receiver whose report
+     * count is the signal to stop at the phase boundary. It carries the failed declaration's own position so
+     * anything that does surface it can still point at the source.
+     *
+     * <p><b>An empty record, because the point is to absorb rather than to be recognised</b> -- javac's model,
+     * where the error type answers every question, rather than Swift's, where every questioner must first ask
+     * whether it is looking at one. A dependent that composes with a failed declaration ({@code parent =>
+     * child & { ... }}) then resolves cleanly, contributing no fields, instead of failing a second time and
+     * reporting a problem that is purely a consequence of the first. Getting this wrong is not a small
+     * mismatch: a `Sum`-bodied placeholder makes every dependent report too, which is the cascade the
+     * placeholder exists to prevent.
+     */
+    private static TypeDefinition unresolved(Optional<SourcePosition> position) {
+        return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of(), false, List.of(), List.of(),
+                Optional.empty(), RecordBody.of(List.of()), position, Annotations.empty());
     }
 
     /** One already-resolved {@code DataValue} replayed through a compiled reader. */

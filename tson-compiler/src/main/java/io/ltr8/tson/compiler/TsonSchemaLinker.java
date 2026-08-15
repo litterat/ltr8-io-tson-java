@@ -44,6 +44,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
@@ -98,10 +99,9 @@ public final class TsonSchemaLinker {
 
     /**
      * Links {@code bootstrap} -- meta-kernel's own raw, pre-loaded bootstrap output (see {@link
-     * TsonSchema#bootstrap()}'s own Javadoc for why it can't be resolved the ordinary way). Moved
-     * here from {@link TsonSchemaRegistry} (2026-07-27) once that class became a pure store again --
-     * this method belongs with the verb it performs, not with a registry it deliberately never
-     * stores its own result in (see below).
+     * TsonSchema#bootstrap()}'s own Javadoc for why it can't be resolved the ordinary way). It lives here
+     * rather than on {@link TsonSchemaRegistry} because it belongs with the verb it performs: linking, not
+     * storage -- and this is a link whose result the registry deliberately never stores (see below).
      *
      * <p>Takes no {@link TsonSchemaLoader} -- unlike {@link #link}, which always needs one for
      * {@code !!import}/{@code !!meta} lookups -- because meta-kernel's own document, the only real
@@ -132,10 +132,61 @@ public final class TsonSchemaLinker {
                     + "TsonSchemaLinker.linkBootstrap exists specifically for that case; call "
                     + "link directly for an ordinary schema instead");
         }
-        return link(bootstrap, null);
+        return linkWith(bootstrap, null, null);
     }
 
     public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader) {
+        return linkWith(schema, loader, null);
+    }
+
+    /**
+     * {@link #link(TsonSchema, TsonSchemaLoader)} reporting every entry that fails validation through {@code
+     * receiver} instead of throwing at the first ([TSON-DATA] §8.1: implementations SHOULD "continue
+     * processing after an error to report multiple issues in a single pass"). Every entry is checked, so a
+     * schema with two unresolved references reports two.
+     *
+     * <p><b>The result is only trustworthy if nothing was reported</b> -- same phase-boundary contract as
+     * {@code SchemaResolver}'s own reporting overload. A {@link TsonLinkedSchema} whose linking produced
+     * diagnostics is not a proof that linking succeeded; the caller checks the receiver and stops rather than
+     * registering or compiling it.
+     *
+     * <p><b>What still throws:</b> anything that makes the namespace itself unusable rather than making one
+     * entry wrong -- an {@code !!import} that will not load, or a {@code !!meta} that may not govern. Carrying
+     * on past those would report a page of unresolved references that are all consequences of the one real
+     * problem, which is the cascade this reporting is meant to avoid, not an example of it.
+     *
+     * @param receiver where a failing entry is reported; must not be {@code null}
+     */
+    public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader,
+                                        TsonDiagnosticsReceiver receiver) {
+        Objects.requireNonNull(receiver, "receiver");
+        return linkWith(schema, loader, receiver);
+    }
+
+    /**
+     * Reports {@code message} against one entry, or throws it when there is no receiver.
+     *
+     * @return {@code true} if the caller should carry on as though the check had passed -- always, since a
+     *         throw is the only other outcome. Reads as a guard at the call sites that want to skip the entry.
+     */
+    private static boolean report(TsonDiagnosticsReceiver receiver, TsonSchema schema, String name,
+                                  TypeDefinition def, String message) {
+        if (receiver == null) {
+            throw new TsonSchemaValidationException(message);
+        }
+        receiver.report(schemaError(schema, name, def, message));
+        return false;
+    }
+
+    /** One entry's failure as a {@link Diagnostic}, positioned at that entry's own declaration. */
+    private static Diagnostic schemaError(TsonSchema schema, String name, TypeDefinition def, String message) {
+        return Diagnostic.ofSchemaError(TsonCanonicalIdentity.canonicalize(schema.id()), name, message,
+                def == null ? Optional.empty() : def.position());
+    }
+
+    /** The shared body; {@code receiver} is {@code null} for the fail-fast overloads, which rethrow instead. */
+    private static TsonLinkedSchema linkWith(TsonSchema schema, TsonSchemaLoader loader,
+                                             TsonDiagnosticsReceiver receiver) {
         Map<String, TypeDefinition> merged = mergeImports(schema.imports(), loader);
 
         // The governing meta-schema's own namespace, one hop via !!meta -- distinct from !!import (which
@@ -158,8 +209,13 @@ public final class TsonSchemaLinker {
         Boolean constructorsAllowed = null;
         for (Map.Entry<String, TypeDefinition> entry : schema.entries().entrySet()) {
             if (merged.containsKey(entry.getKey())) {
-                throw new TsonSchemaValidationException(
-                        "'" + entry.getKey() + "' collides with an entry of the same name brought in by !!import");
+                // The local entry is dropped, not the import's: an import is already-linked, separately
+                // registered material, so keeping it is the choice that leaves the rest of this schema
+                // checkable against something real.
+                if (!report(receiver, schema, entry.getKey(), entry.getValue(), "'" + entry.getKey()
+                        + "' collides with an entry of the same name brought in by !!import")) {
+                    continue;
+                }
             }
             TypeDefinition def = entry.getValue();
             if (def.constructor()) {
@@ -167,7 +223,11 @@ public final class TsonSchemaLinker {
                     constructorsAllowed = isMetaKernelGoverned(schema);
                 }
                 if (!constructorsAllowed) {
-                    throw new TsonSchemaValidationException("'" + entry.getKey() + "' declares a type constructor "
+                    // Reported, but the entry is still merged: its own shape is fine, it is only not permitted
+                    // here, so keeping it lets every reference to it check normally instead of turning one
+                    // eligibility error into an unresolved reference at every use site.
+                    report(receiver, schema, entry.getKey(), def, "'" + entry.getKey()
+                            + "' declares a type constructor "
                             + "(the '~' marker), but '" + schema.id() + "' is not governed directly by the "
                             + "meta-kernel (its own !!meta is '" + schema.meta() + "') -- only a schema chaining "
                             + "to meta-kernel.tn directly may declare new constructors (§2.2.2's "
@@ -183,7 +243,14 @@ public final class TsonSchemaLinker {
         merged = computeDisjointness(merged);
 
         for (Map.Entry<String, TypeDefinition> entry : merged.entrySet()) {
-            validateEntry(entry.getKey(), entry.getValue(), merged, structureNamespace);
+            try {
+                validateEntry(entry.getKey(), entry.getValue(), merged, structureNamespace);
+            } catch (TsonSchemaValidationException e) {
+                if (receiver == null) {
+                    throw e;
+                }
+                receiver.report(schemaError(schema, entry.getKey(), entry.getValue(), e.getMessage()));
+            }
         }
 
         return new TsonLinkedSchema(new TsonSchema(schema.id(), schema.meta(), schema.imports(),

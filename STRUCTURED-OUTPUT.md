@@ -54,7 +54,12 @@ backend.
   - `message` — landed, but still **hand-composed at each call site**, not synthesized from `code` +
     params as this bullet originally called for — that needs a richer per-code parameter shape than
     exists yet. Still open.
-  - `expected`/`actual` — landed exactly as described.
+  - `expected`/`actual` — the fields landed; `actual` carries what it should (`99999`, `CANCELLED`,
+    `(absent)`). **`expected` does not**: it names the declared type (`a value satisfying quantity_t`)
+    rather than the constraint that failed, while the concrete bound or member list sits in `message`
+    (`'99999' is greater than the maximum 100`). So a consumer of the structured fields has to regex the
+    prose to recover what this bullet's own item (4) below asks for. Still open — see `BACKLOG.md`'s
+    "Diagnostic quality for machine consumers".
   - `dataPosition` — landed, resolved via `TsonReadContext`'s own identity-keyed position table (a
     parser's `positions()`), not a fresh lexer-level `Position` thread. Infrastructure-level problems (an
     unresolvable `!!schema`, an unknown root type) now report through the same receiver rather than being
@@ -89,10 +94,15 @@ backend.
   single ready-to-paste `message` synthesized from 1–4, which is what actually gets dropped into a
   retry prompt in practice, but should be a *rendering* of the structured fields, not
   hand-authored per site.
-  - (1)–(4) are all present today; (5) is the remaining gap, and it is the same one the `message`
-    bullet above names. Note what is *not* a gap any more: a repair loop can obtain the diagnostics
-    without giving up the value, so a retry can be built from the partial result rather than from
-    scratch.
+  - (1)–(3) are present today. **(4) is not**, despite the field existing — `expected` names the type
+    rather than the violated constraint, so the concrete "must be ≤ 100" lives only in `message` (see the
+    `expected` bullet above). (5) is the remaining gap it shares a cause with. Note what is *not* a gap any
+    more: a repair loop can obtain the diagnostics without giving up the value, so a retry can be built
+    from the partial result rather than from scratch.
+  - **Ranked above all five for a model that authors *schemas* as well as data**: a wrong schema must not
+    report `OK`. An unknown member in a refinement body is silently ignored today, so JSON-Schema
+    vocabulary (`minimum`/`maximum`) compiles clean and enforces nothing — see `BACKLOG.md`'s "Validation
+    correctness". No amount of diagnostic quality helps when no diagnostic is emitted.
 
 - [x] **A TSON-native idea worth pursuing** — landed as `tson-cli`'s own `diagnostics.tn`
   (`diagnostic`/`diagnostic_code`/`validation_report`) plus `DiagnosticsSchema`'s compiled reader:

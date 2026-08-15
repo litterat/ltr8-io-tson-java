@@ -184,7 +184,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
         // meta.tn isn't meta-kernel's own well-known bootstrap case, and the default TsonSchemaSource
         // fetches nothing -- so this is exactly TsonSchemaSource.registeredOnly()'s own rejection.
-        IllegalStateException thrown = assertThrows(IllegalStateException.class,
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
                 () -> loader.loadMeta(coreDocument.meta()));
         assertTrue(thrown.getMessage().contains("meta.tn"));
         assertTrue(thrown.getMessage().contains("no fetch capability"));
@@ -220,7 +220,8 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         SchemaResolver resolver = new SchemaResolver(registry);
         SchemaDocument miniDocument = new TsonSchemaParser(MINI_DOCUMENT).parseSchemaDocument();
 
-        IllegalStateException thrown = assertThrows(IllegalStateException.class, () -> resolver.resolveSchema(miniDocument));
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> resolver.resolveSchema(miniDocument));
         assertTrue(thrown.getMessage().contains("meta.tn"));
     }
 
@@ -399,7 +400,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         TsonCompiledMetaRegistry registry = new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext());
         TsonCompiledSchemaLoader loader = registry;
 
-        IllegalStateException thrown = assertThrows(IllegalStateException.class,
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
                 () -> loader.loadMeta("https://tson.io/2026/32/m/meta.tn"));
         assertTrue(thrown.getMessage().contains("no fetch capability"));
     }

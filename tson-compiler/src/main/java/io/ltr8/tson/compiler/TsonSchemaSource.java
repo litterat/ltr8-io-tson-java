@@ -32,11 +32,20 @@ public interface TsonSchemaSource {
      */
     String fetch(String uri);
 
-    /** Never fetches anything -- every call throws {@link IllegalStateException} naming {@code uri}. */
+    /**
+     * Never fetches anything -- every call throws naming {@code uri}.
+     *
+     * <p>A {@link io.ltr8.tson.schema.TsonSchemaValidationException} rather than an {@code
+     * IllegalStateException}: a schema referencing an identity nothing can supply is a resolution failure
+     * ([TSON-DATA] §8.1 puts "unresolved type names, schema resolution failures" in the resolver-error
+     * category), not a broken invariant. The distinction is what lets a caller report a mistyped {@code
+     * !!import} as a problem with the document instead of as a fault in this library -- the CLI's exit 1
+     * against its exit 70.
+     */
     static TsonSchemaSource registeredOnly() {
         return uri -> {
-            throw new IllegalStateException("'" + uri + "' is not registered, and this loader has no "
-                    + "fetch capability configured to load it from anywhere");
+            throw new io.ltr8.tson.schema.TsonSchemaValidationException("'" + uri + "' is not registered, "
+                    + "and this loader has no fetch capability configured to load it from anywhere");
         };
     }
 }

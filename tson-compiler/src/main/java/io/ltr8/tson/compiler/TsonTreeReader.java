@@ -251,9 +251,21 @@ public final class TsonTreeReader {
     private TsonValue readAgainstSchema(String schemaUri, TsonReadContext ctx, String typeName) {
         TsonCompiledSchema compiled;
         try {
-            compiled = tree.get(schemaUri);
+            // Every problem with the schema, not just the first, and each keeping the declaration and
+            // position it was reported against. They go to this reader's own receiver rather than through
+            // ctx.report, which would rebuild them from the *data* cursor -- stamping a data position on a
+            // problem in a schema and discarding the schema pointer, which is the misattribution this
+            // reports its way out of.
+            compiled = tree.get(schemaUri, receiver);
         } catch (RuntimeException e) {
+            // The schema could not be reached at all (unfetchable, malformed, a bad !!id): one problem, and
+            // there is nothing to enumerate.
             return abandon(ctx, Diagnostic.Code.SCHEMA_ERROR, e.getMessage());
+        }
+        if (compiled == null) {
+            // Reported above; skip the value so the stream still lands on DocumentEnd.
+            EventSkip.dataValue(ctx);
+            return null;
         }
         String name = typeName;
         if (name == null) {
