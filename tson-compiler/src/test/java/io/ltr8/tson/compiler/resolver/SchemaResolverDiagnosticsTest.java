@@ -140,6 +140,34 @@ class SchemaResolverDiagnosticsTest {
         assertEquals(List.of("/child"), diagnostics.stream().map(Diagnostic::schemaPointer).toList());
     }
 
+    /**
+     * A body the constructor's own vocabulary rejects reaches the resolver as a {@code TsonReadException}
+     * from the governing meta's compiled reader, one layer below every other error here. It is collected
+     * like the rest only because {@code DefinitionResolver} restates it as a schema error first: while it
+     * wore an {@code UnsupportedOperationException}, one such declaration aborted the entire run -- no
+     * diagnostics at all, exit 70, and a stack trace under a "this is a bug in tson" banner.
+     */
+    @Test
+    void aBodyTheConstructorsVocabularyRejectsJoinsTheOtherDiagnostics() {
+        List<Diagnostic> diagnostics = resolveCollecting("""
+                !!id:"https://example.test/broken.tn"
+                !!meta:"https://tson.io/2026/32/m/meta.tn"
+                !!import:"https://tson.io/2026/32/m/core.tn"
+                {
+                  bad_min => !integer ^ { min: "abc" }
+                  bad_max => !integer ^ { max: "xyz" }
+                  fine => int32
+                }
+                """);
+
+        assertEquals(List.of("/bad_max", "/bad_min"),
+                diagnostics.stream().map(Diagnostic::schemaPointer).sorted().toList());
+        for (Diagnostic diagnostic : diagnostics) {
+            assertTrue(diagnostic.message().contains("not valid data for 'integer_type'"), diagnostic.message());
+            assertTrue(diagnostic.schemaPosition().isPresent(), diagnostic.schemaPointer());
+        }
+    }
+
     /** The default overloads keep throwing, so nothing that exists today changes behaviour. */
     @Test
     void withoutAReceiverTheFirstFailureStillThrows() {
