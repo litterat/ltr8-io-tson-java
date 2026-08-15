@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * Everything {@link RecordTreeReader} and {@link RecordBindReader} share verbatim: the compiled
@@ -58,8 +59,15 @@ import java.util.Optional;
  * (fail-fast: an exception; collecting: a reported problem) even though its own decoded value is
  * ultimately discarded, where it previously went entirely unvalidated.
  *
- * <p>A field name with no match in the compiled field list is discarded unread via {@link EventSkip},
- * keeping the stream correctly positioned. A FIXED field the document <em>does</em> state is a different
+ * <p><b>Records are closed under their type</b> ([TSON-SCHEMA] §7.2): a field name with no match in the
+ * compiled field list is an {@code UNRECOGNIZED_FIELD} violation, reported and then discarded unread via
+ * {@link EventSkip}, which keeps the stream correctly positioned. Closure is a MUST wherever a schema is in
+ * scope and is not configurable; §7.2 exempts only schemaless records, and those are read by
+ * {@code SchemalessObjectReader}/{@code SchemalessTreeReader}, which never reach this class. The rule
+ * reaches the <em>schema</em> path too, through the same code: a constructor body ({@code !integer ^ { min:
+ * 1 }}) is bound by replaying it through the governing meta's own compiled reader, so a hallucinated facet
+ * (§5.5's vocabulary does not include JSON Schema's {@code minimum}) is caught here rather than silently
+ * constraining nothing. A FIXED field the document <em>does</em> state is a different
  * case: its value still comes from {@link #precomputedValue} and never from the data, but the stated token
  * is decoded and checked against the fixed one, because §5.2 makes a contradicting value a validation
  * error. Skipping it unread would let a document say one thing and decode to another in silence.
@@ -121,6 +129,13 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     private final FixedCheck[] fixedCheck;
     final int positionalFieldIndex;
     final Optional<SourcePosition> schemaPosition;
+    /**
+     * This type's declared field names in <em>schema</em> order, rendered once for the closure diagnostic
+     * ({@link #readFields}) -- both its message and its machine-readable {@code expected}. Schema order, not
+     * {@link #fieldIndex}'s hash order, so the same schema always produces the same diagnostic; built here
+     * rather than per report because a document full of stray names would otherwise rebuild it per name.
+     */
+    private final String declaredFields;
 
     RecordAbstractReader(String name, RecordBody body, TsonTypeReaderResolver resolver,
                           Optional<SourcePosition> schemaPosition) {
@@ -154,6 +169,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         }
         this.fixedCheck = fixedChecks;
         this.positionalFieldIndex = bareRequiredCount == 1 ? solePositionalField : -1;
+        this.declaredFields = fields.stream().map(field -> field.schema().name()).collect(Collectors.joining(" | "));
     }
 
     private static List<CompiledField> buildFields(RecordBody body, TsonTypeReaderResolver resolver) {
@@ -202,6 +218,10 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      * Javadoc for the forward-overwrite behavior this implements. Returns which schema fields
      * {@code sink} was invoked for at least once, so a caller's own second "fill in missing/default"
      * pass (over every {@code false} entry) knows exactly which fields still need it.
+     *
+     * <p>A name this type does not declare is reported ({@code UNRECOGNIZED_FIELD}) and then discarded
+     * unread, per the continuation policy -- so one collecting pass finds every stray name in a record
+     * rather than only the first, and the record still yields whatever its declared fields hold.
      */
     final boolean[] readFields(TsonReadContext ctx, FieldSink sink) {
         boolean[] seen = new boolean[fields.size()];
@@ -209,6 +229,10 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             FieldName fieldName = (FieldName) ctx.next();
             Integer schemaIndex = fieldIndex.get(fieldName.name());
             if (schemaIndex == null) {
+                ctx.field(fieldName.name()).report(Diagnostic.Code.UNRECOGNIZED_FIELD,
+                        "unknown field '" + fieldName.name() + "' on '" + name + "' -- a record is closed "
+                                + "under its type (§7.2), whose fields are (" + declaredFields + ")",
+                        declaredFields, fieldName.name());
                 EventSkip.scopedValue(ctx);
                 continue;
             }

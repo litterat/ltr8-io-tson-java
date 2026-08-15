@@ -73,6 +73,24 @@ class ValidateCommandTest {
         assertTrue(output.contains("/b"), output);
     }
 
+    /**
+     * A field the schema does not declare is a validation error, not a shrug ([TSON-SCHEMA] §7.2 -- records
+     * are closed under their type). The exit code is what matters as much as the text: for a repair loop,
+     * "we stored a field that does not exist" and "we rejected it" are opposite instructions.
+     */
+    @Test
+    void aFieldTheSchemaDoesNotDeclareIsInvalid(@TempDir Path dir) throws IOException {
+        Path schema = writeFile(dir, "schema.tn1", RECORD_SCHEMA);
+        Path data = writeFile(dir, "data.tson", selfDescribing("{ a: 1  b: 2  hallucinated_field: \"nope\" }"));
+
+        String output = captureStdout(() ->
+                assertEquals(1, ValidateCommand.run(List.of(schema, data), OutputFormat.TEXT)));
+
+        assertTrue(output.contains("[UNRECOGNIZED_FIELD]"), output);
+        assertTrue(output.contains("/hallucinated_field"), output);
+        assertTrue(output.contains("(a | b)"), output);
+    }
+
     @Test
     void aDeclaredSchemaThatWasNotProvidedIsASchemaError(@TempDir Path dir) throws IOException {
         // The data names a schema URI, but no schema file for it was given.

@@ -47,6 +47,31 @@ class CompileCommandTest {
         assertTrue(output.contains("[SCHEMA_ERROR]"), output);
     }
 
+    /**
+     * The whole reason this issue was worth doing, end to end: a JSON-Schema-shaped refinement used to
+     * print {@code OK} and then enforce nothing. Exit 1 (the author's schema is wrong), not exit 70 (a
+     * fault in this library) -- {@code TsonCli} keeps those apart, and a body error wore the wrong
+     * exception type until the classification split landed.
+     */
+    @Test
+    void aRefinementUsingJsonSchemaFacetNamesExitsOneAndNamesTheRealVocabulary(@TempDir Path dir) throws IOException {
+        Path schema = writeFile(dir, "json-shaped.tn1", """
+                !!id:"https://example.test/cli-compile-json-shaped.tn1"
+                !!meta:"https://tson.io/2026/32/m/meta.tn"
+                !!import:"https://tson.io/2026/32/m/core.tn"
+                {
+                  quantity_t => !integer ^ { minimum: 1  maximum: 100 }
+                }
+                """);
+
+        String output = captureStdout(() -> assertEquals(1, CompileCommand.run(schema, OutputFormat.TEXT)));
+
+        assertTrue(output.contains("[SCHEMA_ERROR]"), output);
+        assertTrue(output.contains("/quantity_t"), output);
+        assertTrue(output.contains("unknown field 'minimum'"), output);
+        assertTrue(output.contains("min"), output);
+    }
+
     private static Path writeFile(Path dir, String name, String content) throws IOException {
         Path file = dir.resolve(name);
         Files.writeString(file, content);
