@@ -62,13 +62,13 @@ import java.util.Optional;
  * that is to fully parse whatever comes first (which can itself be an arbitrarily deep nested
  * value) and only then check which delimiter follows -- correct, but it would force this class to
  * buffer arbitrarily deep before emitting anything, undermining the point of being lazy. It's
- * avoidable because record-field position requires the first thing after {@code {} to reduce to a
+ * avoidable because record-field position requires the first thing after <code>&#123;</code> to reduce to a
  * single bare token (no annotations, no type-ref, no nested container) -- anything else can only
  * ever be valid as a map key. That collapses the lookahead to at most two tokens, decided the
- * instant {@code {} is seen, with no recursive buffering at all:
+ * instant <code>&#123;</code> is seen, with no recursive buffering at all:
  *
  * <ul>
- *   <li>{@code {}} immediately followed by {@code @}, {@code !}, {@code {}, {@code [}, or {@code
+ *   <li>{@code {}} immediately followed by {@code @}, {@code !}, <code>&#123;</code>, {@code [}, or {@code
  *       _} can only be a map -- none of those can reduce to a bare field-name token, so a single
  *       token of lookahead settles it. A document that's actually malformed here (e.g. an
  *       annotated key immediately followed by {@code :} instead of {@code =>}) still commits to

@@ -18,7 +18,7 @@ import java.util.Objects;
  * Binds a TSON document to a Java object of a caller-chosen target class -- the class-driven read-side
  * front door, the inverse of {@link TsonObjectWriter} and the object-shaped peer of {@link TsonTreeReader}.
  *
- * <p><b>Two modes, fixed at construction.</b> A reader from {@link Tson#objectReader()} (the {@code
+ * <p><b>Two modes, fixed at construction.</b> A reader from {@code Tson#objectReader()} (the {@code
  * (TsonCompiledSchemaRegistry, DataBindContext)} constructor) is <i>schema-aware</i>: a document that
  * declares a {@code !!schema} is validated against it as it binds -- the schema resolves through that
  * environment's own source, the document's root type-ref (e.g. {@code !person}) selects the type, and a
@@ -62,7 +62,7 @@ public final class TsonObjectReader {
 
     /**
      * Schema-aware -- validates a self-describing document against its {@code !!schema}, resolved and
-     * compiled through {@code bind}. Used by {@link Tson#objectReader()}.
+     * compiled through {@code bind}. Used by {@code Tson#objectReader()}.
      *
      * <p><b>Takes the registry rather than building one</b>, so a caller holding a registry shares its
      * compiled-schema cache with every reader made from it instead of each reader compiling the same schema
@@ -119,7 +119,7 @@ public final class TsonObjectReader {
      * This reader bound to the schema {@code schemaUri} names, for {@link #readAs} -- a new reader, leaving
      * this one unchanged, sharing its compiled-schema registry. The schema is resolved through the same
      * source and cache a self-describing document's own {@code !!schema} goes through, so it must already be
-     * registered (e.g. via {@link Tson#resolve}) or be servable by the configured {@code TsonSchemaSource}.
+     * registered (e.g. via {@code Tson#resolve}) or be servable by the configured {@code TsonSchemaSource}.
      */
     public TsonObjectReader withSchema(String schemaUri) {
         if (bind == null) {
@@ -256,7 +256,7 @@ public final class TsonObjectReader {
      *
      * <p>A problem reaching the schema, or a root type this target class can't hold, is reported through {@code
      * ctx} like any other -- so a fail-fast reader still throws while a collecting one gets it as a {@link
-     * Diagnostic}, the same promise {@link Tson#validate} makes. Where the failure is noticed before the value
+     * Diagnostic}, the same promise {@code Tson#validate} makes. Where the failure is noticed before the value
      * is read, the value is skipped so the stream still lands on {@code DocumentEnd}.
      */
     private <T> T readAgainstSchema(String schemaUri, TsonReadContext ctx, Class<T> type, String typeName) {

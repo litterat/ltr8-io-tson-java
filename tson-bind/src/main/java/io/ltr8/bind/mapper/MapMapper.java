@@ -30,9 +30,8 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- *
- * Sample showing how to use the library to convert an Object to/from Map<String,Object> Each key in
- * the returned map has the name of the field. Union types have an extra field called "type" which
+ * Sample showing how to use the library to convert an Object to/from {@code Map<String, Object>}. Each key
+ * in the returned map has the name of the field. Union types have an extra field called "type" which
  * provides the class name of the type of value recorded.
  */
 public class MapMapper {

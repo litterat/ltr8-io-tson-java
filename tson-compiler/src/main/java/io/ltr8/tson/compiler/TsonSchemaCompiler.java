@@ -61,7 +61,7 @@ public final class TsonSchemaCompiler {
      * body's constructor is dispatched, scoped, through that meta-schema (see {@link #governedFactory}).
      * This is what {@code TsonCompiledMetaRegistry} uses to compile a schema in the context of the meta that
      * governs it. {@code governingMeta} is always an already-compiled result from a previous compile --
-     * meta-kernel's own case aside (see {@link TsonCompiledMetaSchema#bootstrap}).
+     * meta-kernel's own case aside (see {@link TsonSchema#bootstrap()}).
      */
     public static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema, TsonCompiledMetaSchema governingMeta) {
         TsonSchema schema = linkedSchema.schema();
@@ -98,7 +98,7 @@ public final class TsonSchemaCompiler {
      * This is for reading data against an already-resolved, already-linked (hence already-validated)
      * schema in a chosen mode: the schema's own constructor usage was checked when it was registered,
      * so no governing-meta scoping is applied or needed here, and any of the mode's factories may be
-     * used. It is also how meta-kernel itself is first compiled ({@link TsonCompiledMetaSchema#bootstrap}),
+     * used. It is also how meta-kernel itself is first compiled ({@link TsonSchema#bootstrap()}),
      * since meta-kernel declares its whole vocabulary itself and has no earlier meta to be governed by.
      */
     public static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema, ValueReaderFactoryResolver factories) {

@@ -22,3 +22,8 @@ jobs:
 
       - name: Build and test
         run: ./gradlew build
+
+      # Not reached by `build` -- javadoc is its own task tree, so a broken doc comment
+      # is invisible to the line above.
+      - name: Javadoc
+        run: ./gradlew javadoc
