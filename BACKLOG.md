@@ -294,12 +294,6 @@ clean; these are the friction points the run surfaced. The exercise's biggest fi
 diagnostic whose `schemaPosition` points into core.tn with no `schemaId` saying so, was already tracked
 under "Schema-side diagnostics".
 
-- [ ] **No stdin, and the refusal is unhelpful**
-  ([#12](https://github.com/litterat/ltr8-io-tson-java/issues/12)). An LLM harness holds the candidate
-  document in memory; today it must write a temp file per attempt, and `tson validate schema.tn -` dies
-  with `cannot read -: -` (exit 2 — the message is `Files.newInputStream` failing on a literal `-` path).
-  Accept `-` as "read one data document from stdin" (schemas stay files — classification re-reads, which
-  stdin can't), and fix the message regardless.
 - [ ] **`no schema file provided for !!schema "…"` should say what *was* provided.** Classification keys a
   supplied schema file by its embedded `!!id`, not its filename (correct — §2.2.1), so a schema file whose
   `!!id` differs from the data's `!!schema` produces this message while the author stares at the very file

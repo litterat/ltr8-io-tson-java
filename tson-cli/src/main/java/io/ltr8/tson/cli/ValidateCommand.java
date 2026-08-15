@@ -11,7 +11,10 @@ import io.ltr8.tson.schema.TsonCanonicalIdentity;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.AccessDeniedException;
+import java.nio.file.FileSystemException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -19,14 +22,17 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * {@code tson validate [--output text|json|tson] <file>...} -- validates data files.
+ * {@code tson validate [--output text|json|tson] <file|->...} -- validates data documents.
  *
  * <p><b>A flat list of files, auto-classified.</b> Each file is a TSON schema document (its header
  * carries {@code !!meta}) or a data document. The schema files are made available through a {@link
- * TsonSchemaSource}, and each data file is handed to {@link Tson#validate(InputStream)}, which works
- * out on its own whether the data's {@code !!schema} selects a schema or whether it's validated
+ * TsonSchemaSource}, and each data document is handed to {@link Tson#validate(InputStream)}, which
+ * works out on its own whether the data's {@code !!schema} selects a schema or whether it's validated
  * schemalessly (base syntax + built-in atoms). This command only turns the argument list into a
- * source + a list of data files, then renders the diagnostics.
+ * source + a list of data documents, then renders the diagnostics.
+ *
+ * <p><b>{@code -} is standard input</b>, always a data document and never classified -- see {@link
+ * ValidateInput}. Schemas stay files.
  *
  * <p><b>One {@link ValidationRun} per invocation, whatever the file count.</b> Each data file's
  * verdict is a named {@link FileReport} inside it, so {@code --output json}/{@code tson} emit a
@@ -39,16 +45,22 @@ final class ValidateCommand {
     }
 
     /** @return exit code: 0 every data file valid, 1 at least one invalid, 2 a usage/classification failure */
-    static int run(List<Path> files, OutputFormat format) {
+    static int run(List<ValidateInput> inputs, OutputFormat format) {
         Map<String, String> schemas = new HashMap<>();
-        List<Path> dataFiles = new ArrayList<>();
-        for (Path file : files) {
+        List<ValidateInput> dataInputs = new ArrayList<>();
+        for (ValidateInput input : inputs) {
+            // Standard input is a data document by definition -- classification opens the document a second
+            // time, and a stream has nothing to reopen. See ValidateInput.
+            if (!(input instanceof ValidateInput.OfFile(Path file))) {
+                dataInputs.add(input);
+                continue;
+            }
             boolean schema;
             try {
                 schema = isSchemaDocument(file);
             } catch (IOException e) {
                 System.out.println(format.render(ValidationRun.failed(Diagnostic.Code.VALIDATION_ERROR,
-                        "cannot read " + file + ": " + e.getMessage())));
+                        cannotRead(input, e))));
                 return 2;
             }
             if (schema) {
@@ -70,11 +82,11 @@ final class ValidateCommand {
                     return 2;
                 }
             } else {
-                dataFiles.add(file);
+                dataInputs.add(input);
             }
         }
 
-        if (dataFiles.isEmpty()) {
+        if (dataInputs.isEmpty()) {
             System.out.println(format.render(ValidationRun.failed(Diagnostic.Code.VALIDATION_ERROR,
                     "no data files to validate (only schema files were given)")));
             return 2;
@@ -94,25 +106,43 @@ final class ValidateCommand {
         // Every file's report is collected before anything is printed: the envelope's own verdict is the
         // AND across the files, so there is nothing to emit until the last one is in.
         List<FileReport> reports = new ArrayList<>();
-        for (Path dataFile : dataFiles) {
+        for (ValidateInput dataInput : dataInputs) {
             List<CliDiagnostic> errors;
             // IOException only: an unreadable file is that file's own problem, so it renders as a verdict
             // and the run carries on to the next one. A RuntimeException is not -- Tson.validate returns
             // every document-level failure as a Diagnostic and rethrows only a fault in the library, so
             // catching it here would put that fault back into a per-file "invalid" verdict, which is what
             // it went out of its way to avoid. It propagates to TsonCli's fault handler instead.
-            try (InputStream in = Files.newInputStream(dataFile)) {
+            try (InputStream in = dataInput.open()) {
                 errors = tson.validate(in).stream().map(CliDiagnostic::from).toList();
             } catch (IOException e) {
                 errors = List.of(CliDiagnostic.minimal(Diagnostic.Code.VALIDATION_ERROR,
-                        "cannot read " + dataFile + ": " + e.getMessage()));
+                        cannotRead(dataInput, e)));
             }
-            reports.add(FileReport.of(dataFile.toString(), errors));
+            reports.add(FileReport.of(dataInput.name(), errors));
         }
 
         ValidationRun run = ValidationRun.of(reports);
         System.out.println(format.render(run));
         return run.valid() ? 0 : 1;
+    }
+
+    /**
+     * Why a document could not be read, named.
+     *
+     * <p>An {@link IOException} from the file system usually carries the offending path as its whole
+     * message and the failure <i>kind</i> only in its type, so the obvious {@code "cannot read " + file +
+     * ": " + e.getMessage()} renders as {@code cannot read x: x} -- the path twice and no reason. The
+     * common kinds are spelled out; anything else falls back to whatever the exception does say.
+     */
+    private static String cannotRead(ValidateInput input, IOException e) {
+        String reason = switch (e) {
+            case NoSuchFileException ignored -> "no such file";
+            case AccessDeniedException ignored -> "permission denied";
+            case FileSystemException fs when fs.getReason() != null -> fs.getReason();
+            default -> e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+        };
+        return "cannot read " + input.name() + ": " + reason;
     }
 
     /** The three bundled standard-library identities, which {@code TsonConfig} always serves from its own resources. */

@@ -479,6 +479,18 @@ available, so order doesn't matter and you can pass several of each. A data file
 is checked *schemalessly*: base syntax plus any built-in type (`!uuid`/`!int32`/`!date`/…), with a
 non-built-in type-ref reported as unknown.
 
+**`-` reads one data document from standard input**, so a generator can pipe a candidate straight in
+rather than writing a temp file per attempt:
+
+```
+$ printf '!!schema:"…/person-1.tn"\n!person { name: "Ada" age: 30 }\n' | tson validate person.tn -
+OK
+```
+
+It reports under the name `-`, and only the bare argument `-` means stdin — a file really called `-` is
+reachable as `./-`. Schemas must be files: classification opens a document a second time and a stream has
+nothing to reopen, so piped input is always treated as data.
+
 For a hand-written schema `person.tn` and a self-describing data file `ada.tn`:
 
 ```tson
