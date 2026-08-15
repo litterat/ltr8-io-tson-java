@@ -2100,3 +2100,107 @@ constructor's real vocabulary, which is the part that makes the error correctabl
 3. **Say it is an error, explicitly, rather than leaving it to the closure rule.** The failure mode here is
    an implementation that never asks the question, so the rule needs to be stated where an implementer of
    body binding is looking, in the imperative.
+
+---
+
+## 41. Duplicate field names and map keys are SHOULD-level, so the ambiguity lives in the format rather than in one document
+
+**Section:** §2.5 ("Records"), §2.6 ("Maps"). Related: §7.4 (the token stream is single-pass),
+[TSON-SCHEMA] §7.2 (record closure), and this file's #21.
+
+**Problem:** Both duplicate rules are stated softly, and each then defines what a processor does with the
+ambiguity rather than removing it:
+
+> Field names within a record SHOULD be unique. If duplicate field names are present, the last value wins.
+> (§2.5)
+
+> Duplicate keys SHOULD NOT be present. If duplicate keys are present, the last value wins. […] The parser
+> SHOULD warn when textually identical keys are detected. (§2.6)
+
+This is JSON's compromise, inherited whole. RFC 8259 says the same thing for the same reason, and JEP 540
+("Simple JSON API", incubating in JDK 28) sets out why that reason does not transfer to a format being
+designed now:
+
+> When the issue of duplicate names was discussed on the ECMAScript Discussion List in 2013, the concern
+> about prohibiting duplicate names was that doing so would invalidate existing documents. Thus, the
+> "should be unique" wording (instead of "must") was retained, and it has been carried over to current
+> specifications.
+
+The SHOULD in RFC 8259 buys backward compatibility with a corpus that already existed in 2013. **TSON has
+no such corpus.** The series is an unreleased working revision with no compatibility guarantees between
+revisions and no frozen version 1 (#20), so it is paying the interoperability cost of that compromise while
+collecting none of the benefit it was made for — and the window in which fixing it is free closes at
+version 1.
+
+What the cost is, in RFC 8259's own words, quoted by the JEP:
+
+> An object whose names are all unique is interoperable in the sense that all software implementations
+> receiving that object will agree on the name-value mappings. When the names within an object are not
+> unique, the behavior of software that receives such an object is unpredictable.
+
+and what makes it more than a theoretical concern:
+
+> The unpredictability arises when the object is processed by a system consisting of multiple,
+> independently-developed JSON libraries. This can lead to hard-to-diagnose errors, security
+> vulnerabilities, decreased interoperability, and general lack of robustness.
+> (JEP 540, citing RFC 9413, "Maintaining Robust Protocols")
+
+JEP 540's own resolution is unconditional rejection — "This policy, permitted by the RFC, provides maximum
+interoperability and predictability, and reduces concerns about processing malformed or ambiguous JSON
+documents" — reached by a group with every incentive to stay compatible with an installed base, choosing
+strictness anyway.
+
+**Four things make the case stronger for TSON than for JSON.**
+
+1. **The spec already pays for detection and then declines to use it.** §2.6 requires a parser to detect
+   textually identical keys ("The parser SHOULD warn when textually identical keys are detected"), including
+   the structural comparison compound keys need. The work is mandated; only the verdict is soft. Turning a
+   warning into a rejection costs an implementation nothing it is not already doing.
+
+2. **"Last value wins" is unimplementable as a *warning* by a processor with one severity.** Warning
+   requires a diagnostic model with a severity axis, and a processor that has only "error" must choose
+   between staying silent about a construct the spec itself calls suspect and failing a document the spec
+   calls conforming. This implementation is in exactly that position and stays silent (below). MUST NOT
+   dissolves the problem instead of pushing it into every implementation's diagnostic model.
+
+3. **It contradicts the schema layer's own posture.** [TSON-SCHEMA] §7.2 closes a record under its type: a
+   field name the type does not declare MUST be a validation error, precisely so a stray name cannot pass
+   unnoticed. A *repeated* name is the same class of authoring mistake with a stronger proof — no schema is
+   needed to know that a record stating `x` twice states one of them for nothing — yet closure rejects the
+   first and §2.5 accepts the second.
+
+4. **A Class 1 and a Class 2 processor can decode one map to different values.** §2.6's textual rule makes
+   `1` and `1.0` distinct keys, while "type-aware key equality requires declared type information" — so
+   under an `integer`-keyed schema they are one key. With "last value wins", that difference is not a
+   disagreement about validity but about *content*: two entries under Class 1, one entry under Class 2,
+   silently, from the same bytes. Under MUST NOT the same document is accepted by one and rejected by the
+   other, which is a disagreement a user can see and fix.
+
+**Interpretation chosen:** implemented exactly as written — duplicates are accepted, the last occurrence
+wins, and nothing is reported. `RecordAbstractReader.readFields` decodes every occurrence of a repeated
+field name forward and lets a later one overwrite an earlier (#21 has that half);
+`MapAbstractReader.readInto` walks every entry, and a duplicate key disappears at the sink's own `Map.put`.
+**No warning is emitted for either**, because `Diagnostic` has no severity axis: every diagnostic makes
+`Tson.validate` return non-empty and the CLI exit 1, so emitting one would fail a document this spec calls
+conforming — the opposite defect, and the worse one. Detection at both sites is a `HashSet`; it is the
+verdict that has nowhere to go.
+
+**Suggested resolution:** make both rules MUST NOT, and delete the resolution rules that exist only to
+disambiguate what would then be malformed.
+
+1. **§2.5:** "Field names within a record MUST be unique. A record containing the same field name more than
+   once is malformed and MUST be rejected." Delete "the last value wins".
+2. **§2.6:** the same for textually identical keys, replacing both "last value wins" and "SHOULD warn" —
+   the detection §2.6 already requires becomes the rejection.
+3. **Say what a schema-governed processor does with a type-aware duplicate** (`1` and `1.0` at an
+   `integer`-keyed map): recommended as a Class 2 validation error, so the two conformance classes differ
+   in *when* a document is rejected rather than in what it decodes to.
+4. **This dissolves #21.** The shadowed-occurrence question — whether a processor must validate an
+   occurrence a later one overwrites — exists only because there is something to shadow. With uniqueness
+   required, the second occurrence *is* the error, reported at its own position, and the
+   streaming-vs-buffered interoperability hazard that entry describes disappears rather than being
+   documented.
+5. **If full strictness is judged too strong at the data layer**, the fallback is to say so explicitly
+   rather than through SHOULD: keep last-value-wins for Class 1 and make uniqueness a MUST for Class 2,
+   where a schema is in scope and §7.2 already closes the record. That is a weaker outcome, but it is a
+   decision the format makes once, instead of one every implementation makes silently.

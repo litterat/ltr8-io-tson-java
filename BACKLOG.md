@@ -139,6 +139,10 @@ choice this list once called it.
   - The work is the model, not the detection: a severity on `Diagnostic`, a decision on how `validate` and
     the CLI's exit codes treat a warning (exit 0 with output, presumably, and a `--strict` to promote), and
     a `diagnostics-N.tn` bump for the wire shape.
+  - **Both of these are the spec's SHOULD, and `SPEC-FEEDBACK.md` #41 argues it should be a MUST NOT** —
+    duplicates rejected outright, as JEP 540 decided for JSON. If that lands, the two rules stop needing a
+    severity and become ordinary errors, and this item loses its only two motivating cases (the severity
+    axis may still be wanted, but nothing in the spec would then demand it).
 
 ## Reader behaviour
 
