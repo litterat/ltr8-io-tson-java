@@ -3,14 +3,18 @@ package io.ltr8.tson.cli;
 import io.ltr8.tson.compiler.TsonObjectWriter;
 import io.ltr8.tson.compiler.TsonWriteException;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 
 /**
- * How a {@link ValidationReport} is printed -- {@link #TEXT} for a human reading a terminal, {@link
- * #JSON} for a script/agent (and interop with the JSON-Schema/pydantic tooling ecosystem), and
- * {@link #TSON} for a real, schema-validated TSON document: this CLI's own diagnostics dogfooding
- * the library, not just JSON with a different label.
+ * How a {@link ValidationRun} or a {@link ValidationReport} is printed -- {@link #TEXT} for a human
+ * reading a terminal, {@link #JSON} for a script/agent (and interop with the JSON-Schema/pydantic
+ * tooling ecosystem), and {@link #TSON} for a real, schema-validated TSON document: this CLI's own
+ * diagnostics dogfooding the library, not just JSON with a different label.
+ *
+ * <p>The two inputs are the two commands: {@code validate} renders a run (named per-file reports),
+ * {@code compile} a bare report (one schema, nothing to name).
  */
 enum OutputFormat {
     TEXT, JSON, TSON;
@@ -31,6 +35,64 @@ enum OutputFormat {
             case JSON -> renderJson(report);
             case TSON -> renderTson(report);
         };
+    }
+
+    /**
+     * Renders a whole {@code validate} run.
+     *
+     * <p><b>{@link #JSON} and {@link #TSON} emit the envelope whatever the file count</b> -- a harness
+     * parses one document and finds the filenames inside it. {@link #TEXT} keeps the per-file
+     * {@code # <file>} header instead, printed only when there is more than one file to tell apart:
+     * that label is for a person reading a terminal, and it is precisely its being outside the object
+     * that made the machine formats unparseable.
+     */
+    String render(ValidationRun run) {
+        return switch (this) {
+            case TEXT -> renderText(run);
+            case JSON -> renderJson(run);
+            case TSON -> renderTson(run);
+        };
+    }
+
+    private static String renderText(ValidationRun run) {
+        StringBuilder text = new StringBuilder();
+        for (CliDiagnostic error : run.errors()) {
+            text.append(renderText(new ValidationReport(false, List.of(error)))).append(System.lineSeparator());
+        }
+        for (FileReport file : run.files()) {
+            if (run.files().size() > 1) {
+                text.append("# ").append(file.file()).append(System.lineSeparator());
+            }
+            text.append(renderText(new ValidationReport(file.valid(), file.errors()))).append(System.lineSeparator());
+        }
+        return text.toString().stripTrailing();
+    }
+
+    private static String renderJson(ValidationRun run) {
+        StringBuilder json = new StringBuilder();
+        json.append("{\"valid\":").append(run.valid()).append(",\"files\":[");
+        for (int i = 0; i < run.files().size(); i++) {
+            if (i > 0) {
+                json.append(',');
+            }
+            FileReport file = run.files().get(i);
+            json.append("{\"file\":").append(jsonString(file.file()))
+                    .append(",\"valid\":").append(file.valid())
+                    .append(",\"errors\":");
+            jsonErrors(json, file.errors());
+            json.append('}');
+        }
+        json.append("],\"errors\":");
+        jsonErrors(json, run.errors());
+        return json.append('}').toString();
+    }
+
+    private static String renderTson(ValidationRun run) {
+        try {
+            return new TsonObjectWriter().toTson(run);
+        } catch (TsonWriteException e) {
+            throw new IllegalStateException("failed to render this CLI's own diagnostics as TSON", e);
+        }
     }
 
     private static String renderText(ValidationReport report) {
@@ -72,25 +134,30 @@ enum OutputFormat {
     /** Every {@link CliDiagnostic} field, not just {@code code}/{@code message} -- the primary alignment target this shape maps to, Pydantic v2's own {@code ValidationError.errors()} ({@code type}/{@code loc}/{@code msg}/{@code input}/{@code ctx}), needs all of it. */
     private static String renderJson(ValidationReport report) {
         StringBuilder json = new StringBuilder();
-        json.append("{\"valid\":").append(report.valid()).append(",\"errors\":[");
-        for (int i = 0; i < report.errors().size(); i++) {
+        json.append("{\"valid\":").append(report.valid()).append(",\"errors\":");
+        jsonErrors(json, report.errors());
+        return json.append('}').toString();
+    }
+
+    private static void jsonErrors(StringBuilder json, List<CliDiagnostic> errors) {
+        json.append('[');
+        for (int i = 0; i < errors.size(); i++) {
             if (i > 0) {
                 json.append(',');
             }
-            CliDiagnostic error = report.errors().get(i);
+            CliDiagnostic error = errors.get(i);
             json.append("{\"path\":").append(jsonString(error.path()))
                     .append(",\"schemaPointer\":").append(jsonString(error.schemaPointer()))
-                    .append(",\"schemaId\":").append(jsonString(error.schemaId()))
+                    .append(",\"schemaId\":").append(jsonStringOrNull(error.schemaId()))
                     .append(",\"code\":").append(jsonString(error.code().name()))
                     .append(",\"message\":").append(jsonString(error.message()))
-                    .append(",\"expected\":").append(jsonString(error.expected()))
-                    .append(",\"actual\":").append(jsonString(error.actual()))
+                    .append(",\"expected\":").append(jsonStringOrNull(error.expected()))
+                    .append(",\"actual\":").append(jsonStringOrNull(error.actual()))
                     .append(",\"dataPosition\":").append(jsonStringOrNull(error.dataPosition()))
                     .append(",\"schemaPosition\":").append(jsonStringOrNull(error.schemaPosition()))
                     .append('}');
         }
-        json.append("]}");
-        return json.toString();
+        json.append(']');
     }
 
     private static String jsonStringOrNull(Optional<String> value) {

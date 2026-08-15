@@ -279,43 +279,22 @@ left:
   - The fuller version is the standing `message`-synthesis item (compose the sentence *from* `code` +
     params rather than hand-writing it per call site), which would make the two consistent by construction
     instead of by discipline.
+- [ ] **A base-syntax diagnostic states its position twice.** `(7:3:183): … found ']' (RBRACKET) at line 7,
+  column 3` — the parser's own exception message embeds a location the `Diagnostic` already carries
+  structurally as `dataPosition`, so every renderer prints it twice and a machine consumer parsing
+  `message` sees a second, differently-formatted copy (no byte offset). The fix belongs in the parse/lex
+  exception messages, not in a renderer: state what went wrong, and let the diagnostic say where.
+- [ ] **`""` is overloaded on `Diagnostic`'s two pointers**, meaning both "the root" (RFC 6901's own
+  spelling, which `Tson.validateSchema` genuinely emits for a document-level problem) and "this diagnostic
+  has no such end" (every read diagnostic, which populates no `schemaPointer` at all). A consumer cannot
+  tell them apart, and neither can a renderer: `CliDiagnostic` maps `schemaId`/`expected`/`actual` to
+  absent when empty but has to leave `path`/`schemaPointer` as plain strings for exactly this reason.
+  Making the two pointers `Optional<String>` on `Diagnostic` itself would settle it at the source.
 - [ ] **`UNKNOWN_TYPE` doesn't enumerate, unlike its sibling.** A typo'd root type-ref reports
   `'meeting_note' is not in this compiled schema` and stops there, where `UNRECOGNIZED_FIELD` lists the
   closed field set that makes the fix one-shot. The message originates as `TsonCompiledSchema.get`'s
   `IllegalArgumentException`, and the compiled schema knows its `entries()` — listing the declared type
   names (the root position's exact analogue of a record's field list) costs nothing.
-
-## CLI
-
-Findings from running the structured-output loop end to end the way an LLM harness would (author a schema,
-generate data, iterate on `tson validate`'s diagnostics, consume `--output json`) — the loop itself works,
-including a whole JSON-flavored document (quoted field names, commas, quoted enum members) validating
-clean; these are the friction points the run surfaced. The exercise's biggest finding, a read-path
-diagnostic whose `schemaPosition` points into core.tn with no `schemaId` saying so, was already tracked
-under "Schema-side diagnostics".
-
-- [ ] **Multi-file `--output json` is not parseable as JSON.** `ValidateCommand.run` prints a `# <file>`
-  header line between per-file JSON objects whenever more than one data file is given, so a harness cannot
-  parse the output as JSON — the labels sit outside the objects, and `--output tson` has the same shape.
-  Either one envelope (`{ files: [ { file: ... valid: ... errors: [...] } ] }`) or JSONL with the filename
-  inside each object; whether the single-file form stays a bare object or gains the same `file` field is
-  the one design decision.
-- [ ] **No stdin, and the refusal is unhelpful.** An LLM harness holds the candidate document in memory;
-  today it must write a temp file per attempt, and `tson validate schema.tn -` dies with `cannot read -: -`
-  (exit 2 — the message is `Files.newInputStream` failing on a literal `-` path). Accept `-` as "read one
-  data document from stdin" (schemas stay files — classification re-reads, which stdin can't), and fix the
-  message regardless.
-- [ ] **`no schema file provided for !!schema "…"` should say what *was* provided.** Classification keys a
-  supplied schema file by its embedded `!!id`, not its filename (correct — §2.2.1), so a schema file whose
-  `!!id` differs from the data's `!!schema` produces this message while the author stares at the very file
-  they passed. Appending the supplied schemas' identities (`supplied schema files declare: [...]`) defuses
-  it; the `TsonSchemaSource` lambda in `ValidateCommand` already closes over the map it would list.
-- [ ] **Rendering polish**, three small ones from the same run: absent fields render inconsistently in JSON
-  (`schemaId`/`schemaPointer` come out `""`, being plain `String`s on `Diagnostic`, but the positions come
-  out `null`, being `Optional` on `CliDiagnostic`); the `line:column:byteOffset` position format is
-  documented only in `CliDiagnostic`'s Javadoc, nowhere a consumer of the JSON would look; and a
-  base-syntax diagnostic states its position twice (`(7:3:183): … found ']' (RBRACKET) at line 7, column
-  3` — the parser message embeds what the diagnostic also carries structurally as `dataPosition`).
 
 ## Write side
 

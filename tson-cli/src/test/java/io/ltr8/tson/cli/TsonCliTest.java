@@ -3,8 +3,10 @@ package io.ltr8.tson.cli;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -107,6 +109,47 @@ class TsonCliTest {
         assertEquals(0, exitCode);
     }
 
+    /** {@code -} is standard input all the way through {@code main}'s own dispatch, not just in the command. */
+    @Test
+    void dashReadsOneDataDocumentFromStandardInput(@TempDir Path dir) throws IOException {
+        Path schema = writeFile(dir, "schema.tn1", """
+                !!id:"https://example.test/cli-stdin.tn1"
+                !!meta:"https://tson.io/2026/32/m/meta.tn"
+                !!import:"https://tson.io/2026/32/m/core.tn"
+                { my_int => int32 }
+                """);
+        String data = "!!schema:\"https://example.test/cli-stdin.tn1\"\n!my_int 42\n";
+
+        String out = withStdin(data, () -> captureStdout(() -> assertEquals(0,
+                TsonCli.run(new String[] {"validate", "--output", "json", schema.toString(), "-"}))));
+
+        assertTrue(out.contains("\"file\":\"-\",\"valid\":true"), out);
+    }
+
+    /**
+     * There is one standard input and the first read consumes it, so a second {@code -} could only ever
+     * report an empty document -- which would come back valid, the worst available answer.
+     */
+    @Test
+    void asecondDashIsAUsageError() throws IOException {
+        String err = captureStderr(() ->
+                assertEquals(2, TsonCli.run(new String[] {"validate", "-", "-"})));
+
+        assertTrue(err.contains("standard input can only be read once"), err);
+    }
+
+    /**
+     * Only the exact argument {@code -} is standard input. A file genuinely named {@code -} stays
+     * reachable by any path that spells more than the bare dash -- {@code ./-} being the usual Unix
+     * escape hatch -- so the convention costs nothing.
+     */
+    @Test
+    void onlyABareDashIsStandardInputNotAPathEndingInOne(@TempDir Path dir) throws IOException {
+        writeFile(dir, "-", "42");
+
+        assertEquals(0, TsonCli.run(new String[] {"validate", dir.resolve("-").toString()}));
+    }
+
     @Test
     void initScaffoldsAnExampleThatActuallyValidates(@TempDir Path dir) {
         assertEquals(0, TsonCli.run(new String[] {"init-example", dir.toString()}));
@@ -166,6 +209,21 @@ class TsonCliTest {
 
     private interface ThrowingRunnable {
         void run() throws IOException;
+    }
+
+    private interface ThrowingSupplier<T> {
+        T get() throws IOException;
+    }
+
+    /** Runs {@code body} with {@code content} on standard input, restoring the real stream afterwards. */
+    private static <T> T withStdin(String content, ThrowingSupplier<T> body) throws IOException {
+        InputStream original = System.in;
+        System.setIn(new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8)));
+        try {
+            return body.get();
+        } finally {
+            System.setIn(original);
+        }
     }
 
     private static String captureStderr(ThrowingRunnable body) throws IOException {

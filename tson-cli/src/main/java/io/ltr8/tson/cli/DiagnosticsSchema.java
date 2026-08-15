@@ -15,8 +15,9 @@ import java.nio.charset.StandardCharsets;
 
 /**
  * Compiles this module's own {@code diagnostics.tn} (a small schema, governed by meta.tn and
- * importing core.tn, declaring {@code diagnostic}/{@code validation_report}), *compiled* in
- * object-binding mode -- bound directly to {@link CliDiagnostic}/{@link ValidationReport} via
+ * importing core.tn, declaring {@code diagnostic}/{@code validation_report}/{@code
+ * file_report}/{@code validation_run}), *compiled* in object-binding mode -- bound directly to
+ * {@link CliDiagnostic}/{@link ValidationReport}/{@link FileReport}/{@link ValidationRun} via
  * {@link #BINDER} -- what {@link OutputFormat#TSON} reads a written report back through, to prove
  * the emitted text is genuinely valid against a real TSON schema, not just structurally similar to
  * one.
@@ -30,6 +31,8 @@ import java.nio.charset.StandardCharsets;
 final class DiagnosticsSchema {
 
     private static final DataNameBinder BINDER = name -> switch (name) {
+        case "validation_run" -> ValidationRun.class;
+        case "file_report" -> FileReport.class;
         case "validation_report" -> ValidationReport.class;
         case "diagnostic" -> CliDiagnostic.class;
         case "diagnostic_code" -> Diagnostic.Code.class;

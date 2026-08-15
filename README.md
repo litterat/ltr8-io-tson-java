@@ -479,6 +479,18 @@ available, so order doesn't matter and you can pass several of each. A data file
 is checked *schemalessly*: base syntax plus any built-in type (`!uuid`/`!int32`/`!date`/…), with a
 non-built-in type-ref reported as unknown.
 
+**`-` reads one data document from standard input**, so a generator can pipe a candidate straight in
+rather than writing a temp file per attempt:
+
+```
+$ printf '!!schema:"…/person-1.tn"\n!person { name: "Ada" age: 30 }\n' | tson validate person.tn -
+OK
+```
+
+It reports under the name `-`, and only the bare argument `-` means stdin — a file really called `-` is
+reachable as `./-`. Schemas must be files: classification opens a document a second time and a stream has
+nothing to reopen, so piped input is always treated as data.
+
 For a hand-written schema `person.tn` and a self-describing data file `ada.tn`:
 
 ```tson
@@ -495,14 +507,27 @@ $ tson validate person.tn ada.tn      # ada.tn = !!schema:"…/person-1.tn" !per
 OK
 
 $ tson validate --output json person.tn bad.tn   # bad.tn = !!schema:"…/person-1.tn" !person { age: 30 }
-{"valid":false,"errors":[{"path":"/name","code":"FIELD_REQUIRED",
+{"valid":false,"files":[{"file":"bad.tn","valid":false,"errors":[{"path":"/name",
+  "schemaPointer":"","schemaId":null,"code":"FIELD_REQUIRED",
   "message":"missing required field 'name' for 'person'","expected":"a value for 'name'",
-  "actual":"(absent)","dataPosition":"2:1:…","schemaPosition":null}]}
+  "actual":"(absent)","dataPosition":"2:1:…","schemaPosition":null}]}],"errors":[]}
 
 $ tson compile person.tn
 OK
 ```
 
+- **`--output json`/`tson` is one document per invocation**, one file or twenty: a `files` array with each
+  data file's own `file`/`valid`/`errors`, wrapped in the run's own verdict. Nothing to reassemble, and
+  no branch on file count. The top-level `errors` carries only what stopped the run before any document
+  was read (exit 2); a document that read but didn't validate reports inside its own entry (exit 1).
+  `--output text` keeps the human-facing `# <file>` headers instead.
+- **A diagnostic locates a problem at up to two ends** — the value in the data (`path`, `dataPosition`)
+  and the rule in the schema (`schemaId`, `schemaPointer`, `schemaPosition`) — and either end may be
+  absent. A field with nothing to say is `null`, never `""`; the two pointers are the exception and are
+  always present, because for an RFC 6901 pointer `""` is the root rather than an absence. A position is
+  `line:column:byteOffset`, the first two 1-based and the offset counting UTF-8 bytes from 0. The whole
+  shape is declared as a real schema in `tson-cli`'s own `diagnostics.tn`, which `--output tson` is
+  validated against.
 - **Schema selection** is entirely the data's own doing: its `!!schema` names the schema and its root
   type-ref (`!person`) names the type. If a data file's `!!schema` names a schema you didn't pass,
   that's a `SCHEMA_ERROR`. There's no URL *fetching* — schemas come from the files you list (a

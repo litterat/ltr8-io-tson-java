@@ -3,15 +3,19 @@ package io.ltr8.tson.cli;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -42,7 +46,7 @@ class ValidateCommandTest {
         Path data = writeFile(dir, "data.tson", selfDescribing("{ a: 1  b: 2 }"));
 
         String output = captureStdout(() ->
-                assertEquals(0, ValidateCommand.run(List.of(schema, data), OutputFormat.TEXT)));
+                assertEquals(0, ValidateCommand.run(inputs(schema, data), OutputFormat.TEXT)));
 
         assertEquals("OK", output.strip());
     }
@@ -53,7 +57,7 @@ class ValidateCommandTest {
         Path data = writeFile(dir, "data.tson", selfDescribing("{ a: 1  b: 2 }"));
 
         String output = captureStdout(() ->  // data listed before its schema
-                assertEquals(0, ValidateCommand.run(List.of(data, schema), OutputFormat.TEXT)));
+                assertEquals(0, ValidateCommand.run(inputs(data, schema), OutputFormat.TEXT)));
 
         assertEquals("OK", output.strip());
     }
@@ -65,7 +69,7 @@ class ValidateCommandTest {
         Path data = writeFile(dir, "data.tson", selfDescribing("{ a: 99999999999999 }"));
 
         String output = captureStdout(() ->
-                assertEquals(1, ValidateCommand.run(List.of(schema, data), OutputFormat.TEXT)));
+                assertEquals(1, ValidateCommand.run(inputs(schema, data), OutputFormat.TEXT)));
 
         assertTrue(output.contains("[FIELD_REQUIRED]"), output);
         assertTrue(output.contains("[ATOM_CONSTRAINT_VIOLATION]"), output);
@@ -84,7 +88,7 @@ class ValidateCommandTest {
         Path data = writeFile(dir, "data.tson", selfDescribing("{ a: 1  b: 2  hallucinated_field: \"nope\" }"));
 
         String output = captureStdout(() ->
-                assertEquals(1, ValidateCommand.run(List.of(schema, data), OutputFormat.TEXT)));
+                assertEquals(1, ValidateCommand.run(inputs(schema, data), OutputFormat.TEXT)));
 
         assertTrue(output.contains("[UNRECOGNIZED_FIELD]"), output);
         assertTrue(output.contains("/hallucinated_field"), output);
@@ -98,10 +102,43 @@ class ValidateCommandTest {
                 "!!schema:\"https://example.test/not-provided.tn1\"\n!my_record { a: 1  b: 2 }\n");
 
         String output = captureStdout(() ->
-                assertEquals(1, ValidateCommand.run(List.of(data), OutputFormat.TEXT)));
+                assertEquals(1, ValidateCommand.run(inputs(data), OutputFormat.TEXT)));
 
         assertTrue(output.contains("[SCHEMA_ERROR]"), output);
         assertTrue(output.contains("not-provided"), output);
+    }
+
+    /**
+     * The mismatch an author actually hits: the right file passed, but its {@code !!id} isn't the identity
+     * the data names. Matching is by embedded identity, never by filename (§2.2.1), so the bare "no schema
+     * file provided" reads as though the file were missing while they are looking straight at it. Listing
+     * what the supplied files declare puts the two strings side by side.
+     */
+    @Test
+    void anUnmatchedSchemaSaysWhatTheSuppliedFilesDeclare(@TempDir Path dir) throws IOException {
+        Path schema = writeFile(dir, "schema.tn1", RECORD_SCHEMA);   // declares .../cli-validate.tn1
+        Path data = writeFile(dir, "data.tson",
+                "!!schema:\"https://example.test/typo.tn1\"\n!my_record { a: 1  b: 2 }\n");
+
+        String output = captureStdout(() ->
+                assertEquals(1, ValidateCommand.run(inputs(schema, data), OutputFormat.TEXT)));
+
+        assertTrue(output.contains("no schema file provided for !!schema \"https://example.test/typo.tn1\""),
+                output);
+        assertTrue(output.contains("the schema files given declare: https://example.test/cli-validate.tn1"),
+                output);
+    }
+
+    /** With no schema files at all, the message says that rather than listing an empty set. */
+    @Test
+    void anUnmatchedSchemaWithNoSchemaFilesSaysSo(@TempDir Path dir) throws IOException {
+        Path data = writeFile(dir, "data.tson",
+                "!!schema:\"https://example.test/absent.tn1\"\n!my_record { a: 1 }\n");
+
+        String output = captureStdout(() ->
+                assertEquals(1, ValidateCommand.run(inputs(data), OutputFormat.TEXT)));
+
+        assertTrue(output.contains("no schema files were given"), output);
     }
 
     @Test
@@ -111,7 +148,7 @@ class ValidateCommandTest {
                 "!!schema:\"https://example.test/cli-validate.tn1\"\n!no_such_type { a: 1  b: 2 }\n");
 
         String output = captureStdout(() ->
-                assertEquals(1, ValidateCommand.run(List.of(schema, data), OutputFormat.TEXT)));
+                assertEquals(1, ValidateCommand.run(inputs(schema, data), OutputFormat.TEXT)));
 
         assertTrue(output.contains("[UNKNOWN_TYPE]"), output);
     }
@@ -130,7 +167,7 @@ class ValidateCommandTest {
                 "!!schema:\"https://example.test/cli-point.tn1\"\n!point { x: 3  y: 4 }\n");
 
         String output = captureStdout(() -> assertEquals(0,
-                ValidateCommand.run(List.of(recordSchema, pointSchema, recordData, pointData), OutputFormat.TEXT)));
+                ValidateCommand.run(inputs(recordSchema, pointSchema, recordData, pointData), OutputFormat.TEXT)));
 
         assertTrue(output.contains("OK"), output);
     }
@@ -142,7 +179,7 @@ class ValidateCommandTest {
         Path data = writeFile(dir, "data.tson", "{ id: !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09  n: !int32 5 }");
 
         String output = captureStdout(() ->
-                assertEquals(0, ValidateCommand.run(List.of(data), OutputFormat.TEXT)));
+                assertEquals(0, ValidateCommand.run(inputs(data), OutputFormat.TEXT)));
 
         assertEquals("OK", output.strip());
     }
@@ -152,7 +189,7 @@ class ValidateCommandTest {
         Path data = writeFile(dir, "data.tson", "{ n: !int32 twelve }");
 
         String output = captureStdout(() ->
-                assertEquals(1, ValidateCommand.run(List.of(data), OutputFormat.TEXT)));
+                assertEquals(1, ValidateCommand.run(inputs(data), OutputFormat.TEXT)));
 
         assertTrue(output.contains("[ATOM_CONSTRAINT_VIOLATION]"), output);
     }
@@ -164,7 +201,7 @@ class ValidateCommandTest {
         Path schema = writeFile(dir, "schema.tn1", RECORD_SCHEMA);
 
         String output = captureStdout(() ->
-                assertEquals(2, ValidateCommand.run(List.of(schema), OutputFormat.TEXT)));
+                assertEquals(2, ValidateCommand.run(inputs(schema), OutputFormat.TEXT)));
 
         assertTrue(output.contains("no data files"), output);
     }
@@ -175,10 +212,75 @@ class ValidateCommandTest {
         Path data = writeFile(dir, "data.tson", selfDescribing("{ a: 99999999999999  b: 2 }"));
 
         String output = captureStdout(() ->
-                assertEquals(1, ValidateCommand.run(List.of(schema, data), OutputFormat.JSON)));
+                assertEquals(1, ValidateCommand.run(inputs(schema, data), OutputFormat.JSON)));
 
         assertTrue(output.contains("\"valid\":false"), output);
         assertTrue(output.contains("\"code\":\"ATOM_CONSTRAINT_VIOLATION\""), output);
+    }
+
+    /**
+     * The whole point of the envelope: whatever the file count, {@code --output json} is one document a
+     * harness can parse, with the filename each verdict belongs to <i>inside</i> it. The old shape put a
+     * bare {@code # <file>} line between per-file objects, which is neither JSON nor JSONL.
+     */
+    @Test
+    void multiFileJsonOutputIsOneParseableDocument(@TempDir Path dir) throws IOException {
+        Path schema = writeFile(dir, "schema.tn1", RECORD_SCHEMA);
+        Path good = writeFile(dir, "good.tson", selfDescribing("{ a: 1  b: 2 }"));
+        Path bad = writeFile(dir, "bad.tson", selfDescribing("{ a: 1 }"));
+
+        String output = captureStdout(() ->
+                assertEquals(1, ValidateCommand.run(inputs(schema, good, bad), OutputFormat.JSON)));
+
+        assertEquals(1, output.strip().lines().count(), output);
+        assertFalse(output.contains("# "), output);
+        assertTrue(output.startsWith("{\"valid\":false,\"files\":["), output);
+        assertTrue(output.contains("\"file\":\"" + good + "\",\"valid\":true,\"errors\":[]"), output);
+        assertTrue(output.contains("\"file\":\"" + bad + "\",\"valid\":false"), output);
+        assertTrue(output.contains("\"code\":\"FIELD_REQUIRED\""), output);
+    }
+
+    /** A single file gets the same envelope, so a consumer never branches on file count. */
+    @Test
+    void aSingleFileGetsTheSameEnvelope(@TempDir Path dir) throws IOException {
+        Path data = writeFile(dir, "data.tson", "42");
+
+        String output = captureStdout(() ->
+                assertEquals(0, ValidateCommand.run(inputs(data), OutputFormat.JSON)));
+
+        assertEquals("{\"valid\":true,\"files\":[{\"file\":\"" + data + "\",\"valid\":true,\"errors\":[]}],"
+                + "\"errors\":[]}", output.strip());
+    }
+
+    /**
+     * A failure that stops the run before any document is read (here: no data files at all) keeps the
+     * envelope too, with an empty {@code files} and the problem at run level -- so the exit-2 path
+     * doesn't hand a machine consumer a second shape to parse.
+     */
+    @Test
+    void aRunLevelFailureKeepsTheEnvelopeWithNoFilesInIt(@TempDir Path dir) throws IOException {
+        Path schema = writeFile(dir, "schema.tn1", RECORD_SCHEMA);
+
+        String output = captureStdout(() ->
+                assertEquals(2, ValidateCommand.run(inputs(schema), OutputFormat.JSON)));
+
+        assertTrue(output.strip().startsWith("{\"valid\":false,\"files\":[],\"errors\":[{"), output);
+        assertTrue(output.contains("no data files"), output);
+    }
+
+    /** Text keeps the per-file header, and keeps printing it only when there is more than one file. */
+    @Test
+    void textStillLabelsEachFileWhenThereIsMoreThanOne(@TempDir Path dir) throws IOException {
+        Path schema = writeFile(dir, "schema.tn1", RECORD_SCHEMA);
+        Path good = writeFile(dir, "good.tson", selfDescribing("{ a: 1  b: 2 }"));
+        Path bad = writeFile(dir, "bad.tson", selfDescribing("{ a: 1 }"));
+
+        String output = captureStdout(() ->
+                assertEquals(1, ValidateCommand.run(inputs(schema, good, bad), OutputFormat.TEXT)));
+
+        assertTrue(output.contains("# " + good), output);
+        assertTrue(output.contains("# " + bad), output);
+        assertTrue(output.contains("[FIELD_REQUIRED]"), output);
     }
 
     @Test
@@ -193,7 +295,7 @@ class ValidateCommandTest {
         Path data = writeFile(dir, "data.tson", selfDescribing("{ a: 1  b: 2 }"));
 
         String output = captureStdout(() ->
-                assertEquals(0, ValidateCommand.run(List.of(schema, data), OutputFormat.TEXT)));
+                assertEquals(0, ValidateCommand.run(inputs(schema, data), OutputFormat.TEXT)));
 
         assertEquals("OK", output.strip());
     }
@@ -210,10 +312,82 @@ class ValidateCommandTest {
         Path data = writeFile(dir, "data.tson", "42");   // plain -> schemaless -> valid
 
         String err = captureStderr(() ->
-                assertEquals(0, ValidateCommand.run(List.of(fake, data), OutputFormat.TEXT)));
+                assertEquals(0, ValidateCommand.run(inputs(fake, data), OutputFormat.TEXT)));
 
         assertTrue(err.contains("not supported"), err);
         assertTrue(err.contains("core.tn"), err);
+    }
+
+    // --- standard input ---
+
+    /**
+     * The case the whole feature exists for: a harness holding a candidate document in memory pipes it
+     * straight in, with the schema still an ordinary file, instead of writing a temp file per attempt.
+     */
+    @Test
+    void aDataDocumentPipedInValidatesAgainstASchemaFile(@TempDir Path dir) throws IOException {
+        Path schema = writeFile(dir, "schema.tn1", RECORD_SCHEMA);
+
+        String output = withStdin(selfDescribing("{ a: 1  b: 2 }"), () -> captureStdout(() ->
+                assertEquals(0, ValidateCommand.run(
+                        List.of(new ValidateInput.OfFile(schema), new ValidateInput.OfStdin()),
+                        OutputFormat.TEXT))));
+
+        assertEquals("OK", output.strip());
+    }
+
+    @Test
+    void aPipedDocumentThatDoesNotValidateReportsUnderTheNameDash(@TempDir Path dir) throws IOException {
+        Path schema = writeFile(dir, "schema.tn1", RECORD_SCHEMA);
+
+        String output = withStdin(selfDescribing("{ a: 1 }"), () -> captureStdout(() ->
+                assertEquals(1, ValidateCommand.run(
+                        List.of(new ValidateInput.OfFile(schema), new ValidateInput.OfStdin()),
+                        OutputFormat.JSON))));
+
+        assertTrue(output.contains("\"file\":\"-\",\"valid\":false"), output);
+        assertTrue(output.contains("\"code\":\"FIELD_REQUIRED\""), output);
+    }
+
+    /** Piped data is never classified, so a schema arriving on stdin is read as data and fails as data. */
+    @Test
+    void aSchemaPipedInIsTreatedAsDataNotAsASchema() throws IOException {
+        String output = withStdin(RECORD_SCHEMA, () -> captureStdout(() ->
+                assertEquals(1, ValidateCommand.run(List.of(new ValidateInput.OfStdin()), OutputFormat.TEXT))));
+
+        assertFalse(output.contains("no data files"), output);
+        assertTrue(output.contains("["), output);   // a diagnostic, not a silent pass
+    }
+
+    /** Stdin on its own is a complete invocation -- no schema files needed for a schemaless check. */
+    @Test
+    void stdinAloneIsAValidInvocation() throws IOException {
+        String output = withStdin("{ n: !int32 5 }", () -> captureStdout(() ->
+                assertEquals(0, ValidateCommand.run(List.of(new ValidateInput.OfStdin()), OutputFormat.TEXT))));
+
+        assertEquals("OK", output.strip());
+    }
+
+    // --- unreadable files ---
+
+    /**
+     * The message names the failure, not the path twice. {@code NoSuchFileException}'s own message is
+     * just the filename, so {@code "cannot read " + file + ": " + e.getMessage()} used to render as
+     * {@code cannot read /x: /x}.
+     */
+    @Test
+    void anUnreadableFileSaysWhyNotJustItsNameAgain(@TempDir Path dir) throws IOException {
+        Path missing = dir.resolve("not-here.tn");
+
+        String output = captureStdout(() ->
+                assertEquals(2, ValidateCommand.run(inputs(missing), OutputFormat.TEXT)));
+
+        assertTrue(output.contains("no such file"), output);
+        assertFalse(output.contains(missing + ": " + missing), output);
+    }
+
+    private static List<ValidateInput> inputs(Path... files) {
+        return Arrays.stream(files).<ValidateInput>map(ValidateInput.OfFile::new).toList();
     }
 
     private static Path writeFile(Path dir, String name, String content) throws IOException {
@@ -224,6 +398,21 @@ class ValidateCommandTest {
 
     private interface ThrowingRunnable {
         void run() throws IOException;
+    }
+
+    private interface ThrowingSupplier<T> {
+        T get() throws IOException;
+    }
+
+    /** Runs {@code body} with {@code content} on standard input, restoring the real stream afterwards. */
+    private static <T> T withStdin(String content, ThrowingSupplier<T> body) throws IOException {
+        InputStream original = System.in;
+        System.setIn(new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8)));
+        try {
+            return body.get();
+        } finally {
+            System.setIn(original);
+        }
     }
 
     private static String captureStdout(ThrowingRunnable body) throws IOException {

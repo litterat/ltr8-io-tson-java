@@ -1031,14 +1031,47 @@ hash" is the spec's own term throughout §2.2.1/§10.2, never shortened to "hash
 
 ### CLI (`tson-cli`)
 
-`tson validate [--output text|json] <file>...` takes a **flat list of files**, auto-classifies each as
-schema or data (a header peek — `!!id`-carrying schema vs `DocumentStart` data), exposes the schema files
-through a `TsonSchemaSource`, and validates each data file via `Tson.validate` — the `!!schema` URI selects
-the schema, the root type-ref selects the type, no `!!schema` means schemaless. **Fully self-describing:
-no `--type`.** The facade owns the whole per-document decision; the CLI just classifies files into a source
+`tson validate [--output text|json|tson] <file|->...` takes a **flat list of files**, auto-classifies each
+as schema or data (a header peek — `!!id`-carrying schema vs `DocumentStart` data), exposes the schema files
+through a `TsonSchemaSource`, and validates each data document via `Tson.validate` — the `!!schema` URI
+selects the schema, the root type-ref selects the type, no `!!schema` means schemaless. **Fully
+self-describing: no `--type`.**
+
+**`-` is standard input, at most once, and always a data document.** `ValidateInput` is the sealed argument
+type (`OfFile`/`OfStdin`) that keeps this out of `Path`-with-a-magic-value territory; its `OfStdin.open()`
+suppresses `close()`, since `System.in` belongs to the process rather than to one read. Piped input is never
+*classified*, because classification opens a document a second time and a stream has nothing to reopen — so
+schemas stay files, and that rule is a consequence of the design rather than a restriction bolted onto it. A
+second `-` is a `UsageException`: one stream, consumed by the first read, so the second could only ever
+report an empty document as valid. Only the bare argument matches, leaving `./-` for a file actually named
+`-`. `cannotRead` names the failure kind (`NoSuchFileException` and friends carry it in the exception type,
+not the message, so the obvious concatenation renders `cannot read x: x`). An unmatched `!!schema` lists
+what the supplied files *declare* — matching is by embedded `!!id`, never filename (§2.2.1), so the common
+failure is the right file with the wrong identity in it; `declaredIds` keeps the ids verbatim and in
+argument order, deliberately apart from the lookup map whose keys are canonicalized.
+
+**`CliDiagnostic` renders an absent field as absent.** `Diagnostic` spells "nothing to say" as `""` for its
+strings and as an empty `Optional` for its positions, so the output used to show both `""` and `null` for
+one idea; `schemaId`/`expected`/`actual` are now `Optional` and render `null`. **`path` and `schemaPointer`
+stay plain strings**, because for an RFC 6901 pointer `""` is the *root*, not an absence — `Tson.validateSchema`
+genuinely reports a document-level problem against it, and a base-syntax failure genuinely locates itself at
+the data root. That `""` means both things is a `Diagnostic`-level overload, not a rendering one, and is
+tracked in `BACKLOG.md` rather than papered over here. The facade owns the whole per-document decision; the CLI just classifies files into a source
 and calls it. Also `tson compile <schema>` (checks a schema compiles, tree mode), `tson hash <file>`, `tson
 init-example [<dir>]` (writes a working `person.tn`/`person-data.tn`). The installed command is `tson`
 (`application.applicationName`), launched on the classpath.
+
+**`validate` emits one `ValidationRun` envelope per invocation, whatever the file count** — `{ valid, files:
+[{ file, valid, errors }], errors }`, so `--output json`/`tson` is a single parseable document with each
+verdict's filename *inside* it. Only `--output text` keeps the `# <file>` header (and only when there's more
+than one file): a label outside the object is right for a person and is exactly what made the machine
+formats unparseable. **The two error lists are the two exit codes**: run-level `errors` holds only what
+stops the invocation before any document is read (an unreadable file during classification, a schema with no
+`!!id`, no data files at all) and is exit 2, while a document that read but didn't validate lands in its own
+`FileReport` at exit 1 — so a consumer tells "your invocation was wrong" from "your document was" without
+reading messages. `compile` renders a bare `ValidationReport` instead, having one schema and nothing to
+name. Every file's report is collected before anything prints, since the envelope's verdict is the AND
+across them.
 
 **Exit codes: 0 all valid, 1 any data file invalid** (bad value / unresolvable `!!schema` / unknown type /
 no root type-ref), **2 usage/classification** (no data files, an unreadable/`!!id`-less schema, a bad

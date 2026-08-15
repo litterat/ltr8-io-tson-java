@@ -6,8 +6,8 @@ import java.util.List;
 
 /**
  * Entry point for the {@code tson} command ({@code BACKLOG.md}'s "Front door / ergonomics" -- a CLI,
- * ajv-cli-style): {@code tson validate --type <name> [--output text|json|tson] <schema> <data...>}
- * and {@code tson compile [--output text|json|tson] <schema>}. Hand-rolled argument parsing --
+ * ajv-cli-style): {@code tson validate [--output text|json|tson] <file|->...} and {@code tson compile
+ * [--output text|json|tson] <schema>}. Hand-rolled argument parsing --
  * deliberately, matching this codebase's own "no external runtime dependencies" constraint; the
  * flag set is small and fixed enough that a real parsing library buys nothing here.
  *
@@ -23,15 +23,17 @@ public final class TsonCli {
     private static final String USAGE = """
             usage:
               tson init-example [<dir>]
-              tson validate [--output text|json|tson] <file>...
+              tson validate [--output text|json|tson] <file|->...
               tson compile [--output text|json|tson] <schema>
               tson hash <file>
 
             commands:
               init-example        write an example schema + data file to try, then edit and re-run validate
-              validate    validate data files; each file is auto-classified as a schema or data
+              validate    validate data documents; each file is auto-classified as a schema or data
                           document, and a data file's !!schema selects its schema and its root type-ref
-                          (!person) the type (or, with no !!schema, a base-syntax + built-in-type check)
+                          (!person) the type (or, with no !!schema, a base-syntax + built-in-type check).
+                          `-` reads one data document from standard input, reported under the name "-"
+                          (a file really named - is reachable as ./-); schemas must be files
               compile     check that a schema document itself resolves and compiles
               hash        compute a document's content hash and stamp it onto its !!id (?sha256=...)
 
@@ -42,7 +44,7 @@ public final class TsonCli {
             exit codes: 0 ok, 1 validation/compile failure, 2 usage error, 70 internal error""";
 
     private static final String VALIDATE_USAGE =
-            "usage: tson validate [--output text|json|tson] <file>...";
+            "usage: tson validate [--output text|json|tson] <file|->...   (`-` reads one data document from stdin)";
 
     private static final String COMPILE_USAGE =
             "usage: tson compile [--output text|json|tson] <schema>";
@@ -141,20 +143,31 @@ public final class TsonCli {
             return 0;
         }
         OutputFormat format = OutputFormat.TEXT;
-        List<Path> files = new ArrayList<>();
+        List<ValidateInput> inputs = new ArrayList<>();
+        int stdin = 0;
 
         for (int i = 0; i < args.size(); i++) {
             String arg = args.get(i);
             switch (arg) {
                 case "--output" -> format = OutputFormat.parse(requireValue(args, ++i, "--output"));
-                default -> files.add(Path.of(arg));
+                case "-" -> {
+                    stdin++;
+                    inputs.add(new ValidateInput.OfStdin());
+                }
+                default -> inputs.add(new ValidateInput.OfFile(Path.of(arg)));
             }
         }
 
-        if (files.isEmpty()) {
+        if (stdin > 1) {
+            // There is one standard input and it is consumed by the first read, so a second `-` could only
+            // ever report an empty document. Saying so beats validating nothing and calling it valid.
+            throw new UsageException("standard input can only be read once, but `-` was given "
+                    + stdin + " times");
+        }
+        if (inputs.isEmpty()) {
             throw new UsageException(VALIDATE_USAGE);
         }
-        return ValidateCommand.run(files, format);
+        return ValidateCommand.run(inputs, format);
     }
 
     private static int runCompile(List<String> args) {
