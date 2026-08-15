@@ -429,8 +429,14 @@ namespace *before* any local declaration resolves.
   loosens REQUIRED→OPTIONAL (§5.11), a source or supertype whose body is a binding record and so has no
   vocabulary (§5.7's "finished"), a choice or bracketed form at a supertype position (`&` composes record
   types; §12.1 admits these only because `construction-def` draws its operands from `type-ref` where
-  `refined-def` takes a name — `SPEC-FEEDBACK.md` #38). Telling an author their correctly-rejected schema is
-  unsupported sends them looking for the wrong fix, so the split is worth keeping honest —
+  `refined-def` takes a name — `SPEC-FEEDBACK.md` #38), a name in a `!` position resolving in neither
+  namespace (the plain typo, §3.3.1), and a `!` form aimed at the wrong kind of target — refining a
+  constructor, applying a non-constructor, refining a non-atom — each answered with the form the author
+  probably meant. Telling an author their correctly-rejected schema is
+  unsupported sends them looking for the wrong fix, and now costs more than clarity: only the validation
+  exception is collected into a `Diagnostic`, so a misfiled author error also aborts the run instead of
+  joining the other problems. The useful test is that **a schema error's verdict doesn't change when this
+  library improves; a gap's does.** The split is worth keeping honest —
   `IllegalStateException` is the third, for an invariant only a malformed `TypeDefinition` could break (a
   `constructor: true` entry with a non-record body, which §12.1's grammar makes unreachable).
   `DefinitionResolver`'s Javadoc lists the exact boundary.

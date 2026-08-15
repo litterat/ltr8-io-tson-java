@@ -193,9 +193,14 @@ with `path: ""`, `schemaPosition: null`, and (through `validate`) a `dataPositio
     string checks, inherently positionless), 10 `IllegalStateException` (invariants/faults), 3
     `TsonParseException` (schema syntax, already positioned). Reporting a library gap as "your schema is
     wrong" is the same mistake the CLI made in reporting a library fault as an invalid document — a gap and
-    a fault are not verdicts. Some sites are mislabelled today in both directions: `DefinitionResolver`
-    throws `UnsupportedOperationException` for *"'!x' does not resolve to a constructor (§3.3.1) — did you
-    mean atom refinement?"*, which is an author error with a helpful hint wearing a library-gap exception.
+    a fault are not verdicts. **`DefinitionResolver`'s `!`-position sites are done**: a name resolving in
+    neither namespace (the plain typo), and a `!` form aimed at the wrong kind of target — refining a
+    constructor, applying a non-constructor, refining a non-atom — all raise `TsonSchemaValidationException`
+    now, including the *"'!x' does not resolve to a constructor (§3.3.1) — did you mean atom refinement?"*
+    case this bullet used to cite. The one left beside them is deliberate: an atom instance with no recorded
+    constructor is a malformed `TypeDefinition`, not a schema anyone wrote. The useful test, from Swift's
+    treatment of `expression_too_complex`: **a schema error's verdict doesn't change when the library
+    improves; a gap's does.** The remaining sites outside `DefinitionResolver` still want the same pass.
   - **Find the shared object.** The readers had `TsonReadContext` threaded everywhere to hang `report` off;
     the schema phases have no equivalent. The resolver is better placed than it looks (it already takes a
     declaration position per call, see above); the linker and `TsonCanonicalIdentity` are not.

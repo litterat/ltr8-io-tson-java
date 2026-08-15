@@ -50,4 +50,16 @@ public class TsonSchemaResolver {
                                     Map<SchemaMap.Declaration, ? extends SourcePosition> declarationPositions) {
         return this.resolver.resolveSchema(document, declarationPositions);
     }
+
+    /**
+     * {@link #resolveSchema(SchemaDocument, Map)} reporting every declaration that fails through {@code
+     * receiver} rather than throwing at the first -- see {@link SchemaResolver#resolveSchema(SchemaDocument,
+     * Map, TsonDiagnosticsReceiver)} for the contract, and in particular for why the returned schema must not
+     * be linked, registered or compiled when anything was reported.
+     */
+    public TsonSchema resolveSchema(SchemaDocument document,
+                                    Map<SchemaMap.Declaration, ? extends SourcePosition> declarationPositions,
+                                    TsonDiagnosticsReceiver receiver) {
+        return this.resolver.resolveSchema(document, declarationPositions, receiver);
+    }
 }

@@ -102,7 +102,11 @@ final class DefaultTsonReadContext implements TsonReadContext {
 
     @Override
     public void report(Diagnostic.Code code, String message, String expected, String actual) {
-        Diagnostic diagnostic = new Diagnostic(path, code, message, expected, actual, position(), schemaPosition);
+        // The schema end carries a position but no pointer or identity: a reader knows the declaration
+        // position it stamped, not which entry of which schema it came from. Populating those means
+        // threading the compiled schema's identity down the reader stack -- see BACKLOG.md.
+        Diagnostic diagnostic = new Diagnostic(path, "", "", code, message, expected, actual,
+                position(), schemaPosition);
         cursor.reported++;
         cursor.receiver.report(diagnostic);
     }

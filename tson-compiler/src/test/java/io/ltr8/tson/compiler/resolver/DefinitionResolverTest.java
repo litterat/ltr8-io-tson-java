@@ -1032,7 +1032,7 @@ class DefinitionResolverTest {
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 { bad => !token {} }""").parseSchemaDocument().body();
 
-        UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
                 () -> definitionResolverFor(metaKernelParser, EMPTY_NAMESPACE).resolve(
                         schemaMap.declarations().get("bad")));
         assertTrue(thrown.getMessage().contains("does not resolve to a constructor"), thrown.getMessage());
@@ -1185,7 +1185,7 @@ class DefinitionResolverTest {
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 { bad => !integer_type ^ { min: 1 } }""").parseSchemaDocument().body();
 
-        UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
                 () -> metaKernelBackedResolver.resolve(schemaMap.declarations().get("bad")));
         assertTrue(thrown.getMessage().contains("refines a constructor, not an instance"), thrown.getMessage());
     }
@@ -1200,7 +1200,7 @@ class DefinitionResolverTest {
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 { bad => !top ^ { x: integer } }""").parseSchemaDocument().body();
 
-        UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
                 () -> metaKernelBackedResolver.resolve(schemaMap.declarations().get("bad")));
         assertTrue(thrown.getMessage().contains("is not an atom-family instance"), thrown.getMessage());
     }
@@ -1408,7 +1408,7 @@ class DefinitionResolverTest {
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 { bad => !integer_type ^ { min: 1 } }""").parseSchemaDocument().body();
 
-        UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
                 () -> definitionResolverFor(metaKernelParser, EMPTY_NAMESPACE).resolve(
                         schemaMap.declarations().get("bad")));
         assertTrue(thrown.getMessage().contains("does not resolve against the type-name namespace"), thrown.getMessage());
