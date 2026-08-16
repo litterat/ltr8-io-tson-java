@@ -348,6 +348,13 @@ substitution, which this phase does not answer.
   early) and one in the structure namespace (via its resolved definition). Still uncaught: a template
   declared by an `!!import`, which needs the imported entries' resolved definitions rather than the name set
   the phase takes.
+- **An invalid sugar form is reported per declaration, not thrown**, when a `DesugarFailureReporter` is
+  supplied — `SchemaResolver` always supplies one on its reporting overload, so the phase joins resolution and
+  linking in reporting every independent problem in one pass. Two forms are reportable, both
+  `TsonSchemaValidationException` and both declaration-position-only (a size specifier is rejected at parse
+  time at an inline type-ref position): a vacuous `[T; 0..]` and a sized application binding `min_items` above
+  `max_items`. The record-template `UnsupportedOperationException` keeps propagating — a gap is not a verdict
+  on the author's schema. See "Schema-side diagnostics" for the placeholder and the no-rollback rule.
 - **Bottom-up, so nesting needs no special case:** an inner application is hoisted first and the outer one
   is built from the already-flattened name (`map<text, [integer]>` works at any depth). The injected name
   is `head_args_hash`, derived from the application itself, so two structurally identical applications
@@ -860,8 +867,19 @@ error* category, so this is the same layer, not a new one.
   publishing error, not a library fault, which is what lets `Tson.validateSchema` catch them and report
   against RFC 6901's root pointer (`""`), since they concern the document rather than any declaration, and
   what keeps the CLI's exit 1 apart from exit 70.
-- **Still fail-fast:** desugaring and compilation. Compilation already keeps going via `ErrorReader`, but
-  that marks a *library gap* (an unregistered atom factory), which is a different question from an author
+- **Desugaring reports too, and needs no gate of its own.** `SchemaDesugarer.desugar` takes a
+  `DesugarFailureReporter` — a `(Declaration, TsonSchemaValidationException)` callback rather than a receiver,
+  keeping the diagnostics vocabulary out of a phase whose whole shape is AST-in/AST-out, and keeping
+  `Diagnostic.ofSchemaError` construction in `SchemaResolver`, which alone holds the canonical id and the
+  identity-keyed position table. It needs no phase boundary because it runs *inside* `resolveSchema`, so
+  whatever it reports is already behind the gate the caller checks. A reported declaration is replaced with
+  `ABSORBED` (a fresh zero-field record, the AST-level twin of `SchemaResolver.unresolved`) — **not passed
+  through**, which would hand `DefinitionResolver` the very `ContainerTypeDef` the phase exists to remove and
+  draw an `UnsupportedOperationException` the resolver deliberately doesn't catch, turning a reported author
+  error into an unreported abort. Injected declarations are never rolled back: names are derived from the
+  application, so §8.2's structural sharing means a later declaration may already reference one.
+- **Still fail-fast:** parsing (issue #29) and compilation. Compilation already keeps going via `ErrorReader`,
+  but that marks a *library gap* (an unregistered atom factory), which is a different question from an author
   error.
 
 ### Read facades: `TsonObjectReader`/`TsonTreeReader` (root package) + `TsonObjectWriter`
@@ -1240,12 +1258,13 @@ compatibility).
   AtomSpecification` rather than flat, so it never receives a schema-composed default the way
   `email_type`'s flat `spec` field does. Subtype *dispatch* to them works; this is a narrower field-binding
   gap.
-- **Schema-side diagnostics, the remainder** — resolution and linking report through a
-  `TsonDiagnosticsReceiver` now (see "Schema-side diagnostics" above); two things are left. **Desugaring
-  is still fail-fast**, so a sugar-form error aborts before resolution reports anything. And **a read-path
-  diagnostic carries `schemaPosition` but no `schemaId`/`schemaPointer`**, which needs the compiled schema's
-  identity threaded down the reader stack. Throw-site classification is done across the whole schema
-  pipeline.
+- **Schema-side diagnostics, the remainder** — desugaring, resolution and linking all report through a
+  `TsonDiagnosticsReceiver` now (see "Schema-side diagnostics" above); two things are left. **Parsing is
+  still fail-fast, and names a token class rather than a construct** (issue #29) — it lands in
+  `TsonDataStream`/`TsonDataParser`, shared with the data path, and is floor-limited by the lexer being
+  fail-fast too. And **a read-path diagnostic carries `schemaPosition` but no `schemaId`/`schemaPointer`**,
+  which needs the compiled schema's identity threaded down the reader stack. Throw-site classification is
+  done across the whole schema pipeline.
 - **Deferred design questions** — `REQUIRED_FIXED`/`OPTIONAL_FIXED` value validation, `value_param` real
   parameter substitution, thread-safety, and a general disk/HTTP-backed `TsonSchemaSource` (with
   whitelist/blacklist policy).

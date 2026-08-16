@@ -88,6 +88,12 @@ import java.util.function.UnaryOperator;
  * substitution is a separate, unimplemented feature, so {@code box<text>} is not something this phase can
  * rewrite -- and leaving it alone produced a schema that linked and compiled and then failed on the first
  * read that reached the field. See {@link #rejectIfTemplateApplication} for what is and is not covered.
+ *
+ * <p><b>An invalid sugar form is reported per declaration, not thrown</b>, when a {@link
+ * DesugarFailureReporter} is supplied -- the same one-pass treatment {@code SchemaResolver} and {@code
+ * TsonSchemaLinker} give their own phases, so an author sees every independent problem at once rather than
+ * one per run. {@link #desugarOrReport} has the mechanics and {@link #ABSORBED} what a reported declaration
+ * leaves behind.
  */
 final class SchemaDesugarer {
 
@@ -100,6 +106,23 @@ final class SchemaDesugarer {
     /** {@code tuple_element}'s own two members (§5.3) -- the record one tuple position becomes. */
     private static final String ELEMENT_TYPE = "element_type";
     private static final String STATE = "state";
+
+    /**
+     * What a declaration whose sugar form was reported is replaced with: a fresh, zero-field record. The
+     * counterpart of {@code SchemaResolver.unresolved} one phase later, and the same javac model -- an error
+     * type that answers every question, rather than Swift's, where every questioner must first check whether
+     * it is looking at one. A dependent that composes with a failed declaration resolves cleanly, contributing
+     * no fields, instead of failing a second time over a problem that is purely a consequence of the first.
+     *
+     * <p><b>Producing one means a diagnostic has already been reported</b> -- Swift's {@code ErrorType}
+     * obligation, and the half of its model worth keeping. It can only ever be reached through a {@link
+     * DesugarFailureReporter}, so a document that expanded cleanly can never contain one.
+     *
+     * <p>Shared rather than built per failure: it carries nothing declaration-specific, and it is deliberately
+     * never in {@code TsonSchemaParser.declarationPositions()} -- the position belongs to the diagnostic
+     * already reported against the real declaration, not to this stand-in.
+     */
+    private static final TypeDef ABSORBED = new StructuralTypeDef(List.of(), false, new RecordDef(List.of()));
 
     /** The governing meta's entries -- where a constructor's parameter list and vocabulary field names come from. */
     private final Map<String, TypeDefinition> metaEntries;
@@ -119,18 +142,33 @@ final class SchemaDesugarer {
     /** This document's own declarations, for {@link #rejectIfTemplateApplication} -- set before the walk starts. */
     private Map<String, SchemaMap.Declaration> local = Map.of();
 
-    private SchemaDesugarer(Map<String, TypeDefinition> metaEntries, Set<String> imported) {
+    /** Where an invalid sugar form is reported, or {@code null} to rethrow it and abandon the document. */
+    private final DesugarFailureReporter reporter;
+
+    private SchemaDesugarer(Map<String, TypeDefinition> metaEntries, Set<String> imported,
+            DesugarFailureReporter reporter) {
         this.metaEntries = metaEntries;
         this.imported = imported;
+        this.reporter = reporter;
+    }
+
+    /** {@link #desugar(SchemaDocument, Map, Set, DesugarFailureReporter)}, throwing at the first invalid sugar form. */
+    static SchemaDocument desugar(SchemaDocument document, Map<String, TypeDefinition> metaEntries,
+            Set<String> imported) {
+        return desugar(document, metaEntries, imported, null);
     }
 
     /**
      * The document with every expandable application hoisted into its own declaration, or the same instance
      * when there was nothing to expand.
+     *
+     * <p>A declaration whose sugar form is invalid is reported to {@code reporter} and replaced with {@link
+     * #ABSORBED}, so the declarations around it still expand and go on to resolve -- see {@link
+     * #desugarOrReport}. With a {@code null} {@code reporter} the first such form throws instead.
      */
     static SchemaDocument desugar(SchemaDocument document, Map<String, TypeDefinition> metaEntries,
-            Set<String> imported) {
-        SchemaDesugarer pass = new SchemaDesugarer(metaEntries, imported);
+            Set<String> imported, DesugarFailureReporter reporter) {
+        SchemaDesugarer pass = new SchemaDesugarer(metaEntries, imported, reporter);
         pass.local = document.body().declarations();
         SchemaMap body = pass.schemaMap(document.body());
         if (body == document.body() && pass.injected.isEmpty()) {
@@ -150,7 +188,7 @@ final class SchemaDesugarer {
     private SchemaMap schemaMap(SchemaMap map) {
         Map<String, SchemaMap.Declaration> rewritten = null;
         for (Map.Entry<String, SchemaMap.Declaration> entry : map.declarations().entrySet()) {
-            SchemaMap.Declaration declaration = declaration(entry.getValue());
+            SchemaMap.Declaration declaration = desugarOrReport(entry.getValue());
             if (declaration != entry.getValue() && rewritten == null) {
                 rewritten = new LinkedHashMap<>(map.declarations());
             }
@@ -159,6 +197,43 @@ final class SchemaDesugarer {
             }
         }
         return rewritten == null ? map : new SchemaMap(map.annotations(), rewritten);
+    }
+
+    /**
+     * One declaration expanded, or -- when its sugar form is invalid and a {@link DesugarFailureReporter} is
+     * in play -- reported and replaced with {@link #ABSORBED}. Per declaration, which is both the granularity
+     * {@code SchemaResolver} reports at one phase later and the finest source positions this project has.
+     *
+     * <p><b>The substitution is not optional.</b> Leaving the declaration un-expanded would hand {@code
+     * DefinitionResolver} the very {@code ContainerTypeDef} this phase exists to remove, and it answers that
+     * with an {@code UnsupportedOperationException} -- which {@code SchemaResolver} deliberately does not
+     * catch, since a library gap is not a verdict on the author's schema. So passing through would convert a
+     * reported author error into an unreported abort: worse than the fail-fast behaviour it replaces.
+     *
+     * <p>Only {@link TsonSchemaValidationException} is reported. The {@code UnsupportedOperationException}
+     * for applying a record template is a genuine §5.10 gap and keeps propagating, by the same test {@code
+     * SchemaResolver} applies: <em>a schema error's verdict doesn't change when this library improves; a
+     * gap's does.</em>
+     *
+     * <p><b>Anything already injected on behalf of a failed declaration stays injected</b>, and is not rolled
+     * back. Injected names are derived from the application itself, so a later declaration containing the
+     * same application finds and references the existing entry (§8.2's structural-equality rule, which is
+     * what makes the injection shared rather than per-use in the first place); removing one because the
+     * declaration that happened to reach it first went on to fail would break whichever declaration referenced
+     * it second. Left behind, it is an ordinary unreferenced declaration that resolves and links like any
+     * other.
+     */
+    private SchemaMap.Declaration desugarOrReport(SchemaMap.Declaration declaration) {
+        try {
+            return declaration(declaration);
+        } catch (TsonSchemaValidationException e) {
+            if (reporter == null) {
+                throw e;
+            }
+            reporter.reportFailedDeclaration(declaration, e);
+            return new SchemaMap.Declaration(declaration.nameAnnotations(), declaration.name(),
+                    declaration.typeDefAnnotations(), ABSORBED);
+        }
     }
 
     private SchemaMap.Declaration declaration(SchemaMap.Declaration declaration) {
