@@ -94,6 +94,9 @@ import java.util.Set;
  */
 public final class TsonSchemaLinker {
 
+    /** meta.tn's {@code void}-targeted marker (§5.4), written bare -- presence is the assertion. */
+    private static final String DISJOINT = "disjoint";
+
     private TsonSchemaLinker() {
     }
 
@@ -253,8 +256,56 @@ public final class TsonSchemaLinker {
             }
         }
 
+        AnnotatedMap<String, TypeDefinition> annotated = withNameAnnotations(merged, schema, loader);
+        checkDisjointAssertions(schema, annotated, localNames, receiver);
+
         return new TsonLinkedSchema(new TsonSchema(schema.id(), schema.meta(), schema.imports(),
-                withNameAnnotations(merged, schema, loader), schema.bootstrap()));
+                annotated, schema.bootstrap()));
+    }
+
+    /**
+     * §5.4's {@code @disjoint} assertion, checked against the fact {@link #computeDisjointness} derived. The
+     * annotation "carries no decode force -- the resolver computes {@code type_definition.disjoint} whether
+     * or not it is present -- and exists to be checked against that derived fact, converting a silent drift
+     * into a diagnostic."
+     *
+     * <p><b>Two of §5.4's three outcomes are reachable.</b> Proved ({@code disjoint} is {@code true}) is
+     * silent, and refuted ({@code false} -- a variant IS-A another, say) is an error. <b>Unprovable</b>
+     * ({@code disjoint} absent) is where §5.4 asks for a *warning*, and {@code Diagnostic} carries no
+     * severity: every one of them fails the schema and exits non-zero. Reporting it would reject a schema
+     * §5.4 calls legal, which is the worse of the two errors, so it stays silent until the severity axis
+     * lands ({@code BACKLOG.md}). Note §5.4 is explicit that the warnable condition is the *unverifiable
+     * assertion*, never mere non-disjointness -- an unannotated choice is asked nothing here.
+     *
+     * <p><b>Runs on the annotated map, and after it is built.</b> §6 puts a declaration's annotations in two
+     * places -- before the name (they land on the map key) or after {@code =>} (on the definition) -- and
+     * {@code @disjoint} is equally an assertion either way, so both are consulted. Key annotations only
+     * exist once {@link #withNameAnnotations} has re-attached them, which is why this is the last pass
+     * rather than part of {@code validateEntry}.
+     *
+     * <p><b>Local entries only.</b> An imported entry was checked when its own schema linked, and {@link
+     * #schemaError} stamps <em>this</em> schema's identity -- so re-checking would report another document's
+     * problem against this one.
+     */
+    private static void checkDisjointAssertions(TsonSchema schema, AnnotatedMap<String, TypeDefinition> entries,
+                                                 Set<String> localNames, TsonDiagnosticsReceiver receiver) {
+        for (String name : localNames) {
+            TypeDefinition def = entries.get(name);
+            if (def == null || !(def.body() instanceof ChoiceBody choice)) {
+                continue;
+            }
+            if (!def.annotations().has(DISJOINT) && !entries.getAnnotations(name).has(DISJOINT)) {
+                continue;
+            }
+            if (!def.disjoint().equals(Optional.of(false))) {
+                continue; // proved, or unprovable -- see the note above on the missing severity
+            }
+            report(receiver, schema, name, def, "'" + name + "' asserts @disjoint, but its variants "
+                    + choice.variants().stream().map(TypeRef::name).toList() + " are provably not disjoint "
+                    + "(§5.4) -- one variant IS-A another, or they share a value set the resolver can see "
+                    + "into; drop the assertion, or use a field group (§5.11), which discriminates by label "
+                    + "and needs no disjointness");
+        }
     }
 
     /**
@@ -414,12 +465,21 @@ public final class TsonSchemaLinker {
         return result;
     }
 
-    /** {@code def} plus {@code newSubtypes}, unioned with whatever subtypes it already had -- a new {@link TypeDefinition}, {@code def} itself untouched. */
+    /**
+     * {@code def} plus {@code newSubtypes}, unioned with whatever subtypes it already had -- a new {@link
+     * TypeDefinition}, {@code def} itself untouched.
+     *
+     * <p>Every component is carried across explicitly, {@code position} and {@code annotations} included.
+     * They are the two a shorter constructor defaults away, and both are load-bearing: a diagnostic against
+     * this entry is located by {@code position}, and §6 metadata written after {@code =>} lives in {@code
+     * annotations}. Dropping them here would silently blank both for every type that has a subtype.
+     */
     private static TypeDefinition withAddedSubtypes(TypeDefinition def, Set<String> newSubtypes) {
         Set<String> combined = new LinkedHashSet<>(def.subtypes());
         combined.addAll(newSubtypes);
         return new TypeDefinition(def.source(), def.kind(), def.parameters(), def.constructor(),
-                def.supertypes(), List.copyOf(combined), def.disjoint(), def.body());
+                def.supertypes(), List.copyOf(combined), def.disjoint(), def.body(), def.position(),
+                def.annotations());
     }
 
     /**
@@ -435,7 +495,8 @@ public final class TsonSchemaLinker {
                 TypeDefinition def = entry.getValue();
                 result.put(entry.getKey(), new TypeDefinition(def.source(), def.kind(), def.parameters(),
                         def.constructor(), def.supertypes(), def.subtypes(),
-                        ChoiceDisjointness.derive(choice, merged), def.body(), def.position()));
+                        ChoiceDisjointness.derive(choice, merged), def.body(), def.position(),
+                        def.annotations()));
             }
         }
         return result;
@@ -544,6 +605,7 @@ public final class TsonSchemaLinker {
                     validateTypeRef(variant, namespace, ownParameters, "'" + entryName + "' variant[" + index + "]");
                     index++;
                 }
+                checkVariantsAreDistinct(entryName, c, namespace);
             }
             case Unit ignored -> {
             }
@@ -594,6 +656,65 @@ public final class TsonSchemaLinker {
             case Extern ignored -> {
             }
         }
+    }
+
+    /**
+     * §5.4: "The resolver validates that each variant resolves to a distinct type."
+     *
+     * <p><b>Judged after flattening, which is the whole point of the rule.</b> §8.3 makes an alias and its
+     * target one type, so {@code (text | my_text)} with {@code my_text => text} is the same duplicate {@code
+     * (text | text)} is -- spelled so that an author cannot see it. Comparing the written names would catch
+     * only the spelling an author would have caught themselves. A duplicate variant is never merely
+     * redundant: the second is unreachable under §5.4's Tagging rule, since a {@code !variant} tag naming it
+     * and one naming the first select the same type, and untagged recovery has nothing to choose between.
+     *
+     * <p>Here rather than in {@code SchemaDesugarer}, where the sugar is expanded, because this asks what
+     * names <em>resolve to</em> -- a question with no answer until the whole namespace exists, imports
+     * merged. It runs after {@link #validateTypeRef} has accepted every variant, so an unresolved name is
+     * already reported and never reaches the walk.
+     *
+     * <p>Arguments are compared as written rather than flattened through: only the head name is walked. The
+     * gap is unreachable from the sugar -- {@code SchemaDesugarer} hoists any argument-bearing variant to a
+     * bare name -- and reaches only a hand-written {@code !choice { variants: [...] } } naming two
+     * differently-spelled applications of one type.
+     */
+    private static void checkVariantsAreDistinct(String entryName, ChoiceBody choice,
+                                                  Map<String, TypeDefinition> namespace) {
+        Map<TypeRef, String> seen = new LinkedHashMap<>();
+        for (TypeRef variant : choice.variants()) {
+            TypeRef flattened = new TypeRef(terminalName(variant.name(), namespace), variant.arguments());
+            String first = seen.putIfAbsent(flattened, variant.name());
+            if (first == null) {
+                continue;
+            }
+            throw new TsonSchemaValidationException("'" + entryName + "' " + (first.equals(variant.name())
+                    ? "lists the variant '" + variant.name() + "' twice"
+                    : "variants '" + first + "' and '" + variant.name() + "' both resolve to '"
+                            + flattened.name() + "'")
+                    + " -- §5.4 requires each variant to resolve to a distinct type");
+        }
+    }
+
+    /**
+     * The name a reference chain ends at (§8.3): the first entry whose body is not a {@code Reference}. A
+     * name this schema does not declare is returned unchanged -- it is a type parameter, already accepted by
+     * {@link #validateTypeRef}.
+     *
+     * <p>A reference cycle stops the walk rather than hanging. Detecting and diagnosing one is a separate
+     * unimplemented concern ({@code BACKLOG.md}); stopping at the repeat is enough here, because the name it
+     * stops at depends on where the walk started, so a cycle yields no false duplicate.
+     */
+    private static String terminalName(String name, Map<String, TypeDefinition> namespace) {
+        Set<String> walked = new LinkedHashSet<>();
+        String current = name;
+        while (walked.add(current)) {
+            TypeDefinition def = namespace.get(current);
+            if (def == null || !(def.body() instanceof Reference reference)) {
+                return current;
+            }
+            current = reference.target().name();
+        }
+        return current;
     }
 
     /** {@code fallback} entries, overridden by {@code primary} on collision -- {@code primary} isn't mutated. */

@@ -280,10 +280,14 @@ materialization, no validation (those are the resolver's/linker's jobs).
 
 ### Desugaring (`tson-compiler/.../resolver/SchemaDesugarer.java`)
 
-An AST→AST rewrite between parsing and resolution. Every sugar form (`[T]`, `[T; N..M]`, §5.3) and every
-generic application (`map<K, V>`, §5.6) becomes a `!C value` construction: at declaration position it simply
-*is* that construction, and anywhere else (a field, an element, a variant) it becomes an **injected
-declaration plus a bare reference to it**. So `DefinitionResolver` only ever sees two shapes: a bare
+An AST→AST rewrite between parsing and resolution. Every sugar form (`[T]`, `[T; N..M]`, §5.3), the choice
+sugar (`(A | B)`, §5.4) and every generic application (`map<K, V>`, §5.6) becomes a `!C value` construction:
+at declaration position it simply *is* that construction, and anywhere else (a field, an element, a variant)
+it becomes an **injected declaration plus a bare reference to it**. **The second half is a known conformance
+divergence** — §8.2 says a constructor application *never* materialises an entry and is carried structurally
+at the use site; declaration position, where the spec agrees, is correct. It stands because nothing
+downstream reads `TypeRef.arguments()`, so the structural form would have nothing to compile against;
+`BACKLOG.md` has the full account, including the `!!import` visibility that rides on it. So `DefinitionResolver` only ever sees two shapes: a bare
 reference or `!C value`. §5.3/§5.6 already *describe* these forms as desugarings and §3.3.1 calls their
 targets "the implicit desugar targets of the sugar forms" — this implements that literally instead of
 splitting it across the resolver (declaration position) and the linker (field position), which is what it
@@ -300,6 +304,16 @@ substitution, which this phase does not answer.
   than the ones someone hand-wrote an assembler for.
 - **The head is looked up in the structure namespace only** (the governing meta's entries) and must be
   `constructor: true` with matching arity. The precedence/shadowing consequences are `SPEC-FEEDBACK.md` #28.
+- **The choice sugar takes a second, variadic path** (`choiceInstance`), because per-parameter routing
+  structurally cannot express it: `choice => ~sum & { variants: [type_ref] }` declares no parameters, and its
+  one vocabulary field is a *collection* with no `value_param` to route through. §5.3 names the shape instead
+  — for "the variadic pair, `tuple` and `choice`, arguments map positionally onto `elements` and `variants`"
+  — so every variant becomes one element of that one field. Only the head is fixed here (§5.6's desugaring
+  table fixes it, exactly as `[T]` fixes `array`); the *field* the variants fill is still read off the
+  governing meta by name, so routing stays vocabulary-derived. **`tuple` does not share the method** — its
+  elements are `tuple_element` records rather than bare references — and inline tuple is still unexpanded.
+  §5.4's "each variant resolves to a distinct type" is deliberately not checked here: it is a question about
+  what names *resolve to*, after §8.3 flattening, which this phase can't answer (`BACKLOG.md`).
 - **A template application over a constructor is instantiated** (§8.2's one materialising form). §5.3's
   sized sugar is the case that matters: `[T; 1..5]` → `array_ranged<T, 1, 5>`, and `array_ranged` is a
   template (declared without `~`) whose resolved vocabulary carries the same `value_param` channels a
@@ -524,7 +538,15 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   (different kind / different atom family disjoint; same-family integers by bound interval; IS-A ⇒ not
   disjoint); record-set and regex-pattern disjointness left absent (see `BACKLOG.md` for the "how far" view);
   (4) **validate** every reference
-  resolves, with a type-parameter exception (a bare name valid if it's the entry's own declared parameter)
+  resolves, with a type-parameter exception (a bare name valid if it's the entry's own declared parameter);
+  **a choice's variants are checked distinct** (§5.4) *after* §8.3 flattening, since an alias and its target
+  are one type — so `(text | my_text)` with `my_text => text` is caught, which comparing the written names
+  would miss and which is the only spelling an author can't see for themselves; the walk stops on a
+  reference cycle rather than hanging, cycle diagnosis being its own unimplemented concern; **an author's
+  `@disjoint` marker is checked against the derived fact** (§5.4) — refuted is an error, proved is silent,
+  and *unprovable* is silent too, because `Diagnostic` has no severity and §5.4 asks for a warning there
+  (reporting it would fail a schema the spec calls legal); the marker is read from both places §6 puts it,
+  the definition and the map key, which is why the check runs last, after `withNameAnnotations`;
   and a **constructor-eligibility** check with two halves, the same §2.2.2 question asked from both ends
   (see `SPEC-FEEDBACK.md` #19): a locally-declared `constructor: true` entry is valid only if the schema's
   `!!meta` is exactly meta-kernel's identity, and a schema named as this one's **`!!meta` target** is valid
@@ -1137,6 +1159,11 @@ compatibility).
 
 ## Not yet implemented
 
+- **Inline tuple** (`[T, U]` at a field/element/variant position) — `SchemaDesugarer` rebuilds an
+  `InlineTupleRef` unchanged, so it reaches `resolveTypeRef` and throws. The other half of §5.3's variadic
+  pair; the choice half is done, and `choiceInstance` is the shape to follow, though tuple can't reuse it
+  (`tuple_element` records, not bare references). Declaration-position tuple containers are a separate,
+  older gap.
 - **Part 2 resolution gaps** — the identity-diagonal
   FIXED-value invariant, a generic type-ref whose argument is nested or a value rather than a plain name,
   and a parameterized supertype (`customer & box<T>`, which needs §5.10 substitution into the absorbed

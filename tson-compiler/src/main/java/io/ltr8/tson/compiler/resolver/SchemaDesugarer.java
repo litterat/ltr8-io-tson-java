@@ -1,5 +1,7 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.compiler.ast.ArrayValue;
+import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.ScopedValue;
@@ -86,6 +88,9 @@ import java.util.function.UnaryOperator;
  * read that reached the field. See {@link #rejectIfTemplateApplication} for what is and is not covered.
  */
 final class SchemaDesugarer {
+
+    /** §5.6's desugar target for {@code (A | B)}, fixed by the sugar form rather than named by the author. */
+    private static final String CHOICE = "choice";
 
     /** The governing meta's entries -- where a constructor's parameter list and vocabulary field names come from. */
     private final Map<String, TypeDefinition> metaEntries;
@@ -204,6 +209,19 @@ final class SchemaDesugarer {
                 if (!reference.typeParams().isEmpty()) {
                     yield reference;
                 }
+                // §5.4: a declaration whose body is the choice sugar *is* that construction, so it becomes
+                // the instance itself rather than a reference to an injected one -- which is what makes
+                // `contact => (email | phone)` a SUM entry with a real ChoiceBody instead of a REFERENCE to
+                // one. Same treatment declarationLevelArray gives `[T]` at declaration position.
+                if (reference.ref() instanceof ChoiceRef choice) {
+                    List<TypeRef> variants = mapShared(choice.variants(), this::typeRef);
+                    Optional<TypeDef> instance = choiceInstance(variants);
+                    if (instance.isPresent()) {
+                        yield instance.get();
+                    }
+                    yield variants == choice.variants() ? reference
+                            : new ReferenceTypeDef(reference.typeParams(), new ChoiceRef(variants));
+                }
                 TypeRef ref = argumentsOnly(reference.ref());
                 // §5.6: a declaration whose body is a fully-bound application resolves as a construction, so
                 // it becomes the instance itself rather than a reference to an injected one -- which is what
@@ -314,16 +332,17 @@ final class SchemaDesugarer {
                 yield apply(generic.name(), args,
                         args == generic.args() ? generic : new GenericRef(generic.name(), args));
             }
-            // Not yet expandable: DefinitionResolver has never handled either at a type-ref position, so
-            // there is no behaviour here to preserve or break -- they join the arc once tuple/choice
-            // desugaring is written.
+            case ChoiceRef choice -> {
+                List<TypeRef> variants = mapShared(choice.variants(), this::typeRef);
+                yield hoistChoice(variants,
+                        variants == choice.variants() ? choice : new ChoiceRef(variants));
+            }
+            // Not yet expandable: DefinitionResolver has never handled a tuple at a type-ref position, so
+            // there is no behaviour here to preserve or break -- it joins the arc once tuple desugaring is
+            // written (the other half of §5.3's variadic pair; see choiceInstance).
             case InlineTupleRef tuple -> {
                 List<TypeRef> elements = mapShared(tuple.elementTypes(), this::typeRef);
                 yield elements == tuple.elementTypes() ? tuple : new InlineTupleRef(elements);
-            }
-            case ChoiceRef choice -> {
-                List<TypeRef> variants = mapShared(choice.variants(), this::typeRef);
-                yield variants == choice.variants() ? choice : new ChoiceRef(variants);
             }
         };
     }
@@ -406,10 +425,32 @@ final class SchemaDesugarer {
             rejectIfTemplateApplication(head);
             return unexpanded;
         }
-        String name = syntheticName(head, args);
+        return hoist(syntheticName(head, args), instance.get());
+    }
+
+    /**
+     * §5.4's {@code (A | B)} at a type-ref position, hoisted into its own declaration and replaced by a bare
+     * reference to it -- the treatment {@link #apply} gives every other inline form. Returns {@code
+     * unexpanded} when {@link #choiceInstance} cannot build the construction.
+     *
+     * <p>The name is derived through {@link #syntheticName} from the variants themselves, so two identical
+     * inline choices anywhere in the document collapse to one declaration (§8.2's structural-equality rule).
+     * There is no {@link #rejectIfTemplateApplication} counterpart here: §5.6 fixes this head, so it can
+     * never be an author's template.
+     */
+    private TypeRef hoistChoice(List<TypeRef> variants, TypeRef unexpanded) {
+        Optional<TypeDef> instance = choiceInstance(variants);
+        if (instance.isEmpty()) {
+            return unexpanded;
+        }
+        return hoist(syntheticName(CHOICE, variants.stream().<TypeArg>map(TypeArg.Ref::new).toList()),
+                instance.get());
+    }
+
+    /** Records an injected declaration under a derived name and yields the reference that replaces the sugar. */
+    private TypeRef hoist(String name, TypeDef instance) {
         if (!imported.contains(name)) {
-            injected.computeIfAbsent(name,
-                    n -> new SchemaMap.Declaration(List.of(), n, List.of(), instance.get()));
+            injected.computeIfAbsent(name, n -> new SchemaMap.Declaration(List.of(), n, List.of(), instance));
         }
         return new SimpleRef(name);
     }
@@ -501,8 +542,7 @@ final class SchemaDesugarer {
             if (token.isEmpty()) {
                 return Optional.empty();
             }
-            fields.add(new RecordValue.Field(field.name(),
-                    new ScopedValue(Optional.empty(), new DataValue(List.of(), Optional.empty(), token.get()))));
+            fields.add(new RecordValue.Field(field.name(), scoped(token.get())));
         }
         if (fields.isEmpty()) {
             return Optional.empty();
@@ -514,6 +554,57 @@ final class SchemaDesugarer {
         }
         checkBounds(head, fields);
         return Optional.of(new TemplateInstance(new GenericRef(head, args), body));
+    }
+
+    /**
+     * §5.6's {@code (A | B | ...)} as the construction it denotes: {@code !choice { variants: [A B ...] } }.
+     *
+     * <p><b>Why this is not {@link #instanceFor}.</b> That path routes one argument per vocabulary field, by
+     * the field's own {@code value_param} ({@code element_type: type_ref = T}), which fixes the arity at the
+     * constructor's parameter count. {@code choice} declares no parameters and its single vocabulary field is
+     * a <em>collection</em> ({@code variants: [type_ref]}, no {@code value_param} to route through), so no
+     * per-parameter routing can express it. §5.3 names the shape instead: for "the variadic pair, {@code
+     * tuple} and {@code choice}, arguments map positionally onto {@code elements} and {@code variants}". Every
+     * variant becomes one element of that one field. {@code tuple} is the other half of the pair and does not
+     * share this method -- its elements are {@code tuple_element} records rather than bare references.
+     *
+     * <p>The head is fixed by the sugar form rather than written by the author, exactly as {@code [T]} fixes
+     * {@code array} (§5.6's desugaring table), so it is not looked up from an application's own text. What
+     * <em>is</em> read from the governing meta is the field the variants fill, by name, so the routing still
+     * comes from the vocabulary rather than from a string written here.
+     *
+     * <p>Empty -- leaving the choice unexpanded for whoever handles it next -- when the governing meta cannot
+     * supply that vocabulary ({@code choice} absent, not a constructor, or not the single-field record its
+     * kernel declaration gives it), or when a variant did not reduce to a plain name. Variants are expected
+     * already expanded: a nested inline form is hoisted by the caller first, so what arrives here is a
+     * {@link SimpleRef} per variant.
+     *
+     * <p>Distinctness of the variants (§5.4: "the resolver validates that each variant resolves to a distinct
+     * type") is deliberately not checked here -- it is a question about what the names <em>resolve</em> to,
+     * after reference flattening, which this phase has no answer to.
+     */
+    private Optional<TypeDef> choiceInstance(List<TypeRef> variants) {
+        TypeDefinition choice = metaEntries.get(CHOICE);
+        if (choice == null || !choice.constructor() || !(choice.body() instanceof RecordBody vocabulary)
+                || vocabulary.fields().size() != 1) {
+            return Optional.empty();
+        }
+        List<ScopedValue> elements = new ArrayList<>();
+        for (TypeRef variant : variants) {
+            if (!(variant instanceof SimpleRef simple)) {
+                return Optional.empty();
+            }
+            elements.add(scoped(new TokenValue(simple.name(), TokenForm.UNQUOTED)));
+        }
+        RecordValue.Field field = new RecordValue.Field(vocabulary.fields().getFirst().name(),
+                scoped(new ArrayValue(elements)));
+        return Optional.of(new Instance(
+                new DataValue(List.of(), Optional.of(CHOICE), new RecordValue(List.of(field)))));
+    }
+
+    /** A bare value in a field or element position -- no schema directive, no annotations, no type-ref of its own. */
+    private static ScopedValue scoped(CoreValue value) {
+        return new ScopedValue(Optional.empty(), new DataValue(List.of(), Optional.empty(), value));
     }
 
     /**

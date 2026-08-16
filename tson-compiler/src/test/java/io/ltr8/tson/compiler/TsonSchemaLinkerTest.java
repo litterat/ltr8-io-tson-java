@@ -1,9 +1,17 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.schema.*;
+import io.ltr8.annotation.Annotation;
+import io.ltr8.annotation.AnnotatedMap;
+import io.ltr8.annotation.Annotations;
+import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.FieldGroup;
+import io.ltr8.tson.schema.meta.IntegerSize;
+import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
+import io.ltr8.tson.schema.meta.SourcePosition;
+import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
@@ -39,6 +47,12 @@ class TsonSchemaLinkerTest {
 
     private static TypeDefinition emptyRecord() {
         return TypeDefinition.product(RecordBody.of(List.of()));
+    }
+
+    /** A declared choice -- what {@code (A | B)} resolves to. {@code disjoint} is the linker's to derive. */
+    private static TypeDefinition choiceEntry(ChoiceBody body) {
+        return new TypeDefinition(Optional.empty(), TypeKind.SUM, List.of(), false, List.of(), List.of(),
+                Optional.empty(), body);
     }
 
     /**
@@ -103,6 +117,166 @@ class TsonSchemaLinkerTest {
         TsonSchemaValidationException ex = assertThrows(TsonSchemaValidationException.class,
                 () -> TsonSchemaLinker.link(schemaOf(entries), null));
         assertTrue(ex.getMessage().contains("no_such_type"));
+    }
+
+    /** §5.4's distinct-variant rule at its plainest: the same name written twice. */
+    @Test
+    void rejectsAChoiceListingOneVariantTwice() {
+        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        entries.put("token", unitEntry());
+        entries.put("contact", choiceEntry(new ChoiceBody(List.of(TypeRef.of("token"), TypeRef.of("token")))));
+
+        TsonSchemaValidationException ex = assertThrows(TsonSchemaValidationException.class,
+                () -> TsonSchemaLinker.link(schemaOf(entries), null));
+        assertTrue(ex.getMessage().contains("lists the variant 'token' twice"), ex.getMessage());
+    }
+
+    /**
+     * The case the rule exists for: §8.3 makes an alias and its target one type, so two spellings of it are
+     * a duplicate an author cannot see. The diagnostic names both spellings and what they landed on.
+     */
+    @Test
+    void rejectsTwoVariantsThatFlattenToOneType() {
+        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        entries.put("token", unitEntry());
+        entries.put("nickname", TypeDefinition.reference("token"));
+        entries.put("contact", choiceEntry(
+                new ChoiceBody(List.of(TypeRef.of("token"), TypeRef.of("nickname")))));
+
+        TsonSchemaValidationException ex = assertThrows(TsonSchemaValidationException.class,
+                () -> TsonSchemaLinker.link(schemaOf(entries), null));
+        assertTrue(ex.getMessage().contains("'token' and 'nickname' both resolve to 'token'"), ex.getMessage());
+    }
+
+    /** Two aliases of *different* types stay distinct -- flattening must not collapse what it merely renames. */
+    @Test
+    void acceptsAliasedVariantsThatFlattenToDifferentTypes() {
+        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        entries.put("token", unitEntry());
+        entries.put("other", emptyRecord());
+        entries.put("nickname", TypeDefinition.reference("token"));
+        entries.put("contact", choiceEntry(
+                new ChoiceBody(List.of(TypeRef.of("nickname"), TypeRef.of("other")))));
+
+        TsonSchemaLinker.link(schemaOf(entries), null); // no exception
+    }
+
+    /**
+     * A reference cycle is a separate, unimplemented diagnostic; what matters here is that the flattening
+     * walk stops instead of hanging, and that a cycle produces no false duplicate.
+     */
+    @Test
+    void aReferenceCycleAmongVariantsTerminates() {
+        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        entries.put("a", TypeDefinition.reference("b"));
+        entries.put("b", TypeDefinition.reference("a"));
+        entries.put("contact", choiceEntry(new ChoiceBody(List.of(TypeRef.of("a"), TypeRef.of("b")))));
+
+        TsonSchemaLinker.link(schemaOf(entries), null); // terminates, no exception
+    }
+
+    /** An IS-A pair: `positive` is an `integer`, so no value of one excludes the other (§5.4's own example). */
+    private static Map<String, TypeDefinition> nonDisjointChoice() {
+        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        entries.put("integer", new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), false,
+                List.of(), List.of(), Optional.empty(), new IntegerType(new IntegerSize(32, true))));
+        entries.put("positive", new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), false,
+                List.of("integer"), List.of(), Optional.empty(), new IntegerType(new IntegerSize(32, true))));
+        entries.put("contact", choiceEntry(
+                new ChoiceBody(List.of(TypeRef.of("positive"), TypeRef.of("integer")))));
+        return entries;
+    }
+
+    private static Annotations disjointMarker() {
+        return Annotations.of(List.of(Annotation.of("disjoint")));
+    }
+
+    /**
+     * §5.4's `@disjoint` assertion refuted: the author asserts disjointness the resolver can disprove.
+     * Written after {@code =>}, so the marker rides on the definition.
+     */
+    @Test
+    void rejectsADisjointAssertionTheDerivedFactRefutes() {
+        Map<String, TypeDefinition> entries = nonDisjointChoice();
+        entries.computeIfPresent("contact", (n, def) -> def.withAnnotations(disjointMarker()));
+
+        TsonSchemaValidationException ex = assertThrows(TsonSchemaValidationException.class,
+                () -> TsonSchemaLinker.link(schemaOf(entries), null));
+        assertTrue(ex.getMessage().contains("provably not disjoint"), ex.getMessage());
+    }
+
+    /** §6 lets the same marker precede the name, where it lands on the map key -- equally an assertion. */
+    @Test
+    void rejectsADisjointAssertionWrittenBeforeTheName() {
+        AnnotatedMap<String, TypeDefinition> entries = AnnotatedMap.of(nonDisjointChoice());
+        entries = entries.withAnnotations("contact", disjointMarker());
+
+        TsonSchema schema = new TsonSchema("https://example.test/s.tn1", TsonBundledSchemas.META_KERNEL_ID,
+                List.of(), entries, false);
+        assertThrows(TsonSchemaValidationException.class, () -> TsonSchemaLinker.link(schema, null));
+    }
+
+    /** The same choice without the assertion is legal: §5.4 permits a non-disjoint choice, it only needs the tag. */
+    @Test
+    void acceptsANonDisjointChoiceThatAssertsNothing() {
+        TsonLinkedSchema linked = TsonSchemaLinker.link(schemaOf(nonDisjointChoice()), null);
+
+        assertEquals(Optional.of(false), linked.schema().entries().get("contact").disjoint());
+    }
+
+    /** A proved assertion is silent -- different atom families, so the derivation returns true. */
+    @Test
+    void acceptsADisjointAssertionTheDerivedFactProves() {
+        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        entries.put("token", unitEntry());
+        entries.put("count", new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), false,
+                List.of(), List.of(), Optional.empty(), new IntegerType(new IntegerSize(32, true))));
+        entries.put("contact", choiceEntry(new ChoiceBody(List.of(TypeRef.of("token"), TypeRef.of("count"))))
+                .withAnnotations(disjointMarker()));
+
+        TsonLinkedSchema linked = TsonSchemaLinker.link(schemaOf(entries), null); // no exception
+        assertEquals(Optional.of(true), linked.schema().entries().get("contact").disjoint());
+    }
+
+    /**
+     * §5.4 asks for a *warning* where the assertion can be neither proved nor refuted, and {@code Diagnostic}
+     * has no severity, so this stays silent rather than failing a schema §5.4 calls legal. Pins the current
+     * behaviour so that adding the severity axis is a deliberate change, not an accident.
+     */
+    @Test
+    void anUnprovableDisjointAssertionIsSilentForNow() {
+        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        entries.put("a", new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), false,
+                List.of(), List.of(), Optional.empty(), TextType.UNCONSTRAINED));
+        entries.put("b", new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), false,
+                List.of(), List.of(), Optional.empty(), TextType.UNCONSTRAINED));
+        entries.put("contact", choiceEntry(new ChoiceBody(List.of(TypeRef.of("a"), TypeRef.of("b"))))
+                .withAnnotations(disjointMarker()));
+
+        TsonLinkedSchema linked = TsonSchemaLinker.link(schemaOf(entries), null); // no exception
+        assertEquals(Optional.empty(), linked.schema().entries().get("contact").disjoint());
+    }
+
+    /**
+     * The subtypes pass rebuilds every entry that gains one, and a rebuild that forgets a component blanks
+     * it for the whole schema. {@code position} locates every diagnostic reported against the entry and
+     * {@code annotations} carries §6 metadata written after {@code =>} -- neither is recoverable afterwards,
+     * and nothing else would notice them missing.
+     */
+    @Test
+    void anEntryGainingSubtypesKeepsItsPositionAndAnnotations() {
+        Annotations doc = Annotations.of(List.of(Annotation.of("doc", "the parent")));
+        Optional<SourcePosition> position = Optional.of(new Position(7, 3, 42));
+        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        entries.put("parent", emptyRecord().withPosition(position).withAnnotations(doc));
+        entries.put("child", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of(), false,
+                List.of("parent"), List.of(), Optional.empty(), RecordBody.of(List.of())));
+
+        TypeDefinition parent = TsonSchemaLinker.link(schemaOf(entries), null).schema().entries().get("parent");
+
+        assertEquals(List.of("child"), parent.subtypes());
+        assertEquals(position, parent.position());
+        assertEquals(doc, parent.annotations());
     }
 
     @Test
