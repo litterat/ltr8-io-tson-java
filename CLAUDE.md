@@ -280,10 +280,14 @@ materialization, no validation (those are the resolver's/linker's jobs).
 
 ### Desugaring (`tson-compiler/.../resolver/SchemaDesugarer.java`)
 
-An AST→AST rewrite between parsing and resolution. Every sugar form (`[T]`, `[T; N..M]`, §5.3) and every
-generic application (`map<K, V>`, §5.6) becomes a `!C value` construction: at declaration position it simply
-*is* that construction, and anywhere else (a field, an element, a variant) it becomes an **injected
-declaration plus a bare reference to it**. So `DefinitionResolver` only ever sees two shapes: a bare
+An AST→AST rewrite between parsing and resolution. Every sugar form (`[T]`, `[T; N..M]`, §5.3), the choice
+sugar (`(A | B)`, §5.4) and every generic application (`map<K, V>`, §5.6) becomes a `!C value` construction:
+at declaration position it simply *is* that construction, and anywhere else (a field, an element, a variant)
+it becomes an **injected declaration plus a bare reference to it**. **The second half is a known conformance
+divergence** — §8.2 says a constructor application *never* materialises an entry and is carried structurally
+at the use site; declaration position, where the spec agrees, is correct. It stands because nothing
+downstream reads `TypeRef.arguments()`, so the structural form would have nothing to compile against;
+`BACKLOG.md` has the full account, including the `!!import` visibility that rides on it. So `DefinitionResolver` only ever sees two shapes: a bare
 reference or `!C value`. §5.3/§5.6 already *describe* these forms as desugarings and §3.3.1 calls their
 targets "the implicit desugar targets of the sugar forms" — this implements that literally instead of
 splitting it across the resolver (declaration position) and the linker (field position), which is what it
@@ -300,6 +304,16 @@ substitution, which this phase does not answer.
   than the ones someone hand-wrote an assembler for.
 - **The head is looked up in the structure namespace only** (the governing meta's entries) and must be
   `constructor: true` with matching arity. The precedence/shadowing consequences are `SPEC-FEEDBACK.md` #28.
+- **The choice sugar takes a second, variadic path** (`choiceInstance`), because per-parameter routing
+  structurally cannot express it: `choice => ~sum & { variants: [type_ref] }` declares no parameters, and its
+  one vocabulary field is a *collection* with no `value_param` to route through. §5.3 names the shape instead
+  — for "the variadic pair, `tuple` and `choice`, arguments map positionally onto `elements` and `variants`"
+  — so every variant becomes one element of that one field. Only the head is fixed here (§5.6's desugaring
+  table fixes it, exactly as `[T]` fixes `array`); the *field* the variants fill is still read off the
+  governing meta by name, so routing stays vocabulary-derived. **`tuple` does not share the method** — its
+  elements are `tuple_element` records rather than bare references — and inline tuple is still unexpanded.
+  §5.4's "each variant resolves to a distinct type" is deliberately not checked here: it is a question about
+  what names *resolve to*, after §8.3 flattening, which this phase can't answer (`BACKLOG.md`).
 - **A template application over a constructor is instantiated** (§8.2's one materialising form). §5.3's
   sized sugar is the case that matters: `[T; 1..5]` → `array_ranged<T, 1, 5>`, and `array_ranged` is a
   template (declared without `~`) whose resolved vocabulary carries the same `value_param` channels a
@@ -1137,6 +1151,11 @@ compatibility).
 
 ## Not yet implemented
 
+- **Inline tuple** (`[T, U]` at a field/element/variant position) — `SchemaDesugarer` rebuilds an
+  `InlineTupleRef` unchanged, so it reaches `resolveTypeRef` and throws. The other half of §5.3's variadic
+  pair; the choice half is done, and `choiceInstance` is the shape to follow, though tuple can't reuse it
+  (`tuple_element` records, not bare references). Declaration-position tuple containers are a separate,
+  older gap.
 - **Part 2 resolution gaps** — the identity-diagonal
   FIXED-value invariant, a generic type-ref whose argument is nested or a value rather than a plain name,
   and a parameterized supertype (`customer & box<T>`, which needs §5.10 substitution into the absorbed

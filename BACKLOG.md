@@ -26,22 +26,46 @@ own prose (which had gone stale on at least one of them):
   "import cycle" diagnostic naming the actual cycle path. Distinct from what
   `TsonCompiledMetaRegistry.withStandardLibrary` already does, which is scoped to just the three bundled
   schemas in a known order, not a general algorithm.
-- [ ] **A choice type doesn't resolve at all** ([TSON-SCHEMA] §5.4) — the gap underneath every other choice
-  item here, and not previously listed. `ChoiceBody` is **never constructed anywhere in main code**:
-  `DefinitionResolver` recognizes `ChoiceRef` only far enough to *reject* it at a supertype position, and
-  neither the `(a | b)` form nor `!choice { variants: [...] }` produces an entry. So no schema resolved from
-  source has a choice entry at all.
-  - The consequence is that two finished pieces of machinery have no live input. `ChoiceReader` is a
-    complete factory — dispatching on `!typeName` via `NamedDispatchReader`, precomputing §5.4's untagged
-    structural recovery where every variant occupies a distinct base-type class — and nothing can reach it.
-    `ChoiceDisjointness` likewise derives `disjoint` for choice entries the linker never sees; both are
-    exercised only by tests that hand-build a `ChoiceBody`.
-  - So the two sub-items below are **not** the remaining work on choice, and were misleading as written:
-    they refine a fact that is currently computed for nothing. Resolution has to come first.
-  - Blocks the conformance-suite sidecar reshape too (see "Conformance test suite" below, where `!choice`
-    is cited twice as the thing that would make a precise `outcome`-correlated shape expressible).
-- **Choice disjointness derivation and untagged reading** ([TSON-SCHEMA] §5.4, §8.1) — the derivation code
-  exists and is unit-tested, but per the item above it has no live producer until choice resolves:
+- [ ] **§5.4's distinct-variant validation** ([TSON-SCHEMA] §5.4) — "the resolver validates that each variant
+  resolves to a distinct type" is unimplemented, so `(text | text)` resolves clean. Deliberately not done in
+  `SchemaDesugarer`, which is where the sugar is expanded: the rule is about what the names *resolve to*,
+  after §8.3 reference flattening, which that phase has no answer to. It belongs where the variants are
+  already resolved names — the linker, alongside the reference validation and `ChoiceDisjointness` it
+  already runs per choice entry.
+- [ ] **Inline constructor applications materialise entries, and §8.2 says they never may** — a real
+  conformance divergence, not a representation preference, and it predates choice: inline `[T]` and
+  `map<K, V>` have always been hoisted this way. §8.2 is unambiguous — "Constructor applications never
+  materialise entries — they are carried structurally wherever they occur (§5.3) and, as declaration bodies,
+  resolve in place as constructions (§5.6). Exactly one form materialises: a **fully-bound application of a
+  non-constructor template**." §5.4 repeats it for choice specifically. So **declaration position is correct
+  today** (`contact => (email | phone)` resolving to a construction is exactly §5.6's rule); only the inline
+  hoisting is off-spec. It is also *observably* off-spec rather than internally: Class 2 requires a resolved
+  value conforming to §8, and §8.2 forgives resolved-form differences only "up to renaming of instantiation
+  entries" — extra entries are not renaming. It is visible in this implementation's own resolved meta-kernel,
+  whose `choice.variants` field is typed `array_type_ref_<hash>` where the spec's fixture has
+  `{ name: array  arguments: [ { name: type_ref } ] }`.
+  - **Why it hasn't been fixed:** nothing in `TsonSchemaCompiler` or the reader stack reads
+    `TypeRef.arguments()`, so the structural form would resolve and link and then have nothing to compile
+    against. The work is argument-bearing `type_ref` support in the compiler, and it reopens inline `[T]`
+    and generic application at the same time — which is why it's an item rather than a fix.
+  - **A second violation rides on the first.** §8.2's *Non-exposure* rule says materialised entries "MUST
+    NOT participate in `!!import` resolution: imports merge declared entries only". `SchemaDesugarer` takes
+    an `imported` name set precisely so that an application an import already hoisted is *referenced* rather
+    than redeclared (meta.tn reusing meta-kernel's `array<type_name>`). That cross-schema visibility is
+    exactly what the rule forbids. It disappears on its own once the entries do — under the spec there is
+    no entry to collide with — so it is a symptom, not a separate item.
+  - `DefinitionResolver.resolveTypeRef` already contains a structural branch for `InlineArrayRef`, dead in
+    practice because the desugarer rewrites the node first. It is the shape the fix generalizes.
+- [ ] **Inline tuple is still unexpanded** — the other half of §5.3's variadic pair. `SchemaDesugarer.typeRef`
+  rebuilds an `InlineTupleRef` unchanged, so `[T, U]` at a field position reaches `resolveTypeRef` and
+  throws. The choice half is done and `choiceInstance` is the shape to follow, but tuple does not share it:
+  its elements are `tuple_element` records rather than bare references, so each element needs its own
+  construction rather than a bare name token.
+- **Choice disjointness derivation and untagged reading** ([TSON-SCHEMA] §5.4, §8.1) — both halves now have a
+  live producer: the `(A | B)` sugar resolves to a real `ChoiceBody` entry, so the linker derives `disjoint`
+  for author-written choices and `ChoiceReader` reads them (`ChoiceReadTest` pins the whole §5.4 Tagging
+  rule end to end — untagged recovery where the base-type classes separate the variants, a mandatory tag
+  where they don't). What is left is refinement of the derived fact:
   - [ ] **Two §5.4 "MAY" cases left absent:** record-set disjointness under composition, and pattern
     disjointness over `regex`-constrained atoms. The view on how far to go (recorded so it isn't
     relitigated): the `disjoint` *fact* is encoding-independent, but §5.4's Tagging rule makes TSON text
@@ -348,10 +372,10 @@ missing most of the mirror.
   implies `form`/`text` present and `fields`/`entries`/`elements` absent, and so on. Three ways to
   actually get that enforcement, discussed with the user 2026-07-29, in order of how much the real
   wire format would have to change:
-  - `!choice { variants: [...] }` — blocked on "A choice type doesn't resolve at all" under
-    "Resolution & linking generality" above. Even once that lands, a schema built on it needs a
-    `!typeName` tag unless every variant occupies a distinct base-type class, which `ChoiceReader`
-    already precomputes — so `core_value`'s variants, all records, would still be tagged on the wire.
+  - `!choice { variants: [...] }` — no longer blocked: choice resolves, links, compiles and reads. But the
+    reservation that always sat behind it stands and is the deciding factor here — a schema built on it
+    needs a `!typeName` tag unless every variant occupies a distinct base-type class, and `core_value`'s
+    variants are all records, so every one of them would be tagged on the wire.
   - **Field groups** (§5.11) — confirmed empirically to work today, including with a record-typed
     member (`core_value => { ( token: core_value_token | record: core_value_record | ... ) }`,
     resolves cleanly, each member individually `OPTIONAL`, mutual exclusivity captured in the
@@ -373,10 +397,10 @@ missing most of the mirror.
     not scoped or planned yet.
 - [ ] **`vocabulary-sidecar.tn`'s own `value` field is a known simplification** — typed as plain
   optional `text`, which doesn't capture the two atom families (`complex`, `duration`) that actually
-  write `value` as a small nested record on the wire. Revisit once `!choice` construction resolves
-  (a precise per-family shape would need a discriminator on `type-ref` itself — an open ~30-name
-  vocabulary, not a small closed enum like `outcome`/`kind`, so even with `!choice` working this one
-  isn't a completely free win the way the `outcome`-discriminated shapes are).
+  write `value` as a small nested record on the wire. `!choice` now resolves, but this was never the
+  item waiting on it: a precise per-family shape needs a discriminator on `type-ref` itself — an open
+  ~30-name vocabulary, not a small closed enum like `outcome`/`kind` — so it isn't the free win the
+  `outcome`-discriminated shapes are.
 
 ## Documentation
 
