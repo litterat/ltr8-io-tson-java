@@ -734,9 +734,18 @@ is small and parsed once.)
   decides nothing. **The same rules hold on the schemaless path** (`SchemalessTreeReader`/
   `SchemalessObjectReader`), these being Part 1 rules a document violates with or without a schema; a
   verdict that turned on whether a schema was in scope would be the interoperability failure #41 argues
-  against. Keys compare by decoded value, so `0xFF` and `255` are one key. In the schemaless object
-  reader the seen-set is keyed on the *written* name, not the target-class slot, so a repeat of a name the
-  class doesn't declare still counts.
+  against. In the schemaless object reader the seen-set is keyed on the *written* name, not the
+  target-class slot, so a repeat of a name the class doesn't declare still counts.
+- **A map key's identity is its structure and decoded values, with type-ref and annotations stripped** —
+  §7.7's host-value equality, applied at every layer that decodes rather than only where a schema is in
+  scope. So `0xFF` and `255` are one key, and `!person a`/`a` are one key. **This is a deliberate
+  divergence from §2.6**, which defines key identity *textually* at the parser layer (`Alice`/`"Alice"`
+  are duplicates, `1`/`1.0` are not) and leaves typed equality to §7.7's MAY — the series names no
+  equality for the Class 1 *reader* in between, which has run §4 base resolution but has no declared
+  types. `SPEC-FEEDBACK.md` #43 has the table and the argument: a key realised as a host value is one key
+  whatever §2.6 says, since that is what the host `Map` will do with it. `SchemalessTreeReader.keyIdentity`
+  does the stripping explicitly; the other two readers compare bound host values, which strips both by
+  construction.
 - **A written `_` at a `REQUIRED_DEFAULT` field is an error**, where plain omission still injects the
   default silently (`valueForStatedAbsentField` against `valueForAbsentField`). §5.2 asks for a warning
   and an injection; #42 calls this its strongest case, since warn-and-inject answers "here is a value" to

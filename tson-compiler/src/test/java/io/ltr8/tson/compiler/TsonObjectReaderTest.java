@@ -107,7 +107,7 @@ class TsonObjectReaderTest {
     void duplicateFieldNameIsAnError() throws DataBindException {
         // §2.5 words a repeated field as a SHOULD-warn with "the last value wins" as the recovery;
         // SPEC-FEEDBACK.md #41/#42 makes it an error. The recovery still runs underneath -- see
-        // DuplicateFieldOverwriteTest, which can observe it; a reported record binds to null in object
+        // DuplicateFieldTest, which can observe it; a reported record binds to null in object
         // mode whatever the problem was (GitHub #7), so this one asserts the verdict only.
         TsonReadException thrown = assertThrows(TsonReadException.class,
                 () -> mapper.read("{ x: 1 x: 99 y: 2 }", Point.class));

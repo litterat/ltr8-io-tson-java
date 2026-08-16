@@ -40,7 +40,9 @@ import java.util.function.BiConsumer;
  * {@code SPEC-FEEDBACK.md} #41/#42's position -- a repeated key states an entry for nothing, which needs
  * no schema to see, and the recovery rule exists only to disambiguate what an error rejects outright.
  * Keys compare by their decoded value, so two spellings of one key ({@code 0xFF} and {@code 255}) are
- * the same key, which is what the sink's own {@code put} would have collapsed silently.
+ * the same key, which is what the sink's own {@code put} would have collapsed silently. That exercises
+ * [TSON-SCHEMA] §7.7's typed-equality MAY wherever a key type is declared, and diverges from §2.6's
+ * textual identity where the two disagree -- {@code SPEC-FEEDBACK.md} #43 has the argument.
  *
  * <p><b>A key's own path segment is read from a bare peek, not a fully-decoded value</b> -- an
  * annotated key ({@code @foo "mykey" => ...}, a rare shape in practice) reports its path segment as

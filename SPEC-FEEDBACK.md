@@ -882,7 +882,7 @@ had the record's complete field list in hand before reading any of it (built fro
 (`RecordAbstractReader`/`TsonDataStream`, "Streaming readers" in `CLAUDE.md`), backward iteration was
 no longer available at all, and the forward, validate-everything behavior was chosen as the one
 consistent with never buffering more than one open container's worth of state. Verified in
-`DuplicateFieldOverwriteTest`: a record with the same field name twice, first occurrence out of range
+`DuplicateFieldTest`: a record with the same field name twice, first occurrence out of range
 for its own atom type, second occurrence valid, confirms exactly one diagnostic is reported for the
 first (shadowed) occurrence and the field's own final value is the second (surviving) occurrence's.
 
@@ -2176,14 +2176,22 @@ strictness anyway.
    silently, from the same bytes. Under MUST NOT the same document is accepted by one and rejected by the
    other, which is a disagreement a user can see and fix.
 
-**Interpretation chosen:** implemented exactly as written — duplicates are accepted, the last occurrence
-wins, and nothing is reported. `RecordAbstractReader.readFields` decodes every occurrence of a repeated
-field name forward and lets a later one overwrite an earlier (#21 has that half);
-`MapAbstractReader.readInto` walks every entry, and a duplicate key disappears at the sink's own `Map.put`.
-**No warning is emitted for either**, because `Diagnostic` has no severity axis: every diagnostic makes
-`Tson.validate` return non-empty and the CLI exit 1, so emitting one would fail a document this spec calls
-conforming — the opposite defect, and the worse one. Detection at both sites is a `HashSet`; it is the
-verdict that has nowhere to go.
+**Interpretation chosen:** the suggested resolution, implemented ahead of the spec — a repeated record
+field name is a `DUPLICATE_FIELD` error and a duplicate map key a `DUPLICATE_MAP_KEY` one, at the repeat's
+own position, under a schema (`RecordAbstractReader.readFields`, `MapAbstractReader.readInto`) and
+schemalessly (`SchemalessTreeReader`, `SchemalessObjectReader`) alike. This entry originally recorded the
+opposite — implemented as written, detected nowhere, because a warning had no severity to be emitted at —
+and #42 settled the general question in favour of the error, which is what let the verdict land.
+
+The last-value-wins *recovery* still runs underneath, because a single forward pass cannot know a name
+recurs without buffering; what changed is that the document is now invalid, not what it decodes to. Point 4
+above is therefore realised: the second occurrence is the error, reported at its own position, and #21 is
+dissolved rather than documented.
+
+Point 3 — what a schema-governed processor does with a type-aware duplicate — is answered as a Class 2
+error, but the layering it assumes turned out not to survive contact with the implementation. See **#43**:
+a Class 1 *reader* sits between §2.6's textual identity and §7.7's typed identity, and the series names no
+equality for it.
 
 **Suggested resolution:** make both rules MUST NOT, and delete the resolution rules that exist only to
 disambiguate what would then be malformed.
@@ -2362,3 +2370,83 @@ specification never asks for a warning* — and resolve the table above accordin
 9. §5.2's inline-nesting MAY-warn: delete, or restate as a §9.1-style configurable limit.
 10. §7.1: when `!!schema` is present, the governed value MUST be annotated with its type (at minimum for
     validating processors), so a validator can never return "valid" having engaged nothing.
+
+---
+
+## 43. Map-key identity is defined for a parser and for a schema-governed resolver, but not for the reader in between
+
+**Section:** §2.6 ("Maps"); [TSON-SCHEMA] §7.7 ("Resolver Behaviours at Typed Positions"). Related: #41,
+#42, #7.
+
+**Problem:** The series defines two notions of map-key identity, at two named layers:
+
+> The parser detects **textually identical** keys: scalar keys are identical if they produce the same
+> NFC-normalized string after escape processing (`Alice` and `"Alice"` are duplicates; `1` and `1.0` are
+> not); compound keys are identical if they have the same structure with textually identical elements at
+> every position. […] Type-aware key equality requires declared type information ([TSON-SCHEMA]). (§2.6)
+
+> When the key type is known, the resolver MAY additionally apply type-specific equality […]. The MAY is
+> deliberate: once keys are realised as host-language values, equality semantics are determined by the
+> host's collection types. ([TSON-SCHEMA] §7.7)
+
+Between those two sits a layer the series never addresses: a **Class 1 reader** — a processor that has run
+§4 base type resolution but has no schema. It is not the parser, because §4 has already turned `0xFF` and
+`255` into one value and `1` and `1.0` into two. It is not the §7.7 resolver, because no type was declared.
+And it is the layer at which duplicate keys actually become observable, because §2.6's "last value wins" is
+a rule about *decoded output*, and only something producing decoded output can apply it.
+
+The gap is not academic: it is where the two rules give different answers.
+
+| Keys | §2.6 (textual) | Base-resolved | §7.7 (typed, `integer` key) |
+|---|---|---|---|
+| `Alice` / `"Alice"` | duplicate | duplicate | duplicate |
+| `0xFF` / `255` | **distinct** | **duplicate** | duplicate |
+| `1` / `1.0` | distinct | distinct | **duplicate** |
+| `1_000` / `1000` | **distinct** | **duplicate** | duplicate |
+
+A processor that binds keys into a host `Map` cannot honour the textual rule even if it wants to: §7.7's own
+sentence — "once keys are realised as host-language values, equality semantics are determined by the host's
+collection types" — is *equally true with no schema in scope*, because base resolution realises host values
+too. `{ 0xFF => a  255 => b }` read schemalessly into a `Map<BigInteger, ?>` has one entry whatever §2.6
+says, and the second silently replaces the first. §2.6's textual rule cannot describe that outcome, so a
+Class 1 processor either reports a duplicate the spec calls distinct, or stays silent about a collapse the
+spec's own "last value wins" is supposed to govern.
+
+**A second, smaller underspecification, in the same sentence.** §2.6 says a scalar key's identity is "the
+same NFC-normalized string after escape processing" and a compound key's is "the same structure with
+textually identical elements at every position" — neither of which mentions a key's own **type-ref or
+annotations**, both of which a map key may carry (§3.1 permits an annotation at both sides of a map entry).
+Are `!token a => 1` and `a => 2` one key or two? Under the quoted text they are one, since the type-ref is
+not part of the normalized string; under a naive implementation that compares whole decoded values they are
+two. The spec should say so outright, in either direction.
+
+**Interpretation chosen:** key identity is the key's **structure and decoded values, with each node's
+type-ref and annotations stripped** — §7.7's host-value equality, applied at every layer that produces
+decoded output rather than only where a schema is in scope. `SchemalessTreeReader.keyIdentity` implements
+the stripping for the tree path; `SchemalessObjectReader` and the compiled `MapAbstractReader` compare bound
+host values, which strips both by construction. So the row that diverges from §2.6 is `0xFF`/`255`, and it
+diverges deliberately: those are one key in every host map the value can land in, and reporting them is the
+only outcome that does not silently drop an entry. `1`/`1.0` still read as two keys with no schema and one
+under an `integer`-keyed schema, which is §7.7 working as designed.
+
+Note this makes the type-aware detection §7.7 leaves as a MAY unconditional here, and — per #42 — an error
+rather than a warning.
+
+**Suggested resolution:**
+
+1. **Name the third layer.** §2.6 should say that textual identity is the *minimum* a processor detects, and
+   that a processor which decodes values (any Class 1 reader, not only a schema-governed one) compares
+   decoded values instead — with the consequence spelled out, that different spellings of one number are one
+   key from base resolution onward.
+2. **Fold §7.7's MAY into it.** Once the rule is "compare what you decoded", the schema-governed case stops
+   being a separate permission and becomes the same rule with more type information available. §7.7 then
+   only needs to say that a declared key type may make *more* keys equal (`1` and `1.0` at `integer`), never
+   fewer.
+3. **Say whether a key's type-ref and annotations participate in identity.** The recommendation is that they
+   do not, matching §2.6's existing "NFC-normalized string" wording and §3.1's framing of annotations as
+   metadata that a processor may not act on.
+4. **With #41 applied, this all becomes a rejection rule** rather than a tie-break, which is the outcome
+   worth optimising for: the question stops being "which duplicate wins" and becomes "is this document
+   valid", and the three layers then differ only in *how many* documents they reject — a monotone
+   relationship a reader can reason about, unlike the current one where the same bytes decode to different
+   maps at different conformance classes (#41's point 4).

@@ -160,10 +160,13 @@ RFC 9413 interoperability failure, per-diagnostic.
   shrinks the case and is worth doing first.
 - Landing later, with their owning features — each arrives as an error when its feature does:
   - **Set-typed duplicate** → error, when sets get real semantics at all (today `set` compiles through the
-    `array` factory and nothing dedupes); **type-aware duplicate map keys** → Class 2 error (#41 pt 3),
-    with typed-key equality; **phantom (unused) parameter** and **parameter shadowing a schema type** →
-    resolver errors, with §5.10 substitution; **non-productive recursion** → resolver error, with
+    `array` factory and nothing dedupes); **phantom (unused) parameter** and **parameter shadowing a schema
+    type** → resolver errors, with §5.10 substitution; **non-productive recursion** → resolver error, with
     productivity analysis (`SPEC-FEEDBACK.md` #25 — "guarded" needs defining first).
+  - **Type-aware duplicate map keys** (#41 pt 3) is *not* on this list any more: every reader compares keys
+    by decoded value, so §7.7's MAY is exercised wherever a key type is declared and the Class 2 error
+    arrives with it. What replaced the item is a spec question rather than an implementation one —
+    `SPEC-FEEDBACK.md` #43, on the equality the series never defines for a Class 1 reader.
 
 ## Reader behaviour
 

@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * <p>That is also what settles {@code SPEC-FEEDBACK.md} #21: every occurrence is decoded, so a shadowed
  * one's own problems are reported alongside the duplication itself rather than going unvalidated.
  */
-class DuplicateFieldOverwriteTest {
+class DuplicateFieldTest {
 
     private static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema) {
         TsonCompiledMetaRegistry core = new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext());

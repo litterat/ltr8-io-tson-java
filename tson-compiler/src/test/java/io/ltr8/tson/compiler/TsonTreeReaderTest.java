@@ -215,10 +215,38 @@ class TsonTreeReaderTest {
         assertEquals(BigInteger.TWO, node.at("/a").asBigInteger().orElseThrow());
     }
 
-    /** Two spellings of one key are one key: the comparison is on the read node, not the wire text. */
+    /**
+     * Two spellings of one number are one key: the comparison is on the decoded value, not the wire text.
+     * §2.6's own rule is textual and would keep these apart — the deliberate divergence
+     * {@code SPEC-FEEDBACK.md} #43 argues for and asks the spec to settle.
+     */
     @Test
     void aRepeatedKeyIsJudgedOnTheDecodedValue() {
         assertEquals(List.of(Diagnostic.Code.DUPLICATE_MAP_KEY),
                 problemsIn("{ 0xFF => 1  255 => 2 }").stream().map(Diagnostic::code).toList());
+    }
+
+    /**
+     * A key's type-ref and annotations are not part of its identity — §2.6 compares a scalar key's
+     * NFC-normalized string, and a leading {@code !person} or {@code @doc} is not in it. Comparing whole
+     * nodes would read each of these pairs as two keys, which §2.6 says they are not. (The type-ref half
+     * runs preserving, so rule 3's own {@code UNKNOWN_TYPE_REF} isn't what the assertion sees; a wire
+     * type-ref that doesn't change the decoded value is the case at issue.)
+     */
+    @Test
+    void aKeysTypeRefAndAnnotationsAreNotPartOfItsIdentity() {
+        TsonDiagnosticsCollector preserved = TsonDiagnosticsReceiver.collecting();
+        READER.withDiagnostics(preserved).read("{ !person a => 1  a => 2 }");
+        assertEquals(List.of(Diagnostic.Code.DUPLICATE_MAP_KEY),
+                preserved.diagnostics().stream().map(Diagnostic::code).toList());
+
+        assertEquals(List.of(Diagnostic.Code.DUPLICATE_MAP_KEY),
+                problemsIn("{ @doc:\"why\" a => 1  a => 2 }").stream().map(Diagnostic::code).toList());
+    }
+
+    /** §2.6's own non-example, which the decoded comparison agrees with: {@code 1} and {@code 1.0} differ. */
+    @Test
+    void anIntegerAndAFloatSpellingAreTwoKeys() {
+        assertEquals(List.of(), problemsIn("{ 1 => a  1.0 => b }"));
     }
 }
