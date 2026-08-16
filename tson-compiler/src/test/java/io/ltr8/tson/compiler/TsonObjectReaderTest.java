@@ -107,8 +107,8 @@ class TsonObjectReaderTest {
     void duplicateFieldNameIsAnError() throws DataBindException {
         // §2.5 words a repeated field as a SHOULD-warn with "the last value wins" as the recovery;
         // SPEC-FEEDBACK.md #41/#42 makes it an error. The recovery still runs underneath -- see
-        // DuplicateFieldTest, which can observe it; a reported record binds to null in object
-        // mode whatever the problem was (GitHub #7), so this one asserts the verdict only.
+        // DuplicateFieldTest, which can observe it; bind mode is all-or-nothing (ConstructionGuard), so a
+        // reported document binds to null whatever the problem was and this one asserts the verdict only.
         TsonReadException thrown = assertThrows(TsonReadException.class,
                 () -> mapper.read("{ x: 1 x: 99 y: 2 }", Point.class));
         assertTrue(thrown.getMessage().contains("duplicate field 'x'"), thrown.getMessage());
@@ -331,8 +331,8 @@ class TsonObjectReaderTest {
     @Test
     void mapDuplicateKeyIsAnError() throws DataBindException {
         // §2.6, the map half of the record rule above. "Last value wins" still falls out of the repeated
-        // put() calls in source order; MapTreeReaderTest is where that is observable, since the enclosing
-        // record binds to null here once anything is reported (GitHub #7).
+        // put() calls in source order; MapTreeReaderTest is where that is observable, since bind mode is
+        // all-or-nothing (ConstructionGuard) and this document binds to null once anything is reported.
         TsonReadException thrown = assertThrows(TsonReadException.class,
                 () -> mapper.read("{ counts: { apples => 3 apples => 7 } }", CountsHolder.class));
         assertTrue(thrown.getMessage().contains("duplicate key 'apples'"), thrown.getMessage());
@@ -645,6 +645,60 @@ class TsonObjectReaderTest {
     @Test
     void aTypeRefOnACollectionTargetHasNothingToNameAndIsReported() {
         assertThrows(TsonReadException.class, () -> mapper.read("{ tags: !tags [\"a\"] }", StringListHolder.class));
+    }
+
+    // ── All-or-nothing binding (ConstructionGuard, GitHub #7) ──────────────
+
+    /**
+     * Bind mode's standing rule: a document that reported anything binds to {@code null}, whatever the
+     * readers underneath assembled. Collecting mode decides how many problems the caller learns about, never
+     * whether a flawed document still yields an object -- the point of binding is that holding one means the
+     * document was good.
+     */
+    @Test
+    void aDocumentThatReportedAnythingBindsToNull() {
+        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+
+        assertNull(mapper.withDiagnostics(problems).read("{ x: 1  y: nope }", Point.class));
+        assertEquals(List.of(Diagnostic.Code.TYPE_MISMATCH),
+                problems.diagnostics().stream().map(Diagnostic::code).toList());
+    }
+
+    /**
+     * The root value's own framing has no enclosing read to bracket it, so {@code ConstructionGuard} cannot
+     * see it -- {@code TsonObjectReader} applies the same rule at the document boundary. Without that, a
+     * {@code Point} came back for a document already reported as wrong.
+     */
+    @Test
+    void aReportedTypeRefOnTheRootValueStillBindsToNull() {
+        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+
+        assertNull(mapper.withDiagnostics(problems).read("!nosuchtype { x: 1  y: 2 }", Point.class));
+        assertEquals(List.of(Diagnostic.Code.UNKNOWN_TYPE_REF),
+                problems.diagnostics().stream().map(Diagnostic::code).toList());
+    }
+
+    /**
+     * The other position the per-value guard cannot cover: a collection tolerates a {@code null} element
+     * where a constructor does not, so a root array builds around a failed element rather than abandoning
+     * itself. The document boundary is what keeps it from being handed back with a hole in it.
+     */
+    @Test
+    void aRootArrayWithAFailedElementBindsToNullRatherThanToAHole() {
+        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+
+        assertNull(mapper.withDiagnostics(problems).read("[1 !notabuiltin 2 3]", int[].class));
+        assertEquals(List.of(Diagnostic.Code.UNKNOWN_TYPE_REF),
+                problems.diagnostics().stream().map(Diagnostic::code).toList());
+    }
+
+    /** A clean document is unaffected: the rule only ever turns a reported read into {@code null}. */
+    @Test
+    void aCleanDocumentBindsNormallyUnderACollectingReceiver() throws DataBindException {
+        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+
+        assertEquals(new Point(1, 2), mapper.withDiagnostics(problems).read("{ x: 1  y: 2 }", Point.class));
+        assertTrue(problems.diagnostics().isEmpty());
     }
 
     @Test

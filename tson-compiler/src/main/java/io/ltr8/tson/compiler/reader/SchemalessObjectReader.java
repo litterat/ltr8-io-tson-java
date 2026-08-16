@@ -288,7 +288,6 @@ public final class SchemalessObjectReader {
      * record value's, matching the tree-based reader's own deliberate scope limit.
      */
     private Object bindRecord(TsonReadContext ctx, DataClassRecord dataClass) {
-        int diagnosticsBefore = ctx.reported();
         DataClassField[] fields = dataClass.fields();
         DataClassField carrier = dataClass.annotationsCarrier().orElse(null);
         Annotations captured = Annotations.empty();
@@ -317,6 +316,9 @@ public final class SchemalessObjectReader {
             EventSkip.coreValue(ctx);
             return null;
         }
+        // Marked here, not on entry: the framing above is the enclosing read's concern, not this record's --
+        // see ConstructionGuard, and RecordBindReader, which marks at the same point.
+        int mark = ConstructionGuard.mark(ctx);
 
         Map<String, Integer> indexByName = new HashMap<>();
         for (int i = 0; i < fields.length; i++) {
@@ -378,7 +380,7 @@ public final class SchemalessObjectReader {
             construct[field.index()] = null;
         }
 
-        return construct(ctx, dataClass.constructor(), construct, diagnosticsBefore, dataClass.typeClass());
+        return construct(ctx, dataClass.constructor(), construct, mark, dataClass.typeClass());
     }
 
     /** One record field's value: the absent sentinel {@code _} binds to {@code null} (a required field left {@code _} is a {@code FIELD_REQUIRED} problem), anything else binds recursively. */
@@ -407,6 +409,7 @@ public final class SchemalessObjectReader {
             return null;
         }
         ctx.next();
+        int mark = ConstructionGuard.mark(ctx);
         DataClass elementClass = dataClass.arrayDataClass();
         List<Object> buffered = new ArrayList<>();
         int index = 0;
@@ -418,6 +421,11 @@ public final class SchemalessObjectReader {
             index++;
         }
         ctx.next(); // ArrayEnd
+        if (ConstructionGuard.abandoned(ctx, mark)) {
+            // Before allocating, not just before returning -- a failed element is buffered as null, and
+            // storing one into a primitive-component array throws NPE out of `put`'s own MethodHandle.
+            return null;
+        }
 
         try {
             Object arrayData = dataClass.constructor().invoke(buffered.size());
@@ -458,6 +466,7 @@ public final class SchemalessObjectReader {
             EventSkip.coreValue(ctx);
             return null;
         }
+        int mark = ConstructionGuard.mark(ctx);
 
         try {
             Object mapData = dataClass.constructor().invoke(0);
@@ -494,7 +503,7 @@ public final class SchemalessObjectReader {
                 dataClass.put().invoke(mapData, key, value);
             }
             ctx.next(); // MapEnd
-            return mapData;
+            return ConstructionGuard.abandoned(ctx, mark) ? null : mapData;
         } catch (RuntimeException ex) {
             throw ex;
         } catch (Throwable t) {
@@ -508,7 +517,6 @@ public final class SchemalessObjectReader {
 
     /** A tuple is array-shaped on the wire (§5.3), not record-shaped -- so {@code {}} is never a reading, only {@code []}. Arity is fixed and exact. */
     private Object bindTuple(TsonReadContext ctx, DataClassTuple dataClass) {
-        int diagnosticsBefore = ctx.reported();
         containerFraming(ctx, dataClass);
         if (!(ctx.peek() instanceof ArrayStart)) {
             TsonEvent e = ctx.peek();
@@ -518,6 +526,8 @@ public final class SchemalessObjectReader {
             return null;
         }
         ctx.next();
+        // Marked past the framing, matching bindRecord and TupleBindReader -- see ConstructionGuard.
+        int mark = ConstructionGuard.mark(ctx);
 
         DataClassElement[] slots = dataClass.elements();
         Object[] construct = new Object[slots.length];
@@ -546,7 +556,7 @@ public final class SchemalessObjectReader {
                     + " elements, found " + index, slots.length + " elements", String.valueOf(index));
         }
 
-        return construct(ctx, dataClass.constructor(), construct, diagnosticsBefore, dataClass.typeClass());
+        return construct(ctx, dataClass.constructor(), construct, mark, dataClass.typeClass());
     }
 
     // ── Unions ───────────────────────────────────────────────────────────
@@ -612,15 +622,14 @@ public final class SchemalessObjectReader {
     // ── Shared helpers ───────────────────────────────────────────────────
 
     /**
-     * Invokes {@code constructor} with the assembled arguments, unless a problem was already reported
-     * while reading this value's own fields/elements (collecting mode) -- a real Java constructor
-     * can't tolerate a {@code null} argument for a primitive-typed parameter, so constructing after a
-     * failure would risk a confusing secondary {@code NullPointerException} on top of the diagnostic
-     * already recorded; the caller already has what it needs from {@code ctx.diagnostics()}.
+     * Invokes {@code constructor} with the assembled arguments, unless anything was reported since {@code
+     * mark} -- {@link ConstructionGuard}'s all-or-nothing rule, shared verbatim with the schema-driven
+     * {@code RecordBindReader}/{@code TupleBindReader} so both bind paths abandon a value for the same
+     * reasons. A caller in collecting mode has the diagnostics saying why.
      */
     private Object construct(TsonReadContext ctx, java.lang.invoke.MethodHandle constructor, Object[] arguments,
-                             int diagnosticsBefore, Class<?> typeClass) {
-        if (ctx.reported() > diagnosticsBefore) {
+                             int mark, Class<?> typeClass) {
+        if (ConstructionGuard.abandoned(ctx, mark)) {
             return null;
         }
         try {

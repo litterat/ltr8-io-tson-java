@@ -709,6 +709,22 @@ is small and parsed once.)
 - **Continuation policy: always keep reading in collecting mode.** A failed field/element is recorded and
   a `null` placeholder kept in place (so later indices stay accurate); a shape mismatch reports
   `TYPE_MISMATCH`/`WRONG_ARITY` and returns `null` so a caller doesn't also report every child as missing.
+- **Bind mode is all-or-nothing; tree mode is not** (`ConstructionGuard`, which states the rule once for all
+  nine bind-mode assembly sites). A value whose read reported *anything* — its own field's problem or a
+  descendant's, whether or not it left an argument unfilled — is not assembled and binds to `null`, which
+  propagates to the root. A tree read is the opposite: a `TsonValue` is inspectable structure a caller can
+  hold beside the diagnostics, so both tree readers keep everything they built. The asymmetry is the point,
+  not an inconsistency — a bound object is typed application data whose *existence* is the claim that the
+  document was good, so handing one back for a document already known to be wrong is the failure binding
+  exists to prevent. A stray field (`UNRECOGNIZED_FIELD`) or a repeat (`DUPLICATE_FIELD`) counts like any
+  other diagnostic: the only question the rule asks is whether the document is wrong. `TsonObjectReader`
+  applies the same rule once more at the **document boundary**, covering the two positions the per-value
+  guard structurally cannot — the root value's own framing (no enclosing read brackets it) and a root
+  array/map (a collection tolerates a `null` child where a constructor doesn't). **The mark goes after the
+  framing, before the fields**, so a container type-ref's `UNKNOWN_TYPE_REF` belongs to the enclosing read
+  that chose to look there. Narrower uses of the same `ctx.reported()` idiom are unrelated and stay put:
+  `MapAbstractReader`/`SchemalessObjectReader` asking whether one key bound, `verifyFixed` asking whether one
+  token decoded, `AnnotationCapture`'s throwaway probe context — each brackets a single child read.
 - **Every reader stamps its own schema position** first thing (`ctx.at(value).withSchemaPosition(...)`) so
   a diagnostic from inside an atom carries *that atom's* declared position. A record field never mentioned
   by the data can only be noticed after the record is consumed, so its `FIELD_REQUIRED` reports against
@@ -723,8 +739,7 @@ is small and parsed once.)
   by replaying it through the governing meta's compiled reader, so `!integer ^ { minimum: 1 }` (JSON
   Schema's spelling of `min`) is rejected instead of compiling clean and constraining nothing — §5.5/§5.7
   never say so themselves, which is `SPEC-FEEDBACK.md` #40. In bind
-  mode a reported record still binds to `null`, which is `RecordBindReader`'s standing rule for *any*
-  diagnostic raised while it reads (`ctx.reported()` counts a whole read), not something closure chose.
+  mode a reported record still binds to `null` — the all-or-nothing rule above, not something closure chose.
 - **A repeated record field name or map key is an error** (`DUPLICATE_FIELD`/`DUPLICATE_MAP_KEY`,
   §2.5/§2.6), reported at the repeat's own position, with the spec's "last value wins" recovery still
   running underneath: a single-pass pull stream can't know a name recurs without buffering, so every

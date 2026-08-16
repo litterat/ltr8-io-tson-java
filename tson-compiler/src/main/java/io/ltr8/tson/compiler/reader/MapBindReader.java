@@ -64,12 +64,13 @@ final class MapBindReader extends MapAbstractReader<Object> {
         if (shape == Shape.MISMATCH) {
             return null;
         }
+        int mark = ConstructionGuard.mark(ctx);
         try {
             Object mapData = descriptor.constructor().invoke(0);
             if (shape == Shape.ENTRIES) {
                 readInto(ctx, (key, decodedValue) -> put(mapData, key, decodedValue));
             }
-            return mapData;
+            return ConstructionGuard.abandoned(ctx, mark) ? null : mapData;
         } catch (RuntimeException e) {
             throw e;
         } catch (Throwable t) {
