@@ -538,7 +538,11 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   (different kind / different atom family disjoint; same-family integers by bound interval; IS-A ⇒ not
   disjoint); record-set and regex-pattern disjointness left absent (see `BACKLOG.md` for the "how far" view);
   (4) **validate** every reference
-  resolves, with a type-parameter exception (a bare name valid if it's the entry's own declared parameter)
+  resolves, with a type-parameter exception (a bare name valid if it's the entry's own declared parameter);
+  **a choice's variants are checked distinct** (§5.4) *after* §8.3 flattening, since an alias and its target
+  are one type — so `(text | my_text)` with `my_text => text` is caught, which comparing the written names
+  would miss and which is the only spelling an author can't see for themselves; the walk stops on a
+  reference cycle rather than hanging, cycle diagnosis being its own unimplemented concern;
   and a **constructor-eligibility** check with two halves, the same §2.2.2 question asked from both ends
   (see `SPEC-FEEDBACK.md` #19): a locally-declared `constructor: true` entry is valid only if the schema's
   `!!meta` is exactly meta-kernel's identity, and a schema named as this one's **`!!meta` target** is valid

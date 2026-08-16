@@ -26,12 +26,6 @@ own prose (which had gone stale on at least one of them):
   "import cycle" diagnostic naming the actual cycle path. Distinct from what
   `TsonCompiledMetaRegistry.withStandardLibrary` already does, which is scoped to just the three bundled
   schemas in a known order, not a general algorithm.
-- [ ] **§5.4's distinct-variant validation** ([TSON-SCHEMA] §5.4) — "the resolver validates that each variant
-  resolves to a distinct type" is unimplemented, so `(text | text)` resolves clean. Deliberately not done in
-  `SchemaDesugarer`, which is where the sugar is expanded: the rule is about what the names *resolve to*,
-  after §8.3 reference flattening, which that phase has no answer to. It belongs where the variants are
-  already resolved names — the linker, alongside the reference validation and `ChoiceDisjointness` it
-  already runs per choice entry.
 - [ ] **Inline constructor applications materialise entries, and §8.2 says they never may** — a real
   conformance divergence, not a representation preference, and it predates choice: inline `[T]` and
   `map<K, V>` have always been hoisted this way. §8.2 is unambiguous — "Constructor applications never

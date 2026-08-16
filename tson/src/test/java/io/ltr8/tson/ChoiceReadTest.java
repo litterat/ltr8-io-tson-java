@@ -2,6 +2,7 @@ package io.ltr8.tson;
 
 import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonTypeReader;
+import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
@@ -113,5 +114,17 @@ class ChoiceReadTest {
         TsonValue person = read(personReader("(text | integer)"), "42");
 
         assertEquals(Optional.of("boolean"), person.get("inline").typeRef());
+    }
+
+    /**
+     * §5.4's distinct-variant rule, reached from source: the sugar resolves and the linker rejects it, so a
+     * duplicate never reaches a reader that could not discriminate it anyway.
+     */
+    @Test
+    void aChoiceWithADuplicateVariantIsRejected() {
+        TsonSchemaValidationException e = assertThrows(TsonSchemaValidationException.class,
+                () -> personReader("(text | text)"));
+
+        assertTrue(e.getMessage().contains("§5.4"), e.getMessage());
     }
 }

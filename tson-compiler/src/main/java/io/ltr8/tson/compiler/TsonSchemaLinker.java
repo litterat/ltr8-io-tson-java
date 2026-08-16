@@ -544,6 +544,7 @@ public final class TsonSchemaLinker {
                     validateTypeRef(variant, namespace, ownParameters, "'" + entryName + "' variant[" + index + "]");
                     index++;
                 }
+                checkVariantsAreDistinct(entryName, c, namespace);
             }
             case Unit ignored -> {
             }
@@ -594,6 +595,65 @@ public final class TsonSchemaLinker {
             case Extern ignored -> {
             }
         }
+    }
+
+    /**
+     * §5.4: "The resolver validates that each variant resolves to a distinct type."
+     *
+     * <p><b>Judged after flattening, which is the whole point of the rule.</b> §8.3 makes an alias and its
+     * target one type, so {@code (text | my_text)} with {@code my_text => text} is the same duplicate {@code
+     * (text | text)} is -- spelled so that an author cannot see it. Comparing the written names would catch
+     * only the spelling an author would have caught themselves. A duplicate variant is never merely
+     * redundant: the second is unreachable under §5.4's Tagging rule, since a {@code !variant} tag naming it
+     * and one naming the first select the same type, and untagged recovery has nothing to choose between.
+     *
+     * <p>Here rather than in {@code SchemaDesugarer}, where the sugar is expanded, because this asks what
+     * names <em>resolve to</em> -- a question with no answer until the whole namespace exists, imports
+     * merged. It runs after {@link #validateTypeRef} has accepted every variant, so an unresolved name is
+     * already reported and never reaches the walk.
+     *
+     * <p>Arguments are compared as written rather than flattened through: only the head name is walked. The
+     * gap is unreachable from the sugar -- {@code SchemaDesugarer} hoists any argument-bearing variant to a
+     * bare name -- and reaches only a hand-written {@code !choice { variants: [...] } } naming two
+     * differently-spelled applications of one type.
+     */
+    private static void checkVariantsAreDistinct(String entryName, ChoiceBody choice,
+                                                  Map<String, TypeDefinition> namespace) {
+        Map<TypeRef, String> seen = new LinkedHashMap<>();
+        for (TypeRef variant : choice.variants()) {
+            TypeRef flattened = new TypeRef(terminalName(variant.name(), namespace), variant.arguments());
+            String first = seen.putIfAbsent(flattened, variant.name());
+            if (first == null) {
+                continue;
+            }
+            throw new TsonSchemaValidationException("'" + entryName + "' " + (first.equals(variant.name())
+                    ? "lists the variant '" + variant.name() + "' twice"
+                    : "variants '" + first + "' and '" + variant.name() + "' both resolve to '"
+                            + flattened.name() + "'")
+                    + " -- §5.4 requires each variant to resolve to a distinct type");
+        }
+    }
+
+    /**
+     * The name a reference chain ends at (§8.3): the first entry whose body is not a {@code Reference}. A
+     * name this schema does not declare is returned unchanged -- it is a type parameter, already accepted by
+     * {@link #validateTypeRef}.
+     *
+     * <p>A reference cycle stops the walk rather than hanging. Detecting and diagnosing one is a separate
+     * unimplemented concern ({@code BACKLOG.md}); stopping at the repeat is enough here, because the name it
+     * stops at depends on where the walk started, so a cycle yields no false duplicate.
+     */
+    private static String terminalName(String name, Map<String, TypeDefinition> namespace) {
+        Set<String> walked = new LinkedHashSet<>();
+        String current = name;
+        while (walked.add(current)) {
+            TypeDefinition def = namespace.get(current);
+            if (def == null || !(def.body() instanceof Reference reference)) {
+                return current;
+            }
+            current = reference.target().name();
+        }
+        return current;
     }
 
     /** {@code fallback} entries, overridden by {@code primary} on collision -- {@code primary} isn't mutated. */

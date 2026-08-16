@@ -1,6 +1,7 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.schema.*;
+import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
@@ -39,6 +40,12 @@ class TsonSchemaLinkerTest {
 
     private static TypeDefinition emptyRecord() {
         return TypeDefinition.product(RecordBody.of(List.of()));
+    }
+
+    /** A declared choice -- what {@code (A | B)} resolves to. {@code disjoint} is the linker's to derive. */
+    private static TypeDefinition choiceEntry(ChoiceBody body) {
+        return new TypeDefinition(Optional.empty(), TypeKind.SUM, List.of(), false, List.of(), List.of(),
+                Optional.empty(), body);
     }
 
     /**
@@ -103,6 +110,62 @@ class TsonSchemaLinkerTest {
         TsonSchemaValidationException ex = assertThrows(TsonSchemaValidationException.class,
                 () -> TsonSchemaLinker.link(schemaOf(entries), null));
         assertTrue(ex.getMessage().contains("no_such_type"));
+    }
+
+    /** §5.4's distinct-variant rule at its plainest: the same name written twice. */
+    @Test
+    void rejectsAChoiceListingOneVariantTwice() {
+        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        entries.put("token", unitEntry());
+        entries.put("contact", choiceEntry(new ChoiceBody(List.of(TypeRef.of("token"), TypeRef.of("token")))));
+
+        TsonSchemaValidationException ex = assertThrows(TsonSchemaValidationException.class,
+                () -> TsonSchemaLinker.link(schemaOf(entries), null));
+        assertTrue(ex.getMessage().contains("lists the variant 'token' twice"), ex.getMessage());
+    }
+
+    /**
+     * The case the rule exists for: §8.3 makes an alias and its target one type, so two spellings of it are
+     * a duplicate an author cannot see. The diagnostic names both spellings and what they landed on.
+     */
+    @Test
+    void rejectsTwoVariantsThatFlattenToOneType() {
+        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        entries.put("token", unitEntry());
+        entries.put("nickname", TypeDefinition.reference("token"));
+        entries.put("contact", choiceEntry(
+                new ChoiceBody(List.of(TypeRef.of("token"), TypeRef.of("nickname")))));
+
+        TsonSchemaValidationException ex = assertThrows(TsonSchemaValidationException.class,
+                () -> TsonSchemaLinker.link(schemaOf(entries), null));
+        assertTrue(ex.getMessage().contains("'token' and 'nickname' both resolve to 'token'"), ex.getMessage());
+    }
+
+    /** Two aliases of *different* types stay distinct -- flattening must not collapse what it merely renames. */
+    @Test
+    void acceptsAliasedVariantsThatFlattenToDifferentTypes() {
+        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        entries.put("token", unitEntry());
+        entries.put("other", emptyRecord());
+        entries.put("nickname", TypeDefinition.reference("token"));
+        entries.put("contact", choiceEntry(
+                new ChoiceBody(List.of(TypeRef.of("nickname"), TypeRef.of("other")))));
+
+        TsonSchemaLinker.link(schemaOf(entries), null); // no exception
+    }
+
+    /**
+     * A reference cycle is a separate, unimplemented diagnostic; what matters here is that the flattening
+     * walk stops instead of hanging, and that a cycle produces no false duplicate.
+     */
+    @Test
+    void aReferenceCycleAmongVariantsTerminates() {
+        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        entries.put("a", TypeDefinition.reference("b"));
+        entries.put("b", TypeDefinition.reference("a"));
+        entries.put("contact", choiceEntry(new ChoiceBody(List.of(TypeRef.of("a"), TypeRef.of("b")))));
+
+        TsonSchemaLinker.link(schemaOf(entries), null); // terminates, no exception
     }
 
     @Test
