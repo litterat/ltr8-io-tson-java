@@ -11,6 +11,7 @@ import io.ltr8.tson.schema.TsonCanonicalIdentity;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
+import io.ltr8.tson.schema.TsonSchemaValidationException;
 
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -350,11 +351,16 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      * return content under the wrong identity. A hash-pinned reference's target MUST carry an {@code
      * !!id} at all; a plain reference to an id-less development artifact is allowed here (registration
      * requires an id separately).
+     *
+     * <p>Both failures are {@link TsonSchemaValidationException}s, not library faults: the reference and the
+     * document it names disagree, which is an authoring or publishing error whose verdict does not change
+     * when this library improves. Same reasoning as {@link TsonSchemaLinker#notAMetaSchema} above, and what
+     * lets {@code Tson.validateSchema} report them rather than rethrow.
      */
     private void crossCheckId(SchemaDocument document, String referenceUri, String identity) {
         if (document.id().isEmpty()) {
             if (TsonContentHash.declaredSha256(referenceUri).isPresent()) {
-                throw new IllegalStateException("the hash-pinned reference \"" + referenceUri
+                throw new TsonSchemaValidationException("the hash-pinned reference \"" + referenceUri
                         + "\" resolved to a document with no !!id -- a hashed reference's target must carry one "
                         + "([TSON-DATA] §2.2.1)");
             }
@@ -362,7 +368,8 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
         }
         String embedded = TsonCanonicalIdentity.canonicalize(document.id().get());
         if (!embedded.equals(identity)) {
-            throw new IllegalStateException("identity mismatch: reference \"" + referenceUri + "\" (identity \""
+            throw new TsonSchemaValidationException("identity mismatch: reference \"" + referenceUri
+                    + "\" (identity \""
                     + identity + "\") resolved to a document whose own !!id is \"" + document.id().get()
                     + "\" (identity \"" + embedded + "\") -- refusing content obtained under the wrong identity "
                     + "([TSON-DATA] §2.2.1)");

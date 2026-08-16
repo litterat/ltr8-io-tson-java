@@ -45,8 +45,10 @@ public interface TsonCompiledSchemaLoader {
      * Resolves {@code uri} to its compiled governing meta-schema -- for a document's own {@code !!meta}
      * target, which must be a meta-layer schema (its own {@code !!meta} is meta-kernel).
      *
-     * @throws IllegalStateException if {@code uri} resolves but isn't a meta-layer schema, so cannot govern
-     *                               another (in addition to whatever {@link #resolveLinked} may throw)
+     * @throws io.ltr8.tson.schema.TsonSchemaValidationException if {@code uri} resolves but isn't a
+     *                               meta-layer schema, so cannot govern another -- an authoring error, like
+     *                               every other verdict on a schema's own soundness (in addition to whatever
+     *                               {@link #resolveLinked} may throw)
      */
     TsonCompiledMetaSchema loadMeta(String uri);
 }

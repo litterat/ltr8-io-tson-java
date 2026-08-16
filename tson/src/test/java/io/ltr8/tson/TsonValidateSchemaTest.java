@@ -115,6 +115,40 @@ class TsonValidateSchemaTest {
         assertEquals("", problems.get(0).schemaPointer());
     }
 
+    /**
+     * An {@code !!import} whose target carries a different {@code !!id} than the reference it was fetched
+     * under ([TSON-DATA] §2.2.1's cross-check) is an authoring/publishing error, so it reports like one
+     * rather than escaping as a library fault -- the CLI keeps exit 1 and exit 70 apart on exactly that
+     * distinction, and {@link Tson#validateSchema} promises never to throw for a bad document.
+     */
+    @Test
+    void anImportWhoseTargetOwnsAnotherIdentityIsReportedAgainstTheDocument() {
+        String lib = """
+                !!id:"https://example.test/its-real-name.tn"
+                !!meta:"https://tson.io/2026/32/m/meta.tn"
+                { widget => { name: text } }
+                """;
+        Tson tson = Tson.builder()
+                .schemaSource(uri -> {
+                    if (uri.equals("https://example.test/fetched-as.tn")) {
+                        return lib;
+                    }
+                    throw new IllegalStateException("no schema for " + uri);
+                })
+                .build();
+
+        List<Diagnostic> problems = tson.validateSchema("""
+                !!id:"https://example.test/mismatched-import.tn"
+                !!meta:"https://tson.io/2026/32/m/meta.tn"
+                !!import:"https://example.test/fetched-as.tn"
+                { holder => { w: widget } }
+                """);
+
+        assertEquals(1, problems.size(), problems::toString);
+        assertEquals("", problems.getFirst().schemaPointer());
+        assertTrue(problems.getFirst().message().contains("identity mismatch"), problems::toString);
+    }
+
     /** A schema that failed is not registered, so a later call can't find a half-resolved entry from it. */
     @Test
     void aFailedSchemaIsNotRegistered() {

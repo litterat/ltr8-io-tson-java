@@ -852,11 +852,14 @@ error* category, so this is the same layer, not a new one.
   library gap and keeps propagating — a gap is not a verdict on the author's schema. The test for which is
   which, from Swift's treatment of `expression_too_complex`: *a schema error's verdict doesn't change when
   this library improves; a gap's does.*
-- **What still throws even with a receiver:** an `!!import` that won't load, or a `!!meta` that may not
-  govern. Those make the namespace itself unusable rather than one entry wrong, and continuing would report
-  a page of unresolved references that are all consequences of the one real problem. `Tson.validateSchema`
-  catches them and reports against RFC 6901's root pointer (`""`), since they concern the document rather
-  than any declaration.
+- **What still throws even with a receiver:** an `!!import` that won't load, a `!!meta` that may not
+  govern, or a reference whose target owns a different `!!id` than it was fetched under (§2.2.1's
+  cross-check, `TsonCompiledMetaRegistry.crossCheckId`). Those make the namespace itself unusable rather
+  than one entry wrong, and continuing would report a page of unresolved references that are all
+  consequences of the one real problem. Each is a `TsonSchemaValidationException` — an authoring or
+  publishing error, not a library fault, which is what lets `Tson.validateSchema` catch them and report
+  against RFC 6901's root pointer (`""`), since they concern the document rather than any declaration, and
+  what keeps the CLI's exit 1 apart from exit 70.
 - **Still fail-fast:** desugaring and compilation. Compilation already keeps going via `ErrorReader`, but
   that marks a *library gap* (an unregistered atom factory), which is a different question from an author
   error.
@@ -1238,11 +1241,11 @@ compatibility).
   `email_type`'s flat `spec` field does. Subtype *dispatch* to them works; this is a narrower field-binding
   gap.
 - **Schema-side diagnostics, the remainder** — resolution and linking report through a
-  `TsonDiagnosticsReceiver` now (see "Schema-side diagnostics" above); three things are left. **Desugaring
-  is still fail-fast**, so a sugar-form error aborts before resolution reports anything. **A read-path
+  `TsonDiagnosticsReceiver` now (see "Schema-side diagnostics" above); two things are left. **Desugaring
+  is still fail-fast**, so a sugar-form error aborts before resolution reports anything. And **a read-path
   diagnostic carries `schemaPosition` but no `schemaId`/`schemaPointer`**, which needs the compiled schema's
-  identity threaded down the reader stack. And **the throw-site classification is only done inside
-  `DefinitionResolver`** — the same pass is still owed everywhere else. `BACKLOG.md` has the census.
+  identity threaded down the reader stack. Throw-site classification is done across the whole schema
+  pipeline.
 - **Deferred design questions** — `REQUIRED_FIXED`/`OPTIONAL_FIXED` value validation, `value_param` real
   parameter substitution, thread-safety, and a general disk/HTTP-backed `TsonSchemaSource` (with
   whitelist/blacklist policy).

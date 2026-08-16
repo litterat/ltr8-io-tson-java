@@ -264,9 +264,10 @@ RFC 9413 interoperability failure, per-diagnostic.
   inline arrays of one are resolved so far"). Overlaps the template-substitution item above, but is
   reachable without templates.
 
-Only genuine gaps are listed above — a throw that means "your schema is wrong" is not one, and
-`DefinitionResolver`'s have been separated out already. The remaining classification work is tracked under
-"Schema-side diagnostics", which carries the current census.
+Only genuine gaps are listed above — a throw that means "your schema is wrong" is not one. Classifying the
+throw sites by that test is done across the whole schema pipeline (issue #26); if a census is ever wanted
+again, take it fresh rather than trusting a recorded one, since the last recorded numbers had gone stale
+by a factor of six.
 
 - [ ] **A FIXED-value contradiction reports as `ATOM_CONSTRAINT_VIOLATION`**, which is the closest code in
   the closed vocabulary and not an accurate one — a document contradicting `field: type = value` (§5.2) has
@@ -293,16 +294,6 @@ left:
   declaration position it stamped, not which entry of which schema produced it, so a value error reports
   `110:3:4858` with nothing saying that is core.tn's line for `int32`. Threading the compiled schema's
   identity down the reader stack is what closes it.
-- [ ] **Finish classifying the throw sites outside `DefinitionResolver`.** Census across the schema pipeline
-  (parser, desugarer, resolvers, linker, compiler, registries, `TsonCanonicalIdentity`): 13
-  `UnsupportedOperationException` (*library gaps*), 52 `TsonSchemaValidationException` (author errors —
-  though 11 are `TsonCanonicalIdentity` `!!id` string checks, inherently positionless), 16
-  `IllegalStateException` (invariants/faults), 3 `TsonParseException` (schema syntax, already positioned).
-  Only a validation exception is collected into a `Diagnostic`, so a misfiled author error both aborts the
-  run and tells the author their correct schema is this library's fault. The test, from Swift's treatment of
-  `expression_too_complex`: **a schema error's verdict doesn't change when the library improves; a gap's
-  does.** `DefinitionResolver`'s `!`-position sites and `TsonSchemaSource.registeredOnly` are done;
-  everywhere else still wants the pass.
 - [ ] **A schema *parse* error is still fail-fast, and names a token class rather than a construct.**
   Everything downstream of parsing now reports many problems; parsing itself reports one and stops, so an
   author fixes a syntax error, re-runs, and meets the next. The message is also pitched at the wrong level
