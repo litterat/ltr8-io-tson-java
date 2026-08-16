@@ -75,14 +75,15 @@ final class ArrayBindReader extends ArrayAbstractReader<Object> {
         if (!expectArrayStart(ctx)) {
             return null;
         }
+        int mark = ConstructionGuard.mark(ctx);
         try {
             if (descriptor.typeClass().isArray()) {
-                return readIntoFixedSizeArray(ctx);
+                return readIntoFixedSizeArray(ctx, mark);
             }
             Object arrayData = descriptor.constructor().invoke(0);
             Object iterator = descriptor.iterator().invoke(arrayData);
             readInto(ctx, decoded -> put(arrayData, iterator, decoded));
-            return arrayData;
+            return ConstructionGuard.abandoned(ctx, mark) ? null : arrayData;
         } catch (RuntimeException e) {
             throw e;
         } catch (Throwable t) {
@@ -91,9 +92,15 @@ final class ArrayBindReader extends ArrayAbstractReader<Object> {
         }
     }
 
-    private Object readIntoFixedSizeArray(TsonReadContext ctx) throws Throwable {
+    private Object readIntoFixedSizeArray(TsonReadContext ctx, int mark) throws Throwable {
         List<Object> buffered = new ArrayList<>();
         readInto(ctx, buffered::add);
+        if (ConstructionGuard.abandoned(ctx, mark)) {
+            // Checked before allocating, not just before returning: a failed element is buffered as null, and
+            // storing one into a primitive-component array unboxes it and throws NPE out of `put`'s own
+            // MethodHandle -- the secondary failure ConstructionGuard exists to keep off a caller's stack.
+            return null;
+        }
         Object arrayData = descriptor.constructor().invoke(buffered.size());
         Object iterator = descriptor.iterator().invoke(arrayData);
         for (Object decoded : buffered) {

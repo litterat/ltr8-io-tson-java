@@ -39,8 +39,13 @@ import java.util.Objects;
  *
  * <p>A read is fail-fast by default, throwing {@link TsonReadException} at the first problem. {@link
  * #withDiagnostics} swaps that for any other {@link TsonDiagnosticsReceiver} -- a collector gathers every
- * problem in one pass and still hands back the (possibly partial) object, in schema-aware and schemaless
- * mode alike.
+ * problem in the document in one pass, in schema-aware and schemaless mode alike.
+ *
+ * <p><b>Binding is all-or-nothing: a document that reported anything binds to {@code null}</b>, and the
+ * diagnostics are the whole result. Collecting mode changes how many problems a caller learns about, never
+ * whether a flawed document yields an object. Tree mode is the opposite by design -- {@link TsonTreeReader}
+ * hands back the structure it read alongside the diagnostics, because a {@link io.ltr8.tson.tree.TsonValue}
+ * is inspectable and a bound object is application data whose existence implies the document was good.
  *
  * <p>A schemaless bind also holds a wire type-ref to account: a built-in name must sit on a token and
  * satisfy its atom, and any other name must name the target being bound. {@link #preservingUnknownTypeRefs}
@@ -220,7 +225,7 @@ public final class TsonObjectReader {
                 ? schemaless.read(ctx, type)
                 : readAgainstSchema(start.schema().get(), ctx, type, null);
         requireDocumentEnd(ctx);
-        return result;
+        return valid(ctx, result);
     }
 
     private <T> T readDocumentAs(TsonDataStream stream, String typeName, Class<T> type) {
@@ -232,7 +237,28 @@ public final class TsonObjectReader {
         ctx.next(); // DocumentStart -- any !!schema it declares is overridden by withSchema
         T result = readAgainstSchema(schemaUri, ctx, type, typeName);
         requireDocumentEnd(ctx);
-        return result;
+        return valid(ctx, result);
+    }
+
+    /**
+     * The all-or-nothing rule at the document boundary: a document that reported anything binds to {@code
+     * null}, whatever the readers underneath managed to assemble. Fail-fast never reaches here (the first
+     * problem already threw), so this is what a collecting reader's caller sees.
+     *
+     * <p>The per-value guard in the reader stack ({@code ConstructionGuard}) already propagates a failure up
+     * through every enclosing record and tuple, so for most documents this changes nothing. It exists for the
+     * positions that guard structurally cannot cover: the <b>root value's own framing</b>, whose diagnostics
+     * belong to no enclosing read, and a <b>root array or map</b>, which builds around a failed child rather
+     * than abandoning itself (a collection tolerates a {@code null} element where a constructor does not).
+     * Both would otherwise hand back real-looking application data for a document already known to be bad,
+     * which is the outcome binding exists to prevent.
+     *
+     * <p>Deliberately not applied to {@link #read(TsonReadContext, Class)}: that reads one value at a cursor
+     * in a context the caller owns, where {@code reported()} may already count problems from before the call
+     * and the caller is the one framing the document.
+     */
+    private static <T> T valid(TsonReadContext ctx, T result) {
+        return ctx.reported() > 0 ? null : result;
     }
 
     /**

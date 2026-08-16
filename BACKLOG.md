@@ -213,18 +213,6 @@ RFC 9413 interoperability failure, per-diagnostic.
     arrives with it. What replaced the item is a spec question rather than an implementation one —
     `SPEC-FEEDBACK.md` #43, on the equality the series never defines for a Class 1 reader.
 
-## Reader behaviour
-
-- [ ] **A reported record binds to `null` in object mode, however small the problem**
-  ([#7](https://github.com/litterat/ltr8-io-tson-java/issues/7)). `RecordBindReader`
-  returns `null` whenever `ctx.reported()` moved while it was reading, on the grounds that a bound
-  constructor cannot take a null argument for a primitive-typed parameter. But the counter is per *read*,
-  not per record, so a diagnostic anywhere in a subtree also collapses every record above it — and for a
-  closure violation the reasoning does not apply at all, since every declared field is intact and the
-  object is constructible. Fixing it means distinguishing "one of my own fields failed" from "something
-  below me did", which is a change to the `int before = ctx.reported()` checkpoint idiom shared with
-  `TupleBindReader`/`SchemalessObjectReader`. Tree mode already keeps the value.
-
 ## Remaining built-in types
 
 - [ ] `cidr4`/`cidr6`/`unknown` — no compiled-parser factory yet (`ValueReaderFactoryRegistry` registers

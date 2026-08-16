@@ -131,10 +131,11 @@ class RecordClosureTest {
      * {@link TextType} would have ignored one regardless of what the schema said.
      *
      * <p>Collecting mode binds the record to {@code null} rather than to a {@link TextType} carrying the
-     * fields that were fine. That is {@link RecordBindReader}'s standing rule and not specific to closure:
-     * {@code ctx.reported()} counts a whole read, so <em>any</em> diagnostic raised while a record is being
-     * read -- its own field's or a descendant's -- stops it constructing. Tree mode keeps the value, which
-     * is why the deeper assertions above are written against it.
+     * fields that were fine. That is {@code ConstructionGuard}'s all-or-nothing rule and not specific to
+     * closure: <em>any</em> diagnostic raised while a value is being read -- its own field's or a
+     * descendant's, and whether or not it left an argument unfilled -- stops it being assembled. A stray
+     * field says the document is wrong, which is the only question the rule asks. Tree mode keeps the value,
+     * which is why the deeper assertions above are written against it.
      */
     @Test
     void closureReachesObjectBindingModeToo() {
