@@ -27,13 +27,13 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * Proves the deliberate, streaming-driven behavior change from this codebase's own pre-streaming
- * design (see {@code SPEC-FEEDBACK.md}'s entry on it, and {@link RecordAbstractReader}'s own class
- * Javadoc): a record field named twice reads and validates <em>every</em> occurrence, forward, in
- * stream order -- a shadowed (non-final) duplicate's own value is genuinely decoded, so its own
- * problems still surface as a diagnostic, even though the field's own final stored value always
- * ends up being whichever occurrence came <em>last</em> (§2.5's "last value wins", applied per
- * decode rather than by skipping every occurrence but the last unread).
+ * A record field named twice is a validation error ({@code DUPLICATE_FIELD}) -- [TSON-DATA] §2.5's
+ * SHOULD-warn taken as an error, per {@code SPEC-FEEDBACK.md} #41/#42 -- and the "last value wins"
+ * recovery still runs underneath it, because {@link RecordAbstractReader} reads forward in one pass and
+ * has no way to skip an occurrence it cannot yet know is shadowed.
+ *
+ * <p>That is also what settles {@code SPEC-FEEDBACK.md} #21: every occurrence is decoded, so a shadowed
+ * one's own problems are reported alongside the duplication itself rather than going unvalidated.
  */
 class DuplicateFieldOverwriteTest {
 
@@ -61,15 +61,38 @@ class DuplicateFieldOverwriteTest {
         Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue)
                 compiled.get("holder").read(TestDocuments.document(dataSource, problems)));
 
-        // The malformed first occurrence was genuinely read/validated -- exactly one diagnostic,
-        // for the out-of-range 999, not silently skipped the way pre-streaming backward-scan-and-
-        // skip would have (it never touched a shadowed value at all).
-        assertEquals(1, problems.diagnostics().size(), problems.diagnostics().toString());
-        assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, problems.diagnostics().get(0).code());
+        // Two independent problems, in stream order: the malformed first occurrence was genuinely
+        // read and validated (out-of-range 999), and the second occurrence is the duplication itself.
+        assertEquals(List.of(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, Diagnostic.Code.DUPLICATE_FIELD),
+                problems.diagnostics().stream().map(Diagnostic::code).toList(),
+                problems.diagnostics().toString());
 
-        // Despite that, the field's own final stored value is the second, valid occurrence --
-        // forward overwrite, matching §2.5's "last value wins". DOM mode still narrows a real
-        // int8-typed atom down to a Java byte (AtomTypeReader.INTEGER_TYPE, unrelated to this test).
+        // The value still follows §2.5's "last value wins" -- the document is invalid either way, and
+        // reporting is not a reason to hand back a record missing a field the data did state. DOM mode
+        // narrows a real int8-typed atom to a Java byte (AtomTypeReader.INTEGER_TYPE, unrelated here).
         assertEquals((byte) 42, result.get("value"));
+    }
+
+    /**
+     * A name stated three times is two repeats, each reported at its own position -- the continuation policy
+     * this reader stack applies everywhere, so one collecting pass finds every one rather than the first.
+     */
+    @Test
+    void everyRepeatIsReported() {
+        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        entries.put("int8", new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), false, List.of(),
+                List.of(), Optional.empty(), new IntegerType(new IntegerSize(8, true))));
+        entries.put("holder", TypeDefinition.product(RecordBody.of(List.of(
+                RecordField.required("value", TypeRef.of("int8"))))));
+        TsonCompiledSchema compiled = compile(new TsonLinkedSchema(new TsonSchema(
+                "https://example.test/dup-field.tn", "https://example.test/meta.tn", List.of(), entries)));
+        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+
+        compiled.get("holder").read(TestDocuments.document("{ value: 1  value: 2  value: 3 }", problems));
+
+        assertEquals(List.of(Diagnostic.Code.DUPLICATE_FIELD, Diagnostic.Code.DUPLICATE_FIELD),
+                problems.diagnostics().stream().map(Diagnostic::code).toList(),
+                problems.diagnostics().toString());
+        assertEquals("/value", problems.diagnostics().getFirst().path());
     }
 }

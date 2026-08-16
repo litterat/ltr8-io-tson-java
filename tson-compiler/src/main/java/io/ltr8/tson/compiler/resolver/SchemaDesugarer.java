@@ -370,6 +370,14 @@ final class SchemaDesugarer {
      * resolves to (§5.10 substitution, unimplemented) is a separate question it does not answer. A bound is
      * carried through as the raw token it was parsed as -- it may name a value parameter rather than a
      * literal, which is why {@code SizeSpec} keeps them as text.
+     *
+     * <p><b>{@code [T; 0..]} is rejected</b> rather than desugared. §5.3 calls it vacuous and asks the
+     * resolver to warn while desugaring it anyway; rejecting the spelling is {@code SPEC-FEEDBACK.md} #42's
+     * position, and here the warning would be guarding more than a style nit -- §5.3's own sentence notes
+     * that identity is application-structural (§8.2), so the form lands on an entry <em>distinct from</em>
+     * {@code [T]} that means exactly the same thing. That is an identity trap, and the author's fix is the
+     * one §5.3 itself names. Only a literal {@code 0} is caught: a bound naming a value parameter is not
+     * concrete here, and a parameter that turns out to be zero is §8.2's materialisation-time question.
      */
     private Optional<GenericRef> sizedArrayApplication(ContainerDef def) {
         if (!(def instanceof ArrayContainerDef array) || array.size().isEmpty()
@@ -379,6 +387,14 @@ final class SchemaDesugarer {
         }
         TypeArg element = new TypeArg.Ref(typeRef(plain.typeRef()));
         return Optional.of(switch (array.size().get()) {
+            case SizeSpec.Min min when min.lower().equals("0") -> {
+                String shown = plain.typeRef() instanceof SimpleRef simple ? simple.name() : "T";
+                throw new TsonSchemaValidationException("'[" + shown + "; 0..]' pins a floor of zero, which "
+                        + "every array already satisfies -- write '[" + shown + "]' for the unconstrained "
+                        + "array (§5.3). The spelling is not merely redundant: identity is "
+                        + "application-structural (§8.2), so it lands on an entry distinct from '[" + shown
+                        + "]' that means the same thing");
+            }
             case SizeSpec.Min min -> application("array_min", element, min.lower());
             case SizeSpec.Max max -> application("array_max", element, max.upper());
             case SizeSpec.Ranged ranged -> application("array_ranged", element, ranged.lower(), ranged.upper());

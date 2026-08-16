@@ -193,4 +193,32 @@ class TsonTreeReaderTest {
         assertEquals(1, problems.size());
         assertEquals("/a", problems.get(0).path());
     }
+
+    /**
+     * §2.5/§2.6 are Part 1 rules, so a repeat is an error with no schema in scope too -- a document whose
+     * verdict turned on whether a schema happened to be in scope is exactly the interoperability failure
+     * {@code SPEC-FEEDBACK.md} #41/#42 argues against. The recovery still applies to the record's fields;
+     * the map is structure-preserving and keeps both entries, the diagnostic being the verdict.
+     */
+    @Test
+    void aRepeatedFieldOrKeyIsReportedWithNoSchemaInScope() {
+        List<Diagnostic> fieldProblems = problemsIn("{ a: 1  a: 2 }");
+        assertEquals(List.of(Diagnostic.Code.DUPLICATE_FIELD),
+                fieldProblems.stream().map(Diagnostic::code).toList(), fieldProblems.toString());
+        assertEquals("/a", fieldProblems.getFirst().path());
+
+        List<Diagnostic> keyProblems = problemsIn("{ \"a\" => 1  \"a\" => 2 }");
+        assertEquals(List.of(Diagnostic.Code.DUPLICATE_MAP_KEY),
+                keyProblems.stream().map(Diagnostic::code).toList(), keyProblems.toString());
+
+        TsonValue node = STRICT.withDiagnostics(TsonDiagnosticsReceiver.collecting()).read("{ a: 1  a: 2 }");
+        assertEquals(BigInteger.TWO, node.at("/a").asBigInteger().orElseThrow());
+    }
+
+    /** Two spellings of one key are one key: the comparison is on the read node, not the wire text. */
+    @Test
+    void aRepeatedKeyIsJudgedOnTheDecodedValue() {
+        assertEquals(List.of(Diagnostic.Code.DUPLICATE_MAP_KEY),
+                problemsIn("{ 0xFF => 1  255 => 2 }").stream().map(Diagnostic::code).toList());
+    }
 }

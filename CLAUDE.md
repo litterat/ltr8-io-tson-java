@@ -322,7 +322,12 @@ substitution, which this phase does not answer.
   result is a `TemplateInstance` AST node — no surface syntax corresponds to it — which `DefinitionResolver`
   completes with the two things a construction doesn't carry: §8.2's `source` (the flattened application) and
   the template's supertypes, unchanged, which is what makes a sized array IS-A `array`. §8.2's deferred
-  `min_items <= max_items` check runs here too, at the materialising application.
+  `min_items <= max_items` check runs here too, at the materialising application. So does the rejection of
+  a **vacuous `[T; 0..]`**: §5.3 calls the form vacuous and asks for a warning while desugaring it anyway,
+  and `SPEC-FEEDBACK.md` #42 rejects the spelling instead — §5.3's own sentence says why it is worth
+  rejecting rather than tolerating, since application-structural identity (§8.2) makes it an entry
+  *distinct from* `[T]` that means the same thing. Only a literal `0` is caught; a bound naming a value
+  parameter isn't concrete here.
 - **Applying a *record* template is still rejected here**
   (`UnsupportedOperationException`) — `box => <T> { v: T }` puts its parameter in a *field type*, so
   instantiating it means rewriting the body, which is real §5.10 substitution and unimplemented. Rejecting at
@@ -720,11 +725,23 @@ is small and parsed once.)
   never say so themselves, which is `SPEC-FEEDBACK.md` #40. In bind
   mode a reported record still binds to `null`, which is `RecordBindReader`'s standing rule for *any*
   diagnostic raised while it reads (`ctx.reported()` counts a whole read), not something closure chose.
-- **Forward, single-pass, overwrite on a duplicate record field name** (`SPEC-FEEDBACK.md` #21) — a
-  single-pass pull stream can't know a name recurs without buffering, so every occurrence is decoded
-  (hence validated) and a later one overwrites an earlier (§2.5's "last value wins" by overwrite, not
-  skip). A malformed *shadowed* occurrence therefore surfaces a diagnostic even though its value is
-  discarded.
+- **A repeated record field name or map key is an error** (`DUPLICATE_FIELD`/`DUPLICATE_MAP_KEY`,
+  §2.5/§2.6), reported at the repeat's own position, with the spec's "last value wins" recovery still
+  running underneath: a single-pass pull stream can't know a name recurs without buffering, so every
+  occurrence is decoded (hence validated) and a later one overwrites an earlier. Both spec rules are
+  written as SHOULD-warn; `SPEC-FEEDBACK.md` #41/#42 makes them errors, which also dissolves #21's
+  shadowed-occurrence question — the repeat *is* the error, so whether its value was going to be used
+  decides nothing. **The same rules hold on the schemaless path** (`SchemalessTreeReader`/
+  `SchemalessObjectReader`), these being Part 1 rules a document violates with or without a schema; a
+  verdict that turned on whether a schema was in scope would be the interoperability failure #41 argues
+  against. Keys compare by decoded value, so `0xFF` and `255` are one key. In the schemaless object
+  reader the seen-set is keyed on the *written* name, not the target-class slot, so a repeat of a name the
+  class doesn't declare still counts.
+- **A written `_` at a `REQUIRED_DEFAULT` field is an error**, where plain omission still injects the
+  default silently (`valueForStatedAbsentField` against `valueForAbsentField`). §5.2 asks for a warning
+  and an injection; #42 calls this its strongest case, since warn-and-inject answers "here is a value" to
+  a document that said "absent". The default is still what the field decodes to — only the verdict
+  changes, the same split `verifyFixed` makes for a contradicted FIXED value.
 - **`EventSkip`** is the shared grammar-aware "consume and discard" utility (leading annotations + an
   optional type-ref as every reader's first step; a whole value; one core-value on a shape mismatch, to
   keep the stream correctly positioned). **`ListEventSource`** replays a pre-built event list — used for a
@@ -736,8 +753,8 @@ is small and parsed once.)
 
 `Diagnostic` is the structured value every `TsonDiagnosticsReceiver` receives, identical shape whichever
 one is in play: a closed `Code` enum (`FIELD_REQUIRED`/`TYPE_MISMATCH`/`WRONG_ARITY`/`UNKNOWN_TYPE_REF`/
-`ATOM_CONSTRAINT_VIOLATION`/`UNRECOGNIZED_FIELD` from readers; `SCHEMA_ERROR`/`UNKNOWN_TYPE`/
-`VALIDATION_ERROR` for infrastructure-level failures; `DUPLICATE_MAP_KEY` reserved but unproduced),
+`ATOM_CONSTRAINT_VIOLATION`/`UNRECOGNIZED_FIELD`/`DUPLICATE_MAP_KEY`/`DUPLICATE_FIELD` from readers;
+`SCHEMA_ERROR`/`UNKNOWN_TYPE`/`VALIDATION_ERROR` for infrastructure-level failures),
 `message` (hand-composed per call site), `expected`/`actual` (machine-parseable), and **four location
 components covering two ends** — the value in the data, and the rule in the schema.
 
@@ -762,10 +779,7 @@ is still implicit; the schema path populates all three (`BACKLOG.md`).
 An atom's `AtomTypeException` is caught in `AtomTypeReader` and mapped to
 `ATOM_CONSTRAINT_VIOLATION` — `AtomType`'s own signature is untouched, since it's shared with the
 schemaless binder which has no read context. Out of scope for now: message synthesis from code + params,
-fine-grained atom codes, `DUPLICATE_MAP_KEY` (detectable at `MapAbstractReader.readInto`, which sees every
-entry — §2.6 words the duplicate rule as a warning, but per `SPEC-FEEDBACK.md` #42 this implementation
-reports every warn-shaped rule as an ordinary error, so this becomes a real error once produced;
-`BACKLOG.md`'s Diagnostics section has the item), and per-field schema positions.
+fine-grained atom codes, and per-field schema positions.
 
 ### Schema-side diagnostics (`SchemaResolver`, `TsonSchemaLinker`, `Tson.validateSchema`)
 

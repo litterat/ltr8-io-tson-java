@@ -104,10 +104,19 @@ class TsonObjectReaderTest {
     }
 
     @Test
-    void duplicateFieldNameLastValueWins() throws DataBindException {
-        // §2.5: "If duplicate field names are present, the last value wins."
-        Point p = mapper.read("{ x: 1 x: 99 y: 2 }", Point.class);
-        assertEquals(99, p.x());
+    void duplicateFieldNameIsAnError() throws DataBindException {
+        // §2.5 words a repeated field as a SHOULD-warn with "the last value wins" as the recovery;
+        // SPEC-FEEDBACK.md #41/#42 makes it an error. The recovery still runs underneath -- see
+        // DuplicateFieldOverwriteTest, which can observe it; a reported record binds to null in object
+        // mode whatever the problem was (GitHub #7), so this one asserts the verdict only.
+        TsonReadException thrown = assertThrows(TsonReadException.class,
+                () -> mapper.read("{ x: 1 x: 99 y: 2 }", Point.class));
+        assertTrue(thrown.getMessage().contains("duplicate field 'x'"), thrown.getMessage());
+
+        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+        mapper.withDiagnostics(problems).read("{ x: 1 x: 99 y: 2 }", Point.class);
+        assertEquals(List.of(Diagnostic.Code.DUPLICATE_FIELD),
+                problems.diagnostics().stream().map(Diagnostic::code).toList());
     }
 
     public record Renamed(@Field("xx") int x, @Field("yy") int y) {
@@ -320,12 +329,18 @@ class TsonObjectReaderTest {
     }
 
     @Test
-    void mapDuplicateKeyLastValueWins() throws DataBindException {
-        // §2.6: "last value wins" for a duplicate map key, the same rule §2.5 gives record fields --
-        // falls out for free here from repeated put() calls in source order.
-        CountsHolder h = mapper.read("{ counts: { apples => 3 apples => 7 } }", CountsHolder.class);
-        assertEquals(1, h.counts().size());
-        assertEquals(7, h.counts().get("apples"));
+    void mapDuplicateKeyIsAnError() throws DataBindException {
+        // §2.6, the map half of the record rule above. "Last value wins" still falls out of the repeated
+        // put() calls in source order; MapTreeReaderTest is where that is observable, since the enclosing
+        // record binds to null here once anything is reported (GitHub #7).
+        TsonReadException thrown = assertThrows(TsonReadException.class,
+                () -> mapper.read("{ counts: { apples => 3 apples => 7 } }", CountsHolder.class));
+        assertTrue(thrown.getMessage().contains("duplicate key 'apples'"), thrown.getMessage());
+
+        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+        mapper.withDiagnostics(problems).read("{ counts: { apples => 3 apples => 7 } }", CountsHolder.class);
+        assertEquals(List.of(Diagnostic.Code.DUPLICATE_MAP_KEY),
+                problems.diagnostics().stream().map(Diagnostic::code).toList());
     }
 
     @Test

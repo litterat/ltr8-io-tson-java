@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonDataStream;
 import io.ltr8.tson.compiler.TsonObjectReader;
 import io.ltr8.tson.compiler.TsonReadContext;
@@ -24,10 +25,12 @@ import io.ltr8.tson.tree.*;
 import io.ltr8.tson.tree.TsonValue;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Reads a TSON data document into an immutable {@link TsonValue} tree with <b>no schema</b> -- the
@@ -154,6 +157,13 @@ public final class SchemalessTreeReader {
         return atom;
     }
 
+    /**
+     * A field name stated twice is reported ({@code DUPLICATE_FIELD}, §2.5) and its value still overwrites
+     * the earlier one -- §2.5's "last value wins" recovery, which the {@code LinkedHashMap} applies anyway.
+     * The rule is Part 1's and needs no schema to see, so it holds on this path exactly as it does under a
+     * compiled one; a document whose verdict changed depending on whether a schema was in scope would be
+     * the interoperability failure {@code SPEC-FEEDBACK.md} #41/#42 is arguing against.
+     */
     private TsonRecord readRecord(TsonReadContext ctx, Optional<String> typeRef, List<TsonAnnotation> annotations) {
         ctx.next(); // RecordStart
         Map<String, TsonValue> fields = new LinkedHashMap<>();
@@ -161,6 +171,12 @@ public final class SchemalessTreeReader {
             FieldName fieldName = (FieldName) ctx.next();
             if (ctx.peek() instanceof SchemaRef) {
                 ctx.next();
+            }
+            if (fields.containsKey(fieldName.name())) {
+                ctx.field(fieldName.name()).report(Diagnostic.Code.DUPLICATE_FIELD,
+                        "duplicate field '" + fieldName.name() + "' -- a record states each field at most once "
+                                + "(§2.5), and the repeat states a value for nothing",
+                        "each field stated once", "'" + fieldName.name() + "' stated again");
             }
             fields.put(fieldName.name(), readNode(ctx.field(fieldName.name())));
         }
@@ -190,8 +206,18 @@ public final class SchemalessTreeReader {
     private TsonMap readMap(TsonReadContext ctx, Optional<String> typeRef, List<TsonAnnotation> annotations) {
         ctx.next(); // MapStart
         List<TsonMap.Entry> entries = new ArrayList<>();
+        Set<TsonValue> seen = new HashSet<>();
         while (!(ctx.peek() instanceof MapEnd)) {
             TsonValue key = readNode(ctx);
+            if (!seen.add(key)) {
+                // §2.6, the map half of readRecord's rule. Keys compare as read nodes, so two spellings of
+                // one scalar are one key -- the structure-preserving model keeps the wire form of each, but
+                // a TsonAtom equates on the decoded value, which is the identity §2.6 is talking about.
+                ctx.report(Diagnostic.Code.DUPLICATE_MAP_KEY,
+                        "duplicate key '" + keySegment(key) + "' -- a map states each key at most once (§2.6), "
+                                + "and the repeat states an entry for nothing",
+                        "each key stated once", "'" + keySegment(key) + "' stated again");
+            }
             ctx.next(); // MapArrow
             if (ctx.peek() instanceof SchemaRef) {
                 ctx.next();
