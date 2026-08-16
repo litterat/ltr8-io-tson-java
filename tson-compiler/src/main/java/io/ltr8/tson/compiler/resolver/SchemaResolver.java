@@ -189,7 +189,17 @@ public final class SchemaResolver {
         // bare reference or `!C value` (§5.3/§5.6 define these as desugarings; §3.3.1 names their targets).
         // Sits after `metaParser` because the expansion needs the governing meta's own constructor
         // vocabulary, and returns `document` itself when there is no sugar to expand.
-        SchemaDocument desugared = SchemaDesugarer.desugar(document, metaParser.schema().entries(), namespace.keySet());
+        //
+        // Desugaring reports through the same receiver resolution does, rather than throwing at the first bad
+        // sugar form. It needs no phase gate of its own: it runs inside this method, so whatever it reports is
+        // already behind the one gate the caller checks after this call returns. The reporter is built here
+        // because everything Diagnostic.ofSchemaError wants -- the canonical schema id, the identity-keyed
+        // position table -- is this method's, not an AST-to-AST rewrite's.
+        SchemaDocument desugared = SchemaDesugarer.desugar(document, metaParser.schema().entries(),
+                namespace.keySet(), receiver == null ? null : (declaration, error) ->
+                        receiver.report(Diagnostic.ofSchemaError(TsonCanonicalIdentity.canonicalize(id),
+                                declaration.name(), error.getMessage(),
+                                Optional.ofNullable(declarationPositions.get(declaration)))));
         Map<String, SchemaMap.Declaration> declarations = desugared.body().declarations();
 
         // Local-vs-import collisions, up front (local names are already unique -- SchemaMap dedupes them).
@@ -304,7 +314,12 @@ public final class SchemaResolver {
         return reader.read(TsonReadContext.throwing(new ListEventSource(DataValueEvents.of(value))));
     }
 
-    /** Stage 1 of {@link #resolveSchema(SchemaDocument)} -- every {@code !!import}'s own entries, in declaration order, merged as-is (never re-resolved against the importer). Mirrors {@code TsonSchemaLinker.mergeImports} exactly, including its collision rule, since this is the same concept discovered one stage earlier. */
+    /**
+     * Stage 1 of {@link #resolveSchema(SchemaDocument)} -- every {@code !!import}'s own entries, in
+     * declaration order, merged as-is (never re-resolved against the importer). Mirrors {@code
+     * TsonSchemaLinker.mergeImports} exactly, including its collision rule, since this is the same concept
+     * discovered one stage earlier.
+     */
     private Map<String, TypeDefinition> mergeImports(SchemaDocument document) {
         Map<String, TypeDefinition> merged = new LinkedHashMap<>();
         for (String importUri : document.imports()) {

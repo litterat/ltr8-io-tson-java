@@ -52,6 +52,32 @@ class TsonValidateSchemaTest {
     }
 
     /**
+     * An invalid sugar form is one declaration's problem, and reads as one. Desugaring runs inside
+     * {@code resolveSchema}, so its throw used to land in this method's document-level catch and be reported
+     * at RFC 6901's root pointer with no declaration name and no position -- one mislocated diagnostic
+     * standing in for however many problems the schema actually had. Both halves are pinned here: the sugar
+     * form is attributed to {@code vacuous}, and the unrelated {@code widens} is reported alongside it rather
+     * than never being reached.
+     */
+    @Test
+    void anInvalidSugarFormNamesItsDeclarationAndDoesNotHideTheRest() {
+        List<Diagnostic> problems = check("""
+                {
+                  vacuous => [int32; 0..]
+                  widens => !uint8 ^ { min: -10 }
+                  fine => int32
+                }
+                """);
+
+        assertEquals(List.of("/vacuous", "/widens"),
+                problems.stream().map(Diagnostic::schemaPointer).sorted().toList());
+        Diagnostic sugar = problems.stream().filter(d -> d.schemaPointer().equals("/vacuous")).findFirst().orElseThrow();
+        assertEquals("example.test/validate-schema-test.tn", sugar.schemaId());
+        assertTrue(sugar.schemaPosition().isPresent(), "a sugar-form error carries the declaration's position");
+        assertTrue(sugar.message().contains("pins a floor of zero"), sugar.message());
+    }
+
+    /**
      * The phase boundary. {@code widens} fails to resolve and {@code dangling} has an unresolved reference,
      * which is a *linking* problem -- only the resolution failure is reported, because a reference may well
      * resolve once the declaration it points at does, so reporting it now would be reporting a possible

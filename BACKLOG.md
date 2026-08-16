@@ -287,9 +287,6 @@ Resolution and linking report every independent problem in one pass through a `T
 `CLAUDE.md`'s "Schema-side diagnostics" section describes the shape and the decisions behind it. What is
 left:
 
-- [ ] **Desugaring is still fail-fast**, so a sugar-form error (`[T; 5..3]`, an unsupported template
-  application) aborts before resolution reports anything. The same per-declaration treatment applies and
-  `SchemaDesugarer` has the declaration in hand, so this is the cheapest remaining piece.
 - [ ] **The read path carries `schemaPosition` but not `schemaId`/`schemaPointer`** — a reader knows the
   declaration position it stamped, not which entry of which schema produced it, so a value error reports
   `110:3:4858` with nothing saying that is core.tn's line for `int32`. Threading the compiled schema's
