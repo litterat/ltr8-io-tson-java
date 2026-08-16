@@ -2628,3 +2628,82 @@ desugarer's sized path converges with the `[T]` path (one injected `!array` cons
 `TemplateInstance`), `DefinitionResolver`'s instantiation completion (source flattening, supertype transfer)
 is deleted, application routing gains a labelled-member merge with a duplicate-slot error, and §8.2
 materialisation remains only for the still-unimplemented shadow-channel substitution.
+
+
+## 46. Refinement and composition are level-preserving everywhere but one place — a constructor operand must require a `~` result, and the kernel's only violations are the three lines #45 respells
+
+**Section:** §4.2 ("Type Construction" — the constructor marker's two `~` uses, "constructor refinement is a
+meta-level operation"); §5.7 ("Refinement"); §5.8 ("Composition"); §5.9 (subtraction, rule 8); §4.1 (base
+kinds); the kernel's declarations. Related: #44, #45.
+
+**Problem:** `^` and `&` each do two jobs at once: derive the new entry's *body* from the operands (vocabulary
+tightening, field-set merging) and mint the new entry *at the operands' level*, with IS-A lineage to them.
+Every use the spec discusses is level-preserving:
+
+- **Atom refinement** — `age => !integer ^ { min: 0 }`: type → new type, IS-A kept.
+- **Record refinement** — `person ^ { ... }`: type → new type, IS-A kept.
+- **Composition** — `employee => person & { ... }`: types → new type, IS-A per parent (§4.3).
+- **Constructor refinement/composition** — `set => <T> ~array<T> ^ { ... }`, `record => ~product & { ... }`:
+  constructor(/kind) → new constructor, lineage kept. §4.2 already marks this as a *different* operation
+  ("meta-level", MAY replace fixed values), keyed by the `~` marker.
+
+But the spec never states the level discipline as a rule, and the grammar admits the one combination that
+crosses: a constructor operand in a declaration *not* marked `~`. The size templates are that combination —
+`array_min => <T, MIN> array<T> ^ { min_items: = MIN }` wants job one (pin a field of `array`'s vocabulary)
+and cannot coherently have job two (mint a *type* in IS-A relation to a *constructor*), which is precisely
+what produced #45's `supertypes: [array product top]` category error. The crossing is the bug; everything
+level-preserving is fine.
+
+**The kernel audit confirms the joint.** Every `^`/`&` in meta-kernel.tn against the rule "a constructor
+operand requires a `~` result":
+
+| Declaration | Operand level | `~`? | Verdict |
+|---|---|---|---|
+| `atom => top & {}`, `product => top & { ... }`, `sum => top & {}` | kind | no | legal (no constructor operand) |
+| `record => ~product & { ... }`, `array => <T> ~product & { ... }`, `enum => ~atom & { ... }`, `unit`, `integer_type`, `text_type`, `tuple`, `choice`, `map` | kind | yes | legal |
+| `set => <T> ~array<T> ^ { ... }` | constructor | yes | legal |
+| `uri_type => ~text_type & atom_specification & { ... }`, `regex_type` | constructor + record mixin | yes | legal |
+| `array_min`, `array_max`, `array_ranged` — `array<T> ^ { ... }` | constructor | **no** | **the only violations** |
+
+The rule and #45 independently select the same three lines.
+
+**The rule is one-directional, and must be.** Constructor operand ⇒ `~` result. The converse — `~` result ⇒
+constructor operands — is false by the kernel's own design: `record => ~product & {}` seeds the constructor
+level from a kind, and `uri_type => ~text_type & atom_specification & { ... }` borrows vocabulary from a
+plain record mixin. So the discipline is not "operand and result levels must match on both sides"; it is *you
+cannot step down* — deriving from a constructor keeps you at constructor level. Stepping *up* (kinds and
+mixins feeding a `~` declaration) is how the constructor level is built at all.
+
+**Lattice payoff.** Under the rule the two IS-A relations separate completely: types relate to types (the
+governed lattice §7.2's subsumption reads — atom and record refinement, composition), and constructors relate
+to constructors and kinds (the meta lattice — `set` → `array` → `product` → `top`, the chain that admits
+`!array { ... }` bodies at `top`-typed positions). No edge ever connects them; the size templates were the
+only edge that tried, and #45 documents what came of it.
+
+**Interpretation chosen** (design-review conclusion; not yet enforced): a refinement source, composition
+operand, or subtraction head that resolves to a `constructor: true` entry is a resolver error unless the
+declaring entry is itself marked `~`. This is a resolver check on what the operand resolves to, like
+§3.3.1's existing gates, not a grammar change. In practice the crossing is nearly unreachable in user schemas
+already — refinement sources and composition targets resolve through the type-name namespace alone (§3.3.2),
+so naming a constructor there requires importing the kernel — which is why the kernel's own three lines were
+the only instances anywhere. Implementation enforcement belongs in `DefinitionResolver` beside the existing
+wrong-kind-of-target checks (refining a constructor via `!`, applying a non-constructor); it is not yet
+written.
+
+**Suggested resolution:**
+
+1. **State the rule in §4.2**, where the `~` marker's two uses are already enumerated: an entry that refines,
+   composes with, or subtracts from a constructor MUST itself be declared `~`; a constructor operand in an
+   unmarked declaration is a resolver error at the declaration. One sentence makes the level discipline —
+   currently implicit in the fact that §4.2 only ever *describes* `~`-marked derivations from constructors —
+   into a checkable rule.
+2. **Cross-reference from §5.7/§5.8**: refinement and composition preserve level; the `~` marker declares
+   which level the operands are on, and §4.2's "meta-level operation" semantics (fixed values replaceable)
+   apply exactly when it is present.
+3. **Note the asymmetry explicitly**, so the rule isn't over-applied: non-constructor operands in `~`
+   declarations remain legal (base kinds seed the level; record mixins like `atom_specification` lend
+   vocabulary). The rule forbids stepping down, not mixing upward.
+4. **Together with #44 and #45 this completes the characterization of `~`:** operands may come from any level
+   but constructor operands force `~` (this entry); parameters are labelled-only (#44); and partial binding
+   of a constructor is application syntax (#45), never refinement — after all three, `array<T> ^ { ... }`
+   without `~` is ill-formed by rule and `array<T; min_items: = MIN>` is its only spelling.
