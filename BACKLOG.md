@@ -284,7 +284,8 @@ by a factor of six.
 Resolution and linking report every independent problem in one pass through a `TsonDiagnosticsReceiver`
 (issue #3, PR #4), whether reached by `tson compile`/`Tson.validateSchema` or by a *data* read whose
 `!!schema` names a schema that doesn't resolve — both give the same account of the same broken schema.
-`CLAUDE.md`'s "Schema-side diagnostics" section describes the shape and the decisions behind it. What is
+`docs/readers-and-diagnostics.md`'s "Schema-side diagnostics" section describes the shape and the decisions
+behind it. What is
 left:
 
 - [ ] **The read path carries `schemaPosition` but not `schemaId`/`schemaPointer`** — a reader knows the
@@ -483,7 +484,7 @@ missing most of the mirror.
 
 ## Tree model (`TsonValue`)
 
-The tree model itself is built and described in `CLAUDE.md`'s "Tree model" section. What's left:
+The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tree model" section. What's left:
 
 - [ ] **Copy-on-write transforms + builders (parked).** The "new tree from old" editing half —
   `TsonRecord.with(name, value)`/`without(name)`, `TsonArray.with(i, value)`/`plus(value)`/`without(i)`,

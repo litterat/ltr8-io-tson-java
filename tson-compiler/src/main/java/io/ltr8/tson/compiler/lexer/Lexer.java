@@ -427,6 +427,12 @@ public final class Lexer {
         return finish(TokenType.MULTI_LINE_STRING, decoded.toString());
     }
 
+    /**
+     * Decides whether one line of a multi-line token is the closing delimiter. Must be handed the line content
+     * <em>after</em> its leading whitespace is removed (§7.2.3 lets the closing {@code """} be indented) -- testing
+     * the raw line instead makes every indented closing delimiter unmatched and every multi-line token spuriously
+     * "unterminated". {@code LexerTest} guards the indented case.
+     */
     private static boolean isClosingDelimiterContent(String trimmed) {
         if (!trimmed.startsWith("\"\"\"")) {
             return false;

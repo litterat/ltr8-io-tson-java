@@ -59,5 +59,5 @@ but the *library* front door doesn't yet have the equivalent one-call "read this
 the reader from its own `!!schema`/type-ref" entry point; every `read` still needs you to name the
 target class or schema type up front.
 
-See [CLAUDE.md](CLAUDE.md#architecture) for architecture and design notes, and
+See [CLAUDE.md](CLAUDE.md) for orientation, [docs/](docs/) for the per-area design notes, and
 [CONFORMANCE.md](CONFORMANCE.md) for edge-case behavior worth knowing about.

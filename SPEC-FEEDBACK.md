@@ -879,7 +879,7 @@ never touching a shadowed occurrence's own value at all, so a malformed shadowed
 silently ignored. The backward-scan approach was only possible because that earlier version always
 had the record's complete field list in hand before reading any of it (built from a pre-parsed
 `Document` tree); once reading moved to pull genuinely one event at a time directly off the lexer
-(`RecordAbstractReader`/`TsonDataStream`, "Streaming readers" in `CLAUDE.md`), backward iteration was
+(`RecordAbstractReader`/`TsonDataStream`, "Streaming readers" in `docs/readers-and-diagnostics.md`), backward iteration was
 no longer available at all, and the forward, validate-everything behavior was chosen as the one
 consistent with never buffering more than one open container's worth of state. Verified in
 `DuplicateFieldTest`: a record with the same field name twice, first occurrence out of range

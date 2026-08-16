@@ -1,0 +1,111 @@
+# Lexer and data parsing
+
+Design notes for the Class 1 input path: the lexer, the Tier 2 event stream, the Tier 3 AST, base type
+resolution, and the built-in atom vocabulary. Current form only; history lives in git. `CLAUDE.md` holds
+the one-paragraph orientation; this file holds the detail.
+
+## Lexer (`tson-compiler/.../lexer/`)
+
+`Lexer` is a single hand-written scanner producing `Token`s, driven off `nextToken()` (never a
+`tokenize()` batch). **Complete and frozen for the whole series** (§1.3: higher parts introduce no new
+tokens, modes, or character-classification changes).
+
+- **Constructed from an `InputStream`**, decoded UTF-8 and buffered a few code points of lookahead — never
+  requires the whole document resident as a `String`. **Code-point addressed, not char-addressed**
+  (surrogate pairs are never split; supplementary-plane identifiers per UAX #31 work). `Position` tracks
+  line, code-point column, and a UTF-8 byte offset (§8.1 error reporting).
+- **`Token` is a flat record of six raw `int` coordinates plus type/text**, not nested `Position` objects,
+  to keep allocation off the high-throughput read path; `start()`/`end()` materialize a `Position` on
+  demand.
+- **`Character.isUnicodeIdentifierStart/Part` stands in for XID_Start/XID_Continue** (§7.1). The JDK
+  doesn't expose the exact UAX #31 properties and building the table from scratch is out of scope — a
+  known, deliberate approximation. Flag it if a lexing bug ever hinges on a script where Java's notion and
+  true XID_* diverge.
+- **NFC normalization** (`java.text.Normalizer`) applies to *unquoted* tokens only (§7.2.1) — quoted
+  tokens preserve exact content. **Pattern_White_Space is the spec's fixed 11-character set**, hardcoded
+  (not `Character.isWhitespace`). A single leading **BOM** is stripped; U+FEFF elsewhere falls through to
+  "unrecognised character" naturally.
+- **Multi-line common-prefix stripping** (§7.2.3) compares leading-whitespace prefixes character by
+  character (a tab never matches a space). **Closing-delimiter detection checks the line content *after*
+  removing leading whitespace against `"""`** — getting this backwards makes every multi-line token
+  spuriously "unterminated"; this bug happened once and is guarded by `LexerTest`.
+- When embedding BOM/NEL/LINE SEPARATOR/PARAGRAPH SEPARATOR in tests or source, use `\uXXXX` escapes — the
+  literal invisible character is an editing hazard and exactly the confusable-character risk §9.4 warns
+  about.
+- Errors are **fail-fast** (`LexException`, unchecked), not the spec's "SHOULD continue to report multiple
+  issues" recommendation (§8.1) — multi-error recovery is deferred.
+
+## Structural parsing: Tier 2 stream + Tier 3 AST (`tson-compiler/.../`)
+
+Two roles turn tokens into a `Document` (§2, §3, §7.4). There is exactly one implementation of the data
+grammar, split by role, not duplicated:
+
+- **`TsonDataStream` (Tier 2)** is the only thing that walks source text: a lazy, pull-based
+  `TsonEventSource` (`stream` package — `hasNext()`/`next()`/`peek()` over a sealed `TsonEvent` hierarchy:
+  `RecordStart`/`MapArrow`/`ArrayStart`/`TypeRef`/`SchemaRef`/`TokenEvent`/`AbsentEvent`/... each carrying
+  its own `Position`). Driven off `Lexer.nextToken()` with an explicit frame stack (memory is proportional
+  to open-container depth, never document size) and at most two tokens of lookahead (only to disambiguate
+  `{}` record-vs-map).
+- **`TsonDataParser` (Tier 3)** builds the full AST — the sealed `CoreValue` hierarchy in `ast`
+  (`RecordValue`/`MapValue`/`ArrayValue`/`EmptyBrace`/`AbsentValue`/`TokenValue`) — by reducing the flat
+  event sequence back into a tree. It holds no grammar logic of its own.
+
+Key points:
+
+- **Whitespace is invisible by the time tokens arrive** — the lexer discarded it, leaving only `Position`
+  gaps. So `ws` in the grammar needs nothing special, and strict **adjacency** (`!`, `!!`, `@`, `:` to
+  their operand, §7.5) is checked via `Position` equality between one token's end and the next's start.
+  **Separator detection** (§2.4) works the same way: a real comma is optional evidence, a position gap is
+  the other kind, and at least one is required unless the closing delimiter is immediately next.
+- **Layering is deliberately incomplete, matching §1.2's division of labor.** Neither tier deduplicates
+  record fields or map keys ("last value wins" is a resolver rule, §2.5/§2.6), NFC-normalizes field names,
+  rejects `_` as a map key (§2.9), resolves `EmptyBrace` to a record/typed container (§2.8), or interprets
+  `TokenValue` text as null/boolean/number/string (base type resolution, below). These are intentional
+  gaps, not omissions.
+- **`!!meta` in the header throws `TsonUnsupportedDocumentException`, not `TsonParseException`.** This is a
+  Class 1 processor; a schema document isn't malformed input, it's a well-formed document of a kind this
+  parser doesn't implement, and §8.1 requires that distinction be visible (a categorized diagnostic).
+- **Nested annotation value-scope is right-recursive** and can legitimately leave an outer data-value
+  without a core-value (`@a:@b:val`) — see `SPEC-FEEDBACK.md` #3; documented as intentional, not a bug.
+
+## Base type resolution (`tson-compiler/.../base/`)
+
+`BaseTypeResolver.resolve(TokenValue)` implements §4's fixed order (null → boolean → number → string,
+§4.5) for untyped tokens. `NumberGrammar.tryParse` recognizes the `number` production (§7.6).
+
+- **Identification is separate from binding to a host numeric type.** `NumberGrammar` decides which of the
+  four grammar alternatives matches and extracts structural pieces into `NumberForm` — it does **not**
+  convert to `long`/`double`/`BigInteger`/`BigDecimal`. The spec leaves that mapping to the implementation
+  (§4.3); binding is where the required `255`/`0xFF`, `.5`/`0.5` equivalences get enforced, and different
+  consumers want different host types. Each number alternative is its own anchored regex (Java forbids a
+  named group repeating across alternation).
+- **Quoted tokens always resolve to `StringValue`** regardless of content (§4.4) — form is consulted once,
+  here. `"42"` and unquoted `42` differ even though their text is identical.
+- **§9.1's numeric-literal length limit** (SHOULD, 4096 digits, DoS-hardening) is **not enforced** — noted
+  so it isn't mistaken for an oversight.
+
+## Built-in atom vocabulary (`tson-compiler/.../atom/`)
+
+`AtomType<T>` is a built-in atom's parsing contract (§5.2): `read(TokenValue)` (its natural host value),
+`read(TokenValue, Class<?>)` (narrow to a caller target), `write(T)`. `BuiltinTypeVocabulary` is the
+fixed, closed name→`AtomType` table (§5).
+
+- **Each constructor splits into two classes across two modules:** a pure constraint-*values* record in
+  `io.ltr8.tson.schema.meta` (`IntegerType`, `TextType`, `RegexType`, `DateType`, …, matching the kernel's
+  `*_type` shape) and a same-named `*Parser` in `atom` (`IntegerParser`, `TextParser`, …) that holds one
+  and does the `read`/`write`/validate work. This is what lets `atom` consult `schema.meta` constraint
+  records directly.
+- **`RegexParser` returns `String`, and `TextType.pattern`/`UriType.pattern` are `Optional<String>`, not
+  `Pattern`** — `regex` IS-A piece of text (§5.7), so its host value is `String` like every other
+  text-composing atom; the text is validated as I-Regexp via `tson-regex`'s `TsonRegex.parse` (not
+  `java.util.regex`, whose grammar is a superset — `regex_type`'s `spec` is `REQUIRED_FIXED` to RFC 9485),
+  and the parsed form discarded once it's confirmed well-formed. Keeping these as plain equatable `String`
+  (not a compiled matcher) is also what lets them bind generically with no `DataBridge`. **Matching** a value
+  against a `pattern` constraint (`TextParser`/`UriParser`) runs through `tson-regex`'s `TsonRegex.matches` —
+  a Thompson-NFA, linear-time and ReDoS-safe — not `java.util.regex`.
+- **`unit`'s three instances are three separate parsers**, not one: `value` (runs base-type resolution to
+  the natural host), `token` (raw NFC-normalized token text, unconstrained), `void` (`VoidReader`, accepts
+  only the absent sentinel `_`). They resolve to the byte-identical `Unit` body — nothing in the *schema*
+  distinguishes them — so dispatch is keyed on the declaration's own name (see `SPEC-FEEDBACK.md` #18).
+- The full `int8`..`int256` width ladder is seeded, versus the four §5.6 explicitly lists — a known
+  departure tracked in `SPEC-FEEDBACK.md`.

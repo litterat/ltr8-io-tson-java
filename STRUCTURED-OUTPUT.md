@@ -39,7 +39,7 @@ backend.
   document, and `tson.treeReader()/objectReader().withDiagnostics(collector).read(...)` returns the
   (possibly partial) **value alongside** them — the shape a repair loop actually needs, which for a while
   no route offered. `tson-cli`'s `ValidateCommand` is now just a caller of the former. See
-  `CLAUDE.md`'s "Multi-error collection" section for the full design. Field by field, against the
+  `docs/readers-and-diagnostics.md` for the full design. Field by field, against the
   shape sketched below:
   - `path` — landed exactly as described, an RFC 6901 JSON Pointer accumulated by
     `TsonReadContext.field`/`index` as a read descends (that context is still the engine's cursor; it

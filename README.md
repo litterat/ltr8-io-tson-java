@@ -391,7 +391,7 @@ are still out of scope. Details live in dedicated docs rather than crowding this
 - **[BACKLOG.md](BACKLOG.md)** — the actively-tracked engineering backlog
 - **[STRUCTURED-OUTPUT.md](STRUCTURED-OUTPUT.md)** — the target-use-case plan (LLM structured-output validation, JSON compatibility)
 - **[SPEC-FEEDBACK.md](SPEC-FEEDBACK.md)** — ambiguities and errors found in the spec while implementing
-- **[CLAUDE.md](CLAUDE.md#architecture)** — architecture and design notes
+- **[CLAUDE.md](CLAUDE.md)** — orientation and conventions, with the detailed per-area design notes in [docs/](docs/)
 
 ## Schema pipeline
 
@@ -433,8 +433,8 @@ linking a schema both need its own *governing* schema already compiled, to resol
 like `!enum`/`!integer_type` against — including meta-kernel itself, whose own `!!meta` names *itself*
 (§1.5's "one deliberate circularity in the series"), closed by pre-loading a hand-written bootstrap
 (`MetaKernelBootstrapResolver`) rather than resolving it the ordinary way. See
-[CLAUDE.md](CLAUDE.md#architecture) for the full walkthrough, including how meta-kernel/meta.tn/core.tn
-are loaded and registered together.
+[docs/schema-resolution.md](docs/schema-resolution.md) for the full walkthrough, including how
+meta-kernel/meta.tn/core.tn are loaded and registered together.
 
 There's no polished, single-call "load a *custom* governing chain" entry point yet (see
 [BACKLOG.md](BACKLOG.md)) — `Tson` today assumes a schema governed by the standard
