@@ -326,6 +326,69 @@ class SchemaDesugarerTest {
     }
 
     /**
+     * §5.3's variadic pair, tuple half. Run against the real meta-kernel rather than {@link #META}, because
+     * the field the positions fill is read off {@code tuple}'s own vocabulary (its sole bare-{@code REQUIRED}
+     * field, §5.6's positional-form rule) -- using the real declaration is what proves the routing rather
+     * than a fixture built to agree with it.
+     *
+     * <p>At declaration position the bracket form <em>is</em> the construction, the treatment {@code [T]} and
+     * {@code (A | B)} already get, so nothing is injected alongside it.
+     */
+    @Test
+    void aDeclarationLevelTupleBecomesTheConstructionItDenotes() {
+        SchemaDocument document = desugarAgainstTheRealMetaKernel("  pair => [integer, text]");
+
+        Instance instance = assertInstanceOf(Instance.class,
+                document.body().declarations().get("pair").typeDef());
+        assertEquals("tuple", instance.target());
+        assertEquals("[ { element_type: integer } { element_type: text } ]", tupleElements(instance));
+        assertEquals(1, document.body().declarations().size(), "nothing injected alongside it");
+    }
+
+    /** At a field position it is hoisted and referred to by name, exactly as inline {@code [T]} is. */
+    @Test
+    void anInlineTupleIsHoistedIntoItsOwnDeclarationAndReferredToByName() {
+        SchemaDocument document = desugarAgainstTheRealMetaKernel("  holder => { p: [integer, text] }");
+
+        SchemaMap.Declaration injected = onlyInjected(document, "tuple");
+        assertEquals(firstFieldType(document, "holder"), injected.name());
+        assertTrue(injected.name().startsWith("tuple_integer_text_"), injected.name());
+        assertEquals("[ { element_type: integer } { element_type: text } ]",
+                tupleElements(assertInstanceOf(Instance.class, injected.typeDef())));
+    }
+
+    /**
+     * A position's own {@code ?} (declaration position only -- the parser rejects one inline) becomes {@code
+     * state: OPTIONAL}. A REQUIRED position writes no {@code state} at all: the member is REQUIRED_DEFAULT
+     * ({@code state: element_state ~ REQUIRED}), so §5.2's default injection supplies it, the same way
+     * {@code instanceFor} omits every defaulted vocabulary field.
+     */
+    @Test
+    void anOptionalPositionStatesItsStateAndARequiredOneLetsTheDefaultSupplyIt() {
+        SchemaDocument document = desugarAgainstTheRealMetaKernel("  pair => [integer?, text]");
+
+        Instance instance = assertInstanceOf(Instance.class,
+                document.body().declarations().get("pair").typeDef());
+        assertEquals("[ { element_type: integer  state: OPTIONAL } { element_type: text } ]",
+                tupleElements(instance));
+    }
+
+    /**
+     * A nested bracket form at a tuple position is the declaration-level container syntax nesting inside
+     * itself (§5.3), which this phase does not build for arrays either -- it stays unexpanded and keeps
+     * whatever handling it already had, rather than being turned into a differently-broken shape here.
+     */
+    @Test
+    void aPositionHoldingANestedBracketFormIsLeftAlone() {
+        SchemaDocument document = new TsonSchemaParser("""
+                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
+                { pair => [[integer; 2], text] }""").parseSchemaDocument();
+
+        assertSame(document, SchemaDesugarer.desugar(document,
+                MetaKernelBootstrapResolver.getMetaKernelSchema().entries(), Set.of()));
+    }
+
+    /**
      * The check is narrow on purpose. A head naming nothing this document declares, and nothing in the
      * structure namespace either, is an ordinary unresolved reference the linker reports over the whole
      * schema -- so it stays this phase's business only to leave alone.
@@ -337,6 +400,38 @@ class SchemaDesugarerTest {
                 { holder => { b: nowhere<text> } }""").parseSchemaDocument();
 
         assertSame(document, SchemaDesugarer.desugar(document, META, Set.of()));
+    }
+
+    /** {@link #desugar(String)} against the real meta-kernel entries, for the forms whose routing needs them. */
+    private static SchemaDocument desugarAgainstTheRealMetaKernel(String declarations) {
+        SchemaDocument document = new TsonSchemaParser("""
+                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
+                {
+                %s
+                }
+                """.formatted(declarations)).parseSchemaDocument();
+        return SchemaDesugarer.desugar(document, MetaKernelBootstrapResolver.getMetaKernelSchema().entries(),
+                Set.of());
+    }
+
+    /**
+     * Renders a variadic {@code Instance}'s one collection-valued field as {@code [ { member: value  ... }
+     * ... ]} -- {@link #instanceBody}'s counterpart for a body whose field holds records rather than tokens.
+     */
+    private static String tupleElements(Instance instance) {
+        var record = (io.ltr8.tson.compiler.ast.RecordValue) instance.value().coreValue();
+        var elements = (io.ltr8.tson.compiler.ast.ArrayValue) record.fields().get(0).value().value().coreValue();
+        StringBuilder out = new StringBuilder("[");
+        for (var element : elements.elements()) {
+            var members = (io.ltr8.tson.compiler.ast.RecordValue) element.value().coreValue();
+            StringBuilder rendered = new StringBuilder("{");
+            for (var member : members.fields()) {
+                var token = (io.ltr8.tson.compiler.ast.TokenValue) member.value().value().coreValue();
+                rendered.append(' ').append(member.name()).append(": ").append(token.text()).append(' ');
+            }
+            out.append(' ').append(rendered.append('}').toString().replace("  }", " }"));
+        }
+        return out.append(" ]").toString();
     }
 
     /** Renders an {@code Instance}'s binding record as {@code { field: value  ... }} for readable assertions. */

@@ -27,13 +27,14 @@ own prose (which had gone stale on at least one of them):
   `TsonCompiledMetaRegistry.withStandardLibrary` already does, which is scoped to just the three bundled
   schemas in a known order, not a general algorithm.
 - [ ] **Inline constructor applications materialise entries, and §8.2 says they never may** — a real
-  conformance divergence, not a representation preference, and it predates choice: inline `[T]` and
+  conformance divergence, not a representation preference, and it predates choice and tuple: inline `[T]` and
   `map<K, V>` have always been hoisted this way. §8.2 is unambiguous — "Constructor applications never
   materialise entries — they are carried structurally wherever they occur (§5.3) and, as declaration bodies,
   resolve in place as constructions (§5.6). Exactly one form materialises: a **fully-bound application of a
   non-constructor template**." §5.4 repeats it for choice specifically. So **declaration position is correct
-  today** (`contact => (email | phone)` resolving to a construction is exactly §5.6's rule); only the inline
-  hoisting is off-spec. It is also *observably* off-spec rather than internally: Class 2 requires a resolved
+  today** (`contact => (email | phone)` and `pair => [integer, text]` resolving to constructions is exactly
+  §5.6's rule); only the inline hoisting is off-spec. It is also *observably* off-spec rather than
+  internally: Class 2 requires a resolved
   value conforming to §8, and §8.2 forgives resolved-form differences only "up to renaming of instantiation
   entries" — extra entries are not renaming. It is visible in this implementation's own resolved meta-kernel,
   whose `choice.variants` field is typed `array_type_ref_<hash>` where the spec's fixture has
@@ -53,11 +54,20 @@ own prose (which had gone stale on at least one of them):
   - `SPEC-FEEDBACK.md` #45 shrinks the eventual target: once sized forms are constructions too (see the
     template-construction item below), §8.2's legitimately-materialised entries are structural-template
     instantiations only, so the structural-carrying fix has one less form to represent.
-- [ ] **Inline tuple is still unexpanded** — the other half of §5.3's variadic pair. `SchemaDesugarer.typeRef`
-  rebuilds an `InlineTupleRef` unchanged, so `[T, U]` at a field position reaches `resolveTypeRef` and
-  throws. The choice half is done and `choiceInstance` is the shape to follow, but tuple does not share it:
-  its elements are `tuple_element` records rather than bare references, so each element needs its own
-  construction rather than a bare name token.
+- [ ] **A nested bracket form inside a container is still unexpanded** ([TSON-SCHEMA] §5.3) — declaration-level
+  container syntax nests inside itself (`[[T; 2], U]`, `[[T]; 3]`), and `SchemaDesugarer` builds no position
+  holding an `ElementType.Expr.Nested`, so the declaration reaches `DefinitionResolver` as a
+  `ContainerTypeDef` and throws. Both flat forms are done — `[T]`/`[T; N..M]` and, since #24, `[T, U]` in both
+  positions. The fix is the same bottom-up hoist the type-ref walk already does: build the inner container's
+  own instance first, inject it, and let the outer position refer to it by name.
+- [ ] **A tuple's absent position reads back as `TsonNull`, not `TsonAbsent`** — `TupleAbstractReader.decode`
+  returns `null` both for "the `_` sentinel at an OPTIONAL position" and for "this slot's read failed", and
+  `TupleTreeReader` maps every `null` to `TsonNull`. Tree mode keeps *missing*, *null* and *absent* as three
+  distinct kinds precisely so a caller can tell them apart, and a written `_` currently round-trips through
+  `TsonTreeWriter` as `null`. A tuple is the one shape where this is visible: a record omits an absent field
+  and an array has no per-element state, so neither has a slot to misrepresent. Telling the two `null`s apart
+  needs a per-mode hook on the shared reader — bind mode genuinely wants `null` for an absent position — so
+  it is a small design decision rather than a one-line change.
 - **Choice disjointness derivation and untagged reading** ([TSON-SCHEMA] §5.4, §8.1) — both halves now have a
   live producer: the `(A | B)` sugar resolves to a real `ChoiceBody` entry, so the linker derives `disjoint`
   for author-written choices and `ChoiceReader` reads them (`ChoiceReadTest` pins the whole §5.4 Tagging
