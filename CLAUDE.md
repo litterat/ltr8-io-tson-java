@@ -544,8 +544,9 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   would miss and which is the only spelling an author can't see for themselves; the walk stops on a
   reference cycle rather than hanging, cycle diagnosis being its own unimplemented concern; **an author's
   `@disjoint` marker is checked against the derived fact** (§5.4) — refuted is an error, proved is silent,
-  and *unprovable* is silent too, because `Diagnostic` has no severity and §5.4 asks for a warning there
-  (reporting it would fail a schema the spec calls legal); the marker is read from both places §6 puts it,
+  and *unprovable* is silent today; §5.4 asks for a warning there, but `SPEC-FEEDBACK.md` #42's decision is
+  to make it an error too (`BACKLOG.md`'s Diagnostics section — there is no severity axis and none is
+  coming); the marker is read from both places §6 puts it,
   the definition and the map key, which is why the check runs last, after `withNameAnnotations`;
   and a **constructor-eligibility** check with two halves, the same §2.2.2 question asked from both ends
   (see `SPEC-FEEDBACK.md` #19): a locally-declared `constructor: true` entry is valid only if the schema's
@@ -762,9 +763,9 @@ An atom's `AtomTypeException` is caught in `AtomTypeReader` and mapped to
 `ATOM_CONSTRAINT_VIOLATION` — `AtomType`'s own signature is untouched, since it's shared with the
 schemaless binder which has no read context. Out of scope for now: message synthesis from code + params,
 fine-grained atom codes, `DUPLICATE_MAP_KEY` (detectable at `MapAbstractReader.readInto`, which sees every
-entry — but §2.6 makes a duplicate key a SHOULD NOT that *warns*, and `Diagnostic` has no severity axis, so
-reporting one would fail a conforming document; `BACKLOG.md` has the shape of that work), and per-field
-schema positions.
+entry — §2.6 words the duplicate rule as a warning, but per `SPEC-FEEDBACK.md` #42 this implementation
+reports every warn-shaped rule as an ordinary error, so this becomes a real error once produced;
+`BACKLOG.md`'s Diagnostics section has the item), and per-field schema positions.
 
 ### Schema-side diagnostics (`SchemaResolver`, `TsonSchemaLinker`, `Tson.validateSchema`)
 

@@ -2204,3 +2204,161 @@ disambiguate what would then be malformed.
    rather than through SHOULD: keep last-value-wins for Class 1 and make uniqueness a MUST for Class 2,
    where a schema is in scope and §7.2 already closes the record. That is a weaker outcome, but it is a
    decision the format makes once, instead of one every implementation makes silently.
+
+---
+
+## 42. Every warn-level rule in the series resolves to an error or a deletion — the spec never needs a warning severity
+
+**Section:** Part 2 §5.2 ("Field States"), §5.3 ("Type Expressions"), §5.4 ("Choice Types"), §5.10
+("Templates and Parameters"), §5.10.1 ("Self-Referential Types"), §7.1 ("The `!!schema` Directive"), §7.5
+("Sets"), §7.6 ("The Absent Sentinel Under a Schema"), §7.7 ("Resolver Behaviours at Typed Positions");
+Part 1 §2.5 ("Records"), §2.6 ("Maps"). Related: #7, #21, #25, #41.
+
+**Problem:** The series asks for warnings in roughly ten places, and #41 already argues the two Part 1
+cases (duplicate field names, duplicate map keys) should be MUST NOT. This entry generalizes #41's
+argument: examined one by one, *every* warn-level rule in both parts is better as an error or as nothing,
+so the severity axis the warnings collectively demand of every implementation's diagnostic model is
+machinery the format does not need — and each individual WARN reads as a decision the spec declined to
+make.
+
+The general argument, sharpened by the format's own target consumer. A warning channel presumes a human
+reader exercising judgment over a legitimate-but-suspect construct. TSON's stated near-term consumer is an
+LLM in a generate-validate-retry loop, where there is no such reader: a validating processor has exactly
+two behaviors — fail the document or don't — so every WARN forces each implementation or pipeline to
+privately promote it to an error or silently drop it. That is #41's interoperability failure (RFC 9413,
+"Maintaining Robust Protocols") reproduced per-diagnostic instead of per-duplicate-key: two conforming
+processors, or one processor under two configurations, disagree about the same bytes in a way the spec
+sanctioned. And a warning costs the retry loop either way: ignored, it hides a generation defect;
+promoted, it was an error with extra steps. #41's point 2 — "last value wins" is unimplementable as a
+*warning* by a processor with one severity — is this thesis stated for one rule.
+
+The inventory, with the verdict each case argues for:
+
+| Rule | Written verdict | Argued verdict |
+|---|---|---|
+| Duplicate record fields / map keys (P1 §2.5/§2.6) | SHOULD warn, last wins | Error (#41) |
+| Type-aware duplicate map keys (§7.7) | MAY detect, SHOULD warn | Class 2 error (#41 pt 3) |
+| `_` at a REQUIRED_DEFAULT field (§5.2, §7.6) | warn and inject the default | Error |
+| Duplicate at a set-typed position (§7.5) | dedupe first-wins, SHOULD warn | Error |
+| Vacuous `0..` array bound (§5.3) | SHOULD warn, desugar anyway | Error (reject the spelling) |
+| Unused (phantom) parameter (§5.10) | blessed *and* warned | Error (or bless silently) |
+| Parameter shadowing a schema type (§5.10) | SHOULD warn | Error |
+| Non-productive required recursion (§5.10.1) | MUST NOT instantiate, SHOULD warn | Error at declaration |
+| Unprovable `@disjoint` (§5.4) | resolver warning | Error, given a pinned prover baseline |
+| Inline nesting depth (§5.2) | MAY warn | Delete (or a §9.1-style hard limit) |
+
+Case by case:
+
+1. **`_` at REQUIRED_DEFAULT is the strongest case.** §5.2: "the decoder SHOULD warn — `_` asserts absence
+   at a position the schema always fills — and injects the default." Warn-and-inject substitutes a value
+   the document explicitly disclaimed: the document said "absent," the decoder answers "here is a value."
+   For an LLM emitter, `_` at a defaulted field means the model misread the schema, and injection papers
+   over exactly the signal the retry loop exists to catch. It is also internally inconsistent: `_` is
+   already a validation error at both REQUIRED and REQUIRED_FIXED, leaving REQUIRED_DEFAULT the lone
+   warn-cell in §7.6's table. And the spec already takes the strict posture for the analogous FIXED case —
+   a stated FIXED value is checked against the schema's, not obeyed. The emitter's fix is trivial (omit the
+   field), the profile of a rule that should simply be MUST NOT.
+
+2. **The set rule carries a bonus inconsistency.** §7.5: "duplicates are silently deduped — first
+   occurrence wins. The resolver SHOULD warn when dedup occurs." Sets resolve duplicates *first*-wins while
+   §2.6 resolves map keys *last*-wins — two different tie-break rules for the same mistake, each existing
+   only to disambiguate what an error would reject outright. A stated duplicate at a set position states an
+   element for nothing (the same no-schema-needed proof #41 makes for a repeated field), and erroring
+   deletes both resolution rules along with both warnings.
+
+3. **The phantom-parameter sentence is the purest indecision in the spec.** §5.10 blesses the construct and
+   warns about it in one sentence: "An unused parameter is a type parameter (the phantom-parameter reading)
+   and the resolver SHOULD warn." Either phantom parameters are a feature (then silence, documented) or a
+   mistake (then an error) — a warning is the refusal to choose. For generated schemas the
+   forgot-to-use/typo reading dominates, and nominal separation is available explicitly via distinct named
+   declarations, so error is the better pick.
+
+4. **Shadowing is the same shape with a sharper edge.** §5.10: "implementations SHOULD warn when a
+   parameter shadows a schema type." `box => <text> { v: text }` silently captures a builtin — the §9.4
+   confusable-hazard class the spec elsewhere takes seriously — and renaming a parameter is free, so an
+   error costs no expressiveness. (§5.4's "A resolver SHOULD NOT warn merely because a choice's variants
+   are not disjoint" is the one SHOULD-NOT-warn in the series, and it survives trivially: under this
+   entry's position there is nothing to warn with.)
+
+5. **Vacuous `0..` is worse than a style nit, which strengthens the error case.** Because identity is
+   application-structural (§8.2), `[T; 0..]` produces an entry *distinct from* `[T]` that means the same
+   thing — two semantically identical schemas with different entry graphs. Rejecting the spelling removes
+   an identity trap, not just noise, and the author's fix is written in the spec's own sentence ("Authors
+   wanting the unconstrained array write `[T]`").
+
+6. **Non-productive recursion: "MUST NOT be instantiated" plus "SHOULD warn at declaration" means a
+   declaration that can never be used loads successfully.** There is nothing the warning preserves. Make it
+   an error, with the caveat #25 already demands: define "guarded" (optional field, possibly-empty
+   array/set, bottoming-out variant), and decide whether a non-productive base a subtraction repairs
+   (§5.9) deserves blessing — if it does, productivity is checked where the type is *used* at a data
+   position rather than where declared.
+
+7. **Unprovable `@disjoint` is the one place WARN carries real information** ("your assertion may hold but
+   I cannot verify it") — and even here, error is defensible. §5.4's own text observes that an *unproved*
+   assertion has no operational effect: discrimination "will fall back to the encoding's structural
+   testing where the encoding permits, or require the tag where it does not," proved or not. So an
+   unproved `@disjoint` is dead weight, and rejecting dead weight costs no expressiveness (delete the
+   assertion, or restructure until it proves). It also makes `@disjoint` mean "machine-verified disjoint" —
+   the only meaning a downstream encoding can actually rely on to drop tags. The genuine blocker is that
+   prover strength is implementation-defined (the record-set and pattern MAYs), so error-on-unprovable
+   would make one schema load under a strong prover and fail under a weak one. The fix belongs in the
+   spec: pin the required decision procedure (the cheap exact rules at minimum) and make unprovable-under-
+   that-procedure an error. If the spec will not pin the prover, this becomes the *only* WARN in the
+   language — and a severity axis, a strictness flag, and a diagnostics-schema revision are a lot of
+   machinery for one diagnostic; silence (the current pinned behavior of this implementation) would be the
+   lesser cost.
+
+8. **The MAY-warn on inline nesting depth (§5.2) should be deleted** or restated as a §9.1-style
+   configurable hard limit, which errors when enabled and exceeded. As written it is a style lint with no
+   addressee.
+
+9. **One sleeper that is not spelled "warn": the unannotated root value.** §7.1: "Encoders SHOULD annotate
+   the value a `!!schema` directive governs with the type it instantiates; an unannotated value under a
+   bound schema is legal but vocabulary-only — validation engages only where annotations appear within
+   it." For the structured-output use case this is the worst trap in the series: an LLM omits the root
+   annotation and the validator answers "valid" while having checked nothing — vacuous validity,
+   indistinguishable from real validity. The root annotation should be a MUST when `!!schema` is present,
+   at least for a validating processor.
+
+**What should stay SHOULD** — these are not severity questions, and several are actively good for the
+retry-loop consumer: the diagnostic-*wording* SHOULDs ("SHOULD suggest `^` or `&`", "SHOULD note the
+absorbed hyphen", "SHOULD suggest `= S`") — an actionable fix in the message is what turns a retry into a
+one-shot repair; §8.1's "SHOULD continue processing after an error" — multi-error collection is *the*
+retry-loop feature; encoder-side style guidance (write defaulted fields, quote binary, own-line
+directives, `_`-vs-omission control), which changes no decoder verdict; and the §9/§11 security and
+resource SHOULDs (pre-register schemas, pin hashes, confusables, bidi marks, fetch policy, DoS limits),
+which are deployment policy — though where a limit is enabled, exceeding it is already a hard error.
+
+**Interpretation chosen:** This implementation adopts the error-based outcomes throughout, deliberately
+ahead of the spec's written warn-level verdicts, and will not grow a severity axis: `Diagnostic` stays
+single-severity, a non-empty `validate` result still means invalid, and each warn case lands as an
+ordinary error as its owning feature is built (`BACKLOG.md`'s "Diagnostics" section tracks the work).
+Current state per rule: duplicate fields/keys are undetected (to become errors at both reader loops); a
+stated `_` at a REQUIRED_DEFAULT field injects the default silently (to become a validation error; plain
+omission still injects); an unprovable `@disjoint` assertion is silent (pinned by
+`anUnprovableDisjointAssertionIsSilentForNow`, to become a linker error); the vacuous `0..` bound
+desugars mechanically (to become a desugar-time error); set-typed positions currently read as plain
+arrays with no dedup at all, and the phantom-parameter, shadowing, and productivity checks belong to
+features not yet implemented — each arrives as an error when its feature does. The implementation had
+already chosen strictness twice where the spec offered leniency: an unresolvable type annotation is
+`UNKNOWN_TYPE_REF` rather than "informational" (#7), and a missing root type-ref under a schema-aware
+read is reported rather than read vacuously.
+
+**Suggested resolution:** State the position once — *a conforming TSON processor has one severity; this
+specification never asks for a warning* — and resolve the table above accordingly:
+
+1. §2.5/§2.6 per #41: duplicates MUST be rejected; delete both last-value-wins rules.
+2. §7.5: a duplicate at a set-typed position is a validation error; delete first-occurrence-wins.
+3. §7.7: a type-aware duplicate key is a Class 2 validation error (#41 point 3).
+4. §5.2/§7.6: `_` at a REQUIRED_DEFAULT field is a validation error, completing the table row that
+   already errors at REQUIRED and REQUIRED_FIXED; omission remains the injection route.
+5. §5.3: the `0..` size specifier is a resolver error; the diagnostic suggests `[T]`.
+6. §5.10: an unused parameter is a resolver error (or, if phantom parameters are wanted, silently legal
+   and documented as a feature — but not warned); a parameter shadowing a schema type is a resolver
+   error.
+7. §5.10.1: a non-productive recursive type is a resolver error, with "guarded" defined (#25).
+8. §5.4: pin the required disjointness decision procedure, and make an assertion unprovable under it a
+   resolver error; keep the SHOULD-NOT-warn-on-mere-overlap sentence by deleting its premise.
+9. §5.2's inline-nesting MAY-warn: delete, or restate as a §9.1-style configurable limit.
+10. §7.1: when `!!schema` is present, the governed value MUST be annotated with its type (at minimum for
+    validating processors), so a validator can never return "valid" having engaged nothing.

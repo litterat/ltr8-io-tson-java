@@ -52,8 +52,9 @@ backend.
     carry a structured code to route on yet (still open, see below); `UNRECOGNIZED_FIELD` now lands too,
     carrying the type's real field list in `expected` (§7.2's record closure — the one place `expected`
     already says what this bullet's item (4) asks for); `DUPLICATE_MAP_KEY` exists on the enum but is
-    reserved, blocked on `Diagnostic` having no severity axis — §2.6 wants a *warning* for a duplicate key,
-    and every `Diagnostic` today fails the document (`BACKLOG.md`).
+    still unproduced — §2.6 words the duplicate rule as a *warning*, but per `SPEC-FEEDBACK.md` #42
+    every warn-shaped rule is implemented as an ordinary error, so this is now unblocked and just needs
+    the `HashSet` at the reader loop (`BACKLOG.md`'s Diagnostics section).
   - `message` — landed, but still **hand-composed at each call site**, not synthesized from `code` +
     params as this bullet originally called for — that needs a richer per-code parameter shape than
     exists yet. Still open.

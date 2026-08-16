@@ -80,13 +80,14 @@ own prose (which had gone stale on at least one of them):
   - [ ] **The `@disjoint` assertion check — the unprovable case only.** Three of §5.4's four outcomes are
     done in `TsonSchemaLinker.checkDisjointAssertions`: proved is silent, refuted is a resolver error, and
     an unannotated choice is asked nothing (§5.4 is explicit that the warnable condition is the unverifiable
-    *assertion*, never mere non-disjointness). What is left is **unprovable → warning**, which is blocked on
-    the severity axis under "Diagnostics" below and nothing else: every `Diagnostic` is an error, so
-    reporting it would fail a schema §5.4 calls legal — the worse of the two wrong answers.
-    `anUnprovableDisjointAssertionIsSilentForNow` pins the current behaviour so that adding severities is a
-    deliberate change rather than an accident. Exact regex-pattern disjointness (the item above) is what
-    would shrink this case: it turns an unprovable pattern choice into a proved or refuted one, and refuted
-    is already expressible, so it pays off without waiting for severities.
+    *assertion*, never mere non-disjointness). What is left is **unprovable → error** — the `SPEC-FEEDBACK.md`
+    #42 decision, superseding §5.4's written warning: an unproved assertion has no operational effect
+    (discrimination falls back to structural testing or the tag regardless), so it is dead weight the author
+    can delete, and erroring makes `@disjoint` mean "machine-verified" — the only meaning an encoding can
+    rely on to drop tags. This implementation's cheap exact rules are its prover baseline.
+    `anUnprovableDisjointAssertionIsSilentForNow` pins the current silence and flips to assert the error when
+    this lands (tracked under "Diagnostics" below). Exact regex-pattern disjointness (the item above) shrinks
+    the case first: it turns an unprovable pattern choice into a proved or refuted one.
 - [ ] **§5.10 substitution into a template *body*.** Half of template application works. A template that
   refines a constructor — `array_ranged => <T, MIN, MAX> array<T> ^ { min_items: = MIN  max_items: = MAX }`,
   and therefore §5.3's sized sugar — instantiates per §8.2, because its resolved vocabulary carries the same
@@ -140,29 +141,41 @@ Record closure closed it out — the unknown member in a refinement body and the
 one discard in `RecordAbstractReader.readFields`, and §7.2 settles it as a MUST rather than the policy
 choice this list once called it.
 
-## Diagnostics: no severity axis, so two SHOULD-level rules are unreportable
+## Diagnostics: one severity — every warn-shaped rule lands as an error
 
-- [ ] **`Diagnostic` can only say "error"** ([#6](https://github.com/litterat/ltr8-io-tson-java/issues/6)).
-  Every one makes `Tson.validate` return non-empty and the CLI exit 1, so a rule the spec states as SHOULD
-  has nowhere to land. Two of them:
-  - **Duplicate map keys** ([TSON-DATA] §2.6): "Duplicate keys SHOULD NOT be present. If duplicate keys
-    are present, the last value wins. The parser SHOULD **warn**."
-  - **Duplicate record field names** (§2.5): the same shape — SHOULD be unique, last value wins.
+**The decision** (`SPEC-FEEDBACK.md` #42, generalizing #41): every warn-level rule in the spec series is
+implemented as an ordinary error, deliberately ahead of the spec's written SHOULD-warn verdicts. No
+severity axis: `Diagnostic` stays single-severity, a non-empty `validate` still means invalid, the CLI
+keeps its exit codes, and no `--strict`/`diagnostics-2.tn` machinery is needed
+([#6](https://github.com/litterat/ltr8-io-tson-java/issues/6) closes as won't-need). #42 has the full
+argument; the short form: the target consumer is a generate-validate-retry loop with exactly two
+behaviors, so a WARN is either promoted to an error or dropped by every pipeline privately — #41's
+RFC 9413 interoperability failure, per-diagnostic.
 
-  Both are *detectable today, cheaply* — correcting a claim this file and `Diagnostic`'s own Javadoc used
-  to make: the parser does **not** collapse duplicates before a reader sees them. `MapAbstractReader.readInto`
-  walks every entry off the event stream and the duplicate disappears only at the sink's `Map.put`, and
-  `RecordAbstractReader.readFields` decodes every occurrence of a repeated field name by design
-  (`SPEC-FEEDBACK.md` #21). Detection is a `HashSet` at either loop. What is missing is a way to say
-  "warning": emitting `DUPLICATE_MAP_KEY` as things stand would fail a document the spec calls conforming,
-  which is the opposite defect and a worse one.
-  - The work is the model, not the detection: a severity on `Diagnostic`, a decision on how `validate` and
-    the CLI's exit codes treat a warning (exit 0 with output, presumably, and a `--strict` to promote), and
-    a `diagnostics-N.tn` bump for the wire shape.
-  - **Both of these are the spec's SHOULD, and `SPEC-FEEDBACK.md` #41 argues it should be a MUST NOT** —
-    duplicates rejected outright, as JEP 540 decided for JSON. If that lands, the two rules stop needing a
-    severity and become ordinary errors, and this item loses its only two motivating cases (the severity
-    axis may still be wanted, but nothing in the spec would then demand it).
+- Ready to implement now — detection was never the blocker, and the verdict finally has somewhere to go:
+  - [ ] **Duplicate map keys** → `DUPLICATE_MAP_KEY` produced for real. `MapAbstractReader.readInto` walks
+    every entry off the event stream (the duplicate currently disappears only at the sink's `Map.put`);
+    detection is a `HashSet` at that loop.
+  - [ ] **Duplicate record field names** → error at `RecordAbstractReader.readFields`, which already
+    decodes every occurrence of a repeated name by design (`SPEC-FEEDBACK.md` #21 — whose shadowed-
+    occurrence question this dissolves: the second occurrence *is* the error, reported at its own
+    position). Needs its own `Diagnostic.Code` or a rename of `DUPLICATE_MAP_KEY` to cover both.
+  - [ ] **`_` stated at a REQUIRED_DEFAULT field** → validation error instead of the current silent inject
+    (`RecordAbstractReader.valueForAbsentField`'s `REQUIRED_DEFAULT` arm, reached via the stated-`_`
+    branch in `readFields`). Plain omission still injects — only the written sentinel errors, completing
+    the row that already errors at REQUIRED and REQUIRED_FIXED.
+  - [ ] **Vacuous `[T; 0..]`** → desugar-time error in `SchemaDesugarer` (beside `checkBounds`), with a
+    diagnostic suggesting `[T]`. Also removes the identity trap: an entry semantically equal to `[T]`
+    with a different structural identity (§8.2).
+  - [ ] **Unprovable `@disjoint`** → linker error in `checkDisjointAssertions`; flip
+    `anUnprovableDisjointAssertionIsSilentForNow` to assert it. See the fuller bullet under "Resolution &
+    linking generality" — exact pattern disjointness shrinks the case and is worth doing first.
+- Landing later, with their owning features — each arrives as an error when its feature does:
+  - **Set-typed duplicate** → error, when sets get real semantics at all (today `set` compiles through the
+    `array` factory and nothing dedupes); **type-aware duplicate map keys** → Class 2 error (#41 pt 3),
+    with typed-key equality; **phantom (unused) parameter** and **parameter shadowing a schema type** →
+    resolver errors, with §5.10 substitution; **non-productive recursion** → resolver error, with
+    productivity analysis (`SPEC-FEEDBACK.md` #25 — "guarded" needs defining first).
 
 ## Reader behaviour
 
@@ -468,7 +481,8 @@ The tree model itself is built and described in `CLAUDE.md`'s "Tree model" secti
 - [ ] Thread-safety — currently only `synchronized` on `TsonSchemaRegistry`/
   `TsonCompiledSchemaRegistry`'s own `register`/`get`/`getMeta` (its `load` deliberately isn't, to
   avoid serializing unrelated on-demand loads); everything else is an open design question.
-- [ ] Confusable-character and bidi-formatting-character warnings (§9.4-adjacent security hardening) —
+- [ ] Confusable-character and bidi-formatting-character checks (§9.4-adjacent security hardening;
+  opt-in, and per `SPEC-FEEDBACK.md` #42 reported as ordinary errors when enabled, not warnings) —
   the sibling gap to the numeric-literal length limit tracked in `STRUCTURED-OUTPUT.md`'s Tier 1 section;
   neither is enforced anywhere yet. `SPEC-FEEDBACK.md` #34 is the fuller treatment: which UTS #39 mechanism
   applies where, the comparison scopes TSON can actually name, and why a normative requirement would oblige
