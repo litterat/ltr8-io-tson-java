@@ -98,16 +98,20 @@ public record Diagnostic(String path, String schemaPointer, String schemaId, Cod
     }
 
     /**
-     * A stable, machine-readable identifier from a closed vocabulary -- not a free string. The first six
+     * A stable, machine-readable identifier from a closed vocabulary -- not a free string. The first eight
      * members are produced by an actual reader against real data; {@code UNRECOGNIZED_FIELD} carries
      * [TSON-SCHEMA] §7.2's record closure, so its {@code expected} is the type's own field list.
-     * {@code DUPLICATE_MAP_KEY} is reserved and not yet produced by any reader -- not for want of a place
-     * to detect one ({@code MapAbstractReader.readInto} sees every entry; the duplicate disappears only at
-     * the sink's {@code put}) but because [TSON-DATA] §2.6 makes a duplicate key a SHOULD NOT with defined
-     * recovery, asking the parser to <em>warn</em>, and this type has no severity axis: every {@code
-     * Diagnostic} is an error that fails the document. Reporting one today would reject data the spec calls
-     * conforming. See {@code BACKLOG.md}. Every {@link
-     * io.ltr8.tson.compiler.atom.AtomTypeException} maps to the single {@code
+     *
+     * <p>{@code DUPLICATE_MAP_KEY} and {@code DUPLICATE_FIELD} are the same mistake at the two container
+     * shapes TSON keeps apart -- a key stated twice in one map ([TSON-DATA] §2.6), a field name stated
+     * twice in one record (§2.5) -- and they stay two codes because the constructs are two, exactly as
+     * {@code UNRECOGNIZED_FIELD} is record-specific. Both spec rules are written as a SHOULD-warn with a
+     * defined recovery ("last value wins"); this implementation reports them as ordinary errors, which is
+     * {@code SPEC-FEEDBACK.md} #41/#42's position: a warning presumes a human reader exercising judgment,
+     * and the format's target consumer is a generate-validate-retry loop with exactly two behaviors, so a
+     * severity axis would be machinery neither this type nor the format needs.
+     *
+     * <p>Every {@link io.ltr8.tson.compiler.atom.AtomTypeException} maps to the single {@code
      * ATOM_CONSTRAINT_VIOLATION} code for now, since {@code AtomValidationException} itself doesn't
      * yet carry a structured code to route on. That code is also, less accurately, what a
      * <em>schema-level</em> value violation reports under -- a document contradicting a FIXED field's value
@@ -126,6 +130,7 @@ public record Diagnostic(String path, String schemaPointer, String schemaId, Cod
         ATOM_CONSTRAINT_VIOLATION,
         UNRECOGNIZED_FIELD,
         DUPLICATE_MAP_KEY,
+        DUPLICATE_FIELD,
         SCHEMA_ERROR,
         UNKNOWN_TYPE,
         VALIDATION_ERROR

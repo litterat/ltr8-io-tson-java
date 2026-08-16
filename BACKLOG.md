@@ -152,30 +152,21 @@ argument; the short form: the target consumer is a generate-validate-retry loop 
 behaviors, so a WARN is either promoted to an error or dropped by every pipeline privately — #41's
 RFC 9413 interoperability failure, per-diagnostic.
 
-- Ready to implement now — detection was never the blocker, and the verdict finally has somewhere to go:
-  - [ ] **Duplicate map keys** → `DUPLICATE_MAP_KEY` produced for real. `MapAbstractReader.readInto` walks
-    every entry off the event stream (the duplicate currently disappears only at the sink's `Map.put`);
-    detection is a `HashSet` at that loop.
-  - [ ] **Duplicate record field names** → error at `RecordAbstractReader.readFields`, which already
-    decodes every occurrence of a repeated name by design (`SPEC-FEEDBACK.md` #21 — whose shadowed-
-    occurrence question this dissolves: the second occurrence *is* the error, reported at its own
-    position). Needs its own `Diagnostic.Code` or a rename of `DUPLICATE_MAP_KEY` to cover both.
-  - [ ] **`_` stated at a REQUIRED_DEFAULT field** → validation error instead of the current silent inject
-    (`RecordAbstractReader.valueForAbsentField`'s `REQUIRED_DEFAULT` arm, reached via the stated-`_`
-    branch in `readFields`). Plain omission still injects — only the written sentinel errors, completing
-    the row that already errors at REQUIRED and REQUIRED_FIXED.
-  - [ ] **Vacuous `[T; 0..]`** → desugar-time error in `SchemaDesugarer` (beside `checkBounds`), with a
-    diagnostic suggesting `[T]`. Also removes the identity trap: an entry semantically equal to `[T]`
-    with a different structural identity (§8.2).
-  - [ ] **Unprovable `@disjoint`** → linker error in `checkDisjointAssertions`; flip
-    `anUnprovableDisjointAssertionIsSilentForNow` to assert it. See the fuller bullet under "Resolution &
-    linking generality" — exact pattern disjointness shrinks the case and is worth doing first.
+- [ ] **Unprovable `@disjoint`** → linker error in `checkDisjointAssertions`; flip
+  `anUnprovableDisjointAssertionIsSilentForNow` to assert it. #42 argues for the error *given a pinned
+  prover baseline*, and this implementation's isn't there: `ChoiceDisjointness` leaves record-set and
+  regex-pattern disjointness absent, so flipping it today rejects schemas whose variants genuinely are
+  disjoint. See the fuller bullet under "Resolution & linking generality" — exact pattern disjointness
+  shrinks the case and is worth doing first.
 - Landing later, with their owning features — each arrives as an error when its feature does:
   - **Set-typed duplicate** → error, when sets get real semantics at all (today `set` compiles through the
-    `array` factory and nothing dedupes); **type-aware duplicate map keys** → Class 2 error (#41 pt 3),
-    with typed-key equality; **phantom (unused) parameter** and **parameter shadowing a schema type** →
-    resolver errors, with §5.10 substitution; **non-productive recursion** → resolver error, with
+    `array` factory and nothing dedupes); **phantom (unused) parameter** and **parameter shadowing a schema
+    type** → resolver errors, with §5.10 substitution; **non-productive recursion** → resolver error, with
     productivity analysis (`SPEC-FEEDBACK.md` #25 — "guarded" needs defining first).
+  - **Type-aware duplicate map keys** (#41 pt 3) is *not* on this list any more: every reader compares keys
+    by decoded value, so §7.7's MAY is exercised wherever a key type is declared and the Class 2 error
+    arrives with it. What replaced the item is a spec question rather than an implementation one —
+    `SPEC-FEEDBACK.md` #43, on the equality the series never defines for a Class 1 reader.
 
 ## Reader behaviour
 

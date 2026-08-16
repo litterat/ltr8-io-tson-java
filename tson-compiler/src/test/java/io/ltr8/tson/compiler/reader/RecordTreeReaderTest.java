@@ -55,10 +55,15 @@ class RecordTreeReaderTest {
         return TsonSchemaCompiler.compile(linkedSchema, ValueReaderFactoryRegistry.tree());
     }
 
-    @SuppressWarnings("unchecked")
     private static Map<String, Object> read(TsonCompiledSchema compiled, String source) {
+        return read(compiled, source, TsonDiagnosticsReceiver.throwing());
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> read(TsonCompiledSchema compiled, String source,
+                                            TsonDiagnosticsReceiver receiver) {
         return (Map<String, Object>) Dom.of((TsonValue) compiled.get("point")
-                .read(TestDocuments.document(source)));
+                .read(TestDocuments.document(source, receiver)));
     }
 
     @Test
@@ -229,5 +234,27 @@ class RecordTreeReaderTest {
 
         assertEquals(BigInteger.valueOf(7), read(compiled, "{}").get("value"));
         assertEquals(BigInteger.valueOf(9), read(compiled, "{ value: 9 }").get("value"));
+    }
+
+    /**
+     * Omission and a written {@code _} are two different documents at a REQUIRED_DEFAULT field. §5.2 asks
+     * the decoder to warn and inject for the second; {@code SPEC-FEEDBACK.md} #42 calls that its strongest
+     * case for an error, since warn-and-inject answers "here is a value" to a document that said "absent".
+     * The default is still what the field decodes to -- only the verdict changes.
+     */
+    @Test
+    void requiredDefaultFieldRejectsAWrittenAbsentSentinelWhileOmissionStillInjects() {
+        RecordField defaulted = new RecordField("value", TypeRef.of("integer"), FieldState.REQUIRED_DEFAULT,
+                Optional.of(new Token("7", Token.Form.UNQUOTED)), Optional.empty());
+        TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED), defaulted));
+
+        assertEquals(BigInteger.valueOf(7), read(compiled, "{}").get("value"));
+
+        TsonReadException thrown = assertThrows(TsonReadException.class, () -> read(compiled, "{ value: _ }"));
+        assertTrue(thrown.getMessage().contains("cannot be written '_'"), thrown.getMessage());
+
+        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+        assertEquals(BigInteger.valueOf(7), read(compiled, "{ value: _ }", problems).get("value"));
+        assertEquals(1, problems.diagnostics().size(), problems.diagnostics().toString());
     }
 }

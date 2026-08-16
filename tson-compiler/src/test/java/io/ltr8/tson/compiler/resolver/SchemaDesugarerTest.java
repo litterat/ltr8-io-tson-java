@@ -9,6 +9,7 @@ import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.ast.schema.SimpleRef;
 import io.ltr8.tson.compiler.ast.schema.TemplateInstance;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
+import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
@@ -289,6 +290,39 @@ class SchemaDesugarerTest {
         assertEquals("array_ranged", instantiation.template(), "the application is kept for §8.2's source");
         assertEquals("array", instantiation.body().target(), "headed at the nearest ~ constructor");
         assertEquals("{ element_type: text  min_items: 1  max_items: 5 }", instanceBody(instantiation.body()));
+    }
+
+    /**
+     * §5.3 calls {@code [T; 0..]} vacuous and asks for a warning while desugaring it anyway;
+     * {@code SPEC-FEEDBACK.md} #42 rejects the spelling instead, and §5.3's own sentence says why it is
+     * worth rejecting rather than tolerating: application-structural identity (§8.2) makes it a distinct
+     * entry meaning exactly what {@code [text]} means.
+     */
+    @Test
+    void aVacuousZeroFloorIsRejectedRatherThanDesugared() {
+        SchemaDocument document = new TsonSchemaParser("""
+                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
+                { tags => [text; 0..] }""").parseSchemaDocument();
+        Map<String, TypeDefinition> realMeta = MetaKernelBootstrapResolver.getMetaKernelSchema().entries();
+
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> SchemaDesugarer.desugar(document, realMeta, Set.of()));
+        assertTrue(thrown.getMessage().contains("'[text]'"), "names the fix: " + thrown.getMessage());
+    }
+
+    /** Only the open-ended floor is vacuous: {@code 0..M} still pins a ceiling, and desugars as usual. */
+    @Test
+    void aZeroFloorWithACeilingIsStillARealConstraint() {
+        SchemaDocument document = new TsonSchemaParser("""
+                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
+                { tags => [text; 0..5] }""").parseSchemaDocument();
+        Map<String, TypeDefinition> realMeta = MetaKernelBootstrapResolver.getMetaKernelSchema().entries();
+
+        SchemaDocument desugared = SchemaDesugarer.desugar(document, realMeta, Set.of());
+
+        TemplateInstance instantiation = assertInstanceOf(TemplateInstance.class,
+                desugared.body().declarations().get("tags").typeDef());
+        assertEquals("{ element_type: text  min_items: 0  max_items: 5 }", instanceBody(instantiation.body()));
     }
 
     /**

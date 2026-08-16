@@ -40,9 +40,11 @@ import io.ltr8.tson.compiler.stream.TsonEvent;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.BiConsumer;
 
 /**
@@ -335,9 +337,20 @@ public final class SchemalessObjectReader {
             }
         }
 
+        // §2.5's "each field at most once" is about the *document*, so a repeat is tracked by written name
+        // rather than by target-class slot -- a name the class doesn't declare is still stated twice.
+        Set<String> statedNames = new HashSet<>();
+
         if (!empty) {
             while (!(ctx.peek() instanceof RecordEnd)) {
                 FieldName fieldName = (FieldName) ctx.next();
+                if (!statedNames.add(fieldName.name())) {
+                    ctx.field(fieldName.name()).report(Diagnostic.Code.DUPLICATE_FIELD,
+                            "duplicate field '" + fieldName.name() + "' for " + dataClass.typeClass()
+                                    + " -- a record states each field at most once (§2.5), and the repeat "
+                                    + "states a value for nothing",
+                            "each field stated once", "'" + fieldName.name() + "' stated again");
+                }
                 Integer idx = indexByName.get(fieldName.name());
                 if (idx == null) {
                     EventSkip.scopedValue(ctx); // a data field the target class doesn't declare -- discard
@@ -453,6 +466,7 @@ public final class SchemalessObjectReader {
             }
             DataClass keyClass = dataClass.keyDataClass();
             DataClass valueClass = dataClass.valueDataClass();
+            Set<Object> statedKeys = new HashSet<>();
             while (!(ctx.peek() instanceof MapEnd)) {
                 if (ctx.peek() instanceof AbsentEvent) {
                     ctx.next(); // the absent key itself
@@ -462,7 +476,16 @@ public final class SchemalessObjectReader {
                     EventSkip.scopedValue(ctx);
                     continue;
                 }
+                int beforeKey = ctx.reported();
                 Object key = bind(ctx, keyClass);
+                if (ctx.reported() == beforeKey && !statedKeys.add(key)) {
+                    // §2.6, by bound key value -- a key that failed to bind is left out, since it is not a
+                    // key the document stated and a second failure would otherwise read as a repeat of it.
+                    ctx.report(Diagnostic.Code.DUPLICATE_MAP_KEY,
+                            "duplicate key '" + key + "' for " + dataClass.typeClass() + " -- a map states each "
+                                    + "key at most once (§2.6), and the repeat states an entry for nothing",
+                            "each key stated once", "'" + key + "' stated again");
+                }
                 ctx.next(); // MapArrow
                 if (ctx.peek() instanceof SchemaRef) {
                     ctx.next();

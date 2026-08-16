@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonDataStream;
 import io.ltr8.tson.compiler.TsonObjectReader;
 import io.ltr8.tson.compiler.TsonReadContext;
@@ -24,10 +25,12 @@ import io.ltr8.tson.tree.*;
 import io.ltr8.tson.tree.TsonValue;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Reads a TSON data document into an immutable {@link TsonValue} tree with <b>no schema</b> -- the
@@ -154,6 +157,13 @@ public final class SchemalessTreeReader {
         return atom;
     }
 
+    /**
+     * A field name stated twice is reported ({@code DUPLICATE_FIELD}, §2.5) and its value still overwrites
+     * the earlier one -- §2.5's "last value wins" recovery, which the {@code LinkedHashMap} applies anyway.
+     * The rule is Part 1's and needs no schema to see, so it holds on this path exactly as it does under a
+     * compiled one; a document whose verdict changed depending on whether a schema was in scope would be
+     * the interoperability failure {@code SPEC-FEEDBACK.md} #41/#42 is arguing against.
+     */
     private TsonRecord readRecord(TsonReadContext ctx, Optional<String> typeRef, List<TsonAnnotation> annotations) {
         ctx.next(); // RecordStart
         Map<String, TsonValue> fields = new LinkedHashMap<>();
@@ -161,6 +171,12 @@ public final class SchemalessTreeReader {
             FieldName fieldName = (FieldName) ctx.next();
             if (ctx.peek() instanceof SchemaRef) {
                 ctx.next();
+            }
+            if (fields.containsKey(fieldName.name())) {
+                ctx.field(fieldName.name()).report(Diagnostic.Code.DUPLICATE_FIELD,
+                        "duplicate field '" + fieldName.name() + "' -- a record states each field at most once "
+                                + "(§2.5), and the repeat states a value for nothing",
+                        "each field stated once", "'" + fieldName.name() + "' stated again");
             }
             fields.put(fieldName.name(), readNode(ctx.field(fieldName.name())));
         }
@@ -190,8 +206,16 @@ public final class SchemalessTreeReader {
     private TsonMap readMap(TsonReadContext ctx, Optional<String> typeRef, List<TsonAnnotation> annotations) {
         ctx.next(); // MapStart
         List<TsonMap.Entry> entries = new ArrayList<>();
+        Set<Object> seen = new HashSet<>();
         while (!(ctx.peek() instanceof MapEnd)) {
             TsonValue key = readNode(ctx);
+            if (!seen.add(keyIdentity(key))) {
+                // §2.6, the map half of readRecord's rule.
+                ctx.report(Diagnostic.Code.DUPLICATE_MAP_KEY,
+                        "duplicate key '" + keySegment(key) + "' -- a map states each key at most once (§2.6), "
+                                + "and the repeat states an entry for nothing",
+                        "each key stated once", "'" + keySegment(key) + "' stated again");
+            }
             ctx.next(); // MapArrow
             if (ctx.peek() instanceof SchemaRef) {
                 ctx.next();
@@ -224,4 +248,43 @@ public final class SchemalessTreeReader {
     private static String keySegment(TsonValue key) {
         return key instanceof TsonAtom atom ? String.valueOf(atom.value()) : "?";
     }
+
+    /**
+     * What {@link #readMap}'s duplicate check compares: a key's structure and decoded values, with every
+     * node's type-ref and annotations stripped. Neither is part of the key §2.6 compares -- it asks for
+     * "the same NFC-normalized string after escape processing" for a scalar and "the same structure with
+     * textually identical elements at every position" for a compound one, and a leading {@code !text} or
+     * {@code @doc} is in neither. Comparing whole {@link TsonValue} nodes instead would read {@code !text
+     * a} and {@code a} as two keys, which §2.6 says they are not.
+     *
+     * <p>Equating on the <em>decoded</em> value rather than the source text is a deliberate divergence in
+     * the other direction, and the one place this reader is stricter than §2.6: {@code 0xFF} and {@code
+     * 255} are textually distinct and land on one identity here. {@code SPEC-FEEDBACK.md} #43 makes the
+     * argument and asks the spec to name the layer -- §2.6 defines textual identity for the parser and
+     * [TSON-SCHEMA] §7.7 typed identity for a schema-governed resolver, leaving a Class 1 <em>reader</em>,
+     * which has run §4 base resolution but has no declared types, between the two with nothing said about
+     * it.
+     */
+    private static Object keyIdentity(TsonValue key) {
+        return switch (key) {
+            case TsonAtom atom -> atom.value();
+            case TsonArray array -> array.elements().stream().map(SchemalessTreeReader::keyIdentity).toList();
+            case TsonTuple tuple -> tuple.elements().stream().map(SchemalessTreeReader::keyIdentity).toList();
+            case TsonRecord record -> {
+                Map<String, Object> identity = new LinkedHashMap<>();
+                record.fields().forEach((name, value) -> identity.put(name, keyIdentity(value)));
+                yield identity;
+            }
+            case TsonMap map -> map.entries().stream()
+                    .map(entry -> List.of(keyIdentity(entry.key()), keyIdentity(entry.value()))).toList();
+            // No payload to compare: the kind is the whole identity, and a distinct constant per kind keeps
+            // a `null` key apart from a quoted "null" that base resolution made an ordinary string.
+            case TsonNull ignored -> KeyKind.NULL;
+            case TsonAbsent ignored -> KeyKind.ABSENT;
+            case TsonMissing ignored -> KeyKind.MISSING;
+        };
+    }
+
+    /** Identity stand-ins for the payload-free node kinds -- see {@link #keyIdentity}. */
+    private enum KeyKind { NULL, ABSENT, MISSING }
 }

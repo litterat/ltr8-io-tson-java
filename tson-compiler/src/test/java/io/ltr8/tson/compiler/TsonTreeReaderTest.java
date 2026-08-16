@@ -193,4 +193,60 @@ class TsonTreeReaderTest {
         assertEquals(1, problems.size());
         assertEquals("/a", problems.get(0).path());
     }
+
+    /**
+     * §2.5/§2.6 are Part 1 rules, so a repeat is an error with no schema in scope too -- a document whose
+     * verdict turned on whether a schema happened to be in scope is exactly the interoperability failure
+     * {@code SPEC-FEEDBACK.md} #41/#42 argues against. The recovery still applies to the record's fields;
+     * the map is structure-preserving and keeps both entries, the diagnostic being the verdict.
+     */
+    @Test
+    void aRepeatedFieldOrKeyIsReportedWithNoSchemaInScope() {
+        List<Diagnostic> fieldProblems = problemsIn("{ a: 1  a: 2 }");
+        assertEquals(List.of(Diagnostic.Code.DUPLICATE_FIELD),
+                fieldProblems.stream().map(Diagnostic::code).toList(), fieldProblems.toString());
+        assertEquals("/a", fieldProblems.getFirst().path());
+
+        List<Diagnostic> keyProblems = problemsIn("{ \"a\" => 1  \"a\" => 2 }");
+        assertEquals(List.of(Diagnostic.Code.DUPLICATE_MAP_KEY),
+                keyProblems.stream().map(Diagnostic::code).toList(), keyProblems.toString());
+
+        TsonValue node = STRICT.withDiagnostics(TsonDiagnosticsReceiver.collecting()).read("{ a: 1  a: 2 }");
+        assertEquals(BigInteger.TWO, node.at("/a").asBigInteger().orElseThrow());
+    }
+
+    /**
+     * Two spellings of one number are one key: the comparison is on the decoded value, not the wire text.
+     * §2.6's own rule is textual and would keep these apart — the deliberate divergence
+     * {@code SPEC-FEEDBACK.md} #43 argues for and asks the spec to settle.
+     */
+    @Test
+    void aRepeatedKeyIsJudgedOnTheDecodedValue() {
+        assertEquals(List.of(Diagnostic.Code.DUPLICATE_MAP_KEY),
+                problemsIn("{ 0xFF => 1  255 => 2 }").stream().map(Diagnostic::code).toList());
+    }
+
+    /**
+     * A key's type-ref and annotations are not part of its identity — §2.6 compares a scalar key's
+     * NFC-normalized string, and a leading {@code !person} or {@code @doc} is not in it. Comparing whole
+     * nodes would read each of these pairs as two keys, which §2.6 says they are not. (The type-ref half
+     * runs preserving, so rule 3's own {@code UNKNOWN_TYPE_REF} isn't what the assertion sees; a wire
+     * type-ref that doesn't change the decoded value is the case at issue.)
+     */
+    @Test
+    void aKeysTypeRefAndAnnotationsAreNotPartOfItsIdentity() {
+        TsonDiagnosticsCollector preserved = TsonDiagnosticsReceiver.collecting();
+        READER.withDiagnostics(preserved).read("{ !person a => 1  a => 2 }");
+        assertEquals(List.of(Diagnostic.Code.DUPLICATE_MAP_KEY),
+                preserved.diagnostics().stream().map(Diagnostic::code).toList());
+
+        assertEquals(List.of(Diagnostic.Code.DUPLICATE_MAP_KEY),
+                problemsIn("{ @doc:\"why\" a => 1  a => 2 }").stream().map(Diagnostic::code).toList());
+    }
+
+    /** §2.6's own non-example, which the decoded comparison agrees with: {@code 1} and {@code 1.0} differ. */
+    @Test
+    void anIntegerAndAFloatSpellingAreTwoKeys() {
+        assertEquals(List.of(), problemsIn("{ 1 => a  1.0 => b }"));
+    }
 }

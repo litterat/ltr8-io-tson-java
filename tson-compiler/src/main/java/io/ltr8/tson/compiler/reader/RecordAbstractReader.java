@@ -47,17 +47,16 @@ import java.util.stream.Collectors;
  * {@code FixedCheck} keeps the pre-rebind parser for exactly that reason: a written token has to be
  * decoded the same way the schema's own value was, or comparing them would compare across the narrowing.
  *
- * <p><b>Forward, single-pass, with overwrite on a duplicate field name</b> (a deliberate behavior
- * change from this class's own pre-streaming design, which scanned backward specifically so a
- * shadowed duplicate's own value was never read at all): {@link #readFields} consumes {@code
- * FieldName} events strictly in stream order, decoding (and thus validating) every occurrence of a
- * recognized field name, with a later occurrence's own decoded value simply replacing an earlier
- * one's in whatever {@link FieldSink} the caller supplies -- necessary for a record to be read in one
- * forward pass over the stream at all, since there's no way to know in advance whether a field name
- * will recur later without buffering the whole record first. See {@code SPEC-FEEDBACK.md} for the
- * observable consequence: a shadowed duplicate's own malformed value now surfaces as a diagnostic
- * (fail-fast: an exception; collecting: a reported problem) even though its own decoded value is
- * ultimately discarded, where it previously went entirely unvalidated.
+ * <p><b>Forward, single-pass, and a repeated field name is a validation error</b> ({@code
+ * DUPLICATE_FIELD}): {@link #readFields} consumes {@code FieldName} events strictly in stream order,
+ * decoding (and thus validating) every occurrence of a recognized field name, reporting the second and
+ * later ones at their own positions. [TSON-DATA] §2.5 words this as a SHOULD-warn with "last value wins"
+ * defined as the recovery; reporting it outright is {@code SPEC-FEEDBACK.md} #41/#42's position, and it
+ * dissolves #21's shadowed-occurrence question -- the repeat <em>is</em> the error, so whether its value
+ * was going to be used decides nothing. The recovery still runs underneath: a later occurrence's decoded
+ * value replaces an earlier one's in whatever {@link FieldSink} the caller supplies, which is what lets a
+ * record be read in one forward pass over the stream at all (there is no way to know in advance whether a
+ * name will recur without buffering the whole record first).
  *
  * <p><b>Records are closed under their type</b> ([TSON-SCHEMA] §7.2): a field name with no match in the
  * compiled field list is an {@code UNRECOGNIZED_FIELD} violation, reported and then discarded unread via
@@ -236,6 +235,12 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                 EventSkip.scopedValue(ctx);
                 continue;
             }
+            if (seen[schemaIndex]) {
+                ctx.field(fieldName.name()).report(Diagnostic.Code.DUPLICATE_FIELD,
+                        "duplicate field '" + fieldName.name() + "' on '" + name + "' -- a record states each "
+                                + "field at most once (§2.5), and the repeat states a value for nothing",
+                        "each field stated once", "'" + fieldName.name() + "' stated again");
+            }
             if (fixedCheck[schemaIndex] != null) {
                 // A FIXED field's value comes from the schema, never the data -- but the data may still
                 // *state* it, and §5.2 makes a contradicting statement a validation error. Skipping it
@@ -252,7 +257,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             Object decoded;
             if (ctx.peek() instanceof AbsentEvent) {
                 ctx.next();
-                decoded = valueForAbsentField(schemaIndex, ctx);
+                decoded = valueForStatedAbsentField(schemaIndex, ctx);
             } else {
                 decoded = fields.get(schemaIndex).parser().read(ctx.field(fieldName.name()));
             }
@@ -307,6 +312,34 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                         "one of (" + members + ")", "none present");
             }
         }
+    }
+
+    /**
+     * The value a field takes when the document wrote {@code _} at it, which differs from never mentioning
+     * it at all ({@link #valueForAbsentField}) in exactly one state. At REQUIRED_DEFAULT, §5.2 asks the
+     * decoder to warn and inject the default; this reports a validation error and injects it anyway. The
+     * error is {@code SPEC-FEEDBACK.md} #42's strongest case: warn-and-inject substitutes a value the
+     * document explicitly disclaimed, and for the retry loop the format targets, {@code _} at a defaulted
+     * field means the emitter misread the schema -- exactly the signal injection papers over. It also
+     * completes §7.6's table, whose REQUIRED_DEFAULT cell was the lone warn among states that already
+     * error at REQUIRED and REQUIRED_FIXED. Plain omission still injects silently, which is the whole
+     * point of the state.
+     *
+     * <p>The default is still what the field decodes to, so the value comes back whole and only the
+     * verdict changes -- the same split {@link #verifyFixed} makes for a contradicted FIXED value. Neither
+     * FIXED state reaches here at all: {@link #readFields} routes both through {@link #verifyFixed}, which
+     * answers {@code _} for itself.
+     */
+    final Object valueForStatedAbsentField(int schemaIndex, TsonReadContext ctx) {
+        RecordField schema = fields.get(schemaIndex).schema();
+        if (schema.state() == FieldState.REQUIRED_DEFAULT) {
+            ctx.field(schema.name()).report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION,
+                    "'" + schema.name() + "' on '" + name + "' is always filled from the schema and cannot be "
+                            + "written '_' -- omit the field to take its default (§5.2)",
+                    "the field omitted, or a value for '" + schema.name() + "'", "_");
+            return precomputedValue[schemaIndex];
+        }
+        return valueForAbsentField(schemaIndex, ctx);
     }
 
     /**

@@ -15,7 +15,9 @@ import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.SourcePosition;
 
 import java.math.BigInteger;
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.BiConsumer;
 
 /**
@@ -29,10 +31,18 @@ import java.util.function.BiConsumer;
  * ArrayAbstractReader#readInto} documents for arrays.
  *
  * <p>Unlike {@link ArrayAbstractReader}, there's no {@code unique_items}/{@code ElementState}
- * concept here at all -- {@link MapBody} carries neither: a map's own keys are inherently unique by
- * construction (a duplicate key is "last value wins" via an ordinary {@code put}, matching {@code
- * TsonObjectReader.toMap}'s own note, not a validation error), and there's no per-entry
- * required/optional state for a value the way an array element or tuple position has.
+ * concept here at all -- {@link MapBody} carries neither: a map has no per-entry required/optional
+ * state for a value the way an array element or tuple position has.
+ *
+ * <p><b>A repeated key is a validation error</b> ({@code DUPLICATE_MAP_KEY}), reported at the repeat's
+ * own position and then decoded like any other entry so the sink still ends up "last value wins".
+ * [TSON-DATA] §2.6 words this as a SHOULD-warn with that recovery defined; reporting it outright is
+ * {@code SPEC-FEEDBACK.md} #41/#42's position -- a repeated key states an entry for nothing, which needs
+ * no schema to see, and the recovery rule exists only to disambiguate what an error rejects outright.
+ * Keys compare by their decoded value, so two spellings of one key ({@code 0xFF} and {@code 255}) are
+ * the same key, which is what the sink's own {@code put} would have collapsed silently. That exercises
+ * [TSON-SCHEMA] §7.7's typed-equality MAY wherever a key type is declared, and diverges from §2.6's
+ * textual identity where the two disagree -- {@code SPEC-FEEDBACK.md} #43 has the argument.
  *
  * <p><b>A key's own path segment is read from a bare peek, not a fully-decoded value</b> -- an
  * annotated key ({@code @foo "mykey" => ...}, a rare shape in practice) reports its path segment as
@@ -100,9 +110,16 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
      * {@code min_items}/{@code max_items} are validated against the final count once {@code MapEnd}
      * arrives. Keeps decoding every remaining entry after one fails, so sibling entries' own problems
      * still surface in the same pass.
+     *
+     * <p>A key equal to one already decoded is reported ({@code DUPLICATE_MAP_KEY}) at its own position
+     * and its entry then read normally -- the continuation policy this reader stack applies everywhere,
+     * and what leaves the sink holding the last value for the key either way. A key whose own decoding
+     * reported is left out of {@code seen} entirely: it is not a key the document stated, so a second
+     * equally-undecodable key would otherwise be reported a second time as a repeat of the first.
      */
     final void readInto(TsonReadContext ctx, BiConsumer<Object, Object> sink) {
         int count = 0;
+        Set<Object> seen = new HashSet<>();
         while (!(ctx.peek() instanceof MapEnd)) {
             TsonEvent keyPeek = ctx.peek();
             if (keyPeek instanceof AbsentEvent) {
@@ -116,7 +133,14 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
                 continue;
             }
             String keySegment = keySegmentFor(keyPeek);
+            int before = ctx.reported();
             Object key = keyParser.read(ctx.field(keySegment));
+            if (ctx.reported() == before && !seen.add(key)) {
+                ctx.field(keySegment).report(Diagnostic.Code.DUPLICATE_MAP_KEY,
+                        "duplicate key '" + keySegment + "' in '" + name + "' -- a map states each key at most "
+                                + "once (§2.6), and the repeat states an entry for nothing",
+                        "each key stated once", "'" + keySegment + "' stated again");
+            }
             ctx.next(); // MapArrow
             if (ctx.peek() instanceof SchemaRef) {
                 ctx.next();

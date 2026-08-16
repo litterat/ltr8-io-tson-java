@@ -1,7 +1,9 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
+import io.ltr8.tson.compiler.TsonDiagnosticsCollector;
 import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -71,6 +73,55 @@ class MapTreeReaderTest {
         TsonReadException thrown = assertThrows(TsonReadException.class,
                 () -> readMap(compiled, "{ _ => 1 }"));
         assertTrue(thrown.getMessage().contains("absent sentinel"), thrown.getMessage());
+    }
+
+    /**
+     * [TSON-DATA] §2.6 words a repeated key as a SHOULD-warn with "last value wins" as the recovery; this
+     * implementation reports it ({@code SPEC-FEEDBACK.md} #41/#42) and applies the recovery anyway.
+     */
+    @Test
+    void duplicateKeyIsAValidationError() {
+        TsonCompiledSchema compiled = compile(MapBody.of(TypeRef.of("integer"), TypeRef.of("integer")));
+
+        TsonReadException thrown = assertThrows(TsonReadException.class,
+                () -> readMap(compiled, "{ 1 => 10  1 => 20 }"));
+        assertTrue(thrown.getMessage().contains("duplicate key '1'"), thrown.getMessage());
+    }
+
+    /**
+     * Keys compare by their <em>decoded</em> value, so two spellings of one integer are one key -- which is
+     * the case the sink's own {@code put} would otherwise have collapsed with nothing to see. The recovery
+     * still runs: the map comes back with the one key and the later value.
+     */
+    @Test
+    void duplicateKeyIsJudgedOnTheDecodedValueNotTheWrittenText() {
+        TsonCompiledSchema compiled = compile(MapBody.of(TypeRef.of("integer"), TypeRef.of("integer")));
+        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+
+        @SuppressWarnings("unchecked")
+        Map<Object, Object> result = (Map<Object, Object>) Dom.of((TsonValue) compiled.get("scores")
+                .read(TestDocuments.document("{ 0xFF => 10  255 => 20 }", problems)));
+
+        assertEquals(List.of(Diagnostic.Code.DUPLICATE_MAP_KEY),
+                problems.diagnostics().stream().map(Diagnostic::code).toList(),
+                problems.diagnostics().toString());
+        assertEquals(Map.of(BigInteger.valueOf(255), BigInteger.valueOf(20)), result);
+    }
+
+    /**
+     * A key that failed to decode is not a key the document stated, so it never joins the seen set -- two
+     * equally-undecodable keys are two atom violations, not an atom violation plus a phantom duplicate.
+     */
+    @Test
+    void anUndecodableKeyIsNotCountedAsSeen() {
+        TsonCompiledSchema compiled = compile(MapBody.of(TypeRef.of("integer"), TypeRef.of("integer")));
+        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+
+        compiled.get("scores").read(TestDocuments.document("{ \"a\" => 1  \"b\" => 2 }", problems));
+
+        assertEquals(List.of(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION),
+                problems.diagnostics().stream().map(Diagnostic::code).toList(),
+                problems.diagnostics().toString());
     }
 
     @Test
