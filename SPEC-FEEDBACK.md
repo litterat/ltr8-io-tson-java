@@ -2450,3 +2450,181 @@ rather than a warning.
    valid", and the three layers then differ only in *how many* documents they reject — a monotone
    relationship a reader can reason about, unlike the current one where the same bytes decode to different
    maps at different conformance classes (#41's point 4).
+
+
+## 44. A constructor with a shadow-channel parameter is grammatical, implied invalid from three directions, and rejected nowhere
+
+**Section:** §4.2 ("Type Construction"); §5.10 ("Templates and Parameters", the shadowing/label rule); §7.2
+("Parameterized heads over binding records"); §8.2 ("Template Instantiation"); §12.1 (grammar). Related: #28.
+
+**Problem:** §5.10 gives a parameter two possible channel forms: **labelled** (a `value_param` route or
+`= P`/`~ P` pin on a field — including a `type_ref`-typed field, where the slot's *type* is fixed and the
+reference argument flows through its *value*) and **shadowing** (the parameter name standing in a
+type-reference channel: a field type, element type, variant, or argument). Three sections jointly assume a
+**constructor's** parameters are labelled-only, but none states it as a rule on the declaration:
+
+- §4.2 *describes* the shape: "A parameterized constructor's open slots are ordinary fields of its
+  vocabulary, typed `type_ref` and routed by parameter … the parameter rides the value channel." Every
+  kernel and meta constructor (`array`, `map`, `set`, `vector`) conforms. But prose describing the shipped
+  declarations is not a constraint on authored ones.
+- §8.2 makes the labelled-only property *necessary*: "Constructor applications never materialise entries —
+  they are carried structurally wherever they occur." A labelled parameter closes by routing the argument
+  into a vocabulary slot of the binding record; a shadowing parameter can close only by rewriting the body
+  it sits in — §5.10's substitution — which produces a new `type_definition`, i.e. exactly the
+  materialisation constructors never get. There is no structural representation of a closed shadow channel.
+- §7.2 permits a parameterized head over binding records "if and only if every occurrence of its parameters
+  in its vocabulary is a `value_param` member" — and heading binding records is a constructor's defining
+  role (§5.6: closed applications carry `!C` bodies). A shadow-parameter constructor's every instance is
+  therefore invalid resolver output.
+
+Yet the declaration itself parses and resolves. §4.2 explicitly allows a parameter list before the
+constructor marker ("with or without a preceding parameter list — `~product & { ... }`, `<T> ~array<T> ^
+{ ... }`"), and nothing stops the composition body from using the parameter in a field-type position:
+
+```
+boxer => <T> ~product & { boxed: T }
+```
+
+No rule rejects this line. The incoherence surfaces only at each *use*: `boxer<text>` desugars per §5.6's
+table to `!boxer { <bindings> }` — but there is no vocabulary slot for `text` to bind to, and the spec
+never says what the bindings of a shadow-channel argument even are; a closed declaration `!boxer { boxed:
+text }`(?) is barred from heading a binding record by §7.2. Each failure arrives one section away from the
+actual mistake, with a diagnostic about applications or resolver output rather than about the declaration
+that was wrong on the day it was written.
+
+**Interpretation chosen:** labelled-only is a **declaration-time validity rule for constructors**: a `~`
+declaration whose parameter occurs anywhere outside a labelled value channel — in a field type, element
+type, variant, or an argument of its source chain in a non-routed position — is a resolver error at the
+declaration. Shadow-channel parameters are template-only. (Not yet enforced in this implementation —
+`SchemaDesugarer` currently rejects record-template *application* wholesale, which happens to catch the
+downstream symptom — but this is the boundary the implementation builds toward: closing strategy is keyed
+per parameter occurrence — labelled ⇒ argument routing, shadowing ⇒ §5.10 body substitution — and `~` is
+what forbids the substitution-requiring kind.)
+
+**Suggested resolution:**
+
+1. **State the rule in §4.2**, where constructors are defined: a constructor's parameters MUST occur only as
+   labelled value-channel routes (`value_param` members in its resolved vocabulary); a parameter of a `~`
+   declaration occurring in any type-reference channel is a resolver error at the declaration. One sentence
+   turns three sections' worth of implication into a direct diagnostic.
+2. **Cross-reference from §5.10's shadowing/label rule** — "shadow where the grammar position admits only
+   references; label wherever a value stands" is the natural place to add "and only in non-constructor
+   templates", since shadowing is precisely the channel whose closure requires substitution.
+3. **Optionally note the why in §8.2**: the labelled-only rule is what makes "constructor applications never
+   materialise" coherent — every argument of a constructor application has a vocabulary slot to land in, so
+   the structural representation is always sufficient.
+
+
+## 45. The size templates are partial applications wearing refinement syntax — `^` over an application misapplies an IS-A rule and hides the closing behind a chain-walk
+
+**Section:** §5.10 ("Templates and Parameters" — the substitution paragraph's "nearest `~` constructor in the
+source chain"); §5.3/§5.6 (size sugar, desugaring table, "Layer visibility"); §8.1 (the `array_ranged` closure
+sentence); §8.2 ("Template Instantiation" — entry shape and worked example); §3.3.1 (the constructor-gate
+exemption); §4.2 and the kernel's `array_min`/`array_max`/`array_ranged` declarations. Related: #44, #31, #28.
+
+**Problem:** the interaction the size templates exist to describe is simple — `array_min<text, 2>` means
+`!array { element_type: text  min_items: 2 }`, a partially-filled construction of `array` completed at the
+application — but the spec reaches that outcome through four cooperating mechanisms: the template is spelled as
+a *refinement* over a constructor application (`array_min => <T, MIN> array<T> ^ { min_items: = MIN }`), §5.7
+materialises the source chain's vocabulary with `value_param` routes, §8.2 materialises an instantiation entry
+per distinct application, and the head of the closed body is discovered by a rule stated about output rather
+than read off the declaration:
+
+> the vocabulary body collapses to a binding record headed by the nearest `~` constructor in the source chain
+> (§5.10)
+
+Two defects follow, one of substance and one of economy.
+
+**(a) The borrowed `^` grants an IS-A whose precondition fails — a category error the spec commits in three
+places.** "Refinement establishes IS-A" is a true rule for refinement over an *instance*: `age => !integer ^
+{ min: 0 }` IS-A `integer`, and both sides are types. The size templates borrow the `^` spelling with a
+constructor *application* as source, and the IS-A rule rides along even though its precondition — a type on
+the left — does not hold. `array` is a constructor: a factory, `constructor: true`, not something a value can
+have as its type; `type_definition.supertypes` is a relation between types, and there is no "array of
+anything" type in the lattice for `[text]`, `[uri]`, `[integer]` to be subtypes of. Those three close to
+`!array` constructions with **empty** `supertypes` — §8.1's own rule, "Construction and instantiation are not
+IS-A", with family membership a `source.name` question — and `[text; 2..]` closes to the *same* `!array`
+construction, so it must record the same. Yet the spec grants sized closures `[array product top]`:
+
+- §5.6: "their closures are ordinary members of the array family, IS-A `array` and substitutable where arrays
+  are expected."
+- §8.1: "a closure of `array_ranged` records `supertypes: [array product top]` — the template's own
+  supertypes."
+- §8.2's entry shape ("`supertypes`: the template's supertypes, unchanged by substitution") and its worked
+  example, `array_ranged_pixel_af3` with `supertypes: [array product top]`.
+
+The result is an asymmetry with no design behind it: three spellings of "an array-family thing" — `[text]`,
+`vector<text, 3>`, `[text; 2..]` — of which the first two record empty `supertypes` and the third records
+three entries headed by a constructor name. The grant is also **inert**: §7.2's subsumption requires the
+*position's* type to appear in the value's type's `supertypes`, and two distinct sized-array entries never
+list each other — both list only `array` — so no sized array was ever admissible at another's position. The
+only substitution it ever enabled was at a position literally typed `array`, which is nameable solely in
+kernel-importing layers and used nowhere in the three bundled schemas. Removing it changes no real program.
+
+**(b) The machinery outweighs the interaction.** The three size templates exist only as the sugar's route to
+`array`'s vocabulary, and everything around them is scaffolding for that one trip: §3.3.1 must exempt "the
+implicit desugar targets" from the `constructor: true` gate precisely because the templates are
+non-constructors an ordinary schema cannot name; §5.6's "Layer visibility" paragraph exists to explain that
+reachability knot; §8.2 must mint an instantiation entry (internal name, structural identity, dedup,
+non-exposure rules) for every `[text; 2..]` while `[text]` stays structural; and the author-facing account of
+what `array_min` *means* routes through §5.7's state-transition table applied to something that was never an
+instance.
+
+**Interpretation chosen** (design-review conclusions; no implementation change yet): sized closures record
+**empty `supertypes`** — the three quoted passages are transcription errors induced by the `^` spelling, not
+design, and family membership is a head question for every construction uniformly. The current implementation
+follows the letter (`DefinitionResolver` completes a `TemplateInstance` by transferring the template's
+supertypes, documented as "what makes a sized array IS-A `array`"); that transfer is scheduled for deletion.
+The redesign below is the recommended resolution and the direction implementation will follow.
+
+**Suggested resolution:** replace refinement-over-application with a form that states the binding directly —
+**named partial applications**.
+
+1. **Application-with-bindings.** Extend the application form to `C<args; member  member ...>`: positional
+   arguments before the `;` bind `C`'s declared parameters; labelled members after it bind further fields of
+   `C`'s vocabulary. Each member is `field: value` (concrete) or `field: = P` (parameter-routed — the `=`
+   kept for §5.7's existing reason: a bare token at a scalar position is always a literal, so only a label
+   can mark a parameter). The `;` means exactly what it means in `[T; 2..]`: "constraint section follows" —
+   `[text; 2..]` *is* `array<text; min_items: 2>` in bracket spelling. §5.6's table already defines an
+   application as a binding record in sugar form (`map<K, V>` → `!map { key_type: K  value_type: V }`); this
+   completes the correspondence by letting the sugar state members the parameters don't cover. The size
+   templates become one-liners: `array_min => <T, MIN> array<T; min_items: = MIN>`.
+2. **Closing is evaluation, not a chain walk.** One sentence replaces the "nearest `~` constructor" rule: *a
+   named partial application is transparent — applying it applies its body with its parameters bound; every
+   application chain terminates at a `~` constructor, so every fully-bound application is a construction of
+   that constructor.* `array_min<text, 2>` is `array<text; min_items: 2>` is `!array { element_type: text
+   min_items: 2 }`. `!array_min` never exists because `array_min` was never a head — it names a
+   partially-filled `!array` record. The head of the result emerges from evaluation instead of being found by
+   a rule about output.
+3. **Template taxonomy by channel** (replacing §5.10's kind-inference framing, and aligning with #44): a
+   **partial application** — body is an application with open bindings, parameters occur only in labelled
+   value channels — closes by *routing*, is carried *structurally*, and never materialises an entry
+   (`array_min`, `text_keyed_map`, `matrix`); a **structural template** — a record or reference body with
+   parameters in type-reference channels — closes by *substitution* and materialises an instantiation entry
+   per §8.2 (`container`, `box`). A constructor MUST be of the first kind (#44's rule), which this syntax
+   makes nearly unstatable-to-violate: `vector => <T, S> ~array<T; min_items: = S  max_items: = S>` has no
+   position for a shadow parameter. (#44 remains needed for the `~product & { ... }` composition form.)
+4. **Two completing rules.** *Slot-binds-once*: a vocabulary slot bound twice along an application chain —
+   positionally and by label, or an outer application rebinding what an inner one supplied — is a resolver
+   error; this replaces the pin-based finality story (`array_min<text, 2; min_items: 5>` fails as a
+   duplicate binding, not as a FIXED-state transition). *No recursion through partial applications*: routing
+   has no entry to tie a knot through, so a cycle of named partial applications is a resolver error;
+   recursion stays with structural templates (§5.10.1), which have entries. Family-coherence checks
+   (`min_items ≤ max_items`) run where they do now, at the point the bindings become concrete.
+5. **Deletions.** §3.3.1's gate exemption and §5.6's "Layer visibility" reachability knot (the sugar now
+   targets the constructor `array` directly, so the gate holds uniformly). The kernel's three size templates
+   (their only normative consumer was the sugar; keep one as §5.10's worked example of a named partial
+   application, which any kernel-importing layer can still declare). §8.2 narrows to structural templates —
+   sized arrays rejoin `[text]` and `vector<text, 3>` as ordinary structural constructions, and the
+   instantiation-entry machinery serves only the case that genuinely needs an entry. `^` comes to mean one
+   thing — refinement of a *named* instance or type — removing the application-source use and, with it, the
+   misapplied IS-A rule that produced defect (a).
+6. **Correct the three IS-A passages regardless** of whether the redesign is adopted: §5.6's "IS-A `array`"
+   sentence, §8.1's `array_ranged` closure sentence, and §8.2's entry shape and example (`supertypes: []`).
+
+Grammar cost is modest: labelled members inside `<>` reuse the existing record-member productions, and the
+lexer — frozen for the series — already emits `;`. Implementation-side the change is mostly deletions: the
+desugarer's sized path converges with the `[T]` path (one injected `!array` construction, no
+`TemplateInstance`), `DefinitionResolver`'s instantiation completion (source flattening, supertype transfer)
+is deleted, application routing gains a labelled-member merge with a duplicate-slot error, and §8.2
+materialisation remains only for the still-unimplemented shadow-channel substitution.
