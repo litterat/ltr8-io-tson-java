@@ -1245,7 +1245,7 @@ compatibility).
   is still fail-fast**, so a sugar-form error aborts before resolution reports anything. And **a read-path
   diagnostic carries `schemaPosition` but no `schemaId`/`schemaPointer`**, which needs the compiled schema's
   identity threaded down the reader stack. Throw-site classification is done across the whole schema
-  pipeline; `BACKLOG.md` has the closing census.
+  pipeline.
 - **Deferred design questions** — `REQUIRED_FIXED`/`OPTIONAL_FIXED` value validation, `value_param` real
   parameter substitution, thread-safety, and a general disk/HTTP-backed `TsonSchemaSource` (with
   whitelist/blacklist policy).
