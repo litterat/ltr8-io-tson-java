@@ -304,16 +304,27 @@ substitution, which this phase does not answer.
   than the ones someone hand-wrote an assembler for.
 - **The head is looked up in the structure namespace only** (the governing meta's entries) and must be
   `constructor: true` with matching arity. The precedence/shadowing consequences are `SPEC-FEEDBACK.md` #28.
-- **The choice sugar takes a second, variadic path** (`choiceInstance`), because per-parameter routing
-  structurally cannot express it: `choice => ~sum & { variants: [type_ref] }` declares no parameters, and its
-  one vocabulary field is a *collection* with no `value_param` to route through. §5.3 names the shape instead
-  — for "the variadic pair, `tuple` and `choice`, arguments map positionally onto `elements` and `variants`"
-  — so every variant becomes one element of that one field. Only the head is fixed here (§5.6's desugaring
-  table fixes it, exactly as `[T]` fixes `array`); the *field* the variants fill is still read off the
-  governing meta by name, so routing stays vocabulary-derived. **`tuple` does not share the method** — its
-  elements are `tuple_element` records rather than bare references — and inline tuple is still unexpanded.
+- **§5.3's variadic pair, `choice` and `tuple`, takes a second path** (`choiceInstance`/`tupleInstance` over
+  a shared `variadicField`), because per-parameter routing structurally cannot express either: neither
+  `choice => ~sum & { variants: [type_ref] }` nor `tuple => ~product & { elements: [tuple_element] }` declares
+  parameters, and the field each fills is a *collection* with no `value_param` to route through. §5.3 names
+  the shape instead — for "the variadic pair, `tuple` and `choice`, arguments map positionally onto `elements`
+  and `variants`" — so every variant/position becomes one element of that one field. Only the head is fixed
+  here (§5.6's desugaring table fixes it, exactly as `[T]` fixes `array`); the *field* is still read off the
+  governing meta as its **sole bare-`REQUIRED` field** (§5.6's own positional-form rule), so routing stays
+  vocabulary-derived. The two halves differ in what one position *is*: a variant is a bare `type_ref`, an
+  element a `tuple_element` record carrying a type **and** its own `ElementState`, so each tuple position
+  needs a record built for it. `state` is written only for an `OPTIONAL` position — the member is
+  `REQUIRED_DEFAULT` (`state: element_state ~ REQUIRED`), so a `REQUIRED` one is spelled by omitting it, as
+  `instanceFor` omits every defaulted field. Its two member names are meta-kernel-fixed constants rather than
+  a second vocabulary lookup one level down, and nothing rides on trust: the emitted body binds through the
+  governing meta's compiled reader, where an undeclared member is `UNRECOGNIZED_FIELD` under §7.2's closure.
   §5.4's "each variant resolves to a distinct type" is deliberately not checked here: it is a question about
   what names *resolve to*, after §8.3 flattening, which this phase can't answer (`BACKLOG.md`).
+- **Both bracket positions desugar, tuple as well as array.** At declaration position the form *is* the
+  construction (`pair => [integer, text]` becomes `!tuple { ... }`, like `ids => [text]` and
+  `contact => (A | B)`); inline it is hoisted into a `tuple_<...>_<hash>` declaration and referenced. A
+  position holding a *nested* bracket form is left unexpanded, the same limit the array side has.
 - **A template application over a constructor is instantiated** (§8.2's one materialising form). §5.3's
   sized sugar is the case that matters: `[T; 1..5]` → `array_ranged<T, 1, 5>`, and `array_ranged` is a
   template (declared without `~`) whose resolved vocabulary carries the same `value_param` channels a
@@ -1198,11 +1209,10 @@ compatibility).
 
 ## Not yet implemented
 
-- **Inline tuple** (`[T, U]` at a field/element/variant position) — `SchemaDesugarer` rebuilds an
-  `InlineTupleRef` unchanged, so it reaches `resolveTypeRef` and throws. The other half of §5.3's variadic
-  pair; the choice half is done, and `choiceInstance` is the shape to follow, though tuple can't reuse it
-  (`tuple_element` records, not bare references). Declaration-position tuple containers are a separate,
-  older gap.
+- **A nested bracket form inside a container** (`[[T; 2], U]`, `[[T]; 3]`) — `SchemaDesugarer` builds
+  neither an array nor a tuple position holding an `ElementType.Expr.Nested`, so the declaration reaches
+  `DefinitionResolver` as a `ContainerTypeDef` and throws. The last piece of §5.3's declaration-level
+  container syntax; both flat forms are done.
 - **Part 2 resolution gaps** — the identity-diagonal
   FIXED-value invariant, a generic type-ref whose argument is nested or a value rather than a plain name,
   and a parameterized supertype (`customer & box<T>`, which needs §5.10 substitution into the absorbed

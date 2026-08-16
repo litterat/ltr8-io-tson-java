@@ -364,8 +364,9 @@ final class DefinitionResolver {
         }
         // A declaration-level container form is rewritten by SchemaDesugarer before resolution -- a sized
         // array into its array_min/array_max/array_ranged application (§5.3), a size-less one into the
-        // `!array { ... }` construction it denotes (§5.6). Anything still here is a shape that phase does
-        // not build (a tuple container, an optional or nested element) and falls through below.
+        // `!array { ... }` construction it denotes (§5.6), and a tuple into `!tuple { elements: [...] }`.
+        // Anything still here is a shape that phase does not build (an optional array element, or a nested
+        // bracket form at either an array's or a tuple's position) and falls through below.
         if (typeDef instanceof TemplateInstance template) {
             return resolveTemplateInstance(name, template);
         }

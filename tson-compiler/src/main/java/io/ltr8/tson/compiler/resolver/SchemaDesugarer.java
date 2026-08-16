@@ -35,6 +35,8 @@ import io.ltr8.tson.compiler.ast.schema.TypeArg;
 import io.ltr8.tson.compiler.ast.schema.TypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeRef;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.schema.meta.ElementState;
+import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -91,6 +93,13 @@ final class SchemaDesugarer {
 
     /** §5.6's desugar target for {@code (A | B)}, fixed by the sugar form rather than named by the author. */
     private static final String CHOICE = "choice";
+
+    /** §5.6's desugar target for {@code [T, U]}, fixed the same way {@link #CHOICE} is. */
+    private static final String TUPLE = "tuple";
+
+    /** {@code tuple_element}'s own two members (§5.3) -- the record one tuple position becomes. */
+    private static final String ELEMENT_TYPE = "element_type";
+    private static final String STATE = "state";
 
     /** The governing meta's entries -- where a constructor's parameter list and vocabulary field names come from. */
     private final Map<String, TypeDefinition> metaEntries;
@@ -186,6 +195,12 @@ final class SchemaDesugarer {
                 Optional<TypeDef> instance = declarationLevelArray(container.container());
                 if (instance.isPresent()) {
                     yield instance.get();
+                }
+                // The tuple half of the same rule: at declaration position the bracket form *is* the
+                // construction, so `pair => [integer, text]` becomes the `!tuple { ... }` it denotes.
+                Optional<TypeDef> tuple = declarationLevelTuple(container.container());
+                if (tuple.isPresent()) {
+                    yield tuple.get();
                 }
                 Optional<GenericRef> sized = sizedArrayApplication(container.container());
                 if (sized.isPresent()) {
@@ -337,19 +352,18 @@ final class SchemaDesugarer {
                 yield hoistChoice(variants,
                         variants == choice.variants() ? choice : new ChoiceRef(variants));
             }
-            // Not yet expandable: DefinitionResolver has never handled a tuple at a type-ref position, so
-            // there is no behaviour here to preserve or break -- it joins the arc once tuple desugaring is
-            // written (the other half of §5.3's variadic pair; see choiceInstance).
             case InlineTupleRef tuple -> {
                 List<TypeRef> elements = mapShared(tuple.elementTypes(), this::typeRef);
-                yield elements == tuple.elementTypes() ? tuple : new InlineTupleRef(elements);
+                yield hoistTuple(elements,
+                        elements == tuple.elementTypes() ? tuple : new InlineTupleRef(elements));
             }
         };
     }
 
     /**
      * A size-less declaration-level array as its own constructor application, or empty for anything this
-     * does not build -- a tuple container, a sized array, an optional element, or a non-plain element.
+     * does not build -- a tuple container ({@link #declarationLevelTuple}'s), a sized array ({@link
+     * #sizedArrayApplication}'s), an optional element, or a non-plain element.
      */
     private Optional<TypeDef> declarationLevelArray(ContainerDef def) {
         if (!(def instanceof ArrayContainerDef array) || array.size().isPresent()
@@ -461,6 +475,48 @@ final class SchemaDesugarer {
         }
         return hoist(syntheticName(CHOICE, variants.stream().<TypeArg>map(TypeArg.Ref::new).toList()),
                 instance.get());
+    }
+
+    /**
+     * §5.3's {@code [T, U]} at a type-ref position, hoisted into its own declaration and replaced by a bare
+     * reference to it -- the treatment {@link #apply}/{@link #hoistChoice} give every other inline form.
+     * Returns {@code unexpanded} when {@link #tupleInstance} cannot build the construction.
+     *
+     * <p>Every inline position is {@code REQUIRED} (see {@link Position}), so the name derives from the
+     * element types alone, and two identical inline tuples anywhere in the document collapse to one
+     * declaration (§8.2's structural-equality rule). No {@link #rejectIfTemplateApplication} counterpart, for
+     * the reason {@link #hoistChoice} has none: §5.6 fixes this head, so it can never be an author's template.
+     */
+    private TypeRef hoistTuple(List<TypeRef> elements, TypeRef unexpanded) {
+        Optional<TypeDef> instance = tupleInstance(elements.stream().map(e -> new Position(e, false)).toList());
+        if (instance.isEmpty()) {
+            return unexpanded;
+        }
+        return hoist(syntheticName(TUPLE, elements.stream().<TypeArg>map(TypeArg.Ref::new).toList()),
+                instance.get());
+    }
+
+    /**
+     * A declaration-level tuple as its own constructor application, or empty for anything this does not build
+     * -- an array container (which {@link #declarationLevelArray}/{@link #sizedArrayApplication} own) or a
+     * position holding a nested bracket form rather than a type-ref, which stays unexpanded and keeps its
+     * existing handling.
+     *
+     * <p>Unlike the inline form, a position here may carry its own {@code ?} (§5.3), which becomes {@link
+     * ElementState#OPTIONAL} on that element.
+     */
+    private Optional<TypeDef> declarationLevelTuple(ContainerDef def) {
+        if (!(def instanceof TupleContainerDef tuple)) {
+            return Optional.empty();
+        }
+        List<Position> positions = new ArrayList<>();
+        for (ElementType element : tuple.elementTypes()) {
+            if (!(element.expr() instanceof ElementType.Expr.Plain plain)) {
+                return Optional.empty();
+            }
+            positions.add(new Position(typeRef(plain.typeRef()), element.optional()));
+        }
+        return tupleInstance(positions);
     }
 
     /** Records an injected declaration under a derived name and yields the reference that replaces the sugar. */
@@ -575,47 +631,126 @@ final class SchemaDesugarer {
     /**
      * §5.6's {@code (A | B | ...)} as the construction it denotes: {@code !choice { variants: [A B ...] } }.
      *
-     * <p><b>Why this is not {@link #instanceFor}.</b> That path routes one argument per vocabulary field, by
-     * the field's own {@code value_param} ({@code element_type: type_ref = T}), which fixes the arity at the
-     * constructor's parameter count. {@code choice} declares no parameters and its single vocabulary field is
-     * a <em>collection</em> ({@code variants: [type_ref]}, no {@code value_param} to route through), so no
-     * per-parameter routing can express it. §5.3 names the shape instead: for "the variadic pair, {@code
-     * tuple} and {@code choice}, arguments map positionally onto {@code elements} and {@code variants}". Every
-     * variant becomes one element of that one field. {@code tuple} is the other half of the pair and does not
-     * share this method -- its elements are {@code tuple_element} records rather than bare references.
-     *
-     * <p>The head is fixed by the sugar form rather than written by the author, exactly as {@code [T]} fixes
-     * {@code array} (§5.6's desugaring table), so it is not looked up from an application's own text. What
-     * <em>is</em> read from the governing meta is the field the variants fill, by name, so the routing still
-     * comes from the vocabulary rather than from a string written here.
-     *
      * <p>Empty -- leaving the choice unexpanded for whoever handles it next -- when the governing meta cannot
-     * supply that vocabulary ({@code choice} absent, not a constructor, or not the single-field record its
-     * kernel declaration gives it), or when a variant did not reduce to a plain name. Variants are expected
-     * already expanded: a nested inline form is hoisted by the caller first, so what arrives here is a
-     * {@link SimpleRef} per variant.
+     * supply {@code choice}'s vocabulary (see {@link #variadicField}), or when a variant did not reduce to a
+     * plain name. Variants are expected already expanded: a nested inline form is hoisted by the caller first,
+     * so what arrives here is a {@link SimpleRef} per variant.
      *
      * <p>Distinctness of the variants (§5.4: "the resolver validates that each variant resolves to a distinct
      * type") is deliberately not checked here -- it is a question about what the names <em>resolve</em> to,
      * after reference flattening, which this phase has no answer to.
      */
     private Optional<TypeDef> choiceInstance(List<TypeRef> variants) {
-        TypeDefinition choice = metaEntries.get(CHOICE);
-        if (choice == null || !choice.constructor() || !(choice.body() instanceof RecordBody vocabulary)
-                || vocabulary.fields().size() != 1) {
+        Optional<RecordField> field = variadicField(CHOICE);
+        if (field.isEmpty()) {
             return Optional.empty();
         }
-        List<ScopedValue> elements = new ArrayList<>();
+        List<ScopedValue> members = new ArrayList<>();
         for (TypeRef variant : variants) {
             if (!(variant instanceof SimpleRef simple)) {
                 return Optional.empty();
             }
-            elements.add(scoped(new TokenValue(simple.name(), TokenForm.UNQUOTED)));
+            members.add(scoped(new TokenValue(simple.name(), TokenForm.UNQUOTED)));
         }
-        RecordValue.Field field = new RecordValue.Field(vocabulary.fields().getFirst().name(),
-                scoped(new ArrayValue(elements)));
-        return Optional.of(new Instance(
-                new DataValue(List.of(), Optional.of(CHOICE), new RecordValue(List.of(field)))));
+        return Optional.of(variadicInstance(CHOICE, field.get().name(), members));
+    }
+
+    /**
+     * §5.6's {@code [T, U, ...]} as the construction it denotes: {@code !tuple { elements: [ { element_type: T
+     * } { element_type: U } ] } } -- the other half of §5.3's variadic pair.
+     *
+     * <p><b>Why this is not {@link #choiceInstance}.</b> Both are variadic, and both fill one collection-typed
+     * vocabulary field, so they share {@link #variadicField} and {@link #variadicInstance}. What differs is
+     * what one position <em>is</em>: a variant is a bare {@code type_ref}, while an element is a {@code
+     * tuple_element} record carrying a type <em>and</em> its own {@link ElementState}, so each position needs a
+     * record built for it rather than a name token. {@code state} is written only for an {@code OPTIONAL}
+     * position -- the member is {@code REQUIRED_DEFAULT} ({@code state: element_state ~ REQUIRED}), so a
+     * {@code REQUIRED} position is spelled by omitting it and letting §5.2's default injection supply it,
+     * exactly as {@link #instanceFor} omits every defaulted vocabulary field.
+     *
+     * <p>The two member names are meta-kernel-fixed like the head itself, so they are constants here rather
+     * than a second vocabulary lookup one level down: {@code tuple_element}'s own type is reachable only
+     * through the array declaration {@code elements} was desugared to, which is a long way to travel for a
+     * name §5.3 states outright. Nothing is taken on trust -- the emitted body is bound through the governing
+     * meta's compiled reader, where a member {@code tuple_element} does not declare is an {@code
+     * UNRECOGNIZED_FIELD} under §7.2's closure rule rather than a silently ignored one.
+     *
+     * <p>Empty when the governing meta cannot supply {@code tuple}'s vocabulary, or when a position did not
+     * reduce to a plain name -- the same conditions {@link #choiceInstance} returns empty under.
+     */
+    private Optional<TypeDef> tupleInstance(List<Position> positions) {
+        Optional<RecordField> field = variadicField(TUPLE);
+        if (field.isEmpty()) {
+            return Optional.empty();
+        }
+        List<ScopedValue> elements = new ArrayList<>();
+        for (Position position : positions) {
+            if (!(position.typeRef() instanceof SimpleRef simple)) {
+                return Optional.empty();
+            }
+            List<RecordValue.Field> members = new ArrayList<>();
+            members.add(new RecordValue.Field(ELEMENT_TYPE,
+                    scoped(new TokenValue(simple.name(), TokenForm.UNQUOTED))));
+            if (position.optional()) {
+                members.add(new RecordValue.Field(STATE,
+                        scoped(new TokenValue(ElementState.OPTIONAL.name(), TokenForm.UNQUOTED))));
+            }
+            elements.add(scoped(new RecordValue(members)));
+        }
+        return Optional.of(variadicInstance(TUPLE, field.get().name(), elements));
+    }
+
+    /**
+     * One position of a tuple after expansion: the type it names, and whether the declaration marked it
+     * {@code OPTIONAL}. An inline tuple's positions are always {@code REQUIRED} -- {@code
+     * TsonSchemaParser.parseInlineElement} rejects a {@code ?} at an inline type-ref position (§5.3) -- so the
+     * flag only ever varies for the declaration-position form.
+     */
+    private record Position(TypeRef typeRef, boolean optional) {
+    }
+
+    /**
+     * The one vocabulary field a variadic constructor's arguments map onto (§5.3: "for the variadic pair,
+     * {@code tuple} and {@code choice}, arguments map positionally onto {@code elements} and {@code
+     * variants}"), or empty when the governing meta cannot supply it -- the head absent, not a constructor,
+     * not record-shaped, or not carrying exactly one such field.
+     *
+     * <p><b>Why the variadic pair needs this at all, rather than {@link #instanceFor}.</b> That path routes
+     * one argument per vocabulary field by the field's own {@code value_param} ({@code element_type: type_ref
+     * = T}), which fixes the arity at the constructor's parameter count. Neither {@code choice} nor {@code
+     * tuple} declares parameters, and the field each fills is a <em>collection</em> ({@code variants:
+     * [type_ref]}, {@code elements: [tuple_element]}) with no {@code value_param} to route through, so no
+     * per-parameter routing can express either one.
+     *
+     * <p>The field is identified as the sole bare {@code REQUIRED} one -- §5.6's own positional-form rule,
+     * which is what makes it the field a bare argument list fills. That is read off the governing meta rather
+     * than written here, so the routing stays vocabulary-derived even though the <em>head</em> is fixed by the
+     * sugar form (exactly as {@code [T]} fixes {@code array}, §5.6's desugaring table) rather than named by an
+     * author.
+     */
+    private Optional<RecordField> variadicField(String head) {
+        TypeDefinition constructor = metaEntries.get(head);
+        if (constructor == null || !constructor.constructor()
+                || !(constructor.body() instanceof RecordBody vocabulary)) {
+            return Optional.empty();
+        }
+        RecordField sole = null;
+        for (RecordField field : vocabulary.fields()) {
+            if (field.state() != FieldState.REQUIRED) {
+                continue;
+            }
+            if (sole != null) {
+                return Optional.empty();
+            }
+            sole = field;
+        }
+        return Optional.ofNullable(sole);
+    }
+
+    /** {@code !head { field: [ members... ] } } -- the construction a variadic sugar form denotes. */
+    private static TypeDef variadicInstance(String head, String field, List<ScopedValue> members) {
+        RecordValue.Field bound = new RecordValue.Field(field, scoped(new ArrayValue(members)));
+        return new Instance(new DataValue(List.of(), Optional.of(head), new RecordValue(List.of(bound))));
     }
 
     /** A bare value in a field or element position -- no schema directive, no annotations, no type-ref of its own. */
