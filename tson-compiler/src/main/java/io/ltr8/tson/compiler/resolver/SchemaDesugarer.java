@@ -1,5 +1,7 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.compiler.ast.ArrayValue;
+import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.ScopedValue;
@@ -86,6 +88,9 @@ import java.util.function.UnaryOperator;
  * read that reached the field. See {@link #rejectIfTemplateApplication} for what is and is not covered.
  */
 final class SchemaDesugarer {
+
+    /** §5.6's desugar target for {@code (A | B)}, fixed by the sugar form rather than named by the author. */
+    private static final String CHOICE = "choice";
 
     /** The governing meta's entries -- where a constructor's parameter list and vocabulary field names come from. */
     private final Map<String, TypeDefinition> metaEntries;
@@ -501,8 +506,7 @@ final class SchemaDesugarer {
             if (token.isEmpty()) {
                 return Optional.empty();
             }
-            fields.add(new RecordValue.Field(field.name(),
-                    new ScopedValue(Optional.empty(), new DataValue(List.of(), Optional.empty(), token.get()))));
+            fields.add(new RecordValue.Field(field.name(), scoped(token.get())));
         }
         if (fields.isEmpty()) {
             return Optional.empty();
@@ -514,6 +518,57 @@ final class SchemaDesugarer {
         }
         checkBounds(head, fields);
         return Optional.of(new TemplateInstance(new GenericRef(head, args), body));
+    }
+
+    /**
+     * §5.6's {@code (A | B | ...)} as the construction it denotes: {@code !choice { variants: [A B ...] } }.
+     *
+     * <p><b>Why this is not {@link #instanceFor}.</b> That path routes one argument per vocabulary field, by
+     * the field's own {@code value_param} ({@code element_type: type_ref = T}), which fixes the arity at the
+     * constructor's parameter count. {@code choice} declares no parameters and its single vocabulary field is
+     * a <em>collection</em> ({@code variants: [type_ref]}, no {@code value_param} to route through), so no
+     * per-parameter routing can express it. §5.3 names the shape instead: for "the variadic pair, {@code
+     * tuple} and {@code choice}, arguments map positionally onto {@code elements} and {@code variants}". Every
+     * variant becomes one element of that one field. {@code tuple} is the other half of the pair and does not
+     * share this method -- its elements are {@code tuple_element} records rather than bare references.
+     *
+     * <p>The head is fixed by the sugar form rather than written by the author, exactly as {@code [T]} fixes
+     * {@code array} (§5.6's desugaring table), so it is not looked up from an application's own text. What
+     * <em>is</em> read from the governing meta is the field the variants fill, by name, so the routing still
+     * comes from the vocabulary rather than from a string written here.
+     *
+     * <p>Empty -- leaving the choice unexpanded for whoever handles it next -- when the governing meta cannot
+     * supply that vocabulary ({@code choice} absent, not a constructor, or not the single-field record its
+     * kernel declaration gives it), or when a variant did not reduce to a plain name. Variants are expected
+     * already expanded: a nested inline form is hoisted by the caller first, so what arrives here is a
+     * {@link SimpleRef} per variant.
+     *
+     * <p>Distinctness of the variants (§5.4: "the resolver validates that each variant resolves to a distinct
+     * type") is deliberately not checked here -- it is a question about what the names <em>resolve</em> to,
+     * after reference flattening, which this phase has no answer to.
+     */
+    private Optional<TypeDef> choiceInstance(List<TypeRef> variants) {
+        TypeDefinition choice = metaEntries.get(CHOICE);
+        if (choice == null || !choice.constructor() || !(choice.body() instanceof RecordBody vocabulary)
+                || vocabulary.fields().size() != 1) {
+            return Optional.empty();
+        }
+        List<ScopedValue> elements = new ArrayList<>();
+        for (TypeRef variant : variants) {
+            if (!(variant instanceof SimpleRef simple)) {
+                return Optional.empty();
+            }
+            elements.add(scoped(new TokenValue(simple.name(), TokenForm.UNQUOTED)));
+        }
+        RecordValue.Field field = new RecordValue.Field(vocabulary.fields().getFirst().name(),
+                scoped(new ArrayValue(elements)));
+        return Optional.of(new Instance(
+                new DataValue(List.of(), Optional.of(CHOICE), new RecordValue(List.of(field)))));
+    }
+
+    /** A bare value in a field or element position -- no schema directive, no annotations, no type-ref of its own. */
+    private static ScopedValue scoped(CoreValue value) {
+        return new ScopedValue(Optional.empty(), new DataValue(List.of(), Optional.empty(), value));
     }
 
     /**
