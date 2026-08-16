@@ -50,6 +50,9 @@ own prose (which had gone stale on at least one of them):
     no entry to collide with — so it is a symptom, not a separate item.
   - `DefinitionResolver.resolveTypeRef` already contains a structural branch for `InlineArrayRef`, dead in
     practice because the desugarer rewrites the node first. It is the shape the fix generalizes.
+  - `SPEC-FEEDBACK.md` #45 shrinks the eventual target: once sized forms are constructions too (see the
+    template-construction item below), §8.2's legitimately-materialised entries are structural-template
+    instantiations only, so the structural-carrying fix has one less form to represent.
 - [ ] **Inline tuple is still unexpanded** — the other half of §5.3's variadic pair. `SchemaDesugarer.typeRef`
   rebuilds an `InlineTupleRef` unchanged, so `[T, U]` at a field position reaches `resolveTypeRef` and
   throws. The choice half is done and `choiceInstance` is the shape to follow, but tuple does not share it:
@@ -88,15 +91,57 @@ own prose (which had gone stale on at least one of them):
     `anUnprovableDisjointAssertionIsSilentForNow` pins the current silence and flips to assert the error when
     this lands (tracked under "Diagnostics" below). Exact regex-pattern disjointness (the item above) shrinks
     the case first: it turns an unprovable pattern choice into a proved or refuted one.
-- [ ] **§5.10 substitution into a template *body*.** Half of template application works. A template that
-  refines a constructor — `array_ranged => <T, MIN, MAX> array<T> ^ { min_items: = MIN  max_items: = MAX }`,
-  and therefore §5.3's sized sugar — instantiates per §8.2, because its resolved vocabulary carries the same
-  `value_param` channels a constructor's does, so the arguments route by the same mechanism and the binding
-  record is headed at the nearest `~` constructor. What is left is a template whose parameter appears as a
-  **field type** (`box => <T> { v: T }`): instantiating that means rewriting the body with `T` replaced,
-  which is substitution proper. Rejected at the application site today
-  (`SchemaDesugarer.rejectIfTemplateApplication`), so it fails where it is written rather than at a read
-  that may never happen.
+- [ ] **Template construction — the `SPEC-FEEDBACK.md` #44/#45/#46 conclusions, staged.** The design review
+  settled the type-constructor-vs-template question: a **partial application** (parameters only in labelled
+  value channels — `array_min`, and §5.3's sized sugar) closes by *routing* and is a construction of its
+  head constructor, with **no instantiation entry and no IS-A** (`supertypes: [array product top]` on sized
+  closures was a category error — a constructor is not a type — and the grant was inert); a **structural
+  template** (parameters in type-reference channels — `box => <T> { v: T }`) closes by *substitution* and
+  becomes §8.2's **only** materialising form; a constructor's parameters are labelled-only (#44); and
+  deriving from a constructor requires a `~` result (#46). Split by what gates on a spec revision:
+  - **This cycle** (each corrects or converges on agreed-wrong spec letter; no revision needed first):
+    - [ ] **Stop transferring the template's supertypes onto a sized-array instantiation** — sized closures
+      record empty `supertypes`, like every other construction. The minimum safe move if everything else
+      holds: it is a pure error correction (#45's defect (a)), nothing valid depends on the grant, and the
+      bundled schemas never exercise it. `DefinitionResolver`'s `TemplateInstance` completion and the tests
+      pinning IS-A `array` are the touch points.
+    - [ ] **Desugar the sized forms straight to the `!array` construction the routing already produces** —
+      closing-by-evaluation, reachable today through the existing `[T; N..M]` spelling, no new syntax
+      needed. Deletes the `TemplateInstance` node and its `DefinitionResolver` completion (source
+      flattening, supertype transfer) outright; a named application in a kernel-importing context
+      (`array_ranged<text, 3, 3>`) emits the same plain construction via its routed channels.
+      `checkBounds` and the vacuous-`[T; 0..]` rejection stay put — the sugar site is still where bounds
+      close. The kernel's three template *declarations* still resolve as entries (the bundled document is
+      unchanged until the revision); the sugar just stops routing through them. Resolved output diverges
+      from §8.2's worked example, deliberately — the spec author has confirmed the example wrong, and no
+      bundled schema or fixture exercises a sized form.
+    - [ ] **#44's declaration-time check**: a `~` declaration with a parameter occurrence outside a
+      labelled value channel is a `TsonSchemaValidationException` at the declaration. No valid schema is
+      affected (the kernel audit in #46 found zero violations among constructors); today the incoherence
+      surfaces as downstream wrong-layer failures.
+  - **Waits for the spec revision** (grammar or kernel-document changes — implementing ahead would diverge
+    from rev 32 rather than converge on the agreed design):
+    - The `C<args; member ...>` application-with-bindings surface form (#45) — a normative grammar change;
+      until then the sized sugar is the only spelling of a partial application of `array`.
+    - The kernel respell — size templates deleted (or one kept as §5.10's worked example) and `vector`
+      restated in the new form — with re-pinned content hashes, refreshed `spec/` snapshots, and updated
+      resolved fixtures.
+    - **#46 enforcement** (a constructor operand in `^`/`&`/subtraction requires a `~` result): enabling it
+      today fails the bundled meta-kernel's own three size templates — the rule and the kernel fix must
+      land together.
+    - §3.3.1's constructor-gate exemption removal as spec text (the implementation's special-casing goes
+      with the direct-desugar item above regardless).
+    - The slot-binds-once and no-partial-application-recursion rules — meaningful only once the new form
+      exists.
+    - Conformance-suite vectors for any of this — blocked twice over: the suite has no Part 2 layer at all
+      yet (see "Conformance test suite").
+- [ ] **§5.10 substitution into a template *body* — now the sole materialising form.** What remains of
+  template application after the item above: a template whose parameter appears as a **field type**
+  (`box => <T> { v: T }`), where instantiating means rewriting the body with `T` replaced — substitution
+  proper. Rejected at the application site today (`SchemaDesugarer.rejectIfTemplateApplication`), so it
+  fails where it is written rather than at a read that may never happen. Unaffected by the #45 staging:
+  structural templates exist in rev 32 and keep their semantics under the redesign, so this can proceed
+  independently, before or after the revision.
   - Belongs in the same phase, as another `TemplateInstance`-producing path: the body comes from the
     template's own AST with parameters replaced, rather than from a vocabulary.
   - **Requires a termination guard.** Non-regular (polymorphic) recursion like
