@@ -209,6 +209,19 @@ final class SchemaDesugarer {
                 if (!reference.typeParams().isEmpty()) {
                     yield reference;
                 }
+                // §5.4: a declaration whose body is the choice sugar *is* that construction, so it becomes
+                // the instance itself rather than a reference to an injected one -- which is what makes
+                // `contact => (email | phone)` a SUM entry with a real ChoiceBody instead of a REFERENCE to
+                // one. Same treatment declarationLevelArray gives `[T]` at declaration position.
+                if (reference.ref() instanceof ChoiceRef choice) {
+                    List<TypeRef> variants = mapShared(choice.variants(), this::typeRef);
+                    Optional<TypeDef> instance = choiceInstance(variants);
+                    if (instance.isPresent()) {
+                        yield instance.get();
+                    }
+                    yield variants == choice.variants() ? reference
+                            : new ReferenceTypeDef(reference.typeParams(), new ChoiceRef(variants));
+                }
                 TypeRef ref = argumentsOnly(reference.ref());
                 // §5.6: a declaration whose body is a fully-bound application resolves as a construction, so
                 // it becomes the instance itself rather than a reference to an injected one -- which is what
@@ -319,16 +332,17 @@ final class SchemaDesugarer {
                 yield apply(generic.name(), args,
                         args == generic.args() ? generic : new GenericRef(generic.name(), args));
             }
-            // Not yet expandable: DefinitionResolver has never handled either at a type-ref position, so
-            // there is no behaviour here to preserve or break -- they join the arc once tuple/choice
-            // desugaring is written.
+            case ChoiceRef choice -> {
+                List<TypeRef> variants = mapShared(choice.variants(), this::typeRef);
+                yield hoistChoice(variants,
+                        variants == choice.variants() ? choice : new ChoiceRef(variants));
+            }
+            // Not yet expandable: DefinitionResolver has never handled a tuple at a type-ref position, so
+            // there is no behaviour here to preserve or break -- it joins the arc once tuple desugaring is
+            // written (the other half of §5.3's variadic pair; see choiceInstance).
             case InlineTupleRef tuple -> {
                 List<TypeRef> elements = mapShared(tuple.elementTypes(), this::typeRef);
                 yield elements == tuple.elementTypes() ? tuple : new InlineTupleRef(elements);
-            }
-            case ChoiceRef choice -> {
-                List<TypeRef> variants = mapShared(choice.variants(), this::typeRef);
-                yield variants == choice.variants() ? choice : new ChoiceRef(variants);
             }
         };
     }
@@ -411,10 +425,32 @@ final class SchemaDesugarer {
             rejectIfTemplateApplication(head);
             return unexpanded;
         }
-        String name = syntheticName(head, args);
+        return hoist(syntheticName(head, args), instance.get());
+    }
+
+    /**
+     * §5.4's {@code (A | B)} at a type-ref position, hoisted into its own declaration and replaced by a bare
+     * reference to it -- the treatment {@link #apply} gives every other inline form. Returns {@code
+     * unexpanded} when {@link #choiceInstance} cannot build the construction.
+     *
+     * <p>The name is derived through {@link #syntheticName} from the variants themselves, so two identical
+     * inline choices anywhere in the document collapse to one declaration (§8.2's structural-equality rule).
+     * There is no {@link #rejectIfTemplateApplication} counterpart here: §5.6 fixes this head, so it can
+     * never be an author's template.
+     */
+    private TypeRef hoistChoice(List<TypeRef> variants, TypeRef unexpanded) {
+        Optional<TypeDef> instance = choiceInstance(variants);
+        if (instance.isEmpty()) {
+            return unexpanded;
+        }
+        return hoist(syntheticName(CHOICE, variants.stream().<TypeArg>map(TypeArg.Ref::new).toList()),
+                instance.get());
+    }
+
+    /** Records an injected declaration under a derived name and yields the reference that replaces the sugar. */
+    private TypeRef hoist(String name, TypeDef instance) {
         if (!imported.contains(name)) {
-            injected.computeIfAbsent(name,
-                    n -> new SchemaMap.Declaration(List.of(), n, List.of(), instance.get()));
+            injected.computeIfAbsent(name, n -> new SchemaMap.Declaration(List.of(), n, List.of(), instance));
         }
         return new SimpleRef(name);
     }
