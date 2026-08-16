@@ -293,16 +293,27 @@ left:
   declaration position it stamped, not which entry of which schema produced it, so a value error reports
   `110:3:4858` with nothing saying that is core.tn's line for `int32`. Threading the compiled schema's
   identity down the reader stack is what closes it.
-- [ ] **Finish classifying the throw sites outside `DefinitionResolver`.** Census across the schema pipeline
-  (parser, desugarer, resolvers, linker, compiler, registries, `TsonCanonicalIdentity`): 13
-  `UnsupportedOperationException` (*library gaps*), 52 `TsonSchemaValidationException` (author errors —
-  though 11 are `TsonCanonicalIdentity` `!!id` string checks, inherently positionless), 16
-  `IllegalStateException` (invariants/faults), 3 `TsonParseException` (schema syntax, already positioned).
-  Only a validation exception is collected into a `Diagnostic`, so a misfiled author error both aborts the
-  run and tells the author their correct schema is this library's fault. The test, from Swift's treatment of
-  `expression_too_complex`: **a schema error's verdict doesn't change when the library improves; a gap's
-  does.** `DefinitionResolver`'s `!`-position sites and `TsonSchemaSource.registeredOnly` are done;
-  everywhere else still wants the pass.
+- [x] **Finish classifying the throw sites outside `DefinitionResolver`.** The test, from Swift's treatment
+  of `expression_too_complex`: **a schema error's verdict doesn't change when the library improves; a gap's
+  does.** Only a `TsonSchemaValidationException` is collected into a `Diagnostic`, so a misfiled author error
+  both aborts the run and tells the author their correct schema is this library's fault. Current census
+  across the schema pipeline proper (parser, desugarer, resolvers, linker, compiler, registries,
+  `TsonCanonicalIdentity`): 2 `UnsupportedOperationException`, 29 `TsonSchemaValidationException` (11 of them
+  `TsonCanonicalIdentity` `!!id` string checks, inherently positionless), 11 `IllegalStateException`, 3
+  `TsonParseException` (schema syntax, already positioned). Every one re-read and judged; one genuine
+  misfiling found and fixed — `TsonCompiledMetaRegistry.crossCheckId`'s two §2.2.1 cross-checks (a reference
+  whose target embeds a different `!!id`; a hash-pinned reference to an `!!id`-less document) were
+  `IllegalStateException`, which `Tson.validateSchema` rethrows, so `tson compile` on a schema whose
+  `!!import` names a misidentified document exited 70 with a stack trace instead of reporting it. Now
+  `TsonSchemaValidationException`, matching the `TsonSchemaLinker.notAMetaSchema` precedent in the same file.
+  The read path was unaffected — `TsonTreeReader.readAgainstSchema` catches `RuntimeException` wholesale and
+  renders it `SCHEMA_ERROR`, which is why the leak only ever showed on the schema-side entry point.
+  - One judgment call left deliberately alone: `MetaKernelBootstrapResolver.NEVER_CALLED` is an
+    `UnsupportedOperationException` guarding a path unreachable by construction (meta-kernel resolves every
+    instance through `instanceBody`, never through `DefinitionResolver`). It is neither an author error nor a
+    gap the library will fill, so by the test above it is an invariant and reads better as an
+    `IllegalStateException` — but it is a documented loud-failure guard, so changing it is cosmetic. Noted so
+    a later triage of `UnsupportedOperationException` sites doesn't count it as a real gap.
 - [ ] **A schema *parse* error is still fail-fast, and names a token class rather than a construct.**
   Everything downstream of parsing now reports many problems; parsing itself reports one and stops, so an
   author fixes a syntax error, re-runs, and meets the next. The message is also pitched at the wrong level
