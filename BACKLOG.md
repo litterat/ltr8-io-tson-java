@@ -77,14 +77,16 @@ own prose (which had gone stale on at least one of them):
     longer required**: `ChoiceDisjointness` moved into `tson-compiler` with the linker, and that module
     already requires `tson-regex`, so `isDisjointFrom` is a direct call rather than an oracle injected from
     outside. See `SPEC-FEEDBACK.md` #23 for the load-bearing ambiguity underneath all of this.
-  - [ ] **The `@disjoint` assertion check** — an author's `@disjoint` marker checked against the derived
-    fact: proved (silent), refuted / provably-not (resolver error), unprovable (warning), absent (no
-    check). This is where exact regex-pattern disjointness (`isDisjointFrom`, called directly — see above)
-    pays off — turning an otherwise-"unprovable" pattern choice into a proved-or-refuted one. **No longer
-    blocked**: a declaration's annotations now reach the resolved model, on `TypeDefinition` when written
-    after `=>` and on the schema map's key when written before the name, so the linker can read a
-    `@disjoint` marker where `disjoint` is derived. Nothing in the bundled schemas actually writes one yet,
-    so the checker's own fixtures have to supply it.
+  - [ ] **The `@disjoint` assertion check — the unprovable case only.** Three of §5.4's four outcomes are
+    done in `TsonSchemaLinker.checkDisjointAssertions`: proved is silent, refuted is a resolver error, and
+    an unannotated choice is asked nothing (§5.4 is explicit that the warnable condition is the unverifiable
+    *assertion*, never mere non-disjointness). What is left is **unprovable → warning**, which is blocked on
+    the severity axis under "Diagnostics" below and nothing else: every `Diagnostic` is an error, so
+    reporting it would fail a schema §5.4 calls legal — the worse of the two wrong answers.
+    `anUnprovableDisjointAssertionIsSilentForNow` pins the current behaviour so that adding severities is a
+    deliberate change rather than an accident. Exact regex-pattern disjointness (the item above) is what
+    would shrink this case: it turns an unprovable pattern choice into a proved or refuted one, and refuted
+    is already expressible, so it pays off without waiting for severities.
 - [ ] **§5.10 substitution into a template *body*.** Half of template application works. A template that
   refines a constructor — `array_ranged => <T, MIN, MAX> array<T> ^ { min_items: = MIN  max_items: = MAX }`,
   and therefore §5.3's sized sugar — instantiates per §8.2, because its resolved vocabulary carries the same

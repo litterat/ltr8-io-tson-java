@@ -542,7 +542,11 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   **a choice's variants are checked distinct** (§5.4) *after* §8.3 flattening, since an alias and its target
   are one type — so `(text | my_text)` with `my_text => text` is caught, which comparing the written names
   would miss and which is the only spelling an author can't see for themselves; the walk stops on a
-  reference cycle rather than hanging, cycle diagnosis being its own unimplemented concern;
+  reference cycle rather than hanging, cycle diagnosis being its own unimplemented concern; **an author's
+  `@disjoint` marker is checked against the derived fact** (§5.4) — refuted is an error, proved is silent,
+  and *unprovable* is silent too, because `Diagnostic` has no severity and §5.4 asks for a warning there
+  (reporting it would fail a schema the spec calls legal); the marker is read from both places §6 puts it,
+  the definition and the map key, which is why the check runs last, after `withNameAnnotations`;
   and a **constructor-eligibility** check with two halves, the same §2.2.2 question asked from both ends
   (see `SPEC-FEEDBACK.md` #19): a locally-declared `constructor: true` entry is valid only if the schema's
   `!!meta` is exactly meta-kernel's identity, and a schema named as this one's **`!!meta` target** is valid
