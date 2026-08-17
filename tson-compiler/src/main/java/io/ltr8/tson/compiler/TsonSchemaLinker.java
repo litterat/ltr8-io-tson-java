@@ -542,12 +542,13 @@ public final class TsonSchemaLinker {
             validateTypeRef(def.source().get(), sourceLookup, def.parameters(), "'" + name + "' source");
         }
         // A supertype gets the same structure-namespace fallback as `source`, and for the same reason: it is
-        // not an author-written reference but the residue of one. A §8.2 template instantiation keeps "the
-        // template's supertypes, unchanged by substitution", and a kernel template's chain begins at the
-        // constructor it refines and continues into the base kinds -- a closure of `array_ranged` materialised
-        // in a user schema carries [array, product, top], none of which that schema can name. §3.3.2 confines
-        // author-written type-refs to the type-name namespace; it does not speak to a derived chain, and §8.2
-        // mandates one that routinely leaves it. The spec does not reconcile the two -- see SPEC-FEEDBACK.md.
+        // not an author-written reference but the residue of one, and §3.3.2 confines only author-written
+        // type-refs to the type-name namespace (SPEC-FEEDBACK.md #32). A derived chain reaches a constructor
+        // whenever a refinement derives from one -- meta-kernel's own `array_min => <T, MIN> array<T> ^ {...}`
+        // resolves with [array, product, top]. The fallback is defensive rather than load-bearing today: a
+        // refinement source resolves through the type-name namespace alone, so a schema deriving from `array`
+        // already names it. What did need it -- §8.2's transfer of a template's supertypes onto every sized
+        // array materialised in a user schema -- is gone (SPEC-FEEDBACK.md #45).
         for (String supertype : def.supertypes()) {
             if (!namespace.containsKey(supertype) && !structureNamespace.containsKey(supertype)) {
                 throw new TsonSchemaValidationException("'" + name + "' has an unresolved supertype '" + supertype + "'");

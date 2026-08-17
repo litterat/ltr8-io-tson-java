@@ -83,8 +83,12 @@ substitution, which this phase does not answer.
   constructor's does — so the *same* routing code handles it, with one difference: the emitted binding record
   is headed at the nearest `~` constructor in the source chain (`!array`, §5.6), not at the template. The
   result is a `TemplateInstance` AST node — no surface syntax corresponds to it — which `DefinitionResolver`
-  completes with the two things a construction doesn't carry: §8.2's `source` (the flattened application) and
-  the template's supertypes, unchanged, which is what makes a sized array IS-A `array`. §8.2's deferred
+  completes with the one thing a construction doesn't carry: §8.2's `source`, the flattened application.
+  §8.2's "the template's supertypes, unchanged by substitution" is **not** implemented (`SPEC-FEEDBACK.md`
+  #45): a size template's chain begins at the constructor it refines, and a constructor is not a type
+  anything can be a subtype of, so a sized array records empty `supertypes` exactly as `[T]` and
+  `vector<T, N>` do. The template's *own* entry keeps its chain — this phase walks it to find the head.
+  §8.2's deferred
   `min_items <= max_items` check runs here too, at the materialising application. So does the rejection of
   a **vacuous `[T; 0..]`**: §5.3 calls the form vacuous and asks for a warning while desugaring it anyway,
   and `SPEC-FEEDBACK.md` #42 rejects the spelling instead — §5.3's own sentence says why it is worth
