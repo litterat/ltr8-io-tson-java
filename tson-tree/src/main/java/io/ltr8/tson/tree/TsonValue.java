@@ -19,16 +19,17 @@ import java.util.stream.Stream;
  * deliberately doesn't, and drops lexical detail (token quoting) the parse tree keeps.
  *
  * <p><b>Navigation never throws.</b> {@link #get}/{@link #at} return {@link TsonMissing} for an absent
- * field/index, so a deep {@code node.at("/orders/3/total").asBigDecimal()} chain is null-safe. "Missing"
- * (no such node in the tree), "null" (the {@code null} token, {@link TsonNull}), and "absent" (the {@code
- * _} sentinel, {@link TsonAbsent}) are three distinct kinds. A lenient chain still says <em>where</em> it
+ * field/index, so a deep {@code node.at("/orders/3/total").asBigDecimal()} chain is null-safe. "Absent"
+ * (a position that was written but holds no value -- the {@code _} sentinel or its alternate spelling
+ * {@code null}, {@link TsonAbsent}) and "missing" (no such node in the tree at all, {@link TsonMissing})
+ * are distinct kinds. A lenient chain still says <em>where</em> it
  * failed: the missing carries the pointer of the step that failed, readable via {@link #missingPath()}.
  *
  * <p>Every node carries its own {@link #typeRef()} (the wire or schema type, e.g. {@code "int32"} or
  * {@code "person"}) and {@link #annotations()}.
  */
 public sealed interface TsonValue
-        permits TsonRecord, TsonMap, TsonArray, TsonTuple, TsonAtom, TsonNull, TsonAbsent, TsonMissing {
+        permits TsonRecord, TsonMap, TsonArray, TsonTuple, TsonAtom, TsonAbsent, TsonMissing {
 
     /** This value's own type-ref (e.g. {@code "int32"}, {@code "uuid"}, {@code "person"}), if the wire or schema gave one. */
     Optional<String> typeRef();
@@ -63,7 +64,6 @@ public sealed interface TsonValue
             case TsonArray n -> new TsonArray(n.elements(), n.typeRef(), merged);
             case TsonTuple n -> new TsonTuple(n.elements(), n.typeRef(), merged);
             case TsonAtom n -> new TsonAtom(n.value(), n.typeRef(), merged);
-            case TsonNull n -> new TsonNull(n.typeRef(), merged);
             case TsonAbsent n -> new TsonAbsent(n.typeRef(), merged);
             case TsonMissing n -> n;
         };
@@ -76,7 +76,6 @@ public sealed interface TsonValue
     default boolean isArray()     { return false; }
     default boolean isTuple()     { return false; }
     default boolean isAtom()      { return false; }
-    default boolean isNull()      { return false; }
     default boolean isAbsent()    { return false; }
     default boolean isMissing()   { return false; }
     default boolean isContainer() { return isRecord() || isMap() || isArray() || isTuple(); }

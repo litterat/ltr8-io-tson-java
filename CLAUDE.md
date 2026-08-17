@@ -325,10 +325,14 @@ annotations in §7.4 order; `toTson` is mainly a debugging tool with documented 
 
 ### Tree model: `TsonValue` (`tson-tree`) — `docs/facades-and-tree.md`
 
-A sealed `TsonValue` over eight pure immutable node types (`TsonRecord`/`TsonMap`/`TsonArray`/`TsonTuple`/
-`TsonAtom`/`TsonNull`/`TsonAbsent`/`TsonMissing`), structure-preserving and annotation-aware. No `Node`
+A sealed `TsonValue` over seven pure immutable node types (`TsonRecord`/`TsonMap`/`TsonArray`/`TsonTuple`/
+`TsonAtom`/`TsonAbsent`/`TsonMissing`), structure-preserving and annotation-aware. No `Node`
 suffix (deliberate, against Jackson's names). `get`/`at` never throw — a `TsonMissing` carries the RFC 6901
-pointer of the step that failed. Two accessor families with different questions: `as(Class)`/`asString`/…
+pointer of the step that failed. **One no-value node, no separate null node**: `TsonAbsent` carries `_`, the
+`null` token where §4 base resolution applies (schemaless data and `value` positions), and a collecting-mode
+read failure. Under a schema `null` stays ordinary text — §7.3's concession is local to `void`, and lives in
+`VoidReader`, never in the lexer or `TsonDataStream`.
+Two accessor families with different questions: `as(Class)`/`asString`/…
 **cast** ("what host type did the read produce?"), `asInt`/`asLong`/`asDouble` **convert** ("what number is
 this?") — a test asserting which host type a reader produced must use `as(Class)`. Read-side only; no
 builders or transforms yet.

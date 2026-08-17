@@ -81,6 +81,14 @@ Key points:
   named group repeating across alternation).
 - **Quoted tokens always resolve to `StringValue`** regardless of content (§4.4) — form is consulted once,
   here. `"42"` and unquoted `42` differ even though their text is identical.
+- **§4's applicability clause is load-bearing, and `BaseValue.NullValue` is where it shows.** Base
+  resolution runs only where no declared type is in scope, so the `null` token identifies as a value on
+  exactly one path: schemaless data, plus `value`-typed positions, whose atom contract *is* "run base
+  resolution". Under a schema every other position hands the token to its own declared atom and `null` is
+  ordinary text ([TSON-SCHEMA] §7.3) — which is why nothing normalizes `null` in the lexer or in
+  `TsonDataStream`, where it would strip `null` out of the token vocabulary for `enum`/`token`/FIXED-`text`
+  positions too. The tree model spells the null base value `TsonAbsent` (`docs/facades-and-tree.md`); bind
+  mode binds it to Java `null`.
 - **§9.1's numeric-literal length limit** (SHOULD, 4096 digits, DoS-hardening) is **not enforced** — noted
   so it isn't mistaken for an oversight.
 

@@ -242,6 +242,20 @@ all, with no decoder integration required.
   *against a TSON schema* is the case that matters: accepting a duplicate there means validating a
   document the JDK's own parser would reject.
 
+- [ ] **JSON `null` at a non-`void` position reads as the string `"null"`, and that is the spec's answer,
+  not a bug.** [TSON-SCHEMA] §7.3 gives `null` no special status under a schema — "their meaning is
+  determined entirely by the position's type" — with a single concession at `void`-typed positions, where it
+  is accepted as a spelling of `_` (`VoidReader` implements it). So a JSON-shaped `"nickname": null` aimed at
+  an OPTIONAL `text?` field satisfies the `text` contract and lands as the four-character string, where an
+  LLM emitting it means absence. This is the one place JSON's two states (present / `null`) and TSON's three
+  (omitted / `_` / `null`) fail to line up in the direction that matters here, and no front-end can paper
+  over it silently: a `TsonJsonParser` producing the same AST inherits the position-driven behaviour exactly
+  as the duplicate-member rule above does. The options are to widen §7.3's concession to every
+  absence-admitting position (a spec change — the single-inhabitant argument that justifies it at `void`
+  generalises to "the position admits absence anyway"), to require JSON-facing schemas to type nullable
+  fields as `(T | void)`, or to make it a JSON-front-end-only normalisation. Decide before the front-end
+  exists, not after documents depend on it.
+
 - [ ] **Numeric compatibility is one-directional and already free on read.** Every valid JSON
   number is a valid TSON number, so JSON numbers parse through `NumberGrammar`/`BaseTypeResolver`
   with no changes needed. The reverse isn't true: TSON-only extensions (hex/binary/octal

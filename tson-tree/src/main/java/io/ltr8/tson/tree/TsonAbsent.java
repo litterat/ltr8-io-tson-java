@@ -4,9 +4,13 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The absent sentinel {@code _} as a node (§2.7) -- a value explicitly marked absent, distinct from {@link
- * TsonNull} (the {@code null} token) and {@link TsonMissing} (no such node at all). Carries its own
- * type-ref/annotations for the annotated case; {@link #instance()} is the bare common case.
+ * The absent sentinel as a node (§2.7) -- a position that was written but holds no value, spelled {@code _}
+ * or, equivalently, {@code null}. Distinct from {@link TsonMissing} (no such node at all): this one was
+ * written. Carries its own type-ref/annotations for the annotated case; {@link #instance()} is the bare
+ * common case.
+ *
+ * <p>Also the placeholder a tree-mode reader leaves where a value failed to read in collecting mode -- what
+ * went wrong is carried by the diagnostic, not by the node standing in for it.
  */
 public record TsonAbsent(Optional<String> typeRef, List<TsonAnnotation> annotations) implements TsonValue {
 

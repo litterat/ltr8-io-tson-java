@@ -71,7 +71,7 @@ class TsonTreeWriterTest {
         assertEquals(Optional.of("London"), second.at("/address/city").asString());
         assertEquals(BigInteger.valueOf(3), second.at("/scores/2").asBigInteger().orElseThrow());
         assertEquals(Boolean.TRUE, second.at("/active").asBoolean().orElseThrow());
-        assertTrue(second.at("/note").isNull());
+        assertTrue(second.at("/note").isAbsent());      // read from `null`, re-emitted as `_`
         assertTrue(second.at("/nickname").isAbsent());
     }
 

@@ -65,7 +65,7 @@ class TsonTreeReaderTest {
         assertTrue(node.get("skills").isArray());                                     // array, never tuple (schemaless)
         assertEquals(Optional.of("b"), node.at("/skills/1").asString());
         assertEquals(Boolean.TRUE, node.get("active").asBoolean().orElseThrow());
-        assertTrue(node.get("note").isNull());                                        // the null token
+        assertTrue(node.get("note").isAbsent());                                      // the null token: §4 + one no-value node
         assertTrue(node.get("nickname").isAbsent());                                  // the _ sentinel
     }
 
@@ -156,11 +156,11 @@ class TsonTreeReaderTest {
 
     /** The failed leaf keeps its place and its wire type-ref; only its value is gone. */
     @Test
-    void aRejectedTokenLeavesANullPlaceholderInTheTree() {
+    void aRejectedTokenLeavesAnAbsentPlaceholderInTheTree() {
         TsonValue node = STRICT.withDiagnostics(TsonDiagnosticsReceiver.collecting())
                 .read("{ a: !uuid nope  b: 2 }");
 
-        assertTrue(node.at("/a").isNull());
+        assertTrue(node.at("/a").isAbsent());
         assertEquals(Optional.of("uuid"), node.at("/a").typeRef());
         assertEquals(BigInteger.TWO, node.at("/b").asBigInteger().orElseThrow());
     }

@@ -18,7 +18,9 @@ import java.util.Optional;
  * Tree mode's {@code tuple} reader -- reads a fixed-arity, positionally-typed sequence into a {@link
  * TsonTuple}, the counterpart to the old DOM reader's plain {@code List} and a distinct kind from {@link
  * ArrayTreeReader} (a schemaless read, which has no schema to tell tuple from array, can only produce an
- * array). A failed/out-of-arity slot is kept as a {@link TsonNull} placeholder.
+ * array). A slot that is absent (the sentinel {@code _}/{@code null} at an OPTIONAL position) or failed to
+ * read is kept as a {@link TsonAbsent} placeholder -- a failed slot's story is carried by its diagnostic,
+ * not by the node standing in for it.
  */
 final class TupleTreeReader extends TupleAbstractReader<TsonValue> {
 
@@ -53,7 +55,7 @@ final class TupleTreeReader extends TupleAbstractReader<TsonValue> {
         }
         List<TsonValue> elements = new ArrayList<>();
         for (Object decoded : decode(ctx)) {
-            elements.add(decoded == null ? TsonNull.instance() : (TsonValue) decoded);
+            elements.add(decoded == null ? TsonAbsent.instance() : (TsonValue) decoded);
         }
         return new TsonTuple(elements, Optional.of(name), annotations);
     }

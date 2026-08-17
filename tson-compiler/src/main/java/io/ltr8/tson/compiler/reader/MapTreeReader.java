@@ -60,6 +60,6 @@ final class MapTreeReader extends MapAbstractReader<TsonValue> {
     }
 
     private static TsonValue node(Object decoded) {
-        return decoded == null ? TsonNull.instance() : (TsonValue) decoded;
+        return decoded == null ? TsonAbsent.instance() : (TsonValue) decoded;
     }
 }

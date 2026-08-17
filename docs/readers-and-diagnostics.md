@@ -47,7 +47,8 @@ is small and parsed once.)
   omission or `_`. There is no pre-seeding pass any more: every field the document didn't state goes through
   one `valueForAbsentField` switch over all five states.
 - **Continuation policy: always keep reading in collecting mode.** A failed field/element is recorded and
-  a `null` placeholder kept in place (so later indices stay accurate); a shape mismatch reports
+  a placeholder kept in place (so later indices stay accurate) — Java `null` in bind mode, `TsonAbsent` in
+  tree mode, where the diagnostic, not the node, carries what went wrong; a shape mismatch reports
   `TYPE_MISMATCH`/`WRONG_ARITY` and returns `null` so a caller doesn't also report every child as missing.
 - **Bind mode is all-or-nothing; tree mode is not** (`ConstructionGuard`, which states the rule once for all
   nine bind-mode assembly sites). A value whose read reported *anything* — its own field's problem or a

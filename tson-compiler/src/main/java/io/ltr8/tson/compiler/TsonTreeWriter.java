@@ -69,10 +69,6 @@ public final class TsonTreeWriter {
             case TsonArray array -> writeSequence(array.elements(), array.typeRef(), out);
             case TsonTuple tuple -> writeSequence(tuple.elements(), tuple.typeRef(), out);
             case TsonAtom atom -> writeAtom(atom, out);
-            case TsonNull nullNode -> {
-                nullNode.typeRef().ifPresent(out::typeRef);
-                out.nullValue();
-            }
             case TsonAbsent absentNode -> {
                 absentNode.typeRef().ifPresent(out::typeRef);
                 out.absentValue();

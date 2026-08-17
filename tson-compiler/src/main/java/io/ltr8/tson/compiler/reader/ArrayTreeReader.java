@@ -4,7 +4,7 @@ import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.tree.*;
-import io.ltr8.tson.tree.TsonNull;
+import io.ltr8.tson.tree.TsonAbsent;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -18,7 +18,7 @@ import java.util.Optional;
  * Tree mode's {@code array} reader -- reads an array-shaped value into a {@link TsonArray}, one {@link
  * TsonValue} per element in source order, the counterpart to the old DOM reader's plain {@code List}.
  * Distinct from {@link TupleTreeReader}, which reads a fixed-arity, positionally-typed sequence into a {@code
- * TsonTuple}. A failed/mismatched element is kept as a {@link TsonNull} placeholder (its diagnostic is
+ * TsonTuple}. A failed/mismatched element is kept as a {@link TsonAbsent} placeholder (its diagnostic is
  * already reported) so later elements' indices stay accurate.
  */
 final class ArrayTreeReader extends ArrayAbstractReader<TsonValue> {
@@ -53,7 +53,7 @@ final class ArrayTreeReader extends ArrayAbstractReader<TsonValue> {
             return null;
         }
         List<TsonValue> elements = new ArrayList<>();
-        readInto(ctx, decoded -> elements.add(decoded == null ? TsonNull.instance() : (TsonValue) decoded));
+        readInto(ctx, decoded -> elements.add(decoded == null ? TsonAbsent.instance() : (TsonValue) decoded));
         return new TsonArray(elements, Optional.of(name), annotations);
     }
 }
