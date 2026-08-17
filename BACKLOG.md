@@ -60,14 +60,38 @@ own prose (which had gone stale on at least one of them):
   `ContainerTypeDef` and throws. Both flat forms are done — `[T]`/`[T; N..M]` and, since #24, `[T, U]` in both
   positions. The fix is the same bottom-up hoist the type-ref walk already does: build the inner container's
   own instance first, inject it, and let the outer position refer to it by name.
+- [ ] **Remove `TsonNull`: `null` becomes an equivalent spelling of `_`, the model standardises on `TsonAbsent`** —
+  decided direction; tracks a coming spec revision (the spec author's call, made here, not a SPEC-FEEDBACK finding).
+  The rationale, recorded so it isn't relitigated: under a schema `null` already has no special status ([TSON-SCHEMA]
+  §7.3 — it's a token handed to the position's atom contract, so the null *value* survives only in schemaless data
+  and at `value`-typed positions); §7.3's void-position concession already accepts `null` as an equivalent spelling
+  of `_` locally, justified by a single-inhabitant argument that generalises (null's base class has one inhabitant
+  everywhere); the three field states (omitted / `_` / `null`) don't survive the JSON boundary — JSON has two, so
+  writing TSON as JSON is lossy in exactly the direction `STRUCTURED-OUTPUT.md` targets; and today a JSON-shaped
+  `"field": null` at an OPTIONAL `text` position silently reads as the *string* `"null"` (the text contract accepts
+  the token), where LLM output means absence. Unifying makes JSON `null` ↔ `_` a clean bijection.
+  - **Spec side** (prerequisite): Part 1 §4.1's null step of base resolution goes (the unquoted token `null` becomes
+    an alternate spelling of the absent sentinel; quoted `"null"` stays a string), §6's JSON mapping sends `null` to
+    absence, `value`'s contract drops null from its admitted products, and `(T | null)`-style choices are written
+    `(T | void)` — discrimination is unaffected, the void variant discriminates by the `_`/`null` spelling exactly
+    as the null class does today.
+  - **Implementation shape:** the natural normalisation site is Tier 2 — `TsonDataStream` emits `AbsentEvent` for
+    the unquoted token `null` exactly where it already does for `_` — after which every downstream layer is either
+    a deletion (`TsonNull` and its `KeyKind`/writer/reader cases) or untouched. Bind mode already collapses all
+    three states to Java `null`, so it doesn't move.
+  - **Subsumes a rev-32 conformance gap:** §7.3's void concession is currently unimplemented — `VoidReader` admits
+    only `AbsentEvent`, so a `null` token at a void-typed position reports `TYPE_MISMATCH` instead of normalising
+    to absence. Stream-level normalisation fixes it with no `VoidReader` change; if the unification is ever walked
+    back, this narrower gap remains and needs its own fix.
+  - Part 1 conformance vectors for null base resolution change with the spec revision — same-session suite work.
 - [ ] **A tuple's absent position reads back as `TsonNull`, not `TsonAbsent`** — `TupleAbstractReader.decode`
   returns `null` both for "the `_` sentinel at an OPTIONAL position" and for "this slot's read failed", and
-  `TupleTreeReader` maps every `null` to `TsonNull`. Tree mode keeps *missing*, *null* and *absent* as three
-  distinct kinds precisely so a caller can tell them apart, and a written `_` currently round-trips through
+  `TupleTreeReader` maps every `null` to `TsonNull`, so a written `_` currently round-trips through
   `TsonTreeWriter` as `null`. A tuple is the one shape where this is visible: a record omits an absent field
-  and an array has no per-element state, so neither has a slot to misrepresent. Telling the two `null`s apart
-  needs a per-mode hook on the shared reader — bind mode genuinely wants `null` for an absent position — so
-  it is a small design decision rather than a one-line change.
+  and an array has no per-element state, so neither has a slot to misrepresent. Under the `TsonNull`-removal
+  item above this stops being a per-mode design decision: both cases map to `TsonAbsent` (a failed slot's
+  story is carried by its diagnostic, not its placeholder), bind mode keeps Java `null`, and `_` round-trips
+  as `_`. Kept as its own checkbox for the reader-side change; lands with or after the item above.
 - **Choice disjointness derivation and untagged reading** ([TSON-SCHEMA] §5.4, §8.1) — both halves now have a
   live producer: the `(A | B)` sugar resolves to a real `ChoiceBody` entry, so the linker derives `disjoint`
   for author-written choices and `ChoiceReader` reads them (`ChoiceReadTest` pins the whole §5.4 Tagging
