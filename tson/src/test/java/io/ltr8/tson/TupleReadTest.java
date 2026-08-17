@@ -5,6 +5,7 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonReadException;
+import io.ltr8.tson.compiler.TsonTreeWriter;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
@@ -131,6 +132,19 @@ class TupleReadTest {
 
         TsonTuple tuple = assertInstanceOf(TsonTuple.class, pair);
         assertEquals(Optional.of("hello"), tuple.get(1).asString());
+    }
+
+    /**
+     * A tuple is the one shape where an absent position is <em>visible</em> in the tree -- a record omits an
+     * absent field and an array has no per-element state, so neither has a slot to misrepresent. It holds a
+     * {@code TsonAbsent}, so {@code _} round-trips through {@link TsonTreeWriter} as {@code _}.
+     */
+    @Test
+    void anAbsentPositionIsATsonAbsentAndRoundTripsAsTheSentinel() {
+        TsonValue pair = read("[integer?, text]", "pair", "[_ \"hello\"]");
+
+        assertTrue(pair.get(0).isAbsent());
+        assertEquals("!pair [ _ !text \"hello\" ]", new TsonTreeWriter().toTson(pair));
     }
 
     /** And a REQUIRED one does not -- the default state, since a tuple element's `state` defaults to REQUIRED. */

@@ -9,9 +9,8 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Tree mode: reads the {@code void} unit instance -- the absent sentinel {@code _} -- consuming it via a
- * delegate {@link VoidReader} and yielding {@link TsonAbsent}. Distinct from a null-yielding leaf ({@link
- * AtomTreeReader} → {@link TsonNull}), since {@code _} is "absent", not "null".
+ * Tree mode: reads the {@code void} unit instance -- the absent sentinel, spelled {@code _} or {@code null}
+ * -- consuming it via a delegate {@link VoidReader} and yielding {@link TsonAbsent}.
  */
 final class AbsentTreeReader implements TsonTypeReader<TsonValue> {
 

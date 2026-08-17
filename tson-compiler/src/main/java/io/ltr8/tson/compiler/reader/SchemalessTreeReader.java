@@ -36,8 +36,9 @@ import java.util.Set;
  * Reads a TSON data document into an immutable {@link TsonValue} tree with <b>no schema</b> -- the
  * schemaless (Class 1) tree-producing peer of {@link TsonObjectReader} (which produces Java objects). Like
  * Jackson's {@code readTree}: the wire structure is the source of truth. Leaves are typed by §4 base
- * resolution ({@code null}/{@code Boolean}/{@code BigInteger}/{@code BigDecimal}/{@code Double}/{@code
- * String}), or by the built-in vocabulary when a leaf carries a type-ref for one (e.g. {@code !uuid},
+ * resolution ({@code Boolean}/{@code BigInteger}/{@code BigDecimal}/{@code Double}/{@code String}, and the
+ * {@code null} token as a {@link TsonAbsent} -- the tree model has one no-value node, not two), or by the
+ * built-in vocabulary when a leaf carries a type-ref for one (e.g. {@code !uuid},
  * {@code !date}); a container carries its own wire type-ref (e.g. {@code !person}) when present.
  *
  * <p><b>Streams the event source directly</b> (a {@link TsonDataStream}), the same way {@link
@@ -60,7 +61,7 @@ import java.util.Set;
  * decides its fate exactly as it does for the schema-driven readers: fail-fast throws {@code
  * TsonReadException} at the first, a collector gathers them all and still hands back a tree. Reporting never
  * abandons the value -- the node is still built and its children are still read, so one pass finds
- * everything; a leaf whose atom rejected the token becomes a {@link TsonNull}, the placeholder {@code
+ * everything; a leaf whose atom rejected the token becomes a {@link TsonAbsent}, the placeholder {@code
  * AtomTreeReader} uses for the same situation.
  *
  * <p><b>Wire annotations are captured</b> onto each node's own {@code annotations()}, at every position §3.1
@@ -226,7 +227,16 @@ public final class SchemalessTreeReader {
         return new TsonMap(entries, typeRef, annotations);
     }
 
-    /** A token leaf, decoded by the built-in atom {@link #checkTypeRef} resolved, else by §4 base resolution. */
+    /**
+     * A token leaf, decoded by the built-in atom {@link #checkTypeRef} resolved, else by §4 base resolution.
+     *
+     * <p>Both no-value outcomes land on {@link TsonAbsent}: the {@code null} token, which §4.1 resolves to
+     * the null base value and which the tree model spells as absence, and a token the atom rejected, where
+     * reporting never abandons the surrounding value and the diagnostic -- not the placeholder -- carries
+     * what went wrong. This is the only path on which {@code null} means absence: it is base resolution's
+     * answer, so it holds exactly where §4 applies (no declared type in scope). Under a schema, {@code null}
+     * is a token like any other and the position's own atom decides ([TSON-SCHEMA] §7.3).
+     */
     private TsonValue leaf(TsonReadContext ctx, TokenEvent token, Optional<String> typeRef,
                            Optional<AtomType<?>> atom, List<TsonAnnotation> annotations) {
         TokenValue tokenValue = new TokenValue(token.text(), token.form());
@@ -236,12 +246,12 @@ public final class SchemalessTreeReader {
                 value = atom.get().read(tokenValue);
             } catch (AtomTypeException e) {
                 TypeRefCheck.violation(ctx, typeRef.orElseThrow(), e, token.text());
-                return new TsonNull(typeRef, annotations);
+                return new TsonAbsent(typeRef, annotations);
             }
         } else {
             value = ValueParser.INSTANCE.read(tokenValue);
         }
-        return value == null ? new TsonNull(typeRef, annotations) : new TsonAtom(value, typeRef, annotations);
+        return value == null ? new TsonAbsent(typeRef, annotations) : new TsonAtom(value, typeRef, annotations);
     }
 
     /** A map key's own path segment: its scalar text, or {@code ?} for a key with no single text form. */
@@ -278,13 +288,14 @@ public final class SchemalessTreeReader {
             case TsonMap map -> map.entries().stream()
                     .map(entry -> List.of(keyIdentity(entry.key()), keyIdentity(entry.value()))).toList();
             // No payload to compare: the kind is the whole identity, and a distinct constant per kind keeps
-            // a `null` key apart from a quoted "null" that base resolution made an ordinary string.
-            case TsonNull ignored -> KeyKind.NULL;
+            // a no-value key apart from a quoted "null" that base resolution made an ordinary string. A `_`
+            // key and a `null` key share this identity, since the tree spells both as absence -- a further
+            // case of the decoded-vs-textual divergence #43 already argues, alongside `0xFF`/`255`.
             case TsonAbsent ignored -> KeyKind.ABSENT;
             case TsonMissing ignored -> KeyKind.MISSING;
         };
     }
 
     /** Identity stand-ins for the payload-free node kinds -- see {@link #keyIdentity}. */
-    private enum KeyKind { NULL, ABSENT, MISSING }
+    private enum KeyKind { ABSENT, MISSING }
 }

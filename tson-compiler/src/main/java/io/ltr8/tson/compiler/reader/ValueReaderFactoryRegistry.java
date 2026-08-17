@@ -77,8 +77,8 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
     /**
      * Tree mode: reads into an immutable {@link TsonValue}. The container factories
      * build node containers; every atom-family/enum factory is wrapped ({@link AtomTreeFactory}) so its leaf
-     * yields a {@code TsonAtom}/{@code TsonNull}, and {@code unit}'s {@code void} yields a {@code TsonAbsent}
-     * (see {@link #TREE_UNIT}). Uses the object-binding enum factory so {@code boolean} reads a real {@code
+     * yields a {@code TsonAtom} (or a {@code TsonAbsent} where it produced no value), and {@code unit}'s
+     * {@code void} yields a {@code TsonAbsent} (see {@link #TREE_UNIT}). Uses the object-binding enum factory so {@code boolean} reads a real {@code
      * Boolean} rather than the text {@code "true"}/{@code "false"}.
      */
     public static ValueReaderFactoryRegistry tree() {

@@ -12,14 +12,13 @@ import java.util.Optional;
  * built-in- or schema-typed one; {@link #typeRef()} names the TSON type when known (e.g. {@code "int32"}).
  * Typed access is via {@link #as(Class)} and the {@code asString}/{@code asBigInteger}/… conveniences.
  *
- * <p>The value is never {@code null} -- use {@link TsonNull} for the {@code null} token and {@link TsonAbsent}
- * for the {@code _} sentinel.
+ * <p>The value is never {@code null} -- {@link TsonAbsent} is the node for a position holding no value.
  */
 public record TsonAtom(Object value, Optional<String> typeRef, List<TsonAnnotation> annotations)
         implements TsonValue {
 
     public TsonAtom {
-        Objects.requireNonNull(value, "TsonAtom value must not be null -- use TsonNull or TsonAbsent");
+        Objects.requireNonNull(value, "TsonAtom value must not be null -- use TsonAbsent");
         annotations = List.copyOf(annotations);
     }
 
