@@ -1493,6 +1493,12 @@ namespace rather than only its constructors: a transitive chain runs past the co
 (`product`, `top`), which are ordinary non-constructor entries, so a constructors-only rule rejects the very
 example §8.2 prints.
 
+The fallback is now defensive rather than load-bearing here: dropping §8.2's supertype transfer (#45's defect
+(a)) removed the only case that reached the linker with unnameable supertypes, since a schema that *derives*
+from a constructor resolves that source through the type-name namespace and so already names it. The
+underlying question — which namespace a resolved entry's derived references are checked against — is
+unchanged, and `source` still needs the answer.
+
 **Suggested resolution:** State which namespace a resolved entry's derived references are checked against.
 The cleanest reading is that §3.3.2 governs *author-written* type references — what a schema may name — while
 resolver output is checked against whatever the entry was derived from, since by construction those names
@@ -1528,11 +1534,20 @@ This is observable wherever IS-A is: `subtypes` (§8.1), substitutability, and �
 which uses IS-A to prove two variants are *not* disjoint — so `(id_list | text)` and `(tag_list | text)` can
 be classified differently for no reason an author would recognise.
 
-**Interpretation chosen:** Implemented as written — the size-less form resolves to a construction with no
-supertypes, the sized form to an instantiation carrying `[array, product, top]`. Pinned by
-`DefinitionResolverTest.aSizeLessDeclarationLevelArrayIsAConstructionWithNoSupertypes` and
-`GenericApplicationHeadTest.sizedSugarMaterializesTheInstantiationEntrySpecifiedByEightTwo` so the asymmetry
-is visible rather than incidental.
+**Interpretation chosen:** The asymmetry is removed — **both** spellings resolve with no supertypes. The
+sized form still materialises §8.2's instantiation entry (that much is real: application-structural identity),
+but the entry records empty `supertypes` rather than the template's, per #45's defect (a): a size template's
+chain begins at the constructor it refines, and a constructor is not a type anything can be a subtype of. So
+a bound is a constraint, not a change of place in the hierarchy, and `[text]`, `vector<text, 3>` and
+`[text; 1..2]` agree. Pinned by
+`DefinitionResolverTest.aSizeLessDeclarationLevelArrayIsAConstructionWithNoSupertypes`,
+`GenericApplicationHeadTest.everySpellingOfAnArrayFamilyDeclarationRecordsNoSupertypes`, and
+`GenericApplicationHeadTest.sizedSugarMaterializesTheInstantiationEntrySpecifiedByEightTwo` (which asserts
+§8.2's entry shape, `supertypes` apart).
+
+The suggested resolution below is unchanged in substance, but this implementation has answered its question
+the other way: a construction does *not* establish IS-A with the constructor it applies (§8.1's own rule),
+and it is §5.3's "IS-A `array` and substitutable where arrays are expected" claim that needs deleting.
 
 **Suggested resolution:** Decide whether a construction establishes IS-A with the constructor it applies.
 Saying it does would make both spellings agree and cost little — the constructor is known at the point of
@@ -2570,12 +2585,15 @@ non-exposure rules) for every `[text; 2..]` while `[text]` stays structural; and
 what `array_min` *means* routes through §5.7's state-transition table applied to something that was never an
 instance.
 
-**Interpretation chosen** (design-review conclusions; no implementation change yet): sized closures record
-**empty `supertypes`** — the three quoted passages are transcription errors induced by the `^` spelling, not
-design, and family membership is a head question for every construction uniformly. The current implementation
-follows the letter (`DefinitionResolver` completes a `TemplateInstance` by transferring the template's
-supertypes, documented as "what makes a sized array IS-A `array`"); that transfer is scheduled for deletion.
-The redesign below is the recommended resolution and the direction implementation will follow.
+**Interpretation chosen:** sized closures record **empty `supertypes`** — the three quoted passages are
+transcription errors induced by the `^` spelling, not design, and family membership is a head question for
+every construction uniformly. **Defect (a) is implemented**: `DefinitionResolver.resolveTemplateInstance`
+completes a `TemplateInstance` with §8.2's `source` alone, and the supertype transfer is gone, so the
+divergence from §8.2's entry shape is deliberate and pinned by test. It costs nothing: the grant was inert
+(no two sized entries ever listed each other, so none was ever admissible at another's position) and no
+bundled schema writes a sized form. The size *templates'* own entries keep their chain, which the desugarer
+walks to find the head. Defect (b) and the redesign below are the recommended resolution and the direction
+implementation will follow; the rest of the staging is in `BACKLOG.md`.
 
 **Suggested resolution:** replace refinement-over-application with a form that states the binding directly —
 **named partial applications**.
@@ -2625,9 +2643,9 @@ The redesign below is the recommended resolution and the direction implementatio
 Grammar cost is modest: labelled members inside `<>` reuse the existing record-member productions, and the
 lexer — frozen for the series — already emits `;`. Implementation-side the change is mostly deletions: the
 desugarer's sized path converges with the `[T]` path (one injected `!array` construction, no
-`TemplateInstance`), `DefinitionResolver`'s instantiation completion (source flattening, supertype transfer)
-is deleted, application routing gains a labelled-member merge with a duplicate-slot error, and §8.2
-materialisation remains only for the still-unimplemented shadow-channel substitution.
+`TemplateInstance`), `DefinitionResolver`'s instantiation completion (source flattening; the supertype
+transfer is already gone) is deleted, application routing gains a labelled-member merge with a duplicate-slot
+error, and §8.2 materialisation remains only for the still-unimplemented shadow-channel substitution.
 
 
 ## 46. Refinement and composition are level-preserving everywhere but one place — a constructor operand must require a `~` result, and the kernel's only violations are the three lines #45 respells

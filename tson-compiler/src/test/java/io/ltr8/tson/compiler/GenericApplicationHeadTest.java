@@ -127,8 +127,8 @@ class GenericApplicationHeadTest {
      * §5.3's sized sugar, end to end. {@code [text; 1..2]} desugars to {@code array_ranged<text, 1, 2>}, and
      * {@code array_ranged} is a <em>template</em> (declared without {@code ~}), so it materialises as §8.2's
      * instantiation entry rather than resolving in place: the body is headed at the nearest {@code ~}
-     * constructor in the source chain, and the template's own supertypes and the flattened application come
-     * through unchanged. Asserted against §8.2's own worked example shape.
+     * constructor in the source chain, and the flattened application comes through as {@code source}.
+     * Asserted against §8.2's own worked example shape, {@code supertypes} apart.
      */
     @Test
     void sizedSugarMaterializesTheInstantiationEntrySpecifiedByEightTwo() {
@@ -139,8 +139,9 @@ class GenericApplicationHeadTest {
         TypeDefinition entry = compiled.schema().entries().get("tag_list");
         assertEquals(TypeKind.PRODUCT, entry.kind(), "the template's kind");
         assertEquals(List.of(), entry.parameters(), "closed -- §5.10");
-        assertEquals(List.of("array", "product", "top"), entry.supertypes(),
-                "the template's supertypes, unchanged by substitution -- a closure of array_ranged IS-A array");
+        assertEquals(List.of(), entry.supertypes(),
+                "empty, against §8.2's transfer of the template's -- a closure of a size template is a "
+                        + "construction of `array`, and a constructor is not a supertype (SPEC-FEEDBACK.md #45)");
         assertEquals(new TypeRef("array_ranged", List.of(
                         new TypeArgument.Ref(TypeRef.of("text")),
                         new TypeArgument.Value(new Token("1", Token.Form.UNQUOTED)),
@@ -153,6 +154,27 @@ class GenericApplicationHeadTest {
         assertEquals(TypeRef.of("text"), body.elementType());
         assertEquals(Optional.of(BigInteger.ONE), body.minItems());
         assertEquals(Optional.of(BigInteger.TWO), body.maxItems());
+    }
+
+    /**
+     * The three spellings of an array-family declaration agree about the hierarchy: a bound is a constraint,
+     * not a change of place. {@code [text]} and {@code vector<text, 3>} are constructions (§5.5 transfers only
+     * the target's kind) and {@code [text; 1..2]} is an instantiation, but all three close to a binding record
+     * headed by a constructor, and a constructor is not something a value can have as its type -- so none of
+     * them records a supertype ({@code SPEC-FEEDBACK.md} #33/#45).
+     */
+    @Test
+    void everySpellingOfAnArrayFamilyDeclarationRecordsNoSupertypes() {
+        TsonCompiledSchema compiled = compile("""
+                  id_list => [text]
+                  tag_list => [text; 1..2]
+                  triple => vector<text, 3>""");
+
+        for (String name : List.of("id_list", "tag_list", "triple")) {
+            TypeDefinition entry = compiled.schema().entries().get(name);
+            assertInstanceOf(ArrayBody.class, entry.body(), name);
+            assertEquals(List.of(), entry.supertypes(), name);
+        }
     }
 
     /** And the bounds are live: the instantiation is a real array body, so the compiled reader enforces them. */

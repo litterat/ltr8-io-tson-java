@@ -456,8 +456,12 @@ class DefinitionResolverTest {
 
     /**
      * §8.2's own worked example, one bound apart: {@code [pixel; 1920]} is {@code array_ranged<pixel, 1920,
-     * 1920>}, materialising to a closed PRODUCT whose {@code source} is the flattened application, whose
-     * supertypes are the template's unchanged, and whose body is headed at the nearest {@code ~} constructor.
+     * 1920>}, materialising to a closed PRODUCT whose {@code source} is the flattened application and whose
+     * body is headed at the nearest {@code ~} constructor.
+     *
+     * <p>{@code supertypes} is empty where §8.2 asks for the template's -- the one deliberate divergence from
+     * its entry shape ({@code SPEC-FEEDBACK.md} #45): a size template's chain begins at the constructor it
+     * refines, and a constructor is not a type anything can be a subtype of.
      */
     @Test
     void resolvesASizedArrayToTheInstantiationEntryEightTwoSpecifies() {
@@ -465,7 +469,7 @@ class DefinitionResolverTest {
 
         assertEquals(TypeKind.PRODUCT, frame.kind());
         assertEquals(List.of(), frame.parameters());
-        assertEquals(List.of("array", "product", "top"), frame.supertypes());
+        assertEquals(List.of(), frame.supertypes());
         assertEquals(new TypeRef("array_ranged", List.of(
                         new TypeArgument.Ref(TypeRef.of("text")),
                         new TypeArgument.Value(new Token("1920", Token.Form.UNQUOTED)),
@@ -494,9 +498,9 @@ class DefinitionResolverTest {
      * A <em>size-less</em> declaration-level array takes the other path: {@code [text]} is a plain {@code
      * array<text>}, a constructor application, which §8.2 says never materialises an entry and §5.6 says
      * resolves in place as a construction. So it lands on the same {@code ArrayBody} as its sized sibling
-     * but, per §5.5, carries no supertypes -- {@code id_list} is not IS-A {@code array} while {@code
-     * [text; 1..2]} is. That asymmetry is the spec's, not this implementation's; see {@code
-     * SPEC-FEEDBACK.md}.
+     * and, per §5.5, carries no supertypes -- and the sized sibling now records the same, so a bound no
+     * longer decides an array's place in the hierarchy ({@code SPEC-FEEDBACK.md} #33/#45). What still
+     * separates the two is the entry: the sized form materialises one, this resolves in place.
      */
     @Test
     void aSizeLessDeclarationLevelArrayIsAConstructionWithNoSupertypes() {

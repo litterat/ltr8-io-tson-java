@@ -110,17 +110,12 @@ own prose (which had gone stale on at least one of them):
   becomes §8.2's **only** materialising form; a constructor's parameters are labelled-only (#44); and
   deriving from a constructor requires a `~` result (#46). Split by what gates on a spec revision:
   - **This cycle** (each corrects or converges on agreed-wrong spec letter; no revision needed first):
-    - [ ] **Stop transferring the template's supertypes onto a sized-array instantiation** — sized closures
-      record empty `supertypes`, like every other construction. The minimum safe move if everything else
-      holds: it is a pure error correction (#45's defect (a)), nothing valid depends on the grant, and the
-      bundled schemas never exercise it. `DefinitionResolver`'s `TemplateInstance` completion and the tests
-      pinning IS-A `array` are the touch points.
     - [ ] **Desugar the sized forms straight to the `!array` construction the routing already produces** —
       closing-by-evaluation, reachable today through the existing `[T; N..M]` spelling, no new syntax
       needed. Deletes the `TemplateInstance` node and its `DefinitionResolver` completion (source
-      flattening, supertype transfer) outright; a named application in a kernel-importing context
-      (`array_ranged<text, 3, 3>`) emits the same plain construction via its routed channels.
-      `checkBounds` and the vacuous-`[T; 0..]` rejection stay put — the sugar site is still where bounds
+      flattening — the supertype transfer is already gone) outright; a named application in a
+      kernel-importing context (`array_ranged<text, 3, 3>`) emits the same plain construction via its
+      routed channels. `checkBounds` and the vacuous-`[T; 0..]` rejection stay put — the sugar site is still where bounds
       close. The kernel's three template *declarations* still resolve as entries (the bundled document is
       unchanged until the revision); the sugar just stops routing through them. Resolved output diverges
       from §8.2's worked example, deliberately — the spec author has confirmed the example wrong, and no
