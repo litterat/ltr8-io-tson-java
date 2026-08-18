@@ -54,23 +54,6 @@ own prose (which had gone stale on at least one of them):
   - `SPEC-FEEDBACK.md` #45 shrinks the eventual target: once sized forms are constructions too (see the
     template-construction item below), §8.2's legitimately-materialised entries are structural-template
     instantiations only, so the structural-carrying fix has one less form to represent.
-- [ ] **An array's element `?` is still unexpanded** ([TSON-SCHEMA] §5.3) — `[T?]` gives the resolved array
-  `state: OPTIONAL`, under which "elements at any position MAY be the absent sentinel `_`; absent elements
-  occupy positional slots — `[a _ c]` has three elements and satisfies a `[T?; 3]` size constraint". No
-  position carrying one is built, so the declaration reaches `DefinitionResolver` as a `ContainerTypeDef` and
-  throws — and so does any container enclosing it, since `SchemaDesugarer` leaves a container whole rather
-  than partially reduced. The last piece of §5.3's declaration-level container syntax: the flat forms, the
-  tuple position `?`, and nesting (#52) are done.
-  - Unlike the tuple position `?`, which routes through `tupleInstance`'s per-position `tuple_element` record,
-    this is one more field on the array's *own* binding record: `array`'s meta-kernel vocabulary already
-    declares `state: element_state ~ REQUIRED`, so the desugar is `!array { element_type: T  state: OPTIONAL }`
-    — REQUIRED_DEFAULT, so the unmarked form keeps writing no `state` at all. `instanceFor` routes by
-    `value_param` and `state` has none, so the field has to be appended alongside the routed ones rather than
-    fall out of the same walk.
-  - The read side is the larger half and needs checking before this is called small: `ArrayAbstractReader`
-    has to admit `_` at an element position under `ElementState.OPTIONAL` and count it toward the size bounds,
-    which is where `[T?; 3]`'s stated equivalence lives. `set` pins `state: = REQUIRED`, so the unordered
-    family is untouched.
 - [ ] **Template construction — the `SPEC-FEEDBACK.md` #44/#45/#46 conclusions, staged.** The design review
   settled the type-constructor-vs-template question: a **partial application** (parameters only in labelled
   value channels — `array_min`, and §5.3's sized sugar) closes by *routing* and is a construction of its

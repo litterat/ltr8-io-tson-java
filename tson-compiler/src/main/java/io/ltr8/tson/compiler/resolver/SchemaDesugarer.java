@@ -270,8 +270,8 @@ final class SchemaDesugarer {
                     yield container;
                 }
                 // A size-less declaration-level array IS a top-level constructor application (§5.6), so it
-                // becomes the instance directly. The sized forms desugar to array_min/array_max/array_ranged,
-                // which are templates rather than constructors, and stay on their existing path.
+                // becomes the instance directly. The sized forms are spelled through the size templates first
+                // and close onto the same `!array` construction (SPEC-FEEDBACK.md #45), a few lines down.
                 Optional<TypeDef> instance = declarationLevelArray(container.container());
                 if (instance.isPresent()) {
                     yield instance.get();
@@ -282,18 +282,22 @@ final class SchemaDesugarer {
                 if (tuple.isPresent()) {
                     yield tuple.get();
                 }
-                Optional<GenericRef> sized = sizedArrayApplication(container.container());
+                Optional<SizedArray> sized = sizedArrayApplication(container.container());
                 if (sized.isPresent()) {
                     // The application this stands for closes by routing, like every other: array_ranged and
                     // its siblings bind parameters in value channels only, so this yields the plain `!array`
                     // construction those bindings denote (SPEC-FEEDBACK.md #45).
-                    GenericRef application = sized.get();
-                    Optional<TypeDef> instantiation = instanceFor(application.name(), application.args());
-                    if (instantiation.isPresent()) {
-                        yield instantiation.get();
+                    // The element `?` rides alongside the routed bounds: `[T?; 3]` binds state and both
+                    // bounds onto one record, which is the whole reason the sized forms stopped routing
+                    // through an instantiation entry (§5.3's "no template route" sentence, SPEC-FEEDBACK #45).
+                    SizedArray closure = sized.get();
+                    Optional<TypeDef> construction = instanceFor(closure.application().name(),
+                            closure.application().args(), closure.state());
+                    if (construction.isPresent()) {
+                        yield construction.get();
                     }
-                    rejectIfTemplateApplication(application.name());
-                    yield new ReferenceTypeDef(List.of(), application);
+                    rejectIfTemplateApplication(closure.application().name());
+                    yield new ReferenceTypeDef(List.of(), closure.application());
                 }
                 ContainerDef def = containerDef(container.container());
                 yield def == container.container() ? container
@@ -444,16 +448,34 @@ final class SchemaDesugarer {
     /**
      * A size-less declaration-level array as its own constructor application, or empty for anything this
      * does not build -- a tuple container ({@link #declarationLevelTuple}'s), a sized array ({@link
-     * #sizedArrayApplication}'s), an optional element, or an element position {@link #elementRef} cannot
-     * reduce to a name.
+     * #sizedArrayApplication}'s), or an element position {@link #elementRef} cannot reduce to a name.
      */
     private Optional<TypeDef> declarationLevelArray(ContainerDef def) {
-        if (!(def instanceof ArrayContainerDef array) || array.size().isPresent()
-                || array.elementType().optional()) {
+        if (!(def instanceof ArrayContainerDef array) || array.size().isPresent()) {
             return Optional.empty();
         }
-        return elementRef(array.elementType())
-                .flatMap(element -> instanceFor("array", List.of(new TypeArg.Ref(element))));
+        return elementRef(array.elementType()).flatMap(element ->
+                instanceFor("array", List.of(new TypeArg.Ref(element)), elementState(array.elementType())));
+    }
+
+    /**
+     * §5.3's element {@code ?} as the vocabulary binding it denotes: {@code state: OPTIONAL} on the resolved
+     * {@code array}, under which "elements at any position MAY be the absent sentinel {@code _}; absent
+     * elements occupy positional slots -- {@code [a _ c]} has three elements and satisfies a {@code [T?; 3]}
+     * size constraint".
+     *
+     * <p><b>It is a direct binding, not a routed one.</b> {@code array}'s {@code state} carries no {@code
+     * value_param} ({@code state: element_state ~ REQUIRED}), so no application argument can reach it --
+     * which is §5.3's own reason the {@code ?} forms "have no template route ... and desugar directly". An
+     * unmarked element states nothing at all and lets §5.2's REQUIRED_DEFAULT injection supply it, exactly
+     * as {@link #instanceFor} omits every other defaulted vocabulary field, and exactly as a REQUIRED tuple
+     * position omits its own {@code state}.
+     */
+    private static List<RecordValue.Field> elementState(ElementType element) {
+        return element.optional()
+                ? List.of(new RecordValue.Field(STATE,
+                        scoped(new TokenValue(ElementState.OPTIONAL.name(), TokenForm.UNQUOTED))))
+                : List.of();
     }
 
     /**
@@ -475,13 +497,21 @@ final class SchemaDesugarer {
      * one §5.3 itself names. Only a literal {@code 0} is caught: a bound naming a value parameter is not
      * concrete here, and a parameter that turns out to be zero is §8.2's materialisation-time question.
      */
-    private Optional<GenericRef> sizedArrayApplication(ContainerDef def) {
-        if (!(def instanceof ArrayContainerDef array) || array.size().isEmpty()
-                || array.elementType().optional()) {
+    private Optional<SizedArray> sizedArrayApplication(ContainerDef def) {
+        if (!(def instanceof ArrayContainerDef array) || array.size().isEmpty()) {
             return Optional.empty();
         }
-        return elementRef(array.elementType()).map(element ->
-                sizedApplication(element, shownElement(array.elementType()), array.size().orElseThrow()));
+        return elementRef(array.elementType()).map(element -> new SizedArray(
+                sizedApplication(element, shownElement(array.elementType()), array.size().orElseThrow()),
+                elementState(array.elementType())));
+    }
+
+    /**
+     * A sized declaration-level array reduced to what fills one binding record: the size template application
+     * the bounds route through, and the element {@code ?}'s own direct binding, which no application argument
+     * can carry. Kept together because {@code [T?; 3]} states both at once and both land on the same record.
+     */
+    private record SizedArray(GenericRef application, List<RecordValue.Field> state) {
     }
 
     /**
@@ -566,7 +596,32 @@ final class SchemaDesugarer {
      * stay unexpanded whole.
      */
     private Optional<TypeRef> hoistApplication(String head, List<TypeArg> args) {
-        return instanceFor(head, args).map(instance -> hoist(syntheticName(head, args), instance));
+        return hoistApplication(head, args, List.of());
+    }
+
+    /**
+     * {@link #hoistApplication(String, List)} with direct bindings, which must reach the derived name as well
+     * as the record: without them {@code [T?]} and {@code [T]} derive the same name and the second one written
+     * collapses onto the first one injected. The tuple form has the same hazard and {@link #tupleName} the
+     * same answer.
+     */
+    private Optional<TypeRef> hoistApplication(String head, List<TypeArg> args, List<RecordValue.Field> direct) {
+        return instanceFor(head, args, direct)
+                .map(instance -> hoist(applicationName(head, args, direct), instance));
+    }
+
+    /** {@link #syntheticName} widened to distinguish two applications differing only in a direct binding. */
+    private static String applicationName(String head, List<TypeArg> args, List<RecordValue.Field> direct) {
+        if (direct.isEmpty()) {
+            return syntheticName(head, args);
+        }
+        List<TypeArg> distinguishing = new ArrayList<>(args);
+        for (RecordValue.Field field : direct) {
+            if (field.value().value().coreValue() instanceof TokenValue token) {
+                distinguishing.add(new TypeArg.Value(token));
+            }
+        }
+        return syntheticName(head, distinguishing);
     }
 
     /**
@@ -690,25 +745,22 @@ final class SchemaDesugarer {
      * and the tuple form {@link #typeDef} builds at declaration position, built here one bracket in.
      * Recursive through {@link #elementRef}, so nesting depth needs no special case.
      *
-     * <p>Empty for an array with an optional <em>element</em> ({@code [T?]}, which this phase does not build
-     * at any depth) and for anything {@link #instanceFor} does not construct.
+     * <p>Empty for anything {@link #instanceFor} does not construct.
      */
     private Optional<TypeRef> hoistNested(ContainerDef def) {
         return switch (def) {
             case ArrayContainerDef array -> {
-                if (array.elementType().optional()) {
-                    yield Optional.empty();
-                }
                 Optional<TypeRef> element = elementRef(array.elementType());
                 if (element.isEmpty()) {
                     yield Optional.empty();
                 }
+                List<RecordValue.Field> state = elementState(array.elementType());
                 if (array.size().isEmpty()) {
-                    yield hoistApplication("array", List.of(new TypeArg.Ref(element.orElseThrow())));
+                    yield hoistApplication("array", List.of(new TypeArg.Ref(element.orElseThrow())), state);
                 }
                 GenericRef sized = sizedApplication(element.orElseThrow(), shownElement(array.elementType()),
                         array.size().orElseThrow());
-                yield hoistApplication(sized.name(), sized.args());
+                yield hoistApplication(sized.name(), sized.args(), state);
             }
             case TupleContainerDef tuple -> positions(tuple).flatMap(this::hoistTuplePositions);
         };
@@ -795,6 +847,20 @@ final class SchemaDesugarer {
      * why the spec's own worked example diverges.
      */
     private Optional<TypeDef> instanceFor(String head, List<TypeArg> args) {
+        return instanceFor(head, args, List.of());
+    }
+
+    /**
+     * {@link #instanceFor(String, List)} with vocabulary fields bound <em>directly</em> rather than routed
+     * from an argument -- §5.3's element {@code ?}, whose {@code state: OPTIONAL} has no parameter to ride.
+     *
+     * <p>Each {@code direct} entry is matched against the vocabulary by name and emitted in the vocabulary's
+     * own field order, so the binding record reads the way the constructor declares it however the call site
+     * listed them. A binding naming a field the vocabulary does not declare yields empty rather than being
+     * dropped: silently binding nothing is how {@code UriType}/{@code RegexType} stayed broken invisibly
+     * (see {@code CLAUDE.md}'s traps), and this is the same shape of mistake one layer up.
+     */
+    private Optional<TypeDef> instanceFor(String head, List<TypeArg> args, List<RecordValue.Field> direct) {
         TypeDefinition applied = metaEntries.get(head);
         if (applied == null || !(applied.body() instanceof RecordBody vocabulary)
                 || applied.parameters().size() != args.size()) {
@@ -807,10 +873,19 @@ final class SchemaDesugarer {
             return Optional.empty();
         }
         List<RecordValue.Field> fields = new ArrayList<>();
+        int bound = 0;
         for (RecordField field : vocabulary.fields()) {
             Optional<String> parameter = field.valueParam();
             if (parameter.isEmpty()) {
-                continue; // a fixed or defaulted vocabulary field -- the reader supplies it
+                // A fixed or defaulted vocabulary field -- the reader supplies it, unless the sugar form
+                // states it outright (`[T?]`'s state, the one binding with no parameter to route through).
+                for (RecordValue.Field stated : direct) {
+                    if (stated.name().equals(field.name())) {
+                        fields.add(stated);
+                        bound++;
+                    }
+                }
+                continue;
             }
             int index = applied.parameters().indexOf(parameter.get());
             if (index < 0) {
@@ -822,7 +897,7 @@ final class SchemaDesugarer {
             }
             fields.add(new RecordValue.Field(field.name(), scoped(token.get())));
         }
-        if (fields.isEmpty()) {
+        if (fields.isEmpty() || bound != direct.size()) {
             return Optional.empty();
         }
         if (!applied.constructor()) {

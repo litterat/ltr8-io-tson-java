@@ -97,10 +97,22 @@ construction — see the partial-application bullet below.
   nested form carries no parameter its flat sibling does not. An injected **tuple**'s name derives from its
   positions' *states* as well as their types, or `[T, U?]` and `[T, U]` would land on one entry — and that
   form is exactly the one §8.2's structural representation has no channel for, so nesting it is only
-  representable at all *because* of the entry-materialising divergence (`SPEC-FEEDBACK.md` #49). What stays
-  unexpanded is the **element `?` on an array** (`[T?]`, §5.3's `state: OPTIONAL` on the resolved array) — a
-  separate gap in the same phase (`BACKLOG.md`), and one that keeps its enclosing container unexpanded too,
-  since a partially reduced container is no longer a recognisable sugar form.
+  representable at all *because* of the entry-materialising divergence (`SPEC-FEEDBACK.md` #49).
+- **The element `?` is a *direct* binding, not a routed one.** `[T?]` becomes `!array { element_type: T
+  state: OPTIONAL }` — §5.3's "elements at any position MAY be the absent sentinel `_`; absent elements occupy
+  positional slots". `array`'s `state` carries no `value_param` (`state: element_state ~ REQUIRED`), so no
+  application argument can reach it, which is §5.3's own reason the `?` forms "have no template route ... and
+  desugar directly". `instanceFor` therefore takes a list of fields bound by name against the vocabulary and
+  emits them in the vocabulary's own field order; a binding naming a field the vocabulary doesn't declare
+  yields empty rather than being dropped, since silently binding nothing is the `UriType`/`RegexType` trap one
+  layer up. An unmarked element states nothing and lets §5.2's REQUIRED_DEFAULT injection supply `REQUIRED`,
+  exactly as a REQUIRED tuple position omits its own `state`. The state reaches the derived name too, or
+  `[T?]` and `[T]` collide on one injected entry. **`[T?; 3]` — the form §5.3 states the rule through — is
+  what forced the sized forms onto the bullet below**: the element state and both bounds have to land on one
+  binding record, and while the size half routed through an application, `[T; 3]` and `[T?; 3]` recorded the
+  same `source` (an argument list has no channel for an element state, #49). The read side needed nothing:
+  `ArrayAbstractReader` already admitted `_` under `ElementState.OPTIONAL` and already counted it toward the
+  bounds — dead code until a schema could carry the state.
 - **A partial application closes by routing, into a construction of its constructor** — it does *not*
   materialise an entry. §5.3's sized sugar is the case that matters: `[T; 1..5]` → `array_ranged<T, 1, 5>`,
   and `array_ranged` is declared without `~` with its parameters only in labelled *value* channels, so

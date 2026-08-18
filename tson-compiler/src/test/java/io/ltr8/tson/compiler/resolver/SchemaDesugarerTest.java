@@ -459,21 +459,59 @@ class SchemaDesugarerTest {
                         document.body().declarations().get("loose").typeDef())));
     }
 
+    // ── The element `?` on an array (§5.3) ───────────────────────────────
+    //    `state: OPTIONAL` on the resolved array, bound *directly* rather than routed: `array`'s `state`
+    //    carries no value_param, which is §5.3's own reason the ? forms "have no template route".
+
+    /** {@code [T?]} writes the state; the unmarked form writes nothing and lets REQUIRED_DEFAULT supply it. */
+    @Test
+    void anOptionalElementStatesItsStateAndARequiredOneLetsTheDefaultSupplyIt() {
+        SchemaDocument document = desugarAgainstTheRealMetaKernel("""
+                  slots  => [integer?]
+                  strict => [integer]""");
+
+        assertEquals("{ element_type: integer  state: OPTIONAL }", instanceBody(assertInstanceOf(
+                Instance.class, document.body().declarations().get("slots").typeDef())));
+        assertEquals("{ element_type: integer }", instanceBody(assertInstanceOf(
+                Instance.class, document.body().declarations().get("strict").typeDef())));
+    }
+
     /**
-     * The <em>element</em> {@code ?} on an array ({@code [T?]}, §5.3's {@code state: OPTIONAL} on the resolved
-     * array) is a separate gap this phase still builds nothing for, at any nesting depth. It stays unexpanded
-     * and keeps whatever handling it already had, rather than being turned into a differently-broken shape
-     * here -- and so does the container enclosing it, since a partially reduced one is no longer a
-     * recognisable sugar form.
+     * The form §5.3 states the rule through: {@code [T?; 3]} puts the element state <em>and</em> both bounds
+     * on one binding record. It is representable only because a sized form closes by routing into the same
+     * {@code !array} construction rather than through an application ({@code SPEC-FEEDBACK.md} #45) -- an
+     * application's argument list has no channel for an element state (#49).
+     *
+     * <p>{@code state} precedes the bounds because the fields are emitted in {@code array}'s own vocabulary
+     * order, not in the order the call site listed them.
      */
     @Test
-    void anOptionalArrayElementIsStillLeftAlone() {
-        SchemaDocument document = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
-                { holder => [[integer?]; 3] }""").parseSchemaDocument();
+    void anOptionalElementAndASizeLandOnOneBindingRecord() {
+        SchemaDocument document = desugarAgainstTheRealMetaKernel("  triple => [integer?; 3]");
 
-        assertSame(document, SchemaDesugarer.desugar(document,
-                MetaKernelBootstrapResolver.getMetaKernelSchema().entries(), Set.of()));
+        assertEquals("{ element_type: integer  state: OPTIONAL  min_items: 3  max_items: 3 }",
+                instanceBody(assertInstanceOf(Instance.class,
+                        document.body().declarations().get("triple").typeDef())));
+    }
+
+    /**
+     * The state reaches the derived name, for the reason {@link #tupleName} does: without it {@code [T?]} and
+     * {@code [T]} derive the same name and the second one written collapses onto the first one injected.
+     */
+    @Test
+    void twoNestedArraysDifferingOnlyInElementStateGetSeparateDeclarations() {
+        SchemaDocument document = desugarAgainstTheRealMetaKernel("""
+                  loose  => [[integer?; 3], text]
+                  strict => [[integer; 3], text]""");
+
+        List<SchemaMap.Declaration> injected = document.body().declarations().values().stream()
+                .filter(declaration -> declaration.name().startsWith("array_ranged_")).toList();
+        assertEquals(2, injected.size(), () -> "expected two injected arrays, got "
+                + injected.stream().map(SchemaMap.Declaration::name).toList());
+        assertEquals("{ element_type: integer  state: OPTIONAL  min_items: 3  max_items: 3 }",
+                instanceBody(assertInstanceOf(Instance.class, injected.get(0).typeDef())));
+        assertEquals("{ element_type: integer  min_items: 3  max_items: 3 }",
+                instanceBody(assertInstanceOf(Instance.class, injected.get(1).typeDef())));
     }
 
     /**

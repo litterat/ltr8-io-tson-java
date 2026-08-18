@@ -229,7 +229,9 @@ is why the phase runs with the meta in hand), with a hand-written table for meta
 `choice`/`tuple` take a variadic second path; a *partial* application — §5.3's size templates, whose
 parameters occupy labelled value channels only — closes by routing into a construction of its constructor
 rather than materialising an entry (`SPEC-FEEDBACK.md` #45; record templates are rejected — real §5.10
-substitution is unimplemented).
+substitution is unimplemented). §5.3's element/position `?` binds `state` *directly* — it has no parameter to
+route through, which is why §5.3 gives those forms no template route — so `[T?; 3]` puts a state and both
+bounds on one binding record. §5.3's declaration-level container syntax is complete.
 Bottom-up, so nesting needs no special case; injected names are `head_args_hash`, so structurally identical
 applications collapse. Invalid sugar forms report per declaration via `DesugarFailureReporter` rather than
 throwing.
@@ -468,11 +470,6 @@ compatibility).
 
 ## Not yet implemented
 
-- **An array's element `?`** (`[T?]` — §5.3's `state: OPTIONAL` on the resolved array, absent elements
-  occupying positional slots) — `SchemaDesugarer` builds no array position carrying one, so the declaration
-  reaches `DefinitionResolver` as a `ContainerTypeDef` and throws, and so does any container enclosing it.
-  The last piece of §5.3's declaration-level container syntax: the flat forms, the tuple position `?`, and
-  nesting are all done.
 - **Part 2 resolution gaps** — the identity-diagonal
   FIXED-value invariant, a generic type-ref whose argument is nested or a value rather than a plain name,
   and a parameterized supertype (`customer & box<T>`, which needs §5.10 substitution into the absorbed
