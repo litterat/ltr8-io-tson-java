@@ -139,6 +139,13 @@ schemaless `TsonTreeReader` alike. A sealed `TsonValue` over seven pure immutabl
 record-vs-map and array-vs-tuple distinctions survive into the model, where JSON's would collapse — and
 annotation-aware, every node carrying its own `typeRef()` and `annotations()`.
 
+- **`TsonAtom.toString()` renders its value alone, and that is load-bearing.** A reader reporting on a
+  decoded value stringifies whatever it decoded, and in tree mode that is a `TsonAtom` — so the record's own
+  default rendering would reach a `Diagnostic`'s `expected`/`actual`, the two fields that exist precisely so
+  a consumer needn't parse the message, and the message itself wherever a reader interpolates a value
+  (`RecordAbstractReader.verifyFixed`, `ArrayAbstractReader`'s `unique_items`). The type-ref and annotations
+  stay reachable through the accessors. Composites keep the record default: rendering one as TSON text is
+  `TsonTreeWriter`'s job, encoding and lossy spots and all.
 - **The names are chosen against Jackson, not in a vacuum.** No node carries a `Node` suffix, because
   Jackson ships `ArrayNode`, `NullNode` and `MissingNode` — a consumer using both libraries in one file
   would otherwise fully qualify every one. The sealed shape independently matches JEP 540's

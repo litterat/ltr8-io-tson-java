@@ -207,6 +207,22 @@ class RecordTreeReaderTest {
         assertTrue(message.contains("use '~'"), message);
     }
 
+    /**
+     * {@code expected}/{@code actual} exist so a consumer reads the two values without parsing the message.
+     * In tree mode a decoded value is a {@code TsonAtom}, so this is where the record's own default
+     * rendering would land in the structured half of the diagnostic.
+     */
+    @Test
+    void aFixedViolationNamesBothValuesRatherThanTheTreeNodesComponents() {
+        TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED),
+                fixed(FieldState.REQUIRED_FIXED, "7")));
+
+        Diagnostic reported = onlyDiagnostic(compiled, "{ value: 9 }");
+
+        assertEquals("7", reported.expected());
+        assertEquals("9", reported.actual());
+    }
+
     private static Diagnostic onlyDiagnostic(TsonCompiledSchema compiled, String document) {
         TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
         compiled.get("point").read(TestDocuments.document(document, problems));

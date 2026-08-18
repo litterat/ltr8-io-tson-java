@@ -205,6 +205,20 @@ class TsonValueTest {
         assertThrows(NullPointerException.class, () -> TsonAtom.of(null));
     }
 
+    /**
+     * Load-bearing rather than cosmetic: a reader reporting on a decoded value stringifies whatever it
+     * decoded, and in tree mode that is a {@link TsonAtom}. The record default would put {@code
+     * TsonAtom[value=medium, typeRef=Optional[text], annotations=[]]} into a diagnostic's {@code
+     * expected}/{@code actual} and into messages that interpolate a value.
+     */
+    @Test
+    void atomRendersItsValueAloneRatherThanTheRecordsComponents() {
+        assertEquals("medium", TsonAtom.of("medium", "text").toString());
+        assertEquals("7", TsonAtom.of(BigInteger.valueOf(7)).toString());
+        // Composites keep the record default -- rendering those as TSON text is TsonTreeWriter's job.
+        assertTrue(TsonRecord.of(Map.of("a", TsonAtom.of(1))).toString().startsWith("TsonRecord["));
+    }
+
     @Test
     void mapNodeKeysAreNodesAndGetByStringMatches() {
         TsonMap map = TsonMap.of(List.of(
