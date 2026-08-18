@@ -130,6 +130,12 @@ backend.
 - [ ] The same fail-fast gap exists one layer down, in the lexer (`LexException`, unchecked,
   despite §8.1's "SHOULD continue processing to report multiple issues"). Worth deciding whether
   lexer/parser errors eventually feed the same `Diagnostic` model, or stay a separate concern.
+  **It is now the floor under schema-parse recovery**: `TsonSchemaParser` reports every declaration's
+  syntax error in one pass, but resynchronising means reading the very tokens that don't lex, so a
+  schema whose first problem is an unterminated multi-line token still reports one and stops.
+  Recovery here is also harder to justify than it was in the parser — the grammar hands the parser
+  real resync points, where an unterminated token leaves no reliable boundary to resume on — so this
+  wants a specific case that bites before it becomes work.
 - [ ] `REQUIRED_FIXED`/`OPTIONAL_FIXED` identity-diagonal invariant (a restated fixed field's value
   must not change) — never checked.
 - [ ] `value_param` — parametric field modifiers are recorded but never substituted at application

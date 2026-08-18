@@ -181,8 +181,11 @@ public final class Tson {
      * an unresolved reference and an unloadable {@code !!import} all come back as {@link Diagnostic}s.
      *
      * <p><b>It stops at the first phase that reports anything</b> ([TSON-DATA] §8.1's four error categories
-     * are per layer, and this is the resolver layer). Every declaration is resolved before the verdict is
-     * given, and only if resolution was clean does linking run -- so a schema with three broken declarations
+     * are per layer). Parsing is such a phase too: every declaration is parsed and each syntax error reported,
+     * and a document that didn't parse whole is not resolved at all -- resolving what survived would report
+     * every reference to a broken declaration as unresolved, on top of the syntax error that is the real
+     * problem. Then every declaration is resolved
+     * before the verdict is given, and only if resolution was clean does linking run -- so a schema with three broken declarations
      * reports three, but a schema with a broken declaration *and* an unresolved reference reports only the
      * former, since the reference may well resolve once the declaration does. Both javac and Swift draw the
      * boundary here: javac attributes every entry before {@code shouldStopPolicyIfError} blocks the next
@@ -197,7 +200,11 @@ public final class Tson {
         TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
         try {
             TsonSchemaParser parser = new TsonSchemaParser(schemaText);
-            SchemaDocument document = parser.parseSchemaDocument();
+            Optional<SchemaDocument> parsed = parser.parseSchemaDocument(problems);
+            if (parsed.isEmpty()) {
+                return problems.diagnostics();
+            }
+            SchemaDocument document = parsed.get();
 
             TsonSchema resolved = new TsonSchemaResolver(core)
                     .resolveSchema(document, parser.declarationPositions(), problems);
@@ -216,8 +223,9 @@ public final class Tson {
             problems.report(Diagnostic.ofSchemaError("", "", e.getMessage(), Optional.empty()));
         } catch (RuntimeException e) {
             // Base syntax is this document's problem; anything else is a fault in this library and rethrows
-            // itself from here rather than being laundered into a false verdict.
-            problems.report(Diagnostic.ofBaseSyntaxError(e));
+            // itself from here rather than being laundered into a false verdict. The schema-side factory,
+            // because this document is a schema: the position belongs at the schema end, not the data end.
+            problems.report(Diagnostic.ofSchemaSyntaxError("", e));
         }
         return problems.diagnostics();
     }

@@ -104,6 +104,8 @@ public final class TsonDataStream implements TsonEventSource {
     private final Lexer lexer;
 
     /** The next not-yet-consumed token -- lazily populated by {@link #peekToken()} on first use. */
+    private int nesting;
+
     private Token current;
 
     /** A second lookahead token, buffered only transiently to resolve {@code {}} disambiguation. */
@@ -249,11 +251,32 @@ public final class TsonDataStream implements TsonEventSource {
                 lexer.endLine(), lexer.endColumn(), lexer.endByteOffset());
     }
 
+    /**
+     * Bracket-pair depth at the cursor, counted as tokens are consumed. <b>Only {@link TsonSchemaParser}'s
+     * error recovery reads it</b>, to tell the record body it failed inside from the schema map it must get
+     * back out to -- a failure at {@code first => { x: }} leaves the cursor on the <em>record's</em> closing
+     * brace, and resynchronising on brace text alone would mistake it for the map's own. Counted here rather
+     * than in the parser because this is the one place every token is consumed. {@code <}/{@code >} are not
+     * counted: they are schema-only, and a stray one is skipped harmlessly where a miscount would not be.
+     */
+    int nesting() {
+        return nesting;
+    }
+
     Token peekToken() {
         if (current == null) {
             current = snapshot(lexer, lexer.nextToken());
         }
         return current;
+    }
+
+    /**
+     * The token after {@link #peekToken()}, without consuming either -- the second of the at-most-two tokens of
+     * lookahead this stream keeps. Package-private so {@link TsonSchemaParser}'s error recovery can recognise a
+     * declaration start ({@code name =>}) while resynchronising, the one place two tokens decide the answer.
+     */
+    Token peekSecondToken() {
+        return peekSecond();
     }
 
     private Token peekSecond() {
@@ -268,6 +291,11 @@ public final class TsonDataStream implements TsonEventSource {
         lastEndLine = t.endLine();
         lastEndColumn = t.endColumn();
         lastEndByteOffset = t.endByteOffset();
+        switch (t.type()) {
+            case LBRACE, LBRACKET, LPAREN -> nesting++;
+            case RBRACE, RBRACKET, RPAREN -> nesting = Math.max(0, nesting - 1);
+            default -> { }
+        }
         if (pending != null) {
             current = pending;
             pending = null;
@@ -281,13 +309,27 @@ public final class TsonDataStream implements TsonEventSource {
         return peekToken().type() == type;
     }
 
-    Token expect(TokenType type, String context) {
+    /**
+     * Consumes a token of {@code type}, or fails naming {@code construct} -- <b>the construct the position
+     * admits, phrased as the author would say it</b> ({@code "a record field's ':'"}), never the token class
+     * that would have satisfied it. The token class is parser vocabulary: an author reading {@code expected
+     * COLON (record field)} has to know what this parser calls things before the sentence tells them
+     * anything, where {@code expected a record field's ':'} names the fix outright.
+     */
+    Token expect(TokenType type, String construct) {
         if (!check(type)) {
-            throw parseError("expected " + type + " (" + context + "), found " + describe(peekToken()));
+            throw mismatch(construct);
         }
         return advance();
     }
 
+    /** The failure {@link #expect} raises, for a throw site that decides on more than one token's type. */
+    TsonParseException mismatch(String construct) {
+        return new TsonParseException("expected " + construct + ", found " + describe(peekToken()),
+                construct, describe(peekToken()), peekToken().start());
+    }
+
+    /** A parse failure that states a rule rather than a substitution, so it carries no {@code expected}/{@code actual} pair. */
     TsonParseException parseError(String message) {
         return new TsonParseException(message, peekToken().start());
     }
@@ -301,11 +343,18 @@ public final class TsonDataStream implements TsonEventSource {
         return new Position(lastEndLine, lastEndColumn, lastEndByteOffset);
     }
 
+    /**
+     * One written token as an author would point at it. A quoted token names its form, since its text
+     * alone ({@code abc}) is indistinguishable from an unquoted one and the difference is often the whole
+     * problem; everything else is its own text in quotes. <b>The {@link TokenType} is deliberately not
+     * printed</b> -- {@code '!' (BANG)} spends its second half restating the first in parser vocabulary.
+     */
     static String describe(Token t) {
-        if (t.type() == TokenType.EOF) {
-            return "end of input";
-        }
-        return "'" + t.text() + "' (" + t.type() + ")";
+        return switch (t.type()) {
+            case EOF -> "end of input";
+            case SINGLE_LINE_STRING, MULTI_LINE_STRING -> "the quoted token '" + t.text() + "'";
+            default -> "'" + t.text() + "'";
+        };
     }
 
     private static boolean isStructuralDelimiter(TokenType type) {
@@ -370,7 +419,7 @@ public final class TsonDataStream implements TsonEventSource {
 
     /** {@code "!!" name ":" single-line-token}, requiring the directive name to equal {@code expectedName} (§3.3). */
     String parseNamedDirective(String expectedName) {
-        Token bangbang = expect(TokenType.DIRECTIVE, "directive");
+        Token bangbang = expect(TokenType.DIRECTIVE, "a directive");
         Token name = peekToken();
         if (name.type() != TokenType.UNQUOTED) {
             throw parseError("expected a directive name after '!!', found " + describe(name));
@@ -429,12 +478,15 @@ public final class TsonDataStream implements TsonEventSource {
         return name.text();
     }
 
-    /** {@code field-name = token} (§7.4): any of the three token forms. Shared with [TSON-SCHEMA]'s identical production (§12.1). */
-    Token expectFieldNameToken(String context) {
+    /**
+     * {@code field-name = token} (§7.4): any of the three token forms. Shared with [TSON-SCHEMA]'s identical
+     * production (§12.1). {@code construct} names the position in the author's voice, exactly as
+     * {@link #expect}'s does.
+     */
+    Token expectFieldNameToken(String construct) {
         Token name = peekToken();
-        if (name.type() != TokenType.UNQUOTED && name.type() != TokenType.SINGLE_LINE_STRING
-                && name.type() != TokenType.MULTI_LINE_STRING) {
-            throw parseError("expected a field name (a token) for " + context + ", found " + describe(name));
+        if (!isBareTokenType(name.type())) {
+            throw mismatch(construct);
         }
         advance();
         return name;
@@ -634,8 +686,8 @@ public final class TsonDataStream implements TsonEventSource {
                 return;
             }
             consumeSeparatorOrCloseCheck(TokenType.RBRACE);
-            Token name = expectFieldNameToken("a record field");
-            expect(TokenType.COLON, "record field");
+            Token name = expectFieldNameToken("a record field name");
+            expect(TokenType.COLON, "a record field's ':'");
             ready.add(new FieldName(name.text(), name.start()));
             pushFrame(new RecordFrame());
             pushFrame(new ScopedValueFrame());
@@ -666,7 +718,7 @@ public final class TsonDataStream implements TsonEventSource {
                     pushFrame(new DataValueFrame()); // the next key
                 }
                 case AWAITING_ARROW -> {
-                    Token arrow = expect(TokenType.MAP_ARROW, "map entry");
+                    Token arrow = expect(TokenType.MAP_ARROW, "a map entry's '=>'");
                     ready.add(new MapArrow(arrow.start()));
                     pushFrame(new MapFrame(Mode.AFTER_ENTRY));
                     pushFrame(new ScopedValueFrame());

@@ -455,6 +455,164 @@ class TsonSchemaParserTest {
         return doc.body().declarations().values().iterator().next();
     }
 
+    // ── Message level: the construct, not the token class (#29) ──────────
+
+    @Test
+    void aMismatchNamesTheConstructThePositionAdmitsAndNotTheTokenClass() {
+        TsonParseException e = assertThrows(TsonParseException.class, () -> declOf("a => { x: }"));
+        assertEquals("expected a type reference, found '}'", e.getMessage());
+        assertEquals("a type reference", e.expected());
+        assertEquals("'}'", e.actual());
+    }
+
+    @Test
+    void aQuotedTokenIsDescribedAsOneSinceItsTextAloneDoesNotSaySo() {
+        TsonParseException e = assertThrows(TsonParseException.class, () -> declOf("a => \"text\""));
+        assertEquals("expected a type reference, found the quoted token 'text'", e.getMessage());
+    }
+
+    @Test
+    void anInlineAtomRefinementNamesTheFixRatherThanTheTokenItTrippedOn() {
+        TsonParseException e = assertThrows(TsonParseException.class,
+                () -> declOf("order => { quantity: !integer ^ { min: 1 } }"));
+        assertTrue(e.getMessage().startsWith("an atom refinement or constructor application is not permitted "
+                + "at a type-ref position (§5.3)"), e::getMessage);
+        assertTrue(e.getMessage().contains("declare a named type instead"), e::getMessage);
+    }
+
+    @Test
+    void aRuleViolationCarriesNoExpectedActualPairToInvent() {
+        TsonParseException e = assertThrows(TsonParseException.class, () -> declOf("a => { x: text ? }"));
+        assertEquals("", e.expected());
+        assertEquals("", e.actual());
+    }
+
+    // ── Declaration-level recovery (#29) ─────────────────────────────────
+
+    private static List<Diagnostic> parseCollecting(String source) {
+        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        new TsonSchemaParser(source).parseSchemaDocument(problems);
+        return problems.diagnostics();
+    }
+
+    @Test
+    void everyBrokenDeclarationIsReportedInOnePass() {
+        List<Diagnostic> problems = parseCollecting("""
+                !!id:"https://example.com/x.tn"
+                !!meta:"https://tson.io/2026/32/m/meta.tn1"
+                {
+                  first => { x: }
+                  second => { y: text }
+                  third => { z: !integer ^ { min: 1 } }
+                }
+                """);
+        assertEquals(2, problems.size(), problems::toString);
+        assertEquals(List.of("/first", "/third"),
+                problems.stream().map(d -> d.schemaPointer().orElseThrow()).toList());
+    }
+
+    @Test
+    void aParseThatReportedAnythingHandsBackNoDocumentEvenThoughSomeDeclarationsParsed() {
+        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        TsonSchemaParser parser = new TsonSchemaParser("""
+                !!meta:"https://tson.io/2026/32/m/meta.tn1"
+                {
+                  broken => { x: }
+                  sound => { y: text }
+                }
+                """);
+        assertTrue(parser.parseSchemaDocument(problems).isEmpty());
+        assertEquals(1, parser.reported());
+    }
+
+    @Test
+    void aCleanParseThroughTheRecoveringEntryPointHandsBackTheDocument() {
+        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        TsonSchemaParser parser = new TsonSchemaParser("""
+                !!meta:"https://tson.io/2026/32/m/meta.tn1"
+                { sound => { y: text } }
+                """);
+        SchemaDocument doc = parser.parseSchemaDocument(problems).orElseThrow();
+        assertEquals(0, parser.reported());
+        assertEquals(List.of("sound"), List.copyOf(doc.body().declarations().keySet()));
+    }
+
+    @Test
+    void everyDeclarationFailingLeavesNoSchemaMapToBuildRatherThanAnEmptyOne() {
+        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        TsonSchemaParser parser = new TsonSchemaParser("""
+                !!meta:"https://tson.io/2026/32/m/meta.tn1"
+                {
+                  first => { x: }
+                  second => { y: }
+                }
+                """);
+        assertTrue(parser.parseSchemaDocument(problems).isEmpty());
+        assertEquals(2, parser.reported());
+    }
+
+    @Test
+    void recoveryResynchronisesPastNestedBracketsRatherThanStoppingAtTheirClosers() {
+        List<Diagnostic> problems = parseCollecting("""
+                !!meta:"https://tson.io/2026/32/m/meta.tn1"
+                {
+                  broken => { a: [ text, (b | c) ] x: }
+                  next => { y: }
+                }
+                """);
+        assertEquals(List.of("/broken", "/next"),
+                problems.stream().map(d -> d.schemaPointer().orElseThrow()).toList());
+    }
+
+    @Test
+    void aDeclarationFailingBeforeItsOwnNameIsPointedAtTheDocumentRoot() {
+        List<Diagnostic> problems = parseCollecting("""
+                !!meta:"https://tson.io/2026/32/m/meta.tn1"
+                {
+                  "quoted" => text
+                  next => text
+                }
+                """);
+        assertEquals("", problems.get(0).schemaPointer().orElseThrow());
+    }
+
+    @Test
+    void aSchemaSyntaxDiagnosticLocatesItselfAtTheSchemaEndAndNotTheDataEnd() {
+        Diagnostic d = parseCollecting("""
+                !!id:"https://example.com/x.tn"
+                !!meta:"https://tson.io/2026/32/m/meta.tn1"
+                {
+                  broken => { x: }
+                  next => text
+                }
+                """).get(0);
+        // Canonicalized (§2.2.1, scheme stripped), so it matches the id every later phase reports under.
+        assertEquals("example.com/x.tn", d.schemaId());
+        assertEquals(Diagnostic.Code.VALIDATION_ERROR, d.code());
+        assertTrue(d.path().isEmpty());
+        assertTrue(d.dataPosition().isEmpty());
+        assertEquals(4, d.schemaPosition().orElseThrow().line());
+        assertEquals("a type reference", d.expected());
+    }
+
+    @Test
+    void aMissingReceiverIsStillFailFast() {
+        assertThrows(TsonParseException.class, () -> parse("""
+                !!meta:"https://tson.io/2026/32/m/meta.tn1"
+                {
+                  broken => { x: }
+                  next => text
+                }
+                """));
+    }
+
+    @Test
+    void aMalformedHeaderStillThrowsBecauseThereIsNothingToResynchroniseOn() {
+        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        assertThrows(TsonParseException.class,
+                () -> new TsonSchemaParser("{ a => text }").parseSchemaDocument(problems));
+    }
+
     // ── Declaration position side-table ──────────────────────────────────
 
     @Test

@@ -180,12 +180,14 @@ by a factor of six.
 
 ## Schema-side diagnostics
 
-Resolution and linking report every independent problem in one pass through a `TsonDiagnosticsReceiver`
-(issue #3, PR #4), whether reached by `tson compile`/`Tson.validateSchema` or by a *data* read whose
-`!!schema` names a schema that doesn't resolve — both give the same account of the same broken schema.
-`docs/readers-and-diagnostics.md`'s "Schema-side diagnostics" section describes the shape and the decisions
-behind it. What is
-left:
+Parsing, desugaring, resolution and linking all report every independent problem in one pass through a
+`TsonDiagnosticsReceiver` (issues #3/#28/#29), whether reached by `tson compile`/`Tson.validateSchema` or by
+a *data* read whose `!!schema` names a schema that doesn't resolve — both give the same account of the same
+broken schema. `docs/readers-and-diagnostics.md`'s "Schema-side diagnostics" section describes the shape and
+the decisions behind it. One thing is left here; the *floor* under all of it — the lexer being fail-fast, so
+a token that will not lex aborts the pass that would have reported past it — is deliberately not an item in
+this list, because there is no work to do until someone decides whether lexer errors feed the `Diagnostic`
+model at all. `STRUCTURED-OUTPUT.md` holds that question.
 
 - [ ] **The read path carries `schemaPosition` but not `schemaId`/`schemaPointer`** — a reader knows the
   declaration position it stamped, not which entry of which schema produced it, so a value error reports
@@ -206,24 +208,12 @@ left:
     becomes a three-part stamp across its ~11 reader call sites, and `DefaultTsonReadContext.report`
     populates all three. `schemaPointer` is the cheap half — `ValueReaderFactory` is already handed the
     entry's own declared name, which is the `/name` pointer.
-- [ ] **A schema *parse* error is still fail-fast, and names a token class rather than a construct.**
-  Everything downstream of parsing now reports many problems; parsing itself reports one and stops, so an
-  author fixes a syntax error, re-runs, and meets the next. The message is also pitched at the wrong level
-  for the person reading it: an atom refinement written inline at a field position (`quantity: !integer ^ {
-  min: 1 }`, a natural thing to try) gives
-
-  ```
-  [VALIDATION_ERROR] (6:15:157): expected UNQUOTED (a type reference), found '!' (BANG)
-  ```
-
-  which is accurate about tokens and silent about the fix — hoist the refinement to its own declaration and
-  reference it. Naming the construct that *is* admissible at the failing position would turn a guess into a
-  one-shot correction. Related: `STRUCTURED-OUTPUT.md` tracks the same fail-fast gap one layer further down,
-  in the lexer.
 - Granularity ceiling to know before starting any of these: positions are **per declaration**, from the
   declaration's own name token. Sub-declaration positions (which field, which supertype) do not exist and
   would be their own parser work — visible today as a diagnostic pointing at `/my_type` when the problem is
-  one of its fields.
+  one of its fields. A *syntax* error is the one exception: it has the failing token's own position, since
+  the parser reports it where it stands rather than looking it up per declaration afterwards. Its
+  `schemaPointer` is still only `/my_type`.
 
 ## Write side
 

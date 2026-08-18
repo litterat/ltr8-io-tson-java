@@ -52,6 +52,33 @@ class BrokenSchemaDuringDataValidationTest {
         return Tson.builder().schemaSource(source).build();
     }
 
+    /**
+     * A schema that doesn't even *parse* reports the same way, and as many times: the read path parses the
+     * named schema with the same recovering parse {@code validateSchema} uses, so the account an author gets
+     * from {@code tson validate} still matches the one {@code tson compile} gives.
+     */
+    @Test
+    void aSchemaThatDoesNotParseIsReportedPerDeclarationToo() {
+        String unparseable = """
+                !!id:"https://example.test/broken-during-read.tn"
+                !!meta:"https://tson.io/2026/32/m/meta.tn"
+                !!import:"https://tson.io/2026/32/m/core.tn"
+                {
+                  first => { x: }
+                  point => { x: int32  y: int32 }
+                  second => { q: !int32 ^ { min: 1 } }
+                }
+                """;
+        Tson tson = Tson.builder().schemaSource(uri -> unparseable).build();
+
+        List<Diagnostic> problems = tson.validate(DATA);
+
+        assertEquals(List.of("/first", "/second"),
+                problems.stream().map(d -> d.schemaPointer().orElseThrow()).toList(),
+                () -> "expected both syntax errors, got " + problems);
+        assertEquals(Optional.empty(), problems.get(0).path(), "a schema problem has no data location");
+    }
+
     @Test
     void everyProblemWithTheSchemaIsReported() {
         List<Diagnostic> problems = tson().validate(DATA);

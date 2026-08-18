@@ -200,6 +200,19 @@ class TsonDataStreamTest {
         assertThrows(TsonParseException.class, () -> shape("{ x: 1, }"));
     }
 
+    /**
+     * The data path shares {@code expect}/{@code describe} with the schema path, so it gets the same
+     * construct-led wording and the same structured {@code expected}/{@code actual} pair (issue #29). Pinned
+     * here because Part 1's accept/reject set is frozen and only the wording may move.
+     */
+    @Test
+    void aMismatchNamesTheConstructAndCarriesItStructurally() {
+        TsonParseException thrown = assertThrows(TsonParseException.class, () -> shape("{ a: 1  b 2 }"));
+        assertEquals("expected a record field's ':', found '2'", thrown.getMessage());
+        assertEquals("a record field's ':'", thrown.expected());
+        assertEquals("'2'", thrown.actual());
+    }
+
     @Test
     void contentAfterTheDocumentsValueIsAParseErrorFromTheStreamItself() {
         // RootFrame rejects it before ever emitting DocumentEnd, so no reader has to police trailing

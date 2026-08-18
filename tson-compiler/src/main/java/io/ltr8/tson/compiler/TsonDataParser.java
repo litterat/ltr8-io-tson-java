@@ -147,8 +147,8 @@ public class TsonDataParser {
         return stream.peekDirectiveName();
     }
 
-    Token expectFieldNameToken(String context) {
-        return stream.expectFieldNameToken(context);
+    Token expectFieldNameToken(String construct) {
+        return stream.expectFieldNameToken(construct);
     }
 
     boolean consumeSeparatorOrCloseCheck(TokenType closing) {
@@ -166,6 +166,16 @@ public class TsonDataParser {
         return stream.peekToken();
     }
 
+    /** The token after {@link #peek()} -- see {@link TsonDataStream#peekSecondToken()} for why exactly one more. */
+    Token peekSecond() {
+        return stream.peekSecondToken();
+    }
+
+    /** Bracket-pair depth at the cursor -- see {@link TsonDataStream#nesting()}. */
+    int nesting() {
+        return stream.nesting();
+    }
+
     Token advance() {
         return stream.advance();
     }
@@ -174,12 +184,16 @@ public class TsonDataParser {
         return stream.check(type);
     }
 
-    Token expect(TokenType type, String context) {
-        return stream.expect(type, context);
+    Token expect(TokenType type, String construct) {
+        return stream.expect(type, construct);
     }
 
     TsonParseException parseError(String message) {
         return stream.parseError(message);
+    }
+
+    TsonParseException mismatch(String construct) {
+        return stream.mismatch(construct);
     }
 
     static String describe(Token t) {

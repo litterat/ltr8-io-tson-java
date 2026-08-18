@@ -33,6 +33,8 @@ import io.ltr8.tson.compiler.ast.schema.TypeArg;
 import io.ltr8.tson.compiler.ast.schema.TypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeRef;
 import io.ltr8.tson.compiler.lexer.Token;
+import io.ltr8.tson.schema.TsonCanonicalIdentity;
+import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.compiler.lexer.TokenType;
 import io.ltr8.tson.compiler.base.NumberGrammar;
 
@@ -75,6 +77,22 @@ public final class TsonSchemaParser extends TsonDataParser {
      */
     private final Map<SchemaMap.Declaration, Position> declarationPositions = new IdentityHashMap<>();
 
+    /**
+     * Where a recovered parse's problems go, and the switch between the two modes: {@code null} (the
+     * {@link #parseSchemaDocument()} entry point) is fail-fast, and the first {@link TsonParseException}
+     * leaves this class. A receiver turns on the declaration-level recovery in {@link #parseSchemaMap}.
+     */
+    private TsonDiagnosticsReceiver receiver;
+
+    /** Count of problems handed to {@link #receiver} -- the {@code ctx.reported()} idiom, for a receiver that keeps no list. */
+    private int reported;
+
+    /** This document's own {@code !!id} once read, so a recovered declaration's diagnostic can say which schema it is in. */
+    private String schemaId = "";
+
+    /** The declaration currently being parsed, or {@code ""} before its name token is reached -- the {@code /name} schema pointer a recovered diagnostic carries. */
+    private String declarationInProgress = "";
+
     public TsonSchemaParser(String source) {
         super(source);
     }
@@ -84,11 +102,63 @@ public final class TsonSchemaParser extends TsonDataParser {
         return Collections.unmodifiableMap(declarationPositions);
     }
 
+    /** Parses fail-fast: the first syntax error anywhere in the document leaves as a {@link TsonParseException}. */
     public SchemaDocument parseSchemaDocument() {
-        Optional<String> id = Optional.empty();
-        if (check(TokenType.DIRECTIVE) && "id".equals(peekDirectiveName())) {
-            id = Optional.of(parseNamedDirective("id"));
+        // Only recovery can empty this, and recovery needs a receiver, which this entry point never sets.
+        return parseDocumentBody().orElseThrow();
+    }
+
+    /**
+     * Parses reporting every <em>declaration</em>'s syntax error to {@code receiver} instead of throwing at the
+     * first, so an author sees all of them in one pass -- the parse-phase peer of what resolution and linking
+     * already do. Panic-mode recovery: a failed declaration is reported, its remaining tokens are skipped to the
+     * next {@code name =>} back at schema-map depth, and parsing resumes there.
+     *
+     * <p><b>A parse that reported anything hands back no document at all</b> ({@link Optional#empty()}), even
+     * though the declarations around the broken ones did parse. A half-document is not a thing a later phase
+     * can use: resolving it reports every reference to a dropped declaration as unresolved, on top of the
+     * syntax error that is the real problem, and §8.1's error categories are per layer precisely so a layer's
+     * verdict is not second-guessed by the next one. The surviving nodes exist only to keep parsing.
+     *
+     * <p><b>Two failures are not recoverable and still throw.</b> A malformed <em>header</em> (a missing or
+     * ill-placed {@code !!meta}, a directive argument that isn't a URI) has no following construct to
+     * resynchronise on -- the schema map has not started. And a token that will not <em>lex</em> raises
+     * {@link io.ltr8.tson.compiler.lexer.LexException} from underneath this recovery, since resynchronising
+     * means reading the very tokens that don't exist; the lexer being fail-fast is the floor on how much of a
+     * broken document this can report ({@code STRUCTURED-OUTPUT.md} tracks it).
+     */
+    public Optional<SchemaDocument> parseSchemaDocument(TsonDiagnosticsReceiver receiver) {
+        this.receiver = receiver;
+        Optional<SchemaDocument> document = parseDocumentBody();
+        return reported > 0 ? Optional.empty() : document;
+    }
+
+    /**
+     * This document's {@code !!id} canonicalized (§2.2.1) so a parse diagnostic's {@code schemaId} matches the
+     * one every later phase reports under, <b>falling back to the id as written</b> when it does not canonicalize.
+     * A non-canonical id is a real error, but it is the resolver's to report; raising it from the grammar layer
+     * would replace a syntax diagnostic the author can act on with a different complaint about a different line.
+     */
+    private static String canonicalIdOrAsWritten(String id) {
+        try {
+            return TsonCanonicalIdentity.canonicalize(id);
+        } catch (TsonSchemaValidationException e) {
+            return id;
         }
+    }
+
+    /** How many problems {@link #parseSchemaDocument(TsonDiagnosticsReceiver)} reported -- zero meaning the document parsed clean. */
+    public int reported() {
+        return reported;
+    }
+
+    private Optional<SchemaDocument> parseDocumentBody() {
+        Optional<String> documentId = Optional.empty();
+        if (check(TokenType.DIRECTIVE) && "id".equals(peekDirectiveName())) {
+            documentId = Optional.of(parseNamedDirective("id"));
+            schemaId = canonicalIdOrAsWritten(documentId.get());
+        }
+        final Optional<String> id = documentId;
 
         if (!check(TokenType.DIRECTIVE) || !"meta".equals(peekDirectiveName())) {
             throw parseError("expected '!!meta' (a schema document requires exactly one, "
@@ -105,29 +175,84 @@ public final class TsonSchemaParser extends TsonDataParser {
                     + "(expected '!!import' or the schema map's opening '{')");
         }
 
-        SchemaMap body = parseSchemaMap();
+        Optional<SchemaMap> body = parseSchemaMap();
 
         if (!check(TokenType.EOF)) {
             throw parseError("unexpected content after the schema map: " + describe(peek()));
         }
-        return new SchemaDocument(id, meta, imports, body);
+        return body.map(map -> new SchemaDocument(id, meta, imports, map));
     }
 
     // ── Schema Map (§2.1, §12.1) ─────────────────────────────────────────
 
-    private SchemaMap parseSchemaMap() {
+    /**
+     * Empty only when recovery reported every declaration there was, leaving nothing §2.1's at-least-one rule
+     * could be satisfied with -- {@link #parseSchemaDocument(TsonDiagnosticsReceiver)} already discards the
+     * document in that case, so there is no map to build and nothing that would read it.
+     */
+    private Optional<SchemaMap> parseSchemaMap() {
         List<Annotation> annotations = parseAnnotationList();
-        expect(TokenType.LBRACE, "schema map");
+        expect(TokenType.LBRACE, "a schema map's opening '{'");
         if (check(TokenType.RBRACE)) {
             throw parseError("a schema map requires at least one declaration; '{}' is not permitted here (§2.1)");
         }
+        int mapDepth = nesting();
         Map<String, SchemaMap.Declaration> declarations = new LinkedHashMap<>();
-        putDeclaration(declarations, parseDeclaration());
-        while (consumeSeparatorOrCloseCheck(TokenType.RBRACE)) {
-            putDeclaration(declarations, parseDeclaration());
+        boolean more = true;
+        while (more) {
+            try {
+                putDeclaration(declarations, parseDeclaration());
+                more = consumeSeparatorOrCloseCheck(TokenType.RBRACE);
+            } catch (TsonParseException e) {
+                if (receiver == null) {
+                    throw e;
+                }
+                report(e);
+                more = recoverToNextDeclaration(mapDepth);
+            }
         }
-        expect(TokenType.RBRACE, "schema map");
-        return new SchemaMap(annotations, declarations);
+        expect(TokenType.RBRACE, "a schema map's closing '}'");
+        return declarations.isEmpty() ? Optional.empty() : Optional.of(new SchemaMap(annotations, declarations));
+    }
+
+    /** Hands one recovered declaration's syntax error to {@link #receiver}, pointed at the declaration it was found in. */
+    private void report(TsonParseException e) {
+        reported++;
+        receiver.report(Diagnostic.ofSchemaSyntaxError(schemaId, declarationInProgress, e));
+    }
+
+    /**
+     * Panic-mode resynchronisation after a reported declaration: discards tokens until the next declaration
+     * begins, returning {@code true} if one does and {@code false} at the schema map's own {@code }} or at
+     * end of input.
+     *
+     * <p><b>A declaration start is {@code name =>} back at {@code mapDepth}, and nothing else.</b> Two tokens
+     * decide it unambiguously, which is exactly the lookahead this stream has. The looser candidates were
+     * rejected: a bare name is most of a broken declaration's own wreckage, and a leading {@code @} is equally
+     * an annotation on a field. The cost of the strict rule is that an annotated declaration resynchronises at
+     * its <em>name</em>, so the recovered node loses annotations the author wrote -- harmless, since a document
+     * that reported here is discarded whole.
+     *
+     * <p><b>Depth is the cursor's, not a tally kept here</b> ({@link TsonDataStream#nesting()}): a declaration
+     * failing inside a record body leaves the cursor on that <em>record's</em> closing brace, and a local
+     * counter starting at zero would read it as the schema map's own and stop one declaration in.
+     */
+    private boolean recoverToNextDeclaration(int mapDepth) {
+        declarationInProgress = "";
+        while (true) {
+            if (check(TokenType.EOF)) {
+                return false;
+            }
+            if (nesting() == mapDepth) {
+                if (check(TokenType.RBRACE)) {
+                    return false;
+                }
+                if (check(TokenType.UNQUOTED) && peekSecond().type() == TokenType.MAP_ARROW) {
+                    return true;
+                }
+            }
+            advance();
+        }
     }
 
     private void putDeclaration(Map<String, SchemaMap.Declaration> declarations, SchemaMap.Declaration declaration) {
@@ -138,11 +263,13 @@ public final class TsonSchemaParser extends TsonDataParser {
         List<Annotation> nameAnnotations = parseAnnotationList();
         Position namePosition = peek().start();
         String name = expectTypeName("a declaration name");
-        expect(TokenType.MAP_ARROW, "declaration");
+        declarationInProgress = name;
+        expect(TokenType.MAP_ARROW, "a declaration's '=>'");
         List<Annotation> typeDefAnnotations = parseAnnotationList();
         TypeDef typeDef = parseTypeDef();
         SchemaMap.Declaration declaration = new SchemaMap.Declaration(nameAnnotations, name, typeDefAnnotations, typeDef);
         declarationPositions.put(declaration, namePosition);
+        declarationInProgress = "";
         return declaration;
     }
 
@@ -201,10 +328,10 @@ public final class TsonSchemaParser extends TsonDataParser {
     }
 
     private TypeDef parseAtomRefinementOrInstance() {
-        Token bang = expect(TokenType.BANG, "atom refinement or constructor application");
+        Token bang = expect(TokenType.BANG, "an atom refinement or constructor application ('!name')");
         Token name = peek();
         if (name.type() != TokenType.UNQUOTED) {
-            throw parseError("expected a type name after '!', found " + describe(name));
+            throw mismatch("a type name immediately after '!'");
         }
         if (!bang.end().equals(name.start())) {
             throw parseError("'!' must be immediately adjacent to the type name (no whitespace)");
@@ -262,21 +389,21 @@ public final class TsonSchemaParser extends TsonDataParser {
     }
 
     private RemovalSet parseRemovalSet() {
-        expect(TokenType.MINUS, "removal set");
-        expect(TokenType.LBRACE, "removal set");
+        expect(TokenType.MINUS, "a removal clause's '-'");
+        expect(TokenType.LBRACE, "a removal set's opening '{'");
         List<String> names = new ArrayList<>();
         names.add(expectFieldNameToken("a removed field name").text());
         while (consumeSeparatorOrCloseCheck(TokenType.RBRACE)) {
             names.add(expectFieldNameToken("a removed field name").text());
         }
-        expect(TokenType.RBRACE, "removal set");
+        expect(TokenType.RBRACE, "a removal set's closing '}'");
         return new RemovalSet(names);
     }
 
     // ── Records, Fields, Groups (§5.2, §5.11, §12.1) ─────────────────────
 
     private RecordDef parseRecordDef() {
-        expect(TokenType.LBRACE, "record");
+        expect(TokenType.LBRACE, "a record body's opening '{'");
         List<RecordEntry> entries = new ArrayList<>();
         if (!check(TokenType.RBRACE)) {
             entries.add(parseRecordEntry());
@@ -284,7 +411,7 @@ public final class TsonSchemaParser extends TsonDataParser {
                 entries.add(parseRecordEntry());
             }
         }
-        expect(TokenType.RBRACE, "record");
+        expect(TokenType.RBRACE, "a record body's closing '}'");
         return new RecordDef(entries);
     }
 
@@ -297,8 +424,8 @@ public final class TsonSchemaParser extends TsonDataParser {
     }
 
     private FieldDef parseFieldDef(List<Annotation> annotations) {
-        Token name = expectFieldNameToken("a record field");
-        expect(TokenType.COLON, "record field");
+        Token name = expectFieldNameToken("a record field name");
+        expect(TokenType.COLON, "a record field's ':'");
 
         Optional<FieldDef.FieldType> type = Optional.empty();
         Optional<FieldDef.Modifier> modifier = Optional.empty();
@@ -329,8 +456,8 @@ public final class TsonSchemaParser extends TsonDataParser {
                 case UNQUOTED -> TokenForm.UNQUOTED;
                 case SINGLE_LINE_STRING -> TokenForm.SINGLE_LINE_QUOTED;
                 case MULTI_LINE_STRING -> TokenForm.MULTI_LINE_QUOTED;
-                default -> throw parseError("expected a scalar token or the absent sentinel '_' after '"
-                        + (kind == FieldDef.Modifier.Kind.DEFAULT ? "~" : "=") + "', found " + describe(t));
+                default -> throw mismatch("a scalar token or the absent sentinel '_' after '"
+                        + (kind == FieldDef.Modifier.Kind.DEFAULT ? "~" : "=") + "'");
             };
             advance();
             value = new FieldDef.Modifier.Value.Literal(recordPosition(new TokenValue(t.text(), form), t.start()));
@@ -340,7 +467,7 @@ public final class TsonSchemaParser extends TsonDataParser {
 
     private GroupDef parseGroupDef(List<Annotation> annotations) {
         Position start = peek().start();
-        expect(TokenType.LPAREN, "field group");
+        expect(TokenType.LPAREN, "a field group's opening '('");
         List<GroupDef.Member> members = new ArrayList<>();
         members.add(parseGroupMember());
         if (!check(TokenType.PIPE)) {
@@ -350,26 +477,39 @@ public final class TsonSchemaParser extends TsonDataParser {
             advance();
             members.add(parseGroupMember());
         }
-        expect(TokenType.RPAREN, "field group");
+        expect(TokenType.RPAREN, "a field group's closing ')'");
         boolean optional = consumeAdjacentQuestion();
         return new GroupDef(annotations, members, optional);
     }
 
     private GroupDef.Member parseGroupMember() {
         List<Annotation> annotations = parseAnnotationList();
-        Token name = expectFieldNameToken("a field group member");
-        expect(TokenType.COLON, "field group member");
+        Token name = expectFieldNameToken("a field group member's name");
+        expect(TokenType.COLON, "a field group member's ':'");
         return new GroupDef.Member(annotations, name.text(), parseTypeRef());
     }
 
     // ── Type References (§5.3, §12.1) ────────────────────────────────────
 
+    /**
+     * A type-ref position (§5.3): a field's type, a group member's type, a choice variant, an inline element,
+     * a type argument. <b>{@code !} is rejected here by name rather than by falling through to "expected a
+     * type reference"</b> -- writing the refinement inline ({@code quantity: !integer ^ { min: 1 }}) is the
+     * natural first attempt, and the grammar's answer (hoist it to its own declaration, reference it by name)
+     * is a one-line fix an author cannot guess from a token-level complaint. Same shape as the size-spec and
+     * element-{@code ?} rejections in {@link #parseInlineElement}.
+     */
     private TypeRef parseTypeRef() {
         if (check(TokenType.LPAREN)) {
             return parseChoiceRef();
         }
         if (check(TokenType.LBRACKET)) {
             return parseInlineArrayOrTuple();
+        }
+        if (check(TokenType.BANG)) {
+            throw parseError("an atom refinement or constructor application is not permitted at a type-ref "
+                    + "position (§5.3); declare a named type instead (e.g. 'quantity_t => !integer ^ { min: 1 }') "
+                    + "and reference it by name");
         }
         return parseTypeRefHead();
     }
@@ -380,7 +520,7 @@ public final class TsonSchemaParser extends TsonDataParser {
         if (check(TokenType.LESS_THAN)) {
             advance();
             List<TypeArg> args = parseTypeArgs();
-            expect(TokenType.GREATER_THAN, "type arguments");
+            expect(TokenType.GREATER_THAN, "a type argument list's closing '>'");
             return new GenericRef(name, args);
         }
         return new SimpleRef(name);
@@ -388,7 +528,7 @@ public final class TsonSchemaParser extends TsonDataParser {
 
     private TypeRef parseChoiceRef() {
         Position start = peek().start();
-        expect(TokenType.LPAREN, "choice type");
+        expect(TokenType.LPAREN, "a choice type's opening '('");
         List<TypeRef> variants = new ArrayList<>();
         variants.add(parseTypeRef());
         if (!check(TokenType.PIPE)) {
@@ -398,18 +538,18 @@ public final class TsonSchemaParser extends TsonDataParser {
             advance();
             variants.add(parseTypeRef());
         }
-        expect(TokenType.RPAREN, "choice type");
+        expect(TokenType.RPAREN, "a choice type's closing ')'");
         return new ChoiceRef(variants);
     }
 
     private TypeRef parseInlineArrayOrTuple() {
-        expect(TokenType.LBRACKET, "inline array or tuple");
+        expect(TokenType.LBRACKET, "an inline array or tuple's opening '['");
         List<TypeRef> elements = new ArrayList<>();
         elements.add(parseInlineElement());
         while (consumeSeparatorOrCloseCheck(TokenType.RBRACKET)) {
             elements.add(parseInlineElement());
         }
-        expect(TokenType.RBRACKET, "inline array or tuple");
+        expect(TokenType.RBRACKET, "an inline array or tuple's closing ']'");
         return elements.size() == 1 ? new InlineArrayRef(elements.get(0)) : new InlineTupleRef(elements);
     }
 
@@ -467,18 +607,18 @@ public final class TsonSchemaParser extends TsonDataParser {
         if (t.type() == TokenType.ABSENT) {
             throw parseError("the absent sentinel '_' is not valid in a type argument position (§7.6)");
         }
-        throw parseError("expected a type argument (a type reference or a scalar value), found " + describe(t));
+        throw mismatch("a type argument (a type reference or a scalar value)");
     }
 
     // ── Declaration-Level Container Forms (§5.3, §12.1) ──────────────────
 
     private ContainerDef parseContainerDef() {
-        expect(TokenType.LBRACKET, "array or tuple type");
+        expect(TokenType.LBRACKET, "an array or tuple type's opening '['");
         ElementType first = parseElementType();
         if (check(TokenType.SEMICOLON)) {
             advance();
             SizeSpec size = parseSizeSpec();
-            expect(TokenType.RBRACKET, "array type");
+            expect(TokenType.RBRACKET, "an array type's closing ']'");
             return new ArrayContainerDef(first, Optional.of(size));
         }
         List<ElementType> elements = new ArrayList<>();
@@ -486,7 +626,7 @@ public final class TsonSchemaParser extends TsonDataParser {
         while (consumeSeparatorOrCloseCheck(TokenType.RBRACKET)) {
             elements.add(parseElementType());
         }
-        expect(TokenType.RBRACKET, "array or tuple type");
+        expect(TokenType.RBRACKET, "an array or tuple type's closing ']'");
         if (elements.size() == 1) {
             return new ArrayContainerDef(first, Optional.empty());
         }
@@ -541,7 +681,7 @@ public final class TsonSchemaParser extends TsonDataParser {
         while (consumeSeparatorOrCloseCheck(TokenType.GREATER_THAN)) {
             params.add(expectTypeName("a type parameter"));
         }
-        expect(TokenType.GREATER_THAN, "type parameters");
+        expect(TokenType.GREATER_THAN, "a type parameter list's closing '>'");
         return params;
     }
 

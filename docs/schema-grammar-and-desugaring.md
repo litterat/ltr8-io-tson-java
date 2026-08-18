@@ -24,6 +24,16 @@ materialization, no validation (those are the resolver's/linker's jobs).
   `atom-refinement` has the same `data-value`-vs-`core-value` defect as `instance` but is left as-is (its
   own note in #16). An unquoted non-numeric type-argument always parses as a type reference, never a value
   literal — a deliberate grammar-layer deferral, classified at a later semantic layer.
+- **Two entry points, one grammar.** `parseSchemaDocument()` is fail-fast; `parseSchemaDocument(receiver)`
+  reports each *declaration's* syntax error and resynchronises to the next, handing back no document at all
+  if it reported anything. The mechanics, the resync rule and the two failures that stay fail-fast are in
+  `docs/readers-and-diagnostics.md` under "Schema-side diagnostics", with the rest of the diagnostics model.
+- **A mismatch names the construct the position admits, not the token class** — `expect` takes that
+  construct in the author's voice, and every call site here is phrased that way (`"a record field's ':'"`,
+  `"a choice type's closing ')'"`), never as the enclosing construct. Three positions go further and name
+  the *fix*, all in the same shape: an inline atom refinement or constructor application (`quantity:
+  !integer ^ { min: 1 }`), an element `?`, and a size specifier, each rejected at a type-ref position with
+  the "declare a named type and reference it by name" correction (§5.3).
 - **The bracket form is parsed twice, per the spec** — `ArrayContainerDef`/`TupleContainerDef` at
   declaration position, `InlineArrayRef`/`InlineTupleRef` at type-ref position, with `[` at type-def
   position hard-coded to the container path (§12.1's prose tie-break; the two productions overlap and
