@@ -480,8 +480,8 @@ compatibility).
   `TsonDataStream`/`TsonDataParser`, shared with the data path, and is floor-limited by the lexer being
   fail-fast too. And **a read-path diagnostic carries `schemaPosition` but no `schemaId`/`schemaPointer`**,
   which is blocked upstream of the reader stack: `mergeImports` discards which schema an imported entry came
-  from, so the identity a reader could reach is the importing schema's, not the declaration's own. Throw-site classification is
-  done across the whole schema pipeline.
+  from, so the identity a reader could reach is the importing schema's, not the declaration's own.
+  Throw-site classification is done across the whole schema pipeline.
 - **Deferred design questions** — `REQUIRED_FIXED`/`OPTIONAL_FIXED` value validation, `value_param` real
   parameter substitution, thread-safety, and a general disk/HTTP-backed `TsonSchemaSource` (with
   whitelist/blacklist policy).
