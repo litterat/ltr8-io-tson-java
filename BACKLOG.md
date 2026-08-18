@@ -83,22 +83,6 @@ own prose (which had gone stale on at least one of them):
       labelled value channel is a `TsonSchemaValidationException` at the declaration. No valid schema is
       affected (the kernel audit in #46 found zero violations among constructors); today the incoherence
       surfaces as downstream wrong-layer failures.
-  - **Waits for the spec revision** (grammar or kernel-document changes — implementing ahead would diverge
-    from rev 32 rather than converge on the agreed design):
-    - The `C<args; member ...>` application-with-bindings surface form (#45) — a normative grammar change;
-      until then the sized sugar is the only spelling of a partial application of `array`.
-    - The kernel respell — size templates deleted (or one kept as §5.10's worked example) and `vector`
-      restated in the new form — with re-pinned content hashes, refreshed `spec/` snapshots, and updated
-      resolved fixtures.
-    - **#46 enforcement** (a constructor operand in `^`/`&`/subtraction requires a `~` result): enabling it
-      today fails the bundled meta-kernel's own three size templates — the rule and the kernel fix must
-      land together.
-    - §3.3.1's constructor-gate exemption removal as spec text (the implementation's special-casing goes
-      with the direct-desugar item above regardless).
-    - The slot-binds-once and no-partial-application-recursion rules — meaningful only once the new form
-      exists.
-    - Conformance-suite vectors for any of this — blocked twice over: the suite has no Part 2 layer at all
-      yet (see "Conformance test suite").
 - [ ] **§5.10 substitution into a template *body* — now the sole materialising form.** What remains of
   template application after the item above: a template whose parameter appears as a **field type**
   (`box => <T> { v: T }`), where instantiating means rewriting the body with `T` replaced — substitution
@@ -137,39 +121,6 @@ own prose (which had gone stale on at least one of them):
   including on where a declaration's annotations land (the name's on the map key, the definition's on the
   entry). Lower priority than the rest of this section: the spec marks this path explicitly **optional**
   ("MAY implement ingest"), not a MUST.
-
-## Validation correctness — cases that report OK when they shouldn't
-
-**Empty.** The membership rule is strict and worth keeping that way: *the library returns a wrong verdict*
-— it says OK to something it should reject. Nothing else. An error reported with too little detail, an
-over-strict return value, a bad exit code: those are real, but they belong to the sections that own them.
-The section grew to four items once by collecting everything one investigation turned up, and three of the
-four never matched this header at all.
-
-Record closure closed it out — the unknown member in a refinement body and the unknown field in data were
-one discard in `RecordAbstractReader.readFields`, and §7.2 settles it as a MUST rather than the policy
-choice this list once called it.
-
-## Diagnostics: one severity — every warn-shaped rule lands as an error
-
-**The decision** (`SPEC-FEEDBACK.md` #42, generalizing #41): every warn-level rule in the spec series is
-implemented as an ordinary error, deliberately ahead of the spec's written SHOULD-warn verdicts. No
-severity axis: `Diagnostic` stays single-severity, a non-empty `validate` still means invalid, the CLI
-keeps its exit codes, and no `--strict`/`diagnostics-2.tn` machinery is needed
-([#6](https://github.com/litterat/ltr8-io-tson-java/issues/6) closes as won't-need). #42 has the full
-argument; the short form: the target consumer is a generate-validate-retry loop with exactly two
-behaviors, so a WARN is either promoted to an error or dropped by every pipeline privately — #41's
-RFC 9413 interoperability failure, per-diagnostic.
-
-- Landing later, with their owning features — each arrives as an error when its feature does:
-  - **Set-typed duplicate** → error, when sets get real semantics at all (today `set` compiles through the
-    `array` factory and nothing dedupes); **phantom (unused) parameter** and **parameter shadowing a schema
-    type** → resolver errors, with §5.10 substitution; **non-productive recursion** → resolver error, with
-    productivity analysis (`SPEC-FEEDBACK.md` #25 — "guarded" needs defining first).
-  - **Type-aware duplicate map keys** (#41 pt 3) is *not* on this list any more: every reader compares keys
-    by decoded value, so §7.7's MAY is exercised wherever a key type is declared and the Class 2 error
-    arrives with it. What replaced the item is a spec question rather than an implementation one —
-    `SPEC-FEEDBACK.md` #43, on the equality the series never defines for a Class 1 reader.
 
 ## Remaining built-in types
 
@@ -458,3 +409,28 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
   neither is enforced anywhere yet. `SPEC-FEEDBACK.md` #34 is the fuller treatment: which UTS #39 mechanism
   applies where, the comparison scopes TSON can actually name, and why a normative requirement would oblige
   every implementation to ship UCD data the JDK does not expose.
+
+- [ ] **Template construction — the `SPEC-FEEDBACK.md` #44/#45/#46 conclusions, staged.** The design review
+  settled the type-constructor-vs-template question: a **partial application** (parameters only in labelled
+  value channels — `array_min`, and §5.3's sized sugar) closes by *routing* and is a construction of its
+  head constructor, with **no instantiation entry and no IS-A** (`supertypes: [array product top]` on sized
+  closures was a category error — a constructor is not a type — and the grant was inert); a **structural
+  template** (parameters in type-reference channels — `box => <T> { v: T }`) closes by *substitution* and
+  becomes §8.2's **only** materialising form; a constructor's parameters are labelled-only (#44); and
+  deriving from a constructor requires a `~` result (#46). Split by what gates on a spec revision:
+    - **Waits for the spec revision** (grammar or kernel-document changes — implementing ahead would diverge
+      from rev 32 rather than converge on the agreed design):
+        - The `C<args; member ...>` application-with-bindings surface form (#45) — a normative grammar change;
+          until then the sized sugar is the only spelling of a partial application of `array`.
+        - The kernel respell — size templates deleted (or one kept as §5.10's worked example) and `vector`
+          restated in the new form — with re-pinned content hashes, refreshed `spec/` snapshots, and updated
+          resolved fixtures.
+        - **#46 enforcement** (a constructor operand in `^`/`&`/subtraction requires a `~` result): enabling it
+          today fails the bundled meta-kernel's own three size templates — the rule and the kernel fix must
+          land together.
+        - §3.3.1's constructor-gate exemption removal as spec text (the implementation's special-casing goes
+          with the direct-desugar item above regardless).
+        - The slot-binds-once and no-partial-application-recursion rules — meaningful only once the new form
+          exists.
+        - Conformance-suite vectors for any of this — blocked twice over: the suite has no Part 2 layer at all
+          yet (see "Conformance test suite").

@@ -2367,7 +2367,7 @@ which are deployment policy — though where a limit is enabled, exceeding it is
 **Interpretation chosen:** This implementation adopts the error-based outcomes throughout, deliberately
 ahead of the spec's written warn-level verdicts, and will not grow a severity axis: `Diagnostic` stays
 single-severity, a non-empty `validate` result still means invalid, and each warn case lands as an
-ordinary error as its owning feature is built (`BACKLOG.md`'s "Diagnostics" section tracks the work).
+ordinary error as its owning feature is built.
 Current state per rule: duplicate fields and duplicate map keys are errors at both reader loops (with
 last-value-wins recovery underneath); a stated `_` at a REQUIRED_DEFAULT field is a validation error where
 plain omission still injects; `@disjoint` on a non-disjoint choice is a linker error, and #47's total
