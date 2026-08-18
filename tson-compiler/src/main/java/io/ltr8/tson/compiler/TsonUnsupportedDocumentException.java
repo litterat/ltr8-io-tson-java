@@ -11,6 +11,10 @@ package io.ltr8.tson.compiler;
  * <p>Deliberately not a {@link TsonParseException}: the input isn't malformed -- it may be a
  * perfectly well-formed schema document per [TSON-SCHEMA] -- this processor simply doesn't
  * implement that layer.
+ *
+ * <p><b>{@link #getMessage()} states what went wrong, never where</b> -- {@link #position()} is the
+ * location, and a {@code Diagnostic} built from this carries it structurally; see {@link
+ * TsonParseException} for the full reasoning. {@link #toString()} appends it for a stack trace.
  */
 public final class TsonUnsupportedDocumentException extends RuntimeException {
 
@@ -20,12 +24,17 @@ public final class TsonUnsupportedDocumentException extends RuntimeException {
 
     public TsonUnsupportedDocumentException(Position position) {
         super("this is a TSON schema document (header contains !!meta); "
-                + "a Class 1 (data-format-only) processor does not support schema documents"
-                + " at line " + position.line() + ", column " + position.column());
+                + "a Class 1 (data-format-only) processor does not support schema documents");
         this.position = position;
     }
 
     public Position position() {
         return position;
+    }
+
+    /** The message plus its location -- what a stack trace prints, and the only place the two are joined. */
+    @Override
+    public String toString() {
+        return super.toString() + " at line " + position.line() + ", column " + position.column();
     }
 }

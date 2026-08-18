@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -118,6 +119,32 @@ class SchemalessValidationTest {
         List<Diagnostic> diagnostics = validate("{ a: 1 ");   // unclosed record
         assertEquals(1, diagnostics.size(), diagnostics.toString());
         assertEquals(Diagnostic.Code.VALIDATION_ERROR, diagnostics.getFirst().code());
+    }
+
+    /**
+     * And states its location once. The message used to end {@code at line 2, column 3} while {@code
+     * dataPosition} carried the same place structurally, so every renderer printed it twice, in two
+     * formats, and a consumer parsing the message got a second copy with no byte offset. The exception
+     * says what went wrong; the diagnostic says where.
+     */
+    @Test
+    void aBaseSyntaxErrorStatesItsPositionOnlyStructurally() {
+        Diagnostic diagnostic = validate("{ a: 1  b: ] }").getFirst();
+
+        assertTrue(diagnostic.dataPosition().isPresent(), diagnostic.toString());
+        assertFalse(diagnostic.message().contains("at line"), diagnostic.message());
+        assertFalse(diagnostic.message().contains("column"), diagnostic.message());
+    }
+
+    /** A stack trace still says where, so nothing is lost for the fail-fast caller who never builds a diagnostic. */
+    @Test
+    void theExceptionItselfStillCarriesItsPositionIntoAStackTrace() {
+        TsonParseException thrown = assertThrows(TsonParseException.class,
+                () -> new TsonTreeReader().read("{ a: 1  b: ] }"));
+
+        assertFalse(thrown.getMessage().contains("at line"), thrown.getMessage());
+        assertTrue(thrown.toString().endsWith("at line " + thrown.position().line()
+                + ", column " + thrown.position().column()), thrown.toString());
     }
 
     /**
