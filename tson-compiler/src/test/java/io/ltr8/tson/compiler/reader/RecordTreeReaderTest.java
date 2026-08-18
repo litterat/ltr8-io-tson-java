@@ -2,6 +2,7 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
+import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonDiagnosticsCollector;
 import io.ltr8.tson.compiler.TsonDiagnosticsReceiver;
 import io.ltr8.tson.compiler.TsonReadException;
@@ -170,6 +171,47 @@ class RecordTreeReaderTest {
         assertEquals(1, problems.diagnostics().size(), problems.diagnostics().toString());
         assertTrue(problems.diagnostics().getFirst().message().contains("cannot be given another value"),
                 problems.diagnostics().toString());
+    }
+
+    /**
+     * The code is {@code FIELD_FIXED}, not {@code ATOM_CONSTRAINT_VIOLATION}: nothing about {@code 9}
+     * failed {@code integer}'s grammar or any facet of it, so a consumer routing on {@code code} must be
+     * able to tell a §5.2 field-state rule from an atom's own contract. All three ways to break a FIXED
+     * field report the same code.
+     */
+    @Test
+    void everyFixedViolationReportsFieldFixedRatherThanAnAtomConstraint() {
+        TsonCompiledSchema required = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED),
+                fixed(FieldState.REQUIRED_FIXED, "7")));
+        TsonCompiledSchema fixedAbsent = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED),
+                fixed(FieldState.OPTIONAL_FIXED, null)));
+
+        assertEquals(Diagnostic.Code.FIELD_FIXED, onlyDiagnostic(required, "{ value: 9 }").code());
+        assertEquals(Diagnostic.Code.FIELD_FIXED, onlyDiagnostic(required, "{ value: _ }").code());
+        assertEquals(Diagnostic.Code.FIELD_FIXED, onlyDiagnostic(fixedAbsent, "{ value: 7 }").code());
+    }
+
+    /**
+     * {@code =} reads as "default" to anyone arriving from JSON Schema, so {@code priority: priority =
+     * medium} is a plausible mis-spelling of {@code ~ medium} -- and the author otherwise discovers it only
+     * by watching the reader reject every document that dared to differ. The message names the fix.
+     */
+    @Test
+    void aContradictedFixedValuePointsTheAuthorAtTheDefaultSpelling() {
+        TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED),
+                fixed(FieldState.REQUIRED_FIXED, "7")));
+
+        String message = onlyDiagnostic(compiled, "{ value: 9 }").message();
+
+        assertTrue(message.contains("declares it with '=' (fixed)"), message);
+        assertTrue(message.contains("use '~'"), message);
+    }
+
+    private static Diagnostic onlyDiagnostic(TsonCompiledSchema compiled, String document) {
+        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        compiled.get("point").read(TestDocuments.document(document, problems));
+        assertEquals(1, problems.diagnostics().size(), problems.diagnostics().toString());
+        return problems.diagnostics().getFirst();
     }
 
     /** §5.2: "At a plain REQUIRED or a REQUIRED_FIXED field, `_` is a validation error." */

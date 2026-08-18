@@ -165,9 +165,16 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
     }
 
     /**
-     * A stable, machine-readable identifier from a closed vocabulary -- not a free string. The first eight
+     * A stable, machine-readable identifier from a closed vocabulary -- not a free string. The first nine
      * members are produced by an actual reader against real data; {@code UNRECOGNIZED_FIELD} carries
      * [TSON-SCHEMA] §7.2's record closure, so its {@code expected} is the type's own field list.
+     *
+     * <p>{@code FIELD_REQUIRED} and {@code FIELD_FIXED} are the two [TSON-SCHEMA] §5.2 field-state rules a
+     * document can break, and they sit together deliberately: neither is anything to do with the field's
+     * <em>type</em>. A {@code FIELD_FIXED} value satisfied its atom's grammar and every facet -- it simply
+     * isn't the one value the schema permits, whether that is a stated value contradicting {@code = value},
+     * a {@code REQUIRED_FIXED} field written {@code _}, or a value written where {@code = _} fixes the
+     * field to absent.
      *
      * <p>{@code DUPLICATE_MAP_KEY} and {@code DUPLICATE_FIELD} are the same mistake at the two container
      * shapes TSON keeps apart -- a key stated twice in one map ([TSON-DATA] §2.6), a field name stated
@@ -179,10 +186,9 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      * severity axis would be machinery neither this type nor the format needs.
      *
      * <p>Every {@link io.ltr8.tson.compiler.atom.AtomTypeException} maps to the single {@code
-     * ATOM_CONSTRAINT_VIOLATION} code for now, since {@code AtomValidationException} itself doesn't
-     * yet carry a structured code to route on. That code is also, less accurately, what a
-     * <em>schema-level</em> value violation reports under -- a document contradicting a FIXED field's value
-     * (§5.2) is not an atom constraint at all, and wants a code of its own; see {@code BACKLOG.md}.
+     * ATOM_CONSTRAINT_VIOLATION} code, since {@code AtomValidationException} itself doesn't yet carry a
+     * structured code to route on -- so that member means "the atom rejected this token", nothing finer.
+     * Routing its varieties apart is tracked in {@code BACKLOG.md}.
      * The last three ({@code SCHEMA_ERROR}/{@code
      * UNKNOWN_TYPE}/{@code VALIDATION_ERROR}) are infrastructure-level fallbacks a caller (e.g.
      * {@code tson-cli}) uses for a failure that happens outside any single {@link TsonReadContext}
@@ -191,6 +197,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      */
     public enum Code {
         FIELD_REQUIRED,
+        FIELD_FIXED,
         TYPE_MISMATCH,
         WRONG_ARITY,
         UNKNOWN_TYPE_REF,
