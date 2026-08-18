@@ -577,6 +577,7 @@ public final class TsonSchemaLinker {
                 for (RecordField field : r.fields()) {
                     validateTypeRef(field.type(), namespace, ownParameters,
                             "'" + entryName + "' field '" + field.name() + "'");
+                    checkClosedEntryIsParameterFree(entryName, field, ownParameters);
                 }
                 for (FieldGroup group : r.groups()) {
                     for (String member : group.members()) {
@@ -746,6 +747,33 @@ public final class TsonSchemaLinker {
         Map<String, TypeDefinition> combined = new LinkedHashMap<>(fallback);
         combined.putAll(primary);
         return combined;
+    }
+
+    /**
+     * §5.10's closed-entry rule -- "an entry whose {@code parameters} list is empty MUST contain no parameter
+     * references anywhere: no {@code value_param} members, and no reference {@code name} ... that resolves to
+     * a parameter, at any depth" -- for the {@code value_param} half. The reference half needs no code of its
+     * own: {@link #validateTypeRef} accepts a name only if the namespace holds it or {@code ownParameters}
+     * lists it, so at a closed entry, where that list is empty, a parameter reference is already an
+     * unresolved one. {@link RecordField} is the only type carrying a {@code value_param} at all, so one
+     * condition covers every position the rule names.
+     *
+     * <p><b>An {@link IllegalStateException}, not a {@link TsonSchemaValidationException}</b>, because the
+     * spec calls this "a well-formedness rule on resolver output": a schema author cannot write a
+     * {@code value_param} -- only the kernel's own templates carry one, and those are not in a user schema's
+     * type-name namespace -- so a violation is this library emitting a malformed entry, and the verdict
+     * would not change if the library improved. It becomes an author-facing check at the other place §5.10
+     * points, resolved-form ingest (§8.1), which does not exist yet. What it guards meanwhile is §5.10
+     * substitution: a materialisation that leaves a routed {@code value_param} behind on the closed entry it
+     * produces fails here, rather than downstream at a reader asked to fill a field nothing can fill.
+     */
+    private static void checkClosedEntryIsParameterFree(String entryName, RecordField field,
+                                                         List<String> ownParameters) {
+        if (ownParameters.isEmpty() && field.valueParam().isPresent()) {
+            throw new IllegalStateException("'" + entryName + "' declares no parameters, so it is a closed entry, "
+                    + "but its field '" + field.name() + "' routes the parameter '" + field.valueParam().get()
+                    + "' -- a closed entry contains no parameter references anywhere (§5.10)");
+        }
     }
 
     private static void validateTypeRef(TypeRef ref, Map<String, TypeDefinition> namespace, List<String> ownParameters,

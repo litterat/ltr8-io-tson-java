@@ -147,11 +147,6 @@ own prose (which had gone stale on at least one of them):
   (`map<text, [integer]>`) works; what is left is an argument that does not reduce to a plain name. The
   `weird<[T]>` shape additionally sits inside a *parameterized* declaration, which the phase skips
   entirely. Lifting this is part of the template-application item above, including its termination guard.
-- [ ] Closed-entry parameter-free check (§5.10) — nothing validates that an entry with an empty
-  `parameters` list truly contains no parameter references (`value_param` members, or a reference
-  name resolving to a parameter) anywhere in its body, at any depth. Distinct from `value_param`
-  *substitution* (tracked in `STRUCTURED-OUTPUT.md`) — this is a rejection rule for a malformed
-  "closed" entry, not the substitution mechanism itself.
 
 - [ ] **A parameterized supertype reference** (`vip => <T> customer & box<T> & { ... }`, §5.8's
   "Parameterized references"). The only genuine gap left in the composition path, and it is not independent:
@@ -159,9 +154,22 @@ own prose (which had gone stale on at least one of them):
   ordinary type channels", so composing with `box<T>` means substituting into a record template's body —
   the §5.10 item above, termination guard and all. Worth doing together, not before.
 - [ ] **A field/element type that is not a simple name, a generic application, or an inline array.**
-  `resolveFieldType`'s catch-all ("only simple (non-generic) type-refs, generic applications of one, and
-  inline arrays of one are resolved so far"). Overlaps the template-substitution item above, but is
-  reachable without templates.
+  `DefinitionResolver.resolveTypeRef`'s catch-all ("only simple (non-generic) type-refs, generic
+  applications of one, and inline arrays of one are resolved so far"). **Only reachable inside a
+  parameterized declaration**, contrary to what this item used to claim — `SchemaDesugarer` normalizes every
+  inline and generic form in an ordinary field or group-member position first, so `[[text]]`,
+  `[map<text, integer>]`, `(text | integer)`, `[text, integer]` and `map<text, [integer]>` all compile
+  today, in both positions. The phase skips a parameterized declaration entirely, and that is where the
+  throw is live, in two shapes measured directly:
+  - `box => <T> { v: [T] }` — the `InlineArrayRef` branch *does* fire and builds `array<T>`, then the linker
+    rejects `array`, which a user schema's type-name namespace does not hold. The author is told their
+    schema has an unresolved reference to something they never wrote.
+  - `pair => <T> { v: (T | text) }` — `ChoiceRef` hits the catch-all, and an `UnsupportedOperationException`
+    reaching the CLI is reported as `internal error ... This is a bug in tson` with exit 70. It is a gap,
+    not a fault, so even before the feature lands the classification is wrong (see the exception policy in
+    CLAUDE.md).
+  Both being inside a template makes this part of the §5.10 substitution work rather than independent of
+  it — desugaring a parameterized declaration is the same problem as substituting into one.
 
 Only genuine gaps are listed above — a throw that means "your schema is wrong" is not one. Classifying the
 throw sites by that test is done across the whole schema pipeline (issue #26); if a census is ever wanted
