@@ -37,7 +37,9 @@ import java.util.Optional;
  * ({@code ipv4}, §5.5) -- see {@link Ipv4Parser}'s Javadoc for why its JDK leniency gap is a real
  * SSRF-adjacent concern, not just a spec-fidelity one, and how that's handled. And with {@code
  * ipv6_type} ({@code ipv6}, §5.5) -- a hand-rolled RFC 4291 §2.2 compiler for the same reason, see
- * {@link Ipv6Parser}'s Javadoc. And with {@code mac_type} ({@code mac}, §5.5, EUI-48 per RFC 9542).
+ * {@link Ipv6Parser}'s Javadoc. And with {@code cidr4_type}/{@code cidr6_type} ({@code cidr4}/{@code cidr6},
+ * §5.5), which reuse those two address grammars for the address half of a network. And with {@code mac_type}
+ * ({@code mac}, §5.5, EUI-48 per RFC 9542).
  *
  * <p><b>{@code email} is seeded too, which §5.5's table does not list</b> -- a known departure, the same
  * kind as the integer ladder above. core.tn groups {@code email} with {@code uuid}/{@code ipv4}/{@code mac}
@@ -96,6 +98,8 @@ public final class BuiltinTypeVocabulary {
 
         types.put(Ipv4Parser.TYPENAME, Ipv4Parser.UNCONSTRAINED);
         types.put(Ipv6Parser.TYPENAME, Ipv6Parser.UNCONSTRAINED);
+        types.put(Cidr4Parser.TYPENAME, Cidr4Parser.UNCONSTRAINED);
+        types.put(Cidr6Parser.TYPENAME, Cidr6Parser.UNCONSTRAINED);
 
         return Map.copyOf(types);
     }

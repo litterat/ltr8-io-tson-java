@@ -898,6 +898,38 @@ class TsonObjectReaderTest {
         assertThrows(TsonReadException.class, () -> mapper.read("{ value: !ipv6 \"1::2::3\" }", Ipv6Holder.class));
     }
 
+    // ── CIDR networks (§5.5) ─────────────────────────────────────────────
+
+    public record CidrHolder(String value) {
+    }
+
+    @Test
+    void builtinCidrAnnotationsBindAsTheAuthoredTextThroughTheMapper() throws DataBindException {
+        // Host type is String, not a parsed pair -- Java has no CIDR type, so the network is validated
+        // and handed back exactly as written (see Cidr4Parser's Javadoc). Both must be quoted: '/' is
+        // not a legal unquoted-token character (§7.2), and an IPv6 network also contains ':'.
+        assertEquals("10.0.0.0/8", mapper.read("{ value: !cidr4 \"10.0.0.0/8\" }", CidrHolder.class).value());
+        assertEquals("2001:db8::/32", mapper.read("{ value: !cidr6 \"2001:db8::/32\" }", CidrHolder.class).value());
+    }
+
+    @Test
+    void builtinCidrAnnotationsRejectNonzeroHostBitsThroughTheMapper() throws DataBindException {
+        // §5.5: the host value is a network, and accept-and-mask would be lossy. Without this the two
+        // atoms would say nothing an ordinary text field doesn't.
+        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !cidr4 \"10.1.0.0/8\" }", CidrHolder.class));
+        assertThrows(TsonReadException.class,
+                () -> mapper.read("{ value: !cidr6 \"2001:db8:1::/32\" }", CidrHolder.class));
+    }
+
+    @Test
+    void builtinCidrAnnotationsRejectAPrefixLengthOutsideTheirOwnFamilyRangeThroughTheMapper()
+            throws DataBindException {
+        // /33 is out of range for IPv4 and perfectly ordinary for IPv6 -- the range is per family.
+        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !cidr4 \"10.0.0.0/33\" }", CidrHolder.class));
+        assertEquals("2001:db8:8000::/33",
+                mapper.read("{ value: !cidr6 \"2001:db8:8000::/33\" }", CidrHolder.class).value());
+    }
+
     // ── Temporal types (§5.4) ────────────────────────────────────────────
 
     public record DateHolder(LocalDate value) {

@@ -39,15 +39,13 @@ import java.util.function.UnaryOperator;
  * DataClassUnion}-bounded counterpart the way {@code record} does.
  *
  * <p><b>Every {@code ~}-marked constructor meta-kernel.tn1/meta.tn1 declare has an entry</b> --
- * verified against both files directly, not assumed. Six of them (see {@link #notImplemented}'s own
+ * verified against both files directly, not assumed. Two of them (see {@link #notImplemented}'s own
  * call sites, deliberately grouped at the bottom of {@link #baseFactories} rather than interleaved
- * with the working entries above) still have no compiled reader at all -- {@code extern}, {@code
- * unknown_type}, {@code cidr4_type}, {@code cidr6_type} --
- * registered anyway, to an {@link ErrorReader}, so a schema merely *declaring* one of them still
- * compiles; only reading a value against one actually fails. {@code complex_type}/{@code
- * ipv4_type}/{@code ipv6_type} used to be in this group too -- wired up to the real {@code
- * atom.ComplexParser}/{@code Ipv4Parser}/{@code Ipv6Parser}, which already existed but had never
- * been registered anywhere.
+ * with the working entries above) still have no compiled reader at all -- {@code extern} and {@code
+ * unknown_type} -- registered anyway, to an {@link ErrorReader}, so a schema merely *declaring* one of
+ * them still compiles; only reading a value against one actually fails. Neither is an ordinary missing
+ * parser: {@code extern} is a whole absent mechanism (§7.8's mid-document schema scope switch) and
+ * {@code unknown_type} is the universe of types, not a token shape.
  */
 public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResolver {
 
@@ -132,6 +130,8 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         factories.put("email_type", leaf.apply(AtomTypeReader.EMAIL_TYPE));
         factories.put("ipv4_type", leaf.apply(AtomTypeReader.IPV4_TYPE));
         factories.put("ipv6_type", leaf.apply(AtomTypeReader.IPV6_TYPE));
+        factories.put("cidr4_type", leaf.apply(AtomTypeReader.CIDR4_TYPE));
+        factories.put("cidr6_type", leaf.apply(AtomTypeReader.CIDR6_TYPE));
 
         // Sugar/alias names -- not their own `~`-marked constructors, kept for lookup convenience only.
         factories.put("array_min", array);
@@ -143,8 +143,6 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         // ---- schema declaring one still compiles; only reading a value against one actually fails.
         factories.put("extern", notImplemented("extern"));
         factories.put("unknown_type", notImplemented("unknown_type"));
-        factories.put("cidr4_type", notImplemented("cidr4_type"));
-        factories.put("cidr6_type", notImplemented("cidr6_type"));
 
         // Collections.unmodifiableMap, not Map.copyOf -- preserves the LinkedHashMap's own insertion
         // order (Map.copyOf's own iteration order is unspecified), so the "not implemented" block

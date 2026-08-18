@@ -470,9 +470,12 @@ compatibility).
   (`array_ranged`, and so §5.3's sized sugar) instantiates via argument routing; a *record* template
   (`box => <T> { v: T }`), whose parameter is a field type, is rejected at the application site instead.
   `BACKLOG.md` has the shape of the remaining work.
-- **Undocumented atom constructors** — `unknown`/`cidr4`/`cidr6` (and `extern`, which has no core.tn
-  declaration) have no compiled-parser factory, so they compile to `ErrorReader` (a schema merely
-  *declaring* one still compiles). `complex`/`ipv4`/`ipv6`/`mac`/`email` do have parsers. **`email` is
+- **Undocumented atom constructors** — `unknown` (and `extern`, which has no core.tn declaration) has no
+  compiled-parser factory, so it compiles to `ErrorReader` (a schema merely *declaring* one still compiles).
+  Neither is an ordinary missing parser waiting to be written: `extern` is a whole absent mechanism and `unknown`
+  is the universe of types, not a token shape. `complex`/`ipv4`/`ipv6`/`cidr4`/`cidr6`/`mac`/`email` do have
+  parsers — the CIDR pair reusing the two address grammars, and validating §5.5's family-range and
+  host-bits-zero rules on top. **`email` is
   seeded into `BuiltinTypeVocabulary` although §5.5's table has no row for it** — a known departure like the
   integer ladder, because core.tn groups it with its siblings identically and withholding it would only make
   the two read paths disagree (`SPEC-FEEDBACK.md` #5). Its format check is a documented subset of RFC 5322 —

@@ -111,6 +111,12 @@ own prose (which had gone stale on at least one of them):
   kin §8.2 gestures at — "bounds within a width-derived range, and their kin" — belong with the constraint
   families that own them, next to `AtomNarrowing`, not in a syntax rewrite. Doing that properly probably
   means the check moves out of the desugarer entirely and `checkBounds` goes with it.
+  - **A concrete instance now reachable**: `cidr4_type`/`cidr6_type`'s `min_prefix`/`max_prefix` must fall
+    inside the family range (0-32, 0-128) and `min_prefix <= max_prefix` — meta.tn says so in its own `@doc`
+    ("bounds outside that range are invalid at the schema level"), and `Cidr4Parser`/`Cidr6Parser`
+    deliberately don't check it, since a parser rejecting a *declaration* would misclassify an author error
+    as an `ErrorReader`. An out-of-range bound is inert rather than wrong today — the family range is
+    enforced on every value regardless — so this is a missing diagnosis, not a soundness hole.
 - [ ] **Resolved-form ingest** ([TSON-SCHEMA] §8.1/§10.1) — bringing an already-resolved
   `!type_definition` document into the library (not source text), with its own integrity checks:
   `subtypes`/`disjoint` recomputed and verified, the closed-entry parameter-free rule reverified, an
@@ -124,11 +130,13 @@ own prose (which had gone stale on at least one of them):
 
 ## Remaining built-in types
 
-- [ ] `cidr4`/`cidr6`/`unknown` — no compiled-parser factory yet (`ValueReaderFactoryRegistry` registers
-  these constructors to `ErrorReader`). Pinned down exactly by
-  `CoreSchemaImportTest.exactlyTheThreeUndocumentedAtomConstructorsCompileToErrorReaders`. `mac` and
-  `email` left this set when their parsers landed; `cidr4`/`cidr6` compose on the existing
-  `Ipv4Parser`/`Ipv6Parser` and are the natural next pair.
+- [ ] `unknown` — no compiled-parser factory yet (`ValueReaderFactoryRegistry` registers it, and `extern`,
+  to `ErrorReader`). Pinned down exactly by
+  `CoreSchemaImportTest.exactlyTheUnknownAtomConstructorCompilesToAnErrorReader`. `mac`/`email` left this
+  set when their parsers landed and `cidr4`/`cidr6` when theirs did, which leaves nothing here that is
+  merely an unwritten parser: `unknown` accepts any well-formed value of any type, so what it needs is a
+  reader that defers to the document's own type-ref (or to schemaless base-type resolution when there is
+  none), which is a design question about where that dispatch lives, not an atom grammar.
 - [ ] `uri_type`/`regex_type` — don't bind correctly in object-binding mode. Their RFC-citation
   field is nested inside `specification: AtomSpecification` rather than flat, so it never receives
   a schema-composed default the way `email_type`'s own flat `spec` field does.

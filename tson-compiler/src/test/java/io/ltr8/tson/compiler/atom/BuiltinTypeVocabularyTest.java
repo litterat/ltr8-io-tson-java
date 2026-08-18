@@ -74,9 +74,23 @@ class BuiltinTypeVocabularyTest {
         assertTrue(BuiltinTypeVocabulary.lookup("ipv6").isPresent());
     }
 
+    @org.junit.jupiter.api.Test
+    void cidr4AtomIsRegistered() {
+        assertTrue(BuiltinTypeVocabulary.lookup("cidr4").isPresent());
+    }
+
+    @org.junit.jupiter.api.Test
+    void cidr6AtomIsRegistered() {
+        assertTrue(BuiltinTypeVocabulary.lookup("cidr6").isPresent());
+    }
+
+    /**
+     * {@code binary} is not a name the vocabulary ever answers to: §5.3 spells out that "there is no generic
+     * {@code !binary} annotation", only its four encodings.
+     */
     @ParameterizedTest
-    @ValueSource(strings = {"cidr4", "cidr6", "not_a_type", "binary"})
-    void namesFromFamiliesNotYetImplementedAreNotRegistered(String name) {
+    @ValueSource(strings = {"not_a_type", "binary"})
+    void namesTheVocabularyDoesNotAnswerToAreNotRegistered(String name) {
         assertFalse(BuiltinTypeVocabulary.lookup(name).isPresent());
     }
 

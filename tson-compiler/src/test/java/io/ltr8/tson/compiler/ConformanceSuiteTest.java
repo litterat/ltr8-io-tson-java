@@ -534,6 +534,13 @@ class ConformanceSuiteTest {
                 assertArrayEquals(HexFormat.of().parseHex(fieldText(sidecar, "value")), actual.getAddress(),
                         "vocabulary value");
             }
+            case "cidr4", "cidr6", "mac", "email" -> {
+                // The atoms whose host value is the authored text itself (Java has no type to map onto --
+                // see Cidr4Parser/MacParser), so the oracle is a plain string compare with no parse in
+                // between. Deliberately not folded into the numeric default arm below.
+                String actual = (String) atomType.read(token, String.class);
+                assertEquals(fieldText(sidecar, "value"), actual, "vocabulary value");
+            }
             default -> {
                 BigDecimal actual = (BigDecimal) atomType.read(token, BigDecimal.class);
                 BigDecimal expected = new BigDecimal(fieldText(sidecar, "value"));

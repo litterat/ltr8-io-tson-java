@@ -47,6 +47,20 @@ instead (confirmed to behave like "no scope" and match the generic method's resu
 non-mapped address tried) to guarantee `!ipv6` always returns `Inet6Address`, regardless of the
 address's value.
 
+**`!cidr4`/`!cidr6` validate a network but hand back the authored text.** Java has no CIDR type, so the
+host value is the token's own text rather than an invented address/prefix pair — validated, never
+rewritten, so a round trip is exact (which for IPv6 also avoids expanding `2001:db8::/32` into its
+uncompressed eight-group spelling on the way out). The address half reuses `Ipv4Parser`/`Ipv6Parser`
+whole, so both inherit the strictness above; the prefix half must be a canonical decimal, rejecting `/08`
+for the same reason a `dec-octet` rejects `010`. §5.5's own split between the two failure categories is
+followed exactly: a token that isn't CIDR-shaped is a parse error, while a prefix outside the family
+range and an address with nonzero host bits are validation errors. `min_prefix`/`max_prefix` are applied;
+`within`/`excluding` are not, on the same deferral as `ipv4_type`'s (deciding subnet-of and non-overlap
+against a list of networks is a materially bigger piece of work than a scalar bound). Whether a *declared*
+bound itself falls inside the family range — "invalid at the schema level", per meta.tn — is a
+constraint-family coherence rule tracked in `BACKLOG.md`, not enforced by the parser; an out-of-range
+bound is inert, since the family range is enforced regardless.
+
 **One accepted, unfixable gap.** RFC 3339's grammar permits `time-second` up to `60` (leap-second
 accommodation), but `java.time` has no leap-second concept at all — `!time`/`!datetime` reject a
 spec-legal leap-second token as a parse error. There's no reasonable fix short of a from-scratch time
