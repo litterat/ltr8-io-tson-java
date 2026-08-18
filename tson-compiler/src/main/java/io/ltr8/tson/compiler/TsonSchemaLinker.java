@@ -269,13 +269,13 @@ public final class TsonSchemaLinker {
      * or not it is present -- and exists to be checked against that derived fact, converting a silent drift
      * into a diagnostic."
      *
-     * <p><b>Two of §5.4's three outcomes are reachable.</b> Proved ({@code disjoint} is {@code true}) is
-     * silent, and refuted ({@code false} -- a variant IS-A another, say) is an error. <b>Unprovable</b>
-     * ({@code disjoint} absent) is where §5.4 asks for a *warning*, and {@code Diagnostic} carries no
-     * severity: every one of them fails the schema and exits non-zero. Reporting it would reject a schema
-     * §5.4 calls legal, which is the worse of the two errors, so it stays silent until the severity axis
-     * lands ({@code BACKLOG.md}). Note §5.4 is explicit that the warnable condition is the *unverifiable
-     * assertion*, never mere non-disjointness -- an unannotated choice is asked nothing here.
+     * <p><b>Two outcomes, because the fact is two-valued.</b> {@code disjoint: true} verifies the assertion,
+     * silently; {@code false} makes it an error. The derivation ({@link ChoiceDisjointness}) is total, so
+     * §5.4's third outcome -- unprovable, where the spec asks for a warning -- cannot arise ({@code
+     * SPEC-FEEDBACK.md} #47, resolving #42's case for a pinned decision procedure), which is what makes
+     * {@code @disjoint} mean <em>machine-verified</em>, the only reading an encoding can rely on to drop a
+     * tag. Note §5.4 is explicit that the reportable condition is the assertion, never mere
+     * non-disjointness -- an unannotated choice is asked nothing here.
      *
      * <p><b>Runs on the annotated map, and after it is built.</b> §6 puts a declaration's annotations in two
      * places -- before the name (they land on the map key) or after {@code =>} (on the definition) -- and
@@ -297,14 +297,15 @@ public final class TsonSchemaLinker {
             if (!def.annotations().has(DISJOINT) && !entries.getAnnotations(name).has(DISJOINT)) {
                 continue;
             }
-            if (!def.disjoint().equals(Optional.of(false))) {
-                continue; // proved, or unprovable -- see the note above on the missing severity
+            if (def.disjoint().equals(Optional.of(true))) {
+                continue; // verified -- the assertion holds, and says so
             }
+            List<String> variants = choice.variants().stream().map(TypeRef::name).toList();
             report(receiver, schema, name, def, "'" + name + "' asserts @disjoint, but its variants "
-                    + choice.variants().stream().map(TypeRef::name).toList() + " are provably not disjoint "
-                    + "(§5.4) -- one variant IS-A another, or they share a value set the resolver can see "
-                    + "into; drop the assertion, or use a field group (§5.11), which discriminates by label "
-                    + "and needs no disjointness");
+                    + variants + " are not disjoint (§5.4) -- two of them occupy the same discrimination "
+                    + "class (or one has no class at all), so no encoding's single form-resolution pass can "
+                    + "tell them apart and every value keeps its !variant tag; drop the assertion, or use a "
+                    + "field group (§5.11), which discriminates by label and needs no disjointness");
         }
     }
 
@@ -483,10 +484,11 @@ public final class TsonSchemaLinker {
     }
 
     /**
-     * Derives {@link TypeDefinition#disjoint} for every choice entry (§5.4), over the fully-merged,
-     * subtypes-populated namespace -- a namespace-wide pass, like {@link #computeSubtypes}, since a
-     * variant's own kind/family/bounds/supertypes are only knowable with every entry resolved. See {@link
-     * ChoiceDisjointness} for the derivation and its deliberately partial scope.
+     * Derives {@link TypeDefinition#disjoint} for every choice entry (§5.4), over the fully-merged
+     * namespace -- a namespace-wide pass, like {@link #computeSubtypes}, since a variant's discrimination
+     * class is only knowable with every entry resolved. The derivation ({@link ChoiceDisjointness}) is
+     * total and two-valued, so a linked choice always carries the fact; only non-choice entries leave it
+     * absent.
      */
     private static Map<String, TypeDefinition> computeDisjointness(Map<String, TypeDefinition> merged) {
         Map<String, TypeDefinition> result = new LinkedHashMap<>(merged);
@@ -495,7 +497,7 @@ public final class TsonSchemaLinker {
                 TypeDefinition def = entry.getValue();
                 result.put(entry.getKey(), new TypeDefinition(def.source(), def.kind(), def.parameters(),
                         def.constructor(), def.supertypes(), def.subtypes(),
-                        ChoiceDisjointness.derive(choice, merged), def.body(), def.position(),
+                        Optional.of(ChoiceDisjointness.derive(choice, merged)), def.body(), def.position(),
                         def.annotations()));
             }
         }
@@ -607,6 +609,7 @@ public final class TsonSchemaLinker {
                     index++;
                 }
                 checkVariantsAreDistinct(entryName, c, namespace);
+                checkVariantsAreNotVoid(entryName, c, namespace);
             }
             case Unit ignored -> {
             }
@@ -693,6 +696,25 @@ public final class TsonSchemaLinker {
                     : "variants '" + first + "' and '" + variant.name() + "' both resolve to '"
                             + flattened.name() + "'")
                     + " -- §5.4 requires each variant to resolve to a distinct type");
+        }
+    }
+
+    /**
+     * A variant must not resolve to {@code void} ({@code SPEC-FEEDBACK.md} #48): {@code (T | void)} spells
+     * optionality as a choice, and optionality belongs to the position -- a field's {@code ?} state, the
+     * {@code _} sentinel -- never to the type occupying it. Judged after §8.3 flattening, like
+     * distinctness, so an alias of {@code void} is caught under whatever name the author wrote.
+     */
+    private static void checkVariantsAreNotVoid(String entryName, ChoiceBody choice,
+                                                 Map<String, TypeDefinition> namespace) {
+        for (TypeRef variant : choice.variants()) {
+            if (terminalName(variant.name(), namespace).equals("void")) {
+                throw new TsonSchemaValidationException("'" + entryName + "' has a variant"
+                        + (variant.name().equals("void") ? "" : " '" + variant.name() + "'")
+                        + " resolving to 'void' -- optionality is not choice (§5.4): a value's absence is the "
+                        + "position's own state, so mark the position optional ('?') instead of uniting its "
+                        + "type with void");
+            }
         }
     }
 

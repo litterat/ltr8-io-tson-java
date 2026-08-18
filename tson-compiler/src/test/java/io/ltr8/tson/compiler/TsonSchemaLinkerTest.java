@@ -20,6 +20,7 @@ import io.ltr8.tson.schema.meta.Unit;
 
 import org.junit.jupiter.api.Test;
 
+import java.math.BigInteger;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -202,7 +203,7 @@ class TsonSchemaLinkerTest {
 
         TsonSchemaValidationException ex = assertThrows(TsonSchemaValidationException.class,
                 () -> TsonSchemaLinker.link(schemaOf(entries), null));
-        assertTrue(ex.getMessage().contains("provably not disjoint"), ex.getMessage());
+        assertTrue(ex.getMessage().contains("are not disjoint"), ex.getMessage());
     }
 
     /** §6 lets the same marker precede the name, where it lands on the map key -- equally an assertion. */
@@ -224,14 +225,15 @@ class TsonSchemaLinkerTest {
         assertEquals(Optional.of(false), linked.schema().entries().get("contact").disjoint());
     }
 
-    /** A proved assertion is silent -- different atom families, so the derivation returns true. */
+    /** A verified assertion is silent -- distinct discrimination classes, so the derivation returns true. */
     @Test
     void acceptsADisjointAssertionTheDerivedFactProves() {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("token", unitEntry());
+        entries.put("label", new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), false,
+                List.of(), List.of(), Optional.empty(), TextType.UNCONSTRAINED));
         entries.put("count", new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), false,
                 List.of(), List.of(), Optional.empty(), new IntegerType(new IntegerSize(32, true))));
-        entries.put("contact", choiceEntry(new ChoiceBody(List.of(TypeRef.of("token"), TypeRef.of("count"))))
+        entries.put("contact", choiceEntry(new ChoiceBody(List.of(TypeRef.of("label"), TypeRef.of("count"))))
                 .withAnnotations(disjointMarker()));
 
         TsonLinkedSchema linked = TsonSchemaLinker.link(schemaOf(entries), null); // no exception
@@ -239,22 +241,78 @@ class TsonSchemaLinkerTest {
     }
 
     /**
-     * §5.4 asks for a *warning* where the assertion can be neither proved nor refuted, and {@code Diagnostic}
-     * has no severity, so this stays silent rather than failing a schema §5.4 calls legal. Pins the current
-     * behaviour so that adding the severity axis is a deliberate change, not an accident.
+     * The derivation is two-valued and class-based ({@code SPEC-FEEDBACK.md} #47), so an assertion §5.4's
+     * value-set reading would call merely unprovable is simply refuted here: {@code even} and {@code small}
+     * are both number-class, and no encoding's single form-resolution pass separates a same-class pair,
+     * however their value sets relate.
      */
     @Test
-    void anUnprovableDisjointAssertionIsSilentForNow() {
+    void rejectsADisjointAssertionOnSameClassVariants() {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("a", new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), false,
-                List.of(), List.of(), Optional.empty(), TextType.UNCONSTRAINED));
-        entries.put("b", new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), false,
-                List.of(), List.of(), Optional.empty(), TextType.UNCONSTRAINED));
-        entries.put("contact", choiceEntry(new ChoiceBody(List.of(TypeRef.of("a"), TypeRef.of("b"))))
+        entries.put("integer", new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), false,
+                List.of(), List.of(), Optional.empty(), IntegerType.UNCONSTRAINED));
+        entries.put("even", integerEntry(new IntegerType(Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.of(BigInteger.TWO))));
+        entries.put("small", integerEntry(new IntegerType(Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.of(BigInteger.TEN), Optional.empty(), Optional.empty())));
+        entries.put("contact", choiceEntry(new ChoiceBody(List.of(TypeRef.of("even"), TypeRef.of("small"))))
                 .withAnnotations(disjointMarker()));
 
+        TsonSchemaValidationException ex = assertThrows(TsonSchemaValidationException.class,
+                () -> TsonSchemaLinker.link(schemaOf(entries), null));
+        assertTrue(ex.getMessage().contains("are not disjoint"), ex.getMessage());
+    }
+
+    /** The same choice without the assertion is legal -- §5.4 only ever reports the assertion. */
+    @Test
+    void acceptsASameClassChoiceThatAssertsNothing() {
+        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        entries.put("integer", new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), false,
+                List.of(), List.of(), Optional.empty(), IntegerType.UNCONSTRAINED));
+        entries.put("even", integerEntry(new IntegerType(Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.of(BigInteger.TWO))));
+        entries.put("small", integerEntry(new IntegerType(Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.of(BigInteger.TEN), Optional.empty(), Optional.empty())));
+        entries.put("contact", choiceEntry(new ChoiceBody(List.of(TypeRef.of("even"), TypeRef.of("small")))));
+
         TsonLinkedSchema linked = TsonSchemaLinker.link(schemaOf(entries), null); // no exception
-        assertEquals(Optional.empty(), linked.schema().entries().get("contact").disjoint());
+        assertEquals(Optional.of(false), linked.schema().entries().get("contact").disjoint());
+    }
+
+    /** §5.4 per {@code SPEC-FEEDBACK.md} #48: {@code (T | void)} spells optionality as a choice -- rejected. */
+    @Test
+    void rejectsAVoidChoiceVariant() {
+        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        entries.put("void", unitEntry());
+        entries.put("label", new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), false,
+                List.of(), List.of(), Optional.empty(), TextType.UNCONSTRAINED));
+        entries.put("maybe_label", choiceEntry(
+                new ChoiceBody(List.of(TypeRef.of("label"), TypeRef.of("void")))));
+
+        TsonSchemaValidationException ex = assertThrows(TsonSchemaValidationException.class,
+                () -> TsonSchemaLinker.link(schemaOf(entries), null));
+        assertTrue(ex.getMessage().contains("optionality is not choice"), ex.getMessage());
+    }
+
+    /** Judged after §8.3 flattening, so an alias of {@code void} is caught under the author's own name. */
+    @Test
+    void rejectsAVoidVariantReachedThroughAnAlias() {
+        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
+        entries.put("void", unitEntry());
+        entries.put("nothing", TypeDefinition.reference("void"));
+        entries.put("label", new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), false,
+                List.of(), List.of(), Optional.empty(), TextType.UNCONSTRAINED));
+        entries.put("maybe_label", choiceEntry(
+                new ChoiceBody(List.of(TypeRef.of("label"), TypeRef.of("nothing")))));
+
+        TsonSchemaValidationException ex = assertThrows(TsonSchemaValidationException.class,
+                () -> TsonSchemaLinker.link(schemaOf(entries), null));
+        assertTrue(ex.getMessage().contains("'nothing'"), ex.getMessage());
+    }
+
+    private static TypeDefinition integerEntry(IntegerType body) {
+        return new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), false,
+                List.of("integer"), List.of(), Optional.empty(), body);
     }
 
     /**

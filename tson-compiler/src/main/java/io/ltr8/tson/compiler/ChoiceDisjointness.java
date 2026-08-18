@@ -1,142 +1,47 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.schema.meta.Atom;
+import io.ltr8.tson.compiler.reader.DiscriminationClass;
 import io.ltr8.tson.schema.meta.ChoiceBody;
-import io.ltr8.tson.schema.meta.IntegerSize;
-import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeRef;
 
-import java.math.BigInteger;
+import java.util.EnumSet;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
- * Derives a choice's {@code type_definition.disjoint} (Part 2 §5.4): whether its variants are pairwise
- * disjoint as value sets. The encoding-independent fact the resolver records -- {@code Optional<Boolean>}
- * with three states: {@code true} (proved disjoint), {@code false} (provably not disjoint, e.g. an IS-A
- * variant pair or overlapping numeric ranges), {@code empty} (neither proved -- conservative, per §5.4's
- * "leave the fact absent when it cannot").
+ * Derives a choice's {@code type_definition.disjoint} (Part 2 §5.4): {@code true} exactly when every
+ * variant has a {@link DiscriminationClass} and no class appears twice, {@code false} otherwise. A total,
+ * two-valued decision -- there is no "unable to decide" state, because the question is not value-set
+ * disjointness (a partial-prover problem over bound intervals, pattern emptiness and record inhabitation)
+ * but whether an encoding's single form-resolution pass can tell the variants apart, which the
+ * declarations answer by inspection. Same-class variants -- two numeric families, two string-form atoms,
+ * two records -- are not disjoint however separated their value sets, because separating them would take
+ * exactly the type-directed second inspection of the value's form that [TSON-DATA] §2.4's once-only rule
+ * forbids a reader. {@code SPEC-FEEDBACK.md} #47 records the departure from §5.4's written value-set
+ * derivation and the MAY-prove latitude this deletes.
  *
- * <p><b>Scope (deliberately partial, per §5.4).</b> The cheap, exact, spec-baseline rules only: different
- * kinds are disjoint; different atom families are disjoint; same-family integer atoms are compared by their
- * bound intervals; a variant that IS-A another (via its transitive supertypes) is not disjoint. Two cases
- * §5.4 marks a resolver MAY prove are left absent here: record-set disjointness under composition, and
- * pattern disjointness over {@code regex}-constrained atoms. The latter is not attempted even though {@code
- * tson-regex}'s {@code TsonRegex.isDisjointFrom} could decide it exactly, and is reachable from this module
- * -- two {@code regex}/{@code text}-constrained atoms are the same string base-type class, and §5.4's own
- * Tagging rule makes a shared base-type class un-discriminable for TSON text regardless of value-set
- * disjointness (`(email | uri)` is the spec's example), so proving it would give TSON-text untagged reading
- * nothing. It remains worth computing for the {@code @disjoint} assertion check; see {@code BACKLOG.md} for
- * the fuller rationale.
+ * <p><b>The fact is load-bearing twice, so the class table is pinned.</b> {@code
+ * TsonSchemaLinker.checkDisjointAssertions} rejects {@code @disjoint} on a {@code false} choice, and
+ * {@code ChoiceReader} offers untagged recovery exactly where the fact is {@code true} and every class is
+ * scalar -- dispatching through the same {@link DiscriminationClass#of} this derivation classifies with,
+ * so the two can never disagree. Changing what classifies therefore changes both which schemas load and
+ * which documents read untagged: a compatibility decision, not a free improvement.
  */
 final class ChoiceDisjointness {
-
-    private enum Pair {DISJOINT, OVERLAP, UNKNOWN}
 
     private ChoiceDisjointness() {
     }
 
-    static Optional<Boolean> derive(ChoiceBody choice, Map<String, TypeDefinition> namespace) {
-        var variants = choice.variants();
-        boolean allProvedDisjoint = true;
-        for (int i = 0; i < variants.size(); i++) {
-            for (int j = i + 1; j < variants.size(); j++) {
-                switch (pairwise(variants.get(i), variants.get(j), namespace)) {
-                    case OVERLAP -> {
-                        return Optional.of(false); // one overlapping pair makes the whole choice not disjoint
-                    }
-                    case UNKNOWN -> allProvedDisjoint = false;
-                    case DISJOINT -> { /* keep checking */ }
-                }
+    static boolean derive(ChoiceBody choice, Map<String, TypeDefinition> namespace) {
+        Set<DiscriminationClass> seen = EnumSet.noneOf(DiscriminationClass.class);
+        for (TypeRef variant : choice.variants()) {
+            Optional<DiscriminationClass> variantClass = DiscriminationClass.of(variant.name(), namespace);
+            if (variantClass.isEmpty() || !seen.add(variantClass.get())) {
+                return false;
             }
         }
-        return allProvedDisjoint ? Optional.of(true) : Optional.empty();
-    }
-
-    private static Pair pairwise(TypeRef a, TypeRef b, Map<String, TypeDefinition> namespace) {
-        TypeDefinition da = namespace.get(a.name());
-        TypeDefinition db = namespace.get(b.name());
-        if (da == null || db == null) {
-            return Pair.UNKNOWN; // an unresolved variant -- defensive; the linker validates references separately
-        }
-        // IS-A either way (or the same type): one value set contains the other, so they share values.
-        if (a.name().equals(b.name()) || da.supertypes().contains(b.name()) || db.supertypes().contains(a.name())) {
-            return Pair.OVERLAP;
-        }
-        if (da.kind() != db.kind()) {
-            return Pair.DISJOINT; // different kinds are disjoint (§5.4)
-        }
-        if (da.body() instanceof Atom atomA && db.body() instanceof Atom atomB) {
-            return atomPair(atomA, atomB);
-        }
-        return Pair.UNKNOWN; // records/products/sums -- the labelled form is the better model (§5.4)
-    }
-
-    private static Pair atomPair(Atom a, Atom b) {
-        if (a.getClass() != b.getClass()) {
-            return Pair.DISJOINT; // different atom families are disjoint (§5.4)
-        }
-        if (a instanceof IntegerType ia && b instanceof IntegerType ib) {
-            return integerPair(ia, ib);
-        }
-        // Same non-integer family (two text/regex, two enums, ...): pattern/set disjointness is a §5.4 MAY
-        // this doesn't attempt (see the class Javadoc) -- leave it absent.
-        return Pair.UNKNOWN;
-    }
-
-    /** Same-family integers, compared by bound interval (§5.4). {@code null} bound = unbounded. */
-    private static Pair integerPair(IntegerType a, IntegerType b) {
-        BigInteger loA = low(a);
-        BigInteger hiA = high(a);
-        BigInteger loB = low(b);
-        BigInteger hiB = high(b);
-        boolean aBelowB = hiA != null && loB != null && hiA.compareTo(loB) < 0;
-        boolean bBelowA = hiB != null && loA != null && hiB.compareTo(loA) < 0;
-        if (aBelowB || bBelowA) {
-            return Pair.DISJOINT; // the intervals don't meet
-        }
-        // Intervals overlap. A multiple-of constraint could still separate them (evens vs odds), which this
-        // interval-only rule doesn't decide, so only claim overlap when neither side carries one.
-        if (a.multipleOf().isEmpty() && b.multipleOf().isEmpty()) {
-            return Pair.OVERLAP;
-        }
-        return Pair.UNKNOWN;
-    }
-
-    private static BigInteger low(IntegerType t) {
-        BigInteger fromSize = t.size().map(size -> sizeRange(size)[0]).orElse(null);
-        BigInteger explicit = t.min().or(() -> t.exclusiveMin().map(m -> m.add(BigInteger.ONE))).orElse(null);
-        return tighterLow(fromSize, explicit);
-    }
-
-    private static BigInteger high(IntegerType t) {
-        BigInteger fromSize = t.size().map(size -> sizeRange(size)[1]).orElse(null);
-        BigInteger explicit = t.max().or(() -> t.exclusiveMax().map(m -> m.subtract(BigInteger.ONE))).orElse(null);
-        return tighterHigh(fromSize, explicit);
-    }
-
-    /** Inclusive {@code [min, max]} a {@code size} implies -- signed two's-complement or unsigned. */
-    private static BigInteger[] sizeRange(IntegerSize size) {
-        int bits = size.bits().intValueExact();
-        if (size.signed()) {
-            BigInteger half = BigInteger.TWO.pow(bits - 1);
-            return new BigInteger[] {half.negate(), half.subtract(BigInteger.ONE)};
-        }
-        return new BigInteger[] {BigInteger.ZERO, BigInteger.TWO.pow(bits).subtract(BigInteger.ONE)};
-    }
-
-    private static BigInteger tighterLow(BigInteger a, BigInteger b) {
-        if (a == null) {
-            return b;
-        }
-        return b == null ? a : a.max(b);
-    }
-
-    private static BigInteger tighterHigh(BigInteger a, BigInteger b) {
-        if (a == null) {
-            return b;
-        }
-        return b == null ? a : a.min(b);
+        return true;
     }
 }

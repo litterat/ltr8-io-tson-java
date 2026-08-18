@@ -972,13 +972,16 @@ would be the `@disjoint` assertion check and non-text encodings. It is unclear w
 whether TSON text is meant to use the value itself (a value inspection, not a type re-parse) to pick the
 range-disjoint variant — which the "never a second, type-directed inspection" clause appears to forbid.
 
-**Interpretation chosen:** The `disjoint` *fact* is derived regardless (kind/family/numeric-bounds/IS-A). For
-TSON-text untagged reading specifically, this implementation reads §5.4 strictly: a choice's tag is omissible
-only when its variants occupy *distinct base-type classes* (so §4's single pass discriminates them with no
-type-directed inspection); a same-base-class choice — including a value-disjoint numeric one like
-`(positive_integer | negative_integer)` — requires the tag. So the numeric-bound (and unimplemented pattern)
-disjointness rules feed the `@disjoint` check and the encoding-independent fact, but do not enable untagged
-TSON-text reads.
+**Interpretation chosen:** The `disjoint` *fact* is derived regardless, and as fully as exact rules allow —
+kind, atom family, IS-A, numeric bound intervals, text lengths, I-Regexp pattern disjointness, enum member
+sets, and record closure. For TSON-text untagged reading specifically, this implementation reads §5.4
+strictly: a choice's tag is omissible only when its variants occupy *distinct base-type classes* (so §4's
+single pass discriminates them with no type-directed inspection); a same-base-class choice — including a
+value-disjoint numeric one like `(positive_integer | negative_integer)`, and every pattern- or
+enum-separated string choice — requires the tag. The two readings are kept independent in code rather than
+by convention: `ChoiceReader` requires distinct base-type classes *in addition to* a proved `disjoint`, and
+tests them itself, so every same-family rule above feeds only the `@disjoint` check and the
+encoding-independent fact — no strengthening of the prover can drop a tag a reader needs.
 
 **Suggested resolution:** State explicitly whether TSON text's discrimination may consult a scalar value's own
 resolved form (sign/magnitude for numbers, content for strings) to select among same-base-class value-disjoint
@@ -987,6 +990,11 @@ require the tag. If the latter (the reading chosen here), note that the "same-fa
 intervals" rule is, for TSON text, only ever consumed by `@disjoint` and other encodings, never by untagged
 reading — worth saying plainly, since a reader naturally expects `(positive_integer | negative_integer)` to be
 untagged-readable and it is not.
+
+*(#47 has since resolved this in this implementation by definition: `disjoint` is now derived as
+discrimination-class distinctness, so "disjoint" and "separable by §4's single pass" are one fact —
+`(positive_integer | negative_integer)` derives `false` outright, and the strict reading above stops being
+an extra gate and becomes the meaning of the fact.)*
 
 ---
 
@@ -1011,6 +1019,10 @@ fact, rather than recomputing.
 `false` (provably not disjoint), or is absent (neither proved) — matching the `boolean?` model and the three
 cases the `@disjoint` check already enumerates. As written, "true when proved, absent otherwise" reads as
 two-valued and leaves the refuted state's storage unspecified.
+
+*(#47 has since dissolved this in this implementation: the derivation is total and two-valued, so a linked
+choice always records `true` or `false` and there is no third state to store — the better fix is #47's
+rewrite rather than the three-state prose amendment above.)*
 
 ---
 
@@ -2356,11 +2368,13 @@ which are deployment policy — though where a limit is enabled, exceeding it is
 ahead of the spec's written warn-level verdicts, and will not grow a severity axis: `Diagnostic` stays
 single-severity, a non-empty `validate` result still means invalid, and each warn case lands as an
 ordinary error as its owning feature is built (`BACKLOG.md`'s "Diagnostics" section tracks the work).
-Current state per rule: duplicate fields/keys are undetected (to become errors at both reader loops); a
-stated `_` at a REQUIRED_DEFAULT field injects the default silently (to become a validation error; plain
-omission still injects); an unprovable `@disjoint` assertion is silent (pinned by
-`anUnprovableDisjointAssertionIsSilentForNow`, to become a linker error); the vacuous `0..` bound
-desugars mechanically (to become a desugar-time error); set-typed positions currently read as plain
+Current state per rule: duplicate fields and duplicate map keys are errors at both reader loops (with
+last-value-wins recovery underneath); a stated `_` at a REQUIRED_DEFAULT field is a validation error where
+plain omission still injects; `@disjoint` on a non-disjoint choice is a linker error, and #47's total
+two-valued derivation means "unprovable" no longer exists — the pinned decision procedure case 7 asks the
+spec for is `ChoiceDisjointness`'s discrimination-class rule (pinned by
+`rejectsADisjointAssertionOnSameClassVariants`); the vacuous `0..`
+bound is a desugar-time error; set-typed positions currently read as plain
 arrays with no dedup at all, and the phantom-parameter, shadowing, and productivity checks belong to
 features not yet implemented — each arrives as an error when its feature does. The implementation had
 already chosen strictness twice where the spec offered leniency: an unresolvable type annotation is
@@ -2380,8 +2394,9 @@ specification never asks for a warning* — and resolve the table above accordin
    and documented as a feature — but not warned); a parameter shadowing a schema type is a resolver
    error.
 7. §5.10.1: a non-productive recursive type is a resolver error, with "guarded" defined (#25).
-8. §5.4: pin the required disjointness decision procedure, and make an assertion unprovable under it a
-   resolver error; keep the SHOULD-NOT-warn-on-mere-overlap sentence by deleting its premise.
+8. §5.4: pin the required disjointness decision procedure (#47 supplies it, total and two-valued, so
+   "unprovable" disappears outright), and make an assertion it decides `false` a resolver error; keep the
+   SHOULD-NOT-warn-on-mere-overlap sentence by deleting its premise.
 9. §5.2's inline-nesting MAY-warn: delete, or restate as a §9.1-style configurable limit.
 10. §7.1: when `!!schema` is present, the governed value MUST be annotated with its type (at minimum for
     validating processors), so a validator can never return "valid" having engaged nothing.
@@ -2725,3 +2740,134 @@ written.
    but constructor operands force `~` (this entry); parameters are labelled-only (#44); and partial binding
    of a constructor is application syntax (#45), never refinement — after all three, `array<T> ^ { ... }`
    without `~` is ill-formed by rule and `array<T; min_items: = MIN>` is its only spelling.
+
+---
+
+## 47. §5.4's disjointness should be a total, two-valued discrimination-class decision — the value-set derivation answers a question no reader may act on
+
+**Section:** Part 2 §5.4 (Disjointness + Tagging + The `@disjoint` assertion); §5.5 (the atom table);
+meta-kernel `type_definition.disjoint: boolean?`; [TSON-DATA] §2.4 (once-only reading of form), §4 (base
+type resolution). Related: #23, #24, #42 (case 7).
+
+**Problem:** §5.4 defines `disjoint` as a value-set property with a *partial* derivation: a baseline
+("different kinds are disjoint; different atom families are disjoint; same-family numerics are compared by
+their bound intervals"), two MAY-prove cases (record composition/closure, pattern disjointness), and "MUST
+leave absent when it cannot". Four defects compound:
+
+1. **The different-atom-families rule is wrong as a value-set claim.** `(integer | decimal)` comes out
+   "disjoint" while `5` is plausibly a value of both and the two write the identical token shape; `(uuid |
+   text)` likewise, while every uuid literal is a valid text. The rule smuggles a nominal distinction in as
+   a semantic one.
+2. **The fine-grained rules are unreachable from reading.** Per #23's resolution, TSON text discriminates
+   an untagged value only by §4's single base-resolution pass — so every same-class verdict the value-set
+   rules produce (separated numeric bounds, disjoint patterns, disjoint enum member sets, record closure)
+   feeds nothing but the `@disjoint` assertion check. A derivation whose hardest rules exist only to
+   validate an optional annotation is effort in the wrong place.
+3. **Partiality forces the third state and the warning tier.** "Neither proved nor refuted" is what
+   demands `@disjoint`'s warn-on-unprovable (#42 case 7) and the three-valued field prose #24 found
+   inconsistent. And because prover *strength* is implementation-defined (the MAYs), the same schema can
+   load under one conforming resolver and fail under another — the fact is unusable by any encoding
+   precisely because no two implementations are required to derive it identically.
+4. **Exactness is expensive and author-illegible.** A conforming value-set prover needs interval algebra
+   with open ends, `multiple_of`/digit-facet abstention, IEEE semantics (two default-`allow_nan` floats
+   overlap via NaN however far apart their ranges — technically right, baffling to an author), and
+   regular-language intersection-emptiness over I-Regexp, which an implementation delegating `pattern` to a
+   host regex engine cannot build at all.
+
+**Interpretation chosen** (implemented; supersedes the value-set prover this implementation briefly
+carried): redefine `disjoint` as **discrimination-class distinctness** — a total, two-valued function of
+the declarations.
+
+Every type has at most one *discrimination class*, derived after following its §8.3 reference chain:
+
+| Class | Types |
+|---|---|
+| `boolean` | the boolean family |
+| `number` | **every** numeric family — `integer`, `decimal`, `float` |
+| `string` | every text-form family — `text`, `uuid`, `uri`, `date`/`time`/`datetime`/`duration`, `binary`, `email`, the network-address families, … |
+| `brace` | records **and** maps (both `{...}`; `{}` is ambiguous between them) |
+| `bracket` | arrays **and** tuples (both `[...]`) |
+
+(§4's `null` class exists at read time — a `null` token resolves to it — but no schema type occupies it:
+`void` is not a legitimate variant at all, per #48, so the table has no row for it.)
+
+An enum's class is its members' shared class (`[true false]` is boolean-class; mixed members → none). A
+type with no single class — `rational`/`complex` (typed forms straddle classes), `unit`/`value`/`token`
+(and so `void`, whose misuse in a choice #48 addresses), a nested choice, an extern, an unresolvable or
+cyclic reference — has none, and a classless variant makes its choice `false`.
+
+**The rule:** a choice is `disjoint: true` iff every variant has a class and no class appears twice;
+`false` otherwise. The procedure is closed and normative — a resolver MUST record exactly this, MUST NOT
+prove more or less — so the MAY-prove latitude, the "MUST leave absent" state, and the SHOULD-warn tier
+all delete. `@disjoint` has two outcomes: verified (silent) or an error. The kernel field stays `boolean?`
+only because non-choice entries omit it; a choice always carries it.
+
+The payoffs, in order of weight:
+
+1. **`disjoint` ⇔ "the encoding can tell the variants apart".** #23's two carefully-held-apart facts
+   (value-set disjointness; encoding separability) collapse into one, and the Tagging rule simplifies to:
+   the tag is REQUIRED when the choice is not disjoint, OPTIONAL when it is. `(positive_integer |
+   negative_integer)` is simply `false` — which is what a reader could always do with it.
+2. **Portable by construction.** The classes are §4's own semantic partition plus the two delimiter forms,
+   and they map one-to-one onto JSON's (null/boolean/number/string, `{}`/`[]`) — so a future JSON encoding
+   consumes the fact unchanged, which the implementation-varying value-set fact never could be.
+3. **Trivially derivable and reasonable-about.** Every rule is answerable by looking at declarations — no
+   arithmetic, no IEEE semantics, no automata. An emitter (the format's stated LLM consumer) needs one
+   sentence: *if two variants share a class, tag every value of the choice; a tag is never wrong.*
+4. **#24 dissolves** (no third state to store) and **#42 case 7 resolves** to its own suggested fix: the
+   decision procedure is pinned, so error-on-unprovable is portable — indeed "unprovable" no longer exists.
+
+What is deliberately given up: `@disjoint` on value-set-separated same-class pairs (bounded numerics,
+disjoint patterns, disjoint enum member sets, records separated by a required field) is now an *error*
+rather than a verified assertion. Nothing operational is lost — no encoding could drop those tags anyway —
+and §5.4's own recommendation already points such choices at the labelled form (§5.11), which
+discriminates by label and needs no disjointness at all.
+
+**Suggested resolution:** Rewrite §5.4's Disjointness paragraph as the closed class-based procedure above
+(the class table can live as a column of §5.5's atom table); restate Tagging as "REQUIRED unless
+`disjoint`, OPTIONAL where it is; an omitted tag is recovered by the value's class"; cut the `@disjoint`
+outcome list to verified/error; amend the meta-kernel prose so a choice always records the field. This
+also delivers the "no MAY/SHOULD latitude" direction the next revision wants: one procedure, one severity,
+no implementation-defined strength anywhere in §5.4.
+
+---
+
+## 48. `void` must not be a choice variant — `(T | void)` confuses optionality with choice
+
+**Section:** Part 2 §5.4 (Choice Types); §5.2 (field states — optionality's real home); §7.3 (`void`'s
+`null` concession); §7.6 (the absent sentinel under a schema). Related: #47.
+
+**Problem:** Nothing in §5.4 forbids a variant resolving to `void`, so `(text | void)` is grammatical and
+resolves. But it is a category error the spec elsewhere works hard to keep out: a choice selects among
+*value types* — every variant a type whose values a position can hold — while optionality is a property of
+the *position* (a field's `?`/OPTIONAL state, the `_` sentinel), not of the type occupying it. Admitting
+`void` as a variant creates a second, worse spelling of "optional T":
+
+1. **Two optionality mechanisms with different semantics.** `field: text?` means the field may be absent;
+   `field: (text | void)` means the field is always present and may hold the null value (`void`'s §7.3 text
+   form). The distinction between absent and null is one the format draws deliberately ([TSON-DATA] §4.1:
+   "`null` is a value that can be stored and transmitted; `_` indicates that no value occupies a
+   position") — and the choice spelling invites authors to blur it, JSON-habitually (`type: ["string",
+   "null"]` is exactly this construct).
+2. **It degrades mechanically under #47.** `void` resolves to the same `unit` body as `value`/`token`, has
+   no discrimination class, and so makes any choice containing it non-disjoint — every `(T | void)` value
+   carries a `!void` tag around a `null` token, which no author wants and which reads as a bug report
+   against the schema rather than a design.
+3. **The tag names the wrong thing.** A `!variant` tag selects a variant *type*; `!void null` asserts "this
+   position holds the no-value value of type void", a sentence with no data-model payoff over the position
+   simply being optional or the field being typed `void` outright where a placeholder is genuinely meant.
+
+**Interpretation chosen:** implemented — `TsonSchemaLinker` rejects a choice with a variant resolving to
+`void` (judged after §8.3 flattening, so an alias of `void` is caught too), with a diagnostic that says
+why: "optionality is not choice — a value's absence is the position's own state, so mark the position
+optional (`?`) instead of uniting its type with void". No bundled schema is affected. `value`/`token`
+variants are left legal for now (they degrade to `disjoint: false` via classlessness, per #47).
+
+**Suggested resolution:** Add to §5.4: **a variant MUST NOT resolve to `void`** — a resolver rejects the
+declaration, and the diagnostic SHOULD say why: optionality is not choice; write the position optional
+(§5.2's `?`), or type it `void` outright if a unit placeholder is genuinely meant. This also keeps #47's
+class table closed over real value types (no `null` row needed) and forecloses the `(T | void)` idiom
+before JSON-trained emitters — the format's stated consumer — reinvent it schema by schema. The same
+reasoning suggests (though this entry does not insist) that `value` and `token` variants deserve a look:
+`value` spans every class, so a choice containing it can never be disjoint either, and a position that
+admits anything is better typed `value` directly than through a union.

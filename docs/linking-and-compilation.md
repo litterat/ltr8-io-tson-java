@@ -28,19 +28,18 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   wrapper that is a compile-time proof linking ran): (1) **merge `!!import`s** — each import's entries
   copied in as-is, keeping their home namespace, name collisions rejected; (2) **populate `subtypes`**
   (reverse of `supertypes`); (3) **derive `disjoint`** for every choice entry (`ChoiceDisjointness`, §5.4) —
-  three-valued `Optional<Boolean>` over the cheap exact rules
-  (different kind / different atom family disjoint; same-family integers by bound interval; IS-A ⇒ not
-  disjoint); record-set and regex-pattern disjointness left absent (see `BACKLOG.md` for the "how far" view);
+  total and two-valued, detailed under "The disjointness derivation" below, so a linked choice always
+  carries the fact;
   (4) **validate** every reference
   resolves, with a type-parameter exception (a bare name valid if it's the entry's own declared parameter);
   **a choice's variants are checked distinct** (§5.4) *after* §8.3 flattening, since an alias and its target
   are one type — so `(text | my_text)` with `my_text => text` is caught, which comparing the written names
   would miss and which is the only spelling an author can't see for themselves; the walk stops on a
   reference cycle rather than hanging, cycle diagnosis being its own unimplemented concern; **an author's
-  `@disjoint` marker is checked against the derived fact** (§5.4) — refuted is an error, proved is silent,
-  and *unprovable* is silent today; §5.4 asks for a warning there, but `SPEC-FEEDBACK.md` #42's decision is
-  to make it an error too (`BACKLOG.md`'s Diagnostics section — there is no severity axis and none is
-  coming); the marker is read from both places §6 puts it,
+  `@disjoint` marker is checked against the derived fact** (§5.4) — `true` verifies it silently, `false` is
+  an error, and there is no third outcome because the derivation is total (`SPEC-FEEDBACK.md` #47, which
+  resolves #42's "pin the decision procedure" case: §5.4's warn-on-unprovable can never arise, and there is
+  no severity axis and none coming). The marker is read from both places §6 puts it,
   the definition and the map key, which is why the check runs last, after `withNameAnnotations`;
   and a **constructor-eligibility** check with two halves, the same §2.2.2 question asked from both ends
   (see `SPEC-FEEDBACK.md` #19): a locally-declared `constructor: true` entry is valid only if the schema's
@@ -65,6 +64,43 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   `TsonSchemaLoader` (`Optional<TsonLinkedSchema> load(id)`) is the pluggable import/meta lookup hook,
   registered-only by default (nothing fetched). `TsonSchemaLinker.linkBootstrap` is the one sanctioned way
   to link meta-kernel's raw bootstrap output without registering it.
+
+## The disjointness derivation (`ChoiceDisjointness`, `reader/DiscriminationClass`)
+
+`ChoiceDisjointness.derive` decides §5.4's question for a choice **totally and two-valued**: `disjoint` is
+`true` exactly when every variant has a *discrimination class* and no class appears twice, `false`
+otherwise — never absent. This is a deliberate departure from §5.4's written value-set derivation (bound
+intervals, MAY-prove record and pattern cases, "MUST leave absent when it cannot"), recorded as
+`SPEC-FEEDBACK.md` #47: the question the fact exists to answer is not "do the value sets intersect" but
+"can an encoding's single form-resolution pass tell the variants apart", and *that* is a total function of
+the declarations. A value-set prover (interval algebra, exact I-Regexp intersection-emptiness, record
+closure) was built and discarded during PR #36's review: it answered questions no conforming reader may
+act on — separating same-class variants takes the type-directed second inspection [TSON-DATA] §2.4
+forbids — at the price of verdicts an author cannot predict (two default-`allow_nan` floats overlap via
+NaN however far apart their ranges sit) and a conformance bar no second implementation should have to
+match. #47 carries the full account.
+
+**The class table** (`DiscriminationClass`, in `reader/` because untagged recovery dispatches on it):
+§4's four scalar classes — `null`, `boolean`, `number` (every numeric family: an `integer` and a `decimal`
+are one class, so never disjoint), `string` (every text-form family: `text`, enums by their members' shared
+class — so `[true false]` is boolean-class — `uuid`, `date`, `binary`, …) — plus `brace` (records **and**
+maps: both are `{...}` and `{}` is ambiguous between them, so calling them distinct would promise a
+discrimination the wire can't deliver) and `bracket` (arrays and tuples). A variant classifies through its
+§8.3 reference chain (an alias is its target; a cycle has no terminal, so no class). No class at all —
+`rational`/`complex` (whose typed forms straddle classes), `unit`, a mixed-class enum, `unknown`, a nested
+choice, an extern, an unresolved name — makes the choice `false`, the conservative side. A `void` variant
+never even gets that far: the linker rejects the declaration outright (`checkVariantsAreNotVoid`, after
+§8.3 flattening) — `(T | void)` confuses optionality with choice, which belongs to the position (`?`, `_`),
+per `SPEC-FEEDBACK.md` #48.
+
+**`disjoint` ⇔ the tag is droppable — one fact, not two.** `ChoiceReader.untaggedRecovery` builds its
+`class → variant` dispatch map through the same `DiscriminationClass.of` the derivation classifies with,
+so the derived fact and the reader's separability can never disagree (`SPEC-FEEDBACK.md` #23's two
+carefully-held-apart facts collapse into one). Recovery still engages only when every class is *scalar* —
+a `brace`/`bracket` variant is honestly disjoint from a scalar, but recovery dispatches on a token's
+resolved class and structural recovery from an opening delimiter isn't attempted yet. **The class table is
+pinned twice over**: it decides which schemas load (`@disjoint` on a `false` choice is an error) and which
+documents read untagged, so any change to it is a compatibility decision, not a free improvement.
 
 ## Class 2 compilation (`tson-compiler/TsonSchemaCompiler.java`, `.../reader/`)
 
