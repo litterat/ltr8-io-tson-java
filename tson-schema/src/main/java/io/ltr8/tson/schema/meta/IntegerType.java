@@ -111,6 +111,36 @@ public record IntegerType(
         return List.copyOf(violations);
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Judged on the <em>effective</em> range, the same fold {@link #constraintsCheck} compares
+     * against: a stated bound and the one {@link #size} implies contradict each other exactly as
+     * readily as two stated bounds do, so {@code !integer_type { size: { bits: 8  signed: false }
+     * min: 300 }} is caught by the same comparison that catches {@code min: 10  max: 3}. This is the
+     * one family where a body can be empty without stating both ends.
+     *
+     * <p>The fold is what {@link #constraintsCheck} deliberately does <em>not</em> do to the
+     * refinement side, and the difference is not an inconsistency: there, intersecting first would
+     * make every widening compare vacuously equal and nothing would ever be rejected. Here there is
+     * no second body to compare against and no widening to hide -- the question is only whether what
+     * this body says leaves any value standing, and an implied bound constrains as firmly as a
+     * written one.
+     *
+     * <p>{@code multiple_of: 0} is rejected outright rather than treated as vacuous: see {@link
+     * AtomCoherence#checkPositiveStep} for why it is the one incoherence here that is actively
+     * unsound rather than merely undiagnosed. A zero {@link IntegerSize#bits} needs no rule of its
+     * own -- it contributes no derived range (below {@code MAX_DERIVED_BITS}'s positive floor), and a
+     * width-zero integer is already unrepresentable rather than incoherent.
+     */
+    @Override
+    public List<String> coherenceCheck() {
+        List<String> violations = new ArrayList<>();
+        AtomCoherence.checkRange(violations, effectiveLower(), effectiveUpper());
+        AtomCoherence.checkPositiveStep(violations, "multiple_of", multipleOf, BigInteger::signum);
+        return List.copyOf(violations);
+    }
+
     /** The widest {@link IntegerSize#bits} a derived range is materialised for -- see {@link #constraintsCheck}. */
     private static final int MAX_DERIVED_BITS = 4096;
 

@@ -37,4 +37,17 @@ public record DateType(Optional<LocalDate> min, Optional<LocalDate> max) impleme
         AtomNarrowing.checkAtMost(violations, "max", max, other.max);
         return List.copyOf(violations);
     }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Both bounds are inclusive -- this family has no exclusive spelling -- so the only empty
+     * range is a ceiling below its own floor, compared on calendar order.
+     */
+    @Override
+    public List<String> coherenceCheck() {
+        List<String> violations = new ArrayList<>();
+        AtomCoherence.checkOrdered(violations, "min", min, "max", max);
+        return List.copyOf(violations);
+    }
 }

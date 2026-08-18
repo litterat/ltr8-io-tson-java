@@ -1378,6 +1378,56 @@ class DefinitionResolverTest {
     }
 
     /**
+     * The third question about an atom body, after "does it bind?" and "does it tighten its source?":
+     * do its own facets contradict each other? {@code AtomCoherenceTest} pins each family's rule
+     * directly; this pins the wiring -- that {@link DefinitionResolver} runs it at all, on both
+     * atom-body-producing paths, and reports a violation as the author's error.
+     *
+     * <p>Both paths matter because they reach the check by different routes: the refinement carries
+     * the offending facets in its own body, while the {@code !C value} application declares them
+     * from nothing. Neither had any coherence check before.
+     */
+    @Test
+    void anAtomBodyWhoseOwnFacetsContradictEachOtherIsRejected() {
+        TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
+        Map<String, TypeDefinition> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries());
+        DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
+        SchemaMap schemaMap = new TsonSchemaParser("""
+                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
+                {
+                  emptyByRefinement  => !integer ^ { min: 10  max: 3 }
+                  emptyByApplication => !integer_type { min: 10  max: 3 }
+                  emptyText          => !text ^ { min_length: 10  max_length: 3 }
+                  zeroStep           => !integer ^ { multiple_of: 0 }
+                  pinnedToOneValue   => !integer ^ { min: 5  max: 5 }
+                }""").parseSchemaDocument().body();
+
+        TsonSchemaValidationException refined = assertThrows(TsonSchemaValidationException.class,
+                () -> instanceResolver.resolve(schemaMap.declarations().get("emptyByRefinement")));
+        assertTrue(refined.getMessage().contains("contradict each other"), refined.getMessage());
+        assertTrue(refined.getMessage().contains("min 10 is above max 3"), refined.getMessage());
+
+        TsonSchemaValidationException applied = assertThrows(TsonSchemaValidationException.class,
+                () -> instanceResolver.resolve(schemaMap.declarations().get("emptyByApplication")));
+        assertTrue(applied.getMessage().contains("min 10 is above max 3"), applied.getMessage());
+
+        TsonSchemaValidationException text = assertThrows(TsonSchemaValidationException.class,
+                () -> instanceResolver.resolve(schemaMap.declarations().get("emptyText")));
+        assertTrue(text.getMessage().contains("min_length 10 is above max_length 3"), text.getMessage());
+
+        // Not merely vacuous: IntegerParser divides by this facet, so leaving it unchecked turns a read
+        // of an otherwise valid document into an ArithmeticException reported as a library fault.
+        TsonSchemaValidationException step = assertThrows(TsonSchemaValidationException.class,
+                () -> instanceResolver.resolve(schemaMap.declarations().get("zeroStep")));
+        assertTrue(step.getMessage().contains("multiple_of is zero"), step.getMessage());
+
+        // Emptiness is the rule, not narrowness -- a range admitting exactly one value pins a constant.
+        assertEquals(new IntegerType(Optional.empty(), Optional.of(java.math.BigInteger.valueOf(5)), Optional.empty(),
+                Optional.of(java.math.BigInteger.valueOf(5)), Optional.empty(), Optional.empty()),
+                instanceResolver.resolve(schemaMap.declarations().get("pinnedToOneValue")).body());
+    }
+
+    /**
      * A refinement inherits a field its source holds even when that field is {@code REQUIRED} with
      * no schema default -- {@code float_type.format}, which meta.tn1 declares as a bare {@code
      * format: ieee_format}. The merge supplies it from {@code float32}'s own bound body, so the

@@ -97,4 +97,20 @@ public record FloatType(
             throw new IllegalArgumentException("max and exclusiveMax are mutually exclusive");
         }
     }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Only the bounds. The four {@code allow_*} flags are independent permissions rather than a
+     * range -- withdrawing all of them still leaves every ordinary finite value -- and {@link #format}
+     * is a selector. Bounds are compared as written, before rounding to the format's grid, which is
+     * the same basis meta.tn's own {@code @doc} states they are validated on.
+     */
+    @Override
+    public List<String> coherenceCheck() {
+        List<String> violations = new ArrayList<>();
+        AtomCoherence.checkRange(violations, AtomNarrowing.bound(min, exclusiveMin, "min", "exclusive_min"),
+                AtomNarrowing.bound(max, exclusiveMax, "max", "exclusive_max"));
+        return List.copyOf(violations);
+    }
 }

@@ -41,4 +41,23 @@ public record Cidr6Type(String spec, @Field("min_prefix") Optional<Integer> minP
         AtomNarrowing.checkSubset(violations, "within", within, other.within);
         return List.copyOf(violations);
     }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>The IPv6 twin of {@link Cidr4Type#coherenceCheck} -- same two judgements, same {@code
+     * within}/{@code excluding} gap, over the 128 bits meta.tn's own {@code @doc} names as this
+     * family's range.
+     */
+    @Override
+    public List<String> coherenceCheck() {
+        List<String> violations = new ArrayList<>();
+        AtomCoherence.checkWithin(violations, "min_prefix", minPrefix, 0, PREFIX_BITS);
+        AtomCoherence.checkWithin(violations, "max_prefix", maxPrefix, 0, PREFIX_BITS);
+        AtomCoherence.checkOrdered(violations, "min_prefix", minPrefix, "max_prefix", maxPrefix);
+        return List.copyOf(violations);
+    }
+
+    /** An IPv6 address's width, and so the inclusive ceiling on any prefix length. */
+    private static final int PREFIX_BITS = 128;
 }

@@ -72,4 +72,25 @@ public record RationalType(
         BigInteger divisor = step.denominator().multiply(of.numerator());
         return dividend.remainder(divisor).signum() == 0;
     }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Bounds compare by cross-multiplication, so an incoherent pair is caught however either end
+     * happens to be written -- {@code min: 3/4} above {@code max: 1/2} is the same contradiction as
+     * {@code min: 6/8} above {@code max: 2/4}.
+     *
+     * <p>A zero {@code multiple_of} is not the crash it is for {@link IntegerType} and {@link
+     * DecimalType} -- {@code RationalParser} guards its own divisor and degrades to rejecting every
+     * value -- but "admits nothing" is the incoherence this check exists to name, so it is reported
+     * on the same terms.
+     */
+    @Override
+    public List<String> coherenceCheck() {
+        List<String> violations = new ArrayList<>();
+        AtomCoherence.checkRange(violations, AtomNarrowing.bound(min, exclusiveMin, "min", "exclusive_min"),
+                AtomNarrowing.bound(max, exclusiveMax, "max", "exclusive_max"));
+        AtomCoherence.checkPositiveStep(violations, "multiple_of", multipleOf, r -> r.numerator().signum());
+        return List.copyOf(violations);
+    }
 }

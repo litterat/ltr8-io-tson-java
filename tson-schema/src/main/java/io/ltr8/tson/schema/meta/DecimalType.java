@@ -72,4 +72,28 @@ public record DecimalType(
         }
         return List.copyOf(violations);
     }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Bounds must leave a value between them, and the two precision facets must leave a shape
+     * describable: {@code fraction_digits} counts digits after the point out of the {@code
+     * total_digits} significant digits available, so a scale above the precision describes no number.
+     * That is SQL's own {@code DECIMAL(precision, scale)} rule, which meta.tn's {@code @doc} names
+     * this pair after.
+     *
+     * <p>{@code multiple_of: 0} is unsound rather than vacuous here, exactly as for {@link
+     * IntegerType} -- {@code DecimalParser} divides by it too.
+     */
+    @Override
+    public List<String> coherenceCheck() {
+        List<String> violations = new ArrayList<>();
+        AtomCoherence.checkRange(violations, AtomNarrowing.bound(min, exclusiveMin, "min", "exclusive_min"),
+                AtomNarrowing.bound(max, exclusiveMax, "max", "exclusive_max"));
+        AtomCoherence.checkPositiveStep(violations, "multiple_of", multipleOf, BigDecimal::signum);
+        AtomCoherence.checkNonNegative(violations, "total_digits", totalDigits);
+        AtomCoherence.checkNonNegative(violations, "fraction_digits", fractionDigits);
+        AtomCoherence.checkOrdered(violations, "fraction_digits", fractionDigits, "total_digits", totalDigits);
+        return List.copyOf(violations);
+    }
 }

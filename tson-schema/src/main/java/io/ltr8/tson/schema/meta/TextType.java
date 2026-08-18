@@ -63,6 +63,33 @@ public record TextType(
         return List.copyOf(violations);
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>The length family's whole coherence question, shared verbatim by every family that composes
+     * these facets ({@link RegexType}, {@link UriType}, {@link EmailType}, which delegate here rather
+     * than restating it): the floor may not exceed the ceiling, no count may be negative, and {@link
+     * #length} -- pinning both ends at once -- must itself fall inside whatever range the other two
+     * leave. {@code { length: 5  max_length: 3 }} is the third case and would otherwise pass, since
+     * neither stated facet contradicts the other <em>as a pair</em>.
+     *
+     * <p>{@link #pattern} is unchecked here for the same reason it is unchecked in {@link
+     * #constraintsCheck}, one question over: deciding that a pattern's language is empty, or that it
+     * admits no string of a permitted length, needs the regex engine {@code tson-schema} has no
+     * dependency on.
+     */
+    @Override
+    public List<String> coherenceCheck() {
+        List<String> violations = new ArrayList<>();
+        AtomCoherence.checkNonNegative(violations, "min_length", minLength);
+        AtomCoherence.checkNonNegative(violations, "max_length", maxLength);
+        AtomCoherence.checkNonNegative(violations, "length", length);
+        AtomCoherence.checkOrdered(violations, "min_length", minLength, "max_length", maxLength);
+        AtomCoherence.checkOrdered(violations, "min_length", minLength, "length", length);
+        AtomCoherence.checkOrdered(violations, "length", length, "max_length", maxLength);
+        return List.copyOf(violations);
+    }
+
     /** The tightest floor this type's own length facets impose -- {@link #length} pins both ends, so it counts here too. */
     private Optional<Integer> effectiveMinLength() {
         return Stream.of(minLength, length).flatMap(Optional::stream).max(Integer::compareTo);

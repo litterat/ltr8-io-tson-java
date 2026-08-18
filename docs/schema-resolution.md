@@ -89,11 +89,50 @@ namespace *before* any local declaration resolves.
   `tson-schema` has no `tson-regex` dependency), `duration_type`'s text bounds, and **selector** facets
   (`component`/`format`/`encoding`/`version`) — core.tn's own prose calls a selector swap a narrowing, so
   rejecting one would reject a documented construct (`SPEC-FEEDBACK.md` #27).
+- **An atom body must also be coherent with itself**, which is the other question about the same facets and
+  needs no source to compare against. `checkCoherent` asks `Atom.coherenceCheck()` — one rule per family over
+  the shared `AtomCoherence` mechanics, the `AtomNarrowing` twin — and throws `TsonSchemaValidationException`
+  when a body's own facets admit nothing (`{ min_length: 10 max_length: 3 }`, `{ min: 10 max: 3 }`,
+  `{ min_prefix: 40 max_prefix: 8 }`). §7.2 puts the rule and its home in one sentence — "family coherence
+  between bindings (e.g. `min ≤ max`) is a **compilation** and ingest concern (§8), **not data validation**"
+  — which is also why it cannot live in the atom parsers. Running it at *resolution* rather than compilation
+  is deliberate and strictly earlier: the bound constraint objects first exist here, and both are schema-load
+  time. meta.tn's own header `@doc` states the same obligation from the other side: bounds are field
+  groups so an inclusive/exclusive pair on one side is unrepresentable, while "value-level coherence (the
+  lower bound not exceeding the upper) remains a schema-load check". `cidr4_type`'s `@doc` adds the family
+  range — prefixes narrow "within the family range 0-32", and "bounds outside that range are invalid at the
+  schema level" — so the CIDR pair is judged against its address width as well as against itself.
+  - **Hooked in `bindAtomInstance`, not at either call site**, because that is where the `!C value` and
+    `!I ^ { ... }` paths meet — one hook covers both, and a non-`Atom` body passes through. Running it after
+    binding is what makes it generic: facets arrive converted to the host type their family compares on, with
+    the constructor's own schema-composed defaults already filled in.
+  - **Emptiness is the rule, not narrowness.** `{ min: 5 max: 5 }` pins a constant and resolves; the same
+    range with either end exclusive admits nothing and does not. Integer folds its `size`-derived range in
+    first, so it is the one family where a single stated bound can be incoherent on its own — the opposite of
+    `constraintsCheck`, which deliberately does *not* fold the refinement side (there, intersecting first
+    would make every widening compare vacuously equal).
+  - **`multiple_of: 0` is the one case that was unsound rather than merely undiagnosed.** `IntegerParser` and
+    `DecimalParser` validate with `value.remainder(m)`, which throws on a zero divisor — so before this check
+    a valid *data* document read against such a type exited 70 under the "this is a bug in tson" banner, an
+    author error reported as a library fault against the wrong document. `RationalParser` already guarded its
+    own divisor.
+  - Unchecked by design, each documented on its class and matching that family's existing narrowing gap:
+    `duration_type`'s text bounds (ordering them means parsing them — `"P1M"` vs `"P30D"` does not order
+    lexically, and judging them as strings would call a coherent body empty), `pattern` emptiness, selector
+    facets, and CIDR `within`/`excluding` overlap (containment arithmetic this family has no parser for).
+  - **The three temporal families' rules are correct but not yet reachable from schema text**, for a reason
+    that predates them and is nothing to do with coherence: `date_type.min`/`max` are declared `value?` in
+    meta.tn (the untyped escape hatch), so a bound arrives as a `String` and the bind into `DateType`'s
+    `Optional<LocalDate>` throws `ClassCastException` — surfaced as an `UnsupportedOperationException`, exit
+    70, "this is a bug in tson". `!date ^ { min: 2020-01-01 }` and the `!date`-tagged spelling fail
+    identically, so **no temporal bound can be written at all today**. `AtomCoherenceTest` reaches these
+    families by direct construction; they go live at the resolver the moment the binding is fixed.
 - **Two exception types, and which one is deliberate.** `UnsupportedOperationException` means *this library
   hasn't implemented that yet* — the identity-diagonal FIXED-value invariant, a generic type-ref with a
   nested or value (non-simple) argument, a parameterized supertype.
   `TsonSchemaValidationException` means *the schema is wrong*, and the spec says so: a tightening outside
-  §5.7's transition table, a refinement body field (or group) that adds rather than tightens, a
+  §5.7's transition table, a refinement body field (or group) that adds rather than tightens, an atom body
+  whose own facets admit nothing, a
   modifier-only entry with nothing to elide toward (§5.7), a field name two supertypes both contribute or a
   body/group declares twice (§5.8/§5.11), a group restatement that reorders, retypes, changes membership or
   loosens REQUIRED→OPTIONAL (§5.11), a source or supertype whose body is a binding record and so has no

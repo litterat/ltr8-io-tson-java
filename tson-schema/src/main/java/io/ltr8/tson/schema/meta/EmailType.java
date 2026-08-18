@@ -43,4 +43,10 @@ public record EmailType(String spec, @Field("min_length") Optional<Integer> minL
         return new TextType(minLength, maxLength, length, pattern)
                 .constraintsCheck(new TextType(other.minLength, other.maxLength, other.length, other.pattern));
     }
+
+    /** {@inheritDoc} <p>The length facets this composes, judged by {@link TextType#coherenceCheck} that owns them. */
+    @Override
+    public List<String> coherenceCheck() {
+        return new TextType(minLength, maxLength, length, pattern).coherenceCheck();
+    }
 }

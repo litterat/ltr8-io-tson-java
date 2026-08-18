@@ -240,8 +240,12 @@ namespace first. Namespace dependencies are constructor-fixed functional interfa
 resolves — composition, refinement (`^`), constructor application (bound generically via the compiled meta
 reader, no name→class table), atom refinement (which **merges with its source** via a `TsonObjectWriter`
 round-trip and is checked to genuinely narrow), subtraction (which empties `type_definition.supertypes` on
-purpose), group restatement, all six field-state spellings. The exception-classification policy under
-Conventions governs every rejection here; `DefinitionResolver`'s Javadoc lists the exact boundary.
+purpose), group restatement, all six field-state spellings. Every atom body is checked twice over, by two
+per-family rules asking different questions: `Atom.constraintsCheck` (over `AtomNarrowing`) that a refinement
+tightens its source, and `Atom.coherenceCheck` (over `AtomCoherence`) that a single body's own facets admit
+anything at all — `{ min: 10 max: 3 }` is the second one's, and meta.tn's own `@doc` calls it "a schema-load
+check". The exception-classification policy under Conventions governs every rejection here;
+`DefinitionResolver`'s Javadoc lists the exact boundary.
 
 ### Meta-kernel bootstrap (`MetaKernelBootstrapResolver`) — `docs/schema-resolution.md`
 
