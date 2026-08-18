@@ -63,19 +63,13 @@ own prose (which had gone stale on at least one of them):
   becomes §8.2's **only** materialising form; a constructor's parameters are labelled-only (#44); and
   deriving from a constructor requires a `~` result (#46). Split by what gates on a spec revision:
   - **This cycle** (each corrects or converges on agreed-wrong spec letter; no revision needed first):
-    - [x] **Desugar the sized forms straight to the `!array` construction the routing already produces** —
-      done (#54). `SchemaDesugarer.instanceFor` emits the plain construction for a partial application as
-      well as a constructor one; `TemplateInstance` and `DefinitionResolver`'s instantiation completion are
-      deleted. A sized array's `source` is now plain `array`, converging with `[T]` and `vector<T, N>`.
-      `checkBounds` and the vacuous-`[T; 0..]` rejection stayed at the sugar site, where the bindings become
-      concrete. The kernel's three template *declarations* still resolve as entries; the sugar just stopped
-      routing through them.
     - [ ] **#44's declaration-time check**: a `~` declaration with a parameter occurrence outside a
       labelled value channel is a `TsonSchemaValidationException` at the declaration. No valid schema is
       affected (the kernel audit in #46 found zero violations among constructors); today the incoherence
       surfaces as downstream wrong-layer failures.
 - [ ] **§5.10 substitution into a template *body* — now the sole materialising form.** What remains of
-  template application after the item above: a template whose parameter appears as a **field type**
+  template application now that a partial application closes by routing: a template whose parameter appears
+  as a **field type**
   (`box => <T> { v: T }`), where instantiating means rewriting the body with `T` replaced — substitution
   proper. Rejected at the application site today (`SchemaDesugarer.rejectIfTemplateApplication`), so it
   fails where it is written rather than at a read that may never happen. Unaffected by the #45 staging:
