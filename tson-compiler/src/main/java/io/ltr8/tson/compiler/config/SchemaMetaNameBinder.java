@@ -11,7 +11,7 @@ import java.util.Set;
  * The {@link DataNameBinder} object-binding mode builds its default {@code DataBindContext}
  * against (see {@link #defaultContext}) -- a fixed namespace plus a snake_case-to-PascalCase
  * mangling of the schema type name (e.g. {@code "integer_size"} -> {@code IntegerSize}, {@code
- * "atom_specification"} -> {@code AtomSpecification}), which holds directly for every genuine
+ * "record_field"} -> {@code RecordField}), which holds directly for every genuine
  * constraint-vocabulary/helper record in that package, with one confirmed exception (found by
  * actually running this against the real, registered meta-kernel.tn1 fixture, not guessed in
  * advance): {@link #ALIASES}.

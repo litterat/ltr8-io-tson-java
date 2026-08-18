@@ -6,10 +6,9 @@ import io.ltr8.annotation.Typename;
  * meta.tn1's {@code complex_type} constructor ({@code complex_type => ~atom & { component:
  * complex_component ~ NUMBER } }): {@code component} narrows the numeric family used for the
  * real/imaginary parts, defaulting to {@code NUMBER} (the exact-decimal tier). Pure constraint
- * value, no parsing/validation behavior -- deliberately no {@code tson-compiler} compiler exists for
- * this atom yet (added as a {@code schema.meta}/{@link Atom} variant only, per explicit user
- * direction, so {@code !complex_type {}}/{@code complex}'s own resolution succeeds -- not to add
- * real complex-number validation).
+ * value, no parsing/validation behavior -- {@code tson-compiler}'s {@code ComplexParser} does the
+ * actual reading/writing (it takes no configuration from here: {@code component} is fixed, not
+ * modeled -- see that class's own Javadoc).
  *
  * <p>{@code component}'s own schema-level default ({@code ~ NUMBER}) is filled in by {@code
  * tson-compiler}'s compiled {@code Record*Reader} from the schema itself before binding, the same

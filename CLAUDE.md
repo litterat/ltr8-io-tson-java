@@ -408,6 +408,15 @@ the class and (where noted) pinned by a test; the `docs/` notes carry the full w
   `precomputedValue` in place, and comparing across that narrowing flags every conforming document.
 - **A `schema.meta` bind target with more than one public constructor needs `@Record` on the canonical
   one**, or `DefaultRecordBinder` throws (`IntegerType`/`IntegerSize` hit this).
+- **An atom body's components must mirror its constructor's *resolved* shape, not the composition that
+  produced it** — every field flat, one component per schema field name. Composition flattens (§5.8) and a
+  compiled `Record*Reader` fills a field, including a `REQUIRED_FIXED` field's schema-composed default,
+  under its own schema field name, so a component nesting one (`specification: AtomSpecification` for
+  `spec`) or omitting one silently binds `null` rather than failing. `UriType`/`RegexType` did both for a
+  long time, invisibly, because their tests asserted against hand-written `UNCONSTRAINED` constants and
+  `MetaKernelBootstrapResolver` hands those same constants back — only a schema resolved through the
+  compiled meta reader shows it. `DefinitionResolverTest.resolvesRegexAndUriInstancesWithEveryComposedFieldBound`
+  is the guard.
 - **A desugar-reported declaration is replaced with `ABSORBED`, never passed through** — passing it through
   hands `DefinitionResolver` the very node the phase removes and turns a reported author error into an
   unreported abort. Injected declarations are never rolled back (later declarations may already reference
@@ -480,10 +489,6 @@ compatibility).
   integer ladder, because core.tn groups it with its siblings identically and withholding it would only make
   the two read paths disagree (`SPEC-FEEDBACK.md` #5). Its format check is a documented subset of RFC 5322 —
   the `dot-atom` core, without quoted local parts, domain literals or comments.
-- **`uri_type`/`regex_type` object-binding** — their RFC-citation field is nested inside `specification:
-  AtomSpecification` rather than flat, so it never receives a schema-composed default the way
-  `email_type`'s flat `spec` field does. Subtype *dispatch* to them works; this is a narrower field-binding
-  gap.
 - **Schema-side diagnostics, the remainder** — parsing, desugaring, resolution and linking all report
   through a `TsonDiagnosticsReceiver` now (see `docs/readers-and-diagnostics.md`); one thing is left.
   **A read-path diagnostic carries `schemaPosition` but no `schemaId`/`schemaPointer`**, which is blocked

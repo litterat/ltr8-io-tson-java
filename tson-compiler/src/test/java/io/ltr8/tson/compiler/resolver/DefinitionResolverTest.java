@@ -21,6 +21,8 @@ import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RegexType;
+import io.ltr8.tson.schema.meta.UriType;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.schema.meta.BinaryType;
@@ -1141,6 +1143,39 @@ class DefinitionResolverTest {
         assertEquals(Cidr6Type.UNCONSTRAINED, cidr6.body());
         assertEquals(EmailType.UNCONSTRAINED, email.body());
         assertEquals(MacType.UNCONSTRAINED, mac.body());
+    }
+
+    /**
+     * The regression the nested shape hid, for the two constructors that had it. Both are declared
+     * {@code ~text_type & atom_specification & { spec: = ... }}, and composition flattens (§5.8), so the
+     * compiled {@code RecordBindReader} fills {@code min_length}/{@code max_length}/{@code length}/{@code
+     * pattern} and the {@code REQUIRED_FIXED} {@code spec} side by side, under those names. A body
+     * component nesting any of them under a name the wire doesn't carry receives nothing at all: {@code
+     * RegexType} came back with every component {@code null}, {@code UriType} with a null citation.
+     * Asserting against a hand-written constant cannot catch that; this resolves real declarations.
+     */
+    @Test
+    void resolvesRegexAndUriInstancesWithEveryComposedFieldBound() {
+        SchemaMap schemaMap = new TsonSchemaParser("""
+                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
+                { plain_regex   => !regex_type {}
+                  bounded_regex => !regex_type { max_length: 40 }
+                  plain_uri     => !uri_type {}
+                  https_uri     => !uri_type { scheme: "https" length: 19 } }""").parseSchemaDocument().body();
+        DefinitionResolver resolver = definitionResolverFor(metaKernelCompiled(), EMPTY_NAMESPACE);
+
+        assertEquals(RegexType.UNCONSTRAINED, resolver.resolve(schemaMap.declarations().get("plain_regex")).body());
+        assertEquals(UriType.UNCONSTRAINED, resolver.resolve(schemaMap.declarations().get("plain_uri")).body());
+
+        RegexType bounded = (RegexType) resolver.resolve(schemaMap.declarations().get("bounded_regex")).body();
+        assertEquals("https://www.rfc-editor.org/rfc/rfc9485", bounded.spec());
+        assertEquals(Optional.of(40), bounded.maxLength());
+
+        // length is the facet UriType declared no component for at all, so it had nowhere to bind.
+        UriType https = (UriType) resolver.resolve(schemaMap.declarations().get("https_uri")).body();
+        assertEquals("https://www.rfc-editor.org/rfc/rfc3986", https.spec());
+        assertEquals(Optional.of("https"), https.scheme());
+        assertEquals(Optional.of(19), https.length());
     }
 
     @Test

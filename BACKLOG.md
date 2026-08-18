@@ -132,11 +132,8 @@ own prose (which had gone stale on at least one of them):
   grammar: `unknown` accepts any well-formed value of any type, so what it needs is a reader deferring to
   the document's own type-ref (or to schemaless base-type resolution when there is none) — a design
   question about where that dispatch lives.
-- [ ] `uri_type`/`regex_type` — don't bind correctly in object-binding mode. Their RFC-citation
-  field is nested inside `specification: AtomSpecification` rather than flat, so it never receives
-  a schema-composed default the way `email_type`'s own flat `spec` field does.
-- [ ] `extern` ([TSON-SCHEMA] §7.8) — materially bigger than the two items above, which just need
-  an ordinary atom parser or a binding fix. `Extern` (`schema.meta`) is a record-only placeholder with no
+- [ ] `extern` ([TSON-SCHEMA] §7.8) — materially bigger than the item above, and a different kind of gap
+  again. `Extern` (`schema.meta`) is a record-only placeholder with no
   parsing/validation behavior at all (its own Javadoc says so explicitly: "not to add real
   cross-schema reference resolution"); the real mechanism — a value at an extern-matched position
   carrying its own scoped `!!schema` plus a mandatory `!type` tag, switching schema scope

@@ -10,26 +10,21 @@ import java.util.Optional;
 /**
  * meta.tn1's {@code cidr4_type} constructor (IPv4-network constraint vocabulary, RFC 4632):
  * prefix-length bounds plus CIDR-text network lists. Pure constraint values, no parsing/validation
- * behavior -- deliberately no {@code tson-compiler} compiler exists for this atom yet (added as a
- * {@code schema.meta}/{@link Atom} variant only, per explicit user direction, so {@code
- * !cidr4_type {}}/{@code cidr4}'s own resolution succeeds -- not to add real CIDR validation).
+ * behavior -- {@code tson-compiler}'s {@code Cidr4Parser} holds one of these and does the actual
+ * reading/writing, applying {@code min_prefix}/{@code max_prefix} but not {@code within}/{@code
+ * excluding} (see its own Javadoc).
  *
- * <p>{@code spec} is a bare {@link String}, not nested inside {@link AtomSpecification} the way
- * {@link UriType}/{@link RegexType} keep it, and not a {@link java.net.URI} either -- two separate
- * corrections from an initial attempt, both confirmed empirically, not assumed: (1) {@code
- * tson-compiler}'s compiled {@code Record*Reader} injects a REQUIRED_FIXED field's schema-composed
- * default value flat, under its own schema field name, and {@code
- * atom_specification}'s own {@code spec} field composes into {@code cidr4_type} flat too
- * (composition always flattens, §5.8) -- {@code UriType}/{@code RegexType}'s own nested {@code
- * specification: AtomSpecification} field predates this mechanism and still doesn't bind correctly
- * for exactly this reason (see {@code MetaKernelBootstrapResolver}'s own Javadoc), not retrofitted here to
- * avoid a breaking change to those two already-tested classes; (2) a bare, untyped string value
- * (no {@code !uri} type-ref -- the schema modifier is just {@code spec: = "https://..."}, no
- * annotation) can't bind directly into a {@code java.net.URI}-typed field at all -- {@code
- * AtomBinder} only converts a recognized string into {@code URI} via the built-in-vocabulary
- * type-ref path ({@code !uri "..."}), not the untyped path this field actually goes through. This
- * is the exact same reason {@code TextType}/{@code UriType.pattern} are {@code Optional<String>},
- * not a compiled {@code Pattern} -- same class of gap, same fix.
+ * <p><b>{@code spec} is flat, and a bare {@link String}</b> -- two separate requirements, both confirmed
+ * empirically, not assumed. <b>Flat</b>, because {@code atom_specification}'s own {@code spec} field
+ * composes into {@code cidr4_type} flat (composition always flattens, §5.8) and {@code tson-compiler}'s
+ * compiled {@code Record*Reader} fills a field, including a REQUIRED_FIXED field's schema-composed
+ * default, under its own schema field name -- a component nesting it under a name the wire doesn't carry
+ * receives nothing at all. <b>A {@link String}</b>, because the value arrives untyped: the schema
+ * modifier is just {@code spec: = "https://..."}, with no {@code !uri} type-ref, and {@code AtomBinder}
+ * converts a string into {@code java.net.URI} only via the built-in-vocabulary type-ref path ({@code !uri
+ * "..."}), never the untyped path this field goes through. That second point is the same reason {@code
+ * TextType.pattern} is an {@code Optional<String>} rather than a compiled {@code Pattern}. Every atom
+ * body in this package citing an external document follows both rules.
  *
  * <p>{@code within}/{@code excluding} are the schema's own {@code [value]?} (an optional array of
  * the kernel's untyped {@code value}) -- modeled as a bare, always-present {@code List<String>}
