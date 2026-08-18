@@ -73,4 +73,31 @@ public record Cidr4Type(String spec, @Field("min_prefix") Optional<Integer> minP
         AtomNarrowing.checkSubset(violations, "within", within, other.within);
         return List.copyOf(violations);
     }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>The sharpest case in the package, because the schema names the rule outright rather than
+     * leaving it to be inferred: meta.tn's own {@code @doc} for this constructor says the prefix
+     * bounds narrow "within the family range 0-32" and that "bounds outside that range are invalid at
+     * the schema level". So both facets are judged twice -- against each other, and against the 32
+     * bits an IPv4 address has.
+     *
+     * <p>{@link #within}/{@link #excluding} are left out, as they are in {@link #constraintsCheck}
+     * and for the same reason: deciding that a {@code within} list and an {@code excluding} list
+     * between them admit no network is CIDR containment arithmetic, which this family has no parser
+     * for. A malformed entry in either list is separately not this check's business -- it is data the
+     * constructor's own vocabulary already validated.
+     */
+    @Override
+    public List<String> coherenceCheck() {
+        List<String> violations = new ArrayList<>();
+        AtomCoherence.checkWithin(violations, "min_prefix", minPrefix, 0, PREFIX_BITS);
+        AtomCoherence.checkWithin(violations, "max_prefix", maxPrefix, 0, PREFIX_BITS);
+        AtomCoherence.checkOrdered(violations, "min_prefix", minPrefix, "max_prefix", maxPrefix);
+        return List.copyOf(violations);
+    }
+
+    /** An IPv4 address's width, and so the inclusive ceiling on any prefix length. */
+    private static final int PREFIX_BITS = 32;
 }

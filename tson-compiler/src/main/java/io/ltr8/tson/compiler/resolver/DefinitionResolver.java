@@ -634,14 +634,48 @@ final class DefinitionResolver {
         String constructorName = value.typeRef().orElseThrow(() -> new IllegalStateException(
                 "'" + name + "': normalized value has no type-ref naming its own constructor -- "
                         + "DefinitionResolver should never produce this"));
+        Top body;
         try {
-            return definitionMetaReader.read(constructorName, value);
+            body = definitionMetaReader.read(constructorName, value);
         } catch (TsonReadException e) {
             throw bodyIsNotValidData(name, constructorName, e);
         } catch (RuntimeException e) {
             throw new UnsupportedOperationException(
                     "'" + name + "': failed to bind '" + constructorName + "' via the compiled meta-schema reader: "
                             + e.getMessage(), e);
+        }
+        checkCoherent(name, constructorName, body);
+        return body;
+    }
+
+    /**
+     * Every atom body this resolver produces is checked for self-coherence, here rather than at
+     * either call site, because this is the one place both of them meet: {@link #resolveInstance}'s
+     * {@code !C value} and {@link #resolveAtomRefinement}'s {@code !I ^ { ... }} bind through this
+     * method and nothing else does.
+     *
+     * <p>Only an {@link Atom} body has constraint facets to contradict each other, so every other
+     * {@link Top} the constructor vocabulary can produce ({@link RecordBody}, a container, a sum)
+     * passes straight through. The check is the family's own -- see {@link Atom#coherenceCheck} --
+     * since only it knows which of its fields form a range.
+     *
+     * <p>A violation is the <b>author's</b> error and stays a {@link TsonSchemaValidationException}:
+     * the verdict on {@code { min_length: 10  max_length: 3 }} does not change when this library
+     * improves. It is deliberately not left to the atom parsers, which would surface it as an {@code
+     * ErrorReader} -- the library-gap marker -- and so would give exactly the wrong classification.
+     *
+     * <p>Running it after binding rather than on the wire record is what makes it work generically:
+     * a facet arrives here already converted to the host type its family compares on, and a facet the
+     * body never mentioned is already filled in from the constructor's own schema-composed default.
+     */
+    private static void checkCoherent(String name, String constructorName, Top body) {
+        if (!(body instanceof Atom atom)) {
+            return;
+        }
+        List<String> violations = atom.coherenceCheck();
+        if (!violations.isEmpty()) {
+            throw new TsonSchemaValidationException("'" + name + "': the body's own '" + constructorName
+                    + "' constraints contradict each other: " + String.join("; ", violations));
         }
     }
 

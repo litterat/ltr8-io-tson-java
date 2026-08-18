@@ -21,12 +21,14 @@ import java.util.Optional;
  * <p>Also an {@link Atom} variant: {@code duration => !duration_type {}} is a
  * constructor-application instance (§5.5) whose resolved body is exactly {@link #UNCONSTRAINED}.
  *
- * <p><b>No narrowing check.</b> {@link Atom#constraintsCheck} is left at its permissive default
- * here, because this family's bounds are unparsed ISO 8601 text and ordering them means parsing
- * them: {@code "P1M"} and {@code "P30D"} are not lexically ordered, and comparing the raw strings
- * would reject valid refinements and admit invalid ones with equal confidence. Parsing belongs to
- * {@code DurationParser} in {@code tson-compiler}, which this module cannot reach -- the same
- * boundary {@link TextType#pattern} sits behind.
+ * <p><b>No narrowing check, and no coherence check.</b> Both {@link Atom#constraintsCheck} and
+ * {@link Atom#coherenceCheck} are left at their permissive defaults here, for one reason: this
+ * family's bounds are unparsed ISO 8601 text and ordering them means parsing them. {@code "P1M"} and
+ * {@code "P30D"} are not lexically ordered, so comparing the raw strings would reject valid
+ * refinements and admit invalid ones with equal confidence -- and would call a perfectly coherent
+ * {@code { min: "P1M"  max: "P30D" }} empty. Parsing belongs to {@code DurationParser} in {@code
+ * tson-compiler}, which this module cannot reach -- the same boundary {@link TextType#pattern} sits
+ * behind. This is the one ordered family whose bounds neither check judges.
  */
 @Typename(name = "duration_type")
 public record DurationType(Optional<String> min, Optional<String> max) implements Atom {

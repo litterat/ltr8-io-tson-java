@@ -61,4 +61,10 @@ public record UriType(String spec, @Field("min_length") Optional<Integer> minLen
         }
         return textConstraints().constraintsCheck(other.textConstraints());
     }
+
+    /** {@inheritDoc} <p>The length facets this composes, judged by {@link TextType#coherenceCheck} that owns them. */
+    @Override
+    public List<String> coherenceCheck() {
+        return textConstraints().coherenceCheck();
+    }
 }

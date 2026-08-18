@@ -77,4 +77,21 @@ public record BinaryType(Encoding encoding, @Field("min_length") Optional<Intege
         AtomNarrowing.checkAtMost(violations, "max_length", maxLength, other.maxLength);
         return List.copyOf(violations);
     }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>The same two length facets, on the same terms as {@link TextType#coherenceCheck} -- minus
+     * its {@code length}, which this family does not carry. Lengths count decoded bytes rather than
+     * code points, which changes what the numbers mean but not whether a floor above a ceiling admits
+     * anything.
+     */
+    @Override
+    public List<String> coherenceCheck() {
+        List<String> violations = new ArrayList<>();
+        AtomCoherence.checkNonNegative(violations, "min_length", minLength);
+        AtomCoherence.checkNonNegative(violations, "max_length", maxLength);
+        AtomCoherence.checkOrdered(violations, "min_length", minLength, "max_length", maxLength);
+        return List.copyOf(violations);
+    }
 }

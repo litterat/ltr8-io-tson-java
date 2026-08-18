@@ -124,21 +124,6 @@ own prose (which had gone stale on at least one of them):
   entry). Lower priority than the rest of this section: the spec marks this path explicitly **optional**
   ("MAY implement ingest"), not a MUST.
 
-## Remaining built-in types
-
-- [ ] `unknown` — no compiled-parser factory (`ValueReaderFactoryRegistry` registers it, and `extern`, to
-  `ErrorReader`), pinned down exactly by
-  `CoreSchemaImportTest.exactlyTheUnknownAtomConstructorCompilesToAnErrorReader`. Not an unwritten atom
-  grammar: `unknown` accepts any well-formed value of any type, so what it needs is a reader deferring to
-  the document's own type-ref (or to schemaless base-type resolution when there is none) — a design
-  question about where that dispatch lives.
-- [ ] `extern` ([TSON-SCHEMA] §7.8) — materially bigger than the item above, and a different kind of gap
-  again. `Extern` (`schema.meta`) is a record-only placeholder with no
-  parsing/validation behavior at all (its own Javadoc says so explicitly: "not to add real
-  cross-schema reference resolution"); the real mechanism — a value at an extern-matched position
-  carrying its own scoped `!!schema` plus a mandatory `!type` tag, switching schema scope
-  mid-document — doesn't exist anywhere in the reader stack.
-
 ## Remaining Part 2 resolution gaps
 
 - [ ] Generic type-refs whose arguments are not simple names. A non-simple argument (`weird<[T]>`) is
@@ -176,22 +161,19 @@ throw sites by that test is done across the whole schema pipeline (issue #26); i
 again, take it fresh rather than trusting a recorded one, since the last recorded numbers had gone stale
 by a factor of six.
 
-- [ ] **An atom body is never checked for self-coherence.** Every family's `constraintsCheck` compares a
-  *refinement against its source* (`AtomNarrowing`, §5.7's tighten-never-loosen rule); nothing asks whether
-  a single declared body is internally consistent, so a facet pair that admits nothing resolves, links and
-  compiles clean. Confirmed by compiling all three of these together — `tson compile` says `OK`:
-  `!text ^ { min_length: 10 max_length: 3 }`, `!integer ^ { min: 10 max: 3 }`, and
-  `!cidr4 ^ { min_prefix: 40 max_prefix: 8 }`. The cidr case is the sharpest, because the spec names the
-  rule outright: meta.tn's own `@doc` says prefix bounds narrow "within the family range 0-32" and that
-  "bounds outside that range are invalid at the schema level", and `40` is both outside 0-32 and above its
-  own `max_prefix`.
-  - The check belongs next to `AtomNarrowing`, as a per-family sibling of `constraintsCheck` run at
-    resolution, raising `TsonSchemaValidationException` — *not* in the parsers. A parser rejecting a
-    declaration would surface an author error as an `ErrorReader`, which is the library-gap marker, and the
-    verdict would then wrongly change if the library improved.
-  - Nothing is unsound today — a vacuous range simply admits nothing, and the cidr family range is enforced
-    on every value regardless of what the schema declared — so this is a missing diagnosis. The payoff is
-    catching the mistake where the author wrote it rather than at a read that may never happen.
+- [ ] **Atom-body coherence, the parts that need a parser this module doesn't have.** `Atom.coherenceCheck`
+  (issue #50) now rejects an atom body whose own facets admit nothing, but three gaps are left, each
+  matching that family's existing *narrowing* gap and each blocked on the same thing — `tson-schema` has no
+  dependency on a parser for the values involved:
+  - `duration_type`'s bounds are unparsed ISO 8601 text. `"P1M"` vs `"P30D"` does not order lexically, so
+    judging them as strings would call a coherent body empty. Needs `DurationParser`/`IsoDuration`, which
+    live in `tson-compiler`.
+  - `pattern` emptiness — a regex matching no string at all, or none of a permitted length. Needs
+    `tson-regex`, the same boundary the narrowing check's containment gap sits behind.
+  - CIDR `within`/`excluding` admitting no network between them. Needs real containment arithmetic; the
+    family has no CIDR parser.
+  - The natural fix for all three is the same one the narrowing check would want: an injected oracle, rather
+    than moving the value model's dependencies.
 
 ## Schema-side diagnostics
 
@@ -229,6 +211,36 @@ model at all. `STRUCTURED-OUTPUT.md` holds that question.
   one of its fields. A *syntax* error is the one exception: it has the failing token's own position, since
   the parser reports it where it stands rather than looking it up per declaration afterwards. Its
   `schemaPointer` is still only `/my_type`.
+
+## Miscellaneous
+
+- [ ] General resolver-layer structural rules as reusable primitives, rather than binding-time-only
+  behavior — empty-brace resolution, the absent-vs-missing distinction.
+- [ ] **Annotations are still discarded at a dispatched position.** A dispatcher (`VariantBindReader` for a
+  union, `VariantSchemaReader` under bind mode) must consume the leading annotations to reach the
+  `!typeName` it dispatches on -- they precede it in `data-value = *annotation [type-ref] core-value` -- so
+  the reader that ends up building the value never sees them. Tree mode solved this by re-attaching to the
+  finished node (`TsonValue.withAnnotations`); bind mode would do the same through `DataClassAnnotated`'s
+  `constructor` handle, wrapping what came back.
+    - Not reachable today: a union member is not a boxed position, so its carrier is always empty rather than
+      wrong. Worth closing when a boxed variant becomes expressible, not before.
+
+## Remaining built-in types
+
+- [ ] `unknown` — no compiled-parser factory (`ValueReaderFactoryRegistry` registers it, and `extern`, to
+  `ErrorReader`), pinned down exactly by
+  `CoreSchemaImportTest.exactlyTheUnknownAtomConstructorCompilesToAnErrorReader`. Not an unwritten atom
+  grammar: `unknown` accepts any well-formed value of any type, so what it needs is a reader deferring to
+  the document's own type-ref (or to schemaless base-type resolution when there is none) — a design
+  question about where that dispatch lives.
+- [ ] `extern` ([TSON-SCHEMA] §7.8) — materially bigger than the item above, and a different kind of gap
+  again. `Extern` (`schema.meta`) is a record-only placeholder with no
+  parsing/validation behavior at all (its own Javadoc says so explicitly: "not to add real
+  cross-schema reference resolution"); the real mechanism — a value at an extern-matched position
+  carrying its own scoped `!!schema` plus a mandatory `!type` tag, switching schema scope
+  mid-document — doesn't exist anywhere in the reader stack.
+
+# Lower Priority
 
 ## Write side
 
@@ -342,22 +354,6 @@ missing most of the mirror.
   collector, a metrics sink), and only the two built-ins are shown anywhere today. The README covers the
   collector; a worked custom receiver is the obvious missing example, and it is what
   `STRUCTURED-OUTPUT.md`'s Tier 1.5 streaming consumer will be built on.
-
-## Miscellaneous
-
-- [ ] General resolver-layer structural rules as reusable primitives, rather than binding-time-only
-  behavior — empty-brace resolution, the absent-vs-missing distinction.
-- [ ] **Annotations are still discarded at a dispatched position.** A dispatcher (`VariantBindReader` for a
-  union, `VariantSchemaReader` under bind mode) must consume the leading annotations to reach the
-  `!typeName` it dispatches on -- they precede it in `data-value = *annotation [type-ref] core-value` -- so
-  the reader that ends up building the value never sees them. Tree mode solved this by re-attaching to the
-  finished node (`TsonValue.withAnnotations`); bind mode would do the same through `DataClassAnnotated`'s
-  `constructor` handle, wrapping what came back.
-  - Not reachable today: a union member is not a boxed position, so its carrier is always empty rather than
-    wrong. Worth closing when a boxed variant becomes expressible, not before.
-
-
-# Lower Priority
 
 ## Front door / ergonomics
 

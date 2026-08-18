@@ -42,4 +42,36 @@ public sealed interface Atom extends Top permits Unit, EnumBody, IntegerType, Te
     default List<String> constraintsCheck(Atom refined) {
         return List.of();
     }
+
+    /**
+     * Reports how this atom's own constraint fields contradict <em>each other</em> -- an empty list
+     * means the body is internally coherent. The {@link #constraintsCheck} twin, asking the other
+     * question: that one compares a refinement against its source (§5.7's tightening rule, a relation
+     * between two bodies), this one judges a single body on its own, with nothing to compare it
+     * against but itself.
+     *
+     * <p>Nothing else asks it. A facet pair admitting no value at all -- {@code min_length: 10
+     * max_length: 3}, {@code min: 10 max: 3}, {@code min_prefix: 40 max_prefix: 8} -- otherwise
+     * resolves, links and compiles clean, and the mistake surfaces (if ever) at a read that rejects
+     * every value for reasons the author never sees stated. Part 2 §7.2 puts both the rule and its
+     * home in one sentence: "family coherence between bindings (e.g. {@code min <= max}) is a
+     * compilation and ingest concern (§8), not data validation" -- which is why this is a resolver
+     * question and not something an atom parser may decide. {@code meta.tn}'s own header {@code @doc}
+     * states the same obligation from the other side: bounds are field groups so that an
+     * inclusive/exclusive pair on one side is unrepresentable, while "value-level coherence (the
+     * lower bound not exceeding the upper) remains a schema-load check".
+     *
+     * <p>A family also reports a facet outside the range the family itself fixes, where it has one:
+     * {@code cidr4_type}'s {@code @doc} says prefix bounds narrow "within the family range 0-32" and
+     * that "bounds outside that range are invalid at the schema level".
+     *
+     * <p>The same fragment convention as {@link #constraintsCheck} -- each element names one problem,
+     * so a body with several reports them all in one pass -- and the same "only where it is decidable
+     * by ordinary value comparison" limit. A family carrying no orderable facet at all ({@link Unit},
+     * and every selector-only family) keeps the default; a family whose bounds are unparsed text
+     * ({@link DurationType}) records why it does the same.
+     */
+    default List<String> coherenceCheck() {
+        return List.of();
+    }
 }

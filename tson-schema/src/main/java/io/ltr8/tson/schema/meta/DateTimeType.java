@@ -37,4 +37,19 @@ public record DateTimeType(Optional<OffsetDateTime> min, Optional<OffsetDateTime
         AtomNarrowing.checkAtMost(violations, "max", max, other.max);
         return List.copyOf(violations);
     }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Both bounds are inclusive -- this family has no exclusive spelling -- so the only empty
+     * range is a ceiling below its own floor. Compared on {@link java.time.OffsetDateTime}'s own
+     * ordering, which compares the instant first, so a pair written in two different offsets is
+     * still judged rather than waved through as incomparable.
+     */
+    @Override
+    public List<String> coherenceCheck() {
+        List<String> violations = new ArrayList<>();
+        AtomCoherence.checkOrdered(violations, "min", min, "max", max);
+        return List.copyOf(violations);
+    }
 }
