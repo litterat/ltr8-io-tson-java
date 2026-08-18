@@ -46,6 +46,13 @@ is small and parsed once.)
   `REQUIRED_FIXED`, fine at `OPTIONAL_FIXED`; a `= _` field (`OPTIONAL_FIXED` with no value) admits only
   omission or `_`. There is no pre-seeding pass any more: every field the document didn't state goes through
   one `valueForAbsentField` switch over all five states.
+- **An array element's own state is the two-member `ElementState`, and an absent element occupies its slot.**
+  Under `[T?]` (`state: OPTIONAL`) an element may be the absent sentinel `_`; under the default `REQUIRED` one
+  is `FIELD_REQUIRED`. Either way `ArrayAbstractReader` consumes the `AbsentEvent` and advances the index, so
+  `[a _ c]` has three elements and satisfies a `[T?; 3]` size constraint — §5.3's own stated equivalence,
+  which falls out of counting rather than being checked for. Elements have no default/fixed concept at all
+  (`ElementState` has two members where a record field's `FieldState` has five), so none of the
+  `valueForAbsentField` machinery above has an array counterpart.
 - **Continuation policy: always keep reading in collecting mode.** A failed field/element is recorded and
   a placeholder kept in place (so later indices stay accurate) — Java `null` in bind mode, `TsonAbsent` in
   tree mode, where the diagnostic, not the node, carries what went wrong; a shape mismatch reports

@@ -226,8 +226,12 @@ one; anywhere else it becomes an injected declaration plus a bare reference (**a
 divergence** from §8.2's carried-structurally rule; `BACKLOG.md` has the account). So `DefinitionResolver`
 only ever sees a bare reference or `!C value`. Routing is vocabulary-derived off the governing meta (which
 is why the phase runs with the meta in hand), with a hand-written table for meta-kernel's own bootstrap;
-`choice`/`tuple` take a variadic second path; a template application over a constructor is instantiated
-into a `TemplateInstance` (record templates are rejected — real §5.10 substitution is unimplemented).
+`choice`/`tuple` take a variadic second path; a *partial* application — §5.3's size templates, whose
+parameters occupy labelled value channels only — closes by routing into a construction of its constructor
+rather than materialising an entry (`SPEC-FEEDBACK.md` #45; record templates are rejected — real §5.10
+substitution is unimplemented). §5.3's element/position `?` binds `state` *directly* — it has no parameter to
+route through, which is why §5.3 gives those forms no template route — so `[T?; 3]` puts a state and both
+bounds on one binding record. §5.3's declaration-level container syntax is complete.
 Bottom-up, so nesting needs no special case; injected names are `head_args_hash`, so structurally identical
 applications collapse. Invalid sugar forms report per declaration via `DesugarFailureReporter` rather than
 throwing.
@@ -466,11 +470,6 @@ compatibility).
 
 ## Not yet implemented
 
-- **An array's element `?`** (`[T?]` — §5.3's `state: OPTIONAL` on the resolved array, absent elements
-  occupying positional slots) — `SchemaDesugarer` builds no array position carrying one, so the declaration
-  reaches `DefinitionResolver` as a `ContainerTypeDef` and throws, and so does any container enclosing it.
-  The last piece of §5.3's declaration-level container syntax: the flat forms, the tuple position `?`, and
-  nesting are all done.
 - **Part 2 resolution gaps** — the identity-diagonal
   FIXED-value invariant, a generic type-ref whose argument is nested or a value rather than a plain name,
   and a parameterized supertype (`customer & box<T>`, which needs §5.10 substitution into the absorbed
@@ -480,9 +479,10 @@ compatibility).
   of those throws are gaps at all: the rest are schema-author errors, or internal faults, wearing the
   wrong exception type. Six of the nine have since been reclassified rather than implemented; the
   composition path in particular turned out to be one real gap, not the five the backlog listed.
-- **§5.10 parameter substitution into a template *body*** — a template that refines a constructor
-  (`array_ranged`, and so §5.3's sized sugar) instantiates via argument routing; a *record* template
-  (`box => <T> { v: T }`), whose parameter is a field type, is rejected at the application site instead.
+- **§5.10 parameter substitution into a template *body*** — the only template form left. A *partial*
+  application (`array_ranged`, and so §5.3's sized sugar) closes by routing its arguments into its
+  constructor's vocabulary and needs no substitution; a *structural* template (`box => <T> { v: T }`), whose
+  parameter is a field type, needs real substitution and is rejected at the application site instead.
   `BACKLOG.md` has the shape of the remaining work.
 - **Undocumented atom constructors** — `unknown` (and `extern`, which has no core.tn declaration) has no
   compiled-parser factory, so it compiles to `ErrorReader` (a schema merely *declaring* one still compiles).

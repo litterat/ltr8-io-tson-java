@@ -2602,13 +2602,26 @@ instance.
 
 **Interpretation chosen:** sized closures record **empty `supertypes`** — the three quoted passages are
 transcription errors induced by the `^` spelling, not design, and family membership is a head question for
-every construction uniformly. **Defect (a) is implemented**: `DefinitionResolver.resolveTemplateInstance`
-completes a `TemplateInstance` with §8.2's `source` alone, and the supertype transfer is gone, so the
-divergence from §8.2's entry shape is deliberate and pinned by test. It costs nothing: the grant was inert
-(no two sized entries ever listed each other, so none was ever admissible at another's position) and no
-bundled schema writes a sized form. The size *templates'* own entries keep their chain, which the desugarer
-walks to find the head. Defect (b) and the redesign below are the recommended resolution and the direction
-implementation will follow; the rest of the staging is in `BACKLOG.md`.
+every construction uniformly. It costs nothing: the grant was inert (no two sized entries ever listed each
+other, so none was ever admissible at another's position) and no bundled schema writes a sized form.
+
+**Defect (a) and point 2 of the resolution are both implemented.** A size template's application closes by
+*evaluation*: `SchemaDesugarer.instanceFor` routes the arguments through the same `value_param` channels a
+constructor's own vocabulary uses and emits the plain `!array` construction they denote, headed at the
+nearest `~` constructor in the source chain. So `[text; 1920]` resolves exactly as `[text]` and
+`vector<text, 3>` do, one bound apart, with `source: array` — no instantiation entry, no `supertypes`, and
+`!array_ranged` never exists. `TemplateInstance` and `DefinitionResolver`'s instantiation completion are
+deleted outright. The size *templates'* own entries keep their chain, which the desugarer walks to find the
+head, and the kernel document is unchanged. The divergence from §8.2's entry shape *and* its worked example
+is deliberate and pinned by test.
+
+The forcing case was §5.3's own `[T?; 3]`: the element `?` and a size arrive on one `ArrayContainerDef` and
+must land on one binding record, and while the size half routed through an application, `[T; 3]` and
+`[T?; 3]` would have recorded the same `source` — application-structural identity (§8.2) putting two
+different types on one identity, since an argument list has no channel for an element state (see #49).
+
+What remains unimplemented is the *syntax* half — point 1's `C<args; member ...>` spelling, and points 4-6's
+deletions — which needs a spec revision. The rest of the staging is in `BACKLOG.md`.
 
 **Suggested resolution:** replace refinement-over-application with a form that states the binding directly —
 **named partial applications**.

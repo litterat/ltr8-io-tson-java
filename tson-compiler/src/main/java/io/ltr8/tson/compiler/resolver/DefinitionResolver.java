@@ -21,7 +21,6 @@ import io.ltr8.tson.compiler.ast.schema.GroupDef;
 import io.ltr8.tson.compiler.ast.schema.RemovalSet;
 import io.ltr8.tson.compiler.ast.schema.InlineArrayRef;
 import io.ltr8.tson.compiler.ast.schema.Instance;
-import io.ltr8.tson.compiler.ast.schema.TemplateInstance;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.RecordEntry;
 import io.ltr8.tson.compiler.ast.schema.RefinedDef;
@@ -368,9 +367,6 @@ final class DefinitionResolver {
         // A nested bracket form at either position is expanded there too, innermost first. Anything still
         // here holds an optional array element (`[T?]`), the one shape that phase does not build, and falls
         // through below.
-        if (typeDef instanceof TemplateInstance template) {
-            return resolveTemplateInstance(name, template);
-        }
         if (typeDef instanceof Instance instance) {
             return resolveInstance(name, instance);
         }
@@ -381,40 +377,6 @@ final class DefinitionResolver {
                 "'" + name + "': only fresh record constructions, composition, simple type references, "
                         + "declaration-level sized arrays, constructor application, and atom refinement are "
                         + "resolved so far, got " + typeDef.getClass().getSimpleName());
-    }
-
-    /**
-     * A materialised template instantiation (§8.2). The substituted binding record resolves as the ordinary
-     * construction it is -- {@code SchemaDesugarer} already headed it at the nearest {@code ~} constructor in
-     * the source chain (§5.6) -- and the one component a construction does not carry is recovered from the
-     * template's own entry: {@code source}, the flattened application. {@code parameters} is empty because
-     * the entry is closed (§5.10).
-     *
-     * <p><b>{@code supertypes} is empty, against §8.2's "the template's supertypes, unchanged by
-     * substitution"</b> -- a deliberate divergence ({@code SPEC-FEEDBACK.md} #45, defect (a)). A size
-     * template's chain begins at the constructor it refines, and a constructor is a factory, not a type a
-     * value can have: there is no "array of anything" type in the lattice for {@code [text; 1..2]} to be a
-     * subtype of. §8.1's own rule -- construction and instantiation are not IS-A, family membership being a
-     * {@code source.name} question -- governs the sized form exactly as it governs {@code [text]} and {@code
-     * vector<pixel, 1920>}, which record empty supertypes beside it. The template's *own* entry keeps its
-     * chain: {@code SchemaDesugarer} walks it to find the head this body is built at.
-     */
-    private TypeDefinition resolveTemplateInstance(String name, TemplateInstance instantiation) {
-        TypeDefinition template = metaDefinitions.getTypeDefinition(instantiation.template());
-        if (template == null) {
-            throw new IllegalStateException("'" + name + "': template '" + instantiation.template()
-                    + "' is not in the structure namespace -- SchemaDesugarer only builds an instantiation "
-                    + "for a template it found there");
-        }
-        TypeDefinition construction = resolveInstance(name, instantiation.body());
-        List<TypeArgument> arguments = new ArrayList<>();
-        for (TypeArg argument : instantiation.application().args()) {
-            arguments.add(resolveSimpleTypeArg(name, argument));
-        }
-        io.ltr8.tson.schema.meta.TypeRef source =
-                new io.ltr8.tson.schema.meta.TypeRef(instantiation.template(), arguments);
-        return new TypeDefinition(Optional.of(source), template.kind(), List.of(), false,
-                List.of(), List.of(), Optional.empty(), construction.body());
     }
 
     // ── Constructor application (§5.5, §5.6) ────────────────────────────────

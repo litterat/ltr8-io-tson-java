@@ -48,7 +48,6 @@ import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Unit;
 import io.ltr8.tson.schema.meta.UnknownType;
-import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.TypeArgument;
 import org.junit.jupiter.api.Test;
 
@@ -451,32 +450,31 @@ class DefinitionResolverTest {
                 write(typeRefDef));
     }
 
-    // ── Declaration-level sized-array sugar (§5.3, §8.2) ──
+    // ── Declaration-level sized-array sugar (§5.3, §5.6) ──
     //    SchemaDesugarer rewrites the spelling and routes the arguments (SchemaDesugarerTest owns both);
-    //    what arrives here is a TemplateInstance, and what this covers is the entry §8.2 requires it to
-    //    become. GenericApplicationHeadTest drives the same forms through the real meta.tn/core.tn chain.
+    //    what arrives here is the plain `!array` Instance those bindings denote, and what this covers is
+    //    the construction it resolves to. GenericApplicationHeadTest drives the same forms through the real
+    //    meta.tn/core.tn chain.
 
     /**
-     * §8.2's own worked example, one bound apart: {@code [pixel; 1920]} is {@code array_ranged<pixel, 1920,
-     * 1920>}, materialising to a closed PRODUCT whose {@code source} is the flattened application and whose
-     * body is headed at the nearest {@code ~} constructor.
+     * §8.2's own worked example, one bound apart -- and deliberately not the entry it prints. {@code [text;
+     * 1920]} is {@code array_ranged<text, 1920, 1920>}, a <b>partial application</b>: its parameters occur
+     * only in labelled value channels, so it closes by routing into a construction of {@code array} rather
+     * than materialising an instantiation entry ({@code SPEC-FEEDBACK.md} #45). So {@code source} is plain
+     * {@code array}, exactly as {@code [text]}'s is, and the bounds live in the body where they constrain.
      *
-     * <p>{@code supertypes} is empty where §8.2 asks for the template's -- the one deliberate divergence from
-     * its entry shape ({@code SPEC-FEEDBACK.md} #45): a size template's chain begins at the constructor it
-     * refines, and a constructor is not a type anything can be a subtype of.
+     * <p>{@code supertypes} is empty for the same entry's reason: a constructor is a factory, not a type
+     * anything can be a subtype of.
      */
     @Test
-    void resolvesASizedArrayToTheInstantiationEntryEightTwoSpecifies() {
+    void resolvesASizedArrayToAConstructionOfArray() {
         TypeDefinition frame = resolveSnippet("frame => [text; 1920]");
 
         assertEquals(TypeKind.PRODUCT, frame.kind());
         assertEquals(List.of(), frame.parameters());
         assertEquals(List.of(), frame.supertypes());
-        assertEquals(new TypeRef("array_ranged", List.of(
-                        new TypeArgument.Ref(TypeRef.of("text")),
-                        new TypeArgument.Value(new Token("1920", Token.Form.UNQUOTED)),
-                        new TypeArgument.Value(new Token("1920", Token.Form.UNQUOTED)))),
-                frame.source().orElseThrow());
+        assertEquals(TypeRef.of("array"), frame.source().orElseThrow(),
+                "the constructor the application closes at, not the template it was spelled through");
 
         ArrayBody body = assertInstanceOf(ArrayBody.class, frame.body());
         assertEquals(TypeRef.of("text"), body.elementType());

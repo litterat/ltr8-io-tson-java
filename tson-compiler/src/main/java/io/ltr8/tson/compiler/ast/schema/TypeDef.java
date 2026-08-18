@@ -16,10 +16,11 @@ package io.ltr8.tson.compiler.ast.schema;
  *   <li>{@link ReferenceTypeDef} -- {@code [type-params] type-ref} (§8.3, a plain reference or inline sugar)</li>
  * </ul>
  *
- * <p>{@link TemplateInstance} is the one variant with no ABNF alternative behind it: §8.2's materialised
- * template instantiation has no surface syntax, and is synthesised by {@code SchemaDesugarer} rather than
- * parsed.
+ * <p>Every variant has an ABNF alternative behind it -- each is parsed, never synthesised. §5.3's sized sugar
+ * is no exception: {@code [T; 1..2]} is rewritten by {@code SchemaDesugarer} into the {@link Instance} its
+ * bindings denote, because a size template's application closes by routing into a construction of {@code
+ * array} rather than materialising an entry of its own ({@code SPEC-FEEDBACK.md} #45).
  */
 public sealed interface TypeDef
-        permits AtomRefinement, Instance, StructuralTypeDef, ContainerTypeDef, ReferenceTypeDef, TemplateInstance {
+        permits AtomRefinement, Instance, StructuralTypeDef, ContainerTypeDef, ReferenceTypeDef {
 }

@@ -7,6 +7,8 @@ import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.tree.TsonAbsent;
+import io.ltr8.tson.tree.TsonArray;
 import io.ltr8.tson.tree.TsonValue;
 
 import java.math.BigInteger;
@@ -142,6 +144,46 @@ class NestedContainerTest {
                 .filter(name -> name.startsWith("array_integer_")).toList();
         assertEquals(List.of(rows.elementType().name()), arrayEntries,
                 "one injected array<integer>, shared by every spelling of it");
+    }
+
+    /**
+     * §5.3's element {@code ?} end to end, through the form the spec states the rule with: "absent elements
+     * occupy positional slots -- {@code [a _ c]} has three elements and satisfies a {@code [T?; 3]} size
+     * constraint". The state and both bounds land on one binding record, and the compiled reader enforces
+     * exactly that reading: {@code _} is admitted at an element position and still counts toward the size.
+     */
+    @Test
+    void anOptionalElementAdmitsTheAbsentSentinelAndItCountsTowardTheSize() {
+        TsonCompiledSchema compiled = compile("""
+                  triple => [integer?; 3]
+                  strict => [integer; 3]""");
+
+        ArrayBody body = assertInstanceOf(ArrayBody.class, entry(compiled, "triple").body());
+        assertEquals(ElementState.OPTIONAL, body.state());
+        assertEquals(Optional.of(new BigInteger("3")), body.minItems());
+
+        assertNotNull((TsonValue) compiled.get("triple").read(TestDocuments.document("[1 _ 3]")));
+        assertNotNull((TsonValue) compiled.get("triple").read(TestDocuments.document("[_ _ _]")));
+        assertTrue(assertThrows(TsonReadException.class,
+                () -> compiled.get("triple").read(TestDocuments.document("[1 _]")))
+                .getMessage().contains("minimum 3"), "an absent element occupies a slot, it does not vacate one");
+
+        assertEquals(ElementState.REQUIRED,
+                assertInstanceOf(ArrayBody.class, entry(compiled, "strict").body()).state(),
+                "the unmarked form keeps REQUIRED from the vocabulary's own default");
+        assertTrue(assertThrows(TsonReadException.class,
+                () -> compiled.get("strict").read(TestDocuments.document("[1 _ 3]")))
+                .getMessage().contains("elements are required"));
+    }
+
+    /** An absent element reaches the tree as {@code TsonAbsent}, in its own positional slot. */
+    @Test
+    void anAbsentElementReadsAsTsonAbsentInItsOwnSlot() {
+        TsonCompiledSchema compiled = compile("  slots => [integer?]");
+
+        TsonArray array = (TsonArray) compiled.get("slots").read(TestDocuments.document("[1 _ 3]"));
+        assertEquals(3, array.elements().size());
+        assertInstanceOf(TsonAbsent.class, array.get(1));
     }
 
     /** Nesting recurses: a third bracket is no special case, because the hoist is bottom-up. */

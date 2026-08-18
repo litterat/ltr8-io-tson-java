@@ -53,11 +53,10 @@ downstream reads `TypeRef.arguments()`, so the structural form would have nothin
 reference or `!C value`. §5.3/§5.6 already *describe* these forms as desugarings and §3.3.1 calls their
 targets "the implicit desugar targets of the sugar forms" — this implements that literally instead of
 splitting it across the resolver (declaration position) and the linker (field position), which is what it
-replaces. A **sized** form desugars only as far as the size template it stands for (`[T; 1..5]` →
-`array_ranged<T, 1, 5>`, `[T; 2..]` → `array_min`, `[T; ..9]` → `array_max`, `[T; 3]` → `array_ranged` with
-the bound twice) — purely a change of spelling, which is why it belongs here, but those targets are
-*templates*, not constructors, so the result stays an application. What it then resolves to is §5.10
-substitution, which this phase does not answer.
+replaces. A **sized** form goes the whole way too: the spelling first becomes the size template it stands for
+(`[T; 1..5]` → `array_ranged<T, 1, 5>`, `[T; 2..]` → `array_min`, `[T; ..9]` → `array_max`, `[T; 3]` →
+`array_ranged` with the bound twice), and that application then *closes by routing* into the same `!array`
+construction — see the partial-application bullet below.
 
 - **It runs with the governing meta in hand, not context-free.** `SchemaResolver` calls it after acquiring
   `metaParser`, because turning `map<text, X>` into `!map { key_type: text  value_type: X }` needs `map`'s
@@ -98,23 +97,39 @@ substitution, which this phase does not answer.
   nested form carries no parameter its flat sibling does not. An injected **tuple**'s name derives from its
   positions' *states* as well as their types, or `[T, U?]` and `[T, U]` would land on one entry — and that
   form is exactly the one §8.2's structural representation has no channel for, so nesting it is only
-  representable at all *because* of the entry-materialising divergence (`SPEC-FEEDBACK.md` #49). What stays
-  unexpanded is the **element `?` on an array** (`[T?]`, §5.3's `state: OPTIONAL` on the resolved array) — a
-  separate gap in the same phase (`BACKLOG.md`), and one that keeps its enclosing container unexpanded too,
-  since a partially reduced container is no longer a recognisable sugar form.
-- **A template application over a constructor is instantiated** (§8.2's one materialising form). §5.3's
-  sized sugar is the case that matters: `[T; 1..5]` → `array_ranged<T, 1, 5>`, and `array_ranged` is a
-  template (declared without `~`) whose resolved vocabulary carries the same `value_param` channels a
-  constructor's does — so the *same* routing code handles it, with one difference: the emitted binding record
-  is headed at the nearest `~` constructor in the source chain (`!array`, §5.6), not at the template. The
-  result is a `TemplateInstance` AST node — no surface syntax corresponds to it — which `DefinitionResolver`
-  completes with the one thing a construction doesn't carry: §8.2's `source`, the flattened application.
-  §8.2's "the template's supertypes, unchanged by substitution" is **not** implemented (`SPEC-FEEDBACK.md`
-  #45): a size template's chain begins at the constructor it refines, and a constructor is not a type
-  anything can be a subtype of, so a sized array records empty `supertypes` exactly as `[T]` and
-  `vector<T, N>` do. The template's *own* entry keeps its chain — this phase walks it to find the head.
-  §8.2's deferred
-  `min_items <= max_items` check runs here too, at the materialising application. So does the rejection of
+  representable at all *because* of the entry-materialising divergence (`SPEC-FEEDBACK.md` #49).
+- **The element `?` is a *direct* binding, not a routed one.** `[T?]` becomes `!array { element_type: T
+  state: OPTIONAL }` — §5.3's "elements at any position MAY be the absent sentinel `_`; absent elements occupy
+  positional slots". `array`'s `state` carries no `value_param` (`state: element_state ~ REQUIRED`), so no
+  application argument can reach it, which is §5.3's own reason the `?` forms "have no template route ... and
+  desugar directly". `instanceFor` therefore takes a list of fields bound by name against the vocabulary and
+  emits them in the vocabulary's own field order; a binding naming a field the vocabulary doesn't declare
+  yields empty rather than being dropped, since silently binding nothing is the `UriType`/`RegexType` trap one
+  layer up. An unmarked element states nothing and lets §5.2's REQUIRED_DEFAULT injection supply `REQUIRED`,
+  exactly as a REQUIRED tuple position omits its own `state`. The state reaches the derived name too, or
+  `[T?]` and `[T]` collide on one injected entry. **`[T?; 3]` — the form §5.3 states the rule through — is
+  what forced the sized forms onto the bullet below**: the element state and both bounds have to land on one
+  binding record, and while the size half routed through an application, `[T; 3]` and `[T?; 3]` recorded the
+  same `source` (an argument list has no channel for an element state, #49). The read side needed nothing:
+  `ArrayAbstractReader` already admitted `_` under `ElementState.OPTIONAL` and already counted it toward the
+  bounds — dead code until a schema could carry the state.
+- **A partial application closes by routing, into a construction of its constructor** — it does *not*
+  materialise an entry. §5.3's sized sugar is the case that matters: `[T; 1..5]` → `array_ranged<T, 1, 5>`,
+  and `array_ranged` is declared without `~` with its parameters only in labelled *value* channels, so
+  applying it is **evaluation**: the arguments route through the same `value_param` channels a constructor's
+  own vocabulary uses, and the emitted binding record is headed at the nearest `~` constructor in the source
+  chain (`!array`, §5.6), not at the template. So `[T; 1..5]` and `[T]` land on the same shape, one bound
+  apart, and a sized array's `source` is plain `array`. This is `SPEC-FEEDBACK.md` #45's taxonomy, and a
+  **deliberate divergence from §8.2's worked example**, which prints an `array_ranged_pixel_af3`
+  instantiation entry with `supertypes: [array product top]`: a size template's chain begins at the
+  constructor it refines, a constructor is a factory rather than a type anything can be a subtype of, and the
+  grant was inert besides. The spec author has confirmed the example wrong; no bundled schema or fixture
+  writes a sized form. The size templates' *own* entries keep their chain — this phase walks it to find the
+  head. §8.2's materialisation is left for the form that genuinely needs an entry, a **structural** template
+  closing by substitution (`box => <T> { v: T }`), which is rejected at the application site until §5.10 is
+  implemented — so there is no `TemplateInstance` node any more, and `DefinitionResolver` has no
+  instantiation completion. §8.2's deferred
+  `min_items <= max_items` check still runs here, where the bindings become concrete. So does the rejection of
   a **vacuous `[T; 0..]`**: §5.3 calls the form vacuous and asks for a warning while desugaring it anyway,
   and `SPEC-FEEDBACK.md` #42 rejects the spelling instead — §5.3's own sentence says why it is worth
   rejecting rather than tolerating, since application-structural identity (§8.2) makes it an entry
