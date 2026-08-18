@@ -189,8 +189,23 @@ left:
 
 - [ ] **The read path carries `schemaPosition` but not `schemaId`/`schemaPointer`** — a reader knows the
   declaration position it stamped, not which entry of which schema produced it, so a value error reports
-  `110:3:4858` with nothing saying that is core.tn's line for `int32`. Threading the compiled schema's
-  identity down the reader stack is what closes it.
+  `110:3:4858` with nothing saying that is core.tn's line for `int32`.
+  - **It is not just a matter of threading the compiled schema's identity down the reader stack** (as this
+    item used to claim): the identity a reader could reach that way is the *wrong one*. `TsonSchemaLinker`'s
+    `mergeImports` copies each imported `TypeDefinition` straight into the importing schema's `entries()`
+    map and keeps nothing about where it came from, so by compile time the origin is already gone. Measured:
+    a 4-line `point-1.tn` declaring `{ point => { x: int32 } }` reports `schemaPosition` `110:3:4858` —
+    core.tn's line for `int32`. Stamping `linkedSchema.schema().id()` alongside it would pair
+    `example.test/point-1.tn` with line 110 of a 4-line document, sending a consumer to the wrong file.
+    Absent is honest; wrong is not, which is why the field is empty rather than approximated.
+  - So the work is upstream first: **record each merged entry's origin schema id**, either as a side map on
+    `TsonSchema`/`TsonLinkedSchema` populated by `mergeImports` (preferred — leaves `schema.meta` alone,
+    since the spec's own `type_definition` has no such field and it is a bind target with a hand-written
+    `equals` and the `@Record` constructor-selection trap) or as a new excluded-from-equality component on
+    `TypeDefinition` beside `position`. Only then does the reader-stack half apply: `withSchemaPosition`
+    becomes a three-part stamp across its ~11 reader call sites, and `DefaultTsonReadContext.report`
+    populates all three. `schemaPointer` is the cheap half — `ValueReaderFactory` is already handed the
+    entry's own declared name, which is the `/name` pointer.
 - [ ] **A schema *parse* error is still fail-fast, and names a token class rather than a construct.**
   Everything downstream of parsing now reports many problems; parsing itself reports one and stops, so an
   author fixes a syntax error, re-runs, and meets the next. The message is also pitched at the wrong level
@@ -198,7 +213,7 @@ left:
   min: 1 }`, a natural thing to try) gives
 
   ```
-  [VALIDATION_ERROR] expected UNQUOTED (a type reference), found '!' (BANG) at line 8, column 15
+  [VALIDATION_ERROR] (6:15:157): expected UNQUOTED (a type reference), found '!' (BANG)
   ```
 
   which is accurate about tokens and silent about the fix — hoist the refinement to its own declaration and

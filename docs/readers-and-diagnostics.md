@@ -146,7 +146,11 @@ value in the data and the type it violated in the schema. Every reader stamps it
 one reported is the *atom's* declaration (`int32` in core.tn), not the enclosing record's. **The read path
 populates `schemaPosition` but not `schemaId`/`schemaPointer`** — a reader knows the declaration position it
 stamped, not which entry of which schema it came from, so which schema a read diagnostic's position refers to
-is still implicit; the schema path populates all three (`BACKLOG.md`).
+is still implicit; the schema path populates all three (`BACKLOG.md`). The cause is upstream of the reader:
+`TsonSchemaLinker.mergeImports` copies an imported `TypeDefinition` into the importing schema's `entries()`
+and keeps no record of where it came from, so a 4-line schema importing core.tn reports core.tn's
+`110:3:4858` for `int32` and the compiled schema's own id would be the *wrong* answer to pair with it. The
+field stays absent rather than approximated.
 An atom's `AtomTypeException` is caught in `AtomTypeReader` and mapped to
 `ATOM_CONSTRAINT_VIOLATION` — `AtomType`'s own signature is untouched, since it's shared with the
 schemaless binder which has no read context. Out of scope for now: message synthesis from code + params,
