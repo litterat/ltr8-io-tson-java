@@ -402,7 +402,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         if (ctx.peek() instanceof AbsentEvent) {
             ctx.next();
             if (schema.state() == FieldState.REQUIRED_FIXED) {
-                fieldCtx.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION,
+                fieldCtx.report(Diagnostic.Code.FIELD_FIXED,
                         "'" + fieldName + "' is fixed on '" + name + "' and cannot be absent",
                         String.valueOf(check.value()), "_");
                 return;
@@ -411,7 +411,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         }
         if (check.mustBeAbsent()) {
             EventSkip.scopedValue(ctx);
-            fieldCtx.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION,
+            fieldCtx.report(Diagnostic.Code.FIELD_FIXED,
                     "'" + fieldName + "' is fixed to absent on '" + name + "' and may only be omitted or "
                             + "written as '_'", "_", "a value");
             return;
@@ -427,8 +427,10 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             return;
         }
         if (!Objects.equals(written, check.value())) {
-            fieldCtx.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION,
-                    "'" + fieldName + "' is fixed on '" + name + "' and cannot be given another value",
+            fieldCtx.report(Diagnostic.Code.FIELD_FIXED,
+                    "'" + fieldName + "' is fixed on '" + name + "' and cannot be given another value -- the "
+                            + "schema declares it with '=' (fixed); for a default the data may override, "
+                            + "use '~'",
                     String.valueOf(check.value()), String.valueOf(written));
             return;
         }

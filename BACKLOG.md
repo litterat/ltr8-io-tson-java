@@ -184,15 +184,16 @@ by a factor of six.
   - Nothing is unsound today — a vacuous range simply admits nothing, and the cidr family range is enforced
     on every value regardless of what the schema declared — so this is a missing diagnosis. The payoff is
     catching the mistake where the author wrote it rather than at a read that may never happen.
-- [ ] **A FIXED-value contradiction reports as `ATOM_CONSTRAINT_VIOLATION`**, which is the closest code in
-  the closed vocabulary and not an accurate one — a document contradicting `field: type = value` (§5.2) has
-  violated a schema-level field constraint, not an atom's own parsing contract. Wants its own code, together
-  with the "fine-grained atom codes" note under Diagnostics.
-  - The message is also the natural place for an authoring hint: `=` reads as "default" to anyone arriving
-    from JSON Schema, so `priority: priority = medium` is a plausible mis-spelling of `~ medium` — and the
-    author only discovers it when the reader rejects every data value that dared to differ. A trailing
-    "the schema declares this field with `=` (fixed); for a default the data may override, use `~`" turns
-    that discovery into a one-step fix.
+- [ ] **A diagnostic's `expected`/`actual` can carry a Java `toString()` instead of a value.** In tree mode
+  a decoded value is a `TsonAtom`, so `RecordAbstractReader.verifyFixed`'s `String.valueOf(check.value())`
+  renders `TsonAtom[value=medium, typeRef=Optional[text], annotations=[]]` where the whole point of those
+  two fields is that a consumer reads the value without regexing the message. Bind mode is unaffected —
+  there the decoded value is the host object — so this is the tree path only, and it is exactly the path
+  `tson validate` uses. The fix needs a seam rather than a cast: `RecordAbstractReader` is the shared base
+  for both modes and deliberately names no `tson-tree` type, so either the unwrap belongs behind something
+  mode-specific, or `TsonAtom.toString()` should render its value (a broader change, since a record's
+  default `toString` is genuinely useful when debugging). Reachable from any report site that stringifies a
+  decoded value, not just the FIXED ones.
 
 ## Schema-side diagnostics
 

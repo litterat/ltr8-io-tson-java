@@ -35,7 +35,7 @@ is small and parsed once.)
   records that the pull, not the assertion after it, is the point.
 - **A FIXED field's value comes from the schema, and a document that states it is checked, not obeyed**
   (§5.2). `RecordAbstractReader.verifyFixed` decodes the written token and compares it to the schema's
-  value: a contradiction is `ATOM_CONSTRAINT_VIOLATION`, and the field still resolves to the *schema's*
+  value: a contradiction is `FIELD_FIXED`, and the field still resolves to the *schema's*
   value. Skipping it unread — the old behaviour — let a document say one thing and decode to another in
   silence. The comparison uses a raw parsed value and the **pre-rebind** parser (`FixedCheck`), because bind
   mode narrows `precomputedValue` in place and comparing across that narrowing would flag every conforming
@@ -117,8 +117,9 @@ is small and parsed once.)
 ## Diagnostics (`Diagnostic`, root package)
 
 `Diagnostic` is the structured value every `TsonDiagnosticsReceiver` receives, identical shape whichever
-one is in play: a closed `Code` enum (`FIELD_REQUIRED`/`TYPE_MISMATCH`/`WRONG_ARITY`/`UNKNOWN_TYPE_REF`/
-`ATOM_CONSTRAINT_VIOLATION`/`UNRECOGNIZED_FIELD`/`DUPLICATE_MAP_KEY`/`DUPLICATE_FIELD` from readers;
+one is in play: a closed `Code` enum (`FIELD_REQUIRED`/`FIELD_FIXED`/`TYPE_MISMATCH`/`WRONG_ARITY`/
+`UNKNOWN_TYPE_REF`/`ATOM_CONSTRAINT_VIOLATION`/`UNRECOGNIZED_FIELD`/`DUPLICATE_MAP_KEY`/`DUPLICATE_FIELD`
+from readers;
 `SCHEMA_ERROR`/`UNKNOWN_TYPE`/`VALIDATION_ERROR` for infrastructure-level failures),
 `message` (hand-composed per call site), `expected`/`actual` (machine-parseable), and **four location
 components covering two ends** — the value in the data, and the rule in the schema.
@@ -153,8 +154,19 @@ and keeps no record of where it came from, so a 4-line schema importing core.tn 
 field stays absent rather than approximated.
 An atom's `AtomTypeException` is caught in `AtomTypeReader` and mapped to
 `ATOM_CONSTRAINT_VIOLATION` — `AtomType`'s own signature is untouched, since it's shared with the
-schemaless binder which has no read context. Out of scope for now: fine-grained atom codes, and per-field
-schema positions. (Message synthesis from code + params is not a gap but a decision -- see below.)
+schemaless binder which has no read context. That code means exactly "the atom rejected this token" and
+nothing finer; routing `AtomValidationException`'s own varieties apart is out of scope for now, as are
+per-field schema positions. (Message synthesis from code + params is not a gap but a decision -- see below.)
+
+**A broken FIXED field is `FIELD_FIXED`, not an atom code.** `field: type = value` (§5.2) is a field-state
+rule, so a value contradicting it has satisfied its atom's grammar and every facet — it is simply not the
+one value permitted. `FIELD_FIXED` sits beside `FIELD_REQUIRED` for that reason: the two §5.2 field-state
+rules a document can break, neither of them about the field's type. All three ways to break one report it
+(`RecordAbstractReader.verifyFixed`): a stated value contradicting `= value`, a `REQUIRED_FIXED` field
+written `_`, and a value written where `= _` fixes the field to absent. The contradiction message also
+names the fix — `=` reads as "default" to anyone arriving from JSON Schema, so `priority: priority = medium`
+is a plausible mis-spelling of `~ medium`, and without the hint the author discovers it only by watching
+every differing document get rejected.
 
 **`expected` carries the constraint that failed, never the type's name.** `AtomTypeException` holds an
 `expected` alongside its message, filled at each throw site from the facet that rejected the value, and all

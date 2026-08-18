@@ -45,7 +45,8 @@ backend.
     `TsonReadContext.field`/`index` as a read descends (that context is still the engine's cursor; it
     just no longer owns the throw-vs-collect decision).
   - `code` — landed as a real, closed `Diagnostic.Code` enum, not the exact starter set sketched
-    below: `FIELD_REQUIRED`/`TYPE_MISMATCH`/`WRONG_ARITY`/`UNKNOWN_TYPE_REF`/`ATOM_CONSTRAINT_VIOLATION`
+    below: `FIELD_REQUIRED`/`FIELD_FIXED`/`TYPE_MISMATCH`/`WRONG_ARITY`/`UNKNOWN_TYPE_REF`/
+    `ATOM_CONSTRAINT_VIOLATION`
     are genuinely produced by a real reader today; `INTEGER_OUT_OF_RANGE`/`ENUM_MEMBER_NOT_RECOGNIZED`/
     `PATTERN_MISMATCH` never landed as their own codes — every atom-constraint violation maps to the
     one general `ATOM_CONSTRAINT_VIOLATION` instead, since `AtomValidationException` itself doesn't
