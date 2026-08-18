@@ -196,8 +196,8 @@ class TsonReadTest {
                 !point { x: 99999999999999  y: 88888888888888 }""");
 
         assertEquals(2, problems.diagnostics().size(), problems.diagnostics()::toString);
-        assertEquals("/x", problems.diagnostics().get(0).path());
-        assertEquals("/y", problems.diagnostics().get(1).path());
+        assertEquals(Optional.of("/x"), problems.diagnostics().get(0).path());
+        assertEquals(Optional.of("/y"), problems.diagnostics().get(1).path());
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, problems.diagnostics().get(0).code());
         // The tree still comes back, so a caller has the partial value alongside what was wrong with it.
         assertTrue(node.isRecord());
@@ -212,8 +212,8 @@ class TsonReadTest {
                 !point { x: 99999999999999  y: 88888888888888 }""", Point.class);
 
         assertEquals(2, problems.diagnostics().size(), problems.diagnostics()::toString);
-        assertEquals("/x", problems.diagnostics().get(0).path());
-        assertEquals("/y", problems.diagnostics().get(1).path());
+        assertEquals(Optional.of("/x"), problems.diagnostics().get(0).path());
+        assertEquals(Optional.of("/y"), problems.diagnostics().get(1).path());
     }
 
     @Test
@@ -274,7 +274,7 @@ class TsonReadTest {
         TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
         tson.objectReader().withSchema(POINT_ID).withDiagnostics(problems)
                 .readAs("{ x: 99999999999999  y: 88888888888888 }", "point", Point.class);
-        assertEquals(List.of("/x", "/y"), problems.diagnostics().stream().map(Diagnostic::path).toList());
+        assertEquals(List.of("/x", "/y"), problems.diagnostics().stream().map(d -> d.path().orElseThrow()).toList());
     }
 
     @Test

@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -70,8 +71,8 @@ class SchemalessValidationTest {
         List<Diagnostic> diagnostics = validate("{ id: !uuid nope  count: !int32 twelve }");
         assertEquals(2, diagnostics.size(), diagnostics.toString());
         assertTrue(diagnostics.stream().allMatch(d -> d.code() == Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION), diagnostics.toString());
-        assertTrue(diagnostics.stream().anyMatch(d -> d.path().equals("/id")), diagnostics.toString());
-        assertTrue(diagnostics.stream().anyMatch(d -> d.path().equals("/count")), diagnostics.toString());
+        assertTrue(diagnostics.stream().anyMatch(d -> d.path().equals(Optional.of("/id"))), diagnostics.toString());
+        assertTrue(diagnostics.stream().anyMatch(d -> d.path().equals(Optional.of("/count"))), diagnostics.toString());
         assertTrue(diagnostics.stream().allMatch(d -> d.dataPosition().isPresent()), diagnostics.toString());
     }
 
@@ -80,7 +81,7 @@ class SchemalessValidationTest {
         List<Diagnostic> diagnostics = validate("{ big: !int32 99999999999999 }");
         assertEquals(1, diagnostics.size(), diagnostics.toString());
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, diagnostics.getFirst().code());
-        assertEquals("/big", diagnostics.getFirst().path());
+        assertEquals(Optional.of("/big"), diagnostics.getFirst().path());
     }
 
     @Test
@@ -102,8 +103,8 @@ class SchemalessValidationTest {
     void nestedBadAtomsInArraysAndMapsAreReportedWithTheirPaths() {
         List<Diagnostic> diagnostics = validate("{ ids: [ !uuid ok-nope  !uuid also-bad ] }");
         assertEquals(2, diagnostics.size(), diagnostics.toString());
-        assertTrue(diagnostics.stream().anyMatch(d -> d.path().equals("/ids/0")), diagnostics.toString());
-        assertTrue(diagnostics.stream().anyMatch(d -> d.path().equals("/ids/1")), diagnostics.toString());
+        assertTrue(diagnostics.stream().anyMatch(d -> d.path().equals(Optional.of("/ids/0"))), diagnostics.toString());
+        assertTrue(diagnostics.stream().anyMatch(d -> d.path().equals(Optional.of("/ids/1"))), diagnostics.toString());
     }
 
     /** New coverage the AST walk never had: an annotation's value is a data-value (§3.1), so it is checked too. */

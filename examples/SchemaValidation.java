@@ -37,6 +37,7 @@ void main() {
     var bad = "{ hostname: \"web-01\"  port: 99999999999999 }";   // port is out of int32 range
     reader.withDiagnostics(problems).readAs(bad, "server");
     for (Diagnostic d : problems.diagnostics()) {
-        IO.println("problem: " + d.path() + " -- " + d.message());
+        // path is Optional because "" is RFC 6901's root, a real location, not an absence.
+        IO.println("problem: " + d.path().orElse("(no data location)") + " -- " + d.message());
     }
 }

@@ -5,6 +5,7 @@ import io.ltr8.tson.compiler.TsonSchemaSource;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -56,7 +57,7 @@ class BrokenSchemaDuringDataValidationTest {
         List<Diagnostic> problems = tson().validate(DATA);
 
         assertEquals(List.of("/declared_twice", "/widens"),
-                problems.stream().map(Diagnostic::schemaPointer).sorted().toList(),
+                problems.stream().map(d -> d.schemaPointer().orElseThrow()).sorted().toList(),
                 () -> "expected both schema faults, got " + problems);
     }
 
@@ -66,7 +67,7 @@ class BrokenSchemaDuringDataValidationTest {
         for (Diagnostic problem : tson().validate(DATA)) {
             assertEquals("example.test/broken-during-read.tn", problem.schemaId());
             assertTrue(problem.schemaPosition().isPresent(),
-                    () -> "no schema position on " + problem.schemaPointer());
+                    () -> "no schema position on " + problem.schemaPointer().orElseThrow());
         }
     }
 
@@ -77,7 +78,7 @@ class BrokenSchemaDuringDataValidationTest {
     @Test
     void noDataPositionIsStampedOnAProblemThatIsInTheSchema() {
         for (Diagnostic problem : tson().validate(DATA)) {
-            assertEquals("", problem.path());
+            assertEquals(Optional.empty(), problem.path());
             assertTrue(problem.dataPosition().isEmpty(),
                     () -> "a schema problem was given a data position: " + problem.dataPosition());
         }
@@ -89,8 +90,8 @@ class BrokenSchemaDuringDataValidationTest {
         List<Diagnostic> viaData = tson().validate(DATA);
         List<Diagnostic> viaSchema = tson().validateSchema(BROKEN_SCHEMA);
 
-        assertEquals(viaSchema.stream().map(Diagnostic::schemaPointer).sorted().toList(),
-                viaData.stream().map(Diagnostic::schemaPointer).sorted().toList());
+        assertEquals(viaSchema.stream().map(d -> d.schemaPointer().orElseThrow()).sorted().toList(),
+                viaData.stream().map(d -> d.schemaPointer().orElseThrow()).sorted().toList());
         assertEquals(viaSchema.stream().map(Diagnostic::message).sorted().toList(),
                 viaData.stream().map(Diagnostic::message).sorted().toList());
     }

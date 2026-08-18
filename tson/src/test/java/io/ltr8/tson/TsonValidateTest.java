@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -311,7 +312,7 @@ class TsonValidateTest {
     }
 
     private static String expectedAt(List<Diagnostic> problems, String path) {
-        return problems.stream().filter(d -> d.path().equals(path)).findFirst()
+        return problems.stream().filter(d -> d.path().equals(Optional.of(path))).findFirst()
                 .orElseThrow(() -> new AssertionError("no diagnostic at " + path + " in " + problems))
                 .expected();
     }
@@ -357,7 +358,7 @@ class TsonValidateTest {
         assertEquals(Diagnostic.Code.UNKNOWN_TYPE_REF, only(tson, "{ a: !nosuchtype 1 }").code());
         assertEquals(Diagnostic.Code.UNKNOWN_TYPE_REF, only(tson, "!nosuchtype { a: 1 }").code());
 
-        assertEquals("/a", only(tson, "{ a: !uuid nope }").path());
+        assertEquals(Optional.of("/a"), only(tson, "{ a: !uuid nope }").path());
     }
 
     /** An annotation's value is a data-value (§3.1), so validation reaches inside it. */

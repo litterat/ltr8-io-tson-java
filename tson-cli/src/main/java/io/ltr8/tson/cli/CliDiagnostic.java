@@ -17,19 +17,13 @@ import java.util.Optional;
  * the real {@link Diagnostic.Code} enum, since enum narrowing *is* a proven, already-used binding
  * path elsewhere in this codebase.
  *
- * <p><b>An absent field is absent, not empty.</b> {@link Diagnostic} spells "nothing to say here"
- * as {@code ""} for its string components and as an empty {@link Optional} for its positions, so the
- * rendered output used to show both {@code ""} and {@code null} for the same idea. Here everything
- * that can be absent is an {@code Optional} and renders as {@code null}.
- *
- * <p><b>{@code path} and {@code schemaPointer} are the exceptions, and stay plain strings</b>, because
- * for an RFC 6901 pointer {@code ""} is not absence -- it is the root. A document-level schema problem
- * genuinely carries the root pointer ({@code Tson.validateSchema} reports one for an {@code !!import}
- * that won't load), and a base-syntax failure genuinely locates itself at the root of the data. Folding
- * those into {@code null} would erase a real distinction, and the distinction can only be drawn
- * properly on {@link Diagnostic} itself, where the same {@code ""} means both things today.
+ * <p><b>An absent field is absent, not empty.</b> {@link Diagnostic} still spells "nothing to say
+ * here" as {@code ""} for {@code schemaId}/{@code expected}/{@code actual}, so those are narrowed to
+ * {@link Optional} here and render as {@code null}. The two RFC 6901 pointers need no narrowing: they
+ * are already {@code Optional} at the source, because for a pointer {@code ""} is not absence but the
+ * root, and a document-level schema problem genuinely carries it.
  */
-public record CliDiagnostic(String path, @Field("schema_pointer") String schemaPointer,
+public record CliDiagnostic(Optional<String> path, @Field("schema_pointer") Optional<String> schemaPointer,
                              @Field("schema_id") Optional<String> schemaId,
                              Diagnostic.Code code, String message,
                              Optional<String> expected, Optional<String> actual,
@@ -45,9 +39,10 @@ public record CliDiagnostic(String path, @Field("schema_pointer") String schemaP
                 diagnostic.schemaPosition().map(CliDiagnostic::render));
     }
 
+    /** A problem with no location at either end -- a usage failure, or a schema that never named itself. */
     static CliDiagnostic minimal(Diagnostic.Code code, String message) {
-        return new CliDiagnostic("", "", Optional.empty(), code, message, Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty());
+        return new CliDiagnostic(Optional.empty(), Optional.empty(), Optional.empty(), code, message,
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
     }
 
     /** {@link Diagnostic}'s "nothing to say here" for a string component, as an absence. */

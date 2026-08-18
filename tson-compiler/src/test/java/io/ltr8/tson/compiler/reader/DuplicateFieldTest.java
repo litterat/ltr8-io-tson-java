@@ -93,6 +93,6 @@ class DuplicateFieldTest {
         assertEquals(List.of(Diagnostic.Code.DUPLICATE_FIELD, Diagnostic.Code.DUPLICATE_FIELD),
                 problems.diagnostics().stream().map(Diagnostic::code).toList(),
                 problems.diagnostics().toString());
-        assertEquals("/value", problems.diagnostics().getFirst().path());
+        assertEquals(Optional.of("/value"), problems.diagnostics().getFirst().path());
     }
 }

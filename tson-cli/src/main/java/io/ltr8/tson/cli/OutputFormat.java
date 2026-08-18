@@ -123,12 +123,18 @@ enum OutputFormat {
      * half may be missing, and an end with neither renders empty so the caller can fall through to the other.
      * A position with no pointer is worth printing on its own: a base-syntax error has no path into a
      * document it could not parse, but it does know where it gave up.
+     *
+     * <p>The root pointer renders the same as an absent one, and deliberately: {@code ": message"} is noise
+     * to a person reading a terminal, who is looking at the whole document either way. The distinction is
+     * real and is preserved everywhere a consumer reads it -- {@link #JSON} and {@link #TSON} both emit
+     * {@code ""} and {@code null} apart -- it just isn't worth a character here.
      */
-    private static String location(String pointer, Optional<String> position) {
+    private static String location(Optional<String> pointer, Optional<String> position) {
+        String rendered = pointer.orElse("");
         if (position.isEmpty()) {
-            return pointer;
+            return rendered;
         }
-        return pointer.isEmpty() ? "(" + position.get() + ")" : pointer + " (" + position.get() + ")";
+        return rendered.isEmpty() ? "(" + position.get() + ")" : rendered + " (" + position.get() + ")";
     }
 
     /** Every {@link CliDiagnostic} field, not just {@code code}/{@code message} -- the primary alignment target this shape maps to, Pydantic v2's own {@code ValidationError.errors()} ({@code type}/{@code loc}/{@code msg}/{@code input}/{@code ctx}), needs all of it. */
@@ -146,8 +152,8 @@ enum OutputFormat {
                 json.append(',');
             }
             CliDiagnostic error = errors.get(i);
-            json.append("{\"path\":").append(jsonString(error.path()))
-                    .append(",\"schemaPointer\":").append(jsonString(error.schemaPointer()))
+            json.append("{\"path\":").append(jsonStringOrNull(error.path()))
+                    .append(",\"schemaPointer\":").append(jsonStringOrNull(error.schemaPointer()))
                     .append(",\"schemaId\":").append(jsonStringOrNull(error.schemaId()))
                     .append(",\"code\":").append(jsonString(error.code().name()))
                     .append(",\"message\":").append(jsonString(error.message()))

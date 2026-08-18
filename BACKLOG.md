@@ -212,37 +212,15 @@ left:
 
 ## Diagnostic quality for machine consumers
 
-- [ ] **`expected` names the type, not the constraint that failed**, so the structured fields carry strictly
-  less than the prose does — the opposite of the intent. Measured on real output:
-
-  | field | value |
-  |---|---|
-  | `message` | `'99999' is greater than the maximum 100` |
-  | `expected` | `a value satisfying quantity_t` |
-  | `actual` | `99999` |
-
-  Same for an enum: the message lists `[PENDING, SHIPPED, DELIVERED]`, `expected` says `a value satisfying
-  status`. A consumer reading the structured fields has to fall back to regexing `message` to recover the
-  bound or the member list, which is exactly what `Diagnostic` exists to avoid, and what the JDK's own
-  `javax.tools.Diagnostic` is criticised for in issue #3's research notes.
-  `STRUCTURED-OUTPUT.md`'s Tier 1 asks for precisely this — *"turns 'too large' into 'must be ≤ 100'"* — and
-  records the field as landed, which is optimistic: the field exists, the content doesn't.
-  - Cheapest useful version: have each atom's constraint check populate `expected` from the facet it
-    violated. That is where the bound already is; nothing needs to be plumbed to reach it.
-  - The fuller version is the standing `message`-synthesis item (compose the sentence *from* `code` +
-    params rather than hand-writing it per call site), which would make the two consistent by construction
-    instead of by discipline.
-- [ ] **A base-syntax diagnostic states its position twice.** `(7:3:183): … found ']' (RBRACKET) at line 7,
-  column 3` — the parser's own exception message embeds a location the `Diagnostic` already carries
-  structurally as `dataPosition`, so every renderer prints it twice and a machine consumer parsing
-  `message` sees a second, differently-formatted copy (no byte offset). The fix belongs in the parse/lex
-  exception messages, not in a renderer: state what went wrong, and let the diagnostic say where.
-- [ ] **`""` is overloaded on `Diagnostic`'s two pointers**, meaning both "the root" (RFC 6901's own
-  spelling, which `Tson.validateSchema` genuinely emits for a document-level problem) and "this diagnostic
-  has no such end" (every read diagnostic, which populates no `schemaPointer` at all). A consumer cannot
-  tell them apart, and neither can a renderer: `CliDiagnostic` maps `schemaId`/`expected`/`actual` to
-  absent when empty but has to leave `path`/`schemaPointer` as plain strings for exactly this reason.
-  Making the two pointers `Optional<String>` on `Diagnostic` itself would settle it at the source.
+- [ ] **`message` is hand-composed at each call site**, not synthesized from `code` plus a per-code
+  parameter shape, so the sentence and the structured fields stay consistent by discipline rather than by
+  construction. This is what is left of the section: `expected` now carries the violated constraint
+  (`AtomTypeException`'s six-shape vocabulary — an ordering bound, a membership, a length, a pattern, a
+  grammar, a prohibition), the base-syntax exceptions state their position only structurally, and both RFC
+  6901 pointers are `Optional<String>` so a present `""` (the root) and an absence are distinguishable.
+  `STRUCTURED-OUTPUT.md`'s Tier 1 ranks this last of its five, as a *rendering* of 1–4 rather than a sixth
+  piece of information — which is the shape the fix should take, and needs the parameter shape to exist
+  first.
 
 ## Write side
 

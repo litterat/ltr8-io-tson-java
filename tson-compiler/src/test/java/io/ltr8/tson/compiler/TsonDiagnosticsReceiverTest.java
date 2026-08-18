@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -27,7 +28,7 @@ class TsonDiagnosticsReceiverTest {
         TsonReadException thrown = assertThrows(TsonReadException.class,
                 () -> new TsonObjectReader().read(THREE_BAD, Three.class));
 
-        assertEquals("/a", thrown.diagnostic().path());
+        assertEquals(Optional.of("/a"), thrown.diagnostic().path());
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, thrown.diagnostic().code());
     }
 
@@ -37,7 +38,7 @@ class TsonDiagnosticsReceiverTest {
 
         new TsonObjectReader().withDiagnostics(problems).read(THREE_BAD, Three.class);
 
-        assertEquals(List.of("/a", "/b", "/c"), problems.diagnostics().stream().map(Diagnostic::path).toList());
+        assertEquals(List.of("/a", "/b", "/c"), problems.diagnostics().stream().map(d -> d.path().orElseThrow()).toList());
     }
 
     @Test
@@ -56,7 +57,7 @@ class TsonDiagnosticsReceiverTest {
         // arrive during it. If they were batched at the end, all three would already have been found.
         List<String> seen = new ArrayList<>();
         TsonDiagnosticsReceiver cappedAtTwo = diagnostic -> {
-            seen.add(diagnostic.path());
+            seen.add(diagnostic.path().orElseThrow());
             if (seen.size() == 2) {
                 throw new IllegalStateException("enough");
             }

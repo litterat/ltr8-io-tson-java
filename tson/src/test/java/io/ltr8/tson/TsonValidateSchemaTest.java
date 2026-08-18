@@ -4,6 +4,7 @@ import io.ltr8.tson.compiler.Diagnostic;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -48,7 +49,7 @@ class TsonValidateSchemaTest {
                 """);
 
         assertEquals(List.of("/declared_twice", "/typo_in_source", "/widens"),
-                problems.stream().map(Diagnostic::schemaPointer).sorted().toList());
+                problems.stream().map(d -> d.schemaPointer().orElseThrow()).sorted().toList());
     }
 
     /**
@@ -70,8 +71,9 @@ class TsonValidateSchemaTest {
                 """);
 
         assertEquals(List.of("/vacuous", "/widens"),
-                problems.stream().map(Diagnostic::schemaPointer).sorted().toList());
-        Diagnostic sugar = problems.stream().filter(d -> d.schemaPointer().equals("/vacuous")).findFirst().orElseThrow();
+                problems.stream().map(d -> d.schemaPointer().orElseThrow()).sorted().toList());
+        Diagnostic sugar = problems.stream().filter(d -> d.schemaPointer().equals(Optional.of("/vacuous")))
+                .findFirst().orElseThrow();
         assertEquals("example.test/validate-schema-test.tn", sugar.schemaId());
         assertTrue(sugar.schemaPosition().isPresent(), "a sugar-form error carries the declaration's position");
         assertTrue(sugar.message().contains("pins a floor of zero"), sugar.message());
@@ -92,7 +94,7 @@ class TsonValidateSchemaTest {
                 }
                 """);
 
-        assertEquals(List.of("/widens"), problems.stream().map(Diagnostic::schemaPointer).toList());
+        assertEquals(List.of("/widens"), problems.stream().map(d -> d.schemaPointer().orElseThrow()).toList());
     }
 
     /** With resolution clean, linking runs and reports its own problems -- both of them. */
@@ -106,7 +108,7 @@ class TsonValidateSchemaTest {
                 }
                 """);
 
-        assertEquals(List.of("/a", "/b"), problems.stream().map(Diagnostic::schemaPointer).sorted().toList());
+        assertEquals(List.of("/a", "/b"), problems.stream().map(d -> d.schemaPointer().orElseThrow()).sorted().toList());
     }
 
     /** Every schema diagnostic names its schema and where in the source it is (§8.1's MUST). */
@@ -115,7 +117,7 @@ class TsonValidateSchemaTest {
         for (Diagnostic problem : check("{ widens => !uint8 ^ { min: -10 } }")) {
             assertEquals("example.test/validate-schema-test.tn", problem.schemaId());
             assertTrue(problem.schemaPosition().isPresent());
-            assertEquals("", problem.path(), "a schema problem has no data location");
+            assertEquals(Optional.empty(), problem.path(), "a schema problem has no data location");
         }
     }
 
@@ -138,7 +140,7 @@ class TsonValidateSchemaTest {
                 """);
 
         assertFalse(problems.isEmpty());
-        assertEquals("", problems.get(0).schemaPointer());
+        assertEquals(Optional.of(""), problems.get(0).schemaPointer());
     }
 
     /**
@@ -171,7 +173,7 @@ class TsonValidateSchemaTest {
                 """);
 
         assertEquals(1, problems.size(), problems::toString);
-        assertEquals("", problems.getFirst().schemaPointer());
+        assertEquals(Optional.of(""), problems.getFirst().schemaPointer());
         assertTrue(problems.getFirst().message().contains("identity mismatch"), problems::toString);
     }
 
