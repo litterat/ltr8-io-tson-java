@@ -3,8 +3,10 @@ package io.ltr8.tson.compiler;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -69,8 +71,8 @@ class SchemalessValidationTest {
         List<Diagnostic> diagnostics = validate("{ id: !uuid nope  count: !int32 twelve }");
         assertEquals(2, diagnostics.size(), diagnostics.toString());
         assertTrue(diagnostics.stream().allMatch(d -> d.code() == Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION), diagnostics.toString());
-        assertTrue(diagnostics.stream().anyMatch(d -> d.path().equals("/id")), diagnostics.toString());
-        assertTrue(diagnostics.stream().anyMatch(d -> d.path().equals("/count")), diagnostics.toString());
+        assertTrue(diagnostics.stream().anyMatch(d -> d.path().equals(Optional.of("/id"))), diagnostics.toString());
+        assertTrue(diagnostics.stream().anyMatch(d -> d.path().equals(Optional.of("/count"))), diagnostics.toString());
         assertTrue(diagnostics.stream().allMatch(d -> d.dataPosition().isPresent()), diagnostics.toString());
     }
 
@@ -79,7 +81,7 @@ class SchemalessValidationTest {
         List<Diagnostic> diagnostics = validate("{ big: !int32 99999999999999 }");
         assertEquals(1, diagnostics.size(), diagnostics.toString());
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, diagnostics.getFirst().code());
-        assertEquals("/big", diagnostics.getFirst().path());
+        assertEquals(Optional.of("/big"), diagnostics.getFirst().path());
     }
 
     @Test
@@ -101,8 +103,8 @@ class SchemalessValidationTest {
     void nestedBadAtomsInArraysAndMapsAreReportedWithTheirPaths() {
         List<Diagnostic> diagnostics = validate("{ ids: [ !uuid ok-nope  !uuid also-bad ] }");
         assertEquals(2, diagnostics.size(), diagnostics.toString());
-        assertTrue(diagnostics.stream().anyMatch(d -> d.path().equals("/ids/0")), diagnostics.toString());
-        assertTrue(diagnostics.stream().anyMatch(d -> d.path().equals("/ids/1")), diagnostics.toString());
+        assertTrue(diagnostics.stream().anyMatch(d -> d.path().equals(Optional.of("/ids/0"))), diagnostics.toString());
+        assertTrue(diagnostics.stream().anyMatch(d -> d.path().equals(Optional.of("/ids/1"))), diagnostics.toString());
     }
 
     /** New coverage the AST walk never had: an annotation's value is a data-value (§3.1), so it is checked too. */
@@ -118,6 +120,32 @@ class SchemalessValidationTest {
         List<Diagnostic> diagnostics = validate("{ a: 1 ");   // unclosed record
         assertEquals(1, diagnostics.size(), diagnostics.toString());
         assertEquals(Diagnostic.Code.VALIDATION_ERROR, diagnostics.getFirst().code());
+    }
+
+    /**
+     * And states its location once. The message used to end {@code at line 2, column 3} while {@code
+     * dataPosition} carried the same place structurally, so every renderer printed it twice, in two
+     * formats, and a consumer parsing the message got a second copy with no byte offset. The exception
+     * says what went wrong; the diagnostic says where.
+     */
+    @Test
+    void aBaseSyntaxErrorStatesItsPositionOnlyStructurally() {
+        Diagnostic diagnostic = validate("{ a: 1  b: ] }").getFirst();
+
+        assertTrue(diagnostic.dataPosition().isPresent(), diagnostic.toString());
+        assertFalse(diagnostic.message().contains("at line"), diagnostic.message());
+        assertFalse(diagnostic.message().contains("column"), diagnostic.message());
+    }
+
+    /** A stack trace still says where, so nothing is lost for the fail-fast caller who never builds a diagnostic. */
+    @Test
+    void theExceptionItselfStillCarriesItsPositionIntoAStackTrace() {
+        TsonParseException thrown = assertThrows(TsonParseException.class,
+                () -> new TsonTreeReader().read("{ a: 1  b: ] }"));
+
+        assertFalse(thrown.getMessage().contains("at line"), thrown.getMessage());
+        assertTrue(thrown.toString().endsWith("at line " + thrown.position().line()
+                + ", column " + thrown.position().column()), thrown.toString());
     }
 
     /**

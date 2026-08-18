@@ -69,7 +69,7 @@ class TsonSchemaLinkerDiagnosticsTest {
 
         assertEquals(3, diagnostics.size(), () -> "expected one per broken entry, got " + diagnostics);
         assertEquals(List.of("/a", "/b", "/c"),
-                diagnostics.stream().map(Diagnostic::schemaPointer).sorted().toList());
+                diagnostics.stream().map(d -> d.schemaPointer().orElseThrow()).sorted().toList());
     }
 
     @Test
@@ -78,7 +78,7 @@ class TsonSchemaLinkerDiagnosticsTest {
             assertEquals("example.test/link-diagnostics.tn", diagnostic.schemaId());
             assertEquals(Diagnostic.Code.SCHEMA_ERROR, diagnostic.code());
             assertTrue(diagnostic.schemaPosition().isPresent(),
-                    () -> "no position on " + diagnostic.schemaPointer());
+                    () -> "no position on " + diagnostic.schemaPointer().orElseThrow());
         }
     }
 
@@ -86,7 +86,7 @@ class TsonSchemaLinkerDiagnosticsTest {
     @Test
     void aLinkDiagnosticCarriesNoDataLocation() {
         for (Diagnostic diagnostic : linkCollecting(threeUnresolvedReferences())) {
-            assertEquals("", diagnostic.path());
+            assertEquals(Optional.empty(), diagnostic.path());
             assertTrue(diagnostic.dataPosition().isEmpty());
         }
     }
@@ -106,7 +106,7 @@ class TsonSchemaLinkerDiagnosticsTest {
                 new TsonSchema(ID, "https://tson.io/2026/32/m/meta.tn", List.of(), entries));
 
         assertEquals(List.of("/bad_field", "/bad_supertype"),
-                diagnostics.stream().map(Diagnostic::schemaPointer).sorted().toList());
+                diagnostics.stream().map(d -> d.schemaPointer().orElseThrow()).sorted().toList());
     }
 
     /** The existing two-argument overload is untouched: first failure, original exception type. */

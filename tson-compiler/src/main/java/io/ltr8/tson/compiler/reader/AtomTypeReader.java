@@ -132,15 +132,18 @@ final class AtomTypeReader<T> implements TsonTypeReader<T> {
     };
 
     /**
-     * The schema entry's own declared name, for a diagnostic's {@code expected}. The <em>declaration's</em>
-     * name, not the built-in it refines: a value violating {@code my_percentage => !positive_integer ^ {
-     * max: 100 }} is told about {@code my_percentage}, which is the name its author wrote and can act on.
+     * The schema entry's own declared name -- the <em>declaration's</em>, not the built-in it refines, so a
+     * {@code TYPE_MISMATCH} against {@code my_percentage => !positive_integer ^ { max: 100 }} names {@code
+     * my_percentage}, which is what its author wrote and can act on. There is no name on {@link AtomType} to
+     * use instead (one {@code IntegerParser} serves {@code int8}..{@code int256} and every refinement of
+     * them), so it has to come from the entry, which every {@link ValueReaderFactory} is handed anyway.
      *
-     * <p>Deliberately not {@code AtomType.toString()}, which is a Java record's generated form and dumps the
-     * whole constraint object graph into a field {@link Diagnostic} documents as the machine-parseable half.
-     * There is no name on {@link AtomType} to use instead -- one {@code IntegerParser} serves {@code
-     * int8}..{@code int256}, the bound-only refinements, and every schema-declared refinement of them -- so
-     * the name has to come from the entry, which is what every {@link ValueReaderFactory} is handed anyway.
+     * <p><b>It is not what a constraint violation reports as {@code expected}.</b> Naming the type there
+     * says strictly less than the message already does -- a consumer wanting the bound has to recover it by
+     * regexing the sentence, which is the one thing {@link Diagnostic}'s structured half exists to avoid.
+     * The atom knows the facet it just violated and carries it on the exception; see {@link
+     * io.ltr8.tson.compiler.atom.AtomTypeException} for the vocabulary. The name still leads the
+     * <em>message</em>, which is where the author needs to see it.
      */
     private final String name;
 
@@ -169,8 +172,8 @@ final class AtomTypeReader<T> implements TsonTypeReader<T> {
         try {
             return delegate.read(tokenValue);
         } catch (AtomTypeException ex) {
-            ctx.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, ex.getMessage(), "a value satisfying " + name,
-                    token.text());
+            ctx.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION,
+                    "'" + name + "': " + ex.getMessage(), ex.expected(), token.text());
             return null;
         }
     }

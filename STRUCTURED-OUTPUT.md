@@ -54,15 +54,14 @@ backend.
     already says what this bullet's item (4) asks for); `DUPLICATE_MAP_KEY` is produced for real, and
     `DUPLICATE_FIELD` joined it for the record half — §2.5/§2.6 word both as *warnings*, but per
     `SPEC-FEEDBACK.md` #41/#42 every warn-shaped rule is implemented as an ordinary error.
-  - `message` — landed, but still **hand-composed at each call site**, not synthesized from `code` +
-    params as this bullet originally called for — that needs a richer per-code parameter shape than
-    exists yet. Still open.
-  - `expected`/`actual` — the fields landed; `actual` carries what it should (`99999`, `CANCELLED`,
-    `(absent)`). **`expected` does not**: it names the declared type (`a value satisfying quantity_t`)
-    rather than the constraint that failed, while the concrete bound or member list sits in `message`
-    (`'99999' is greater than the maximum 100`). So a consumer of the structured fields has to regex the
-    prose to recover what this bullet's own item (4) below asks for. Still open — see `BACKLOG.md`'s
-    "Diagnostic quality for machine consumers".
+  - `message` — landed, **hand-composed at each call site, and staying that way**. Synthesizing it from
+    `code` + params was reconsidered and dropped; see item (5) below for the reasoning.
+  - `expected`/`actual` — landed, both carrying what they should. `actual` is the offending value
+    (`99999`, `CANCELLED`, `(absent)`); `expected` is the **constraint that failed** (`<= 100`, `one of
+    (PENDING, SHIPPED, DELIVERED)`, `at most 10 characters`, `an RFC 3339 date-time`), not the declared
+    type's name, so a consumer never has to regex `message` to recover a bound or a member list.
+    `AtomTypeException` carries it from the facet that rejected the value; its Javadoc fixes the
+    vocabulary at six shapes, and `AtomTypeExceptionTest` pins every one.
   - `dataPosition` — landed, resolved via `TsonReadContext`'s own identity-keyed position table (a
     parser's `positions()`), not a fresh lexer-level `Position` thread. Infrastructure-level problems (an
     unresolvable `!!schema`, an unknown root type) now report through the same receiver rather than being
@@ -94,14 +93,22 @@ backend.
   kind of problem, categorized** (`code`) — lets a system prompt/few-shot pattern generalize a fix
   instead of parsing free text; (3) **what was actually there** (`actual`) — closes the loop; (4)
   **what was expected**, concretely (`expected`) — turns "too large" into "must be ≤ 100"; (5) a
-  single ready-to-paste `message` synthesized from 1–4, which is what actually gets dropped into a
-  retry prompt in practice, but should be a *rendering* of the structured fields, not
-  hand-authored per site.
-  - (1)–(3) are present today. **(4) is not**, despite the field existing — `expected` names the type
-    rather than the violated constraint, so the concrete "must be ≤ 100" lives only in `message` (see the
-    `expected` bullet above). (5) is the remaining gap it shares a cause with. Note what is *not* a gap any
-    more: a repair loop can obtain the diagnostics without giving up the value, so a retry can be built
+  single ready-to-paste `message`, which is what actually gets dropped into a retry prompt in practice.
+  - **All five are present today.** (1)–(4) are structured fields; `expected` carries the violated
+    constraint itself, so "too large" does read as `<= 100` without parsing prose. Note what is *not* a gap
+    any more: a repair loop can obtain the diagnostics without giving up the value, so a retry can be built
     from the partial result rather than from scratch.
+  - **(5) originally asked for `message` to be a *rendering* of 1–4 rather than hand-authored per site. That
+    was reconsidered and dropped**, and should not be re-derived from this list. The premise was that the
+    sentence and the structured fields say the same thing twice and can therefore drift; they don't. The
+    structured half carries the facts a consumer acts on, and *that* is what closes the "don't make the model
+    parse prose" need — items (1)–(4) alone. `message` is for a person, and earns its keep doing what a
+    template cannot: `annotation '@since' is written bare, which §6 treats as '@since:_', but 'since' does
+    not admit the absent sentinel` cites the spec, and `… or an explicit type annotation` names the fix.
+    Synthesis would degrade both. It is also not mechanically available: `code` does not determine the
+    sentence (`TYPE_MISMATCH` alone spans six unrelated situations). The real failure mode was a site
+    leaving `expected`/`actual` blank, which was three facade-level diagnostics and is now fixed and
+    structurally prevented — see `docs/readers-and-diagnostics.md`.
   - **Ranked above all five for a model that authors *schemas* as well as data**: a wrong schema must not
     report `OK`. An unknown member in a refinement body is silently ignored today, so JSON-Schema
     vocabulary (`minimum`/`maximum`) compiles clean and enforces nothing — see `BACKLOG.md`'s "Validation

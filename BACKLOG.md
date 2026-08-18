@@ -189,8 +189,23 @@ left:
 
 - [ ] **The read path carries `schemaPosition` but not `schemaId`/`schemaPointer`** — a reader knows the
   declaration position it stamped, not which entry of which schema produced it, so a value error reports
-  `110:3:4858` with nothing saying that is core.tn's line for `int32`. Threading the compiled schema's
-  identity down the reader stack is what closes it.
+  `110:3:4858` with nothing saying that is core.tn's line for `int32`.
+  - **It is not just a matter of threading the compiled schema's identity down the reader stack** (as this
+    item used to claim): the identity a reader could reach that way is the *wrong one*. `TsonSchemaLinker`'s
+    `mergeImports` copies each imported `TypeDefinition` straight into the importing schema's `entries()`
+    map and keeps nothing about where it came from, so by compile time the origin is already gone. Measured:
+    a 4-line `point-1.tn` declaring `{ point => { x: int32 } }` reports `schemaPosition` `110:3:4858` —
+    core.tn's line for `int32`. Stamping `linkedSchema.schema().id()` alongside it would pair
+    `example.test/point-1.tn` with line 110 of a 4-line document, sending a consumer to the wrong file.
+    Absent is honest; wrong is not, which is why the field is empty rather than approximated.
+  - So the work is upstream first: **record each merged entry's origin schema id**, either as a side map on
+    `TsonSchema`/`TsonLinkedSchema` populated by `mergeImports` (preferred — leaves `schema.meta` alone,
+    since the spec's own `type_definition` has no such field and it is a bind target with a hand-written
+    `equals` and the `@Record` constructor-selection trap) or as a new excluded-from-equality component on
+    `TypeDefinition` beside `position`. Only then does the reader-stack half apply: `withSchemaPosition`
+    becomes a three-part stamp across its ~11 reader call sites, and `DefaultTsonReadContext.report`
+    populates all three. `schemaPointer` is the cheap half — `ValueReaderFactory` is already handed the
+    entry's own declared name, which is the `/name` pointer.
 - [ ] **A schema *parse* error is still fail-fast, and names a token class rather than a construct.**
   Everything downstream of parsing now reports many problems; parsing itself reports one and stops, so an
   author fixes a syntax error, re-runs, and meets the next. The message is also pitched at the wrong level
@@ -198,7 +213,7 @@ left:
   min: 1 }`, a natural thing to try) gives
 
   ```
-  [VALIDATION_ERROR] expected UNQUOTED (a type reference), found '!' (BANG) at line 8, column 15
+  [VALIDATION_ERROR] (6:15:157): expected UNQUOTED (a type reference), found '!' (BANG)
   ```
 
   which is accurate about tokens and silent about the fix — hoist the refinement to its own declaration and
@@ -209,40 +224,6 @@ left:
   declaration's own name token. Sub-declaration positions (which field, which supertype) do not exist and
   would be their own parser work — visible today as a diagnostic pointing at `/my_type` when the problem is
   one of its fields.
-
-## Diagnostic quality for machine consumers
-
-- [ ] **`expected` names the type, not the constraint that failed**, so the structured fields carry strictly
-  less than the prose does — the opposite of the intent. Measured on real output:
-
-  | field | value |
-  |---|---|
-  | `message` | `'99999' is greater than the maximum 100` |
-  | `expected` | `a value satisfying quantity_t` |
-  | `actual` | `99999` |
-
-  Same for an enum: the message lists `[PENDING, SHIPPED, DELIVERED]`, `expected` says `a value satisfying
-  status`. A consumer reading the structured fields has to fall back to regexing `message` to recover the
-  bound or the member list, which is exactly what `Diagnostic` exists to avoid, and what the JDK's own
-  `javax.tools.Diagnostic` is criticised for in issue #3's research notes.
-  `STRUCTURED-OUTPUT.md`'s Tier 1 asks for precisely this — *"turns 'too large' into 'must be ≤ 100'"* — and
-  records the field as landed, which is optimistic: the field exists, the content doesn't.
-  - Cheapest useful version: have each atom's constraint check populate `expected` from the facet it
-    violated. That is where the bound already is; nothing needs to be plumbed to reach it.
-  - The fuller version is the standing `message`-synthesis item (compose the sentence *from* `code` +
-    params rather than hand-writing it per call site), which would make the two consistent by construction
-    instead of by discipline.
-- [ ] **A base-syntax diagnostic states its position twice.** `(7:3:183): … found ']' (RBRACKET) at line 7,
-  column 3` — the parser's own exception message embeds a location the `Diagnostic` already carries
-  structurally as `dataPosition`, so every renderer prints it twice and a machine consumer parsing
-  `message` sees a second, differently-formatted copy (no byte offset). The fix belongs in the parse/lex
-  exception messages, not in a renderer: state what went wrong, and let the diagnostic say where.
-- [ ] **`""` is overloaded on `Diagnostic`'s two pointers**, meaning both "the root" (RFC 6901's own
-  spelling, which `Tson.validateSchema` genuinely emits for a document-level problem) and "this diagnostic
-  has no such end" (every read diagnostic, which populates no `schemaPointer` at all). A consumer cannot
-  tell them apart, and neither can a renderer: `CliDiagnostic` maps `schemaId`/`expected`/`actual` to
-  absent when empty but has to leave `path`/`schemaPointer` as plain strings for exactly this reason.
-  Making the two pointers `Optional<String>` on `Diagnostic` itself would settle it at the source.
 
 ## Write side
 

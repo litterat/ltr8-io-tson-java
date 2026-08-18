@@ -170,6 +170,7 @@ public record Ipv6Parser() implements AtomType<Inet6Address> {
 
     private static AtomParseException malformed(String text) {
         return new AtomParseException(
-                "'" + text + "' is not a valid IPv6 address -- expected RFC 4291 §2.2's text representation (§5.5)");
+                "'" + text + "' is not a valid IPv6 address -- expected RFC 4291 §2.2's text representation (§5.5)",
+                "an IPv6 address");
     }
 }

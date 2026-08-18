@@ -305,7 +305,12 @@ stripped (#43); a written `_` at `REQUIRED_DEFAULT` is an error where omission i
 `Diagnostic` (root package) is one record for both data- and schema-side problems — the variation is
 locational, not categorical: a closed `Code` enum, `message`, `expected`/`actual`, and four location
 components matching JSON Schema 2020-12 §12's output unit (`path`, `schemaId`+`schemaPointer`, plus
-`dataPosition`/`schemaPosition`). Schema-side reporting runs through the same receiver: `SchemaResolver`
+`dataPosition`/`schemaPosition`). Both RFC 6901 pointers are `Optional<String>` because `""` is the *root*,
+a location this really emits, not an absence. `expected` carries the **constraint that failed** — `<= 100`,
+`one of (A, B, C)` — from `AtomTypeException`'s six-shape vocabulary, never the type's name; the name leads
+`message` instead. The base-syntax exceptions keep their position out of `getMessage()` (it is in
+`position()`, and in `toString()` for a stack trace) so a diagnostic states it once.
+Schema-side reporting runs through the same receiver: `SchemaResolver`
 and `TsonSchemaLinker` have reporting overloads that collect every independent problem in one pass (a
 failed declaration leaves an answer-everything placeholder, javac-style), while `Tson.validateSchema` owns
 the phase boundary — linking runs only if resolution was clean, and a schema that reported anything is
@@ -474,8 +479,9 @@ compatibility).
   still fail-fast, and names a token class rather than a construct** (issue #29) — it lands in
   `TsonDataStream`/`TsonDataParser`, shared with the data path, and is floor-limited by the lexer being
   fail-fast too. And **a read-path diagnostic carries `schemaPosition` but no `schemaId`/`schemaPointer`**,
-  which needs the compiled schema's identity threaded down the reader stack. Throw-site classification is
-  done across the whole schema pipeline.
+  which is blocked upstream of the reader stack: `mergeImports` discards which schema an imported entry came
+  from, so the identity a reader could reach is the importing schema's, not the declaration's own.
+  Throw-site classification is done across the whole schema pipeline.
 - **Deferred design questions** — `REQUIRED_FIXED`/`OPTIONAL_FIXED` value validation, `value_param` real
   parameter substitution, thread-safety, and a general disk/HTTP-backed `TsonSchemaSource` (with
   whitelist/blacklist policy).

@@ -18,7 +18,7 @@ import java.util.Optional;
  *
  * <ul>
  *   <li>{@code path} -- the *data* location, an RFC 6901 JSON Pointer (e.g. {@code /orders/3/total}).
- *   Reuses an existing IETF standard rather than a TSON-specific path syntax. Empty for a problem
+ *   Reuses an existing IETF standard rather than a TSON-specific path syntax. Absent for a problem
  *   found in a schema, which has no data.</li>
  *   <li>{@code schemaPointer} -- the *schema* location, an RFC 6901 JSON Pointer into the schema's
  *   own {@code map<type_name, type_definition>} (e.g. {@code /my_type}). Deeper pointers
@@ -32,20 +32,31 @@ import java.util.Optional;
  *   see {@link TsonReadContext}'s own Javadoc).</li>
  * </ul>
  *
+ * <p><b>Both pointers are {@link Optional} because {@code ""} is a real pointer.</b> RFC 6901 spells
+ * "the whole document" as the empty string, and this type emits it for real -- a document-level schema
+ * problem such as an unloadable {@code !!import} genuinely points at the schema's root. Spelling
+ * "nothing to say here" the same way makes the two indistinguishable to a consumer and to a renderer
+ * alike, which is exactly the ambiguity the structured half exists to remove. An absent pointer means
+ * this diagnostic has no such end at all; a present {@code ""} means the root.
+ *
  * <p>The two ends are not alternatives: a value violating {@code int32} as core.tn declares it
  * populates both, which is why this is one record with a richer location model rather than separate
  * data- and schema-diagnostic types. That also matches every comparable system -- {@code
  * javax.tools.Diagnostic}, LSP's {@code Diagnostic}, rustc's {@code DiagInner} -- none of which
  * splits by *where* the problem is.
  *
- * <p>{@code message} is hand-composed at each {@link TsonReadContext#report} call site for now, not
- * synthesized purely from {@code code} plus {@code expected}/{@code actual} -- that would need a
- * richer per-code parameter shape than exists yet. {@code expected}/{@code actual} are the
- * machine-parseable pieces a caller (e.g. an LLM retry loop) can build its own message from without
- * parsing {@code message} itself.
+ * <p><b>{@code message} and the structured fields do different jobs.</b> {@code code}/{@code path}/
+ * {@code expected}/{@code actual} plus the positions carry the facts, and are what a caller (e.g. an LLM
+ * retry loop) acts on without ever reading prose -- so every report site populates them, including the
+ * facade-level ones. {@code message} is hand-composed at each {@link TsonReadContext#report} call site, for
+ * a person, and is free to do what a rendering of the other fields could not: cite the spec, or name the
+ * fix. It is deliberately <em>not</em> synthesized from {@code code} plus parameters -- {@code code} does
+ * not determine the sentence ({@link Code#TYPE_MISMATCH} alone spans a wrong shape, a wrong token, a wrong
+ * cardinality, a bare annotation, an unmatched variant and a host-binding failure), and the sentences differ
+ * because the situations do. See {@code docs/readers-and-diagnostics.md}.
  */
-public record Diagnostic(String path, String schemaPointer, String schemaId, Code code, String message,
-                          String expected, String actual,
+public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, String schemaId, Code code,
+                          String message, String expected, String actual,
                           Optional<SourcePosition> dataPosition, Optional<SourcePosition> schemaPosition) {
 
     /**
@@ -73,7 +84,7 @@ public record Diagnostic(String path, String schemaPointer, String schemaId, Cod
             case TsonUnsupportedDocumentException u -> position = u.position();
             default -> throw e;
         }
-        return new Diagnostic("", "", "", Code.VALIDATION_ERROR, e.getMessage(),
+        return new Diagnostic(Optional.of(""), Optional.empty(), "", Code.VALIDATION_ERROR, e.getMessage(),
                 "well-formed TSON", "a base-syntax error", Optional.ofNullable(position), Optional.empty());
     }
 
@@ -87,14 +98,14 @@ public record Diagnostic(String path, String schemaPointer, String schemaId, Cod
      *                    document may have failed before its own {@code !!id} could be read)
      * @param declaration the declared type name, which becomes the {@code /name} schema pointer. Empty for a
      *                    problem with the document as a whole rather than one of its declarations -- an
-     *                    unloadable {@code !!import}, say -- which leaves the pointer {@code ""}, RFC 6901's
-     *                    own spelling of "the whole document"
+     *                    unloadable {@code !!import}, say -- which makes the pointer a <em>present</em>
+     *                    {@code ""}, RFC 6901's own spelling of "the whole document", not an absence
      * @param position    where that declaration begins in the schema source, absent for a synthesized entry
      */
     public static Diagnostic ofSchemaError(String schemaId, String declaration, String message,
                                            Optional<SourcePosition> position) {
-        return new Diagnostic("", declaration.isEmpty() ? "" : "/" + declaration, schemaId, Code.SCHEMA_ERROR,
-                message, "", "", Optional.empty(), position);
+        return new Diagnostic(Optional.empty(), Optional.of(declaration.isEmpty() ? "" : "/" + declaration),
+                schemaId, Code.SCHEMA_ERROR, message, "", "", Optional.empty(), position);
     }
 
     /**

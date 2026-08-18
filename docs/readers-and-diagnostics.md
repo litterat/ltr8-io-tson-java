@@ -132,7 +132,13 @@ because the variation is locational, not categorical** — a value violating `in
 populates both ends at once, and `javax.tools.Diagnostic`, LSP's `Diagnostic` and rustc's `DiagInner` all
 model it the same way (rustc's `MultiSpan` being the mature form of the same idea).
 
-Either end may be empty: a schema-side problem has no data, and a schemaless read has no schema.
+Either end may be absent: a schema-side problem has no data, and a schemaless read has no schema. **Both
+pointers are `Optional<String>`, and that is load-bearing** — RFC 6901 spells "the whole document" as `""`,
+and this type emits it for real (a document-level schema problem such as an unloadable `!!import` points at
+the schema root; a base-syntax failure points at the data root), so spelling "no such end" the same way would
+make the two indistinguishable to a consumer *and* to a renderer. A present `""` is the root; an absence is
+an absence. `schemaId`/`expected`/`actual` stay plain strings, where `""` carries no second meaning.
+
 **`schemaPosition` comes from `TypeDefinition.position()`**, which is
 populated because `SchemaResolver.resolveSchema` takes `TsonSchemaParser.declarationPositions()` and passes
 each declaration's own position into `DefinitionResolver.resolve` — so a value error points at both ends, the
@@ -140,11 +146,63 @@ value in the data and the type it violated in the schema. Every reader stamps it
 one reported is the *atom's* declaration (`int32` in core.tn), not the enclosing record's. **The read path
 populates `schemaPosition` but not `schemaId`/`schemaPointer`** — a reader knows the declaration position it
 stamped, not which entry of which schema it came from, so which schema a read diagnostic's position refers to
-is still implicit; the schema path populates all three (`BACKLOG.md`).
+is still implicit; the schema path populates all three (`BACKLOG.md`). The cause is upstream of the reader:
+`TsonSchemaLinker.mergeImports` copies an imported `TypeDefinition` into the importing schema's `entries()`
+and keeps no record of where it came from, so a 4-line schema importing core.tn reports core.tn's
+`110:3:4858` for `int32` and the compiled schema's own id would be the *wrong* answer to pair with it. The
+field stays absent rather than approximated.
 An atom's `AtomTypeException` is caught in `AtomTypeReader` and mapped to
 `ATOM_CONSTRAINT_VIOLATION` — `AtomType`'s own signature is untouched, since it's shared with the
-schemaless binder which has no read context. Out of scope for now: message synthesis from code + params,
-fine-grained atom codes, and per-field schema positions.
+schemaless binder which has no read context. Out of scope for now: fine-grained atom codes, and per-field
+schema positions. (Message synthesis from code + params is not a gap but a decision -- see below.)
+
+**`expected` carries the constraint that failed, never the type's name.** `AtomTypeException` holds an
+`expected` alongside its message, filled at each throw site from the facet that rejected the value, and all
+three atom report sites (`AtomTypeReader`, `TypeRefCheck.violation`, `SchemalessObjectReader.bindBuiltin`)
+pass it straight through. Naming the type there — the old `a value satisfying quantity_t` against a message
+reading `'99999' is greater than the maximum 100` — made the structured half carry strictly *less* than the
+prose, so a consumer wanting the bound had to regex the sentence. That exception's own Javadoc fixes the
+vocabulary at six shapes and no site invents a seventh:
+
+| shape | example |
+|---|---|
+| an ordering bound | `<= 100`, `> 1`, `>= -128 and <= 127` |
+| a membership | `one of (PENDING, SHIPPED, DELIVERED)` |
+| a length | `exactly 4 characters`, `at most 10 bytes` |
+| a pattern | `matching [A-Z]{3}` |
+| a grammar (parse failures only) | `an RFC 3339 date-time`, `an integer or based-integer form` |
+| a prohibition | `not NaN`, `a finite value` |
+
+The declaring type name leads the *message* instead (`'my_percentage': '500' is greater than the maximum
+100`) — it is what an author wrote and can act on, so giving up `expected` must not drop it from the
+diagnostic entirely. `AtomTypeExceptionTest` pins all six shapes against the real parsers, because the
+field's value is that it is one vocabulary across atoms, not a per-parser phrasing.
+
+**`message` and the structured fields do different jobs, and neither is derived from the other.** The
+structured half — `code`, `path`, `expected`, `actual`, the positions — carries the *facts*, and is what a
+machine consumer acts on; it must be complete at every report site, including the facade-level ones
+(`TsonObjectReader`/`TsonTreeReader`'s `abandon`, which no longer offers an overload that omits them, because
+that overload is how three diagnostics ended up with a blank structured half). `message` is for a person, and
+is free to do what a template could not: cite the spec, or name the fix.
+
+```
+annotation '@since' is written bare, which §6 treats as '@since:_', but 'since' does not admit the absent sentinel
+'contact' has no variant matching this untagged value -- expected a value of one of
+    (email, phone), or an explicit type annotation
+```
+
+Neither of those is a restatement of `expected`/`actual`, and synthesizing them from `code` plus parameters
+would make them worse. **So there is deliberately no message-synthesis layer here**, and one should not be
+added: `code` does not determine the sentence (`TYPE_MISMATCH` alone covers a wrong shape, a wrong token, a
+wrong cardinality, a bare annotation, an unmatched variant and a host-binding failure), and the sentences
+differ because the situations do. The failure mode worth guarding is a site that forgets `expected` — which
+the missing overload now makes hard — not a site that writes a sentence a template wouldn't have.
+
+**A base-syntax diagnostic states its position once, structurally.** `TsonParseException`, `LexException`
+and `TsonUnsupportedDocumentException` keep the location in `position()` and out of `getMessage()`;
+`toString()` appends it, so a stack trace still says where while the `Diagnostic` built from one carries
+`dataPosition` as the single copy. Repeating it in the message made every renderer print the location twice,
+in two formats, the second without a byte offset.
 
 ## Schema-side diagnostics (`SchemaResolver`, `TsonSchemaLinker`, `Tson.validateSchema`)
 

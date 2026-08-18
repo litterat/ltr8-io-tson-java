@@ -294,25 +294,27 @@ public final class TsonObjectReader {
         if (bound != null && !type.isAssignableFrom(bound)) {
             return abandon(ctx, Diagnostic.Code.TYPE_MISMATCH,
                     "the schema's root type `" + root.typeName() + "` binds to " + bound.getName()
-                            + ", which is not assignable to the requested " + type.getName());
+                            + ", which is not assignable to the requested " + type.getName(),
+                    type.getName(), bound.getName());
         }
         Object value = root.reader().read(ctx);
         if (value != null && !type.isInstance(value)) {
             // The value is already consumed, so there is nothing left to skip -- just report and yield none.
             ctx.report(Diagnostic.Code.TYPE_MISMATCH,
                     "the schema's root type `" + root.typeName() + "` produced a " + value.getClass().getName()
-                            + ", not the requested " + type.getName(), "", "");
+                            + ", not the requested " + type.getName(), type.getName(), value.getClass().getName());
             return null;
         }
         return type.cast(value);
     }
 
-    /** Reports {@code code}/{@code message}, discards the root value, and yields no object -- see {@link #readAgainstSchema}. */
-    private static <T> T abandon(TsonReadContext ctx, Diagnostic.Code code, String message) {
-        return abandon(ctx, code, message, "", "");
-    }
-
-    /** {@link #abandon(TsonReadContext, Diagnostic.Code, String)} for a problem with machine-readable ends. */
+    /**
+     * Reports {@code code}/{@code message}, discards the root value, and yields no object -- see {@link
+     * #readAgainstSchema}. There is deliberately no overload that omits {@code expected}/{@code actual}: a
+     * facade-level failure is exactly the kind a machine consumer must be able to act on without reading
+     * prose, and the omitting overload this used to have is how three of them ended up with a blank
+     * structured half. See {@code docs/readers-and-diagnostics.md} on what each field is for.
+     */
     private static <T> T abandon(TsonReadContext ctx, Diagnostic.Code code, String message, String expected,
             String actual) {
         ctx.report(code, message, expected, actual);
@@ -338,7 +340,7 @@ public final class TsonObjectReader {
             // rebuilt from the data cursor.
             compiled = bind.get(schemaUri, receiver);
         } catch (RuntimeException e) {
-            return abandon(ctx, Diagnostic.Code.SCHEMA_ERROR, e.getMessage());
+            return abandon(ctx, Diagnostic.Code.SCHEMA_ERROR, e.getMessage(), "a resolvable schema", schemaUri);
         }
         if (compiled == null) {
             EventSkip.dataValue(ctx);
@@ -348,7 +350,8 @@ public final class TsonObjectReader {
         if (name == null) {
             if (!(ctx.peek() instanceof TypeRef typeRef)) {
                 return abandon(ctx, Diagnostic.Code.VALIDATION_ERROR,
-                        "data declares a !!schema but has no root type-ref (e.g. `!person`) to select a type");
+                        "data declares a !!schema but has no root type-ref (e.g. `!person`) to select a type",
+                        "a root type-ref", "(none)");
             }
             name = typeRef.name();
         }

@@ -103,7 +103,7 @@ class TsonTreeReaderTest {
 
         assertEquals(1, problems.size());
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, problems.get(0).code());
-        assertEquals("", problems.get(0).path());
+        assertEquals(Optional.of(""), problems.get(0).path());
         assertTrue(problems.get(0).message().contains("!uuid"));
 
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, problemsIn("!date [1 2]").get(0).code());
@@ -117,7 +117,7 @@ class TsonTreeReaderTest {
         assertEquals(2, problems.size());
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, problems.get(0).code());
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, problems.get(1).code());
-        assertEquals("/a", problems.get(1).path());
+        assertEquals(Optional.of("/a"), problems.get(1).path());
     }
 
     @Test
@@ -127,7 +127,7 @@ class TsonTreeReaderTest {
         List<Diagnostic> nested = problemsIn("{ a: !nosuchtype 1 }");
         assertEquals(1, nested.size());
         assertEquals(Diagnostic.Code.UNKNOWN_TYPE_REF, nested.get(0).code());
-        assertEquals("/a", nested.get(0).path());
+        assertEquals(Optional.of("/a"), nested.get(0).path());
     }
 
     /** §5.1 is case-sensitive, so a near-miss of a built-in name is exactly what this rule is for. */
@@ -143,7 +143,7 @@ class TsonTreeReaderTest {
 
         assertEquals(1, problems.size());
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, problems.get(0).code());
-        assertEquals("/a", problems.get(0).path());
+        assertEquals(Optional.of("/a"), problems.get(0).path());
         assertTrue(problems.get(0).dataPosition().isPresent());
     }
 
@@ -191,7 +191,7 @@ class TsonTreeReaderTest {
         List<Diagnostic> problems = problemsIn("{ \"a\" => !uuid nope }");
 
         assertEquals(1, problems.size());
-        assertEquals("/a", problems.get(0).path());
+        assertEquals(Optional.of("/a"), problems.get(0).path());
     }
 
     /**
@@ -205,7 +205,7 @@ class TsonTreeReaderTest {
         List<Diagnostic> fieldProblems = problemsIn("{ a: 1  a: 2 }");
         assertEquals(List.of(Diagnostic.Code.DUPLICATE_FIELD),
                 fieldProblems.stream().map(Diagnostic::code).toList(), fieldProblems.toString());
-        assertEquals("/a", fieldProblems.getFirst().path());
+        assertEquals(Optional.of("/a"), fieldProblems.getFirst().path());
 
         List<Diagnostic> keyProblems = problemsIn("{ \"a\" => 1  \"a\" => 2 }");
         assertEquals(List.of(Diagnostic.Code.DUPLICATE_MAP_KEY),

@@ -1,19 +1,20 @@
-!!id:"https://tson.io/2026/32/ltr8/cli/diagnostics-4.tn"
+!!id:"https://tson.io/2026/32/ltr8/cli/diagnostics-5.tn"
 !!meta:"https://tson.io/2026/32/m/meta.tn"
 !!import:"https://tson.io/2026/32/m/core.tn"
 @doc:"""
   This project's own schema !!id convention (see CLAUDE.md's "Project-owned schema !!id
   convention"): /2026/32 is the spec revision this schema is written against, ltr8 is the
-  publishing org, cli is this module's own schema group, and the trailing -4 is this schema's
+  publishing org, cli is this module's own schema group, and the trailing -5 is this schema's
   own version -- bumped when file_report/validation_run were added, so `validate` can name the
-  file each verdict belongs to inside one document, and when the fields that may have nothing to
-  say became optional rather than empty; per that same convention's "bump it, under a new name"
-  rule, never edit a published schema's own content in place.
+  file each verdict belongs to inside one document; when the fields that may have nothing to
+  say became optional rather than empty; and when path/schema_pointer joined them, DUPLICATE_FIELD
+  having been missing from diagnostic_code all along. Per that same convention's "bump it, under a
+  new name" rule, never edit a published schema's own content in place.
   """
 {
   diagnostic_code => !enum [
     FIELD_REQUIRED TYPE_MISMATCH WRONG_ARITY UNKNOWN_TYPE_REF ATOM_CONSTRAINT_VIOLATION
-    UNRECOGNIZED_FIELD DUPLICATE_MAP_KEY SCHEMA_ERROR UNKNOWN_TYPE VALIDATION_ERROR
+    UNRECOGNIZED_FIELD DUPLICATE_MAP_KEY DUPLICATE_FIELD SCHEMA_ERROR UNKNOWN_TYPE VALIDATION_ERROR
   ]
   @doc:"""
     One problem, located at up to two ends: the value in the data (path, data_position) and the rule
@@ -21,16 +22,16 @@
     found in a schema has no data, and a schemaless read has no schema.
 
     Absence is written as absence: every field that may have nothing to say is optional here and
-    renders as null in --output json. path and schema_pointer are the exceptions and are always
-    present, because for an RFC 6901 pointer "" is not absence but the root -- a document-level
-    schema problem genuinely carries it.
+    renders as null in --output json. That includes both RFC 6901 pointers, and the distinction they
+    draw is load-bearing: a present "" is the root, which a document-level schema problem genuinely
+    carries, while null means this diagnostic has no such end at all.
 
     A position is "line:column:byte_offset", all three 1-based except byte_offset, which counts
     UTF-8 bytes from 0 ([TSON-DATA] §8.1).
     """
   diagnostic => {
-    path: text
-    schema_pointer: text
+    path: text?
+    schema_pointer: text?
     schema_id: text?
     code: diagnostic_code
     message: text

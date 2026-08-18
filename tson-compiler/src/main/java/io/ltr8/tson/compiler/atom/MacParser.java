@@ -43,7 +43,8 @@ public record MacParser(MacType constraints) implements AtomType<String> {
         String text = token.text();
         if (!EUI_48.matcher(text).matches()) {
             throw new AtomParseException("'" + text + "' is not a valid MAC address -- expected RFC 9542's EUI-48 "
-                    + "form, six hex octets separated consistently by ':' or by '-' (§5.5)");
+                    + "form, six hex octets separated consistently by ':' or by '-' (§5.5)",
+                    "an EUI-48 MAC address");
         }
         return text;
     }

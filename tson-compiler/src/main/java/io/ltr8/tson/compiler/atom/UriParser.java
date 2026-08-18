@@ -47,7 +47,7 @@ public record UriParser(UriType constraints) implements AtomType<URI> {
         try {
             value = new URI(text);
         } catch (URISyntaxException e) {
-            throw new AtomParseException("'" + text + "' is not a valid URI (§5.5): " + e.getReason());
+            throw new AtomParseException("'" + text + "' is not a valid URI (§5.5): " + e.getReason(), "a URI");
         }
         validate(value, text);
         return value;
@@ -62,26 +62,30 @@ public record UriParser(UriType constraints) implements AtomType<URI> {
         constraints.minLength().ifPresent(min -> {
             if (text.length() < min) {
                 throw new AtomValidationException(
-                        "'" + text + "' is " + text.length() + " characters, less than the minimum " + min);
+                        "'" + text + "' is " + text.length() + " characters, less than the minimum " + min,
+                        "at least " + min + " characters");
             }
         });
         constraints.maxLength().ifPresent(max -> {
             if (text.length() > max) {
                 throw new AtomValidationException(
-                        "'" + text + "' is " + text.length() + " characters, more than the maximum " + max);
+                        "'" + text + "' is " + text.length() + " characters, more than the maximum " + max,
+                        "at most " + max + " characters");
             }
         });
         // Pattern is I-Regexp (RFC 9485), matched via tson-regex (linear-time, ReDoS-safe), not
         // java.util.regex; already validated well-formed at schema resolution (see RegexParser).
         constraints.pattern().ifPresent(p -> {
             if (!TsonRegex.parse(p).matches(text)) {
-                throw new AtomValidationException("'" + text + "' does not match the required pattern " + p);
+                throw new AtomValidationException("'" + text + "' does not match the required pattern " + p,
+                        "matching " + p);
             }
         });
         constraints.scheme().ifPresent(s -> {
             if (!s.equalsIgnoreCase(value.getScheme())) {
                 throw new AtomValidationException(
-                        "'" + text + "' has scheme '" + value.getScheme() + "', expected '" + s + "'");
+                        "'" + text + "' has scheme '" + value.getScheme() + "', expected '" + s + "'",
+                        "scheme " + s);
             }
         });
     }

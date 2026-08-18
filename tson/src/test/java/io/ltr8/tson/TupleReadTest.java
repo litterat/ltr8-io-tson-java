@@ -122,7 +122,7 @@ class TupleReadTest {
         TsonReadException thrown = assertThrows(TsonReadException.class,
                 () -> read("[integer, text]", "pair", "[\"not a number\" \"hello\"]"));
 
-        assertEquals("/0", thrown.diagnostic().path(), "reported at the offending position");
+        assertEquals(Optional.of("/0"), thrown.diagnostic().path(), "reported at the offending position");
     }
 
     /** A declaration-position `?` makes that position OPTIONAL, which is what admits the absent sentinel. */

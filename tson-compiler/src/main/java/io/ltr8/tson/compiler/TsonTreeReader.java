@@ -260,7 +260,7 @@ public final class TsonTreeReader {
         } catch (RuntimeException e) {
             // The schema could not be reached at all (unfetchable, malformed, a bad !!id): one problem, and
             // there is nothing to enumerate.
-            return abandon(ctx, Diagnostic.Code.SCHEMA_ERROR, e.getMessage());
+            return abandon(ctx, Diagnostic.Code.SCHEMA_ERROR, e.getMessage(), "a resolvable schema", schemaUri);
         }
         if (compiled == null) {
             // Reported above; skip the value so the stream still lands on DocumentEnd.
@@ -271,7 +271,8 @@ public final class TsonTreeReader {
         if (name == null) {
             if (!(ctx.peek() instanceof TypeRef typeRef)) {
                 return abandon(ctx, Diagnostic.Code.VALIDATION_ERROR,
-                        "data declares a !!schema but has no root type-ref (e.g. `!person`) to select a type");
+                        "data declares a !!schema but has no root type-ref (e.g. `!person`) to select a type",
+                        "a root type-ref", "(none)");
             }
             name = typeRef.name();
         }
@@ -285,12 +286,13 @@ public final class TsonTreeReader {
         return (TsonValue) reader.read(ctx);
     }
 
-    /** Reports {@code code}/{@code message}, discards the root value, and yields no tree -- see {@link #readAgainstSchema}. */
-    private static TsonValue abandon(TsonReadContext ctx, Diagnostic.Code code, String message) {
-        return abandon(ctx, code, message, "", "");
-    }
-
-    /** {@link #abandon(TsonReadContext, Diagnostic.Code, String)} for a problem with machine-readable ends. */
+    /**
+     * Reports {@code code}/{@code message}, discards the root value, and yields no tree -- see {@link
+     * #readAgainstSchema}. There is deliberately no overload that omits {@code expected}/{@code actual}: a
+     * facade-level failure is exactly the kind a machine consumer must be able to act on without reading
+     * prose, and the omitting overload this used to have is how three of them ended up with a blank
+     * structured half. See {@code docs/readers-and-diagnostics.md} on what each field is for.
+     */
     private static TsonValue abandon(TsonReadContext ctx, Diagnostic.Code code, String message, String expected,
             String actual) {
         ctx.report(code, message, expected, actual);

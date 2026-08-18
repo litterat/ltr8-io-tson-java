@@ -59,9 +59,14 @@ final class TypeRefCheck {
                 "a scalar for !" + name, describe(core));
     }
 
-    /** A token the built-in atom named by {@code name} rejected -- both {@code AtomTypeException} subtypes land here. */
+/**
+     * A token the built-in atom named by {@code name} rejected -- both {@code AtomTypeException} subtypes land
+     * here. {@code expected} is the atom's own account of the constraint that failed, not the atom's name: see
+     * {@link AtomTypeException} for the vocabulary, and {@link io.ltr8.tson.compiler.reader.AtomTypeReader} for
+     * why naming the type there is a loss.
+     */
     static void violation(TsonReadContext ctx, String name, AtomTypeException e, String text) {
-        ctx.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, e.getMessage(), "a value satisfying !" + name, text);
+        ctx.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, e.getMessage(), e.expected(), text);
     }
 
     /**

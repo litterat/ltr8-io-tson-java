@@ -81,7 +81,7 @@ class RecordClosureTest {
 
         Map<String, Diagnostic> byPath = new LinkedHashMap<>();
         for (Diagnostic diagnostic : problems.diagnostics()) {
-            byPath.put(diagnostic.path(), diagnostic);
+            byPath.put(diagnostic.path().orElseThrow(), diagnostic);
         }
         assertEquals(List.of("/address/nested_bogus", "/top_bogus"), byPath.keySet().stream().sorted().toList());
         for (Diagnostic diagnostic : problems.diagnostics()) {
@@ -163,7 +163,7 @@ class RecordClosureTest {
 
         Diagnostic diagnostic = problems.diagnostics().getFirst();
         assertEquals(Diagnostic.Code.UNRECOGNIZED_FIELD, diagnostic.code());
-        assertEquals("/minLength", diagnostic.path());
+        assertEquals(Optional.of("/minLength"), diagnostic.path());
         assertEquals("min_length | max_length | length | pattern", diagnostic.expected());
         assertNull(bound);
 

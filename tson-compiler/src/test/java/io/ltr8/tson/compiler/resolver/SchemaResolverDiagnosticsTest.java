@@ -14,6 +14,7 @@ import io.ltr8.tson.schema.TsonSchemaValidationException;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -92,7 +93,7 @@ class SchemaResolverDiagnosticsTest {
         List<Diagnostic> diagnostics = resolveCollecting(FOUR_BROKEN);
 
         assertEquals(List.of("/declared_twice", "/typo_in_source", "/widens", "/widens_too"),
-                diagnostics.stream().map(Diagnostic::schemaPointer).sorted().toList());
+                diagnostics.stream().map(d -> d.schemaPointer().orElseThrow()).sorted().toList());
         for (Diagnostic diagnostic : diagnostics) {
             assertEquals("example.test/broken.tn", diagnostic.schemaId());
             assertEquals(Diagnostic.Code.SCHEMA_ERROR, diagnostic.code());
@@ -104,7 +105,7 @@ class SchemaResolverDiagnosticsTest {
     void everyDiagnosticCarriesTheDeclarationsPositionInTheSchemaSource() {
         for (Diagnostic diagnostic : resolveCollecting(FOUR_BROKEN)) {
             assertTrue(diagnostic.schemaPosition().isPresent(),
-                    () -> "no schema position on " + diagnostic.schemaPointer());
+                    () -> "no schema position on " + diagnostic.schemaPointer().orElseThrow());
             assertTrue(diagnostic.schemaPosition().get().line() > 0);
         }
     }
@@ -113,7 +114,7 @@ class SchemaResolverDiagnosticsTest {
     @Test
     void aSchemaDiagnosticCarriesNoDataLocation() {
         for (Diagnostic diagnostic : resolveCollecting(FOUR_BROKEN)) {
-            assertEquals("", diagnostic.path());
+            assertEquals(Optional.empty(), diagnostic.path());
             assertTrue(diagnostic.dataPosition().isEmpty());
         }
     }
@@ -137,7 +138,7 @@ class SchemaResolverDiagnosticsTest {
                 }
                 """);
 
-        assertEquals(List.of("/child"), diagnostics.stream().map(Diagnostic::schemaPointer).toList());
+        assertEquals(List.of("/child"), diagnostics.stream().map(d -> d.schemaPointer().orElseThrow()).toList());
     }
 
     /**
@@ -161,10 +162,10 @@ class SchemaResolverDiagnosticsTest {
                 """);
 
         assertEquals(List.of("/bad_max", "/bad_min"),
-                diagnostics.stream().map(Diagnostic::schemaPointer).sorted().toList());
+                diagnostics.stream().map(d -> d.schemaPointer().orElseThrow()).sorted().toList());
         for (Diagnostic diagnostic : diagnostics) {
             assertTrue(diagnostic.message().contains("not valid data for 'integer_type'"), diagnostic.message());
-            assertTrue(diagnostic.schemaPosition().isPresent(), diagnostic.schemaPointer());
+            assertTrue(diagnostic.schemaPosition().isPresent(), diagnostic.schemaPointer().orElseThrow());
         }
     }
 
@@ -196,11 +197,11 @@ class SchemaResolverDiagnosticsTest {
                 """);
 
         assertEquals(List.of("/inverted", "/vacuous"),
-                diagnostics.stream().map(Diagnostic::schemaPointer).sorted().toList());
+                diagnostics.stream().map(d -> d.schemaPointer().orElseThrow()).sorted().toList());
         for (Diagnostic diagnostic : diagnostics) {
             assertEquals("example.test/broken.tn", diagnostic.schemaId());
             assertEquals(Diagnostic.Code.SCHEMA_ERROR, diagnostic.code());
-            assertTrue(diagnostic.schemaPosition().isPresent(), diagnostic.schemaPointer());
+            assertTrue(diagnostic.schemaPosition().isPresent(), diagnostic.schemaPointer().orElseThrow());
         }
     }
 
@@ -224,7 +225,7 @@ class SchemaResolverDiagnosticsTest {
                 """);
 
         assertEquals(List.of("/vacuous", "/widens"),
-                diagnostics.stream().map(Diagnostic::schemaPointer).sorted().toList());
+                diagnostics.stream().map(d -> d.schemaPointer().orElseThrow()).sorted().toList());
     }
 
     /**
@@ -248,7 +249,7 @@ class SchemaResolverDiagnosticsTest {
                 }
                 """);
 
-        assertEquals(List.of("/vacuous"), diagnostics.stream().map(Diagnostic::schemaPointer).toList());
+        assertEquals(List.of("/vacuous"), diagnostics.stream().map(d -> d.schemaPointer().orElseThrow()).toList());
     }
 
     /** Desugaring's half of the same guarantee -- the overload without a receiver still throws its own error. */

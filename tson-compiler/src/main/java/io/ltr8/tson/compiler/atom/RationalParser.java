@@ -44,7 +44,8 @@ public record RationalParser(RationalType constraints) implements AtomType<Ratio
     public Rational read(TokenValue token) {
         String text = token.text();
         RationalForm form = NumberGrammar.tryRational(text).orElseThrow(() -> new AtomParseException(
-                "'" + text + "' is not a valid rational -- expected numerator/denominator, e.g. \"2/3\" (§7.6)"));
+                "'" + text + "' is not a valid rational -- expected numerator/denominator, e.g. \"2/3\" (§7.6)",
+                "a rational form"));
 
         BigInteger numerator = new BigInteger(form.numerator().replace("_", ""));
         if (form.sign().filter(s -> s == NumberForm.Sign.MINUS).isPresent()) {
@@ -65,22 +66,22 @@ public record RationalParser(RationalType constraints) implements AtomType<Ratio
     private void validate(Rational value, String text) {
         constraints.min().ifPresent(m -> {
             if (value.compareTo(m) < 0) {
-                throw new AtomValidationException("'" + text + "' is less than the minimum " + m);
+                throw new AtomValidationException("'" + text + "' is less than the minimum " + m, ">= " + m);
             }
         });
         constraints.exclusiveMin().ifPresent(m -> {
             if (value.compareTo(m) <= 0) {
-                throw new AtomValidationException("'" + text + "' must be strictly greater than " + m);
+                throw new AtomValidationException("'" + text + "' must be strictly greater than " + m, "> " + m);
             }
         });
         constraints.max().ifPresent(m -> {
             if (value.compareTo(m) > 0) {
-                throw new AtomValidationException("'" + text + "' is greater than the maximum " + m);
+                throw new AtomValidationException("'" + text + "' is greater than the maximum " + m, "<= " + m);
             }
         });
         constraints.exclusiveMax().ifPresent(m -> {
             if (value.compareTo(m) >= 0) {
-                throw new AtomValidationException("'" + text + "' must be strictly less than " + m);
+                throw new AtomValidationException("'" + text + "' must be strictly less than " + m, "< " + m);
             }
         });
         constraints.multipleOf().ifPresent(m -> {
@@ -89,7 +90,7 @@ public record RationalParser(RationalType constraints) implements AtomType<Ratio
             BigInteger lhs = value.numerator().multiply(m.denominator());
             BigInteger rhs = value.denominator().multiply(m.numerator());
             if (rhs.signum() == 0 || lhs.remainder(rhs).signum() != 0) {
-                throw new AtomValidationException("'" + text + "' is not a multiple of " + m);
+                throw new AtomValidationException("'" + text + "' is not a multiple of " + m, "a multiple of " + m);
             }
         });
     }

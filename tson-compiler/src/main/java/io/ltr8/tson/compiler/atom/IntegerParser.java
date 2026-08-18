@@ -84,7 +84,8 @@ public record IntegerParser(IntegerType constraints) implements AtomType<Number>
         NumberForm form = NumberGrammar.tryParse(text)
                 .filter(f -> f instanceof NumberForm.IntegerForm || f instanceof NumberForm.BasedIntegerForm)
                 .orElseThrow(() -> new AtomParseException(
-                        "'" + text + "' is not a valid integer -- only integer and based-integer forms are accepted (§5.6)"));
+                        "'" + text + "' is not a valid integer -- only integer and based-integer forms are accepted (§5.6)",
+                        "an integer or based-integer form"));
 
         BigInteger value = NumberForms.toBigInteger(form);
         validate(value, text);
@@ -98,32 +99,32 @@ public record IntegerParser(IntegerType constraints) implements AtomType<Number>
             if (value.compareTo(min) < 0 || value.compareTo(max) > 0) {
                 throw new AtomValidationException("'" + text + "' is out of range for a "
                         + (s.signed() ? "signed" : "unsigned") + " " + s.bits() + "-bit integer ["
-                        + min + ", " + max + "]");
+                        + min + ", " + max + "]", ">= " + min + " and <= " + max);
             }
         });
         constraints.min().ifPresent(m -> {
             if (value.compareTo(m) < 0) {
-                throw new AtomValidationException("'" + text + "' is less than the minimum " + m);
+                throw new AtomValidationException("'" + text + "' is less than the minimum " + m, ">= " + m);
             }
         });
         constraints.exclusiveMin().ifPresent(m -> {
             if (value.compareTo(m) <= 0) {
-                throw new AtomValidationException("'" + text + "' must be strictly greater than " + m);
+                throw new AtomValidationException("'" + text + "' must be strictly greater than " + m, "> " + m);
             }
         });
         constraints.max().ifPresent(m -> {
             if (value.compareTo(m) > 0) {
-                throw new AtomValidationException("'" + text + "' is greater than the maximum " + m);
+                throw new AtomValidationException("'" + text + "' is greater than the maximum " + m, "<= " + m);
             }
         });
         constraints.exclusiveMax().ifPresent(m -> {
             if (value.compareTo(m) >= 0) {
-                throw new AtomValidationException("'" + text + "' must be strictly less than " + m);
+                throw new AtomValidationException("'" + text + "' must be strictly less than " + m, "< " + m);
             }
         });
         constraints.multipleOf().ifPresent(m -> {
             if (value.remainder(m).signum() != 0) {
-                throw new AtomValidationException("'" + text + "' is not a multiple of " + m);
+                throw new AtomValidationException("'" + text + "' is not a multiple of " + m, "a multiple of " + m);
             }
         });
     }

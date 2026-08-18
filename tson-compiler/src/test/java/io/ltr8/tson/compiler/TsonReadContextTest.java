@@ -125,9 +125,9 @@ class TsonReadContextTest {
 
         assertEquals(2, problems.diagnostics().size());
         assertEquals("first problem", problems.diagnostics().get(0).message());
-        assertEquals("", problems.diagnostics().get(0).path());
+        assertEquals(Optional.of(""), problems.diagnostics().get(0).path());
         assertEquals("second problem", problems.diagnostics().get(1).message());
-        assertEquals("/nested", problems.diagnostics().get(1).path());
+        assertEquals(Optional.of("/nested"), problems.diagnostics().get(1).path());
     }
 
     @Test
@@ -161,7 +161,7 @@ class TsonReadContextTest {
         scoped.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, "out of range", "0..100", "200");
 
         Diagnostic diagnostic = problems.diagnostics().get(0);
-        assertEquals("/value", diagnostic.path());
+        assertEquals(Optional.of("/value"), diagnostic.path());
         assertEquals(Optional.of(dataPosition), diagnostic.dataPosition());
         assertEquals(Optional.of(schemaPosition), diagnostic.schemaPosition());
     }

@@ -38,7 +38,8 @@ public record RegexParser(RegexType constraints) implements AtomType<String> {
         try {
             TsonRegex.parse(text);
         } catch (TsonRegexSyntaxException e) {
-            throw new AtomParseException("'" + text + "' is not a valid I-Regexp (RFC 9485): " + e.getMessage());
+            throw new AtomParseException("'" + text + "' is not a valid I-Regexp (RFC 9485): " + e.getMessage(),
+                    "an I-Regexp pattern");
         }
         return text;
     }

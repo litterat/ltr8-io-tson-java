@@ -58,7 +58,7 @@ public record EmailParser(EmailType constraints) implements AtomType<String> {
         if (!ADDR_SPEC.matcher(text).matches()) {
             throw new AtomParseException("'" + text + "' is not a valid email address -- expected RFC 5322's "
                     + "dot-atom form, local@domain (quoted local parts, domain literals and comments are not "
-                    + "accepted; see EmailParser)");
+                    + "accepted; see EmailParser)", "an RFC 5322 dot-atom address");
         }
         validate(text);
         return text;
@@ -74,26 +74,30 @@ public record EmailParser(EmailType constraints) implements AtomType<String> {
         constraints.length().ifPresent(len -> {
             if (text.length() != len) {
                 throw new AtomValidationException(
-                        "'" + text + "' is " + text.length() + " characters, expected exactly " + len);
+                        "'" + text + "' is " + text.length() + " characters, expected exactly " + len,
+                        "exactly " + len + " characters");
             }
         });
         constraints.minLength().ifPresent(min -> {
             if (text.length() < min) {
                 throw new AtomValidationException(
-                        "'" + text + "' is " + text.length() + " characters, less than the minimum " + min);
+                        "'" + text + "' is " + text.length() + " characters, less than the minimum " + min,
+                        "at least " + min + " characters");
             }
         });
         constraints.maxLength().ifPresent(max -> {
             if (text.length() > max) {
                 throw new AtomValidationException(
-                        "'" + text + "' is " + text.length() + " characters, more than the maximum " + max);
+                        "'" + text + "' is " + text.length() + " characters, more than the maximum " + max,
+                        "at most " + max + " characters");
             }
         });
         // I-Regexp (RFC 9485) via tson-regex -- linear-time and ReDoS-safe, not java.util.regex; already
         // validated well-formed when the schema resolved (see RegexParser).
         constraints.pattern().ifPresent(p -> {
             if (!TsonRegex.parse(p).matches(text)) {
-                throw new AtomValidationException("'" + text + "' does not match the required pattern " + p);
+                throw new AtomValidationException("'" + text + "' does not match the required pattern " + p,
+                        "matching " + p);
             }
         });
     }

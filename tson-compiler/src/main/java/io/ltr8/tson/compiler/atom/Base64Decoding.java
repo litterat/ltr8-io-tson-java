@@ -27,13 +27,15 @@ final class Base64Decoding {
     static byte[] decode(String text, Base64.Decoder decoder, String schemeName) {
         if (text.length() % 4 != 0) {
             throw new AtomParseException("'" + text + "' is not a valid " + schemeName
-                    + " encoding -- length must be a multiple of 4 once padded (RFC 4648, §5.3)");
+                    + " encoding -- length must be a multiple of 4 once padded (RFC 4648, §5.3)",
+                    "a " + schemeName + " encoding");
         }
         try {
             return decoder.decode(text);
         } catch (IllegalArgumentException e) {
             throw new AtomParseException(
-                    "'" + text + "' is not valid " + schemeName + " (RFC 4648, §5.3): " + e.getMessage());
+                    "'" + text + "' is not valid " + schemeName + " (RFC 4648, §5.3): " + e.getMessage(),
+                    "a " + schemeName + " encoding");
         }
     }
 }

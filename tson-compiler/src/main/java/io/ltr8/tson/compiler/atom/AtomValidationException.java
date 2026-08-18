@@ -6,12 +6,14 @@ package io.ltr8.tson.compiler.atom;
  * fails the 32-bit range) or {@code -10} under {@code !uint32} (parses and is in-range for a signed
  * form, fails the unsigned range -- §5.6: "the range constraint, not the lexer, enforces
  * unsignedness").
+ *
+ * <p>{@code expected} is the violated facet -- see {@link AtomTypeException} for the vocabulary.
  */
 public final class AtomValidationException extends AtomTypeException {
 
     private static final long serialVersionUID = 1L;
 
-    public AtomValidationException(String message) {
-        super(message);
+    public AtomValidationException(String message, String expected) {
+        super(message, expected);
     }
 }

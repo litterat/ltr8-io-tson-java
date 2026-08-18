@@ -38,13 +38,15 @@ public record DateParser(DateType constraints) implements AtomType<LocalDate> {
         String text = token.text();
         if (!FULL_DATE.matcher(text).matches()) {
             throw new AtomParseException(
-                    "'" + text + "' is not a valid date -- expected RFC 3339 full-date, YYYY-MM-DD (§5.4)");
+                    "'" + text + "' is not a valid date -- expected RFC 3339 full-date, YYYY-MM-DD (§5.4)",
+                    "an RFC 3339 full-date");
         }
         LocalDate value;
         try {
             value = LocalDate.parse(text);
         } catch (DateTimeParseException e) {
-            throw new AtomParseException("'" + text + "' is not a valid date (§5.4): " + e.getMessage());
+            throw new AtomParseException("'" + text + "' is not a valid date (§5.4): " + e.getMessage(),
+                    "an RFC 3339 full-date");
         }
         validate(value, text);
         return value;
@@ -59,12 +61,12 @@ public record DateParser(DateType constraints) implements AtomType<LocalDate> {
     private void validate(LocalDate value, String text) {
         constraints.min().ifPresent(m -> {
             if (value.isBefore(m)) {
-                throw new AtomValidationException("'" + text + "' is before the minimum " + m);
+                throw new AtomValidationException("'" + text + "' is before the minimum " + m, ">= " + m);
             }
         });
         constraints.max().ifPresent(m -> {
             if (value.isAfter(m)) {
-                throw new AtomValidationException("'" + text + "' is after the maximum " + m);
+                throw new AtomValidationException("'" + text + "' is after the maximum " + m, "<= " + m);
             }
         });
     }

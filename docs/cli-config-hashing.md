@@ -59,13 +59,13 @@ what the supplied files *declare* — matching is by embedded `!!id`, never file
 failure is the right file with the wrong identity in it; `declaredIds` keeps the ids verbatim and in
 argument order, deliberately apart from the lookup map whose keys are canonicalized.
 
-**`CliDiagnostic` renders an absent field as absent.** `Diagnostic` spells "nothing to say" as `""` for its
-strings and as an empty `Optional` for its positions, so the output used to show both `""` and `null` for
-one idea; `schemaId`/`expected`/`actual` are now `Optional` and render `null`. **`path` and `schemaPointer`
-stay plain strings**, because for an RFC 6901 pointer `""` is the *root*, not an absence — `Tson.validateSchema`
-genuinely reports a document-level problem against it, and a base-syntax failure genuinely locates itself at
-the data root. That `""` means both things is a `Diagnostic`-level overload, not a rendering one, and is
-tracked in `BACKLOG.md` rather than papered over here. The facade owns the whole per-document decision; the
+**`CliDiagnostic` renders an absent field as absent.** `Diagnostic` spells "nothing to say" as `""` for
+`schemaId`/`expected`/`actual`, so those are narrowed to `Optional` here and render `null`. **The two RFC
+6901 pointers need no narrowing** — they are `Optional` at the source, because for a pointer `""` is the
+*root*, not an absence: `Tson.validateSchema` genuinely reports a document-level problem against it, and a
+base-syntax failure genuinely locates itself at the data root. `--output json` and `--output tson` both keep
+a present `""` and an absent pointer apart; `--output text` renders them alike, deliberately, since `": msg"`
+is noise to a person looking at the whole document either way. The facade owns the whole per-document decision; the
 CLI just classifies files into a source and calls it. Also `tson compile <schema>` (checks a schema
 compiles, tree mode), `tson hash <file>`, `tson init-example [<dir>]` (writes a working
 `person.tn`/`person-data.tn`). The installed command is `tson` (`application.applicationName`), launched on

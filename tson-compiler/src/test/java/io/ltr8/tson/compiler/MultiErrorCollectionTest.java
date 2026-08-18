@@ -76,7 +76,7 @@ class MultiErrorCollectionTest {
 
         Map<String, Diagnostic> byPath = new LinkedHashMap<>();
         for (Diagnostic diagnostic : problems.diagnostics()) {
-            byPath.put(diagnostic.path(), diagnostic);
+            byPath.put(diagnostic.path().orElseThrow(), diagnostic);
         }
         assertEquals(Set.of("/value", "/tag", "/items/1"), byPath.keySet());
 

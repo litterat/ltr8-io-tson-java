@@ -5,6 +5,7 @@ import io.ltr8.tson.compiler.stream.TsonEventSource;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -83,9 +84,9 @@ class TsonObjectReaderStreamingTest {
         TwoFields result = new TsonObjectReader().read(ctx, TwoFields.class);
 
         assertEquals(2, problems.diagnostics().size(), problems.diagnostics().toString());
-        assertEquals("/first", problems.diagnostics().get(0).path());
+        assertEquals(Optional.of("/first"), problems.diagnostics().get(0).path());
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, problems.diagnostics().get(0).code());
-        assertEquals("/second", problems.diagnostics().get(1).path());
+        assertEquals(Optional.of("/second"), problems.diagnostics().get(1).path());
         // A constructor can't take nulls for its primitive long parameters, so no object is built --
         // the caller already has both problems from the collector.
         assertNull(result);
