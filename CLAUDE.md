@@ -482,13 +482,12 @@ compatibility).
   `email_type`'s flat `spec` field does. Subtype *dispatch* to them works; this is a narrower field-binding
   gap.
 - **Schema-side diagnostics, the remainder** — parsing, desugaring, resolution and linking all report
-  through a `TsonDiagnosticsReceiver` now (see `docs/readers-and-diagnostics.md`); two things are left.
+  through a `TsonDiagnosticsReceiver` now (see `docs/readers-and-diagnostics.md`); one thing is left.
   **A read-path diagnostic carries `schemaPosition` but no `schemaId`/`schemaPointer`**, which is blocked
   upstream of the reader stack: `mergeImports` discards which schema an imported entry came from, so the
-  identity a reader could reach is the importing schema's, not the declaration's own. And **the lexer is
-  still fail-fast**, which floor-limits schema-parse recovery: a token that won't lex aborts the pass that
-  would have reported past it (`STRUCTURED-OUTPUT.md`). Throw-site classification is done across the whole
-  schema pipeline.
+  identity a reader could reach is the importing schema's, not the declaration's own. Throw-site
+  classification is done across the whole schema pipeline. The lexer stays fail-fast on purpose and is the
+  floor under schema-parse recovery — not a tracked gap; `STRUCTURED-OUTPUT.md` holds the open question.
 - **Deferred design questions** — `REQUIRED_FIXED`/`OPTIONAL_FIXED` value validation, `value_param` real
   parameter substitution, thread-safety, and a general disk/HTTP-backed `TsonSchemaSource` (with
   whitelist/blacklist policy).

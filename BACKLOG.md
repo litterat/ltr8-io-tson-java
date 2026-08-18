@@ -184,8 +184,10 @@ Parsing, desugaring, resolution and linking all report every independent problem
 `TsonDiagnosticsReceiver` (issues #3/#28/#29), whether reached by `tson compile`/`Tson.validateSchema` or by
 a *data* read whose `!!schema` names a schema that doesn't resolve — both give the same account of the same
 broken schema. `docs/readers-and-diagnostics.md`'s "Schema-side diagnostics" section describes the shape and
-the decisions behind it. What is
-left:
+the decisions behind it. One thing is left here; the *floor* under all of it — the lexer being fail-fast, so
+a token that will not lex aborts the pass that would have reported past it — is deliberately not an item in
+this list, because there is no work to do until someone decides whether lexer errors feed the `Diagnostic`
+model at all. `STRUCTURED-OUTPUT.md` holds that question.
 
 - [ ] **The read path carries `schemaPosition` but not `schemaId`/`schemaPointer`** — a reader knows the
   declaration position it stamped, not which entry of which schema produced it, so a value error reports
@@ -206,12 +208,6 @@ left:
     becomes a three-part stamp across its ~11 reader call sites, and `DefaultTsonReadContext.report`
     populates all three. `schemaPointer` is the cheap half — `ValueReaderFactory` is already handed the
     entry's own declared name, which is the `/name` pointer.
-- [ ] **The lexer is still fail-fast**, and it is the floor under schema-parse recovery: a token that will
-  not lex raises `LexException` from underneath the parser's resynchronisation, since resyncing means reading
-  the very tokens that don't exist. So a schema whose first problem is an unterminated multi-line token still
-  reports one problem and stops, where one whose problems all lex reports them all.
-  `STRUCTURED-OUTPUT.md` tracks the same gap and the open question that goes with it — whether lexer errors
-  eventually feed the same `Diagnostic` model or stay a separate concern.
 - Granularity ceiling to know before starting any of these: positions are **per declaration**, from the
   declaration's own name token. Sub-declaration positions (which field, which supertype) do not exist and
   would be their own parser work — visible today as a diagnostic pointing at `/my_type` when the problem is
