@@ -6,8 +6,6 @@ import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.Token;
-import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -125,28 +123,28 @@ class GenericApplicationHeadTest {
 
     /**
      * §5.3's sized sugar, end to end. {@code [text; 1..2]} desugars to {@code array_ranged<text, 1, 2>}, and
-     * {@code array_ranged} is a <em>template</em> (declared without {@code ~}), so it materialises as §8.2's
-     * instantiation entry rather than resolving in place: the body is headed at the nearest {@code ~}
-     * constructor in the source chain, and the flattened application comes through as {@code source}.
-     * Asserted against §8.2's own worked example shape, {@code supertypes} apart.
+     * {@code array_ranged} is a <b>partial application</b> -- declared without {@code ~}, with its parameters
+     * only in labelled value channels -- so applying it is evaluation: it routes into {@code array}'s
+     * vocabulary and closes to the construction those bindings denote, with no entry of its own. That
+     * diverges from §8.2's worked example deliberately; {@code SPEC-FEEDBACK.md} #45 has the taxonomy and the
+     * spec author's confirmation. The upshot for an author is that all three array spellings agree
+     * ({@link #everySpellingOfAnArrayFamilyDeclarationRecordsNoSupertypes}).
      */
     @Test
-    void sizedSugarMaterializesTheInstantiationEntrySpecifiedByEightTwo() {
+    void sizedSugarClosesOntoAConstructionOfArray() {
         TsonCompiledSchema compiled = compile("""
                   tag_list => [text; 1..2]
                   holder => { tags: tag_list }""");
 
         TypeDefinition entry = compiled.schema().entries().get("tag_list");
-        assertEquals(TypeKind.PRODUCT, entry.kind(), "the template's kind");
+        assertEquals(TypeKind.PRODUCT, entry.kind(), "the constructor's kind");
         assertEquals(List.of(), entry.parameters(), "closed -- §5.10");
         assertEquals(List.of(), entry.supertypes(),
                 "empty, against §8.2's transfer of the template's -- a closure of a size template is a "
                         + "construction of `array`, and a constructor is not a supertype (SPEC-FEEDBACK.md #45)");
-        assertEquals(new TypeRef("array_ranged", List.of(
-                        new TypeArgument.Ref(TypeRef.of("text")),
-                        new TypeArgument.Value(new Token("1", Token.Form.UNQUOTED)),
-                        new TypeArgument.Value(new Token("2", Token.Form.UNQUOTED)))),
-                entry.source().orElseThrow(), "the flattened fully-bound application");
+        assertEquals(TypeRef.of("array"), entry.source().orElseThrow(),
+                "the constructor the application closes at -- a partial application routes into `array`'s "
+                        + "vocabulary rather than materialising an entry of its own (SPEC-FEEDBACK.md #45)");
 
         // !array { element_type: text  min_items: 1  max_items: 2 } -- only the parameter-routed fields; the
         // vocabulary's own defaults (state/unordered/unique_items) stay out of the binding record (§5.6).

@@ -80,16 +80,13 @@ own prose (which had gone stale on at least one of them):
   becomes §8.2's **only** materialising form; a constructor's parameters are labelled-only (#44); and
   deriving from a constructor requires a `~` result (#46). Split by what gates on a spec revision:
   - **This cycle** (each corrects or converges on agreed-wrong spec letter; no revision needed first):
-    - [ ] **Desugar the sized forms straight to the `!array` construction the routing already produces** —
-      closing-by-evaluation, reachable today through the existing `[T; N..M]` spelling, no new syntax
-      needed. Deletes the `TemplateInstance` node and its `DefinitionResolver` completion (source
-      flattening — the supertype transfer is already gone) outright; a named application in a
-      kernel-importing context (`array_ranged<text, 3, 3>`) emits the same plain construction via its
-      routed channels. `checkBounds` and the vacuous-`[T; 0..]` rejection stay put — the sugar site is still where bounds
-      close. The kernel's three template *declarations* still resolve as entries (the bundled document is
-      unchanged until the revision); the sugar just stops routing through them. Resolved output diverges
-      from §8.2's worked example, deliberately — the spec author has confirmed the example wrong, and no
-      bundled schema or fixture exercises a sized form.
+    - [x] **Desugar the sized forms straight to the `!array` construction the routing already produces** —
+      done (#54). `SchemaDesugarer.instanceFor` emits the plain construction for a partial application as
+      well as a constructor one; `TemplateInstance` and `DefinitionResolver`'s instantiation completion are
+      deleted. A sized array's `source` is now plain `array`, converging with `[T]` and `vector<T, N>`.
+      `checkBounds` and the vacuous-`[T; 0..]` rejection stayed at the sugar site, where the bindings become
+      concrete. The kernel's three template *declarations* still resolve as entries; the sugar just stopped
+      routing through them.
     - [ ] **#44's declaration-time check**: a `~` declaration with a parameter occurrence outside a
       labelled value channel is a `TsonSchemaValidationException` at the declaration. No valid schema is
       affected (the kernel audit in #46 found zero violations among constructors); today the incoherence

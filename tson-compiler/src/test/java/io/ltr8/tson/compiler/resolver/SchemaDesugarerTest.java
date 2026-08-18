@@ -7,7 +7,6 @@ import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.ast.schema.SimpleRef;
-import io.ltr8.tson.compiler.ast.schema.TemplateInstance;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.schema.meta.FieldState;
@@ -267,17 +266,19 @@ class SchemaDesugarerTest {
     }
 
     /**
-     * §5.3's sized sugar targets {@code array_ranged}, which the meta-kernel declares as a <em>template</em>
-     * (no {@code ~}), so a sized array materialises as §8.2's instantiation entry. Its head lives in the
-     * structure namespace rather than this document, and the emitted body is headed at {@code array} -- the
-     * nearest {@code ~} constructor in the template's source chain (§5.6), not at the template itself.
+     * §5.3's sized sugar targets {@code array_ranged}, which the meta-kernel declares without {@code ~} and
+     * whose parameters occur only in labelled <em>value</em> channels -- a <b>partial application</b>. Applying
+     * one is evaluation, not instantiation: it closes to the plain {@code !array} construction its bindings
+     * denote, headed at the nearest {@code ~} constructor in the source chain (§5.6), with no entry of its own
+     * ({@code SPEC-FEEDBACK.md} #45). So the sized form lands on exactly the shape {@code [text]} does, one
+     * bound apart.
      *
      * <p>Routing is the same mechanism a constructor application uses, because the template's resolved
      * vocabulary carries the same {@code value_param} channels: {@code element_type} from {@code T}, {@code
      * min_items} from {@code MIN}, {@code max_items} from {@code MAX}. Nothing here knows what an array is.
      */
     @Test
-    void sizedSugarAgainstARealMetaInstantiatesTheTemplateOntoItsConstructor() {
+    void sizedSugarAgainstARealMetaClosesOntoItsConstructorsConstruction() {
         SchemaDocument document = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 { tags => [text; 1..5] }""").parseSchemaDocument();
@@ -285,11 +286,10 @@ class SchemaDesugarerTest {
 
         SchemaDocument desugared = SchemaDesugarer.desugar(document, realMeta, Set.of());
 
-        TemplateInstance instantiation = assertInstanceOf(TemplateInstance.class,
+        Instance instance = assertInstanceOf(Instance.class,
                 desugared.body().declarations().get("tags").typeDef());
-        assertEquals("array_ranged", instantiation.template(), "the application is kept for §8.2's source");
-        assertEquals("array", instantiation.body().target(), "headed at the nearest ~ constructor");
-        assertEquals("{ element_type: text  min_items: 1  max_items: 5 }", instanceBody(instantiation.body()));
+        assertEquals("array", instance.target(), "headed at the nearest ~ constructor, not at the template");
+        assertEquals("{ element_type: text  min_items: 1  max_items: 5 }", instanceBody(instance));
     }
 
     /**
@@ -320,9 +320,8 @@ class SchemaDesugarerTest {
 
         SchemaDocument desugared = SchemaDesugarer.desugar(document, realMeta, Set.of());
 
-        TemplateInstance instantiation = assertInstanceOf(TemplateInstance.class,
-                desugared.body().declarations().get("tags").typeDef());
-        assertEquals("{ element_type: text  min_items: 0  max_items: 5 }", instanceBody(instantiation.body()));
+        assertEquals("{ element_type: text  min_items: 0  max_items: 5 }", instanceBody(
+                assertInstanceOf(Instance.class, desugared.body().declarations().get("tags").typeDef())));
     }
 
     /**
@@ -390,7 +389,7 @@ class SchemaDesugarerTest {
 
         SchemaMap.Declaration inner = onlyInjected(document, "array_ranged");
         assertEquals("{ element_type: integer  min_items: 2  max_items: 2 }",
-                instanceBody(assertInstanceOf(TemplateInstance.class, inner.typeDef()).body()));
+                instanceBody(assertInstanceOf(Instance.class, inner.typeDef())));
         assertEquals("[ { element_type: " + inner.name() + " } { element_type: text } ]",
                 tupleElements(assertInstanceOf(Instance.class,
                         document.body().declarations().get("grid").typeDef())));
@@ -405,8 +404,8 @@ class SchemaDesugarerTest {
         assertEquals("{ element_type: integer }",
                 instanceBody(assertInstanceOf(Instance.class, inner.typeDef())));
         assertEquals("{ element_type: " + inner.name() + "  min_items: 3  max_items: 3 }",
-                instanceBody(assertInstanceOf(TemplateInstance.class,
-                        document.body().declarations().get("rows").typeDef()).body()));
+                instanceBody(assertInstanceOf(Instance.class,
+                        document.body().declarations().get("rows").typeDef())));
     }
 
     /**

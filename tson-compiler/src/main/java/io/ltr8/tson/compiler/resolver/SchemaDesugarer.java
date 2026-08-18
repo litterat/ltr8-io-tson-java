@@ -30,7 +30,6 @@ import io.ltr8.tson.compiler.ast.schema.SizeSpec;
 import io.ltr8.tson.compiler.ast.schema.StructuralDef;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.compiler.ast.schema.TupleContainerDef;
-import io.ltr8.tson.compiler.ast.schema.TemplateInstance;
 import io.ltr8.tson.compiler.ast.schema.TypeArg;
 import io.ltr8.tson.compiler.ast.schema.TypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeRef;
@@ -285,8 +284,9 @@ final class SchemaDesugarer {
                 }
                 Optional<GenericRef> sized = sizedArrayApplication(container.container());
                 if (sized.isPresent()) {
-                    // The application this stands for is instantiated like any other (§8.2): array_ranged and
-                    // its siblings are templates, so this yields a TemplateInstance headed at `array`.
+                    // The application this stands for closes by routing, like every other: array_ranged and
+                    // its siblings bind parameters in value channels only, so this yields the plain `!array`
+                    // construction those bindings denote (SPEC-FEEDBACK.md #45).
                     GenericRef application = sized.get();
                     Optional<TypeDef> instantiation = instanceFor(application.name(), application.args());
                     if (instantiation.isPresent()) {
@@ -778,10 +778,21 @@ final class SchemaDesugarer {
 
     /**
      * The {@code !C { field: arg ... }} an application denotes, or empty when this is not one this phase
-     * builds: an unknown head, a non-constructor head (a template application -- §5.10, out of scope), a head
-     * whose vocabulary is not record-shaped, an arity mismatch, or an argument that did not reduce to a plain
-     * name. Each of those keeps its existing downstream handling rather than being turned into a differently
-     * broken shape here.
+     * builds: an unknown head, a head whose vocabulary is not record-shaped, an arity mismatch, or an argument
+     * that did not reduce to a plain name. Each of those keeps its existing downstream handling rather than
+     * being turned into a differently broken shape here.
+     *
+     * <p><b>A partial application closes to its constructor's construction, not to an entry of its own.</b>
+     * §5.3's size templates ({@code array_min}/{@code array_max}/{@code array_ranged}) bind parameters only in
+     * labelled <em>value</em> channels, so applying one is evaluation: {@code array_ranged<text, 1, 2>} is
+     * {@code !array { element_type: text  min_items: 1  max_items: 2 } } -- a construction of {@code array},
+     * reached by routing the arguments through the same {@code value_param} channels a constructor's own
+     * vocabulary uses. The emitted body is therefore identical whether the head is a constructor or a size
+     * template; only the head the record is built at differs, and {@link #nearestConstructor} finds it. No
+     * §8.2 instantiation entry is minted: an entry exists for the form that genuinely needs one, a
+     * <em>structural</em> template closing by substitution ({@code box => <T> { v: T } }), which is rejected
+     * at the application site until §5.10 is implemented. {@code SPEC-FEEDBACK.md} #45 has the taxonomy and
+     * why the spec's own worked example diverges.
      */
     private Optional<TypeDef> instanceFor(String head, List<TypeArg> args) {
         TypeDefinition applied = metaEntries.get(head);
@@ -814,13 +825,11 @@ final class SchemaDesugarer {
         if (fields.isEmpty()) {
             return Optional.empty();
         }
-        Instance body = new Instance(
-                new DataValue(List.of(), Optional.of(constructorHead), new RecordValue(fields)));
-        if (applied.constructor()) {
-            return Optional.of(body);
+        if (!applied.constructor()) {
+            checkBounds(head, fields);
         }
-        checkBounds(head, fields);
-        return Optional.of(new TemplateInstance(new GenericRef(head, args), body));
+        return Optional.of(new Instance(
+                new DataValue(List.of(), Optional.of(constructorHead), new RecordValue(fields))));
     }
 
     /**
