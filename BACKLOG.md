@@ -60,39 +60,6 @@ own prose (which had gone stale on at least one of them):
   `ContainerTypeDef` and throws. Both flat forms are done — `[T]`/`[T; N..M]` and, since #24, `[T, U]` in both
   positions. The fix is the same bottom-up hoist the type-ref walk already does: build the inner container's
   own instance first, inject it, and let the outer position refer to it by name.
-- **Choice disjointness derivation and untagged reading** ([TSON-SCHEMA] §5.4, §8.1) — both halves now have a
-  live producer: the `(A | B)` sugar resolves to a real `ChoiceBody` entry, so the linker derives `disjoint`
-  for author-written choices and `ChoiceReader` reads them (`ChoiceReadTest` pins the whole §5.4 Tagging
-  rule end to end — untagged recovery where the base-type classes separate the variants, a mandatory tag
-  where they don't). What is left is refinement of the derived fact:
-  - [ ] **Two §5.4 "MAY" cases left absent:** record-set disjointness under composition, and pattern
-    disjointness over `regex`-constrained atoms. The view on how far to go (recorded so it isn't
-    relitigated): the `disjoint` *fact* is encoding-independent, but §5.4's Tagging rule makes TSON text
-    recover a variant only by the single §4 base-type-resolution pass — class-level (null/boolean/
-    number/string), never a type-directed inspection — so **two variants of the same base-type class are
-    never TSON-text-discriminable, regardless of value-set disjointness** (`(email | uri)` is the spec's
-    example). Same-family numeric-bound and regex-pattern disjointness both produce a same-base-class
-    `true`, so neither buys TSON-text *untagged reading* anything; the cheap different-class rules
-    (family/kind) are the only scalar disjointness the reader can use. Pattern disjointness is therefore
-    **not** wired into the reading-path derivation — but it is *safe* to compute and belongs in the
-    `@disjoint` checker below (an earlier "an innocuous pattern edit silently flips tag-requiredness"
-    worry is void: schemas are immutable and hash-pinned, so a revision is a new content identity —
-    existing data pins the old, still-disjoint one, and a disjointness-losing revision is a load-time
-    error under `@disjoint`, never a silent flip). **The dependency-inversion seam this used to need is no
-    longer required**: `ChoiceDisjointness` moved into `tson-compiler` with the linker, and that module
-    already requires `tson-regex`, so `isDisjointFrom` is a direct call rather than an oracle injected from
-    outside. See `SPEC-FEEDBACK.md` #23 for the load-bearing ambiguity underneath all of this.
-  - [ ] **The `@disjoint` assertion check — the unprovable case only.** Three of §5.4's four outcomes are
-    done in `TsonSchemaLinker.checkDisjointAssertions`: proved is silent, refuted is a resolver error, and
-    an unannotated choice is asked nothing (§5.4 is explicit that the warnable condition is the unverifiable
-    *assertion*, never mere non-disjointness). What is left is **unprovable → error** — the `SPEC-FEEDBACK.md`
-    #42 decision, superseding §5.4's written warning: an unproved assertion has no operational effect
-    (discrimination falls back to structural testing or the tag regardless), so it is dead weight the author
-    can delete, and erroring makes `@disjoint` mean "machine-verified" — the only meaning an encoding can
-    rely on to drop tags. This implementation's cheap exact rules are its prover baseline.
-    `anUnprovableDisjointAssertionIsSilentForNow` pins the current silence and flips to assert the error when
-    this lands (tracked under "Diagnostics" below). Exact regex-pattern disjointness (the item above) shrinks
-    the case first: it turns an unprovable pattern choice into a proved or refuted one.
 - [ ] **Template construction — the `SPEC-FEEDBACK.md` #44/#45/#46 conclusions, staged.** The design review
   settled the type-constructor-vs-template question: a **partial application** (parameters only in labelled
   value channels — `array_min`, and §5.3's sized sugar) closes by *routing* and is a construction of its
@@ -194,12 +161,6 @@ argument; the short form: the target consumer is a generate-validate-retry loop 
 behaviors, so a WARN is either promoted to an error or dropped by every pipeline privately — #41's
 RFC 9413 interoperability failure, per-diagnostic.
 
-- [ ] **Unprovable `@disjoint`** → linker error in `checkDisjointAssertions`; flip
-  `anUnprovableDisjointAssertionIsSilentForNow` to assert it. #42 argues for the error *given a pinned
-  prover baseline*, and this implementation's isn't there: `ChoiceDisjointness` leaves record-set and
-  regex-pattern disjointness absent, so flipping it today rejects schemas whose variants genuinely are
-  disjoint. See the fuller bullet under "Resolution & linking generality" — exact pattern disjointness
-  shrinks the case and is worth doing first.
 - Landing later, with their owning features — each arrives as an error when its feature does:
   - **Set-typed duplicate** → error, when sets get real semantics at all (today `set` compiles through the
     `array` factory and nothing dedupes); **phantom (unused) parameter** and **parameter shadowing a schema

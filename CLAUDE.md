@@ -254,8 +254,12 @@ to itself. The payoff: meta-kernel's linked form needs no materialization.
 `TsonCanonicalIdentity.canonicalize` is §2.2.1's algorithm (exactly two reductions — strip scheme, strip
 query — everything else must already be canonical), public API because `TsonSchemaLoader` keys on it.
 `TsonSchemaLinker.link(schema, loader)` merges `!!import`s, populates `subtypes`, derives choice
-`disjoint` (`ChoiceDisjointness`, three-valued), and validates every reference — including choice-variant
-distinctness after §8.3 flattening, the author's `@disjoint` marker against the derived fact, and
+`disjoint` (`ChoiceDisjointness` — total and two-valued: `true` iff every variant occupies a distinct
+discrimination class, the same `DiscriminationClass` untagged reading dispatches on; `SPEC-FEEDBACK.md`
+#47), and validates every reference — including choice-variant
+distinctness after §8.3 flattening, rejection of a variant resolving to `void` (optionality is not choice,
+`SPEC-FEEDBACK.md` #48), the author's `@disjoint` marker against the derived fact (`false` is
+an error; no third outcome exists), and
 constructor eligibility from both ends (§2.2.2, `SPEC-FEEDBACK.md` #19). The linker materializes nothing —
 desugaring already did. `TsonSchemaRegistry.register` rejects duplicate identities (no overwrite: that plus
 unmodifiable `entries()` *is* the "locked" guarantee). The linker lives in `tson-compiler` (a pipeline

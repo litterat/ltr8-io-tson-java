@@ -17,16 +17,16 @@ import java.util.Set;
  * NamedDispatchReader}. Same for both {@link ValueReaderFactoryRegistry#tree} and {@link
  * ValueReaderFactoryRegistry#bind} (a single shared entry, not per mode).
  *
- * <p><b>Untagged structural recovery (§5.4).</b> Where the choice is disjoint and every variant is a scalar
- * occupying a <i>distinct</i> base-type class, the tag is omissible: an untagged value is recovered to the
- * variant of its own §4 base-type class. This factory precomputes that {@code class -> variant} map (reading
- * each variant's own definition from the enclosing schema, via {@link ValueReaderContext#schema}) and hands
- * it to {@link NamedDispatchReader}; it is empty (so the tag stays required) unless every variant classifies
- * to a distinct {@link BaseTypeClass}. Distinct base-type classes are the exact TSON-text criterion -- they
- * imply value-set disjointness <i>and</i> §4 separability -- so a same-class pair (two numbers, two strings)
- * always keeps the tag, no matter how disjoint its value sets ({@code (email | uri)}); see {@code
- * SPEC-FEEDBACK.md} #23. A non-scalar variant (record/map/array) is left absent -- structural recovery
- * beyond base-type classes isn't attempted here yet.
+ * <p><b>Untagged structural recovery (§5.4).</b> Where the choice is disjoint and every variant's {@link
+ * DiscriminationClass} is scalar, the tag is omissible: an untagged value is recovered to the variant of its
+ * own §4 base-type class. This factory precomputes that {@code class -> variant} map (reading each variant's
+ * definition from the enclosing schema, via {@link ValueReaderContext#schema}) and hands it to {@link
+ * NamedDispatchReader}. The derived {@code disjoint} fact already <em>is</em> class-distinctness -- {@code
+ * ChoiceDisjointness} classifies through the same {@link DiscriminationClass#of} -- so a same-class pair
+ * (two numbers, two strings) is never disjoint and always keeps the tag, no matter how separated its value
+ * sets ({@code (email | uri)}); see {@code SPEC-FEEDBACK.md} #47. A {@code BRACE}/{@code BRACKET} variant
+ * still keeps the tag here: recovery dispatches on a scalar token's resolved class, and structural recovery
+ * from a container's opening delimiter isn't attempted yet.
  */
 final class ChoiceReader {
 
@@ -61,20 +61,23 @@ final class ChoiceReader {
     }
 
     /**
-     * {@code base-type class -> variant name} for untagged recovery, or empty (tag stays required) unless the
-     * choice is proved disjoint and every variant is a scalar of a distinct base-type class.
+     * {@code discrimination class -> variant name} for untagged recovery, or empty (tag stays required)
+     * unless the choice is disjoint and every variant's class is scalar. The distinctness check is kept
+     * although a derived {@code disjoint: true} already implies it -- a hand-assembled definition can state
+     * {@code true} over variants the classes contradict, and the safe reading of that disagreement is no
+     * recovery.
      */
-    private static Map<BaseTypeClass, String> untaggedRecovery(TypeDefinition def, ChoiceBody body,
+    private static Map<DiscriminationClass, String> untaggedRecovery(TypeDefinition def, ChoiceBody body,
             TsonSchema schema) {
         if (!def.disjoint().equals(Optional.of(true))) {
             return Map.of();
         }
-        Map<BaseTypeClass, String> byClass = new EnumMap<>(BaseTypeClass.class);
+        Map<DiscriminationClass, String> byClass = new EnumMap<>(DiscriminationClass.class);
         for (TypeRef variant : body.variants()) {
-            Optional<BaseTypeClass> variantClass =
-                    Optional.ofNullable(schema.entries().get(variant.name())).flatMap(BaseTypeClass::of);
-            if (variantClass.isEmpty() || byClass.putIfAbsent(variantClass.get(), variant.name()) != null) {
-                return Map.of(); // a non-scalar/ambiguous variant, or two variants sharing a class -> keep the tag
+            Optional<DiscriminationClass> variantClass = DiscriminationClass.of(variant.name(), schema.entries());
+            if (variantClass.isEmpty() || !variantClass.get().scalar()
+                    || byClass.putIfAbsent(variantClass.get(), variant.name()) != null) {
+                return Map.of(); // a classless or container variant, or two variants sharing a class -> keep the tag
             }
         }
         return byClass;

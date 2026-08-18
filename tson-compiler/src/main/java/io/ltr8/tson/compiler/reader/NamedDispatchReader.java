@@ -36,12 +36,12 @@ final class NamedDispatchReader implements TsonTypeReader<Object> {
     private final String candidateNoun;
     private final Set<String> candidateNames;
     private final TsonTypeReaderResolver resolver;
-    private final Map<BaseTypeClass, String> untaggedRecovery;
+    private final Map<DiscriminationClass, String> untaggedRecovery;
     private final AnnotationTypes annotationTypes;
 
     NamedDispatchReader(String positionName, String missingTypeRefMessage, String candidateNoun,
                          Set<String> candidateNames, TsonTypeReaderResolver resolver,
-                         Map<BaseTypeClass, String> untaggedRecovery, AnnotationTypes annotationTypes) {
+                         Map<DiscriminationClass, String> untaggedRecovery, AnnotationTypes annotationTypes) {
         this.positionName = positionName;
         this.missingTypeRefMessage = missingTypeRefMessage;
         this.candidateNoun = candidateNoun;
@@ -80,7 +80,7 @@ final class NamedDispatchReader implements TsonTypeReader<Object> {
     private Object recoverUntagged(TsonReadContext ctx) {
         TsonEvent event = ctx.peek(); // not consumed -- the variant's own reader reads it
         if (event instanceof TokenEvent token) {
-            BaseTypeClass valueClass = BaseTypeClass.ofValue(
+            DiscriminationClass valueClass = DiscriminationClass.ofValue(
                     ValueParser.INSTANCE.read(new TokenValue(token.text(), token.form())));
             String variant = untaggedRecovery.get(valueClass);
             if (variant != null) {
