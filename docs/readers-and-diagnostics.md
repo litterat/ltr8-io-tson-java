@@ -204,7 +204,7 @@ and `TsonUnsupportedDocumentException` keep the location in `position()` and out
 `dataPosition` as the single copy. Repeating it in the message made every renderer print the location twice,
 in two formats, the second without a byte offset.
 
-## Schema-side diagnostics (`SchemaResolver`, `TsonSchemaLinker`, `Tson.validateSchema`)
+## Schema-side diagnostics (`TsonSchemaParser`, `SchemaResolver`, `TsonSchemaLinker`, `Tson.validateSchema`)
 
 A broken *schema* reports every independent problem in one pass, through the same
 `TsonDiagnosticsReceiver` the read path uses. §8.1 asks for both halves of this: implementations MUST carry
@@ -212,6 +212,49 @@ source position in **all** error reports, and SHOULD "continue processing after 
 issues in a single pass" — and it explicitly puts schema resolution/compilation failures in the *resolver
 error* category, so this is the same layer, not a new one.
 
+- **Parsing reports too, per declaration** — `TsonSchemaParser.parseSchemaDocument(receiver)` is the
+  recovering entry point beside the fail-fast `parseSchemaDocument()`; without a receiver nothing changes.
+  Panic-mode recovery: a failed declaration is reported, its wreckage is skipped, and parsing resumes at the
+  next declaration.
+  - **A declaration start is `name =>` back at schema-map depth, and nothing looser.** Two tokens decide it
+    unambiguously, which is exactly the lookahead `TsonDataStream` keeps. A bare name is most of a broken
+    declaration's own wreckage and a leading `@` is equally a field annotation, so neither resyncs. The cost
+    is that an annotated declaration resyncs at its *name* and the recovered node loses its annotations —
+    harmless, since the document is discarded whole.
+  - **Depth is the cursor's (`TsonDataStream.nesting()`), not a counter the recovery keeps.** A declaration
+    failing inside a record body leaves the cursor on *that record's* closing brace; a local counter starting
+    at zero reads it as the schema map's own and stops one declaration in. The stream counts bracket pairs as
+    tokens are consumed, being the one place every token goes through. `<`/`>` are not counted — a stray one
+    is skipped harmlessly where a miscount would not be.
+  - **A parse that reported anything hands back no document at all** (`Optional.empty()`), even though the
+    declarations around the broken ones did parse. Resolving a half-document reports every reference to a
+    dropped declaration as unresolved, on top of the syntax error that is the real problem; §8.1's categories
+    are per layer precisely so a layer's verdict isn't second-guessed by the next. The surviving nodes exist
+    only to keep parsing going.
+  - **Two failures stay fail-fast.** A malformed *header* has no following construct to resync on — the
+    schema map hasn't started. And the **lexer is the floor**: a token that won't lex raises `LexException`
+    from underneath the recovery, since resynchronising means reading the very tokens that don't exist
+    (`STRUCTURED-OUTPUT.md` tracks that layer).
+- **A schema syntax error locates itself at the schema end** (`Diagnostic.ofSchemaSyntaxError`), the
+  schema-side peer of `ofBaseSyntaxError`: `path`/`dataPosition` empty, the token's position in
+  `schemaPosition` beside a `/name` pointer, so a syntax error and a resolution error against the same
+  declaration render identically. The code stays `VALIDATION_ERROR` — *where* the problem is found is what
+  the four location components are for. The `schemaId` is the document's own `!!id` canonicalized so it
+  matches every later phase's, **falling back to the id as written** when it doesn't canonicalize: that is a
+  real error but the resolver's to report, and raising it from the grammar layer would swap a syntax
+  diagnostic the author can act on for a different complaint about a different line.
+- **A parse failure names the construct the position admits, not the token class.** `TsonDataStream.expect`
+  takes that construct in the author's voice (`"a record field's ':'"`), and `describe` prints the written
+  token without its `TokenType` — `expected UNQUOTED (a type reference), found '!' (BANG)` spent both halves
+  on parser vocabulary. The construct and the written token also become the diagnostic's `expected`/`actual`
+  (via `TsonParseException`), which were the useless constant pair `well-formed TSON`/`a base-syntax error`
+  before; a throw site stating a *rule* rather than a substitution — an adjacency violation, a trailing
+  separator — leaves both `""` and nothing invents a pair. **One position names the fix outright:** `!` at a
+  type-ref position (`quantity: !integer ^ { min: 1 }`, the natural first attempt) is rejected by name with
+  the hoist-and-reference correction, the same shape as the size-spec and element-`?` rejections beside it.
+- **Both callers parse this way**, so `tson validate` and `tson compile` give the same account of the same
+  broken schema: `Tson.validateSchema` and `TsonCompiledMetaRegistry.resolveLinked(uri, receiver)` — the
+  latter being how a *data* read reports on the schema its `!!schema` names.
 - **Two reporting overloads, `SchemaResolver.resolveSchema(document, positions, receiver)` and
   `TsonSchemaLinker.link(schema, loader, receiver)`.** The existing overloads are untouched and still throw
   at the first problem. **The fail-fast paths deliberately do not route through
@@ -230,10 +273,11 @@ error* category, so this is the same layer, not a new one.
   means a diagnostic was already reported. It never escapes a reporting resolve, so it needs no `TypeKind`
   of its own.
 - **`Tson.validateSchema(schemaText)` is the front door and owns the phase boundary** — the schema-side peer
-  of `validate`, and the only caller that composes the two phases. Every declaration resolves before a
-  verdict; linking runs only if resolution was clean, so a schema with a broken declaration *and* an
-  unresolved reference reports the declaration alone (the reference may well resolve once the declaration
-  does). This is where javac and Swift both draw it: javac attributes every entry before
+  of `validate`, and the only caller that composes all three phases. Every declaration parses before a
+  verdict and a document that didn't parse whole is not resolved at all; every declaration then resolves
+  before a verdict, and linking runs only if resolution was clean, so a schema with a broken declaration
+  *and* an unresolved reference reports the declaration alone (the reference may well resolve once the
+  declaration does). This is where javac and Swift both draw it: javac attributes every entry before
   `shouldStopPolicyIfError` blocks the next phase, Swift never reaches SILGen after a Sema error. **A schema
   that reported anything is never registered.**
 - **Only `TsonSchemaValidationException` becomes a diagnostic.** An `UnsupportedOperationException` is a
@@ -259,6 +303,6 @@ error* category, so this is the same layer, not a new one.
   draw an `UnsupportedOperationException` the resolver deliberately doesn't catch, turning a reported author
   error into an unreported abort. Injected declarations are never rolled back: names are derived from the
   application, so §8.2's structural sharing means a later declaration may already reference one.
-- **Still fail-fast:** parsing (issue #29) and compilation. Compilation already keeps going via `ErrorReader`,
-  but that marks a *library gap* (an unregistered atom factory), which is a different question from an author
-  error.
+- **Still fail-fast:** compilation, and the lexer under everything. Compilation already keeps going via
+  `ErrorReader`, but that marks a *library gap* (an unregistered atom factory), which is a different question
+  from an author error.

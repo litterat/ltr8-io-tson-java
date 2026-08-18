@@ -78,14 +78,70 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      */
     public static Diagnostic ofBaseSyntaxError(RuntimeException e) {
         SourcePosition position;
+        String expected = "well-formed TSON";
+        String actual = "a base-syntax error";
         switch (e) {
-            case TsonParseException p -> position = p.position();
+            case TsonParseException p -> {
+                position = p.position();
+                // A parse failure that named a construct carries the pair itself; one that stated a rule
+                // (an adjacency violation, a trailing separator) has no substitution to describe.
+                if (!p.expected().isEmpty()) {
+                    expected = p.expected();
+                    actual = p.actual();
+                }
+            }
             case io.ltr8.tson.compiler.lexer.LexException l -> position = l.position();
             case TsonUnsupportedDocumentException u -> position = u.position();
             default -> throw e;
         }
         return new Diagnostic(Optional.of(""), Optional.empty(), "", Code.VALIDATION_ERROR, e.getMessage(),
-                "well-formed TSON", "a base-syntax error", Optional.ofNullable(position), Optional.empty());
+                expected, actual, Optional.ofNullable(position), Optional.empty());
+    }
+
+    /**
+     * A *syntax* error in a schema document -- {@link #ofBaseSyntaxError}'s schema-side peer, and the shape
+     * {@link TsonSchemaParser}'s recovering parse reports each failed declaration under.
+     *
+     * <p><b>It locates the problem at the schema end, not the data end.</b> A schema document is not data, so
+     * {@code path}/{@code dataPosition} stay empty and the token's position lands in {@code schemaPosition}
+     * beside a {@code /name} pointer -- the same two-ended model {@link #ofSchemaError} uses, so a syntax
+     * error and a resolution error against the same declaration render identically. Running a schema
+     * document's syntax error through {@code ofBaseSyntaxError} instead would point a consumer at the data
+     * end of a diagnostic that has no data.
+     *
+     * <p>The code stays {@link Code#VALIDATION_ERROR}, the base-syntax code: where the failure is found is
+     * carried by the location components, which is the whole reason there are four of them.
+     *
+     * @param declaration the declaration the error was found in, or {@code ""} for one outside any -- a
+     *                    malformed header, an unterminated map -- which makes the pointer a <em>present</em>
+     *                    {@code ""}, RFC 6901's own spelling of "the whole document"
+     */
+    public static Diagnostic ofSchemaSyntaxError(String schemaId, String declaration, TsonParseException e) {
+        return new Diagnostic(Optional.empty(), Optional.of(declaration.isEmpty() ? "" : "/" + declaration),
+                schemaId, Code.VALIDATION_ERROR, e.getMessage(),
+                e.expected().isEmpty() ? "well-formed TSON" : e.expected(),
+                e.actual().isEmpty() ? "a syntax error" : e.actual(),
+                Optional.empty(), Optional.ofNullable(e.position()));
+    }
+
+    /**
+     * {@link #ofSchemaSyntaxError(String, String, TsonParseException)} over the three ways a *schema* document
+     * can fail before any declaration resolves, classified exactly as {@link #ofBaseSyntaxError} classifies
+     * them and rethrowing anything else for the same reason. Lives here for the same reason too: {@code
+     * LexException} is in the unexported {@code lexer} package, so a caller in another module cannot catch it.
+     */
+    public static Diagnostic ofSchemaSyntaxError(String schemaId, RuntimeException e) {
+        SourcePosition position;
+        switch (e) {
+            case TsonParseException p -> {
+                return ofSchemaSyntaxError(schemaId, "", p);
+            }
+            case io.ltr8.tson.compiler.lexer.LexException l -> position = l.position();
+            case TsonUnsupportedDocumentException u -> position = u.position();
+            default -> throw e;
+        }
+        return new Diagnostic(Optional.empty(), Optional.of(""), schemaId, Code.VALIDATION_ERROR, e.getMessage(),
+                "well-formed TSON", "a syntax error", Optional.empty(), Optional.ofNullable(position));
     }
 
     /**

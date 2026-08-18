@@ -241,7 +241,8 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
     /**
      * {@link #resolveLinked(String)} reporting every problem in the schema through {@code receiver} rather
      * than throwing at the first, with the same phase boundary {@code Tson.validateSchema} draws: every
-     * declaration resolves before a verdict, and linking runs only if resolution was clean.
+     * declaration parses before a verdict, resolution runs only if the whole document parsed, and linking
+     * only if resolution was clean.
      *
      * <p>Exists so a *read* of a data document can say what is wrong with the schema it names. Without it a
      * reader can only catch the first exception and flatten it, losing the other problems along with the
@@ -265,13 +266,20 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
         // its own resolveLinked/load reaches here.
         recordAndVerify(sourceText, uri, identity);
         TsonSchemaParser parser = new TsonSchemaParser(sourceText);
-        SchemaDocument document = parser.parseSchemaDocument();
-        crossCheckId(document, uri, identity);
         if (receiver == null) {
+            SchemaDocument document = parser.parseSchemaDocument();
+            crossCheckId(document, uri, identity);
             TsonSchema resolved = new SchemaResolver(this).resolveSchema(document, parser.declarationPositions());
             return schemaRegistry.register(TsonSchemaLinker.link(resolved, schemaRegistry));
         }
         TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        Optional<SchemaDocument> parsed = parser.parseSchemaDocument(problems);
+        if (parsed.isEmpty()) {
+            problems.diagnostics().forEach(receiver::report);
+            return null;
+        }
+        SchemaDocument document = parsed.get();
+        crossCheckId(document, uri, identity);
         TsonSchema resolved = new SchemaResolver(this)
                 .resolveSchema(document, parser.declarationPositions(), problems);
         if (problems.isEmpty()) {

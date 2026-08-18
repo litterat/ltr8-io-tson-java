@@ -129,6 +129,53 @@ class TsonValidateSchemaTest {
         assertFalse(problems.isEmpty());
     }
 
+    /** Parsing is a reporting phase like resolution: every declaration's syntax error, in one pass. */
+    @Test
+    void everySyntaxErrorIsReportedInOnePass() {
+        List<Diagnostic> problems = check("""
+                {
+                  first => { x: }
+                  fine => int32
+                  second => { quantity: !int32 ^ { min: 1 } }
+                }
+                """);
+
+        assertEquals(List.of("/first", "/second"),
+                problems.stream().map(d -> d.schemaPointer().orElseThrow()).toList());
+        assertEquals("example.test/validate-schema-test.tn", problems.get(0).schemaId());
+        assertTrue(problems.get(0).schemaPosition().isPresent(), "a schema syntax error locates itself in the schema");
+        assertEquals(Optional.empty(), problems.get(0).path(), "a schema document is not data");
+    }
+
+    /**
+     * A syntax error stops the pipeline before resolution, so the unresolved reference the *broken*
+     * declaration would have caused is not reported on top of it. {@code fine} references {@code missing},
+     * which nothing declares -- a real resolution error, and one an author cannot act on until the syntax is
+     * fixed, since the fix may well declare it.
+     */
+    @Test
+    void aSyntaxErrorStopsThePipelineBeforeResolutionSpeaks() {
+        List<Diagnostic> problems = check("""
+                {
+                  broken => { x: }
+                  fine => { y: missing }
+                }
+                """);
+
+        assertEquals(1, problems.size(), problems::toString);
+        assertEquals(Diagnostic.Code.VALIDATION_ERROR, problems.get(0).code());
+    }
+
+    /** An inline atom refinement is the one syntax error worth naming the fix for, not just the token. */
+    @Test
+    void anInlineAtomRefinementIsToldHowToBecomeADeclaration() {
+        List<Diagnostic> problems = check("{ order => { quantity: !int32 ^ { min: 1 } } }");
+
+        assertEquals(1, problems.size(), problems::toString);
+        assertTrue(problems.get(0).message().contains("declare a named type instead"),
+                problems.get(0)::message);
+    }
+
     /** A document-level problem carries RFC 6901's root pointer rather than naming a declaration. */
     @Test
     void anUnloadableImportIsReportedAgainstTheDocument() {

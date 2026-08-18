@@ -213,6 +213,8 @@ plus a same-named `*Parser` in `atom` that holds one and does the work. Pattern 
 Parses a schema document body (Part 2 §12.1) into a `SchemaDocument`, grammar-only — no resolution, no
 validation. `extends TsonDataParser` (same package) because §12.1 imports Part 1's grammar directly.
 `SchemaMap.declarations` is a `LinkedHashMap` and duplicate names overwrite (grammar layer doesn't dedupe).
+Two entry points: `parseSchemaDocument()` is fail-fast, `parseSchemaDocument(receiver)` reports each
+declaration's syntax error and resyncs to the next.
 Three spec defects are implemented per intent with `SPEC-FEEDBACK.md` entries (#14/#15/#16); the bracket
 form is parsed twice per the spec's own overlapping productions (#31).
 
@@ -310,12 +312,17 @@ a location this really emits, not an absence. `expected` carries the **constrain
 `one of (A, B, C)` — from `AtomTypeException`'s six-shape vocabulary, never the type's name; the name leads
 `message` instead. The base-syntax exceptions keep their position out of `getMessage()` (it is in
 `position()`, and in `toString()` for a stack trace) so a diagnostic states it once.
-Schema-side reporting runs through the same receiver: `SchemaResolver`
-and `TsonSchemaLinker` have reporting overloads that collect every independent problem in one pass (a
-failed declaration leaves an answer-everything placeholder, javac-style), while `Tson.validateSchema` owns
-the phase boundary — linking runs only if resolution was clean, and a schema that reported anything is
-never registered. Namespace-level failures (unloadable `!!import`, ineligible `!!meta`, `!!id` cross-check)
-still throw even with a receiver. Parsing and compilation are still fail-fast.
+Schema-side reporting runs through the same receiver: `TsonSchemaParser`,
+`SchemaResolver` and `TsonSchemaLinker` have reporting overloads that collect every independent problem in
+one pass (a failed declaration leaves an answer-everything placeholder, javac-style), while
+`Tson.validateSchema` owns the phase boundary — resolution runs only if the document parsed whole, linking
+only if resolution was clean, and a schema that reported anything is never registered. A schema *syntax*
+error reports per declaration too (`Diagnostic.ofSchemaSyntaxError`, located at the schema end, resyncing on
+`name =>` at schema-map depth), naming the **construct** the position admits rather than the token class —
+and the recovering parse hands back no document at all, since resolving a half-document reports every
+reference to a dropped declaration on top of the real error. Namespace-level failures (unloadable
+`!!import`, ineligible `!!meta`, `!!id` cross-check) still throw even with a receiver. Compilation, and the
+lexer under everything, are still fail-fast.
 
 ### Read facades and writers — `docs/facades-and-tree.md`
 
@@ -474,14 +481,14 @@ compatibility).
   AtomSpecification` rather than flat, so it never receives a schema-composed default the way
   `email_type`'s flat `spec` field does. Subtype *dispatch* to them works; this is a narrower field-binding
   gap.
-- **Schema-side diagnostics, the remainder** — desugaring, resolution and linking all report through a
-  `TsonDiagnosticsReceiver` now (see `docs/readers-and-diagnostics.md`); two things are left. **Parsing is
-  still fail-fast, and names a token class rather than a construct** (issue #29) — it lands in
-  `TsonDataStream`/`TsonDataParser`, shared with the data path, and is floor-limited by the lexer being
-  fail-fast too. And **a read-path diagnostic carries `schemaPosition` but no `schemaId`/`schemaPointer`**,
-  which is blocked upstream of the reader stack: `mergeImports` discards which schema an imported entry came
-  from, so the identity a reader could reach is the importing schema's, not the declaration's own.
-  Throw-site classification is done across the whole schema pipeline.
+- **Schema-side diagnostics, the remainder** — parsing, desugaring, resolution and linking all report
+  through a `TsonDiagnosticsReceiver` now (see `docs/readers-and-diagnostics.md`); two things are left.
+  **A read-path diagnostic carries `schemaPosition` but no `schemaId`/`schemaPointer`**, which is blocked
+  upstream of the reader stack: `mergeImports` discards which schema an imported entry came from, so the
+  identity a reader could reach is the importing schema's, not the declaration's own. And **the lexer is
+  still fail-fast**, which floor-limits schema-parse recovery: a token that won't lex aborts the pass that
+  would have reported past it (`STRUCTURED-OUTPUT.md`). Throw-site classification is done across the whole
+  schema pipeline.
 - **Deferred design questions** — `REQUIRED_FIXED`/`OPTIONAL_FIXED` value validation, `value_param` real
   parameter substitution, thread-safety, and a general disk/HTTP-backed `TsonSchemaSource` (with
   whitelist/blacklist policy).
