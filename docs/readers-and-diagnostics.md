@@ -153,8 +153,8 @@ and keeps no record of where it came from, so a 4-line schema importing core.tn 
 field stays absent rather than approximated.
 An atom's `AtomTypeException` is caught in `AtomTypeReader` and mapped to
 `ATOM_CONSTRAINT_VIOLATION` — `AtomType`'s own signature is untouched, since it's shared with the
-schemaless binder which has no read context. Out of scope for now: message synthesis from code + params,
-fine-grained atom codes, and per-field schema positions.
+schemaless binder which has no read context. Out of scope for now: fine-grained atom codes, and per-field
+schema positions. (Message synthesis from code + params is not a gap but a decision -- see below.)
 
 **`expected` carries the constraint that failed, never the type's name.** `AtomTypeException` holds an
 `expected` alongside its message, filled at each throw site from the facet that rejected the value, and all
@@ -177,6 +177,26 @@ The declaring type name leads the *message* instead (`'my_percentage': '500' is 
 100`) — it is what an author wrote and can act on, so giving up `expected` must not drop it from the
 diagnostic entirely. `AtomTypeExceptionTest` pins all six shapes against the real parsers, because the
 field's value is that it is one vocabulary across atoms, not a per-parser phrasing.
+
+**`message` and the structured fields do different jobs, and neither is derived from the other.** The
+structured half — `code`, `path`, `expected`, `actual`, the positions — carries the *facts*, and is what a
+machine consumer acts on; it must be complete at every report site, including the facade-level ones
+(`TsonObjectReader`/`TsonTreeReader`'s `abandon`, which no longer offers an overload that omits them, because
+that overload is how three diagnostics ended up with a blank structured half). `message` is for a person, and
+is free to do what a template could not: cite the spec, or name the fix.
+
+```
+annotation '@since' is written bare, which §6 treats as '@since:_', but 'since' does not admit the absent sentinel
+'contact' has no variant matching this untagged value -- expected a value of one of
+    (email, phone), or an explicit type annotation
+```
+
+Neither of those is a restatement of `expected`/`actual`, and synthesizing them from `code` plus parameters
+would make them worse. **So there is deliberately no message-synthesis layer here**, and one should not be
+added: `code` does not determine the sentence (`TYPE_MISMATCH` alone covers a wrong shape, a wrong token, a
+wrong cardinality, a bare annotation, an unmatched variant and a host-binding failure), and the sentences
+differ because the situations do. The failure mode worth guarding is a site that forgets `expected` — which
+the missing overload now makes hard — not a site that writes a sentence a template wouldn't have.
 
 **A base-syntax diagnostic states its position once, structurally.** `TsonParseException`, `LexException`
 and `TsonUnsupportedDocumentException` keep the location in `position()` and out of `getMessage()`;

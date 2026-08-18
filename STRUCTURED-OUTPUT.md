@@ -54,9 +54,8 @@ backend.
     already says what this bullet's item (4) asks for); `DUPLICATE_MAP_KEY` is produced for real, and
     `DUPLICATE_FIELD` joined it for the record half — §2.5/§2.6 word both as *warnings*, but per
     `SPEC-FEEDBACK.md` #41/#42 every warn-shaped rule is implemented as an ordinary error.
-  - `message` — landed, but still **hand-composed at each call site**, not synthesized from `code` +
-    params as this bullet originally called for — that needs a richer per-code parameter shape than
-    exists yet. Still open.
+  - `message` — landed, **hand-composed at each call site, and staying that way**. Synthesizing it from
+    `code` + params was reconsidered and dropped; see item (5) below for the reasoning.
   - `expected`/`actual` — landed, both carrying what they should. `actual` is the offending value
     (`99999`, `CANCELLED`, `(absent)`); `expected` is the **constraint that failed** (`<= 100`, `one of
     (PENDING, SHIPPED, DELIVERED)`, `at most 10 characters`, `an RFC 3339 date-time`), not the declared
@@ -94,14 +93,22 @@ backend.
   kind of problem, categorized** (`code`) — lets a system prompt/few-shot pattern generalize a fix
   instead of parsing free text; (3) **what was actually there** (`actual`) — closes the loop; (4)
   **what was expected**, concretely (`expected`) — turns "too large" into "must be ≤ 100"; (5) a
-  single ready-to-paste `message` synthesized from 1–4, which is what actually gets dropped into a
-  retry prompt in practice, but should be a *rendering* of the structured fields, not
-  hand-authored per site.
-  - (1)–(4) are present today: `expected` now carries the violated constraint itself, so "too large" does
-    read as `<= 100` in the structured half. **(5) is the remaining gap** — `message` is still hand-authored
-    per site rather than rendered from 1–4, which keeps the two consistent by discipline instead of by
-    construction. Note what is *not* a gap any more: a repair loop can obtain the diagnostics without giving
-    up the value, so a retry can be built from the partial result rather than from scratch.
+  single ready-to-paste `message`, which is what actually gets dropped into a retry prompt in practice.
+  - **All five are present today.** (1)–(4) are structured fields; `expected` carries the violated
+    constraint itself, so "too large" does read as `<= 100` without parsing prose. Note what is *not* a gap
+    any more: a repair loop can obtain the diagnostics without giving up the value, so a retry can be built
+    from the partial result rather than from scratch.
+  - **(5) originally asked for `message` to be a *rendering* of 1–4 rather than hand-authored per site. That
+    was reconsidered and dropped**, and should not be re-derived from this list. The premise was that the
+    sentence and the structured fields say the same thing twice and can therefore drift; they don't. The
+    structured half carries the facts a consumer acts on, and *that* is what closes the "don't make the model
+    parse prose" need — items (1)–(4) alone. `message` is for a person, and earns its keep doing what a
+    template cannot: `annotation '@since' is written bare, which §6 treats as '@since:_', but 'since' does
+    not admit the absent sentinel` cites the spec, and `… or an explicit type annotation` names the fix.
+    Synthesis would degrade both. It is also not mechanically available: `code` does not determine the
+    sentence (`TYPE_MISMATCH` alone spans six unrelated situations). The real failure mode was a site
+    leaving `expected`/`actual` blank, which was three facade-level diagnostics and is now fixed and
+    structurally prevented — see `docs/readers-and-diagnostics.md`.
   - **Ranked above all five for a model that authors *schemas* as well as data**: a wrong schema must not
     report `OK`. An unknown member in a refinement body is silently ignored today, so JSON-Schema
     vocabulary (`minimum`/`maximum`) compiles clean and enforces nothing — see `BACKLOG.md`'s "Validation

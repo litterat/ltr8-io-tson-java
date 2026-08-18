@@ -225,18 +225,6 @@ left:
   would be their own parser work — visible today as a diagnostic pointing at `/my_type` when the problem is
   one of its fields.
 
-## Diagnostic quality for machine consumers
-
-- [ ] **`message` is hand-composed at each call site**, not synthesized from `code` plus a per-code
-  parameter shape, so the sentence and the structured fields stay consistent by discipline rather than by
-  construction. This is what is left of the section: `expected` now carries the violated constraint
-  (`AtomTypeException`'s six-shape vocabulary — an ordering bound, a membership, a length, a pattern, a
-  grammar, a prohibition), the base-syntax exceptions state their position only structurally, and both RFC
-  6901 pointers are `Optional<String>` so a present `""` (the root) and an absence are distinguishable.
-  `STRUCTURED-OUTPUT.md`'s Tier 1 ranks this last of its five, as a *rendering* of 1–4 rather than a sixth
-  piece of information — which is the shape the fix should take, and needs the parameter shape to exist
-  first.
-
 ## Write side
 
 The read/write matrix in the README makes the asymmetry plain: the read side has a schemaless→object

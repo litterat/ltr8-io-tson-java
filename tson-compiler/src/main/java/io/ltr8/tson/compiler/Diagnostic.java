@@ -45,11 +45,15 @@ import java.util.Optional;
  * javax.tools.Diagnostic}, LSP's {@code Diagnostic}, rustc's {@code DiagInner} -- none of which
  * splits by *where* the problem is.
  *
- * <p>{@code message} is hand-composed at each {@link TsonReadContext#report} call site for now, not
- * synthesized purely from {@code code} plus {@code expected}/{@code actual} -- that would need a
- * richer per-code parameter shape than exists yet. {@code expected}/{@code actual} are the
- * machine-parseable pieces a caller (e.g. an LLM retry loop) can build its own message from without
- * parsing {@code message} itself.
+ * <p><b>{@code message} and the structured fields do different jobs.</b> {@code code}/{@code path}/
+ * {@code expected}/{@code actual} plus the positions carry the facts, and are what a caller (e.g. an LLM
+ * retry loop) acts on without ever reading prose -- so every report site populates them, including the
+ * facade-level ones. {@code message} is hand-composed at each {@link TsonReadContext#report} call site, for
+ * a person, and is free to do what a rendering of the other fields could not: cite the spec, or name the
+ * fix. It is deliberately <em>not</em> synthesized from {@code code} plus parameters -- {@code code} does
+ * not determine the sentence ({@link Code#TYPE_MISMATCH} alone spans a wrong shape, a wrong token, a wrong
+ * cardinality, a bare annotation, an unmatched variant and a host-binding failure), and the sentences differ
+ * because the situations do. See {@code docs/readers-and-diagnostics.md}.
  */
 public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, String schemaId, Code code,
                           String message, String expected, String actual,

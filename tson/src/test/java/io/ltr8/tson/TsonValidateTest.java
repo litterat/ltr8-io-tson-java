@@ -276,6 +276,27 @@ class TsonValidateTest {
     }
 
     /**
+     * A facade-level failure carries a structured half too. These three are the ones that used to pass
+     * {@code expected}/{@code actual} as {@code ""} and put everything in the prose -- the exact diagnostics
+     * a machine consumer cannot act on, and the reason the {@code abandon} overload that omitted the two
+     * arguments is gone. The prose is still free to explain; it is just no longer the only account.
+     */
+    @Test
+    void aFacadeLevelFailureCarriesItsStructuredEndsToo() {
+        Diagnostic unreachable = only(tsonWithPoint(), """
+                !!schema:"https://example.test/not-there.tn"
+                !point { x: 3  y: 4 }""");
+        assertEquals("a resolvable schema", unreachable.expected());
+        assertEquals("https://example.test/not-there.tn", unreachable.actual(), "which schema could not be had");
+
+        Diagnostic noRootRef = only(tsonWithPoint(), """
+                !!schema:"https://example.test/point-1.tn"
+                { x: 3  y: 4 }""");
+        assertEquals("a root type-ref", noRootRef.expected());
+        assertEquals("(none)", noRootRef.actual());
+    }
+
+    /**
      * {@code AtomTypeException}'s {@code expected} vocabulary survives the trip through a real schema, a real
      * compiled reader and {@code TsonReadContext.report} -- a membership, a length and a grammar, each landing
      * on the {@link Diagnostic} verbatim. {@code AtomTypeExceptionTest} pins the vocabulary itself, including
