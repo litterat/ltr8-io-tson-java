@@ -2871,3 +2871,70 @@ before JSON-trained emitters — the format's stated consumer — reinvent it sc
 reasoning suggests (though this entry does not insist) that `value` and `token` variants deserve a look:
 `value` spans every class, so a choice containing it can never be disjoint either, and a position that
 admits anything is better typed `value` directly than through a union.
+
+---
+
+## 49. A nested container may carry an element/position `?`, and §8.2's structural representation has no channel to carry it
+
+**Section:** Part 2 §5.3 (Array/Tuple Types — declaration-level forms, nesting); §8.2 (Resolution is
+structural; Materialisation); §12.1 (`element-type` production and its notes). Related: #45.
+
+**Problem:** Three statements are individually clear and jointly inconsistent for one grammatical form.
+
+1. §12.1 permits the `?` at a **nested** element position, not only a top-level one: "Element- and
+   position-level `?` is declaration-level syntax: it appears in `container-def` — a top-level type-def
+   body, *or a nested element position within one* (§5.3)". So `holder => [[T, U?], V]` and
+   `rows => [[T?]; 3]` parse.
+2. §5.3 says a nested form desugars innermost-first — `grid => <T, N> [[T; N]; N]` is
+   `array_ranged<array_ranged<T, N, N>, N, N>` — so an inner container becomes an application occupying an
+   element position of the outer one. That position is a **use site**, not a declaration body.
+3. §8.2 says a constructor application at a use site never materialises an entry: it is "carried
+   structurally", as a `type_ref` whose `arguments` are `type_argument` records, and a `type_argument` has
+   exactly two members, `name` (a reference) and `value` (a literal). For the variadic pair the spec states
+   the losslessness condition outright: "arguments map positionally onto `elements` and `variants`,
+   **lossless precisely because the inline restriction keeps element states and sizes out of inline
+   forms**."
+
+That guard covers inline positions. It does not cover nested ones, and (1) puts element states there.
+There is no channel for them:
+
+- **Tuple.** `tuple`'s positions map onto `elements`, whose members are `tuple_element` records carrying
+  `element_type` *and* `state`. As `arguments`, each position is a `type_argument` — `{ name: ... }` or
+  `{ value: ... }` — with nowhere to record `state: OPTIONAL`. So `[T, U?]` nested inside another container
+  has no structural form; `[T, U]` and `[T, U?]` carry structurally as the *same* `type_ref`.
+- **Array.** `array`'s `state` is an ordinary vocabulary field with no `value_param` (only `element_type`
+  carries `= T`), so nothing routes a state through an application's argument list either. `[T?]` nested
+  has no structural form; `[T]` and `[T?]` carry as the same `type_ref`.
+
+Sizes are *not* affected — they route through the `array_min`/`array_max`/`array_ranged` templates' value
+parameters, and a fully-bound template application is §8.2's one materialising form, so a nested `[T; N]`
+gets a real entry to name. It is specifically the two `?` forms, the ones §5.3 says have "no template
+route", that nesting places where the spec cannot represent them.
+
+§5.3's own sentence about them reads as though nesting were not in play: "they desugar directly and become
+**the declaration's body**; these forms remain declaration-level only". A nested one cannot become the
+declaration's body — the declaration's body is the enclosing container.
+
+**Interpretation chosen:** nesting is implemented (`SchemaDesugarer.elementRef`/`hoistNested`) as the
+bottom-up hoist §5.3's ordering describes, and this implementation already materialises an entry for every
+hoisted application rather than carrying it structurally — the deliberate §8.2 divergence recorded in
+`BACKLOG.md`. Under that divergence the question does not arise: an inner `[T, U?]` becomes a real entry
+whose `elements` carry their states, and the outer position names it. The injected entry's derived name
+includes each position's state, so `[[T, U?], V]` and `[[T, U], V]` land on distinct entries rather than
+colliding. Neither `?` form is expanded at the *array* element (`[T?]`) yet, at any depth — a separate gap.
+
+**Suggested resolution:** decide which way the incompatibility resolves, and say so in §5.3.
+
+- **Simplest, and consistent with §5.3's existing framing:** restrict the element/position `?` to a
+  **top-level** `container-def` — a declaration's own body — and make it a parse error at a nested element
+  position, the same verdict inline positions already get. §12.1's note would drop "or a nested element
+  position within one", and §5.3's "become the declaration's body" becomes literally true. Nesting keeps
+  working for every form that has a representation; an author wanting an optional-position tuple inside a
+  container names it, exactly as §5.3 already tells them to for an inline one.
+- **Otherwise**, §8.2 needs the missing channel — either a `type_argument` member for an element state, or
+  a rule that a nested container-def carrying a `?` materialises an entry rather than carrying structurally
+  (which is the behaviour this implementation has, and would make the *materialising* forms two rather than
+  §8.2's stated one).
+
+Either way §12.1's note and §5.3's paragraph should agree; today one permits the form and the other
+describes only the case where it cannot occur.

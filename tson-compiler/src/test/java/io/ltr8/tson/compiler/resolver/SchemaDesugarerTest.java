@@ -373,16 +373,105 @@ class SchemaDesugarerTest {
                 tupleElements(instance));
     }
 
+    // ── Nested bracket forms (§5.3, §12.1) ───────────────────────────────
+    //    Declaration-level container syntax nests inside itself, and §5.3 fixes the order: `grid => <T, N>
+    //    [[T; N]; N]` is `array_ranged<array_ranged<T, N, N>, N, N>`, "the inner form desugaring first".
+    //    So the inner container is injected under its own derived name and the position that held it
+    //    becomes a bare reference -- the bottom-up hoist an inline form at a type-ref position already gets.
+
     /**
-     * A nested bracket form at a tuple position is the declaration-level container syntax nesting inside
-     * itself (§5.3), which this phase does not build for arrays either -- it stays unexpanded and keeps
-     * whatever handling it already had, rather than being turned into a differently-broken shape here.
+     * A tuple position holding a nested <em>sized</em> array. The inner form desugars first, into the
+     * {@code array_ranged} instantiation the flat spelling would produce, and the position refers to it by
+     * name -- so what the outer tuple routes is a plain name like any other.
      */
     @Test
-    void aPositionHoldingANestedBracketFormIsLeftAlone() {
+    void aTuplePositionHoldingANestedSizedArrayRefersToTheInjectedInnerArray() {
+        SchemaDocument document = desugarAgainstTheRealMetaKernel("  grid => [[integer; 2], text]");
+
+        SchemaMap.Declaration inner = onlyInjected(document, "array_ranged");
+        assertEquals("{ element_type: integer  min_items: 2  max_items: 2 }",
+                instanceBody(assertInstanceOf(TemplateInstance.class, inner.typeDef()).body()));
+        assertEquals("[ { element_type: " + inner.name() + " } { element_type: text } ]",
+                tupleElements(assertInstanceOf(Instance.class,
+                        document.body().declarations().get("grid").typeDef())));
+    }
+
+    /** The other nesting direction: a sized array <em>over</em> a nested plain array ({@code [[T]; N]}). */
+    @Test
+    void aSizedArrayOverANestedArrayRefersToTheInjectedInnerArray() {
+        SchemaDocument document = desugarAgainstTheRealMetaKernel("  rows => [[integer]; 3]");
+
+        SchemaMap.Declaration inner = onlyInjected(document, "array_integer");
+        assertEquals("{ element_type: integer }",
+                instanceBody(assertInstanceOf(Instance.class, inner.typeDef())));
+        assertEquals("{ element_type: " + inner.name() + "  min_items: 3  max_items: 3 }",
+                instanceBody(assertInstanceOf(TemplateInstance.class,
+                        document.body().declarations().get("rows").typeDef()).body()));
+    }
+
+    /**
+     * Nesting is recursive, and bottom-up needs no special case for depth: {@code [[[T]]]} injects the
+     * innermost array first and the middle one refers to it, exactly as the outermost refers to the middle.
+     */
+    @Test
+    void nestingRecursesInnermostFirst() {
+        SchemaDocument document = desugarAgainstTheRealMetaKernel("  deep => [[[integer]]]");
+
+        SchemaMap.Declaration innermost = onlyInjected(document, "array_integer");
+        SchemaMap.Declaration middle = onlyInjected(document, "array_array_integer");
+        assertEquals("{ element_type: integer }",
+                instanceBody(assertInstanceOf(Instance.class, innermost.typeDef())));
+        assertEquals("{ element_type: " + innermost.name() + " }",
+                instanceBody(assertInstanceOf(Instance.class, middle.typeDef())));
+        assertEquals("{ element_type: " + middle.name() + " }",
+                instanceBody(assertInstanceOf(Instance.class,
+                        document.body().declarations().get("deep").typeDef())));
+    }
+
+    /**
+     * A nested tuple's <em>position</em> optionality reaches the derived name. Without it {@code [T, U?]} and
+     * {@code [T, U]} derive the same name from their element types alone, and the second one written collapses
+     * onto the first one injected -- two different types on one entry, silently.
+     */
+    @Test
+    void twoNestedTuplesDifferingOnlyInPositionOptionalityGetSeparateDeclarations() {
+        SchemaDocument document = desugarAgainstTheRealMetaKernel("""
+                  strict  => [[integer, text], boolean]
+                  relaxed => [[integer, text?], boolean]""");
+
+        List<SchemaMap.Declaration> injected = document.body().declarations().values().stream()
+                .filter(declaration -> declaration.name().startsWith("tuple_")).toList();
+        assertEquals(2, injected.size(), () -> "expected two injected tuples, got "
+                + injected.stream().map(SchemaMap.Declaration::name).toList());
+        assertEquals("[ { element_type: integer } { element_type: text } ]",
+                tupleElements(assertInstanceOf(Instance.class, injected.get(0).typeDef())));
+        assertEquals("[ { element_type: integer } { element_type: text  state: OPTIONAL } ]",
+                tupleElements(assertInstanceOf(Instance.class, injected.get(1).typeDef())));
+    }
+
+    /** A nested position may carry its own {@code ?} as well, and that is the outer tuple's fact, not the inner's. */
+    @Test
+    void anOptionalPositionHoldingANestedFormKeepsItsOwnState() {
+        SchemaDocument document = desugarAgainstTheRealMetaKernel("  loose => [[integer, text]?, boolean]");
+
+        SchemaMap.Declaration inner = onlyInjected(document, "tuple");
+        assertEquals("[ { element_type: " + inner.name() + "  state: OPTIONAL } { element_type: boolean } ]",
+                tupleElements(assertInstanceOf(Instance.class,
+                        document.body().declarations().get("loose").typeDef())));
+    }
+
+    /**
+     * The <em>element</em> {@code ?} on an array ({@code [T?]}, §5.3's {@code state: OPTIONAL} on the resolved
+     * array) is a separate gap this phase still builds nothing for, at any nesting depth. It stays unexpanded
+     * and keeps whatever handling it already had, rather than being turned into a differently-broken shape
+     * here -- and so does the container enclosing it, since a partially reduced one is no longer a
+     * recognisable sugar form.
+     */
+    @Test
+    void anOptionalArrayElementIsStillLeftAlone() {
         SchemaDocument document = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
-                { pair => [[integer; 2], text] }""").parseSchemaDocument();
+                { holder => [[integer?]; 3] }""").parseSchemaDocument();
 
         assertSame(document, SchemaDesugarer.desugar(document,
                 MetaKernelBootstrapResolver.getMetaKernelSchema().entries(), Set.of()));

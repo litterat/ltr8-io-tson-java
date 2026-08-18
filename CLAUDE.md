@@ -466,10 +466,11 @@ compatibility).
 
 ## Not yet implemented
 
-- **A nested bracket form inside a container** (`[[T; 2], U]`, `[[T]; 3]`) — `SchemaDesugarer` builds
-  neither an array nor a tuple position holding an `ElementType.Expr.Nested`, so the declaration reaches
-  `DefinitionResolver` as a `ContainerTypeDef` and throws. The last piece of §5.3's declaration-level
-  container syntax; both flat forms are done.
+- **An array's element `?`** (`[T?]` — §5.3's `state: OPTIONAL` on the resolved array, absent elements
+  occupying positional slots) — `SchemaDesugarer` builds no array position carrying one, so the declaration
+  reaches `DefinitionResolver` as a `ContainerTypeDef` and throws, and so does any container enclosing it.
+  The last piece of §5.3's declaration-level container syntax: the flat forms, the tuple position `?`, and
+  nesting are all done.
 - **Part 2 resolution gaps** — the identity-diagonal
   FIXED-value invariant, a generic type-ref whose argument is nested or a value rather than a plain name,
   and a parameterized supertype (`customer & box<T>`, which needs §5.10 substitution into the absorbed

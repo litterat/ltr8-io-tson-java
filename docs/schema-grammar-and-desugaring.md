@@ -85,8 +85,23 @@ substitution, which this phase does not answer.
   what names *resolve to*, after §8.3 flattening, which this phase can't answer (`BACKLOG.md`).
 - **Both bracket positions desugar, tuple as well as array.** At declaration position the form *is* the
   construction (`pair => [integer, text]` becomes `!tuple { ... }`, like `ids => [text]` and
-  `contact => (A | B)`); inline it is hoisted into a `tuple_<...>_<hash>` declaration and referenced. A
-  position holding a *nested* bracket form is left unexpanded, the same limit the array side has.
+  `contact => (A | B)`); inline it is hoisted into a `tuple_<...>_<hash>` declaration and referenced.
+- **A nested bracket form desugars innermost-first** (`elementRef`/`hoistNested`). §5.3's declaration-level
+  container syntax nests inside itself and the spec fixes the order outright — `grid => <T, N> [[T; N]; N]`
+  is `array_ranged<array_ranged<T, N, N>, N, N>`, "the inner form desugaring first" — so the inner container
+  is built as its own instance, injected under its derived name, and the position that held it becomes a bare
+  reference. That is the bottom-up hoist the type-ref walk already does for `map<text, [integer]>`, one tier
+  down, and it reaches every element position: an array's element (`[[T]; 3]`) and a tuple's positions
+  (`[[T; 2], U]`) alike, to any depth, with no per-depth case. Because identity is application-structural
+  (§8.2), the injected entry is shared — the one `array_integer_<hash>` serves the nested position, the flat
+  declaration `[integer]` and an inline field's `[integer]` alike. Nothing here needs §5.10 substitution: a
+  nested form carries no parameter its flat sibling does not. An injected **tuple**'s name derives from its
+  positions' *states* as well as their types, or `[T, U?]` and `[T, U]` would land on one entry — and that
+  form is exactly the one §8.2's structural representation has no channel for, so nesting it is only
+  representable at all *because* of the entry-materialising divergence (`SPEC-FEEDBACK.md` #49). What stays
+  unexpanded is the **element `?` on an array** (`[T?]`, §5.3's `state: OPTIONAL` on the resolved array) — a
+  separate gap in the same phase (`BACKLOG.md`), and one that keeps its enclosing container unexpanded too,
+  since a partially reduced container is no longer a recognisable sugar form.
 - **A template application over a constructor is instantiated** (§8.2's one materialising form). §5.3's
   sized sugar is the case that matters: `[T; 1..5]` → `array_ranged<T, 1, 5>`, and `array_ranged` is a
   template (declared without `~`) whose resolved vocabulary carries the same `value_param` channels a

@@ -72,6 +72,12 @@ import java.util.function.UnaryOperator;
  * a body -- {@code resolveInstance} binds the emitted instance through the meta's compiled reader, which is
  * exactly how every other {@code !C value} is already handled.
  *
+ * <p><b>A nested bracket form expands innermost first.</b> §5.3's declaration-level container syntax nests
+ * inside itself and fixes the order -- {@code [[T; N]; N]} is {@code array_ranged<array_ranged<T, N, N>, N,
+ * N>}, "the inner form desugaring first" -- so an element position holding one has the inner container
+ * injected under its own derived name and becomes a bare reference to it. The enclosing container then routes
+ * a plain name like any other, at any depth. See {@link #elementRef}.
+ *
  * <p><b>Structural sharing.</b> Every method returns its input unchanged when nothing beneath it changed, so
  * a document with no sugar comes back as the same object graph. Source positions live in identity-keyed side
  * tables ({@code TsonSchemaParser.declarationPositions()} is an {@code IdentityHashMap}), so a rebuilt node
@@ -438,15 +444,16 @@ final class SchemaDesugarer {
     /**
      * A size-less declaration-level array as its own constructor application, or empty for anything this
      * does not build -- a tuple container ({@link #declarationLevelTuple}'s), a sized array ({@link
-     * #sizedArrayApplication}'s), an optional element, or a non-plain element.
+     * #sizedArrayApplication}'s), an optional element, or an element position {@link #elementRef} cannot
+     * reduce to a name.
      */
     private Optional<TypeDef> declarationLevelArray(ContainerDef def) {
         if (!(def instanceof ArrayContainerDef array) || array.size().isPresent()
-                || array.elementType().optional()
-                || !(array.elementType().expr() instanceof ElementType.Expr.Plain plain)) {
+                || array.elementType().optional()) {
             return Optional.empty();
         }
-        return instanceFor("array", List.of(new TypeArg.Ref(typeRef(plain.typeRef()))));
+        return elementRef(array.elementType())
+                .flatMap(element -> instanceFor("array", List.of(new TypeArg.Ref(element))));
     }
 
     /**
@@ -470,25 +477,43 @@ final class SchemaDesugarer {
      */
     private Optional<GenericRef> sizedArrayApplication(ContainerDef def) {
         if (!(def instanceof ArrayContainerDef array) || array.size().isEmpty()
-                || array.elementType().optional()
-                || !(array.elementType().expr() instanceof ElementType.Expr.Plain plain)) {
+                || array.elementType().optional()) {
             return Optional.empty();
         }
-        TypeArg element = new TypeArg.Ref(typeRef(plain.typeRef()));
-        return Optional.of(switch (array.size().get()) {
-            case SizeSpec.Min min when min.lower().equals("0") -> {
-                String shown = plain.typeRef() instanceof SimpleRef simple ? simple.name() : "T";
-                throw new TsonSchemaValidationException("'[" + shown + "; 0..]' pins a floor of zero, which "
-                        + "every array already satisfies -- write '[" + shown + "]' for the unconstrained "
-                        + "array (§5.3). The spelling is not merely redundant: identity is "
-                        + "application-structural (§8.2), so it lands on an entry distinct from '[" + shown
-                        + "]' that means the same thing");
-            }
-            case SizeSpec.Min min -> application("array_min", element, min.lower());
-            case SizeSpec.Max max -> application("array_max", element, max.upper());
-            case SizeSpec.Ranged ranged -> application("array_ranged", element, ranged.lower(), ranged.upper());
-            case SizeSpec.Exact exact -> application("array_ranged", element, exact.bound(), exact.bound());
-        });
+        return elementRef(array.elementType()).map(element ->
+                sizedApplication(element, shownElement(array.elementType()), array.size().orElseThrow()));
+    }
+
+    /**
+     * {@link #sizedArrayApplication}'s size-to-application mapping, over an element position already reduced
+     * to a name -- shared with {@link #hoistNested}, which reaches the same four spellings one bracket in.
+     * {@code shown} is how the element was <em>written</em>, for the one diagnostic that quotes the form back.
+     */
+    private static GenericRef sizedApplication(TypeRef element, String shown, SizeSpec size) {
+        TypeArg argument = new TypeArg.Ref(element);
+        return switch (size) {
+            case SizeSpec.Min min when min.lower().equals("0") ->
+                    throw new TsonSchemaValidationException("'[" + shown + "; 0..]' pins a floor of zero, which "
+                            + "every array already satisfies -- write '[" + shown + "]' for the unconstrained "
+                            + "array (§5.3). The spelling is not merely redundant: identity is "
+                            + "application-structural (§8.2), so it lands on an entry distinct from '[" + shown
+                            + "]' that means the same thing");
+            case SizeSpec.Min min -> application("array_min", argument, min.lower());
+            case SizeSpec.Max max -> application("array_max", argument, max.upper());
+            case SizeSpec.Ranged ranged -> application("array_ranged", argument, ranged.lower(), ranged.upper());
+            case SizeSpec.Exact exact -> application("array_ranged", argument, exact.bound(), exact.bound());
+        };
+    }
+
+    /**
+     * How an element position was spelled, for a diagnostic that quotes the sugar form back at its author: the
+     * position's own name when it has one, and a stand-in when it is an inline or nested form whose expansion
+     * carries a derived name the author never wrote.
+     */
+    private static String shownElement(ElementType element) {
+        return element.expr() instanceof ElementType.Expr.Plain plain && plain.typeRef() instanceof SimpleRef simple
+                ? simple.name()
+                : "T";
     }
 
     private static GenericRef application(String template, TypeArg element, String... bounds) {
@@ -525,12 +550,23 @@ final class SchemaDesugarer {
      * downstream handling rather than being turned into a differently-broken shape here.
      */
     private TypeRef apply(String head, List<TypeArg> args, TypeRef unexpanded) {
-        Optional<TypeDef> instance = instanceFor(head, args);
-        if (instance.isEmpty()) {
+        Optional<TypeRef> hoisted = hoistApplication(head, args);
+        if (hoisted.isEmpty()) {
             rejectIfTemplateApplication(head);
             return unexpanded;
         }
-        return hoist(syntheticName(head, args), instance.get());
+        return hoisted.get();
+    }
+
+    /**
+     * {@code head<args>} as an injected declaration plus the bare reference that replaces it, or empty when
+     * {@link #instanceFor} does not build the construction. {@link #apply}'s half that answers in an {@code
+     * Optional} rather than falling back to an unexpanded node -- what {@link #hoistNested} needs, since a
+     * nested bracket form has no unexpanded node to fall back to, only an enclosing container that must then
+     * stay unexpanded whole.
+     */
+    private Optional<TypeRef> hoistApplication(String head, List<TypeArg> args) {
+        return instanceFor(head, args).map(instance -> hoist(syntheticName(head, args), instance));
     }
 
     /**
@@ -563,19 +599,43 @@ final class SchemaDesugarer {
      * the reason {@link #hoistChoice} has none: §5.6 fixes this head, so it can never be an author's template.
      */
     private TypeRef hoistTuple(List<TypeRef> elements, TypeRef unexpanded) {
-        Optional<TypeDef> instance = tupleInstance(elements.stream().map(e -> new Position(e, false)).toList());
-        if (instance.isEmpty()) {
-            return unexpanded;
+        return hoistTuplePositions(elements.stream().map(element -> new Position(element, false)).toList())
+                .orElse(unexpanded);
+    }
+
+    /**
+     * A tuple's positions as an injected declaration plus the bare reference that replaces it -- {@link
+     * #hoistTuple}'s inline form and {@link #hoistNested}'s nested one share it, differing only in whether a
+     * position can carry its own {@code ?}.
+     */
+    private Optional<TypeRef> hoistTuplePositions(List<Position> positions) {
+        return tupleInstance(positions).map(instance -> hoist(tupleName(positions), instance));
+    }
+
+    /**
+     * {@code tuple_T_U_hash}, with an OPTIONAL position contributing its state to the derivation. Without it
+     * {@code [T, U?]} and {@code [T, U]} derive the same name and the second one written collapses onto the
+     * first one injected -- two different types on one entry. An all-REQUIRED tuple keeps exactly the name the
+     * element types alone produce, so the inline form's names are unchanged.
+     *
+     * <p>A position state is representable here only because this phase materialises an entry for a hoisted
+     * form; §8.2's structural carrying has no channel for one ({@code SPEC-FEEDBACK.md} #49).
+     */
+    private static String tupleName(List<Position> positions) {
+        List<TypeArg> args = new ArrayList<>();
+        for (Position position : positions) {
+            args.add(new TypeArg.Ref(position.typeRef()));
+            if (position.optional()) {
+                args.add(new TypeArg.Value(new TokenValue(ElementState.OPTIONAL.name(), TokenForm.UNQUOTED)));
+            }
         }
-        return hoist(syntheticName(TUPLE, elements.stream().<TypeArg>map(TypeArg.Ref::new).toList()),
-                instance.get());
+        return syntheticName(TUPLE, args);
     }
 
     /**
      * A declaration-level tuple as its own constructor application, or empty for anything this does not build
      * -- an array container (which {@link #declarationLevelArray}/{@link #sizedArrayApplication} own) or a
-     * position holding a nested bracket form rather than a type-ref, which stays unexpanded and keeps its
-     * existing handling.
+     * position {@link #elementRef} cannot reduce to a name.
      *
      * <p>Unlike the inline form, a position here may carry its own {@code ?} (§5.3), which becomes {@link
      * ElementState#OPTIONAL} on that element.
@@ -584,14 +644,74 @@ final class SchemaDesugarer {
         if (!(def instanceof TupleContainerDef tuple)) {
             return Optional.empty();
         }
+        return positions(tuple).flatMap(this::tupleInstance);
+    }
+
+    /**
+     * Every position of a declaration-level tuple reduced to a name plus its own {@code ?}, or empty as soon
+     * as one position holds a form this phase cannot build -- which leaves the whole tuple unexpanded, since
+     * a partially reduced one would be a differently-broken shape rather than a recognisable sugar form.
+     */
+    private Optional<List<Position>> positions(TupleContainerDef tuple) {
         List<Position> positions = new ArrayList<>();
         for (ElementType element : tuple.elementTypes()) {
-            if (!(element.expr() instanceof ElementType.Expr.Plain plain)) {
+            Optional<TypeRef> ref = elementRef(element);
+            if (ref.isEmpty()) {
                 return Optional.empty();
             }
-            positions.add(new Position(typeRef(plain.typeRef()), element.optional()));
+            positions.add(new Position(ref.get(), element.optional()));
         }
-        return tupleInstance(positions);
+        return Optional.of(positions);
+    }
+
+    /**
+     * The type-ref an element position denotes: an ordinary reference expanded the usual way, or a <b>nested
+     * bracket form</b> hoisted into its own declaration and replaced by its name.
+     *
+     * <p>§5.3's declaration-level container syntax nests inside itself ({@code [[T; 2], U]}, {@code [[T]; 3]}),
+     * and the spec fixes the order outright -- {@code grid => <T, N> [[T; N]; N]} is {@code
+     * array_ranged<array_ranged<T, N, N>, N, N>}, "the inner form desugaring first". That is the bottom-up
+     * hoist {@link #typeRef} already performs for an inline form, one tier down: {@link #hoistNested} builds
+     * the inner container's own instance and injects it, and the position that held it becomes a bare
+     * reference, so the enclosing container routes a plain name like any other.
+     *
+     * <p>Empty when the position holds a form this phase cannot build, which leaves the enclosing container
+     * unexpanded and keeps its existing handling.
+     */
+    private Optional<TypeRef> elementRef(ElementType element) {
+        return switch (element.expr()) {
+            case ElementType.Expr.Plain plain -> Optional.of(typeRef(plain.typeRef()));
+            case ElementType.Expr.Nested nested -> hoistNested(nested.container());
+        };
+    }
+
+    /**
+     * A nested bracket form as a reference to its own injected declaration -- the same four array spellings
+     * and the tuple form {@link #typeDef} builds at declaration position, built here one bracket in.
+     * Recursive through {@link #elementRef}, so nesting depth needs no special case.
+     *
+     * <p>Empty for an array with an optional <em>element</em> ({@code [T?]}, which this phase does not build
+     * at any depth) and for anything {@link #instanceFor} does not construct.
+     */
+    private Optional<TypeRef> hoistNested(ContainerDef def) {
+        return switch (def) {
+            case ArrayContainerDef array -> {
+                if (array.elementType().optional()) {
+                    yield Optional.empty();
+                }
+                Optional<TypeRef> element = elementRef(array.elementType());
+                if (element.isEmpty()) {
+                    yield Optional.empty();
+                }
+                if (array.size().isEmpty()) {
+                    yield hoistApplication("array", List.of(new TypeArg.Ref(element.orElseThrow())));
+                }
+                GenericRef sized = sizedApplication(element.orElseThrow(), shownElement(array.elementType()),
+                        array.size().orElseThrow());
+                yield hoistApplication(sized.name(), sized.args());
+            }
+            case TupleContainerDef tuple -> positions(tuple).flatMap(this::hoistTuplePositions);
+        };
     }
 
     /** Records an injected declaration under a derived name and yields the reference that replaces the sugar. */
