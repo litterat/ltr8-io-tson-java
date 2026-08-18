@@ -110,7 +110,9 @@ own prose (which had gone stale on at least one of them):
   kernel's own templates route parameters into and the sugar (`[T; 5..3]`) is how an author reaches it. The
   kin §8.2 gestures at — "bounds within a width-derived range, and their kin" — belong with the constraint
   families that own them, next to `AtomNarrowing`, not in a syntax rewrite. Doing that properly probably
-  means the check moves out of the desugarer entirely and `checkBounds` goes with it.
+  means the check moves out of the desugarer entirely and `checkBounds` goes with it. Distinct from the
+  atom-body self-coherence item below, which shares that destination but has no parameter or
+  materialisation dimension at all.
 - [ ] **Resolved-form ingest** ([TSON-SCHEMA] §8.1/§10.1) — bringing an already-resolved
   `!type_definition` document into the library (not source text), with its own integrity checks:
   `subtypes`/`disjoint` recomputed and verified, the closed-entry parameter-free rule reverified, an
@@ -124,11 +126,12 @@ own prose (which had gone stale on at least one of them):
 
 ## Remaining built-in types
 
-- [ ] `cidr4`/`cidr6`/`unknown` — no compiled-parser factory yet (`ValueReaderFactoryRegistry` registers
-  these constructors to `ErrorReader`). Pinned down exactly by
-  `CoreSchemaImportTest.exactlyTheThreeUndocumentedAtomConstructorsCompileToErrorReaders`. `mac` and
-  `email` left this set when their parsers landed; `cidr4`/`cidr6` compose on the existing
-  `Ipv4Parser`/`Ipv6Parser` and are the natural next pair.
+- [ ] `unknown` — no compiled-parser factory (`ValueReaderFactoryRegistry` registers it, and `extern`, to
+  `ErrorReader`), pinned down exactly by
+  `CoreSchemaImportTest.exactlyTheUnknownAtomConstructorCompilesToAnErrorReader`. Not an unwritten atom
+  grammar: `unknown` accepts any well-formed value of any type, so what it needs is a reader deferring to
+  the document's own type-ref (or to schemaless base-type resolution when there is none) — a design
+  question about where that dispatch lives.
 - [ ] `uri_type`/`regex_type` — don't bind correctly in object-binding mode. Their RFC-citation
   field is nested inside `specification: AtomSpecification` rather than flat, so it never receives
   a schema-composed default the way `email_type`'s own flat `spec` field does.
@@ -168,6 +171,22 @@ throw sites by that test is done across the whole schema pipeline (issue #26); i
 again, take it fresh rather than trusting a recorded one, since the last recorded numbers had gone stale
 by a factor of six.
 
+- [ ] **An atom body is never checked for self-coherence.** Every family's `constraintsCheck` compares a
+  *refinement against its source* (`AtomNarrowing`, §5.7's tighten-never-loosen rule); nothing asks whether
+  a single declared body is internally consistent, so a facet pair that admits nothing resolves, links and
+  compiles clean. Confirmed by compiling all three of these together — `tson compile` says `OK`:
+  `!text ^ { min_length: 10 max_length: 3 }`, `!integer ^ { min: 10 max: 3 }`, and
+  `!cidr4 ^ { min_prefix: 40 max_prefix: 8 }`. The cidr case is the sharpest, because the spec names the
+  rule outright: meta.tn's own `@doc` says prefix bounds narrow "within the family range 0-32" and that
+  "bounds outside that range are invalid at the schema level", and `40` is both outside 0-32 and above its
+  own `max_prefix`.
+  - The check belongs next to `AtomNarrowing`, as a per-family sibling of `constraintsCheck` run at
+    resolution, raising `TsonSchemaValidationException` — *not* in the parsers. A parser rejecting a
+    declaration would surface an author error as an `ErrorReader`, which is the library-gap marker, and the
+    verdict would then wrongly change if the library improved.
+  - Nothing is unsound today — a vacuous range simply admits nothing, and the cidr family range is enforced
+    on every value regardless of what the schema declared — so this is a missing diagnosis. The payoff is
+    catching the mistake where the author wrote it rather than at a read that may never happen.
 - [ ] **A FIXED-value contradiction reports as `ATOM_CONSTRAINT_VIOLATION`**, which is the closest code in
   the closed vocabulary and not an accurate one — a document contradicting `field: type = value` (§5.2) has
   violated a schema-level field constraint, not an atom's own parsing contract. Wants its own code, together
@@ -248,11 +267,10 @@ missing most of the mirror.
 
 ## Conformance test suite
 
-- [ ] Build out `ltr8-io-tson-test-suite` well beyond its current 110 vectors (grown from the 38 this
-  note originally cited — it's picked up a fourth `vocabulary` bucket alongside `lexer`/`parser`/
-  `resolver` since). Still Part 1 (lexer/parser/§5 vocabulary) only — Part 2 (resolution, linking,
-  compilation) has no conformance-suite coverage at all yet, only this repo's own unit/integration
-  tests.
+- [ ] Build out `ltr8-io-tson-test-suite` well beyond its current 123 vectors, spread across four buckets
+  (`lexer`/`parser`/`resolver`/`vocabulary`). Still Part 1 (lexer/parser/§5 vocabulary) only — Part 2
+  (resolution, linking, compilation) has no conformance-suite coverage at all yet, only this repo's own
+  unit/integration tests.
 - [ ] **Run the JSON front-end against the established JSON Parsing Test Suite** when it lands (the
   `TsonJsonParser` tracked in `STRUCTURED-OUTPUT.md`). JEP 540 commits to exactly this for the JDK's own
   parser — its own unit tests *plus* that external corpus, "which contains numerous edge-case inputs" —

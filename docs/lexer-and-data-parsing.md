@@ -115,5 +115,15 @@ fixed, closed name→`AtomType` table (§5).
   the natural host), `token` (raw NFC-normalized token text, unconstrained), `void` (`VoidReader`, accepts
   only the absent sentinel `_`). They resolve to the byte-identical `Unit` body — nothing in the *schema*
   distinguishes them — so dispatch is keyed on the declaration's own name (see `SPEC-FEEDBACK.md` #18).
+- **The network family reuses one grammar per address form, never a second copy.** `Ipv6Parser` parses
+  RFC 4291 §2.2's embedded IPv4 tail through `Ipv4Parser`'s own strict `dec-octet` pattern, and
+  `Cidr4Parser`/`Cidr6Parser` parse the address half of a network through those two — so the leniency gap
+  `Ipv4Parser`'s Javadoc documents is shut down once, in one place. What the CIDR pair adds on top is
+  §5.5's own two validation rules (prefix length inside the family range; host bits zero under that
+  prefix, since a network that accepted and masked would be lossy) plus the `min_prefix`/`max_prefix`
+  facets; `within`/`excluding` stay unmodeled across all four, set membership against a list of networks
+  being a materially bigger piece of work than a scalar bound. Their host type is `String` — the authored
+  text, validated and handed back — for `MacParser`'s reason: Java has no type to map onto, and the
+  round trip stays exact.
 - The full `int8`..`int256` width ladder is seeded, versus the four §5.6 explicitly lists — a known
   departure tracked in `SPEC-FEEDBACK.md`.

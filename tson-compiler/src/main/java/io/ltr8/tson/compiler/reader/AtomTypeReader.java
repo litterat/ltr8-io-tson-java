@@ -7,6 +7,8 @@ import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.atom.AtomType;
 import io.ltr8.tson.compiler.atom.AtomTypeException;
 import io.ltr8.tson.compiler.atom.BinaryParser;
+import io.ltr8.tson.compiler.atom.Cidr4Parser;
+import io.ltr8.tson.compiler.atom.Cidr6Parser;
 import io.ltr8.tson.compiler.atom.ComplexParser;
 import io.ltr8.tson.compiler.atom.DateParser;
 import io.ltr8.tson.compiler.atom.DateTimeParser;
@@ -30,6 +32,8 @@ import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.schema.meta.BinaryType;
+import io.ltr8.tson.schema.meta.Cidr4Type;
+import io.ltr8.tson.schema.meta.Cidr6Type;
 import io.ltr8.tson.schema.meta.DateTimeType;
 import io.ltr8.tson.schema.meta.DateType;
 import io.ltr8.tson.schema.meta.DecimalType;
@@ -91,15 +95,33 @@ final class AtomTypeReader<T> implements TsonTypeReader<T> {
             new AtomTypeReader<>(name, new UriParser((UriType) definition.body()), definition.position());
     static final ValueReaderFactory REGEX_TYPE = (name, definition, _) ->
             new AtomTypeReader<>(name, new RegexParser((RegexType) definition.body()), definition.position());
-    /** {@code complex_type} has nothing to configure ({@code component} is fixed, not modeled -- see {@link ComplexParser}'s own Javadoc), so this ignores {@code definition}'s own body entirely (though not its position) and always wraps the one {@link ComplexParser#UNCONSTRAINED} singleton. */
     static final ValueReaderFactory MAC_TYPE = (name, definition, _) ->
             new AtomTypeReader<>(name, new MacParser((MacType) definition.body()), definition.position());
     static final ValueReaderFactory EMAIL_TYPE = (name, definition, _) ->
             new AtomTypeReader<>(name, new EmailParser((EmailType) definition.body()), definition.position());
+    /**
+     * {@code within}/{@code excluding} aren't modeled by {@link Cidr4Parser} -- see its own Javadoc -- but
+     * {@code min_prefix}/{@code max_prefix} are, so unlike {@link #IPV4_TYPE} this does read {@code
+     * definition}'s own body.
+     */
+    static final ValueReaderFactory CIDR4_TYPE = (name, definition, _) ->
+            new AtomTypeReader<>(name, new Cidr4Parser((Cidr4Type) definition.body()), definition.position());
+    /** Same reasoning as {@link #CIDR4_TYPE}, for {@link Cidr6Parser}. */
+    static final ValueReaderFactory CIDR6_TYPE = (name, definition, _) ->
+            new AtomTypeReader<>(name, new Cidr6Parser((Cidr6Type) definition.body()), definition.position());
 
+    /**
+     * {@code complex_type} has nothing to configure ({@code component} is fixed, not modeled -- see {@link
+     * ComplexParser}'s own Javadoc), so this ignores {@code definition}'s own body entirely (though not its
+     * position) and always wraps the one {@link ComplexParser#UNCONSTRAINED} singleton.
+     */
     static final ValueReaderFactory COMPLEX_TYPE = (name, definition, _) ->
             new AtomTypeReader<>(name, ComplexParser.UNCONSTRAINED, definition.position());
-    /** {@code within}/{@code excluding} ({@code schema.meta.Ipv4Type}'s own fields) aren't modeled by {@link Ipv4Parser} -- see its own Javadoc -- so, like {@link #COMPLEX_TYPE}, this ignores {@code definition}'s own body. */
+    /**
+     * {@code within}/{@code excluding} ({@code schema.meta.Ipv4Type}'s own fields) aren't modeled by {@link
+     * Ipv4Parser} -- see its own Javadoc -- so, like {@link #COMPLEX_TYPE}, this ignores {@code
+     * definition}'s own body.
+     */
     static final ValueReaderFactory IPV4_TYPE = (name, definition, _) ->
             new AtomTypeReader<>(name, Ipv4Parser.UNCONSTRAINED, definition.position());
     /** Same reasoning as {@link #IPV4_TYPE}, for {@link Ipv6Parser}. */

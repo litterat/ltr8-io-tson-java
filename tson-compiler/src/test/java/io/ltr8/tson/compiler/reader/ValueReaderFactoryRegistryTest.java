@@ -6,10 +6,10 @@ import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.meta.Cidr4Type;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
+import io.ltr8.tson.schema.meta.UnknownType;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
@@ -55,21 +55,21 @@ class ValueReaderFactoryRegistryTest {
     }
 
     /**
-     * {@code cidr4_type} stands in for the group with no compiled parser; {@code CoreSchemaImportTest}
+     * {@code unknown_type} stands in for the group with no compiled parser; {@code CoreSchemaImportTest}
      * pins the current membership. If it ever gains one, pick another from that set rather than deleting
      * this -- the ErrorReader-not-compile-failure behaviour is what is under test, not the constructor.
      */
     @Test
     void aConstructorWithNoCompiledParserYetStillResolvesButFailsOnlyWhenActuallyRead() {
         ValueReaderFactoryRegistry registry = ValueReaderFactoryRegistry.tree();
-        TypeDefinition entry = new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), true,
-                List.of(), List.of(), Optional.empty(), Cidr4Type.UNCONSTRAINED);
+        TypeDefinition entry = new TypeDefinition(Optional.empty(), TypeKind.SUM, List.of(), true,
+                List.of(), List.of(), Optional.empty(), new UnknownType());
 
-        TsonTypeReader<?> reader = registry.resolve("cidr4_type").create("cidr4", entry, CONTEXT);
+        TsonTypeReader<?> reader = registry.resolve("unknown_type").create("unknown", entry, CONTEXT);
 
         UnsupportedOperationException thrown =
                 assertThrows(UnsupportedOperationException.class, () -> reader.read((TsonReadContext) null));
-        assertEquals(true, thrown.getMessage().contains("cidr4"));
+        assertEquals(true, thrown.getMessage().contains("unknown"));
     }
 
     @Test

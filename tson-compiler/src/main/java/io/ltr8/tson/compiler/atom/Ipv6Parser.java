@@ -80,6 +80,20 @@ public record Ipv6Parser() implements AtomType<Inet6Address> {
         return value.getHostAddress();
     }
 
+    /**
+     * The 16 address bytes, or {@code null} if {@code text} isn't an RFC 4291 §2.2 address -- {@link
+     * Cidr6Parser} reuses this whole grammar for the address half of a network, the same way {@link
+     * Cidr4Parser} reuses {@link Ipv4Parser#tryParseOctets}. Null-returning rather than throwing because the
+     * caller's own token is the network, not the address, and it names that in its own message.
+     */
+    static byte[] tryParseBytes(String text) {
+        try {
+            return parse(text);
+        } catch (AtomParseException e) {
+            return null;
+        }
+    }
+
     private static byte[] parse(String text) {
         int compressionAt = text.indexOf("::");
         boolean compressed = compressionAt >= 0;

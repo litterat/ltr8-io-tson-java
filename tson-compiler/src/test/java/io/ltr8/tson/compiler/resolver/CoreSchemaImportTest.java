@@ -3,12 +3,14 @@ package io.ltr8.tson.compiler.resolver;
 import io.ltr8.tson.compiler.*;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
+import io.ltr8.tson.compiler.reader.Dom;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
+import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
@@ -103,16 +105,14 @@ class CoreSchemaImportTest {
      * deferral means a broken entry wouldn't have failed that step; it would silently have compiled to
      * an {@code ErrorReader} instead (see that class's own Javadoc), only throwing once someone
      * actually tries to {@code read} it. This confirms exactly which entries land there and pins the
-     * set down: {@code cidr4}/{@code cidr6}/{@code unknown} -- constructed via {@code cidr4_type}/{@code
-     * cidr6_type}/{@code unknown_type}, three of the four constructors {@link ValueReaderFactoryRegistry}
-     * registers to {@code ErrorReader} outright (the fourth, {@code extern}, has no core.tn declaration at
-     * all; {@code email} and {@code mac} left this set when their parsers landed) --
-     * a real, already-documented, deliberate gap (see this repo's own CLAUDE.md, "Not yet
-     * implemented"), not a regression to chase. Every *other* entry compiles to a genuinely usable
-     * reader.
+     * set down: {@code unknown} alone -- constructed via {@code unknown_type}, one of the two constructors
+     * {@link ValueReaderFactoryRegistry} registers to {@code ErrorReader} outright (the other, {@code
+     * extern}, has no core.tn declaration at all) -- a real, already-documented, deliberate gap (see this
+     * repo's own CLAUDE.md, "Not yet implemented"), not a regression to chase. Every *other* entry compiles
+     * to a genuinely usable reader.
      */
     @Test
-    void exactlyTheThreeUndocumentedAtomConstructorsCompileToErrorReaders() {
+    void exactlyTheUnknownAtomConstructorCompilesToAnErrorReader() {
         Loaded loaded = loadMetaKernelMetaAndCore();
         TsonSchema core = loaded.schemaRegistry().get(TsonBundledSchemas.CORE_ID).orElseThrow().schema();
 
@@ -130,6 +130,23 @@ class CoreSchemaImportTest {
             }
         }
 
-        assertEquals(Set.of("cidr4", "cidr6", "unknown"), errored);
+        assertEquals(Set.of("unknown"), errored);
+    }
+
+    /**
+     * The compiled-reader half of the entry above: {@code cidr4}/{@code cidr6} don't merely stop being
+     * {@code ErrorReader}s, they read real values against core.tn's own declarations -- the schema-driven
+     * path, next to {@code TsonObjectReaderTest}'s coverage of the schemaless one.
+     */
+    @Test
+    void theCidrEntriesReadRealValuesAgainstCoreTnsOwnDeclarations() {
+        Loaded loaded = loadMetaKernelMetaAndCore();
+        TsonCompiledSchema compiledCore =
+                TsonCompiledSchemaRegistry.tree(loaded.registry()).get(TsonBundledSchemas.CORE_ID);
+
+        assertEquals("10.0.0.0/8",
+                Dom.of((TsonValue) compiledCore.get("cidr4").read(TestDocuments.document("\"10.0.0.0/8\""))));
+        assertEquals("2001:db8::/32",
+                Dom.of((TsonValue) compiledCore.get("cidr6").read(TestDocuments.document("\"2001:db8::/32\""))));
     }
 }
