@@ -1,6 +1,9 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TestDocuments;
+import io.ltr8.tson.compiler.TsonDiagnosticsCollector;
+import io.ltr8.tson.compiler.TsonDiagnosticsReceiver;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
@@ -26,6 +29,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * End-to-end proof of {@link ArrayTreeReader} against real TSON data source text -- both standalone
@@ -99,6 +103,25 @@ class ArrayTreeReaderTest {
 
         assertEquals(List.of(BigInteger.ONE, BigInteger.TWO), readArray(compiled, "numbers", "[1 2]"));
         assertThrows(TsonReadException.class, () -> readArray(compiled, "numbers", "[1 2 1]"));
+    }
+
+    /**
+     * The duplicate is named as the value it is. In tree mode the decoded element is a {@code TsonAtom}, so
+     * this is the site where the record's default rendering would reach both the message and {@code actual}
+     * -- the field a consumer reads instead of parsing the message.
+     */
+    @Test
+    void aDuplicateElementIsReportedAsItsValueNotAsATreeNodesComponents() {
+        ArrayBody body = new ArrayBody(TypeRef.of("integer"), ElementState.REQUIRED, false, true,
+                Optional.empty(), Optional.empty());
+        TsonCompiledSchema compiled = compile(Map.of("numbers", TypeDefinition.product(body)));
+        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+
+        compiled.get("numbers").read(TestDocuments.document("[1 2 1]", problems));
+
+        Diagnostic reported = problems.diagnostics().getFirst();
+        assertEquals("1", reported.actual());
+        assertTrue(reported.message().contains("'1' appears more than once"), reported.message());
     }
 
     @Test

@@ -184,16 +184,6 @@ by a factor of six.
   - Nothing is unsound today — a vacuous range simply admits nothing, and the cidr family range is enforced
     on every value regardless of what the schema declared — so this is a missing diagnosis. The payoff is
     catching the mistake where the author wrote it rather than at a read that may never happen.
-- [ ] **A diagnostic's `expected`/`actual` can carry a Java `toString()` instead of a value.** In tree mode
-  a decoded value is a `TsonAtom`, so `RecordAbstractReader.verifyFixed`'s `String.valueOf(check.value())`
-  renders `TsonAtom[value=medium, typeRef=Optional[text], annotations=[]]` where the whole point of those
-  two fields is that a consumer reads the value without regexing the message. Bind mode is unaffected —
-  there the decoded value is the host object — so this is the tree path only, and it is exactly the path
-  `tson validate` uses. The fix needs a seam rather than a cast: `RecordAbstractReader` is the shared base
-  for both modes and deliberately names no `tson-tree` type, so either the unwrap belongs behind something
-  mode-specific, or `TsonAtom.toString()` should render its value (a broader change, since a record's
-  default `toString` is genuinely useful when debugging). Reachable from any report site that stringifies a
-  decoded value, not just the FIXED ones.
 
 ## Schema-side diagnostics
 

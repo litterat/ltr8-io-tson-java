@@ -13,6 +13,16 @@ import java.util.Optional;
  * Typed access is via {@link #as(Class)} and the {@code asString}/{@code asBigInteger}/… conveniences.
  *
  * <p>The value is never {@code null} -- {@link TsonAbsent} is the node for a position holding no value.
+ *
+ * <p><b>{@link #toString()} renders the value alone</b>, not the record's own components, and that is
+ * load-bearing rather than cosmetic: a reader reporting on a decoded value stringifies whatever it decoded,
+ * and in tree mode that is one of these. The record default would put {@code
+ * TsonAtom[value=a, typeRef=Optional[text], annotations=[]]} into a {@code Diagnostic}'s {@code
+ * expected}/{@code actual} -- the two fields that exist so a consumer needn't parse the message -- and into
+ * the message itself wherever a reader interpolates a value. The type-ref and annotations stay reachable
+ * through the accessors; they are simply not what a value reads as. A {@code byte[]} value is the one shape
+ * this does not improve ({@code String.valueOf} gives its identity hash either way) -- rendering binary is
+ * {@code TsonTreeWriter}'s job, encoding and all.
  */
 public record TsonAtom(Object value, Optional<String> typeRef, List<TsonAnnotation> annotations)
         implements TsonValue {
@@ -38,5 +48,11 @@ public record TsonAtom(Object value, Optional<String> typeRef, List<TsonAnnotati
     @Override
     public <T> Optional<T> as(Class<T> type) {
         return type.isInstance(value) ? Optional.of(type.cast(value)) : Optional.empty();
+    }
+
+    /** The value alone -- see this class's own Javadoc for why the record's default is not what is wanted. */
+    @Override
+    public String toString() {
+        return String.valueOf(value);
     }
 }
