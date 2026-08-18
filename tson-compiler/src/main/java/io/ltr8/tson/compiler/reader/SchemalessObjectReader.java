@@ -236,7 +236,7 @@ public final class SchemalessObjectReader {
         if (typeRef.isPresent()) {
             Optional<AtomType<?>> atomType = BuiltinTypeVocabulary.lookup(typeRef.get());
             if (atomType.isPresent()) {
-                return bindBuiltin(ctx, atomType.get(), typeRef.get(), tokenValue, dataClass.dataClass());
+                return bindBuiltin(ctx, atomType.get(), tokenValue, dataClass.dataClass());
             }
             // Not a built-in: only a name the target class declares outright gets through -- see the class
             // Javadoc on why an atom position takes `declares` rather than `names`.
@@ -258,14 +258,15 @@ public final class SchemalessObjectReader {
         }
     }
 
-    /** {@code typeName} is the wire type-ref this atom was resolved from -- the name an author wrote, not the parser's {@code toString()}. */
-    private Object bindBuiltin(TsonReadContext ctx, AtomType<?> atomType, String typeName, TokenValue token,
-                               Class<?> target) {
+    /**
+     * A rejection reports the atom's own {@code expected} -- the constraint that failed, not the type-ref the
+     * author wrote, which the diagnostic's {@code path} and the document itself already say.
+     */
+    private Object bindBuiltin(TsonReadContext ctx, AtomType<?> atomType, TokenValue token, Class<?> target) {
         try {
             return atomType.read(token, target);
         } catch (AtomTypeException e) {
-            ctx.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, e.getMessage(), "a value satisfying !" + typeName,
-                    token.text());
+            ctx.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, e.getMessage(), e.expected(), token.text());
             return null;
         } catch (ArithmeticException e) {
             ctx.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, token.text() + " does not fit in " + target,

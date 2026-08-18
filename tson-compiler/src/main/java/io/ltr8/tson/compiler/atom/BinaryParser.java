@@ -52,7 +52,8 @@ public record BinaryParser(BinaryType constraints) implements AtomType<byte[]> {
         try {
             return HEX_FORMAT.parseHex(text);
         } catch (IllegalArgumentException e) {
-            throw new AtomParseException("'" + text + "' is not valid hex (RFC 4648 §8, §5.3): " + e.getMessage());
+            throw new AtomParseException("'" + text + "' is not valid hex (RFC 4648 §8, §5.3): " + e.getMessage(),
+                    "a hex encoding");
         }
     }
 
@@ -75,13 +76,15 @@ public record BinaryParser(BinaryType constraints) implements AtomType<byte[]> {
         constraints.minLength().ifPresent(min -> {
             if (value.length < min) {
                 throw new AtomValidationException(
-                        "'" + text + "' decodes to " + value.length + " bytes, less than the minimum " + min);
+                        "'" + text + "' decodes to " + value.length + " bytes, less than the minimum " + min,
+                        "at least " + min + " bytes");
             }
         });
         constraints.maxLength().ifPresent(max -> {
             if (value.length > max) {
                 throw new AtomValidationException(
-                        "'" + text + "' decodes to " + value.length + " bytes, more than the maximum " + max);
+                        "'" + text + "' decodes to " + value.length + " bytes, more than the maximum " + max,
+                        "at most " + max + " bytes");
             }
         });
     }

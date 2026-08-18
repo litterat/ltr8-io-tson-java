@@ -50,13 +50,15 @@ public record TimeParser(TimeType constraints) implements AtomType<OffsetTime> {
         String text = token.text();
         if (!FULL_TIME.matcher(text).matches()) {
             throw new AtomParseException(
-                    "'" + text + "' is not a valid time -- expected RFC 3339 full-time, HH:MM:SS[.fraction](Z|+HH:MM) (§5.4)");
+                    "'" + text + "' is not a valid time -- expected RFC 3339 full-time, "
+                            + "HH:MM:SS[.fraction](Z|+HH:MM) (§5.4)", "an RFC 3339 full-time");
         }
         OffsetTime value;
         try {
             value = OffsetTime.parse(text);
         } catch (DateTimeParseException e) {
-            throw new AtomParseException("'" + text + "' is not a valid time (§5.4): " + e.getMessage());
+            throw new AtomParseException("'" + text + "' is not a valid time (§5.4): " + e.getMessage(),
+                    "an RFC 3339 full-time");
         }
         validate(value, text);
         return value;
@@ -71,12 +73,12 @@ public record TimeParser(TimeType constraints) implements AtomType<OffsetTime> {
     private void validate(OffsetTime value, String text) {
         constraints.min().ifPresent(m -> {
             if (value.isBefore(m)) {
-                throw new AtomValidationException("'" + text + "' is before the minimum " + m);
+                throw new AtomValidationException("'" + text + "' is before the minimum " + m, ">= " + m);
             }
         });
         constraints.max().ifPresent(m -> {
             if (value.isAfter(m)) {
-                throw new AtomValidationException("'" + text + "' is after the maximum " + m);
+                throw new AtomValidationException("'" + text + "' is after the maximum " + m, "<= " + m);
             }
         });
     }

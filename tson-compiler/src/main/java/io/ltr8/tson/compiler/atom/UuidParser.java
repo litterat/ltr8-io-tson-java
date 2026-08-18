@@ -51,13 +51,15 @@ public record UuidParser(UuidType constraints) implements AtomType<UUID> {
         String text = token.text();
         if (!UUID_TEXT.matcher(text).matches()) {
             throw new AtomParseException(
-                    "'" + text + "' is not a valid UUID -- expected RFC 9562's 8-4-4-4-12 hex-and-hyphen form (§5.5)");
+                    "'" + text + "' is not a valid UUID -- expected RFC 9562's 8-4-4-4-12 hex-and-hyphen form (§5.5)",
+                    "a UUID");
         }
         UUID value = UUID.fromString(text);
         constraints.version().ifPresent(v -> {
             if (value.version() != v) {
                 throw new AtomValidationException(
-                        "'" + text + "' is version " + value.version() + ", expected version " + v);
+                        "'" + text + "' is version " + value.version() + ", expected version " + v,
+                        "version " + v);
             }
         });
         return value;

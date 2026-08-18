@@ -45,26 +45,30 @@ public record TextParser(TextType constraints) implements AtomType<String> {
         constraints.length().ifPresent(len -> {
             if (text.length() != len) {
                 throw new AtomValidationException(
-                        "'" + text + "' is " + text.length() + " characters, expected exactly " + len);
+                        "'" + text + "' is " + text.length() + " characters, expected exactly " + len,
+                        "exactly " + len + " characters");
             }
         });
         constraints.minLength().ifPresent(min -> {
             if (text.length() < min) {
                 throw new AtomValidationException(
-                        "'" + text + "' is " + text.length() + " characters, less than the minimum " + min);
+                        "'" + text + "' is " + text.length() + " characters, less than the minimum " + min,
+                        "at least " + min + " characters");
             }
         });
         constraints.maxLength().ifPresent(max -> {
             if (text.length() > max) {
                 throw new AtomValidationException(
-                        "'" + text + "' is " + text.length() + " characters, more than the maximum " + max);
+                        "'" + text + "' is " + text.length() + " characters, more than the maximum " + max,
+                        "at most " + max + " characters");
             }
         });
         // The pattern is I-Regexp (RFC 9485), matched via tson-regex (linear-time, ReDoS-safe), not
         // java.util.regex; it was already validated well-formed when the schema resolved (see RegexParser).
         constraints.pattern().ifPresent(p -> {
             if (!TsonRegex.parse(p).matches(text)) {
-                throw new AtomValidationException("'" + text + "' does not match the required pattern " + p);
+                throw new AtomValidationException("'" + text + "' does not match the required pattern " + p,
+                        "matching " + p);
             }
         });
     }

@@ -67,7 +67,8 @@ public record DurationParser(DurationType constraints) implements AtomType<IsoDu
         Matcher m = DURATION.matcher(text);
         if (!m.matches()) {
             throw new AtomParseException(
-                    "'" + text + "' is not a valid ISO 8601 duration -- expected PnYnMnDTnHnMnS (§5.4)");
+                    "'" + text + "' is not a valid ISO 8601 duration -- expected PnYnMnDTnHnMnS (§5.4)",
+                    "an ISO 8601 duration");
         }
 
         String years = m.group("years");
@@ -79,7 +80,8 @@ public record DurationParser(DurationType constraints) implements AtomType<IsoDu
 
         if (years == null && months == null && days == null && hours == null && minutes == null && seconds == null) {
             throw new AtomParseException(
-                    "'" + text + "' is not a valid ISO 8601 duration -- at least one designator is required (§5.4)");
+                    "'" + text + "' is not a valid ISO 8601 duration -- at least one designator is required (§5.4)",
+                    "an ISO 8601 duration");
         }
 
         Period calendarPart = Period.of(

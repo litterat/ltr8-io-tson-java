@@ -54,7 +54,7 @@ public record Ipv4Parser() implements AtomType<Inet4Address> {
         if (octets == null) {
             throw new AtomParseException(
                     "'" + text + "' is not a valid IPv4 address -- expected RFC 3986's dotted-quad IPv4address "
-                            + "production, no leading zeros or non-canonical forms (§5.5)");
+                            + "production, no leading zeros or non-canonical forms (§5.5)", "an IPv4 address");
         }
         return (Inet4Address) toInetAddress(octets);
     }

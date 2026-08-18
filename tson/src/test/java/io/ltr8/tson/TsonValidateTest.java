@@ -229,22 +229,26 @@ class TsonValidateTest {
     // ── Diagnostic field quality ─────────────────────────────────────────
 
     /**
-     * {@code expected} is documented as the machine-parseable half a caller builds its own message from, so
-     * it carries the type's <em>name</em>. It used to concatenate the parser object, and since every
-     * {@code AtomType} is a Java record that meant its generated {@code toString()} -- the whole constraint
-     * graph, {@code Optional.empty} facets and all -- landing in the field an LLM retry loop reads.
+     * {@code expected} is the machine-parseable half a caller builds its own message from, so it carries the
+     * <em>constraint that failed</em> -- naming the type instead says strictly less than {@code message}
+     * already does, and leaves a consumer regexing the sentence to recover the bound.
      */
     @Test
-    void aConstraintViolationNamesTheTypeRatherThanDumpingTheParser() {
+    void aConstraintViolationCarriesTheViolatedBoundNotTheTypeName() {
         Diagnostic problem = only(tsonWithPoint(), """
                 !!schema:"https://example.test/point-1.tn"
                 !point { x: 3  y: 99999999999999 }""");
 
-        assertEquals("a value satisfying int32", problem.expected());
+        assertEquals(">= -2147483648 and <= 2147483647", problem.expected());
         assertEquals("99999999999999", problem.actual());
+        assertTrue(problem.message().startsWith("'int32':"), problem.message());
     }
 
-    /** The <em>declaration's</em> name, not the built-in it refines -- the name its author wrote and can act on. */
+    /**
+     * The declaring type still leads the <em>message</em>: {@code expected} gives up the name to carry the
+     * bound, and the name is what its author wrote and can act on, so it must not vanish from the
+     * diagnostic entirely. The <em>declaration's</em> name, not the built-in it refines.
+     */
     @Test
     void aRefinementIsNamedByItsOwnDeclarationNotItsSource() {
         String schemaId = "https://example.test/pct-1.tn";
@@ -266,7 +270,50 @@ class TsonValidateTest {
 
         Diagnostic problem = only(tson, "!!schema:\"" + schemaId + "\"\n!reading { pct: 500 }");
 
-        assertEquals("a value satisfying my_percentage", problem.expected());
+        assertEquals("<= 100", problem.expected());
+        assertTrue(problem.message().startsWith("'my_percentage':"), problem.message());
+    }
+
+    /**
+     * {@code AtomTypeException}'s {@code expected} vocabulary survives the trip through a real schema, a real
+     * compiled reader and {@code TsonReadContext.report} -- a membership, a length and a grammar, each landing
+     * on the {@link Diagnostic} verbatim. {@code AtomTypeExceptionTest} pins the vocabulary itself, including
+     * the shapes no schema can reach today (a {@code pattern} facet needs {@code regex_type} object-binding,
+     * which is still a gap -- see {@code CLAUDE.md}'s "Not yet implemented").
+     */
+    @Test
+    void everyExpectedShapeIsTheViolatedConstraint() {
+        String schemaId = "https://example.test/facets-1.tn";
+        String schema = """
+                !!id:"https://example.test/facets-1.tn"
+                !!meta:"https://tson.io/2026/32/m/meta.tn"
+                !!import:"https://tson.io/2026/32/m/core.tn"
+                {
+                  status => !enum [PENDING SHIPPED DELIVERED]
+                  label  => !text ^ { max_length: 4 }
+                  order  => { status: status  label: label  when: date }
+                }
+                """;
+        Tson tson = Tson.builder().schemaSource(uri -> {
+            if (uri.equals(schemaId)) {
+                return schema;
+            }
+            throw new IllegalStateException("no schema for " + uri);
+        }).build();
+
+        List<Diagnostic> problems = tson.validate("!!schema:\"" + schemaId + "\"\n"
+                + "!order { status: CANCELLED  label: toolong  when: nope }");
+
+        assertEquals(3, problems.size(), problems.toString());
+        assertEquals("one of (PENDING, SHIPPED, DELIVERED)", expectedAt(problems, "/status"));
+        assertEquals("at most 4 characters", expectedAt(problems, "/label"));
+        assertEquals("an RFC 3339 full-date", expectedAt(problems, "/when"));
+    }
+
+    private static String expectedAt(List<Diagnostic> problems, String path) {
+        return problems.stream().filter(d -> d.path().equals(path)).findFirst()
+                .orElseThrow(() -> new AssertionError("no diagnostic at " + path + " in " + problems))
+                .expected();
     }
 
     /** The shape-mismatch path leaked twice -- the parser into {@code message}, and a raw event into {@code actual}. */

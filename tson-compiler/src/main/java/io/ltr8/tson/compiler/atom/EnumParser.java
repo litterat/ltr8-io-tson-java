@@ -43,7 +43,8 @@ public record EnumParser(EnumBody constraints) implements AtomType<String> {
         String text = token.text();
         if (!constraints.members().contains(text)) {
             throw new AtomValidationException(
-                    "'" + text + "' is not a member of this enum -- expected one of " + constraints.members());
+                    "'" + text + "' is not a member of this enum -- expected one of " + constraints.members(),
+                    "one of (" + String.join(", ", constraints.members()) + ")");
         }
         return text;
     }

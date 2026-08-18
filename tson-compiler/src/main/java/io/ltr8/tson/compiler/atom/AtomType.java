@@ -43,7 +43,8 @@ public interface AtomType<T> {
     default Object read(TokenValue token, Class<?> target) throws AtomParseException, AtomValidationException {
         T value = read(token);
         if (!wrap(target).isInstance(value)) {
-            throw new AtomValidationException("cannot represent " + value + " as " + target);
+            throw new AtomValidationException("cannot represent " + value + " as " + target,
+                    "a value representable as " + target.getSimpleName());
         }
         return value;
     }

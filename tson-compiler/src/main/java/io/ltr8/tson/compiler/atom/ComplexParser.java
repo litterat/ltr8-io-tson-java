@@ -52,7 +52,8 @@ public record ComplexParser() implements AtomType<Complex> {
         NumberForm form = NumberGrammar.tryParse(text)
                 .filter(f -> f instanceof NumberForm.IntegerForm || f instanceof NumberForm.FloatForm)
                 .orElseThrow(() -> new AtomParseException("'" + text + "' is not a valid complex number -- "
-                        + "only complex, integer, and float forms are accepted (§5.6)"));
+                        + "only complex, integer, and float forms are accepted (§5.6)",
+                        "a complex, integer or float form"));
         return new Complex(toBigDecimal(form), BigDecimal.ZERO);
     }
 

@@ -103,14 +103,16 @@ public record FloatParser(FloatType constraints) implements AtomType<Number> {
                 case NumberForm.FloatForm ignored -> parseDirectly(text);
                 case NumberForm.BasedIntegerForm ignored -> throw new AtomParseException("'" + text
                         + "' (a based-integer/hex/octal/binary whole number) is not accepted here -- only "
-                        + "integer, float, hex-float, and special-value forms are (§5.6)");
+                        + "integer, float, hex-float, and special-value forms are (§5.6)",
+                        "an integer, float, hex-float or special-value form");
             };
         }
         if (NumberGrammar.isHexFloat(text)) {
             return parseDirectly(text);
         }
         throw new AtomParseException(
-                "'" + text + "' does not match integer, float, hex-float, or special-value (§5.6)");
+                "'" + text + "' does not match integer, float, hex-float, or special-value (§5.6)",
+                "an integer, float, hex-float or special-value form");
     }
 
     /**
@@ -140,40 +142,43 @@ public record FloatParser(FloatType constraints) implements AtomType<Number> {
     private void validate(double value, String text) {
         if (Double.isNaN(value)) {
             if (!constraints.allowNan()) {
-                throw new AtomValidationException("'" + text + "' is NaN, not permitted (allow_nan: false)");
+                throw new AtomValidationException("'" + text + "' is NaN, not permitted (allow_nan: false)", "not NaN");
             }
             return;
         }
         if (Double.isInfinite(value)) {
             if (!constraints.allowInfinity()) {
-                throw new AtomValidationException("'" + text + "' is infinite, not permitted (allow_infinity: false)");
+                throw new AtomValidationException("'" + text + "' is infinite, not permitted (allow_infinity: false)",
+                        "a finite value");
             }
             return;
         }
         if (!constraints.allowNegativeZero() && value == 0.0 && Double.doubleToRawLongBits(value) != 0L) {
-            throw new AtomValidationException("'" + text + "' is negative zero, not permitted (allow_negative_zero: false)");
+            throw new AtomValidationException("'" + text + "' is negative zero, not permitted (allow_negative_zero: false)",
+                    "not negative zero");
         }
         if (!constraints.allowSubnormal() && isSubnormal(value)) {
-            throw new AtomValidationException("'" + text + "' is a subnormal value, not permitted (allow_subnormal: false)");
+            throw new AtomValidationException("'" + text + "' is a subnormal value, not permitted (allow_subnormal: false)",
+                    "not a subnormal value");
         }
         constraints.min().ifPresent(m -> {
             if (value < m.doubleValue()) {
-                throw new AtomValidationException("'" + text + "' is less than the minimum " + m);
+                throw new AtomValidationException("'" + text + "' is less than the minimum " + m, ">= " + m);
             }
         });
         constraints.exclusiveMin().ifPresent(m -> {
             if (value <= m.doubleValue()) {
-                throw new AtomValidationException("'" + text + "' must be strictly greater than " + m);
+                throw new AtomValidationException("'" + text + "' must be strictly greater than " + m, "> " + m);
             }
         });
         constraints.max().ifPresent(m -> {
             if (value > m.doubleValue()) {
-                throw new AtomValidationException("'" + text + "' is greater than the maximum " + m);
+                throw new AtomValidationException("'" + text + "' is greater than the maximum " + m, "<= " + m);
             }
         });
         constraints.exclusiveMax().ifPresent(m -> {
             if (value >= m.doubleValue()) {
-                throw new AtomValidationException("'" + text + "' must be strictly less than " + m);
+                throw new AtomValidationException("'" + text + "' must be strictly less than " + m, "< " + m);
             }
         });
     }

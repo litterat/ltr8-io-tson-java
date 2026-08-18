@@ -719,17 +719,16 @@ class TsonObjectReaderTest {
     }
 
     /**
-     * {@code expected} names the wire type-ref, not the parser object. It used to concatenate the {@code
-     * AtomType}, and every one is a Java record, so its generated {@code toString()} dumped the whole
-     * constraint graph into the field {@code Diagnostic} documents as the machine-parseable half.
+     * {@code expected} carries the violated constraint, on the schemaless path too -- {@code !uint8}'s own
+     * range, which is what a caller acts on, not the type-ref the document already states.
      */
     @Test
-    void aBuiltinConstraintViolationNamesTheTypeRefRatherThanDumpingTheParser() {
+    void aBuiltinConstraintViolationCarriesTheViolatedBound() {
         TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
         mapper.withDiagnostics(problems).read("{ value: !uint8 300 }", IntHolder.class);
 
         assertEquals(1, problems.diagnostics().size(), problems.diagnostics().toString());
-        assertEquals("a value satisfying !uint8", problems.diagnostics().getFirst().expected());
+        assertEquals(">= 0 and <= 255", problems.diagnostics().getFirst().expected());
         assertEquals("300", problems.diagnostics().getFirst().actual());
     }
 

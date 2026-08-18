@@ -32,7 +32,8 @@ final class Base32Decoding {
     static byte[] decode(String text) {
         if (text.length() % 8 != 0) {
             throw new AtomParseException("'" + text + "' is not a valid base32 encoding -- "
-                    + "length must be a multiple of 8 once padded (RFC 4648 §6, §5.3)");
+                    + "length must be a multiple of 8 once padded (RFC 4648 §6, §5.3)",
+                    "a base32 encoding");
         }
 
         int padding = 0;
@@ -43,7 +44,8 @@ final class Base32Decoding {
         // before indexing rather than let it throw ArrayIndexOutOfBoundsException.
         if (padding >= LEGAL_PADDING_COUNT.length || !LEGAL_PADDING_COUNT[padding]) {
             throw new AtomParseException(
-                    "'" + text + "' is not a valid base32 encoding -- " + padding + " padding characters is not a legal count (RFC 4648 §6)");
+                    "'" + text + "' is not a valid base32 encoding -- " + padding
+                            + " padding characters is not a legal count (RFC 4648 §6)", "a base32 encoding");
         }
 
         int dataChars = text.length() - padding;
@@ -56,7 +58,7 @@ final class Base32Decoding {
             int value = ALPHABET.indexOf(c);
             if (value < 0) {
                 throw new AtomParseException("'" + text + "' is not a valid base32 encoding -- "
-                        + "'" + c + "' is not in the base32 alphabet (RFC 4648 §6)");
+                        + "'" + c + "' is not in the base32 alphabet (RFC 4648 §6)", "a base32 encoding");
             }
             buffer = (buffer << 5) | value;
             bitsInBuffer += 5;

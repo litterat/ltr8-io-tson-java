@@ -59,7 +59,7 @@ public record DecimalParser(DecimalType constraints) implements AtomType<BigDeci
                 .filter(f -> f instanceof NumberForm.IntegerForm || f instanceof NumberForm.FloatForm)
                 .orElseThrow(() -> new AtomParseException("'" + text + "' is not a valid exact number -- "
                         + "only integer and float forms are accepted (§5.6); !number does not accept "
-                        + "based-integer or the special values"));
+                        + "based-integer or the special values", "an integer or float form"));
 
         BigDecimal exact = (form instanceof NumberForm.IntegerForm intForm)
                 ? new BigDecimal(NumberForms.toBigInteger(intForm))
@@ -71,33 +71,34 @@ public record DecimalParser(DecimalType constraints) implements AtomType<BigDeci
     private void validate(BigDecimal value, String text) {
         constraints.min().ifPresent(m -> {
             if (value.compareTo(m) < 0) {
-                throw new AtomValidationException("'" + text + "' is less than the minimum " + m);
+                throw new AtomValidationException("'" + text + "' is less than the minimum " + m, ">= " + m);
             }
         });
         constraints.exclusiveMin().ifPresent(m -> {
             if (value.compareTo(m) <= 0) {
-                throw new AtomValidationException("'" + text + "' must be strictly greater than " + m);
+                throw new AtomValidationException("'" + text + "' must be strictly greater than " + m, "> " + m);
             }
         });
         constraints.max().ifPresent(m -> {
             if (value.compareTo(m) > 0) {
-                throw new AtomValidationException("'" + text + "' is greater than the maximum " + m);
+                throw new AtomValidationException("'" + text + "' is greater than the maximum " + m, "<= " + m);
             }
         });
         constraints.exclusiveMax().ifPresent(m -> {
             if (value.compareTo(m) >= 0) {
-                throw new AtomValidationException("'" + text + "' must be strictly less than " + m);
+                throw new AtomValidationException("'" + text + "' must be strictly less than " + m, "< " + m);
             }
         });
         constraints.multipleOf().ifPresent(m -> {
             if (value.remainder(m).compareTo(BigDecimal.ZERO) != 0) {
-                throw new AtomValidationException("'" + text + "' is not a multiple of " + m);
+                throw new AtomValidationException("'" + text + "' is not a multiple of " + m, "a multiple of " + m);
             }
         });
         constraints.totalDigits().ifPresent(td -> {
             if (value.precision() > td) {
                 throw new AtomValidationException(
-                        "'" + text + "' has more than the maximum " + td + " total significant digits");
+                        "'" + text + "' has more than the maximum " + td + " total significant digits",
+                        "at most " + td + " total significant digits");
             }
         });
         constraints.fractionDigits().ifPresent(fd -> {
@@ -105,7 +106,8 @@ public record DecimalParser(DecimalType constraints) implements AtomType<BigDeci
             // digits at all, not -2 of them) -- clamp at 0 before comparing.
             if (Math.max(value.scale(), 0) > fd) {
                 throw new AtomValidationException(
-                        "'" + text + "' has more than the maximum " + fd + " digits after the decimal point");
+                        "'" + text + "' has more than the maximum " + fd + " digits after the decimal point",
+                        "at most " + fd + " digits after the decimal point");
             }
         });
     }
