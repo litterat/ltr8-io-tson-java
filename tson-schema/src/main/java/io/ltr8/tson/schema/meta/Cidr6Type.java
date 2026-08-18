@@ -12,9 +12,9 @@ import java.util.Optional;
  * {@link Cidr4Type}'s exact IPv6 counterpart, same shape, different RFC citation and prefix-length
  * family range (0-128 instead of 0-32, not enforced here either way). See {@link Cidr4Type}'s own
  * Javadoc for why {@code spec} is a flat {@link String} rather than nested {@link
- * AtomSpecification} or a {@link java.net.URI}, why {@code within}/{@code excluding} are bare
- * {@code List<String>} with a defensive compact constructor, and why no compiler exists for this atom
- * yet.
+ * AtomSpecification} or a {@link java.net.URI} and why {@code within}/{@code excluding} are bare
+ * {@code List<String>} with a defensive compact constructor. {@code tson-compiler}'s {@code
+ * Cidr6Parser} holds one of these and does the actual reading/writing.
  */
 @Typename(name = "cidr6_type")
 public record Cidr6Type(String spec, @Field("min_prefix") Optional<Integer> minPrefix,

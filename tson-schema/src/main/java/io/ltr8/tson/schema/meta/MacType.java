@@ -6,9 +6,8 @@ import io.ltr8.annotation.Typename;
  * meta.tn1's {@code mac_type} constructor (EUI-48 MAC address, RFC 9542) -- deliberately bare
  * beyond the RFC pin (I/G-/U/L-bit predicates and OUI vendor prefixes were considered and rejected
  * as niche, per meta.tn1's own doc comment). Pure constraint value, no parsing/validation behavior
- * -- deliberately no {@code tson-compiler} compiler exists for this atom yet (added as a {@code
- * schema.meta}/{@link Atom} variant only, per explicit user direction, so {@code !mac_type {}}/
- * {@code mac}'s own resolution succeeds -- not to add real MAC-address validation).
+ * -- {@code tson-compiler}'s {@code MacParser} holds one of these and does the actual
+ * reading/writing.
  *
  * <p>{@code spec} is a bare {@link String}, not nested inside {@link AtomSpecification} or typed
  * as a {@link java.net.URI} -- see {@link Cidr4Type}'s own Javadoc for why.

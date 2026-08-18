@@ -7,9 +7,8 @@ import java.util.List;
 /**
  * meta.tn1's {@code ipv4_type} constructor (IPv4 address constraint vocabulary, RFC 3986's {@code
  * IPv4address} production): CIDR-text network allow/deny lists. Pure constraint values, no
- * parsing/validation behavior -- deliberately no {@code tson-compiler} compiler exists for this atom
- * yet (added as a {@code schema.meta}/{@link Atom} variant only, per explicit user direction, so
- * {@code !ipv4_type {}}/{@code ipv4}'s own resolution succeeds -- not to add real IPv4 validation).
+ * parsing/validation behavior -- {@code tson-compiler}'s {@code Ipv4Parser} does the actual
+ * reading/writing, though it does not model {@code within}/{@code excluding} (see its own Javadoc).
  *
  * <p>Same shape as {@link Cidr4Type} minus {@code min_prefix}/{@code max_prefix} (an address, not a
  * network, has no prefix length) -- see {@link Cidr4Type}'s own Javadoc for why {@code spec} is a

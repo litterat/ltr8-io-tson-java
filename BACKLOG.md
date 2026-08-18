@@ -132,9 +132,17 @@ own prose (which had gone stale on at least one of them):
   grammar: `unknown` accepts any well-formed value of any type, so what it needs is a reader deferring to
   the document's own type-ref (or to schemaless base-type resolution when there is none) — a design
   question about where that dispatch lives.
-- [ ] `uri_type`/`regex_type` — don't bind correctly in object-binding mode. Their RFC-citation
-  field is nested inside `specification: AtomSpecification` rather than flat, so it never receives
-  a schema-composed default the way `email_type`'s own flat `spec` field does.
+- [ ] `uri_type` — doesn't bind correctly in object-binding mode. `UriType` mirrors the composition that
+  produced `uri_type` rather than its resolved shape: composition flattens (§5.8), but the record nests the
+  RFC citation inside `specification: AtomSpecification`, so nothing fills it — a field, including a
+  `REQUIRED_FIXED` field's schema-composed default, is filled under its own schema field name. Two things
+  ride along, both found by probing rather than reading: the record also declares **no `length`
+  component** at all, though `text_type` composes one into `uri_type`, so `!uri ^ { length: 20 }` has
+  nowhere to land; and `AtomSpecification` has no other user once this converts, so it goes with it (the
+  kernel's own `atom_specification => { spec: uri }` declaration stays — `SchemaMetaNameBinder` mangles
+  names on demand rather than keeping a table that would miss the class). `RegexType` was the same defect
+  and is the worked example to copy: flat `spec` as a bare `String`, never `java.net.URI`, since the wire
+  value is an untyped quoted string the `AtomBinder` will not convert.
 - [ ] `extern` ([TSON-SCHEMA] §7.8) — materially bigger than the two items above, which just need
   an ordinary atom parser or a binding fix. `Extern` (`schema.meta`) is a record-only placeholder with no
   parsing/validation behavior at all (its own Javadoc says so explicitly: "not to add real

@@ -34,7 +34,7 @@ public record RegexParser(RegexType constraints) implements AtomType<String> {
 
     @Override
     public String read(TokenValue token) {
-        String text = new TextParser(constraints.constraints()).read(token);
+        String text = new TextParser(constraints.textConstraints()).read(token);
         try {
             TsonRegex.parse(text);
         } catch (TsonRegexSyntaxException e) {

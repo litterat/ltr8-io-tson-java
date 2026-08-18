@@ -4,8 +4,6 @@ import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import org.junit.jupiter.api.Test;
 
-import java.net.URI;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -41,11 +39,16 @@ class RegexParserTest {
         assertEquals("[a-z]+", written);
     }
 
+    /**
+     * The unconstrained parser's own cited document. That this passes says nothing about whether a
+     * {@code regex_type} body <em>resolved from a schema</em> carries the citation -- the constant is
+     * hand-written here, so it is right by construction; {@code DefinitionResolverTest} covers the
+     * binding.
+     */
     @Test
-    void citesRfc9485ViaTheComposedAtomSpecificationNotRfc3986() {
+    void citesRfc9485NotUriTypesRfc3986() {
         // regex_type => ~text_type & atom_specification & { spec: = "https://.../rfc9485" } --
-        // the same atom_specification mixin UriParser composes, but a different cited RFC.
-        assertEquals(URI.create("https://www.rfc-editor.org/rfc/rfc9485"),
-                RegexParser.UNCONSTRAINED.constraints().specification().spec());
+        // the same atom_specification mixin uri_type composes, but a different cited RFC.
+        assertEquals("https://www.rfc-editor.org/rfc/rfc9485", RegexParser.UNCONSTRAINED.constraints().spec());
     }
 }

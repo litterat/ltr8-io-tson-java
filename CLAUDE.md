@@ -480,10 +480,10 @@ compatibility).
   integer ladder, because core.tn groups it with its siblings identically and withholding it would only make
   the two read paths disagree (`SPEC-FEEDBACK.md` #5). Its format check is a documented subset of RFC 5322 —
   the `dot-atom` core, without quoted local parts, domain literals or comments.
-- **`uri_type`/`regex_type` object-binding** — their RFC-citation field is nested inside `specification:
+- **`uri_type` object-binding** — `UriType` holds its RFC citation nested inside `specification:
   AtomSpecification` rather than flat, so it never receives a schema-composed default the way
-  `email_type`'s flat `spec` field does. Subtype *dispatch* to them works; this is a narrower field-binding
-  gap.
+  `email_type`/`regex_type`'s flat `spec` field does, and it declares no `length` component for the facet
+  `text_type` composes into it. Subtype *dispatch* works; this is a narrower field-binding gap.
 - **Schema-side diagnostics, the remainder** — parsing, desugaring, resolution and linking all report
   through a `TsonDiagnosticsReceiver` now (see `docs/readers-and-diagnostics.md`); one thing is left.
   **A read-path diagnostic carries `schemaPosition` but no `schemaId`/`schemaPointer`**, which is blocked
