@@ -107,11 +107,9 @@ class CoreSchemaImportTest {
      * actually tries to {@code read} it. This confirms exactly which entries land there and pins the
      * set down: {@code unknown} alone -- constructed via {@code unknown_type}, one of the two constructors
      * {@link ValueReaderFactoryRegistry} registers to {@code ErrorReader} outright (the other, {@code
-     * extern}, has no core.tn declaration at all; {@code email} and {@code mac} left this set when their
-     * parsers landed, {@code cidr4} and {@code cidr6} when theirs did) --
-     * a real, already-documented, deliberate gap (see this repo's own CLAUDE.md, "Not yet
-     * implemented"), not a regression to chase. Every *other* entry compiles to a genuinely usable
-     * reader.
+     * extern}, has no core.tn declaration at all) -- a real, already-documented, deliberate gap (see this
+     * repo's own CLAUDE.md, "Not yet implemented"), not a regression to chase. Every *other* entry compiles
+     * to a genuinely usable reader.
      */
     @Test
     void exactlyTheUnknownAtomConstructorCompilesToAnErrorReader() {

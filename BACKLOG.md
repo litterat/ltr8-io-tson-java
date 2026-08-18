@@ -130,13 +130,12 @@ own prose (which had gone stale on at least one of them):
 
 ## Remaining built-in types
 
-- [ ] `unknown` — no compiled-parser factory yet (`ValueReaderFactoryRegistry` registers it, and `extern`,
-  to `ErrorReader`). Pinned down exactly by
-  `CoreSchemaImportTest.exactlyTheUnknownAtomConstructorCompilesToAnErrorReader`. `mac`/`email` left this
-  set when their parsers landed and `cidr4`/`cidr6` when theirs did, which leaves nothing here that is
-  merely an unwritten parser: `unknown` accepts any well-formed value of any type, so what it needs is a
-  reader that defers to the document's own type-ref (or to schemaless base-type resolution when there is
-  none), which is a design question about where that dispatch lives, not an atom grammar.
+- [ ] `unknown` — no compiled-parser factory (`ValueReaderFactoryRegistry` registers it, and `extern`, to
+  `ErrorReader`), pinned down exactly by
+  `CoreSchemaImportTest.exactlyTheUnknownAtomConstructorCompilesToAnErrorReader`. Not an unwritten atom
+  grammar: `unknown` accepts any well-formed value of any type, so what it needs is a reader deferring to
+  the document's own type-ref (or to schemaless base-type resolution when there is none) — a design
+  question about where that dispatch lives.
 - [ ] `uri_type`/`regex_type` — don't bind correctly in object-binding mode. Their RFC-citation
   field is nested inside `specification: AtomSpecification` rather than flat, so it never receives
   a schema-composed default the way `email_type`'s own flat `spec` field does.
@@ -256,9 +255,8 @@ missing most of the mirror.
 
 ## Conformance test suite
 
-- [ ] Build out `ltr8-io-tson-test-suite` well beyond its current 110 vectors (grown from the 38 this
-  note originally cited — it's picked up a fourth `vocabulary` bucket alongside `lexer`/`parser`/
-  `resolver` since). Still Part 1 (lexer/parser/§5 vocabulary) only — Part 2 (resolution, linking,
+- [ ] Build out `ltr8-io-tson-test-suite` well beyond its current 123 vectors, spread across four buckets
+  (`lexer`/`parser`/`resolver`/`vocabulary`). Still Part 1 (lexer/parser/§5 vocabulary) only — Part 2 (resolution, linking,
   compilation) has no conformance-suite coverage at all yet, only this repo's own unit/integration
   tests.
 - [ ] **Run the JSON front-end against the established JSON Parsing Test Suite** when it lands (the
