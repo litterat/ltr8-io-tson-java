@@ -40,35 +40,35 @@ class UriParserTest {
 
     @Test
     void minLengthRejectsShorterUri() {
-        UriParser type = new UriParser(Optional.of(20), Optional.empty(), Optional.empty(), Optional.empty());
+        UriParser type = new UriParser(Optional.of(20), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
         assertEquals(URI.create("https://example.com/"), type.read(token("https://example.com/")));
         assertThrows(AtomValidationException.class, () -> type.read(token("urn:x")));
     }
 
     @Test
     void maxLengthRejectsLongerUri() {
-        UriParser type = new UriParser(Optional.empty(), Optional.of(6), Optional.empty(), Optional.empty());
+        UriParser type = new UriParser(Optional.empty(), Optional.of(6), Optional.empty(), Optional.empty(), Optional.empty());
         assertEquals(URI.create("urn:x"), type.read(token("urn:x")));
         assertThrows(AtomValidationException.class, () -> type.read(token("https://example.com/")));
     }
 
     @Test
     void patternRejectsNonMatchingUri() {
-        UriParser type = new UriParser(Optional.empty(), Optional.empty(), Optional.of("https://.*"), Optional.empty());
+        UriParser type = new UriParser(Optional.empty(), Optional.empty(), Optional.empty(), Optional.of("https://.*"), Optional.empty());
         assertEquals(URI.create("https://example.com/"), type.read(token("https://example.com/")));
         assertThrows(AtomValidationException.class, () -> type.read(token("http://example.com/")));
     }
 
     @Test
     void schemeConstraintRejectsMismatchedScheme() {
-        UriParser type = new UriParser(Optional.empty(), Optional.empty(), Optional.empty(), Optional.of("https"));
+        UriParser type = new UriParser(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.of("https"));
         assertEquals(URI.create("https://example.com/"), type.read(token("https://example.com/")));
         assertThrows(AtomValidationException.class, () -> type.read(token("http://example.com/")));
     }
 
     @Test
     void schemeConstraintRejectsSchemelessReference() {
-        UriParser type = new UriParser(Optional.empty(), Optional.empty(), Optional.empty(), Optional.of("https"));
+        UriParser type = new UriParser(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.of("https"));
         assertThrows(AtomValidationException.class, () -> type.read(token("foo/bar")));
     }
 
@@ -79,11 +79,26 @@ class UriParserTest {
     }
 
     @Test
-    void citesRfc3986ViaTheComposedAtomSpecification() {
+    void exactLengthConstraintRejectsAnythingElse() {
+        // The facet text_type composes into uri_type that had no component here at all to bind into,
+        // so it was silently unenforceable however a schema declared it.
+        UriParser type = new UriParser(Optional.empty(), Optional.empty(), Optional.of(19),
+                Optional.empty(), Optional.empty());
+
+        assertEquals(URI.create("https://example.com"), type.read(token("https://example.com")));
+        assertThrows(AtomValidationException.class, () -> type.read(token("https://example.com/a")));
+    }
+
+    /**
+     * The unconstrained parser's own cited document. That this passes says nothing about whether a
+     * {@code uri_type} body <em>resolved from a schema</em> carries the citation -- the constant is
+     * hand-written here, so it is right by construction; {@code DefinitionResolverTest} covers the
+     * binding.
+     */
+    @Test
+    void citesRfc3986NotRegexTypesRfc9485() {
         // uri_type => ~text_type & atom_specification & { spec: = "https://.../rfc3986" ... } --
-        // the composed atom_specification's own spec field, not RegexParser's RFC 9485 (§5.5 vs.
-        // the I-Regexp citation RegexParser composes the same mixin for).
-        assertEquals(URI.create("https://www.rfc-editor.org/rfc/rfc3986"),
-                UriParser.UNCONSTRAINED.constraints().specification().spec());
+        // the same atom_specification mixin regex_type composes, but a different cited RFC.
+        assertEquals("https://www.rfc-editor.org/rfc/rfc3986", UriParser.UNCONSTRAINED.constraints().spec());
     }
 }

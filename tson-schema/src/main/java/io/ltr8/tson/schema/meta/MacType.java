@@ -9,8 +9,8 @@ import io.ltr8.annotation.Typename;
  * -- {@code tson-compiler}'s {@code MacParser} holds one of these and does the actual
  * reading/writing.
  *
- * <p>{@code spec} is a bare {@link String}, not nested inside {@link AtomSpecification} or typed
- * as a {@link java.net.URI} -- see {@link Cidr4Type}'s own Javadoc for why.
+ * <p>{@code spec} is flat and a bare {@link String}, never a {@link java.net.URI} -- see {@link
+ * Cidr4Type}'s own Javadoc for why.
  */
 @Typename(name = "mac_type")
 public record MacType(String spec) implements Atom {

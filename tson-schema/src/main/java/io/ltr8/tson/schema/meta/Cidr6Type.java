@@ -11,9 +11,8 @@ import java.util.Optional;
  * meta.tn1's {@code cidr6_type} constructor (IPv6-network constraint vocabulary, RFC 4291) --
  * {@link Cidr4Type}'s exact IPv6 counterpart, same shape, different RFC citation and prefix-length
  * family range (0-128 instead of 0-32, not enforced here either way). See {@link Cidr4Type}'s own
- * Javadoc for why {@code spec} is a flat {@link String} rather than nested {@link
- * AtomSpecification} or a {@link java.net.URI} and why {@code within}/{@code excluding} are bare
- * {@code List<String>} with a defensive compact constructor. {@code tson-compiler}'s {@code
+ * Javadoc for why {@code spec} is a flat {@link String} rather than a {@link java.net.URI} and why
+ * {@code within}/{@code excluding} are bare {@code List<String>} with a defensive compact constructor. {@code tson-compiler}'s {@code
  * Cidr6Parser} holds one of these and does the actual reading/writing.
  */
 @Typename(name = "cidr6_type")

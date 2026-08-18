@@ -12,13 +12,10 @@ import java.util.Optional;
  * parsing/validation behavior -- {@code tson-compiler}'s {@code EmailParser} holds one of these and does
  * the actual reading/writing.
  *
- * <p>{@code spec} is a bare {@link String}, not nested inside {@link AtomSpecification} or typed
- * as a {@link java.net.URI} -- see {@link Cidr4Type}'s own Javadoc for why: a flat field is what
- * lets {@code tson-compiler}'s compiled {@code Record*Reader}'s own schema-composed-default filling
- * actually populate it (unlike {@link UriType}'s own nested {@code specification} field, the one
- * remaining body that doesn't), and a bare {@code String} target is what an untyped,
- * unannotated string value can actually bind into ({@code java.net.URI} can't, without a {@code
- * !uri} type-ref).
+ * <p>{@code spec} is flat and a bare {@link String}, never a {@link java.net.URI} -- see {@link
+ * Cidr4Type}'s own Javadoc for both halves of why. {@link RegexType} is this record's exact twin:
+ * {@code regex_type} is declared by the identical composition and differs only in the document {@code
+ * spec} is fixed to.
  */
 @Typename(name = "email_type")
 public record EmailType(String spec, @Field("min_length") Optional<Integer> minLength,

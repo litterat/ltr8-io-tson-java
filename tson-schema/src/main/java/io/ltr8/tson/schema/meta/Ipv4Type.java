@@ -12,9 +12,8 @@ import java.util.List;
  *
  * <p>Same shape as {@link Cidr4Type} minus {@code min_prefix}/{@code max_prefix} (an address, not a
  * network, has no prefix length) -- see {@link Cidr4Type}'s own Javadoc for why {@code spec} is a
- * flat {@link String} (not nested {@link AtomSpecification}, not a {@link java.net.URI}) and why
- * {@code within}/{@code excluding} are bare {@code List<String>} with a defensive compact
- * constructor.
+ * flat {@link String} rather than a {@link java.net.URI} and why {@code within}/{@code excluding} are
+ * bare {@code List<String>} with a defensive compact constructor.
  */
 @Typename(name = "ipv4_type")
 public record Ipv4Type(String spec, List<String> within, List<String> excluding) implements Atom {

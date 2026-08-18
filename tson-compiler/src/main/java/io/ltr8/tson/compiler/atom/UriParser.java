@@ -33,11 +33,13 @@ public record UriParser(UriType constraints) implements AtomType<URI> {
     /** {@code uri => !uri_type {}} -- the unconstrained URI, §5.5's {@code !uri}. */
     public static final UriParser UNCONSTRAINED = new UriParser(UriType.UNCONSTRAINED);
 
-    public UriParser(Optional<Integer> minLength, Optional<Integer> maxLength, Optional<String> pattern,
-                      Optional<String> scheme) {
-        // "specification" (§5.5's atom_specification mixin, citing RFC 3986) is fixed per
-        // constructor, not a per-instance parameter -- every UriParser cites the same one.
-        this(new UriType(minLength, maxLength, pattern, UriType.UNCONSTRAINED.specification(), scheme));
+    /**
+     * Every facet {@code uri_type} carries except {@code spec}, which §5.5 fixes per constructor --
+     * every {@link UriParser} cites RFC 3986.
+     */
+    public UriParser(Optional<Integer> minLength, Optional<Integer> maxLength, Optional<Integer> length,
+                      Optional<String> pattern, Optional<String> scheme) {
+        this(new UriType(UriType.UNCONSTRAINED.spec(), minLength, maxLength, length, pattern, scheme));
     }
 
     @Override
@@ -59,6 +61,13 @@ public record UriParser(UriType constraints) implements AtomType<URI> {
     }
 
     private void validate(URI value, String text) {
+        constraints.length().ifPresent(len -> {
+            if (text.length() != len) {
+                throw new AtomValidationException(
+                        "'" + text + "' is " + text.length() + " characters, expected exactly " + len,
+                        "exactly " + len + " characters");
+            }
+        });
         constraints.minLength().ifPresent(min -> {
             if (text.length() < min) {
                 throw new AtomValidationException(
