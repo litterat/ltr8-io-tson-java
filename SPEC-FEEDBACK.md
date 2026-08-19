@@ -3094,3 +3094,51 @@ more work than diff-stability. It is still not required for correctness — an i
 entries differently produces a redundant second entry, not a wrong one — but it is what makes two
 implementations' merged namespaces agree entry-for-entry, and is worth stating as such rather than as a
 formatting nicety.
+
+
+---
+
+## 52. The record/map brace dispatch makes D2's "no `?` on a map key" unreachable for the common spelling
+
+**Section:** `tson-cr-structure-templates.md` §4.8 (§12.2 dispatch), D2 (*Map keys are simple refs; one
+entry; no `?`*). Related: #45, #50.
+
+**Problem:** the change report states both of these, and they interact in a way it does not note.
+
+D2, on the map sugar: "Neither side of `=>` admits `?`: the kernel's `map` has no `state` field and absence
+has no defined meaning for map values". §12.2, on the brace dispatch, one consumed token plus one of
+lookahead:
+
+```
+;   {              → brace form; consume "{" and dispatch on content:
+;       name ":"     → record-def (field)
+;       name "=>"    → map-def
+;       name "<"     → map-def (generic key; consume args, expect "=>")
+;       name (other) → parse error
+```
+
+`{text? => integer}` is `name` followed by `?`, which is neither `:` nor `=>` nor `<`. It falls into
+`name (other)`, so the brace has already committed to a **record** before the `=>` is ever read. The rule
+D2 states — reject a `?` on the key — is therefore unreachable for a plain-name key: the author who writes
+one gets a record-field diagnostic ("expected a record field's `:`"), which names a construct they were not
+writing. The rule *is* reachable for a generic key (`{pair<text>? => integer}`), because `<` commits to a
+map before the `?` appears, so the same spelling is answered two different ways depending on whether the
+key carries type arguments.
+
+This is a diagnostic-quality defect, not a grammar hole — both spellings are correctly rejected, and the
+dispatch is right to be decidable within its stated budget. But the report presents D2's `?` prohibition as
+a rule the parser enforces, and for the spelling an author is most likely to reach for, no map rule fires at
+all.
+
+**Interpretation chosen:** implement the dispatch exactly as §12.2 specifies and let `{text? => integer}`
+fail as a record (`TsonSchemaParser.braceOpensMap`, pinned by
+`TsonSchemaParserTest.aQuestionMarkOnAPlainMapKeyIsAnsweredByTheBraceDispatch`). The alternative — a third
+token of lookahead, or scanning ahead for a `=>` before the first `:` — buys one better message at the cost
+of the property §12.2 is written to preserve, which is a poor trade.
+
+**Suggested resolution:** state the interaction where §12.2 states the dispatch, so an implementer does not
+discover it by writing the test. Two sentences suffice: that `name` followed by anything other than `:`,
+`=>` or `<` commits to a record and is diagnosed as one, and that D2's key-side `?` prohibition is therefore
+enforced only where a generic key has already committed the brace. If a better message is wanted anyway, the
+place for it is the record-field diagnostic — "expected `:`; if you meant a map type, `?` is not permitted on
+a map key" — which costs no lookahead, since by then the `?` has been read.

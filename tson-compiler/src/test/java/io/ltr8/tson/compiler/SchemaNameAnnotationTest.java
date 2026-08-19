@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Documentation on a schema declaration, which is where the bundled schemas actually put it: every one of
  * their {@code @doc} annotations precedes the declared name, so §6 binds it to the <em>name</em> and forbids
- * hoisting it onto the definition. A resolved schema is a {@code map<type_name, type_definition>}, so the
+ * hoisting it onto the definition. A resolved schema is a <code>{type_name =&gt; type_definition}</code>, so the
  * name is that map's key -- and {@link AnnotatedMap} is what keeps a key's annotations reachable while the
  * map still presents its plain {@code String} keys.
  *

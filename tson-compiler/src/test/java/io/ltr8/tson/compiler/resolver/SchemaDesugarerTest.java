@@ -9,20 +9,12 @@ import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.ast.schema.SimpleRef;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
-import io.ltr8.tson.schema.meta.FieldState;
-import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.SourcePosition;
-import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.TypeDefinition;
-import io.ltr8.tson.schema.meta.TypeKind;
-import io.ltr8.tson.schema.meta.TypeRef;
 import org.junit.jupiter.api.Test;
 
 import java.util.IdentityHashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -33,13 +25,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@link SchemaDesugarer}: the AST rewrite that hoists an application into its own declaration before
- * resolution, so {@code DefinitionResolver} only ever sees a bare reference or {@code !C value}.
+ * {@link SchemaDesugarer}: the AST rewrite that turns every sugar form into the constructor application it
+ * denotes before resolution, so {@code DefinitionResolver} only ever sees a bare reference or {@code !C
+ * value}.
  *
- * <p>The governing meta is hand-built rather than the real meta-kernel: the phase needs only a constructor's
- * {@code parameters()} and the {@code valueParam} its vocabulary fields route through, and stating that
- * directly makes the argument-to-field mapping the test is about visible in the fixture instead of buried in
- * a bundled schema.
+ * <p>No governing meta appears in any fixture, and that is the point of the phase's current shape: the sugar
+ * set is closed and grammar-supplied, so the head each form desugars to and the vocabulary field each
+ * argument fills are a fixed table (§5.3), not something read off a constructor's parameter list.
  *
  * <p>Assertions on unchanged documents use {@link org.junit.jupiter.api.Assertions#assertSame}, not {@code
  * assertEquals}, deliberately. The nodes are records, so an equal-but-rebuilt tree would satisfy {@code
@@ -49,50 +41,28 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class SchemaDesugarerTest {
 
-    /** {@code array => <T> ~product & { element_type: type_ref = T  ... }} -- one parameter, one routed field. */
-    private static TypeDefinition arrayConstructor() {
-        RecordBody vocabulary = new RecordBody(List.of(), List.of(
-                new RecordField("element_type", TypeRef.of("type_ref"), FieldState.REQUIRED,
-                        Optional.empty(), Optional.of("T"))),
-                List.of());
-        return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of("T"), true, List.of(), List.of(),
-                Optional.empty(), vocabulary);
+    private static SchemaDocument parse(String declarations) {
+        return new TsonSchemaParser("""
+                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn"
+                {
+                %s
+                }
+                """.formatted(declarations)).parseSchemaDocument();
     }
-
-    /** {@code map => <K, V> ~product & { key_type: type_ref = K  value_type: type_ref = V  ... }}. */
-    private static TypeDefinition mapConstructor() {
-        RecordBody vocabulary = new RecordBody(List.of(), List.of(
-                new RecordField("key_type", TypeRef.of("type_ref"), FieldState.REQUIRED,
-                        Optional.empty(), Optional.of("K")),
-                new RecordField("value_type", TypeRef.of("type_ref"), FieldState.REQUIRED,
-                        Optional.empty(), Optional.of("V"))),
-                List.of());
-        return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of("K", "V"), true, List.of(), List.of(),
-                Optional.empty(), vocabulary);
-    }
-
-    private static final Map<String, TypeDefinition> META =
-            Map.of("array", arrayConstructor(), "map", mapConstructor());
 
     private static SchemaDocument desugar(String declarations) {
         return desugar(declarations, Set.of());
     }
 
     private static SchemaDocument desugar(String declarations, Set<String> imported) {
-        SchemaDocument document = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
-                {
-                %s
-                }
-                """.formatted(declarations)).parseSchemaDocument();
-        return SchemaDesugarer.desugar(document, META, imported);
+        return SchemaDesugarer.desugar(parse(declarations), imported);
     }
 
-    /** The injected declaration for the sole application in {@code document}, whichever name it got. */
-    private static SchemaMap.Declaration onlyInjected(SchemaDocument document, String head) {
+    /** The injected declaration for the sole form in {@code document} whose derived name starts with {@code prefix}. */
+    private static SchemaMap.Declaration onlyInjected(SchemaDocument document, String prefix) {
         List<SchemaMap.Declaration> matching = document.body().declarations().values().stream()
-                .filter(d -> d.name().startsWith(head + "_")).toList();
-        assertEquals(1, matching.size(), () -> "expected one injected " + head + " in "
+                .filter(d -> d.name().startsWith(prefix + "_")).toList();
+        assertEquals(1, matching.size(), () -> "expected one injected " + prefix + " in "
                 + document.body().declarations().keySet());
         return matching.get(0);
     }
@@ -102,6 +72,10 @@ class SchemaDesugarerTest {
         StructuralTypeDef typeDef = (StructuralTypeDef) document.body().declarations().get(declaration).typeDef();
         FieldDef field = (FieldDef) ((RecordDef) typeDef.body()).entries().get(0);
         return ((SimpleRef) field.type().orElseThrow().typeRef()).name();
+    }
+
+    private static Instance instanceOf(SchemaDocument document, String declaration) {
+        return assertInstanceOf(Instance.class, document.body().declarations().get(declaration).typeDef());
     }
 
     /**
@@ -114,7 +88,7 @@ class SchemaDesugarerTest {
     @Test
     void aRewrittenDeclarationKeepsItsSourcePosition() {
         TsonSchemaParser parser = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
+                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn"
                 {
                   plain => { a: text }
 
@@ -123,7 +97,7 @@ class SchemaDesugarerTest {
         SchemaDocument document = parser.parseSchemaDocument();
         Map<SchemaMap.Declaration, SourcePosition> positions = new IdentityHashMap<>(parser.declarationPositions());
 
-        SchemaDocument desugared = SchemaDesugarer.desugar(document, META, Set.of(), null, positions);
+        SchemaDocument desugared = SchemaDesugarer.desugar(document, Set.of(), null, positions);
 
         Map<String, SchemaMap.Declaration> after = desugared.body().declarations();
         assertNotSame(document.body().declarations().get("sugared"), after.get("sugared"),
@@ -134,45 +108,49 @@ class SchemaDesugarerTest {
     }
 
     @Test
-    void aDocumentWithNoApplicationsComesBackUntouched() {
-        SchemaDocument document = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
-                { plain => { a: text  b: integer? } }""").parseSchemaDocument();
+    void aDocumentWithNoSugarComesBackUntouched() {
+        SchemaDocument document = parse("  plain => { a: text  b: integer? }");
 
-        assertSame(document, SchemaDesugarer.desugar(document, META, Set.of()));
+        assertSame(document, SchemaDesugarer.desugar(document, Set.of()));
     }
 
-    @Test
-    void aFieldsApplicationBecomesAnInstanceDeclarationAndAReference() {
-        SchemaDocument document = desugar("  holder => { entries: map<text, integer> }");
+    // ── The desugar table (§5.3) ─────────────────────────────────────────
 
-        SchemaMap.Declaration injected = onlyInjected(document, "map");
+    @Test
+    void aFieldsInlineArrayBecomesAnInstanceDeclarationAndAReference() {
+        SchemaDocument document = desugar("  holder => { xs: [text] }");
+
+        SchemaMap.Declaration injected = onlyInjected(document, "array");
         assertEquals(firstFieldType(document, "holder"), injected.name(),
                 "the use site refers to the injected declaration by name");
-        assertTrue(injected.name().startsWith("map_text_integer_"), injected.name());
+        Instance instance = (Instance) injected.typeDef();
+        assertEquals("array", instance.target());
+        assertEquals("{ element_type: text }", instanceBody(instance));
+    }
 
-        // !map { key_type: text  value_type: integer } -- routed by each vocabulary field's own valueParam,
-        // which is what makes this work for any constructor rather than needing a per-shape assembler.
+    /**
+     * The map sugar, the one form the change to type-name-only head resolution added: <code>{K =&gt; V}</code>
+     * mirrors the data notation's own {@code {k =&gt; v}} the way {@code [T]} mirrors {@code [a b]}, and it is
+     * now the only spelling for a map type -- {@code map<K, V>} resolves its head in the type-name namespace,
+     * where the kernel's {@code map} constructor is not reachable.
+     */
+    @Test
+    void aFieldsInlineMapBecomesAnInstanceDeclarationAndAReference() {
+        SchemaDocument document = desugar("  holder => { entries: {text => integer} }");
+
+        SchemaMap.Declaration injected = onlyInjected(document, "map");
+        assertEquals(firstFieldType(document, "holder"), injected.name());
+        assertTrue(injected.name().startsWith("map_text_integer_"), injected.name());
         Instance instance = (Instance) injected.typeDef();
         assertEquals("map", instance.target());
         assertEquals("{ key_type: text  value_type: integer }", instanceBody(instance));
     }
 
     @Test
-    void inlineArraySugarBecomesTheSameShapeAsAnExplicitApplication() {
-        SchemaDocument sugar = desugar("  holder => { xs: [text] }");
-        SchemaDocument explicit = desugar("  holder => { xs: array<text> }");
-
-        assertEquals(onlyInjected(explicit, "array").name(), onlyInjected(sugar, "array").name(),
-                "[T] and array<T> are the same application and must produce the same declaration");
-        assertEquals("{ element_type: text }", instanceBody((Instance) onlyInjected(sugar, "array").typeDef()));
-    }
-
-    @Test
-    void anInnerApplicationIsHoistedFirstAndReferredToByTheOuterOne() {
+    void anInnerFormIsHoistedFirstAndReferredToByTheOuterOne() {
         // The walk is bottom-up, so the inner array is already a plain name when the outer map is built --
         // which is what keeps arbitrarily nested sugar working without a special case.
-        SchemaDocument document = desugar("  holder => { m: map<text, [integer]> }");
+        SchemaDocument document = desugar("  holder => { m: {text => [integer]} }");
 
         String innerName = onlyInjected(document, "array").name();
         assertEquals("{ element_type: integer }",
@@ -182,13 +160,12 @@ class SchemaDesugarerTest {
     }
 
     /**
-     * Two structurally identical applications share one declaration, wherever in the document they appear.
-     * The name is derived from the application itself, so this falls out of naming rather than needing a
-     * separate dedup table -- and it is what §8.2 asks for ("flattened applications that are structurally
-     * equal denote the same type").
+     * Two structurally identical forms share one declaration, wherever in the document they appear. The name
+     * is derived from the binding record itself, so this falls out of naming rather than needing a separate
+     * dedup table -- and it is what §8.2 asks for: one entry per distinct concrete form, schema-wide.
      */
     @Test
-    void twoStructurallyIdenticalApplicationsBecomeOneDeclaration() {
+    void twoStructurallyIdenticalFormsBecomeOneDeclaration() {
         SchemaDocument document = desugar("""
                   first => { xs: [text] }
                   second => { ys: [text] }""");
@@ -199,25 +176,43 @@ class SchemaDesugarerTest {
     }
 
     /**
+     * Identity is the <em>resolved binding record</em>, not the spelling that produced it, so the two ways of
+     * writing an exactly-sized array land on the very same entry. That is the rule that also makes a form
+     * arising inside a materialised template collapse onto one written directly.
+     */
+    @Test
+    void twoSpellingsOfOneBindingRecordLandOnTheSameEntry() {
+        SchemaDocument document = desugar("""
+                  sized  => [[text]; 3]
+                  ranged => [[text]; 3..3]""");
+
+        assertEquals(1, document.body().declarations().values().stream()
+                .filter(d -> d.name().startsWith("array_text_")).count(),
+                "one injected inner array, shared by both spellings");
+        assertEquals(instanceBody(instanceOf(document, "sized")), instanceBody(instanceOf(document, "ranged")),
+                "[T; 3] and [T; 3..3] are one binding record, so one entry");
+    }
+
+    /**
      * The derived names are pinned to exact strings, deliberately. They are built from a rendering the
      * desugarer controls rather than from the AST's own {@code toString}, so renaming a component of an
      * {@code ast.schema} record -- or a JDK that formats records differently -- must leave every injected
      * name untouched. Both halves of the name matter: the readable prefix is what a diagnostic shows, and
-     * the hash is what an importing schema re-derives to land on an entry an import already materialised
-     * ({@code SPEC-FEEDBACK.md} #50/#51). If this test fails, the resolved form of every schema changed.
+     * the hash is what an importing schema re-derives to land on an entry an import already materialised.
+     * If this test fails, the resolved form of every schema changed.
      */
     @Test
     void derivedNamesDoNotRideOnTheAstsOwnStringForms() {
-        assertEquals("array_text_d5ed9ca5", onlyInjected(desugar("  holder => { xs: [text] }"), "array").name());
-        assertEquals("map_text_integer_0db753ed",
-                onlyInjected(desugar("  holder => { m: map<text, integer> }"), "map").name());
+        assertEquals("array_text_4cc4a482", onlyInjected(desugar("  holder => { xs: [text] }"), "array").name());
+        assertEquals("map_text_integer_5c4af9ec",
+                onlyInjected(desugar("  holder => { m: {text => integer} }"), "map").name());
     }
 
     @Test
-    void anApplicationAnImportAlreadyDeclaresIsReferencedNotRedeclared() {
-        // The name is derived from the application, so an identical one in an imported schema has already
+    void aFormAnImportAlreadyDeclaresIsReferencedNotRedeclared() {
+        // The name is derived from the binding record, so an identical form in an imported schema has already
         // produced this type. Redeclaring it would be rejected as a local-vs-import collision -- which is how
-        // this surfaced: meta.tn imports the meta-kernel and repeats several of its applications.
+        // this surfaced: meta.tn imports the meta-kernel and repeats several of its forms.
         String name = onlyInjected(desugar("  holder => { xs: [text] }"), "array").name();
 
         SchemaDocument reusing = desugar("  holder => { xs: [text] }", Set.of(name));
@@ -227,165 +222,95 @@ class SchemaDesugarerTest {
                 "but declares nothing: " + reusing.body().declarations().keySet());
     }
 
-    @Test
-    void aDeclarationsOwnApplicationBecomesTheInstanceItself() {
-        // §5.6: a declaration whose body is a fully-bound application resolves as a *construction*, so it
-        // becomes the instance in place rather than a reference to an injected one. That is what keeps
-        // `x => map<K, V>` a PRODUCT carrying a real body instead of a REFERENCE to one, and it is why
-        // declaration position is handled separately from a use site.
-        SchemaDocument document = desugar("  entries => map<text, integer>");
+    // ── Declaration position: the form *is* the construction (§5.6) ──────
 
-        Instance instance = (Instance) document.body().declarations().get("entries").typeDef();
+    @Test
+    void aSizeLessDeclarationLevelArrayIsTheConstructionItself() {
+        SchemaDocument document = desugar("  ids => [text]");
+
+        Instance instance = instanceOf(document, "ids");
+        assertEquals("array", instance.target());
+        assertEquals("{ element_type: text }", instanceBody(instance));
+        assertEquals(1, document.body().declarations().size(), "nothing injected alongside it");
+    }
+
+    @Test
+    void aDeclarationLevelMapIsTheConstructionItself() {
+        SchemaDocument document = desugar("  entries => {text => integer}");
+
+        Instance instance = instanceOf(document, "entries");
         assertEquals("map", instance.target());
         assertEquals("{ key_type: text  value_type: integer }", instanceBody(instance));
         assertEquals(1, document.body().declarations().size(), "nothing injected alongside it");
     }
 
+    /**
+     * §5.3's size specifier as the {@code min_items}/{@code max_items} pair it binds -- one rule for arrays and
+     * maps alike, since both constructors declare the same two fields. There is no template in the middle any
+     * more: the kernel's {@code array_min}/{@code array_max}/{@code array_ranged} are deleted, and the four
+     * spellings land directly on {@code !array}.
+     */
     @Test
-    void aSizeLessDeclarationLevelArrayIsAlsoAnApplication() {
-        // §5.6 again -- `x => [T]` is a top-level constructor application, which DefinitionResolver used to
-        // reject outright. The *sized* forms are not: they desugar to array_min/array_max/array_ranged,
-        // which are templates rather than constructors, so they stay on their existing path.
-        SchemaDocument document = desugar("  ids => [text]");
-
-        Instance instance = (Instance) document.body().declarations().get("ids").typeDef();
-        assertEquals("array", instance.target());
-        assertEquals("{ element_type: text }", instanceBody(instance));
+    void everySizeSpellingBindsMinItemsAndMaxItemsDirectly() {
+        assertEquals("{ element_type: text  min_items: 1  max_items: 5 }",
+                instanceBody(instanceOf(desugar("  bounded => [text; 1..5]"), "bounded")));
+        assertEquals("{ element_type: text  min_items: 2 }",
+                instanceBody(instanceOf(desugar("  atLeast => [text; 2..]"), "atLeast")));
+        assertEquals("{ element_type: text  max_items: 9 }",
+                instanceBody(instanceOf(desugar("  atMost => [text; ..9]"), "atMost")));
+        assertEquals("{ element_type: text  min_items: 3  max_items: 3 }",
+                instanceBody(instanceOf(desugar("  exact => [text; 3]"), "exact")));
     }
 
+    /** The map tier admits the same specifier, under the same grammar and the same bindings (§5.3). */
     @Test
-    void sizedSugarBecomesTheSizeTemplateApplicationItStandsFor() {
-        // §5.3: [T; N..M] is array_ranged<T, N, M>, [T; N..] is array_min, [T; ..M] is array_max, and an
-        // exact [T; N] is array_ranged with the bound twice. Purely a change of spelling, which is why it
-        // belongs here even though the targets are templates rather than constructors -- what a template
-        // application then resolves to (§5.10 substitution) is a separate question this phase does not
-        // answer, so the result stays an application rather than becoming an instance.
-        //
-        // Observable in isolation only because META declares no templates. Against a real governing meta the
-        // rewrite still happens and is then rejected, since array_ranged is a template -- see
-        // sizedSugarAgainstARealMetaIsRejectedAsTheTemplateApplicationItIs below.
-        assertEquals("array_ranged<text, 1, 5>", application(desugar("  bounded => [text; 1..5]"), "bounded"));
-        assertEquals("array_min<text, 2>", application(desugar("  atLeast => [text; 2..]"), "atLeast"));
-        assertEquals("array_max<text, 9>", application(desugar("  atMost => [text; ..9]"), "atMost"));
-        assertEquals("array_ranged<text, 3, 3>", application(desugar("  exact => [text; 3]"), "exact"));
-    }
-
-    /** Renders a declaration's application body as {@code head<arg, arg>} for readable assertions. */
-    private static String application(SchemaDocument document, String declaration) {
-        var ref = (io.ltr8.tson.compiler.ast.schema.ReferenceTypeDef)
-                document.body().declarations().get(declaration).typeDef();
-        var generic = (io.ltr8.tson.compiler.ast.schema.GenericRef) ref.ref();
-        List<String> args = generic.args().stream()
-                .map(a -> a instanceof io.ltr8.tson.compiler.ast.schema.TypeArg.Ref r
-                        ? ((SimpleRef) r.ref()).name()
-                        : ((io.ltr8.tson.compiler.ast.schema.TypeArg.Value) a).value().text())
-                .toList();
-        return generic.name() + "<" + String.join(", ", args) + ">";
-    }
-
-    @Test
-    void aParameterizedDeclarationIsLeftEntirelyAlone() {
-        // A template's body references its own parameters, so expanding array<T> here would inject a
-        // declaration naming an unbound T. This is meta-kernel's own set/array_min/array_max/array_ranged.
-        SchemaDocument document = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
-                { my_set => <T> array<T> ^ { unique_items: = true } }""").parseSchemaDocument();
-
-        assertSame(document, SchemaDesugarer.desugar(document, META, Set.of()));
-    }
-
-    @Test
-    void applyingALocallyDeclaredTemplateIsRejectedHere() {
-        // §5.10 substitution is unimplemented, so this phase cannot rewrite the application -- and leaving it
-        // alone produced a schema that linked and compiled, then failed on the first read that reached the
-        // field. Rejecting it at the application site puts the error where it can be acted on.
-        SchemaDocument document = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
-                {
-                  box => <T> { v: T }
-                  holder => { b: box<text> }
-                }""").parseSchemaDocument();
-
-        UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
-                () -> SchemaDesugarer.desugar(document, META, Set.of()));
-        assertTrue(thrown.getMessage().contains("'box' is a parameterized template"), thrown.getMessage());
-        assertTrue(thrown.getMessage().contains("[T]"), "names the unbound parameters: " + thrown.getMessage());
+    void aMapTakesTheSameSizeSpecifierAsAnArray() {
+        assertEquals("{ key_type: text  value_type: integer  min_items: 1  max_items: 5 }",
+                instanceBody(instanceOf(desugar("  bounded => {text => integer; 1..5}"), "bounded")));
+        assertEquals("{ key_type: text  value_type: integer  min_items: 2 }",
+                instanceBody(instanceOf(desugar("  atLeast => {text => integer; 2..}"), "atLeast")));
     }
 
     /**
-     * §5.3's sized sugar targets {@code array_ranged}, which the meta-kernel declares without {@code ~} and
-     * whose parameters occur only in labelled <em>value</em> channels -- a <b>partial application</b>. Applying
-     * one is evaluation, not instantiation: it closes to the plain {@code !array} construction its bindings
-     * denote, headed at the nearest {@code ~} constructor in the source chain (§5.6), with no entry of its own
-     * ({@code SPEC-FEEDBACK.md} #45). So the sized form lands on exactly the shape {@code [text]} does, one
-     * bound apart.
-     *
-     * <p>Routing is the same mechanism a constructor application uses, because the template's resolved
-     * vocabulary carries the same {@code value_param} channels: {@code element_type} from {@code T}, {@code
-     * min_items} from {@code MIN}, {@code max_items} from {@code MAX}. Nothing here knows what an array is.
+     * §5.3's bound-coherence rule on the {@code min_items}/{@code max_items} pair, stated once and applying
+     * identically to both tiers: a resolver error where the bounds are literal at schema load.
      */
     @Test
-    void sizedSugarAgainstARealMetaClosesOntoItsConstructorsConstruction() {
-        SchemaDocument document = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
-                { tags => [text; 1..5] }""").parseSchemaDocument();
-        Map<String, TypeDefinition> realMeta = MetaKernelBootstrapResolver.getMetaKernelSchema().entries();
-
-        SchemaDocument desugared = SchemaDesugarer.desugar(document, realMeta, Set.of());
-
-        Instance instance = assertInstanceOf(Instance.class,
-                desugared.body().declarations().get("tags").typeDef());
-        assertEquals("array", instance.target(), "headed at the nearest ~ constructor, not at the template");
-        assertEquals("{ element_type: text  min_items: 1  max_items: 5 }", instanceBody(instance));
+    void anIncoherentSizeRangeIsRejectedForArraysAndMapsAlike() {
+        for (String declaration : List.of("  bad => [text; 5..3]", "  bad => {text => integer; 5..3}")) {
+            TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                    () -> desugar(declaration), declaration);
+            assertTrue(thrown.getMessage().contains("min <= max"), thrown.getMessage());
+        }
     }
 
     /**
      * §5.3 calls {@code [T; 0..]} vacuous and asks for a warning while desugaring it anyway;
      * {@code SPEC-FEEDBACK.md} #42 rejects the spelling instead, and §5.3's own sentence says why it is
-     * worth rejecting rather than tolerating: application-structural identity (§8.2) makes it a distinct
-     * entry meaning exactly what {@code [text]} means.
+     * worth rejecting rather than tolerating: structural identity (§8.2) makes it a distinct entry meaning
+     * exactly what the unconstrained form means.
      */
     @Test
     void aVacuousZeroFloorIsRejectedRatherThanDesugared() {
-        SchemaDocument document = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
-                { tags => [text; 0..] }""").parseSchemaDocument();
-        Map<String, TypeDefinition> realMeta = MetaKernelBootstrapResolver.getMetaKernelSchema().entries();
-
         TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
-                () -> SchemaDesugarer.desugar(document, realMeta, Set.of()));
-        assertTrue(thrown.getMessage().contains("'[text]'"), "names the fix: " + thrown.getMessage());
+                () -> desugar("  tags => [text; 0..]"));
+        assertTrue(thrown.getMessage().contains("'[text; 0..]'"), "quotes the form: " + thrown.getMessage());
     }
 
     /** Only the open-ended floor is vacuous: {@code 0..M} still pins a ceiling, and desugars as usual. */
     @Test
     void aZeroFloorWithACeilingIsStillARealConstraint() {
-        SchemaDocument document = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
-                { tags => [text; 0..5] }""").parseSchemaDocument();
-        Map<String, TypeDefinition> realMeta = MetaKernelBootstrapResolver.getMetaKernelSchema().entries();
-
-        SchemaDocument desugared = SchemaDesugarer.desugar(document, realMeta, Set.of());
-
-        assertEquals("{ element_type: text  min_items: 0  max_items: 5 }", instanceBody(
-                assertInstanceOf(Instance.class, desugared.body().declarations().get("tags").typeDef())));
+        assertEquals("{ element_type: text  min_items: 0  max_items: 5 }",
+                instanceBody(instanceOf(desugar("  tags => [text; 0..5]"), "tags")));
     }
 
-    /**
-     * §5.3's variadic pair, tuple half. Run against the real meta-kernel rather than {@link #META}, because
-     * the field the positions fill is read off {@code tuple}'s own vocabulary (its sole bare-{@code REQUIRED}
-     * field, §5.6's positional-form rule) -- using the real declaration is what proves the routing rather
-     * than a fixture built to agree with it.
-     *
-     * <p>At declaration position the bracket form <em>is</em> the construction, the treatment {@code [T]} and
-     * {@code (A | B)} already get, so nothing is injected alongside it.
-     */
+    // ── The variadic pair: tuple and choice (§5.3, §5.4) ─────────────────
+
     @Test
     void aDeclarationLevelTupleBecomesTheConstructionItDenotes() {
-        SchemaDocument document = desugarAgainstTheRealMetaKernel("  pair => [integer, text]");
+        SchemaDocument document = desugar("  pair => [integer, text]");
 
-        Instance instance = assertInstanceOf(Instance.class,
-                document.body().declarations().get("pair").typeDef());
+        Instance instance = instanceOf(document, "pair");
         assertEquals("tuple", instance.target());
         assertEquals("[ { element_type: integer } { element_type: text } ]", tupleElements(instance));
         assertEquals(1, document.body().declarations().size(), "nothing injected alongside it");
@@ -394,7 +319,7 @@ class SchemaDesugarerTest {
     /** At a field position it is hoisted and referred to by name, exactly as inline {@code [T]} is. */
     @Test
     void anInlineTupleIsHoistedIntoItsOwnDeclarationAndReferredToByName() {
-        SchemaDocument document = desugarAgainstTheRealMetaKernel("  holder => { p: [integer, text] }");
+        SchemaDocument document = desugar("  holder => { p: [integer, text] }");
 
         SchemaMap.Declaration injected = onlyInjected(document, "tuple");
         assertEquals(firstFieldType(document, "holder"), injected.name());
@@ -403,56 +328,77 @@ class SchemaDesugarerTest {
                 tupleElements(assertInstanceOf(Instance.class, injected.typeDef())));
     }
 
+    @Test
+    void aDeclarationLevelChoiceBecomesTheConstructionItDenotes() {
+        SchemaDocument document = desugar("  contact => (text | integer)");
+
+        Instance instance = instanceOf(document, "contact");
+        assertEquals("choice", instance.target());
+        assertEquals("{ variants: [text integer] }", variantsOf(instance));
+        assertEquals(1, document.body().declarations().size(), "nothing injected alongside it");
+    }
+
     /**
      * A position's own {@code ?} (declaration position only -- the parser rejects one inline) becomes {@code
      * state: OPTIONAL}. A REQUIRED position writes no {@code state} at all: the member is REQUIRED_DEFAULT
-     * ({@code state: element_state ~ REQUIRED}), so §5.2's default injection supplies it, the same way
-     * {@code instanceFor} omits every defaulted vocabulary field.
+     * ({@code state: element_state ~ REQUIRED}), so §5.2's default injection supplies it.
      */
     @Test
     void anOptionalPositionStatesItsStateAndARequiredOneLetsTheDefaultSupplyIt() {
-        SchemaDocument document = desugarAgainstTheRealMetaKernel("  pair => [integer?, text]");
-
-        Instance instance = assertInstanceOf(Instance.class,
-                document.body().declarations().get("pair").typeDef());
         assertEquals("[ { element_type: integer  state: OPTIONAL } { element_type: text } ]",
-                tupleElements(instance));
+                tupleElements(instanceOf(desugar("  pair => [integer?, text]"), "pair")));
     }
 
-    // ── Nested bracket forms (§5.3, §12.1) ───────────────────────────────
-    //    Declaration-level container syntax nests inside itself, and §5.3 fixes the order: `grid => <T, N>
-    //    [[T; N]; N]` is `array_ranged<array_ranged<T, N, N>, N, N>`, "the inner form desugaring first".
-    //    So the inner container is injected under its own derived name and the position that held it
-    //    becomes a bare reference -- the bottom-up hoist an inline form at a type-ref position already gets.
+    // ── Nested declaration-level forms (§5.3, §12.1) ─────────────────────
+    //    Declaration-level container syntax nests inside itself, and the inner form desugars first: the
+    //    inner container is injected under its own derived name and the position that held it becomes a
+    //    bare reference -- the bottom-up hoist an inline form at a type-ref position already gets.
 
-    /**
-     * A tuple position holding a nested <em>sized</em> array. The inner form desugars first, into the
-     * {@code array_ranged} instantiation the flat spelling would produce, and the position refers to it by
-     * name -- so what the outer tuple routes is a plain name like any other.
-     */
     @Test
     void aTuplePositionHoldingANestedSizedArrayRefersToTheInjectedInnerArray() {
-        SchemaDocument document = desugarAgainstTheRealMetaKernel("  grid => [[integer; 2], text]");
+        SchemaDocument document = desugar("  grid => [[integer; 2], text]");
 
-        SchemaMap.Declaration inner = onlyInjected(document, "array_ranged");
+        SchemaMap.Declaration inner = onlyInjected(document, "array_integer");
         assertEquals("{ element_type: integer  min_items: 2  max_items: 2 }",
                 instanceBody(assertInstanceOf(Instance.class, inner.typeDef())));
         assertEquals("[ { element_type: " + inner.name() + " } { element_type: text } ]",
-                tupleElements(assertInstanceOf(Instance.class,
-                        document.body().declarations().get("grid").typeDef())));
+                tupleElements(instanceOf(document, "grid")));
     }
 
     /** The other nesting direction: a sized array <em>over</em> a nested plain array ({@code [[T]; N]}). */
     @Test
     void aSizedArrayOverANestedArrayRefersToTheInjectedInnerArray() {
-        SchemaDocument document = desugarAgainstTheRealMetaKernel("  rows => [[integer]; 3]");
+        SchemaDocument document = desugar("  rows => [[integer]; 3]");
 
         SchemaMap.Declaration inner = onlyInjected(document, "array_integer");
         assertEquals("{ element_type: integer }",
                 instanceBody(assertInstanceOf(Instance.class, inner.typeDef())));
         assertEquals("{ element_type: " + inner.name() + "  min_items: 3  max_items: 3 }",
-                instanceBody(assertInstanceOf(Instance.class,
-                        document.body().declarations().get("rows").typeDef())));
+                instanceBody(instanceOf(document, "rows")));
+    }
+
+    /** A map value nests the same way an array element does -- {@code map-value = container-def / type-ref}. */
+    @Test
+    void aMapValueHoldingANestedSizedArrayRefersToTheInjectedInnerArray() {
+        SchemaDocument document = desugar("  index => {text => [order; 1..]}");
+
+        SchemaMap.Declaration inner = onlyInjected(document, "array_order");
+        assertEquals("{ element_type: order  min_items: 1 }",
+                instanceBody(assertInstanceOf(Instance.class, inner.typeDef())));
+        assertEquals("{ key_type: text  value_type: " + inner.name() + " }",
+                instanceBody(instanceOf(document, "index")));
+    }
+
+    /** And a map nests inside a map, on both tiers, since {@code container-def} now includes {@code map-def}. */
+    @Test
+    void aMapValueHoldingANestedMapRefersToTheInjectedInnerMap() {
+        SchemaDocument document = desugar("  index => {text => {text => integer; 1..}}");
+
+        SchemaMap.Declaration inner = onlyInjected(document, "map_text_integer");
+        assertEquals("{ key_type: text  value_type: integer  min_items: 1 }",
+                instanceBody(assertInstanceOf(Instance.class, inner.typeDef())));
+        assertEquals("{ key_type: text  value_type: " + inner.name() + " }",
+                instanceBody(instanceOf(document, "index")));
     }
 
     /**
@@ -461,7 +407,7 @@ class SchemaDesugarerTest {
      */
     @Test
     void nestingRecursesInnermostFirst() {
-        SchemaDocument document = desugarAgainstTheRealMetaKernel("  deep => [[[integer]]]");
+        SchemaDocument document = desugar("  deep => [[[integer]]]");
 
         SchemaMap.Declaration innermost = onlyInjected(document, "array_integer");
         SchemaMap.Declaration middle = onlyInjected(document, "array_array_integer");
@@ -470,8 +416,7 @@ class SchemaDesugarerTest {
         assertEquals("{ element_type: " + innermost.name() + " }",
                 instanceBody(assertInstanceOf(Instance.class, middle.typeDef())));
         assertEquals("{ element_type: " + middle.name() + " }",
-                instanceBody(assertInstanceOf(Instance.class,
-                        document.body().declarations().get("deep").typeDef())));
+                instanceBody(instanceOf(document, "deep")));
     }
 
     /**
@@ -481,7 +426,7 @@ class SchemaDesugarerTest {
      */
     @Test
     void twoNestedTuplesDifferingOnlyInPositionOptionalityGetSeparateDeclarations() {
-        SchemaDocument document = desugarAgainstTheRealMetaKernel("""
+        SchemaDocument document = desugar("""
                   strict  => [[integer, text], boolean]
                   relaxed => [[integer, text?], boolean]""");
 
@@ -498,61 +443,45 @@ class SchemaDesugarerTest {
     /** A nested position may carry its own {@code ?} as well, and that is the outer tuple's fact, not the inner's. */
     @Test
     void anOptionalPositionHoldingANestedFormKeepsItsOwnState() {
-        SchemaDocument document = desugarAgainstTheRealMetaKernel("  loose => [[integer, text]?, boolean]");
+        SchemaDocument document = desugar("  loose => [[integer, text]?, boolean]");
 
         SchemaMap.Declaration inner = onlyInjected(document, "tuple");
         assertEquals("[ { element_type: " + inner.name() + "  state: OPTIONAL } { element_type: boolean } ]",
-                tupleElements(assertInstanceOf(Instance.class,
-                        document.body().declarations().get("loose").typeDef())));
+                tupleElements(instanceOf(document, "loose")));
     }
 
     // ── The element `?` on an array (§5.3) ───────────────────────────────
-    //    `state: OPTIONAL` on the resolved array, bound *directly* rather than routed: `array`'s `state`
-    //    carries no value_param, which is §5.3's own reason the ? forms "have no template route".
+    //    `state: OPTIONAL` on the resolved array, bound directly alongside the bounds rather than routed
+    //    through anything: `[T?; 3]` states both at once and both land on one binding record.
 
-    /** {@code [T?]} writes the state; the unmarked form writes nothing and lets REQUIRED_DEFAULT supply it. */
     @Test
     void anOptionalElementStatesItsStateAndARequiredOneLetsTheDefaultSupplyIt() {
-        SchemaDocument document = desugarAgainstTheRealMetaKernel("""
+        SchemaDocument document = desugar("""
                   slots  => [integer?]
                   strict => [integer]""");
 
-        assertEquals("{ element_type: integer  state: OPTIONAL }", instanceBody(assertInstanceOf(
-                Instance.class, document.body().declarations().get("slots").typeDef())));
-        assertEquals("{ element_type: integer }", instanceBody(assertInstanceOf(
-                Instance.class, document.body().declarations().get("strict").typeDef())));
+        assertEquals("{ element_type: integer  state: OPTIONAL }", instanceBody(instanceOf(document, "slots")));
+        assertEquals("{ element_type: integer }", instanceBody(instanceOf(document, "strict")));
     }
 
-    /**
-     * The form §5.3 states the rule through: {@code [T?; 3]} puts the element state <em>and</em> both bounds
-     * on one binding record. It is representable only because a sized form closes by routing into the same
-     * {@code !array} construction rather than through an application ({@code SPEC-FEEDBACK.md} #45) -- an
-     * application's argument list has no channel for an element state (#49).
-     *
-     * <p>{@code state} precedes the bounds because the fields are emitted in {@code array}'s own vocabulary
-     * order, not in the order the call site listed them.
-     */
     @Test
     void anOptionalElementAndASizeLandOnOneBindingRecord() {
-        SchemaDocument document = desugarAgainstTheRealMetaKernel("  triple => [integer?; 3]");
-
         assertEquals("{ element_type: integer  state: OPTIONAL  min_items: 3  max_items: 3 }",
-                instanceBody(assertInstanceOf(Instance.class,
-                        document.body().declarations().get("triple").typeDef())));
+                instanceBody(instanceOf(desugar("  triple => [integer?; 3]"), "triple")));
     }
 
     /**
-     * The state reaches the derived name, for the reason {@link #tupleName} does: without it {@code [T?]} and
-     * {@code [T]} derive the same name and the second one written collapses onto the first one injected.
+     * The state reaches the derived name: without it {@code [T?]} and {@code [T]} derive the same name and the
+     * second one written collapses onto the first one injected.
      */
     @Test
     void twoNestedArraysDifferingOnlyInElementStateGetSeparateDeclarations() {
-        SchemaDocument document = desugarAgainstTheRealMetaKernel("""
+        SchemaDocument document = desugar("""
                   loose  => [[integer?; 3], text]
                   strict => [[integer; 3], text]""");
 
         List<SchemaMap.Declaration> injected = document.body().declarations().values().stream()
-                .filter(declaration -> declaration.name().startsWith("array_ranged_")).toList();
+                .filter(declaration -> declaration.name().startsWith("array_integer_")).toList();
         assertEquals(2, injected.size(), () -> "expected two injected arrays, got "
                 + injected.stream().map(SchemaMap.Declaration::name).toList());
         assertEquals("{ element_type: integer  state: OPTIONAL  min_items: 3  max_items: 3 }",
@@ -561,31 +490,76 @@ class SchemaDesugarerTest {
                 instanceBody(assertInstanceOf(Instance.class, injected.get(1).typeDef())));
     }
 
+    // ── Generic application heads (§3.3.1, §5.10) ────────────────────────
+
+    @Test
+    void aParameterizedDeclarationIsLeftEntirelyAlone() {
+        // A template's desugared structure is its recorded open form, and every nested form inside it becomes
+        // concrete only at materialisation -- so lifting one here would mint an entry for a template that may
+        // never be instantiated.
+        SchemaDocument document = parse("  box => <T> { v: [T] }");
+
+        assertSame(document, SchemaDesugarer.desugar(document, Set.of()));
+    }
+
     /**
-     * The check is narrow on purpose. A head naming nothing this document declares, and nothing in the
-     * structure namespace either, is an ordinary unresolved reference the linker reports over the whole
-     * schema -- so it stays this phase's business only to leave alone.
+     * A generic head resolves through the type-name namespace only, so an application can only ever be a
+     * §5.10 user-template application -- and substitution is unimplemented. Leaving it alone produced a schema
+     * that linked and compiled, then failed on the first read that reached the field, so it is rejected at the
+     * site that writes it.
      */
     @Test
+    void applyingALocallyDeclaredTemplateIsRejectedHere() {
+        UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
+                () -> desugar("""
+                          box => <T> { v: T }
+                          holder => { b: box<text> }"""));
+        assertTrue(thrown.getMessage().contains("'box' is a template"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("[T]"), "names the unbound parameters: " + thrown.getMessage());
+    }
+
+    /**
+     * An <em>imported</em> head is rejected the same way, which the old parameter-list-driven check could not
+     * do: this phase is handed only the imported names, so a template arriving by {@code !!import} used to slip
+     * through to a read-time failure.
+     */
+    @Test
+    void applyingAnImportedTemplateIsRejectedToo() {
+        UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
+                () -> desugar("  holder => { b: elsewhere<text> }", Set.of("elsewhere")));
+        assertTrue(thrown.getMessage().contains("'elsewhere' is a template"), thrown.getMessage());
+    }
+
+    /**
+     * The kernel's own container constructors are no longer reachable at a head. {@code map<text, integer>}
+     * resolves {@code map} in the type-name namespace, finds nothing, and stays an ordinary unresolved
+     * reference for the linker to report over the whole schema -- there is nothing here to apply.
+     */
+    @Test
+    void aKernelConstructorNameAtAHeadIsNoLongerAnApplication() {
+        SchemaDocument document = parse("  holder => { m: map<text, integer> }");
+
+        assertSame(document, SchemaDesugarer.desugar(document, Set.of()));
+    }
+
+    /** Applying arguments to a local declaration that takes none is the author's error, not a library gap. */
+    @Test
+    void applyingArgumentsToSomethingThatTakesNoneIsAnAuthorError() {
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> desugar("""
+                          plain => { a: text }
+                          holder => { b: plain<text> }"""));
+        assertTrue(thrown.getMessage().contains("declares no type parameters"), thrown.getMessage());
+    }
+
+    @Test
     void anUnknownHeadIsStillPassedThrough() {
-        SchemaDocument document = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
-                { holder => { b: nowhere<text> } }""").parseSchemaDocument();
+        SchemaDocument document = parse("  holder => { b: nowhere<text> }");
 
-        assertSame(document, SchemaDesugarer.desugar(document, META, Set.of()));
+        assertSame(document, SchemaDesugarer.desugar(document, Set.of()));
     }
 
-    /** {@link #desugar(String)} against the real meta-kernel entries, for the forms whose routing needs them. */
-    private static SchemaDocument desugarAgainstTheRealMetaKernel(String declarations) {
-        SchemaDocument document = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
-                {
-                %s
-                }
-                """.formatted(declarations)).parseSchemaDocument();
-        return SchemaDesugarer.desugar(document, MetaKernelBootstrapResolver.getMetaKernelSchema().entries(),
-                Set.of());
-    }
+    // ── Rendering helpers ────────────────────────────────────────────────
 
     /**
      * Renders a variadic {@code Instance}'s one collection-valued field as {@code [ { member: value  ... }
@@ -607,6 +581,15 @@ class SchemaDesugarerTest {
         return out.append(" ]").toString();
     }
 
+    /** Renders {@code !choice { variants: [...] }} as {@code { variants: [a b] }}. */
+    private static String variantsOf(Instance instance) {
+        var record = (io.ltr8.tson.compiler.ast.RecordValue) instance.value().coreValue();
+        var elements = (io.ltr8.tson.compiler.ast.ArrayValue) record.fields().get(0).value().value().coreValue();
+        return "{ variants: [" + elements.elements().stream()
+                .map(e -> ((io.ltr8.tson.compiler.ast.TokenValue) e.value().coreValue()).text())
+                .reduce((a, b) -> a + " " + b).orElse("") + "] }";
+    }
+
     /** Renders an {@code Instance}'s binding record as {@code { field: value  ... }} for readable assertions. */
     private static String instanceBody(Instance instance) {
         var record = (io.ltr8.tson.compiler.ast.RecordValue) instance.value().coreValue();
@@ -616,10 +599,5 @@ class SchemaDesugarerTest {
             out.append(' ').append(field.name()).append(": ").append(token.text()).append(' ');
         }
         return out.append('}').toString().replace("  }", " }");
-    }
-
-    /** Unused today; kept so a future stage asserting declaration order has the helper it needs. */
-    private static Map<String, SchemaMap.Declaration> ordered(SchemaDocument document) {
-        return new LinkedHashMap<>(document.body().declarations());
     }
 }

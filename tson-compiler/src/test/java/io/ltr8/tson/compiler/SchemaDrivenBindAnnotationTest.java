@@ -47,7 +47,7 @@ class SchemaDrivenBindAnnotationTest {
               rank => int32
               marker => void
               widget => { name: text }
-              catalogue => { entries: map<text, text> }
+              catalogue => { entries: {text => text} }
               basket => { items: [text] }
             }
             """;
@@ -160,7 +160,7 @@ class SchemaDrivenBindAnnotationTest {
 
     /**
      * A map whose <b>keys</b> are boxed. This is the shape schema documentation actually takes: a resolved
-     * schema is a {@code map<type_name, type_definition>}, and §6 binds an annotation written before a
+     * schema is a <code>{type_name =&gt; type_definition}</code>, and §6 binds an annotation written before a
      * declaration's name to that name -- which is the map's key. Recovering {@code @doc} on a declaration is
      * this, applied to that map; {@code TsonSchema.entries()} is exactly this type.
      */

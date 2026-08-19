@@ -9,10 +9,12 @@ package io.ltr8.tson.compiler.ast.schema;
 public record ElementType(Expr expr, boolean optional) {
 
     /**
-     * {@code container-def / type-ref} -- a nested bracket form (declaration-level syntax nests
-     * inside itself, §5.3: {@code [[T; N]; N]}) or an ordinary type-ref. A {@code type-ref}
-     * position, by contrast, never admits a nested {@link ContainerDef} -- only {@link
-     * InlineArrayRef}/{@link InlineTupleRef}'s narrower inline shapes.
+     * {@code container-def / type-ref} -- a nested declaration-level form (that syntax nests inside
+     * itself, §5.3: {@code [[T; N]; N]}, {@code {text => [order; 1..]}}) or an ordinary type-ref. Shared
+     * with {@link MapContainerDef}'s value position, whose {@code map-value} production is the same pair;
+     * only the enclosing {@code ?} is an array/tuple-position fact. A {@code type-ref} position, by
+     * contrast, never admits a nested {@link ContainerDef} -- only {@link InlineArrayRef}/{@link
+     * InlineMapRef}/{@link InlineTupleRef}'s narrower inline shapes.
      */
     public sealed interface Expr {
 

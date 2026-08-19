@@ -58,9 +58,10 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   and exit 70 apart). `source`
   validation additionally falls back to the governing meta's namespace (a `source` naming a constructor is
   one of §3.3.1's constructor roles); no other reference does. **The linker does not materialize anything** —
-  `SchemaDesugarer` already turned every application into a real declaration, one phase earlier and in the
-  module that can bind a constructor generically. The only argument-bearing `type_ref` it ever sees is a
-  parameterized declaration's reference to its own parameter (`array<T>`), which is validated, not rewritten.
+  `SchemaDesugarer` already turned every sugar form into a real declaration, one phase earlier and in the
+  module that can bind a constructor generically. The only argument-bearing `type_ref` it ever sees is inside
+  a template declaration, which the desugar phase passes through whole (`box<T>` in `box`'s own body), and
+  which is validated, not rewritten.
   - **`entryOrigins` is on `TsonLinkedSchema`, not on `TsonSchema` or `TypeDefinition`**, because it is a
     fact *linking* establishes rather than part of the resolved schema value §9 defines — and because
     `schema.meta` is a bind target with a hand-written `equals` and the `@Record` constructor-selection trap,

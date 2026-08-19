@@ -94,12 +94,12 @@ class MetaSchemaImportTest {
         TsonSchemaRegistry registry = new TsonSchemaRegistry();
 
         TsonSchema meta = parseMetaTn1(registry);
-        // 31 written declarations plus one the desugar phase hoists: meta.tn's `within`/`excluding` fields
-        // are `[value]`, which becomes an `array<value>` instance declaration -- one entry for all eight
-        // occurrences, since identical applications share a name. Its sibling sugar `[type_name]` adds
-        // nothing here, because the meta-kernel already declares that same application and an import in
-        // scope is referenced rather than redeclared.
-        assertEquals(32, meta.entries().size(), "expected every meta.tn1 declaration to resolve");
+        // 30 written declarations plus one the desugar phase hoists: meta.tn's `within`/`excluding` fields
+        // are `[value]`, which becomes an `!array { element_type: value }` declaration -- one entry for all
+        // eight occurrences, since identical forms share a name. Its sibling sugar `[type_name]` adds
+        // nothing here, because the meta-kernel already declares that same form and an import in scope is
+        // referenced rather than redeclared.
+        assertEquals(31, meta.entries().size(), "expected every meta.tn declaration to resolve");
 
         TsonLinkedSchema registered = registry.register(TsonSchemaLinker.link(meta, registry));
 

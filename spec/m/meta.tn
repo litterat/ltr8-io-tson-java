@@ -1,6 +1,6 @@
-!!id:"https://tson.io/2026/32/m/meta.tn?sha256=983ad4da2ddf5b70b37da4af45e964290d24e6942776ef281c1e0d5942b46b07"
-!!meta:"https://tson.io/2026/32/m/meta-kernel.tn?sha256=093472adaba914ef5b16408713683b0f836309b0217bc69250bfeae0fc8f383f"
-!!import:"https://tson.io/2026/32/m/meta-kernel.tn?sha256=093472adaba914ef5b16408713683b0f836309b0217bc69250bfeae0fc8f383f"
+!!id:"https://tson.io/2026/32/m/meta.tn?sha256=155269f4cbea13f7534da6f3593482df65201b1ac68d35bb9d5913fab052f529"
+!!meta:"https://tson.io/2026/32/m/meta-kernel.tn?sha256=2088a157686cfcc4bc30b5e633eab32fd36f64eec88a2533dabcc58b4687feed"
+!!import:"https://tson.io/2026/32/m/meta-kernel.tn?sha256=2088a157686cfcc4bc30b5e633eab32fd36f64eec88a2533dabcc58b4687feed"
 @doc:"""
   TSON meta-schema — 2026 Revision 32 draft.
 
@@ -19,7 +19,9 @@
   Three families of constructors live here:
 
   1. Structural constructors: `binary` (with `binary_encoding` enum)
-     and `extern`.
+     and `extern`. Fixed-size arrays need no constructor of their own —
+     `[T; N]` is the spelling, and an intent that deserves a name earns
+     a user template.
 
   2. The `unknown_type` sum constructor whose instance in core is the
      universal `unknown` sum.
@@ -84,14 +86,6 @@
     universe of types. Distinct from absent and from the unit type.
     """
   unknown_type => ~sum & {}
-
-  @doc:"""
-    Fixed-size array constructor.
-    """
-  vector => <T, S> ~array<T> ^ {
-    min_items: = S
-    max_items: = S
-  }
 
   @doc:"""
     IEEE 754-2019 interchange formats, both radices. Selects the

@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/32/m/meta-kernel.tn?sha256=093472adaba914ef5b16408713683b0f836309b0217bc69250bfeae0fc8f383f"
+!!id:"https://tson.io/2026/32/m/meta-kernel.tn?sha256=2088a157686cfcc4bc30b5e633eab32fd36f64eec88a2533dabcc58b4687feed"
 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 32 draft).
@@ -6,7 +6,7 @@
   The root of the schema ladder, written in the Part 2 schema grammar:
   a braced schema map of `name => definition` declarations, one entry
   per type, resolving to the kernel's own `schema` type
-  (`map<type_name, type_definition>`).
+  (`{type_name => type_definition}`).
 
   The `!!meta` directive names this file itself — the one deliberate
   circularity in the series, closed by pre-loading rather than by
@@ -195,9 +195,11 @@
     `name` directly, and a braced record is the explicit form,
     canonical only when `arguments` is present.
 
-    Applications of constructors are carried structurally and
-    materialise no entries. A fully-bound application of a
-    non-constructor template materialises an entry: the applied
+    Inline sugar forms are carried structurally and materialise no
+    entries; their positional `arguments` take their meaning from
+    the desugar table ([TSON-SCHEMA] §5.3), so an inline
+    constructor argument is always a type reference. A fully-bound
+    application of a template materialises an entry: the applied
     form is recorded in the entry's `source`, the substituted
     binding record becomes its body headed by the nearest `~`
     constructor, and the entry's name is internal —
@@ -221,9 +223,12 @@
     literal. `value` holds concrete literals only, so the
     reference/literal split is structural and value-typed tokens
     (enum members) are never ambiguous with parameter names. The
-    group is REQUIRED: exactly one member is present. Deliberately
-    no positional form — a bare token cannot self-classify as
-    reference or literal, so the braced record is load-bearing.
+    split is needed for template applications only — an inline
+    sugar form's arguments are always references ([TSON-SCHEMA]
+    §5.3). The group is REQUIRED: exactly one member is present.
+    Deliberately no positional form — a bare token cannot
+    self-classify as reference or literal, so the braced record is
+    load-bearing.
     """
   type_argument => {
     ( name: type_ref | value: value )
@@ -305,10 +310,10 @@
     supertypes:      [type_name]?
   }
 
-  array => <T> ~product & {
+  array => ~product & {
     access_pattern:  product_access_type = INDEX
     size_type:       product_size_type = VARIABLE
-    element_type:    type_ref = T
+    element_type:    type_ref
     state:           element_state ~ REQUIRED
     unordered:       boolean ~ false
     unique_items:    boolean ~ false
@@ -316,37 +321,17 @@
     max_items:       integer?
   }
 
-  set => <T> ~array<T> ^ {
+  set => ~array ^ {
     state:        = REQUIRED
     unordered:    = true
     unique_items: = true
   }
 
-  @doc:"""
-    Size-refinement templates — the desugar targets of the array
-    size-specifier sugar ([TSON-SCHEMA] §5.3): `[T; N..]` is
-    array_min<T, N>, `[T; ..M]` is array_max<T, M>, and `[T; N..M]`
-    and the exact form `[T; N]` are array_ranged<T, N, M> and
-    array_ranged<T, N, N>.
-    """
-  array_min => <T, MIN> array<T> ^ {
-    min_items: = MIN
-  }
-
-  array_max => <T, MAX> array<T> ^ {
-    max_items: = MAX
-  }
-
-  array_ranged => <T, MIN, MAX> array<T> ^ {
-    min_items: = MIN
-    max_items: = MAX
-  }
-
-  map => <K, V> ~product & {
+  map => ~product & {
     access_pattern:  product_access_type = NAMED
     size_type:       product_size_type = VARIABLE
-    key_type:        type_ref = K
-    value_type:      type_ref = V
+    key_type:        type_ref
+    value_type:      type_ref
     min_items:       integer?
     max_items:       integer?
   }
@@ -357,8 +342,15 @@
     elements:        [tuple_element]
   }
 
+  @doc:"""
+    A named entry rather than an inline form, because `!` constructor
+    applications remain prohibited at field positions
+    ([TSON-SCHEMA] §5.2) and `set` has no sugar of its own.
+    """
+  token_set => !set { element_type: token }
+
   enum => ~atom & {
-    members: set<token>
+    members: token_set
   }
 
   choice => ~sum & {
@@ -385,5 +377,5 @@
     body:         top
   }
 
-  schema => map<type_name, type_definition>
+  schema => {type_name => type_definition}
 }

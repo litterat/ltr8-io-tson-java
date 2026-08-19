@@ -216,27 +216,30 @@ validation. `extends TsonDataParser` (same package) because §12.1 imports Part 
 Two entry points: `parseSchemaDocument()` is fail-fast, `parseSchemaDocument(receiver)` reports each
 declaration's syntax error and resyncs to the next.
 Three spec defects are implemented per intent with `SPEC-FEEDBACK.md` entries (#14/#15/#16); the bracket
-form is parsed twice per the spec's own overlapping productions (#31).
+form is parsed twice per the spec's own overlapping productions (#31), and the `{K => V}` map sugar twice
+alongside it. A `{` at a type position dispatches by consuming one token and inspecting — Part 1 §2.8's
+record/map idiom, imported wholesale — and `{` is a map and only a map everywhere except type-def position,
+since a bare record body is not spellable at a type position (§5.2). One consequence of the dispatch's
+lookahead budget is `SPEC-FEEDBACK.md` #52.
 
 ### Desugaring (`.../resolver/SchemaDesugarer.java`) — `docs/schema-grammar-and-desugaring.md`
 
-An AST→AST rewrite between parsing and resolution: every sugar form (`[T]`, `[T; N..M]`, `(A | B)`) and
-every generic application (`map<K, V>`) becomes a `!C value` construction — at declaration position it *is*
-one; anywhere else it becomes an injected declaration plus a bare reference (**a deliberate divergence** from
-§8.2's carried-structurally rule, argued as spec feedback rather than tracked as debt — the structural
-`type_argument` channel cannot carry an element state or, once `SPEC-FEEDBACK.md` #45 lands, a size;
-`SPEC-FEEDBACK.md` #50/#51 have the account). So `DefinitionResolver` only ever sees a bare reference or
-`!C value`. Routing is vocabulary-derived off the governing meta (which
-is why the phase runs with the meta in hand), with a hand-written table for meta-kernel's own bootstrap;
-`choice`/`tuple` take a variadic second path; a *partial* application — §5.3's size templates, whose
-parameters occupy labelled value channels only — closes by routing into a construction of its constructor
-rather than materialising an entry (`SPEC-FEEDBACK.md` #45; record templates are rejected — real §5.10
-substitution is unimplemented). §5.3's element/position `?` binds `state` *directly* — it has no parameter to
-route through, which is why §5.3 gives those forms no template route — so `[T?; 3]` puts a state and both
-bounds on one binding record. §5.3's declaration-level container syntax is complete.
-Bottom-up, so nesting needs no special case; injected names are `head_args_hash`, so structurally identical
-applications collapse. Invalid sugar forms report per declaration via `DesugarFailureReporter` rather than
-throwing.
+An AST→AST rewrite between parsing and resolution: every sugar form — `[T]` and the sized forms, `[T, U]`,
+`{K => V}`, `(A | B)` — becomes the `!C value` construction it denotes, at declaration position simply *being*
+one and anywhere else becoming an injected declaration plus a bare reference (**a deliberate divergence** from
+§8.2's carried-structurally rule; `SPEC-FEEDBACK.md` #49/#50/#51 have the account, and
+`spec/tson-cr-structure-templates.md` D8 supersedes it by prohibition — not yet landed, since it is one change
+with the compiler building readers from structural inline refs). So `DefinitionResolver` only ever sees a bare
+reference or `!C value`. **The phase is purely syntactic and consults no governing meta**: the sugar set is
+closed, so the head each form desugars to and the vocabulary field each argument fills are a fixed table —
+which is also why meta-kernel's bootstrap needs no hand-written routing of its own. §5.3's element/position
+`?` binds `state` directly (`[T?; 3]` puts a state and both bounds on one binding record), and the size
+specifier binds the `min_items`/`max_items` pair directly for arrays and maps alike, with no size template in
+between. §5.3's declaration-level container syntax is complete. Bottom-up, so nesting needs no special case;
+an injected name derives from the *resolved binding record*, so `[T; 3]` and `[T; 3..3]` land on one entry. A
+generic application can only be a §5.10 user-template application (§3.3.1 resolves heads in the type-name
+namespace only), and applying one is rejected at the site that writes it, an imported head included. Invalid
+sugar forms report per declaration via `DesugarFailureReporter` rather than throwing.
 
 ### Schema resolution (`.../resolver/`) — `docs/schema-resolution.md`
 
@@ -257,9 +260,10 @@ check". The exception-classification policy under Conventions governs every reje
 
 Meta-kernel's `!!meta` names itself (§1.5's one deliberate circularity), so ordinary resolution can't
 bootstrap it. `getMetaKernelSchema()` resolves it in **two passes** (non-`Instance` declarations first,
-deferred `Instance` declarations second) with a closed `instanceBody` switch instead of a compiled reader,
-and `BOOTSTRAP_CONSTRUCTORS` hand-writes the desugar routing for the three constructors meta-kernel applies
-to itself. The payoff: meta-kernel's linked form needs no materialization.
+deferred `Instance` declarations second) with a closed `instanceBody` switch instead of a compiled reader.
+Desugaring needs no special case: the table is fixed by the sugar forms, so the phase consults no governing
+meta — which here would have been the very entries this class is producing. The payoff: meta-kernel's linked
+form needs no materialization.
 
 ### Registry and linking (`TsonSchemaLinker`, `tson-schema/.../registry/`) — `docs/linking-and-compilation.md`
 
@@ -488,11 +492,11 @@ compatibility).
   of those throws are gaps at all: the rest are schema-author errors, or internal faults, wearing the
   wrong exception type. Six of the nine have since been reclassified rather than implemented; the
   composition path in particular turned out to be one real gap, not the five the backlog listed.
-- **§5.10 parameter substitution into a template *body*** — the only template form left. A *partial*
-  application (`array_ranged`, and so §5.3's sized sugar) closes by routing its arguments into its
-  constructor's vocabulary and needs no substitution; a *structural* template (`box => <T> { v: T }`), whose
-  parameter is a field type, needs real substitution and is rejected at the application site instead.
-  `BACKLOG.md` has the shape of the remaining work.
+- **§5.10 parameter substitution** — a generic application is now *only* ever a user-template application
+  (§3.3.1 resolves heads in the type-name namespace only), and applying one is rejected at the site that
+  writes it, whether the template is local or imported. `spec/tson-cr-structure-templates.md`'s Tranche B is
+  the full design — open-form recording with `value_form`, materialisation as an innermost-out synthesis
+  cascade, knot-tying through synthetic entries — and `BACKLOG.md` carries the remaining work.
 - **Undocumented atom constructors** — `unknown` (and `extern`, which has no core.tn declaration) has no
   compiled-parser factory, so it compiles to `ErrorReader` (a schema merely *declaring* one still compiles).
   Neither is an ordinary missing parser waiting to be written: `extern` is a whole absent mechanism and `unknown`

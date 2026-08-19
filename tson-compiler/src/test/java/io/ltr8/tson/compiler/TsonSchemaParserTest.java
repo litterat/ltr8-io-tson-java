@@ -8,8 +8,11 @@ import io.ltr8.tson.compiler.ast.schema.ContainerTypeDef;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
 import io.ltr8.tson.compiler.ast.schema.GenericRef;
 import io.ltr8.tson.compiler.ast.schema.GroupDef;
+import io.ltr8.tson.compiler.ast.schema.ElementType;
 import io.ltr8.tson.compiler.ast.schema.InlineArrayRef;
+import io.ltr8.tson.compiler.ast.schema.InlineMapRef;
 import io.ltr8.tson.compiler.ast.schema.Instance;
+import io.ltr8.tson.compiler.ast.schema.MapContainerDef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.RefinedDef;
 import io.ltr8.tson.compiler.ast.schema.ReferenceTypeDef;
@@ -39,6 +42,12 @@ class TsonSchemaParserTest {
 
     private static SchemaDocument parse(String source) {
         return new TsonSchemaParser(source).parseSchemaDocument();
+    }
+
+    /** The {@link MapContainerDef} one declaration's body is, for the map-grammar fixtures. */
+    private static MapContainerDef mapOf(String declaration) {
+        ContainerTypeDef container = assertInstanceOf(ContainerTypeDef.class, declOf(declaration).typeDef());
+        return assertInstanceOf(MapContainerDef.class, container.container());
     }
 
     // ── Header (§2.1, §2.2) ──────────────────────────────────────────────
@@ -220,7 +229,7 @@ class TsonSchemaParserTest {
         ContainerTypeDef container = assertInstanceOf(ContainerTypeDef.class, def);
         ArrayContainerDef array = assertInstanceOf(ArrayContainerDef.class, container.container());
         assertEquals(new SimpleRef("integer"),
-                ((io.ltr8.tson.compiler.ast.schema.ElementType.Expr.Plain) array.elementType().expr()).typeRef());
+                ((ElementType.Expr.Plain) array.elementType().expr()).typeRef());
         assertEquals(new SizeSpec.Min("1"), array.size().orElseThrow());
     }
 
@@ -238,6 +247,135 @@ class TsonSchemaParserTest {
         ReferenceTypeDef ref = assertInstanceOf(ReferenceTypeDef.class, def);
         ChoiceRef choice = assertInstanceOf(ChoiceRef.class, ref.ref());
         assertEquals(List.of(new SimpleRef("email"), new SimpleRef("phone"), new SimpleRef("address")), choice.variants());
+    }
+
+    // ── The map sugar and §12.2's brace dispatch (§5.3, D1/D2) ───────────
+    //    A '{' at a type position opens either a record body or a map type, decided by consuming it and
+    //    inspecting one more token. Every row of §12.2's dispatch matrix is here.
+
+    @Test
+    void declarationLevelMap() {
+        MapContainerDef map = mapOf("translations => {text => text}");
+        assertEquals(new SimpleRef("text"), map.keyType());
+        assertEquals(new SimpleRef("text"), ((ElementType.Expr.Plain) map.valueType()).typeRef());
+        assertTrue(map.size().isEmpty());
+    }
+
+    @Test
+    void declarationLevelMapWithSize() {
+        MapContainerDef map = mapOf("index => {text => order; 1..5}");
+        assertEquals(new SizeSpec.Ranged("1", "5"), map.size().orElseThrow());
+    }
+
+    /** The open-ended {@code N..} form runs up against the map's own closing brace, not a bracket. */
+    @Test
+    void anOpenEndedMapSizeBoundClosesOnTheBrace() {
+        assertEquals(new SizeSpec.Min("1"), mapOf("index => {text => order; 1..}").size().orElseThrow());
+    }
+
+    /** A generic key consumes its own argument list before the {@code =>} the dispatch committed on. */
+    @Test
+    void aGenericKeyIsStillAMap() {
+        MapContainerDef map = mapOf("index => { pair<text> => integer }");
+        assertEquals(new GenericRef("pair", List.of(new TypeArg.Ref(new SimpleRef("text")))), map.keyType());
+    }
+
+    /** {@code map-value = container-def / type-ref}, so the declaration-level tier nests inside a map value. */
+    @Test
+    void aMapValueMayNestADeclarationLevelForm() {
+        MapContainerDef map = mapOf("index => {text => [order; 1..]}");
+        ArrayContainerDef nested = assertInstanceOf(ArrayContainerDef.class,
+                ((ElementType.Expr.Nested) map.valueType()).container());
+        assertEquals(new SizeSpec.Min("1"), nested.size().orElseThrow());
+    }
+
+    @Test
+    void aMapValueMayNestAnotherMap() {
+        MapContainerDef map = mapOf("index => {text => {text => integer}}");
+        assertInstanceOf(MapContainerDef.class, ((ElementType.Expr.Nested) map.valueType()).container());
+    }
+
+    @Test
+    void anInlineMapAtAFieldPosition() {
+        FieldDef field = (FieldDef) ((RecordDef) ((StructuralTypeDef)
+                declOf("holder => { entries: {text => integer} }").typeDef()).body()).entries().get(0);
+        InlineMapRef map = assertInstanceOf(InlineMapRef.class, field.type().orElseThrow().typeRef());
+        assertEquals(new SimpleRef("text"), map.keyType());
+        assertEquals(new SimpleRef("integer"), map.valueType());
+    }
+
+    /** Every brace that is not {@code name "=>"} or {@code name "<"} commits to a record, {@code {}} included. */
+    @Test
+    void everyOtherBraceShapeCommitsToARecord() {
+        assertInstanceOf(StructuralTypeDef.class, declOf("empty => {}").typeDef());
+        assertInstanceOf(StructuralTypeDef.class, declOf("plain => { a: text }").typeDef());
+        assertInstanceOf(StructuralTypeDef.class, declOf("grouped => { ( a: text | b: integer ) }").typeDef());
+        assertInstanceOf(StructuralTypeDef.class, declOf("annotated => { @doc:\"x\" a: text }").typeDef());
+    }
+
+    /**
+     * A record body stays a record body wherever the grammar already fixed one -- a refinement body, a
+     * composition tail, a constructor vocabulary -- so {@code =>} there is an error rather than a map, and
+     * the diagnostic says which of the two constructs {@code =>} belongs to.
+     */
+    @Test
+    void aMapArrowInARecordBodyNamesTheConstructRatherThanTheToken() {
+        TsonParseException thrown = assertThrows(TsonParseException.class, () -> parse("""
+                !!meta:"https://tson.io/2026/32/m/meta.tn"
+                { config => base ^ {text => text} }"""));
+        assertTrue(thrown.getMessage().contains("'=>' begins a map type only where a type is expected"),
+                thrown.getMessage());
+    }
+
+    /** A map <em>type</em> has one key type and one value type; the data grammar's multi-entry habit is named. */
+    @Test
+    void aSecondMapEntryIsNamedAsTheSingleEntryRuleRatherThanAnUnexpectedToken() {
+        TsonParseException thrown = assertThrows(TsonParseException.class, () -> parse("""
+                !!meta:"https://tson.io/2026/32/m/meta.tn"
+                { m => {text => integer  integer => text} }"""));
+        assertTrue(thrown.getMessage().contains("a map type is a single 'key => value' entry"),
+                thrown.getMessage());
+    }
+
+    /** At a type-ref position the two brace meanings are distinguished by name: a bare record must be declared. */
+    @Test
+    void aBareRecordAtATypeRefPositionDistinguishesTheTwoBraceMeanings() {
+        TsonParseException thrown = assertThrows(TsonParseException.class, () -> parse("""
+                !!meta:"https://tson.io/2026/32/m/meta.tn"
+                { holder => { inner: {name: text} } }"""));
+        assertTrue(thrown.getMessage().contains("opens the map sugar"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("record body is not permitted"), thrown.getMessage());
+    }
+
+    /**
+     * Neither side of the {@code =>} admits {@code ?}: a map declares no element state (§5.3). The value
+     * side, and a <em>generic</em> key, reach that rule; a plain-name key marked {@code ?} never does, because
+     * §12.2's dispatch has already committed the brace to a record by the time the {@code ?} is read -- see
+     * {@link #aQuestionMarkOnAPlainMapKeyIsAnsweredByTheBraceDispatch}.
+     */
+    @Test
+    void aQuestionMarkOnAMapTypeIsAParseError() {
+        for (String body : List.of("{text => integer?}", "{pair<text>? => integer}")) {
+            TsonParseException thrown = assertThrows(TsonParseException.class, () -> parse("""
+                    !!meta:"https://tson.io/2026/32/m/meta.tn"
+                    { m => %s }""".formatted(body)), body);
+            assertTrue(thrown.getMessage().contains("not permitted on a map type's"), thrown.getMessage());
+        }
+    }
+
+    /**
+     * {@code {text? => integer}} is rejected, but as a <b>record</b>: {@code text} followed by anything that
+     * is not {@code =>} or {@code <} commits the brace to a record body, and the {@code ?} is then a field
+     * name missing its {@code :}. Pinned because it is the one place the dispatch's answer and the author's
+     * intent visibly diverge, and closing it would cost a third token of lookahead ({@code SPEC-FEEDBACK.md}
+     * #52).
+     */
+    @Test
+    void aQuestionMarkOnAPlainMapKeyIsAnsweredByTheBraceDispatch() {
+        TsonParseException thrown = assertThrows(TsonParseException.class, () -> parse("""
+                !!meta:"https://tson.io/2026/32/m/meta.tn"
+                { m => {text? => integer} }"""));
+        assertTrue(thrown.getMessage().contains("a record field's ':'"), thrown.getMessage());
     }
 
     @Test
@@ -359,6 +497,13 @@ class TsonSchemaParserTest {
     }
 
     @Test
+    void anInlineMapSizeSpecifierIsAParseError() {
+        assertThrows(TsonParseException.class, () -> parse("""
+                !!meta:"https://tson.io/2026/32/m/meta.tn1"
+                { a => { x: {text => integer; 1} } }"""));
+    }
+
+    @Test
     void inlineElementOptionalityIsAParseError() {
         assertThrows(TsonParseException.class, () -> parse("""
                 !!meta:"https://tson.io/2026/32/m/meta.tn1"
@@ -429,7 +574,7 @@ class TsonSchemaParserTest {
     @Test
     void metaKernelParses() throws IOException {
         SchemaDocument doc = parse(readFixture("meta-kernel.tn"));
-        assertEquals(49, doc.body().declarations().size());
+        assertEquals(47, doc.body().declarations().size());
     }
 
     @Test

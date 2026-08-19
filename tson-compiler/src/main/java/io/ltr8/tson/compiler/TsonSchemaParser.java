@@ -15,8 +15,10 @@ import io.ltr8.tson.compiler.ast.schema.FieldDef;
 import io.ltr8.tson.compiler.ast.schema.GenericRef;
 import io.ltr8.tson.compiler.ast.schema.GroupDef;
 import io.ltr8.tson.compiler.ast.schema.InlineArrayRef;
+import io.ltr8.tson.compiler.ast.schema.InlineMapRef;
 import io.ltr8.tson.compiler.ast.schema.InlineTupleRef;
 import io.ltr8.tson.compiler.ast.schema.Instance;
+import io.ltr8.tson.compiler.ast.schema.MapContainerDef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.RecordEntry;
 import io.ltr8.tson.compiler.ast.schema.ReferenceTypeDef;
@@ -287,7 +289,7 @@ public final class TsonSchemaParser extends TsonDataParser {
             return new StructuralTypeDef(typeParams, true, parseMandatoryStructuralDef());
         }
         if (check(TokenType.LBRACE)) {
-            return new StructuralTypeDef(typeParams, false, parseRecordDef());
+            return braceTypeDef(typeParams);
         }
         if (check(TokenType.LPAREN)) {
             return new ReferenceTypeDef(typeParams, parseTypeRef());
@@ -325,6 +327,42 @@ public final class TsonSchemaParser extends TsonDataParser {
             return parseConstructionDefContinuation(head);
         }
         throw parseError("expected '^', '&', '-', or a record body after '~' (constructor marker)");
+    }
+
+    /**
+     * §12.2's brace dispatch at a type-def position, where a {@code '{'} opens either a record body or the
+     * map sugar. The token is consumed and the decision made on what follows -- the consume-one-then-inspect
+     * idiom [TSON-DATA] §2.8 already fixes for the data grammar's own brace, within the same budget of one
+     * consumed token plus one of lookahead. {@code '}'} (the empty record, {@code top}'s shape), {@code '('}
+     * (a leading field group) and {@code '@'} (§6 annotations, which the map sugar admits nowhere inside its
+     * braces) commit to a record; a name followed by {@code '=>'}, or by {@code '<'} opening a generic key's
+     * arguments, commits to a map. A name followed by anything else is a record whose field is missing its
+     * {@code ':'}, and {@link #parseFieldDef} names it as one.
+     */
+    private TypeDef braceTypeDef(List<String> typeParams) {
+        expect(TokenType.LBRACE, "a record body's or map type's opening '{'");
+        if (braceOpensMap()) {
+            return new ContainerTypeDef(typeParams, parseMapDefBody());
+        }
+        return new StructuralTypeDef(typeParams, false, parseRecordBody());
+    }
+
+    /** The dispatch decision itself, with the {@code '{'} already consumed -- see {@link #braceTypeDef}. */
+    private boolean braceOpensMap() {
+        return check(TokenType.UNQUOTED)
+                && (peekSecond().type() == TokenType.MAP_ARROW || peekSecond().type() == TokenType.LESS_THAN);
+    }
+
+    /**
+     * The two brace meanings, distinguished (§12.2). Everywhere except a type-def position a {@code '{'} opens
+     * the map sugar and nothing else: a bare record body is not spellable at a type position (§5.2), so a
+     * field name behind the brace is answered by saying which of the two constructs the author reached for.
+     */
+    private void requireMapBrace() {
+        if (!braceOpensMap()) {
+            throw parseError("'{' here opens the map sugar '{K => V}'; a record body is not permitted at a "
+                    + "type position (§5.2), so declare a named record type and reference it by name");
+        }
     }
 
     private TypeDef parseAtomRefinementOrInstance() {
@@ -404,6 +442,14 @@ public final class TsonSchemaParser extends TsonDataParser {
 
     private RecordDef parseRecordDef() {
         expect(TokenType.LBRACE, "a record body's opening '{'");
+        return parseRecordBody();
+    }
+
+    /**
+     * {@link #parseRecordDef} past its opening {@code '{'} -- {@link #braceTypeDef} consumes that token
+     * before it knows which construct it opened.
+     */
+    private RecordDef parseRecordBody() {
         List<RecordEntry> entries = new ArrayList<>();
         if (!check(TokenType.RBRACE)) {
             entries.add(parseRecordEntry());
@@ -425,6 +471,11 @@ public final class TsonSchemaParser extends TsonDataParser {
 
     private FieldDef parseFieldDef(List<Annotation> annotations) {
         Token name = expectFieldNameToken("a record field name");
+        if (check(TokenType.MAP_ARROW)) {
+            throw parseError("a record body's entries are 'name: type'; '=>' begins a map type only where a "
+                    + "type is expected (§12.2), not in a refinement body, a composition tail or a "
+                    + "constructor vocabulary");
+        }
         expect(TokenType.COLON, "a record field's ':'");
 
         Optional<FieldDef.FieldType> type = Optional.empty();
@@ -506,6 +557,9 @@ public final class TsonSchemaParser extends TsonDataParser {
         if (check(TokenType.LBRACKET)) {
             return parseInlineArrayOrTuple();
         }
+        if (check(TokenType.LBRACE)) {
+            return parseInlineMap();
+        }
         if (check(TokenType.BANG)) {
             throw parseError("an atom refinement or constructor application is not permitted at a type-ref "
                     + "position (§5.3); declare a named type instead (e.g. 'quantity_t => !integer ^ { min: 1 }') "
@@ -567,6 +621,61 @@ public final class TsonSchemaParser extends TsonDataParser {
         return ref;
     }
 
+    /**
+     * {@code inline-map = "{" ws map-key ws "=>" ws type-ref ws "}"} (§12.1) -- the map sugar at an inline
+     * type-ref position. The declaration-level-only syntax the {@link MapContainerDef} tier admits (a size
+     * specifier) is rejected here the way {@link #parseInlineElement} rejects the array tier's.
+     */
+    private TypeRef parseInlineMap() {
+        expect(TokenType.LBRACE, "an inline map type's opening '{'");
+        requireMapBrace();
+        TypeRef key = parseMapKey();
+        expect(TokenType.MAP_ARROW, "a map type's '=>'");
+        TypeRef value = parseTypeRef();
+        rejectMapQuestion("value");
+        if (check(TokenType.SEMICOLON)) {
+            throw parseError("a size specifier is not permitted at an inline type-ref position (§5.3); "
+                    + "declare a named type instead (e.g. 'foo => {K => V; N}') and reference it by name");
+        }
+        requireMapClose();
+        expect(TokenType.RBRACE, "a map type's closing '}'");
+        return new InlineMapRef(key, value);
+    }
+
+    /**
+     * {@code map-key = type-name ["<" type-args ">"]} (§12.1) -- a plain reference, optionally carrying type
+     * arguments, and never a bracket or paren form. That restriction is what holds {@link #braceOpensMap}'s
+     * record/map decision to two tokens; a composite key type earns a named declaration instead.
+     */
+    private TypeRef parseMapKey() {
+        TypeRef key = parseTypeRefHead();
+        rejectMapQuestion("key");
+        return key;
+    }
+
+    /**
+     * Neither side of the map sugar's {@code '=>'} admits {@code ?} (§5.3): {@code map} declares no {@code
+     * state} field for one to bind, and an absent key is already a data-grammar error.
+     */
+    private void rejectMapQuestion(String side) {
+        if (check(TokenType.QUESTION)) {
+            throw parseError("'?' is not permitted on a map type's " + side + " (§5.3); a map has no element "
+                    + "state to mark optional");
+        }
+    }
+
+    /**
+     * The single-entry rule (§5.3): a map <em>type</em> carries one key type and one value type, mirroring the
+     * data notation's shape rather than its arity. A second entry -- the habit the data grammar's multi-entry
+     * {@code {k => v  k2 => v2}} teaches -- is named as one rather than reported as an unexpected token.
+     */
+    private void requireMapClose() {
+        if (!check(TokenType.RBRACE)) {
+            throw parseError("a map type is a single 'key => value' entry (§5.3), however many entries a map "
+                    + "value may hold; found " + describe(peek()));
+        }
+    }
+
     private List<TypeArg> parseTypeArgs() {
         List<TypeArg> args = new ArrayList<>();
         args.add(parseTypeArg());
@@ -604,6 +713,9 @@ public final class TsonSchemaParser extends TsonDataParser {
         if (t.type() == TokenType.LBRACKET) {
             return new TypeArg.Ref(parseInlineArrayOrTuple());
         }
+        if (t.type() == TokenType.LBRACE) {
+            return new TypeArg.Ref(parseInlineMap());
+        }
         if (t.type() == TokenType.ABSENT) {
             throw parseError("the absent sentinel '_' is not valid in a type argument position (§7.6)");
         }
@@ -613,11 +725,16 @@ public final class TsonSchemaParser extends TsonDataParser {
     // ── Declaration-Level Container Forms (§5.3, §12.1) ──────────────────
 
     private ContainerDef parseContainerDef() {
+        if (check(TokenType.LBRACE)) {
+            advance();
+            requireMapBrace();
+            return parseMapDefBody();
+        }
         expect(TokenType.LBRACKET, "an array or tuple type's opening '['");
         ElementType first = parseElementType();
         if (check(TokenType.SEMICOLON)) {
             advance();
-            SizeSpec size = parseSizeSpec();
+            SizeSpec size = parseSizeSpec(TokenType.RBRACKET);
             expect(TokenType.RBRACKET, "an array type's closing ']'");
             return new ArrayContainerDef(first, Optional.of(size));
         }
@@ -633,15 +750,54 @@ public final class TsonSchemaParser extends TsonDataParser {
         return new TupleContainerDef(elements);
     }
 
+    /**
+     * {@code map-def} past its opening {@code '{'} (§12.1): one {@code key => value} entry, an optional size
+     * specifier after {@code ';'}, and the closing brace. The size specifier is the array tier's own, under
+     * the same grammar and the same {@code N <= M} coherence rule (§5.3).
+     */
+    private MapContainerDef parseMapDefBody() {
+        TypeRef key = parseMapKey();
+        expect(TokenType.MAP_ARROW, "a map type's '=>'");
+        ElementType.Expr value = parseMapValue();
+        Optional<SizeSpec> size = Optional.empty();
+        if (check(TokenType.SEMICOLON)) {
+            advance();
+            size = Optional.of(parseSizeSpec(TokenType.RBRACE));
+        }
+        requireMapClose();
+        expect(TokenType.RBRACE, "a map type's closing '}'");
+        return new MapContainerDef(key, value, size);
+    }
+
+    /** {@code map-value = container-def / type-ref} (§12.1) -- a nested declaration-level form, or an ordinary reference. */
+    private ElementType.Expr parseMapValue() {
+        ElementType.Expr value = nestedOrPlain();
+        rejectMapQuestion("value");
+        return value;
+    }
+
     private ElementType parseElementType() {
-        ElementType.Expr expr = check(TokenType.LBRACKET)
-                ? new ElementType.Expr.Nested(parseContainerDef())
-                : new ElementType.Expr.Plain(parseTypeRef());
+        ElementType.Expr expr = nestedOrPlain();
         boolean optional = consumeAdjacentQuestion();
         return new ElementType(expr, optional);
     }
 
-    private SizeSpec parseSizeSpec() {
+    /**
+     * The {@code container-def / type-ref} choice both an array/tuple position and a map value are spelled
+     * with -- a {@code '['} or {@code '{'} nests the declaration-level tier, anything else is an ordinary
+     * reference.
+     */
+    private ElementType.Expr nestedOrPlain() {
+        return check(TokenType.LBRACKET) || check(TokenType.LBRACE)
+                ? new ElementType.Expr.Nested(parseContainerDef())
+                : new ElementType.Expr.Plain(parseTypeRef());
+    }
+
+    /**
+     * {@code size-spec} (§12.1), shared by the array and map tiers -- {@code closing} is the bracket or brace
+     * the open-ended {@code N..} form runs up against.
+     */
+    private SizeSpec parseSizeSpec(TokenType closing) {
         if (check(TokenType.RANGE)) {
             advance();
             return new SizeSpec.Max(expectSizeBound());
@@ -649,7 +805,7 @@ public final class TsonSchemaParser extends TsonDataParser {
         String lower = expectSizeBound();
         if (check(TokenType.RANGE)) {
             advance();
-            if (check(TokenType.RBRACKET)) {
+            if (check(closing)) {
                 return new SizeSpec.Min(lower);
             }
             return new SizeSpec.Ranged(lower, expectSizeBound());
