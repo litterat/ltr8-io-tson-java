@@ -88,12 +88,24 @@ name. That pairs with the `value_form` invariant a template body's nested forms 
 structurally, with no vocabulary needed to read a `type_ref`.
 
 `spec/tson-cr-structure-templates.md` D8 proposed the opposite — inline sugar riding as a structural
-`type_ref` rather than as an injected entry — and is **not implemented**. Its case does not hold up: an entry
-set wider than the declaration set is already normal (`subtypes` and `disjoint` are resolver-derived too), a
-derived name only has to be stable *within* an implementation rather than agreed between them, and the
-report's own D7 rejects a second representation of a nested form for precisely the reason D8 would impose one
-on containers. The dedup would not disappear either, only relocate into a compile-time memo keyed on ref
-structure. `BACKLOG.md` carries the full account.
+`type_ref` rather than as an injected entry, with the compiler building readers from those refs — and is
+**deliberately not implemented**. Four arguments were weighed for it and none holds:
+
+- *An entry set wider than the declaration set is untidy.* It is already normal — `subtypes` and `disjoint`
+  are resolver-derived too, so §8 output has never been the author's declarations and nothing else.
+- *It would avoid needing a `@synthetic` marker.* That marker is an optional display hint for tooling
+  folding entries back into nested form; needing one is not a reason to restructure the representation.
+- *Ingest gets simpler.* Speculation about code that does not exist yet, against machinery that works.
+- *Derived names leak across `!!import`.* They must be stable **within** an implementation, including across
+  that boundary — which is exactly what the naming below guarantees — never agreed **between** them; §8.2
+  disclaims the names, and a comparison tool canonicalises. Nor do they reach an author: a read diagnostic
+  reports the path taken (`/holder/xs`), never the leaf it resolves to.
+
+Two arguments run the other way. The change report's own D7 rejects a second representation of a nested form
+because it "forces every consumer to walk two representations" — precisely what D8 would impose on every
+container. And the deduplication would not disappear, only relocate: `[text]` in five records must not
+compile five readers, so the compiler would need a memo keyed on ref structure, which is the naming below
+rebuilt and called a cache.
 
 - **Purely syntactic, and per declaration — no governing meta.** The sugar set is closed and
   grammar-supplied, so the head each form desugars to and the vocabulary field each argument fills are a

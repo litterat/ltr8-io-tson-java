@@ -484,15 +484,13 @@ compatibility).
 
 ## Not yet implemented
 
-- **Part 2 resolution gaps** — the identity-diagonal
-  FIXED-value invariant, a generic type-ref whose argument is nested or a value rather than a plain name,
-  and a parameterized supertype (`customer & box<T>`, which needs §5.10 substitution into the absorbed
-  fields and so belongs with the item below). `DefinitionResolver`'s Javadoc is the exact current boundary,
-  and `BACKLOG.md`'s "Remaining Part 2 resolution gaps" carries the full list — an audit of the ~34
-  `UnsupportedOperationException` sites found nine genuine gaps that had no item, and that only about half
-  of those throws are gaps at all: the rest are schema-author errors, or internal faults, wearing the
-  wrong exception type. Six of the nine have since been reclassified rather than implemented; the
-  composition path in particular turned out to be one real gap, not the five the backlog listed.
+- **Part 2 resolution gaps** — the identity-diagonal FIXED-value invariant, plus a small set that are all
+  one job: a generic type-ref whose argument is nested or a value rather than a plain name, a parameterized
+  supertype (`customer & box<T>`), and a field/element type that is none of the shapes the resolver handles
+  — each reachable only inside a template, and each blocked on §5.10 substitution (the item below).
+  `DefinitionResolver`'s Javadoc is the exact current boundary and `BACKLOG.md` carries the detail. Only
+  about half the `UnsupportedOperationException` sites in the pipeline are gaps at all; the rest are
+  schema-author errors or internal faults wearing the wrong exception type, and the classification is done.
 - **§5.10 parameter substitution** — a generic application is now *only* ever a user-template application
   (§3.3.1 resolves heads in the type-name namespace only), and applying one is rejected at the site that
   writes it, whether the template is local or imported. `spec/tson-cr-structure-templates.md`'s Tranche B is

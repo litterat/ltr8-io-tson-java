@@ -26,68 +26,9 @@ own prose (which had gone stale on at least one of them):
   "import cycle" diagnostic naming the actual cycle path. Distinct from what
   `TsonCompiledMetaRegistry.withStandardLibrary` already does, which is scoped to just the three bundled
   schemas in a known order, not a general algorithm.
-- [ ] **Structure-template removal — implement `spec/tson-cr-structure-templates.md`, Tranche A.**
-  **Steps 2-4 have landed** (issue #60): the parser has the `{K => V}` map sugar on both tiers with §12.2's
-  brace dispatch and its three diagnostics; `SchemaDesugarer` runs off the fixed §4.2 table with the map
-  routes, consults no governing meta at all, derives an injected name from the resolved binding record, and
-  rejects a generic application at the site that writes it (an imported head now included); and the
-  bootstrap's `BOOTSTRAP_CONSTRUCTORS` dissolved with the lookup it existed for. The kernel respell landed
-  with them because the desugarer needed it: `array`/`set`/`map` are parameterless, `array_min`/`array_max`/
-  `array_ranged` and meta.tn's `vector` are deleted, `token_set` is a named entry and `schema` is
-  `{type_name => type_definition}`, with all three bundled digests re-pinned. **What remains of Tranche A:**
-  - `record_field`'s `value_form: top` member (§5 of the report), which needs `schema.meta.RecordField` to
-    carry it — Tranche B step 7, so it lands there.
-  - The `*-resolved.tn` fixtures in `spec/m/`, now stale against the respelled kernel. They are the spec's
-    own non-normative artifacts, hand-authored under terser conventions and read by nothing here.
-  - **Step 5 needs no work**, checked rather than assumed. `!` heads already resolve
-    structure-namespace-only (`DefinitionResolver.resolveConstructorTarget`) and a hit that is not a
-    constructor is already a loud `TsonSchemaValidationException` (`resolveInstance`); the application-side
-    half of the §2.2.2 eligibility check went out with the generic-head gate, since a generic head *was* the
-    second application route into the structure namespace. The declaration-side half
-    (`TsonSchemaLinker.isMetaKernelGoverned`) stays. Worth knowing if it is ever revisited: a `~` in a user
-    schema is **inert**, not dangerous. `constructor: true` is read in exactly one place, resolving a
-    `!C value` against the *governing meta's* entries, and `checkMayGovern` already refuses to let a
-    user-level schema be named as anyone's `!!meta` — using the same predicate. So nothing can ever chain to
-    it, no `!xxx_type` can ever appear in a schema position, and the flag is never consulted. In a *data*
-    document `!xxx_type { ... }` is an ordinary record annotation and reads fine, which is also what makes
-    §8 resolver output expressible. The declaration-side check is therefore a lint, not a guard.
-  - **Step 6 and D8 are not being implemented.** D8 would have inline sugar ride as a structural
-    `type_ref` with arguments rather than as an injected entry, and step 6 is the compiler half that needs
-    (`resolve` taking a `TypeRef`, a structural reader memo, a linker branch skipping a grammar-supplied
-    head). The four arguments for it do not survive: an entry set larger than the declaration set is
-    already the norm (`subtypes`/`disjoint` are resolver-derived too); the `@synthetic` marker it would
-    avoid is an optional display hint; ingest "getting simpler" is speculation about unwritten code; and
-    the derived name only ever has to be stable *within* an implementation, including across `!!import`
-    (which `SchemaDesugarer.bindingName` guarantees), never agreed *between* them — §8.2 disclaims the
-    names and comparison tools canonicalise. Two arguments run the other way: the report's own D7 rejects
-    a second representation of a nested form because it "forces every consumer to walk two
-    representations", which is exactly what D8 imposes on containers; and the dedup does not disappear,
-    it relocates into a compile-time memo keyed on ref structure — `bindingName` rebuilt and called a
-    cache. **The rule kept instead:** `TypeRef.arguments` non-empty ⟺ an open form, a template
-    application; everything closed is an entry referenced by a bare name. That pairs with D7's
-    `value_form` invariant and lets ingest check the closed-entry rule structurally, with no vocabulary
-    needed to read a `type_ref`. `SPEC-FEEDBACK.md` #49/#50/#51 therefore stay open and keep their
-    existing recommendations; they are deliberately left as revision discussion points.
-  - `SPEC-FEEDBACK.md` #28/#32/#45/#46 gain their resolution notes once the tranche is whole.
-  The original framing follows. The
-  change report supersedes the staged #44/#45/#46 design review that used to sit here (and its
-  "waits for the spec revision" twin that sat under Lower Priority): the CR *is* the revision plan.
-  `!` resolves structure-namespace-only with a loud constructor gate, generic heads resolve
-  type-name-only, the kernel's container constructors go parameterless, the size templates and
-  `vector` delete, and maps gain the `{K => V}` sugar. The CR's own §10 carries the step-by-step
-  plan; Tranche A (sugar, namespaces, kernel respell with re-pinned hashes and regenerated fixtures,
-  bootstrap-table collapse) is independently landable and absorbs what
-  the old item staged behind a revision — including **#46's enforcement** (its blocker, the kernel's
-  own size templates, deletes with the respell). Superseded outright, no task remains: the
-  `C<args; member ...>` application-with-bindings surface form (#45) — constructors no longer have
-  parameters to partially apply, so the form has nothing to spell — along with the slot-binds-once and
-  no-partial-application-recursion rules that only that form needed; and **#44's shadow-channel
-  check**, which collapses to "a constructor declaration carries no parameters and no routes"
-  (CR D3), landing with Tranche A. Conformance vectors stay blocked on the suite having no Part 2
-  layer.
 - [ ] **User templates in full — implement `spec/tson-cr-structure-templates.md`, Tranche B.** §5.10
   substitution into a template body (`box => <T> { v: T }`), rejected at the application site today
-  (`SchemaDesugarer.rejectIfTemplateApplication`), is now fully designed rather than an open shape:
+  (`SchemaDesugarer.rejectTemplateApplication`), is fully designed rather than an open shape:
   the CR retains user templates in declaration, application, partial application, recursion, kind
   inference (§4.5), and specifies the machinery — open-form recording with `value_form` for nested
   forms (D5/D7), materialisation as an innermost-out synthesis cascade, knot-tying through synthetic
@@ -100,20 +41,16 @@ own prose (which had gone stale on at least one of them):
     `SPEC-FEEDBACK.md` #25 (non-*productive* recursion — no finite *data* model): this is no finite
     *type* model. The CR's §4.5 covers regular recursion (knot-tying) but is silent on this —
     arguably a sentence the CR should gain.
-  - **Eager rejection survived Tranche A**, and got stronger: with heads resolving type-name-only there is
-    no namespace check left to make, so `SchemaDesugarer.rejectTemplateApplication` fails on any head this
-    document declares *or imports* — closing the `!!import` case that used to slip through to a read-time
-    failure. Materialisation must replace that rejection, not merely remove it.
-  - The generic-head scoping questions that used to hang off this item (`SPEC-FEEDBACK.md` #28 —
-    precedence wording, cross-namespace shadowing, parameters at a head, the constructor gate) are
-    settled by the CR's §4.1/D4; #28 gets its resolution note when Tranche A lands.
+  - **Materialisation must replace the eager rejection, not merely remove it.** With heads resolving
+    type-name-only there is no namespace check left to make, so `SchemaDesugarer.rejectTemplateApplication`
+    fails on any head this document declares *or imports* — a template arriving by `!!import` included.
+    Deleting that without materialisation in place regresses to a read-time failure.
 - [ ] **The rest of §8.2's deferred value-level checks.** Materialisation "runs the value-level checks that
   open bounds deferred: family coherence rules whose operands were parameters". The array family's
-  `min_items <= max_items` is done, in `SchemaDesugarer.checkBounds`; the CR (§4.2) restates it once as a
-  rule on the `min_items`/`max_items` binding pair for arrays *and maps* — resolver error where literal at
-  schema load, at materialisation where parameter-bound. The literal half is done for both tiers
-  (`SchemaDesugarer.checkBounds`, now over the emitted binding record rather than a routed application);
-  Tranche B moves the parameter-bound half to materialisation time. The
+  `min_items <= max_items` is one rule over the binding pair for arrays *and maps*: a resolver error where
+  the bounds are literal at schema load, at materialisation where parameter-bound. The literal half is done
+  for both tiers (`SchemaDesugarer.checkBounds`); Tranche B moves the parameter-bound half to
+  materialisation time. The
   kin §8.2 gestures at — "bounds within a width-derived range, and their kin" — belong with the constraint
   families that own them, next to `AtomNarrowing`, not in a syntax rewrite. Doing that properly probably
   means the check moves out of the desugarer entirely and `checkBounds` goes with it. Distinct from the
@@ -134,25 +71,21 @@ own prose (which had gone stale on at least one of them):
 
 ## Remaining Part 2 resolution gaps
 
-- [ ] Generic type-refs whose arguments are not simple names. A non-simple argument (`weird<[T]>`) is
-  rejected outright ("only simple type arguments are resolved so far"). A generic head is now only ever a
-  user template — `map<text, [integer]>` is spelled `{text => [integer]}` and involves no head at all — so
-  what is left of this item is exactly a template application whose argument does not reduce to a plain
-  name: Tranche B work (the Tranche B item above), termination guard included. Today the desugarer rejects
-  every such application eagerly, so the resolver throw is unreachable through the pipeline.
+The type-level gaps here are all blocked on §5.10 substitution — the Tranche B item above — and none is
+independently doable. Two need no item of their own beyond naming: a **generic type-ref whose arguments are not
+simple names** (`weird<[T]>`, rejected as "only simple type arguments are resolved so far"), unreachable
+through the pipeline today because the desugarer rejects every application eagerly; and a **parameterized
+supertype reference** (`vip => <T> customer & box<T>`, §5.8's "Parameterized references"), where §5.8's
+"absorbed fields... carry the parameters through ordinary type channels" is substitution into a record
+template's body. The third has measured detail worth keeping:
 
-- [ ] **A parameterized supertype reference** (`vip => <T> customer & box<T> & { ... }`, §5.8's
-  "Parameterized references"). The only genuine gap left in the composition path, and it is not independent:
-  §5.8 says the applied form's arguments reach "the absorbed fields, which carry the parameters through
-  ordinary type channels", so composing with `box<T>` means substituting into a record template's body —
-  the CR's Tranche B, termination guard and all. Worth doing together, not before.
 - [ ] **A field/element type that is not a simple name, a generic application, or an inline array.**
   `DefinitionResolver.resolveTypeRef`'s catch-all ("only simple (non-generic) type-refs, generic
   applications of one, and inline arrays of one are resolved so far"). **Only reachable inside a
-  parameterized declaration**, contrary to what this item used to claim — `SchemaDesugarer` normalizes every
-  inline and generic form in an ordinary field or group-member position first, so `[[text]]`,
-  `[map<text, integer>]`, `(text | integer)`, `[text, integer]` and `map<text, [integer]>` all compile
-  today, in both positions. The phase skips a parameterized declaration entirely, and that is where the
+  parameterized declaration** — `SchemaDesugarer` normalizes every inline form in an ordinary field or
+  group-member position first, so `[[text]]`, `[{text => integer}]`, `(text | integer)`, `[text, integer]`
+  and `{text => [integer]}` all compile today, in both positions. The phase skips a parameterized
+  declaration entirely, and that is where the
   throw is live, in two shapes measured directly:
   - `box => <T> { v: [T] }` — the `InlineArrayRef` branch *does* fire and builds `array<T>`, then the linker
     rejects `array`, which a user schema's type-name namespace does not hold. The author is told their
@@ -163,8 +96,9 @@ own prose (which had gone stale on at least one of them):
     reaching the CLI is reported as `internal error ... This is a bug in tson` with exit 70. It is a gap,
     not a fault, so even before the feature lands the classification is wrong (see the exception policy in
     CLAUDE.md).
-  Both being inside a template makes this Tranche B work: the CR's open-form recording (D5) is precisely
-  "desugar a parameterized declaration without lifting", the thing the phase skips today.
+  Both live shapes are inside a template, which is what makes this Tranche B work: the CR's open-form
+  recording (D5) is precisely "desugar a parameterized declaration without lifting", the thing the phase
+  skips today.
 
 Only genuine gaps are listed above — a throw that means "your schema is wrong" is not one. Classifying the
 throw sites by that test is done across the whole schema pipeline (issue #26); if a census is ever wanted

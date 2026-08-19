@@ -50,7 +50,15 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   only if *its* `!!meta` is — so an ordinary type library can't govern (naming core.tn as `!!meta` is the
   `!!import` confusion, and core.tn declares no constructors to supply). The target half is judged only when
   the loader actually produced the target; an unresolvable `!!meta` is left to whoever owns fetching, which
-  is also what keeps meta-kernel's self-naming `!!meta` linkable mid-registration. In the shipped wiring
+  is also what keeps meta-kernel's self-naming `!!meta` linkable mid-registration. **The declaring half is a
+  lint, not a guard**: a `~` in a user schema is *inert*, because `constructor: true` is read in exactly one
+  place — resolving a `!C value` against the **governing meta's** entries — and the target half already
+  refuses to let a user-level schema be named as anyone's `!!meta`, on the same predicate. Nothing can chain
+  to it, so no `!xxx_type` can ever occupy a schema position, so the flag is never consulted. (In a *data*
+  document `!xxx_type { ... }` is an ordinary record annotation and reads fine, which is what makes §8
+  resolver-output bodies like `!record { ... }` expressible at all.) Worth keeping anyway, at one comparison:
+  "you wrote something that can never do anything" is better said at the `~` than in whichever document later
+  tries to name the schema as its `!!meta`. In the shipped wiring
   `TsonCompiledMetaRegistry.loadMeta` reaches that verdict a phase earlier (it must *compile* the meta to
   resolve against it) and raises the linker's own `TsonSchemaLinker.notAMetaSchema` — one wording, one module,
   and a **`TsonSchemaValidationException` rather than an `IllegalStateException`**
