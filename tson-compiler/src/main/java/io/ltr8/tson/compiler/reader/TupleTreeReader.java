@@ -42,7 +42,7 @@ final class TupleTreeReader extends TupleAbstractReader<TsonValue> {
             if (!(typeDefinition.body() instanceof TupleBody body)) {
                 throw new IllegalArgumentException("'" + name + "' is not tuple-shaped: " + typeDefinition.body());
             }
-            return new TupleTreeReader(name, body, resolver, SchemaLocation.of(name, typeDefinition),
+            return new TupleTreeReader(name, body, resolver, context.locationOf(name, typeDefinition),
                     AnnotationTypes.of(context));
         }
     }

@@ -166,11 +166,15 @@ was built for, which is not always the name the reader's own *message* uses —
 while carrying the original declaration's location through, so the message reads naturally and the pointer
 still lands on the entry that declares the rule.
 
-**`schemaId` is still absent**, so which *document* a read diagnostic's pointer indexes into is implicit; the
-schema path populates all three (`BACKLOG.md`). The cause is upstream of the reader:
-`TsonSchemaLinker.mergeImports` copies an imported `TypeDefinition` into the importing schema's `entries()`
-and keeps no record of where it came from, so pairing `/int32` with the compiled schema's own id would name
-the *importing* schema for an *imported* declaration. The field stays absent rather than approximated.
+**`schemaId` is the schema that *declared* the entry, not the one being read against.** The two differ
+whenever an `!!import` is involved, and the difference is the whole point: a four-line schema importing
+core.tn enforces `/int32` at core.tn's line 110, so pairing that position with the importing schema's own id
+would send a consumer to a line past the end of their own file. It is reachable only because
+`TsonSchemaLinker` records each merged entry's origin (`TsonLinkedSchema.entryOrigins`); the compiled schema's
+own id is *not* the answer, and was left empty rather than approximated until the linker kept the fact.
+`ValueReaderContext.locationOf` is the one place a `SchemaLocation` is built, so the identity can only come
+from `originOf`. A read with no schema behind it stamps no location at all, and all three components stay
+empty — `""` for the id, absent for both pointers.
 An atom's `AtomTypeException` is caught in `AtomTypeReader` and mapped to
 `ATOM_CONSTRAINT_VIOLATION` — `AtomType`'s own signature is untouched, since it's shared with the
 schemaless binder which has no read context. That code means exactly "the atom rejected this token" and

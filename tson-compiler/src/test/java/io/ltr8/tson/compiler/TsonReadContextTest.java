@@ -17,6 +17,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TsonReadContextTest {
 
+    private static final String SCHEMA_ID = "example.test/s.tn";
+
     private static TokenEvent token(String text, Position position) {
         return new TokenEvent(text, TokenForm.UNQUOTED, position);
     }
@@ -93,7 +95,7 @@ class TsonReadContextTest {
         ctx.peek();
         TsonReadContext descended = ctx.field("x");
 
-        SchemaLocation location = new SchemaLocation("my_type", Optional.of(new Position(9, 2, 99)));
+        SchemaLocation location = new SchemaLocation(SCHEMA_ID, "my_type", Optional.of(new Position(9, 2, 99)));
         TsonReadContext restamped = descended.withSchemaLocation(location);
 
         assertEquals(Optional.of(location), restamped.schemaLocation());
@@ -157,13 +159,14 @@ class TsonReadContextTest {
                 new ListEventSource(List.of(token("42", dataPosition))), problems);
 
         TsonReadContext scoped =
-                ctx.withSchemaLocation(new SchemaLocation("my_type", Optional.of(schemaPosition))).field("value");
+                ctx.withSchemaLocation(new SchemaLocation(SCHEMA_ID, "my_type", Optional.of(schemaPosition))).field("value");
         scoped.peek();
         scoped.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, "out of range", "0..100", "200");
 
         Diagnostic diagnostic = problems.diagnostics().get(0);
         assertEquals(Optional.of("/value"), diagnostic.path());
         assertEquals(Optional.of(dataPosition), diagnostic.dataPosition());
+        assertEquals(SCHEMA_ID, diagnostic.schemaId());
         assertEquals(Optional.of("/my_type"), diagnostic.schemaPointer());
         assertEquals(Optional.of(schemaPosition), diagnostic.schemaPosition());
     }
@@ -182,6 +185,7 @@ class TsonReadContextTest {
         ctx.report(Diagnostic.Code.TYPE_MISMATCH, "wrong shape", "a record", "a token");
 
         Diagnostic diagnostic = problems.diagnostics().get(0);
+        assertEquals("", diagnostic.schemaId());
         assertEquals(Optional.empty(), diagnostic.schemaPointer());
         assertEquals(Optional.empty(), diagnostic.schemaPosition());
     }

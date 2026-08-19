@@ -508,9 +508,10 @@ OK
 
 $ tson validate --output json person.tn bad.tn   # bad.tn = !!schema:"…/person-1.tn" !person { age: 30 }
 {"valid":false,"files":[{"file":"bad.tn","valid":false,"errors":[{"path":"/name",
-  "schemaPointer":"/person","schemaId":null,"code":"FIELD_REQUIRED",
-  "message":"missing required field 'name' for 'person'","expected":"a value for 'name'",
-  "actual":"(absent)","dataPosition":"2:9:63","schemaPosition":"5:5:145"}]}],"errors":[]}
+  "schemaPointer":"/person","schemaId":"example.com/2026/32/app/person-1.tn",
+  "code":"FIELD_REQUIRED","message":"missing required field 'name' for 'person'",
+  "expected":"a value for 'name'","actual":"(absent)","dataPosition":"2:9:63",
+  "schemaPosition":"5:5:145"}]}],"errors":[]}
 
 $ tson compile person.tn
 OK
@@ -523,11 +524,13 @@ OK
   `--output text` keeps the human-facing `# <file>` headers instead.
 - **A diagnostic locates a problem at up to two ends** — the value in the data (`path`, `dataPosition`)
   and the rule in the schema (`schemaId`, `schemaPointer`, `schemaPosition`) — and either end may be
-  absent. A field with nothing to say is `null`, never `""`, the two RFC 6901 pointers included: for a
-  pointer `""` is the *root*, a real location a document-level problem genuinely carries, so `""` and
-  `null` stay apart there. A position is `line:column:byteOffset`, the first two 1-based and the offset
-  counting UTF-8 bytes from 0. The whole shape is declared as a real schema in `tson-cli`'s own
-  `diagnostics.tn`, which `--output tson` is validated against.
+  absent. The schema end names the document that *declared* the rule, which under an `!!import` is not the
+  one the data named: a violated `int32` reports `/int32` in `tson.io/2026/32/m/core.tn`, not a line number
+  past the end of your own schema. A field with nothing to say is `null`, never `""`, the two RFC 6901
+  pointers included: for a pointer `""` is the *root*, a real location a document-level problem genuinely
+  carries, so `""` and `null` stay apart there. A position is `line:column:byteOffset`, the first two
+  1-based and the offset counting UTF-8 bytes from 0. The whole shape is declared as a real schema in
+  `tson-cli`'s own `diagnostics.tn`, which `--output tson` is validated against.
 - **`expected` is the constraint that failed, not a type name** — `<= 100`, `one of (PENDING, SHIPPED,
   DELIVERED)`, `at most 10 characters`, `an RFC 3339 date-time` — so a consumer building its own message
   (an LLM repair loop, say) never has to parse `message` to recover a bound or a member list.

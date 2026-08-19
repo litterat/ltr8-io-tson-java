@@ -111,7 +111,7 @@ public final class TsonSchemaCompiler {
      */
     private static TsonCompiledSchema compileWith(
             TsonLinkedSchema linkedSchema, Function<String, ValueReaderFactory> factoryFor) {
-        Compilation compilation = new Compilation(linkedSchema.schema(), factoryFor);
+        Compilation compilation = new Compilation(linkedSchema, factoryFor);
         for (String name : linkedSchema.schema().entries().keySet()) {
             compilation.resolve(name);
         }
@@ -136,6 +136,7 @@ public final class TsonSchemaCompiler {
      * makes "never escape" true rather than aspirational.
      */
     private static final class Compilation {
+        private final TsonLinkedSchema linked;
         private final TsonSchema schema;
         private final Function<String, ValueReaderFactory> factoryFor;
         private final Map<String, TsonTypeReader<?>> finished = new LinkedHashMap<>();
@@ -148,8 +149,9 @@ public final class TsonSchemaCompiler {
          */
         private final CompiledReaders readers = new CompiledReaders(this::resolve);
 
-        Compilation(TsonSchema schema, Function<String, ValueReaderFactory> factoryFor) {
-            this.schema = schema;
+        Compilation(TsonLinkedSchema linked, Function<String, ValueReaderFactory> factoryFor) {
+            this.linked = linked;
+            this.schema = linked.schema();
             this.factoryFor = factoryFor;
         }
 
@@ -186,7 +188,7 @@ public final class TsonSchemaCompiler {
                 return resolve(r.target().name());
             }
             ValueReaderFactory factory = factoryFor.apply(TsonCompiledMetaSchema.typenameOf(body));
-            return factory.create(name, definition, new ValueReaderContext(schema, readers));
+            return factory.create(name, definition, new ValueReaderContext(linked, readers));
         }
     }
 }

@@ -26,7 +26,10 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   the reason `TsonContentHash` is — a consumer plausibly has their own `CanonicalIdentity`.
 - **`TsonSchemaLinker.link(schema, loader)`** is the pass-2 engine returning a `TsonLinkedSchema` (a thin
   wrapper that is a compile-time proof linking ran): (1) **merge `!!import`s** — each import's entries
-  copied in as-is, keeping their home namespace, name collisions rejected; (2) **populate `subtypes`**
+  copied in as-is, keeping their home namespace, name collisions rejected, and **each merged entry's origin
+  recorded** (`TsonLinkedSchema.entryOrigins`, name → the canonical identity of the schema that *declared*
+  it, taken from the import's own `originOf` so an entry two hops away keeps its author rather than the
+  intermediary); (2) **populate `subtypes`**
   (reverse of `supertypes`); (3) **derive `disjoint`** for every choice entry (`ChoiceDisjointness`, §5.4) —
   total and two-valued, detailed under "The disjointness derivation" below, so a linked choice always
   carries the fact;
@@ -58,6 +61,13 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   `SchemaDesugarer` already turned every application into a real declaration, one phase earlier and in the
   module that can bind a constructor generically. The only argument-bearing `type_ref` it ever sees is a
   parameterized declaration's reference to its own parameter (`array<T>`), which is validated, not rewritten.
+  - **`entryOrigins` is on `TsonLinkedSchema`, not on `TsonSchema` or `TypeDefinition`**, because it is a
+    fact *linking* establishes rather than part of the resolved schema value §9 defines — and because
+    `schema.meta` is a bind target with a hand-written `equals` and the `@Record` constructor-selection trap,
+    which a new component would walk straight into. It is what lets a read diagnostic against `int32` name
+    core.tn instead of the four-line schema that imported it; without it the only identity reachable at read
+    time is the importing schema's, which is the wrong answer rather than a missing one. The registry stores
+    `TsonLinkedSchema` directly, so the map survives registration and every later `load`.
 - **`TsonSchemaRegistry.register(TsonLinkedSchema)`** computes canonical identity from `!!id`, rejects a
   duplicate identity (no overwrite — this plus `entries()` being unmodifiable *is* the "locked" guarantee)
   and any self-referential `bootstrap()==true` schema, and stores it. `get(uri)` canonicalizes internally.

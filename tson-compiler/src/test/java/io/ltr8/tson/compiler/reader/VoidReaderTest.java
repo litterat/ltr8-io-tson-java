@@ -14,7 +14,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class VoidReaderTest {
 
-    private static final VoidReader READER = new VoidReader(new SchemaLocation("void", Optional.empty()));
+    private static final VoidReader READER =
+            new VoidReader(new SchemaLocation("example.test/s.tn", "void", Optional.empty()));
 
     @Test
     void acceptsTheAbsentSentinelAndReadsAsNull() {

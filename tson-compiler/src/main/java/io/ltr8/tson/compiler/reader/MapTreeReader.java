@@ -40,7 +40,7 @@ final class MapTreeReader extends MapAbstractReader<TsonValue> {
             if (!(typeDefinition.body() instanceof MapBody body)) {
                 throw new IllegalArgumentException("'" + name + "' is not map-shaped: " + typeDefinition.body());
             }
-            return new MapTreeReader(name, body, resolver, SchemaLocation.of(name, typeDefinition),
+            return new MapTreeReader(name, body, resolver, context.locationOf(name, typeDefinition),
                     AnnotationTypes.of(context));
         }
     }

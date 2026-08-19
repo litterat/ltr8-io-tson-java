@@ -122,7 +122,7 @@ final class MapBindReader extends MapAbstractReader<Object> {
                 throw new IllegalArgumentException("'" + name + "' resolves to " + dataClass.typeClass()
                         + ", which isn't map-shaped -- can't bind '" + name + "' as one");
             }
-            return new MapBindReader(name, body, descriptor, resolver, SchemaLocation.of(name, typeDefinition),
+            return new MapBindReader(name, body, descriptor, resolver, context.locationOf(name, typeDefinition),
                     AnnotationTypes.of(context));
         }
 

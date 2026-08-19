@@ -5,6 +5,7 @@ import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -38,7 +39,8 @@ class ValueReaderFactoryRegistryTest {
 
     // These atom/enum factories consult only name/definition, never the enclosing schema, so an empty one suffices.
     private static final ValueReaderContext CONTEXT =
-            new ValueReaderContext(new TsonSchema("id", "meta", List.of(), Map.of()), NEVER_CALLED);
+            new ValueReaderContext(
+                    new TsonLinkedSchema(new TsonSchema("id", "meta", List.of(), Map.of())), NEVER_CALLED);
 
     @Test
     void resolveThrowsForAnUnregisteredConstructor() {

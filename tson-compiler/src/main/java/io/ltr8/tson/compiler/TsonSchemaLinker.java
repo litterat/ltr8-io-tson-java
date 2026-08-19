@@ -187,10 +187,20 @@ public final class TsonSchemaLinker {
                 def == null ? Optional.empty() : def.position());
     }
 
+    /**
+     * This schema's own canonical identity, stamped on every entry it declares itself -- the same form {@link
+     * #schemaError} reports under and {@code TsonSchemaRegistry} keys on, so a read diagnostic and a schema
+     * diagnostic against the same declaration name the same document.
+     */
+    private static String localIdentity(TsonSchema schema) {
+        return TsonCanonicalIdentity.canonicalize(schema.id());
+    }
+
     /** The shared body; {@code receiver} is {@code null} for the fail-fast overloads, which rethrow instead. */
     private static TsonLinkedSchema linkWith(TsonSchema schema, TsonSchemaLoader loader,
                                              TsonDiagnosticsReceiver receiver) {
-        Map<String, TypeDefinition> merged = mergeImports(schema.imports(), loader);
+        Map<String, String> origins = new LinkedHashMap<>();
+        Map<String, TypeDefinition> merged = mergeImports(schema.imports(), loader, origins);
 
         // The governing meta-schema's own namespace, one hop via !!meta -- distinct from !!import (which
         // flattens another schema's entries into *this* schema's own returned entries()). !!meta only says
@@ -239,6 +249,7 @@ public final class TsonSchemaLinker {
                 }
             }
             merged.put(entry.getKey(), def);
+            origins.put(entry.getKey(), localIdentity(schema));
             localNames.add(entry.getKey());
         }
 
@@ -260,7 +271,7 @@ public final class TsonSchemaLinker {
         checkDisjointAssertions(schema, annotated, localNames, receiver);
 
         return new TsonLinkedSchema(new TsonSchema(schema.id(), schema.meta(), schema.imports(),
-                annotated, schema.bootstrap()));
+                annotated, schema.bootstrap()), origins);
     }
 
     /**
@@ -508,7 +519,8 @@ public final class TsonSchemaLinker {
      * Stage 1: every {@code !!import}'s own entries, in declaration order, brought in as-is
      * (§2.2.3's "merged entries keep their home namespace" -- no re-resolution here).
      */
-    private static Map<String, TypeDefinition> mergeImports(List<String> imports, TsonSchemaLoader loader) {
+    private static Map<String, TypeDefinition> mergeImports(List<String> imports, TsonSchemaLoader loader,
+                                                            Map<String, String> origins) {
         Map<String, TypeDefinition> merged = new LinkedHashMap<>();
         for (String importUri : imports) {
             String importIdentity = TsonCanonicalIdentity.canonicalize(importUri);
@@ -520,6 +532,9 @@ public final class TsonSchemaLinker {
                             "'" + entry.getKey() + "' is declared by more than one !!import");
                 }
                 merged.put(entry.getKey(), entry.getValue());
+                // The import's own answer, not importIdentity: an entry it reached through an import of its
+                // own belongs to whoever declared it, however many hops away that is.
+                origins.put(entry.getKey(), imported.originOf(entry.getKey()));
             }
         }
         return merged;

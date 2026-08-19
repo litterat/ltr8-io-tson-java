@@ -301,7 +301,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
 
             if (typeDefinition.subtypes().isEmpty()) {
                 return new RecordBindReader(name, body, requireRecord(name, dataClass), resolver,
-                        SchemaLocation.of(name, typeDefinition), AnnotationTypes.of(context));
+                        context.locationOf(name, typeDefinition), AnnotationTypes.of(context));
             }
 
             if (dataClass instanceof DataClassUnion union) {
@@ -317,7 +317,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
 
             if (dataClass instanceof DataClassRecord record) {
                 RecordBindReader ownParser = new RecordBindReader(name, body, record, resolver,
-                        SchemaLocation.of(name, typeDefinition), AnnotationTypes.of(context));
+                        context.locationOf(name, typeDefinition), AnnotationTypes.of(context));
                 return new VariantSchemaReader(name, ownParser, typeDefinition.subtypes(), resolver,
                         AnnotationTypes.DISCARDED);
             }

@@ -139,35 +139,18 @@ Parsing, desugaring, resolution and linking all report every independent problem
 `TsonDiagnosticsReceiver` (issues #3/#28/#29), whether reached by `tson compile`/`Tson.validateSchema` or by
 a *data* read whose `!!schema` names a schema that doesn't resolve — both give the same account of the same
 broken schema. `docs/readers-and-diagnostics.md`'s "Schema-side diagnostics" section describes the shape and
-the decisions behind it. One thing is left here; the *floor* under all of it — the lexer being fail-fast, so
-a token that will not lex aborts the pass that would have reported past it — is deliberately not an item in
-this list, because there is no work to do until someone decides whether lexer errors feed the `Diagnostic`
-model at all. `STRUCTURED-OUTPUT.md` holds that question.
+the decisions behind it. Nothing is outstanding here except the granularity ceiling below; the *floor* under
+all of it — the lexer being fail-fast, so a token that will not lex aborts the pass that would have reported
+past it — is deliberately not an item in this list, because there is no work to do until someone decides
+whether lexer errors feed the `Diagnostic` model at all. `STRUCTURED-OUTPUT.md` holds that question.
 
-- [ ] **The read path carries `schemaPointer`/`schemaPosition` but not `schemaId`** (issue #58) — a reader
-  knows the entry it was built for, not which schema that entry came from, so a value error reports
-  `/int32` at `110:3:4858` with nothing saying that is *core.tn*'s line rather than the document's own.
-  - **It is not just a matter of threading the compiled schema's identity down the reader stack** (as this
-    item used to claim): the identity a reader could reach that way is the *wrong one*. `TsonSchemaLinker`'s
-    `mergeImports` copies each imported `TypeDefinition` straight into the importing schema's `entries()`
-    map and keeps nothing about where it came from, so by compile time the origin is already gone. Measured:
-    a 4-line `point-1.tn` declaring `{ point => { x: int32 } }` reports `schemaPosition` `110:3:4858` —
-    core.tn's line for `int32`. Stamping `linkedSchema.schema().id()` alongside it would pair
-    `example.test/point-1.tn` with line 110 of a 4-line document, sending a consumer to the wrong file.
-    Absent is honest; wrong is not, which is why the field is empty rather than approximated.
-  - So the work is upstream first: **record each merged entry's origin schema id**, either as a side map on
-    `TsonSchema`/`TsonLinkedSchema` populated by `mergeImports` (preferred — leaves `schema.meta` alone,
-    since the spec's own `type_definition` has no such field and it is a bind target with a hand-written
-    `equals` and the `@Record` constructor-selection trap) or as a new excluded-from-equality component on
-    `TypeDefinition` beside `position`. The reader-stack half is then a one-line change: the id becomes a
-    third component of `SchemaLocation`, which every reader already stamps as one value and
-    `DefaultTsonReadContext.report` already unpacks.
-- Granularity ceiling to know before starting any of these: positions are **per declaration**, from the
+- Granularity ceiling: positions and pointers alike are **per declaration**, from the
   declaration's own name token. Sub-declaration positions (which field, which supertype) do not exist and
   would be their own parser work — visible today as a diagnostic pointing at `/my_type` when the problem is
-  one of its fields. A *syntax* error is the one exception: it has the failing token's own position, since
-  the parser reports it where it stands rather than looking it up per declaration afterwards. Its
-  `schemaPointer` is still only `/my_type`.
+  one of its fields. Closing it means giving `TsonSchemaParser` per-field positions and `SchemaLocation` a
+  deeper pointer; nothing else in the stack would change. A *syntax* error is the one exception: it has the
+  failing token's own position, since the parser reports it where it stands rather than looking it up per
+  declaration afterwards. Its `schemaPointer` is still only `/my_type`.
 
 ## Miscellaneous
 

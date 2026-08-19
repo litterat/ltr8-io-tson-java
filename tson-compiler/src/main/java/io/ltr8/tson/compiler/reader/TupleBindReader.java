@@ -90,7 +90,7 @@ final class TupleBindReader extends TupleAbstractReader<Object> {
                 throw new IllegalArgumentException("'" + name + "' resolves to " + dataClass.typeClass()
                         + ", which isn't tuple-shaped -- can't bind '" + name + "' as one");
             }
-            return new TupleBindReader(name, body, descriptor, resolver, SchemaLocation.of(name, typeDefinition),
+            return new TupleBindReader(name, body, descriptor, resolver, context.locationOf(name, typeDefinition),
                     AnnotationTypes.of(context));
         }
 

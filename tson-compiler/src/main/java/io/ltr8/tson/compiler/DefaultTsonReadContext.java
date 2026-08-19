@@ -102,14 +102,13 @@ final class DefaultTsonReadContext implements TsonReadContext {
 
     @Override
     public void report(Diagnostic.Code code, String message, String expected, String actual) {
-        // The schema end carries a pointer and a position but no identity: a reader knows which entry it was
-        // built for, not which schema that entry came from -- TsonSchemaLinker.mergeImports copies an imported
-        // TypeDefinition into the importing schema's entries and keeps no origin, so by compile time there is
-        // nothing correct to stamp. Reaching for the compiled schema's own id would pair the *importing*
-        // schema with an *imported* declaration's line, which is worse than absent. Recording the origin at
-        // merge time is the prerequisite -- see BACKLOG.md.
+        // All three schema-end components come from the one SchemaLocation the running reader stamped, so a
+        // read against a schema that imported its types names the schema that *declared* the entry, not the
+        // one that imported it. A read with no schema behind it stamps none of them: Diagnostic spells a
+        // missing identity "" and a missing pointer as an absence, since for a pointer "" is the root.
         Diagnostic diagnostic = new Diagnostic(Optional.of(path), schemaLocation.map(SchemaLocation::pointer),
-                "", code, message, expected, actual, position(), schemaLocation.flatMap(SchemaLocation::position));
+                schemaLocation.map(SchemaLocation::schemaId).orElse(""), code, message, expected, actual,
+                position(), schemaLocation.flatMap(SchemaLocation::position));
         cursor.reported++;
         cursor.receiver.report(diagnostic);
     }

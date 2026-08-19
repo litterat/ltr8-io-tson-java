@@ -212,11 +212,13 @@ class TsonValidateTest {
      * declared in a schema. The second half is only non-empty because {@code Tson.resolve}/the loader pass
      * declaration positions through resolution -- {@code schemaPosition} was dead in production until they did.
      *
-     * <p>Both schema-side components name the <em>atom's</em> own declaration ({@code int32}, in core.tn), not
-     * {@code point}'s, because each reader stamps its own schema location before descending -- so a diagnostic
-     * from inside an atom carries that atom's declaration, which is the one that defines the constraint being
-     * violated. The pointer is what makes the position usable: {@code point-1.tn} is four lines long, and
-     * core.tn's line for {@code int32} is past its end.
+     * <p>All three schema-side components name the <em>atom's</em> own declaration ({@code int32}, in core.tn),
+     * not {@code point}'s, because each reader stamps its own schema location before descending -- so a
+     * diagnostic from inside an atom carries that atom's declaration, which is the one that defines the
+     * constraint being violated. <b>The identity is core.tn's, not the schema the document named</b>: {@code
+     * point-1.tn} is four lines long and core.tn's line for {@code int32} is past its end, so pairing the
+     * position with the importing schema would send a consumer to the wrong file. That is only possible
+     * because {@code TsonSchemaLinker} records each merged entry's origin.
      */
     @Test
     void aValueErrorCarriesTheDeclaringTypesOwnSchemaLocation() {
@@ -227,7 +229,23 @@ class TsonValidateTest {
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, problem.code());
         assertTrue(problem.dataPosition().isPresent(), "the value's own position in the data");
         assertEquals(Optional.of("/int32"), problem.schemaPointer(), "which entry declared the constraint");
+        assertEquals("tson.io/2026/32/m/core.tn", problem.schemaId(), "the schema that declared int32");
         assertTrue(problem.schemaPosition().isPresent(), "where int32 is declared");
+    }
+
+    /**
+     * The other half of the same rule: an entry the document's own schema declares is stamped with <em>its</em>
+     * identity, so the two are genuinely distinguished rather than one constant being reported everywhere.
+     */
+    @Test
+    void anErrorAgainstALocalDeclarationCarriesTheDocumentsOwnSchemaIdentity() {
+        Diagnostic problem = only(tsonWithPoint(), """
+                !!schema:"https://example.test/point-1.tn"
+                !point { x: 3 }""");
+
+        assertEquals(Diagnostic.Code.FIELD_REQUIRED, problem.code());
+        assertEquals(Optional.of("/point"), problem.schemaPointer());
+        assertEquals("example.test/point-1.tn", problem.schemaId());
     }
 
     /**
@@ -251,6 +269,7 @@ class TsonValidateTest {
 
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, problem.code());
         assertTrue(problem.schemaPointer().orElseThrow().startsWith("/array_text_"), problem.toString());
+        assertEquals("example.test/tags-1.tn", problem.schemaId(), "injected into the schema that desugared it");
         assertEquals(Optional.empty(), problem.schemaPosition(), "an injected entry has no source line");
     }
 

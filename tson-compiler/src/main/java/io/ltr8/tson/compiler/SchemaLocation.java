@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.SourcePosition;
-import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.util.Optional;
 
@@ -15,9 +15,14 @@ import java.util.Optional;
  * independent calls makes it possible for a reader to claim one and inherit the other from whichever reader
  * ran before it. {@link TsonReadContext#withSchemaLocation} takes all of it at once so that cannot happen.
  *
- * <p>{@code position} is {@link Optional} and {@code declaration} is not, which is the honest asymmetry: a
- * desugar-injected entry ({@code array_text_d5ed9ca5}) has a name in the resolved schema but no line in any
- * source text, so it can be pointed at even though it cannot be opened.
+ * <p>{@code position} is {@link Optional} and the other two are not, which is the honest asymmetry: a
+ * desugar-injected entry ({@code array_text_d5ed9ca5}) has a name in a schema but no line in any source text,
+ * so it can be pointed at even though it cannot be opened.
+ *
+ * <p><b>{@code schemaId} is the schema that <em>declared</em> the entry, not the one being read against.</b>
+ * They differ whenever an {@code !!import} is involved -- a four-line schema importing core.tn enforces
+ * {@code /int32} at core.tn's line 110 -- which is why it comes from {@link TsonLinkedSchema#originOf}, the
+ * record linking keeps of where each merged entry came from, rather than from the compiled schema's own id.
  *
  * <p><b>{@code declaration} is the entry a reader was built for, not necessarily the name that reader's own
  * message uses.</b> They coincide everywhere but one path: {@code RecordBindReader.rebindContainerIfNeeded}
@@ -25,16 +30,7 @@ import java.util.Optional;
  * message, and carries the original declaration's location through unchanged so the pointer still lands on
  * the entry that declares the rule.
  */
-public record SchemaLocation(String declaration, Optional<SourcePosition> position) {
-
-    /**
-     * The location of the entry a {@code ValueReaderFactory} is building a reader for -- {@code declaration}
-     * is the entry's own declared name, which every factory is handed, and the position is the declaration's
-     * own. Every reader stamps one of these; nothing else constructs one.
-     */
-    public static SchemaLocation of(String declaration, TypeDefinition definition) {
-        return new SchemaLocation(declaration, definition.position());
-    }
+public record SchemaLocation(String schemaId, String declaration, Optional<SourcePosition> position) {
 
     /**
      * The RFC 6901 pointer into the schema's own {@code map<type_name, type_definition>} -- {@code /my_type},
