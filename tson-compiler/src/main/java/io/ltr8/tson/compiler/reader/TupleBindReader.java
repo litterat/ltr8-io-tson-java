@@ -4,14 +4,13 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassTuple;
+import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
-import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
-import java.util.Optional;
 
 /**
  * Object-binding mode's own {@code tuple} reader -- reads a tuple's own array-shaped value into a
@@ -36,13 +35,13 @@ final class TupleBindReader extends TupleAbstractReader<Object> {
     private final DataClassTuple descriptor;
 
     public TupleBindReader(String name, TupleBody body, DataClassTuple descriptor, TsonTypeReaderResolver resolver,
-                           Optional<SourcePosition> schemaPosition) {
-        this(name, body, descriptor, resolver, schemaPosition, AnnotationTypes.DISCARDED);
+                           SchemaLocation schemaLocation) {
+        this(name, body, descriptor, resolver, schemaLocation, AnnotationTypes.DISCARDED);
     }
 
     public TupleBindReader(String name, TupleBody body, DataClassTuple descriptor, TsonTypeReaderResolver resolver,
-                           Optional<SourcePosition> schemaPosition, AnnotationTypes annotationTypes) {
-        super(name, body, resolver, schemaPosition,
+                           SchemaLocation schemaLocation, AnnotationTypes annotationTypes) {
+        super(name, body, resolver, schemaLocation,
                 position -> position < descriptor.elements().length
                         ? descriptor.elements()[position].dataClass()
                         : null,
@@ -52,7 +51,7 @@ final class TupleBindReader extends TupleAbstractReader<Object> {
 
     @Override
     public Object read(TsonReadContext ctx) {
-        ctx = ctx.withSchemaPosition(schemaPosition);
+        ctx = ctx.underDeclaration(schemaLocation);
         if (!expectTupleStart(ctx)) {
             return null;
         }
@@ -91,7 +90,7 @@ final class TupleBindReader extends TupleAbstractReader<Object> {
                 throw new IllegalArgumentException("'" + name + "' resolves to " + dataClass.typeClass()
                         + ", which isn't tuple-shaped -- can't bind '" + name + "' as one");
             }
-            return new TupleBindReader(name, body, descriptor, resolver, typeDefinition.position(),
+            return new TupleBindReader(name, body, descriptor, resolver, context.locationOf(name, typeDefinition),
                     AnnotationTypes.of(context));
         }
 

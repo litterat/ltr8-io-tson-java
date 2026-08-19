@@ -2,6 +2,7 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.Position;
+import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
@@ -127,7 +128,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     final Object[] precomputedValue;
     private final FixedCheck[] fixedCheck;
     final int positionalFieldIndex;
-    final Optional<SourcePosition> schemaPosition;
+    final SchemaLocation schemaLocation;
     /**
      * This type's declared field names in <em>schema</em> order, rendered once for the closure diagnostic
      * ({@link #readFields}) -- both its message and its machine-readable {@code expected}. Schema order, not
@@ -137,9 +138,9 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     private final String declaredFields;
 
     RecordAbstractReader(String name, RecordBody body, TsonTypeReaderResolver resolver,
-                          Optional<SourcePosition> schemaPosition) {
+                          SchemaLocation schemaLocation) {
         this.name = name;
-        this.schemaPosition = schemaPosition;
+        this.schemaLocation = schemaLocation;
         this.fields = buildFields(body, resolver);
         this.groups = body.groups();
         this.fieldIndex = new HashMap<>();
@@ -236,7 +237,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                 continue;
             }
             if (seen[schemaIndex]) {
-                ctx.field(fieldName.name()).report(Diagnostic.Code.DUPLICATE_FIELD,
+                ctx.schemaField(fieldName.name()).report(Diagnostic.Code.DUPLICATE_FIELD,
                         "duplicate field '" + fieldName.name() + "' on '" + name + "' -- a record states each "
                                 + "field at most once (§2.5), and the repeat states a value for nothing",
                         "each field stated once", "'" + fieldName.name() + "' stated again");
@@ -259,7 +260,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                 ctx.next();
                 decoded = valueForStatedAbsentField(schemaIndex, ctx);
             } else {
-                decoded = fields.get(schemaIndex).parser().read(ctx.field(fieldName.name()));
+                decoded = fields.get(schemaIndex).parser().read(ctx.schemaField(fieldName.name()));
             }
             sink.accept(schemaIndex, decoded);
             seen[schemaIndex] = true;
@@ -272,7 +273,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     final boolean[] readPositional(TsonReadContext ctx, FieldSink sink) {
         boolean[] seen = new boolean[fields.size()];
         int index = positionalFieldIndex;
-        Object decoded = fields.get(index).parser().read(ctx.field(fields.get(index).schema().name()));
+        Object decoded = fields.get(index).parser().read(ctx.schemaField(fields.get(index).schema().name()));
         sink.accept(index, decoded);
         seen[index] = true;
         return seen;
@@ -333,7 +334,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     final Object valueForStatedAbsentField(int schemaIndex, TsonReadContext ctx) {
         RecordField schema = fields.get(schemaIndex).schema();
         if (schema.state() == FieldState.REQUIRED_DEFAULT) {
-            ctx.field(schema.name()).report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION,
+            ctx.schemaField(schema.name()).report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION,
                     "'" + schema.name() + "' on '" + name + "' is always filled from the schema and cannot be "
                             + "written '_' -- omit the field to take its default (§5.2)",
                     "the field omitted, or a value for '" + schema.name() + "'", "_");
@@ -359,7 +360,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         RecordField schema = fields.get(schemaIndex).schema();
         return switch (schema.state()) {
             case REQUIRED -> {
-                ctx.field(schema.name()).report(Diagnostic.Code.FIELD_REQUIRED,
+                ctx.schemaField(schema.name()).report(Diagnostic.Code.FIELD_REQUIRED,
                         "missing required field '" + schema.name() + "' for '" + name + "'",
                         "a value for '" + schema.name() + "'", "(absent)");
                 yield null;
@@ -398,7 +399,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         }
         FixedCheck check = fixedCheck[schemaIndex];
         RecordField schema = fields.get(schemaIndex).schema();
-        TsonReadContext fieldCtx = ctx.field(fieldName);
+        TsonReadContext fieldCtx = ctx.schemaField(fieldName);
         if (ctx.peek() instanceof AbsentEvent) {
             ctx.next();
             if (schema.state() == FieldState.REQUIRED_FIXED) {

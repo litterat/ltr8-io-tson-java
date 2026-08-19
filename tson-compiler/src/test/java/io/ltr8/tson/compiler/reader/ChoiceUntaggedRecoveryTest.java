@@ -2,6 +2,7 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.*;
 import io.ltr8.tson.compiler.TsonTypeReader;
+import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.IntegerSize;
@@ -55,7 +56,8 @@ class ChoiceUntaggedRecoveryTest {
         TypeDefinition choiceDef = new TypeDefinition(Optional.empty(), TypeKind.SUM, List.of(), false,
                 List.of(), List.of(), disjoint, new ChoiceBody(refs));
         entries.put("contact", choiceDef);
-        ValueReaderContext context = new ValueReaderContext(new TsonSchema("id", "meta", List.of(), entries), readers);
+        ValueReaderContext context = new ValueReaderContext(
+                new TsonLinkedSchema(new TsonSchema("id", "meta", List.of(), entries)), readers);
         return ChoiceReader.FACTORY.create("contact", choiceDef, context);
     }
 

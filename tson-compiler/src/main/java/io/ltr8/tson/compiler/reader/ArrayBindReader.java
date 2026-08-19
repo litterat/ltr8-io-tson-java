@@ -5,17 +5,16 @@ import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassArray;
 import io.ltr8.bind.DataParameterizedType;
+import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.schema.meta.ArrayBody;
-import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Object-binding mode's own {@code array} reader -- reads an array-shaped value into a real, bound
@@ -56,22 +55,22 @@ final class ArrayBindReader extends ArrayAbstractReader<Object> {
     private final DataClassArray descriptor;
 
     public ArrayBindReader(String name, ArrayBody body, DataClassArray descriptor, TsonTypeReaderResolver resolver,
-                           Optional<SourcePosition> schemaPosition) {
-        this(name, body, descriptor, resolver, schemaPosition, AnnotationTypes.DISCARDED);
+                           SchemaLocation schemaLocation) {
+        this(name, body, descriptor, resolver, schemaLocation, AnnotationTypes.DISCARDED);
     }
 
     public ArrayBindReader(String name, ArrayBody body, DataClassArray descriptor, TsonTypeReaderResolver resolver,
-                           Optional<SourcePosition> schemaPosition, AnnotationTypes annotationTypes) {
+                           SchemaLocation schemaLocation, AnnotationTypes annotationTypes) {
         super(name, body,
                 AnnotationBoxing.wrap(resolver.resolve(body.elementType().name()), descriptor.arrayDataClass(),
                         annotationTypes),
-                schemaPosition);
+                schemaLocation);
         this.descriptor = descriptor;
     }
 
     @Override
     public Object read(TsonReadContext ctx) {
-        ctx = ctx.withSchemaPosition(schemaPosition);
+        ctx = ctx.underDeclaration(schemaLocation);
         if (!expectArrayStart(ctx)) {
             return null;
         }
@@ -173,7 +172,7 @@ final class ArrayBindReader extends ArrayAbstractReader<Object> {
                 throw new IllegalArgumentException("'" + name + "' resolves to " + dataClass.typeClass()
                         + ", which isn't array-shaped -- can't bind '" + name + "' as one");
             }
-            return new ArrayBindReader(name, body, descriptor, resolver, typeDefinition.position(),
+            return new ArrayBindReader(name, body, descriptor, resolver, context.locationOf(name, typeDefinition),
                     AnnotationTypes.of(context));
         }
 

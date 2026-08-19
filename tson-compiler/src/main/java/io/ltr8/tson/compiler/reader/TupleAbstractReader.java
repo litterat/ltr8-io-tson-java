@@ -1,6 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.Diagnostic;
+import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
@@ -10,7 +11,6 @@ import io.ltr8.tson.compiler.stream.ArrayStart;
 import io.ltr8.tson.compiler.stream.SchemaRef;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.schema.meta.ElementState;
-import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TupleElement;
 
@@ -18,7 +18,6 @@ import io.ltr8.bind.DataClass;
 import java.util.function.IntFunction;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Everything {@link TupleTreeReader} and {@link TupleBindReader} share verbatim: resolving every
@@ -48,10 +47,10 @@ abstract class TupleAbstractReader<T> implements TsonTypeReader<T> {
 
     final String name;
     final List<CompiledSlot> slots;
-    final Optional<SourcePosition> schemaPosition;
+    final SchemaLocation schemaLocation;
 
-    TupleAbstractReader(String name, TupleBody body, TsonTypeReaderResolver resolver, Optional<SourcePosition> schemaPosition) {
-        this(name, body, resolver, schemaPosition, position -> null, AnnotationTypes.DISCARDED);
+    TupleAbstractReader(String name, TupleBody body, TsonTypeReaderResolver resolver, SchemaLocation schemaLocation) {
+        this(name, body, resolver, schemaLocation, position -> null, AnnotationTypes.DISCARDED);
     }
 
     /**
@@ -61,7 +60,7 @@ abstract class TupleAbstractReader<T> implements TsonTypeReader<T> {
      * types and any subset of them may be boxed.
      */
     TupleAbstractReader(String name, TupleBody body, TsonTypeReaderResolver resolver,
-                         Optional<SourcePosition> schemaPosition, IntFunction<DataClass> boxedAt,
+                         SchemaLocation schemaLocation, IntFunction<DataClass> boxedAt,
                          AnnotationTypes annotationTypes) {
         this.name = name;
         List<CompiledSlot> slots = new ArrayList<>(body.elements().size());
@@ -72,7 +71,7 @@ abstract class TupleAbstractReader<T> implements TsonTypeReader<T> {
             slots.add(new CompiledSlot(element, parser));
         }
         this.slots = slots;
-        this.schemaPosition = schemaPosition;
+        this.schemaLocation = schemaLocation;
     }
 
     /**

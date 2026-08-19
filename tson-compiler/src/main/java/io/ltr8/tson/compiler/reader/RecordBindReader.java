@@ -11,13 +11,13 @@ import io.ltr8.bind.DataClassMap;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassUnion;
 import io.ltr8.tson.compiler.Diagnostic;
+import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.base.NumberNarrowing;
 import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.math.BigDecimal;
@@ -77,8 +77,8 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
     private final AnnotationTypes annotationTypes;
 
     public RecordBindReader(String name, RecordBody body, DataClassRecord descriptor, TsonTypeReaderResolver resolver,
-                             Optional<SourcePosition> schemaPosition, AnnotationTypes annotationTypes) {
-        super(name, body, resolver, schemaPosition);
+                             SchemaLocation schemaLocation, AnnotationTypes annotationTypes) {
+        super(name, body, resolver, schemaLocation);
         this.descriptor = descriptor;
         this.annotationsCarrier = descriptor.annotationsCarrier().orElse(null);
         this.annotationTypes = annotationTypes;
@@ -160,18 +160,18 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         TsonTypeReader<?> parser = field.parser();
         if (target.dataClass() instanceof DataClassArray targetArray && parser instanceof ArrayBindReader existing) {
             return new ArrayBindReader(field.schema().name(), existing.body, targetArray, resolver,
-                    existing.schemaPosition, annotationTypes);
+                    existing.schemaLocation, annotationTypes);
         }
         if (target.dataClass() instanceof DataClassMap targetMap && parser instanceof MapBindReader existing) {
             return new MapBindReader(field.schema().name(), existing.body, targetMap, resolver,
-                    existing.schemaPosition, annotationTypes);
+                    existing.schemaLocation, annotationTypes);
         }
         return parser;
     }
 
     @Override
     public Object read(TsonReadContext ctx) {
-        ctx = ctx.withSchemaPosition(schemaPosition);
+        ctx = ctx.inRecord(schemaLocation);
         // Hoisted ahead of the shape check, like the tree readers: the base consumes the framing and
         // discards it, so capturing first leaves that call a no-op. Nothing to capture when the bound class
         // declares no carrier, in which case annotationTypes is DISCARDED and this consumes and drops.
@@ -301,7 +301,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
 
             if (typeDefinition.subtypes().isEmpty()) {
                 return new RecordBindReader(name, body, requireRecord(name, dataClass), resolver,
-                        typeDefinition.position(), AnnotationTypes.of(context));
+                        context.locationOf(name, typeDefinition), AnnotationTypes.of(context));
             }
 
             if (dataClass instanceof DataClassUnion union) {
@@ -317,7 +317,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
 
             if (dataClass instanceof DataClassRecord record) {
                 RecordBindReader ownParser = new RecordBindReader(name, body, record, resolver,
-                        typeDefinition.position(), AnnotationTypes.of(context));
+                        context.locationOf(name, typeDefinition), AnnotationTypes.of(context));
                 return new VariantSchemaReader(name, ownParser, typeDefinition.subtypes(), resolver,
                         AnnotationTypes.DISCARDED);
             }

@@ -1,6 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.Diagnostic;
+import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
@@ -12,11 +13,9 @@ import io.ltr8.tson.compiler.stream.SchemaRef;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.schema.meta.MapBody;
-import io.ltr8.tson.schema.meta.SourcePosition;
 
 import java.math.BigInteger;
 import java.util.HashSet;
-import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiConsumer;
 
@@ -58,11 +57,11 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
     final MapBody body;
     final TsonTypeReader<?> keyParser;
     final TsonTypeReader<?> valueParser;
-    final Optional<SourcePosition> schemaPosition;
+    final SchemaLocation schemaLocation;
 
-    MapAbstractReader(String name, MapBody body, TsonTypeReaderResolver resolver, Optional<SourcePosition> schemaPosition) {
+    MapAbstractReader(String name, MapBody body, TsonTypeReaderResolver resolver, SchemaLocation schemaLocation) {
         this(name, body, resolver.resolve(body.keyType().name()), resolver.resolve(body.valueType().name()),
-                schemaPosition);
+                schemaLocation);
     }
 
     /**
@@ -72,12 +71,12 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
      * which both modes share, free of anything only one of them needs.
      */
     MapAbstractReader(String name, MapBody body, TsonTypeReader<?> keyParser, TsonTypeReader<?> valueParser,
-                      Optional<SourcePosition> schemaPosition) {
+                      SchemaLocation schemaLocation) {
         this.name = name;
         this.body = body;
         this.keyParser = keyParser;
         this.valueParser = valueParser;
-        this.schemaPosition = schemaPosition;
+        this.schemaLocation = schemaLocation;
     }
 
     /**

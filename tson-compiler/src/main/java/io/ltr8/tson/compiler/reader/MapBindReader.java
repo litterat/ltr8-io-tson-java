@@ -5,16 +5,15 @@ import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassMap;
 import io.ltr8.bind.DataParameterizedType;
+import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.schema.meta.MapBody;
-import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.lang.reflect.Type;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * Object-binding mode's own {@code map} reader -- reads a map-shaped value into a real, bound Java
@@ -41,25 +40,25 @@ final class MapBindReader extends MapAbstractReader<Object> {
     private final DataClassMap descriptor;
 
     public MapBindReader(String name, MapBody body, DataClassMap descriptor, TsonTypeReaderResolver resolver,
-                         Optional<SourcePosition> schemaPosition) {
-        this(name, body, descriptor, resolver, schemaPosition, AnnotationTypes.DISCARDED);
+                         SchemaLocation schemaLocation) {
+        this(name, body, descriptor, resolver, schemaLocation, AnnotationTypes.DISCARDED);
     }
 
     public MapBindReader(String name, MapBody body, DataClassMap descriptor, TsonTypeReaderResolver resolver,
-                         Optional<SourcePosition> schemaPosition, AnnotationTypes annotationTypes) {
+                         SchemaLocation schemaLocation, AnnotationTypes annotationTypes) {
         super(name, body,
                 AnnotationBoxing.wrap(resolver.resolve(body.keyType().name()), descriptor.keyDataClass(),
                         annotationTypes),
                 AnnotationBoxing.wrap(resolver.resolve(body.valueType().name()), descriptor.valueDataClass(),
                         annotationTypes),
-                schemaPosition);
+                schemaLocation);
         this.descriptor = descriptor;
     }
 
 
     @Override
     public Object read(TsonReadContext ctx) {
-        ctx = ctx.withSchemaPosition(schemaPosition);
+        ctx = ctx.underDeclaration(schemaLocation);
         Shape shape = expectMapShape(ctx);
         if (shape == Shape.MISMATCH) {
             return null;
@@ -123,7 +122,7 @@ final class MapBindReader extends MapAbstractReader<Object> {
                 throw new IllegalArgumentException("'" + name + "' resolves to " + dataClass.typeClass()
                         + ", which isn't map-shaped -- can't bind '" + name + "' as one");
             }
-            return new MapBindReader(name, body, descriptor, resolver, typeDefinition.position(),
+            return new MapBindReader(name, body, descriptor, resolver, context.locationOf(name, typeDefinition),
                     AnnotationTypes.of(context));
         }
 

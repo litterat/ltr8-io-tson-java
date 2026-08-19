@@ -1,12 +1,12 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.tree.*;
 import io.ltr8.tson.tree.TsonAbsent;
 import io.ltr8.tson.schema.meta.ArrayBody;
-import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.tree.TsonValue;
 
@@ -24,9 +24,9 @@ import java.util.Optional;
 final class ArrayTreeReader extends ArrayAbstractReader<TsonValue> {
 
     public ArrayTreeReader(String name, ArrayBody body, TsonTypeReaderResolver resolver,
-                           Optional<SourcePosition> schemaPosition,
+                           SchemaLocation schemaLocation,
                             AnnotationTypes annotationTypes) {
-        super(name, body, resolver, schemaPosition);
+        super(name, body, resolver, schemaLocation);
         this.annotationTypes = annotationTypes;
     }
 
@@ -41,13 +41,14 @@ final class ArrayTreeReader extends ArrayAbstractReader<TsonValue> {
             if (!(typeDefinition.body() instanceof ArrayBody body)) {
                 throw new IllegalArgumentException("'" + name + "' is not array-shaped: " + typeDefinition.body());
             }
-            return new ArrayTreeReader(name, body, resolver, typeDefinition.position(), AnnotationTypes.of(context));
+            return new ArrayTreeReader(name, body, resolver, context.locationOf(name, typeDefinition),
+                    AnnotationTypes.of(context));
         }
     }
 
     @Override
     public TsonValue read(TsonReadContext ctx) {
-        ctx = ctx.withSchemaPosition(schemaPosition);
+        ctx = ctx.underDeclaration(schemaLocation);
         List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx, annotationTypes);
         if (!expectArrayStart(ctx)) {
             return null;

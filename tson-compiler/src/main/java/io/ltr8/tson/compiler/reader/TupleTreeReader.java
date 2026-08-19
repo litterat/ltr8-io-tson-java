@@ -1,12 +1,12 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.tree.*;
 import io.ltr8.tson.tree.TsonValue;
 import io.ltr8.tson.tree.TsonTuple;
-import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
@@ -25,9 +25,9 @@ import java.util.Optional;
 final class TupleTreeReader extends TupleAbstractReader<TsonValue> {
 
     public TupleTreeReader(String name, TupleBody body, TsonTypeReaderResolver resolver,
-                           Optional<SourcePosition> schemaPosition,
+                           SchemaLocation schemaLocation,
                             AnnotationTypes annotationTypes) {
-        super(name, body, resolver, schemaPosition);
+        super(name, body, resolver, schemaLocation);
         this.annotationTypes = annotationTypes;
     }
 
@@ -42,13 +42,14 @@ final class TupleTreeReader extends TupleAbstractReader<TsonValue> {
             if (!(typeDefinition.body() instanceof TupleBody body)) {
                 throw new IllegalArgumentException("'" + name + "' is not tuple-shaped: " + typeDefinition.body());
             }
-            return new TupleTreeReader(name, body, resolver, typeDefinition.position(), AnnotationTypes.of(context));
+            return new TupleTreeReader(name, body, resolver, context.locationOf(name, typeDefinition),
+                    AnnotationTypes.of(context));
         }
     }
 
     @Override
     public TsonValue read(TsonReadContext ctx) {
-        ctx = ctx.withSchemaPosition(schemaPosition);
+        ctx = ctx.underDeclaration(schemaLocation);
         List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx, annotationTypes);
         if (!expectTupleStart(ctx)) {
             return null;

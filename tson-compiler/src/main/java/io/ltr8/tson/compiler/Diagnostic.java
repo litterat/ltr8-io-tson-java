@@ -20,16 +20,19 @@ import java.util.Optional;
  *   <li>{@code path} -- the *data* location, an RFC 6901 JSON Pointer (e.g. {@code /orders/3/total}).
  *   Reuses an existing IETF standard rather than a TSON-specific path syntax. Absent for a problem
  *   found in a schema, which has no data.</li>
- *   <li>{@code schemaPointer} -- the *schema* location, an RFC 6901 JSON Pointer into the schema's
- *   own {@code map<type_name, type_definition>} (e.g. {@code /my_type}). Deeper pointers
- *   ({@code /my_type/fields/x}) are the natural extension; positions are per declaration today.</li>
+ *   <li>{@code schemaPointer} -- the *schema* location, an RFC 6901 JSON Pointer. On the read path it is
+ *   the path taken through the schema being validated against ({@code /person/age}), which is a literal
+ *   pointer into that schema document as written; on the schema path it is the failing declaration
+ *   ({@code /my_type}), because a schema problem is about the declaration itself and no validation path
+ *   led to it. See {@link SchemaLocation} for how a read accumulates one.</li>
  *   <li>{@code schemaId} -- the canonical identity ([TSON-DATA] §2.2.1) of the schema
  *   {@code schemaPointer}/{@code schemaPosition} refer to. Without it a schema position is ambiguous
  *   across schemas: {@code 110:3:4858} is core.tn's line for {@code int32}, and nothing else says so.</li>
  *   <li>{@code dataPosition}/{@code schemaPosition} -- line/column/byte-offset in the *submitted
  *   document* and in the *schema source*. Either may be absent (a synthesized/materialized schema
  *   entry has no source position of its own, and not every data value's own position is tracked yet,
- *   see {@link TsonReadContext}'s own Javadoc).</li>
+ *   see {@link TsonReadContext}'s own Javadoc). {@code schemaPosition} is per <em>declaration</em>, so it
+ *   is one level coarser than a read-path pointer: {@code /person/age} carries {@code person}'s own line.</li>
  * </ul>
  *
  * <p><b>Both pointers are {@link Optional} because {@code ""} is a real pointer.</b> RFC 6901 spells

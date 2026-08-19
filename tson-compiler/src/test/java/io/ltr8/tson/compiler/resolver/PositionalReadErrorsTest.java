@@ -54,7 +54,7 @@ class PositionalReadErrorsTest {
     }
 
     @Test
-    void missingRequiredFieldErrorCarriesBothDataAndSchemaPositions() {
+    void missingRequiredFieldErrorCarriesBothDataAndSchemaLocations() {
         String schemaSource = """
                 !!id:"https://tson.io/test-suite/scratch/position-demo.tn"
                 !!meta:"https://tson.io/test-suite/scratch/fake-meta.tn"
@@ -95,6 +95,8 @@ class PositionalReadErrorsTest {
         SourcePosition dataPosition = thrown.diagnostic().dataPosition().orElseThrow();
         assertEquals(new Position(lineOf(dataSource, "{"), 1, 0), dataPosition);
 
+        assertEquals(Optional.of("/my_record/value"), thrown.diagnostic().schemaPointer(),
+                "the missing field itself, reached from the record that declares it");
         assertTrue(thrown.diagnostic().schemaPosition().isPresent());
         SourcePosition schemaPosition = thrown.diagnostic().schemaPosition().get();
         assertEquals(lineOf(schemaSource, "my_record"), schemaPosition.line());

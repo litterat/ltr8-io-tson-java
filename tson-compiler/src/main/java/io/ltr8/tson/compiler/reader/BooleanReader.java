@@ -1,13 +1,12 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.Diagnostic;
+import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
-import io.ltr8.tson.schema.meta.SourcePosition;
 
-import java.util.Optional;
 
 /**
  * Reads meta-kernel's {@code boolean => !enum [true false]} as a genuine Java {@code Boolean} rather than
@@ -18,15 +17,15 @@ import java.util.Optional;
  */
 final class BooleanReader implements TsonTypeReader<Boolean> {
 
-    private final Optional<SourcePosition> schemaPosition;
+    private final SchemaLocation schemaLocation;
 
-    BooleanReader(Optional<SourcePosition> schemaPosition) {
-        this.schemaPosition = schemaPosition;
+    BooleanReader(SchemaLocation schemaLocation) {
+        this.schemaLocation = schemaLocation;
     }
 
     @Override
     public Boolean read(TsonReadContext ctx) {
-        ctx = ctx.withSchemaPosition(schemaPosition);
+        ctx = ctx.underDeclaration(schemaLocation);
         EventSkip.annotationsAndTypeRef(ctx);
         TsonEvent e = ctx.peek();
         if (!(e instanceof TokenEvent token)) {

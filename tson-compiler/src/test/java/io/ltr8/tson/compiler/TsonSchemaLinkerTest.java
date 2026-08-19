@@ -78,6 +78,49 @@ class TsonSchemaLinkerTest {
      * over a materialisation pass that built {@code ArrayBody}/placeholder entries from hand-written per-shape
      * assemblers -- now lives in {@code SchemaDesugarerTest}, one phase earlier and one module over.
      */
+    /** A schema with its own identity and imports, for the origin-tracking chain below. */
+    private static TsonSchema schemaOf(String id, List<String> imports, Map<String, TypeDefinition> entries) {
+        return new TsonSchema(id, TsonBundledSchemas.META_KERNEL_ID, imports, entries);
+    }
+
+    /**
+     * <b>An imported entry keeps the identity of the schema that declared it, however many hops away.</b>
+     * Merging flattens three documents' entries into one namespace, which is what makes every reference
+     * resolvable -- and would erase which document each entry was written in, leaving a read diagnostic's
+     * {@code schemaPosition} pointing at a line in a file the consumer was never given. The intermediary is
+     * deliberately not the answer for {@code c_type}: {@code b.tn} passed it along, {@code c.tn} wrote it.
+     */
+    @Test
+    void aMergedEntryKeepsTheIdentityOfTheSchemaThatDeclaredIt() {
+        TsonSchemaRegistry registry = new TsonSchemaRegistry();
+        registry.register(TsonSchemaLinker.link(
+                schemaOf("https://example.test/c.tn", List.of(), Map.of("c_type", emptyRecord())), registry));
+        registry.register(TsonSchemaLinker.link(
+                schemaOf("https://example.test/b.tn", List.of("https://example.test/c.tn"),
+                        Map.of("b_type", emptyRecord())), registry));
+
+        TsonLinkedSchema a = TsonSchemaLinker.link(
+                schemaOf("https://example.test/a.tn", List.of("https://example.test/b.tn"),
+                        Map.of("a_type", emptyRecord())), registry);
+
+        assertEquals(Set.of("c_type", "b_type", "a_type"), a.schema().entries().keySet());
+        assertEquals("example.test/c.tn", a.originOf("c_type"), "declared two imports away");
+        assertEquals("example.test/b.tn", a.originOf("b_type"));
+        assertEquals("example.test/a.tn", a.originOf("a_type"));
+    }
+
+    /**
+     * A hand-assembled {@link TsonLinkedSchema} -- one that never went through the linker, so nothing ever
+     * recorded an origin -- answers with its own identity rather than nothing at all, since an entry with no
+     * recorded origin was never merged in from anywhere.
+     */
+    @Test
+    void anUnmergedEntryOriginatesInTheSchemaHoldingIt() {
+        TsonLinkedSchema linked = new TsonLinkedSchema(schemaOf(Map.of("local", emptyRecord())));
+
+        assertEquals("https://example.test/s.tn1", linked.originOf("local"));
+    }
+
     @Test
     void anArgumentBearingFieldTypeIsCarriedThroughWithoutSynthesizingAnEntry() {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
