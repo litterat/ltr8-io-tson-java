@@ -2951,3 +2951,146 @@ colliding. Neither `?` form is expanded at the *array* element (`[T?]`) yet, at 
 
 Either way §12.1's note and §5.3's paragraph should agree; today one permits the form and the other
 describes only the case where it cannot occur.
+
+
+---
+
+## 50. Constructor applications must materialise entries — §8.2's "exactly one form materialises" describes a representation that cannot carry what §5.3 permits
+
+**Section:** §8.2 (Template Instantiation — the opening rule, *Identity*, *Entry shape*); §5.3
+("Resolution is structural"); §5.4 (inline choice); §5.6 (the desugaring table); §8.1 (`type_ref`,
+`type_argument`). Related: #45, #49, #51.
+
+**Problem:** §8.2 opens with an absolute rule and one exception:
+
+> Constructor applications never materialise entries — they are carried structurally wherever they occur
+> (§5.3) and, as declaration bodies, resolve in place as constructions (§5.6). Exactly one form
+> materialises: a **fully-bound application of a non-constructor template**.
+
+§5.3 gives the structural form: an inline application "does not materialise a schema entry. The resolver
+represents it in place as a `type_ref` value (§8.1) whose `name` is the desugar target and whose
+`arguments` are `type_argument` records". §5.4 repeats it for inline choice. The declaration half of the
+rule is right and is not at issue — `lookup => map<text, integer>` resolving in place as a construction is
+§5.6 working exactly as written. The use-site half does not hold, for one decisive reason and two
+supporting ones.
+
+**(a) The structural channel cannot carry what §5.3 permits — decisively so once #45 lands.** A
+`type_argument` has exactly two members, `name` and `value`, and they bind *positionally against the head's
+declared parameters*. A vocabulary field with no `value_param` therefore has no channel at all. Two of
+§5.3's own forms bind exactly such fields:
+
+- **Element/position state.** §5.3 says the `?` forms "have no template route … and desugar directly" —
+  `array`'s `state` carries no `value_param`, and `tuple_element.state` is not a parameter of `tuple`. #49
+  records this in full: nested `[T, U?]` and `[T, U]` carry structurally as the *same* `type_ref`.
+- **Sizes, after #45.** #49 exempts sizes ("they route through the `array_min`/`array_max`/`array_ranged`
+  templates' value parameters"), and that exemption is exactly as durable as the three templates. #45's
+  point 5 deletes them and desugars the sugar straight into `array`'s vocabulary, where `min_items` and
+  `max_items` have no `value_param` either. At that point `[T]`, `[T?]`, `[T; 3]` and `[T?; 3]` all carry
+  structurally as the identical `{ name: array  arguments: [ { name: T } ] }`, and §8.2's identity rule —
+  "two fully-bound applications denote the same entry if and only if their flattened applications are
+  structurally equal" — puts four distinct types on one identity.
+
+There is no repair that keeps the rule: giving `type_argument` a labelled-binding channel mirroring #45's
+`C<args; member …>` source form would have to extend to the bracket spelling (`[type; member …]`) as well,
+and the resolved form would then be a second, parallel spelling of a binding record that
+`type_definition` already expresses. An entry *is* the representation that carries this.
+
+**(b) It relocates the routing work rather than removing it.** §8.2 states the consumer's obligation
+plainly: "validators interpret them directly with a one-hop lookup of the head". That lookup is
+argument→vocabulary routing — resolving `{ name: map  arguments: [ … ] }` means reading `map`'s parameters,
+finding each vocabulary field's `value_param`, and binding. The resolver has the constructor vocabulary in
+hand and does this once; carrying structurally defers it past that point and obliges every consumer to
+re-implement it.
+
+**(c) It creates two representations of one thing.** A materialised entry is a `type_definition`, which
+every consumer already handles. A structural `type_ref` with `arguments` is a parallel encoding of the same
+content requiring a parallel resolution path everywhere a type is reached.
+
+**Interpretation chosen:** **every application materialises an entry**, at desugar time, and the use site
+becomes a bare reference to it (`SchemaDesugarer`). Declaration position is unchanged and follows §5.6. The
+entry name derives from the flattened application, so §8.2's identity, dedup and internal-name rules apply
+as written — structurally equal applications collapse onto one entry, and the name is resolver-chosen and
+unnameable from source. `map<text, [order]>` at a field position yields:
+
+```
+array_order_070e44f3                    => !array { element_type: order }
+map_text_array_order_070e44f3_fd48f75f  => !map { key_type: text  value_type: array_order_070e44f3 }
+```
+
+The divergence is visible in the bundled artifacts: meta-kernel resolves to 58 entries against
+`meta-kernel-resolved.tn`'s 49. The nine extras are `set<token>` (§5.6's `set` constructor) and eight `[X]`
+field types. Meta-kernel contains no application of a non-constructor template anywhere, so under §8.2 as
+written it materialises nothing at all.
+
+**Suggested resolution:** replace §8.2's opening rule with the general one — *an application materialises
+an entry wherever it occurs, except as a declaration body, where §5.6's construction-in-place applies.*
+Everything else in §8.2 already reads generally and needs no change: identity is structural equality of the
+flattened application, names are internal, dedup and non-recursion rules stand. Then:
+
+- Delete §5.3's "Resolution is structural" paragraph and §5.4's "an inline choice materialises no entry"
+  sentence. §5.4's `disjoint` caveat goes with them: an inline choice now has an entry to carry the fact,
+  so no consumer needs to recompute it in place.
+- Keep `type_ref.arguments` in §8.1 — the applied form is still what an entry's `source` records, which is
+  where §8.2 already says it belongs and what makes an entry self-describing.
+- §8.2's *Non-exposure* paragraph goes too; #51 has the separate argument for that.
+
+If the working draft's own earlier resolved fixture already carried these entries, that output is the
+better guide than the current rule text.
+
+
+---
+
+## 51. §8.2's non-exposure rule contradicts its own identity rule once `!!import` merges into one namespace
+
+**Section:** §8.2 (*Non-exposure*, *Identity*, *Entry names are internal*); §2.2.3 (`!!import`); §8.1
+(a schema is a map from names to definitions). Related: #50.
+
+**Problem:** §8.2 says materialised entries are invisible across an import:
+
+> Instantiation entries are resolver-materialised, not declared. They cannot be named from any schema
+> source and MUST NOT participate in `!!import` resolution: imports merge declared entries only (§2.2.3);
+> an importing schema applying the same imported template materialises its own entry.
+
+The first two clauses are fine — an author cannot write an internal name, and should not be able to. The
+third is unimplementable, and the remedy it prescribes contradicts §8.2's own identity rule.
+
+A resolved schema is one map keyed by type name (§8.1), and `!!import` merges another schema's entries into
+it. So an importing schema's namespace already contains every materialised entry the imported schema
+produced. When that schema then writes the same application, the identity rule applies:
+
+> two fully-bound applications denote the same entry if and only if their flattened applications are
+> structurally equal … The first occurrence materialises; later occurrences reuse.
+
+**Worked example, from the bundled schemas.** Meta-kernel writes `[type_name]` three times —
+`record.supertypes` (line 305), `type_definition.supertypes` and `.subtypes` (382-383) — which materialise
+one entry between them. meta.tn imports meta-kernel and writes the identical application in `extern`:
+
+```
+  extern => ~sum & {
+    schema: uri
+    types:  [type_name]?
+  }
+```
+
+The entry is already in meta.tn's namespace under the name that application derives. Referencing it is what
+the identity rule requires. Materialising a second one is not merely undesirable, it is impossible: a map
+holds one value per key, and renaming meta.tn's copy would put two identically-bodied types under two names,
+which is precisely what the identity rule exists to prevent.
+
+**Interpretation chosen:** an application whose derived name is already present in the merged namespace is
+*referenced*, not redeclared (`SchemaDesugarer.imported`, consulted by `hoist`). Without it the resolver
+rejects meta.tn outright under the ordinary local-vs-import collision check — the collision being a name
+the spec says should never have crossed the boundary.
+
+**Suggested resolution:** delete the *Non-exposure* paragraph's second and third clauses and restate it:
+
+> Materialised entries are resolver-named and cannot be named from any schema source. They merge under
+> `!!import` like any other entry, and an importing schema whose own application derives an already-merged
+> entry's name denotes that entry — the identity rule (above) applied across the merge.
+
+One consequence worth stating with it: internal names become part of a schema's effective import surface,
+so §8.2's *Determinism* recommendation ("names derived from the flattened application's content") is doing
+more work than diff-stability. It is still not required for correctness — an implementation that names
+entries differently produces a redundant second entry, not a wrong one — but it is what makes two
+implementations' merged namespaces agree entry-for-entry, and is worth stating as such rather than as a
+formatting nicety.

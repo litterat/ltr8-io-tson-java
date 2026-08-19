@@ -1444,12 +1444,16 @@ final class DefinitionResolver {
      * enum}'s own {@code members: set<token>}, resolved the same way a refinement source's
      * arguments are, via {@link #resolveSimpleTypeArg(TypeArg)} -- only a simple, non-nested
      * argument is supported so far, same limit as elsewhere), or the inline array sugar {@code [T]}
-     * (§5.3), which desugars to the constructor application {@code !array { element_type: T }} --
-     * represented in place as a {@code type_ref} value, {@code { name: array  arguments: [ { name:
-     * T } ] } }, exactly like any other generic application (§5.3: "An inline constructor
-     * application does not materialise a schema entry"). Per the same section this would carry
-     * {@code @alias:field_name} when {@code T} is itself an aliased reference (§8.3's reference
-     * flattening) -- not implemented yet, so the bare, unaliased form is produced instead.
+     * (§5.3), which resolves to {@code { name: array  arguments: [ { name: T } ] } } -- §5.3's
+     * structural representation of an inline application.
+     *
+     * <p><b>That last branch is unreachable through the ordinary pipeline</b>: {@link SchemaDesugarer}
+     * materialises an entry for every application and leaves a bare reference behind, so this method
+     * sees {@link SimpleRef} where §5.3 would put a structural {@code type_ref}. The materialising
+     * choice is deliberate and argued in {@code SPEC-FEEDBACK.md} #50 -- §8.2's {@code type_argument}
+     * binds positionally against the head's declared parameters and so cannot carry a vocabulary field
+     * no parameter routes. The branch is kept because it is the shape the structural form takes, and
+     * because a caller reaching this resolver without the desugar pass still resolves.
      */
     private io.ltr8.tson.schema.meta.TypeRef resolveTypeRef(TypeRef ref) {
         if (ref instanceof SimpleRef simple) {

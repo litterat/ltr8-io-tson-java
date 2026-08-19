@@ -45,11 +45,15 @@ materialization, no validation (those are the resolver's/linker's jobs).
 An AST→AST rewrite between parsing and resolution. Every sugar form (`[T]`, `[T; N..M]`, §5.3), the choice
 sugar (`(A | B)`, §5.4) and every generic application (`map<K, V>`, §5.6) becomes a `!C value` construction:
 at declaration position it simply *is* that construction, and anywhere else (a field, an element, a variant)
-it becomes an **injected declaration plus a bare reference to it**. **The second half is a known conformance
+it becomes an **injected declaration plus a bare reference to it**. **The second half is a deliberate
 divergence** — §8.2 says a constructor application *never* materialises an entry and is carried structurally
-at the use site; declaration position, where the spec agrees, is correct. It stands because nothing
-downstream reads `TypeRef.arguments()`, so the structural form would have nothing to compile against;
-`BACKLOG.md` has the full account, including the `!!import` visibility that rides on it. So `DefinitionResolver` only ever sees two shapes: a bare
+at the use site; declaration position, where the spec agrees, is correct. It is argued as spec feedback
+rather than tracked as debt: §8.2's `type_argument` channel binds positionally against the head's declared
+parameters, so it cannot carry a vocabulary field no parameter routes — an element/position `state` today
+(#49), and a size too once #45's redesign removes the size templates, at which point `[T]`, `[T?]`, `[T; 3]`
+and `[T?; 3]` would all carry as the same `type_ref`. `SPEC-FEEDBACK.md` #50 has that argument and #51 the
+`!!import` visibility that rides on it — which is not a violation to repair but what §8.2's own identity rule
+requires once imports merge into one namespace. So `DefinitionResolver` only ever sees two shapes: a bare
 reference or `!C value`. §5.3/§5.6 already *describe* these forms as desugarings and §3.3.1 calls their
 targets "the implicit desugar targets of the sugar forms" — this implements that literally instead of
 splitting it across the resolver (declaration position) and the linker (field position), which is what it
@@ -81,7 +85,8 @@ construction — see the partial-application bullet below.
   a second vocabulary lookup one level down, and nothing rides on trust: the emitted body binds through the
   governing meta's compiled reader, where an undeclared member is `UNRECOGNIZED_FIELD` under §7.2's closure.
   §5.4's "each variant resolves to a distinct type" is deliberately not checked here: it is a question about
-  what names *resolve to*, after §8.3 flattening, which this phase can't answer (`BACKLOG.md`).
+  what names *resolve to*, after §8.3 flattening, which this phase can't answer (`BACKLOG.md`'s
+  reference-closure item).
 - **Both bracket positions desugar, tuple as well as array.** At declaration position the form *is* the
   construction (`pair => [integer, text]` becomes `!tuple { ... }`, like `ids => [text]` and
   `contact => (A | B)`); inline it is hoisted into a `tuple_<...>_<hash>` declaration and referenced.
@@ -97,7 +102,7 @@ construction — see the partial-application bullet below.
   nested form carries no parameter its flat sibling does not. An injected **tuple**'s name derives from its
   positions' *states* as well as their types, or `[T, U?]` and `[T, U]` would land on one entry — and that
   form is exactly the one §8.2's structural representation has no channel for, so nesting it is only
-  representable at all *because* of the entry-materialising divergence (`SPEC-FEEDBACK.md` #49).
+  representable at all *because* of the entry-materialising divergence (`SPEC-FEEDBACK.md` #49, #50).
 - **The element `?` is a *direct* binding, not a routed one.** `[T?]` becomes `!array { element_type: T
   state: OPTIONAL }` — §5.3's "elements at any position MAY be the absent sentinel `_`; absent elements occupy
   positional slots". `array`'s `state` carries no `value_param` (`state: element_state ~ REQUIRED`), so no
@@ -125,8 +130,9 @@ construction — see the partial-application bullet below.
   constructor it refines, a constructor is a factory rather than a type anything can be a subtype of, and the
   grant was inert besides. The spec author has confirmed the example wrong; no bundled schema or fixture
   writes a sized form. The size templates' *own* entries keep their chain — this phase walks it to find the
-  head. §8.2's materialisation is left for the form that genuinely needs an entry, a **structural** template
-  closing by substitution (`box => <T> { v: T }`), which is rejected at the application site until §5.10 is
+  head. §8.2's *substitution*-driven materialisation is left for the form that genuinely needs it, a
+  **structural** template (`box => <T> { v: T }`) — distinct from the entries an application materialises
+  here (#50), which are routed, not rewritten — and is rejected at the application site until §5.10 is
   implemented — so there is no `TemplateInstance` node any more, and `DefinitionResolver` has no
   instantiation completion. §8.2's deferred
   `min_items <= max_items` check still runs here, where the bindings become concrete. So does the rejection of

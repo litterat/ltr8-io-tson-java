@@ -222,9 +222,11 @@ form is parsed twice per the spec's own overlapping productions (#31).
 
 An AST→AST rewrite between parsing and resolution: every sugar form (`[T]`, `[T; N..M]`, `(A | B)`) and
 every generic application (`map<K, V>`) becomes a `!C value` construction — at declaration position it *is*
-one; anywhere else it becomes an injected declaration plus a bare reference (**a known conformance
-divergence** from §8.2's carried-structurally rule; `BACKLOG.md` has the account). So `DefinitionResolver`
-only ever sees a bare reference or `!C value`. Routing is vocabulary-derived off the governing meta (which
+one; anywhere else it becomes an injected declaration plus a bare reference (**a deliberate divergence** from
+§8.2's carried-structurally rule, argued as spec feedback rather than tracked as debt — the structural
+`type_argument` channel cannot carry an element state or, once `SPEC-FEEDBACK.md` #45 lands, a size;
+`SPEC-FEEDBACK.md` #50/#51 have the account). So `DefinitionResolver` only ever sees a bare reference or
+`!C value`. Routing is vocabulary-derived off the governing meta (which
 is why the phase runs with the meta in hand), with a hand-written table for meta-kernel's own bootstrap;
 `choice`/`tuple` take a variadic second path; a *partial* application — §5.3's size templates, whose
 parameters occupy labelled value channels only — closes by routing into a construction of its constructor

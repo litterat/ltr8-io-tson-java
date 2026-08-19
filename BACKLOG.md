@@ -26,48 +26,21 @@ own prose (which had gone stale on at least one of them):
   "import cycle" diagnostic naming the actual cycle path. Distinct from what
   `TsonCompiledMetaRegistry.withStandardLibrary` already does, which is scoped to just the three bundled
   schemas in a known order, not a general algorithm.
-- [ ] **Inline constructor applications materialise entries, and §8.2 says they never may** — a real
-  conformance divergence, not a representation preference, and it predates choice and tuple: inline `[T]` and
-  `map<K, V>` have always been hoisted this way. §8.2 is unambiguous — "Constructor applications never
-  materialise entries — they are carried structurally wherever they occur (§5.3) and, as declaration bodies,
-  resolve in place as constructions (§5.6). Exactly one form materialises: a **fully-bound application of a
-  non-constructor template**." §5.4 repeats it for choice specifically. So **declaration position is correct
-  today** (`contact => (email | phone)` and `pair => [integer, text]` resolving to constructions is exactly
-  §5.6's rule); only the inline hoisting is off-spec. It is also *observably* off-spec rather than
-  internally: Class 2 requires a resolved
-  value conforming to §8, and §8.2 forgives resolved-form differences only "up to renaming of instantiation
-  entries" — extra entries are not renaming. It is visible in this implementation's own resolved meta-kernel,
-  whose `choice.variants` field is typed `array_type_ref_<hash>` where the spec's fixture has
-  `{ name: array  arguments: [ { name: type_ref } ] }`.
-  - **Why it hasn't been fixed:** nothing in `TsonSchemaCompiler` or the reader stack reads
-    `TypeRef.arguments()`, so the structural form would resolve and link and then have nothing to compile
-    against. The work is argument-bearing `type_ref` support in the compiler, and it reopens inline `[T]`
-    and generic application at the same time — which is why it's an item rather than a fix.
-  - **A second violation rides on the first.** §8.2's *Non-exposure* rule says materialised entries "MUST
-    NOT participate in `!!import` resolution: imports merge declared entries only". `SchemaDesugarer` takes
-    an `imported` name set precisely so that an application an import already hoisted is *referenced* rather
-    than redeclared (meta.tn reusing meta-kernel's `array<type_name>`). That cross-schema visibility is
-    exactly what the rule forbids. It disappears on its own once the entries do — under the spec there is
-    no entry to collide with — so it is a symptom, not a separate item.
-  - `DefinitionResolver.resolveTypeRef` already contains a structural branch for `InlineArrayRef`, dead in
-    practice because the desugarer rewrites the node first. It is the shape the fix generalizes.
-  - `SPEC-FEEDBACK.md` #45 shrinks the eventual target: once sized forms are constructions too (see the
-    template-construction item below), §8.2's legitimately-materialised entries are structural-template
-    instantiations only, so the structural-carrying fix has one less form to represent.
 - [ ] **Template construction — the `SPEC-FEEDBACK.md` #44/#45/#46 conclusions, staged.** The design review
   settled the type-constructor-vs-template question: a **partial application** (parameters only in labelled
   value channels — `array_min`, and §5.3's sized sugar) closes by *routing* and is a construction of its
   head constructor, with **no instantiation entry and no IS-A** (`supertypes: [array product top]` on sized
   closures was a category error — a constructor is not a type — and the grant was inert); a **structural
   template** (parameters in type-reference channels — `box => <T> { v: T }`) closes by *substitution* and
-  becomes §8.2's **only** materialising form; a constructor's parameters are labelled-only (#44); and
+  materialises by *rewriting* a body rather than routing into one — the one form substitution is needed for,
+  though no longer §8.2's sole materialising entry (#50); a constructor's parameters are labelled-only (#44); and
   deriving from a constructor requires a `~` result (#46). Split by what gates on a spec revision:
   - **This cycle** (each corrects or converges on agreed-wrong spec letter; no revision needed first):
     - [ ] **#44's declaration-time check**: a `~` declaration with a parameter occurrence outside a
       labelled value channel is a `TsonSchemaValidationException` at the declaration. No valid schema is
       affected (the kernel audit in #46 found zero violations among constructors); today the incoherence
       surfaces as downstream wrong-layer failures.
-- [ ] **§5.10 substitution into a template *body* — now the sole materialising form.** What remains of
+- [ ] **§5.10 substitution into a template *body* — the one form that materialises by substitution.** What remains of
   template application now that a partial application closes by routing: a template whose parameter appears
   as a **field type**
   (`box => <T> { v: T }`), where instantiating means rewriting the body with `T` replaced — substitution
@@ -108,6 +81,23 @@ own prose (which had gone stale on at least one of them):
   including on where a declaration's annotations land (the name's on the map key, the definition's on the
   entry). Lower priority than the rest of this section: the spec marks this path explicitly **optional**
   ("MAY implement ingest"), not a MUST.
+- [ ] **Derive an injected entry's name canonically, not from `Record::toString`.**
+  `SchemaDesugarer.syntheticName` ends the derived name with `String.format("%08x", (head + args).hashCode())`,
+  where `args` is a `List<TypeArg>` — so the hashed string is compiler-generated record `toString` output
+  (`[Ref[ref=SimpleRef[name=type_name]]]`). The JDK documents that format as "subject to change", and it also
+  moves whenever an AST record's components are renamed or reordered (`TypeArg.Ref.ref`, `SimpleRef.name`),
+  silently renumbering every injected entry in every schema. Switching to the records' own `hashCode()` would be
+  **worse**: `Record::hashCode` is explicitly permitted to differ "from one execution of an application to
+  another execution of the same application", where `String.hashCode` is specified exactly — which is the only
+  reason today's value is stable at all. The fix is to build the canonical string by walking the application
+  (head, then each argument's kind and text, recursively) and hash that; `TsonContentHash` is in this module if
+  a truncated sha-256 is preferred to 32 bits.
+  - **Why it is worth doing rather than cosmetic:** under `SPEC-FEEDBACK.md` #50/#51 these names are entries in
+    the resolved form, and an importing schema's own application lands on the imported entry by deriving the
+    same name. §8.2's *Determinism* recommendation is what makes two resolutions of the same schema pair agree
+    entry-for-entry, so the derivation should be deterministic by construction rather than by accident.
+  - Not a live bug: nothing persists a resolved form today (`tson compile` reports pass/fail, not entries), so
+    this is a stability guarantee ahead of need.
 
 ## Remaining Part 2 resolution gaps
 
@@ -382,7 +372,8 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
   head constructor, with **no instantiation entry and no IS-A** (`supertypes: [array product top]` on sized
   closures was a category error — a constructor is not a type — and the grant was inert); a **structural
   template** (parameters in type-reference channels — `box => <T> { v: T }`) closes by *substitution* and
-  becomes §8.2's **only** materialising form; a constructor's parameters are labelled-only (#44); and
+  materialises by *rewriting* a body rather than routing into one — the one form substitution is needed for,
+  though no longer §8.2's sole materialising entry (#50); a constructor's parameters are labelled-only (#44); and
   deriving from a constructor requires a `~` result (#46). Split by what gates on a spec revision:
     - **Waits for the spec revision** (grammar or kernel-document changes — implementing ahead would diverge
       from rev 32 rather than converge on the agreed design):
