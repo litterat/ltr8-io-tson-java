@@ -28,12 +28,12 @@
     positional form (Part 2 Section 5.6, general over schema-backed
     data) and a braced record appears only when `arguments` is
     present.
-  - Type slots of the parameterized constructors are ordinary
-    `type_ref`-typed fields whose value is routed from the
-    application by parameter (`element_type: type_ref = T`, Part 2
-    Section 4.2): open bodies carry the route as a `value_param`
-    member on a REQUIRED field (state omitted; a parametric `= P`
-    fixes nothing and promotes OPTIONAL to REQUIRED, `~ P` yields
+  - The container constructors carry no parameters: their type
+    slots are plain REQUIRED `type_ref`-typed fields, filled by the
+    construction (or by a sugar form's desugaring) like any other
+    required field. A `value_param` member on a REQUIRED field is a
+    user template's routing spelling only (a parametric `= P` fixes
+    nothing and promotes OPTIONAL to REQUIRED, `~ P` yields
     REQUIRED_DEFAULT — Part 2 Section 5.7); a closed binding record
     supplies the bound reference as the field's value.
   - `arguments` elements are type_argument records: `{ name: ... }`
@@ -59,7 +59,7 @@
   @doc:"Base kinds. `top` is the structural root; every type in the schema IS-A `top`."
   top => !type_definition {
     kind: PRODUCT
-    subtypes: [array array_max array_min array_ranged atom choice enum integer_type map product record reference regex_type set sum text_type tuple unit uri_type]
+    subtypes: [array atom choice enum integer_type map product record reference regex_type set sum text_type tuple unit uri_type]
     body: !record { fields: [] }
   }
 
@@ -73,7 +73,7 @@
   product => !type_definition {
     kind: PRODUCT
     supertypes: [top]
-    subtypes: [array array_max array_min array_ranged map record set tuple]
+    subtypes: [array map record set tuple]
     body: !record { supertypes: [top]  fields: [
       !record_field { name: access_pattern  type: product_access_type }
       !record_field { name: size_type       type: product_size_type }
@@ -386,13 +386,12 @@
   array => !type_definition {
     kind: PRODUCT
     constructor: true
-    parameters: [T]
     supertypes: [product top]
-    subtypes: [array_max array_min array_ranged set]
+    subtypes: [set]
     body: !record { supertypes: [product]  fields: [
       !record_field { name: access_pattern  type: product_access_type  state: REQUIRED_FIXED  value: INDEX }
       !record_field { name: size_type       type: product_size_type    state: REQUIRED_FIXED  value: VARIABLE }
-      !record_field { name: element_type    type: type_ref  value_param: T }
+      !record_field { name: element_type    type: type_ref }
       !record_field { name: state           type: element_state  state: REQUIRED_DEFAULT  value: REQUIRED }
       !record_field { name: unordered       type: boolean  state: REQUIRED_DEFAULT  value: false }
       !record_field { name: unique_items    type: boolean  state: REQUIRED_DEFAULT  value: false }
@@ -404,13 +403,12 @@
   set => !type_definition {
     kind: PRODUCT
     constructor: true
-    source: { name: array  arguments: [ { name: T } ] }
-    parameters: [T]
+    source: array
     supertypes: [array product top]
     body: !record { fields: [
       !record_field { name: access_pattern  type: product_access_type  state: REQUIRED_FIXED  value: INDEX }
       !record_field { name: size_type       type: product_size_type    state: REQUIRED_FIXED  value: VARIABLE }
-      !record_field { name: element_type    type: type_ref  value_param: T }
+      !record_field { name: element_type    type: type_ref }
       !record_field { name: state           type: element_state  state: REQUIRED_FIXED  value: REQUIRED }
       !record_field { name: unordered       type: boolean  state: REQUIRED_FIXED  value: true }
       !record_field { name: unique_items    type: boolean  state: REQUIRED_FIXED  value: true }
@@ -418,69 +416,15 @@
       !record_field { name: max_items       type: integer  state: OPTIONAL }
     ] }
   }
-  @doc:"Size-refinement templates — desugar targets of the array size-specifier sugar (Part 2 Section 5.3). Not constructors: closures are ordinary members of the array family, with !array binding-record bodies and the applied form in source."
-  array_min => !type_definition {
-    kind: PRODUCT
-    source: { name: array  arguments: [ { name: T } ] }
-    parameters: [T MIN]
-    supertypes: [array product top]
-    body: !record { fields: [
-      !record_field { name: access_pattern  type: product_access_type  state: REQUIRED_FIXED  value: INDEX }
-      !record_field { name: size_type       type: product_size_type    state: REQUIRED_FIXED  value: VARIABLE }
-      !record_field { name: element_type    type: type_ref  value_param: T }
-      !record_field { name: state           type: element_state  state: REQUIRED_DEFAULT  value: REQUIRED }
-      !record_field { name: unordered       type: boolean  state: REQUIRED_DEFAULT  value: false }
-      !record_field { name: unique_items    type: boolean  state: REQUIRED_DEFAULT  value: false }
-      !record_field { name: min_items       type: integer  value_param: MIN }
-      !record_field { name: max_items       type: integer  state: OPTIONAL }
-    ] }
-  }
-
-  array_max => !type_definition {
-    kind: PRODUCT
-    source: { name: array  arguments: [ { name: T } ] }
-    parameters: [T MAX]
-    supertypes: [array product top]
-    body: !record { fields: [
-      !record_field { name: access_pattern  type: product_access_type  state: REQUIRED_FIXED  value: INDEX }
-      !record_field { name: size_type       type: product_size_type    state: REQUIRED_FIXED  value: VARIABLE }
-      !record_field { name: element_type    type: type_ref  value_param: T }
-      !record_field { name: state           type: element_state  state: REQUIRED_DEFAULT  value: REQUIRED }
-      !record_field { name: unordered       type: boolean  state: REQUIRED_DEFAULT  value: false }
-      !record_field { name: unique_items    type: boolean  state: REQUIRED_DEFAULT  value: false }
-      !record_field { name: min_items       type: integer  state: OPTIONAL }
-      !record_field { name: max_items       type: integer  value_param: MAX }
-    ] }
-  }
-
-  array_ranged => !type_definition {
-    kind: PRODUCT
-    source: { name: array  arguments: [ { name: T } ] }
-    parameters: [T MIN MAX]
-    supertypes: [array product top]
-    body: !record { fields: [
-      !record_field { name: access_pattern  type: product_access_type  state: REQUIRED_FIXED  value: INDEX }
-      !record_field { name: size_type       type: product_size_type    state: REQUIRED_FIXED  value: VARIABLE }
-      !record_field { name: element_type    type: type_ref  value_param: T }
-      !record_field { name: state           type: element_state  state: REQUIRED_DEFAULT  value: REQUIRED }
-      !record_field { name: unordered       type: boolean  state: REQUIRED_DEFAULT  value: false }
-      !record_field { name: unique_items    type: boolean  state: REQUIRED_DEFAULT  value: false }
-      !record_field { name: min_items       type: integer  value_param: MIN }
-      !record_field { name: max_items       type: integer  value_param: MAX }
-    ] }
-  }
-
-
   map => !type_definition {
     kind: PRODUCT
     constructor: true
-    parameters: [K V]
     supertypes: [product top]
     body: !record { supertypes: [product]  fields: [
       !record_field { name: access_pattern  type: product_access_type  state: REQUIRED_FIXED  value: NAMED }
       !record_field { name: size_type       type: product_size_type    state: REQUIRED_FIXED  value: VARIABLE }
-      !record_field { name: key_type        type: type_ref  value_param: K }
-      !record_field { name: value_type      type: type_ref  value_param: V }
+      !record_field { name: key_type        type: type_ref }
+      !record_field { name: value_type      type: type_ref }
       !record_field { name: min_items       type: integer  state: OPTIONAL }
       !record_field { name: max_items       type: integer  state: OPTIONAL }
     ] }
@@ -497,12 +441,19 @@
     ] }
   }
 
+  @doc:"A named entry rather than an inline form: ! constructor applications remain prohibited at field positions (Part 2 Section 5.2) and set has no sugar of its own."
+  token_set => !type_definition {
+    kind: PRODUCT
+    source: set
+    body: !set { element_type: token }
+  }
+
   enum => !type_definition {
     kind: ATOM
     constructor: true
     supertypes: [atom top]
     body: !record { supertypes: [atom]  fields: [
-      !record_field { name: members  type: { name: set  arguments: [ { name: token } ] } }
+      !record_field { name: members  type: token_set }
     ] }
   }
 
@@ -532,7 +483,7 @@
 
   schema => !type_definition {
     kind: PRODUCT
-    source: { name: map  arguments: [ { name: type_name }  { name: type_definition } ] }
+    source: map
     body: !map { key_type: @alias:type_name token  value_type: type_definition }
   }
 }
