@@ -81,23 +81,6 @@ own prose (which had gone stale on at least one of them):
   including on where a declaration's annotations land (the name's on the map key, the definition's on the
   entry). Lower priority than the rest of this section: the spec marks this path explicitly **optional**
   ("MAY implement ingest"), not a MUST.
-- [ ] **Derive an injected entry's name canonically, not from `Record::toString`.**
-  `SchemaDesugarer.syntheticName` ends the derived name with `String.format("%08x", (head + args).hashCode())`,
-  where `args` is a `List<TypeArg>` — so the hashed string is compiler-generated record `toString` output
-  (`[Ref[ref=SimpleRef[name=type_name]]]`). The JDK documents that format as "subject to change", and it also
-  moves whenever an AST record's components are renamed or reordered (`TypeArg.Ref.ref`, `SimpleRef.name`),
-  silently renumbering every injected entry in every schema. Switching to the records' own `hashCode()` would be
-  **worse**: `Record::hashCode` is explicitly permitted to differ "from one execution of an application to
-  another execution of the same application", where `String.hashCode` is specified exactly — which is the only
-  reason today's value is stable at all. The fix is to build the canonical string by walking the application
-  (head, then each argument's kind and text, recursively) and hash that; `TsonContentHash` is in this module if
-  a truncated sha-256 is preferred to 32 bits.
-  - **Why it is worth doing rather than cosmetic:** under `SPEC-FEEDBACK.md` #50/#51 these names are entries in
-    the resolved form, and an importing schema's own application lands on the imported entry by deriving the
-    same name. §8.2's *Determinism* recommendation is what makes two resolutions of the same schema pair agree
-    entry-for-entry, so the derivation should be deterministic by construction rather than by accident.
-  - Not a live bug: nothing persists a resolved form today (`tson compile` reports pass/fail, not entries), so
-    this is a stability guarantee ahead of need.
 
 ## Remaining Part 2 resolution gaps
 

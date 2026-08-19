@@ -166,6 +166,21 @@ class SchemaDesugarerTest {
         assertEquals(injected, firstFieldType(document, "second"));
     }
 
+    /**
+     * The derived names are pinned to exact strings, deliberately. They are built from a rendering the
+     * desugarer controls rather than from the AST's own {@code toString}, so renaming a component of an
+     * {@code ast.schema} record -- or a JDK that formats records differently -- must leave every injected
+     * name untouched. Both halves of the name matter: the readable prefix is what a diagnostic shows, and
+     * the hash is what an importing schema re-derives to land on an entry an import already materialised
+     * ({@code SPEC-FEEDBACK.md} #50/#51). If this test fails, the resolved form of every schema changed.
+     */
+    @Test
+    void derivedNamesDoNotRideOnTheAstsOwnStringForms() {
+        assertEquals("array_text_d5ed9ca5", onlyInjected(desugar("  holder => { xs: [text] }"), "array").name());
+        assertEquals("map_text_integer_0db753ed",
+                onlyInjected(desugar("  holder => { m: map<text, integer> }"), "map").name());
+    }
+
     @Test
     void anApplicationAnImportAlreadyDeclaresIsReferencedNotRedeclared() {
         // The name is derived from the application, so an identical one in an imported schema has already

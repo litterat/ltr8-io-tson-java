@@ -1099,16 +1099,86 @@ final class SchemaDesugarer {
     }
 
     /**
-     * {@code head_arg_arg_hash} -- deliberately the same convention {@code TsonSchemaLinker.syntheticName}
-     * used, since the name is what a diagnostic shows and several tests recognise applications by that
-     * prefix. §8.2's own naming is not conformance-relevant, so only readability and stability matter.
+     * {@code head_arg_arg_hash} -- §8.2's own recommendation for an internal name, "a readable head plus a
+     * structural hash". The readable half is what a diagnostic shows and what several tests recognise an
+     * application by; the hash separates applications the readable half spells alike.
+     *
+     * <p><b>The hash runs over a rendering this class builds itself</b> ({@link #canonical}), never over the
+     * AST's own {@code toString}. Both of the JDK's ready-made answers are unusable here: {@code
+     * Record::toString}'s format is documented as "subject to change" (and shifts whenever an AST record's
+     * components are renamed or reordered), and {@code Record::hashCode} "need not remain consistent from one
+     * execution of an application to another execution of the same application". {@code String.hashCode} is
+     * specified exactly, so hashing a string built here is the one construction that is deterministic by
+     * contract rather than by accident.
+     *
+     * <p>That determinism is load-bearing, not cosmetic. An entry name is part of the resolved form, and an
+     * importing schema reaches an <em>imported</em> materialised entry by deriving the same name for the same
+     * application -- meta.tn's {@code extern.types: [type_name]?} landing on the entry meta-kernel already
+     * produced ({@code SPEC-FEEDBACK.md} #50/#51).
      */
     private static String syntheticName(String head, List<TypeArg> args) {
         StringBuilder name = new StringBuilder(head);
         for (TypeArg arg : args) {
             name.append('_').append(argumentToken(arg).map(TokenValue::text).orElse("arg"));
         }
-        return name.append('_').append(String.format("%08x", (head + args).hashCode())).toString();
+        return name.append('_').append(String.format("%08x", canonical(head, args).hashCode())).toString();
+    }
+
+    /**
+     * The application rendered as one string, structurally and injectively: every argument shape is rendered
+     * under its own tag, nested references recurse, and each piece of author text is written length-first
+     * ({@code 4:text}), so no arrangement of delimiters inside a quoted token can spell a different
+     * application. Two renderings are equal exactly when the applications are.
+     *
+     * <p>Every {@code TypeRef} shape is covered even though {@link #instanceFor}, {@link #choiceInstance} and
+     * {@link #tupleInstance} all reject a non-{@link SimpleRef} argument before a name is ever derived. The
+     * readable prefix degrades to {@code arg} for those (see {@link #argumentToken}); the hash must not, or
+     * the placeholder would be the only thing distinguishing two applications and would not distinguish them
+     * at all.
+     */
+    private static String canonical(String head, List<TypeArg> args) {
+        StringBuilder out = new StringBuilder();
+        appendApplication(out, head, args);
+        return out.toString();
+    }
+
+    private static void appendApplication(StringBuilder out, String head, List<TypeArg> args) {
+        appendText(out.append('A'), head);
+        out.append('(');
+        for (TypeArg arg : args) {
+            switch (arg) {
+                case TypeArg.Ref ref -> appendRef(out.append('r'), ref.ref());
+                case TypeArg.Value value -> {
+                    // The form by name, not ordinal: inserting a TokenForm constant would renumber every
+                    // ordinal invisibly, which is the same hazard as hashing a record's toString.
+                    appendText(out.append('v'), value.value().form().name());
+                    appendText(out, value.value().text());
+                }
+            }
+        }
+        out.append(')');
+    }
+
+    private static void appendRef(StringBuilder out, TypeRef ref) {
+        switch (ref) {
+            case SimpleRef simple -> appendText(out.append('n'), simple.name());
+            case GenericRef generic -> appendApplication(out, generic.name(), generic.args());
+            case InlineArrayRef array -> appendRefs(out.append("a("), List.of(array.elementType()));
+            case InlineTupleRef tuple -> appendRefs(out.append("t("), tuple.elementTypes());
+            case ChoiceRef choice -> appendRefs(out.append("c("), choice.variants());
+        }
+    }
+
+    private static void appendRefs(StringBuilder out, List<TypeRef> refs) {
+        for (TypeRef ref : refs) {
+            appendRef(out, ref);
+        }
+        out.append(')');
+    }
+
+    /** Length-first, so concatenation stays unambiguous whatever the text contains. */
+    private static void appendText(StringBuilder out, String text) {
+        out.append(text.length()).append(':').append(text);
     }
 
     /**
