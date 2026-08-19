@@ -163,7 +163,12 @@ construction — see the partial-application bullet below.
   anywhere in the document collapse to one declaration for free (§8.2's structural-equality rule) — and an
   application an `!!import` already declares is **referenced, not redeclared**, which is why the phase takes
   the imported name set (meta.tn repeats several of meta-kernel's applications; redeclaring would be a
-  local-vs-import collision).
+  local-vs-import collision). The hash half runs over a rendering the phase builds itself — one tag per
+  argument shape, author text written length-first, nested references recursed — and **never over the AST's
+  own `toString`**, whose format the JDK documents as subject to change and which moves whenever an
+  `ast.schema` record's components are renamed; the records' `hashCode` is worse still, being free to differ
+  between two runs of the same application. `SchemaDesugarerTest` pins two derived names to exact strings,
+  because a change to them is a change to the resolved form of every schema.
 - **Structural sharing is load-bearing, not an optimization.** Every node not being rewritten is returned
   by identity, because `TsonSchemaParser.declarationPositions()` is an `IdentityHashMap` — an
   equal-but-rebuilt `Declaration` silently loses its position, and the diagnostics that report against it.
