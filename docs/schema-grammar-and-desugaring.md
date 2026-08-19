@@ -78,12 +78,22 @@ replaces.
 **The injected-entry half is a deliberate divergence** — §8.2 says a constructor application never
 materialises an entry and is carried structurally at the use site; declaration position, where the spec
 agrees, is correct. It is argued as spec feedback rather than tracked as debt (`SPEC-FEEDBACK.md` #49/#50,
-and #51 for the `!!import` visibility that rides on it). `spec/tson-cr-structure-templates.md` D8 supersedes
-that argument by prohibition rather than by uniform injection: with state and size confined to
-declaration-level syntax, the structural `type_argument` channel is sufficient for everything the grammar
-admits inline. **That half has not landed** — inline forms are still injected — because it needs the
-compiler to build readers from structural inline container refs (the change report's Tranche A step 6), which
-is one change with it.
+and #51 for the `!!import` visibility that rides on it), and those entries stay open on purpose, as
+discussion points for the revision.
+
+**The rule this settles on:** `TypeRef.arguments` non-empty means an **open** form — a template application,
+whose arguments are what materialisation substitutes. Everything closed is an entry, referenced by a bare
+name. That pairs with the `value_form` invariant a template body's nested forms will carry
+(`value_form` present ⟺ pending synthesis ⟺ open entry) and makes the closed-entry rule checkable
+structurally, with no vocabulary needed to read a `type_ref`.
+
+`spec/tson-cr-structure-templates.md` D8 proposed the opposite — inline sugar riding as a structural
+`type_ref` rather than as an injected entry — and is **not implemented**. Its case does not hold up: an entry
+set wider than the declaration set is already normal (`subtypes` and `disjoint` are resolver-derived too), a
+derived name only has to be stable *within* an implementation rather than agreed between them, and the
+report's own D7 rejects a second representation of a nested form for precisely the reason D8 would impose one
+on containers. The dedup would not disappear either, only relocate into a compile-time memo keyed on ref
+structure. `BACKLOG.md` carries the full account.
 
 - **Purely syntactic, and per declaration — no governing meta.** The sugar set is closed and
   grammar-supplied, so the head each form desugars to and the vocabulary field each argument fills are a

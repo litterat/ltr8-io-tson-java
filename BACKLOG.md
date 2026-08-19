@@ -51,11 +51,24 @@ own prose (which had gone stale on at least one of them):
     it, no `!xxx_type` can ever appear in a schema position, and the flag is never consulted. In a *data*
     document `!xxx_type { ... }` is an ordinary record annotation and reads fine, which is also what makes
     §8 resolver output expressible. The declaration-side check is therefore a lint, not a guard.
-  - **Step 6**, and with it D8: the compiler building readers from structural inline container refs, so the
-    desugarer can stop injecting an entry for a *pure inline* form. The two are one change — stopping the
-    injection without the compiler half breaks every inline `[T]` — which is why the divergence
-    `SPEC-FEEDBACK.md` #49/#50/#51 argue for is still in place.
-  - `SPEC-FEEDBACK.md` #28/#32/#45/#46/#49/#50/#51 gain their resolution notes once the tranche is whole.
+  - **Step 6 and D8 are not being implemented.** D8 would have inline sugar ride as a structural
+    `type_ref` with arguments rather than as an injected entry, and step 6 is the compiler half that needs
+    (`resolve` taking a `TypeRef`, a structural reader memo, a linker branch skipping a grammar-supplied
+    head). The four arguments for it do not survive: an entry set larger than the declaration set is
+    already the norm (`subtypes`/`disjoint` are resolver-derived too); the `@synthetic` marker it would
+    avoid is an optional display hint; ingest "getting simpler" is speculation about unwritten code; and
+    the derived name only ever has to be stable *within* an implementation, including across `!!import`
+    (which `SchemaDesugarer.bindingName` guarantees), never agreed *between* them — §8.2 disclaims the
+    names and comparison tools canonicalise. Two arguments run the other way: the report's own D7 rejects
+    a second representation of a nested form because it "forces every consumer to walk two
+    representations", which is exactly what D8 imposes on containers; and the dedup does not disappear,
+    it relocates into a compile-time memo keyed on ref structure — `bindingName` rebuilt and called a
+    cache. **The rule kept instead:** `TypeRef.arguments` non-empty ⟺ an open form, a template
+    application; everything closed is an entry referenced by a bare name. That pairs with D7's
+    `value_form` invariant and lets ingest check the closed-entry rule structurally, with no vocabulary
+    needed to read a `type_ref`. `SPEC-FEEDBACK.md` #49/#50/#51 therefore stay open and keep their
+    existing recommendations; they are deliberately left as revision discussion points.
+  - `SPEC-FEEDBACK.md` #28/#32/#45/#46 gain their resolution notes once the tranche is whole.
   The original framing follows. The
   change report supersedes the staged #44/#45/#46 design review that used to sit here (and its
   "waits for the spec revision" twin that sat under Lower Priority): the CR *is* the revision plan.
@@ -63,7 +76,7 @@ own prose (which had gone stale on at least one of them):
   type-name-only, the kernel's container constructors go parameterless, the size templates and
   `vector` delete, and maps gain the `{K => V}` sugar. The CR's own §10 carries the step-by-step
   plan; Tranche A (sugar, namespaces, kernel respell with re-pinned hashes and regenerated fixtures,
-  D8's structural inline forms, bootstrap-table collapse) is independently landable and absorbs what
+  bootstrap-table collapse) is independently landable and absorbs what
   the old item staged behind a revision — including **#46's enforcement** (its blocker, the kernel's
   own size templates, deletes with the respell). Superseded outright, no task remains: the
   `C<args; member ...>` application-with-bindings surface form (#45) — constructors no longer have
