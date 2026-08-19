@@ -39,8 +39,18 @@ own prose (which had gone stale on at least one of them):
     carry it — Tranche B step 7, so it lands there.
   - The `*-resolved.tn` fixtures in `spec/m/`, now stale against the respelled kernel. They are the spec's
     own non-normative artifacts, hand-authored under terser conventions and read by nothing here.
-  - **Step 5**, `!` heads resolving structure-namespace-only with the `constructor: true` gate as a loud
-    error, and the application-side half of the §2.2.2 eligibility check deleting.
+  - **Step 5 needs no work**, checked rather than assumed. `!` heads already resolve
+    structure-namespace-only (`DefinitionResolver.resolveConstructorTarget`) and a hit that is not a
+    constructor is already a loud `TsonSchemaValidationException` (`resolveInstance`); the application-side
+    half of the §2.2.2 eligibility check went out with the generic-head gate, since a generic head *was* the
+    second application route into the structure namespace. The declaration-side half
+    (`TsonSchemaLinker.isMetaKernelGoverned`) stays. Worth knowing if it is ever revisited: a `~` in a user
+    schema is **inert**, not dangerous. `constructor: true` is read in exactly one place, resolving a
+    `!C value` against the *governing meta's* entries, and `checkMayGovern` already refuses to let a
+    user-level schema be named as anyone's `!!meta` — using the same predicate. So nothing can ever chain to
+    it, no `!xxx_type` can ever appear in a schema position, and the flag is never consulted. In a *data*
+    document `!xxx_type { ... }` is an ordinary record annotation and reads fine, which is also what makes
+    §8 resolver output expressible. The declaration-side check is therefore a lint, not a guard.
   - **Step 6**, and with it D8: the compiler building readers from structural inline container refs, so the
     desugarer can stop injecting an entry for a *pure inline* form. The two are one change — stopping the
     injection without the compiler half breaks every inline `[T]` — which is why the divergence
