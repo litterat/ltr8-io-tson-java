@@ -39,7 +39,7 @@ final class VoidReader implements TsonTypeReader<Object> {
 
     @Override
     public Object read(TsonReadContext ctx) {
-        ctx = ctx.withSchemaLocation(schemaLocation);
+        ctx = ctx.underDeclaration(schemaLocation);
         EventSkip.annotationsAndTypeRef(ctx);
         TsonEvent e = ctx.peek();
         if (!(e instanceof AbsentEvent) && !isNullSpelling(e)) {

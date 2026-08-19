@@ -132,9 +132,9 @@ from readers;
 components covering two ends** — the value in the data, and the rule in the schema.
 
 **The four are JSON Schema 2020-12 §12's own output unit**, deliberately: `path` is `instanceLocation` (an
-RFC 6901 pointer into the data), `schemaPointer` is `keywordLocation` (an RFC 6901 pointer into the schema's
-`map<type_name, type_definition>`, `/my_type`), `schemaId` plus `schemaPointer` are
-`absoluteKeywordLocation`, and `dataPosition`/`schemaPosition` add the line/column/byte-offset TSON needs and
+RFC 6901 pointer into the data), `schemaPointer` is `keywordLocation` (the path through the schema being
+validated against, `/person/age`), `schemaId` plus `schemaPointer` are `absoluteKeywordLocation`, and
+`dataPosition`/`schemaPosition` add the line/column/byte-offset TSON needs and
 JSON Schema has no equivalent of. **One record rather than separate data- and schema-diagnostic types,
 because the variation is locational, not categorical** — a value violating `int32` as core.tn declares it
 populates both ends at once, and `javax.tools.Diagnostic`, LSP's `Diagnostic` and rustc's `DiagInner` all
@@ -147,34 +147,46 @@ the schema root; a base-syntax failure points at the data root), so spelling "no
 make the two indistinguishable to a consumer *and* to a renderer. A present `""` is the root; an absence is
 an absence. `schemaId`/`expected`/`actual` stay plain strings, where `""` carries no second meaning.
 
-**The read path's schema end is one value, `SchemaLocation`**, stamped by every reader before it does
-anything else (`ctx = ctx.withSchemaLocation(this.schemaLocation)`, the convention `TsonReadContext`'s own
-Javadoc states) — the declaration's name and its `TypeDefinition.position()`, which is populated because
-`SchemaResolver.resolveSchema` takes `TsonSchemaParser.declarationPositions()` and passes each declaration's
-own position into `DefinitionResolver.resolve`. So a value error points at both ends, the value in the data
-and the type it violated in the schema; because each reader stamps before descending, the one reported is the
-*atom's* declaration (`/int32` in core.tn), not the enclosing record's.
+**The read path's schema end is one value, `SchemaLocation`** — `schemaId` + `schemaPointer` +
+`schemaPosition`, accumulated as the read descends rather than claimed by whichever reader is innermost.
 
-**The two components are carried together because either alone is unusable.** A position with no pointer
-cannot be attributed — `110:3:4858` is core.tn's line for `int32` and nothing says so, while the schema the
-document named is four lines long — and a desugar-injected entry (`/array_text_d5ed9ca5`) has a name in the
-resolved schema but no line in any source text, so the pointer is the only component it can carry. One carrier
-also removes the failure mode two independent withers would allow: a reader claiming one component and
-inheriting the other from whichever reader ran before it. `SchemaLocation.declaration` is the entry the reader
-was built for, which is not always the name the reader's own *message* uses —
-`RecordBindReader.rebindContainerIfNeeded` rebuilds a container reader under the consuming *field's* name
-while carrying the original declaration's location through, so the message reads naturally and the pointer
-still lands on the entry that declares the rule.
+**The pointer is the path taken, not the leaf reached.** A `y: int32` field violating its bound reports
+`/point/y` in the author's own schema, *not* `/int32` in core.tn. Naming the leaf sends a reader to a file
+they did not write, at a line past the end of the four-line schema their data named, and never mentions the
+field they can edit — and it makes two identical mistakes tell different stories, since a field typed by a
+local declaration would have named that instead. This is JSON Schema 2020-12 §12.3's `keywordLocation`, which
+likewise follows the validation path rather than naming the dereferenced target, and it crosses a declaration
+boundary the same way `keywordLocation` crosses a `$ref`: `/person/home/city` where `city` belongs to
+`address`. Read the schema document as written — `{ point => { y: int32 } }` — and `/point/y` is a literal
+RFC 6901 pointer into it. The constraint is not lost with the leaf: `message` still names `int32` and
+`expected` carries `>= -2147483648 and <= 2147483647`.
 
-**`schemaId` is the schema that *declared* the entry, not the one being read against.** The two differ
-whenever an `!!import` is involved, and the difference is the whole point: a four-line schema importing
-core.tn enforces `/int32` at core.tn's line 110, so pairing that position with the importing schema's own id
-would send a consumer to a line past the end of their own file. It is reachable only because
-`TsonSchemaLinker` records each merged entry's origin (`TsonLinkedSchema.entryOrigins`); the compiled schema's
-own id is *not* the answer, and was left empty rather than approximated until the linker kept the fact.
-`ValueReaderContext.locationOf` is the one place a `SchemaLocation` is built, so the identity can only come
-from `originOf`. A read with no schema behind it stamps no location at all, and all three components stay
-empty — `""` for the id, absent for both pointers.
+**Two descent rules produce it**, both on `TsonReadContext`:
+
+- `schemaField(name)` steps the data path *and* the schema pointer — the one descent the schema has its own
+  name for. `field(name)`/`index(i)` step the data alone: the schema says one thing about every entry of a
+  map, so `/person/tags` is the schema location of every `/tags/<key>`, and an *unrecognized* field names
+  nothing in the schema at all, so extending the pointer with it would invent a location that does not exist.
+- `inRecord(declaration)` / `underDeclaration(declaration)` decide the anchor. A **record** re-anchors
+  `schemaId`/`schemaPosition` on itself, because it declares the field the pointer now ends with — and seeds
+  the pointer with its own name only if nothing has yet, which is what makes the outermost record the path's
+  root. **Everything else** offers its declaration only as a seed, taken when nothing encloses it, so a
+  root-level `!int32` still locates itself in core.tn while the same atom inside `person` leaves person.tn's
+  anchor alone.
+
+The upshot is that `schemaId` and `schemaPosition` are always the *same* declaration's and can never disagree
+about which file to open. The seed for a non-record comes from `TsonLinkedSchema.originOf`, not from the
+schema being read against, which is what keeps that true for an imported declaration; `ValueReaderContext.locationOf`
+is the single construction site, so there is nowhere else for a mismatched pair to come from.
+
+**`schemaPosition` is per declaration, so it is one level coarser than the pointer** — `/person/age` carries
+`person`'s own line, not the field's, because `RecordField` has no position (`BACKLOG.md`). It is populated
+because `SchemaResolver.resolveSchema` threads `TsonSchemaParser.declarationPositions()` into
+`DefinitionResolver.resolve` — **and because `SchemaDesugarer` re-registers the position of every declaration
+it rebuilds.** That second half is not incidental: the position table is identity-keyed, and any record
+holding a single `[T]` field is rewritten whole, so without it the common case resolves with no position at
+all. A read with no schema behind it carries none of the three.
+
 An atom's `AtomTypeException` is caught in `AtomTypeReader` and mapped to
 `ATOM_CONSTRAINT_VIOLATION` — `AtomType`'s own signature is untouched, since it's shared with the
 schemaless binder which has no read context. That code means exactly "the atom rejected this token" and

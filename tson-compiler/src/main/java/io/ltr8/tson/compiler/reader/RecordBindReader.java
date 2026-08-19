@@ -171,7 +171,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
 
     @Override
     public Object read(TsonReadContext ctx) {
-        ctx = ctx.withSchemaLocation(schemaLocation);
+        ctx = ctx.inRecord(schemaLocation);
         // Hoisted ahead of the shape check, like the tree readers: the base consumes the framing and
         // discards it, so capturing first leaves that call a no-op. Nothing to capture when the bound class
         // declares no carrier, in which case annotationTypes is DISCARDED and this consumes and drops.

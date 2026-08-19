@@ -24,11 +24,12 @@ public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver
     }
 
     /**
-     * The {@link SchemaLocation} the reader for entry {@code name} stamps on every diagnostic it reports.
-     * The only place one is built: the identity has to come from {@link TsonLinkedSchema#originOf}, so that
-     * an imported entry names the schema that declared it rather than the one importing it.
+     * The {@link SchemaLocation} the reader for entry {@code name} offers as its own declaration. The only
+     * place one is built: the identity has to come from {@link TsonLinkedSchema#originOf} so that it and the
+     * position are the same document's -- an imported entry's line belongs to the schema that declared it,
+     * never to the one importing it.
      */
     public SchemaLocation locationOf(String name, TypeDefinition definition) {
-        return new SchemaLocation(linked.originOf(name), name, definition.position());
+        return SchemaLocation.of(linked.originOf(name), name, definition.position());
     }
 }

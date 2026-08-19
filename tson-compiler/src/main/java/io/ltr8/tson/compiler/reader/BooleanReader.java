@@ -25,7 +25,7 @@ final class BooleanReader implements TsonTypeReader<Boolean> {
 
     @Override
     public Boolean read(TsonReadContext ctx) {
-        ctx = ctx.withSchemaLocation(schemaLocation);
+        ctx = ctx.underDeclaration(schemaLocation);
         EventSkip.annotationsAndTypeRef(ctx);
         TsonEvent e = ctx.peek();
         if (!(e instanceof TokenEvent token)) {

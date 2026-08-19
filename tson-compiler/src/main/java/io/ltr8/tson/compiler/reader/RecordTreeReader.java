@@ -55,7 +55,7 @@ final class RecordTreeReader extends RecordAbstractReader<TsonValue> {
 
     @Override
     public TsonValue read(TsonReadContext ctx) {
-        ctx = ctx.withSchemaLocation(schemaLocation);
+        ctx = ctx.inRecord(schemaLocation);
         List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx, annotationTypes);
         ShapeResult shapeResult = expectRecordShape(ctx);
         if (shapeResult.shape() == Shape.MISMATCH) {

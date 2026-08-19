@@ -49,7 +49,7 @@ final class TupleTreeReader extends TupleAbstractReader<TsonValue> {
 
     @Override
     public TsonValue read(TsonReadContext ctx) {
-        ctx = ctx.withSchemaLocation(schemaLocation);
+        ctx = ctx.underDeclaration(schemaLocation);
         List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx, annotationTypes);
         if (!expectTupleStart(ctx)) {
             return null;

@@ -64,10 +64,11 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   - **`entryOrigins` is on `TsonLinkedSchema`, not on `TsonSchema` or `TypeDefinition`**, because it is a
     fact *linking* establishes rather than part of the resolved schema value §9 defines — and because
     `schema.meta` is a bind target with a hand-written `equals` and the `@Record` constructor-selection trap,
-    which a new component would walk straight into. It is what lets a read diagnostic against `int32` name
-    core.tn instead of the four-line schema that imported it; without it the only identity reachable at read
-    time is the importing schema's, which is the wrong answer rather than a missing one. The registry stores
-    `TsonLinkedSchema` directly, so the map survives registration and every later `load`.
+    which a new component would walk straight into. It keeps a declaration's identity and its line answerable
+    from the same document however many schemas flattened it in — the pair a non-record reader offers as its
+    own location (`ValueReaderContext.locationOf`), which is what locates a root-level `!int32` in core.tn
+    rather than in whatever schema imported it. The registry stores `TsonLinkedSchema` directly, so the map
+    survives registration and every later `load`.
 - **`TsonSchemaRegistry.register(TsonLinkedSchema)`** computes canonical identity from `!!id`, rejects a
   duplicate identity (no overwrite — this plus `entries()` being unmodifiable *is* the "locked" guarantee)
   and any self-referential `bootstrap()==true` schema, and stores it. `get(uri)` canonicalizes internally.

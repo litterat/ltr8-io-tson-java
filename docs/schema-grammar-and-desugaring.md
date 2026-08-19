@@ -173,6 +173,14 @@ construction — see the partial-application bullet below.
   by identity, because `TsonSchemaParser.declarationPositions()` is an `IdentityHashMap` — an
   equal-but-rebuilt `Declaration` silently loses its position, and the diagnostics that report against it.
   `SchemaDesugarerTest` asserts `assertSame` for exactly this reason.
+  - **Sharing alone is not enough, and `schemaMap` carries positions across the rewrites it cannot avoid.**
+    A declaration that genuinely contains sugar *is* rebuilt — any record with a single `[T]` field is
+    rewritten whole, which is the common case, not a corner — so the phase re-registers the original's
+    position against the node replacing it. Without that half, a read diagnostic anchored on the enclosing
+    record (which is every read diagnostic about one of its fields) loses its line. The identity-keyed
+    position map is threaded in and mutated in place rather than rebuilt by the caller, so there is one map
+    and no two-hop lookup; `SchemaDesugarerTest.aRewrittenDeclarationKeepsItsSourcePosition` is the guard.
+    An *injected* declaration still has no position, correctly — it has no source text of its own.
 - **A parameterized declaration is left entirely alone** — its body legitimately references its own
   parameters, and rewriting `array<T>` inside `array`'s own declaration would be nonsense.
 - **The meta-kernel runs this phase too**, supplying its own hand-written routing table

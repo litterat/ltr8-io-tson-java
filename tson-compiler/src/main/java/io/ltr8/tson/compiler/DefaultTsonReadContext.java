@@ -91,8 +91,26 @@ final class DefaultTsonReadContext implements TsonReadContext {
     }
 
     @Override
-    public TsonReadContext withSchemaLocation(SchemaLocation schemaLocation) {
-        return new DefaultTsonReadContext(cursor, path, Optional.of(schemaLocation), positionOverride);
+    public TsonReadContext schemaField(String name) {
+        return new DefaultTsonReadContext(cursor, path + "/" + escape(name),
+                schemaLocation.map(location -> location.field(name)), positionOverride);
+    }
+
+    @Override
+    public TsonReadContext inRecord(SchemaLocation declaration) {
+        // The pointer survives, the anchor does not: this record declares the field the pointer now ends
+        // with, so it is what a reader following the pointer needs opened. Only an outermost record, with no
+        // pointer to extend, contributes its own name as the path's root.
+        return new DefaultTsonReadContext(cursor, path,
+                Optional.of(schemaLocation.map(location -> location.anchoredOn(declaration)).orElse(declaration)),
+                positionOverride);
+    }
+
+    @Override
+    public TsonReadContext underDeclaration(SchemaLocation declaration) {
+        return schemaLocation.isPresent()
+                ? this
+                : new DefaultTsonReadContext(cursor, path, Optional.of(declaration), positionOverride);
     }
 
     @Override
@@ -102,10 +120,10 @@ final class DefaultTsonReadContext implements TsonReadContext {
 
     @Override
     public void report(Diagnostic.Code code, String message, String expected, String actual) {
-        // All three schema-end components come from the one SchemaLocation the running reader stamped, so a
-        // read against a schema that imported its types names the schema that *declared* the entry, not the
-        // one that imported it. A read with no schema behind it stamps none of them: Diagnostic spells a
-        // missing identity "" and a missing pointer as an absence, since for a pointer "" is the root.
+        // All three schema-end components come from the one SchemaLocation the descent accumulated, so they
+        // cannot disagree about which document to open. A read with no schema behind it carries none of them:
+        // Diagnostic spells a missing identity "" and a missing pointer as an absence, since for a pointer
+        // "" is the root.
         Diagnostic diagnostic = new Diagnostic(Optional.of(path), schemaLocation.map(SchemaLocation::pointer),
                 schemaLocation.map(SchemaLocation::schemaId).orElse(""), code, message, expected, actual,
                 position(), schemaLocation.flatMap(SchemaLocation::position));

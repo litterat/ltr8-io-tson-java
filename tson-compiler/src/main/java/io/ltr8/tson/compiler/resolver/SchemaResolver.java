@@ -21,6 +21,7 @@ import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -123,11 +124,13 @@ public final class SchemaResolver {
      * {@link TypeDefinition} carries where it was declared -- {@code TsonSchemaParser#declarationPositions()}
      * for the same document is what a caller passes.
      *
-     * <p><b>Identity-keyed, and that is why {@code SchemaDesugarer} shares structure.</b> The map comes from
-     * an {@code IdentityHashMap}, so only a declaration the parser itself built is found in it; a desugared
-     * or injected one resolves with no position, which is correct -- it has no source text of its own. A
-     * desugar phase that rebuilt an equal-but-distinct declaration would silently lose the position here,
-     * which is the invariant {@code SchemaDesugarerTest}'s {@code assertSame} checks.
+     * <p><b>Identity-keyed, which is why {@code SchemaDesugarer} shares structure <em>and</em> carries
+     * positions across the rewrites it cannot avoid.</b> The map comes from an {@code IdentityHashMap}, so
+     * only a declaration the parser itself built is found in it as given. Structural sharing keeps that true
+     * for everything with no sugar in it ({@code SchemaDesugarerTest}'s {@code assertSame} is the invariant),
+     * and {@code SchemaDesugarer.schemaMap} re-registers the position of every declaration it does rebuild --
+     * without which any record holding a single {@code [T]} field would resolve with no position at all. An
+     * <em>injected</em> declaration still has none, which is correct: it has no source text of its own.
      *
      * <p>The position reaches a diagnostic two ways: {@code TypeDefinition.position()} is what a read-time
      * {@code Diagnostic}'s {@code schemaPosition} is populated from, so a value error can say where the type
@@ -195,11 +198,15 @@ public final class SchemaResolver {
         // already behind the one gate the caller checks after this call returns. The reporter is built here
         // because everything Diagnostic.ofSchemaError wants -- the canonical schema id, the identity-keyed
         // position table -- is this method's, not an AST-to-AST rewrite's.
+        // A mutable identity-keyed copy, because desugaring rewrites the declarations that contain sugar and
+        // has to carry each one's position onto the node it produced -- see SchemaDesugarer.schemaMap. Every
+        // position lookup below goes through this copy, so a rewritten declaration is located like any other.
+        Map<SchemaMap.Declaration, SourcePosition> positions = new IdentityHashMap<>(declarationPositions);
         SchemaDocument desugared = SchemaDesugarer.desugar(document, metaParser.schema().entries(),
                 namespace.keySet(), receiver == null ? null : (declaration, error) ->
                         receiver.report(Diagnostic.ofSchemaError(TsonCanonicalIdentity.canonicalize(id),
                                 declaration.name(), error.getMessage(),
-                                Optional.ofNullable(declarationPositions.get(declaration)))));
+                                Optional.ofNullable(positions.get(declaration)))), positions);
         Map<String, SchemaMap.Declaration> declarations = desugared.body().declarations();
 
         // Local-vs-import collisions, up front (local names are already unique -- SchemaMap dedupes them).
@@ -235,7 +242,7 @@ public final class SchemaResolver {
                         + "supertype or refinement source cannot depend, directly or transitively, on the type "
                         + "it helps define");
             }
-            Optional<SourcePosition> position = Optional.ofNullable(declarationPositions.get(declaration));
+            Optional<SourcePosition> position = Optional.ofNullable(positions.get(declaration));
             try {
                 TypeDefinition resolved = holder[0].resolve(declaration, position);
                 namespace.put(name, resolved);

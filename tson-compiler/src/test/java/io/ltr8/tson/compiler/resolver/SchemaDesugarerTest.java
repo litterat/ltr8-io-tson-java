@@ -11,12 +11,14 @@ import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 import org.junit.jupiter.api.Test;
 
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +27,7 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -99,6 +102,35 @@ class SchemaDesugarerTest {
         StructuralTypeDef typeDef = (StructuralTypeDef) document.body().declarations().get(declaration).typeDef();
         FieldDef field = (FieldDef) ((RecordDef) typeDef.body()).entries().get(0);
         return ((SimpleRef) field.type().orElseThrow().typeRef()).name();
+    }
+
+    /**
+     * <b>The other half of structural sharing.</b> Sharing keeps a sugar-free declaration findable in the
+     * identity-keyed position table by leaving it alone; a declaration that genuinely contains sugar has to be
+     * rebuilt, and its position has to be re-registered against the node that replaces it. Without this any
+     * record holding a single {@code [T]} field resolves with no position, so every read diagnostic against
+     * it -- which is anchored on the enclosing record -- loses its line.
+     */
+    @Test
+    void aRewrittenDeclarationKeepsItsSourcePosition() {
+        TsonSchemaParser parser = new TsonSchemaParser("""
+                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
+                {
+                  plain => { a: text }
+
+                  sugared => { tags: [text] }
+                }""");
+        SchemaDocument document = parser.parseSchemaDocument();
+        Map<SchemaMap.Declaration, SourcePosition> positions = new IdentityHashMap<>(parser.declarationPositions());
+
+        SchemaDocument desugared = SchemaDesugarer.desugar(document, META, Set.of(), null, positions);
+
+        Map<String, SchemaMap.Declaration> after = desugared.body().declarations();
+        assertNotSame(document.body().declarations().get("sugared"), after.get("sugared"),
+                "a declaration containing sugar is genuinely rebuilt");
+        assertEquals(5, positions.get(after.get("sugared")).line(), "carried onto the node that replaced it");
+        assertSame(document.body().declarations().get("plain"), after.get("plain"));
+        assertEquals(3, positions.get(after.get("plain")).line());
     }
 
     @Test

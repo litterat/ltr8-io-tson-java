@@ -208,53 +208,87 @@ class TsonValidateTest {
     }
 
     /**
-     * A value error points at both ends: where the value is in the data, and where the type it violated was
-     * declared in a schema. The second half is only non-empty because {@code Tson.resolve}/the loader pass
-     * declaration positions through resolution -- {@code schemaPosition} was dead in production until they did.
+     * A value error points at both ends: where the value is in the data, and where the rule it broke lives in
+     * a schema. The second half is only non-empty because {@code Tson.resolve}/the loader pass declaration
+     * positions through resolution -- {@code schemaPosition} was dead in production until they did.
      *
-     * <p>All three schema-side components name the <em>atom's</em> own declaration ({@code int32}, in core.tn),
-     * not {@code point}'s, because each reader stamps its own schema location before descending -- so a
-     * diagnostic from inside an atom carries that atom's declaration, which is the one that defines the
-     * constraint being violated. <b>The identity is core.tn's, not the schema the document named</b>: {@code
-     * point-1.tn} is four lines long and core.tn's line for {@code int32} is past its end, so pairing the
-     * position with the importing schema would send a consumer to the wrong file. That is only possible
-     * because {@code TsonSchemaLinker} records each merged entry's origin.
+     * <p><b>The schema end is the author's own path, not the leaf the constraint came from.</b> {@code y}'s
+     * type is {@code int32}, declared in core.tn, and naming <em>that</em> would send a reader to a file they
+     * did not write, at a line past the end of the four-line schema their data named -- while never mentioning
+     * the field they can actually edit. So the pointer is {@code /point/y} and the identity is point-1.tn's:
+     * JSON Schema 2020-12 §12.3's {@code keywordLocation}, which likewise follows the validation path rather
+     * than naming the dereferenced target. The constraint itself is not lost -- {@code message} names {@code
+     * int32} and {@code expected} carries its bounds.
      */
     @Test
-    void aValueErrorCarriesTheDeclaringTypesOwnSchemaLocation() {
+    void aValueErrorLocatesTheAuthorsOwnFieldNotTheLeafTypeItResolvesTo() {
         Diagnostic problem = only(tsonWithPoint(), """
                 !!schema:"https://example.test/point-1.tn"
                 !point { x: 3  y: 99999999999999 }""");
 
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, problem.code());
         assertTrue(problem.dataPosition().isPresent(), "the value's own position in the data");
-        assertEquals(Optional.of("/int32"), problem.schemaPointer(), "which entry declared the constraint");
-        assertEquals("tson.io/2026/32/m/core.tn", problem.schemaId(), "the schema that declared int32");
-        assertTrue(problem.schemaPosition().isPresent(), "where int32 is declared");
+        assertEquals(Optional.of("/point/y"), problem.schemaPointer(), "the field the author declared");
+        assertEquals("example.test/point-1.tn", problem.schemaId(), "the schema the data named");
+        assertTrue(problem.schemaPosition().isPresent(), "where point is declared");
+        assertTrue(problem.message().contains("int32"), problem.message());
     }
 
     /**
-     * The other half of the same rule: an entry the document's own schema declares is stamped with <em>its</em>
-     * identity, so the two are genuinely distinguished rather than one constant being reported everywhere.
+     * <b>The pointer crosses a declaration boundary, and the anchor follows it.</b> {@code city} is declared
+     * by {@code address}, not by {@code person}, so the path keeps extending ({@code keywordLocation} crosses
+     * a {@code $ref} the same way) while the identity and position re-anchor on the record that actually
+     * declares the field the path now ends with. A single fixed anchor would send a reader to {@code person}'s
+     * line for a field {@code person} does not declare.
      */
     @Test
-    void anErrorAgainstALocalDeclarationCarriesTheDocumentsOwnSchemaIdentity() {
+    void aNestedRecordsFieldExtendsThePointerAndReanchorsThePosition() {
+        Tson tson = Tson.builder().build();
+        tson.resolve("""
+                !!id:"https://example.test/nested-1.tn"
+                !!meta:"https://tson.io/2026/32/m/meta.tn"
+                !!import:"https://tson.io/2026/32/m/core.tn"
+                {
+                  person => { home: address }
+
+                  address => { city: text }
+                }
+                """);
+
+        Diagnostic problem = only(tson, """
+                !!schema:"https://example.test/nested-1.tn"
+                !person { home: { } }""");
+
+        assertEquals(Optional.of("/person/home/city"), problem.schemaPointer());
+        assertEquals("example.test/nested-1.tn", problem.schemaId());
+        assertEquals(7, problem.schemaPosition().orElseThrow().line(), "address's line, not person's");
+    }
+
+    /**
+     * A read whose root is not a record has no enclosing declaration to anchor on, so the reader's own is
+     * taken -- and for an imported type that is the schema which <em>declared</em> it, which is the whole
+     * reason {@code TsonSchemaLinker} keeps each merged entry's origin. Nothing encloses {@code int32} here,
+     * so nothing displaces core.tn.
+     */
+    @Test
+    void aRootValueWithNoEnclosingRecordCarriesItsOwnDeclaringSchema() {
         Diagnostic problem = only(tsonWithPoint(), """
                 !!schema:"https://example.test/point-1.tn"
-                !point { x: 3 }""");
+                !int32 99999999999999""");
 
-        assertEquals(Diagnostic.Code.FIELD_REQUIRED, problem.code());
-        assertEquals(Optional.of("/point"), problem.schemaPointer());
-        assertEquals("example.test/point-1.tn", problem.schemaId());
+        assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, problem.code());
+        assertEquals(Optional.of("/int32"), problem.schemaPointer());
+        assertEquals("tson.io/2026/32/m/core.tn", problem.schemaId(), "where int32 is actually declared");
     }
 
     /**
-     * A desugar-injected entry ({@code [text]}'s own {@code array_text_…}) has a name in the resolved schema
-     * but no line in any source text, so the pointer is the only schema-end component it can carry -- which is
-     * exactly why the two are separate components rather than one location string.
+     * A desugar-injected entry ({@code [text]}'s own {@code array_text_…}) is never what a diagnostic points
+     * at: the author wrote {@code tags: [text]}, so {@code /tagged/tags} is the location, and the injected
+     * name survives only in {@code message}. The enclosing record supplies the position, which the injected
+     * entry itself has none of.
      */
     @Test
-    void anInjectedEntrysDiagnosticCarriesAPointerWithoutAPosition() {
+    void anInjectedEntryIsLocatedByTheFieldThatDesugaredIntoIt() {
         Tson tson = Tson.builder().build();
         tson.resolve("""
                 !!id:"https://example.test/tags-1.tn"
@@ -268,9 +302,26 @@ class TsonValidateTest {
                 !tagged { tags: { a: 1 } }""");
 
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, problem.code());
-        assertTrue(problem.schemaPointer().orElseThrow().startsWith("/array_text_"), problem.toString());
-        assertEquals("example.test/tags-1.tn", problem.schemaId(), "injected into the schema that desugared it");
-        assertEquals(Optional.empty(), problem.schemaPosition(), "an injected entry has no source line");
+        assertEquals(Optional.of("/tagged/tags"), problem.schemaPointer());
+        assertEquals("example.test/tags-1.tn", problem.schemaId());
+        assertEquals(4, problem.schemaPosition().orElseThrow().line(),
+                "tagged's own line -- kept across the desugar rewrite its [text] field forces");
+    }
+
+    /**
+     * An <em>unrecognized</em> field is a data step with no schema step: {@code /point/nope} names nothing, so
+     * extending the schema pointer with it would invent a location that does not exist. The data path still
+     * records where the stray name was written.
+     */
+    @Test
+    void anUnrecognizedFieldDoesNotExtendTheSchemaPointer() {
+        Diagnostic problem = only(tsonWithPoint(), """
+                !!schema:"https://example.test/point-1.tn"
+                !point { x: 3  y: 4  nope: 5 }""");
+
+        assertEquals(Diagnostic.Code.UNRECOGNIZED_FIELD, problem.code());
+        assertEquals(Optional.of("/nope"), problem.path(), "the stray name is real data");
+        assertEquals(Optional.of("/point"), problem.schemaPointer(), "and names nothing in the schema");
     }
 
     // ── Diagnostic field quality ─────────────────────────────────────────

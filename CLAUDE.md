@@ -266,8 +266,8 @@ to itself. The payoff: meta-kernel's linked form needs no materialization.
 `TsonCanonicalIdentity.canonicalize` is §2.2.1's algorithm (exactly two reductions — strip scheme, strip
 query — everything else must already be canonical), public API because `TsonSchemaLoader` keys on it.
 `TsonSchemaLinker.link(schema, loader)` merges `!!import`s (recording each merged entry's origin schema id in
-`TsonLinkedSchema.entryOrigins`, transitively — what lets a read diagnostic against `int32` name core.tn
-rather than the schema that imported it), populates `subtypes`, derives choice
+`TsonLinkedSchema.entryOrigins`, transitively — so a declaration's identity and its line always come from the
+same document, whichever schema flattened it in), populates `subtypes`, derives choice
 `disjoint` (`ChoiceDisjointness` — total and two-valued: `true` iff every variant occupies a distinct
 discrimination class, the same `DiscriminationClass` untagged reading dispatches on; `SPEC-FEEDBACK.md`
 #47), and validates every reference — including choice-variant
@@ -324,9 +324,11 @@ a location this really emits, not an absence. `expected` carries the **constrain
 `one of (A, B, C)` — from `AtomTypeException`'s six-shape vocabulary, never the type's name; the name leads
 `message` instead. The base-syntax exceptions keep their position out of `getMessage()` (it is in
 `position()`, and in `toString()` for a stack trace) so a diagnostic states it once. A read's schema end is
-one `SchemaLocation` (origin schema id + declaration name + its position), stamped by every reader before it
-descends, so the three can never come from different declarations; the id is the schema that *declared* the
-entry, which under an `!!import` is not the one being read against.
+one `SchemaLocation` (id + pointer + position) **accumulated as the read descends**, not claimed by whichever
+reader is innermost: the pointer is the path taken (`/person/age`), never the leaf it resolves to (`/int32` in
+core.tn), because the leaf names a file the author didn't write and never mentions the field they can edit.
+`schemaField` steps data and schema together where `field`/`index` step data alone; a record re-anchors
+id+position on itself, everything else offers its own declaration only as a seed for a value nothing encloses.
 Schema-side reporting runs through the same receiver: `TsonSchemaParser`,
 `SchemaResolver` and `TsonSchemaLinker` have reporting overloads that collect every independent problem in
 one pass (a failed declaration leaves an answer-everything placeholder, javac-style), while
@@ -505,8 +507,10 @@ compatibility).
   `TsonDiagnosticsReceiver` (see `docs/readers-and-diagnostics.md`), and read- and schema-side diagnostics
   now populate the same four location components. Throw-site classification is done across the whole schema
   pipeline. The lexer stays fail-fast on purpose and is the floor under schema-parse recovery — not a tracked
-  gap; `STRUCTURED-OUTPUT.md` holds the open question. What remains is granularity: positions and pointers are
-  **per declaration**, so a diagnostic about one field of `/my_type` still points at `/my_type`.
+  gap; `STRUCTURED-OUTPUT.md` holds the open question. What remains is granularity: `schemaPosition` is **per
+  declaration**, one level coarser than the pointer beside it — `/person/age` carries `person`'s own line,
+  because `RecordField` has no position. A `caused by` frame chaining the author's location to the leaf
+  constraint's is the other open shape (`BACKLOG.md`).
 - **Deferred design questions** — `REQUIRED_FIXED`/`OPTIONAL_FIXED` value validation, `value_param` real
   parameter substitution, thread-safety, and a general disk/HTTP-backed `TsonSchemaSource` (with
   whitelist/blacklist policy).

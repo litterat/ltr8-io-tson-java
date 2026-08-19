@@ -51,7 +51,7 @@ final class TupleBindReader extends TupleAbstractReader<Object> {
 
     @Override
     public Object read(TsonReadContext ctx) {
-        ctx = ctx.withSchemaLocation(schemaLocation);
+        ctx = ctx.underDeclaration(schemaLocation);
         if (!expectTupleStart(ctx)) {
             return null;
         }

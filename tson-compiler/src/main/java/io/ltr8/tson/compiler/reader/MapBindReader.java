@@ -58,7 +58,7 @@ final class MapBindReader extends MapAbstractReader<Object> {
 
     @Override
     public Object read(TsonReadContext ctx) {
-        ctx = ctx.withSchemaLocation(schemaLocation);
+        ctx = ctx.underDeclaration(schemaLocation);
         Shape shape = expectMapShape(ctx);
         if (shape == Shape.MISMATCH) {
             return null;

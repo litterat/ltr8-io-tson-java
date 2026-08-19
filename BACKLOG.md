@@ -139,18 +139,37 @@ Parsing, desugaring, resolution and linking all report every independent problem
 `TsonDiagnosticsReceiver` (issues #3/#28/#29), whether reached by `tson compile`/`Tson.validateSchema` or by
 a *data* read whose `!!schema` names a schema that doesn't resolve — both give the same account of the same
 broken schema. `docs/readers-and-diagnostics.md`'s "Schema-side diagnostics" section describes the shape and
-the decisions behind it. Nothing is outstanding here except the granularity ceiling below; the *floor* under
-all of it — the lexer being fail-fast, so a token that will not lex aborts the pass that would have reported
-past it — is deliberately not an item in this list, because there is no work to do until someone decides
-whether lexer errors feed the `Diagnostic` model at all. `STRUCTURED-OUTPUT.md` holds that question.
+the decisions behind it. Two things are open below -- how finely a diagnostic locates itself, and whether it
+should carry more than one location at all. The *floor* under all of it — the lexer being fail-fast, so a
+token that will not lex aborts the pass that would have reported past it — is deliberately not an item in
+this list, because there is no work to do until someone decides whether lexer errors feed the `Diagnostic`
+model at all. `STRUCTURED-OUTPUT.md` holds that question.
 
-- Granularity ceiling: positions and pointers alike are **per declaration**, from the
-  declaration's own name token. Sub-declaration positions (which field, which supertype) do not exist and
-  would be their own parser work — visible today as a diagnostic pointing at `/my_type` when the problem is
-  one of its fields. Closing it means giving `TsonSchemaParser` per-field positions and `SchemaLocation` a
-  deeper pointer; nothing else in the stack would change. A *syntax* error is the one exception: it has the
-  failing token's own position, since the parser reports it where it stands rather than looking it up per
-  declaration afterwards. Its `schemaPointer` is still only `/my_type`.
+- [ ] **`schemaPosition` is one level coarser than the pointer beside it.** A read diagnostic locates
+  `/person/age` but positions it at `person`'s own declaration line, because positions are per declaration
+  (from the declaration's own name token) and `RecordField` carries none. Closing it means giving
+  `TsonSchemaParser` per-field positions and threading them onto `RecordField` — a `schema.meta` bind target,
+  so the `@Record` constructor-selection trap and the hand-written `equals` both apply. Nothing in the reader
+  stack changes: `SchemaLocation` already carries the pointer that names the field. Same gap for a supertype
+  or a choice variant. A *syntax* error is the one exception — it has the failing token's own position, since
+  the parser reports it where it stands rather than looking it up per declaration afterwards.
+- [ ] **A `caused by` frame, for when the author's location is not the whole story.** A read diagnostic now
+  locates the rule where the author can act on it (`/person/age` in their own schema) rather than at the leaf
+  the constraint came from (`/int32` in core.tn). That is the right primary frame, but the leaf is genuinely
+  informative for a *confusing* error — a deep composition, a refinement chain, a type whose bound is not
+  obvious from the field's own line — and it is currently recoverable only from `message`/`expected` prose.
+  - The shape to explore is a chain rather than a second flat pair: the primary location, then zero or more
+    `caused by` frames each carrying the same four location components, the way rustc's `MultiSpan` and JSON
+    Schema's nested `errors` both do. `Diagnostic`'s own Javadoc already cites the first of those as the
+    model this type follows.
+  - **Which suggests an extended output mode**, rather than making every diagnostic bigger: the default stays
+    one frame, and a caller that finds an error confusing asks for the chain. That is a CLI surface question
+    (`--explain`? a verbosity flag?) as much as a model one, and it interacts with `diagnostics.tn` being a
+    versioned schema — a new frame list is a shape change, so §10's immutability rule means `diagnostics-2.tn`.
+  - **The input already exists and is deliberately kept for this.** `TsonLinkedSchema.entryOrigins` answers
+    "which document declared this entry", and every reader is already handed its own declaration's location
+    (`ValueReaderContext.locationOf`) — today only used as the seed for a value nothing encloses. A caused-by
+    frame is what would consume it in the ordinary nested case.
 
 ## Miscellaneous
 

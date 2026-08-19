@@ -34,13 +34,21 @@ import java.util.Optional;
  * own children reported anything asks {@link #reported()}, which works for every receiver -- including
  * one that streams its diagnostics somewhere and keeps no list at all.
  *
- * <p><b>The "stamp my own schema location" convention</b>: every reader's {@code read(ctx)} starts by
- * claiming {@code ctx = ctx.withSchemaLocation(this.schemaLocation);} before doing anything else,
- * including before descending into its own children -- so a diagnostic reported from inside, say, an
- * atom reader for {@code integer} carries *that atom's own* declaration and declared position, not
- * whatever the enclosing record happened to leave in the context. {@link #field}/{@link #index} never
- * touch the schema location; it's always claimed by whichever reader is currently running, not
- * inherited through descent.
+ * <p><b>The "offer my own declaration" convention</b>: every reader's {@code read(ctx)} starts by offering
+ * its own declaration to the schema location before doing anything else -- {@link #inRecord} for a record,
+ * {@link #underDeclaration} for everything else -- and the two differ in exactly the way {@link
+ * SchemaLocation} explains: a record re-anchors the identity and position on itself because it declares the
+ * field the pointer ends with, while an atom's or container's own declaration is only a seed, taken when
+ * nothing encloses it. So a diagnostic from inside the {@code int32} reader for {@code person}'s {@code age}
+ * field carries person.tn's {@code /person/age}, not core.tn's {@code int32}; the same atom read at the root
+ * of a document still carries its own.
+ *
+ * <p>The pointer itself is accumulated on descent, not claimed: {@link #schemaField} steps both the data path
+ * and the schema pointer, {@link #field}/{@link #index} step the data path alone. A map key or an array index
+ * is a data step with no schema step -- the schema says one thing about every entry of a map, so {@code
+ * /person/tags} is the schema location of every {@code /tags/<key>}. An <em>unrecognized</em> field is the
+ * other case for plain {@link #field}: it names nothing in the schema, so extending the schema pointer with
+ * it would invent a location that does not exist.
  *
  * <p><b>A missing value (e.g. a missing required field) needs no special casing when it's noticed
  * inline</b> -- a reader that decides a field is absent without ever calling {@link #peek()}/{@link
@@ -77,17 +85,35 @@ public interface TsonReadContext {
     /** The path to the value currently being read, as an RFC 6901 JSON Pointer accumulated by {@link #field}/{@link #index}. */
     String path();
 
-    /** A copy of this context scoped one record field or map entry deeper -- {@code name} is RFC 6901-escaped into the path. */
+    /**
+     * A copy of this context scoped one step deeper in the <em>data</em> only -- {@code name} is RFC
+     * 6901-escaped into the path. For a map entry, or a field the schema does not declare; a declared record
+     * field uses {@link #schemaField} so both ends descend together.
+     */
     TsonReadContext field(String name);
 
-    /** A copy of this context scoped one array/tuple element deeper. */
+    /** A copy of this context scoped one array/tuple element deeper -- a data step, with no schema step. */
     TsonReadContext index(int i);
 
     /**
-     * A copy of this context with {@link #schemaLocation()} replaced -- see this interface's own "stamp my
-     * own schema location" note.
+     * A copy of this context scoped one <em>declared record field</em> deeper, stepping the data path and the
+     * schema pointer together -- the one descent where the schema has a name of its own for where we went.
      */
-    TsonReadContext withSchemaLocation(SchemaLocation schemaLocation);
+    TsonReadContext schemaField(String name);
+
+    /**
+     * A copy of this context anchored on the record now reading: {@code declaration}'s identity and position
+     * replace whatever was there, and its pointer is taken only if none has been established. See this
+     * interface's own "offer my own declaration" note.
+     */
+    TsonReadContext inRecord(SchemaLocation declaration);
+
+    /**
+     * A copy of this context with {@code declaration} taken <em>only</em> if no schema location has been
+     * established yet -- what every non-record reader offers, so its own declaration locates a value read at
+     * the root of a document without displacing the enclosing record's when there is one.
+     */
+    TsonReadContext underDeclaration(SchemaLocation declaration);
 
     /**
      * A copy of this context whose {@link #position()} is pinned to {@code position} rather than

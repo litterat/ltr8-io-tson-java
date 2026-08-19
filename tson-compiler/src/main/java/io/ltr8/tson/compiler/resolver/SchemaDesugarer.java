@@ -38,10 +38,12 @@ import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
+import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -150,17 +152,24 @@ final class SchemaDesugarer {
     /** Where an invalid sugar form is reported, or {@code null} to rethrow it and abandon the document. */
     private final DesugarFailureReporter reporter;
 
+    /**
+     * The identity-keyed declaration positions, carried across a rewrite -- see {@link #schemaMap}. Never
+     * {@code null}; a caller with no positions to keep passes an empty map it then discards.
+     */
+    private final Map<SchemaMap.Declaration, SourcePosition> positions;
+
     private SchemaDesugarer(Map<String, TypeDefinition> metaEntries, Set<String> imported,
-            DesugarFailureReporter reporter) {
+            DesugarFailureReporter reporter, Map<SchemaMap.Declaration, SourcePosition> positions) {
         this.metaEntries = metaEntries;
         this.imported = imported;
         this.reporter = reporter;
+        this.positions = positions;
     }
 
-    /** {@link #desugar(SchemaDocument, Map, Set, DesugarFailureReporter)}, throwing at the first invalid sugar form. */
+    /** {@link #desugar(SchemaDocument, Map, Set, DesugarFailureReporter, Map)}, throwing at the first invalid sugar form. */
     static SchemaDocument desugar(SchemaDocument document, Map<String, TypeDefinition> metaEntries,
             Set<String> imported) {
-        return desugar(document, metaEntries, imported, null);
+        return desugar(document, metaEntries, imported, null, new IdentityHashMap<>());
     }
 
     /**
@@ -172,8 +181,9 @@ final class SchemaDesugarer {
      * #desugarOrReport}. With a {@code null} {@code reporter} the first such form throws instead.
      */
     static SchemaDocument desugar(SchemaDocument document, Map<String, TypeDefinition> metaEntries,
-            Set<String> imported, DesugarFailureReporter reporter) {
-        SchemaDesugarer pass = new SchemaDesugarer(metaEntries, imported, reporter);
+            Set<String> imported, DesugarFailureReporter reporter,
+            Map<SchemaMap.Declaration, SourcePosition> positions) {
+        SchemaDesugarer pass = new SchemaDesugarer(metaEntries, imported, reporter, positions);
         pass.local = document.body().declarations();
         SchemaMap body = pass.schemaMap(document.body());
         if (body == document.body() && pass.injected.isEmpty()) {
@@ -190,12 +200,26 @@ final class SchemaDesugarer {
                 new SchemaMap(body.annotations(), declarations));
     }
 
+    /**
+     * <b>The one place a rewritten declaration replaces an original</b>, and so the one place the original's
+     * source position has to be carried over. {@code positions} is identity-keyed (see {@code
+     * TsonSchemaParser.declarationPositions()}), which is what makes structural sharing load-bearing
+     * everywhere else -- but a declaration that genuinely contains sugar <em>is</em> rebuilt, and without
+     * this every diagnostic against it would lose its line. That is not a rare case: any record with a single
+     * {@code [T]} field is rewritten whole.
+     */
     private SchemaMap schemaMap(SchemaMap map) {
         Map<String, SchemaMap.Declaration> rewritten = null;
         for (Map.Entry<String, SchemaMap.Declaration> entry : map.declarations().entrySet()) {
             SchemaMap.Declaration declaration = desugarOrReport(entry.getValue());
-            if (declaration != entry.getValue() && rewritten == null) {
-                rewritten = new LinkedHashMap<>(map.declarations());
+            if (declaration != entry.getValue()) {
+                SourcePosition position = positions.get(entry.getValue());
+                if (position != null) {
+                    positions.put(declaration, position);
+                }
+                if (rewritten == null) {
+                    rewritten = new LinkedHashMap<>(map.declarations());
+                }
             }
             if (rewritten != null) {
                 rewritten.put(entry.getKey(), declaration);
