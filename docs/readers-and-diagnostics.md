@@ -147,18 +147,30 @@ the schema root; a base-syntax failure points at the data root), so spelling "no
 make the two indistinguishable to a consumer *and* to a renderer. A present `""` is the root; an absence is
 an absence. `schemaId`/`expected`/`actual` stay plain strings, where `""` carries no second meaning.
 
-**`schemaPosition` comes from `TypeDefinition.position()`**, which is
-populated because `SchemaResolver.resolveSchema` takes `TsonSchemaParser.declarationPositions()` and passes
-each declaration's own position into `DefinitionResolver.resolve` — so a value error points at both ends, the
-value in the data and the type it violated in the schema. Every reader stamps its own position first, so the
-one reported is the *atom's* declaration (`int32` in core.tn), not the enclosing record's. **The read path
-populates `schemaPosition` but not `schemaId`/`schemaPointer`** — a reader knows the declaration position it
-stamped, not which entry of which schema it came from, so which schema a read diagnostic's position refers to
-is still implicit; the schema path populates all three (`BACKLOG.md`). The cause is upstream of the reader:
+**The read path's schema end is one value, `SchemaLocation`**, stamped by every reader before it does
+anything else (`ctx = ctx.withSchemaLocation(this.schemaLocation)`, the convention `TsonReadContext`'s own
+Javadoc states) — the declaration's name and its `TypeDefinition.position()`, which is populated because
+`SchemaResolver.resolveSchema` takes `TsonSchemaParser.declarationPositions()` and passes each declaration's
+own position into `DefinitionResolver.resolve`. So a value error points at both ends, the value in the data
+and the type it violated in the schema; because each reader stamps before descending, the one reported is the
+*atom's* declaration (`/int32` in core.tn), not the enclosing record's.
+
+**The two components are carried together because either alone is unusable.** A position with no pointer
+cannot be attributed — `110:3:4858` is core.tn's line for `int32` and nothing says so, while the schema the
+document named is four lines long — and a desugar-injected entry (`/array_text_d5ed9ca5`) has a name in the
+resolved schema but no line in any source text, so the pointer is the only component it can carry. One carrier
+also removes the failure mode two independent withers would allow: a reader claiming one component and
+inheriting the other from whichever reader ran before it. `SchemaLocation.declaration` is the entry the reader
+was built for, which is not always the name the reader's own *message* uses —
+`RecordBindReader.rebindContainerIfNeeded` rebuilds a container reader under the consuming *field's* name
+while carrying the original declaration's location through, so the message reads naturally and the pointer
+still lands on the entry that declares the rule.
+
+**`schemaId` is still absent**, so which *document* a read diagnostic's pointer indexes into is implicit; the
+schema path populates all three (`BACKLOG.md`). The cause is upstream of the reader:
 `TsonSchemaLinker.mergeImports` copies an imported `TypeDefinition` into the importing schema's `entries()`
-and keeps no record of where it came from, so a 4-line schema importing core.tn reports core.tn's
-`110:3:4858` for `int32` and the compiled schema's own id would be the *wrong* answer to pair with it. The
-field stays absent rather than approximated.
+and keeps no record of where it came from, so pairing `/int32` with the compiled schema's own id would name
+the *importing* schema for an *imported* declaration. The field stays absent rather than approximated.
 An atom's `AtomTypeException` is caught in `AtomTypeReader` and mapped to
 `ATOM_CONSTRAINT_VIOLATION` — `AtomType`'s own signature is untouched, since it's shared with the
 schemaless binder which has no read context. That code means exactly "the atom rejected this token" and

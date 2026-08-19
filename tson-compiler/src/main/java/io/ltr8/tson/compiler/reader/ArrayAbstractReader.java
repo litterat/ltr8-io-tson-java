@@ -1,6 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.Diagnostic;
+import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
@@ -11,11 +12,9 @@ import io.ltr8.tson.compiler.stream.SchemaRef;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.ElementState;
-import io.ltr8.tson.schema.meta.SourcePosition;
 
 import java.math.BigInteger;
 import java.util.LinkedHashSet;
-import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 
@@ -48,10 +47,10 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
     final String name;
     final ArrayBody body;
     final TsonTypeReader<?> elementParser;
-    final Optional<SourcePosition> schemaPosition;
+    final SchemaLocation schemaLocation;
 
-    ArrayAbstractReader(String name, ArrayBody body, TsonTypeReaderResolver resolver, Optional<SourcePosition> schemaPosition) {
-        this(name, body, resolver.resolve(body.elementType().name()), schemaPosition);
+    ArrayAbstractReader(String name, ArrayBody body, TsonTypeReaderResolver resolver, SchemaLocation schemaLocation) {
+        this(name, body, resolver.resolve(body.elementType().name()), schemaLocation);
     }
 
     /**
@@ -61,11 +60,11 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
      * them needs.
      */
     ArrayAbstractReader(String name, ArrayBody body, TsonTypeReader<?> elementParser,
-                         Optional<SourcePosition> schemaPosition) {
+                         SchemaLocation schemaLocation) {
         this.name = name;
         this.body = body;
         this.elementParser = elementParser;
-        this.schemaPosition = schemaPosition;
+        this.schemaLocation = schemaLocation;
     }
 
     /**

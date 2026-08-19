@@ -17,7 +17,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
 
     /**
      * Every scoped copy of a single read (see {@link #field}/{@link #index}/{@link
-     * #withSchemaPosition}/{@link #withPosition}) shares one of these -- the real event source, its
+     * #withSchemaLocation}/{@link #withPosition}) shares one of these -- the real event source, its
      * own live cursor position (mutated by {@link #peek}/{@link #next} regardless of which copy made
      * the call, since there is only ever one real cursor per read), the receiver every copy reports
      * through, and the running count of what they have reported.
@@ -36,14 +36,14 @@ final class DefaultTsonReadContext implements TsonReadContext {
 
     private final Cursor cursor;
     private final String path;
-    private final Optional<SourcePosition> schemaPosition;
+    private final Optional<SchemaLocation> schemaLocation;
     private final Optional<SourcePosition> positionOverride;
 
-    private DefaultTsonReadContext(Cursor cursor, String path, Optional<SourcePosition> schemaPosition,
+    private DefaultTsonReadContext(Cursor cursor, String path, Optional<SchemaLocation> schemaLocation,
                                     Optional<SourcePosition> positionOverride) {
         this.cursor = cursor;
         this.path = path;
-        this.schemaPosition = schemaPosition;
+        this.schemaLocation = schemaLocation;
         this.positionOverride = positionOverride;
     }
 
@@ -71,8 +71,8 @@ final class DefaultTsonReadContext implements TsonReadContext {
     }
 
     @Override
-    public Optional<SourcePosition> schemaPosition() {
-        return schemaPosition;
+    public Optional<SchemaLocation> schemaLocation() {
+        return schemaLocation;
     }
 
     @Override
@@ -82,34 +82,34 @@ final class DefaultTsonReadContext implements TsonReadContext {
 
     @Override
     public TsonReadContext field(String name) {
-        return new DefaultTsonReadContext(cursor, path + "/" + escape(name), schemaPosition, positionOverride);
+        return new DefaultTsonReadContext(cursor, path + "/" + escape(name), schemaLocation, positionOverride);
     }
 
     @Override
     public TsonReadContext index(int i) {
-        return new DefaultTsonReadContext(cursor, path + "/" + i, schemaPosition, positionOverride);
+        return new DefaultTsonReadContext(cursor, path + "/" + i, schemaLocation, positionOverride);
     }
 
     @Override
-    public TsonReadContext withSchemaPosition(Optional<SourcePosition> schemaPosition) {
-        return new DefaultTsonReadContext(cursor, path, schemaPosition, positionOverride);
+    public TsonReadContext withSchemaLocation(SchemaLocation schemaLocation) {
+        return new DefaultTsonReadContext(cursor, path, Optional.of(schemaLocation), positionOverride);
     }
 
     @Override
     public TsonReadContext withPosition(Optional<SourcePosition> position) {
-        return new DefaultTsonReadContext(cursor, path, schemaPosition, position);
+        return new DefaultTsonReadContext(cursor, path, schemaLocation, position);
     }
 
     @Override
     public void report(Diagnostic.Code code, String message, String expected, String actual) {
-        // The schema end carries a position but no pointer or identity: a reader knows the declaration
-        // position it stamped, not which entry of which schema it came from -- TsonSchemaLinker.mergeImports
-        // copies an imported TypeDefinition into the importing schema's entries and keeps no origin, so by
-        // compile time there is nothing correct to stamp. Reaching for the compiled schema's own id would
-        // pair the *importing* schema with an *imported* declaration's line, which is worse than absent.
-        // Recording the origin at merge time is the prerequisite -- see BACKLOG.md.
-        Diagnostic diagnostic = new Diagnostic(Optional.of(path), Optional.empty(), "", code, message,
-                expected, actual, position(), schemaPosition);
+        // The schema end carries a pointer and a position but no identity: a reader knows which entry it was
+        // built for, not which schema that entry came from -- TsonSchemaLinker.mergeImports copies an imported
+        // TypeDefinition into the importing schema's entries and keeps no origin, so by compile time there is
+        // nothing correct to stamp. Reaching for the compiled schema's own id would pair the *importing*
+        // schema with an *imported* declaration's line, which is worse than absent. Recording the origin at
+        // merge time is the prerequisite -- see BACKLOG.md.
+        Diagnostic diagnostic = new Diagnostic(Optional.of(path), schemaLocation.map(SchemaLocation::pointer),
+                "", code, message, expected, actual, position(), schemaLocation.flatMap(SchemaLocation::position));
         cursor.reported++;
         cursor.receiver.report(diagnostic);
     }

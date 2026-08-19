@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonReadException;
@@ -13,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class VoidReaderTest {
 
-    private static final VoidReader READER = new VoidReader(Optional.empty());
+    private static final VoidReader READER = new VoidReader(new SchemaLocation("void", Optional.empty()));
 
     @Test
     void acceptsTheAbsentSentinelAndReadsAsNull() {

@@ -20,7 +20,7 @@ import java.util.Optional;
  *
  * <p><b>{@link #peek()}/{@link #next()} are the core primitives</b> every reader consumes, delegating
  * to a single {@link TsonEventSource} shared across an entire read -- every scoped copy this
- * interface hands back (see {@link #field}/{@link #index}/{@link #withSchemaPosition}) points at the
+ * interface hands back (see {@link #field}/{@link #index}/{@link #withSchemaLocation}) points at the
  * *same* underlying source and diagnostic sink, so pulling an event through any one copy is visible
  * to all of them. {@link #position()} is not a stored, per-copy value -- it always reflects whichever
  * event was most recently peeked or consumed, on *any* copy, since there is only ever one real cursor
@@ -34,12 +34,13 @@ import java.util.Optional;
  * own children reported anything asks {@link #reported()}, which works for every receiver -- including
  * one that streams its diagnostics somewhere and keeps no list at all.
  *
- * <p><b>The "stamp my own schema position" convention</b>: every reader's {@code read(ctx)} starts by
- * claiming {@code ctx = ctx.withSchemaPosition(this.schemaPosition);} before doing anything else,
+ * <p><b>The "stamp my own schema location" convention</b>: every reader's {@code read(ctx)} starts by
+ * claiming {@code ctx = ctx.withSchemaLocation(this.schemaLocation);} before doing anything else,
  * including before descending into its own children -- so a diagnostic reported from inside, say, an
- * atom reader for {@code integer} carries *that atom's own* declared position, not whatever the
- * enclosing record happened to leave in the context. {@link #field}/{@link #index} never touch schema
- * position; it's always claimed by whichever reader is currently running, not inherited through descent.
+ * atom reader for {@code integer} carries *that atom's own* declaration and declared position, not
+ * whatever the enclosing record happened to leave in the context. {@link #field}/{@link #index} never
+ * touch the schema location; it's always claimed by whichever reader is currently running, not
+ * inherited through descent.
  *
  * <p><b>A missing value (e.g. a missing required field) needs no special casing when it's noticed
  * inline</b> -- a reader that decides a field is absent without ever calling {@link #peek()}/{@link
@@ -70,8 +71,8 @@ public interface TsonReadContext {
     /** The position of whichever event was most recently peeked or consumed, on any copy of this context sharing the same read. */
     Optional<SourcePosition> position();
 
-    /** The current position in the <em>schema</em> document -- absent if the governing declaration carries none. */
-    Optional<SourcePosition> schemaPosition();
+    /** The declaration currently governing this read -- absent for a read with no schema behind it at all. */
+    Optional<SchemaLocation> schemaLocation();
 
     /** The path to the value currently being read, as an RFC 6901 JSON Pointer accumulated by {@link #field}/{@link #index}. */
     String path();
@@ -82,8 +83,11 @@ public interface TsonReadContext {
     /** A copy of this context scoped one array/tuple element deeper. */
     TsonReadContext index(int i);
 
-    /** A copy of this context with {@link #schemaPosition()} replaced -- see this interface's own "stamp my own schema position" note. */
-    TsonReadContext withSchemaPosition(Optional<SourcePosition> schemaPosition);
+    /**
+     * A copy of this context with {@link #schemaLocation()} replaced -- see this interface's own "stamp my
+     * own schema location" note.
+     */
+    TsonReadContext withSchemaLocation(SchemaLocation schemaLocation);
 
     /**
      * A copy of this context whose {@link #position()} is pinned to {@code position} rather than
@@ -95,7 +99,7 @@ public interface TsonReadContext {
 
     /**
      * Builds a {@link Diagnostic} for one problem at the current {@link #path()}/{@link #position()}/{@link
-     * #schemaPosition()} and hands it to this read's {@link TsonDiagnosticsReceiver}, which decides its
+     * #schemaLocation()} and hands it to this read's {@link TsonDiagnosticsReceiver}, which decides its
      * fate -- a fail-fast receiver throws {@link TsonReadException} from here and never returns.
      */
     void report(Diagnostic.Code code, String message, String expected, String actual);

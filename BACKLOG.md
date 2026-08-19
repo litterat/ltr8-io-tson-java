@@ -144,9 +144,9 @@ a token that will not lex aborts the pass that would have reported past it — i
 this list, because there is no work to do until someone decides whether lexer errors feed the `Diagnostic`
 model at all. `STRUCTURED-OUTPUT.md` holds that question.
 
-- [ ] **The read path carries `schemaPosition` but not `schemaId`/`schemaPointer`** — a reader knows the
-  declaration position it stamped, not which entry of which schema produced it, so a value error reports
-  `110:3:4858` with nothing saying that is core.tn's line for `int32`.
+- [ ] **The read path carries `schemaPointer`/`schemaPosition` but not `schemaId`** (issue #58) — a reader
+  knows the entry it was built for, not which schema that entry came from, so a value error reports
+  `/int32` at `110:3:4858` with nothing saying that is *core.tn*'s line rather than the document's own.
   - **It is not just a matter of threading the compiled schema's identity down the reader stack** (as this
     item used to claim): the identity a reader could reach that way is the *wrong one*. `TsonSchemaLinker`'s
     `mergeImports` copies each imported `TypeDefinition` straight into the importing schema's `entries()`
@@ -159,10 +159,9 @@ model at all. `STRUCTURED-OUTPUT.md` holds that question.
     `TsonSchema`/`TsonLinkedSchema` populated by `mergeImports` (preferred — leaves `schema.meta` alone,
     since the spec's own `type_definition` has no such field and it is a bind target with a hand-written
     `equals` and the `@Record` constructor-selection trap) or as a new excluded-from-equality component on
-    `TypeDefinition` beside `position`. Only then does the reader-stack half apply: `withSchemaPosition`
-    becomes a three-part stamp across its ~11 reader call sites, and `DefaultTsonReadContext.report`
-    populates all three. `schemaPointer` is the cheap half — `ValueReaderFactory` is already handed the
-    entry's own declared name, which is the `/name` pointer.
+    `TypeDefinition` beside `position`. The reader-stack half is then a one-line change: the id becomes a
+    third component of `SchemaLocation`, which every reader already stamps as one value and
+    `DefaultTsonReadContext.report` already unpacks.
 - Granularity ceiling to know before starting any of these: positions are **per declaration**, from the
   declaration's own name token. Sub-declaration positions (which field, which supertype) do not exist and
   would be their own parser work — visible today as a diagnostic pointing at `/my_type` when the problem is

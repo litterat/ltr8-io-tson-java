@@ -2,6 +2,7 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.Position;
+import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
@@ -127,7 +128,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     final Object[] precomputedValue;
     private final FixedCheck[] fixedCheck;
     final int positionalFieldIndex;
-    final Optional<SourcePosition> schemaPosition;
+    final SchemaLocation schemaLocation;
     /**
      * This type's declared field names in <em>schema</em> order, rendered once for the closure diagnostic
      * ({@link #readFields}) -- both its message and its machine-readable {@code expected}. Schema order, not
@@ -137,9 +138,9 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     private final String declaredFields;
 
     RecordAbstractReader(String name, RecordBody body, TsonTypeReaderResolver resolver,
-                          Optional<SourcePosition> schemaPosition) {
+                          SchemaLocation schemaLocation) {
         this.name = name;
-        this.schemaPosition = schemaPosition;
+        this.schemaLocation = schemaLocation;
         this.fields = buildFields(body, resolver);
         this.groups = body.groups();
         this.fieldIndex = new HashMap<>();

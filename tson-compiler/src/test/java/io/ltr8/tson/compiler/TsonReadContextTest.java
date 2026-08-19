@@ -88,15 +88,15 @@ class TsonReadContextTest {
     }
 
     @Test
-    void withSchemaPositionReplacesOnlySchemaPosition() {
+    void withSchemaLocationReplacesOnlyTheSchemaLocation() {
         TsonReadContext ctx = contextOver(token("42", new Position(1, 1, 0)));
         ctx.peek();
         TsonReadContext descended = ctx.field("x");
 
-        SourcePosition schemaPosition = new Position(9, 2, 99);
-        TsonReadContext restamped = descended.withSchemaPosition(Optional.of(schemaPosition));
+        SchemaLocation location = new SchemaLocation("my_type", Optional.of(new Position(9, 2, 99)));
+        TsonReadContext restamped = descended.withSchemaLocation(location);
 
-        assertEquals(Optional.of(schemaPosition), restamped.schemaPosition());
+        assertEquals(Optional.of(location), restamped.schemaLocation());
         assertEquals(descended.position(), restamped.position());
         assertEquals(descended.path(), restamped.path());
     }
@@ -149,20 +149,40 @@ class TsonReadContextTest {
     }
 
     @Test
-    void reportedDiagnosticCarriesTheCurrentPathPositionAndSchemaPosition() {
+    void reportedDiagnosticCarriesTheCurrentPathPositionAndSchemaLocation() {
         Position dataPosition = new Position(4, 2, 30);
         SourcePosition schemaPosition = new Position(10, 1, 100);
         TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
         TsonReadContext ctx = TsonReadContext.of(
                 new ListEventSource(List.of(token("42", dataPosition))), problems);
 
-        TsonReadContext scoped = ctx.withSchemaPosition(Optional.of(schemaPosition)).field("value");
+        TsonReadContext scoped =
+                ctx.withSchemaLocation(new SchemaLocation("my_type", Optional.of(schemaPosition))).field("value");
         scoped.peek();
         scoped.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, "out of range", "0..100", "200");
 
         Diagnostic diagnostic = problems.diagnostics().get(0);
         assertEquals(Optional.of("/value"), diagnostic.path());
         assertEquals(Optional.of(dataPosition), diagnostic.dataPosition());
+        assertEquals(Optional.of("/my_type"), diagnostic.schemaPointer());
         assertEquals(Optional.of(schemaPosition), diagnostic.schemaPosition());
+    }
+
+    /**
+     * A read with no schema behind it -- {@code TsonReadContext.of} starts with no location, and nothing
+     * stamps one, so both schema-end components stay absent rather than becoming a present root pointer.
+     */
+    @Test
+    void aReportWithNoSchemaLocationStampedCarriesNeitherPointerNorPosition() {
+        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+        TsonReadContext ctx = TsonReadContext.of(
+                new ListEventSource(List.of(token("42", new Position(1, 1, 0)))), problems);
+        ctx.peek();
+
+        ctx.report(Diagnostic.Code.TYPE_MISMATCH, "wrong shape", "a record", "a token");
+
+        Diagnostic diagnostic = problems.diagnostics().get(0);
+        assertEquals(Optional.empty(), diagnostic.schemaPointer());
+        assertEquals(Optional.empty(), diagnostic.schemaPosition());
     }
 }

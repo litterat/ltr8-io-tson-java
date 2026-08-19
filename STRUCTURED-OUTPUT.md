@@ -71,7 +71,9 @@ backend.
     from the positional-errors stripe), not the finer per-`RecordBody`/`ArrayBody`/`MapBody`/`TupleBody`/
     `ChoiceBody`/atom-constraint-family granularity this bullet originally proposed deciding between —
     a diagnostic for a specific field still shows its *enclosing type's* declared position, not the
-    field's own line. Still open if that finer grain ever turns out to matter in practice.
+    field's own line. Still open if that finer grain ever turns out to matter in practice. It travels with
+    a `/name` `schemaPointer` naming the declaration it belongs to — the two are stamped as one
+    `SchemaLocation` — so a position landing outside the document a consumer passed is attributable.
 
 - [x] **Alignment with existing conventions** — realized in `tson-cli`'s own `--output json` shape
   (`OutputFormat.renderJson`), which emits every `CliDiagnostic` field (`path`/`code`/`message`/

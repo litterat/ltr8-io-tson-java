@@ -212,19 +212,46 @@ class TsonValidateTest {
      * declared in a schema. The second half is only non-empty because {@code Tson.resolve}/the loader pass
      * declaration positions through resolution -- {@code schemaPosition} was dead in production until they did.
      *
-     * <p>The position is the <em>atom's</em> own declaration ({@code int32}, in core.tn), not {@code point}'s,
-     * because each reader stamps its own schema position before descending -- so a diagnostic from inside an
-     * atom carries that atom's declaration, which is the one that defines the constraint being violated.
+     * <p>Both schema-side components name the <em>atom's</em> own declaration ({@code int32}, in core.tn), not
+     * {@code point}'s, because each reader stamps its own schema location before descending -- so a diagnostic
+     * from inside an atom carries that atom's declaration, which is the one that defines the constraint being
+     * violated. The pointer is what makes the position usable: {@code point-1.tn} is four lines long, and
+     * core.tn's line for {@code int32} is past its end.
      */
     @Test
-    void aValueErrorCarriesTheDeclaringTypesOwnSchemaPosition() {
+    void aValueErrorCarriesTheDeclaringTypesOwnSchemaLocation() {
         Diagnostic problem = only(tsonWithPoint(), """
                 !!schema:"https://example.test/point-1.tn"
                 !point { x: 3  y: 99999999999999 }""");
 
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, problem.code());
         assertTrue(problem.dataPosition().isPresent(), "the value's own position in the data");
+        assertEquals(Optional.of("/int32"), problem.schemaPointer(), "which entry declared the constraint");
         assertTrue(problem.schemaPosition().isPresent(), "where int32 is declared");
+    }
+
+    /**
+     * A desugar-injected entry ({@code [text]}'s own {@code array_text_…}) has a name in the resolved schema
+     * but no line in any source text, so the pointer is the only schema-end component it can carry -- which is
+     * exactly why the two are separate components rather than one location string.
+     */
+    @Test
+    void anInjectedEntrysDiagnosticCarriesAPointerWithoutAPosition() {
+        Tson tson = Tson.builder().build();
+        tson.resolve("""
+                !!id:"https://example.test/tags-1.tn"
+                !!meta:"https://tson.io/2026/32/m/meta.tn"
+                !!import:"https://tson.io/2026/32/m/core.tn"
+                { tagged => { tags: [text] } }
+                """);
+
+        Diagnostic problem = only(tson, """
+                !!schema:"https://example.test/tags-1.tn"
+                !tagged { tags: { a: 1 } }""");
+
+        assertEquals(Diagnostic.Code.TYPE_MISMATCH, problem.code());
+        assertTrue(problem.schemaPointer().orElseThrow().startsWith("/array_text_"), problem.toString());
+        assertEquals(Optional.empty(), problem.schemaPosition(), "an injected entry has no source line");
     }
 
     // ── Diagnostic field quality ─────────────────────────────────────────

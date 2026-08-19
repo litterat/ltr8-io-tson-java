@@ -1,12 +1,12 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.tree.*;
 import io.ltr8.tson.tree.TsonRecord;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.tree.TsonValue;
 
@@ -26,9 +26,9 @@ import java.util.Optional;
 final class RecordTreeReader extends RecordAbstractReader<TsonValue> {
 
     public RecordTreeReader(String name, RecordBody body, TsonTypeReaderResolver resolver,
-                            Optional<SourcePosition> schemaPosition,
+                            SchemaLocation schemaLocation,
                             AnnotationTypes annotationTypes) {
-        super(name, body, resolver, schemaPosition);
+        super(name, body, resolver, schemaLocation);
         this.annotationTypes = annotationTypes;
     }
 
@@ -43,7 +43,7 @@ final class RecordTreeReader extends RecordAbstractReader<TsonValue> {
             if (!(typeDefinition.body() instanceof RecordBody body)) {
                 throw new IllegalArgumentException("'" + name + "' is not record-shaped: " + typeDefinition.body());
             }
-            RecordTreeReader ownParser = new RecordTreeReader(name, body, resolver, typeDefinition.position(),
+            RecordTreeReader ownParser = new RecordTreeReader(name, body, resolver, SchemaLocation.of(name, typeDefinition),
                     AnnotationTypes.of(context));
             if (typeDefinition.subtypes().isEmpty()) {
                 return ownParser;
@@ -55,7 +55,7 @@ final class RecordTreeReader extends RecordAbstractReader<TsonValue> {
 
     @Override
     public TsonValue read(TsonReadContext ctx) {
-        ctx = ctx.withSchemaPosition(schemaPosition);
+        ctx = ctx.withSchemaLocation(schemaLocation);
         List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx, annotationTypes);
         ShapeResult shapeResult = expectRecordShape(ctx);
         if (shapeResult.shape() == Shape.MISMATCH) {

@@ -321,7 +321,9 @@ components matching JSON Schema 2020-12 §12's output unit (`path`, `schemaId`+`
 a location this really emits, not an absence. `expected` carries the **constraint that failed** — `<= 100`,
 `one of (A, B, C)` — from `AtomTypeException`'s six-shape vocabulary, never the type's name; the name leads
 `message` instead. The base-syntax exceptions keep their position out of `getMessage()` (it is in
-`position()`, and in `toString()` for a stack trace) so a diagnostic states it once.
+`position()`, and in `toString()` for a stack trace) so a diagnostic states it once. A read's schema end is
+one `SchemaLocation` (declaration name + its position), stamped by every reader before it descends, so the
+pointer and the position can never come from different declarations.
 Schema-side reporting runs through the same receiver: `TsonSchemaParser`,
 `SchemaResolver` and `TsonSchemaLinker` have reporting overloads that collect every independent problem in
 one pass (a failed declaration leaves an answer-everything placeholder, javac-style), while
@@ -498,7 +500,7 @@ compatibility).
   the `dot-atom` core, without quoted local parts, domain literals or comments.
 - **Schema-side diagnostics, the remainder** — parsing, desugaring, resolution and linking all report
   through a `TsonDiagnosticsReceiver` now (see `docs/readers-and-diagnostics.md`); one thing is left.
-  **A read-path diagnostic carries `schemaPosition` but no `schemaId`/`schemaPointer`**, which is blocked
+  **A read-path diagnostic carries `schemaPointer`+`schemaPosition` but no `schemaId`**, which is blocked
   upstream of the reader stack: `mergeImports` discards which schema an imported entry came from, so the
   identity a reader could reach is the importing schema's, not the declaration's own. Throw-site
   classification is done across the whole schema pipeline. The lexer stays fail-fast on purpose and is the
