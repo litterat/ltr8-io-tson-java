@@ -38,8 +38,8 @@ namespace *before* any local declaration resolves.
   *mutability* axis (§5.7's "only the value state changes"), so an inherited-OPTIONAL field pinned with
   `= 0` lands in `OPTIONAL_FIXED`, not `REQUIRED_FIXED` — promoting it to always-present takes restating the
   type (`min: integer = 0`). The exception is a **parametric** modifier, which §5.7's "Open modifiers" puts
-  in a REQUIRED-family state whatever the presence axis says (that is what makes `array_min`'s `min_items:
-  = MIN` mandatory), so the parameter branch sits ahead of the `OPTIONAL_FIXED` one.
+  in a REQUIRED-family state whatever the presence axis says (that is what makes a user template's
+  `min_items: = MIN` mandatory), so the parameter branch sits ahead of the `OPTIONAL_FIXED` one.
 - **§5.11's group presence rule is checked after every body**, refinement and composition alike: two members
   of one group both left in a REQUIRED-family state (`REQUIRED`/`REQUIRED_DEFAULT`/`REQUIRED_FIXED`) is a
   resolver error, because a group admits at most one member and nothing could satisfy the result. Only this
@@ -197,10 +197,10 @@ order, so it can't handle `boolean` preceding `enum`; this two-pass ordering liv
   compiled against a complete schema. Given how narrow and fixed meta-kernel's instance shapes are,
   hand-picking them is simplest — "the bootstrap can do whatever tricks it needs, including not compiling,
   just calling `new Xxx(...)`."
-- **`BOOTSTRAP_CONSTRUCTORS` is the same trick one layer up.** The desugar phase needs a constructor's
-  `parameters()` and its fields' `value_param` routing; for meta-kernel those would have to come from the
-  entries this class is in the middle of producing, and declaration order rules out using the partial map
-  (`record` applies `[record_field]` long before `array` is declared). So the routing for the three
-  constructors meta-kernel applies to itself is written out by hand. The payoff is that meta-kernel's
-  linked form needs no materialization either — its nine argument-bearing applications are ordinary
-  declarations by the time the linker sees them.
+- **Desugaring needs no equivalent trick, and used to.** The phase once read a constructor's `parameters()`
+  and its fields' `value_param` routing off the governing meta; for meta-kernel those would have had to come
+  from the entries this class is in the middle of producing, so the routing for the three constructors it
+  applies to itself was written out by hand. With the container constructors parameterless the desugar table
+  is fixed by the sugar forms and nothing is looked up, so the bootstrap special case and the general case
+  are one mechanism. The payoff is unchanged: meta-kernel's linked form needs no materialization either —
+  its eight sugar forms are ordinary declarations by the time the linker sees them.

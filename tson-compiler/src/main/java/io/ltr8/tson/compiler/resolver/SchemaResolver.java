@@ -202,7 +202,7 @@ public final class SchemaResolver {
         // has to carry each one's position onto the node it produced -- see SchemaDesugarer.schemaMap. Every
         // position lookup below goes through this copy, so a rewritten declaration is located like any other.
         Map<SchemaMap.Declaration, SourcePosition> positions = new IdentityHashMap<>(declarationPositions);
-        SchemaDocument desugared = SchemaDesugarer.desugar(document, metaParser.schema().entries(),
+        SchemaDocument desugared = SchemaDesugarer.desugar(document,
                 namespace.keySet(), receiver == null ? null : (declaration, error) ->
                         receiver.report(Diagnostic.ofSchemaError(TsonCanonicalIdentity.canonicalize(id),
                                 declaration.name(), error.getMessage(),
@@ -279,7 +279,7 @@ public final class SchemaResolver {
         }
         // §6: an annotation written before the declared name binds to the *name*, not to the definition,
         // and "the resolver does not hoist annotations from key to value". A resolved schema is a
-        // map<type_name, type_definition>, so the name is this map's key -- which is where they are kept.
+        // {type_name => type_definition}, so the name is this map's key -- which is where they are kept.
         // The two sets stay separate: a declaration's own annotations are on its TypeDefinition.
         AnnotatedMap<String, TypeDefinition> localOnly = new AnnotatedMap<>();
         for (String name : declarations.keySet()) {

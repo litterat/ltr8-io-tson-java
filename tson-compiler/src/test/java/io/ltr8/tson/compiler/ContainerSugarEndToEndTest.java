@@ -26,27 +26,25 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Generic application ({@code head<args>}) in an ordinary user schema -- one governed by {@code meta.tn} and
- * importing {@code core.tn} -- driven through the real bundled chain. The end-to-end peer of {@code
- * SchemaDesugarerTest}, which pins the same rewrite against a hand-built governing meta.
+ * The container sugar forms in an ordinary user schema -- one governed by {@code meta.tn} and importing
+ * {@code core.tn} -- driven through the real bundled chain. The end-to-end peer of {@code
+ * SchemaDesugarerTest}, which pins the same rewrite on the AST alone.
  *
- * <p>[TSON-SCHEMA] §3.3.1 lists "generic-application heads -- the name before {@code <} when the name is not
- * otherwise in scope" among the <b>constructor roles</b> at which the structure namespace is consulted, and
- * gives {@code map<text, text>} as its own example. A user schema's {@code !!meta} is {@code meta.tn}, which
- * imports the meta-kernel, so every container constructor is in that schema's structure namespace.
- *
- * <p>What makes these work uniformly is that {@code SchemaDesugarer} rewrites the application into a real
- * {@code !C value} declaration before resolution, so {@code map} takes the same path as {@code array} rather
- * than a per-shape assembler that only some constructors have.
+ * <p>Sugar and the {@code !} form are the <b>only</b> two ways to reach a container constructor. Bare names
+ * and generic-application heads resolve in the type-name namespace only ([TSON-SCHEMA] §3.3.1), where
+ * {@code array}/{@code set}/{@code map} are not reachable however the schema's {@code !!meta} chain is
+ * arranged -- so {@code map<text, text>} is an unresolved reference and <code>{text =&gt; text}</code> is
+ * the spelling. What makes every form work uniformly is that {@code SchemaDesugarer} rewrites each into a
+ * real {@code !C value} declaration before resolution, off one fixed table.
  */
-class GenericApplicationHeadTest {
+class ContainerSugarEndToEndTest {
 
-    private static final String ID = "https://example.test/generic-head.tn";
+    private static final String ID = "https://example.test/container-sugar.tn";
 
     /** Resolves, links and compiles a user schema whose body is {@code declarations}; throws whatever the pipeline throws. */
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
-                !!id:"https://example.test/generic-head.tn"
+                !!id:"https://example.test/container-sugar.tn"
                 !!meta:"https://tson.io/2026/32/m/meta.tn"
                 !!import:"https://tson.io/2026/32/m/core.tn"
                 {
@@ -72,10 +70,10 @@ class GenericApplicationHeadTest {
         return compiled.schema().entries().get(name);
     }
 
-    /** The whole arc in one assertion: a {@code map}-typed field resolves, links, compiles, and reads real data. */
+    /** The whole arc in one assertion: a map-typed field resolves, links, compiles, and reads real data. */
     @Test
     void aMapTypedFieldReadsRealData() {
-        TsonCompiledSchema compiled = compile("  holder => { entries: map<text, text> }");
+        TsonCompiledSchema compiled = compile("  holder => { entries: {text => text} }");
 
         MapBody body = assertInstanceOf(MapBody.class, fieldTypeEntry(compiled, "holder", "entries").body());
         assertEquals(TypeRef.of("text"), body.keyType());
@@ -87,51 +85,56 @@ class GenericApplicationHeadTest {
     }
 
     @Test
-    void theSameApplicationLinksAsATopLevelDeclaration() {
+    void theSameFormLinksAsATopLevelDeclaration() {
         // §5.6: a declaration whose body is a fully-bound constructor application is a construction. The
         // desugar phase makes the field position above take this exact same path.
         assertNotNull(compile("""
-                  entries => map<text, text>
+                  entries => {text => text}
                   holder => { xs: entries }"""));
     }
 
+    /**
+     * The three routes to a container, side by side: sugar at a field position, sugar at a declaration
+     * position, and the explicit {@code !} form for {@code set}, which has no sugar of its own and so is
+     * reached the way any other constructor without one is -- a named declaration, since {@code !} forms stay
+     * prohibited at field positions (§5.2).
+     */
     @Test
-    void arraySugarAndExplicitArrayOrSetApplicationsAllLink() {
+    void everyRouteToAContainerLinks() {
         assertNotNull(compile("  holder => { xs: [text] }"));
-        assertNotNull(compile("  holder => { xs: array<text> }"));
-        assertNotNull(compile("  holder => { xs: set<text> }"));
+        assertNotNull(compile("  ids => [text]"));
+        assertNotNull(compile("""
+                  text_set => !set { element_type: text }
+                  holder => { xs: text_set }"""));
     }
 
     /**
      * {@code set} and {@code array} share a body shape, so the only thing distinguishing them is the defaults
-     * {@code set}'s own vocabulary tightens (§5.7). Binding the injected {@code !set { element_type: text }}
-     * through the compiled reader applies those schema-composed defaults, so this needs no {@code
-     * set}-specific handling anywhere -- worth pinning precisely because nothing names {@code set}.
+     * {@code set}'s own vocabulary tightens (§5.7). Binding {@code !set { element_type: text }} through the
+     * compiled reader applies those schema-composed defaults, so this needs no {@code set}-specific handling
+     * anywhere -- worth pinning precisely because nothing names {@code set}.
      */
     @Test
-    void aSetApplicationCarriesItsOwnTightenedDefaultsNotArrays() {
+    void aSetCarriesItsOwnTightenedDefaultsNotArrays() {
         ArrayBody asSet = assertInstanceOf(ArrayBody.class,
-                fieldTypeEntry(compile("  holder => { xs: set<text> }"), "holder", "xs").body());
+                compile("  xs => !set { element_type: text }").schema().entries().get("xs").body());
         assertTrue(asSet.unordered());
         assertTrue(asSet.uniqueItems());
 
         ArrayBody asArray = assertInstanceOf(ArrayBody.class,
-                fieldTypeEntry(compile("  holder => { xs: array<text> }"), "holder", "xs").body());
+                compile("  xs => [text]").schema().entries().get("xs").body());
         assertFalse(asArray.unordered());
         assertFalse(asArray.uniqueItems());
     }
 
     /**
-     * §5.3's sized sugar, end to end. {@code [text; 1..2]} desugars to {@code array_ranged<text, 1, 2>}, and
-     * {@code array_ranged} is a <b>partial application</b> -- declared without {@code ~}, with its parameters
-     * only in labelled value channels -- so applying it is evaluation: it routes into {@code array}'s
-     * vocabulary and closes to the construction those bindings denote, with no entry of its own. That
-     * diverges from §8.2's worked example deliberately; {@code SPEC-FEEDBACK.md} #45 has the taxonomy and the
-     * spec author's confirmation. The upshot for an author is that all three array spellings agree
-     * ({@link #everySpellingOfAnArrayFamilyDeclarationRecordsNoSupertypes}).
+     * §5.3's sized sugar, end to end. The size specifier binds {@code min_items}/{@code max_items} on the
+     * {@code array} binding record directly -- there is no size template in between any more, so all three
+     * array spellings land on the same shape, one bound apart
+     * ({@link #everySpellingOfAnArrayDeclarationRecordsNoSupertypes}).
      */
     @Test
-    void sizedSugarClosesOntoAConstructionOfArray() {
+    void sizedSugarBindsItsBoundsOnAConstructionOfArray() {
         TsonCompiledSchema compiled = compile("""
                   tag_list => [text; 1..2]
                   holder => { tags: tag_list }""");
@@ -140,13 +143,10 @@ class GenericApplicationHeadTest {
         assertEquals(TypeKind.PRODUCT, entry.kind(), "the constructor's kind");
         assertEquals(List.of(), entry.parameters(), "closed -- §5.10");
         assertEquals(List.of(), entry.supertypes(),
-                "empty, against §8.2's transfer of the template's -- a closure of a size template is a "
-                        + "construction of `array`, and a constructor is not a supertype (SPEC-FEEDBACK.md #45)");
-        assertEquals(TypeRef.of("array"), entry.source().orElseThrow(),
-                "the constructor the application closes at -- a partial application routes into `array`'s "
-                        + "vocabulary rather than materialising an entry of its own (SPEC-FEEDBACK.md #45)");
+                "empty: this is a construction of `array`, and a constructor is not a supertype");
+        assertEquals(TypeRef.of("array"), entry.source().orElseThrow(), "the constructor the sugar names");
 
-        // !array { element_type: text  min_items: 1  max_items: 2 } -- only the parameter-routed fields; the
+        // !array { element_type: text  min_items: 1  max_items: 2 } -- only the fields the form binds; the
         // vocabulary's own defaults (state/unordered/unique_items) stay out of the binding record (§5.6).
         ArrayBody body = assertInstanceOf(ArrayBody.class, entry.body());
         assertEquals(TypeRef.of("text"), body.elementType());
@@ -154,19 +154,28 @@ class GenericApplicationHeadTest {
         assertEquals(Optional.of(BigInteger.TWO), body.maxItems());
     }
 
+    /** The map tier takes the same specifier, binding the same two fields on {@code map} instead. */
+    @Test
+    void aSizedMapBindsTheSameTwoFields() {
+        TypeDefinition entry = compile("  index => {text => text; 1..2}").schema().entries().get("index");
+
+        assertEquals(TypeRef.of("map"), entry.source().orElseThrow());
+        MapBody body = assertInstanceOf(MapBody.class, entry.body());
+        assertEquals(Optional.of(BigInteger.ONE), body.minItems());
+        assertEquals(Optional.of(BigInteger.TWO), body.maxItems());
+    }
+
     /**
-     * The three spellings of an array-family declaration agree about the hierarchy: a bound is a constraint,
-     * not a change of place. {@code [text]} and {@code vector<text, 3>} are constructions (§5.5 transfers only
-     * the target's kind) and {@code [text; 1..2]} is an instantiation, but all three close to a binding record
-     * headed by a constructor, and a constructor is not something a value can have as its type -- so none of
-     * them records a supertype ({@code SPEC-FEEDBACK.md} #33/#45).
+     * Every spelling of an array declaration agrees about the hierarchy: a bound is a constraint, not a
+     * change of place. All of them close to a binding record headed by a constructor, and a constructor is not
+     * something a value can have as its type -- so none records a supertype ({@code SPEC-FEEDBACK.md} #33/#45).
      */
     @Test
-    void everySpellingOfAnArrayFamilyDeclarationRecordsNoSupertypes() {
+    void everySpellingOfAnArrayDeclarationRecordsNoSupertypes() {
         TsonCompiledSchema compiled = compile("""
                   id_list => [text]
                   tag_list => [text; 1..2]
-                  triple => vector<text, 3>""");
+                  triple => [text; 3]""");
 
         for (String name : List.of("id_list", "tag_list", "triple")) {
             TypeDefinition entry = compiled.schema().entries().get(name);
@@ -175,7 +184,7 @@ class GenericApplicationHeadTest {
         }
     }
 
-    /** And the bounds are live: the instantiation is a real array body, so the compiled reader enforces them. */
+    /** And the bounds are live: the construction is a real array body, so the compiled reader enforces them. */
     @Test
     void aSizedArraysBoundsAreEnforcedWhenReading() {
         TsonCompiledSchema compiled = compile("""
@@ -193,10 +202,8 @@ class GenericApplicationHeadTest {
     }
 
     /**
-     * §8.2 defers a family coherence rule whose operands were parameters until substitution makes them
-     * concrete, and requires "a resolver error reported at the materialising application". {@code min <= max}
-     * (§5.3) is the rule the kernel's own templates route parameters into, and the sugar is how an author
-     * reaches it.
+     * §5.3's bound-coherence rule, reported where the author wrote the bounds: {@code min <= max}, checked at
+     * schema load wherever both bounds are literal.
      */
     @Test
     void aSizedArrayWhoseBoundsCannotBeSatisfiedIsAResolverError() {
@@ -207,11 +214,12 @@ class GenericApplicationHeadTest {
     }
 
     /**
-     * A non-constructor generic head -- a locally declared <em>record</em> template. Unlike the size
-     * templates above, its parameter appears as a <em>field type</em> ({@code v: T}), so instantiating it
-     * means rewriting the body rather than routing arguments into a constructor's vocabulary -- genuine
-     * §5.10 substitution, still unimplemented. The desugar phase rejects it where it is written; left alone,
-     * this schema linked and compiled and then failed on the first read that reached the field.
+     * A generic head resolves through the type-name namespace only (§3.3.1), so an application can only ever
+     * be a §5.10 user-template application -- here a locally declared record template whose parameter is a
+     * <em>field type</em> ({@code v: T}), which means instantiating it is genuine substitution rather than
+     * routing arguments into a vocabulary. Still unimplemented, so the desugar phase rejects it where it is
+     * written; left alone, this schema linked and compiled and then failed on the first read that reached the
+     * field.
      */
     @Test
     void applyingALocallyDeclaredTemplateIsRejectedWhereItIsWritten() {
@@ -220,7 +228,21 @@ class GenericApplicationHeadTest {
                           box => <T> { v: T }
                           holder => { b: box<text> }"""));
 
-        assertTrue(thrown.getMessage().contains("'box' is a parameterized template"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("'box' is a template"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("not implemented"), thrown.getMessage());
+    }
+
+    /**
+     * And a container constructor's own name is no longer reachable at a head, however the {@code !!meta}
+     * chain is arranged: {@code map} resolves in the type-name namespace, finds nothing, and is an ordinary
+     * unresolved reference. This is the migration the change to type-name-only head resolution forces, and the
+     * error an author writing {@code map<text, text>} out of habit will see.
+     */
+    @Test
+    void aContainerConstructorsNameAtAHeadIsAnUnresolvedReference() {
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> compile("  holder => { entries: map<text, text> }"));
+
+        assertTrue(thrown.getMessage().contains("unresolved reference 'map'"), thrown.getMessage());
     }
 }

@@ -17,8 +17,10 @@ import io.ltr8.tson.compiler.ast.schema.FieldDef;
 import io.ltr8.tson.compiler.ast.schema.GenericRef;
 import io.ltr8.tson.compiler.ast.schema.GroupDef;
 import io.ltr8.tson.compiler.ast.schema.InlineArrayRef;
+import io.ltr8.tson.compiler.ast.schema.InlineMapRef;
 import io.ltr8.tson.compiler.ast.schema.InlineTupleRef;
 import io.ltr8.tson.compiler.ast.schema.Instance;
+import io.ltr8.tson.compiler.ast.schema.MapContainerDef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.RecordEntry;
 import io.ltr8.tson.compiler.ast.schema.ReferenceTypeDef;
@@ -35,11 +37,7 @@ import io.ltr8.tson.compiler.ast.schema.TypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeRef;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.schema.meta.ElementState;
-import io.ltr8.tson.schema.meta.FieldState;
-import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.SourcePosition;
-import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -52,32 +50,48 @@ import java.util.Set;
 import java.util.function.UnaryOperator;
 
 /**
- * Expands the schema sugar forms into named declarations before anything resolves them -- the {@code
- * desugar} step of parse -&gt; desugar -&gt; resolve -&gt; link.
+ * Expands the schema sugar forms into the constructor applications they denote before anything resolves them
+ * -- the {@code desugar} step of parse -&gt; desugar -&gt; resolve -&gt; link.
  *
  * <p><b>Why a phase rather than work inside the resolver or linker.</b> [TSON-SCHEMA] §5.3/§5.6 describe
- * {@code [T]} and {@code head&lt;args&gt;} as <em>desugarings</em>, and §3.3.1 calls their targets "the
- * implicit desugar targets of the sugar forms". Doing that expansion once, on the AST, leaves {@code
+ * {@code [T]} and {@code {K =&gt; V}} as <em>desugarings</em>, and §3.3.1 calls their targets "the implicit
+ * desugar targets of the sugar forms". Doing that expansion once, on the AST, leaves {@code
  * DefinitionResolver} with a bare reference or {@code !C value} -- and it already handles the second
  * generically through the governing meta's compiled reader. The arrangement this replaces split the same
  * construct by position: a declaration-position application became a real body in the resolver, while a
  * field-position one was deferred to {@code TsonSchemaLinker}, which sits in a module that cannot reach that
- * generic machinery and so needed a hand-written assembler per constructor shape -- of which only {@code
- * array} and {@code set} were ever written.
+ * generic machinery and so needed a hand-written assembler per constructor shape.
  *
- * <p><b>An application becomes an instance.</b> {@code map&lt;text, integer&gt;} injects
- * {@code map_text_integer_<i>hash</i> => !map { key_type: text  value_type: integer } } and the use site
- * becomes a plain reference to that name. Argument-to-field routing comes from the governing meta itself:
- * the constructor's own {@code parameters()} zip positionally against the arguments, and each vocabulary
- * field names the parameter it takes its value from ({@code key_type: type_ref = K}). Nothing here assembles
- * a body -- {@code resolveInstance} binds the emitted instance through the meta's compiled reader, which is
- * exactly how every other {@code !C value} is already handled.
+ * <p><b>Purely syntactic, and per declaration.</b> The sugar set is closed and grammar-supplied, so the
+ * head each form desugars to and the vocabulary field each argument fills are a fixed table (§5.3):
  *
- * <p><b>A nested bracket form expands innermost first.</b> §5.3's declaration-level container syntax nests
- * inside itself and fixes the order -- {@code [[T; N]; N]} is {@code array_ranged<array_ranged<T, N, N>, N,
- * N>}, "the inner form desugaring first" -- so an element position holding one has the inner container
- * injected under its own derived name and becomes a bare reference to it. The enclosing container then routes
- * a plain name like any other, at any depth. See {@link #elementRef}.
+ * <pre>
+ * [T]              !array { element_type: T }
+ * [T; N..M]        !array { element_type: T  min_items: N  max_items: M }
+ * [T?; ...]        the corresponding form with state: OPTIONAL bound directly
+ * [T, U]           !tuple { elements: [{ element_type: T } { element_type: U }] }
+ * (A | B)          !choice { variants: [A B] }
+ * {K =&gt; V}         !map   { key_type: K  value_type: V }
+ * {K =&gt; V; N..M}   the same, with min_items/max_items
+ * </pre>
+ *
+ * This phase therefore consults no governing meta at all. It used to: constructors carried parameter lists
+ * and their vocabulary fields named the parameter each drew from ({@code element_type: type_ref = T}), so
+ * routing was read off the meta and the meta-kernel's own bootstrap had to hand-write a stand-in table for
+ * the three constructors it applies to itself. With the constructors parameterless the table above is the
+ * whole rule, and the bootstrap needs no special case.
+ *
+ * <p><b>A nested bracket or brace form expands innermost first.</b> §5.3's declaration-level container
+ * syntax nests inside itself -- {@code [[T; N]; N]}, {@code {text =&gt; [order; 1..]}} -- so a position
+ * holding one has the inner form injected under its own derived name and becomes a bare reference to it.
+ * The enclosing container then routes a plain name like any other, at any depth. See {@link #elementRef}.
+ *
+ * <p><b>An application is a user template, and applying one is not implemented.</b> {@code name&lt;args&gt;}
+ * resolves its head through the type-name namespace only (§3.3.1) -- parameters, then locals, then imports
+ * -- so it can only ever be a §5.10 template application. Substitution has no implementation, and leaving
+ * the application alone produced a schema that linked and compiled and then failed on the first read that
+ * reached the field, so it is rejected here, at the site that writes it. See {@link
+ * #rejectTemplateApplication}.
  *
  * <p><b>Structural sharing.</b> Every method returns its input unchanged when nothing beneath it changed, so
  * a document with no sugar comes back as the same object graph. Source positions live in identity-keyed side
@@ -87,14 +101,9 @@ import java.util.function.UnaryOperator;
  * <p><b>What is deliberately left alone.</b> Three positions keep their heads intact, because a name there is
  * being <em>declared</em> or <em>composed</em>, not applied: a declaration's own body reference
  * ({@code ReferenceTypeDef}), a refinement source, and a composition supertype. And nothing inside a
- * <em>parameterized</em> declaration is expanded at all -- a template's body references its own type
- * parameters ({@code set => <T> ~array<T> ^ { ... } }), so expanding {@code array<T>} there would inject a
- * declaration referring to an unbound {@code T}.
- *
- * <p><b>Applying a locally declared template is rejected, not passed through.</b> §5.10 parameter
- * substitution is a separate, unimplemented feature, so {@code box<text>} is not something this phase can
- * rewrite -- and leaving it alone produced a schema that linked and compiled and then failed on the first
- * read that reached the field. See {@link #rejectIfTemplateApplication} for what is and is not covered.
+ * <em>parameterized</em> declaration is expanded at all: the desugared structure of a template body is its
+ * recorded open form, and every nested form inside it becomes concrete only at materialisation, so lifting
+ * one eagerly here would mint an entry for a template that may never be instantiated.
  *
  * <p><b>An invalid sugar form is reported per declaration, not thrown</b>, when a {@link
  * DesugarFailureReporter} is supplied -- the same one-pass treatment {@code SchemaResolver} and {@code
@@ -104,15 +113,27 @@ import java.util.function.UnaryOperator;
  */
 final class SchemaDesugarer {
 
-    /** §5.6's desugar target for {@code (A | B)}, fixed by the sugar form rather than named by the author. */
-    private static final String CHOICE = "choice";
+    /** §5.3's desugar target for {@code [T]} and the sized forms, fixed by the sugar rather than by the author. */
+    private static final String ARRAY = "array";
 
-    /** §5.6's desugar target for {@code [T, U]}, fixed the same way {@link #CHOICE} is. */
+    /** §5.3's desugar target for <code>{K =&gt; V}</code>, fixed the same way {@link #ARRAY} is. */
+    private static final String MAP = "map";
+
+    /** §5.3's desugar target for {@code [T, U]}. */
     private static final String TUPLE = "tuple";
 
-    /** {@code tuple_element}'s own two members (§5.3) -- the record one tuple position becomes. */
+    /** §5.4's desugar target for {@code (A | B)}. */
+    private static final String CHOICE = "choice";
+
+    /** The vocabulary fields the desugar table binds -- fixed by the table, not looked up in a governing meta. */
     private static final String ELEMENT_TYPE = "element_type";
+    private static final String KEY_TYPE = "key_type";
+    private static final String VALUE_TYPE = "value_type";
     private static final String STATE = "state";
+    private static final String MIN_ITEMS = "min_items";
+    private static final String MAX_ITEMS = "max_items";
+    private static final String ELEMENTS = "elements";
+    private static final String VARIANTS = "variants";
 
     /**
      * What a declaration whose sugar form was reported is replaced with: a fresh, zero-field record. The
@@ -131,22 +152,19 @@ final class SchemaDesugarer {
      */
     private static final TypeDef ABSORBED = new StructuralTypeDef(List.of(), false, new RecordDef(List.of()));
 
-    /** The governing meta's entries -- where a constructor's parameter list and vocabulary field names come from. */
-    private final Map<String, TypeDefinition> metaEntries;
-
     /**
-     * Names already in scope from {@code !!import}. An application that generates a name an import already
-     * declares is <em>referenced</em> rather than redeclared: the name is derived from the application
-     * itself, so an identical application in an imported schema has already produced the same type. Without
-     * this, meta.tn's own {@code array<type_name>} would redeclare the one it imports from the meta-kernel
-     * and be rejected as a local-vs-import collision.
+     * Names already in scope from {@code !!import}. A sugar form that generates a name an import already
+     * declares is <em>referenced</em> rather than redeclared: the name is derived from the resolved binding
+     * record itself, so an identical form in an imported schema has already produced the same type. Without
+     * this, meta.tn's own {@code [type_name]} would redeclare the one it imports from the meta-kernel and be
+     * rejected as a local-vs-import collision.
      */
     private final Set<String> imported;
 
-    /** Declarations synthesised for applications encountered during the walk, keyed by their generated name. */
+    /** Declarations synthesised for sugar forms encountered during the walk, keyed by their generated name. */
     private final Map<String, SchemaMap.Declaration> injected = new LinkedHashMap<>();
 
-    /** This document's own declarations, for {@link #rejectIfTemplateApplication} -- set before the walk starts. */
+    /** This document's own declarations, for {@link #rejectTemplateApplication} -- set before the walk starts. */
     private Map<String, SchemaMap.Declaration> local = Map.of();
 
     /** Where an invalid sugar form is reported, or {@code null} to rethrow it and abandon the document. */
@@ -158,32 +176,29 @@ final class SchemaDesugarer {
      */
     private final Map<SchemaMap.Declaration, SourcePosition> positions;
 
-    private SchemaDesugarer(Map<String, TypeDefinition> metaEntries, Set<String> imported,
-            DesugarFailureReporter reporter, Map<SchemaMap.Declaration, SourcePosition> positions) {
-        this.metaEntries = metaEntries;
+    private SchemaDesugarer(Set<String> imported, DesugarFailureReporter reporter,
+            Map<SchemaMap.Declaration, SourcePosition> positions) {
         this.imported = imported;
         this.reporter = reporter;
         this.positions = positions;
     }
 
-    /** {@link #desugar(SchemaDocument, Map, Set, DesugarFailureReporter, Map)}, throwing at the first invalid sugar form. */
-    static SchemaDocument desugar(SchemaDocument document, Map<String, TypeDefinition> metaEntries,
-            Set<String> imported) {
-        return desugar(document, metaEntries, imported, null, new IdentityHashMap<>());
+    /** {@link #desugar(SchemaDocument, Set, DesugarFailureReporter, Map)}, throwing at the first invalid sugar form. */
+    static SchemaDocument desugar(SchemaDocument document, Set<String> imported) {
+        return desugar(document, imported, null, new IdentityHashMap<>());
     }
 
     /**
-     * The document with every expandable application hoisted into its own declaration, or the same instance
+     * The document with every expandable sugar form hoisted into its own declaration, or the same instance
      * when there was nothing to expand.
      *
      * <p>A declaration whose sugar form is invalid is reported to {@code reporter} and replaced with {@link
      * #ABSORBED}, so the declarations around it still expand and go on to resolve -- see {@link
      * #desugarOrReport}. With a {@code null} {@code reporter} the first such form throws instead.
      */
-    static SchemaDocument desugar(SchemaDocument document, Map<String, TypeDefinition> metaEntries,
-            Set<String> imported, DesugarFailureReporter reporter,
-            Map<SchemaMap.Declaration, SourcePosition> positions) {
-        SchemaDesugarer pass = new SchemaDesugarer(metaEntries, imported, reporter, positions);
+    static SchemaDocument desugar(SchemaDocument document, Set<String> imported,
+            DesugarFailureReporter reporter, Map<SchemaMap.Declaration, SourcePosition> positions) {
+        SchemaDesugarer pass = new SchemaDesugarer(imported, reporter, positions);
         pass.local = document.body().declarations();
         SchemaMap body = pass.schemaMap(document.body());
         if (body == document.body() && pass.injected.isEmpty()) {
@@ -240,17 +255,16 @@ final class SchemaDesugarer {
      * reported author error into an unreported abort: worse than the fail-fast behaviour it replaces.
      *
      * <p>Only {@link TsonSchemaValidationException} is reported. The {@code UnsupportedOperationException}
-     * for applying a record template is a genuine §5.10 gap and keeps propagating, by the same test {@code
+     * for applying a template is a genuine §5.10 gap and keeps propagating, by the same test {@code
      * SchemaResolver} applies: <em>a schema error's verdict doesn't change when this library improves; a
      * gap's does.</em>
      *
      * <p><b>Anything already injected on behalf of a failed declaration stays injected</b>, and is not rolled
-     * back. Injected names are derived from the application itself, so a later declaration containing the
-     * same application finds and references the existing entry (§8.2's structural-equality rule, which is
-     * what makes the injection shared rather than per-use in the first place); removing one because the
-     * declaration that happened to reach it first went on to fail would break whichever declaration referenced
-     * it second. Left behind, it is an ordinary unreferenced declaration that resolves and links like any
-     * other.
+     * back. Injected names are derived from the binding record itself, so a later declaration containing the
+     * same form finds and references the existing entry (§8.2's structural-equality rule, which is what makes
+     * the injection shared rather than per-use in the first place); removing one because the declaration that
+     * happened to reach it first went on to fail would break whichever declaration referenced it second. Left
+     * behind, it is an ordinary unreferenced declaration that resolves and links like any other.
      */
     private SchemaMap.Declaration desugarOrReport(SchemaMap.Declaration declaration) {
         try {
@@ -293,35 +307,13 @@ final class SchemaDesugarer {
                 if (!container.typeParams().isEmpty()) {
                     yield container;
                 }
-                // A size-less declaration-level array IS a top-level constructor application (§5.6), so it
-                // becomes the instance directly. The sized forms are spelled through the size templates first
-                // and close onto the same `!array` construction (SPEC-FEEDBACK.md #45), a few lines down.
-                Optional<TypeDef> instance = declarationLevelArray(container.container());
-                if (instance.isPresent()) {
-                    yield instance.get();
-                }
-                // The tuple half of the same rule: at declaration position the bracket form *is* the
-                // construction, so `pair => [integer, text]` becomes the `!tuple { ... }` it denotes.
-                Optional<TypeDef> tuple = declarationLevelTuple(container.container());
-                if (tuple.isPresent()) {
-                    yield tuple.get();
-                }
-                Optional<SizedArray> sized = sizedArrayApplication(container.container());
-                if (sized.isPresent()) {
-                    // The application this stands for closes by routing, like every other: array_ranged and
-                    // its siblings bind parameters in value channels only, so this yields the plain `!array`
-                    // construction those bindings denote (SPEC-FEEDBACK.md #45).
-                    // The element `?` rides alongside the routed bounds: `[T?; 3]` binds state and both
-                    // bounds onto one record, which is the whole reason the sized forms stopped routing
-                    // through an instantiation entry (§5.3's "no template route" sentence, SPEC-FEEDBACK #45).
-                    SizedArray closure = sized.get();
-                    Optional<TypeDef> construction = instanceFor(closure.application().name(),
-                            closure.application().args(), closure.state());
-                    if (construction.isPresent()) {
-                        yield construction.get();
-                    }
-                    rejectIfTemplateApplication(closure.application().name());
-                    yield new ReferenceTypeDef(List.of(), closure.application());
+                // At declaration position the bracket or brace form *is* the construction (§5.6), so it
+                // becomes the instance directly rather than a reference to an injected one -- which is what
+                // makes `score_list => [integer; 1..]` a PRODUCT entry with a real body instead of a
+                // REFERENCE to one.
+                Optional<Binding> binding = binding(container.container());
+                if (binding.isPresent()) {
+                    yield instance(binding.get());
                 }
                 ContainerDef def = containerDef(container.container());
                 yield def == container.container() ? container
@@ -333,30 +325,19 @@ final class SchemaDesugarer {
                 if (!reference.typeParams().isEmpty()) {
                     yield reference;
                 }
-                // §5.4: a declaration whose body is the choice sugar *is* that construction, so it becomes
-                // the instance itself rather than a reference to an injected one -- which is what makes
-                // `contact => (email | phone)` a SUM entry with a real ChoiceBody instead of a REFERENCE to
-                // one. Same treatment declarationLevelArray gives `[T]` at declaration position.
+                // §5.4: a declaration whose body is the choice sugar *is* that construction, the same way
+                // the bracket and brace forms are -- `contact => (email | phone)` is a SUM entry with a real
+                // ChoiceBody, not a REFERENCE to one.
                 if (reference.ref() instanceof ChoiceRef choice) {
                     List<TypeRef> variants = mapShared(choice.variants(), this::typeRef);
-                    Optional<TypeDef> instance = choiceInstance(variants);
-                    if (instance.isPresent()) {
-                        yield instance.get();
+                    Optional<Binding> binding = choiceBinding(variants);
+                    if (binding.isPresent()) {
+                        yield instance(binding.get());
                     }
                     yield variants == choice.variants() ? reference
                             : new ReferenceTypeDef(reference.typeParams(), new ChoiceRef(variants));
                 }
                 TypeRef ref = argumentsOnly(reference.ref());
-                // §5.6: a declaration whose body is a fully-bound application resolves as a construction, so
-                // it becomes the instance itself rather than a reference to an injected one -- which is what
-                // keeps `x => map<K, V>` a PRODUCT with a real body instead of a REFERENCE to one.
-                if (ref instanceof GenericRef generic) {
-                    Optional<TypeDef> instance = instanceFor(generic.name(), generic.args());
-                    if (instance.isPresent()) {
-                        yield instance.get();
-                    }
-                    rejectIfTemplateApplication(generic.name());
-                }
                 yield ref == reference.ref() ? reference : new ReferenceTypeDef(reference.typeParams(), ref);
             }
             default -> typeDef;
@@ -414,11 +395,21 @@ final class SchemaDesugarer {
         return ref == member.typeRef() ? member : new GroupDef.Member(member.annotations(), member.name(), ref);
     }
 
+    /**
+     * The fallback walk for a container this phase could not reduce to a binding record: expand what is
+     * inside it and leave the shape alone.
+     */
     private ContainerDef containerDef(ContainerDef def) {
         return switch (def) {
             case ArrayContainerDef array -> {
                 ElementType element = elementType(array.elementType());
                 yield element == array.elementType() ? array : new ArrayContainerDef(element, array.size());
+            }
+            case MapContainerDef map -> {
+                TypeRef key = typeRef(map.keyType());
+                ElementType.Expr value = expr(map.valueType());
+                yield key == map.keyType() && value == map.valueType() ? map
+                        : new MapContainerDef(key, value, map.size());
             }
             case TupleContainerDef tuple -> {
                 List<ElementType> elements = mapShared(tuple.elementTypes(), this::elementType);
@@ -428,155 +419,58 @@ final class SchemaDesugarer {
     }
 
     private ElementType elementType(ElementType element) {
-        return switch (element.expr()) {
+        ElementType.Expr expr = expr(element.expr());
+        return expr == element.expr() ? element : new ElementType(expr, element.optional());
+    }
+
+    private ElementType.Expr expr(ElementType.Expr expr) {
+        return switch (expr) {
             case ElementType.Expr.Plain plain -> {
                 TypeRef ref = typeRef(plain.typeRef());
-                yield ref == plain.typeRef() ? element
-                        : new ElementType(new ElementType.Expr.Plain(ref), element.optional());
+                yield ref == plain.typeRef() ? expr : new ElementType.Expr.Plain(ref);
             }
             case ElementType.Expr.Nested nested -> {
                 ContainerDef def = containerDef(nested.container());
-                yield def == nested.container() ? element
-                        : new ElementType(new ElementType.Expr.Nested(def), element.optional());
+                yield def == nested.container() ? expr : new ElementType.Expr.Nested(def);
             }
         };
     }
 
     /**
-     * A reference at a position where an application <em>is</em> expandable: expands children first, so a
-     * nested application is already a plain name by the time the enclosing one is built ({@code
-     * map<text, [integer]>} injects the inner array, then the outer map referring to it).
+     * A reference at a position where a sugar form <em>is</em> expandable: expands children first, so a
+     * nested form is already a plain name by the time the enclosing one is built (<code>{text =&gt;
+     * [integer]}</code> injects the inner array, then the outer map referring to it).
      */
     private TypeRef typeRef(TypeRef ref) {
         return switch (ref) {
             case SimpleRef simple -> simple;
-            case InlineArrayRef array -> apply("array", List.of(new TypeArg.Ref(typeRef(array.elementType()))), ref);
-            case GenericRef generic -> {
-                List<TypeArg> args = mapShared(generic.args(), this::typeArg);
-                yield apply(generic.name(), args,
-                        args == generic.args() ? generic : new GenericRef(generic.name(), args));
+            case InlineArrayRef array -> {
+                TypeRef element = typeRef(array.elementType());
+                yield hoistOrKeep(arrayBinding(element, false, Optional.empty(), "T"),
+                        element == array.elementType() ? array : new InlineArrayRef(element));
             }
-            case ChoiceRef choice -> {
-                List<TypeRef> variants = mapShared(choice.variants(), this::typeRef);
-                yield hoistChoice(variants,
-                        variants == choice.variants() ? choice : new ChoiceRef(variants));
+            case InlineMapRef map -> {
+                TypeRef key = typeRef(map.keyType());
+                TypeRef value = typeRef(map.valueType());
+                yield hoistOrKeep(mapBinding(key, value, Optional.empty()),
+                        key == map.keyType() && value == map.valueType() ? map : new InlineMapRef(key, value));
             }
             case InlineTupleRef tuple -> {
                 List<TypeRef> elements = mapShared(tuple.elementTypes(), this::typeRef);
-                yield hoistTuple(elements,
+                yield hoistOrKeep(tupleBinding(elements.stream().map(e -> new Position(e, false)).toList()),
                         elements == tuple.elementTypes() ? tuple : new InlineTupleRef(elements));
             }
+            case ChoiceRef choice -> {
+                List<TypeRef> variants = mapShared(choice.variants(), this::typeRef);
+                yield hoistOrKeep(choiceBinding(variants),
+                        variants == choice.variants() ? choice : new ChoiceRef(variants));
+            }
+            case GenericRef generic -> {
+                rejectTemplateApplication(generic.name());
+                List<TypeArg> args = mapShared(generic.args(), this::typeArg);
+                yield args == generic.args() ? generic : new GenericRef(generic.name(), args);
+            }
         };
-    }
-
-    /**
-     * A size-less declaration-level array as its own constructor application, or empty for anything this
-     * does not build -- a tuple container ({@link #declarationLevelTuple}'s), a sized array ({@link
-     * #sizedArrayApplication}'s), or an element position {@link #elementRef} cannot reduce to a name.
-     */
-    private Optional<TypeDef> declarationLevelArray(ContainerDef def) {
-        if (!(def instanceof ArrayContainerDef array) || array.size().isPresent()) {
-            return Optional.empty();
-        }
-        return elementRef(array.elementType()).flatMap(element ->
-                instanceFor("array", List.of(new TypeArg.Ref(element)), elementState(array.elementType())));
-    }
-
-    /**
-     * §5.3's element {@code ?} as the vocabulary binding it denotes: {@code state: OPTIONAL} on the resolved
-     * {@code array}, under which "elements at any position MAY be the absent sentinel {@code _}; absent
-     * elements occupy positional slots -- {@code [a _ c]} has three elements and satisfies a {@code [T?; 3]}
-     * size constraint".
-     *
-     * <p><b>It is a direct binding, not a routed one.</b> {@code array}'s {@code state} carries no {@code
-     * value_param} ({@code state: element_state ~ REQUIRED}), so no application argument can reach it --
-     * which is §5.3's own reason the {@code ?} forms "have no template route ... and desugar directly". An
-     * unmarked element states nothing at all and lets §5.2's REQUIRED_DEFAULT injection supply it, exactly
-     * as {@link #instanceFor} omits every other defaulted vocabulary field, and exactly as a REQUIRED tuple
-     * position omits its own {@code state}.
-     */
-    private static List<RecordValue.Field> elementState(ElementType element) {
-        return element.optional()
-                ? List.of(new RecordValue.Field(STATE,
-                        scoped(new TokenValue(ElementState.OPTIONAL.name(), TokenForm.UNQUOTED))))
-                : List.of();
-    }
-
-    /**
-     * §5.3's sized sugar as the template application it stands for: {@code [T; N..]} is {@code
-     * array_min<T, N>}, {@code [T; ..M]} is {@code array_max<T, M>}, {@code [T; N..M]} is {@code
-     * array_ranged<T, N, M>}, and an exact {@code [T; N]} is {@code array_ranged<T, N, N>}.
-     *
-     * <p>Purely syntactic, which is why it belongs here even though the targets are <em>templates</em>
-     * rather than constructors: this phase rewrites the spelling, and what a template application then
-     * resolves to (§5.10 substitution, unimplemented) is a separate question it does not answer. A bound is
-     * carried through as the raw token it was parsed as -- it may name a value parameter rather than a
-     * literal, which is why {@code SizeSpec} keeps them as text.
-     *
-     * <p><b>{@code [T; 0..]} is rejected</b> rather than desugared. §5.3 calls it vacuous and asks the
-     * resolver to warn while desugaring it anyway; rejecting the spelling is {@code SPEC-FEEDBACK.md} #42's
-     * position, and here the warning would be guarding more than a style nit -- §5.3's own sentence notes
-     * that identity is application-structural (§8.2), so the form lands on an entry <em>distinct from</em>
-     * {@code [T]} that means exactly the same thing. That is an identity trap, and the author's fix is the
-     * one §5.3 itself names. Only a literal {@code 0} is caught: a bound naming a value parameter is not
-     * concrete here, and a parameter that turns out to be zero is §8.2's materialisation-time question.
-     */
-    private Optional<SizedArray> sizedArrayApplication(ContainerDef def) {
-        if (!(def instanceof ArrayContainerDef array) || array.size().isEmpty()) {
-            return Optional.empty();
-        }
-        return elementRef(array.elementType()).map(element -> new SizedArray(
-                sizedApplication(element, shownElement(array.elementType()), array.size().orElseThrow()),
-                elementState(array.elementType())));
-    }
-
-    /**
-     * A sized declaration-level array reduced to what fills one binding record: the size template application
-     * the bounds route through, and the element {@code ?}'s own direct binding, which no application argument
-     * can carry. Kept together because {@code [T?; 3]} states both at once and both land on the same record.
-     */
-    private record SizedArray(GenericRef application, List<RecordValue.Field> state) {
-    }
-
-    /**
-     * {@link #sizedArrayApplication}'s size-to-application mapping, over an element position already reduced
-     * to a name -- shared with {@link #hoistNested}, which reaches the same four spellings one bracket in.
-     * {@code shown} is how the element was <em>written</em>, for the one diagnostic that quotes the form back.
-     */
-    private static GenericRef sizedApplication(TypeRef element, String shown, SizeSpec size) {
-        TypeArg argument = new TypeArg.Ref(element);
-        return switch (size) {
-            case SizeSpec.Min min when min.lower().equals("0") ->
-                    throw new TsonSchemaValidationException("'[" + shown + "; 0..]' pins a floor of zero, which "
-                            + "every array already satisfies -- write '[" + shown + "]' for the unconstrained "
-                            + "array (§5.3). The spelling is not merely redundant: identity is "
-                            + "application-structural (§8.2), so it lands on an entry distinct from '[" + shown
-                            + "]' that means the same thing");
-            case SizeSpec.Min min -> application("array_min", argument, min.lower());
-            case SizeSpec.Max max -> application("array_max", argument, max.upper());
-            case SizeSpec.Ranged ranged -> application("array_ranged", argument, ranged.lower(), ranged.upper());
-            case SizeSpec.Exact exact -> application("array_ranged", argument, exact.bound(), exact.bound());
-        };
-    }
-
-    /**
-     * How an element position was spelled, for a diagnostic that quotes the sugar form back at its author: the
-     * position's own name when it has one, and a stand-in when it is an inline or nested form whose expansion
-     * carries a derived name the author never wrote.
-     */
-    private static String shownElement(ElementType element) {
-        return element.expr() instanceof ElementType.Expr.Plain plain && plain.typeRef() instanceof SimpleRef simple
-                ? simple.name()
-                : "T";
-    }
-
-    private static GenericRef application(String template, TypeArg element, String... bounds) {
-        List<TypeArg> args = new ArrayList<>();
-        args.add(element);
-        for (String bound : bounds) {
-            args.add(new TypeArg.Value(new TokenValue(bound, TokenForm.UNQUOTED)));
-        }
-        return new GenericRef(template, args);
     }
 
     /** Expands only within a reference's arguments, leaving its own head in place. */
@@ -584,6 +478,7 @@ final class SchemaDesugarer {
         if (!(ref instanceof GenericRef generic)) {
             return ref;
         }
+        rejectTemplateApplication(generic.name());
         List<TypeArg> args = mapShared(generic.args(), this::typeArg);
         return args == generic.args() ? generic : new GenericRef(generic.name(), args);
     }
@@ -597,139 +492,285 @@ final class SchemaDesugarer {
     }
 
     /**
-     * Hoists {@code head<args>} into its own declaration and yields a reference to it, or returns {@code
-     * unexpanded} when this application is not one this phase builds: an unknown head, a non-constructor head
-     * (a template application -- §5.10, out of scope), a head whose vocabulary is not record-shaped, an arity
-     * mismatch, or an argument that did not reduce to a plain name. Each of those keeps its existing
-     * downstream handling rather than being turned into a differently-broken shape here.
+     * Rejects a generic application, which after §3.3.1's type-name-only head resolution can only ever be a
+     * §5.10 user-template application: {@code box => <T> { v: T }} applied as {@code box<text>}. Parameter
+     * substitution is a real unimplemented feature rather than a rewrite this phase can perform, and without
+     * it the application resolves to the template's own body with its parameters still unbound.
+     *
+     * <p><b>A head this document neither declares nor imports is left alone</b>, because there is nothing to
+     * apply: the reference is simply unresolved, which is {@code TsonSchemaLinker}'s verdict to deliver and
+     * not a gap in this library. An <em>imported</em> head is a gap by the conservative reading -- this phase
+     * is handed only the imported names, not their parameter lists (see {@link #imported}) -- and a local
+     * head that declares no parameters is an ordinary author error: nothing there takes type arguments.
      */
-    private TypeRef apply(String head, List<TypeArg> args, TypeRef unexpanded) {
-        Optional<TypeRef> hoisted = hoistApplication(head, args);
-        if (hoisted.isEmpty()) {
-            rejectIfTemplateApplication(head);
-            return unexpanded;
-        }
-        return hoisted.get();
-    }
-
-    /**
-     * {@code head<args>} as an injected declaration plus the bare reference that replaces it, or empty when
-     * {@link #instanceFor} does not build the construction. {@link #apply}'s half that answers in an {@code
-     * Optional} rather than falling back to an unexpanded node -- what {@link #hoistNested} needs, since a
-     * nested bracket form has no unexpanded node to fall back to, only an enclosing container that must then
-     * stay unexpanded whole.
-     */
-    private Optional<TypeRef> hoistApplication(String head, List<TypeArg> args) {
-        return hoistApplication(head, args, List.of());
-    }
-
-    /**
-     * {@link #hoistApplication(String, List)} with direct bindings, which must reach the derived name as well
-     * as the record: without them {@code [T?]} and {@code [T]} derive the same name and the second one written
-     * collapses onto the first one injected. The tuple form has the same hazard and {@link #tupleName} the
-     * same answer.
-     */
-    private Optional<TypeRef> hoistApplication(String head, List<TypeArg> args, List<RecordValue.Field> direct) {
-        return instanceFor(head, args, direct)
-                .map(instance -> hoist(applicationName(head, args, direct), instance));
-    }
-
-    /** {@link #syntheticName} widened to distinguish two applications differing only in a direct binding. */
-    private static String applicationName(String head, List<TypeArg> args, List<RecordValue.Field> direct) {
-        if (direct.isEmpty()) {
-            return syntheticName(head, args);
-        }
-        List<TypeArg> distinguishing = new ArrayList<>(args);
-        for (RecordValue.Field field : direct) {
-            if (field.value().value().coreValue() instanceof TokenValue token) {
-                distinguishing.add(new TypeArg.Value(token));
+    private void rejectTemplateApplication(String head) {
+        SchemaMap.Declaration declaration = local.get(head);
+        if (declaration != null) {
+            List<String> parameters = typeParams(declaration.typeDef());
+            if (parameters.isEmpty()) {
+                throw new TsonSchemaValidationException("'" + head + "' declares no type parameters, so '"
+                        + head + "<...>' applies arguments to something that takes none (§5.10); drop the "
+                        + "argument list");
             }
+            throw templateGap(head, parameters);
         }
-        return syntheticName(head, distinguishing);
-    }
-
-    /**
-     * §5.4's {@code (A | B)} at a type-ref position, hoisted into its own declaration and replaced by a bare
-     * reference to it -- the treatment {@link #apply} gives every other inline form. Returns {@code
-     * unexpanded} when {@link #choiceInstance} cannot build the construction.
-     *
-     * <p>The name is derived through {@link #syntheticName} from the variants themselves, so two identical
-     * inline choices anywhere in the document collapse to one declaration (§8.2's structural-equality rule).
-     * There is no {@link #rejectIfTemplateApplication} counterpart here: §5.6 fixes this head, so it can
-     * never be an author's template.
-     */
-    private TypeRef hoistChoice(List<TypeRef> variants, TypeRef unexpanded) {
-        Optional<TypeDef> instance = choiceInstance(variants);
-        if (instance.isEmpty()) {
-            return unexpanded;
+        if (imported.contains(head)) {
+            throw templateGap(head, List.of());
         }
-        return hoist(syntheticName(CHOICE, variants.stream().<TypeArg>map(TypeArg.Ref::new).toList()),
-                instance.get());
+    }
+
+    private static UnsupportedOperationException templateGap(String head, List<String> parameters) {
+        return new UnsupportedOperationException("'" + head + "' is a template, and applying one is not "
+                + "implemented -- §5.10 parameter substitution has no implementation, so '" + head
+                + "<...>' would resolve to the template's own body with its parameters "
+                + (parameters.isEmpty() ? "" : parameters + " ") + "still unbound. Declare a concrete type "
+                + "instead.");
+    }
+
+    private static List<String> typeParams(TypeDef typeDef) {
+        return switch (typeDef) {
+            case StructuralTypeDef structural -> structural.typeParams();
+            case ContainerTypeDef container -> container.typeParams();
+            case ReferenceTypeDef reference -> reference.typeParams();
+            default -> List.of();
+        };
+    }
+
+    // ── The desugar table (§5.3): one sugar form, one binding record ─────────────────────────────
+
+    /**
+     * A sugar form reduced to what it denotes: a fixed constructor head and the vocabulary fields the form
+     * binds, in the order the table above lists them. Everything downstream -- the emitted {@code !C { ... }},
+     * the derived entry name, the bound-coherence check -- reads this and nothing else.
+     */
+    private record Binding(String head, List<RecordValue.Field> fields) {
+    }
+
+    /** One position of a tuple after expansion: the type it names, and whether it is marked {@code OPTIONAL}. */
+    private record Position(TypeRef typeRef, boolean optional) {
     }
 
     /**
-     * §5.3's {@code [T, U]} at a type-ref position, hoisted into its own declaration and replaced by a bare
-     * reference to it -- the treatment {@link #apply}/{@link #hoistChoice} give every other inline form.
-     * Returns {@code unexpanded} when {@link #tupleInstance} cannot build the construction.
+     * A declaration-level container as the binding record it denotes, or empty when a position holds a form
+     * this phase cannot reduce to a name -- which leaves the whole container unexpanded, since a partially
+     * reduced one would be a differently-broken shape rather than a recognisable sugar form.
+     */
+    private Optional<Binding> binding(ContainerDef def) {
+        return switch (def) {
+            case ArrayContainerDef array -> elementRef(array.elementType()).flatMap(element ->
+                    arrayBinding(element, array.elementType().optional(), array.size(),
+                            shownElement(array.elementType())));
+            case MapContainerDef map -> exprRef(map.valueType()).flatMap(value ->
+                    mapBinding(typeRef(map.keyType()), value, map.size()));
+            case TupleContainerDef tuple -> positions(tuple).flatMap(SchemaDesugarer::tupleBinding);
+        };
+    }
+
+    /**
+     * {@code !array { element_type: T [state: OPTIONAL] [min_items: N] [max_items: M] }} -- the whole array
+     * row of the desugar table, the unsized and sized spellings alike.
      *
-     * <p>Every inline position is {@code REQUIRED} (see {@link Position}), so the name derives from the
-     * element types alone, and two identical inline tuples anywhere in the document collapse to one
-     * declaration (§8.2's structural-equality rule). No {@link #rejectIfTemplateApplication} counterpart, for
-     * the reason {@link #hoistChoice} has none: §5.6 fixes this head, so it can never be an author's template.
+     * <p><b>The element {@code ?} binds {@code state} directly</b>, alongside the bounds rather than through
+     * them: §5.3's {@code [T?; 3]} states both at once and both land on the one record. An unmarked element
+     * states nothing at all and lets §5.2's REQUIRED_DEFAULT injection supply it, exactly as a REQUIRED tuple
+     * position omits its own {@code state}.
      */
-    private TypeRef hoistTuple(List<TypeRef> elements, TypeRef unexpanded) {
-        return hoistTuplePositions(elements.stream().map(element -> new Position(element, false)).toList())
-                .orElse(unexpanded);
-    }
-
-    /**
-     * A tuple's positions as an injected declaration plus the bare reference that replaces it -- {@link
-     * #hoistTuple}'s inline form and {@link #hoistNested}'s nested one share it, differing only in whether a
-     * position can carry its own {@code ?}.
-     */
-    private Optional<TypeRef> hoistTuplePositions(List<Position> positions) {
-        return tupleInstance(positions).map(instance -> hoist(tupleName(positions), instance));
-    }
-
-    /**
-     * {@code tuple_T_U_hash}, with an OPTIONAL position contributing its state to the derivation. Without it
-     * {@code [T, U?]} and {@code [T, U]} derive the same name and the second one written collapses onto the
-     * first one injected -- two different types on one entry. An all-REQUIRED tuple keeps exactly the name the
-     * element types alone produce, so the inline form's names are unchanged.
-     *
-     * <p>A position state is representable here only because this phase materialises an entry for a hoisted
-     * form; §8.2's structural carrying has no channel for one ({@code SPEC-FEEDBACK.md} #49).
-     */
-    private static String tupleName(List<Position> positions) {
-        List<TypeArg> args = new ArrayList<>();
-        for (Position position : positions) {
-            args.add(new TypeArg.Ref(position.typeRef()));
-            if (position.optional()) {
-                args.add(new TypeArg.Value(new TokenValue(ElementState.OPTIONAL.name(), TokenForm.UNQUOTED)));
-            }
-        }
-        return syntheticName(TUPLE, args);
-    }
-
-    /**
-     * A declaration-level tuple as its own constructor application, or empty for anything this does not build
-     * -- an array container (which {@link #declarationLevelArray}/{@link #sizedArrayApplication} own) or a
-     * position {@link #elementRef} cannot reduce to a name.
-     *
-     * <p>Unlike the inline form, a position here may carry its own {@code ?} (§5.3), which becomes {@link
-     * ElementState#OPTIONAL} on that element.
-     */
-    private Optional<TypeDef> declarationLevelTuple(ContainerDef def) {
-        if (!(def instanceof TupleContainerDef tuple)) {
+    private static Optional<Binding> arrayBinding(TypeRef element, boolean optional, Optional<SizeSpec> size,
+            String shown) {
+        if (!(element instanceof SimpleRef simple)) {
             return Optional.empty();
         }
-        return positions(tuple).flatMap(this::tupleInstance);
+        List<RecordValue.Field> fields = new ArrayList<>();
+        fields.add(nameField(ELEMENT_TYPE, simple.name()));
+        if (optional) {
+            fields.add(nameField(STATE, ElementState.OPTIONAL.name()));
+        }
+        size.ifPresent(spec -> fields.addAll(sizeFields(spec, "[" + shown + "; 0..]")));
+        checkBounds(fields);
+        return Optional.of(new Binding(ARRAY, fields));
+    }
+
+    /**
+     * <code>!map { key_type: K  value_type: V [min_items: N] [max_items: M] }</code> -- the map row of the
+     * desugar table. Neither side carries a {@code state}: {@code map} declares no such field, absence has no
+     * defined meaning for a map value, and an absent key is already a Part 1 resolver error.
+     */
+    private static Optional<Binding> mapBinding(TypeRef key, TypeRef value, Optional<SizeSpec> size) {
+        if (!(key instanceof SimpleRef keyName) || !(value instanceof SimpleRef valueName)) {
+            return Optional.empty();
+        }
+        List<RecordValue.Field> fields = new ArrayList<>();
+        fields.add(nameField(KEY_TYPE, keyName.name()));
+        fields.add(nameField(VALUE_TYPE, valueName.name()));
+        size.ifPresent(spec -> fields.addAll(
+                sizeFields(spec, "{" + keyName.name() + " => " + valueName.name() + "; 0..}")));
+        checkBounds(fields);
+        return Optional.of(new Binding(MAP, fields));
+    }
+
+    /**
+     * {@code !tuple { elements: [{ element_type: T } { element_type: U }] }} -- the tuple row of the table.
+     *
+     * <p><b>Why this is not {@link #choiceBinding}.</b> Both are variadic and both fill one collection-typed
+     * vocabulary field. What differs is what one position <em>is</em>: a variant is a bare {@code type_ref},
+     * while an element is a {@code tuple_element} record carrying a type <em>and</em> its own {@link
+     * ElementState}, so each position needs a record built for it rather than a name token. {@code state} is
+     * written only for an {@code OPTIONAL} position, for the reason {@link #arrayBinding} omits an unmarked
+     * element's.
+     */
+    private static Optional<Binding> tupleBinding(List<Position> positions) {
+        List<ScopedValue> elements = new ArrayList<>();
+        for (Position position : positions) {
+            if (!(position.typeRef() instanceof SimpleRef simple)) {
+                return Optional.empty();
+            }
+            List<RecordValue.Field> members = new ArrayList<>();
+            members.add(nameField(ELEMENT_TYPE, simple.name()));
+            if (position.optional()) {
+                members.add(nameField(STATE, ElementState.OPTIONAL.name()));
+            }
+            elements.add(scoped(new RecordValue(members)));
+        }
+        return Optional.of(new Binding(TUPLE,
+                List.of(new RecordValue.Field(ELEMENTS, scoped(new ArrayValue(elements))))));
+    }
+
+    /**
+     * {@code !choice { variants: [A B ...] }} -- the choice row of the table. Variants arrive already
+     * expanded: a nested inline form is hoisted by the caller first, so what reaches here is a {@link
+     * SimpleRef} per variant.
+     *
+     * <p>Distinctness of the variants (§5.4: "the resolver validates that each variant resolves to a distinct
+     * type") is deliberately not checked here -- it is a question about what the names <em>resolve</em> to,
+     * after reference flattening, which this phase has no answer to.
+     */
+    private static Optional<Binding> choiceBinding(List<TypeRef> variants) {
+        List<ScopedValue> members = new ArrayList<>();
+        for (TypeRef variant : variants) {
+            if (!(variant instanceof SimpleRef simple)) {
+                return Optional.empty();
+            }
+            members.add(scoped(new TokenValue(simple.name(), TokenForm.UNQUOTED)));
+        }
+        return Optional.of(new Binding(CHOICE,
+                List.of(new RecordValue.Field(VARIANTS, scoped(new ArrayValue(members))))));
+    }
+
+    /**
+     * §5.3's size specifier as the {@code min_items}/{@code max_items} pair it binds -- one rule for arrays
+     * and maps alike, since both constructors declare the same two fields. An exact {@code N} pins both, so
+     * {@code [T; 3]} and {@code [T; 3..3]} land on the very same entry.
+     *
+     * <p><b>A zero floor is rejected</b> rather than desugared. §5.3 calls it vacuous and asks the resolver to
+     * warn while desugaring it anyway; rejecting the spelling is {@code SPEC-FEEDBACK.md} #42's position, and
+     * here the warning would be guarding more than a style nit -- identity is structural (§8.2), so the form
+     * lands on an entry <em>distinct from</em> the unbounded one that means exactly the same thing. That is an
+     * identity trap, and the author's fix is the one §5.3 itself names. Only a literal {@code 0} is caught: a
+     * bound naming a value parameter is not concrete until materialisation.
+     */
+    private static List<RecordValue.Field> sizeFields(SizeSpec size, String shown) {
+        return switch (size) {
+            case SizeSpec.Min min when min.lower().equals("0") ->
+                    throw new TsonSchemaValidationException("'" + shown + "' pins a floor of zero, which every "
+                            + "container already satisfies -- drop the size specifier for the unconstrained "
+                            + "form (§5.3). The spelling is not merely redundant: identity is structural "
+                            + "(§8.2), so it lands on an entry distinct from the unconstrained one that means "
+                            + "the same thing");
+            case SizeSpec.Min min -> List.of(nameField(MIN_ITEMS, min.lower()));
+            case SizeSpec.Max max -> List.of(nameField(MAX_ITEMS, max.upper()));
+            case SizeSpec.Ranged ranged ->
+                    List.of(nameField(MIN_ITEMS, ranged.lower()), nameField(MAX_ITEMS, ranged.upper()));
+            case SizeSpec.Exact exact ->
+                    List.of(nameField(MIN_ITEMS, exact.bound()), nameField(MAX_ITEMS, exact.bound()));
+        };
+    }
+
+    /**
+     * §5.3's bound-coherence rule on the {@code min_items}/{@code max_items} pair, applying identically to
+     * arrays and maps: a resolver error where the bounds are literal at schema load. A bound that names a
+     * value parameter is not concrete here, and checking it is §8.2's materialisation-time question.
+     *
+     * <p>Deliberately not a general facility. The remaining rules §8.2 gestures at ("bounds within a
+     * width-derived range, and their kin") belong with the constraint families that own them, alongside
+     * {@code AtomNarrowing}, not in a syntax rewrite -- see {@code BACKLOG.md}.
+     */
+    private static void checkBounds(List<RecordValue.Field> fields) {
+        BigInteger min = null;
+        BigInteger max = null;
+        for (RecordValue.Field field : fields) {
+            if (!(field.value().value().coreValue() instanceof TokenValue token)) {
+                continue;
+            }
+            try {
+                if (field.name().equals(MIN_ITEMS)) {
+                    min = new BigInteger(token.text());
+                } else if (field.name().equals(MAX_ITEMS)) {
+                    max = new BigInteger(token.text());
+                }
+            } catch (NumberFormatException e) {
+                return; // a bound that is not a literal -- nothing concrete to compare yet
+            }
+        }
+        if (min != null && max != null && min.compareTo(max) > 0) {
+            throw new TsonSchemaValidationException("a size specifier binds min_items " + min
+                    + " above max_items " + max + " -- a container's size range must satisfy min <= max "
+                    + "(§5.3), and no value can ever satisfy this one");
+        }
+    }
+
+    // ── Hoisting: a sugar form becomes a declaration plus a reference to it ──────────────────────
+
+    /** {@code !head { field: value ... }} -- the construction a binding record denotes. */
+    private static TypeDef instance(Binding binding) {
+        return new Instance(new DataValue(List.of(), Optional.of(binding.head()),
+                new RecordValue(binding.fields())));
+    }
+
+    /**
+     * A binding hoisted into its own declaration and replaced by a bare reference, or {@code unexpanded} when
+     * the form did not reduce.
+     */
+    private TypeRef hoistOrKeep(Optional<Binding> binding, TypeRef unexpanded) {
+        return binding.<TypeRef>map(this::hoist).orElse(unexpanded);
+    }
+
+    /** Records an injected declaration under its derived name and yields the reference that replaces the sugar. */
+    private TypeRef hoist(Binding binding) {
+        String name = bindingName(binding);
+        if (!imported.contains(name)) {
+            injected.computeIfAbsent(name, n -> new SchemaMap.Declaration(List.of(), n, List.of(),
+                    instance(binding)));
+        }
+        return new SimpleRef(name);
+    }
+
+    /**
+     * The type-ref an element or map-value position denotes: an ordinary reference expanded the usual way, or
+     * a <b>nested declaration-level form</b> hoisted into its own declaration and replaced by its name.
+     *
+     * <p>§5.3's declaration-level container syntax nests inside itself ({@code [[T; 2], U]},
+     * <code>{text =&gt; [order; 1..]}</code>), and the inner form desugars first. That is the bottom-up hoist
+     * {@link #typeRef} already performs for an inline form, one tier down: the inner container's own binding
+     * record is built and injected, and the position that held it becomes a bare reference, so the enclosing
+     * container routes a plain name like any other.
+     *
+     * <p>Empty when the position holds a form this phase cannot build, which leaves the enclosing container
+     * unexpanded and keeps its existing handling.
+     */
+    private Optional<TypeRef> elementRef(ElementType element) {
+        return exprRef(element.expr());
+    }
+
+    private Optional<TypeRef> exprRef(ElementType.Expr expr) {
+        return switch (expr) {
+            case ElementType.Expr.Plain plain -> Optional.of(typeRef(plain.typeRef()));
+            case ElementType.Expr.Nested nested -> binding(nested.container()).map(this::hoist);
+        };
     }
 
     /**
      * Every position of a declaration-level tuple reduced to a name plus its own {@code ?}, or empty as soon
-     * as one position holds a form this phase cannot build -- which leaves the whole tuple unexpanded, since
-     * a partially reduced one would be a differently-broken shape rather than a recognisable sugar form.
+     * as one position holds a form this phase cannot build.
      */
     private Optional<List<Position>> positions(TupleContainerDef tuple) {
         List<Position> positions = new ArrayList<>();
@@ -744,316 +785,18 @@ final class SchemaDesugarer {
     }
 
     /**
-     * The type-ref an element position denotes: an ordinary reference expanded the usual way, or a <b>nested
-     * bracket form</b> hoisted into its own declaration and replaced by its name.
-     *
-     * <p>§5.3's declaration-level container syntax nests inside itself ({@code [[T; 2], U]}, {@code [[T]; 3]}),
-     * and the spec fixes the order outright -- {@code grid => <T, N> [[T; N]; N]} is {@code
-     * array_ranged<array_ranged<T, N, N>, N, N>}, "the inner form desugaring first". That is the bottom-up
-     * hoist {@link #typeRef} already performs for an inline form, one tier down: {@link #hoistNested} builds
-     * the inner container's own instance and injects it, and the position that held it becomes a bare
-     * reference, so the enclosing container routes a plain name like any other.
-     *
-     * <p>Empty when the position holds a form this phase cannot build, which leaves the enclosing container
-     * unexpanded and keeps its existing handling.
+     * How an element position was spelled, for the one diagnostic that quotes the sugar form back at its
+     * author: the position's own name when it has one, and a stand-in when it is an inline or nested form
+     * whose expansion carries a derived name the author never wrote.
      */
-    private Optional<TypeRef> elementRef(ElementType element) {
-        return switch (element.expr()) {
-            case ElementType.Expr.Plain plain -> Optional.of(typeRef(plain.typeRef()));
-            case ElementType.Expr.Nested nested -> hoistNested(nested.container());
-        };
+    private static String shownElement(ElementType element) {
+        return element.expr() instanceof ElementType.Expr.Plain plain && plain.typeRef() instanceof SimpleRef simple
+                ? simple.name()
+                : "T";
     }
 
-    /**
-     * A nested bracket form as a reference to its own injected declaration -- the same four array spellings
-     * and the tuple form {@link #typeDef} builds at declaration position, built here one bracket in.
-     * Recursive through {@link #elementRef}, so nesting depth needs no special case.
-     *
-     * <p>Empty for anything {@link #instanceFor} does not construct.
-     */
-    private Optional<TypeRef> hoistNested(ContainerDef def) {
-        return switch (def) {
-            case ArrayContainerDef array -> {
-                Optional<TypeRef> element = elementRef(array.elementType());
-                if (element.isEmpty()) {
-                    yield Optional.empty();
-                }
-                List<RecordValue.Field> state = elementState(array.elementType());
-                if (array.size().isEmpty()) {
-                    yield hoistApplication("array", List.of(new TypeArg.Ref(element.orElseThrow())), state);
-                }
-                GenericRef sized = sizedApplication(element.orElseThrow(), shownElement(array.elementType()),
-                        array.size().orElseThrow());
-                yield hoistApplication(sized.name(), sized.args(), state);
-            }
-            case TupleContainerDef tuple -> positions(tuple).flatMap(this::hoistTuplePositions);
-        };
-    }
-
-    /** Records an injected declaration under a derived name and yields the reference that replaces the sugar. */
-    private TypeRef hoist(String name, TypeDef instance) {
-        if (!imported.contains(name)) {
-            injected.computeIfAbsent(name, n -> new SchemaMap.Declaration(List.of(), n, List.of(), instance));
-        }
-        return new SimpleRef(name);
-    }
-
-    /**
-     * Rejects an application whose head is a parameterized <em>template</em> (§5.10) rather than a
-     * constructor -- {@code box => <T> { v: T } } applied as {@code box<text>}, or the meta-kernel's own
-     * {@code array_ranged}, which §5.3's sized sugar targets. Substituting the arguments for the parameters
-     * is a real unimplemented feature rather than a rewrite this phase can perform, and without it the
-     * application resolves to the template's own body with its parameters still unbound.
-     *
-     * <p>Two namespaces are checked, for the two places a template can be declared. A head this document
-     * declares is checked against its grammar-layer {@code TypeDef}, the only place its parameters exist
-     * this early. A head in the <b>structure namespace</b> is checked against its resolved definition: a
-     * generic-application head is one of §3.3.1's constructor roles, so that is where a container
-     * constructor is found, and a non-constructor entry with parameters sitting in the same namespace is a
-     * template reached the same way.
-     *
-     * <p>Catching the structure-namespace case is what makes {@code tags => [text; 1..5]} report the gap it
-     * actually has. Left alone it reached the linker as a body reference to {@code array_ranged}, which is
-     * validated against the type-name namespace only (§3.3.2), and failed as {@code unresolved reference
-     * 'array_ranged'} -- misleading, because the name is genuinely reachable at the role it is used at; what
-     * is missing is substitution, not the name.
-     *
-     * <p>Still not covered: a template declared by an {@code !!import}. Recognising one needs the imported
-     * entries' resolved definitions, and this phase is given only their names (see {@link #imported}).
-     */
-    private void rejectIfTemplateApplication(String head) {
-        SchemaMap.Declaration declaration = local.get(head);
-        if (declaration != null) {
-            reject(head, typeParams(declaration.typeDef()));
-            return;
-        }
-        TypeDefinition meta = metaEntries.get(head);
-        if (meta != null && !meta.constructor()) {
-            reject(head, meta.parameters());
-        }
-    }
-
-    private static void reject(String head, List<String> parameters) {
-        if (parameters.isEmpty()) {
-            return;
-        }
-        throw new UnsupportedOperationException("'" + head + "' is a parameterized template, and applying one "
-                + "is not implemented -- §5.10 parameter substitution has no implementation, so '" + head
-                + "<...>' would resolve to the template's own body with its parameters " + parameters
-                + " still unbound. Declare a concrete type instead.");
-    }
-
-    private static List<String> typeParams(TypeDef typeDef) {
-        return switch (typeDef) {
-            case StructuralTypeDef structural -> structural.typeParams();
-            case ContainerTypeDef container -> container.typeParams();
-            case ReferenceTypeDef reference -> reference.typeParams();
-            default -> List.of();
-        };
-    }
-
-    /**
-     * The {@code !C { field: arg ... }} an application denotes, or empty when this is not one this phase
-     * builds: an unknown head, a head whose vocabulary is not record-shaped, an arity mismatch, or an argument
-     * that did not reduce to a plain name. Each of those keeps its existing downstream handling rather than
-     * being turned into a differently broken shape here.
-     *
-     * <p><b>A partial application closes to its constructor's construction, not to an entry of its own.</b>
-     * §5.3's size templates ({@code array_min}/{@code array_max}/{@code array_ranged}) bind parameters only in
-     * labelled <em>value</em> channels, so applying one is evaluation: {@code array_ranged<text, 1, 2>} is
-     * {@code !array { element_type: text  min_items: 1  max_items: 2 } } -- a construction of {@code array},
-     * reached by routing the arguments through the same {@code value_param} channels a constructor's own
-     * vocabulary uses. The emitted body is therefore identical whether the head is a constructor or a size
-     * template; only the head the record is built at differs, and {@link #nearestConstructor} finds it. No
-     * §8.2 instantiation entry is minted: an entry exists for the form that genuinely needs one, a
-     * <em>structural</em> template closing by substitution ({@code box => <T> { v: T } }), which is rejected
-     * at the application site until §5.10 is implemented. {@code SPEC-FEEDBACK.md} #45 has the taxonomy and
-     * why the spec's own worked example diverges.
-     */
-    private Optional<TypeDef> instanceFor(String head, List<TypeArg> args) {
-        return instanceFor(head, args, List.of());
-    }
-
-    /**
-     * {@link #instanceFor(String, List)} with vocabulary fields bound <em>directly</em> rather than routed
-     * from an argument -- §5.3's element {@code ?}, whose {@code state: OPTIONAL} has no parameter to ride.
-     *
-     * <p>Each {@code direct} entry is matched against the vocabulary by name and emitted in the vocabulary's
-     * own field order, so the binding record reads the way the constructor declares it however the call site
-     * listed them. A binding naming a field the vocabulary does not declare yields empty rather than being
-     * dropped: silently binding nothing is how {@code UriType}/{@code RegexType} stayed broken invisibly
-     * (see {@code CLAUDE.md}'s traps), and this is the same shape of mistake one layer up.
-     */
-    private Optional<TypeDef> instanceFor(String head, List<TypeArg> args, List<RecordValue.Field> direct) {
-        TypeDefinition applied = metaEntries.get(head);
-        if (applied == null || !(applied.body() instanceof RecordBody vocabulary)
-                || applied.parameters().size() != args.size()) {
-            return Optional.empty();
-        }
-        // A template heads its binding record at the nearest `~` constructor in its source chain (§5.6), not
-        // at itself; a constructor heads its own.
-        String constructorHead = applied.constructor() ? head : nearestConstructor(applied);
-        if (constructorHead == null) {
-            return Optional.empty();
-        }
-        List<RecordValue.Field> fields = new ArrayList<>();
-        int bound = 0;
-        for (RecordField field : vocabulary.fields()) {
-            Optional<String> parameter = field.valueParam();
-            if (parameter.isEmpty()) {
-                // A fixed or defaulted vocabulary field -- the reader supplies it, unless the sugar form
-                // states it outright (`[T?]`'s state, the one binding with no parameter to route through).
-                for (RecordValue.Field stated : direct) {
-                    if (stated.name().equals(field.name())) {
-                        fields.add(stated);
-                        bound++;
-                    }
-                }
-                continue;
-            }
-            int index = applied.parameters().indexOf(parameter.get());
-            if (index < 0) {
-                return Optional.empty();
-            }
-            Optional<TokenValue> token = argumentToken(args.get(index));
-            if (token.isEmpty()) {
-                return Optional.empty();
-            }
-            fields.add(new RecordValue.Field(field.name(), scoped(token.get())));
-        }
-        if (fields.isEmpty() || bound != direct.size()) {
-            return Optional.empty();
-        }
-        if (!applied.constructor()) {
-            checkBounds(head, fields);
-        }
-        return Optional.of(new Instance(
-                new DataValue(List.of(), Optional.of(constructorHead), new RecordValue(fields))));
-    }
-
-    /**
-     * §5.6's {@code (A | B | ...)} as the construction it denotes: {@code !choice { variants: [A B ...] } }.
-     *
-     * <p>Empty -- leaving the choice unexpanded for whoever handles it next -- when the governing meta cannot
-     * supply {@code choice}'s vocabulary (see {@link #variadicField}), or when a variant did not reduce to a
-     * plain name. Variants are expected already expanded: a nested inline form is hoisted by the caller first,
-     * so what arrives here is a {@link SimpleRef} per variant.
-     *
-     * <p>Distinctness of the variants (§5.4: "the resolver validates that each variant resolves to a distinct
-     * type") is deliberately not checked here -- it is a question about what the names <em>resolve</em> to,
-     * after reference flattening, which this phase has no answer to.
-     */
-    private Optional<TypeDef> choiceInstance(List<TypeRef> variants) {
-        Optional<RecordField> field = variadicField(CHOICE);
-        if (field.isEmpty()) {
-            return Optional.empty();
-        }
-        List<ScopedValue> members = new ArrayList<>();
-        for (TypeRef variant : variants) {
-            if (!(variant instanceof SimpleRef simple)) {
-                return Optional.empty();
-            }
-            members.add(scoped(new TokenValue(simple.name(), TokenForm.UNQUOTED)));
-        }
-        return Optional.of(variadicInstance(CHOICE, field.get().name(), members));
-    }
-
-    /**
-     * §5.6's {@code [T, U, ...]} as the construction it denotes: {@code !tuple { elements: [ { element_type: T
-     * } { element_type: U } ] } } -- the other half of §5.3's variadic pair.
-     *
-     * <p><b>Why this is not {@link #choiceInstance}.</b> Both are variadic, and both fill one collection-typed
-     * vocabulary field, so they share {@link #variadicField} and {@link #variadicInstance}. What differs is
-     * what one position <em>is</em>: a variant is a bare {@code type_ref}, while an element is a {@code
-     * tuple_element} record carrying a type <em>and</em> its own {@link ElementState}, so each position needs a
-     * record built for it rather than a name token. {@code state} is written only for an {@code OPTIONAL}
-     * position -- the member is {@code REQUIRED_DEFAULT} ({@code state: element_state ~ REQUIRED}), so a
-     * {@code REQUIRED} position is spelled by omitting it and letting §5.2's default injection supply it,
-     * exactly as {@link #instanceFor} omits every defaulted vocabulary field.
-     *
-     * <p>The two member names are meta-kernel-fixed like the head itself, so they are constants here rather
-     * than a second vocabulary lookup one level down: {@code tuple_element}'s own type is reachable only
-     * through the array declaration {@code elements} was desugared to, which is a long way to travel for a
-     * name §5.3 states outright. Nothing is taken on trust -- the emitted body is bound through the governing
-     * meta's compiled reader, where a member {@code tuple_element} does not declare is an {@code
-     * UNRECOGNIZED_FIELD} under §7.2's closure rule rather than a silently ignored one.
-     *
-     * <p>Empty when the governing meta cannot supply {@code tuple}'s vocabulary, or when a position did not
-     * reduce to a plain name -- the same conditions {@link #choiceInstance} returns empty under.
-     */
-    private Optional<TypeDef> tupleInstance(List<Position> positions) {
-        Optional<RecordField> field = variadicField(TUPLE);
-        if (field.isEmpty()) {
-            return Optional.empty();
-        }
-        List<ScopedValue> elements = new ArrayList<>();
-        for (Position position : positions) {
-            if (!(position.typeRef() instanceof SimpleRef simple)) {
-                return Optional.empty();
-            }
-            List<RecordValue.Field> members = new ArrayList<>();
-            members.add(new RecordValue.Field(ELEMENT_TYPE,
-                    scoped(new TokenValue(simple.name(), TokenForm.UNQUOTED))));
-            if (position.optional()) {
-                members.add(new RecordValue.Field(STATE,
-                        scoped(new TokenValue(ElementState.OPTIONAL.name(), TokenForm.UNQUOTED))));
-            }
-            elements.add(scoped(new RecordValue(members)));
-        }
-        return Optional.of(variadicInstance(TUPLE, field.get().name(), elements));
-    }
-
-    /**
-     * One position of a tuple after expansion: the type it names, and whether the declaration marked it
-     * {@code OPTIONAL}. An inline tuple's positions are always {@code REQUIRED} -- {@code
-     * TsonSchemaParser.parseInlineElement} rejects a {@code ?} at an inline type-ref position (§5.3) -- so the
-     * flag only ever varies for the declaration-position form.
-     */
-    private record Position(TypeRef typeRef, boolean optional) {
-    }
-
-    /**
-     * The one vocabulary field a variadic constructor's arguments map onto (§5.3: "for the variadic pair,
-     * {@code tuple} and {@code choice}, arguments map positionally onto {@code elements} and {@code
-     * variants}"), or empty when the governing meta cannot supply it -- the head absent, not a constructor,
-     * not record-shaped, or not carrying exactly one such field.
-     *
-     * <p><b>Why the variadic pair needs this at all, rather than {@link #instanceFor}.</b> That path routes
-     * one argument per vocabulary field by the field's own {@code value_param} ({@code element_type: type_ref
-     * = T}), which fixes the arity at the constructor's parameter count. Neither {@code choice} nor {@code
-     * tuple} declares parameters, and the field each fills is a <em>collection</em> ({@code variants:
-     * [type_ref]}, {@code elements: [tuple_element]}) with no {@code value_param} to route through, so no
-     * per-parameter routing can express either one.
-     *
-     * <p>The field is identified as the sole bare {@code REQUIRED} one -- §5.6's own positional-form rule,
-     * which is what makes it the field a bare argument list fills. That is read off the governing meta rather
-     * than written here, so the routing stays vocabulary-derived even though the <em>head</em> is fixed by the
-     * sugar form (exactly as {@code [T]} fixes {@code array}, §5.6's desugaring table) rather than named by an
-     * author.
-     */
-    private Optional<RecordField> variadicField(String head) {
-        TypeDefinition constructor = metaEntries.get(head);
-        if (constructor == null || !constructor.constructor()
-                || !(constructor.body() instanceof RecordBody vocabulary)) {
-            return Optional.empty();
-        }
-        RecordField sole = null;
-        for (RecordField field : vocabulary.fields()) {
-            if (field.state() != FieldState.REQUIRED) {
-                continue;
-            }
-            if (sole != null) {
-                return Optional.empty();
-            }
-            sole = field;
-        }
-        return Optional.ofNullable(sole);
-    }
-
-    /** {@code !head { field: [ members... ] } } -- the construction a variadic sugar form denotes. */
-    private static TypeDef variadicInstance(String head, String field, List<ScopedValue> members) {
-        RecordValue.Field bound = new RecordValue.Field(field, scoped(new ArrayValue(members)));
-        return new Instance(new DataValue(List.of(), Optional.of(head), new RecordValue(List.of(bound))));
+    private static RecordValue.Field nameField(String name, String text) {
+        return new RecordValue.Field(name, scoped(new TokenValue(text, TokenForm.UNQUOTED)));
     }
 
     /** A bare value in a field or element position -- no schema directive, no annotations, no type-ref of its own. */
@@ -1061,143 +804,88 @@ final class SchemaDesugarer {
         return new ScopedValue(Optional.empty(), new DataValue(List.of(), Optional.empty(), value));
     }
 
-    /**
-     * The nearest {@code ~} constructor in a template's source chain (§5.6) -- {@code array} for {@code
-     * array_ranged}, whose supertypes are {@code [array, product, top]} in IS-A order, so the first entry
-     * that is itself a constructor is the nearest one. {@code null} when the chain reaches none, which leaves
-     * the application unexpanded rather than guessing a head.
-     */
-    private String nearestConstructor(TypeDefinition template) {
-        for (String supertype : template.supertypes()) {
-            TypeDefinition candidate = metaEntries.get(supertype);
-            if (candidate != null && candidate.constructor()) {
-                return supertype;
-            }
-        }
-        return null;
-    }
-
-    /**
-     * §8.2's deferred value-level check: a family coherence rule whose operands were parameters is verified
-     * once substitution makes them concrete, and a violation is "a resolver error reported at the
-     * materialising application". The array family's {@code min_items <= max_items} (§5.3) is the one rule
-     * reachable here -- it is the only one the kernel's own templates route parameters into, and the sugar
-     * spelling {@code [T; 5..3]} is the way an author hits it.
-     *
-     * <p>Deliberately not a general facility. The remaining rules §8.2 gestures at ("bounds within a
-     * width-derived range, and their kin") belong with the constraint families that own them, alongside
-     * {@code AtomNarrowing}, not in a syntax rewrite -- see {@code BACKLOG.md}.
-     */
-    private void checkBounds(String head, List<RecordValue.Field> fields) {
-        BigInteger min = null;
-        BigInteger max = null;
-        for (RecordValue.Field field : fields) {
-            if (!(field.value().value().coreValue() instanceof TokenValue token)) {
-                continue;
-            }
-            try {
-                if (field.name().equals("min_items")) {
-                    min = new BigInteger(token.text());
-                } else if (field.name().equals("max_items")) {
-                    max = new BigInteger(token.text());
-                }
-            } catch (NumberFormatException e) {
-                return; // a bound that is not a literal -- nothing concrete to compare yet
-            }
-        }
-        if (min != null && max != null && min.compareTo(max) > 0) {
-            throw new TsonSchemaValidationException("'" + head + "<...>' binds min_items " + min
-                    + " above max_items " + max + " -- an array's size range must satisfy min <= max (§5.3), "
-                    + "and no value can ever satisfy this one");
-        }
-    }
-
-    /** An argument reduces to a token: a plain name after expansion, or a literal value argument (a size bound). */
-    private static Optional<TokenValue> argumentToken(TypeArg arg) {
-        return switch (arg) {
-            case TypeArg.Ref ref when ref.ref() instanceof SimpleRef simple ->
-                    Optional.of(new TokenValue(simple.name(), TokenForm.UNQUOTED));
-            case TypeArg.Value value -> Optional.of(value.value());
-            default -> Optional.empty();
-        };
-    }
+    // ── Internal names (§8.2) ────────────────────────────────────────────────────────────────────
 
     /**
      * {@code head_arg_arg_hash} -- §8.2's own recommendation for an internal name, "a readable head plus a
-     * structural hash". The readable half is what a diagnostic shows and what several tests recognise an
-     * application by; the hash separates applications the readable half spells alike.
+     * structural hash". The readable half is what a diagnostic shows and what several tests recognise a form
+     * by; the hash separates forms the readable half spells alike.
+     *
+     * <p><b>The name is derived from the resolved binding record, not from the spelling that produced it.</b>
+     * That is the one identity rule for internal entries: one entry per distinct concrete form, schema-wide,
+     * so {@code [T; 3]} and {@code [T; 3..3]} collapse onto the same entry and a form arising from two
+     * different declarations is written once.
      *
      * <p><b>The hash runs over a rendering this class builds itself</b> ({@link #canonical}), never over the
      * AST's own {@code toString}. Both of the JDK's ready-made answers are unusable here: {@code
-     * Record::toString}'s format is documented as "subject to change" (and shifts whenever an AST record's
+     * Record::toString}'s format is documented as "subject to change" (and shifts whenever a record's
      * components are renamed or reordered), and {@code Record::hashCode} "need not remain consistent from one
      * execution of an application to another execution of the same application". {@code String.hashCode} is
      * specified exactly, so hashing a string built here is the one construction that is deterministic by
      * contract rather than by accident.
      *
      * <p>That determinism is load-bearing, not cosmetic. An entry name is part of the resolved form, and an
-     * importing schema reaches an <em>imported</em> materialised entry by deriving the same name for the same
-     * application -- meta.tn's {@code extern.types: [type_name]?} landing on the entry meta-kernel already
-     * produced ({@code SPEC-FEEDBACK.md} #50/#51).
+     * importing schema reaches an <em>imported</em> entry by deriving the same name for the same form --
+     * meta.tn's {@code extern.types: [type_name]?} landing on the entry meta-kernel already produced.
      */
-    private static String syntheticName(String head, List<TypeArg> args) {
-        StringBuilder name = new StringBuilder(head);
-        for (TypeArg arg : args) {
-            name.append('_').append(argumentToken(arg).map(TokenValue::text).orElse("arg"));
+    private static String bindingName(Binding binding) {
+        StringBuilder readable = new StringBuilder(binding.head());
+        for (RecordValue.Field field : binding.fields()) {
+            appendReadable(readable, field.value().value().coreValue());
         }
-        return name.append('_').append(String.format("%08x", canonical(head, args).hashCode())).toString();
+        return readable.append('_').append(String.format("%08x", canonical(binding).hashCode())).toString();
+    }
+
+    /** The readable half of a derived name: every scalar the binding record holds, in order, under {@code _}. */
+    private static void appendReadable(StringBuilder out, CoreValue value) {
+        switch (value) {
+            case TokenValue token -> out.append('_').append(token.text());
+            case RecordValue record -> record.fields()
+                    .forEach(field -> appendReadable(out, field.value().value().coreValue()));
+            case ArrayValue array -> array.elements()
+                    .forEach(element -> appendReadable(out, element.value().coreValue()));
+            default -> out.append("_v");
+        }
     }
 
     /**
-     * The application rendered as one string, structurally and injectively: every argument shape is rendered
-     * under its own tag, nested references recurse, and each piece of author text is written length-first
-     * ({@code 4:text}), so no arrangement of delimiters inside a quoted token can spell a different
-     * application. Two renderings are equal exactly when the applications are.
-     *
-     * <p>Every {@code TypeRef} shape is covered even though {@link #instanceFor}, {@link #choiceInstance} and
-     * {@link #tupleInstance} all reject a non-{@link SimpleRef} argument before a name is ever derived. The
-     * readable prefix degrades to {@code arg} for those (see {@link #argumentToken}); the hash must not, or
-     * the placeholder would be the only thing distinguishing two applications and would not distinguish them
-     * at all.
+     * The binding record rendered as one string, structurally and injectively: every value shape is written
+     * under its own tag, nested records and arrays recurse, and each piece of author text is written
+     * length-first ({@code 4:text}), so no arrangement of delimiters inside a token can spell a different
+     * record. Two renderings are equal exactly when the binding records are.
      */
-    private static String canonical(String head, List<TypeArg> args) {
+    private static String canonical(Binding binding) {
         StringBuilder out = new StringBuilder();
-        appendApplication(out, head, args);
+        appendText(out.append('A'), binding.head());
+        appendFields(out, binding.fields());
         return out.toString();
     }
 
-    private static void appendApplication(StringBuilder out, String head, List<TypeArg> args) {
-        appendText(out.append('A'), head);
+    private static void appendFields(StringBuilder out, List<RecordValue.Field> fields) {
         out.append('(');
-        for (TypeArg arg : args) {
-            switch (arg) {
-                case TypeArg.Ref ref -> appendRef(out.append('r'), ref.ref());
-                case TypeArg.Value value -> {
-                    // The form by name, not ordinal: inserting a TokenForm constant would renumber every
-                    // ordinal invisibly, which is the same hazard as hashing a record's toString.
-                    appendText(out.append('v'), value.value().form().name());
-                    appendText(out, value.value().text());
-                }
+        for (RecordValue.Field field : fields) {
+            appendText(out.append('f'), field.name());
+            appendValue(out, field.value().value().coreValue());
+        }
+        out.append(')');
+    }
+
+    private static void appendValue(StringBuilder out, CoreValue value) {
+        switch (value) {
+            case TokenValue token -> {
+                // The form by name, not ordinal: inserting a TokenForm constant would renumber every ordinal
+                // invisibly, which is the same hazard as hashing a record's toString.
+                appendText(out.append('v'), token.form().name());
+                appendText(out, token.text());
             }
+            case RecordValue record -> appendFields(out.append('r'), record.fields());
+            case ArrayValue array -> {
+                out.append("a(");
+                array.elements().forEach(element -> appendValue(out, element.value().coreValue()));
+                out.append(')');
+            }
+            default -> out.append('?');
         }
-        out.append(')');
-    }
-
-    private static void appendRef(StringBuilder out, TypeRef ref) {
-        switch (ref) {
-            case SimpleRef simple -> appendText(out.append('n'), simple.name());
-            case GenericRef generic -> appendApplication(out, generic.name(), generic.args());
-            case InlineArrayRef array -> appendRefs(out.append("a("), List.of(array.elementType()));
-            case InlineTupleRef tuple -> appendRefs(out.append("t("), tuple.elementTypes());
-            case ChoiceRef choice -> appendRefs(out.append("c("), choice.variants());
-        }
-    }
-
-    private static void appendRefs(StringBuilder out, List<TypeRef> refs) {
-        for (TypeRef ref : refs) {
-            appendRef(out, ref);
-        }
-        out.append(')');
     }
 
     /** Length-first, so concatenation stays unambiguous whatever the text contains. */

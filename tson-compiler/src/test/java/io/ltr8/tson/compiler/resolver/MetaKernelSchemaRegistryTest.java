@@ -49,23 +49,23 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class MetaKernelSchemaRegistryTest {
 
     @Test
-    void linksTheRealMetaKernelSchemaWhoseGenericFieldTypeRefsTheDesugarPhaseAlreadyResolved() {
+    void linksTheRealMetaKernelSchemaWhoseSugarFormsTheDesugarPhaseAlreadyResolved() {
         TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
         TsonLinkedSchema linked = TsonSchemaLinker.linkBootstrap(raw);
 
         // Nothing left for the linker to materialize: the bootstrap desugars its own document, so every
-        // argument-bearing application is already a declared entry by the time linking runs.
+        // sugar form is already a declared entry by the time linking runs.
         assertEquals(raw.entries().keySet(), linked.schema().entries().keySet());
 
-        // 49 real declarations + one desugared entry per distinct argument-bearing application:
-        // enum's own `members: set<token>`, plus one `array<X>` per distinct X used through §5.3's
-        // `[X]`/`[X]?` array-sugar field types elsewhere in the fixture (`arguments: [type_argument]?`,
+        // 47 real declarations + one desugared entry per distinct sugar form: one `array` entry per
+        // distinct X used through §5.3's `[X]`/`[X]?` field-type sugar (`arguments: [type_argument]?`,
         // `fields: [record_field]`, `groups: [field_group]?`, `supertypes`/`subtypes`/`parameters:
         // [type_name]?`/`[param_name]?` -- three separate `[type_name]?` uses correctly dedup to a
         // single `array_type_name_*` entry, not three -- `elements: [tuple_element]`, `variants:
-        // [type_ref]`, `members: [field_name]`).
-        Set<String> expectedHeads = Set.of("set_token", "array_tuple_element", "array_field_name",
+        // [type_ref]`, `members: [field_name]`). `enum`'s member set is not among them: `token_set` is
+        // a declaration the fixture writes, since `set` has no sugar of its own.
+        Set<String> expectedHeads = Set.of("array_tuple_element", "array_field_name",
                 "array_type_ref", "array_type_name", "array_type_argument", "array_param_name",
                 "array_field_group", "array_record_field");
         Set<String> syntheticNames = new HashSet<>(linked.schema().entries().keySet());
@@ -76,13 +76,12 @@ class MetaKernelSchemaRegistryTest {
                     "expected a synthetic entry with head '" + head + "', found: " + syntheticNames);
         }
 
-        String setTokenName = syntheticNames.stream().filter(n -> n.startsWith("set_token_")).findFirst().orElseThrow();
         TypeDefinition enumDef = linked.schema().entries().get("enum");
         RecordBody enumBody = (RecordBody) enumDef.body();
         RecordField membersField = enumBody.fields().stream()
                 .filter(f -> f.name().equals("members"))
                 .findFirst().orElseThrow();
-        assertEquals(TypeRef.of(setTokenName), membersField.type());
+        assertEquals(TypeRef.of("token_set"), membersField.type());
     }
 
     /**
@@ -118,8 +117,8 @@ class MetaKernelSchemaRegistryTest {
         assertTrue(linked.schema().bootstrap());
         assertEquals(raw.id(), linked.schema().id());
         assertEquals(raw.meta(), linked.schema().meta());
-        assertEquals(58, raw.entries().size());
-        assertEquals(58, linked.schema().entries().size());
+        assertEquals(55, raw.entries().size());
+        assertEquals(55, linked.schema().entries().size());
 
         assertThrows(TsonSchemaValidationException.class, () -> registry.register(new TsonLinkedSchema(raw)));
         assertThrows(TsonSchemaValidationException.class, () -> registry.register(linked));
@@ -149,7 +148,7 @@ class MetaKernelSchemaRegistryTest {
         assertFalse(resolved.bootstrap());
 
         TsonLinkedSchema registered = registry.register(TsonSchemaLinker.link(resolved, registry));
-        assertEquals(58, registered.schema().entries().size());
+        assertEquals(55, registered.schema().entries().size());
         assertThrows(TsonSchemaValidationException.class, () -> registry.register(registered));
     }
 }

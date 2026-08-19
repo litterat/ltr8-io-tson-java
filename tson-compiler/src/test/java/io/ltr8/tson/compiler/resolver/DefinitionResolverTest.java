@@ -512,30 +512,6 @@ class DefinitionResolverTest {
         assertEquals(TypeRef.of("text"), assertInstanceOf(ArrayBody.class, idList.body()).elementType());
     }
 
-    // ── An application DefinitionResolver still sees (§5.10) ─────────────
-    //    Every *constructor* application is rewritten into an `!C value` instance by SchemaDesugarer
-    //    before resolution, so what reaches here still carrying arguments is a template application --
-    //    resolved to a REFERENCE naming it, since §5.10 substitution is unimplemented. meta-kernel's own
-    //    `schema => map<...>` is the one exception, and it is handled by MetaKernelBootstrapResolver,
-    //    which bypasses SchemaResolver and so never desugars.
-
-    @Test
-    void resolvesAnUndesugaredApplicationToAReferenceNamingIt() throws IOException, DataBindException {
-        SchemaMap schemaMap = new TsonSchemaParser(readFixture()).parseSchemaDocument().body();
-
-        TypeDefinition schema = resolver.resolve(schemaMap.declarations().get("schema"));
-
-        assertEquals(TypeKind.REFERENCE, schema.kind());
-        assertEquals("{ source: { name: \"map\" arguments: [ "
-                        + "!ref { ref: { name: \"type_name\" arguments: [] } } "
-                        + "!ref { ref: { name: \"type_definition\" arguments: [] } } ] } "
-                        + "kind: \"REFERENCE\" parameters: [] constructor: false supertypes: [] subtypes: [] "
-                        + "body: !reference { target: { name: \"map\" arguments: [ "
-                        + "!ref { ref: { name: \"type_name\" arguments: [] } } "
-                        + "!ref { ref: { name: \"type_definition\" arguments: [] } } ] } } }",
-                write(schema));
-    }
-
     // ── Type parameters (§5.10): a template's own <T, ...> list ───────────
     //    Threaded straight into TypeDefinition.parameters, with no substitution or
     //    validation that a field actually uses each parameter.
@@ -672,10 +648,10 @@ class DefinitionResolverTest {
         TypeDefinition array = resolver.resolve(schemaMap.declarations().get("array"));
 
         assertEquals(TypeKind.PRODUCT, array.kind());
-        assertEquals(List.of("T"), array.parameters());
+        assertEquals(List.of(), array.parameters(), "the container constructors carry no parameters");
         assertTrue(array.constructor());
         assertEquals(List.of("product", "top"), array.supertypes());
-        assertEquals("{ kind: \"PRODUCT\" parameters: [ \"T\" ] constructor: true "
+        assertEquals("{ kind: \"PRODUCT\" parameters: [] constructor: true "
                         + "supertypes: [ \"product\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [ \"product\" ] fields: [ "
                         + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
@@ -683,7 +659,7 @@ class DefinitionResolverTest {
                         + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
                         + "state: \"REQUIRED_FIXED\" value: { text: \"VARIABLE\" form: \"UNQUOTED\" } } "
                         + "{ name: \"element_type\" type: { name: \"type_ref\" arguments: [] } "
-                        + "state: \"REQUIRED\" value_param: \"T\" } "
+                        + "state: \"REQUIRED\" } "
                         + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } "
                         + "state: \"REQUIRED_DEFAULT\" value: { text: \"REQUIRED\" form: \"UNQUOTED\" } } "
                         + "{ name: \"unordered\" type: { name: \"boolean\" arguments: [] } "
@@ -706,10 +682,10 @@ class DefinitionResolverTest {
         TypeDefinition map = resolver.resolve(schemaMap.declarations().get("map"));
 
         assertEquals(TypeKind.PRODUCT, map.kind());
-        assertEquals(List.of("K", "V"), map.parameters());
+        assertEquals(List.of(), map.parameters(), "the container constructors carry no parameters");
         assertTrue(map.constructor());
         assertEquals(List.of("product", "top"), map.supertypes());
-        assertEquals("{ kind: \"PRODUCT\" parameters: [ \"K\" \"V\" ] constructor: true "
+        assertEquals("{ kind: \"PRODUCT\" parameters: [] constructor: true "
                         + "supertypes: [ \"product\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [ \"product\" ] fields: [ "
                         + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
@@ -717,9 +693,9 @@ class DefinitionResolverTest {
                         + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
                         + "state: \"REQUIRED_FIXED\" value: { text: \"VARIABLE\" form: \"UNQUOTED\" } } "
                         + "{ name: \"key_type\" type: { name: \"type_ref\" arguments: [] } "
-                        + "state: \"REQUIRED\" value_param: \"K\" } "
+                        + "state: \"REQUIRED\" } "
                         + "{ name: \"value_type\" type: { name: \"type_ref\" arguments: [] } "
-                        + "state: \"REQUIRED\" value_param: \"V\" } "
+                        + "state: \"REQUIRED\" } "
                         + "{ name: \"min_items\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
                         + "{ name: \"max_items\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
                         + "] groups: [] } }",
@@ -792,14 +768,14 @@ class DefinitionResolverTest {
         assertTrue(composed.getMessage().contains("'port'"), composed.getMessage());
     }
 
-    // ── The ^ refinement operator (§5.7): set, array_min, array_max, array_ranged ──
+    // ── The ^ refinement operator (§5.7): set ─────────────────────────────
     //    A refinement re-emits the ENTIRE inherited field set (no new fields), tightening
     //    only the fields the body actually names -- verified end-to-end against the real
     //    fixture, resolving "array" first so each refinement's own source is visible.
 
     @Test
     void resolvesSetFromTheRealMetaKernelFixtureRefiningArray() throws IOException, DataBindException {
-        // set => <T> ~array<T> ^ { state: = REQUIRED  unordered: = true  unique_items: = true } --
+        // set => ~array ^ { state: = REQUIRED  unordered: = true  unique_items: = true } --
         // array's own state/unordered/unique_items were REQUIRED_DEFAULT; set's body fixes them,
         // an allowed REQUIRED_DEFAULT -> REQUIRED_FIXED transition (§5.7's table).
         resolveUpToArray();
@@ -807,11 +783,11 @@ class DefinitionResolverTest {
         TypeDefinition set = resolver.resolve(schemaMapFromFixture().declarations().get("set"));
 
         assertEquals(TypeKind.PRODUCT, set.kind());
-        assertEquals(List.of("T"), set.parameters());
+        assertEquals(List.of(), set.parameters(), "the container constructors carry no parameters");
         assertTrue(set.constructor());
         assertEquals(List.of("array", "product", "top"), set.supertypes());
-        assertEquals("{ source: { name: \"array\" arguments: [ !ref { ref: { name: \"T\" arguments: [] } } ] } "
-                        + "kind: \"PRODUCT\" parameters: [ \"T\" ] constructor: true "
+        assertEquals("{ source: { name: \"array\" arguments: [] } "
+                        + "kind: \"PRODUCT\" parameters: [] constructor: true "
                         + "supertypes: [ \"array\" \"product\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [] fields: [ "
                         + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
@@ -819,7 +795,7 @@ class DefinitionResolverTest {
                         + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
                         + "state: \"REQUIRED_FIXED\" value: { text: \"VARIABLE\" form: \"UNQUOTED\" } } "
                         + "{ name: \"element_type\" type: { name: \"type_ref\" arguments: [] } "
-                        + "state: \"REQUIRED\" value_param: \"T\" } "
+                        + "state: \"REQUIRED\" } "
                         + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } "
                         + "state: \"REQUIRED_FIXED\" value: { text: \"REQUIRED\" form: \"UNQUOTED\" } } "
                         + "{ name: \"unordered\" type: { name: \"boolean\" arguments: [] } "
@@ -830,74 +806,6 @@ class DefinitionResolverTest {
                         + "{ name: \"max_items\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
                         + "] groups: [] } }",
                 write(set));
-    }
-
-    @Test
-    void resolvesArrayMinFromTheRealMetaKernelFixtureRoutingMinItemsByParameter() throws IOException, DataBindException {
-        // array_min => <T, MIN> array<T> ^ { min_items: = MIN } -- array's own min_items was
-        // OPTIONAL; MIN is array_min's own parameter, so this is an OPTIONAL -> REQUIRED
-        // (value_param) tightening, not a literal fixed value.
-        resolveUpToArray();
-
-        TypeDefinition arrayMin = resolver.resolve(schemaMapFromFixture().declarations().get("array_min"));
-
-        assertEquals(List.of("T", "MIN"), arrayMin.parameters());
-        assertFalse(arrayMin.constructor());
-        assertEquals(List.of("array", "product", "top"), arrayMin.supertypes());
-        assertEquals("{ source: { name: \"array\" arguments: [ !ref { ref: { name: \"T\" arguments: [] } } ] } "
-                        + "kind: \"PRODUCT\" parameters: [ \"T\" \"MIN\" ] constructor: false "
-                        + "supertypes: [ \"array\" \"product\" \"top\" ] subtypes: [] "
-                        + "body: !record { supertypes: [] fields: [ "
-                        + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: { text: \"INDEX\" form: \"UNQUOTED\" } } "
-                        + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: { text: \"VARIABLE\" form: \"UNQUOTED\" } } "
-                        + "{ name: \"element_type\" type: { name: \"type_ref\" arguments: [] } "
-                        + "state: \"REQUIRED\" value_param: \"T\" } "
-                        + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } "
-                        + "state: \"REQUIRED_DEFAULT\" value: { text: \"REQUIRED\" form: \"UNQUOTED\" } } "
-                        + "{ name: \"unordered\" type: { name: \"boolean\" arguments: [] } "
-                        + "state: \"REQUIRED_DEFAULT\" value: { text: \"false\" form: \"UNQUOTED\" } } "
-                        + "{ name: \"unique_items\" type: { name: \"boolean\" arguments: [] } "
-                        + "state: \"REQUIRED_DEFAULT\" value: { text: \"false\" form: \"UNQUOTED\" } } "
-                        + "{ name: \"min_items\" type: { name: \"integer\" arguments: [] } "
-                        + "state: \"REQUIRED\" value_param: \"MIN\" } "
-                        + "{ name: \"max_items\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
-                        + "] groups: [] } }",
-                write(arrayMin));
-    }
-
-    @Test
-    void resolvesArrayRangedFromTheRealMetaKernelFixtureRoutingBothBoundsByParameter() throws IOException, DataBindException {
-        // array_ranged => <T, MIN, MAX> array<T> ^ { min_items: = MIN  max_items: = MAX } -- both
-        // OPTIONAL fields tighten to REQUIRED via parameter routing.
-        resolveUpToArray();
-
-        TypeDefinition arrayRanged = resolver.resolve(schemaMapFromFixture().declarations().get("array_ranged"));
-
-        assertEquals(List.of("T", "MIN", "MAX"), arrayRanged.parameters());
-        assertEquals("{ source: { name: \"array\" arguments: [ !ref { ref: { name: \"T\" arguments: [] } } ] } "
-                        + "kind: \"PRODUCT\" parameters: [ \"T\" \"MIN\" \"MAX\" ] constructor: false "
-                        + "supertypes: [ \"array\" \"product\" \"top\" ] subtypes: [] "
-                        + "body: !record { supertypes: [] fields: [ "
-                        + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: { text: \"INDEX\" form: \"UNQUOTED\" } } "
-                        + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: { text: \"VARIABLE\" form: \"UNQUOTED\" } } "
-                        + "{ name: \"element_type\" type: { name: \"type_ref\" arguments: [] } "
-                        + "state: \"REQUIRED\" value_param: \"T\" } "
-                        + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } "
-                        + "state: \"REQUIRED_DEFAULT\" value: { text: \"REQUIRED\" form: \"UNQUOTED\" } } "
-                        + "{ name: \"unordered\" type: { name: \"boolean\" arguments: [] } "
-                        + "state: \"REQUIRED_DEFAULT\" value: { text: \"false\" form: \"UNQUOTED\" } } "
-                        + "{ name: \"unique_items\" type: { name: \"boolean\" arguments: [] } "
-                        + "state: \"REQUIRED_DEFAULT\" value: { text: \"false\" form: \"UNQUOTED\" } } "
-                        + "{ name: \"min_items\" type: { name: \"integer\" arguments: [] } "
-                        + "state: \"REQUIRED\" value_param: \"MIN\" } "
-                        + "{ name: \"max_items\" type: { name: \"integer\" arguments: [] } "
-                        + "state: \"REQUIRED\" value_param: \"MAX\" } "
-                        + "] groups: [] } }",
-                write(arrayRanged));
     }
 
     /**
@@ -924,12 +832,13 @@ class DefinitionResolverTest {
         assertFalse(thrown.getMessage().contains("FieldDef["), thrown.getMessage());
     }
 
-    // ── A field's generic type-ref (e.g. `set<token>`) ────────────────────
+    // ── A field typed by a named constructor application ──────────────────
 
     @Test
-    void resolvesEnumFromTheRealMetaKernelFixtureWithAGenericFieldType() throws IOException, DataBindException {
-        // enum => ~atom & { members: set<token> } -- "members" is typed with a generic
-        // application, not a bare reference or the [T] array sugar.
+    void resolvesEnumFromTheRealMetaKernelFixtureNamingTheTokenSetEntry() throws IOException, DataBindException {
+        // enum => ~atom & { members: token_set }, where token_set => !set { element_type: token }.
+        // The named entry exists because `!` forms stay prohibited at field positions (§5.2) and `set`
+        // has no sugar of its own -- there is no generic application left to write here.
         SchemaMap schemaMap = schemaMapFromFixture();
         resolved.put("top", resolver.resolve(schemaMap.declarations().get("top")));
         resolved.put("atom", resolver.resolve(schemaMap.declarations().get("atom")));
@@ -941,8 +850,7 @@ class DefinitionResolverTest {
         assertEquals(List.of("atom", "top"), enumDef.supertypes());
         assertEquals("{ kind: \"ATOM\" parameters: [] constructor: true supertypes: [ \"atom\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [ \"atom\" ] fields: [ "
-                        + "{ name: \"members\" type: { name: \"set\" "
-                        + "arguments: [ !ref { ref: { name: \"token\" arguments: [] } } ] } state: \"REQUIRED\" } "
+                        + "{ name: \"members\" type: { name: \"token_set\" arguments: [] } state: \"REQUIRED\" } "
                         + "] groups: [] } }",
                 write(enumDef));
     }
@@ -1658,18 +1566,10 @@ class DefinitionResolverTest {
     }
 
     /**
-     * Parses one declaration and resolves it, running {@link SchemaDesugarer} in between as {@code
-     * SchemaResolver} does. The phase owns the sugar forms now, so a snippet that skipped it would be
-     * resolving a shape the pipeline never produces -- and these tests assert the resulting {@link
-     * TypeDefinition}, which the move did not change.
-     */
-    /**
-     * Desugars and resolves one declaration against the real meta-kernel as its structure namespace. Both
-     * phases get the *same* namespace, as {@code SchemaResolver} gives them in production -- a §8.2
-     * instantiation is built by one and completed by the other (the desugarer routes the arguments, the
-     * resolver recovers the template's supertypes), so a resolver looking at a different meta than the
-     * desugarer did would fail loudly rather than quietly resolve something else. The compiled form is
-     * needed because the binding record the desugarer emits is bound through the meta's own reader, the
+     * Desugars and resolves one declaration, running {@link SchemaDesugarer} in between as {@code
+     * SchemaResolver} does -- the phase owns the sugar forms, so a snippet that skipped it would be resolving
+     * a shape the pipeline never produces. The compiled meta-kernel is the resolver's structure namespace,
+     * needed because the binding record the desugarer emits is bound through that meta's own reader, the
      * same as any other {@code !C value}.
      */
     private TypeDefinition resolveSnippet(String declaration) {
@@ -1677,7 +1577,7 @@ class DefinitionResolverTest {
                 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn1"
                 { %s }""".formatted(declaration)).parseSchemaDocument();
         TsonCompiledMetaSchema metaKernel = metaKernelCompiled();
-        SchemaMap schemaMap = SchemaDesugarer.desugar(document, metaKernel.schema().entries(), Set.of()).body();
+        SchemaMap schemaMap = SchemaDesugarer.desugar(document, Set.of()).body();
         return definitionResolverFor(metaKernel, resolved::get)
                 .resolve(schemaMap.declarations().get(declaration.split("=>")[0].trim()));
     }

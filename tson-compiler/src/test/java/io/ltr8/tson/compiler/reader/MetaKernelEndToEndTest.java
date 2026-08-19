@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * The real proof this whole sketch works, not against small hand-built fragments: compiles the
- * ENTIRE real, registered {@code meta-kernel.tn1} schema (58 entries after materialization -- see
+ * ENTIRE real, registered {@code meta-kernel.tn} schema (55 entries after materialization -- see
  * {@code MetaKernelSchemaRegistryTest}) with a registry covering every factory this codebase
  * currently has, then reads real TSON data text against several of its own genuinely useful record
  * types -- including {@code top} itself, the case that motivated {@link VariantParser}'s own
@@ -47,20 +47,16 @@ class MetaKernelEndToEndTest {
     }
 
     /**
-     * All 58 of the real schema's entries compile cleanly now -- up from 53 once {@link
-     * VariantParser} started triggering on non-empty {@code subtypes} rather than non-empty {@code
-     * parameters}, and always compiling a declaration's own body alongside any subtype dispatch
-     * rather than treating the two as mutually exclusive (see {@link VariantParser}'s own Javadoc).
-     * {@code map}/{@code set}/{@code array_min}/{@code array_max}/{@code array_ranged} -- the
-     * parameterized constructors that used to be refused outright (no subtypes to dispatch to, and
-     * under the old design that meant no compiled shape at all) -- now compile via their own
-     * ordinary body reader directly, the same as any other constructor's own vocabulary record.
-     * Nothing legitimate ever calls {@code compiled.get("map")} in practice (see the previous
-     * revision of this test for why), but there's no longer a reason for it to fail if something
-     * did.
+     * Every one of the real schema's entries compiles cleanly, the container constructors included:
+     * {@link VariantParser} triggers on non-empty {@code subtypes} rather than non-empty {@code
+     * parameters}, and always compiles a declaration's own body alongside any subtype dispatch rather than
+     * treating the two as mutually exclusive (see {@link VariantParser}'s own Javadoc), so {@code array},
+     * {@code set} and {@code map} compile via their own ordinary body reader, the same as any other
+     * constructor's vocabulary record. Nothing legitimate ever calls {@code compiled.get("map")} in
+     * practice, but there is no reason for it to fail if something did.
      */
     @Test
-    void allFiftyEightRealEntriesCompileCleanly() {
+    void everyRealEntryCompilesCleanly() {
         TsonSchema raw = MetaKernelBootstrapResolver.getMetaKernelSchema();
         TsonLinkedSchema linked = TsonSchemaLinker.linkBootstrap(raw);
         TsonSchema registered = linked.schema();
@@ -69,7 +65,7 @@ class MetaKernelEndToEndTest {
         for (String name : registered.entries().keySet()) {
             compiled.get(name);
         }
-        assertEquals(58, registered.entries().size());
+        assertEquals(55, registered.entries().size());
     }
 
     @Test

@@ -16,16 +16,12 @@ import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.EnumBody;
-import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.MapBody;
-import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.RegexType;
 import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeDefinition;
-import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Unit;
 import io.ltr8.tson.schema.meta.UriType;
@@ -63,13 +59,12 @@ import java.util.Optional;
  * nothing else.
  *
  * <p><b>{@link SchemaDesugarer} runs first, exactly as it does for every other schema</b> -- meta-kernel
- * writes plenty of sugar ({@code fields: [record_field]}, {@code members: set<token>}, {@code schema =>
- * map<type_name, type_definition>}) and there is no reason for the kernel to resolve a different set of
- * forms than anything else does. The one accommodation is {@link #BOOTSTRAP_CONSTRUCTORS}: the phase needs
- * the governing meta's constructor vocabulary to know which field each positional argument fills, and
- * meta-kernel's governing meta is itself, so the routing for the three constructors it applies to itself is
- * written out here. What this buys is that linking has nothing left to materialize -- the desugared entries
- * are ordinary declarations by the time the linker sees them.
+ * writes plenty of sugar ({@code fields: [record_field]}, <code>schema =&gt; {type_name =&gt;
+ * type_definition}</code>) and there is no reason for the kernel to resolve a different set of forms than
+ * anything else does. It needs no accommodation at all: the desugar table is fixed by the sugar forms
+ * (§5.3), so the phase consults no governing meta -- which for meta-kernel would have been the very entries
+ * this class is in the middle of producing. What this buys is that linking has nothing left to
+ * materialize -- the desugared entries are ordinary declarations by the time the linker sees them.
  *
  * <p><b>Every {@code Instance} declaration resolves through {@link #instanceBody}, a closed,
  * hand-written switch</b> -- a schema-driven compiled reader can't safely bootstrap meta-kernel from
@@ -127,38 +122,11 @@ public final class MetaKernelBootstrapResolver {
     /** Meta-kernel governs itself, so it has no separate structure namespace to fall back to -- this class's own first pass never reaches {@link DefinitionResolver#resolveInstance} at all, the one place a structure namespace is ever consulted. */
     private static final DefinitionGetter EMPTY_META_DEFINITIONS = name -> null;
 
-    /**
-     * The parameter-to-field routing for the three constructors meta-kernel applies to itself, written out
-     * rather than read from a governing meta -- the same trick as {@link #instanceBody}, for the same reason.
-     * {@code SchemaDesugarer} needs a constructor's own {@code parameters()} and the {@code valueParam} each
-     * vocabulary field draws from; here those would have to come from meta-kernel's own declarations, which
-     * are what this method is in the middle of producing. Only the routing matters, so the field types are
-     * left as a bare {@code type_ref} reference: nothing reads them.
-     *
-     * <p>Declaration order is why this cannot simply use the entries resolved so far. {@code record} applies
-     * {@code [record_field]} well before {@code array} itself is declared, which is exactly the situation
-     * §3.4.1's forward references exist for -- and the reason the linker built its own lookup namespace up
-     * front rather than relying on resolution order.
-     */
-    private static final Map<String, TypeDefinition> BOOTSTRAP_CONSTRUCTORS = Map.of(
-            "array", routing(List.of("T"), "element_type"),
-            "set", routing(List.of("T"), "element_type"),
-            "map", routing(List.of("K", "V"), "key_type", "value_type"));
-
-    private static TypeDefinition routing(List<String> parameters, String... fields) {
-        List<RecordField> vocabulary = new ArrayList<>();
-        for (int i = 0; i < fields.length; i++) {
-            vocabulary.add(new RecordField(fields[i], TypeRef.of("type_ref"), FieldState.REQUIRED,
-                    Optional.empty(), Optional.of(parameters.get(i))));
-        }
-        return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, parameters, true, List.of(), List.of(),
-                Optional.empty(), new RecordBody(List.of(), vocabulary, List.of()));
-    }
-
     private static Map<String, TypeDefinition> resolveEntries(SchemaDocument document) {
-        // Meta-kernel desugars like every other schema; it just supplies its own routing table, since the
-        // governing meta it would otherwise read is itself.
-        document = SchemaDesugarer.desugar(document, BOOTSTRAP_CONSTRUCTORS, Set.of());
+        // Meta-kernel desugars like every other schema, and needs no special case: the desugar table is fixed
+        // by the sugar forms (§5.3), so the phase consults no governing meta -- which for meta-kernel would
+        // have been the very entries this method is in the middle of producing.
+        document = SchemaDesugarer.desugar(document, Set.of());
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         DefinitionResolver resolver = new DefinitionResolver(NEVER_CALLED, EMPTY_META_DEFINITIONS, entries::get);
         List<SchemaMap.Declaration> instances = new ArrayList<>();

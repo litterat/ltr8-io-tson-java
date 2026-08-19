@@ -125,19 +125,20 @@ class MetaKernelBootstrapResolverTest {
     }
 
     /**
-     * The bootstrap runs {@link SchemaDesugarer} over its own document like every other schema does, so
-     * its output is the 49 declarations the fixture writes plus one injected declaration per distinct
-     * argument-bearing application within them -- {@code enum}'s own {@code members: set<token>} and
-     * eight {@code array<X>} entries from §5.3's {@code [X]} field-type sugar. The nine are the same
-     * nine the linker used to synthesize; producing them here is what leaves the linker with nothing
-     * to materialize (see {@code MetaKernelSchemaRegistryTest}).
+     * The bootstrap runs {@link SchemaDesugarer} over its own document like every other schema does, so its
+     * output is the 47 declarations the fixture writes plus one injected declaration per distinct sugar form
+     * within them -- eight {@code array} entries from §5.3's {@code [X]} field-type sugar. They are the same
+     * entries the linker used to synthesize; producing them here is what leaves the linker with nothing to
+     * materialize (see {@code MetaKernelSchemaRegistryTest}). {@code enum}'s member set is no longer among
+     * them: it is the fixture's own {@code token_set} declaration, since {@code set} has no sugar and a
+     * {@code !} form stays prohibited at a field position (§5.2).
      */
     @Test
-    void theFortyNineRealFixtureDeclarationsResolveAlongsideNineDesugaredEntries() {
+    void theFortySevenRealFixtureDeclarationsResolveAlongsideEightDesugaredEntries() {
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
-        assertEquals(58, schema.entries().size());
-        for (String head : List.of("set_token", "array_tuple_element", "array_field_name", "array_type_ref",
+        assertEquals(55, schema.entries().size());
+        for (String head : List.of("array_tuple_element", "array_field_name", "array_type_ref",
                 "array_type_name", "array_type_argument", "array_param_name", "array_field_group",
                 "array_record_field")) {
             assertTrue(schema.entries().keySet().stream().anyMatch(name -> name.startsWith(head + "_")),

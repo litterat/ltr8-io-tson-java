@@ -42,9 +42,9 @@ including records, record groups, enums and some in-built types. The `2026/32` i
 URIs is the draft year/revision marker from the spec's release scheme.
 
 ```tson
-!!id:"https://example.com/2026/32/getting-started/person.tn?sha256=1434c8c4c285ec9120500ef876dc3a2254f8a35534b922b1382990a9870fc79a"
-!!meta:"https://tson.io/2026/32/m/meta.tn?sha256=983ad4da2ddf5b70b37da4af45e964290d24e6942776ef281c1e0d5942b46b07"
-!!import:"https://tson.io/2026/32/m/core.tn?sha256=63912a45d5c7b12c92b4d32a596de3dbd875b04fd252f443827d6cf2cf5a385e"
+!!id:"https://example.com/2026/32/getting-started/person.tn?sha256=4dc19d46d2e788b19e7eb2d1bc361c6e39203298255a31e94c578bd58ec6a3d2"
+!!meta:"https://tson.io/2026/32/m/meta.tn?sha256=155269f4cbea13f7534da6f3593482df65201b1ac68d35bb9d5913fab052f529"
+!!import:"https://tson.io/2026/32/m/core.tn?sha256=538a37c1b7b14811b888bce24caa9e06e24eddbfb59ec57bae5f7af87f67199f"
 {
     role => !enum [admin member guest]
 
@@ -405,24 +405,27 @@ vocabulary — parse → resolve → link → register → compile → read:
 1. **Parse** (`TsonSchemaParser`) — schema document text into a faithful AST (`SchemaDocument`):
    records, compositions (`&`), refinements (`^`), type references, and so on. No interpretation yet —
    a name is still just a name.
-2. **Resolve** (`TsonSchemaResolver`) — one declaration at a time, the AST becomes a concrete
+2. **Desugar** (`SchemaDesugarer`) — an AST→AST rewrite turning every sugar form (`[T]`, `[T; 1..5]`,
+   `[T, U]`, `{K => V}`, `(A | B)`) into the constructor application it denotes, off a fixed table. At a
+   declaration's own position the form simply *is* that application; anywhere else it becomes an injected
+   declaration plus a bare reference to it, so identical forms anywhere in the document share one entry.
+3. **Resolve** (`TsonSchemaResolver`) — one declaration at a time, the AST becomes a concrete
    `TypeDefinition`: composition induces supertypes and flattens fields, refinement tightens an
    inherited field against a state-transition table, a constructor application (`!C value`) transfers
    its constructor's own kind, and so on. A reference to another declaration is still a bare, unverified
    name at this point.
-3. **Link** (`TsonSchemaLinker`) — the whole-schema pass: merges `!!import`s, flattens every
-   argument-bearing type reference (e.g. an `array<token>` application) into a real, synthesized entry,
-   and validates that every reference in the schema actually resolves to something. Produces a
-   `TsonLinkedSchema` — proof, in the type system, that this pass has run, not a runtime flag to
+4. **Link** (`TsonSchemaLinker`) — the whole-schema pass: merges `!!import`s, populates `subtypes`, derives
+   choice disjointness, and validates that every reference in the schema actually resolves to something.
+   Produces a `TsonLinkedSchema` — proof, in the type system, that this pass has run, not a runtime flag to
    remember to check.
-4. **Register** (`TsonSchemaRegistry`) — stores a linked schema under its own canonical `!!id` (only
+5. **Register** (`TsonSchemaRegistry`) — stores a linked schema under its own canonical `!!id` (only
    ever accepts a `TsonLinkedSchema` — there's no way to register something that skipped linking), so a
    later schema can find it via its own `!!import`/`!!meta`. Once registered, a schema is locked: never
    mutated or removed.
-5. **Compile** (`TsonSchemaCompiler`) — turns a registered schema's `Map<String, TypeDefinition>` into
+6. **Compile** (`TsonSchemaCompiler`) — turns a registered schema's `Map<String, TypeDefinition>` into
    a `TsonCompiledSchema`: real Java object references between per-type parsers rather than further
    name lookups, built once, reused for every document read against it.
-6. **Read** (`TsonTypeReader`) — the compiled schema validates and binds actual TSON *data* documents
+7. **Read** (`TsonTypeReader`) — the compiled schema validates and binds actual TSON *data* documents
    against one of its own types — the schema-validating reader (Class 2) that the schemaless
    `TsonObjectReader`/`TsonDataParser` don't attempt on their own.
 

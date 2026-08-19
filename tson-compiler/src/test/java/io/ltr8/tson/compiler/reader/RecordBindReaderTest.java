@@ -145,7 +145,7 @@ class RecordBindReaderTest {
 
     @Test
     void theWholeRealMetaKernelSchemaCompilesCleanlyInBindMode() {
-        // Every one of the 58 real, registered entries -- including the 5 pure marker roots
+        // Every one of the real, registered entries -- including the 5 pure marker roots
         // (atom/product/sum/top/type_argument, which resolve to real but deliberately non-record
         // sealed interfaces) -- gets a compiled reader; TsonSchemaCompiler's own eager walk builds
         // the whole schema regardless of whether any given entry is ever actually read.
@@ -156,7 +156,7 @@ class RecordBindReaderTest {
         for (String name : linked.schema().entries().keySet()) {
             compiled.get(name);
         }
-        assertEquals(58, linked.schema().entries().size());
+        assertEquals(55, linked.schema().entries().size());
     }
 
     @Test
