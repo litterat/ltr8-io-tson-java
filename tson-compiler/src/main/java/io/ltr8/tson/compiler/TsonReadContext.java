@@ -20,7 +20,7 @@ import java.util.Optional;
  *
  * <p><b>{@link #peek()}/{@link #next()} are the core primitives</b> every reader consumes, delegating
  * to a single {@link TsonEventSource} shared across an entire read -- every scoped copy this
- * interface hands back (see {@link #field}/{@link #index}/{@link #withSchemaLocation}) points at the
+ * interface hands back (see {@link #field}/{@link #index}/{@link #schemaField}) points at the
  * *same* underlying source and diagnostic sink, so pulling an event through any one copy is visible
  * to all of them. {@link #position()} is not a stored, per-copy value -- it always reflects whichever
  * event was most recently peeked or consumed, on *any* copy, since there is only ever one real cursor

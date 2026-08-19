@@ -17,7 +17,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
 
     /**
      * Every scoped copy of a single read (see {@link #field}/{@link #index}/{@link
-     * #withSchemaLocation}/{@link #withPosition}) shares one of these -- the real event source, its
+     * #schemaField}/{@link #withPosition}) shares one of these -- the real event source, its
      * own live cursor position (mutated by {@link #peek}/{@link #next} regardless of which copy made
      * the call, since there is only ever one real cursor per read), the receiver every copy reports
      * through, and the running count of what they have reported.
