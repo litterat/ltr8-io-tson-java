@@ -57,9 +57,20 @@ own prose (which had gone stale on at least one of them):
   an instance admits no partial bindings, so the closed bodies are untouched and `min_items: "two"` becomes
   the error at the materialising application. Take `[T]` first — the unsized inline form, whose only
   parameter rides a type slot — then the sized and nested forms, which are what actually need `param`.
-  Also here: D9's `[type-params] instance` (today `TsonSchemaParser.parseTypeDef` checks `!` *before*
-  `parseTypeParamsOpt`, faithful to the ABNF as written), and open-synthetic identity up to consistent
-  parameter renaming.
+  Also here: D9's `instance-template` production — a `!` head behind a parameter list, resolving against
+  `instance_template` rather than the constructor's own body, so a production of its own rather than
+  `[type-params] instance` (today `TsonSchemaParser.parseTypeDef` checks `!` *before* `parseTypeParamsOpt`,
+  faithful to the ABNF as written) — and open-synthetic identity up to consistent parameter renaming.
+  - **Stage one is the grammar alone**, target `box => <T> { a: [T] }`: the production, a new AST node, and
+    the resolved shape `array_t => <T> !array { element_type: T }` →
+    `body: !instance_template { target: array  bindings: { element_type => { param: T } } }`. Every open
+    entry carries an `instance_template`, including one like this that a plain `!array` body could serve —
+    uniformity is what makes "`instance_template` present ⟺ open entry" checkable, and splitting it by
+    whether a parameter lands in a type or a value slot would leave two open representations.
+  - The compact spelling for a *sugared* constructor already exists and already parses
+    (`vector => <T, N> [T; N]` is `[type-params] container-def`). `instance-template` is the fallback for a
+    constructor with no sugar (`set`) and the target the sugar desugars into — its ergonomics matter less
+    than its existence.
   - **The CR's own §8 fixtures do not parse** and need respelling before they can be acceptance tests:
     `tree => <T> { value: T  children: [tree<T>; 1..] }` and `grid => <T, N> { x: [[T; 1..N]; 2..N] }` both
     put a size specifier at a *field* position, which §5.3's inline prohibition rejects — a prohibition the
