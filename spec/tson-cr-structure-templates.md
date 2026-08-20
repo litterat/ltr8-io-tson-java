@@ -49,13 +49,15 @@ The answer is a distinct intermediate vocabulary rather than a widened one. `ins
 
 ```
 template_argument => { ( param: param_name | value: value | type_ref: type_ref ) }
-instance_template => ~product & {
+instance_template => top & {
   target:   type_name
   bindings: {field_name => template_argument}
 }
 ```
 
-`target`, not `constructor`: `type_definition.constructor` is already a boolean flag, and `reference => top & { target: type_name }` already uses `target` for the thing an entry points at. `instance_template`, not `template_instance`: the latter reads as an *instance of a template*, which is what a closed instantiation is — this is a template *of* an instance.
+**`top &`, not `~product`, and no `~`.** `reference => top & { target: type_name }` is the precedent, and it holds for both halves. `product` obliges an entry to supply `access_pattern` and `size_type`, and an `instance_template` never describes a value — no data value ever has one as its type — so both would be meaningless filler. The missing `~` matters for the same reason `reference` has none: a constructor is what a *schema* applies through `!C value`, gated on `constructor: true`, and nobody writes `foo => !instance_template { … }`. Under D9 the author writes `<T> !array { … }`, where the `!` names `array`; the resolver *produces* the `instance_template` body, exactly as it produces `!reference { target: token }`.
+
+`target`, not `constructor`: `type_definition.constructor` is already a boolean flag, and `reference` already uses `target` for the thing an entry points at. `instance_template`, not `template_instance`: the latter reads as an *instance of a template*, which is what a closed instantiation is — this is a template *of* an instance. And not `data_template`: the payload is not data, which is the entire reason the type exists.
 
 An open entry's body is an `instance_template`; a closed entry's body is an ordinary constructor body (`!array`, `!map`, …). The two never mix: **an instance admits no partial bindings**, which is why `ArrayBody.min_items` keeps its declared `integer?` type and needs no param channel.
 
@@ -71,7 +73,7 @@ Both types are **resolved-form vocabulary, not grammar**. No schema source spell
 
 The new alternative is **not** `[type-params] instance`. The surface syntax is the same — a `!` head over an ordinary record payload — but the two resolve against different vocabulary: `instance` binds its payload through the *constructor's* own reader and yields that constructor's body, while `instance-template` yields an `instance_template` (D7). Same brace, different destination, and the ABNF should say so rather than leaving it to prose. `instance` itself stays unparameterised, which also means nothing gains an optional parameter list that could be silently dropped.
 
-**The payload stays an ordinary `core-value`.** The tagged form (`{ element_type => { param: T } }`) is the *resolved* shape, defined by meta-kernel, not something an author writes:
+**The payload is a production of its own, narrower than `core-value`.** A `core-value` would admit `<T> !array [1 2 3]`, `<T> !array "x"`, and a nested record in a binding — none of which a `template_argument` can carry, since it is `param | value | type_ref` with no collection case (`<T> !choice { variants: [T text] }`, a parameter inside a collection-typed slot, has no resolved form at all). The grammar refuses what the vocabulary cannot hold. The tagged form (`{ element_type => { param: T } }`) is the *resolved* shape, defined by meta-kernel, not something an author writes:
 
 ```
 vector => <T, N> !array { element_type: T  min_items: N  max_items: N }
@@ -81,7 +83,9 @@ Parameterhood comes from the declaration's own `<T, N>`, exactly as it does for 
 
 **It is the fallback spelling, not the primary one.** For the four sugared constructors the compact form already exists and is already grammatical: `vector => <T, N> [T; N]` is `[type-params] container-def`, in the ABNF today. `instance-template` is the route to a constructor with *no* sugar — `set`, and whatever a meta layer adds (`bounded_set => <N> !set { element_type: text  min_items: N }`) — and the target the sugar desugars *into*. Its ergonomics matter less than its existence.
 
-**One limitation, stated rather than discovered.** The payload being a `core-value` means a nested sugar form inside it is not expressible: `!array { element_type: [T] }` reads `[T]` as a data array holding the token `T`, not as an array type. Nesting goes through a second named template, consistent with §5.2's instinct that a composite shape earns a declaration.
+**One limitation, enforced rather than discovered.** `template-arg` admits a name, a name with arguments, or a literal — not the bracket or paren forms — so `<T> !array { element_type: [T] }` is a parse error rather than a form that reads `[T]` as a data array holding the token `T`. Nesting goes through a second named template, consistent with §5.2's instinct that a composite shape earns a declaration. Admitting the sugar forms here instead would mean `template_argument` grows a case and the closing cascade has to lift from *inside* a binding; worth reviewing once the basic form is working, and deliberately out for this iteration.
+
+**`template-def` requires at least one binding.** An empty payload is a template that binds nothing, which no constructor application needs and which the closed form has no counterpart for — §2.1 refuses `{}` for a schema map on the same footing.
 
 ## 4. Normative Changes to Part 2
 
@@ -202,8 +206,14 @@ type-def = atom-refinement
          / [type-params] container-def
          / [type-params] type-ref
 
-instance-template = type-params ws "!" type-name ws core-value   ; NEW
+instance-template = type-params ws "!" type-name ws template-def  ; NEW
+
+template-def  = "{" ws template-bind *( separator template-bind ) ws "}"
+template-bind = field-name ws ":" ws template-arg
+template-arg  = type-name [ "<" type-args ">" ] / value-literal
 ```
+
+`template-def` mirrors `template_argument` one-for-one: a bare name — a parameter or a type, decided at resolution rather than by the grammar — a name carrying arguments, or a literal. Flat, one binding per slot, at least one binding, and no bracket or paren form (see D9).
 
 Decidable on one token after the optional parameter list: `!` with no parameter list opens an `instance`, `!` with one an `instance-template`, and `~`/`{`/`(`/`[`/a name the remaining alternatives as before. `<` only ever starts `type-params`, so consuming it first costs no lookahead. Inside the `!` branch a following `^` continues to separate `atom-refinement` from `instance`, which keeps its unparameterised form — a refinement of an atom instance has no parameter to take.
 
@@ -298,12 +308,12 @@ template_argument => {     ; NEW — one binding of an open form (D7)
   ( param: param_name | value: value | type_ref: type_ref )
 }
 
-instance_template => ~product & {   ; NEW — the open counterpart of an instance
-  access_pattern:  product_access_type = NAMED
-  size_type:       product_size_type = VARIABLE
-  target:          type_name
-  bindings:        {field_name => template_argument}
-}
+instance_template => top & {        ; NEW — the open counterpart of an instance.
+  target:    type_name              ; `top &` and no `~`, exactly as `reference` is:
+  bindings:  {field_name => template_argument}
+}                                   ; it never describes a value, so it has no
+                                    ; access_pattern/size_type, and it is never a
+                                    ; `!` target in a schema (D7).
 
 schema => {type_name => type_definition}         ; was map<type_name, type_definition>
 ```

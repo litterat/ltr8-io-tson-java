@@ -67,6 +67,10 @@ own prose (which had gone stale on at least one of them):
     entry carries an `instance_template`, including one like this that a plain `!array` body could serve —
     uniformity is what makes "`instance_template` present ⟺ open entry" checkable, and splitting it by
     whether a parameter lands in a type or a value slot would leave two open representations.
+    `instance_template` is `top & { ... }` with no `~`, exactly as `reference` is: it never describes a
+    value, so it has no `access_pattern`/`size_type`, and it is never a `!` target in a schema. Its payload
+    has its own production (`template-def`, one or more `field-name: template-arg` bindings, no bracket or
+    paren form) rather than a `core-value`, so the grammar refuses what `template_argument` cannot carry.
   - The compact spelling for a *sugared* constructor already exists and already parses
     (`vector => <T, N> [T; N]` is `[type-params] container-def`). `instance-template` is the fallback for a
     constructor with no sugar (`set`) and the target the sugar desugars into — its ergonomics matter less
