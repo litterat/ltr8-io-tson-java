@@ -466,7 +466,7 @@ final class SchemaDesugarer {
                         variants == choice.variants() ? choice : new ChoiceRef(variants));
             }
             case GenericRef generic -> {
-                rejectTemplateApplication(generic.name());
+                checkTemplateApplication(generic.name());
                 List<TypeArg> args = mapShared(generic.args(), this::typeArg);
                 yield args == generic.args() ? generic : new GenericRef(generic.name(), args);
             }
@@ -478,7 +478,7 @@ final class SchemaDesugarer {
         if (!(ref instanceof GenericRef generic)) {
             return ref;
         }
-        rejectTemplateApplication(generic.name());
+        checkTemplateApplication(generic.name());
         List<TypeArg> args = mapShared(generic.args(), this::typeArg);
         return args == generic.args() ? generic : new GenericRef(generic.name(), args);
     }
@@ -492,39 +492,88 @@ final class SchemaDesugarer {
     }
 
     /**
-     * Rejects a generic application, which after §3.3.1's type-name-only head resolution can only ever be a
-     * §5.10 user-template application: {@code box => <T> { v: T }} applied as {@code box<text>}. Parameter
-     * substitution is a real unimplemented feature rather than a rewrite this phase can perform, and without
-     * it the application resolves to the template's own body with its parameters still unbound.
+     * Checks a generic application, which after §3.3.1's type-name-only head resolution can only ever be a
+     * §5.10 user-template application: {@code box => <T> { v: T }} applied as {@code box<text>}.
      *
-     * <p><b>A head this document neither declares nor imports is left alone</b>, because there is nothing to
-     * apply: the reference is simply unresolved, which is {@code TsonSchemaLinker}'s verdict to deliver and
-     * not a gap in this library. An <em>imported</em> head is a gap by the conservative reading -- this phase
-     * is handed only the imported names, not their parameter lists (see {@link #imported}) -- and a local
-     * head that declares no parameters is an ordinary author error: nothing there takes type arguments.
+     * <p><b>A record template passes through</b> -- substitution happens over the <em>resolved</em> open
+     * form, not over the AST, so this phase leaves the application for {@code SchemaResolver} to materialise
+     * and the head keeps its arguments into resolution.
+     *
+     * <p><b>A template containing a sugar form does not.</b> {@code box => <T> { v: [T] } } needs the open
+     * representation of §5.3's forms, which is a separate, unimplemented feature; left alone the application
+     * resolves against a body whose {@code [T]} became a reference to {@code array}, a name a user schema's
+     * type-name namespace does not hold, so the author is told their schema has an unresolved reference to
+     * something they never wrote. Failing at the site that writes it says what is actually missing.
+     *
+     * <p><b>An imported head passes through too</b>, and needs no check here even though this phase is handed
+     * only the imported names (see {@link #imported}). A template carrying a sugar form cannot link, so it
+     * cannot have been registered, so it cannot be imported: every imported template is sugar-free by
+     * construction.
+     *
+     * <p>A head this document neither declares nor imports is left alone -- the reference is simply
+     * unresolved, which is {@code TsonSchemaLinker}'s verdict to deliver. A local head that declares no
+     * parameters is an ordinary author error: nothing there takes type arguments.
      */
-    private void rejectTemplateApplication(String head) {
+    private void checkTemplateApplication(String head) {
         SchemaMap.Declaration declaration = local.get(head);
-        if (declaration != null) {
-            List<String> parameters = typeParams(declaration.typeDef());
-            if (parameters.isEmpty()) {
-                throw new TsonSchemaValidationException("'" + head + "' declares no type parameters, so '"
-                        + head + "<...>' applies arguments to something that takes none (§5.10); drop the "
-                        + "argument list");
-            }
-            throw templateGap(head, parameters);
+        if (declaration == null) {
+            return;
         }
-        if (imported.contains(head)) {
-            throw templateGap(head, List.of());
+        List<String> parameters = typeParams(declaration.typeDef());
+        if (parameters.isEmpty()) {
+            throw new TsonSchemaValidationException("'" + head + "' declares no type parameters, so '"
+                    + head + "<...>' applies arguments to something that takes none (§5.10); drop the "
+                    + "argument list");
+        }
+        if (containsSugarForm(declaration.typeDef())) {
+            throw new UnsupportedOperationException("'" + head + "' is a template whose body contains a "
+                    + "container sugar form, and applying one is not implemented -- §5.3's forms have no "
+                    + "open representation yet, so '" + head + "<...>' cannot be materialised. A template "
+                    + "whose parameters occupy field types and values applies normally.");
         }
     }
 
-    private static UnsupportedOperationException templateGap(String head, List<String> parameters) {
-        return new UnsupportedOperationException("'" + head + "' is a template, and applying one is not "
-                + "implemented -- §5.10 parameter substitution has no implementation, so '" + head
-                + "<...>' would resolve to the template's own body with its parameters "
-                + (parameters.isEmpty() ? "" : parameters + " ") + "still unbound. Declare a concrete type "
-                + "instead.");
+    /**
+     * Whether a template's body writes a §5.3/§5.4 sugar form anywhere -- the forms whose open (parameterised)
+     * representation is unimplemented. Deliberately syntactic and conservative: it walks the declaration as
+     * written, since a parameterised declaration is passed through un-rewritten and so still carries every
+     * form its author spelled.
+     */
+    private static boolean containsSugarForm(TypeDef typeDef) {
+        return switch (typeDef) {
+            case ContainerTypeDef _ -> true;
+            case ReferenceTypeDef reference -> sugarInRef(reference.ref());
+            case StructuralTypeDef structural -> sugarInStructuralDef(structural.body());
+            default -> false;
+        };
+    }
+
+    private static boolean sugarInStructuralDef(StructuralDef def) {
+        return switch (def) {
+            case RecordDef record -> record.entries().stream().anyMatch(SchemaDesugarer::sugarInEntry);
+            case RefinedDef refined -> sugarInRef(refined.target())
+                    || refined.body().entries().stream().anyMatch(SchemaDesugarer::sugarInEntry);
+            case ConstructionDef construction -> construction.supertypes().stream()
+                    .anyMatch(SchemaDesugarer::sugarInRef)
+                    || construction.body().map(body -> body.entries().stream()
+                            .anyMatch(SchemaDesugarer::sugarInEntry)).orElse(false);
+        };
+    }
+
+    private static boolean sugarInEntry(RecordEntry entry) {
+        return switch (entry) {
+            case FieldDef field -> field.type().map(type -> sugarInRef(type.typeRef())).orElse(false);
+            case GroupDef group -> group.members().stream().anyMatch(member -> sugarInRef(member.typeRef()));
+        };
+    }
+
+    private static boolean sugarInRef(TypeRef ref) {
+        return switch (ref) {
+            case SimpleRef _ -> false;
+            case InlineArrayRef _, InlineMapRef _, InlineTupleRef _, ChoiceRef _ -> true;
+            case GenericRef generic -> generic.args().stream()
+                    .anyMatch(arg -> arg instanceof TypeArg.Ref r && sugarInRef(r.ref()));
+        };
     }
 
     private static List<String> typeParams(TypeDef typeDef) {

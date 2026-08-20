@@ -16,6 +16,7 @@ import io.ltr8.tson.compiler.ast.schema.ContainerTypeDef;
 import io.ltr8.tson.compiler.ast.schema.ElementType;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
 import io.ltr8.tson.compiler.ast.schema.ChoiceRef;
+import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.schema.GenericRef;
 import io.ltr8.tson.compiler.ast.schema.GroupDef;
 import io.ltr8.tson.compiler.ast.schema.RemovalSet;
@@ -702,6 +703,27 @@ final class DefinitionResolver {
             return io.ltr8.tson.schema.meta.TypeRef.of(simple.name());
         }
         throw new UnsupportedOperationException("only simple (non-generic) type arguments are resolved so far, got " + arg);
+    }
+
+    /**
+     * One argument of an application as the {@code type_argument} it denotes: a literal keeps its own token
+     * form, and a reference resolves through {@link #resolveTypeRef}, so an argument may itself be an
+     * application ({@code box<box<text>>}). §12.1 defers the reference/literal classification to this layer,
+     * and the grammar has already made it -- a quoted or numeric token parsed as a {@link TypeArg.Value}.
+     */
+    private TypeArgument typeArgument(TypeArg arg) {
+        if (arg instanceof TypeArg.Value value) {
+            return new TypeArgument.Value(new Token(value.value().text(), tokenForm(value.value().form())));
+        }
+        return new TypeArgument.Ref(resolveTypeRef(((TypeArg.Ref) arg).ref()));
+    }
+
+    private static Token.Form tokenForm(TokenForm form) {
+        return switch (form) {
+            case UNQUOTED -> Token.Form.UNQUOTED;
+            case SINGLE_LINE_QUOTED -> Token.Form.SINGLE_LINE_QUOTED;
+            case MULTI_LINE_QUOTED -> Token.Form.MULTI_LINE_QUOTED;
+        };
     }
 
     // ── Declaration-level array size sugar (§5.3, §5.10) ──────────────────
@@ -1462,7 +1484,7 @@ final class DefinitionResolver {
         if (ref instanceof GenericRef generic) {
             List<TypeArgument> args = new ArrayList<>();
             for (TypeArg arg : generic.args()) {
-                args.add(new TypeArgument.Ref(resolveSimpleTypeArg(arg)));
+                args.add(typeArgument(arg));
             }
             return new io.ltr8.tson.schema.meta.TypeRef(generic.name(), args);
         }
