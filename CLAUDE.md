@@ -14,7 +14,7 @@ to. Trust but verify: the code is the source of truth if a note has drifted.
 |---|---|
 | Lexer, Tier 2/3 data parsing, base type resolution, atom vocabulary | `docs/lexer-and-data-parsing.md` |
 | Schema grammar, desugaring | `docs/schema-grammar-and-desugaring.md` |
-| Schema resolution, meta-kernel bootstrap | `docs/schema-resolution.md` |
+| Schema resolution, template materialisation, meta-kernel bootstrap | `docs/schema-resolution.md` |
 | Identity, linking, registry, Class 2 compilation, compiled registries | `docs/linking-and-compilation.md` |
 | Streaming readers, read context, diagnostics (data- and schema-side) | `docs/readers-and-diagnostics.md` |
 | Read facades, writers, tree model, `Tson` front door | `docs/facades-and-tree.md` |
@@ -257,6 +257,16 @@ anything at all — `{ min: 10 max: 3 }` is the second one's, and meta.tn's own 
 check". The exception-classification policy under Conventions governs every rejection here;
 `DefinitionResolver`'s Javadoc lists the exact boundary.
 
+**Materialisation (`TemplateMaterialiser`)** closes a §5.10 template application, running over the
+*resolved* form after every declaration has resolved — an application arrives as a `TypeRef` carrying
+arguments, so substitution is a walk over `schema.meta` values and the entry it mints can record its own
+`source`, which §8.2 keys identity on. Two `box<text>` anywhere share one entry and a declaration naming the
+application aliases it; arguments close innermost-first; the memo is registered before the body is
+substituted, so regular recursion ties the knot on the entry under construction. Non-regular recursion —
+where the argument grows every level and the memo never fires — is caught by a depth guard rather than run
+into a `StackOverflowError`. Scope is the **record** template; one whose body writes a container sugar form
+is still refused at the application site.
+
 ### Meta-kernel bootstrap (`MetaKernelBootstrapResolver`) — `docs/schema-resolution.md`
 
 Meta-kernel's `!!meta` names itself (§1.5's one deliberate circularity), so ordinary resolution can't
@@ -491,11 +501,12 @@ compatibility).
   `DefinitionResolver`'s Javadoc is the exact current boundary and `BACKLOG.md` carries the detail. Only
   about half the `UnsupportedOperationException` sites in the pipeline are gaps at all; the rest are
   schema-author errors or internal faults wearing the wrong exception type, and the classification is done.
-- **§5.10 parameter substitution** — a generic application is now *only* ever a user-template application
-  (§3.3.1 resolves heads in the type-name namespace only), and applying one is rejected at the site that
-  writes it, whether the template is local or imported. `spec/tson-cr-structure-templates.md`'s Tranche B is
-  the full design — open-form recording with `value_form`, materialisation as an innermost-out synthesis
-  cascade, knot-tying through synthetic entries — and `BACKLOG.md` carries the remaining work.
+- **§5.10 substitution into a template whose body writes a container sugar form** (`box => <T> { v: [T] }`)
+  — §5.3's forms have no *open* representation, so the application is rejected at the site that writes it.
+  A **record** template — parameters occupying field types and field values — applies normally
+  (`TemplateMaterialiser`). `spec/tson-cr-structure-templates.md`'s Tranche C carries the design for the
+  rest: `template_instance`/`template_argument` as the open counterpart of an instance, and D9's
+  `[type-params] instance`.
 - **Undocumented atom constructors** — `unknown` (and `extern`, which has no core.tn declaration) has no
   compiled-parser factory, so it compiles to `ErrorReader` (a schema merely *declaring* one still compiles).
   Neither is an ordinary missing parser waiting to be written: `extern` is a whole absent mechanism and `unknown`

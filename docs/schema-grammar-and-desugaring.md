@@ -128,17 +128,19 @@ rebuilt and called a cache.
   **meta-kernel's bootstrap needs no special case**: the routing table it used to hand-write for the three
   constructors it applies to itself would have had to come from the very entries it is in the middle of
   producing.
-- **A generic application is a user template, and applying one is not implemented.** `name<args>` resolves
+- **A generic application is a user template, and this phase mostly leaves it alone.** `name<args>` resolves
   its head through the type-name namespace only (§3.3.1) — parameters, then locals, then imports — so
   `map<text, text>` finds nothing and is an ordinary unresolved reference for the linker to report, and
-  anything that *does* resolve is a §5.10 template. Substitution is unimplemented, and leaving the
-  application alone produced a schema that linked and compiled and then failed on the first read reaching the
-  field, so `rejectTemplateApplication` fails at the site that writes it. Three outcomes, classified: a local
-  declaration with parameters is the gap (`UnsupportedOperationException`); an **imported** head is the gap
-  too, by the conservative reading, since the phase is handed only the imported names — which is what the old
-  parameter-list-driven check could not do, so an imported template used to slip through to a read-time
-  failure; a local declaration with *no* parameters is the author's error
-  (`TsonSchemaValidationException` — nothing there takes type arguments); anything else is left alone.
+  anything that *does* resolve is a §5.10 template. Substitution happens over the **resolved** form
+  (`TemplateMaterialiser`, `docs/schema-resolution.md`), not over the AST, so an application passes through
+  here with its head and arguments intact. `checkTemplateApplication` refuses exactly two things: a local
+  head declaring *no* parameters (the author's error — nothing there takes type arguments), and a template
+  whose body writes a container sugar form (`box => <T> { v: [T] }`), which has no open representation yet
+  and, left alone, resolves against a body whose `[T]` became a reference to `array` — a name a user
+  schema's type-name namespace does not hold, so the author is told about an unresolved reference to
+  something they never wrote. An **imported** head needs no check at all, even though the phase is handed
+  only the imported names: a template carrying sugar cannot link, so it cannot be registered, so it cannot
+  be imported.
 - **Identity is the resolved binding record, not the spelling.** The injected name is
   `head_value_value_hash`, derived from the record the form desugars to, so `[T; 3]` and `[T; 3..3]` land on
   the same entry and any two structurally identical forms anywhere in the document collapse to one

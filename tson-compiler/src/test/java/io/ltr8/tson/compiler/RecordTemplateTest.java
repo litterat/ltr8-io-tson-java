@@ -167,6 +167,25 @@ class RecordTemplateTest {
     }
 
     /**
+     * Every position that can write an application resolves its arguments the same way -- a field, a
+     * declaration body, and a refinement source all share one resolver. Pinned because they did not: a
+     * value or nested-application argument resolved at a declaration position and was rejected at a field
+     * position, so `box<3>` and `box<box<text>>` worked in one place and not the other.
+     */
+    @Test
+    void aDeclarationPositionApplicationTakesTheSameArgumentFormsAsAFieldOne() {
+        TsonCompiledSchema compiled = compile("""
+                  box     => <T> { v: T }
+                  counted => <N> { n: int32 ~ N }
+                  nested  => box<box<text>>
+                  three   => counted<3>""");
+
+        assertEquals(2, instantiationsOf(compiled, "box").size(), "the inner and outer box");
+        assertEquals("3", fieldOf(compiled, instantiationsOf(compiled, "counted").get(0), "n")
+                .value().orElseThrow().text());
+    }
+
+    /**
      * Regular recursion ties the knot: the recursive application reached while substituting denotes the
      * entry currently under construction, referenced by its internal name before that entry is complete.
      */

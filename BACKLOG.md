@@ -73,8 +73,8 @@ own prose (which had gone stale on at least one of them):
   open bounds deferred: family coherence rules whose operands were parameters". The array family's
   `min_items <= max_items` is one rule over the binding pair for arrays *and maps*: a resolver error where
   the bounds are literal at schema load, at materialisation where parameter-bound. The literal half is done
-  for both tiers (`SchemaDesugarer.checkBounds`); Tranche B moves the parameter-bound half to
-  materialisation time. The
+  for both tiers (`SchemaDesugarer.checkBounds`); the parameter-bound half needs a size specifier inside a
+  template, which is Tranche C. The
   kin §8.2 gestures at — "bounds within a width-derived range, and their kin" — belong with the constraint
   families that own them, next to `AtomNarrowing`, not in a syntax rewrite. Doing that properly probably
   means the check moves out of the desugarer entirely and `checkBounds` goes with it. Distinct from the
@@ -95,14 +95,25 @@ own prose (which had gone stale on at least one of them):
 
 ## Remaining Part 2 resolution gaps
 
-The type-level gaps here are all blocked on §5.10 substitution — the Tranche B item above — and none is
-independently doable. Two need no item of their own beyond naming: a **generic type-ref whose arguments are not
-simple names** (`weird<[T]>`, rejected as "only simple type arguments are resolved so far"), unreachable
-through the pipeline today because the desugarer rejects every application eagerly; and a **parameterized
-supertype reference** (`vip => <T> customer & box<T>`, §5.8's "Parameterized references"), where §5.8's
-"absorbed fields... carry the parameters through ordinary type channels" is substitution into a record
-template's body. The third has measured detail worth keeping:
+§5.10 substitution exists now (`TemplateMaterialiser`), so what is left here is narrower than it was.
 
+**Done:** a generic type-ref whose arguments are not simple names. A value argument and a nested
+application both resolve, at every position that can write one — a field, a declaration body, and a
+refinement source share `DefinitionResolver.typeArgument`. An *inline sugar form* as an argument
+(`weird<[T]>`) is still out, but only because sugar inside a template is Tranche C.
+
+**Still open**, and each has its own item below or above: composing with a template application, now
+blocked on ordering rather than on substitution; and the field/element catch-all, whose two live shapes are
+both inside a template. The second has measured detail worth keeping:
+
+- [ ] **Composing with a template application** (`vip => box<text> & { ... }`, and its parameterized twin
+  `vip => <T> customer & box<T>`, §5.8's "Parameterized references"). Substitution is no longer the blocker;
+  **ordering** is. Composition resolves its supertypes during resolution, in `DefinitionResolver`, while
+  materialisation runs after the driving loop — so the entry `box<text>` denotes does not exist yet when
+  composition needs to absorb its fields. Closing it on demand from `SchemaResolver`'s namespace getter is
+  the obvious shape and is not obviously safe: that getter is the memo the circular-composition check rides
+  on. The message today is accurate about the symptom and wrong about the cause — it says "parameterized
+  supertype" for a fully-bound one.
 - [ ] **A field/element type that is not a simple name, a generic application, or an inline array.**
   `DefinitionResolver.resolveTypeRef`'s catch-all ("only simple (non-generic) type-refs, generic
   applications of one, and inline arrays of one are resolved so far"). **Only reachable inside a

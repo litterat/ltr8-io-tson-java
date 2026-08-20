@@ -677,32 +677,13 @@ final class DefinitionResolver {
     private TypeDefinition resolveTemplateApplication(String name, GenericRef generic) {
         List<TypeArgument> arguments = new ArrayList<>();
         for (TypeArg arg : generic.args()) {
-            arguments.add(resolveSimpleTypeArg(name, arg));
+            try {
+                arguments.add(typeArgument(arg));
+            } catch (UnsupportedOperationException e) {
+                throw new UnsupportedOperationException("'" + name + "': " + e.getMessage());
+            }
         }
         return TypeDefinition.reference(new io.ltr8.tson.schema.meta.TypeRef(generic.name(), arguments));
-    }
-
-    /** A single argument as the {@code type_argument} it denotes -- a reference, or a literal value bound. */
-    private static TypeArgument resolveSimpleTypeArg(String name, TypeArg arg) {
-        if (arg instanceof TypeArg.Value value) {
-            return new TypeArgument.Value(new Token(value.value().text(), Token.Form.UNQUOTED));
-        }
-        return new TypeArgument.Ref(resolveSimpleTypeRefArg(name, arg));
-    }
-
-    private static io.ltr8.tson.schema.meta.TypeRef resolveSimpleTypeRefArg(String name, TypeArg arg) {
-        try {
-            return resolveSimpleTypeArg(arg);
-        } catch (UnsupportedOperationException e) {
-            throw new UnsupportedOperationException("'" + name + "': " + e.getMessage());
-        }
-    }
-
-    private static io.ltr8.tson.schema.meta.TypeRef resolveSimpleTypeArg(TypeArg arg) {
-        if (arg instanceof TypeArg.Ref(SimpleRef simple)) {
-            return io.ltr8.tson.schema.meta.TypeRef.of(simple.name());
-        }
-        throw new UnsupportedOperationException("only simple (non-generic) type arguments are resolved so far, got " + arg);
     }
 
     /**
@@ -1046,10 +1027,9 @@ final class DefinitionResolver {
     /**
      * A refinement's source ({@code target}) is always a {@link SimpleRef} or a {@link
      * GenericRef} by grammar (see {@code RefinedDef}'s own Javadoc) -- a bare name resolves to a
-     * bare {@code type_ref}; a generic application (e.g. {@code array<T>}, {@code T} shadowing the
-     * refining declaration's own parameter) resolves each argument the same way a top-level
-     * constructor application does ({@link #resolveSimpleTypeArg}), since only a simple
-     * (non-nested, non-value) type argument is supported so far.
+     * bare {@code type_ref}; a generic application (e.g. {@code box<T>}, {@code T} shadowing the
+     * refining declaration's own parameter) resolves each argument the way every other application does
+     * ({@link #typeArgument}).
      */
     private io.ltr8.tson.schema.meta.TypeRef resolveRefinementSource(String name, TypeRef target) {
         if (target instanceof SimpleRef simple) {
@@ -1058,7 +1038,11 @@ final class DefinitionResolver {
         if (target instanceof GenericRef generic) {
             List<TypeArgument> args = new ArrayList<>();
             for (TypeArg arg : generic.args()) {
-                args.add(new TypeArgument.Ref(resolveSimpleTypeRefArg(name, arg)));
+                try {
+                    args.add(typeArgument(arg));
+                } catch (UnsupportedOperationException e) {
+                    throw new UnsupportedOperationException("'" + name + "': " + e.getMessage());
+                }
             }
             return new io.ltr8.tson.schema.meta.TypeRef(generic.name(), args);
         }
