@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.function.UnaryOperator;
 
 /**
@@ -51,8 +52,14 @@ import java.util.function.UnaryOperator;
  */
 final class TemplateMaterialiser {
 
-    /** Every entry visible to this schema -- local declarations and merged {@code !!import}s alike. */
-    private final Map<String, TypeDefinition> namespace;
+    /**
+     * Every entry visible to this schema -- local declarations and merged {@code !!import}s alike. A
+     * <em>getter</em> rather than a fixed map, because an application closed on demand during resolution
+     * (at a supertype or refinement source) may name a head that has not been resolved yet; the getter is
+     * {@code SchemaResolver}'s own memo, so asking for it resolves it, with the circular-composition guard
+     * still in front.
+     */
+    private final DefinitionGetter namespace;
 
     /** The instantiation entries produced, keyed by their derived internal name, in creation order. */
     private final Map<String, TypeDefinition> materialised = new LinkedHashMap<>();
@@ -82,8 +89,17 @@ final class TemplateMaterialiser {
      */
     private static final int MAX_CLOSING_DEPTH = 64;
 
-    private TemplateMaterialiser(Map<String, TypeDefinition> namespace) {
+    /**
+     * Where each entry is published as it is built, so the namespace can see it immediately. Load-bearing
+     * for the on-demand half: a composition supertype closes an application and then looks the resulting
+     * name up through {@code namespaceDefinitions} to absorb its fields, which is the very next thing that
+     * happens -- an entry only in this pass's own map would be invisible to it.
+     */
+    private final BiConsumer<String, TypeDefinition> publish;
+
+    TemplateMaterialiser(DefinitionGetter namespace, BiConsumer<String, TypeDefinition> publish) {
         this.namespace = namespace;
+        this.publish = publish;
     }
 
     /**
@@ -94,9 +110,9 @@ final class TemplateMaterialiser {
      * land -- they are local to this schema and carry no source position, being named by derivation rather
      * than declared.
      */
-    static Map<String, TypeDefinition> materialise(Map<String, TypeDefinition> entries,
-            Map<String, TypeDefinition> namespace, MaterialisationFailureReporter reporter) {
-        TemplateMaterialiser pass = new TemplateMaterialiser(namespace);
+    Map<String, TypeDefinition> materialise(Map<String, TypeDefinition> entries,
+            MaterialisationFailureReporter reporter) {
+        TemplateMaterialiser pass = this;
         for (Map.Entry<String, TypeDefinition> entry : entries.entrySet()) {
             if (!entry.getValue().parameters().isEmpty()) {
                 // A template's own body is open: `chain<T>` inside `chain` awaits substitution and is not an
@@ -123,6 +139,16 @@ final class TemplateMaterialiser {
     @FunctionalInterface
     interface MaterialisationFailureReporter {
         void reportFailedApplication(String entryName, TsonSchemaValidationException error);
+    }
+
+    /**
+     * The entry a fully-bound application denotes, closing it if this is the first sight of it -- the
+     * on-demand half, reached from a supertype or refinement-source position during resolution rather than
+     * from the batch pass afterwards. Both share this instance, so an application closed here and the same
+     * one met later in a field land on one entry.
+     */
+    String closeApplication(TypeRef application) {
+        return close(application).name();
     }
 
     /** One definition with every application inside it closed. */
@@ -153,7 +179,7 @@ final class TemplateMaterialiser {
      * reference rather than guessed at here.
      */
     private String instantiate(String head, List<TypeArgument> arguments) {
-        TypeDefinition template = namespace.get(head);
+        TypeDefinition template = namespace.getTypeDefinition(head);
         if (template == null) {
             return head; // unresolved head -- the linker's verdict, not this pass's
         }
@@ -184,7 +210,9 @@ final class TemplateMaterialiser {
         }
         heads.add(head);
         try {
-            materialised.put(name, substitute(template, head, parameters, arguments));
+            TypeDefinition instantiation = substitute(template, head, parameters, arguments);
+            materialised.put(name, instantiation);
+            publish.accept(name, instantiation);
             return name;
         } finally {
             closing.remove(name);

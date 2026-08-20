@@ -102,18 +102,16 @@ application both resolve, at every position that can write one — a field, a de
 refinement source share `DefinitionResolver.typeArgument`. An *inline sugar form* as an argument
 (`weird<[T]>`) is still out, but only because sugar inside a template is Tranche C.
 
-**Still open**, and each has its own item below or above: composing with a template application, now
-blocked on ordering rather than on substitution; and the field/element catch-all, whose two live shapes are
-both inside a template. The second has measured detail worth keeping:
+**Still open**, and each has its own item below or above: composing or refining against an application that
+is still *open*, which needs composition deferred to materialisation; and the field/element catch-all, whose
+two live shapes are both inside a template. The second has measured detail worth keeping:
 
-- [ ] **Composing with a template application** (`vip => box<text> & { ... }`, and its parameterized twin
-  `vip => <T> customer & box<T>`, §5.8's "Parameterized references"). Substitution is no longer the blocker;
-  **ordering** is. Composition resolves its supertypes during resolution, in `DefinitionResolver`, while
-  materialisation runs after the driving loop — so the entry `box<text>` denotes does not exist yet when
-  composition needs to absorb its fields. Closing it on demand from `SchemaResolver`'s namespace getter is
-  the obvious shape and is not obviously safe: that getter is the memo the circular-composition check rides
-  on. The message today is accurate about the symptom and wrong about the cause — it says "parameterized
-  supertype" for a fully-bound one.
+- [ ] **Composing or refining against a template application that is still open** (`vip => <T> customer &
+  box<T>`, §5.8's "Parameterized references"). The *fully-bound* case closes on demand now, at both
+  absorbing positions. What is left is the case where the application names the enclosing declaration's own
+  parameters, which cannot close until that declaration itself materialises — so composition would have to
+  be deferred to materialisation too, absorbing fields into an entry that does not exist yet. A different
+  feature from closing an application, and the diagnostic now says so rather than blaming substitution.
 - [ ] **A field/element type that is not a simple name, a generic application, or an inline array.**
   `DefinitionResolver.resolveTypeRef`'s catch-all ("only simple (non-generic) type-refs, generic
   applications of one, and inline arrays of one are resolved so far"). **Only reachable inside a

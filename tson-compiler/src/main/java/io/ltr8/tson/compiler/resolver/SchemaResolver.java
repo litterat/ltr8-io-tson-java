@@ -265,6 +265,12 @@ public final class SchemaResolver {
                 resolving.remove(name);
             }
         };
+        // One materialiser for the whole schema, created before the driving loop because resolution itself
+        // closes applications on demand: a supertype or refinement source has to absorb the *closed* entry's
+        // fields, and cannot wait for the batch pass below. Sharing the instance is what makes an on-demand
+        // closing and a later batch closing of the same application land on one entry.
+        TemplateMaterialiser materialiser = new TemplateMaterialiser(namespaceGetter, namespace::put);
+
         // The same compiled reader serves both hooks; they differ in what the caller does with the result,
         // which is why they are separate types rather than one Object-returning one.
         holder[0] = new DefinitionResolver(
@@ -272,7 +278,7 @@ public final class SchemaResolver {
                 // An annotation names an ordinary entry, not a constructor (§6), so this goes through the
                 // compiled schema's own reader for that name rather than the constructor vocabulary.
                 (type, value) -> read(metaParser.get(type), value),
-                metaParser.schema().entries()::get, namespaceGetter);
+                metaParser.schema().entries()::get, namespaceGetter, materialiser::closeApplication);
 
         for (String name : declarations.keySet()) {
             namespaceGetter.getTypeDefinition(name);
@@ -287,7 +293,7 @@ public final class SchemaResolver {
         for (String name : declarations.keySet()) {
             resolvedLocals.put(name, namespace.get(name));
         }
-        Map<String, TypeDefinition> instantiations = TemplateMaterialiser.materialise(resolvedLocals, namespace,
+        Map<String, TypeDefinition> instantiations = materialiser.materialise(resolvedLocals,
                 receiver == null ? null : (name, error) -> receiver.report(Diagnostic.ofSchemaError(
                         TsonCanonicalIdentity.canonicalize(id), name, error.getMessage(),
                         Optional.ofNullable(positions.get(declarations.get(name))))));

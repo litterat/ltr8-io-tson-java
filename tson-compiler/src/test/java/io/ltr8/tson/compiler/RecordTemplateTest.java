@@ -215,6 +215,82 @@ class RecordTemplateTest {
                 .read(TestDocuments.document("{ b: { v: \"seven\" } }"))).getMessage().contains("int32"));
     }
 
+    // ── The two field-absorbing positions (§5.7, §5.8) ───────────────────
+    //    A composition supertype and a refinement source copy the source's *fields*, so an application
+    //    there has to be closed during resolution rather than carried and closed by the later pass --
+    //    an open application has no field set to copy.
+
+    @Test
+    void composingWithAnApplicationAbsorbsTheClosedEntrysFields() {
+        TsonCompiledSchema compiled = compile("""
+                  box => <T> { v: T }
+                  vip => box<int32> & { extra: text }""");
+
+        assertEquals(TypeRef.of("int32"), fieldOf(compiled, "vip", "v").type(), "absorbed, with T bound");
+        assertEquals(TypeRef.of("text"), fieldOf(compiled, "vip", "extra").type());
+        assertNotNull(compiled.get("vip").read(TestDocuments.document("{ v: 7  extra: \"x\" }")));
+        assertTrue(assertThrows(TsonReadException.class, () -> compiled.get("vip")
+                .read(TestDocuments.document("{ v: \"seven\"  extra: \"x\" }"))).getMessage().contains("int32"));
+    }
+
+    /**
+     * Refinement previously copied the template's body with its parameters <em>unbound</em>, and the author
+     * was told about an unresolved reference to a parameter they never wrote -- silently wrong rather than
+     * loudly unimplemented, which is why this is pinned rather than merely enabled.
+     */
+    @Test
+    void refiningAnApplicationTightensTheClosedEntrysFields() {
+        TsonCompiledSchema compiled = compile("""
+                  box => <T> { v: T }
+                  pinned => box<text> ^ { v: = "fixed" }""");
+
+        assertEquals(TypeRef.of("text"), fieldOf(compiled, "pinned", "v").type());
+        assertEquals("fixed", fieldOf(compiled, "pinned", "v").value().orElseThrow().text());
+    }
+
+    /** Both positions reach the same entry the ordinary type positions do -- one application, one entry. */
+    @Test
+    void anAbsorbingPositionSharesTheEntryWithAnOrdinaryOne() {
+        TsonCompiledSchema compiled = compile("""
+                  box => <T> { v: T }
+                  vip => box<text> & { extra: text }
+                  holder => { b: box<text> }""");
+
+        assertEquals(1, instantiationsOf(compiled, "box").size());
+        assertEquals(instantiationsOf(compiled, "box").get(0), fieldType(compiled, "holder", "b"));
+    }
+
+    /**
+     * An application still referencing the declaration's own parameters cannot close: deferring composition
+     * itself until the enclosing template materialises is a different feature. The message says that rather
+     * than blaming missing substitution, which now exists.
+     */
+    @Test
+    void composingWithAnApplicationThatIsStillOpenIsRefusedForWhatItActuallyNeeds() {
+        UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
+                () -> compile("""
+                          box => <T> { v: T }
+                          vip => <T> box<T> & { extra: text }"""));
+
+        assertTrue(thrown.getMessage().contains("is still open"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("this declaration's own parameter 'T'"), thrown.getMessage());
+    }
+
+    /**
+     * Closing on demand resolves the head through {@code SchemaResolver}'s namespace getter -- which is also
+     * the memo the circular-composition guard rides on. A cycle reached *through* an application must still
+     * be caught there rather than recursing.
+     */
+    @Test
+    void aCycleThroughAnApplicationIsStillCaughtAsACircularComposition() {
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> compile("""
+                          a => b<text> & { x: text }
+                          b => <T> a & { y: T }"""));
+
+        assertTrue(thrown.getMessage().contains("circular composition/refinement chain"), thrown.getMessage());
+    }
+
     // ── Author errors, reported at the application site ──────────────────
 
     @Test
