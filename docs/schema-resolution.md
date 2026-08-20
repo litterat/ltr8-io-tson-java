@@ -211,11 +211,24 @@ recorded open form, and replacing the application with a reference to the entry 
   it, against the template's own `parameters`.
 - **Failures report per entry**, through the same receiver resolution uses, so two bad applications in one
   schema are both reported against their own declarations rather than the first aborting the document.
+- **Two positions close on demand, during resolution, rather than waiting for the pass.** A composition
+  supertype (§5.8) and a refinement source (§5.7) copy the source's *fields*, and an open application has no
+  field set to copy — so `DefinitionResolver` closes one itself, through an `ApplicationCloser` hook wired to
+  this same instance. Sharing the instance is what makes an on-demand closing and a later batch closing of
+  the same application land on one entry. Each entry is *published into the namespace as it is built*,
+  because absorbing its fields is the very next thing that happens: an entry visible only in this pass's own
+  map would be invisible to the lookup right behind it.
+  - **The cycle guard still applies.** Closing resolves the head through `SchemaResolver`'s namespace getter,
+    which is also the memo the circular-composition check rides on, so a cycle reached *through* an
+    application (`a => b<text> & {}`, `b => <T> a & {}`) is reported as a circular composition rather than
+    recursing. Pinned, because it is the one thing this wiring could have broken.
+  - **An application still naming the declaration's own parameters is refused** (`vip => <T> box<T> & { … }`)
+    — it cannot close until `vip` itself materialises, and deferring composition that far is a different
+    feature. Before this, refinement did not refuse: it copied the template's body with parameters unbound
+    and reported an unresolved reference to a parameter the author never wrote.
 - **Scope is the record template.** One whose body writes a §5.3 container sugar form is refused earlier, at
   the application site, by `SchemaDesugarer.checkTemplateApplication` — those need an open representation of
-  the sugar forms that does not exist yet (`spec/tson-cr-structure-templates.md`, Tranche C). Composing with
-  an application (`vip => box<text> & { … }`) is a separate gap and is *not* unblocked by this: composition
-  resolves its supertypes during resolution, before this pass runs.
+  the sugar forms that does not exist yet (`spec/tson-cr-structure-templates.md`, Tranche C).
 
 ## Meta-kernel bootstrap (`tson-compiler/.../resolver/MetaKernelBootstrapResolver.java`)
 

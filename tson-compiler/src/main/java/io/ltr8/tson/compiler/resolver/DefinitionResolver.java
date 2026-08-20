@@ -243,6 +243,19 @@ final class DefinitionResolver {
     private final DefinitionGetter metaDefinitions;
     private final DefinitionGetter namespaceDefinitions;
 
+    /**
+     * Closes a fully-bound template application into the entry it denotes, returning that entry's name.
+     * Needed at the two positions that absorb a supertype's <em>fields</em> -- a composition supertype and a
+     * refinement source -- because those resolve here, while the rest of §5.10 materialisation runs as a
+     * pass afterwards. Everywhere else an application is simply carried as a {@code type_ref} and closed
+     * later.
+     *
+     * <p>Defaults to refusing, for the callers that resolve a declaration outside a whole-schema pass (the
+     * meta-kernel bootstrap, and unit tests) -- there is no materialiser in those, and no schema for an
+     * instantiation entry to land in.
+     */
+    private final ApplicationCloser applicationCloser;
+
     /** No annotation reader: an annotation's name is kept, its value is out of reach. See {@link AnnotationValueReader}. */
     DefinitionResolver(DefinitionMetaReader definitionMetaReader, DefinitionGetter metaDefinitions,
                         DefinitionGetter namespaceDefinitions) {
@@ -251,10 +264,17 @@ final class DefinitionResolver {
 
     DefinitionResolver(DefinitionMetaReader definitionMetaReader, AnnotationValueReader annotationValueReader,
                         DefinitionGetter metaDefinitions, DefinitionGetter namespaceDefinitions) {
+        this(definitionMetaReader, annotationValueReader, metaDefinitions, namespaceDefinitions, null);
+    }
+
+    DefinitionResolver(DefinitionMetaReader definitionMetaReader, AnnotationValueReader annotationValueReader,
+                        DefinitionGetter metaDefinitions, DefinitionGetter namespaceDefinitions,
+                        ApplicationCloser applicationCloser) {
         this.definitionMetaReader = Objects.requireNonNull(definitionMetaReader, "definitionMetaReader");
         this.annotationValueReader = Objects.requireNonNull(annotationValueReader, "annotationValueReader");
         this.metaDefinitions = Objects.requireNonNull(metaDefinitions, "metaDefinitions");
         this.namespaceDefinitions = Objects.requireNonNull(namespaceDefinitions, "namespaceDefinitions");
+        this.applicationCloser = applicationCloser;
     }
 
     /**
@@ -742,13 +762,9 @@ final class DefinitionResolver {
 
         for (TypeRef supertypeRef : construction.supertypes()) {
             if (supertypeRef instanceof GenericRef generic) {
-                // The one genuine gap here. §5.8's "Parameterized references" admits this
-                // (`vip => <T> customer & box<T> & { ... }`, supertypes recording head names only), but the
-                // arguments have to reach the absorbed fields, and that is §5.10 substitution into a record
-                // template's body -- unimplemented, and tracked with the rest of that work.
-                throw new UnsupportedOperationException("'" + name + "': composing with the parameterized "
-                        + "supertype '" + generic.name() + "' (§5.8) needs §5.10 parameter substitution into "
-                        + "the absorbed fields, which is not implemented yet");
+                // §5.8's "Parameterized references". Composition copies the supertype's own fields, so the
+                // application has to be *closed* here rather than carried -- an open one has no fields yet.
+                supertypeRef = new SimpleRef(closedApplication(name, generic, parameters, "supertype"));
             }
             if (!(supertypeRef instanceof SimpleRef simple)) {
                 // A choice or an inline array/tuple at a supertype position. §12.1 lets these through only
@@ -964,7 +980,7 @@ final class DefinitionResolver {
      */
     private TypeDefinition resolveRefinement(String name, RefinedDef refined, boolean constructor,
                                               List<String> parameters) {
-        io.ltr8.tson.schema.meta.TypeRef sourceRef = resolveRefinementSource(name, refined.target());
+        io.ltr8.tson.schema.meta.TypeRef sourceRef = resolveRefinementSource(name, refined.target(), parameters);
         String sourceName = sourceRef.name();
         TypeDefinition sourceDef = namespaceDefinitions.getTypeDefinition(sourceName);
         if (sourceDef == null) {
@@ -1031,23 +1047,60 @@ final class DefinitionResolver {
      * refining declaration's own parameter) resolves each argument the way every other application does
      * ({@link #typeArgument}).
      */
-    private io.ltr8.tson.schema.meta.TypeRef resolveRefinementSource(String name, TypeRef target) {
+    private io.ltr8.tson.schema.meta.TypeRef resolveRefinementSource(String name, TypeRef target,
+            List<String> typeParams) {
         if (target instanceof SimpleRef simple) {
             return io.ltr8.tson.schema.meta.TypeRef.of(simple.name());
         }
         if (target instanceof GenericRef generic) {
-            List<TypeArgument> args = new ArrayList<>();
-            for (TypeArg arg : generic.args()) {
-                try {
-                    args.add(typeArgument(arg));
-                } catch (UnsupportedOperationException e) {
-                    throw new UnsupportedOperationException("'" + name + "': " + e.getMessage());
-                }
-            }
-            return new io.ltr8.tson.schema.meta.TypeRef(generic.name(), args);
+            // Closed, not carried, for the reason composition closes its supertypes: §5.7 re-emits the
+            // source's whole field set, and an open application has no field set. Carrying it instead copied
+            // the template's body with its parameters unbound, and the author was told about an unresolved
+            // reference to a parameter they never wrote.
+            return io.ltr8.tson.schema.meta.TypeRef.of(closedApplication(name, generic, typeParams, "refinement source"));
         }
         throw new UnsupportedOperationException(
                 "'" + name + "': a refinement source is always a simple or generic type-ref by grammar, got " + target);
+    }
+
+    /**
+     * A fully-bound application at one of the two field-absorbing positions, closed to the entry it denotes.
+     *
+     * <p><b>An application that still references the declaration's own parameters is refused.</b>
+     * {@code vip => <T> customer & box<T>} cannot close while {@code T} is unbound, and deferring composition
+     * itself until {@code vip} is materialised is a different feature from closing an application. Refusing
+     * says which of the two is missing; the message this replaces blamed substitution, which now exists.
+     */
+    private String closedApplication(String name, GenericRef application, List<String> typeParams, String position) {
+        for (TypeArg arg : application.args()) {
+            if (arg instanceof TypeArg.Ref(SimpleRef simple) && typeParams.contains(simple.name())) {
+                throw new UnsupportedOperationException("'" + name + "': the " + position + " '"
+                        + application.name() + "<" + simple.name() + ", ...>' is still open -- it is applied to "
+                        + "this declaration's own parameter '" + simple.name() + "', so it cannot be closed "
+                        + "until '" + name + "' is itself materialised, and composing or refining against an "
+                        + "unclosed application is not implemented (§5.8, §5.10)");
+            }
+        }
+        if (applicationCloser == null) {
+            throw new UnsupportedOperationException("'" + name + "': closing the " + position + " '"
+                    + application.name() + "<...>' needs a whole-schema materialiser, and this resolver was "
+                    + "built without one");
+        }
+        io.ltr8.tson.schema.meta.TypeRef resolved;
+        try {
+            resolved = new io.ltr8.tson.schema.meta.TypeRef(application.name(), typeArguments(name, application));
+        } catch (UnsupportedOperationException e) {
+            throw new UnsupportedOperationException("'" + name + "': " + e.getMessage());
+        }
+        return applicationCloser.closeApplication(resolved);
+    }
+
+    private List<TypeArgument> typeArguments(String name, GenericRef application) {
+        List<TypeArgument> args = new ArrayList<>();
+        for (TypeArg arg : application.args()) {
+            args.add(typeArgument(arg));
+        }
+        return args;
     }
 
     // ── Record bodies, fields, and field groups (§5.2, §5.11) ─────────────
