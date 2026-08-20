@@ -172,6 +172,51 @@ namespace *before* any local declaration resolves.
   divergences from the fixture (no outer `!type_definition` tag, quoted strings for enum members, empty
   lists written rather than omitted, full `TypeRef` form) are in `DefinitionResolverTest`'s Javadoc.
 
+## Materialisation (`tson-compiler/.../resolver/TemplateMaterialiser.java`)
+
+§5.10's other half: closing a template application by substituting its arguments into the template's
+recorded open form, and replacing the application with a reference to the entry that results.
+
+- **It runs over the resolved form, not the AST**, as a pass in `SchemaResolver` after the driving loop.
+  Two reasons. An application arrives here as a `schema.meta.TypeRef` carrying `arguments` — the one thing
+  that shape means, since a closed form is always an entry named by a bare reference — so substitution is a
+  walk over value types rather than a second AST rewrite. And the entry it mints can record its own
+  `source`, which is what §8.2 keys identity on; an injected `SchemaMap.Declaration` has no channel for one,
+  which is what rules out doing this in `SchemaDesugarer` alongside the sugar hoists. It also keeps that
+  phase purely syntactic.
+- **Only a closed entry is scanned.** A template's own body is *open* — `chain<T>` inside `chain` awaits
+  substitution and is not an application to close — so entries with a non-empty `parameters` list are
+  skipped. Closing them would mint an entry per level, keyed on the literal parameter name.
+- **Identity is the flattened application** recorded in `source` (§8.2), and the derived name is built from
+  it, so two `box<text>` anywhere in the schema land on one entry for free. A declaration naming the
+  application (`text_box => box<text>`) resolves as a `Reference` to that entry rather than a second copy —
+  the compiler collapses a `Reference` body at compile time, so nothing downstream sees the hop.
+- **Arguments close innermost-first**, so `box<box<text>>` builds the inner entry before the outer one names
+  it, and no special case is needed for depth.
+- **Substitution descends into arguments.** A parameter is always a whole ref (§5.10 admits no head
+  abstraction), but it may be a whole ref *inside an argument list* — which is exactly what recursion looks
+  like. Binding only the outer name leaves `T` in place inside `chain<T>` and mints an entry per level.
+- **Knot-tying** is the memo, registered before the body is substituted: a recursive application reached
+  during substitution finds the entry under construction and references it by name.
+- **A termination guard, not a decision procedure.** *Regular* recursion ties the knot on its first repeat
+  and never nests. *Non-regular* recursion grows its argument every level (`weird => <T> { next:
+  weird<box<T>>? }`), so every instantiation is distinct, the memo never fires, and there is no finite type
+  model — unguarded, a `StackOverflowError`, which is neither a diagnosis nor something the exception policy
+  can classify. A depth bound set far above any hand-written schema turns it into the author's error, named
+  for the outermost head and showing the growing chain. Distinct from `SPEC-FEEDBACK.md` #25, which is about
+  a type with no finite *data* model; this is one with no finite *type* model, and the spec is silent on it.
+- **Kind checking falls out of substitution.** A value argument reaching a type position, or a type argument
+  reaching a `value_param` route, is the author's error — §5.10 infers a parameter's kind from its use, so
+  the body's use and the applied argument are the two things being compared. Arity is checked before any of
+  it, against the template's own `parameters`.
+- **Failures report per entry**, through the same receiver resolution uses, so two bad applications in one
+  schema are both reported against their own declarations rather than the first aborting the document.
+- **Scope is the record template.** One whose body writes a §5.3 container sugar form is refused earlier, at
+  the application site, by `SchemaDesugarer.checkTemplateApplication` — those need an open representation of
+  the sugar forms that does not exist yet (`spec/tson-cr-structure-templates.md`, Tranche C). Composing with
+  an application (`vip => box<text> & { … }`) is a separate gap and is *not* unblocked by this: composition
+  resolves its supertypes during resolution, before this pass runs.
+
 ## Meta-kernel bootstrap (`tson-compiler/.../resolver/MetaKernelBootstrapResolver.java`)
 
 Meta-kernel is special: its own `!!meta` names *itself* (§1.5's one deliberate circularity, closed by

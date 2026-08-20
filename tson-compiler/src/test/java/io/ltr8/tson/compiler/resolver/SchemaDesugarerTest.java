@@ -503,31 +503,45 @@ class SchemaDesugarerTest {
     }
 
     /**
-     * A generic head resolves through the type-name namespace only, so an application can only ever be a
-     * §5.10 user-template application -- and substitution is unimplemented. Leaving it alone produced a schema
-     * that linked and compiled, then failed on the first read that reached the field, so it is rejected at the
-     * site that writes it.
+     * A <b>record</b> template's application passes through untouched. Substitution happens over the
+     * <em>resolved</em> open form (`TemplateMaterialiser`), not over the AST, so this phase leaves the head
+     * and its arguments alone and the application reaches resolution intact.
      */
     @Test
-    void applyingALocallyDeclaredTemplateIsRejectedHere() {
-        UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
-                () -> desugar("""
-                          box => <T> { v: T }
-                          holder => { b: box<text> }"""));
-        assertTrue(thrown.getMessage().contains("'box' is a template"), thrown.getMessage());
-        assertTrue(thrown.getMessage().contains("[T]"), "names the unbound parameters: " + thrown.getMessage());
+    void applyingARecordTemplateIsLeftForMaterialisation() {
+        SchemaDocument document = parse("""
+                  box => <T> { v: T }
+                  holder => { b: box<text> }""");
+
+        assertSame(document, SchemaDesugarer.desugar(document, Set.of()));
     }
 
     /**
-     * An <em>imported</em> head is rejected the same way, which the old parameter-list-driven check could not
-     * do: this phase is handed only the imported names, so a template arriving by {@code !!import} used to slip
-     * through to a read-time failure.
+     * A template whose body writes a container sugar form does <em>not</em> pass through: §5.3's forms have no
+     * open representation yet, so the application cannot be materialised. Left alone it resolves against a
+     * body whose {@code [T]} became a reference to {@code array} -- a name a user schema's type-name namespace
+     * does not hold -- and the author is told their schema has an unresolved reference to something they never
+     * wrote. Failing at the site that writes it says what is actually missing.
      */
     @Test
-    void applyingAnImportedTemplateIsRejectedToo() {
+    void applyingATemplateWhoseBodyCarriesSugarIsStillRejectedHere() {
         UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
-                () -> desugar("  holder => { b: elsewhere<text> }", Set.of("elsewhere")));
-        assertTrue(thrown.getMessage().contains("'elsewhere' is a template"), thrown.getMessage());
+                () -> desugar("""
+                          box => <T> { v: [T] }
+                          holder => { b: box<text> }"""));
+        assertTrue(thrown.getMessage().contains("container sugar form"), thrown.getMessage());
+    }
+
+    /**
+     * An <em>imported</em> head passes through too, and needs no check here even though this phase is handed
+     * only the imported names. A template carrying a sugar form cannot link, so it cannot have been
+     * registered, so it cannot be imported: every imported template is sugar-free by construction.
+     */
+    @Test
+    void applyingAnImportedTemplateIsLeftForMaterialisationToo() {
+        SchemaDocument document = parse("  holder => { b: elsewhere<text> }");
+
+        assertSame(document, SchemaDesugarer.desugar(document, Set.of("elsewhere")));
     }
 
     /**

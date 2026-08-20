@@ -215,20 +215,21 @@ class ContainerSugarEndToEndTest {
 
     /**
      * A generic head resolves through the type-name namespace only (§3.3.1), so an application can only ever
-     * be a §5.10 user-template application -- here a locally declared record template whose parameter is a
-     * <em>field type</em> ({@code v: T}), which means instantiating it is genuine substitution rather than
-     * routing arguments into a vocabulary. Still unimplemented, so the desugar phase rejects it where it is
-     * written; left alone, this schema linked and compiled and then failed on the first read that reached the
-     * field.
+     * be a §5.10 user-template application. One whose body writes a container sugar form still fails at the
+     * site that writes it: §5.3's forms have no open representation yet, so the application cannot be
+     * materialised. Left alone, the body's {@code [T]} resolves to a reference to {@code array} -- a name a
+     * user schema's type-name namespace does not hold -- and the author is told their schema has an
+     * unresolved reference to something they never wrote. (A template whose parameters occupy field types and
+     * values applies normally; see {@code RecordTemplateTest}.)
      */
     @Test
-    void applyingALocallyDeclaredTemplateIsRejectedWhereItIsWritten() {
+    void applyingATemplateWhoseBodyCarriesSugarIsRejectedWhereItIsWritten() {
         UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
                 () -> compile("""
-                          box => <T> { v: T }
+                          box => <T> { v: [T] }
                           holder => { b: box<text> }"""));
 
-        assertTrue(thrown.getMessage().contains("'box' is a template"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("container sugar form"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("not implemented"), thrown.getMessage());
     }
 

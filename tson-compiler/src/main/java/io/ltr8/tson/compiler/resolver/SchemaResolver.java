@@ -277,15 +277,34 @@ public final class SchemaResolver {
         for (String name : declarations.keySet()) {
             namespaceGetter.getTypeDefinition(name);
         }
+
+        // §5.10 materialisation, after every declaration has resolved and before anything reads the result:
+        // a template application reaches here as a type-ref carrying arguments, and closing it needs the
+        // template's own *resolved* open form, which only exists once the driving loop above has run. The
+        // entries it produces are local to this schema and carry no source position -- they are named by
+        // derivation from the application, not declared -- so they join the map after the declared ones.
+        Map<String, TypeDefinition> resolvedLocals = new LinkedHashMap<>();
+        for (String name : declarations.keySet()) {
+            resolvedLocals.put(name, namespace.get(name));
+        }
+        Map<String, TypeDefinition> instantiations = TemplateMaterialiser.materialise(resolvedLocals, namespace,
+                receiver == null ? null : (name, error) -> receiver.report(Diagnostic.ofSchemaError(
+                        TsonCanonicalIdentity.canonicalize(id), name, error.getMessage(),
+                        Optional.ofNullable(positions.get(declarations.get(name))))));
+        namespace.putAll(resolvedLocals);
+        namespace.putAll(instantiations);
+
         // §6: an annotation written before the declared name binds to the *name*, not to the definition,
         // and "the resolver does not hoist annotations from key to value". A resolved schema is a
         // {type_name => type_definition}, so the name is this map's key -- which is where they are kept.
         // The two sets stay separate: a declaration's own annotations are on its TypeDefinition.
         AnnotatedMap<String, TypeDefinition> localOnly = new AnnotatedMap<>();
         for (String name : declarations.keySet()) {
-            localOnly.put(name, namespace.get(name),
+            localOnly.put(name, resolvedLocals.get(name),
                     holder[0].annotationsFor(name, declarations.get(name).nameAnnotations()));
         }
+        // An instantiation entry has no declared name to carry annotations from.
+        instantiations.forEach(localOnly::put);
         return new TsonSchema(id, document.meta(), document.imports(), localOnly, false);
     }
 
