@@ -37,13 +37,33 @@ The change removes all three at once. Constructors become plain record vocabular
 
 **D4 — Generic heads resolve locally.** `name<args>` heads resolve through the type-name namespace only — parameters, then locals, then imports. An unresolved head is an unresolved-type error. A head that resolves to a *parameter* is likewise an error — §5.10's no-head-abstraction boundary — a case this lookup order makes reachable (`weird => <map> map<text, text>`) and which MUST be diagnosed, not applied. User templates (§5.10) are retained unchanged in declaration, application, partial application, recursion, and materialisation.
 
-**D5 — Synthesis of nested forms, in two moments.** Nested declaration-level forms that carry declaration-only syntax (size specifiers, element/position `?`) cannot be represented as inline `type_ref` structures and are lifted into synthetic entries. For parameter-free declarations, lifting happens at desugar time, before Pass 1, so name population and body resolution never see nesting. For template declarations, nothing lifts: the desugared structure — head, bindings, parameter references, nesting — is the template's recorded open form, and synthesis happens at materialisation, when an application closes and each nested form becomes concrete. A blanket rule applies: if the declaration has parameters, no subform lifts eagerly, even a parameter-free one; deduplication at materialisation makes the outcomes converge and no entries are created for templates never instantiated. Templates therefore never produce synthetic entries; every synthetic entry is born closed.
+**D5 — Synthesis of nested forms, in two moments.** Nested declaration-level forms that carry declaration-only syntax (size specifiers, element/position `?`) cannot be represented as inline `type_ref` structures and are lifted into synthetic entries. For parameter-free declarations, lifting happens at desugar time, before Pass 1, so name population and body resolution never see nesting. For template declarations, nothing lifts: the desugared structure — head, bindings, parameter references, nesting — is the template's recorded open form, and synthesis happens at materialisation, when an application closes and each nested form becomes concrete. A blanket rule applies: if the declaration has parameters, no subform lifts eagerly, even a parameter-free one; deduplication at materialisation makes the outcomes converge and no entries are created for templates never instantiated. A template declaration's own nested forms lift to **open** synthetic entries — see D7.
 
-**D6 — One identity rule for internal entries.** Because synthetics only exist closed, all internal entries carry structural identity. Instantiation entries: structural equality of the flattened, fully-bound application recorded in `source` (§8.2, unchanged). Synthetic entries: structural equality of the resolved binding record, one entry per distinct concrete form schema-wide. The two channels dedupe against each other's products: `[order; 1..]` written directly in a plain declaration and the same form arising inside a materialised template land on the same synthetic entry, because both comparisons occur after names have meaning, over resolved structure. The moment is normative: desugar-time lifting *creates* a synthetic entry, but its identity is settled after Pass 2, when references have resolved — eagerly-lifted synthetics that become structurally identical under resolution merge into one entry, so the one-entry-per-form rule holds schema-wide regardless of which moment produced each candidate.
+**D6 — A synthetic must be closed to be usable.** A synthetic entry exists in one of two states. An **open** synthetic carries parameters and a `template_instance` body (D7); it is an intermediate form, referenced only from within the template that produced it, and no data value ever has it as its type. A **closed** synthetic carries no parameters and an ordinary constructor body; only these are usable as types. Materialisation is the transition, and it is total: closing an application closes every open synthetic it reaches, innermost-out.
 
-**D7 — Open bodies represent nesting via `value_form`.** Resolver output serialises template entries, so the open representation is normative, and the Revision 32 vocabulary cannot express a nested form in a slot (`type_ref` carries no bindings; the value group offers only concrete `value` or bare `value_param`). `record_field`'s value group gains a third member, `value_form: top`, holding the nested form at the vocabulary level — an `!record` body under the same conventions as the template's own, recursively. Materialisation collapses it: substitute innermost-out, lift the now-concrete form to a synthetic entry, replace the `value_form` with an ordinary `value` holding the entry's name as a `type_ref`. The closed-entry rule extends by one clause — a closed entry contains no `value_form` members — making "templates don't get synthetic entries" a checkable integrity property (`value_form` present ⟺ pending synthesis ⟺ open entry). `value_form` is resolver-writable only: it has no source spelling (guaranteed by grammar) and never appears in schema source. A dedicated parallel form record (head plus labelled bindings) was considered and rejected: it duplicates what vocabulary-level `!record` bodies already express and forces every consumer to walk two representations; the `value_form: top` route reuses the existing body machinery and the existing subsumption rule admitting `!record` at `top`-typed positions.
+All internal entries carry structural identity. Instantiation entries: structural equality of the flattened, fully-bound application recorded in `source` (§8.2, unchanged). Closed synthetic entries: structural equality of the resolved binding record, one entry per distinct concrete form schema-wide. Their `source` names the **constructor** they build, not the application that produced them — an open synthetic's name is internal, so keying a closed entry on it would make identity depend on an unstable name and would prevent the cross-channel dedup below. Open synthetic entries: structural equality **up to consistent renaming of parameters** — `<T, N>` and `<A, B>` over the same shape are the same template — most simply by normalising parameters to positional indices before comparing. The two channels dedupe against each other's products: `[order; 1..]` written directly in a plain declaration and the same form arising inside a materialised template land on the same synthetic entry, because both comparisons occur after names have meaning, over resolved structure. The moment is normative: desugar-time lifting *creates* a synthetic entry, but its identity is settled after Pass 2, when references have resolved — eagerly-lifted synthetics that become structurally identical under resolution merge into one entry, so the one-entry-per-form rule holds schema-wide regardless of which moment produced each candidate.
 
-**D8 — Inline representation grounded in the desugar table.** With constructors parameterless, positional `type_ref.arguments` for inline sugar forms take their meaning from the desugar table itself: the sugar set is closed and grammar-supplied, so `array` arguments map to `element_type`, `map` arguments to `key_type`, `value_type`, and `tuple`/`choice` variadically onto `elements`/`variants`. Since sizes never appear inline and the value-parameter size templates are deleted, inline constructor arguments are always pure type references; the reference/literal split of `type_argument` remains necessary only for user-template applications. This restores §8.2's structural carrying for inline forms and resolves the objection recorded against it (`SPEC-FEEDBACK.md` #50/#51: the structural channel cannot carry a state or a size) by prohibition rather than by uniform entry injection — with state and size confined to declaration-level syntax, the channel is sufficient for everything the grammar admits inline, and the injected-entry divergence those entries argued for is superseded.
+**D7 — Structural instance templates.** Resolver output serialises template entries, so the open representation is normative, and the Revision 32 vocabulary cannot express one. The obstruction is not the type slot — a `type_ref` may already name a parameter — but the **value** slots: `array`'s `min_items` is declared `integer?`, so a body carrying `min_items: N` cannot be an `!array` body at all, whatever is done to `type_ref`.
+
+The answer is a distinct intermediate vocabulary rather than a widened one. `template_instance` records a constructor and its bindings; `template_argument` is the labelled three-way choice a binding may hold:
+
+```
+template_argument => { ( param: param_name | value: value | type_ref: type_ref ) }
+template_instance => ~product & {
+  constructor: type_name
+  bindings:    {field_name => template_argument}
+}
+```
+
+An open synthetic's body is a `template_instance`; a closed entry's body is an ordinary constructor body (`!array`, `!map`, …). The two never mix: **an instance admits no partial bindings**, which is why `ArrayBody.min_items` keeps its declared `integer?` type and needs no param channel. Materialisation is where the conversion — and the type check — happens: substituting `N := "two"` yields `!array { element_type: text  min_items: "two" }`, and *that* is the error, reported at the materialising application (§8.2's deferred value-level checks, now with a single home).
+
+`param` earns its place because a value slot has no other way to hold a parameter. To keep body identity well-defined it is also **canonical for a type slot**: a binding whose value is a parameter is always `param`, whatever the slot's declared type, so `param` means "unbound" uniformly and two spellings of one binding cannot arise. `type_argument` is unchanged — its existing rule that parameters ride the reference channel stands, because it has only two channels to work with.
+
+Both types are resolver-writable only in the sense that no schema source spells them directly; they are produced by the desugaring of a sugar form inside a template declaration, and by D9's `[type-params] instance`.
+
+**D8 — Inline representation grounded in the desugar table.** *(Not adopted — see §11.)* With constructors parameterless, positional `type_ref.arguments` for inline sugar forms take their meaning from the desugar table itself: the sugar set is closed and grammar-supplied, so `array` arguments map to `element_type`, `map` arguments to `key_type`, `value_type`, and `tuple`/`choice` variadically onto `elements`/`variants`. Since sizes never appear inline and the value-parameter size templates are deleted, inline constructor arguments are always pure type references; the reference/literal split of `type_argument` remains necessary only for user-template applications. This restores §8.2's structural carrying for inline forms and resolves the objection recorded against it (`SPEC-FEEDBACK.md` #50/#51: the structural channel cannot carry a state or a size) by prohibition rather than by uniform entry injection — with state and size confined to declaration-level syntax, the channel is sufficient for everything the grammar admits inline, and the injected-entry divergence those entries argued for is superseded.
+
+**D9 — `[type-params] instance`.** Revision 32's `type-def` places `instance` outside the `[type-params]` alternatives, so a constructor application can never carry parameters. Every other alternative can be templated; this one cannot, which leaves a targeted open template with no source spelling — the only grammatical route to one is `refined-def` (`array ^ { min_items: = S }`), which is the size-template shape §6 deletes and which §5.7 admits only over a `~` result. Adding the alternative closes that gap and makes the targeted/untargeted distinction structural: an instance-def template records the constructor it builds in `source`, a record-def template records none. Without it, "a template that builds an `!array`" has nowhere to say so.
 
 ## 4. Normative Changes to Part 2
 
@@ -95,13 +115,32 @@ The open-modifiers paragraph is updated: parametric `= P` and `~ P` remain the r
 
 User templates are retained unchanged in declaration, application, arity checking, partial application, recursion, kind inference, and the v1 boundaries (no head abstraction, no parameter bounds). Changes:
 
-The **open-body representation** admits nesting via `value_form` (D7): a template whose recorded structure contains a nested declaration-level form carries that form at the vocabulary level as a `value_form` member on the routed slot, recursively, alongside the existing `value_param` routing.
+A template declaration may now be an **instance** as well as a record, a container or a reference (D9), so `<T, N> !array { element_type: T  min_items: 1  max_items: N }` is a well-formed type-def.
 
-**Materialisation** gains the synthesis cascade: when an application closes, substitution rewrites the recorded structure innermost-out; each nested form, once concrete, lifts to a synthetic entry under D6 identity, and the enclosing binding record references it by name, collapsing `value_form` to `value`. Example: `grid => <T, N> [[T; N]; N]` is a single template entry; closing `grid<pixel, 3>` produces one synthetic entry `!array { element_type: pixel  min_items: 3  max_items: 3 }` and one instantiation entry whose binding record references it, with `source: { name: grid  arguments: [{name: pixel} {value: 3}] }`.
+The **open-body representation** is `template_instance` (D7). A sugar form inside a template declaration desugars to the same construction it would outside one — the desugar table of §4.2 is used unchanged — except that a binding whose value is a parameter is recorded as `param` rather than as a concrete `value` or `type_ref`, which is what makes the body a `template_instance` rather than an instance. Nesting needs no special member: an inner form lifts to its own **open** synthetic entry, and the outer binding holds an ordinary `type_ref` applying it. Worked, for `grid => <T, N> { x: [[T; 1..N]; 2..N] }` (spellable only if the inline prohibition is relaxed at a field position — see §9):
 
-**Knot-tying inside synthesis**: a recursive reference located inside a nested form — `tree => <T> { value: T  children: [tree<T>; 1..] }` — denotes, at materialisation, the instantiation entry under construction; the synthetic entry's binding record references that entry by its internal name before the entry is complete. This is the existing knot-tying principle extended into synthetic lifting, and it is the case implementations are most likely to get wrong first (see §8, fixtures).
+```
+g1   => <T, N> !array { element_type: param T   min_items: value 1  max_items: param N }
+g2   => <T, N> !array { element_type: g1<T, N>  min_items: value 2  max_items: param N }
+grid => <T, N> !record { fields: [ { name: x  type: g2<T, N> } ] }
+```
 
-**Closed-entry rule** extends: an entry whose `parameters` list is empty MUST contain no parameter references at any depth *and no `value_form` members*. The §7.2 data-annotation carve-out for parameterized heads is deleted (see §4.6); the corresponding sentence here deletes with it.
+`g1` and `g2` are internal names, and the applications in `g2` and `grid` ride `type_ref.arguments` — the channel that already means "an application", and now means nothing else.
+
+**Materialisation** closes innermost-out. Closing `grid<pixel, 3>` substitutes, and each open synthetic becomes a closed one as its bindings go concrete:
+
+```
+c1 => !array { element_type: pixel  min_items: 1  max_items: 3 }   ; source: array
+c2 => !array { element_type: c1     min_items: 2  max_items: 3 }   ; source: array
+c3 => !record { fields: [ { name: x  type: c2 } ] }
+      ; source: { name: grid  arguments: [{name: pixel} {value: 3}] }
+```
+
+`c1` and `c2` are closed synthetics keyed on body structure, so `c1` is the same entry an independently written `[pixel; 1..3]` produces anywhere in the schema. `c3` is an instantiation entry keyed on `source`, whose head is the author's own `grid` and therefore comparable. A user declaration naming the application (`pixel_grid => grid<pixel, 3>`) is an alias to `c3` under §8.3, not a second entry.
+
+**Knot-tying**: a recursive reference inside a nested form denotes, at materialisation, the instantiation entry under construction; the open synthetic's binding references that entry by its internal name before the entry is complete.
+
+**Closed-entry rule** extends: an entry whose `parameters` list is empty MUST contain no parameter references at any depth *and no `template_instance` body at any depth* — `template_instance` present ⟺ open entry, a checkable integrity property. The §7.2 data-annotation carve-out for parameterized heads is deleted (see §4.6); the corresponding sentence here deletes with it.
 
 ### 4.6 §7.2 Validation
 
@@ -109,15 +148,25 @@ Delete the **parameterized heads over binding records** section and the carve-ou
 
 ### 4.7 §8 Resolver Output
 
-**§8.1**: `record_field` gains the `value_form` member (kernel diff, §5 below); `value_form` is documented as resolver-writable only, with no source spelling. Synthetic entries resolve under the existing top-level-construction rule (`kind` from the constructor, `source: array`/`map`/`tuple`/`choice`, binding-record body, no supertypes) and appear in the output schema map, passing ingest under the existing integrity checks plus the extended closed-entry rule. The output SHOULD mark synthetic entries with an annotation in the kernel's existing diagnostic style (e.g. a `@synthetic` marker, same posture as `@alias`: no decode force) so tooling can fold them back into nested display.
+**§8.1**: `template_instance` and `template_argument` join the vocabulary (kernel diff, §5 below); `record_field` is unchanged. Synthetic entries resolve under the existing top-level-construction rule (`kind` from the constructor, `source: array`/`map`/`tuple`/`choice`, binding-record body, no supertypes) and appear in the output schema map, passing ingest under the existing integrity checks plus the extended closed-entry rule. The output SHOULD mark synthetic entries with an annotation in the kernel's existing diagnostic style (e.g. a `@synthetic` marker, same posture as `@alias`: no decode force) so tooling can fold them back into nested display.
 
-**§8.2** retitles to cover template instantiation and synthetic entries together, stating the unified structural-identity rule (D6) and the cross-channel deduplication guarantee. Internal names remain non-normative; consumers compare by `source` (instantiations) or body structure (synthetics), never by name.
+**§8.2** retitles to cover template instantiation and synthetic entries together, stating the unified structural-identity rule (D6) and the cross-channel deduplication guarantee. Internal names remain non-normative; consumers compare by `source` (instantiations) or body structure (closed synthetics, up to parameter renaming for open ones), never by name.
 
 **§3.4.1** pipeline: the per-schema sequence becomes **Parse → Desugar → Pass 1 → Pass 2**, with desugar defined as purely syntactic and per-declaration: sugar rewrites to canonical constructor applications; nested declaration-only forms in parameter-free declarations lift to synthetic declarations entering Pass 1 alongside declared names; template declarations contribute exactly one name each.
 
 ### 4.8 §12 Grammar
 
-**§12.1 ABNF.** Restructure `container-def` and add the map productions; `type-def`, `element-type`, `size-spec`, `size-bound`, `type-args`, `type-arg` are unchanged (`map-def` arrives through the existing `[type-params] container-def` alternative, so `<V> {text => V}` requires no new production):
+**§12.1 ABNF.** Restructure `container-def`, add the map productions, and add the templated-instance alternative to `type-def` (D9); `element-type`, `size-spec`, `size-bound`, `type-args`, `type-arg` are unchanged (`map-def` arrives through the existing `[type-params] container-def` alternative, so `<V> {text => V}` requires no new production):
+
+```abnf
+type-def = atom-refinement
+         / [type-params] instance                      ; CHANGED: was bare `instance`
+         / [type-params] ["~"] structural-def
+         / [type-params] container-def
+         / [type-params] type-ref
+```
+
+The alternative stays decidable on one token after the optional parameter list: `!` opens an instance, `~`/`{`/`(`/a name a structural-def, `[` or `{` a container-def. `atom-refinement` keeps its unparameterised form — a refinement of an atom instance has no parameter to take.
 
 ```abnf
 type-ref = paren-type
@@ -163,7 +212,7 @@ map-value = container-def / type-ref
 
 Record bodies (refinement bodies, composition tails, constructor vocabularies) are unaffected by grammar — entries remain `name ":"` — so `config ^ {text => text}` fails at the `=>`; add a diagnostic ("record body expected; `=>` begins a map type only at type positions"). Add the single-entry diagnostic for the map sugar ("a map type is a single `key => value` entry"), anticipating authors carrying the data grammar's multi-entry habit.
 
-**§12.3 adjacency.** Two context additions, no new rules: `=>` gains "map type sugar"; `;` gains "map size spec (map-def, §5.3)". `=>` is already a compound lexer token with optional surrounding whitespace.
+**§12.3 adjacency.** Two context additions, no new rules: `=>` gains "map type sugar"; `;` gains "map size spec (map-def, §5.3)". `=>` is already a compound lexer token with optional surrounding whitespace. The `bindings` map of a `template_instance` is resolver output, not source, so it introduces no adjacency case of its own.
 
 ## 5. Companion Artifact Changes
 
@@ -199,11 +248,22 @@ map => ~product & {
 token_set => !set { element_type: token }        ; NEW
 enum      => ~atom & { members: token_set }      ; was set<token>
 
-record_field => {
+record_field => {          ; unchanged
   name:   field_name
   type:   type_ref
   state:  field_state ~ REQUIRED
-  ( value: value | value_param: param_name | value_form: top )?   ; value_form NEW
+  ( value: value | value_param: param_name )?
+}
+
+template_argument => {     ; NEW — one binding of an open form (D7)
+  ( param: param_name | value: value | type_ref: type_ref )
+}
+
+template_instance => ~product & {   ; NEW — the open counterpart of an instance
+  access_pattern:  product_access_type = NAMED
+  size_type:       product_size_type = VARIABLE
+  constructor:     type_name
+  bindings:        {field_name => template_argument}
 }
 
 schema => {type_name => type_definition}         ; was map<type_name, type_definition>
@@ -219,6 +279,8 @@ Delete `array_min`, `array_max`, `array_ranged`. The `token` primitive's doc com
 
 Removed outright by this change: the generic-application-head structure-namespace rule and its fallback ordering (§3.3.1); the size-refinement templates and their routing (§5.3, kernel); `vector` (meta); constructor parameter lists and `= T` slot routing (§4.2, kernel); refinement of application heads (§5.7); the parameterized-heads-over-binding-records carve-out (§5.10, §7.2); the layer-visibility apparatus and the three-dials characterisation of `~` (§5.3); and the "no template route for element/position `?`" special case (§5.3), subsumed by uniform desugar plus synthesis.
 
+Added rather than removed, and worth listing beside them: `template_instance` and `template_argument` in the kernel (D7), and the `[type-params] instance` alternative in §12.1 (D9).
+
 ## 7. Compatibility and Migration
 
 Revision 32 is not deployed; migrations are mechanical. `map<K, V>` → `{K => V}`; `set<T>` → a named declaration `x => !set { element_type: T }`; `vector<T, S>` → `[T; S]` or a named user template; `array_min`/`array_max`/`array_ranged` applications (kernel-importing layers only) → the size sugar; `map<…> ^ { min_items: … }` → `{… => … ; N..}`. The §4.1 migration diagnostic converts the most common breakage (`map<text, text>` at a type-ref) into a suggested fix at first parse.
@@ -231,9 +293,13 @@ Two fixtures exercise the seams where the syntactic and semantic halves meet. Fi
 
 Deliberately unresolved here and flagged for the revision editor: whether the map sugar's key restriction (simple refs) should be stated as a grammar fact only or additionally motivated normatively (this report treats it as both a dispatch necessity and a design judgment); whether `@synthetic` output marking is a new meta annotation or reuse of an existing diagnostic convention; and whether §12.2's lookahead-budget prose should be reworded globally now that two productions (schema brace form, data brace form) share the consume-then-inspect idiom.
 
+**Whether the inline prohibition holds at a field position inside a template.** §5.3 confines size specifiers and element/position `?` to declaration level, and this report preserves that (§4.2). It follows that `<T> { children: [tree<T>; 1..] }` is a parse error, and so is `<T, N> { x: [[T; 1..N]; 2..N] }` — a nested open form cannot occur at a record field at all, only inside another declaration-level form. Both of §8's fixtures as drafted rely on the field spelling and are ungrammatical as written. Either they respell through `[type-params] container-def` at declaration level, or the prohibition relaxes at a field position. The choice is narrow but it decides how much of D7's machinery is reachable: with the prohibition intact, an open synthetic can only ever arise from a declaration whose *whole body* is a container form.
+
 ## 10. Implementation Plan (`ltr8-io-tson-java`)
 
-The change splits into two independently landable tranches. Tranche A needs no template machinery: user templates keep failing at the application site exactly as in the current implementation, so it can merge alone. Tranche B is the retained §5.10 implemented in full.
+The change splits into three independently landable tranches. Tranche A needs no template machinery: user templates keep failing at the application site exactly as in the current implementation, so it can merge alone. Tranche B is §5.10 for **record** templates only — the form whose parameters occupy field types, and which needs no intermediate vocabulary at all. Tranche C adds **instance** templates: sugar forms inside a template declaration, `template_instance`/`template_argument`, and D9's grammar.
+
+The B/C split is deliberate and load-bearing. A record template (`<T> { a: T  b: text ~ "test" }`) substitutes into `record_field.type` and `record_field.value`, both of which already exist and already admit a parameter; it needs open-form recording, substitution, arity and kind checking, recursion and knot-tying, and materialisation — the whole engine — but no new vocabulary and no grammar change. Everything D7 and D9 introduce exists solely to let a *constructor application* be templated. Building the engine first against the form that needs nothing new keeps the two failure surfaces apart.
 
 **Tranche A — sugar, namespaces, kernel.**
 
@@ -244,9 +310,34 @@ The change splits into two independently landable tranches. Tranche A needs no t
 5. **Resolution and linking.** `!` heads resolve structure-namespace-only with the `constructor: true` gate as a loud error (§4.1); the application-side half of the §2.2.2 constructor-eligibility check deletes.
 6. **Compilation.** The compiler builds readers from structural inline container refs at field positions (a `type_ref` with arguments, interpreted by the desugar table), not only from entries; synthetic entries compile as ordinary entries.
 
-**Tranche B — user templates (§5.10 retained in full).**
+**Tranche B — record templates (§5.10, no new vocabulary).**
 
-7. **Value model.** `schema.meta.RecordField` gains `value_form` (mind the multi-public-constructor `@Record` trap); `TypeArgument` stays, with its existing sealed-interface cycle guard.
-8. **Template engine.** Open-form recording for template declarations; materialisation with the synthesis cascade — innermost-out substitution, lifting each now-concrete form to a synthetic entry, collapsing `value_form` to `value`; knot-tying through synthetics; D6 identity with the post-Pass-2 merge of eagerly-lifted synthetics.
-9. **Fixtures.** The two §8 fixtures (`grid` cross-channel dedup, `tree` knot-tying) plus the parser dispatch matrix land as JUnit tests; the conformance suite has no Part 2 layer, so the unit suite is their home for now.
-10. **Documentation.** `docs/schema-grammar-and-desugaring.md`, `docs/schema-resolution.md`, `docs/linking-and-compilation.md`, and `CLAUDE.md` update in the same sessions as the code they describe; `SPEC-FEEDBACK.md` #28, #32, #45, #46, #49, #50, #51 gain resolutions citing this report.
+Scope: a template declaration whose body is a record, a reference, or a composition/refinement — parameters occupying field types and field values. Explicitly **out of scope**: any sugar form inside a template declaration (`<T> { v: [T] }`, `<T, N> [T; N]`), which keeps failing eagerly at the application site as it does today.
+
+7. **Resolution.** `DefinitionResolver` records a parameterised declaration's open form. `record_field.type` naming a parameter and `record_field.value_param` already exist and are already produced; what is missing is the whole-declaration handling and the closed-entry check that an entry with no parameters carries no parameter reference at any depth.
+8. **Materialisation.** Substitution of an application's arguments into the recorded open form; arity and kind checking against the applied signature; the deferred value-level checks (§8.2) at the materialising application; recursion with knot-tying to the instantiation entry under construction; a termination guard for non-regular recursion (`weird => <T> { next: weird<[T]>? }`), which no section of this report covers and which dedup-by-identity cannot catch.
+9. **Identity.** Instantiation entries keyed on the flattened application in `source` (D6, unchanged), with `pixel_grid => grid<pixel, 3>` resolving as an alias to the entry rather than a second one.
+10. **Eager rejection retires here, and only here.** `SchemaDesugarer` currently fails any application whose head this document declares or imports. Materialisation replaces that for record templates; an application of a template containing a sugar form must keep failing until Tranche C.
+
+**Tranche C — instance templates (D7, D9).**
+
+Scope: sugar forms inside a template declaration, and the intermediate vocabulary they need. Take `[T]` first — the unsized inline form, whose only parameter rides a type slot — and only then the sized and nested forms, which are what actually require `template_argument`'s `param` channel.
+
+11. **Grammar.** `TsonSchemaParser.parseTypeDef` parses `[type-params]` before dispatching on `!`, so `<T, N> !array { … }` is a type-def (D9). Today the `!` check precedes `parseTypeParamsOpt`, faithful to the ABNF as written.
+12. **Value model.** `schema.meta` gains `TemplateInstance` and `TemplateArgument` (a sealed interface over `param`/`value`/`type_ref` — mind the `TypeArgument` cycle trap, and the multi-public-constructor `@Record` trap). `RecordField` is unchanged.
+13. **Desugarer.** A sugar form inside a parameterised declaration lifts to an **open** synthetic entry, using the same §4.2 table as everywhere else, with a parameter-valued binding recorded as `param`. The enclosing binding holds an ordinary `type_ref` applying it. The blanket no-eager-lift rule of D5 narrows accordingly: nothing lifts to a *closed* entry, but open lifting is exactly how nesting is represented.
+14. **Materialisation cascade.** Closing an application closes every open synthetic it reaches, innermost-out; `template_instance` becomes an ordinary constructor body as its bindings go concrete, and a binding that does not type-check against the slot (`min_items: "two"`) is the error, reported at the materialising application.
+15. **Identity.** Closed synthetics keyed on body structure and deduped cross-channel with directly written forms; open synthetics keyed up to consistent parameter renaming (D6).
+16. **Fixtures.** `grid` (cross-channel dedup) and `tree` (knot-tying) land as JUnit tests — both need respelling first, since a size specifier at a field position is a parse error under §5.3's inline prohibition, which this report preserves (§9). The conformance suite has no Part 2 layer, so the unit suite is their home.
+
+**Across all three.** `docs/schema-grammar-and-desugaring.md`, `docs/schema-resolution.md`, `docs/linking-and-compilation.md` and `CLAUDE.md` update in the same session as the code they describe; `SPEC-FEEDBACK.md` #28, #32, #45, #46 gain resolutions citing this report.
+
+---
+
+## 11. Superseded within this report
+
+**D8 is not adopted.** It proposed that inline sugar ride as a structural `type_ref` with arguments rather than as an injected entry, claiming to resolve `SPEC-FEEDBACK.md` #50/#51 by prohibition. Four arguments were weighed and none holds. An entry set wider than the declaration set is already normal — `subtypes` and `disjoint` are resolver-derived too, so §8 output has never been the author's declarations and nothing else. The `@synthetic` marker it would avoid is an optional display hint. "Ingest gets simpler" is a claim about unwritten code. And a derived name has to be stable *within* an implementation, including across `!!import`, never agreed *between* them — §8.2 disclaims the names and a comparison tool canonicalises.
+
+Two arguments run the other way. D7's own reasoning rejects a second representation of a nested form because it "forces every consumer to walk two representations", which is exactly what D8 imposes on every container. And the deduplication does not disappear, only relocates: a form used in five records must not compile five readers, so the compiler needs a memo keyed on ref structure — the naming rule rebuilt and called a cache.
+
+The rule kept instead, and relied on throughout §4.5: **`type_ref.arguments` non-empty means an open form — a template application — and everything closed is an entry referenced by a bare name.** That pairs with D7's own invariant (`template_instance` present ⟺ open entry) and lets the closed-entry rule be checked structurally, with no vocabulary needed to read a `type_ref`. `SPEC-FEEDBACK.md` #49/#50/#51 therefore stay open, as discussion points for the revision rather than as items this report closes.

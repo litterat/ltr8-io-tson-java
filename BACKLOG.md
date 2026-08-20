@@ -26,14 +26,16 @@ own prose (which had gone stale on at least one of them):
   "import cycle" diagnostic naming the actual cycle path. Distinct from what
   `TsonCompiledMetaRegistry.withStandardLibrary` already does, which is scoped to just the three bundled
   schemas in a known order, not a general algorithm.
-- [ ] **User templates in full — implement `spec/tson-cr-structure-templates.md`, Tranche B.** §5.10
-  substitution into a template body (`box => <T> { v: T }`), rejected at the application site today
-  (`SchemaDesugarer.rejectTemplateApplication`), is fully designed rather than an open shape:
-  the CR retains user templates in declaration, application, partial application, recursion, kind
-  inference (§4.5), and specifies the machinery — open-form recording with `value_form` for nested
-  forms (D5/D7), materialisation as an innermost-out synthesis cascade, knot-tying through synthetic
-  entries, and one structural-identity rule with cross-channel dedup (D6). The CR's §8 fixtures
-  (`grid`, `tree`) are the acceptance tests. Still this implementation's own, beyond the CR's letter:
+- [ ] **Record templates — `spec/tson-cr-structure-templates.md`, Tranche B.** §5.10 substitution for the
+  template form whose parameters occupy *field types and field values* (`box => <T> { v: T }`,
+  `<T> { a: T  b: text ~ "test" }`), rejected at the application site today
+  (`SchemaDesugarer.rejectTemplateApplication`). **Deliberately excludes any sugar form inside a template**
+  (`<T> { v: [T] }`, `<T, N> [T; N]`) — that is Tranche C, and it is the only part needing new vocabulary or
+  new grammar. Splitting there keeps the engine and the representation as separate failure surfaces: a
+  record template substitutes into `record_field.type` and `record_field.value_param`, both of which already
+  exist and are already produced, so what is missing is whole-declaration open-form recording,
+  materialisation, arity and kind checking, recursion with knot-tying, and the closed-entry check. Still
+  this implementation's own, beyond the CR's letter:
   - **A termination guard.** Non-regular (polymorphic) recursion like
     `weird => <T> { next: weird<[T]>? }` / `use => weird<text>` grows its argument every level
     (`text` → `[text]` → `[[text]]` …). Every instantiation is structurally distinct, so
@@ -44,7 +46,26 @@ own prose (which had gone stale on at least one of them):
   - **Materialisation must replace the eager rejection, not merely remove it.** With heads resolving
     type-name-only there is no namespace check left to make, so `SchemaDesugarer.rejectTemplateApplication`
     fails on any head this document declares *or imports* — a template arriving by `!!import` included.
-    Deleting that without materialisation in place regresses to a read-time failure.
+    Deleting that without materialisation in place regresses to a read-time failure. Tranche B retires it
+    for record templates only; an application of a template containing a sugar form keeps failing until C.
+- [ ] **Instance templates — `spec/tson-cr-structure-templates.md`, Tranche C (D7, D9).** A sugar form
+  inside a template declaration, which needs both a grammar addition and an intermediate vocabulary.
+  The obstruction is not the type slot — a `type_ref` may already name a parameter — but the *value* slots:
+  `ArrayBody.minItems` is `Optional<BigInteger>`, so `!array { min_items: N }` cannot be an array body at
+  all. The CR's answer is `template_instance` (a constructor plus a `{field_name => template_argument}`
+  binding map) as the open counterpart of an instance, with `template_argument = param | value | type_ref`;
+  an instance admits no partial bindings, so the closed bodies are untouched and `min_items: "two"` becomes
+  the error at the materialising application. Take `[T]` first — the unsized inline form, whose only
+  parameter rides a type slot — then the sized and nested forms, which are what actually need `param`.
+  Also here: D9's `[type-params] instance` (today `TsonSchemaParser.parseTypeDef` checks `!` *before*
+  `parseTypeParamsOpt`, faithful to the ABNF as written), and open-synthetic identity up to consistent
+  parameter renaming.
+  - **The CR's own §8 fixtures do not parse** and need respelling before they can be acceptance tests:
+    `tree => <T> { value: T  children: [tree<T>; 1..] }` and `grid => <T, N> { x: [[T; 1..N]; 2..N] }` both
+    put a size specifier at a *field* position, which §5.3's inline prohibition rejects — a prohibition the
+    CR preserves. Whether that prohibition relaxes at a field position is the CR's own open item (§9), and
+    it decides how much of this tranche is reachable: with it intact, an open synthetic can arise only from
+    a declaration whose whole body is a container form.
 - [ ] **The rest of §8.2's deferred value-level checks.** Materialisation "runs the value-level checks that
   open bounds deferred: family coherence rules whose operands were parameters". The array family's
   `min_items <= max_items` is one rule over the binding pair for arrays *and maps*: a resolver error where
