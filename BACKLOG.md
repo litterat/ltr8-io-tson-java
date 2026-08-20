@@ -65,7 +65,10 @@ own prose (which had gone stale on at least one of them):
     put a size specifier at a *field* position, which §5.3's inline prohibition rejects — a prohibition the
     CR preserves. Whether that prohibition relaxes at a field position is the CR's own open item (§9), and
     it decides how much of this tranche is reachable: with it intact, an open synthetic can arise only from
-    a declaration whose whole body is a container form.
+    a declaration whose whole body is a container form. `SPEC-FEEDBACK.md` #31 is the pending entry in the
+    area and is expected to carry the resolution in a later revision — though as drafted it preserves the
+    prohibition rather than relaxing it, so it needs a paragraph before it settles this. Not a blocker for
+    Tranche B either way.
 - [ ] **The rest of §8.2's deferred value-level checks.** Materialisation "runs the value-level checks that
   open bounds deferred: family coherence rules whose operands were parameters". The array family's
   `min_items <= max_items` is one rule over the binding pair for arrays *and maps*: a resolver error where
