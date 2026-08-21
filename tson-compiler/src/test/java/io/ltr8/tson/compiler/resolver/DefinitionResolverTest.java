@@ -1538,7 +1538,11 @@ class DefinitionResolverTest {
         TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
 
         String source = Files.readString(Path.of("").toAbsolutePath().resolve("../spec/m/meta.tn").normalize());
-        SchemaDocument metaDoc = new TsonSchemaParser(source).parseSchemaDocument();
+        // Desugared first, as SchemaResolver does: resolution only ever sees a bare reference or `!C value`,
+        // and skipping the phase leaves meta.tn's own `[type_name]` as an inline form that resolves to a
+        // structural `array<type_name>` -- a shape the pipeline never produces and the linker rejects.
+        SchemaDocument metaDoc = SchemaDesugarer.desugar(
+                new TsonSchemaParser(source).parseSchemaDocument(), metaKernel.entries().keySet());
         Map<String, TypeDefinition> namespace = new LinkedHashMap<>(metaKernel.entries());
         DefinitionResolver metaResolver = definitionResolverFor(metaKernelParser, namespace::get);
         Map<String, TypeDefinition> localOnly = new LinkedHashMap<>();
