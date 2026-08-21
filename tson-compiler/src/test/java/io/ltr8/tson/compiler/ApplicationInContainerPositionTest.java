@@ -69,6 +69,21 @@ class ApplicationInContainerPositionTest {
                 .filter(e -> e.getValue().position().isEmpty()).map(java.util.Map.Entry::getKey).sorted().toList();
     }
 
+    /** Derived entries still carrying parameters -- the open half of §8's counts. */
+    private static List<String> openNames(TsonCompiledSchema compiled) {
+        return derived(compiled).stream()
+                .filter(n -> compiled.schema().entries().get(n).body() instanceof InstanceTemplate).toList();
+    }
+
+    private static long openSynthetics(TsonCompiledSchema compiled) {
+        return openNames(compiled).size();
+    }
+
+    /** Derived entries that are usable as types -- closed synthetics and instantiation entries alike. */
+    private static long closedDerived(TsonCompiledSchema compiled) {
+        return derived(compiled).size() - openSynthetics(compiled);
+    }
+
     // ── §8's tree fixture: the knot tied through a synthetic ──────────────
 
     /**
@@ -146,6 +161,66 @@ class ApplicationInContainerPositionTest {
     // ── §8's grid fixture: one entry per form, whichever channel produced it ──
 
     /**
+     * §8's primary grid, in the <b>record</b> spelling D10 legalised: {@code <T, N> { x: [[T; 1..N]; 2..N] }}.
+     * Closing {@code grid<pixel, 3>} from two declarations derives six entries in all -- {@code grid} itself,
+     * two open synthetics for the two container levels, two closed synthetics they become, and one
+     * instantiation entry for the application -- and a third declaration writing the inner form directly
+     * lands on the closed synthetic rather than minting a second (§8.2's cross-channel dedup).
+     *
+     * <p><b>This spelling is the primary fixture because it is the only one that exercises the instantiation
+     * channel</b> -- see {@link #theWholeBodySpellingRecordsNoInstantiationEntry}.
+     */
+    @Test
+    void theRecordFormGridDerivesTwoOpenSyntheticsTwoClosedAndOneInstantiation() {
+        TsonCompiledSchema compiled = compile("""
+                  pixel  => { r: int32 }
+                  grid   => <T, N> { x: [[T; 1..N]; 2..N] }
+                  a      => { g: grid<pixel, 3> }
+                  b      => { g: grid<pixel, 3> }
+                  direct => { d: [pixel; 1..3] }""");
+
+        assertEquals(fieldType(compiled, "a", "g"), fieldType(compiled, "b", "g"), "one instantiation");
+        assertEquals(List.of(2L, 3L), List.of(openSynthetics(compiled), closedDerived(compiled)),
+                () -> "two open, three closed (two synthetics and the instantiation): " + derived(compiled));
+
+        // grid<pixel, 3> -> { x: [[pixel; 1..3]; 2..3] }, outermost entry inwards.
+        String outer = fieldType(compiled, fieldType(compiled, "a", "g"), "x");
+        ArrayBody rows = assertInstanceOf(ArrayBody.class, compiled.schema().entries().get(outer).body());
+        assertEquals(Optional.of(BigInteger.TWO), rows.minItems());
+        assertEquals(fieldType(compiled, "direct", "d"), rows.elementType().name(),
+                "the row the grid builds is the row written directly");
+    }
+
+    /**
+     * The <b>whole-body</b> spelling, and the one difference between the two that is visible in resolver
+     * output: it records <em>no instantiation entry at all</em>. Closing it goes through the {@code
+     * instance_template} path, which names the entry it produces for the <b>form</b> -- so the field points
+     * straight at the array, and nothing anywhere records that {@code grid<pixel, 3>} was written.
+     *
+     * <p>Both halves follow D6 and neither is a defect: a closed synthetic's {@code source} names the
+     * constructor it builds, an instantiation entry's names the application it closes. The consequence is
+     * worth pinning rather than discovering -- two spellings of what an author would call one type differ in
+     * whether the application survives §8 output.
+     */
+    @Test
+    void theWholeBodySpellingRecordsNoInstantiationEntry() {
+        TsonCompiledSchema compiled = compile("""
+                  pixel => { r: int32 }
+                  grid  => <T, N> [[T; N]; N]
+                  a     => { g: grid<pixel, 3> }""");
+
+        TypeDefinition entry = compiled.schema().entries().get(fieldType(compiled, "a", "g"));
+
+        assertInstanceOf(ArrayBody.class, entry.body(), "the array itself, not a reference to one");
+        assertEquals(TypeRef.of("array"), entry.source().orElseThrow(),
+                "sourced to the constructor it builds, so the application is not recorded anywhere");
+        assertEquals(0, derived(compiled).stream()
+                .filter(n -> compiled.schema().entries().get(n).source()
+                        .filter(s -> s.name().equals("grid")).isPresent()).count(),
+                () -> "no entry sourced to grid<...>: " + derived(compiled));
+    }
+
+    /**
      * {@code grid => <T, N> [[T; N]; N]} closed via {@code grid<pixel, 3>} from two declarations yields
      * exactly one instantiation entry and one synthetic for the inner row -- and a third declaration writing
      * {@code [pixel; 3]} directly lands on that same synthetic (§8.2's cross-channel dedup).
@@ -167,9 +242,39 @@ class ApplicationInContainerPositionTest {
         assertEquals(Optional.of(BigInteger.valueOf(3)), outer.minItems());
     }
 
-    /** Closing a second argument reuses the template untouched and adds fresh closed entries beside the first. */
+    /**
+     * <b>Templates are consulted, never modified, by closure.</b> Closing {@code grid<pixel, 4>} after
+     * {@code grid<pixel, 3>} leaves {@code grid} and both open synthetics exactly as they were and adds three
+     * fresh closed entries beside the first three -- two container levels and one instantiation.
+     *
+     * <p>The property matters beyond tidiness: substitution walks a template's recorded open form, and a walk
+     * that rewrote what it read would make the second closure depend on the first.
+     */
     @Test
-    void closingASecondArgumentLeavesTheTemplatesUntouched() {
+    void closingASecondArgumentLeavesEveryTemplateUntouched() {
+        TsonCompiledSchema compiled = compile("""
+                  pixel => { r: int32 }
+                  grid  => <T, N> { x: [[T; 1..N]; 2..N] }
+                  three => { g: grid<pixel, 3> }""");
+        List<String> openBefore = openNames(compiled);
+
+        TsonCompiledSchema both = compile("""
+                  pixel => { r: int32 }
+                  grid  => <T, N> { x: [[T; 1..N]; 2..N] }
+                  three => { g: grid<pixel, 3> }
+                  four  => { g: grid<pixel, 4> }""");
+
+        assertEquals(List.of("T", "N"), both.schema().entries().get("grid").parameters(),
+                "the declared template, unchanged");
+        assertEquals(openBefore, openNames(both), "both open synthetics reused, neither rewritten");
+        assertEquals(2, openSynthetics(both));
+        assertEquals(6, closedDerived(both),
+                () -> "three fresh closed entries per closure: " + derived(both));
+    }
+
+    /** The whole-body spelling reuses in the same way, one entry per level fewer. */
+    @Test
+    void theWholeBodySpellingReusesItsOpenSyntheticToo() {
         TsonCompiledSchema compiled = compile("""
                   pixel => { r: int32 }
                   grid  => <T, N> [[T; N]; N]
@@ -177,13 +282,27 @@ class ApplicationInContainerPositionTest {
                   four  => { g: grid<pixel, 4> }""");
 
         assertInstanceOf(InstanceTemplate.class, compiled.schema().entries().get("grid").body());
-        assertEquals(List.of("T", "N"), compiled.schema().entries().get("grid").parameters());
-        assertEquals(1, derived(compiled).stream()
-                .filter(n -> compiled.schema().entries().get(n).body() instanceof InstanceTemplate).count(),
+        assertEquals(1, openSynthetics(compiled),
                 () -> "one open synthetic, shared by both closures: " + derived(compiled));
-        assertEquals(4, derived(compiled).stream()
-                .filter(n -> compiled.schema().entries().get(n).body() instanceof ArrayBody).count(),
+        assertEquals(4, closedDerived(compiled),
                 () -> "two closed arrays per closure, none shared: " + derived(compiled));
+    }
+
+    /**
+     * §8's smallest fixture, and Tranche D's declared stage-one target: the least a sugar form over a
+     * parameter can be. One open synthetic, one closed array, one instantiation.
+     */
+    @Test
+    void theSmallestFormNeedingAnyOfThisIsOneArrayOverOneParameter() {
+        TsonCompiledSchema compiled = compile("""
+                  box => <T> { a: [T] }
+                  use => { u: box<text> }""");
+
+        assertEquals(1, openSynthetics(compiled), () -> derived(compiled).toString());
+        assertEquals(2, closedDerived(compiled), () -> derived(compiled).toString());
+        ArrayBody array = assertInstanceOf(ArrayBody.class, compiled.schema().entries()
+                .get(fieldType(compiled, fieldType(compiled, "use", "u"), "a")).body());
+        assertEquals(TypeRef.of("text"), array.elementType());
     }
 
     // ── The nested form in miniature, and the closed case that stays out ──
