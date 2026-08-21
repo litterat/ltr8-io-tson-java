@@ -15,6 +15,7 @@ import io.ltr8.tson.compiler.ast.schema.FieldDef;
 import io.ltr8.tson.compiler.ast.schema.GenericRef;
 import io.ltr8.tson.compiler.ast.schema.GroupDef;
 import io.ltr8.tson.compiler.ast.schema.Instance;
+import io.ltr8.tson.compiler.ast.schema.InstanceTemplate;
 import io.ltr8.tson.compiler.ast.schema.MapRef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.RecordEntry;
@@ -563,6 +564,7 @@ final class SchemaDesugarer {
 
     private static List<String> typeParams(TypeDef typeDef) {
         return switch (typeDef) {
+            case InstanceTemplate template -> template.typeParams();
             case StructuralTypeDef structural -> structural.typeParams();
 
             case ReferenceTypeDef reference -> reference.typeParams();

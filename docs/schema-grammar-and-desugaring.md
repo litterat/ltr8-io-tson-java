@@ -24,6 +24,19 @@ materialization, no validation (those are the resolver's/linker's jobs).
   `atom-refinement` has the same `data-value`-vs-`core-value` defect as `instance` but is left as-is (its
   own note in #16). An unquoted non-numeric type-argument always parses as a type reference, never a value
   literal — a deliberate grammar-layer deferral, classified at a later semantic layer.
+- **A `!` head behind a parameter list is an `instance-template`, a production of its own** (§12.1) --
+  `vector => <T, N> !array { element_type: T  min_items: N }`. Not `[type-params] instance`: the surface
+  syntax is the same, but the two payloads resolve against different vocabulary, an `Instance` binding
+  through the *constructor's* own reader while this yields an `instance_template`. `Instance` stays
+  unparameterised, so nothing gains an optional parameter list that could be silently dropped, and
+  `parseTypeDef` reads the parameter list *before* dispatching on `!` — one token then decides.
+  - **The payload is narrower than a `core-value`**, mirroring `template_argument` one-for-one: a name, a
+    name with arguments, or a literal. A `core-value` would admit an array payload, a scalar payload and a
+    nested record in a binding, none of which the resolved form can carry — it has no collection case, so a
+    parameter inside a collection-typed slot has no resolved shape at all. `element_type: [T]` is therefore
+    a parse error, not a form that quietly reads `[T]` as a data array of one token.
+  - The **resolved** form does not exist yet, so `DefinitionResolver` refuses one by name rather than
+    dropping its parameters into an ordinary construction.
 - **Two entry points, one grammar.** `parseSchemaDocument()` is fail-fast; `parseSchemaDocument(receiver)`
   reports each *declaration's* syntax error and resynchronises to the next, handing back no document at all
   if it reported anything. The mechanics, the resync rule and the two failures that stay fail-fast are in

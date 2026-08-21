@@ -18,6 +18,7 @@ import io.ltr8.tson.compiler.ast.schema.GroupDef;
 import io.ltr8.tson.compiler.ast.schema.RemovalSet;
 import io.ltr8.tson.compiler.ast.schema.ArrayRef;
 import io.ltr8.tson.compiler.ast.schema.Instance;
+import io.ltr8.tson.compiler.ast.schema.InstanceTemplate;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.RecordEntry;
 import io.ltr8.tson.compiler.ast.schema.RefinedDef;
@@ -389,6 +390,16 @@ final class DefinitionResolver {
         }
         if (typeDef instanceof AtomRefinement refinement) {
             return resolveAtomRefinement(name, refinement);
+        }
+        if (typeDef instanceof InstanceTemplate template) {
+            // The grammar admits it; the resolved form it denotes does not exist yet. `instance_template`
+            // and `template_argument` -- the open counterpart of a constructor body, carrying a `param`
+            // where a concrete instance carries a value -- are the next stage. Refusing here keeps the
+            // parameters and the bindings from being quietly dropped into an ordinary construction, which
+            // would resolve to the constructor's own body with nothing bound.
+            throw new UnsupportedOperationException("'" + name + "': an instance template ('<...> !"
+                    + template.target() + " { ... }') has no resolved form yet -- the open counterpart of a "
+                    + "constructor body is not implemented (§5.10, §8.1)");
         }
         throw new UnsupportedOperationException(
                 "'" + name + "': only fresh record constructions, composition, simple type references, "

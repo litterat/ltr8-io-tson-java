@@ -9,6 +9,7 @@ import io.ltr8.tson.compiler.ast.schema.GenericRef;
 import io.ltr8.tson.compiler.ast.schema.GroupDef;
 import io.ltr8.tson.compiler.ast.schema.ElementType;
 import io.ltr8.tson.compiler.ast.schema.Instance;
+import io.ltr8.tson.compiler.ast.schema.InstanceTemplate;
 import io.ltr8.tson.compiler.ast.schema.MapRef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.RefinedDef;
@@ -17,6 +18,7 @@ import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.ast.schema.SimpleRef;
 import io.ltr8.tson.compiler.ast.schema.SizeSpec;
+import io.ltr8.tson.compiler.ast.schema.TemplateBinding;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.compiler.ast.schema.TupleRef;
 import io.ltr8.tson.compiler.ast.schema.TypeArg;
@@ -541,6 +543,74 @@ class TsonSchemaParserTest {
         assertThrows(TsonParseException.class, () -> parse("""
                 !!meta:"https://tson.io/2026/32/m/meta.tn1"
                 { a => [text, integer,] }"""));
+    }
+
+    // ── Instance templates (§12.1, D9) ───────────────────────────────────
+    //    A `!` head over a braced payload, behind a parameter list. A production of its own rather than
+    //    `[type-params] instance`, because the two payloads resolve against different vocabulary -- an
+    //    instance binds through the constructor's own reader, this yields an `instance_template`.
+
+    @Test
+    void anInstanceTemplateCarriesItsTargetAndBindings() {
+        InstanceTemplate template = assertInstanceOf(InstanceTemplate.class,
+                declOf("vector => <T, N> !array { element_type: T  min_items: N  max_items: N }").typeDef());
+
+        assertEquals(List.of("T", "N"), template.typeParams());
+        assertEquals("array", template.target());
+        assertEquals(List.of("element_type", "min_items", "max_items"),
+                template.bindings().stream().map(TemplateBinding::name).toList());
+        assertEquals(new TypeArg.Ref(new SimpleRef("T")), template.bindings().get(0).value());
+    }
+
+    /** A binding takes a name, an application, or a literal -- the three shapes `template_argument` carries. */
+    @Test
+    void aBindingTakesANameAnApplicationOrALiteral() {
+        InstanceTemplate template = assertInstanceOf(InstanceTemplate.class,
+                declOf("t => <T> !array { element_type: pair<T>  min_items: 2  unordered: \"yes\" }").typeDef());
+
+        assertInstanceOf(GenericRef.class, ((TypeArg.Ref) template.bindings().get(0).value()).ref());
+        assertEquals("2", ((TypeArg.Value) template.bindings().get(1).value()).value().text());
+        assertEquals("yes", ((TypeArg.Value) template.bindings().get(2).value()).value().text());
+    }
+
+    /** No parameter list means an ordinary {@link Instance}: the list is the only thing that distinguishes them. */
+    @Test
+    void theParameterListIsWhatDistinguishesATemplateFromAnInstance() {
+        assertInstanceOf(Instance.class, declOf("x => !array { element_type: text }").typeDef());
+        assertInstanceOf(InstanceTemplate.class, declOf("x => <T> !array { element_type: T }").typeDef());
+    }
+
+    /**
+     * The payload is narrower than a {@code core-value}, mirroring `template_argument` one-for-one: it has
+     * no collection case, so a form the resolved shape could not carry is refused where it is written.
+     */
+    @Test
+    void aContainerFormInABindingIsAParseError() {
+        for (String binding : List.of("[T]", "{text => T}", "(T | text)")) {
+            TsonParseException thrown = assertThrows(TsonParseException.class,
+                    () -> parse("""
+                            !!meta:"https://tson.io/2026/32/m/meta.tn"
+                            { t => <T> !array { element_type: %s } }""".formatted(binding)), binding);
+            assertTrue(thrown.getMessage().contains("not permitted in an instance template binding"),
+                    thrown.getMessage());
+        }
+    }
+
+    @Test
+    void anEmptyPayloadIsAParseError() {
+        TsonParseException thrown = assertThrows(TsonParseException.class, () -> parse("""
+                !!meta:"https://tson.io/2026/32/m/meta.tn"
+                { t => <T> !array { } }"""));
+        assertTrue(thrown.getMessage().contains("binds at least one field"), thrown.getMessage());
+    }
+
+    /** {@code atom-refinement} keeps its unparameterised form -- refining an atom instance binds nothing. */
+    @Test
+    void aParameterizedAtomRefinementIsAParseError() {
+        TsonParseException thrown = assertThrows(TsonParseException.class, () -> parse("""
+                !!meta:"https://tson.io/2026/32/m/meta.tn"
+                { t => <N> !integer ^ { min: N } }"""));
+        assertTrue(thrown.getMessage().contains("'^' takes no type parameters"), thrown.getMessage());
     }
 
     // ── Declaration names ────────────────────────────────────────────────
