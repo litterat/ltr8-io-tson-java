@@ -20,6 +20,7 @@ import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TupleElement;
 import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.ArrayList;
@@ -116,15 +117,27 @@ final class TemplateMaterialiser {
      */
     private final DefinitionMetaReader metaReader;
 
+    /**
+     * The entry names desugaring generated rather than the author writing them.
+     *
+     * <p><b>An application of one is machinery, not a use site.</b> Closing an authored template records the
+     * application in an instantiation entry, because {@code grid<pixel, 3>} is something someone wrote and
+     * §8.2 keys identity on it. Closing a generated open synthetic records nothing: nobody wrote
+     * {@code array_p0_p1_p1_06c4e11f<pixel, 3>}, and an entry named for it would key identity on an internal
+     * name D6 is explicit must not be relied on.
+     */
+    private final Set<String> generated;
+
     TemplateMaterialiser(DefinitionGetter namespace, BiConsumer<String, TypeDefinition> publish) {
-        this(namespace, publish, null);
+        this(namespace, publish, null, Set.of());
     }
 
     TemplateMaterialiser(DefinitionGetter namespace, BiConsumer<String, TypeDefinition> publish,
-            DefinitionMetaReader metaReader) {
+            DefinitionMetaReader metaReader, Set<String> generated) {
         this.namespace = namespace;
         this.publish = publish;
         this.metaReader = metaReader;
+        this.generated = generated;
     }
 
     /**
@@ -219,9 +232,6 @@ final class TemplateMaterialiser {
                     + " type argument" + (parameters.size() == 1 ? "" : "s") + " " + parameters + ", but "
                     + arguments.size() + " " + (arguments.size() == 1 ? "was" : "were") + " applied (§5.10)");
         }
-        if (template.body() instanceof InstanceTemplate open) {
-            return closeInstanceTemplate(head, template, open, bind(parameters, arguments));
-        }
         String name = internalName(head, arguments);
         if (materialised.containsKey(name) || !closing.add(name)) {
             return name; // already built, or under construction -- the knot-tying case
@@ -238,6 +248,22 @@ final class TemplateMaterialiser {
         }
         heads.add(head);
         try {
+            // Both template shapes reach here, so both get the memo, the depth backstop and one publish
+            // path. An open *instance* used to short-circuit ahead of all three, which left a template
+            // applying itself (`weird => <T> [weird<T>]`) recursing to a StackOverflowError instead of
+            // tying the knot.
+            if (template.body() instanceof InstanceTemplate open) {
+                String formName = closeInstanceTemplate(head, template, open, bind(parameters, arguments));
+                if (generated.contains(head)) {
+                    // A generated head closing its own intermediate form: the form entry *is* the answer, and
+                    // an instantiation naming this head would carry an internal name into identity.
+                    return formName;
+                }
+                TypeDefinition alias = instantiationOf(head, arguments, formName);
+                materialised.put(name, alias);
+                publish.accept(name, alias);
+                return name;
+            }
             TypeDefinition instantiation = substitute(template, head, parameters, arguments);
             materialised.put(name, instantiation);
             publish.accept(name, instantiation);
@@ -288,16 +314,18 @@ final class TemplateMaterialiser {
      * longer a template at all: it is the constructor body those bindings always described, so it is bound
      * through that constructor's own reader and the entry carries an ordinary body.
      *
-     * <p><b>The entry is named for the form, not for the application that produced it</b> (§8.2). An open
-     * synthetic's own name is internal and derived, so keying its instantiations on it would make identity
-     * depend on an unstable name -- and would leave {@code [text]} written directly and {@code [T]} closed to
-     * {@code text} on two entries for one type. Naming both by the same function of the same binding record
-     * is what makes the two channels dedupe against each other, so the lookup below usually finds the entry
-     * the desugar phase already injected.
+     * <p><b>Two entries come out of it, because one cannot carry two identities.</b> The body itself is a
+     * closed <em>synthetic</em>, named for the form and sourced to the constructor it builds (§8.2) -- an
+     * open synthetic's own name is internal, so keying it on the application would make identity depend on an
+     * unstable name, and would leave {@code [text]} written directly and {@code [T]} closed to {@code text}
+     * on two entries for one type. But the same closure is also an <em>instantiation</em> of the template,
+     * and §8.2 keys that on the flattened application. So this publishes the synthetic and returns a
+     * reference entry pointing at it, whose {@code source} is the application.
      *
-     * <p>No knot-tying is needed here, unlike the record case: an {@code instance_template}'s bindings are
-     * references to entries, never a nested application of the template being closed, so closing one cannot
-     * re-enter itself.
+     * <p>Without the second entry nothing in resolver output records that {@code grid<pixel, 3>} was ever
+     * written: the field would name the array directly, and the template's name would vanish. The record
+     * template shape gets this for free, since substituting a record yields a record -- structurally distinct
+     * from any synthetic, so it can be the instantiation itself.
      */
     private String closeInstanceTemplate(String head, TypeDefinition template, InstanceTemplate open,
             Map<String, TypeArgument> bindings) {
@@ -313,9 +341,9 @@ final class TemplateMaterialiser {
         for (Map.Entry<String, TemplateArgument> binding : bound.bindings().entrySet()) {
             fields.add(new RecordValue.Field(binding.getKey(), wire(head, binding)));
         }
-        String name = SchemaDesugarer.internalName(target, fields);
-        if (namespace.getTypeDefinition(name) != null) {
-            return name; // already built, here or by the desugar phase -- one entry per form, schema-wide
+        String formName = SchemaDesugarer.internalName(target, fields);
+        if (namespace.getTypeDefinition(formName) != null) {
+            return formName; // already built, here or by the desugar phase -- one entry per form, schema-wide
         }
         if (metaReader == null) {
             throw new IllegalStateException("'" + head + "<...>' closes to a '" + target + "' body, and this "
@@ -334,9 +362,21 @@ final class TemplateMaterialiser {
         }
         TypeDefinition closed = new TypeDefinition(Optional.of(TypeRef.of(target)), template.kind(), List.of(),
                 false, List.of(), List.of(), Optional.empty(), body);
-        materialised.put(name, closed);
-        publish.accept(name, closed);
-        return name;
+        materialised.put(formName, closed);
+        publish.accept(formName, closed);
+        return formName;
+    }
+
+    /**
+     * The instantiation entry for an application whose closure is a synthetic: a reference to that synthetic,
+     * sourced to the application itself. {@code Reference} bodies are collapsed by the compiler, so the hop
+     * costs nothing at read time -- what it buys is that §8.2's "instantiation entries are keyed on the
+     * flattened application recorded in {@code source}" is true of this template shape too, not only of the
+     * record one.
+     */
+    private static TypeDefinition instantiationOf(String head, List<TypeArgument> arguments, String formName) {
+        return new TypeDefinition(Optional.of(new TypeRef(head, arguments)), TypeKind.REFERENCE, List.of(),
+                false, List.of(), List.of(), Optional.empty(), new Reference(TypeRef.of(formName)));
     }
 
     /** The same open body with every {@code param} binding replaced by the argument applied for it. */
