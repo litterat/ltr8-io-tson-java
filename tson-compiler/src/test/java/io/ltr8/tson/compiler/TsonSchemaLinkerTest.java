@@ -121,27 +121,33 @@ class TsonSchemaLinkerTest {
         assertEquals("https://example.test/s.tn1", linked.originOf("local"));
     }
 
+    /**
+     * §5.10's arity rule at a field type. {@code set} declares no parameters, so applying it to one is the
+     * author's error -- and it is caught here rather than carried, because {@code arguments} non-empty means
+     * an open form and nothing else once inline sugar lifts to entries.
+     */
     @Test
-    void anArgumentBearingFieldTypeIsCarriedThroughWithoutSynthesizingAnEntry() {
+    void anArgumentBearingFieldTypeAgainstANonTemplateIsRejected() {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("token", unitEntry());
         entries.put("set", emptyRecord());
-        TypeRef setOfToken = new TypeRef("set", List.of(new TypeArgument.Ref(TypeRef.of("token"))));
-        entries.put("container", TypeDefinition.product(RecordBody.of(List.of(
-                RecordField.required("members", setOfToken)))));
+        entries.put("container", TypeDefinition.product(RecordBody.of(List.of(RecordField.required("members",
+                new TypeRef("set", List.of(new TypeArgument.Ref(TypeRef.of("token")))))))));
 
-        TsonLinkedSchema result = TsonSchemaLinker.link(schemaOf(entries), null);
-
-        assertEquals(Set.of("token", "set", "container"), result.schema().entries().keySet());
-        RecordBody containerBody = (RecordBody) result.schema().entries().get("container").body();
-        assertEquals(setOfToken, containerBody.fields().get(0).type());
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> TsonSchemaLinker.link(schemaOf(entries), null));
+        assertTrue(thrown.getMessage().contains("'set' declares no type parameters"), thrown.getMessage());
     }
 
     @Test
     void aTypeParameterInSourceIsValidWithoutNeedingToResolveOrMaterialize() {
         // set => <T> ~array<T> ^ {...} -- T is set's own declared parameter, not a real entry.
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("other", emptyRecord());
+        // A one-parameter template, so the application's arity is right and the only question left is
+        // whether `T` -- a parameter, not an entry -- is accepted in the argument.
+        entries.put("other", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of("U"), false,
+                List.of(), List.of(), Optional.empty(),
+                RecordBody.of(List.of(RecordField.required("v", TypeRef.of("U"))))));
         TypeRef otherOfT = new TypeRef("other", List.of(new TypeArgument.Ref(TypeRef.of("T"))));
         entries.put("generic", new TypeDefinition(Optional.of(otherOfT), TypeKind.PRODUCT, List.of("T"), false,
                 List.of(), List.of(), Optional.empty(), RecordBody.of(List.of())));

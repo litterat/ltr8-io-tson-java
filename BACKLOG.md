@@ -51,19 +51,6 @@ own prose (which had gone stale on at least one of them):
     fails on any head this document declares *or imports* — a template arriving by `!!import` included.
     Deleting that without materialisation in place regresses to a read-time failure. Tranche B retires it
     for record templates only; an application of a template containing a sugar form keeps failing until C.
-- [ ] **§5.10 declaration-time rules, before Tranche C.** Four gaps, all reachable today and all rules a
-  template must obey whether or not anyone applies it. Worth closing first so Tranche C inherits them
-  instead of adding a fifth form that needs them retrofitted. Measured:
-  - `box => <T> { v: text }` → **OK**. A declared parameter the body never references is an error (D7's
-    decision), and the rule is general, not specific to `instance-template`.
-  - `chain => <T> { tail: chain<T, T>? }` → **OK**. A recursive self-application with the wrong arity is
-    decidable where it is written; `TemplateRegularity` currently skips it because the arity mismatches,
-    deferring to a materialisation that may never happen.
-  - `chain => <T> { tail: chain? }` → **OK**. A template named with no arguments at all.
-  - `use => { u: box }` where `box` is a template → **OK** at compile, then at *read* time:
-    `internal error: 'box' has no usable compiled reader`, **exit 70**. The author's error reported as a
-    library fault, and the read-time failure mode the eager-rejection discipline exists to prevent. Same
-    bug as the previous item, in a different position: a template reference that is not an application.
 - [ ] **Instance templates — `spec/tson-cr-structure-templates.md`, Tranche C (D7, D9).** A sugar form
   inside a template declaration **that mentions one of the declaration's own parameters** — a concrete one
   already lifts to an ordinary closed entry (D5's uniform rule, R2). Needs both a grammar addition and an

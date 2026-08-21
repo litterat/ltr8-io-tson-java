@@ -70,6 +70,16 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   module that can bind a constructor generically. The only argument-bearing `type_ref` it ever sees is inside
   a template declaration, which the desugar phase passes through whole (`box<T>` in `box`'s own body), and
   which is validated, not rewritten.
+  - **Two §5.10 rules on templates, both decidable here and neither depending on anyone applying one.**
+    *Arity*, over every reference: a reference supplies exactly as many arguments as the entry it names
+    declares parameters, which folds three author errors into one rule — too many, too few, and **none at
+    all**. That last is the one that mattered: naming a template without applying it (`use => { u: box }`)
+    linked and compiled clean, then failed at *read* time with "no usable compiled reader" and a
+    library-fault exit code, because the eager-rejection discipline guarded applications and never bare
+    names. *Parameter usage*, the converse of the closed-entry rule below: an open entry references every
+    parameter it declares, so `box => <T> { v: text }` is rejected — every application of it would denote
+    the same type. That one is a `TsonSchemaValidationException` where its twin is an
+    `IllegalStateException`, because a parameter list is author-written where a `value_param` is not.
   - **`entryOrigins` is on `TsonLinkedSchema`, not on `TsonSchema` or `TypeDefinition`**, because it is a
     fact *linking* establishes rather than part of the resolved schema value §9 defines — and because
     `schema.meta` is a bind target with a hand-written `equals` and the `@Record` constructor-selection trap,

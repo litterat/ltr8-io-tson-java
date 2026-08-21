@@ -43,7 +43,9 @@ class VariantTreeReaderTest {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("integer", new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), false,
                 List.of(), List.of(), Optional.empty(), IntegerType.UNCONSTRAINED));
-        entries.put("response", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of("T"), false,
+        // No type parameter: this fixture is about subtypes dispatch, and the `T` it used to carry was
+        // incidental -- a declared parameter the body never references is now a §5.10 error.
+        entries.put("response", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of(), false,
                 List.of(), List.of(), Optional.empty(), RecordBody.of(List.of())));
         entries.put("success_response", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of(), false,
                 List.of("response"), List.of(), Optional.empty(),

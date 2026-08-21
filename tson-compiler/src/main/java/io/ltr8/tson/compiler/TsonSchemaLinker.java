@@ -40,6 +40,7 @@ import io.ltr8.tson.schema.meta.UnknownType;
 import io.ltr8.tson.schema.meta.UriType;
 import io.ltr8.tson.schema.meta.UuidType;
 
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -544,6 +545,7 @@ public final class TsonSchemaLinker {
 
     private static void validateEntry(String name, TypeDefinition def, Map<String, TypeDefinition> namespace,
                                        Map<String, TypeDefinition> structureNamespace) {
+        checkOpenEntryUsesEveryParameter(name, def);
         if (def.source().isPresent()) {
             // Unlike every other reference below, `source` gets the structure-namespace fallback --
             // per §3.3.1, the name it records was consumed at a *constructor role* at the point this
@@ -765,6 +767,66 @@ public final class TsonSchemaLinker {
     }
 
     /**
+     * The converse of {@link #checkClosedEntryIsParameterFree}, and the other half of the same §5.10 rule:
+     * an <em>open</em> entry references every parameter it declares. {@code box => <T> { v: text }} declares
+     * {@code T} and never uses it, so no application of it could differ from any other -- the parameter is a
+     * mistake, not a degenerate-but-legal template.
+     *
+     * <p><b>A {@link TsonSchemaValidationException}, unlike its twin.</b> The closed-entry rule is an
+     * {@link IllegalStateException} because an author cannot write a {@code value_param}, so a violation
+     * means this library emitted a malformed entry. A parameter list is author-written, so an unused one is
+     * the author's error and reported as such.
+     *
+     * <p>Deciding this rather than admitting the degenerate form also settles a question the open
+     * representation would otherwise have to answer: with an unreferenced parameter rejected, a template
+     * whose bindings are all concrete cannot exist, so nothing has to say whether unused parameters
+     * participate in comparing two open entries.
+     */
+    private static void checkOpenEntryUsesEveryParameter(String entryName, TypeDefinition def) {
+        if (def.parameters().isEmpty()) {
+            return;
+        }
+        Set<String> referenced = new HashSet<>();
+        def.source().ifPresent(ref -> collectNames(ref, referenced));
+        collectBodyNames(def.body(), referenced);
+        for (String parameter : def.parameters()) {
+            if (!referenced.contains(parameter)) {
+                throw new TsonSchemaValidationException("'" + entryName + "' declares the type parameter '"
+                        + parameter + "' and never references it, so every application of it would denote the "
+                        + "same type -- a declared parameter must be used (§5.10)");
+            }
+        }
+    }
+
+    /** Every name an entry's body mentions, for {@link #checkOpenEntryUsesEveryParameter}. */
+    private static void collectBodyNames(Top body, Set<String> into) {
+        switch (body) {
+            case RecordBody record -> record.fields().forEach(field -> {
+                collectNames(field.type(), into);
+                field.valueParam().ifPresent(into::add);
+            });
+            case ArrayBody array -> collectNames(array.elementType(), into);
+            case MapBody map -> {
+                collectNames(map.keyType(), into);
+                collectNames(map.valueType(), into);
+            }
+            case TupleBody tuple -> tuple.elements().forEach(e -> collectNames(e.elementType(), into));
+            case ChoiceBody choice -> choice.variants().forEach(v -> collectNames(v, into));
+            case Reference reference -> collectNames(reference.target(), into);
+            default -> { } // an atom body names no type
+        }
+    }
+
+    private static void collectNames(TypeRef ref, Set<String> into) {
+        into.add(ref.name());
+        for (TypeArgument argument : ref.arguments()) {
+            if (argument instanceof TypeArgument.Ref nested) {
+                collectNames(nested.ref(), into);
+            }
+        }
+    }
+
+    /**
      * §5.10's closed-entry rule -- "an entry whose {@code parameters} list is empty MUST contain no parameter
      * references anywhere: no {@code value_param} members, and no reference {@code name} ... that resolves to
      * a parameter, at any depth" -- for the {@code value_param} half. The reference half needs no code of its
@@ -796,11 +858,62 @@ public final class TsonSchemaLinker {
         if (!namespace.containsKey(ref.name()) && !ownParameters.contains(ref.name())) {
             throw new TsonSchemaValidationException(context + " has an unresolved reference '" + ref.name() + "'");
         }
+        checkArity(ref, namespace, ownParameters, context);
         for (TypeArgument arg : ref.arguments()) {
             if (arg instanceof TypeArgument.Ref nested) {
                 validateTypeRef(nested.ref(), namespace, ownParameters, context);
             }
             // TypeArgument.Value is a literal token, not a type reference -- nothing to validate.
         }
+    }
+
+    /**
+     * §5.10's arity rule, over every reference in the schema: a reference supplies exactly as many arguments
+     * as the entry it names declares parameters. Three shapes of author error collapse into it -- too many
+     * ({@code chain<T, T>} for a one-parameter {@code chain}), too few, and <b>none at all</b>
+     * ({@code use => { u: box } } naming a template without applying it, which is the common one).
+     *
+     * <p><b>The zero-argument case is why this check exists here rather than at an application site.</b> An
+     * unapplied template reference is not an application, so nothing on the materialisation path ever sees
+     * it: it linked, compiled, and then failed at <em>read</em> time with "no usable compiled reader" and a
+     * library-fault exit code, for what is plainly the author's error. The eager-rejection discipline
+     * guarded applications and never bare names.
+     *
+     * <p>By the time linking runs, {@code TemplateMaterialiser} has rewritten every application it could
+     * close, so what reaches here is the set that genuinely needs checking: references inside template
+     * bodies, which stay open by design, and bare names anywhere.
+     *
+     * <p>A reference naming one of the enclosing declaration's own <em>parameters</em> is skipped -- a
+     * parameter is not an entry and declares nothing, and §5.10 admits no head abstraction, so it can carry
+     * no arguments to check.
+     */
+    private static void checkArity(TypeRef ref, Map<String, TypeDefinition> namespace,
+                                    List<String> ownParameters, String context) {
+        if (ownParameters.contains(ref.name())) {
+            return;
+        }
+        TypeDefinition referenced = namespace.get(ref.name());
+        if (referenced == null) {
+            return; // reached only through the structure-namespace fallback, which the caller already allowed
+        }
+        int declared = referenced.parameters().size();
+        int supplied = ref.arguments().size();
+        if (declared == supplied) {
+            return;
+        }
+        if (declared == 0) {
+            throw new TsonSchemaValidationException(context + ": '" + ref.name() + "' declares no type "
+                    + "parameters, so '" + ref.name() + "<...>' applies arguments to something that takes "
+                    + "none (§5.10); drop the argument list");
+        }
+        if (supplied == 0) {
+            throw new TsonSchemaValidationException(context + ": '" + ref.name() + "' is a template taking "
+                    + declared + " type argument" + (declared == 1 ? "" : "s") + " " + referenced.parameters()
+                    + ", and a template is not a type until it is applied -- write '" + ref.name()
+                    + "<...>' with its arguments (§5.10)");
+        }
+        throw new TsonSchemaValidationException(context + ": '" + ref.name() + "' takes " + declared
+                + " type argument" + (declared == 1 ? "" : "s") + " " + referenced.parameters() + ", but "
+                + supplied + " " + (supplied == 1 ? "was" : "were") + " applied (§5.10)");
     }
 }
