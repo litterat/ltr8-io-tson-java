@@ -38,7 +38,7 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   **a choice's variants are checked distinct** (§5.4) *after* §8.3 flattening, since an alias and its target
   are one type — so `(text | my_text)` with `my_text => text` is caught, which comparing the written names
   would miss and which is the only spelling an author can't see for themselves; the walk stops on a
-  reference cycle rather than hanging, cycle diagnosis being its own unimplemented concern; **an author's
+  reference cycle rather than hanging, and an alias cycle is then caught by the inhabitance check below; **an author's
   `@disjoint` marker is checked against the derived fact** (§5.4) — `true` verifies it silently, `false` is
   an error, and there is no third outcome because the derivation is total (`SPEC-FEEDBACK.md` #47, which
   resolves #42's "pin the decision procedure" case: §5.4's warn-on-unprovable can never arise, and there is
@@ -94,6 +94,42 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   `TsonSchemaLoader` (`Optional<TsonLinkedSchema> load(id)`) is the pluggable import/meta lookup hook,
   registered-only by default (nothing fetched). `TsonSchemaLinker.linkBootstrap` is the one sanctioned way
   to link meta-kernel's raw bootstrap output without registering it.
+
+## The inhabitance check (`TypeInhabitance`, §3.4.1, `SPEC-FEEDBACK.md` #25)
+
+**An entry no finite document can satisfy is rejected.** `x => { y: y }` with `y => { x: x }` resolves and
+links cleanly otherwise, and fails at the first document as `missing required field 'x'` — blaming the data
+for a defect in the schema, at a line the data's author does not control.
+
+- **A least fixed point over the entry graph, not a search.** Every entry starts unknown; a round marks each
+  one whose body is satisfied by what is already marked; rounds repeat until nothing changes, which takes at
+  most one round per entry. Decidable because the graph is finite — the question is not "does this type have
+  a value" but "does this recursion reach a base case".
+- **Exact, total and two-valued.** The sibling derivation below had to give up exactness to stay total; this
+  needs no such trade, and there is no third answer to report.
+- **The base cases, and nothing else**: an optional field or tuple position, a container whose `min_items` is
+  zero or absent, and a choice variant that does not recur. A choice is the one place the walk **branches**
+  rather than conjoins — one good variant is enough, where a product needs every part.
+  - **Field groups are walked separately**, because §5.11 makes their members uniformly OPTIONAL in `fields`
+    with the requirement carried by the group's own state — reading the field list alone would find nothing
+    required and call every group satisfied.
+  - **Every REQUIRED-family field counts, the two carrying a value included**: a fixed or default value of a
+    type nothing can satisfy does not exist either.
+- **Every local entry is judged, referenced or not** — same footing as a declared type parameter the body
+  never uses (§5.10). So an uninhabited *variant* is rejected even where the choice around it still works.
+  Imported entries are skipped: they were judged when their own schema linked, and repeating the verdict
+  would report one defect once per importer.
+- **A template is judged too, with its parameters assumed inhabited.** No document ever has a template as its
+  type, so this could have been left to its closures — but then a template nobody applies ships broken, which
+  is the failure `TemplateRegularity` prevents for the neighbouring rule. The assumption is sound in the
+  direction that matters: a body that cannot be satisfied even when every argument can has no application
+  that can be. An open container's guard is read off its `instance_template` bindings, and **a bound still
+  held by a parameter counts as possibly-empty** (`<N> [vec<N>; N]` could be applied with `0`).
+- **An unresolved reference is inhabited by fiat.** `validateEntry` has already reported it against this very
+  entry; calling it uninhabited too would report one defect twice, the second time in words naming a
+  different problem. The check runs after that validation for exactly this reason.
+- **Scope is structural.** An atom whose own facets admit nothing (`int8 ^ { min: 300 }`) is uninhabited too,
+  but that is its constraint family's question, next to `AtomNarrowing` (`BACKLOG.md`).
 
 ## The disjointness derivation (`ChoiceDisjointness`, `reader/DiscriminationClass`)
 

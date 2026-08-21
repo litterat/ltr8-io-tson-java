@@ -249,17 +249,24 @@ class TsonSchemaLinkerTest {
     }
 
     /**
-     * A reference cycle is a separate, unimplemented diagnostic; what matters here is that the flattening
-     * walk stops instead of hanging, and that a cycle produces no false duplicate.
+     * A pure alias cycle -- an {@code a} is a {@code b} is an {@code a} -- has no base case, so nothing can
+     * ever be one. It used to link cleanly, with this fixture asserting only that the variant-flattening walk
+     * terminated rather than hanging; the diagnostic it called "separate and unimplemented" now exists
+     * ({@code SPEC-FEEDBACK.md} #25). Termination is still what the walk needs and is still proved here --
+     * by a verdict arriving at all.
      */
     @Test
-    void aReferenceCycleAmongVariantsTerminates() {
+    void aReferenceCycleAmongVariantsIsUninhabited() {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("a", TypeDefinition.reference("b"));
         entries.put("b", TypeDefinition.reference("a"));
         entries.put("contact", choiceEntry(new ChoiceBody(List.of(TypeRef.of("a"), TypeRef.of("b")))));
 
-        TsonSchemaLinker.link(schemaOf(entries), null); // terminates, no exception
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> TsonSchemaLinker.link(schemaOf(entries), null));
+
+        assertTrue(thrown.getMessage().contains("can never be satisfied"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("a needs b"), thrown.getMessage());
     }
 
     /** An IS-A pair: `positive` is an `integer`, so no value of one excludes the other (§5.4's own example). */

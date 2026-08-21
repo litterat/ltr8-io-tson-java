@@ -270,11 +270,43 @@ public final class TsonSchemaLinker {
             }
         }
 
+        checkEveryEntryIsInhabited(schema, merged, localNames, receiver);
+
         AnnotatedMap<String, TypeDefinition> annotated = withNameAnnotations(merged, schema, loader);
         checkDisjointAssertions(schema, annotated, localNames, receiver);
 
         return new TsonLinkedSchema(new TsonSchema(schema.id(), schema.meta(), schema.imports(),
                 annotated, schema.bootstrap()), origins);
+    }
+
+    /**
+     * §3.4.1: an entry no finite document can satisfy is rejected, with the chain that has to be broken
+     * ({@code SPEC-FEEDBACK.md} #25, {@link TypeInhabitance}). {@code x => { y: y }} with {@code y => { x: x }}
+     * resolves and links cleanly otherwise, and fails at the first document as {@code missing required field
+     * 'x'} -- blaming the data for a defect in the schema.
+     *
+     * <p><b>Every local entry is judged, referenced or not</b>, on the same footing as a declared type
+     * parameter the body never uses (§5.10): a declaration nothing can satisfy is a mistake wherever it sits,
+     * and its author cannot see it. Imported entries are skipped -- they were judged when their own schema
+     * linked, and repeating the verdict here would report one defect once per importer.
+     *
+     * <p>Runs after {@link #validateEntry}, so an unresolved reference is already reported and never mistaken
+     * for an uninhabited one.
+     */
+    private static void checkEveryEntryIsInhabited(TsonSchema schema, Map<String, TypeDefinition> merged,
+                                                    Set<String> localNames, TsonDiagnosticsReceiver receiver) {
+        Set<String> inhabited = TypeInhabitance.derive(merged);
+        for (String name : localNames) {
+            if (inhabited.contains(name)) {
+                continue;
+            }
+            List<String> chain = TypeInhabitance.cycleThrough(name, merged, inhabited);
+            report(receiver, schema, name, merged.get(name), "'" + name + "' can never be satisfied by any "
+                    + "document: " + String.join(" needs ", chain)
+                    + ", and nothing in that chain can be left out or left empty (§3.4.1). A recursion "
+                    + "terminates only where it reaches a base case -- an optional field, a possibly-empty "
+                    + "container, or a choice variant that does not recur");
+        }
     }
 
     /**
