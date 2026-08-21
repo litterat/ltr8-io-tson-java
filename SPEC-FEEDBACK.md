@@ -3245,6 +3245,13 @@ The array and map cases are unaffected: every slot they bind is scalar (`element
 `value_type`, `state`, `min_items`, `max_items`), so each is one `template_argument` and the lift is exactly
 what D5 describes.
 
+**Resolution: declined.** The spec author has decided not to pursue this — `template_argument` keeps its three
+channels, and a parameter inside a collection-valued slot stays without a resolved form. What the report should
+still do is say so: D5 currently states the lift rule over every sugar form, which is not true and cannot be
+made true without the fourth channel. Scoping the rule is the one-sentence edit that closes the contradiction.
+The implementation's refusal below is therefore permanent rather than provisional, and is the behaviour to
+document rather than a gap to track (it is out of `BACKLOG.md` accordingly).
+
 **Interpretation chosen:** implement D5 for the two constructors whose slots are all scalar, and refuse the
 other two at the declaration that writes them, as a not-yet-implemented gap rather than an author error —
 the verdict changes if `template_argument` grows a case, which is the test this repo's exception policy

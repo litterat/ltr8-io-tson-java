@@ -32,32 +32,16 @@ own prose (which had gone stale on at least one of them):
   as much as through the sugar, while `max_items` reports correctly. Presumably `EmptyBrace` reaches the
   map reader as something other than a zero-entry map. Unrelated to the container collapse; recorded so it
   is not rediscovered as a regression.
-- [ ] **What Tranche D leaves open.** Instance templates work: a sugar form over one of the enclosing
-  declaration's own parameters lifts to an open synthetic carrying an `instance_template` body, the explicit
-  `<T, N> !array { … }` spelling parses and resolves, and applying either closes it through the target
-  constructor's own reader (`docs/schema-resolution.md`). Two shapes remain, both narrower than the tranche
-  that produced them:
-  - **A parameter inside a collection-valued slot.** `tuple` binds `elements` and `choice` binds `variants`,
-    and a `template_argument` is `param | value | type_ref` with no collection case, so `<T> { v: (T | text) }`
-    has no open form at all and is refused at the declaration that writes it. `SPEC-FEEDBACK.md` #53 puts the
-    contradiction to the spec — D5 states the lift rule over every sugar form, D9 concedes this case has no
-    resolved form — and offers both resolutions: scope the rule, or give `template_argument` a recursive
-    fourth channel. Not worth implementing before that comes back.
-  - **A *value* argument in a closed container position** (`[vec<text, 3>]`). The reference channel works —
-    `[box<text>]` and nested arguments with it — but `type_argument`'s value channel is typed `value`, whose
-    reader decodes a token to its host type, so `<3>` and `<"3">` would arrive indistinguishable and the form
-    is exactly what identity needs. Refused at the form rather than guessed at. Fixing it means a
-    token-preserving read for a slot whose bound component is `schema.meta.Token` — nothing reads one from
-    the wire today, since every other `Token` in the model is built by the resolver in Java. The open form is
-    unaffected: it keeps the reference as written and never reaches a reader.
-  - **Two entries for one type, where both channels lift the same form.** A closed lift hashes the *unclosed*
-    binding record at desugar; the open lift hashes the *closed* one at materialisation — so `[box<text>]`
-    written directly and `[box<T>]` closed with `T := text` land on different names. D6 anticipates this
-    ("identity is settled after Pass 2 ... eagerly-lifted synthetics that become structurally identical under
-    resolution merge into one entry") and that merge pass is not implemented; it never had to be, because
-    every form lifted before this one was already concrete at desugar. Deliberately deferred: two entries are
-    easier to debug than a merge firing at the wrong moment, and it is reachable only when both spellings
-    appear in one schema.
+- [ ] **A *value* argument in a closed container position** (`[vector<float32, 3>]`). The reference channel
+  works — `[box<text>]` and nested arguments with it — and so does the same application anywhere it can be
+  *named*: `float3 => vector<float32, 3>` resolves, materialises to an `array` with both bounds at 3, and
+  reads. It is only inline inside a container that it fails, so a workaround always exists and is the one the
+  diagnostic names. The cause: `type_argument`'s value channel is typed `value`, whose reader decodes a token
+  to its host type, so `<3>` and `<"3">` would arrive indistinguishable and the form is exactly what identity
+  needs — refused at the form rather than guessed at. The fix is a token-preserving read for a slot whose
+  bound component is `schema.meta.Token`; nothing reads one from the wire today, since every other `Token` in
+  the model is built by the resolver in Java. The open form is unaffected: it keeps the reference as written
+  and never reaches a reader.
 
 - [ ] **The rest of §8.2's deferred value-level checks.** Materialisation "runs the value-level checks that
   open bounds deferred: family coherence rules whose operands were parameters". The array family's
@@ -104,12 +88,11 @@ two live shapes are both inside a template. The second has measured detail worth
   parameters, which cannot close until that declaration itself materialises — so composition would have to
   be deferred to materialisation too, absorbing fields into an entry that does not exist yet. A different
   feature from closing an application, and the diagnostic now says so rather than blaming substitution.
-- [ ] **A field/element type the desugar table cannot reduce to a name.**
-  `DefinitionResolver.resolveTypeRef`'s catch-all. Both shapes this used to name are settled: `[T]` inside a
-  template lifts to an open synthetic, and `(T | text)` is refused at the declaration as the representation
-  gap it is (`SPEC-FEEDBACK.md` #53), not as a fault at the CLI. What is left is the *application in a
-  container position* recorded above — `[box<text>]`, closed or open alike — whose entry does not exist
-  until materialisation has run.
+Nothing is left of the catch-all this section used to head. `DefinitionResolver.resolveTypeRef`'s refusal is
+now unreachable from a desugared document: `[T]` inside a template lifts to an open synthetic, `[box<text>]`
+carries the application in its binding record, and `(T | text)` is refused at the declaration as the
+representation gap it is (`SPEC-FEEDBACK.md` #53, declined by the spec author), not as a fault at the CLI.
+The throw stays as a guard against a caller resolving raw AST without running the desugar phase.
 
 Only genuine gaps are listed above — a throw that means "your schema is wrong" is not one. Classifying the
 throw sites by that test is done across the whole schema pipeline (issue #26); if a census is ever wanted
@@ -159,6 +142,19 @@ by a factor of six.
   mid-document — doesn't exist anywhere in the reader stack.
 
 # Lower Priority
+
+## Synthetic entry identity
+
+- [ ] **Two entries for one type, where both lift channels produce the same form.** A closed lift hashes the
+  *unclosed* binding record at desugar; the open lift hashes the *closed* one at materialisation — so
+  `[box<text>]` written directly and `[box<T>]` closed with `T := text` land on different names. D6
+  anticipates exactly this ("identity is settled after Pass 2 ... eagerly-lifted synthetics that become
+  structurally identical under resolution merge into one entry") and that merge pass is not implemented; it
+  never had to be, because every form lifted before `[box<text>]` was already concrete at desugar. Down here
+  on the spec author's own call: two entries are easier to debug than a merge firing at the wrong moment, and
+  it is reachable only when both spellings appear in one schema. Doing it properly means a pass at the end of
+  resolution that re-derives each synthetic's name from its resolved record and merges collisions — not a
+  patch to naming.
 
 ## Schema-side diagnostics
 
