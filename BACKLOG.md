@@ -59,7 +59,7 @@ own prose (which had gone stale on at least one of them):
 
 ## Remaining Part 2 resolution gaps
 
-One is left. `DefinitionResolver.resolveTypeRef`'s catch-all, which used to head this section, is now
+Two are left. `DefinitionResolver.resolveTypeRef`'s catch-all, which used to head this section, is now
 unreachable from a desugared document — every shape it named resolves or is refused where it is written —
 and survives only as a guard against a caller resolving raw AST with the desugar phase skipped.
 
@@ -69,6 +69,13 @@ and survives only as a guard against a caller resolving raw AST with the desugar
   parameters, which cannot close until that declaration itself materialises — so composition would have to
   be deferred to materialisation too, absorbing fields into an entry that does not exist yet. A different
   feature from closing an application, and the diagnostic now says so rather than blaming substitution.
+- [ ] **A parameterised alias — partial application** (`uuid_pair => <B> pair<uuid, B>`). A parameterised
+  declaration whose whole body is a bare application hits `DefinitionResolver.resolveTypeDef`'s
+  "got ReferenceTypeDef" catch-all (`UnsupportedOperationException`, so the CLI exits 70). Distinct from,
+  and simpler-looking than, the composition item above: no absorption is involved — the open form to record
+  is the inner application with the alias's own parameters substituted into its argument list, i.e. §5.10's
+  partial application, which `tson-cr-structure-templates.md` §4.5 lists as "retained unchanged". Found by
+  the 2026-08-21 CLI shakedown.
 
 Only genuine gaps are listed here — a throw that means "your schema is wrong" is not one. Classifying the
 throw sites by that test is done across the whole schema pipeline (issue #26); if a census is ever wanted
@@ -88,6 +95,61 @@ by a factor of six.
     family has no CIDR parser.
   - The natural fix for all three is the same one the narrowing check would want: an injected oracle, rather
     than moving the value model's dependencies.
+
+## Templates at the read boundary, and diagnostics UX
+
+Findings from a 2026-08-21 CLI shakedown of the finished template work: a full template-using schema
+(record templates, instance templates, nested applications, the recursive knot, sized sugar at field
+positions) compiles, validates and round-trips first try, and both data- and schema-side diagnostics
+supported genuinely one-shot fixes — with these exceptions, ordered by how much each hurts the
+validate-then-fix loop the project targets.
+
+- [ ] **An under-applied template named as a data value's type is a user error reported as a library fault.**
+  Data `!paged { … }` against a schema declaring `paged => <T> { … }` reaches an `ErrorReader` and exits 70
+  with "This is a bug in tson, not a problem with your document" — and the `!box` variant's message even
+  blames the linker ("TsonSchemaLinker should already have rejected this"). `tson-cr-structure-templates.md`
+  §4.6 is explicit that a template with any parameter is an ordinary resolver error as a data annotation,
+  "without exception". Naming a template without its arguments is among the most likely author mistakes in
+  the target use case, so it currently gets the worst answer in the whole surface. The fix wants a real
+  diagnostic naming the route: apply the template in a schema declaration and reference that entry.
+- [ ] **`!paged<order>` at a data type-ref position dead-ends the author.** The natural spelling of "a page
+  of orders" as a data root gets `expected whitespace after type name 'paged' before '<'`; following that
+  advice (`!paged <order>`) just produces a second parse error, and the real rule — data type-refs carry no
+  arguments; declare `orders_page => paged<order>` and write `!orders_page` — is never stated. Wants a
+  targeted diagnostic in the same posture as §4.1's migration hint. (The data grammar itself is correct to
+  refuse; only the message is at issue.)
+- [ ] **The CLI renders every `UnsupportedOperationException` as "a bug in tson — please report it", burying
+  gap messages that already contain the fix.** The #53 collection-slot refusal (`<T> { v: (T | text) }`)
+  throws a UOE whose text ends with the workaround ("naming the inner form in its own declaration … is the
+  way to write this today"), but the CLI wraps it in the bug-report framing plus a 25-frame stack trace.
+  Exit 70 is right (a gap is not a verdict on the schema); the framing is not — render UOE as "not
+  implemented yet: <message>", keeping the please-report framing for `IllegalStateException` only. Related:
+  a UOE thrown inside `SchemaDesugarer` aborts the whole compile, where every other desugar failure reports
+  per declaration and resyncs.
+- [ ] **Synthetic names leak into diagnostics, and `schemaPointer` roots at the instantiation entry's
+  internal name.** A read error against a template-derived type says
+  `'array_category_text_58d8f952_1_1dd94a70' has 0 elements`, and the JSON output's pointer begins
+  `/api_response_paged_order_e0260dd4_bd9a46c4/…` where the author wrote `!order_response` — an alias the
+  resolver knows. §8.2 keeps internal names non-normative, and the project's own diagnostics principle is
+  to never name a thing the author didn't write; rendering the applied spelling (`paged<order>`,
+  `[category<text>; 1..]`) or the author's alias is the fix. `tson-cr-structure-templates.md` R9(b)
+  (content-derived naming) is the adjacent, deeper item — this one is only about what diagnostics *print*.
+- [ ] **The §4.1 migration diagnostic (SHOULD) is unimplemented.** `m => map<text, text>` reports
+  "'m' has an unresolved reference 'map'" — confusing precisely because `map` visibly exists as a
+  constructor. The CR specifies the answer: when a generic head fails type-name resolution but matches a
+  parameterless constructor in the structure namespace, suggest the sugar (`{text => text}`) or the
+  `!C { … }` form.
+- [ ] Two cascade papercuts, both minor: after a broken template declaration is placeholder'd, a downstream
+  application reports "'bl' declares no type parameters … drop the argument list", which is wrong advice in
+  a cascade (the fix is upstream); and a regularity violation reports twice — the good declaration-time
+  error plus the 64-deep non-convergence chain from the application — where R5's premise was that the
+  static rule makes the depth guard an assertion that never fires (the guard should stand down, or the
+  placeholder should stop the closure attempt).
+- [ ] **`tson-cr-structure-templates.md`'s own `.tn` examples use `; comment` lines**, which primed this
+  shakedown's author — the exact audience the format targets — into writing comments in a language that has
+  none (Part 1 §2.4 deliberately defines no comment syntax). An editorial fix to the CR, and possibly a
+  lexer-diagnostic one: `expected a declaration name, found ';'` could add "TSON has no comment syntax;
+  use an @doc annotation".
 
 ## Miscellaneous
 
