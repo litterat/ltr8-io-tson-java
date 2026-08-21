@@ -26,12 +26,11 @@ own prose (which had gone stale on at least one of them):
   "import cycle" diagnostic naming the actual cycle path. Distinct from what
   `TsonCompiledMetaRegistry.withStandardLibrary` already does, which is scoped to just the three bundled
   schemas in a known order, not a general algorithm.
-- [ ] **An empty `{}` does not count against a map's `min_items`.** Found while landing the container
-  collapse and
-  **pre-existing**: `b: {text => order; 1..}` with data `b: {}` validates OK, through a named declaration
-  as much as through the sugar, while `max_items` reports correctly. Presumably `EmptyBrace` reaches the
-  map reader as something other than a zero-entry map. Unrelated to the container collapse; recorded so it
-  is not rediscovered as a regression.
+- [ ] **An empty `{}` does not count against a map's `min_items`.** `b: {text => order; 1..}` accepts data
+  `b: {}`, through a named declaration as much as through the sugar, while `max_items` reports correctly
+  (re-verified 2026-08-21). `EmptyBrace` presumably reaches the map reader as something other than a
+  zero-entry map — the concrete instance of the empty-brace primitive under Miscellaneous, and the reason
+  that one is worth doing.
 - [ ] **The rest of §8.2's deferred value-level checks.** Materialisation "runs the value-level checks that
   open bounds deferred: family coherence rules whose operands were parameters". The array family's
   `min_items <= max_items` is one rule over the binding pair for arrays *and maps*: a resolver error where
@@ -50,8 +49,9 @@ own prose (which had gone stale on at least one of them):
   instantiation entry checked against its own `source` by recomputation, a construction's binding
   record checked for parameter-slot agreement with its `source` application. Entirely unimplemented
   — "ingest" doesn't appear anywhere in the codebase. Note `spec/tson-cr-structure-templates.md` §4.7
-  extends what ingest must reverify: the closed-entry rule gains "no `value_form` members", and synthetic
-  entries must pass under the existing integrity checks. Note it would introduce a *second* way to build a
+  extends what ingest must reverify: the closed-entry rule gains "carries no `instance_template` body", the
+  invariant that makes open and closed entries tell apart by inspection, and synthetic entries must pass
+  under the existing integrity checks. Note it would introduce a *second* way to build a
   `TsonSchema` — bound from a document rather than resolved from source — and the two would have to agree,
   including on where a declaration's annotations land (the name's on the map key, the definition's on the
   entry). Lower priority than the rest of this section: the spec marks this path explicitly **optional**
@@ -59,17 +59,9 @@ own prose (which had gone stale on at least one of them):
 
 ## Remaining Part 2 resolution gaps
 
-§5.10 substitution exists now (`TemplateMaterialiser`), so what is left here is narrower than it was.
-
-**Done:** a generic type-ref whose arguments are not simple names. A value argument and a nested
-application both resolve, at every position that can write one — a field, a declaration body, and a
-refinement source share `DefinitionResolver.typeArgument`. An *inline sugar form* as an argument
-(`weird<[T]>`) is still out — `template-def` deliberately admits no bracket or paren form (D9), and the
-grammar refuses it where it is written.
-
-**Still open**, and each has its own item below or above: composing or refining against an application that
-is still *open*, which needs composition deferred to materialisation; and the field/element catch-all, whose
-two live shapes are both inside a template. The second has measured detail worth keeping:
+One is left. `DefinitionResolver.resolveTypeRef`'s catch-all, which used to head this section, is now
+unreachable from a desugared document — every shape it named resolves or is refused where it is written —
+and survives only as a guard against a caller resolving raw AST with the desugar phase skipped.
 
 - [ ] **Composing or refining against a template application that is still open** (`vip => <T> customer &
   box<T>`, §5.8's "Parameterized references"). The *fully-bound* case closes on demand now, at both
@@ -77,13 +69,8 @@ two live shapes are both inside a template. The second has measured detail worth
   parameters, which cannot close until that declaration itself materialises — so composition would have to
   be deferred to materialisation too, absorbing fields into an entry that does not exist yet. A different
   feature from closing an application, and the diagnostic now says so rather than blaming substitution.
-Nothing is left of the catch-all this section used to head. `DefinitionResolver.resolveTypeRef`'s refusal is
-now unreachable from a desugared document: `[T]` inside a template lifts to an open synthetic, `[box<text>]`
-carries the application in its binding record, and `(T | text)` is refused at the declaration as the
-representation gap it is (`SPEC-FEEDBACK.md` #53, declined by the spec author), not as a fault at the CLI.
-The throw stays as a guard against a caller resolving raw AST without running the desugar phase.
 
-Only genuine gaps are listed above — a throw that means "your schema is wrong" is not one. Classifying the
+Only genuine gaps are listed here — a throw that means "your schema is wrong" is not one. Classifying the
 throw sites by that test is done across the whole schema pipeline (issue #26); if a census is ever wanted
 again, take it fresh rather than trusting a recorded one, since the last recorded numbers had gone stale
 by a factor of six.
@@ -104,8 +91,10 @@ by a factor of six.
 
 ## Miscellaneous
 
-- [ ] General resolver-layer structural rules as reusable primitives, rather than binding-time-only
-  behavior — empty-brace resolution, the absent-vs-missing distinction.
+- [ ] **General resolver-layer structural rules as reusable primitives**, rather than binding-time-only
+  behaviour — empty-brace resolution, the absent-vs-missing distinction. The map `min_items` item above is
+  what this looks like when it bites: `{}` reaches a reader as something other than a zero-entry container,
+  so a rule stated over "how many entries" silently does not apply to it.
 - [ ] **Annotations are still discarded at a dispatched position.** A dispatcher (`VariantBindReader` for a
   union, `VariantSchemaReader` under bind mode) must consume the leading annotations to reach the
   `!typeName` it dispatches on -- they precede it in `data-value = *annotation [type-ref] core-value` -- so
@@ -295,10 +284,10 @@ missing most of the mirror.
 - [ ] User-facing documentation on how to use the library — today only `CLAUDE.md`'s own dense,
   session-oriented internal narrative exists.
 - [ ] AI skills for using the library.
-- [ ] `@doc`-driven documentation generation (render a schema's own `@doc` annotations). **Unblocked**: all
-  104 `@doc` strings across the three bundled schemas now survive resolution and linking, reachable as
-  `schema.entries().getAnnotations(name).value("doc", String.class)` — every one of core.tn's 48
-  declarations is documented. What's missing is the renderer, not the data.
+- [ ] `@doc`-driven documentation generation (render a schema's own `@doc` annotations). **Unblocked**:
+  every `@doc` string across the three bundled schemas survives resolution and linking, reachable as
+  `schema.entries().getAnnotations(name).value("doc", String.class)`, and core.tn documents every one of its
+  declarations. What's missing is the renderer, not the data.
 - [ ] **State the streaming contrast in README positioning.** JEP 540 makes its in-memory limit an explicit
   design decision, not an omission: "We assume that input JSON documents can fit in memory, as either a
   `String` or a `char` array... if we were to allow JSON sources such as files or network connections,
