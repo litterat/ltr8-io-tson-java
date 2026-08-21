@@ -293,6 +293,15 @@ public final class SchemaResolver {
         for (String name : declarations.keySet()) {
             resolvedLocals.put(name, namespace.get(name));
         }
+
+        // §5.10's regularity boundary, before anything closes: a template that grows its argument on every
+        // recursive step has no finite set of types to build, and catching it at the declaration means a
+        // broken template is rejected even if nobody ever applies it. Materialisation's own depth guard
+        // stays as a backstop.
+        TemplateRegularity.check(resolvedLocals, receiver == null ? null
+                : (name, error) -> receiver.report(Diagnostic.ofSchemaError(
+                        TsonCanonicalIdentity.canonicalize(id), name, error.getMessage(),
+                        Optional.ofNullable(positions.get(declarations.get(name))))));
         Map<String, TypeDefinition> instantiations = materialiser.materialise(resolvedLocals,
                 receiver == null ? null : (name, error) -> receiver.report(Diagnostic.ofSchemaError(
                         TsonCanonicalIdentity.canonicalize(id), name, error.getMessage(),

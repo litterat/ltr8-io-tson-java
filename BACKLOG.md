@@ -36,13 +36,16 @@ own prose (which had gone stale on at least one of them):
   exist and are already produced, so what is missing is whole-declaration open-form recording,
   materialisation, arity and kind checking, recursion with knot-tying, and the closed-entry check. Still
   this implementation's own, beyond the CR's letter:
-  - **A termination guard.** Non-regular (polymorphic) recursion like
-    `weird => <T> { next: weird<[T]>? }` / `use => weird<text>` grows its argument every level
-    (`text` → `[text]` → `[[text]]` …). Every instantiation is structurally distinct, so
-    dedup-by-identity never fires and materialisation never terminates. Distinct from
-    `SPEC-FEEDBACK.md` #25 (non-*productive* recursion — no finite *data* model): this is no finite
-    *type* model. The CR's §4.5 covers regular recursion (knot-tying) but is silent on this —
-    arguably a sentence the CR should gain.
+  - **Regularity is a declaration-time rule** (`TemplateRegularity`, the change report's R5), not a depth
+    counter: a recursive application must pass each parameter through unchanged, so `weird => <T> { next:
+    weird<box<T>>? }` is rejected where it is written even if nobody applies it. Materialisation keeps a
+    depth backstop in case that check has a hole, since the alternative failure is a `StackOverflowError`.
+    **Finding worth settling in the spec:** the implemented rule (positional identity) is stricter than
+    termination requires — every argument a *bare parameter reference*, at any position, suffices, because
+    arguments are only ever copied and never constructed, so `swap => <A, B> { x: swap<B, A> }` and
+    `dup => <A, B> { x: dup<A, A> }` reach finitely many instantiations and are rejected anyway. Positional
+    identity matches the cited precedent (ML's polymorphic-recursion restriction) and is easy to loosen
+    later; the reverse is not.
   - **Materialisation must replace the eager rejection, not merely remove it.** With heads resolving
     type-name-only there is no namespace check left to make, so `SchemaDesugarer.rejectTemplateApplication`
     fails on any head this document declares *or imports* — a template arriving by `!!import` included.

@@ -321,30 +321,25 @@ class RecordTemplateTest {
     }
 
     /**
-     * <b>Non-regular recursion is caught rather than run.</b> {@code weird<text>} closes to
+     * <b>Non-regular recursion never reaches materialisation.</b> {@code weird<text>} would close to
      * {@code weird<box<text>>}, then {@code weird<box<box<text>>>}, … -- the argument grows every level, so
-     * every instantiation is distinct, the knot-tying memo never fires, and there is no finite set of types
-     * to build. Unguarded this is a {@link StackOverflowError}, which is neither a diagnosis nor something
-     * the exception policy can classify; guarded it is the author's error, reported at the application.
-     *
-     * <p>Reachable without any container sugar, which is why it belongs here and not with the sugar forms:
-     * the argument grows through an ordinary second template.
+     * every instantiation is distinct and the knot-tying memo never fires. {@code TemplateRegularity}
+     * rejects the declaration before any of that, so this is the author's error rather than a library gap,
+     * and it does not depend on anyone applying the template. The full rule is exercised by
+     * {@code TemplateRegularityTest}; this pins the contrast with the regular case below.
      */
     @Test
-    void nonRegularRecursionIsReportedRatherThanOverflowingTheStack() {
+    void nonRegularRecursionIsRejectedBeforeAnythingCloses() {
         TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
                 () -> compile("""
                           box   => <T> { v: T }
                           weird => <T> { next: weird<box<T>>? }
                           use   => { w: weird<text> }"""));
 
-        assertTrue(thrown.getMessage().contains("'weird<...>' does not close"),
-                "names the template the author wrote, not whichever link tipped the depth over: "
-                        + thrown.getMessage());
-        assertTrue(thrown.getMessage().contains("arguments are growing"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("does not pass 'T' through unchanged"), thrown.getMessage());
     }
 
-    /** Regular recursion, by contrast, closes at one entry -- the contrast is the point of the guard. */
+    /** Regular recursion, by contrast, closes at one entry -- the contrast is the point of the rule. */
     @Test
     void regularRecursionClosesWhereNonRegularDoesNot() {
         assertEquals(1, instantiationsOf(compile("""

@@ -198,13 +198,11 @@ recorded open form, and replacing the application with a reference to the entry 
   like. Binding only the outer name leaves `T` in place inside `chain<T>` and mints an entry per level.
 - **Knot-tying** is the memo, registered before the body is substituted: a recursive application reached
   during substitution finds the entry under construction and references it by name.
-- **A termination guard, not a decision procedure.** *Regular* recursion ties the knot on its first repeat
-  and never nests. *Non-regular* recursion grows its argument every level (`weird => <T> { next:
-  weird<box<T>>? }`), so every instantiation is distinct, the memo never fires, and there is no finite type
-  model — unguarded, a `StackOverflowError`, which is neither a diagnosis nor something the exception policy
-  can classify. A depth bound set far above any hand-written schema turns it into the author's error, named
-  for the outermost head and showing the growing chain. Distinct from `SPEC-FEEDBACK.md` #25, which is about
-  a type with no finite *data* model; this is one with no finite *type* model, and the spec is silent on it.
+- **Non-regular recursion is rejected before this pass runs**, by `TemplateRegularity`, at the declaration
+  — see below. What stays here is a depth **backstop**: *regular* recursion ties the knot on its first
+  repeat and never nests, so nothing reaching this pass should run away, but if the static check ever has a
+  hole the alternative is a `StackOverflowError`, which is neither a diagnosis nor something the exception
+  policy can classify.
 - **Kind checking falls out of substitution.** A value argument reaching a type position, or a type argument
   reaching a `value_param` route, is the author's error — §5.10 infers a parameter's kind from its use, so
   the body's use and the applied argument are the two things being compared. Arity is checked before any of
@@ -229,6 +227,35 @@ recorded open form, and replacing the application with a reference to the entry 
 - **Scope is the record template.** One whose body writes a §5.3 container sugar form is refused earlier, at
   the application site, by `SchemaDesugarer.checkTemplateApplication` — those need an open representation of
   the sugar forms that does not exist yet (`spec/tson-cr-structure-templates.md`, Tranche C).
+
+## Template regularity (`tson-compiler/.../resolver/TemplateRegularity.java`)
+
+§5.10's regularity boundary, checked over the resolved entries before anything materialises: **within a
+template body, a recursive application — direct or mutual — must pass each parameter through unchanged.**
+
+- **Why it is a static rule and not a runtime limit.** A template that grows its argument every level
+  (`weird => <T> { next: weird<box<T>>? }`) reaches `weird<box<text>>`, then `weird<box<box<text>>>`, …, so
+  every instantiation is distinct, dedup-by-identity never fires, and there is no finite set of types to
+  build. Caught only while materialising it costs a depth counter — a non-portable limit, and the same
+  retrofit C++ reached for after shipping templates without a regularity restriction. Caught here it is an
+  ordinary schema error at the line that wrote it.
+- **A template nobody applies is still rejected.** That is the difference the move buys: `weird` used to
+  compile clean and fail at the first user's application, which is the pre-concepts C++ error-quality
+  failure in miniature.
+- **Mutual recursion needs reachability, not a self-edge** — neither template in an `a → b → a` cycle
+  applies itself, so an application is checked whenever its head can reach the declaration it sits in.
+- **Applications nested inside arguments are checked too** (`box<deep<box<T>>>`), so the walk recurses
+  through `TypeRef.arguments`. The body walk itself is `TemplateMaterialiser.mapBodyRefs` used as a visitor,
+  so one place knows the shape of a body.
+- **Deliberately stricter than termination requires.** The condition that actually bounds the work is weaker
+  — every argument a bare parameter reference, at any position — because arguments are only ever copied,
+  never constructed, so permuting (`swap => <A, B> { x: swap<B, A> }`) or duplicating still reaches finitely
+  many instantiations. Positional identity is what the cited precedent uses (ML restricts polymorphic
+  recursion the same way), and an over-restriction that is simple to state can be loosened later where the
+  reverse cannot. `TemplateRegularityTest.permutingParametersIsRejectedThoughItWouldTerminate` pins the
+  choice so it stays visible.
+- **Arity is not checked here.** A never-applied template's arity is still unverified — its own gap — so the
+  comparison runs only where the arity already matches.
 
 ## Meta-kernel bootstrap (`tson-compiler/.../resolver/MetaKernelBootstrapResolver.java`)
 
