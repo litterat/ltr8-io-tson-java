@@ -87,11 +87,19 @@ vector => <T, N> !array { element_type: T  min_items: N  max_items: N }
 
 Parameterhood comes from the declaration's own `<T, N>`, exactly as it does for a record template (`box => <T> { v: T }` marks nothing at the use site either) — one rule, not two. A sigil at the binding would be more locally legible, inconsistent with the form beside it, and would need retrofitting to record templates to stay coherent.
 
-**It is the fallback spelling, not the primary one.** For the four sugared constructors the compact form already exists and is already grammatical: `vector => <T, N> [T; N]` is `[type-params] container-def`, in the ABNF today. `instance-template` is the route to a constructor with *no* sugar — `set`, and whatever a meta layer adds (`bounded_set => <N> !set { element_type: text  min_items: N }`) — and the target the sugar desugars *into*. Its ergonomics matter less than its existence.
+**It is the fallback spelling, not the primary one.** For the four sugared constructors the compact form already exists and is already grammatical: `vector => <T, N> [T; N]` is `[type-params] type-ref` over a `bracket-type`. `instance-template` is the route to a constructor with *no* sugar — `set`, and whatever a meta layer adds (`bounded_set => <N> !set { element_type: text  min_items: N }`) — and the target the sugar desugars *into*. Its ergonomics matter less than its existence.
 
 **One limitation, enforced rather than discovered.** `template-arg` admits a name, a name with arguments, or a literal — not the bracket or paren forms — so `<T> !array { element_type: [T] }` is a parse error rather than a form that reads `[T]` as a data array holding the token `T`. Nesting goes through a second named template, consistent with §5.2's instinct that a composite shape earns a declaration. Admitting the sugar forms here instead would mean `template_argument` grows a case and the closing cascade has to lift from *inside* a binding; worth reviewing once the basic form is working, and deliberately out for this iteration.
 
 **`template-def` requires at least one binding.** An empty payload is a template that binds nothing, which no constructor application needs and which the closed form has no counterpart for — §2.1 refuses `{}` for a schema map on the same footing.
+
+**D10 — One bracket production, one map production, and no positional restriction.** Revision 32 spells each container twice: `container-def` at a declaration body, admitting a size specifier and an element/position `?`, and `inline-array`/`inline-map` at a type-ref position, admitting neither — with a prose tie-break in §12.1 because `type-def` is otherwise ambiguous between them. The two collapse into one production reachable from `type-ref`, and the restriction is **dropped**, not relocated.
+
+*Why the split existed, and why it no longer does.* §5.3's own account is representational: the `?` forms "desugar directly and become **the declaration's body**", which a nested or inline one cannot do. Once every form lifts to an entry (D5) there is no becoming-the-declaration's-body to protect — an inline `[T; 1..5]` lifts exactly as `[T]` already does. The rule outlived its reason, and §11 is where that reason went.
+
+*The alternative considered.* Collapsing while keeping the restriction leaves the language unchanged, which is what `SPEC-FEEDBACK.md` #31 proposed. But the restriction then has to move from the grammar into a "declaration-reachable" flag threaded through the parser — true at a type-def body, propagating through element positions and declaration-level map values, false through a record field type — and a flag can be wrong where two productions cannot. Dropping the restriction removes the flag along with it, so the relaxing half makes the parser *simpler*, not merely smaller.
+
+*What it costs.* Sized and `?`-bearing forms become legal at a field, so they become common **anonymous** synthetic entries where today every one of them is a name an author chose. That is the same trade `[text]` already makes, but it raises the stakes on internal naming rather than lowering them. This is a **language change**: documents that are errors today become valid, which is what #31 explicitly disclaimed, so that entry wants a paragraph saying the reasoning has moved on. A style preference for keeping field types simple is legitimate and survives as a style preference; it is no longer a grammar rule.
 
 ## 4. Normative Changes to Part 2
 
@@ -105,7 +113,9 @@ Add a migration diagnostic (SHOULD): when a generic head fails type-name resolut
 
 ### 4.2 §5.3 Type Expressions
 
-Add the map forms to the inline and declaration-level tiers: inline `{K => V}` at any type-ref position; declaration-level `{K => V ; size-spec}` with the size specifier desugaring to `min_items`/`max_items` under the same grammar, bound-coherence, and diagnostic rules as arrays. The N ≤ M coherence check is restated once as a rule on the `min_items`/`max_items` binding pair, applying identically to arrays and maps: resolver error where the bounds are literal at schema load, at materialisation where parameter-bound.
+**Delete the inline/declaration-level tier distinction.** There is one bracket form and one map form, legal at every type-ref position, each admitting a size specifier after `;` and an element/position `?` wherever it appears (D10). §5.3's paragraphs separating the two tiers, and the sentence confining the `?` forms to "the declaration's body", go with it.
+
+Add the map forms alongside the bracket ones: `{K => V}` and `{K => V ; size-spec}`, with the size specifier desugaring to `min_items`/`max_items` under the same grammar, bound-coherence, and diagnostic rules as arrays. The N ≤ M coherence check is restated once as a rule on the `min_items`/`max_items` binding pair, applying identically to arrays and maps: resolver error where the bounds are literal at schema load, at materialisation where parameter-bound.
 
 Replace the desugar table:
 
@@ -125,7 +135,7 @@ Replace the desugar table:
 
 Delete: the size-refinement-template routing paragraph; the "element- and position-`?` forms have no template route" paragraph (everything now desugars uniformly and nesting is handled by synthesis); and the layer-visibility paragraph, including the `vector` rationale and the "the `~` flag sets three dials" statement (now two: annotation head and entry weight).
 
-Add a new subsection, **Nested forms and synthetic entries**, carrying: D5's lift rule and its dividing line, which is *closed vs open* — a concrete form lifts to a closed synthetic entry, a form mentioning one of the enclosing declaration's parameters to an open one, and a declaration's own body never lifts; synthetic naming (reusing §8.2's internal-name rules — fresh by construction, disjoint from declared names, unreachable from source); and an explicit note that lifting does not relax the inline prohibitions — a size spec or `?` at an inline position remains a parse error.
+Add a new subsection, **Nested forms and synthetic entries**, carrying: D5's lift rule and its dividing line, which is *closed vs open* — a concrete form lifts to a closed synthetic entry, a form mentioning one of the enclosing declaration's parameters to an open one, and a declaration's own body never lifts; synthetic naming (reusing §8.2's internal-name rules — fresh by construction, disjoint from declared names, unreachable from source); and a note that the inline prohibitions it used to have to work around are gone (D10) — a size spec or `?` is legal wherever the form is.
 
 Delete the structural-representation paragraph rather than updating it. There is no structural representation of an inline form to describe: every sugar form is an entry referenced by a bare name, and `type_ref.arguments` means an open form and nothing else (§11).
 
@@ -202,15 +212,14 @@ Delete the **parameterized heads over binding records** section and the carve-ou
 
 ### 4.8 §12 Grammar
 
-**§12.1 ABNF.** Restructure `container-def`, add the map productions, and add the templated-instance alternative to `type-def` (D9); `element-type`, `size-spec`, `size-bound`, `type-args`, `type-arg` are unchanged (`map-def` arrives through the existing `[type-params] container-def` alternative, so `<V> {text => V}` requires no new production):
+**§12.1 ABNF.** Collapse each container to a single production reachable from `type-ref` (D10), add the map forms, and add the templated-instance alternative to `type-def` (D9). `size-spec`, `size-bound`, `type-args` and `type-arg` are unchanged; `container-def`, `inline-array` and `element-type` are replaced:
 
 ```abnf
 type-def = atom-refinement
          / instance                                    ; unchanged; never parameterised
          / instance-template                           ; NEW
          / [type-params] ["~"] structural-def
-         / [type-params] container-def
-         / [type-params] type-ref
+         / [type-params] type-ref                      ; CHANGED: container-def alternative deleted
 
 instance-template = type-params ws "!" type-name ws template-def  ; NEW
 
@@ -225,23 +234,24 @@ Decidable on one token after the optional parameter list: `!` with no parameter 
 
 ```abnf
 type-ref = paren-type
-         / inline-array
-         / inline-map                                  ; NEW
+         / bracket-type                                ; CHANGED: was inline-array
+         / map-type                                    ; NEW
          / type-name "<" type-args ">"
          / type-name
 
-inline-map = "{" ws map-key ws "=>" ws type-ref ws "}" ; NEW
+bracket-type = "[" element-type [ ws ";" ws size-spec ] ws "]"
+             / "[" element-type 1*(separator element-type) "]"
 
-container-def = array-def / tuple-def / map-def
+map-type     = "{" ws map-key ws "=>" ws element-type
+               [ ws ";" ws size-spec ] ws "}"          ; NEW
 
-array-def = "[" element-type [ ws ";" ws size-spec ] ws "]"
-tuple-def = "[" element-type 1*(separator element-type) "]"
-map-def   = "{" ws map-key ws "=>" ws map-value
-            [ ws ";" ws size-spec ] ws "}"             ; NEW
-
-map-key   = type-name [ "<" type-args ">" ]
-map-value = container-def / type-ref
+map-key      = type-name [ "<" type-args ">" ]
+element-type = type-ref [ "?" ]
 ```
+
+One production per container, at every position. `type-def` reaches both through `type-ref` like anything else, so §12.1's prose tie-break for a leading `[` disappears rather than needing rewording — there is nothing left to disambiguate. Nesting is the recursion already present in `element-type`, not a second reference to a declaration-level production, so `[[T; N]; N]` and `{text => [order; 1..]}` work by the same rule that makes `[[T]]` work.
+
+An element's `?` and a field's own `?` do not collide: a field is `field-name ":" type-ref [ "?" ]`, and the element's belongs to `element-type` inside the brackets, so `xs: [T?]?` is unambiguous — element optional, field optional.
 
 **§12.2 dispatch.** The brace form adopts the data grammar's consume-one-then-inspect dispatch; the prose should state explicitly that an implementation reuses its Part 1 §2.8 machinery, and that the choice is made by one consumed token plus one token of lookahead, preserving the stated lookahead budget in the same sense the data grammar does:
 
@@ -336,6 +346,8 @@ Removed outright by this change: the generic-application-head structure-namespac
 
 Added rather than removed, and worth listing beside them: `instance_template` and `template_argument` in the kernel (D7), and the `instance-template` production in §12.1 (D9).
 
+Also removed, and a **language change** rather than a restatement: the inline/declaration-level tier split (§5.3) and the positional restriction on size specifiers and element/position `?` (D10). Documents that are parse errors today become valid.
+
 Also a change to Revision 32 semantics beyond this report's core proposal, and easy to miss inside §4.1: **`!` resolves through the structure namespace only**, with no type-name precedence and no local capture. Under Revision 32 a local declaration named `array` could capture `!array`; it can no longer.
 
 ## 7. Compatibility and Migration
@@ -350,15 +362,15 @@ Two fixtures exercise the seams where the syntactic and semantic halves meet. Fi
 
 Deliberately unresolved here and flagged for the revision editor: whether the map sugar's key restriction (simple refs) should be stated as a grammar fact only or additionally motivated normatively (this report treats it as both a dispatch necessity and a design judgment); whether `@synthetic` output marking is a new meta annotation or reuse of an existing diagnostic convention; and whether §12.2's lookahead-budget prose should be reworded globally now that two productions (schema brace form, data brace form) share the consume-then-inspect idiom.
 
-**Whether the inline prohibition holds at a field position inside a template.** §5.3 confines size specifiers and element/position `?` to declaration level, and this report preserves that (§4.2). It follows that `<T> { children: [tree<T>; 1..] }` is a parse error, and so is `<T, N> { x: [[T; 1..N]; 2..N] }` — a nested open form cannot occur at a record field at all, only inside another declaration-level form. Both of §8's fixtures as drafted rely on the field spelling and are ungrammatical as written. Either they respell through `[type-params] container-def` at declaration level, or the prohibition relaxes at a field position. The choice is narrow but it decides how much of D7's machinery is reachable: with the prohibition intact, an open synthetic can only ever arise from a declaration whose *whole body* is a container form.
-
-`SPEC-FEEDBACK.md` #31 is the pending entry in this area and is expected to carry the resolution, but as drafted it does not: it collapses `inline-array` and `container-def` into one production reachable from `type-ref` while keeping the restriction as a note ("valid only where the bracket form is a declaration body or nested within one"), and says outright that "every shape rejected today stays rejected — this is a simplification of how the rule is written, not a change to the language". Relaxing the field position is that change, so #31 wants a paragraph saying so, or a companion entry.
+*(The inline-prohibition question that stood here is resolved by D10: the restriction is dropped, both §8 fixtures become grammatical as drafted, and `SPEC-FEEDBACK.md` #31 wants a paragraph recording that its "not a change to the language" framing no longer holds.)*
 
 ## 10. Implementation Plan (`ltr8-io-tson-java`)
 
-The change splits into three independently landable tranches. Tranche A needs no template machinery: user templates keep failing at the application site exactly as in the current implementation, so it can merge alone. Tranche B is §5.10 for **record** templates only — the form whose parameters occupy field types, and which needs no intermediate vocabulary at all. Tranche C adds **instance** templates: sugar forms inside a template declaration, `instance_template`/`template_argument`, and D9's grammar.
+The change splits into four independently landable tranches. **A** needs no template machinery: user templates keep failing at the application site exactly as in the current implementation, so it can merge alone. **B** is §5.10 for *record* templates only — the form whose parameters occupy field types and values, and which needs no intermediate vocabulary at all. **C** is D10's grammar collapse, which touches no template machinery either and is worth landing on its own because it *shrinks* what D has to handle. **D** adds *instance* templates: sugar forms written over a parameter, `instance_template`/`template_argument`, and D9's production.
 
-The B/C split is deliberate and load-bearing. A record template (`<T> { a: T  b: text ~ "test" }`) substitutes into `record_field.type` and `record_field.value`, both of which already exist and already admit a parameter; it needs open-form recording, substitution, arity and kind checking, recursion and knot-tying, and materialisation — the whole engine — but no new vocabulary and no grammar change. Everything D7 and D9 introduce exists solely to let a *constructor application* be templated. Building the engine first against the form that needs nothing new keeps the two failure surfaces apart.
+The B/D split is deliberate and load-bearing. A record template (`<T> { a: T  b: text ~ "test" }`) substitutes into `record_field.type` and `record_field.value`, both of which already exist and already admit a parameter; it needs open-form recording, substitution, arity and kind checking, recursion and knot-tying, and materialisation — the whole engine — but no new vocabulary and no grammar change. Everything D7 and D9 introduce exists solely to let a *constructor application* be templated. Building the engine first against the form that needs nothing new keeps the two failure surfaces apart.
+
+C sits between them rather than before B because it is independent of both: it is a parser and AST change with no resolution consequences, and its only effect on D is to widen where an open form may appear — which D handles by one mechanism however many positions feed it.
 
 **Tranche A — sugar, namespaces, kernel.**
 
@@ -379,20 +391,28 @@ Scope: a template declaration whose body is a record, a reference, or a composit
 9. **Identity.** Instantiation entries keyed on the flattened application in `source` (D6, unchanged), with `pixel_grid => grid<pixel, 3>` resolving as an alias to the entry rather than a second one.
 10. **Eager rejection retires here, and only here.** `SchemaDesugarer` currently fails any application whose head this document declares or imports. Materialisation replaces that for record templates; an application of a template containing a sugar form must keep failing until Tranche C.
 
-**Tranche C — instance templates (D7, D9).**
+**Tranche C — one bracket production, one map production (D10).**
+
+Scope: the grammar collapse and the dropped restriction. No template machinery, no new vocabulary, and no resolution change — every form this legalises lifts to a synthetic entry by the path D5 already describes.
+
+11. **Grammar and AST.** `bracket-type` and `map-type` replace `inline-array`/`inline-map` and `container-def`; `type-def` loses its `container-def` alternative and reaches both through `type-ref`. Six AST types collapse to two plus `element-type`: `InlineArrayRef`/`ArrayContainerDef`/`InlineTupleRef`/`TupleContainerDef` and the two map nodes become one bracket node and one map node. `TsonSchemaParser`'s three "not permitted at an inline type-ref position" diagnostics delete outright — there is no position where the form is not permitted.
+12. **Desugarer.** The two parallel walks merge. `SchemaDesugarer` currently reaches the same output through `typeRef` for the inline family and `binding`/`containerDef`/`exprRef` for the declaration-level one; with one node family there is one walk. **The distinction that survives is positional, not structural**: a declaration's own body is the construction in place, every other occurrence lifts (D5), and the walk already knows which it is in.
+13. **Fixtures.** `xs: [text; 1..5]` and `xs: [T?]` at a field position, `{text => order; 1..}` inline, and `xs: [T?]?` — element optional *and* field optional — which is the one place the two `?` positions meet.
+
+**Tranche D — instance templates (D7, D9).**
 
 Scope: sugar forms inside a template declaration, and the intermediate vocabulary they need. Take `[T]` first — the unsized inline form, whose only parameter rides a type slot — and only then the sized and nested forms, which are what actually require `template_argument`'s `param` channel.
 
 **Stage one is the grammar alone**, with `box => <T> { a: [T] }` as the whole target — the smallest form that needs any of this.
 
-11. **Grammar.** `TsonSchemaParser.parseTypeDef` parses `[type-params]` before dispatching on `!`, and a `!` behind a non-empty parameter list is an `instance-template` rather than an `instance` (D9). Today the `!` check precedes `parseTypeParamsOpt`, faithful to the ABNF as written. A new AST node, not a widened `Instance`.
-12. **Value model.** `schema.meta` gains `InstanceTemplate` and `TemplateArgument` (a sealed interface over `param`/`value`/`type_ref` — mind the `TypeArgument` cycle trap, and the multi-public-constructor `@Record` trap). `RecordField` is unchanged.
-13. **Desugarer.** A sugar form inside a parameterised declaration lifts to an **open** synthetic entry, using the same §4.2 table as everywhere else, with a parameter-valued binding recorded as `param`. The enclosing binding holds an ordinary `type_ref` applying it. The blanket no-eager-lift rule of D5 narrows accordingly: nothing lifts to a *closed* entry, but open lifting is exactly how nesting is represented.
-14. **Materialisation cascade.** Closing an application closes every open synthetic it reaches, innermost-out; `instance_template` becomes an ordinary constructor body as its bindings go concrete, and a binding that does not type-check against the slot (`min_items: "two"`) is the error, reported at the materialising application.
-15. **Identity.** Closed synthetics keyed on body structure and deduped cross-channel with directly written forms; open synthetics keyed up to consistent parameter renaming (D6).
-16. **Fixtures.** `grid` (cross-channel dedup) and `tree` (knot-tying) land as JUnit tests — both need respelling first, since a size specifier at a field position is a parse error under §5.3's inline prohibition, which this report preserves (§9). The conformance suite has no Part 2 layer, so the unit suite is their home.
+14. **Grammar.** `TsonSchemaParser.parseTypeDef` parses `[type-params]` before dispatching on `!`, and a `!` behind a non-empty parameter list is an `instance-template` rather than an `instance` (D9). Today the `!` check precedes `parseTypeParamsOpt`, faithful to the ABNF as written. A new AST node, not a widened `Instance`.
+15. **Value model.** `schema.meta` gains `InstanceTemplate` and `TemplateArgument` (a sealed interface over `param`/`value`/`type_ref` — mind the `TypeArgument` cycle trap, and the multi-public-constructor `@Record` trap). `RecordField` is unchanged.
+16. **Desugarer.** A sugar form inside a parameterised declaration lifts to an **open** synthetic entry, using the same §4.2 table as everywhere else, with a parameter-valued binding recorded as `param`. The enclosing binding holds an ordinary `type_ref` applying it. The blanket no-eager-lift rule of D5 narrows accordingly: nothing lifts to a *closed* entry, but open lifting is exactly how nesting is represented.
+17. **Materialisation cascade.** Closing an application closes every open synthetic it reaches, innermost-out; `instance_template` becomes an ordinary constructor body as its bindings go concrete, and a binding that does not type-check against the slot (`min_items: "two"`) is the error, reported at the materialising application.
+18. **Identity.** Closed synthetics keyed on body structure and deduped cross-channel with directly written forms; open synthetics keyed up to consistent parameter renaming (D6).
+19. **Fixtures.** `grid` (cross-channel dedup) and `tree` (knot-tying) land as JUnit tests — both need respelling first, since a size specifier at a field position is a parse error under §5.3's inline prohibition, which this report preserves (§9). The conformance suite has no Part 2 layer, so the unit suite is their home.
 
-**Across all three.** `docs/schema-grammar-and-desugaring.md`, `docs/schema-resolution.md`, `docs/linking-and-compilation.md` and `CLAUDE.md` update in the same session as the code they describe; `SPEC-FEEDBACK.md` #28, #32, #45, #46 gain resolutions citing this report.
+**Across all four.** `docs/schema-grammar-and-desugaring.md`, `docs/schema-resolution.md`, `docs/linking-and-compilation.md` and `CLAUDE.md` update in the same session as the code they describe; `SPEC-FEEDBACK.md` #28, #32, #45, #46 gain resolutions citing this report.
 
 ---
 
@@ -442,7 +462,7 @@ And the irony: the "dedicated parallel form record" it rejected is essentially w
 
 Recorded from review of this draft. Where a recommendation conflicts with a section above, the recommendation is the intended direction and the text is the artifact to fix.
 
-**Applied:** R1 (the D8 sweep — the sections above describe only the surviving design, and §11 collects what does not survive), R2 (D5 rewritten as the uniform lift rule, and implemented), R4 (folded into D7, with the degenerate case decided: an unreferenced parameter is an error), R5 (implemented as a declaration-time regularity check), R7 (folded into §6). **Outstanding:** R3, R6, R8, R9, R10.
+**Applied:** R1 (the D8 sweep — the sections above describe only the surviving design, and §11 collects what does not survive), R2 (D5 rewritten as the uniform lift rule, and implemented), R3 (adopted as D10 and scheduled as Tranche C; §9's open item is settled and both §8 fixtures become grammatical), R4 (folded into D7, with the degenerate case decided: an unreferenced parameter is an error), R5 (implemented as a declaration-time regularity check), R7 (folded into §6). **Outstanding:** R6, R8, R9, R10.
 
 **R1 — Sweep the §11 rejection of D8 through the document.** *(Applied.)* §11 rejects D8, but five passages still implement it, and one contradicts itself:
 
@@ -454,7 +474,7 @@ Recorded from review of this draft. Where a recommendation conflicts with a sect
 
 **R2 — Rewrite D5 as the uniform lift rule.** *(Applied; the closed half is implemented, the open half is Tranche C.)* Replacement text: *every sugar form lifts at desugar — concrete forms to closed synthetic entries, parameter-bearing forms to open synthetic entries capturing the free parameters of the enclosing declaration in declaration order; a declaration's own body never lifts (it is the declaration); materialisation creates no synthetic entries — it closes open ones, innermost-out.* This also resolves the wrinkle item 13 papers over ("nothing lifts to a closed entry" inside templates): a concrete `[order]` inside `<T> { a: T  b: [order] }` lifts **closed** at desugar — an open synthetic with no parameters would contradict D7's `instance_template ⟺ open` invariant — and D6's identity-settles-after-Pass-2 paragraph already exists to make eagerly-lifted closed entries merge correctly.
 
-**R3 — Resolve §9 by relaxing the field-position prohibition, and let §11 be the argument.** The inline/declaration tier distinction existed because sized forms had no inline *representation*. With D8 rejected there is no inline representation of anything: every form is an entry referenced by a bare name, so the prohibition protects nothing — it is surface conservatism whose motive §11 deleted. Relaxing it legalizes both §8 fixtures as written, legalizes the record-form grid (`<T, N> { x: [[T; 1..N]; 2..N] }`), and gives `SPEC-FEEDBACK.md` #31 its production collapse together with the honest paragraph that it *is* a language change. If the prohibition is kept instead: Tranche C stage one survives untouched (`box`'s `[T]` is inline-legal today), but tree, both grids, and the cross-channel-dedup fixture must respell through whole-body declarations — and the "third declaration writing `[pixel; 3]`" leg of the grid fixture becomes unreachable as written, since a whole-body `x => [pixel; 3]` is a *nominal* entry with a structurally equal body, not the synthetic.
+**R3 — Resolve §9 by relaxing the field-position prohibition, and let §11 be the argument.** *(Applied as D10; Tranche C.)* The inline/declaration tier distinction existed because sized forms had no inline *representation*. With D8 rejected there is no inline representation of anything: every form is an entry referenced by a bare name, so the prohibition protects nothing — it is surface conservatism whose motive §11 deleted. Relaxing it legalizes both §8 fixtures as written, legalizes the record-form grid (`<T, N> { x: [[T; 1..N]; 2..N] }`), and gives `SPEC-FEEDBACK.md` #31 its production collapse together with the honest paragraph that it *is* a language change. If the prohibition is kept instead: Tranche C stage one survives untouched (`box`'s `[T]` is inline-legal today), but tree, both grids, and the cross-channel-dedup fixture must respell through whole-body declarations — and the "third declaration writing `[pixel; 3]`" leg of the grid fixture becomes unreachable as written, since a whole-body `x => [pixel; 3]` is a *nominal* entry with a structurally equal body, not the synthetic.
 
 **R4 — Split instance-template checking between declaration and materialisation.** *(Applied to D7; unimplemented — the form does not exist yet.)* D7 and Tranche C item 14 defer type-checking to the materialising application, which is right for `param`-bound slots and wrong for everything else: binding *keys* against the target's vocabulary, REQUIRED-without-default coverage, and the typing of *concrete* bindings are all decidable at declaration time, and deferring them means a broken, never-instantiated template ships silently (`<T> !array { elemen_type: T }` should fail at the declaration, not at the first user's application). One sentence in D7: declaration-time checks everything the parameter list does not obscure; materialisation checks substituted values (§8.2's deferred checks, as drafted).
 

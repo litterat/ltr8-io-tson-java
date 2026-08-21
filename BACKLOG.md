@@ -51,7 +51,30 @@ own prose (which had gone stale on at least one of them):
     fails on any head this document declares *or imports* — a template arriving by `!!import` included.
     Deleting that without materialisation in place regresses to a read-time failure. Tranche B retires it
     for record templates only; an application of a template containing a sugar form keeps failing until C.
-- [ ] **Instance templates — `spec/tson-cr-structure-templates.md`, Tranche C (D7, D9).** A sugar form
+- [ ] **One bracket production, one map production — `spec/tson-cr-structure-templates.md`, Tranche C
+  (D10).** Revision 32 spells each container twice — `container-def` at a declaration body, `inline-array`/
+  `inline-map` at a type-ref position — with a prose tie-break because `type-def` is otherwise ambiguous
+  between them. They collapse into one production reached through `type-ref`, and the positional restriction
+  on size specifiers and element `?` is **dropped**, not relocated: §5.3's own justification for it was
+  representational ("they desugar directly and become the declaration's body"), and once every form lifts to
+  an entry there is nothing left for it to protect.
+  - **Nine AST files become about four**, and the two parallel walks in `SchemaDesugarer` merge —
+    `typeRef` for the inline family against `binding`/`containerDef`/`elementType`/`expr`/`exprRef` for the
+    declaration-level one, both walking to the same output. Footprint measured at the time: 40 references
+    to the inline node family, 49 to the declaration-level one. The distinction that survives is positional
+    — a declaration's own body is the construction in place, everything else lifts — and the walk already
+    knows which it is in.
+  - **The relaxing half makes the parser simpler, not just smaller.** Collapsing while keeping the
+    restriction needs a "declaration-reachable" flag threaded through the parser, and a flag can be wrong
+    where two productions cannot; dropping the restriction deletes the flag and the three
+    "not permitted at an inline type-ref position" diagnostics with it.
+  - **A language change**, which `SPEC-FEEDBACK.md` #31 explicitly disclaimed ("every shape rejected today
+    stays rejected"). That entry wants a paragraph recording that the reasoning has moved on — #31 was
+    written when nothing else was touching the grammar, and D9 opens it anyway.
+  - Raises the stakes on internal naming rather than lowering them: sized forms at field positions become
+    common anonymous synthetics where today every one of them is a name an author chose. Worth settling R9
+    in the same pass.
+- [ ] **Instance templates — `spec/tson-cr-structure-templates.md`, Tranche D (D7, D9).** A sugar form
   inside a template declaration **that mentions one of the declaration's own parameters** — a concrete one
   already lifts to an ordinary closed entry (D5's uniform rule, R2). Needs both a grammar addition and an
   intermediate vocabulary.
