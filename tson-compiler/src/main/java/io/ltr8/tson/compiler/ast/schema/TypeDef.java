@@ -11,6 +11,9 @@ package io.ltr8.tson.compiler.ast.schema;
  *   <li>{@link Instance} -- {@code "!" type-name ws core-value} (§5.5, constructor application;
  *       corrected from the spec's own literal {@code data-value} -- see {@link Instance}'s own
  *       Javadoc and {@code SPEC-FEEDBACK.md})</li>
+ *   <li>{@link InstanceTemplate} -- {@code type-params ws "!" type-name ws template-def} (§12.1, a
+ *       constructor application carrying parameters -- a production of its own, since its payload resolves
+ *       against different vocabulary from {@link Instance}'s)</li>
  *   <li>{@link StructuralTypeDef} -- {@code [type-params] ["~"] structural-def} (§5.7-§5.9)</li>
  *   <li>{@link ReferenceTypeDef} -- {@code [type-params] type-ref} (§8.3): a plain reference, or any
  *       container form, since a declaration-level container reaches this through {@code type-ref} like
@@ -23,5 +26,5 @@ package io.ltr8.tson.compiler.ast.schema;
  * ({@code SPEC-FEEDBACK.md} #45).
  */
 public sealed interface TypeDef
-        permits AtomRefinement, Instance, StructuralTypeDef, ReferenceTypeDef {
+        permits AtomRefinement, Instance, InstanceTemplate, StructuralTypeDef, ReferenceTypeDef {
 }
