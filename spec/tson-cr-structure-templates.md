@@ -486,7 +486,13 @@ Recorded from review of this draft. Where a recommendation conflicts with a sect
 
 **R8 — Add conformance tiering, and make it normative.** A consumer that ingests only resolved output is fully conforming with **zero** §5.10 support: the closed-entry rule guarantees no `param`, no `instance_template`, and bare names at every type position, so the wire never carries a template. State this as a conformance clause rather than an observation — it is what confines the engine's cost to authoring tools by construction, and it is the clean seam at which template support could be deferred to a later revision without any redesign.
 
-**R9 — Synthetic naming: reserved lexeme, content-derived names.** Two independent properties, in order of force:
+**R9 — Synthetic naming: reserved lexeme, content-derived names.** *(a) declined; (b) outstanding.* Two independent properties, in order of force:
+
+> **(a) is not available.** A reserved lexeme excluded from the source `type-name` production would also be
+> excluded from the kernel's `type_name` atom, because they are the same lexical class — and §8 resolver
+> output is a *data document* whose schema-map keys are typed `type_name`. A name the grammar cannot spell
+> is a name the resolver cannot write out, so the schema could not be serialised at all. Collision safety
+> stays a property of the derivation (fresh by construction, and checked), not of the lexeme.
 
 *(a) Unspellable, not hidden.* Synthetics stay in the one schema map — closed entries reference them by bare name, and a second namespace would split resolution and validation (the "two representations" sin §11 rejects, relocated). Instead, draw internal names from a lexeme space the **source** grammar's `type-name` production excludes (a reserved leading marker), while the kernel's `type_name` atom — which types the map keys in *data* — continues to admit it. One grammar line buys: collisions with declared names impossible by grammar rather than by freshness discipline; references to synthetics unspellable from source, killing the Hyrum's-law capture in which an observed internal name becomes load-bearing API; and imports resolved for free — synthetics travel transitively (an imported type's closed body keeps resolving) but are never nameable at an import site, because import references are source. Pairs with `@synthetic` (§4.7): the annotation for tools, the lexeme for the grammar.
 
