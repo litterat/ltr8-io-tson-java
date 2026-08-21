@@ -16,6 +16,7 @@ import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.Extern;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FloatType;
+import io.ltr8.tson.schema.meta.InstanceTemplate;
 import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.Ipv4Type;
 import io.ltr8.tson.schema.meta.Ipv6Type;
@@ -26,6 +27,7 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.RegexType;
+import io.ltr8.tson.schema.meta.TemplateArgument;
 import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.TimeType;
 import io.ltr8.tson.schema.meta.Top;
@@ -628,6 +630,27 @@ public final class TsonSchemaLinker {
                 }
                 checkVariantsAreDistinct(entryName, c, namespace);
                 checkVariantsAreNotVoid(entryName, c, namespace);
+            }
+            // An open entry's bindings. `target` names a constructor, which lives in the structure namespace
+            // and was resolved when the template was; what is left is the references the bindings carry, and
+            // that every `param` names a parameter this entry actually declares.
+            case InstanceTemplate template -> {
+                for (Map.Entry<String, TemplateArgument> binding : template.bindings().entrySet()) {
+                    String where = "'" + entryName + "' binding '" + binding.getKey() + "'";
+                    switch (binding.getValue()) {
+                        case TemplateArgument.Ref ref ->
+                                validateTypeRef(ref.typeRef(), namespace, ownParameters, where);
+                        case TemplateArgument.Param param -> {
+                            if (!ownParameters.contains(param.param())) {
+                                throw new TsonSchemaValidationException(where + " is bound to '" + param.param()
+                                        + "', which is not a type parameter of '" + entryName + "' " + ownParameters
+                                        + " (§5.10)");
+                            }
+                        }
+                        case TemplateArgument.Value ignored -> {
+                        }
+                    }
+                }
             }
             case Unit ignored -> {
             }
