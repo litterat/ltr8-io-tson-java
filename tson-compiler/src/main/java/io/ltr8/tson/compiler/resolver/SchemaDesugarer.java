@@ -132,6 +132,10 @@ final class SchemaDesugarer {
     private static final String ELEMENTS = "elements";
     private static final String VARIANTS = "variants";
 
+    /** {@code type_ref}'s own two fields, for the record form a slot takes when it holds an application. */
+    private static final String NAME = "name";
+    private static final String ARGUMENTS = "arguments";
+
 
     /**
      * What a declaration whose sugar form was reported is replaced with: a fresh, zero-field record. The
@@ -477,7 +481,49 @@ final class SchemaDesugarer {
      * binds, in the order the table above lists them. Everything downstream -- the emitted {@code !C { ... }},
      * the derived entry name, the bound-coherence check -- reads this and nothing else.
      */
-    private record Binding(String head, List<RecordValue.Field> fields) {
+    private record Binding(String head, List<RecordValue.Field> fields,
+                            Map<String, TypeRef> applicationSlots) {
+
+        Binding(String head, List<RecordValue.Field> fields) {
+            this(head, fields, Map.of());
+        }
+    }
+
+    /**
+     * A scalar type slot as both of the things downstream needs it as: the wire field a closed construction
+     * writes, and -- when the reference carries arguments -- the reference itself, kept whole for the open
+     * form to bind.
+     *
+     * <p><b>Why an application needs the second half.</b> A closed slot is a bare token, the positional form
+     * of a {@code type_ref} (§5.6). An application has no bare-token spelling: the entry it denotes does not
+     * exist until materialisation, one phase later. Its wire form is the record one, which keeps the name and
+     * the arguments apart -- structurally right, and what {@link #internalName} hashes -- but an open binding
+     * holds a {@code type_ref} directly rather than reading one, so it wants the reference as written.
+     */
+    private static void refSlot(String slot, TypeRef ref, List<RecordValue.Field> fields,
+            Map<String, TypeRef> applicationSlots) {
+        if (ref instanceof SimpleRef simple) {
+            fields.add(nameField(slot, simple.name()));
+            return;
+        }
+        fields.add(new RecordValue.Field(slot, scoped(refRecord((GenericRef) ref))));
+        applicationSlots.put(slot, ref);
+    }
+
+    /** <code>{ name: head  arguments: [ { name: A } { value: 2 } ] }</code> -- {@code type_ref}'s record form. */
+    private static RecordValue refRecord(GenericRef generic) {
+        List<ScopedValue> arguments = new ArrayList<>();
+        for (TypeArg argument : generic.args()) {
+            arguments.add(scoped(new RecordValue(List.of(switch (argument) {
+                case TypeArg.Ref reference when reference.ref() instanceof GenericRef nested ->
+                        new RecordValue.Field(NAME, scoped(refRecord(nested)));
+                case TypeArg.Ref reference ->
+                        nameField(NAME, ((SimpleRef) reference.ref()).name());
+                case TypeArg.Value value -> new RecordValue.Field("value", scoped(value.value()));
+            }))));
+        }
+        return new RecordValue(List.of(nameField(NAME, generic.name()),
+                new RecordValue.Field(ARGUMENTS, scoped(new ArrayValue(arguments)))));
     }
 
     /** One position of a tuple after expansion: the type it names, and whether it is marked {@code OPTIONAL}. */
@@ -512,17 +558,27 @@ final class SchemaDesugarer {
      */
     private static Optional<Binding> arrayBinding(TypeRef element, boolean optional, Optional<SizeSpec> size,
             String shown) {
-        if (!(element instanceof SimpleRef simple)) {
+        if (!isReference(element)) {
             return Optional.empty();
         }
         List<RecordValue.Field> fields = new ArrayList<>();
-        fields.add(nameField(ELEMENT_TYPE, simple.name()));
+        Map<String, TypeRef> applications = new LinkedHashMap<>();
+        refSlot(ELEMENT_TYPE, element, fields, applications);
         if (optional) {
             fields.add(nameField(STATE, ElementState.OPTIONAL.name()));
         }
         size.ifPresent(spec -> fields.addAll(sizeFields(spec, "[" + shown + "; 0..]")));
         checkBounds(fields);
-        return Optional.of(new Binding(ARRAY, fields));
+        return Optional.of(new Binding(ARRAY, fields, applications));
+    }
+
+    /**
+     * Whether a position holds something this table can put in a type slot: a name, or a name carrying
+     * arguments. Anything else is a sugar form the caller was supposed to have expanded first, and leaves the
+     * enclosing container unexpanded rather than half-built.
+     */
+    private static boolean isReference(TypeRef ref) {
+        return ref instanceof SimpleRef || ref instanceof GenericRef;
     }
 
     /**
@@ -531,16 +587,22 @@ final class SchemaDesugarer {
      * defined meaning for a map value, and an absent key is already a Part 1 resolver error.
      */
     private static Optional<Binding> mapBinding(TypeRef key, TypeRef value, Optional<SizeSpec> size) {
-        if (!(key instanceof SimpleRef keyName) || !(value instanceof SimpleRef valueName)) {
+        if (!isReference(key) || !isReference(value)) {
             return Optional.empty();
         }
         List<RecordValue.Field> fields = new ArrayList<>();
-        fields.add(nameField(KEY_TYPE, keyName.name()));
-        fields.add(nameField(VALUE_TYPE, valueName.name()));
+        Map<String, TypeRef> applications = new LinkedHashMap<>();
+        refSlot(KEY_TYPE, key, fields, applications);
+        refSlot(VALUE_TYPE, value, fields, applications);
         size.ifPresent(spec -> fields.addAll(
-                sizeFields(spec, "{" + keyName.name() + " => " + valueName.name() + "; 0..}")));
+                sizeFields(spec, "{" + shownRef(key) + " => " + shownRef(value) + "; 0..}")));
         checkBounds(fields);
-        return Optional.of(new Binding(MAP, fields));
+        return Optional.of(new Binding(MAP, fields, applications));
+    }
+
+    /** How a map side is quoted back in the one diagnostic that shows the form. */
+    private static String shownRef(TypeRef ref) {
+        return ref instanceof SimpleRef simple ? simple.name() : ((GenericRef) ref).name() + "<...>";
     }
 
     /**
@@ -655,8 +717,27 @@ final class SchemaDesugarer {
 
     // ── Hoisting: a sugar form becomes a declaration plus a reference to it ──────────────────────
 
-    /** {@code !head { field: value ... }} -- the construction a binding record denotes. */
+    /**
+     * {@code !head { field: value ... }} -- the construction a binding record denotes.
+     *
+     * <p><b>A closed construction cannot hold an application.</b> Its body is read through the constructor's
+     * own compiled reader, and a {@code type_ref}'s {@code arguments} cannot be read at all: {@code
+     * type_argument} is a field-group record in the kernel but a sealed interface here, the shape that breaks
+     * {@code tson-bind}'s resolution cycle, and nothing can read a value against one. So {@code [box<text>]}
+     * is refused with the reason rather than left unexpanded for the resolver to report as a form that
+     * "should have been lifted" -- it was lifted; it is the wire that cannot carry it. An <em>open</em>
+     * binding is unaffected: it holds the reference directly and never reaches a reader (see
+     * {@link #instanceTemplate}).
+     */
     private static TypeDef instance(Binding binding) {
+        if (!binding.applicationSlots().isEmpty()) {
+            String slot = binding.applicationSlots().keySet().iterator().next();
+            throw new UnsupportedOperationException("'!" + binding.head() + "' binds '" + slot + "' to a "
+                    + "template application, and a closed container cannot carry one: the entry it denotes "
+                    + "does not exist until materialisation, and a type_ref's 'arguments' has no compiled "
+                    + "reader in this implementation (§8.1). Naming the application in its own declaration "
+                    + "and referring to that is the way to write this today");
+        }
         return new Instance(new DataValue(List.of(), Optional.of(binding.head()),
                 new RecordValue(binding.fields())));
     }
@@ -668,6 +749,13 @@ final class SchemaDesugarer {
     private static TypeDef instanceTemplate(Binding binding, List<String> typeParams) {
         List<TemplateBinding> bindings = new ArrayList<>();
         for (RecordValue.Field field : binding.fields()) {
+            TypeRef application = binding.applicationSlots().get(field.name());
+            if (application != null) {
+                // Kept whole rather than read back out of the wire record beside it: an open binding holds a
+                // `type_ref`, and the one this slot was written with is already in hand.
+                bindings.add(new TemplateBinding(field.name(), new TypeArg.Ref(application)));
+                continue;
+            }
             if (!(field.value().value().coreValue() instanceof TokenValue token)) {
                 // A collection-valued slot -- `tuple`'s `elements`, `choice`'s `variants`. `template_argument`
                 // is `param | value | type_ref` with no collection case (§8.1), so a parameter inside one has
@@ -809,9 +897,24 @@ final class SchemaDesugarer {
         for (int i = 0; i < parameters.size(); i++) {
             substitution.put(parameters.get(i), renamed.get(i));
         }
+        Map<String, TypeRef> applications = new LinkedHashMap<>();
+        binding.applicationSlots().forEach((slot, ref) -> applications.put(slot, renameRef(ref, substitution)));
         return new Binding(binding.head(), binding.fields().stream()
                 .map(field -> new RecordValue.Field(field.name(), renameScoped(field.value(), substitution)))
-                .toList());
+                .toList(), applications);
+    }
+
+    /** An application's own arguments renamed alongside the wire record beside it, so the two stay in step. */
+    private static TypeRef renameRef(TypeRef ref, Map<String, String> substitution) {
+        if (ref instanceof SimpleRef simple) {
+            return substitution.containsKey(simple.name()) ? new SimpleRef(substitution.get(simple.name()))
+                    : simple;
+        }
+        GenericRef generic = (GenericRef) ref;
+        return new GenericRef(generic.name(), generic.args().stream().map(argument ->
+                argument instanceof TypeArg.Ref reference
+                        ? (TypeArg) new TypeArg.Ref(renameRef(reference.ref(), substitution))
+                        : argument).toList());
     }
 
     private static ScopedValue renameScoped(ScopedValue scoped, Map<String, String> substitution) {

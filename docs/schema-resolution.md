@@ -245,10 +245,21 @@ recorded open form, and replacing the application with a reference to the entry 
   a value are equally at home, so a value parameter passed straight through (`array_p0_…<N>` inside
   `<N> { a: [text; N] }`) stays a value. A parameter anywhere else is a type by construction, and a value
   arriving there is the kind error above.
-- **One position the desugar table still cannot reduce**: a container whose element is itself an application
-  (`[box<text>]`). Its entry does not exist until this pass has run, one phase later, so the form has no name
-  to bind — `DefinitionResolver` refuses it by name rather than guessing. It is what stands between this and
-  the change report's `grid` fixture.
+- **An application in a container position closes here too, and needs no name before it does.** An open
+  binding holds a `type_ref` whole, arguments intact, so `[tree<T>; 1..]` inside `tree` lifts to a synthetic
+  whose own `element_type` is `tree<p0>`. Closing runs in three steps and the order is the whole of it:
+  replace the `param` bindings, bind the parameters *inside* an application a binding holds, then close what
+  results. Closing first would close `tree<p0>` — an application of an argument nothing supplied.
+  - **That is what ties §8's `tree` knot.** Closing `tree<text>` reaches the synthetic, whose binding reaches
+    `tree<text>` again and finds it in `closing` — so the synthetic's `element_type` names the instantiation
+    entry, recorded before that entry completes. The array is reached *through* the record and names it back.
+  - **An application in a binding closes at the declaration when it can.** One naming none of the template's
+    own parameters (`<N> !array { element_type: box<text>  min_items: N }`) is fully bound already, so
+    `DefinitionResolver` closes it on the spot, the same treatment a composition supertype gets. One naming a
+    parameter is carried open — closing it there recurses through the very entry being resolved, which is the
+    shape `tree` takes.
+  - **The closed container position stays out** (`[box<text>]`): it has to write the application to the wire,
+    and no readable wire form carries arguments. See `docs/schema-grammar-and-desugaring.md` and `BACKLOG.md`.
 
 ## Template regularity (`tson-compiler/.../resolver/TemplateRegularity.java`)
 
