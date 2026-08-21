@@ -135,12 +135,15 @@ rebuilt and called a cache.
   (`TemplateMaterialiser`, `docs/schema-resolution.md`), not over the AST, so an application passes through
   here with its head and arguments intact. `checkTemplateApplication` refuses exactly two things: a local
   head declaring *no* parameters (the author's error — nothing there takes type arguments), and a template
-  whose body writes a container sugar form (`box => <T> { v: [T] }`), which has no open representation yet
-  and, left alone, resolves against a body whose `[T]` became a reference to `array` — a name a user
-  schema's type-name namespace does not hold, so the author is told about an unresolved reference to
-  something they never wrote. An **imported** head needs no check at all, even though the phase is handed
-  only the imported names: a template carrying sugar cannot link, so it cannot be registered, so it cannot
-  be imported.
+  whose body writes a container sugar form **over one of its own parameters** (`box => <T> { v: [T] }`),
+  which has no open representation yet and, left alone, resolves against a body whose `[T]` became a
+  reference to `array` — a name a user schema's type-name namespace does not hold, so the author is told
+  about an unresolved reference to something they never wrote. A *concrete* form in the same position is no
+  obstacle: it has already lifted to an ordinary closed entry by the time anyone applies the template. The
+  question is asked against the declaration **as written** rather than as desugared, because an application
+  may be met before the template it names has been walked and the answer must not depend on that order. An
+  **imported** head needs no check at all, even though the phase is handed only the imported names: a
+  template carrying an open sugar form cannot link, so it cannot be registered, so it cannot be imported.
 - **Identity is the resolved binding record, not the spelling.** The injected name is
   `head_value_value_hash`, derived from the record the form desugars to, so `[T; 3]` and `[T; 3..3]` land on
   the same entry and any two structurally identical forms anywhere in the document collapse to one

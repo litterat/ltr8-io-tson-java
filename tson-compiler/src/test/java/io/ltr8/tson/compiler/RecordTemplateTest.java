@@ -215,6 +215,77 @@ class RecordTemplateTest {
                 .read(TestDocuments.document("{ b: { v: \"seven\" } }"))).getMessage().contains("int32"));
     }
 
+    // ── Sugar inside a template body (R2) ────────────────────────────────
+    //    A *concrete* form lifts to an ordinary closed entry at desugar, exactly as it would outside a
+    //    template, so the template that holds it applies like any other. Only a form written over one of
+    //    the declaration's own parameters has to wait for the open representation.
+
+    @Test
+    void aConcreteSugarFormInsideATemplateLiftsAndTheTemplateApplies() {
+        TsonCompiledSchema compiled = compile("""
+                  order => { id: text }
+                  tmpl  => <T> { a: T  b: [order] }
+                  use   => { u: tmpl<text> }""");
+
+        assertEquals(1, instantiationsOf(compiled, "tmpl").size());
+        assertEquals(TypeRef.of("text"), fieldOf(compiled, fieldType(compiled, "use", "u"), "a").type());
+        assertNotNull(compiled.get("use")
+                .read(TestDocuments.document("{ u: { a: \"x\"  b: [ { id: \"1\" } ] } }")));
+    }
+
+    /** Every sugar form, not just the array: choice, map, and a nested bracket form all lift concretely. */
+    @Test
+    void everyConcreteSugarFormLiftsFromATemplateBody() {
+        for (String field : List.of("[order]", "(order | text)", "[[order]]", "{text => order}")) {
+            assertNotNull(compile("""
+                      order => { id: text }
+                      tmpl  => <T> { a: T  b: %s }
+                      use   => { u: tmpl<text> }""".formatted(field)), field);
+        }
+    }
+
+    /**
+     * The lifted entry is an ordinary one, so it is the same entry a directly written `[order]` produces
+     * anywhere else in the schema -- the cross-channel dedup that makes lifting concrete forms eagerly the
+     * right move rather than merely a convenient one.
+     */
+    @Test
+    void aFormLiftedFromATemplateIsTheSameEntryADirectOneProduces() {
+        TsonCompiledSchema compiled = compile("""
+                  order => { id: text }
+                  tmpl  => <T> { a: T  b: [order] }
+                  plain => { c: [order] }
+                  use   => { u: tmpl<text> }""");
+
+        assertEquals(1, compiled.schema().entries().keySet().stream()
+                .filter(n -> n.startsWith("array_order_")).count(),
+                () -> "one array_order entry, shared: " + compiled.schema().entries().keySet());
+    }
+
+    /** A form written over the declaration's own parameter still waits for the open representation. */
+    @Test
+    void aParameterBearingSugarFormStillRefusesTheApplication() {
+        for (String field : List.of("[T]", "[box<T>]", "(T | text)")) {
+            UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
+                    () -> compile("""
+                              box  => <T> { v: T }
+                              tmpl => <T> { a: %s }
+                              use  => { u: tmpl<text> }""".formatted(field)), field);
+            assertTrue(thrown.getMessage().contains("over one of its own parameters"), thrown.getMessage());
+        }
+    }
+
+    /** A declaration's own body is the construction, not a reference to a lifted one -- unchanged by R2. */
+    @Test
+    void aDeclarationsOwnBodyStillDoesNotLift() {
+        TsonCompiledSchema compiled = compile("""
+                  order => { id: text }
+                  ids   => [order]""");
+
+        assertInstanceOf(io.ltr8.tson.schema.meta.ArrayBody.class,
+                compiled.schema().entries().get("ids").body(), "the construction in place");
+    }
+
     // ── The two field-absorbing positions (§5.7, §5.8) ───────────────────
     //    A composition supertype and a refinement source copy the source's *fields*, so an application
     //    there has to be closed during resolution rather than carried and closed by the later pass --
