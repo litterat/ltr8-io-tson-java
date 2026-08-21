@@ -214,23 +214,56 @@ class ContainerSugarEndToEndTest {
     }
 
     /**
-     * A generic head resolves through the type-name namespace only (§3.3.1), so an application can only ever
-     * be a §5.10 user-template application. One whose body writes a container sugar form still fails at the
-     * site that writes it: §5.3's forms have no open representation yet, so the application cannot be
-     * materialised. Left alone, the body's {@code [T]} resolves to a reference to {@code array} -- a name a
-     * user schema's type-name namespace does not hold -- and the author is told their schema has an
-     * unresolved reference to something they never wrote. (A template whose parameters occupy field types and
-     * values applies normally; see {@code RecordTemplateTest}.)
+     * A container sugar form written over the enclosing template's own parameter: it lifts to an <b>open</b>
+     * synthetic, and applying the template closes it into the concrete container it always described.
      */
     @Test
-    void applyingATemplateWhoseBodyCarriesSugarIsRejectedWhereItIsWritten() {
-        UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
-                () -> compile("""
-                          box => <T> { v: [T] }
-                          holder => { b: box<text> }"""));
+    void applyingATemplateWhoseBodyCarriesSugarClosesTheFormItHolds() {
+        TsonCompiledSchema compiled = compile("""
+                  box => <T> { v: [T] }
+                  holder => { b: box<text> }""");
 
-        assertTrue(thrown.getMessage().contains("container sugar form"), thrown.getMessage());
-        assertTrue(thrown.getMessage().contains("not implemented"), thrown.getMessage());
+        RecordBody box = assertInstanceOf(RecordBody.class, fieldTypeEntry(compiled, "holder", "b").body());
+        ArrayBody array = assertInstanceOf(ArrayBody.class, compiled.schema().entries()
+                .get(box.fields().get(0).type().name()).body());
+
+        assertEquals(TypeRef.of("text"), array.elementType());
+    }
+
+    /**
+     * §8.2's one-entry-per-form rule, across the two channels that produce one. {@code [text]} written
+     * directly lifts at desugar; {@code [T]} closed with {@code T := text} arrives from materialisation --
+     * and they are the same type, so they must be the same entry. Both are named by one function of one
+     * binding record, which is what makes it so.
+     */
+    @Test
+    void aFormClosedFromATemplateIsTheSameEntryADirectOneProduces() {
+        TsonCompiledSchema compiled = compile("""
+                  box    => <T> { v: [T] }
+                  holder => { b: box<text>  direct: [text] }""");
+
+        RecordBody box = assertInstanceOf(RecordBody.class, fieldTypeEntry(compiled, "holder", "b").body());
+        RecordBody holder = (RecordBody) compiled.schema().entries().get("holder").body();
+
+        assertEquals(holder.fields().get(1).type().name(), box.fields().get(0).type().name());
+        assertEquals(1, compiled.schema().entries().keySet().stream()
+                .filter(n -> n.startsWith("array_text_")).count(),
+                () -> "one array_text entry, shared: " + compiled.schema().entries().keySet());
+    }
+
+    /**
+     * The one sugar form with no open representation at all. A {@code template_argument} is {@code param |
+     * value | type_ref} with no collection case (§8.1), so a parameter inside {@code choice}'s {@code
+     * variants} -- or {@code tuple}'s {@code elements} -- has nowhere to sit. Refused at the declaration that
+     * writes it, not at the application: the template itself is what cannot be represented.
+     */
+    @Test
+    void aParameterInsideACollectionValuedSlotHasNoOpenForm() {
+        for (String body : List.of("(T | text)", "[T, text]")) {
+            UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
+                    () -> compile("  odd => <T> { v: %s }".formatted(body)), body);
+            assertTrue(thrown.getMessage().contains("no collection case"), thrown.getMessage());
+        }
     }
 
     /**

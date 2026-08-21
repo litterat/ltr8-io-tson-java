@@ -269,7 +269,8 @@ public final class SchemaResolver {
         // closes applications on demand: a supertype or refinement source has to absorb the *closed* entry's
         // fields, and cannot wait for the batch pass below. Sharing the instance is what makes an on-demand
         // closing and a later batch closing of the same application land on one entry.
-        TemplateMaterialiser materialiser = new TemplateMaterialiser(namespaceGetter, namespace::put);
+        TemplateMaterialiser materialiser = new TemplateMaterialiser(namespaceGetter, namespace::put,
+                (type, value) -> (Top) read(metaParser.reader(type), value));
 
         // The same compiled reader serves both hooks; they differ in what the caller does with the result,
         // which is why they are separate types rather than one Object-returning one.

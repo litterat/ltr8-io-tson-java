@@ -836,6 +836,14 @@ public final class TsonSchemaLinker {
             case TupleBody tuple -> tuple.elements().forEach(e -> collectNames(e.elementType(), into));
             case ChoiceBody choice -> choice.variants().forEach(v -> collectNames(v, into));
             case Reference reference -> collectNames(reference.target(), into);
+            case InstanceTemplate template -> template.bindings().values().forEach(binding -> {
+                switch (binding) {
+                    case TemplateArgument.Param param -> into.add(param.param());
+                    case TemplateArgument.Ref ref -> collectNames(ref.typeRef(), into);
+                    case TemplateArgument.Value ignored -> {
+                    }
+                }
+            });
             default -> { } // an atom body names no type
         }
     }

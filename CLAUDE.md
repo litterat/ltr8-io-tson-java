@@ -501,12 +501,16 @@ compatibility).
   `DefinitionResolver`'s Javadoc is the exact current boundary and `BACKLOG.md` carries the detail. Only
   about half the `UnsupportedOperationException` sites in the pipeline are gaps at all; the rest are
   schema-author errors or internal faults wearing the wrong exception type, and the classification is done.
-- **§5.10 substitution into a template whose body writes a container sugar form** (`box => <T> { v: [T] }`)
-  — §5.3's forms have no *open* representation, so the application is rejected at the site that writes it.
-  A **record** template — parameters occupying field types and field values — applies normally
-  (`TemplateMaterialiser`). `spec/tson-cr-structure-templates.md`'s Tranche C carries the design for the
-  rest: `template_instance`/`template_argument` as the open counterpart of an instance, and D9's
-  `[type-params] instance`.
+- **A sugar form over a parameter whose slots are not all scalar, and a container position that is an
+  application.** §5.10 substitution itself works for both template shapes now: a **record** template
+  (parameters occupying field types and values) and an **open instance** — `<T> { v: [T] }`, or the explicit
+  `<T, N> !array { element_type: T  min_items: N }` — the latter lifting to an `instance_template` body and
+  closing through the target constructor's own reader (`TemplateMaterialiser`, `docs/schema-resolution.md`).
+  Two things remain. `tuple` and `choice` bind a *collection*, and `template_argument` has no collection
+  case, so `<T> { v: (T | text) }` is refused at the declaration (`SPEC-FEEDBACK.md` #53). And a container
+  whose element is itself an application (`[box<text>]`) has no entry to name until materialisation has run,
+  so the desugar table cannot reduce it — which is also what blocks the change report's nested `grid`
+  fixture.
 - **Undocumented atom constructors** — `unknown` (and `extern`, which has no core.tn declaration) has no
   compiled-parser factory, so it compiles to `ErrorReader` (a schema merely *declaring* one still compiles).
   Neither is an ordinary missing parser waiting to be written: `extern` is a whole absent mechanism and `unknown`

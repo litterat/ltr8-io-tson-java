@@ -437,8 +437,8 @@ class DefinitionResolverTest {
      * structural {@code array<T>}, which is the representation the change report rejects (§11) and which the
      * linker now reports as an arity error against a constructor the author never wrote. Refusing says what
      * is actually wrong -- the form reached resolution unlifted, either because a caller skipped
-     * {@code SchemaDesugarer} or because it is written over a type parameter and has no open representation
-     * yet.
+     * {@code SchemaDesugarer} (this fixture's case) or because a position inside it is an application, which
+     * has no entry to name until it is materialised.
      */
     @Test
     void aSugarFormReachingResolutionUnliftedIsRefused() throws IOException {

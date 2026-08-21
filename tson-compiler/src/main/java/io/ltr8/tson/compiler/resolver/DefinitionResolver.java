@@ -27,6 +27,7 @@ import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.ast.schema.SimpleRef;
 import io.ltr8.tson.compiler.ast.schema.SizeSpec;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
+import io.ltr8.tson.compiler.ast.schema.TemplateBinding;
 import io.ltr8.tson.compiler.ast.schema.TypeArg;
 import io.ltr8.tson.compiler.ast.schema.TypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeRef;
@@ -38,8 +39,10 @@ import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.SourcePosition;
+import io.ltr8.tson.schema.meta.TemplateArgument;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeArgument;
@@ -229,6 +232,12 @@ import java.util.Set;
 final class DefinitionResolver {
 
     /**
+     * The kernel's own reference type, which is what a constructor's <em>type</em> slots are declared as --
+     * the one slot kind an instance template's binding fills through the reference channel (§8.1).
+     */
+    private static final String TYPE_REF = "type_ref";
+
+    /**
      * Re-serializes an atom refinement's source back to wire form for {@link #mergeWithSource} -- see
      * {@link #resolveAtomRefinement}. Structural, not incidental: the merge has to happen on the wire
      * record, so this is the only way to get the source's already-bound facets back into one.
@@ -392,14 +401,7 @@ final class DefinitionResolver {
             return resolveAtomRefinement(name, refinement);
         }
         if (typeDef instanceof InstanceTemplate template) {
-            // The grammar admits it; the resolved form it denotes does not exist yet. `instance_template`
-            // and `template_argument` -- the open counterpart of a constructor body, carrying a `param`
-            // where a concrete instance carries a value -- are the next stage. Refusing here keeps the
-            // parameters and the bindings from being quietly dropped into an ordinary construction, which
-            // would resolve to the constructor's own body with nothing bound.
-            throw new UnsupportedOperationException("'" + name + "': an instance template ('<...> !"
-                    + template.target() + " { ... }') has no resolved form yet -- the open counterpart of a "
-                    + "constructor body is not implemented (§5.10, §8.1)");
+            return resolveInstanceTemplate(name, template);
         }
         throw new UnsupportedOperationException(
                 "'" + name + "': only fresh record constructions, composition, simple type references, "
@@ -449,6 +451,130 @@ final class DefinitionResolver {
         Top body = bindAtomInstance(name, instance.value());
         return new TypeDefinition(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of(target)), constructor.kind(),
                 List.of(), false, List.of(), List.of(), Optional.empty(), body);
+    }
+
+    /**
+     * {@code <T, N> !array { element_type: T  min_items: N }} -- the open counterpart of {@link
+     * #resolveInstance}. The target resolves the same way and must be a constructor for the same reason; what
+     * differs is that the payload cannot be read through that constructor's own reader, because at least one
+     * binding is a parameter and no parameter is an {@code integer}. So the bindings are recorded as an
+     * {@code instance_template} (§8.1) and read later, when materialisation has made them concrete.
+     *
+     * <p><b>What is checked here is what the parameter list obscures, and nothing more</b> (§5.10). A closed
+     * instance is checked in full where it is written -- its body binds through the constructor's reader, so
+     * §7.2's closure rule catches an unknown field, a missing required one and a wrong-typed value alike.
+     * Deferring all three would make this the one form in the language validated at use rather than at
+     * declaration, and a broken template would fail at its first user's application site rather than at the
+     * typo. So: binding names against the target's vocabulary, coverage of every REQUIRED-without-default
+     * field, and (at materialisation, through the reader) the typing of the values that substitution supplies.
+     */
+    private TypeDefinition resolveInstanceTemplate(String name, InstanceTemplate template) {
+        String target = template.target();
+        TypeDefinition constructor = resolveConstructorTarget(name, target);
+        if (!constructor.constructor()) {
+            throw new TsonSchemaValidationException("'" + name + "': '!" + target + "' does not resolve to a "
+                    + "constructor (§3.3.1), so there is nothing for '<...> !" + target + " { ... }' to build");
+        }
+        if (!(constructor.body() instanceof RecordBody vocabulary)) {
+            throw new IllegalStateException("'" + name + "': constructor '" + target + "' has a "
+                    + constructor.body().getClass().getSimpleName() + " body; a constructor is record-shaped "
+                    + "(§7.2) and cannot be declared otherwise");
+        }
+        Map<String, TemplateArgument> bindings = new LinkedHashMap<>();
+        for (TemplateBinding binding : template.bindings()) {
+            RecordField slot = vocabulary.fields().stream()
+                    .filter(field -> field.name().equals(binding.name()))
+                    .findFirst()
+                    .orElseThrow(() -> new TsonSchemaValidationException("'" + name + "': '" + target
+                            + "' has no field '" + binding.name() + "' to bind (§7.2) -- its fields are "
+                            + vocabulary.fields().stream().map(RecordField::name).toList()));
+            bindings.put(binding.name(), templateArgument(name, template.typeParams(), slot, binding));
+        }
+        for (RecordField field : vocabulary.fields()) {
+            if (field.state() == FieldState.REQUIRED && field.value().isEmpty()
+                    && !bindings.containsKey(field.name())) {
+                // No application of this template could ever produce a valid instance, so the template is
+                // wrong wherever the application is -- exactly the case the declaration is the right place
+                // to report.
+                throw new TsonSchemaValidationException("'" + name + "': '" + target + "' requires a '"
+                        + field.name() + "', and nothing binds it (§7.2), so no application of this template "
+                        + "could build one");
+            }
+        }
+        return new TypeDefinition(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of(target)), constructor.kind(),
+                template.typeParams(), false, List.of(), List.of(), Optional.empty(),
+                new io.ltr8.tson.schema.meta.InstanceTemplate(target, bindings));
+    }
+
+    /**
+     * One binding on the channel {@code template_argument} keeps it in (§8.1): {@code param} when the token
+     * names a parameter of the declaration, {@code type_ref} when the slot takes a reference, {@code value}
+     * otherwise.
+     *
+     * <p><b>{@code param} wins over the slot's own kind.</b> A type slot could carry a parameter through the
+     * reference channel, a {@code type_ref} being free to name one -- but then one binding has two spellings
+     * and body identity depends on which the resolver picked. {@code param} means "unbound" uniformly.
+     *
+     * <p>The parser cannot make this call: {@code type-arg} reads an unquoted, non-numeric token as a
+     * reference always (§12.1 defers the classification), so {@code state: OPTIONAL} arrives here looking
+     * exactly like {@code element_type: order}. The slot separates them.
+     */
+    private TemplateArgument templateArgument(String name, List<String> parameters, RecordField slot,
+            TemplateBinding binding) {
+        if (binding.value() instanceof TypeArg.Value literal) {
+            return new TemplateArgument.Value(new Token(literal.value().text(),
+                    tokenForm(literal.value().form())));
+        }
+        TypeRef ref = ((TypeArg.Ref) binding.value()).ref();
+        if (ref instanceof SimpleRef simple && parameters.contains(simple.name())) {
+            return new TemplateArgument.Param(simple.name());
+        }
+        if (takesATypeRef(slot)) {
+            return new TemplateArgument.Ref(resolveTemplateBindingRef(name, binding.name(), ref));
+        }
+        if (!(ref instanceof SimpleRef simple)) {
+            throw new TsonSchemaValidationException("'" + name + "': binding '" + binding.name() + "' takes a "
+                    + slot.type().name() + ", so it cannot be an application (§8.1) -- only a type slot "
+                    + "carries one");
+        }
+        return new TemplateArgument.Value(new Token(simple.name(), Token.Form.UNQUOTED));
+    }
+
+    /** A concrete reference in a type slot, resolved the way every other argument-bearing reference is. */
+    private io.ltr8.tson.schema.meta.TypeRef resolveTemplateBindingRef(String name, String slot, TypeRef ref) {
+        if (ref instanceof SimpleRef simple) {
+            return io.ltr8.tson.schema.meta.TypeRef.of(simple.name());
+        }
+        if (ref instanceof GenericRef generic) {
+            // An application in a binding is closed on the spot when it can be -- the same treatment a
+            // supertype or a refinement source gets, and for the same reason: what a binding may hold is an
+            // entry, and an application is not one until it has been closed into one.
+            return io.ltr8.tson.schema.meta.TypeRef.of(closedApplication(name, generic, List.of(),
+                    "binding '" + slot + "'"));
+        }
+        throw new TsonSchemaValidationException("'" + name + "': binding '" + slot + "' holds a form that is "
+                + "not a reference (§8.1)");
+    }
+
+    /**
+     * Whether a constructor field takes a {@code type_ref} -- the one slot kind whose binding rides the
+     * reference channel. Aliases are followed, since a meta layer may name the kernel's own {@code type_ref}
+     * something of its own; the walk is bounded because a cyclic alias chain is a schema this resolver has
+     * already accepted and must not hang on.
+     */
+    private boolean takesATypeRef(RecordField slot) {
+        String typeName = slot.type().name();
+        for (int hop = 0; hop < 32; hop++) {
+            if (typeName.equals(TYPE_REF)) {
+                return true;
+            }
+            TypeDefinition definition = metaDefinitions.getTypeDefinition(typeName);
+            if (definition == null || !(definition.body() instanceof Reference reference)) {
+                return false;
+            }
+            typeName = reference.target().name();
+        }
+        return false;
     }
 
     // ── Atom refinement (§5.5, §5.7) ─────────────────────────────────────────
@@ -1535,17 +1661,17 @@ final class DefinitionResolver {
         if (ref instanceof ArrayRef || ref instanceof io.ltr8.tson.compiler.ast.schema.TupleRef
                 || ref instanceof io.ltr8.tson.compiler.ast.schema.MapRef
                 || ref instanceof io.ltr8.tson.compiler.ast.schema.ChoiceRef) {
-            // Every sugar form is lifted to an entry by `SchemaDesugarer` before resolution, so one reaching
-            // here was not: either a caller resolved raw AST without running that phase, or the form is
-            // written over one of the enclosing declaration's own parameters, which `SchemaDesugarer`
-            // deliberately leaves alone because its open representation does not exist yet. Refusing names
-            // that. What this replaces built a structural `array<T>` instead -- the representation §11
-            // rejects, which the linker then reports as an arity error against a constructor the author
-            // never wrote.
+            // Every sugar form is lifted to an entry by `SchemaDesugarer` before resolution, closed or open,
+            // so one reaching here was not: either a caller resolved raw AST without running that phase, or
+            // the form holds a position the desugar table cannot reduce to a name -- an element that is
+            // itself an application (`[box<text>]`), whose entry does not exist until materialisation has
+            // run, one phase later. Refusing names that. What this replaces built a structural `array<T>`
+            // instead -- the representation §11 rejects, which the linker then reports as an arity error
+            // against a constructor the author never wrote.
             throw new UnsupportedOperationException("a container sugar form must be lifted to an entry "
                     + "before resolution (§5.3); this one was not, which means either the desugar phase was "
-                    + "skipped or the form is written over a type parameter and has no open representation "
-                    + "yet (§5.10): " + ref);
+                    + "skipped or a position inside it is an application, which has no entry to name until "
+                    + "it is materialised: " + ref);
         }
         throw new UnsupportedOperationException(
                 "only simple (non-generic) type-refs, generic applications of one, and inline arrays of one "

@@ -2,12 +2,20 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.schema.meta.ArrayBody;
+import io.ltr8.tson.compiler.TsonReadException;
+import io.ltr8.tson.compiler.ast.DataValue;
+import io.ltr8.tson.compiler.ast.RecordValue;
+import io.ltr8.tson.compiler.ast.ScopedValue;
+import io.ltr8.tson.compiler.ast.TokenForm;
+import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.ChoiceBody;
+import io.ltr8.tson.schema.meta.InstanceTemplate;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.TemplateArgument;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TupleElement;
 import io.ltr8.tson.schema.meta.TypeArgument;
@@ -35,10 +43,12 @@ import java.util.function.UnaryOperator;
  * instead would reuse {@code SchemaDesugarer}'s injection machinery but has no channel for that {@code
  * source}, and would put type-level work back into a phase Tranche A made purely syntactic.
  *
- * <p><b>Scope.</b> A template whose parameters occupy field types and field values. A template whose body
- * writes a §5.3 container sugar form is refused earlier, at the application site, by {@code
- * SchemaDesugarer.checkTemplateApplication} -- those need an open representation of the sugar forms that
- * does not exist yet.
+ * <p><b>Two shapes close here, by two paths.</b> A <b>record</b> template -- parameters occupying field
+ * types and field values -- is substituted and kept: the result is still a record, one with its parameters
+ * filled in. An <b>open instance</b>, whose body is an {@code instance_template} (what a sugar form over a
+ * parameter lifts to), stops being a template altogether once its bindings go concrete: it is the
+ * constructor body those bindings always described, so it is bound through that constructor's own reader
+ * and the entry carries an ordinary body. See {@link #closeInstanceTemplate}.
  *
  * <p><b>Identity (§8.2).</b> An instantiation entry is keyed on the flattened application recorded in
  * {@code source}, so two {@code box<text>} anywhere in the schema land on one entry. The derived name is
@@ -94,9 +104,27 @@ final class TemplateMaterialiser {
      */
     private final BiConsumer<String, TypeDefinition> publish;
 
+    /**
+     * How a closed {@code instance_template} becomes an ordinary constructor body -- the constructor's own
+     * compiled reader, the same one a written {@code !array { ... }} binds through. Using it is what makes
+     * {@code min_items: "two"} an ordinary read error rather than a check this class would have to grow: the
+     * bindings a template defers are exactly the ones a closed instance has always had checked for it.
+     *
+     * <p>{@code null} for a caller with no compiled meta reader to offer -- every hand-built test fixture,
+     * and the bootstrap. Closing an open <em>instance</em> template then fails loudly instead of silently
+     * producing an entry with an unread body; a record template needs none of this and is unaffected.
+     */
+    private final DefinitionMetaReader metaReader;
+
     TemplateMaterialiser(DefinitionGetter namespace, BiConsumer<String, TypeDefinition> publish) {
+        this(namespace, publish, null);
+    }
+
+    TemplateMaterialiser(DefinitionGetter namespace, BiConsumer<String, TypeDefinition> publish,
+            DefinitionMetaReader metaReader) {
         this.namespace = namespace;
         this.publish = publish;
+        this.metaReader = metaReader;
     }
 
     /**
@@ -191,6 +219,9 @@ final class TemplateMaterialiser {
                     + " type argument" + (parameters.size() == 1 ? "" : "s") + " " + parameters + ", but "
                     + arguments.size() + " " + (arguments.size() == 1 ? "was" : "were") + " applied (§5.10)");
         }
+        if (template.body() instanceof InstanceTemplate open) {
+            return closeInstanceTemplate(head, template, open, bind(parameters, arguments));
+        }
         String name = internalName(head, arguments);
         if (materialised.containsKey(name) || !closing.add(name)) {
             return name; // already built, or under construction -- the knot-tying case
@@ -230,10 +261,7 @@ final class TemplateMaterialiser {
      */
     private TypeDefinition substitute(TypeDefinition template, String head, List<String> parameters,
             List<TypeArgument> arguments) {
-        Map<String, TypeArgument> bindings = new LinkedHashMap<>();
-        for (int i = 0; i < parameters.size(); i++) {
-            bindings.put(parameters.get(i), arguments.get(i));
-        }
+        Map<String, TypeArgument> bindings = bind(parameters, arguments);
         TypeDefinition bound = mapFields(mapRefs(template, ref -> bindRef(ref, bindings)),
                 field -> bindValue(field, head, bindings));
         // Only the *body* is closed. `source` records the application as written -- it is the key §8.2
@@ -241,6 +269,116 @@ final class TemplateMaterialiser {
         return new TypeDefinition(Optional.of(new TypeRef(head, arguments)), bound.kind(), List.of(),
                 bound.constructor(), bound.supertypes(), bound.subtypes(), bound.disjoint(),
                 mapBodyRefs(bound.body(), this::close), Optional.empty(), bound.annotations());
+    }
+
+    /** Each parameter of the applied signature against the argument applied for it, in order. */
+    private static Map<String, TypeArgument> bind(List<String> parameters, List<TypeArgument> arguments) {
+        Map<String, TypeArgument> bindings = new LinkedHashMap<>();
+        for (int i = 0; i < parameters.size(); i++) {
+            bindings.put(parameters.get(i), arguments.get(i));
+        }
+        return bindings;
+    }
+
+    // ── Closing an open instance (§5.10, D7) ─────────────────────────────────────────────────────
+
+    /**
+     * The entry an application of an <b>open instance</b> denotes -- a template whose body is an {@code
+     * instance_template} rather than a record. Substituting turns its bindings concrete, and the result is no
+     * longer a template at all: it is the constructor body those bindings always described, so it is bound
+     * through that constructor's own reader and the entry carries an ordinary body.
+     *
+     * <p><b>The entry is named for the form, not for the application that produced it</b> (§8.2). An open
+     * synthetic's own name is internal and derived, so keying its instantiations on it would make identity
+     * depend on an unstable name -- and would leave {@code [text]} written directly and {@code [T]} closed to
+     * {@code text} on two entries for one type. Naming both by the same function of the same binding record
+     * is what makes the two channels dedupe against each other, so the lookup below usually finds the entry
+     * the desugar phase already injected.
+     *
+     * <p>No knot-tying is needed here, unlike the record case: an {@code instance_template}'s bindings are
+     * references to entries, never a nested application of the template being closed, so closing one cannot
+     * re-enter itself.
+     */
+    private String closeInstanceTemplate(String head, TypeDefinition template, InstanceTemplate open,
+            Map<String, TypeArgument> bindings) {
+        InstanceTemplate bound = (InstanceTemplate) mapBodyRefs(substituteBindings(open, head, bindings),
+                this::close);
+        String target = bound.target();
+        List<RecordValue.Field> fields = new ArrayList<>();
+        for (Map.Entry<String, TemplateArgument> binding : bound.bindings().entrySet()) {
+            fields.add(new RecordValue.Field(binding.getKey(), wire(head, binding)));
+        }
+        String name = SchemaDesugarer.internalName(target, fields);
+        if (namespace.getTypeDefinition(name) != null) {
+            return name; // already built, here or by the desugar phase -- one entry per form, schema-wide
+        }
+        if (metaReader == null) {
+            throw new IllegalStateException("'" + head + "<...>' closes to a '" + target + "' body, and this "
+                    + "materialiser was built without a compiled meta reader to bind it through");
+        }
+        DataValue value = new DataValue(List.of(), Optional.of(target), new RecordValue(fields));
+        Top body;
+        try {
+            body = metaReader.read(target, value);
+        } catch (TsonReadException e) {
+            // The bindings a template defers are checked here and nowhere else (§8.2): `<T, N> [T; N]` is a
+            // fine declaration, and `vector<text, "two">` is where it stops being one.
+            throw new TsonSchemaValidationException("'" + head + "<...>' substitutes into a body that is not "
+                    + "valid data for '" + target + "', the constructor's own constraint vocabulary -- "
+                    + e.getMessage(), e);
+        }
+        TypeDefinition closed = new TypeDefinition(Optional.of(TypeRef.of(target)), template.kind(), List.of(),
+                false, List.of(), List.of(), Optional.empty(), body);
+        materialised.put(name, closed);
+        publish.accept(name, closed);
+        return name;
+    }
+
+    /** The same open body with every {@code param} binding replaced by the argument applied for it. */
+    private static InstanceTemplate substituteBindings(InstanceTemplate open, String head,
+            Map<String, TypeArgument> bindings) {
+        Map<String, TemplateArgument> substituted = new LinkedHashMap<>();
+        for (Map.Entry<String, TemplateArgument> binding : open.bindings().entrySet()) {
+            if (!(binding.getValue() instanceof TemplateArgument.Param parameter)) {
+                substituted.put(binding.getKey(), binding.getValue());
+                continue;
+            }
+            TypeArgument argument = bindings.get(parameter.param());
+            if (argument == null) {
+                // A parameter of an enclosing template, still open: this application is not the one that
+                // closes it. Nothing today reaches here -- an application is closed only once every argument
+                // is concrete -- and leaving the binding open is what keeps that true rather than assuming it.
+                throw new UnsupportedOperationException("'" + head + "<...>' leaves binding '"
+                        + binding.getKey() + "' bound to '" + parameter.param() + "', a parameter this "
+                        + "application does not supply, and closing an open form onto another open form is "
+                        + "not implemented (§5.10)");
+            }
+            substituted.put(binding.getKey(), argument instanceof TypeArgument.Ref reference
+                    ? new TemplateArgument.Ref(reference.ref())
+                    : new TemplateArgument.Value(((TypeArgument.Value) argument).value()));
+        }
+        return new InstanceTemplate(open.target(), substituted);
+    }
+
+    /**
+     * One closed binding as the wire value the constructor's reader expects: a bare token either way, since
+     * a reference in the positional form (§5.6) and a literal are spelled alike. The channel it arrived on is
+     * what said which it was, and that question is now answered.
+     */
+    private static ScopedValue wire(String head, Map.Entry<String, TemplateArgument> binding) {
+        TokenValue token = switch (binding.getValue()) {
+            case TemplateArgument.Value value -> new TokenValue(value.value().text(),
+                    switch (value.value().form()) {
+                        case UNQUOTED -> TokenForm.UNQUOTED;
+                        case SINGLE_LINE_QUOTED -> TokenForm.SINGLE_LINE_QUOTED;
+                        case MULTI_LINE_QUOTED -> TokenForm.MULTI_LINE_QUOTED;
+                    });
+            case TemplateArgument.Ref reference -> new TokenValue(reference.typeRef().name(), TokenForm.UNQUOTED);
+            case TemplateArgument.Param parameter -> throw new IllegalStateException("'" + head
+                    + "<...>' still binds '" + binding.getKey() + "' to the parameter '" + parameter.param()
+                    + "' after substitution");
+        };
+        return new ScopedValue(Optional.empty(), new DataValue(List.of(), Optional.empty(), token));
     }
 
     /**
@@ -267,11 +405,26 @@ final class TemplateMaterialiser {
         }
         List<TypeArgument> arguments = new ArrayList<>();
         for (TypeArgument argument : ref.arguments()) {
-            arguments.add(argument instanceof TypeArgument.Ref nested
-                    ? new TypeArgument.Ref(bindRef(nested.ref(), bindings))
-                    : argument);
+            arguments.add(bindArgument(argument, bindings));
         }
         return new TypeRef(ref.name(), arguments);
+    }
+
+    /**
+     * One argument of an application inside a template body, with a parameter replaced by whatever was bound
+     * to it -- <b>on the channel it was bound on</b>, which is what separates this from {@link #bindRef}.
+     * An argument list is the one position where a type and a value are equally at home, so a value parameter
+     * passed straight through ({@code array_p0<N>} inside {@code <N> { a: [text; N] } }) stays a value; a
+     * parameter in any other position is a type by construction, and a value arriving there is the error
+     * {@link #bindRef} reports.
+     */
+    private static TypeArgument bindArgument(TypeArgument argument, Map<String, TypeArgument> bindings) {
+        if (!(argument instanceof TypeArgument.Ref nested)) {
+            return argument;
+        }
+        TypeArgument bound = bindings.get(nested.ref().name());
+        return bound != null && nested.ref().arguments().isEmpty() ? bound
+                : new TypeArgument.Ref(bindRef(nested.ref(), bindings));
     }
 
     /**
@@ -324,6 +477,14 @@ final class TemplateMaterialiser {
                     .map(element -> new TupleElement(map.apply(element.elementType()), element.state())).toList());
             case ChoiceBody choice -> new ChoiceBody(choice.variants().stream().map(map).toList());
             case Reference reference -> new Reference(map.apply(reference.target()));
+            case InstanceTemplate template -> {
+                Map<String, TemplateArgument> bindings = new LinkedHashMap<>();
+                template.bindings().forEach((slot, binding) -> bindings.put(slot,
+                        binding instanceof TemplateArgument.Ref reference
+                                ? new TemplateArgument.Ref(map.apply(reference.typeRef()))
+                                : binding));
+                yield new InstanceTemplate(template.target(), bindings);
+            }
             default -> body; // an atom body holds no type references
         };
     }

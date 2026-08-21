@@ -106,9 +106,8 @@ discussion points for the revision.
 
 **The rule this settles on:** `TypeRef.arguments` non-empty means an **open** form — a template application,
 whose arguments are what materialisation substitutes. Everything closed is an entry, referenced by a bare
-name. That pairs with the `value_form` invariant a template body's nested forms will carry
-(`value_form` present ⟺ pending synthesis ⟺ open entry) and makes the closed-entry rule checkable
-structurally, with no vocabulary needed to read a `type_ref`.
+name. Its counterpart at the body is `instance_template` present ⟺ open entry (D7), and together the two
+make the closed-entry rule checkable structurally, with no vocabulary needed to read a `type_ref`.
 
 `spec/tson-cr-structure-templates.md` D8 proposed the opposite — inline sugar riding as a structural
 `type_ref` rather than as an injected entry, with the compiler building readers from those refs — and is
@@ -156,17 +155,10 @@ rebuilt and called a cache.
   `map<text, text>` finds nothing and is an ordinary unresolved reference for the linker to report, and
   anything that *does* resolve is a §5.10 template. Substitution happens over the **resolved** form
   (`TemplateMaterialiser`, `docs/schema-resolution.md`), not over the AST, so an application passes through
-  here with its head and arguments intact. `checkTemplateApplication` refuses exactly two things: a local
-  head declaring *no* parameters (the author's error — nothing there takes type arguments), and a template
-  whose body writes a container sugar form **over one of its own parameters** (`box => <T> { v: [T] }`),
-  which has no open representation yet and, left alone, resolves against a body whose `[T]` became a
-  reference to `array` — a name a user schema's type-name namespace does not hold, so the author is told
-  about an unresolved reference to something they never wrote. A *concrete* form in the same position is no
-  obstacle: it has already lifted to an ordinary closed entry by the time anyone applies the template. The
-  question is asked against the declaration **as written** rather than as desugared, because an application
-  may be met before the template it names has been walked and the answer must not depend on that order. An
-  **imported** head needs no check at all, even though the phase is handed only the imported names: a
-  template carrying an open sugar form cannot link, so it cannot be registered, so it cannot be imported.
+  here with its head and arguments intact. `checkTemplateApplication` refuses exactly one thing: a local
+  head declaring *no* parameters, the author's error — nothing there takes type arguments. A template whose
+  body writes a container sugar form over one of its own parameters used to be refused here too; that form
+  now lifts open, so what was the refusal is the mechanism.
 - **Identity is the resolved binding record, not the spelling.** The injected name is
   `head_value_value_hash`, derived from the record the form desugars to, so `[T; 3]` and `[T; 3..3]` land on
   the same entry and any two structurally identical forms anywhere in the document collapse to one
@@ -238,10 +230,27 @@ rebuilt and called a cache.
     position map is threaded in and mutated in place rather than rebuilt by the caller, so there is one map
     and no two-hop lookup; `SchemaDesugarerTest.aRewrittenDeclarationKeepsItsSourcePosition` is the guard.
     An *injected* declaration still has no position, correctly — it has no source text of its own.
-- **A parameterized declaration is passed through whole.** Its desugared structure is the template's
-  recorded open form, and every nested form inside it becomes concrete only at materialisation, so lifting
-  one eagerly would mint an entry for a template that may never be instantiated. The blanket rule (the change
-  report's D5) is that a declaration with parameters lifts nothing, not even a parameter-free subform;
-  deduplication at materialisation makes the outcomes converge.
+- **Which entry a form lifts to is D5's one rule, and the enclosing declaration's parameters do not enter
+  it.** A form naming none of them lifts *closed*, template or not; a form naming one lifts *open* — an
+  `InstanceTemplate` over just the parameters it uses, with the position that held it applying them straight
+  back (`<T> { a: [T] }` injects `array_p0_… => <p0> !array { element_type: p0 }` and the field becomes
+  `array_p0_…<T>`). So `<T> { a: [T]  b: [order] }` injects one of each, and only the first waits for
+  materialisation.
+  - **The parameters are renamed positionally**, because two forms alike up to a consistent renaming are one
+    template (§8.2) and the name is derived from the record — so normalising the record is what normalises
+    the name. The prefix grows (`p`, `pp`, …) until it collides with nothing the record already names: a
+    binding may hold a concrete reference to a type genuinely called `p0`.
+  - **A declaration's own sugar body is the open construction**, one tier up from the same rule:
+    `vector => <T> [T]` *is* the `InstanceTemplate`, and its parameters are the declaration's list as
+    written, not the subset the body names — a declared parameter the body never uses is an error the linker
+    reports, and dropping it here would hide the very thing it looks for.
+  - **A binding's channel follows §12.1's own `type-arg` rule**, not the slot: a quoted or number-shaped
+    token is a literal, every other token rides the reference channel, and resolution settles what it turns
+    out to be. Deciding it here instead would make `[text; N]` bind the *literal* `"N"`.
+  - **Two of the four sugar forms have no open representation at all.** `tuple` and `choice` bind a
+    collection (`elements`, `variants`), and a `template_argument` is `param | value | type_ref` with no
+    collection case — so `<T> { v: (T | text) }` is refused at the declaration that writes it, as a gap
+    rather than an author error. `SPEC-FEEDBACK.md` #53 has the account; array and map bind only scalar
+    slots and are unaffected.
 - **The meta-kernel runs this phase too, with no accommodation at all** — its governing meta is itself, and
   with the table fixed there is nothing to look up.

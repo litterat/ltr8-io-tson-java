@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonCanonicalIdentity;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeArgument;
@@ -10,7 +11,10 @@ import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
 
+import java.math.BigInteger;
+
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 
@@ -26,8 +30,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * form and the application is replaced by a reference to the entry that results
  * ({@code TemplateMaterialiser}).
  *
- * <p>A template whose body writes a §5.3 container sugar form is out of scope and still fails at the
- * application site -- see {@code ContainerSugarEndToEndTest}.
+ * <p>A template whose body writes a §5.3 container sugar form closes here too, by the other path: the form
+ * lifts to an open synthetic and the application closes it into an ordinary container entry. The shape of
+ * what it closes into is {@code ContainerSugarEndToEndTest}'s; what these fixtures pin is that applying such
+ * a template works at all, and that a value parameter reaches the slot it was written for.
  */
 class RecordTemplateTest {
 
@@ -262,17 +268,75 @@ class RecordTemplateTest {
                 () -> "one array_order entry, shared: " + compiled.schema().entries().keySet());
     }
 
-    /** A form written over the declaration's own parameter still waits for the open representation. */
+    /**
+     * A form written over the declaration's own parameter closes with it: the open synthetic it lifted to is
+     * closed innermost-out as the application that reaches it is, so the field ends up naming an ordinary
+     * container entry. {@code ContainerSugarEndToEndTest} carries the shape of what it closes into; here the
+     * point is only that applying the template is no longer refused.
+     */
     @Test
-    void aParameterBearingSugarFormStillRefusesTheApplication() {
-        for (String field : List.of("[T]", "[box<T>]", "(T | text)")) {
-            UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
-                    () -> compile("""
-                              box  => <T> { v: T }
-                              tmpl => <T> { a: %s }
-                              use  => { u: tmpl<text> }""".formatted(field)), field);
-            assertTrue(thrown.getMessage().contains("over one of its own parameters"), thrown.getMessage());
+    void aParameterBearingSugarFormClosesWithTheApplication() {
+        for (String field : List.of("[T]", "[T; 1..2]", "{text => T}")) {
+            TsonCompiledSchema compiled = compile("""
+                      box  => <T> { v: T }
+                      tmpl => <T> { a: %s }
+                      use  => { u: tmpl<text> }""".formatted(field));
+
+            TypeDefinition closed = compiled.schema().entries()
+                    .get(fieldType(compiled, fieldType(compiled, "use", "u"), "a"));
+            assertEquals(List.of(), closed.parameters(), () -> field + " closes to a usable entry");
+            assertNotNull(compiled.get(fieldType(compiled, "use", "u")), field);
         }
+    }
+
+    /**
+     * The whole arc for an open instance: the sugar over a parameter, closed by the application, compiled,
+     * and reading real data -- and rejecting data the closed form's own constraints refuse.
+     */
+    @Test
+    void anOpenFormClosedByAnApplicationReadsRealData() {
+        TsonCompiledSchema compiled = compile("""
+                  tags   => <N> { xs: [text; N] }
+                  holder => { t: tags<2> }""");
+
+        assertNotNull(compiled.get("holder")
+                .read(TestDocuments.document("{ t: { xs: [ \"a\" \"b\" ] } }")));
+        assertTrue(assertThrows(TsonReadException.class, () -> compiled.get("holder")
+                .read(TestDocuments.document("{ t: { xs: [ \"a\" ] } }"))).getMessage().contains("2"),
+                "the bound the parameter supplied is the one that is enforced");
+    }
+
+    /**
+     * §8.2's deferred value-level check, at the one place D7 gives it a home. {@code <N> [text; N]} is a fine
+     * declaration -- {@code N} could be anything -- and {@code <"two">} is where it stops being one, because
+     * substitution is what finally hands {@code min_items} something to read.
+     */
+    @Test
+    void anArgumentTheSlotCannotTakeIsReportedAtTheApplication() {
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> compile("""
+                          tags   => <N> { xs: [text; N] }
+                          holder => { t: tags<"two"> }"""));
+
+        assertTrue(thrown.getMessage().contains("not a valid integer"), thrown.getMessage());
+    }
+
+    /**
+     * A parameter passed through as an <em>argument</em> keeps the channel it was applied on. An argument
+     * list is the one position where a type and a value are equally at home, so the value {@code N} carries
+     * reaches the open synthetic's own {@code min_items} rather than being rejected as a type.
+     */
+    @Test
+    void aValueParameterReachesAnOpenSyntheticThroughTheApplication() {
+        TsonCompiledSchema compiled = compile("""
+                  tags   => <N> { xs: [text; N] }
+                  holder => { t: tags<2> }""");
+
+        ArrayBody closed = (ArrayBody) compiled.schema().entries()
+                .get(fieldType(compiled, fieldType(compiled, "holder", "t"), "xs")).body();
+
+        assertEquals(Optional.of(BigInteger.TWO), closed.minItems());
+        assertEquals(Optional.of(BigInteger.TWO), closed.maxItems());
     }
 
     /** A declaration's own body is the construction, not a reference to a lifted one -- unchanged by R2. */
