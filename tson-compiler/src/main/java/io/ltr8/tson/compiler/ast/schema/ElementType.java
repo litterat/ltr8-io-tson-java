@@ -1,27 +1,16 @@
 package io.ltr8.tson.compiler.ast.schema;
 
 /**
- * {@code element-type = ( container-def / type-ref ) ["?"]} (Part 2 §12.1, §5.3) -- one position
- * inside a declaration-level {@link ArrayContainerDef} or {@link TupleContainerDef}. The optional
- * {@code ?} here is element/tuple-position optionality (a container-level fact), distinct from a
- * field's own {@code ?} (§5.2) even though both reuse the same token.
+ * {@code element-type = type-ref ["?"]} (Part 2 §12.1, §5.3) -- one position inside an {@link ArrayRef},
+ * a {@link TupleRef}, or a {@link MapRef}'s value.
+ *
+ * <p>The optional {@code ?} here is element/tuple-position optionality (a container-level fact), distinct
+ * from a field's own {@code ?} (§5.2) even though both reuse the same token. They cannot collide: a field
+ * is {@code field-name ":" type-ref ["?"]}, so in {@code xs: [T?]?} the inner {@code ?} is the element's
+ * and the outer the field's.
+ *
+ * <p>It holds a plain {@link TypeRef} and nothing else. Nesting needs no case of its own, because a bracket
+ * or map form <em>is</em> a type-ref -- which is the whole point of collapsing the two container tiers.
  */
-public record ElementType(Expr expr, boolean optional) {
-
-    /**
-     * {@code container-def / type-ref} -- a nested declaration-level form (that syntax nests inside
-     * itself, §5.3: {@code [[T; N]; N]}, {@code {text => [order; 1..]}}) or an ordinary type-ref. Shared
-     * with {@link MapContainerDef}'s value position, whose {@code map-value} production is the same pair;
-     * only the enclosing {@code ?} is an array/tuple-position fact. A {@code type-ref} position, by
-     * contrast, never admits a nested {@link ContainerDef} -- only {@link InlineArrayRef}/{@link
-     * InlineMapRef}/{@link InlineTupleRef}'s narrower inline shapes.
-     */
-    public sealed interface Expr {
-
-        record Nested(ContainerDef container) implements Expr {
-        }
-
-        record Plain(TypeRef typeRef) implements Expr {
-        }
-    }
+public record ElementType(TypeRef typeRef, boolean optional) {
 }

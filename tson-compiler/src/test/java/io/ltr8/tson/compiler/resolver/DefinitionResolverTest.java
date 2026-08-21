@@ -430,24 +430,23 @@ class DefinitionResolverTest {
         assertEquals(write(documentation), write(alias));
     }
 
-    // ── A field's inline array sugar [T] (§5.3): type_ref.arguments ───────
+    // ── A sugar form must be lifted before resolution ────────────────────
 
+    /**
+     * The resolver builds no container type-ref of its own. It used to: an unlifted {@code [T]} became a
+     * structural {@code array<T>}, which is the representation the change report rejects (§11) and which the
+     * linker now reports as an arity error against a constructor the author never wrote. Refusing says what
+     * is actually wrong -- the form reached resolution unlifted, either because a caller skipped
+     * {@code SchemaDesugarer} or because it is written over a type parameter and has no open representation
+     * yet.
+     */
     @Test
-    void resolvesAFieldsInlineArraySugarFromTheRealMetaKernelFixture() throws IOException, DataBindException {
-        // type_ref => { name: type_name  arguments: [type_argument]? }
+    void aSugarFormReachingResolutionUnliftedIsRefused() throws IOException {
         SchemaMap schemaMap = new TsonSchemaParser(readFixture()).parseSchemaDocument().body();
 
-        TypeDefinition typeRefDef = resolver.resolve(schemaMap.declarations().get("type_ref"));
-
-        // "!ref"/"!value" wrapping each type_argument is a known toTson divergence from the
-        // kernel's own tag-less field-group shape -- see TypeArgument's own Javadoc for why.
-        assertEquals("{ kind: \"PRODUCT\" parameters: [] constructor: false supertypes: [] subtypes: [] "
-                        + "body: !record { supertypes: [] fields: [ "
-                        + "{ name: \"name\" type: { name: \"type_name\" arguments: [] } state: \"REQUIRED\" } "
-                        + "{ name: \"arguments\" type: { name: \"array\" "
-                        + "arguments: [ !ref { ref: { name: \"type_argument\" arguments: [] } } ] } "
-                        + "state: \"OPTIONAL\" } ] groups: [] } }",
-                write(typeRefDef));
+        UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
+                () -> resolver.resolve(schemaMap.declarations().get("type_ref")));
+        assertTrue(thrown.getMessage().contains("must be lifted"), thrown.getMessage());
     }
 
     // ── Declaration-level sized-array sugar (§5.3, §5.6) ──
@@ -573,15 +572,17 @@ class DefinitionResolverTest {
     @Test
     void resolvesFieldGroupFromTheRealMetaKernelFixture() throws IOException, DataBindException {
         // field_group => { members: [field_name]  state: element_state ~ REQUIRED } -- a fresh
-        // record combining the inline array sugar with an ordinary literal default modifier.
-        SchemaMap schemaMap = new TsonSchemaParser(readFixture()).parseSchemaDocument().body();
+        // record combining a sugar form with an ordinary literal default modifier. Desugared first, as
+        // SchemaResolver does: `[field_name]` is lifted to its own entry, so what the resolver sees at the
+        // field is a bare name.
+        SchemaMap schemaMap = SchemaDesugarer.desugar(
+                new TsonSchemaParser(readFixture()).parseSchemaDocument(), Set.of()).body();
 
         TypeDefinition fieldGroup = resolver.resolve(schemaMap.declarations().get("field_group"));
 
         assertEquals("{ kind: \"PRODUCT\" parameters: [] constructor: false supertypes: [] subtypes: [] "
                         + "body: !record { supertypes: [] fields: [ "
-                        + "{ name: \"members\" type: { name: \"array\" "
-                        + "arguments: [ !ref { ref: { name: \"field_name\" arguments: [] } } ] } state: \"REQUIRED\" } "
+                        + "{ name: \"members\" type: { name: \"array_field_name_f1a73e72\" arguments: [] } state: \"REQUIRED\" } "
                         + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } state: \"REQUIRED_DEFAULT\" "
                         + "value: { text: \"REQUIRED\" form: \"UNQUOTED\" } } "
                         + "] groups: [] } }",

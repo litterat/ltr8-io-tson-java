@@ -1,18 +1,15 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.compiler.ast.schema.ArrayContainerDef;
+import io.ltr8.tson.compiler.ast.schema.ArrayRef;
 import io.ltr8.tson.compiler.ast.schema.AtomRefinement;
 import io.ltr8.tson.compiler.ast.schema.ChoiceRef;
 import io.ltr8.tson.compiler.ast.schema.ConstructionDef;
-import io.ltr8.tson.compiler.ast.schema.ContainerTypeDef;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
 import io.ltr8.tson.compiler.ast.schema.GenericRef;
 import io.ltr8.tson.compiler.ast.schema.GroupDef;
 import io.ltr8.tson.compiler.ast.schema.ElementType;
-import io.ltr8.tson.compiler.ast.schema.InlineArrayRef;
-import io.ltr8.tson.compiler.ast.schema.InlineMapRef;
 import io.ltr8.tson.compiler.ast.schema.Instance;
-import io.ltr8.tson.compiler.ast.schema.MapContainerDef;
+import io.ltr8.tson.compiler.ast.schema.MapRef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.RefinedDef;
 import io.ltr8.tson.compiler.ast.schema.ReferenceTypeDef;
@@ -21,9 +18,10 @@ import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.ast.schema.SimpleRef;
 import io.ltr8.tson.compiler.ast.schema.SizeSpec;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
-import io.ltr8.tson.compiler.ast.schema.TupleContainerDef;
+import io.ltr8.tson.compiler.ast.schema.TupleRef;
 import io.ltr8.tson.compiler.ast.schema.TypeArg;
 import io.ltr8.tson.compiler.ast.schema.TypeDef;
+import io.ltr8.tson.compiler.ast.schema.TypeRef;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -44,10 +42,21 @@ class TsonSchemaParserTest {
         return new TsonSchemaParser(source).parseSchemaDocument();
     }
 
-    /** The {@link MapContainerDef} one declaration's body is, for the map-grammar fixtures. */
-    private static MapContainerDef mapOf(String declaration) {
-        ContainerTypeDef container = assertInstanceOf(ContainerTypeDef.class, declOf(declaration).typeDef());
-        return assertInstanceOf(MapContainerDef.class, container.container());
+    /** One field of a declaration, for the fixtures that assert what a field's type parsed to. */
+    private static FieldDef fieldOf(String declaration, String field) {
+        RecordDef record = (RecordDef) ((StructuralTypeDef) declOf(declaration).typeDef()).body();
+        return record.entries().stream().map(FieldDef.class::cast)
+                .filter(f -> f.name().equals(field)).findFirst().orElseThrow();
+    }
+
+    private static TypeRef fieldTypeOf(String declaration, String field) {
+        return fieldOf(declaration, field).type().orElseThrow().typeRef();
+    }
+
+    /** The {@link MapRef} one declaration's body is, for the map-grammar fixtures. */
+    private static MapRef mapOf(String declaration) {
+        ReferenceTypeDef ref = assertInstanceOf(ReferenceTypeDef.class, declOf(declaration).typeDef());
+        return assertInstanceOf(MapRef.class, ref.ref());
     }
 
     // ── Header (§2.1, §2.2) ──────────────────────────────────────────────
@@ -226,18 +235,18 @@ class TsonSchemaParserTest {
     @Test
     void declarationLevelArrayWithSize() {
         TypeDef def = declOf("scores => [integer; 1..]").typeDef();
-        ContainerTypeDef container = assertInstanceOf(ContainerTypeDef.class, def);
-        ArrayContainerDef array = assertInstanceOf(ArrayContainerDef.class, container.container());
+        ReferenceTypeDef ref = assertInstanceOf(ReferenceTypeDef.class, def);
+        ArrayRef array = assertInstanceOf(ArrayRef.class, ref.ref());
         assertEquals(new SimpleRef("integer"),
-                ((ElementType.Expr.Plain) array.elementType().expr()).typeRef());
+                array.elementType().typeRef());
         assertEquals(new SizeSpec.Min("1"), array.size().orElseThrow());
     }
 
     @Test
     void declarationLevelTuple() {
         TypeDef def = declOf("point => [number, number]").typeDef();
-        ContainerTypeDef container = assertInstanceOf(ContainerTypeDef.class, def);
-        TupleContainerDef tuple = assertInstanceOf(TupleContainerDef.class, container.container());
+        ReferenceTypeDef ref = assertInstanceOf(ReferenceTypeDef.class, def);
+        TupleRef tuple = assertInstanceOf(TupleRef.class, ref.ref());
         assertEquals(2, tuple.elementTypes().size());
     }
 
@@ -255,15 +264,15 @@ class TsonSchemaParserTest {
 
     @Test
     void declarationLevelMap() {
-        MapContainerDef map = mapOf("translations => {text => text}");
+        MapRef map = mapOf("translations => {text => text}");
         assertEquals(new SimpleRef("text"), map.keyType());
-        assertEquals(new SimpleRef("text"), ((ElementType.Expr.Plain) map.valueType()).typeRef());
+        assertEquals(new SimpleRef("text"), map.valueType().typeRef());
         assertTrue(map.size().isEmpty());
     }
 
     @Test
     void declarationLevelMapWithSize() {
-        MapContainerDef map = mapOf("index => {text => order; 1..5}");
+        MapRef map = mapOf("index => {text => order; 1..5}");
         assertEquals(new SizeSpec.Ranged("1", "5"), map.size().orElseThrow());
     }
 
@@ -276,32 +285,32 @@ class TsonSchemaParserTest {
     /** A generic key consumes its own argument list before the {@code =>} the dispatch committed on. */
     @Test
     void aGenericKeyIsStillAMap() {
-        MapContainerDef map = mapOf("index => { pair<text> => integer }");
+        MapRef map = mapOf("index => { pair<text> => integer }");
         assertEquals(new GenericRef("pair", List.of(new TypeArg.Ref(new SimpleRef("text")))), map.keyType());
     }
 
     /** {@code map-value = container-def / type-ref}, so the declaration-level tier nests inside a map value. */
     @Test
     void aMapValueMayNestADeclarationLevelForm() {
-        MapContainerDef map = mapOf("index => {text => [order; 1..]}");
-        ArrayContainerDef nested = assertInstanceOf(ArrayContainerDef.class,
-                ((ElementType.Expr.Nested) map.valueType()).container());
+        MapRef map = mapOf("index => {text => [order; 1..]}");
+        ArrayRef nested = assertInstanceOf(ArrayRef.class,
+                map.valueType().typeRef());
         assertEquals(new SizeSpec.Min("1"), nested.size().orElseThrow());
     }
 
     @Test
     void aMapValueMayNestAnotherMap() {
-        MapContainerDef map = mapOf("index => {text => {text => integer}}");
-        assertInstanceOf(MapContainerDef.class, ((ElementType.Expr.Nested) map.valueType()).container());
+        MapRef map = mapOf("index => {text => {text => integer}}");
+        assertInstanceOf(MapRef.class, map.valueType().typeRef());
     }
 
     @Test
     void anInlineMapAtAFieldPosition() {
         FieldDef field = (FieldDef) ((RecordDef) ((StructuralTypeDef)
                 declOf("holder => { entries: {text => integer} }").typeDef()).body()).entries().get(0);
-        InlineMapRef map = assertInstanceOf(InlineMapRef.class, field.type().orElseThrow().typeRef());
+        MapRef map = assertInstanceOf(MapRef.class, field.type().orElseThrow().typeRef());
         assertEquals(new SimpleRef("text"), map.keyType());
-        assertEquals(new SimpleRef("integer"), map.valueType());
+        assertEquals(new SimpleRef("integer"), map.valueType().typeRef());
     }
 
     /** Every brace that is not {@code name "=>"} or {@code name "<"} commits to a record, {@code {}} included. */
@@ -487,27 +496,44 @@ class TsonSchemaParserTest {
                 { a => text { x: text } }"""));
     }
 
-    // ── Inline vs declaration-level sugar (§5.3) ─────────────────────────
+    // ── One tier, not two (§5.3) ─────────────────────────────────────────
+    //    A size specifier and an element `?` used to be declaration-level-only, enforced by there being
+    //    two productions. There is one now, and no position refuses either: the split existed because a
+    //    sized form had no inline representation to carry it, and every form lifts to an entry.
 
     @Test
-    void inlineSizeSpecifierIsAParseError() {
-        assertThrows(TsonParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/32/m/meta.tn1"
-                { a => { x: [text; 1] } }"""));
+    void aSizeSpecifierIsLegalAtAFieldPosition() {
+        ArrayRef array = (ArrayRef) fieldTypeOf("a => { x: [text; 1] }", "x");
+        assertEquals(new SizeSpec.Exact("1"), array.size().orElseThrow());
     }
 
     @Test
-    void anInlineMapSizeSpecifierIsAParseError() {
-        assertThrows(TsonParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/32/m/meta.tn1"
-                { a => { x: {text => integer; 1} } }"""));
+    void aMapSizeSpecifierIsLegalAtAFieldPosition() {
+        MapRef map = (MapRef) fieldTypeOf("a => { x: {text => integer; 1..} }", "x");
+        assertEquals(new SizeSpec.Min("1"), map.size().orElseThrow());
     }
 
     @Test
-    void inlineElementOptionalityIsAParseError() {
-        assertThrows(TsonParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/32/m/meta.tn1"
-                { a => { x: [text?] } }"""));
+    void anElementQuestionMarkIsLegalAtAFieldPosition() {
+        ArrayRef array = (ArrayRef) fieldTypeOf("a => { x: [text?] }", "x");
+        assertTrue(array.elementType().optional());
+    }
+
+    /** The one place the two {@code ?} positions meet: the inner is the element's, the outer the field's. */
+    @Test
+    void anElementQuestionMarkAndAFieldQuestionMarkDoNotCollide() {
+        FieldDef field = fieldOf("a => { x: [text?]? }", "x");
+        assertTrue(field.type().orElseThrow().optional(), "the field's own '?'");
+        assertTrue(((ArrayRef) field.type().orElseThrow().typeRef()).elementType().optional(), "the element's");
+    }
+
+    /** Nesting is the recursion in {@code element-type}, so a sized form nests at a field like anywhere else. */
+    @Test
+    void aNestedSizedFormIsLegalAtAFieldPosition() {
+        ArrayRef outer = (ArrayRef) fieldTypeOf("a => { x: [[text; 2]; 3] }", "x");
+        assertEquals(new SizeSpec.Exact("3"), outer.size().orElseThrow());
+        assertEquals(new SizeSpec.Exact("2"),
+                ((ArrayRef) outer.elementType().typeRef()).size().orElseThrow());
     }
 
     @Test
@@ -563,8 +589,8 @@ class TsonSchemaParserTest {
 
         FieldDef history = (FieldDef) taskBody.entries().get(6);
         assertTrue(history.type().orElseThrow().optional());
-        InlineArrayRef historyArray = assertInstanceOf(InlineArrayRef.class, history.type().get().typeRef());
-        GenericRef flaggedApplication = assertInstanceOf(GenericRef.class, historyArray.elementType());
+        ArrayRef historyArray = assertInstanceOf(ArrayRef.class, history.type().get().typeRef());
+        GenericRef flaggedApplication = assertInstanceOf(GenericRef.class, historyArray.elementType().typeRef());
         assertEquals("flagged", flaggedApplication.name());
         assertEquals(2, flaggedApplication.args().size());
     }

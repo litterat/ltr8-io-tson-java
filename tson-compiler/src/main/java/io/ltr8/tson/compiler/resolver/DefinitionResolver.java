@@ -8,19 +8,15 @@ import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.EmptyBrace;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.TokenValue;
-import io.ltr8.tson.compiler.ast.schema.ArrayContainerDef;
 import io.ltr8.tson.compiler.ast.schema.AtomRefinement;
 import io.ltr8.tson.compiler.ast.schema.ConstructionDef;
-import io.ltr8.tson.compiler.ast.schema.ContainerDef;
-import io.ltr8.tson.compiler.ast.schema.ContainerTypeDef;
-import io.ltr8.tson.compiler.ast.schema.ElementType;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
 import io.ltr8.tson.compiler.ast.schema.ChoiceRef;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.schema.GenericRef;
 import io.ltr8.tson.compiler.ast.schema.GroupDef;
 import io.ltr8.tson.compiler.ast.schema.RemovalSet;
-import io.ltr8.tson.compiler.ast.schema.InlineArrayRef;
+import io.ltr8.tson.compiler.ast.schema.ArrayRef;
 import io.ltr8.tson.compiler.ast.schema.Instance;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.RecordEntry;
@@ -1525,9 +1521,20 @@ final class DefinitionResolver {
             }
             return new io.ltr8.tson.schema.meta.TypeRef(generic.name(), args);
         }
-        if (ref instanceof InlineArrayRef inlineArray && inlineArray.elementType() instanceof SimpleRef elementSimple) {
-            return new io.ltr8.tson.schema.meta.TypeRef("array",
-                    List.of(new TypeArgument.Ref(io.ltr8.tson.schema.meta.TypeRef.of(elementSimple.name()))));
+        if (ref instanceof ArrayRef || ref instanceof io.ltr8.tson.compiler.ast.schema.TupleRef
+                || ref instanceof io.ltr8.tson.compiler.ast.schema.MapRef
+                || ref instanceof io.ltr8.tson.compiler.ast.schema.ChoiceRef) {
+            // Every sugar form is lifted to an entry by `SchemaDesugarer` before resolution, so one reaching
+            // here was not: either a caller resolved raw AST without running that phase, or the form is
+            // written over one of the enclosing declaration's own parameters, which `SchemaDesugarer`
+            // deliberately leaves alone because its open representation does not exist yet. Refusing names
+            // that. What this replaces built a structural `array<T>` instead -- the representation §11
+            // rejects, which the linker then reports as an arity error against a constructor the author
+            // never wrote.
+            throw new UnsupportedOperationException("a container sugar form must be lifted to an entry "
+                    + "before resolution (§5.3); this one was not, which means either the desugar phase was "
+                    + "skipped or the form is written over a type parameter and has no open representation "
+                    + "yet (§5.10): " + ref);
         }
         throw new UnsupportedOperationException(
                 "only simple (non-generic) type-refs, generic applications of one, and inline arrays of one "

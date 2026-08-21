@@ -1467,6 +1467,37 @@ If the split is deliberate and meant to stay, then §12.1 should at least say *w
 rather than only how to disambiguate them, since on the evidence of the notes the answer is "so that
 `type-ref` cannot reach the size specifier" — which a note on one production expresses more directly.
 
+**Implemented — and further than this entry proposed.** The collapse is done
+(`spec/tson-cr-structure-templates.md` D10), but the restriction is **dropped**, not relocated, so the
+sentence above about "every shape rejected today stays rejected" no longer describes the implementation.
+`xs: [text; 1..5]`, `xs: [T?]`, `{text => order; 1..}` inline, and `[[text; 2]; 2]` at a field are all legal
+now. That *is* a change to the language, and the reasoning for it is the reasoning this entry could not have
+had: the split's own justification in §5.3 is representational — the `?` forms "desugar directly and become
+**the declaration's body**" — and once every sugar form lifts to an entry there is no
+becoming-the-declaration's-body left for the rule to protect. A style preference for keeping field types
+simple survives as a style preference; it is no longer a grammar rule.
+
+The interpretation recorded above ("implement as specified") was also cost-driven rather than principled:
+the change was not worth opening the grammar for on its own. The template work opens `type-def` anyway
+(`instance-template`), at which point collapsing `container-def` into `type-ref` is a smaller edit to the
+same production than it would have been standing alone.
+
+The productions as implemented, which differ from the sketch above only in taking the map forms with them —
+they did not exist when this entry was written:
+
+```abnf
+type-ref     = paren-type / bracket-type / map-type / type-name "<" type-args ">" / type-name
+bracket-type = "[" element-type [ ws ";" ws size-spec ] ws "]"
+             / "[" element-type 1*(separator element-type) "]"
+map-type     = "{" ws map-key ws "=>" ws element-type [ ws ";" ws size-spec ] ws "}"
+element-type = type-ref [ "?" ]
+```
+
+`type-def` loses its `container-def` alternative, so §12.1's prose tie-break for a leading `[` disappears
+rather than needing rewording. Nine AST types became four, and `SchemaDesugarer`'s two parallel walks over
+the same shapes became one — the distinction that survives is positional (a declaration's own body is the
+construction in place, everything else lifts), which the walk already knew.
+
 ---
 
 ## 32. §8.2 requires a template instantiation to keep supertypes that §3.3.2 puts out of reach of the schema carrying it
