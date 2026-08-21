@@ -530,7 +530,7 @@ final class DefinitionResolver {
             return new TemplateArgument.Param(simple.name());
         }
         if (takesATypeRef(slot)) {
-            return new TemplateArgument.Ref(resolveTemplateBindingRef(name, binding.name(), ref));
+            return new TemplateArgument.Ref(resolveTemplateBindingRef(name, parameters, binding.name(), ref));
         }
         if (!(ref instanceof SimpleRef simple)) {
             throw new TsonSchemaValidationException("'" + name + "': binding '" + binding.name() + "' takes a "
@@ -540,20 +540,50 @@ final class DefinitionResolver {
         return new TemplateArgument.Value(new Token(simple.name(), Token.Form.UNQUOTED));
     }
 
-    /** A concrete reference in a type slot, resolved the way every other argument-bearing reference is. */
-    private io.ltr8.tson.schema.meta.TypeRef resolveTemplateBindingRef(String name, String slot, TypeRef ref) {
+    /**
+     * A reference in a type slot, resolved as either an entry name or an application still awaiting one.
+     *
+     * <p><b>An application closes here only if it can.</b> One naming none of the template's own parameters
+     * ({@code <N> !array { element_type: box<text>  min_items: N }}) is fully bound already, so it becomes the
+     * entry it denotes, the same treatment a composition supertype gets. One naming a parameter is carried
+     * <em>open</em>, arguments intact: {@code tree<p0>} cannot close until {@code p0} does, and closing it
+     * here recurses through the very entry being resolved -- the shape {@code tree} takes, where the array
+     * synthetic's own binding names the template whose field holds that synthetic.
+     */
+    private io.ltr8.tson.schema.meta.TypeRef resolveTemplateBindingRef(String name, List<String> parameters,
+            String slot, TypeRef ref) {
         if (ref instanceof SimpleRef simple) {
             return io.ltr8.tson.schema.meta.TypeRef.of(simple.name());
         }
         if (ref instanceof GenericRef generic) {
-            // An application in a binding is closed on the spot when it can be -- the same treatment a
-            // supertype or a refinement source gets, and for the same reason: what a binding may hold is an
-            // entry, and an application is not one until it has been closed into one.
+            if (namesAParameter(generic, parameters)) {
+                List<TypeArgument> arguments = new ArrayList<>();
+                for (TypeArg argument : generic.args()) {
+                    arguments.add(typeArgument(argument));
+                }
+                return new io.ltr8.tson.schema.meta.TypeRef(generic.name(), arguments);
+            }
             return io.ltr8.tson.schema.meta.TypeRef.of(closedApplication(name, generic, List.of(),
                     "binding '" + slot + "'"));
         }
         throw new TsonSchemaValidationException("'" + name + "': binding '" + slot + "' holds a form that is "
                 + "not a reference (§8.1)");
+    }
+
+    /** Whether an application's arguments mention a parameter of the template the binding belongs to. */
+    private static boolean namesAParameter(GenericRef generic, List<String> parameters) {
+        for (TypeArg argument : generic.args()) {
+            if (!(argument instanceof TypeArg.Ref reference)) {
+                continue;
+            }
+            if (reference.ref() instanceof SimpleRef simple && parameters.contains(simple.name())) {
+                return true;
+            }
+            if (reference.ref() instanceof GenericRef nested && namesAParameter(nested, parameters)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

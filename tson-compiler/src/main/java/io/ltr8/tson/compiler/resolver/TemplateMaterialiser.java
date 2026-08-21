@@ -301,8 +301,13 @@ final class TemplateMaterialiser {
      */
     private String closeInstanceTemplate(String head, TypeDefinition template, InstanceTemplate open,
             Map<String, TypeArgument> bindings) {
-        InstanceTemplate bound = (InstanceTemplate) mapBodyRefs(substituteBindings(open, head, bindings),
-                this::close);
+        // Three steps, and the order is the whole of it: replace the `param` bindings, then bind the
+        // parameters *inside* an application a binding holds (`tree<p0>` becomes `tree<text>`), and only then
+        // close what results. Closing before binding would close `tree<p0>` -- an application of an argument
+        // nothing has supplied.
+        InstanceTemplate substituted = substituteBindings(open, head, bindings);
+        InstanceTemplate bound = (InstanceTemplate) mapBodyRefs(
+                mapBodyRefs(substituted, ref -> bindRef(ref, bindings)), this::close);
         String target = bound.target();
         List<RecordValue.Field> fields = new ArrayList<>();
         for (Map.Entry<String, TemplateArgument> binding : bound.bindings().entrySet()) {

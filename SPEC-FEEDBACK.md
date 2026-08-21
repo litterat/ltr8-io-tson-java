@@ -1039,6 +1039,15 @@ whether a resolver MUST/SHOULD reject a recursive type that is well-formed yet h
 *productivity*/satisfiability property, not a resolution one. Left unstated, two conformant implementations
 can disagree on whether such a schema is valid at all.
 
+**The spec's own worked example is one.** `tson-cr-structure-templates.md` §8 offers
+`tree => <T> { value: T  children: [tree<T>; 1..] }` as a fixture. The `1..` pins a floor of one on the
+recursive position, so every node requires a child and the guard this entry describes — a *possibly-empty*
+array — is exactly what the bound removes. It resolves, links and compiles here, and no finite document
+validates against it (`ApplicationInContainerPositionTest.theSpecsOwnTreeSpellingAdmitsNoFiniteDocument`).
+The structure the fixture is testing is unaffected — the type-level knot is the point — but it is worth
+noting that an unsatisfiable recursive type reached a worked example without anyone noticing, which is the
+strongest argument available for saying something normative about productivity.
+
 **Interpretation chosen:** This implementation resolves and links a required-recursive record pair like
 `x => { y: y }` / `y => { x: x }` without complaint — it is structurally well-formed (every reference
 resolves), and its unsatisfiability is treated as a semantic property outside resolution's remit, the same way

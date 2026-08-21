@@ -26,6 +26,16 @@ own prose (which had gone stale on at least one of them):
   "import cycle" diagnostic naming the actual cycle path. Distinct from what
   `TsonCompiledMetaRegistry.withStandardLibrary` already does, which is scoped to just the three bundled
   schemas in a known order, not a general algorithm.
+- [ ] **`type_argument` has no usable compiled reader.** `type_argument => { ( name: type_ref | value: value ) }`
+  is an ordinary field-group record in the kernel, but `schema.meta.TypeArgument` is a sealed interface — the
+  shape that breaks `tson-bind`'s resolution cycle (the documented trap in CLAUDE.md) — so nothing can read a
+  value against it: `'type_argument' resolves to interface TypeArgument, which isn't record-shaped`. The write
+  side of that trap is recorded (`toTson` emits a spurious `!ref`/`!value` tag); this is its mirror and was
+  not. What it costs today is exactly one thing: no `type_ref` carrying `arguments` can be read, so no wire
+  form can express an unclosed application — which is what refuses `[box<text>]` above. A fix has to give
+  `tson-bind` a way to read a field-group record into a sealed union without resolving the members eagerly,
+  which is what `DefaultUnionBinder` already does for dispatch; the gap is the *untagged* group form, where
+  there is no `!name` to dispatch on and the present field is what selects the member.
 - [ ] **An empty `{}` does not count against a map's `min_items`.** Found while landing the container
   collapse and
   **pre-existing**: `b: {text => order; 1..}` with data `b: {}` validates OK, through a named declaration
@@ -43,15 +53,12 @@ own prose (which had gone stale on at least one of them):
     contradiction to the spec — D5 states the lift rule over every sugar form, D9 concedes this case has no
     resolved form — and offers both resolutions: scope the rule, or give `template_argument` a recursive
     fourth channel. Not worth implementing before that comes back.
-  - **A container position that is itself an application** (`[box<text>]`, and so the CR's nested `grid`
-    fixture). The desugar table needs a *name* for each position, and an application has no entry to name
-    until materialisation has run — one phase later. Pre-existing, and independent of templates: the closed
-    `[box<text>]` fails the same way. Fixing it means either lifting the position lazily or letting
-    materialisation revisit the table, which is a real design question rather than a missing case.
-  - **The CR's own §8 fixtures still need respelling** before they can be acceptance tests:
-    `tree => <T> { value: T  children: [tree<T>; 1..] }` and `grid => <T, N> { x: [[T; 1..N]; 2..N] }` both
-    put a container position on an application, which is the item above; the size specifier at a field
-    position that also blocked them is legal now (D10).
+  - **A *closed* container position that is an application** (`[box<text>]`). The open case works now — its
+    binding holds the `type_ref` directly — but a closed one has to write the position to the wire, and the
+    only wire form that carries arguments is `type_ref`'s record form, which cannot be read (see the
+    `type_argument` item above). Refused at the form with that reason. Both halves of the fix are the same
+    piece of work: make `type_argument` readable, then let the closed lift emit the record form and
+    materialisation close it, which `close()` already does for every other ref it walks.
 
 - [ ] **The rest of §8.2's deferred value-level checks.** Materialisation "runs the value-level checks that
   open bounds deferred: family coherence rules whose operands were parameters". The array family's

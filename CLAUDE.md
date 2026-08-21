@@ -506,11 +506,13 @@ compatibility).
   (parameters occupying field types and values) and an **open instance** — `<T> { v: [T] }`, or the explicit
   `<T, N> !array { element_type: T  min_items: N }` — the latter lifting to an `instance_template` body and
   closing through the target constructor's own reader (`TemplateMaterialiser`, `docs/schema-resolution.md`).
-  Two things remain. `tuple` and `choice` bind a *collection*, and `template_argument` has no collection
-  case, so `<T> { v: (T | text) }` is refused at the declaration (`SPEC-FEEDBACK.md` #53). And a container
-  whose element is itself an application (`[box<text>]`) has no entry to name until materialisation has run,
-  so the desugar table cannot reduce it — which is also what blocks the change report's nested `grid`
-  fixture.
+  A container position holding an application works too, for the open case: the binding keeps the
+  `type_ref` whole, so `tree => <T> { value: T  children: [tree<T>; 1..] }` ties its knot through the lifted
+  synthetic. Two things remain. `tuple` and `choice` bind a *collection*, and `template_argument` has no
+  collection case, so `<T> { v: (T | text) }` is refused at the declaration (`SPEC-FEEDBACK.md` #53). And the
+  *closed* container position (`[box<text>]`) has to write the application to the wire, where the only form
+  carrying arguments is `type_ref`'s record form — which cannot be read, because `type_argument` is a sealed
+  interface here and nothing binds a value against one (`BACKLOG.md`).
 - **Undocumented atom constructors** — `unknown` (and `extern`, which has no core.tn declaration) has no
   compiled-parser factory, so it compiles to `ErrorReader` (a schema merely *declaring* one still compiles).
   Neither is an ordinary missing parser waiting to be written: `extern` is a whole absent mechanism and `unknown`
