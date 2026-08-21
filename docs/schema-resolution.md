@@ -224,9 +224,31 @@ recorded open form, and replacing the application with a reference to the entry 
     — it cannot close until `vip` itself materialises, and deferring composition that far is a different
     feature. Before this, refinement did not refuse: it copied the template's body with parameters unbound
     and reported an unresolved reference to a parameter the author never wrote.
-- **Scope is the record template.** One whose body writes a §5.3 container sugar form is refused earlier, at
-  the application site, by `SchemaDesugarer.checkTemplateApplication` — those need an open representation of
-  the sugar forms that does not exist yet (`spec/tson-cr-structure-templates.md`, Tranche C).
+- **An open *instance* closes on a second path, and produces an ordinary body.** A template whose body is an
+  `instance_template` — what a sugar form over a parameter lifts to — is not substituted-and-kept like a
+  record template: once its bindings go concrete it is no longer a template at all, but the constructor body
+  those bindings always described. So it is bound through **that constructor's own compiled reader**, the
+  same one a written `!array { … }` binds through, and the entry carries an ordinary `ArrayBody`/`MapBody`.
+  - **That is where §8.2's deferred value-level check lands**, and it needs no code of its own:
+    `<N> [text; N]` is a fine declaration, `<"two">` is where it stops being one, and the reader reports it
+    (`'two' is not a valid integer`) exactly as it would for a written body. D7's split — binding names,
+    REQUIRED coverage and concrete typing at the declaration; what substitution supplies, here — is the
+    whole of it.
+  - **The entry is named for the form, not for the application** (§8.2). An open synthetic's own name is
+    internal and derived, so keying its instantiations on it would make identity depend on an unstable name
+    — and would leave `[text]` written directly and `[T]` closed to `text` on two entries for one type. Both
+    go through `SchemaDesugarer.internalName` over the same binding record, so the two channels dedupe
+    against each other and the closing usually finds the entry desugaring already injected.
+  - **No knot-tying is needed on this path**: an `instance_template`'s bindings are references to entries,
+    never a nested application of the template being closed, so closing one cannot re-enter itself.
+- **An argument keeps the channel it was applied on.** An argument list is the one position where a type and
+  a value are equally at home, so a value parameter passed straight through (`array_p0_…<N>` inside
+  `<N> { a: [text; N] }`) stays a value. A parameter anywhere else is a type by construction, and a value
+  arriving there is the kind error above.
+- **One position the desugar table still cannot reduce**: a container whose element is itself an application
+  (`[box<text>]`). Its entry does not exist until this pass has run, one phase later, so the form has no name
+  to bind — `DefinitionResolver` refuses it by name rather than guessing. It is what stands between this and
+  the change report's `grid` fixture.
 
 ## Template regularity (`tson-compiler/.../resolver/TemplateRegularity.java`)
 

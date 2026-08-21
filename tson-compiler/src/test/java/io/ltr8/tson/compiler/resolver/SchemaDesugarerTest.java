@@ -2,12 +2,15 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
+import io.ltr8.tson.compiler.ast.schema.GenericRef;
 import io.ltr8.tson.compiler.ast.schema.Instance;
+import io.ltr8.tson.compiler.ast.schema.InstanceTemplate;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.ast.schema.SimpleRef;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
+import io.ltr8.tson.compiler.ast.schema.TypeArg;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.schema.meta.SourcePosition;
 import org.junit.jupiter.api.Test;
@@ -492,14 +495,59 @@ class SchemaDesugarerTest {
 
     // ── Generic application heads (§3.3.1, §5.10) ────────────────────────
 
+    /**
+     * A sugar form naming one of the enclosing declaration's own parameters lifts to an <b>open</b> synthetic
+     * -- a template of its own, over just the parameters it uses -- and the field applies it straight back.
+     * The parameters are renamed positionally, so two templates alike up to renaming land on one entry (§8.2).
+     */
     @Test
-    void aParameterizedDeclarationIsLeftEntirelyAlone() {
-        // A template's desugared structure is its recorded open form, and every nested form inside it becomes
-        // concrete only at materialisation -- so lifting one here would mint an entry for a template that may
-        // never be instantiated.
-        SchemaDocument document = parse("  box => <T> { v: [T] }");
+    void aParameterBearingFormLiftsToAnOpenSynthetic() {
+        SchemaDocument document = desugar("  box => <T> { v: [T] }");
 
-        assertSame(document, SchemaDesugarer.desugar(document, Set.of()));
+        SchemaMap.Declaration lifted = document.body().declarations().values().stream()
+                .filter(declaration -> declaration.name().startsWith("array_p0_")).findFirst().orElseThrow();
+        InstanceTemplate template = assertInstanceOf(InstanceTemplate.class, lifted.typeDef());
+        assertEquals(List.of("p0"), template.typeParams());
+        assertEquals("array", template.target());
+        assertEquals(new TypeArg.Ref(new SimpleRef("p0")), template.bindings().get(0).value());
+
+        RecordDef box = (RecordDef) ((StructuralTypeDef) document.body().declarations().get("box").typeDef())
+                .body();
+        assertEquals(new GenericRef(lifted.name(), List.of(new TypeArg.Ref(new SimpleRef("T")))),
+                ((FieldDef) box.entries().get(0)).type().orElseThrow().typeRef());
+    }
+
+    /** Two templates differing only in what they call their parameter are one template, so one entry (§8.2). */
+    @Test
+    void twoOpenFormsAlikeUpToRenamingLandOnOneEntry() {
+        SchemaDocument document = desugar("""
+                  box   => <T> { v: [T] }
+                  crate => <A> { w: [A] }""");
+
+        assertEquals(1, document.body().declarations().keySet().stream()
+                .filter(name -> name.startsWith("array_p0_")).count(),
+                () -> "one open synthetic, shared: " + document.body().declarations().keySet());
+    }
+
+    /** A template's own body is the open construction, not a reference to a lifted one -- D5, one tier up. */
+    @Test
+    void aTemplatesOwnSugarBodyIsTheInstanceTemplate() {
+        SchemaDocument document = desugar("  vector => <T> [T]");
+
+        InstanceTemplate template = assertInstanceOf(InstanceTemplate.class,
+                document.body().declarations().get("vector").typeDef());
+        assertEquals(List.of("T"), template.typeParams(), "the declaration's own parameters, as written");
+        assertEquals("array", template.target());
+    }
+
+    /** A concrete form inside a template still lifts closed: D5 has one rule, and the parameters do not enter it. */
+    @Test
+    void aConcreteFormInsideATemplateStillLiftsClosed() {
+        SchemaDocument document = desugar("  box => <T> { v: T  w: [text] }");
+
+        SchemaMap.Declaration lifted = document.body().declarations().values().stream()
+                .filter(declaration -> declaration.name().startsWith("array_text_")).findFirst().orElseThrow();
+        assertInstanceOf(Instance.class, lifted.typeDef());
     }
 
     /**
@@ -517,19 +565,20 @@ class SchemaDesugarerTest {
     }
 
     /**
-     * A template whose body writes a container sugar form does <em>not</em> pass through: §5.3's forms have no
-     * open representation yet, so the application cannot be materialised. Left alone it resolves against a
-     * body whose {@code [T]} became a reference to {@code array} -- a name a user schema's type-name namespace
-     * does not hold -- and the author is told their schema has an unresolved reference to something they never
-     * wrote. Failing at the site that writes it says what is actually missing.
+     * A template whose body writes a container sugar form passes through as well: the form lifts open, and the
+     * application closes it at materialisation. What this phase used to refuse is now the mechanism.
      */
     @Test
-    void applyingATemplateWhoseBodyCarriesSugarIsStillRejectedHere() {
-        UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
-                () -> desugar("""
-                          box => <T> { v: [T] }
-                          holder => { b: box<text> }"""));
-        assertTrue(thrown.getMessage().contains("container sugar form"), thrown.getMessage());
+    void applyingATemplateWhoseBodyCarriesSugarPassesThroughToo() {
+        SchemaDocument document = desugar("""
+                  box => <T> { v: [T] }
+                  holder => { b: box<text> }""");
+
+        RecordDef holder = (RecordDef) ((StructuralTypeDef) document.body().declarations().get("holder")
+                .typeDef()).body();
+        assertEquals(new GenericRef("box", List.of(new TypeArg.Ref(new SimpleRef("text")))),
+                ((FieldDef) holder.entries().get(0)).type().orElseThrow().typeRef(),
+                "left for materialisation, arguments intact");
     }
 
     /**

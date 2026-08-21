@@ -25,6 +25,7 @@ import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.ast.schema.SimpleRef;
 import io.ltr8.tson.compiler.ast.schema.SizeSpec;
+import io.ltr8.tson.compiler.ast.schema.TemplateBinding;
 import io.ltr8.tson.compiler.ast.schema.StructuralDef;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.compiler.ast.schema.TupleRef;
@@ -131,6 +132,7 @@ final class SchemaDesugarer {
     private static final String ELEMENTS = "elements";
     private static final String VARIANTS = "variants";
 
+
     /**
      * What a declaration whose sugar form was reported is replaced with: a fresh, zero-field record. The
      * counterpart of {@code SchemaResolver.unresolved} one phase later, and the same javac model -- an error
@@ -165,9 +167,9 @@ final class SchemaDesugarer {
 
     /**
      * The type parameters of the declaration currently being walked, or empty outside a template. A sugar
-     * form mentioning one of these is <em>open</em> -- it cannot become a closed entry, because the entry
-     * would carry a reference to a parameter nothing has bound -- so it is left exactly as written for the
-     * open representation to handle. Every other form in the same declaration lifts normally.
+     * form naming one of these lifts to an <em>open</em> entry rather than a closed one -- a closed entry
+     * would carry a reference to a parameter nothing has bound. Every other form in the same declaration
+     * lifts exactly as it would outside a template (D5's one rule).
      */
     private List<String> currentParameters = List.of();
 
@@ -316,9 +318,6 @@ final class SchemaDesugarer {
             // A declaration's own body reference names what this declaration *is*; only its arguments are
             // expandable, so the head stays put and its own handling is unchanged.
             case ReferenceTypeDef reference -> {
-                if (!reference.typeParams().isEmpty()) {
-                    yield reference;
-                }
                 // **A declaration's own body never lifts** (D5): the form *is* the construction, so it
                 // becomes the instance directly rather than a reference to an injected one. That is what
                 // keeps `score_list => [integer; 1..]` a PRODUCT entry with a real body, and
@@ -327,7 +326,16 @@ final class SchemaDesugarer {
                 // `type-ref` like the rest, since there is no separate declaration-level tier.
                 Optional<Binding> binding = binding(reference.ref());
                 if (binding.isPresent()) {
-                    yield instance(binding.get());
+                    // The same rule one tier up: a template's own body is the open construction, so
+                    // `vector => <T, N> [T; N]` *is* the instance template rather than a reference to one.
+                    // Its parameters are the declaration's own list as written, not the subset the body
+                    // happens to name -- a declared parameter the body never uses is an error the linker
+                    // reports (§5.10), and dropping it here would hide the very thing it looks for.
+                    yield reference.typeParams().isEmpty() ? instance(binding.get())
+                            : instanceTemplate(binding.get(), reference.typeParams());
+                }
+                if (!reference.typeParams().isEmpty()) {
+                    yield reference;
                 }
                 TypeRef ref = argumentsOnly(reference.ref());
                 yield ref == reference.ref() ? reference : new ReferenceTypeDef(reference.typeParams(), ref);
@@ -393,12 +401,6 @@ final class SchemaDesugarer {
      * [integer]}</code> injects the inner array, then the outer map referring to it).
      */
     private TypeRef typeRef(TypeRef ref) {
-        if (isOpen(ref)) {
-            // Parameter-bearing: it cannot close, and its open form is a separate, unimplemented feature.
-            // Left as written so `checkTemplateApplication` still refuses an application of the template
-            // that holds it, rather than letting a half-expanded shape through.
-            return ref;
-        }
         return switch (ref) {
             case SimpleRef simple -> simple;
             case ArrayRef _, TupleRef _, MapRef _ -> hoistOrKeep(binding(ref), ref);
@@ -408,31 +410,6 @@ final class SchemaDesugarer {
                 List<TypeArg> args = mapShared(generic.args(), this::typeArg);
                 yield args == generic.args() ? generic : new GenericRef(generic.name(), args);
             }
-        };
-    }
-
-    /**
-     * Whether {@code ref} mentions one of the declaration's own type parameters -- the test that decides
-     * whether a sugar form can lift now or must wait for the open representation. A {@link GenericRef} is
-     * excluded: an application is not a sugar form, and one carrying a parameter closes when the enclosing
-     * template is materialised.
-     */
-    private boolean isOpen(TypeRef ref) {
-        return !currentParameters.isEmpty() && !(ref instanceof GenericRef) && mentionsParameter(ref);
-    }
-
-    private boolean mentionsParameter(TypeRef ref) {
-        return switch (ref) {
-            case SimpleRef simple -> currentParameters.contains(simple.name());
-            case ArrayRef array -> mentionsParameter(array.elementType().typeRef());
-            case MapRef map -> mentionsParameter(map.keyType())
-                    || mentionsParameter(map.valueType().typeRef());
-            case TupleRef tuple -> tuple.elementTypes().stream()
-                    .anyMatch(e -> mentionsParameter(e.typeRef()));
-            case ChoiceRef choice -> choice.variants().stream().anyMatch(this::mentionsParameter);
-            case GenericRef generic -> currentParameters.contains(generic.name())
-                    || generic.args().stream().anyMatch(arg ->
-                            arg instanceof TypeArg.Ref r && mentionsParameter(r.ref()));
         };
     }
 
@@ -462,16 +439,9 @@ final class SchemaDesugarer {
      * form, not over the AST, so this phase leaves the application for {@code SchemaResolver} to materialise
      * and the head keeps its arguments into resolution.
      *
-     * <p><b>A template containing a sugar form does not.</b> {@code box => <T> { v: [T] } } needs the open
-     * representation of §5.3's forms, which is a separate, unimplemented feature; left alone the application
-     * resolves against a body whose {@code [T]} became a reference to {@code array}, a name a user schema's
-     * type-name namespace does not hold, so the author is told their schema has an unresolved reference to
-     * something they never wrote. Failing at the site that writes it says what is actually missing.
-     *
-     * <p><b>An imported head passes through too</b>, and needs no check here even though this phase is handed
-     * only the imported names (see {@link #imported}). A template carrying a sugar form cannot link, so it
-     * cannot have been registered, so it cannot be imported: every imported template is sugar-free by
-     * construction.
+     * <p><b>A template containing a sugar form passes through as well</b>, now that {@code box => <T> { v:
+     * [T] } } lifts that form to an open synthetic instead of leaving it where it was. What used to be
+     * refused here is the mechanism itself.
      *
      * <p>A head this document neither declares nor imports is left alone -- the reference is simply
      * unresolved, which is {@code TsonSchemaLinker}'s verdict to deliver. A local head that declares no
@@ -488,78 +458,6 @@ final class SchemaDesugarer {
                     + head + "<...>' applies arguments to something that takes none (§5.10); drop the "
                     + "argument list");
         }
-        if (containsOpenSugarForm(declaration.typeDef(), parameters)) {
-            throw new UnsupportedOperationException("'" + head + "' is a template whose body writes a "
-                    + "container sugar form over one of its own parameters, and applying one is not "
-                    + "implemented -- §5.3's forms have no open representation yet, so '" + head
-                    + "<...>' cannot be materialised. A template whose parameters occupy field types and "
-                    + "values applies normally, and a sugar form that mentions no parameter lifts like any "
-                    + "other.");
-        }
-    }
-
-    /**
-     * Whether a template's body writes a §5.3/§5.4 sugar form <em>over one of its own parameters</em> -- the
-     * only forms whose representation is still missing. A concrete form has already lifted to an ordinary
-     * closed entry by the time anyone applies the template, so it is no obstacle; refusing on any sugar at
-     * all rejected `<T> { a: T  b: [order] }`, which needs nothing this phase cannot do.
-     *
-     * <p>Deliberately syntactic, and run against the declaration <em>as written</em> rather than as
-     * desugared: an application may be met before the template it names has been walked, and the answer
-     * must not depend on that order.
-     */
-    private static boolean containsOpenSugarForm(TypeDef typeDef, List<String> parameters) {
-        return switch (typeDef) {
-            case ReferenceTypeDef reference -> openSugarInRef(reference.ref(), parameters);
-            case StructuralTypeDef structural -> openSugarInStructuralDef(structural.body(), parameters);
-            default -> false;
-        };
-    }
-
-    private static boolean openSugarInStructuralDef(StructuralDef def, List<String> parameters) {
-        return switch (def) {
-            case RecordDef record -> record.entries().stream().anyMatch(e -> openSugarInEntry(e, parameters));
-            case RefinedDef refined -> openSugarInRef(refined.target(), parameters)
-                    || refined.body().entries().stream().anyMatch(e -> openSugarInEntry(e, parameters));
-            case ConstructionDef construction -> construction.supertypes().stream()
-                    .anyMatch(ref -> openSugarInRef(ref, parameters))
-                    || construction.body().map(body -> body.entries().stream()
-                            .anyMatch(e -> openSugarInEntry(e, parameters))).orElse(false);
-        };
-    }
-
-    private static boolean openSugarInEntry(RecordEntry entry, List<String> parameters) {
-        return switch (entry) {
-            case FieldDef field -> field.type()
-                    .map(type -> openSugarInRef(type.typeRef(), parameters)).orElse(false);
-            case GroupDef group -> group.members().stream()
-                    .anyMatch(member -> openSugarInRef(member.typeRef(), parameters));
-        };
-    }
-
-    private static boolean openSugarInRef(TypeRef ref, List<String> parameters) {
-        return switch (ref) {
-            case SimpleRef _ -> false;
-            case ArrayRef _, MapRef _, TupleRef _, ChoiceRef _ -> namesParameter(ref, parameters);
-            case GenericRef generic -> generic.args().stream()
-                    .anyMatch(arg -> arg instanceof TypeArg.Ref r && openSugarInRef(r.ref(), parameters));
-        };
-    }
-
-    /** {@link #mentionsParameter} against an explicit list -- the same question asked from outside the walk. */
-    private static boolean namesParameter(TypeRef ref, List<String> parameters) {
-        return switch (ref) {
-            case SimpleRef simple -> parameters.contains(simple.name());
-            case ArrayRef array -> namesParameter(array.elementType().typeRef(), parameters);
-            case MapRef map -> namesParameter(map.keyType(), parameters)
-                    || namesParameter(map.valueType().typeRef(), parameters);
-            case TupleRef tuple -> tuple.elementTypes().stream()
-                    .anyMatch(e -> namesParameter(e.typeRef(), parameters));
-            case ChoiceRef choice -> choice.variants().stream().anyMatch(v -> namesParameter(v, parameters));
-            case GenericRef generic -> parameters.contains(generic.name())
-                    || generic.args().stream().anyMatch(arg ->
-                            arg instanceof TypeArg.Ref r && namesParameter(r.ref(), parameters));
-        };
     }
 
     private static List<String> typeParams(TypeDef typeDef) {
@@ -764,21 +662,176 @@ final class SchemaDesugarer {
     }
 
     /**
-     * A binding hoisted into its own declaration and replaced by a bare reference, or {@code unexpanded} when
+     * {@code <p0> !head { field: p0 ... }} -- the open counterpart, for a form naming a parameter of the
+     * declaration it sits in. {@code typeParams} is that form's own parameter list, already renamed.
+     */
+    private static TypeDef instanceTemplate(Binding binding, List<String> typeParams) {
+        List<TemplateBinding> bindings = new ArrayList<>();
+        for (RecordValue.Field field : binding.fields()) {
+            if (!(field.value().value().coreValue() instanceof TokenValue token)) {
+                // A collection-valued slot -- `tuple`'s `elements`, `choice`'s `variants`. `template_argument`
+                // is `param | value | type_ref` with no collection case (§8.1), so a parameter inside one has
+                // no open form to lift to at all. The closed forms are unaffected: this is reached only once
+                // a parameter has already been found in the record.
+                throw new UnsupportedOperationException("'!" + binding.head() + "' binds '" + field.name()
+                        + "' to a collection, and a template_argument has no collection case (§8.1), so a "
+                        + "type parameter inside one has no open representation -- naming the inner form in "
+                        + "its own declaration and referring to that is the way to write this today");
+            }
+            bindings.add(new TemplateBinding(field.name(), isLiteral(token)
+                    ? new TypeArg.Value(token)
+                    : new TypeArg.Ref(new SimpleRef(token.text()))));
+        }
+        return new InstanceTemplate(typeParams, binding.head(), bindings);
+    }
+
+    /**
+     * Whether a binding's token is unambiguously a literal -- §12.1's own rule for {@code type-arg}, applied
+     * to a record this phase built rather than to one it parsed. A quoted token or one shaped like a number
+     * is a value and nothing else; every other token is carried on the reference channel, and what it turns
+     * out to be -- a type, an enum member, a parameter of the enclosing declaration -- is settled at
+     * resolution, where the parameter list and the slot's declared type are both in hand. Deciding it here
+     * instead would mean a size bound naming a parameter ({@code [text; N]}) arrived as the literal "N".
+     */
+    private static boolean isLiteral(TokenValue token) {
+        if (token.form() != TokenForm.UNQUOTED) {
+            return true;
+        }
+        try {
+            new BigInteger(token.text());
+            return true;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    /**
+     * A binding hoisted into its own declaration and replaced by a reference to it, or {@code unexpanded} when
      * the form did not reduce.
      */
     private TypeRef hoistOrKeep(Optional<Binding> binding, TypeRef unexpanded) {
         return binding.<TypeRef>map(this::hoist).orElse(unexpanded);
     }
 
-    /** Records an injected declaration under its derived name and yields the reference that replaces the sugar. */
+    /**
+     * Records an injected declaration under its derived name and yields the reference that replaces the sugar.
+     *
+     * <p><b>Which entry it lifts to is D5's one rule.</b> A form naming none of the enclosing declaration's
+     * parameters lifts <em>closed</em> -- an ordinary construction referenced by a bare name -- whether or not
+     * the declaration around it is a template. A form naming one lifts <em>open</em>: a template over just the
+     * parameters it uses, referenced by an application binding them straight back through. {@code <T> { a: [T]
+     *  b: [order] }} therefore injects one of each, and only the first has to wait for materialisation.
+     */
     private TypeRef hoist(Binding binding) {
-        String name = bindingName(binding);
+        List<String> parameters = parametersIn(binding);
+        if (parameters.isEmpty()) {
+            String name = bindingName(binding);
+            if (!imported.contains(name)) {
+                injected.computeIfAbsent(name, n -> new SchemaMap.Declaration(List.of(), n, List.of(),
+                        instance(binding)));
+            }
+            return new SimpleRef(name);
+        }
+        List<String> renamed = positionalNames(binding, parameters);
+        Binding normalised = rename(binding, parameters, renamed);
+        String name = bindingName(normalised);
         if (!imported.contains(name)) {
             injected.computeIfAbsent(name, n -> new SchemaMap.Declaration(List.of(), n, List.of(),
-                    instance(binding)));
+                    instanceTemplate(normalised, renamed)));
         }
-        return new SimpleRef(name);
+        return new GenericRef(name, parameters.stream()
+                .<TypeArg>map(parameter -> new TypeArg.Ref(new SimpleRef(parameter))).toList());
+    }
+
+    /**
+     * Every parameter of the enclosing declaration this binding record names, in the order the declaration
+     * lists them -- the form's own parameter list, and the argument list of the reference that replaces it.
+     *
+     * <p><b>Asked of the resolved record, not of the source form</b>, so a parameter reaches it the same way
+     * whichever channel carried it: {@code [T]} names one in a type slot and {@code [order; N]} in a value
+     * slot, and §5.3's size specifier keeps its bound as raw token text precisely because it may be either.
+     */
+    private List<String> parametersIn(Binding binding) {
+        List<String> found = new ArrayList<>();
+        for (String parameter : currentParameters) {
+            if (binding.fields().stream().anyMatch(field -> namesToken(field.value().value().coreValue(),
+                    parameter))) {
+                found.add(parameter);
+            }
+        }
+        return found;
+    }
+
+    /** Whether {@code value}, or anything nested inside it, is the bare token {@code text}. */
+    private static boolean namesToken(CoreValue value, String text) {
+        return switch (value) {
+            case TokenValue token -> token.text().equals(text);
+            case ArrayValue array -> array.elements().stream()
+                    .anyMatch(element -> namesToken(element.value().coreValue(), text));
+            case RecordValue record -> record.fields().stream()
+                    .anyMatch(field -> namesToken(field.value().value().coreValue(), text));
+            default -> false;
+        };
+    }
+
+    /**
+     * The names an open form's own parameters take: {@code p0}, {@code p1}, ... positionally.
+     *
+     * <p><b>Renaming is what makes an open entry identify with its equals.</b> Two forms alike up to a
+     * consistent renaming of parameters are one template (§8.2), so {@code <T> [T]} and {@code <A> [A]} have
+     * to land on one entry -- and the name is derived from the record, so normalising the record is what
+     * normalises the name.
+     *
+     * <p>The prefix grows until it collides with nothing the record already names. A binding may hold a
+     * concrete reference to a type genuinely called {@code p0}, and renaming a parameter on top of it would
+     * make the two indistinguishable in the body that results.
+     */
+    private static List<String> positionalNames(Binding binding, List<String> parameters) {
+        String prefix = "p";
+        while (true) {
+            List<String> names = new ArrayList<>();
+            for (int i = 0; i < parameters.size(); i++) {
+                names.add(prefix + i);
+            }
+            boolean clash = names.stream().anyMatch(name -> !parameters.contains(name)
+                    && binding.fields().stream().anyMatch(field ->
+                            namesToken(field.value().value().coreValue(), name)));
+            if (!clash) {
+                return names;
+            }
+            prefix += "p";
+        }
+    }
+
+    /** The same binding record with each parameter token replaced by its positional name. */
+    private static Binding rename(Binding binding, List<String> parameters, List<String> renamed) {
+        Map<String, String> substitution = new LinkedHashMap<>();
+        for (int i = 0; i < parameters.size(); i++) {
+            substitution.put(parameters.get(i), renamed.get(i));
+        }
+        return new Binding(binding.head(), binding.fields().stream()
+                .map(field -> new RecordValue.Field(field.name(), renameScoped(field.value(), substitution)))
+                .toList());
+    }
+
+    private static ScopedValue renameScoped(ScopedValue scoped, Map<String, String> substitution) {
+        DataValue value = scoped.value();
+        return new ScopedValue(scoped.schemaRef(), new DataValue(value.annotations(), value.typeRef(),
+                renameValue(value.coreValue(), substitution)));
+    }
+
+    private static CoreValue renameValue(CoreValue value, Map<String, String> substitution) {
+        return switch (value) {
+            case TokenValue token -> substitution.containsKey(token.text())
+                    ? new TokenValue(substitution.get(token.text()), token.form())
+                    : token;
+            case ArrayValue array -> new ArrayValue(array.elements().stream()
+                    .map(element -> renameScoped(element, substitution)).toList());
+            case RecordValue record -> new RecordValue(record.fields().stream()
+                    .map(field -> new RecordValue.Field(field.name(), renameScoped(field.value(), substitution)))
+                    .toList());
+            default -> value;
+        };
     }
 
     /**
@@ -841,8 +894,21 @@ final class SchemaDesugarer {
      * meta.tn's {@code extern.types: [type_name]?} landing on the entry meta-kernel already produced.
      */
     private static String bindingName(Binding binding) {
-        StringBuilder readable = new StringBuilder(binding.head());
-        for (RecordValue.Field field : binding.fields()) {
+        return internalName(binding.head(), binding.fields());
+    }
+
+    /**
+     * The same derivation, over a binding record built elsewhere -- {@code TemplateMaterialiser}, closing an
+     * open form into the concrete one it always described.
+     *
+     * <p><b>Sharing the function is what makes the two channels dedupe against each other</b> (§8.2). A form
+     * written directly and the same form arriving through a materialised template are one type, so they must
+     * be one entry, and the only way that holds is for one function of one record to name both.
+     */
+    static String internalName(String head, List<RecordValue.Field> fields) {
+        Binding binding = new Binding(head, fields);
+        StringBuilder readable = new StringBuilder(head);
+        for (RecordValue.Field field : fields) {
             appendReadable(readable, field.value().value().coreValue());
         }
         return readable.append('_').append(String.format("%08x", canonical(binding).hashCode())).toString();

@@ -3173,3 +3173,49 @@ discover it by writing the test. Two sentences suffice: that `name` followed by 
 enforced only where a generic key has already committed the brace. If a better message is wanted anyway, the
 place for it is the record-field diagnostic — "expected `:`; if you meant a map type, `?` is not permitted on
 a map key" — which costs no lookahead, since by then the `?` has been read.
+
+## 53. D5's one lift rule has no representation for a parameter inside a collection-valued slot
+
+**Section:** `tson-cr-structure-templates.md` D5 (*One lift rule*), D7 (*Structural instance templates*),
+D9 (*`instance-template`*). Related: #50, #51.
+
+**Problem:** D5 states the lift rule without exception — "Every sugar form lifts at desugar: a **concrete**
+form to a closed synthetic entry, a **parameter-bearing** form — one mentioning a type parameter of the
+enclosing declaration — to an open synthetic entry capturing those parameters in declaration order." Four
+sugar forms exist (§5.3's array, tuple and map, §5.4's choice), and the rule names none of them
+specifically, so it reads as covering all four.
+
+It cannot. The open form is an `instance_template` whose bindings are `template_argument`s, and
+`template_argument` is `param | value | type_ref` with no collection case. Two of the four constructors bind
+a **collection**: `tuple`'s `elements: [tuple_element]` and `choice`'s `variants: [type_ref]`. So
+
+```
+odd => <T> { v: (T | text) }        ; choice: variants would be [ {param: T}  type_ref ]
+odd => <T> { v: [T, text] }         ; tuple:  elements would be [ {element_type: {param: T}} ... ]
+```
+
+have no open representation at all — not a harder one, none. D9 notes the same shortfall from the other
+direction, for the explicit spelling: "`<T> !choice { variants: [T text] }`, a parameter inside a
+collection-typed slot, has no resolved form at all", and uses it to justify keeping `template-def` narrower
+than `core-value`. But that is stated as a reason to restrict the *grammar*, and D5 is left standing as a
+rule over every sugar form. The two sit in the same document and disagree about whether
+`<T> { v: (T | text) }` is a form the language admits.
+
+The array and map cases are unaffected: every slot they bind is scalar (`element_type`, `key_type`,
+`value_type`, `state`, `min_items`, `max_items`), so each is one `template_argument` and the lift is exactly
+what D5 describes.
+
+**Interpretation chosen:** implement D5 for the two constructors whose slots are all scalar, and refuse the
+other two at the declaration that writes them, as a not-yet-implemented gap rather than an author error —
+the verdict changes if `template_argument` grows a case, which is the test this repo's exception policy
+applies (`SchemaDesugarer.instanceTemplate`, pinned by
+`ContainerSugarEndToEndTest.aParameterInsideACollectionValuedSlotHasNoOpenForm`). Refusing at the
+declaration rather than at the application is deliberate: the template itself is what has no
+representation, and the author who wrote it is the one who can change it.
+
+**Suggested resolution:** say which forms D5 covers. Either restrict the rule to the constructors whose
+bindings are all scalar and state that a parameter inside a collection-valued slot is out of scope for this
+revision, or give `template_argument` the collection case that would make the rule true as written — a
+fourth channel, `arguments: [template_argument]`, recursive like `type_argument` already is. The first is a
+one-sentence edit and matches D9's own instinct; the second is a real extension, and would also have to say
+how the closing cascade lifts from *inside* a binding, which D9 explicitly defers.

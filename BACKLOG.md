@@ -26,80 +26,40 @@ own prose (which had gone stale on at least one of them):
   "import cycle" diagnostic naming the actual cycle path. Distinct from what
   `TsonCompiledMetaRegistry.withStandardLibrary` already does, which is scoped to just the three bundled
   schemas in a known order, not a general algorithm.
-- [ ] **Record templates — `spec/tson-cr-structure-templates.md`, Tranche B.** §5.10 substitution for the
-  template form whose parameters occupy *field types and field values* (`box => <T> { v: T }`,
-  `<T> { a: T  b: text ~ "test" }`), rejected at the application site today
-  (`SchemaDesugarer.rejectTemplateApplication`). **Deliberately excludes any sugar form inside a template**
-  (`<T> { v: [T] }`, `<T, N> [T; N]`) — that is Tranche C, and it is the only part needing new vocabulary or
-  new grammar. Splitting there keeps the engine and the representation as separate failure surfaces: a
-  record template substitutes into `record_field.type` and `record_field.value_param`, both of which already
-  exist and are already produced, so what is missing is whole-declaration open-form recording,
-  materialisation, arity and kind checking, recursion with knot-tying, and the closed-entry check. Still
-  this implementation's own, beyond the CR's letter:
-  - **Regularity is a declaration-time rule** (`TemplateRegularity`, the change report's R5), not a depth
-    counter: a recursive application must pass each parameter through unchanged, so `weird => <T> { next:
-    weird<box<T>>? }` is rejected where it is written even if nobody applies it. Materialisation keeps a
-    depth backstop in case that check has a hole, since the alternative failure is a `StackOverflowError`.
-    **Finding worth settling in the spec:** the implemented rule (positional identity) is stricter than
-    termination requires — every argument a *bare parameter reference*, at any position, suffices, because
-    arguments are only ever copied and never constructed, so `swap => <A, B> { x: swap<B, A> }` and
-    `dup => <A, B> { x: dup<A, A> }` reach finitely many instantiations and are rejected anyway. Positional
-    identity matches the cited precedent (ML's polymorphic-recursion restriction) and is easy to loosen
-    later; the reverse is not.
-  - **Materialisation must replace the eager rejection, not merely remove it.** With heads resolving
-    type-name-only there is no namespace check left to make, so `SchemaDesugarer.rejectTemplateApplication`
-    fails on any head this document declares *or imports* — a template arriving by `!!import` included.
-    Deleting that without materialisation in place regresses to a read-time failure. Tranche B retires it
-    for record templates only; an application of a template containing a sugar form keeps failing until C.
-- [ ] **An empty `{}` does not count against a map's `min_items`.** Found while landing Tranche C and
+- [ ] **An empty `{}` does not count against a map's `min_items`.** Found while landing the container
+  collapse and
   **pre-existing**: `b: {text => order; 1..}` with data `b: {}` validates OK, through a named declaration
   as much as through the sugar, while `max_items` reports correctly. Presumably `EmptyBrace` reaches the
   map reader as something other than a zero-entry map. Unrelated to the container collapse; recorded so it
   is not rediscovered as a regression.
-- [ ] **Instance templates — `spec/tson-cr-structure-templates.md`, Tranche D (D7, D9).** A sugar form
-  inside a template declaration **that mentions one of the declaration's own parameters** — a concrete one
-  already lifts to an ordinary closed entry (D5's uniform rule, R2). Needs both a grammar addition and an
-  intermediate vocabulary.
-  The obstruction is not the type slot — a `type_ref` may already name a parameter — but the *value* slots:
-  `ArrayBody.minItems` is `Optional<BigInteger>`, so `!array { min_items: N }` cannot be an array body at
-  all. The CR's answer is `template_instance` (a constructor plus a `{field_name => template_argument}`
-  binding map) as the open counterpart of an instance, with `template_argument = param | value | type_ref`;
-  an instance admits no partial bindings, so the closed bodies are untouched and `min_items: "two"` becomes
-  the error at the materialising application. Take `[T]` first — the unsized inline form, whose only
-  parameter rides a type slot — then the sized and nested forms, which are what actually need `param`.
-  Also here: D9's `instance-template` production — a `!` head behind a parameter list, resolving against
-  `instance_template` rather than the constructor's own body, so a production of its own rather than
-  `[type-params] instance` (today `TsonSchemaParser.parseTypeDef` checks `!` *before* `parseTypeParamsOpt`,
-  faithful to the ABNF as written) — and open-synthetic identity up to consistent parameter renaming.
-  - **Stage one is the grammar alone**, target `box => <T> { a: [T] }`: the production, a new AST node, and
-    the resolved shape `array_t => <T> !array { element_type: T }` →
-    `body: !instance_template { target: array  bindings: { element_type => { param: T } } }`. Every open
-    entry carries an `instance_template`, including one like this that a plain `!array` body could serve —
-    uniformity is what makes "`instance_template` present ⟺ open entry" checkable, and splitting it by
-    whether a parameter lands in a type or a value slot would leave two open representations.
-    `instance_template` is `top & { ... }` with no `~`, exactly as `reference` is: it never describes a
-    value, so it has no `access_pattern`/`size_type`, and it is never a `!` target in a schema. Its payload
-    has its own production (`template-def`, one or more `field-name: template-arg` bindings, no bracket or
-    paren form) rather than a `core-value`, so the grammar refuses what `template_argument` cannot carry.
-  - The compact spelling for a *sugared* constructor already exists and already parses
-    (`vector => <T, N> [T; N]` is `[type-params] container-def`). `instance-template` is the fallback for a
-    constructor with no sugar (`set`) and the target the sugar desugars into — its ergonomics matter less
-    than its existence.
-  - **The CR's own §8 fixtures do not parse** and need respelling before they can be acceptance tests:
+- [ ] **What Tranche D leaves open.** Instance templates work: a sugar form over one of the enclosing
+  declaration's own parameters lifts to an open synthetic carrying an `instance_template` body, the explicit
+  `<T, N> !array { … }` spelling parses and resolves, and applying either closes it through the target
+  constructor's own reader (`docs/schema-resolution.md`). Two shapes remain, both narrower than the tranche
+  that produced them:
+  - **A parameter inside a collection-valued slot.** `tuple` binds `elements` and `choice` binds `variants`,
+    and a `template_argument` is `param | value | type_ref` with no collection case, so `<T> { v: (T | text) }`
+    has no open form at all and is refused at the declaration that writes it. `SPEC-FEEDBACK.md` #53 puts the
+    contradiction to the spec — D5 states the lift rule over every sugar form, D9 concedes this case has no
+    resolved form — and offers both resolutions: scope the rule, or give `template_argument` a recursive
+    fourth channel. Not worth implementing before that comes back.
+  - **A container position that is itself an application** (`[box<text>]`, and so the CR's nested `grid`
+    fixture). The desugar table needs a *name* for each position, and an application has no entry to name
+    until materialisation has run — one phase later. Pre-existing, and independent of templates: the closed
+    `[box<text>]` fails the same way. Fixing it means either lifting the position lazily or letting
+    materialisation revisit the table, which is a real design question rather than a missing case.
+  - **The CR's own §8 fixtures still need respelling** before they can be acceptance tests:
     `tree => <T> { value: T  children: [tree<T>; 1..] }` and `grid => <T, N> { x: [[T; 1..N]; 2..N] }` both
-    put a size specifier at a *field* position, which §5.3's inline prohibition rejects — a prohibition the
-    CR preserves. Whether that prohibition relaxes at a field position is the CR's own open item (§9), and
-    it decides how much of this tranche is reachable: with it intact, an open synthetic can arise only from
-    a declaration whose whole body is a container form. `SPEC-FEEDBACK.md` #31 is the pending entry in the
-    area and is expected to carry the resolution in a later revision — though as drafted it preserves the
-    prohibition rather than relaxing it, so it needs a paragraph before it settles this. Not a blocker for
-    Tranche B either way.
+    put a container position on an application, which is the item above; the size specifier at a field
+    position that also blocked them is legal now (D10).
+
 - [ ] **The rest of §8.2's deferred value-level checks.** Materialisation "runs the value-level checks that
   open bounds deferred: family coherence rules whose operands were parameters". The array family's
   `min_items <= max_items` is one rule over the binding pair for arrays *and maps*: a resolver error where
   the bounds are literal at schema load, at materialisation where parameter-bound. The literal half is done
-  for both tiers (`SchemaDesugarer.checkBounds`); the parameter-bound half needs a size specifier inside a
-  template, which is Tranche C. The
+  for both tiers (`SchemaDesugarer.checkBounds`); the parameter-bound half now has a home too — a
+  parameter-bound `min_items` reaches the target constructor's own reader when the template closes, which is
+  where `<"two">` is rejected, though nothing yet compares a *pair* of bounds once both go concrete. The
   kin §8.2 gestures at — "bounds within a width-derived range, and their kin" — belong with the constraint
   families that own them, next to `AtomNarrowing`, not in a syntax rewrite. Doing that properly probably
   means the check moves out of the desugarer entirely and `checkBounds` goes with it. Distinct from the
@@ -125,7 +85,8 @@ own prose (which had gone stale on at least one of them):
 **Done:** a generic type-ref whose arguments are not simple names. A value argument and a nested
 application both resolve, at every position that can write one — a field, a declaration body, and a
 refinement source share `DefinitionResolver.typeArgument`. An *inline sugar form* as an argument
-(`weird<[T]>`) is still out, but only because sugar inside a template is Tranche C.
+(`weird<[T]>`) is still out — `template-def` deliberately admits no bracket or paren form (D9), and the
+grammar refuses it where it is written.
 
 **Still open**, and each has its own item below or above: composing or refining against an application that
 is still *open*, which needs composition deferred to materialisation; and the field/element catch-all, whose
@@ -137,26 +98,12 @@ two live shapes are both inside a template. The second has measured detail worth
   parameters, which cannot close until that declaration itself materialises — so composition would have to
   be deferred to materialisation too, absorbing fields into an entry that does not exist yet. A different
   feature from closing an application, and the diagnostic now says so rather than blaming substitution.
-- [ ] **A field/element type that is not a simple name, a generic application, or an inline array.**
-  `DefinitionResolver.resolveTypeRef`'s catch-all ("only simple (non-generic) type-refs, generic
-  applications of one, and inline arrays of one are resolved so far"). **Only reachable inside a
-  parameterized declaration** — `SchemaDesugarer` normalizes every inline form in an ordinary field or
-  group-member position first, so `[[text]]`, `[{text => integer}]`, `(text | integer)`, `[text, integer]`
-  and `{text => [integer]}` all compile today, in both positions. The phase skips a parameterized
-  declaration entirely, and that is where the
-  throw is live, in two shapes measured directly:
-  - `box => <T> { v: [T] }` — the `InlineArrayRef` branch *does* fire and builds `array<T>`, then the linker
-    rejects `array`, which a user schema's type-name namespace does not hold. The author is told their
-    schema has an unresolved reference to something they never wrote. Under the CR this failure mode
-    disappears by design: a template body's `[T]` becomes an open `!array` form carried via `value_form`
-    (D5/D7), never a type-name reference to `array`.
-  - `pair => <T> { v: (T | text) }` — `ChoiceRef` hits the catch-all, and an `UnsupportedOperationException`
-    reaching the CLI is reported as `internal error ... This is a bug in tson` with exit 70. It is a gap,
-    not a fault, so even before the feature lands the classification is wrong (see the exception policy in
-    CLAUDE.md).
-  Both live shapes are inside a template, which is what makes this Tranche B work: the CR's open-form
-  recording (D5) is precisely "desugar a parameterized declaration without lifting", the thing the phase
-  skips today.
+- [ ] **A field/element type the desugar table cannot reduce to a name.**
+  `DefinitionResolver.resolveTypeRef`'s catch-all. Both shapes this used to name are settled: `[T]` inside a
+  template lifts to an open synthetic, and `(T | text)` is refused at the declaration as the representation
+  gap it is (`SPEC-FEEDBACK.md` #53), not as a fault at the CLI. What is left is the *application in a
+  container position* recorded above — `[box<text>]`, closed or open alike — whose entry does not exist
+  until materialisation has run.
 
 Only genuine gaps are listed above — a throw that means "your schema is wrong" is not one. Classifying the
 throw sites by that test is done across the whole schema pipeline (issue #26); if a census is ever wanted

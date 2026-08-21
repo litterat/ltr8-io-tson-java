@@ -57,13 +57,13 @@ public final class TsonBundledSchemas {
      * library holds it so a hash-pinned reference to a pre-loaded schema can be verified, and so the
      * shipped resource can be checked against its own published digest ({@link #declaredSha256}).
      */
-    public static final String META_KERNEL_SHA256 = "2088a157686cfcc4bc30b5e633eab32fd36f64eec88a2533dabcc58b4687feed";
+    public static final String META_KERNEL_SHA256 = "a357b93fffd24dbe3fa7132eac751a549f0eebb3fec36d6e00f86cc7589af78b";
 
     /** meta's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/meta.tn}'s {@code !!id}. See {@link #META_KERNEL_SHA256}. */
-    public static final String META_SHA256 = "155269f4cbea13f7534da6f3593482df65201b1ac68d35bb9d5913fab052f529";
+    public static final String META_SHA256 = "5f2d3a4a85d23de9331edb303712e09ff20bee58f830fe5162276a3e6659dac8";
 
     /** core's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/core.tn}'s {@code !!id}. See {@link #META_KERNEL_SHA256}. */
-    public static final String CORE_SHA256 = "538a37c1b7b14811b888bce24caa9e06e24eddbfb59ec57bae5f7af87f67199f";
+    public static final String CORE_SHA256 = "5ed51742a0416c427cddf4f02a0f70a356e022927c1de78e7cda405462270a84";
 
     private static final Map<String, String> RESOURCES = Map.of(
             META_KERNEL_ID, "/meta-kernel.tn",

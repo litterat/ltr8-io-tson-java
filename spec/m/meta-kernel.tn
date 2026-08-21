@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/32/m/meta-kernel.tn?sha256=2088a157686cfcc4bc30b5e633eab32fd36f64eec88a2533dabcc58b4687feed"
+!!id:"https://tson.io/2026/32/m/meta-kernel.tn?sha256=a357b93fffd24dbe3fa7132eac751a549f0eebb3fec36d6e00f86cc7589af78b"
 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 32 draft).
@@ -274,6 +274,41 @@
   tuple_element => {
     element_type: type_ref
     state:        element_state ~ REQUIRED
+  }
+
+  @doc:"""
+    One binding of an instance template — a labelled choice between a
+    parameter, a concrete literal and a concrete reference. `param`
+    marks the slot as unbound, and is canonical for every slot kind:
+    a type slot could carry a parameter through `type_ref`, since a
+    type_ref may name one, but then a single binding would have two
+    spellings and body identity would depend on the choice. `value`
+    holds concrete literals, `type_ref` concrete references. The group
+    is REQUIRED: exactly one member is present. Deliberately no
+    positional form — a bare token cannot self-classify.
+    """
+  template_argument => {
+    ( param: param_name | value: value | type_ref: type_ref )
+  }
+
+  @doc:"""
+    The open counterpart of a constructor application ([TSON-SCHEMA]
+    §5.10): the constructor an entry will build, and the bindings it
+    will build it from, while at least one binding is still a
+    parameter. An entry's body is an `instance_template` exactly when
+    the entry is open, so `parameters` non-empty and this body imply
+    each other. Materialisation is the transition and it is total:
+    once substitution leaves no `param`, the bindings are read against
+    the target's own vocabulary and the result is an ordinary body.
+
+    Composes with `top` directly and carries no `~`, as `reference`
+    does and for the same reasons: it never describes a value, so
+    `product`'s access_pattern/size_type would be filler, and no
+    schema writes `!instance_template` — the resolver produces it.
+    """
+  instance_template => top & {
+    target:    type_name
+    bindings:  {field_name => template_argument}
   }
 
   @doc:"""
