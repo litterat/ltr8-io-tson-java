@@ -2,6 +2,7 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonCanonicalIdentity;
+import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.InstanceTemplate;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -80,7 +81,7 @@ class ApplicationInContainerPositionTest {
     @Test
     void theTreeFixtureTiesTheKnotThroughTheSynthetic() {
         TsonCompiledSchema compiled = compile("""
-                  tree => <T> { value: T  children: [tree<T>; 1..] }
+                  tree => <T> { value: T  children: [tree<T>; 1..]? }
                   use  => { t: tree<text> }""");
 
         String instantiation = fieldType(compiled, "use", "t");
@@ -98,7 +99,7 @@ class ApplicationInContainerPositionTest {
     @Test
     void theLiftedArrayIsOpenAndItsBindingKeepsTheApplication() {
         TsonCompiledSchema compiled = compile("""
-                  tree => <T> { value: T  children: [tree<T>; 1..] }
+                  tree => <T> { value: T  children: [tree<T>; 1..]? }
                   use  => { t: tree<text> }""");
 
         TypeDefinition open = compiled.schema().entries().values().stream()
@@ -127,25 +128,19 @@ class ApplicationInContainerPositionTest {
     }
 
     /**
-     * §8's own spelling pins {@code 1..} on the recursive position, so every node needs a child and no finite
-     * document validates -- the schema resolves, links and compiles, and nothing can ever satisfy it.
-     *
-     * <p>Recorded here rather than fixed: a type with no finite <em>data</em> model is {@code
-     * SPEC-FEEDBACK.md} #25's subject, not this change's, and the fixture is still the right test of the
-     * <em>type</em>-level knot above. Worth knowing that the two halves of §8's example disagree -- the
-     * structure is the point, the bound is a slip.
+     * §8's own spelling pins {@code 1..} on the recursive position <em>and</em> leaves the field REQUIRED, so
+     * every node needs a child and nothing can ever be a {@code tree}. The {@code ?} the fixtures above carry
+     * is the whole difference -- and it is the schema that is rejected now, not the document
+     * ({@code SPEC-FEEDBACK.md} #25).
      */
     @Test
-    void theSpecsOwnTreeSpellingAdmitsNoFiniteDocument() {
-        TsonCompiledSchema compiled = compile("""
-                  tree => <T> { value: T  children: [tree<T>; 1..] }
-                  use  => { t: tree<text> }""");
+    void theSpecsOwnTreeSpellingIsRejectedAsUninhabited() {
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> compile("""
+                          tree => <T> { value: T  children: [tree<T>; 1..] }
+                          use  => { t: tree<text> }"""));
 
-        TsonReadException thrown = assertThrows(TsonReadException.class, () -> compiled.get("use")
-                .read(TestDocuments.document(
-                        "{ t: { value: \"root\"  children: [ { value: \"leaf\"  children: [] } ] } }")));
-
-        assertTrue(thrown.getMessage().contains("fewer than the minimum 1"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("can never be satisfied"), thrown.getMessage());
     }
 
     // ── §8's grid fixture: one entry per form, whichever channel produced it ──

@@ -1048,17 +1048,48 @@ The structure the fixture is testing is unaffected — the type-level knot is th
 noting that an unsatisfiable recursive type reached a worked example without anyone noticing, which is the
 strongest argument available for saying something normative about productivity.
 
-**Interpretation chosen:** This implementation resolves and links a required-recursive record pair like
-`x => { y: y }` / `y => { x: x }` without complaint — it is structurally well-formed (every reference
-resolves), and its unsatisfiability is treated as a semantic property outside resolution's remit, the same way
-an over-constrained atom (`int8 ^ { min: 300 }`, an empty value set) is well-formed but unsatisfiable. Only
-cycles that genuinely block *resolution* are rejected: a composition/refinement-source cycle (`a => b & {}` /
-`b => a & {}`), where resolving one needs the other's resolved form (`SchemaResolver`'s own on-demand
-dependency-following resolution, §3.4.1). A productivity analysis — is every recursive cycle guarded by an
-optional or possibly-empty member? — is not implemented and is considered out of scope for resolution/linking.
+**Interpretation chosen: reject.** The spec author has settled the tri-state below as MUST, and this
+implements it (`TypeInhabitance`, called from `TsonSchemaLinker`). Inhabitance is a least fixed point over the
+linked entry graph — every entry starts unknown, a round marks each one whose body is satisfied by what is
+already marked, rounds repeat until nothing changes. It terminates in at most one round per entry, and it is
+**exact, total and two-valued**: unlike §5.4 disjointness (#47), which had to trade exactness for totality,
+this question is decidable because the graph is finite. It is not "does this type have a value" in general,
+only "does this recursion reach a base case".
 
-**Suggested resolution:** State whether a resolver MUST reject a non-productive recursive type (no finite
-model), SHOULD warn, or MAY leave it — the same tri-state §5.4's `@disjoint` handling uses. If left to the
+The base cases, and nothing else, are: an optional field or tuple position, a container whose `min_items` is
+zero or absent, and a choice variant that does not recur. A required field group needs one member that
+terminates. Every REQUIRED-family field counts, the two that carry a value included — a fixed or default value
+of a type nothing can satisfy does not exist either.
+
+Three consequences worth stating, because each was a decision rather than a detail:
+
+- **Every entry is judged, referenced or not** — the same footing as a declared type parameter the body never
+  uses (§5.10): a declaration nothing can satisfy is a mistake wherever it sits, and its author cannot see it.
+  So an uninhabited *variant* is rejected even where the choice around it still works.
+- **A template is judged too, with its parameters assumed inhabited.** A template is not a type and no
+  document ever has one, so the question could have been left to its closures — but a template nobody applies
+  would then ship broken, which is the failure `TemplateRegularity` exists to prevent for the neighbouring
+  rule. Assuming the arguments inhabited is sound in the direction that matters: if the body cannot be
+  satisfied even when every argument can, no application of it can be. A bound still held by a parameter
+  (`<N> [vec<N>; N]`) counts as possibly-empty, since it could be applied with `0`.
+- **Atom satisfiability is a separate axis.** An over-constrained atom (`int8 ^ { min: 300 }`) is uninhabited
+  too, but that belongs with the constraint family that owns those facets, next to `AtomNarrowing`
+  (`BACKLOG.md`). Every atom body counts as inhabited here.
+
+Composition/refinement-source cycles (`a => b & {}` / `b => a & {}`) remain a separate, earlier rejection:
+they block *resolution* itself, before there is a body to judge.
+
+**Suggested resolution (now with an implementation behind it):** MUST reject, and it is cheap enough to
+require — the algorithm above is a few dozen lines and runs once per link. Two arguments beyond cost. It
+**cannot reject anything that currently validates**: a type with a valid document is inhabited by
+construction, so requiring the check costs no existing schema. And the SHOULD-warn option is the awkward one
+in practice — a warning presumes a human reader exercising judgment, while the format's target consumer is a
+generate-validate-retry loop with two behaviours, which is why this implementation's `Diagnostic` has no
+severity axis at all (#41/#42). A MAY leaves two conformant processors disagreeing about whether a schema is
+valid, which is the interoperability cost the original text below names.
+
+The former suggestion, kept for the record: state whether a resolver MUST reject a non-productive recursive
+type (no finite model), SHOULD warn, or MAY leave it — the same tri-state §5.4's `@disjoint` handling uses. If left to the
 implementation, name it as an explicit interoperability caveat (like the shadowed-duplicate case, #21): two
 conformant processors can legitimately disagree on whether `x => { y: y }` / `y => { x: x }` is a valid schema,
 purely by whether they attempt productivity analysis. If a MUST/SHOULD is intended, the spec should also define

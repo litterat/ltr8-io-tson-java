@@ -282,7 +282,9 @@ form needs no materialization.
 query — everything else must already be canonical), public API because `TsonSchemaLoader` keys on it.
 `TsonSchemaLinker.link(schema, loader)` merges `!!import`s (recording each merged entry's origin schema id in
 `TsonLinkedSchema.entryOrigins`, transitively — so a declaration's identity and its line always come from the
-same document, whichever schema flattened it in), populates `subtypes`, derives choice
+same document, whichever schema flattened it in), populates `subtypes`, rejects an entry no finite document can
+satisfy (`TypeInhabitance` — a least fixed point over the entry graph, exact and total; `SPEC-FEEDBACK.md`
+#25), derives choice
 `disjoint` (`ChoiceDisjointness` — total and two-valued: `true` iff every variant occupies a distinct
 discrimination class, the same `DiscriminationClass` untagged reading dispatches on; `SPEC-FEEDBACK.md`
 #47), and validates every reference — including choice-variant
