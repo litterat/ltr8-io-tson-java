@@ -71,21 +71,18 @@ final class TemplateMaterialiser {
     private final List<String> heads = new ArrayList<>();
 
     /**
-     * How deep the closing chain may go before materialisation is abandoned.
+     * How deep the closing chain may go before materialisation is abandoned -- a <b>backstop</b>, not the
+     * rule.
      *
-     * <p><b>A guard, not a decision procedure.</b> <em>Regular</em> recursion ties the knot on its first
-     * repeat and never nests -- {@code chain<text>} reaches {@code chain<text>} again, finds it in
-     * {@link #closing}, and returns. <em>Non-regular</em> recursion grows its argument every level
-     * ({@code weird => <T> { next: weird<box<T>>? } } applied to {@code text} closes {@code weird<text>},
-     * then {@code weird<box_text>}, then {@code weird<box_box_text>}, …), so every level is a distinct
-     * entry, the memo never fires, and there is no finite type model to build. Nothing here proves which
-     * case it is looking at; the depth is chosen far above any schema a person writes, so hitting it means
-     * the growth is real.
+     * <p>{@code TemplateRegularity} rejects a template that grows its argument on a recursive step where it
+     * is <em>declared</em>, so nothing that reaches here should be able to run away: <em>regular</em>
+     * recursion ties the knot on its first repeat and never nests, since {@code chain<text>} reaches
+     * {@code chain<text>} again and finds it in {@link #closing}. This stays because the alternative
+     * failure, if that check ever has a hole, is a {@link StackOverflowError} -- not a diagnosis, and not
+     * something the exception policy can classify. One comparison for that is worth paying.
      *
      * <p>Distinct from {@code SPEC-FEEDBACK.md} #25, which is about a type with no finite <em>data</em>
-     * model. This is a type with no finite <em>type</em> model, and the spec is silent on it. Left
-     * unguarded it is a {@link StackOverflowError} -- not a diagnosis, and not something the exception
-     * policy can classify.
+     * model; the regularity rule is about one with no finite <em>type</em> model.
      */
     private static final int MAX_CLOSING_DEPTH = 64;
 
@@ -309,7 +306,11 @@ final class TemplateMaterialiser {
                 definition.annotations());
     }
 
-    private static Top mapBodyRefs(Top body, UnaryOperator<TypeRef> map) {
+    /**
+     * Package-visible so {@code TemplateRegularity} can walk a body by the same code that rewrites one --
+     * a body shape added here must not need remembering in a second place.
+     */
+    static Top mapBodyRefs(Top body, UnaryOperator<TypeRef> map) {
         return switch (body) {
             case RecordBody record -> new RecordBody(record.supertypes(),
                     record.fields().stream().map(field -> new RecordField(field.name(), map.apply(field.type()),
