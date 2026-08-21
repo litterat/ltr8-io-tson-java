@@ -179,6 +179,11 @@ final class AtomTypeReader<T> implements TsonTypeReader<T> {
     private final AtomType<T> delegate;
     private final SchemaLocation schemaLocation;
 
+    /** A reader over an {@link AtomType} chosen by the caller rather than by the declaration's own body. */
+    static <T> AtomTypeReader<T> of(String name, AtomType<T> delegate, SchemaLocation schemaLocation) {
+        return new AtomTypeReader<>(name, delegate, schemaLocation);
+    }
+
     private AtomTypeReader(String name, AtomType<T> delegate, SchemaLocation schemaLocation) {
         this.name = name;
         this.delegate = delegate;

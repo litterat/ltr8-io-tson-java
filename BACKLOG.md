@@ -32,17 +32,14 @@ own prose (which had gone stale on at least one of them):
   as much as through the sugar, while `max_items` reports correctly. Presumably `EmptyBrace` reaches the
   map reader as something other than a zero-entry map. Unrelated to the container collapse; recorded so it
   is not rediscovered as a regression.
-- [ ] **A *value* argument in a closed container position** (`[vector<float32, 3>]`). The reference channel
-  works — `[box<text>]` and nested arguments with it — and so does the same application anywhere it can be
-  *named*: `float3 => vector<float32, 3>` resolves, materialises to an `array` with both bounds at 3, and
-  reads. It is only inline inside a container that it fails, so a workaround always exists and is the one the
-  diagnostic names. The cause: `type_argument`'s value channel is typed `value`, whose reader decodes a token
-  to its host type, so `<3>` and `<"3">` would arrive indistinguishable and the form is exactly what identity
-  needs — refused at the form rather than guessed at. The fix is a token-preserving read for a slot whose
-  bound component is `schema.meta.Token`; nothing reads one from the wire today, since every other `Token` in
-  the model is built by the resolver in Java. The open form is unaffected: it keeps the reference as written
-  and never reaches a reader.
-
+- [ ] **A quoted numeric is accepted where an integer is declared.** `xs => !array { element_type: float32
+  min_items: "3" }` resolves with `min_items` 3, and so does every other integer-typed constraint slot: the
+  family's parser reads the token's text and never consults its form, where §4 base resolution makes a quoted
+  token a *string* whatever it spells. Pre-existing and unrelated to templates -- found while checking that a
+  value type-argument keeps its form, which it does; identity keeps `<3>` and `<"3">` apart, and it is the
+  constraint slot underneath that then accepts both. The fix belongs with the atom families, next to
+  `AtomNarrowing`: a parser that takes the whole `TokenValue` can reject a quoted token at a numeric slot,
+  which is the same shape the width-derived-range checks want.
 - [ ] **The rest of §8.2's deferred value-level checks.** Materialisation "runs the value-level checks that
   open bounds deferred: family coherence rules whose operands were parameters". The array family's
   `min_items <= max_items` is one rule over the binding pair for arrays *and maps*: a resolver error where

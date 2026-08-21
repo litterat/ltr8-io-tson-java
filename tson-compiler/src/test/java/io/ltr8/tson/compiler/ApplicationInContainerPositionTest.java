@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -365,19 +366,41 @@ class ApplicationInContainerPositionTest {
     }
 
     /**
-     * A <b>value</b> argument cannot make the wire trip a closed slot makes. {@code type_argument}'s value
-     * channel is typed {@code value}, whose reader decodes the token to its host type, so {@code <3>} and
-     * {@code <"3">} would arrive indistinguishable -- the form is exactly what identity needs. Refused rather
-     * than guessed at; the open form keeps the reference as written and is unaffected.
+     * A <b>value</b> argument makes the wire trip too. {@code type_argument}'s value channel binds a raw
+     * {@code Token}, so the slot reads the token rather than the value it denotes -- §4 decoding would leave
+     * {@code <3>} and {@code <"3">} indistinguishable, and the form is exactly what identity needs.
      */
     @Test
-    void aValueArgumentInAClosedContainerIsRefusedRatherThanGuessedAt() {
-        UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
-                () -> compile("""
-                          vec => <T, N> !array { element_type: T  min_items: N }
-                          xs  => [vec<text, 3>]"""));
+    void aValueArgumentInAClosedContainerKeepsItsToken() {
+        TsonCompiledSchema compiled = compile("""
+                  vector => <T, N> !array { element_type: T  min_items: N  max_items: N }
+                  holder => { p: [vector<float32, 3>] }""");
 
-        assertTrue(thrown.getMessage().contains("loses the form"), thrown.getMessage());
+        ArrayBody outer = assertInstanceOf(ArrayBody.class, compiled.schema().entries()
+                .get(fieldType(compiled, "holder", "p")).body());
+        ArrayBody vector = assertInstanceOf(ArrayBody.class,
+                compiled.schema().entries().get(outer.elementType().name()).body());
+
+        assertEquals(Optional.of(BigInteger.valueOf(3)), vector.minItems());
+        assertNotNull(compiled.get("holder")
+                .read(TestDocuments.document("{ p: [ [ 1.0 2.0 3.0 ] ] }")));
+        assertThrows(TsonReadException.class, () -> compiled.get("holder")
+                .read(TestDocuments.document("{ p: [ [ 1.0 2.0 ] ] }")));
+    }
+
+    /**
+     * And the form is what keeps two spellings apart. {@code <float32, 3>} and {@code <float32, "3">} apply
+     * different arguments, so they must land on different entries -- which they do only because the token
+     * reached identity with its form intact rather than decoded to the same {@code 3} twice.
+     */
+    @Test
+    void aQuotedValueArgumentIsADifferentApplicationFromABareOne() {
+        String vector = "  vector => <T, N> !array { element_type: T  min_items: N  max_items: N }\n";
+        TsonCompiledSchema bare = compile(vector + "  holder => { p: [vector<float32, 3>] }");
+        TsonCompiledSchema quoted = compile(vector + "  holder => { p: [vector<float32, \"3\">] }");
+
+        assertNotEquals(fieldType(bare, "holder", "p"), fieldType(quoted, "holder", "p"),
+                "one entry each, not one shared");
     }
 
     /** A map's value slot takes one the same way -- the table's scalar type slots are one rule, not three. */

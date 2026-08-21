@@ -243,6 +243,13 @@ for a record body, so no `type_ref` carrying `arguments` could be read at all.
   does not carry.
 - **The group rule is the whole contract**, so `validateGroups` is what guarantees exactly one member arrived
   — an empty record and a two-field one are both reported before anything is constructed.
+- **A slot may want the raw token rather than the value it denotes**, and the choice has to be made *before*
+  the read: `type_argument`'s value channel is typed `value`, whose reader decodes (§4), but `box<3>` and
+  `box<"3">` apply different arguments and once the text is equal the form is all that separates them.
+  Decoding first and rebuilding a token afterwards cannot recover it. So the factory picks `RawTokenParser`
+  for a slot whose bound component is `schema.meta.Token`, by the component's own Java type — and refuses to
+  build at all if two group members share a slot type and disagree, since the resolver is keyed by type name
+  and could not serve both.
 - **Bind mode only.** Tree mode reads into `TsonValue` and has no Java shape to satisfy.
 
 ## The registries (`tson-compiler/{TsonCompiledMetaRegistry,TsonCompiledSchemaRegistry}.java`)

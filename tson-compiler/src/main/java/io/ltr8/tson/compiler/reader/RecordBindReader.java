@@ -15,18 +15,23 @@ import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
+import io.ltr8.tson.compiler.atom.RawTokenParser;
 import io.ltr8.tson.compiler.base.NumberNarrowing;
 import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Object-binding mode's own {@code record} reader -- reads a record-shaped value into a real, bound
@@ -306,8 +311,11 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             if (typeDefinition.subtypes().isEmpty()) {
                 Map<String, DataClassRecord> labelled = labelledChoice(body, dataClass);
                 if (labelled != null) {
-                    return new GroupUnionBindReader(name, body, labelled, resolver,
-                            context.locationOf(name, typeDefinition));
+                    SchemaLocation location = context.locationOf(name, typeDefinition);
+                    TsonTypeReaderResolver slotResolver =
+                            tokenPreserving(name, body, labelled, resolver, location);
+                    return slotResolver == null ? null
+                            : new GroupUnionBindReader(name, body, labelled, slotResolver, location);
                 }
                 return new RecordBindReader(name, body, requireRecord(name, dataClass), resolver,
                         context.locationOf(name, typeDefinition), AnnotationTypes.of(context));
@@ -373,6 +381,41 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 byField.put(label, record);
             }
             return byField.size() == body.fields().size() ? byField : null;
+        }
+
+        /**
+         * The field resolver a labelled choice reads through: the ordinary one, except that a slot whose bound
+         * component is a {@link io.ltr8.tson.schema.meta.Token} reads the token rather than the value it
+         * denotes.
+         *
+         * <p><b>Why a slot can want the raw token.</b> {@code type_argument}'s value channel is typed {@code
+         * value}, whose reader decodes ([TSON-DATA] §4) -- but {@code box<3>} and {@code box<"3">} apply
+         * different arguments, and once the text is equal the form is the only thing that tells them apart.
+         * Decoding first and rebuilding a token afterwards cannot recover it, so the choice has to be made
+         * before the read, which is here.
+         *
+         * <p>{@code null} when two group members share a slot type and disagree about wanting the token --
+         * the resolver is keyed by type name, so it could not serve both, and building a reader that quietly
+         * decoded one of them is worse than falling through to the ordinary record path.
+         */
+        private TsonTypeReaderResolver tokenPreserving(String name, RecordBody body,
+                Map<String, DataClassRecord> members, TsonTypeReaderResolver resolver, SchemaLocation location) {
+            Set<String> wantToken = new HashSet<>();
+            Set<String> wantValue = new HashSet<>();
+            for (RecordField field : body.fields()) {
+                DataClassRecord member = members.get(field.name());
+                Class<?> component = member.fields()[0].type();
+                (component == io.ltr8.tson.schema.meta.Token.class ? wantToken : wantValue)
+                        .add(field.type().name());
+            }
+            if (wantToken.isEmpty()) {
+                return resolver;
+            }
+            if (!Collections.disjoint(wantToken, wantValue)) {
+                return null;
+            }
+            TsonTypeReader<?> rawToken = AtomTypeReader.of(name, RawTokenParser.INSTANCE, location);
+            return typeName -> wantToken.contains(typeName) ? rawToken : resolver.resolve(typeName);
         }
 
         private DataClass descriptorFor(String name) {

@@ -262,8 +262,8 @@ recorded open form, and replacing the application with a reference to the entry 
     form, so the entry the desugar phase injects names something that is not an entry yet — and the batch pass
     here closes it, the same walk that closes every other ref. Nested arguments need no separate handling,
     since `close()` already builds `pair<int32>` before `box<pair<int32>>` names it. What made the wire hop
-    possible was `type_argument` becoming readable (`docs/linking-and-compilation.md`); what is still out is a
-    *value* argument, whose channel decodes the token and loses its form.
+    possible was `type_argument` becoming readable, value channel included
+    (`docs/linking-and-compilation.md`).
 
 ## Template regularity (`tson-compiler/.../resolver/TemplateRegularity.java`)
 
