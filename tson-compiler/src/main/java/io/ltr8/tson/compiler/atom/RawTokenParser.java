@@ -6,12 +6,16 @@ import io.ltr8.tson.schema.meta.Token;
 /**
  * Reads a token <em>without</em> resolving it: the text plus the form that produced it, as {@link Token}.
  *
- * <p><b>The counterpart of {@link ValueParser}, for the one thing that parser is wrong for.</b> The kernel's
- * {@code value} primitive normally decodes ([TSON-DATA] §4) -- {@code 3} to an integer, {@code "3"} to a
- * string -- which is what a document's data wants. A {@code type_argument}'s value channel wants the opposite:
- * {@code box<3>} and {@code box<"3">} apply different arguments and must stay apart, and the form is the only
- * thing that separates them once the text is equal. Decoding first and rebuilding a token afterwards cannot
- * recover it.
+ * <p><b>The counterpart of {@link ValueParser}, for the one slot that parser cannot fill.</b> The kernel's
+ * {@code value} primitive decodes ([TSON-DATA] §4) -- {@code 3} to an integer, {@code "3"} to a string --
+ * which is what a document's data wants and what every other {@code value}-typed slot gets. A {@code
+ * type_argument}'s value channel is bound to a {@link Token}, because §5.10 describes a type argument's
+ * literal as a bare token rather than as the value it denotes, and a decoded host object cannot fill one.
+ *
+ * <p><b>What that choice costs is real and is not this class's to settle.</b> Identity is derived from the
+ * token, so {@code vector<float32, 255>} and {@code vector<float32, 0xFF>} are two applications where §4
+ * makes them one number -- see {@code SPEC-FEEDBACK.md} #54, which puts the disagreement to the spec: the
+ * same slot is called a bare token in the prose and typed {@code value} in the kernel.
  *
  * <p>Selected per slot rather than per type, by the bound component's own Java type -- see {@code
  * GroupUnionBindReader}. A {@code value}-typed field bound to anything else keeps {@link ValueParser}.

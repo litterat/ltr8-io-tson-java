@@ -516,7 +516,8 @@ compatibility).
   (`GroupUnionBindReader`). What remains is narrower: `tuple` and `choice` bind a *collection* and
   `template_argument` has no collection case, so `<T> { v: (T | text) }` is refused at the declaration
   (`SPEC-FEEDBACK.md` #53); a *value* argument keeps its token, so `[vector<float32, 3>]` closes to a
-  nested array with both bounds at 3 and stays distinct from `<"3">` (`RawTokenParser`).
+  nested array with both bounds at 3 (`RawTokenParser`) — at the cost of identity being keyed on the
+  spelling, so `<255>` and `<0xFF>` are two applications (`SPEC-FEEDBACK.md` #54).
 - **Undocumented atom constructors** — `unknown` (and `extern`, which has no core.tn declaration) has no
   compiled-parser factory, so it compiles to `ErrorReader` (a schema merely *declaring* one still compiles).
   Neither is an ordinary missing parser waiting to be written: `extern` is a whole absent mechanism and `unknown`

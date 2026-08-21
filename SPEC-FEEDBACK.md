@@ -3266,3 +3266,72 @@ revision, or give `template_argument` the collection case that would make the ru
 fourth channel, `arguments: [template_argument]`, recursive like `type_argument` already is. The first is a
 one-sentence edit and matches D9's own instinct; the second is a real extension, and would also have to say
 how the closing cascade lifts from *inside* a binding, which D9 explicitly defers.
+
+## 54. A type argument's literal is called a bare token and typed `value`, and §8.2 identity depends on which
+
+**Section:** Part 2 §5.10 (type arguments), §8.1 (`type_argument`), §8.2 (instantiation identity); Part 1 §4
+(base type resolution), §7.6 (number). Related: #43, `tson-cr-structure-templates.md` D6.
+
+**Problem:** three statements about the same slot, which do not agree.
+
+§5.10 and §8.1's prose describe a type argument's literal value as **a bare token** — "never annotated,
+never typed, never a container". A bare token is text plus the form that produced it, unresolved.
+
+meta-kernel types the slot as `value`:
+
+```
+type_argument => { ( name: type_ref | value: value ) }
+```
+
+and `value` is the escape-hatch primitive whose whole contract is that [TSON-DATA] §4 base type resolution
+**has been applied** to it. A token and the value it denotes are not the same thing, and this slot is
+declared as both.
+
+§8.2 then keys an instantiation entry on "structural equality of the flattened, fully-bound application
+recorded in `source`". Structural equality of *what*? The two readings differ, and §4 is where they part:
+`255` and `0xFF` are the same number, so
+
+- **as tokens**, `vector<float32, 255>` and `vector<float32, 0xFF>` are different applications, hence two
+  entries;
+- **as values**, they are one application and one entry.
+
+This is not hypothetical. This implementation reads the token, and the two produce entries whose bodies are
+byte-identical:
+
+```
+vector<float32, 255>   → array_float32_255_255_5c5f53f7    ArrayBody[minItems=255, maxItems=255]
+vector<float32, 0xFF>  → array_float32_0xFF_0xFF_462d33b7  ArrayBody[minItems=255, maxItems=255]
+```
+
+The bodies agree because `min_items` is declared `integer` and decodes through that atom; the identities
+disagree because they are derived from the argument's token text. So the same schema holds two entries for
+one type, and §8.2's one-entry-per-application rule is satisfied only under a reading of "application" that
+§4 contradicts.
+
+Note this is not an artifact of *how* the argument reaches the resolver. A declaration-level application
+(`a => vector<float32, 255>`) never goes near a wire form and splits identically, because the split is in
+what identity compares, not in how the argument was parsed.
+
+**Interpretation chosen:** the token, because the model has to fill a `Token`-typed component and §5.10's
+"bare token" is the only prose that speaks to it (`schema.meta.Token`, `RawTokenParser`). The consequence
+above is accepted and recorded rather than worked around: normalising numeric tokens before hashing would
+get §4's equivalence back, but it would be this implementation inventing an identity rule the spec does not
+state, and the resulting entry set would then disagree with any implementation that took the prose at face
+value.
+
+**Suggested resolution:** say which, in §8.2, and make §8.1 agree with it.
+
+1. **Identity compares token text and form.** Then §5.10's "bare token" is the operative reading, the kernel
+   should type the slot `token` rather than `value`, and §8.2 should say plainly that two spellings of one
+   number are two types — surprising enough to be worth stating, since §4 spends a paragraph making them one
+   value.
+2. **Identity compares the values the arguments denote.** Then the kernel's `value` typing is right, §5.10's
+   "bare token" is about what may be *written* rather than what is *recorded*, and §8.1's `type_argument`
+   holds a resolved value — which also settles what an implementation binds it to.
+3. **Keep the token in the model and normalise before comparing** — the slot stays a token so the original
+   spelling survives into §8 output, and identity applies §4 first. This is the only option that keeps both
+   the written form and the equivalence, and it is the one that most needs saying out loud, because no
+   implementation will arrive at it from the current text.
+
+Option 2 is the smaller edit; option 3 is the better answer if resolver output is meant to round-trip what
+the author wrote.

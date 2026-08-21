@@ -145,6 +145,13 @@ by a factor of six.
 
 ## Synthetic entry identity
 
+- [ ] **Two entries for one type, where the argument is one number spelled two ways.** `vector<float32, 255>`
+  and `vector<float32, 0xFF>` produce entries with byte-identical bodies, because identity derives from the
+  argument's token text where §4 makes the two one number. Blocked on `SPEC-FEEDBACK.md` #54 rather than on
+  effort: normalising numeric tokens before hashing is a three-line change, and doing it now would be this
+  implementation inventing an identity rule the spec does not state, disagreeing with any implementation that
+  read §5.10's "bare token" literally. The entry offers three resolutions and names the one that keeps both
+  the written spelling and §4's equivalence.
 - [ ] **Two entries for one type, where both lift channels produce the same form.** A closed lift hashes the
   *unclosed* binding record at desugar; the open lift hashes the *closed* one at materialisation — so
   `[box<text>]` written directly and `[box<T>]` closed with `T := text` land on different names. D6

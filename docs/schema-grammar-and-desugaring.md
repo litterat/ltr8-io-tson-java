@@ -259,9 +259,10 @@ rebuilt and called a cache.
       lives in, since `close()` walks every closed entry's references after the driving loop. What made this
       possible was teaching the bind readers to read an untagged labelled choice, which is what
       `type_argument` is (`docs/linking-and-compilation.md`).
-    - **A *value* argument makes the trip intact.** `type_argument`'s value channel binds a raw `Token`, so
-      the slot reads the token rather than the value it denotes — §4 decoding would leave `<3>` and `<"3">`
-      indistinguishable, and the form is exactly what identity needs (`RawTokenParser`).
+    - **A *value* argument makes the trip intact.** `type_argument`'s value channel binds a raw `Token` —
+      §5.10 calls a type argument's literal a bare token rather than the value it denotes — so the slot reads
+      the token rather than decoding it (`RawTokenParser`). What that costs, identity keyed on the spelling
+      so `<255>` and `<0xFF>` are two applications, is `SPEC-FEEDBACK.md` #54.
   - **Two of the four sugar forms have no open representation at all.** `tuple` and `choice` bind a
     collection (`elements`, `variants`), and a `template_argument` is `param | value | type_ref` with no
     collection case — so `<T> { v: (T | text) }` is refused at the declaration that writes it, as a gap

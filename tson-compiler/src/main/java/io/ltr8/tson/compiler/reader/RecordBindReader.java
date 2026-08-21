@@ -389,10 +389,11 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
          * denotes.
          *
          * <p><b>Why a slot can want the raw token.</b> {@code type_argument}'s value channel is typed {@code
-         * value}, whose reader decodes ([TSON-DATA] §4) -- but {@code box<3>} and {@code box<"3">} apply
-         * different arguments, and once the text is equal the form is the only thing that tells them apart.
-         * Decoding first and rebuilding a token afterwards cannot recover it, so the choice has to be made
-         * before the read, which is here.
+         * value}, whose reader decodes ([TSON-DATA] §4), but the member it fills carries a {@code Token} --
+         * §5.10 describes a type argument's literal as a bare token rather than as the value it denotes, and
+         * a decoded host object cannot fill one. The choice has to be made before the read, which is here.
+         * {@code SPEC-FEEDBACK.md} #54 records what it costs and puts the underlying disagreement -- bare
+         * token in the prose, {@code value} in the kernel -- to the spec.
          *
          * <p>{@code null} when two group members share a slot type and disagree about wanting the token --
          * the resolver is keyed by type name, so it could not serve both, and building a reader that quietly

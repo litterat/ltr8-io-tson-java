@@ -244,12 +244,18 @@ for a record body, so no `type_ref` carrying `arguments` could be read at all.
 - **The group rule is the whole contract**, so `validateGroups` is what guarantees exactly one member arrived
   — an empty record and a two-field one are both reported before anything is constructed.
 - **A slot may want the raw token rather than the value it denotes**, and the choice has to be made *before*
-  the read: `type_argument`'s value channel is typed `value`, whose reader decodes (§4), but `box<3>` and
-  `box<"3">` apply different arguments and once the text is equal the form is all that separates them.
-  Decoding first and rebuilding a token afterwards cannot recover it. So the factory picks `RawTokenParser`
-  for a slot whose bound component is `schema.meta.Token`, by the component's own Java type — and refuses to
-  build at all if two group members share a slot type and disagree, since the resolver is keyed by type name
-  and could not serve both.
+  the read: `type_argument`'s value channel is typed `value`, whose reader decodes (§4), but the union member
+  it fills carries a `Token` — §5.10 calls a type argument's literal a bare token rather than the value it
+  denotes, and a decoded host object cannot fill one. So the factory picks `RawTokenParser` for a slot whose
+  bound component is `schema.meta.Token`, by the component's own Java type — and refuses to build at all if
+  two group members share a slot type and disagree, since the resolver is keyed by type name and could not
+  serve both.
+  - **It costs an identity split, recorded rather than papered over.** Identity derives from the token, so
+    `vector<float32, 255>` and `vector<float32, 0xFF>` are two applications with byte-identical bodies where
+    §4 makes them one number. `SPEC-FEEDBACK.md` #54 puts the disagreement underneath it to the spec — the
+    same slot is a bare token in the prose and a `value` in the kernel, and §8.2's identity rule inherits the
+    ambiguity. Normalising numeric tokens before hashing would recover §4's equivalence, and is deliberately
+    not done here: it would be this implementation inventing an identity rule the spec does not state.
 - **Bind mode only.** Tree mode reads into `TsonValue` and has no Java shape to satisfy.
 
 ## The registries (`tson-compiler/{TsonCompiledMetaRegistry,TsonCompiledSchemaRegistry}.java`)

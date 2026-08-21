@@ -516,9 +516,10 @@ final class SchemaDesugarer {
      * a closed slot carries an application through the constructor's own reader.
      *
      * <p>A <em>value</em> argument makes the trip intact: {@code type_argument}'s value channel binds a raw
-     * {@code Token}, so the reader that fills it preserves the form rather than decoding it (§4 decoding
-     * would leave {@code box<3>} and {@code box<"3">} indistinguishable, and the form is exactly what
-     * identity needs). See {@code RawTokenParser}.
+     * {@code Token}, §5.10 describing a type argument's literal as a bare token rather than as the value it
+     * denotes, so the reader that fills it preserves the token instead of decoding it ({@code
+     * RawTokenParser}). What that costs -- identity keyed on the spelling, so {@code <255>} and {@code
+     * <0xFF>} are two applications -- is {@code SPEC-FEEDBACK.md} #54.
      */
     private static RecordValue refRecord(GenericRef generic) {
         List<ScopedValue> arguments = new ArrayList<>();
