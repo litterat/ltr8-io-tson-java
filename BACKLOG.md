@@ -32,14 +32,6 @@ own prose (which had gone stale on at least one of them):
   as much as through the sugar, while `max_items` reports correctly. Presumably `EmptyBrace` reaches the
   map reader as something other than a zero-entry map. Unrelated to the container collapse; recorded so it
   is not rediscovered as a regression.
-- [ ] **A quoted numeric is accepted where an integer is declared.** `xs => !array { element_type: float32
-  min_items: "3" }` resolves with `min_items` 3, and so does every other integer-typed constraint slot: the
-  family's parser reads the token's text and never consults its form, where §4 base resolution makes a quoted
-  token a *string* whatever it spells. Pre-existing and unrelated to templates -- found while checking that a
-  value type-argument keeps its form, which it does; identity keeps `<3>` and `<"3">` apart, and it is the
-  constraint slot underneath that then accepts both. The fix belongs with the atom families, next to
-  `AtomNarrowing`: a parser that takes the whole `TokenValue` can reject a quoted token at a numeric slot,
-  which is the same shape the width-derived-range checks want.
 - [ ] **The rest of §8.2's deferred value-level checks.** Materialisation "runs the value-level checks that
   open bounds deferred: family coherence rules whose operands were parameters". The array family's
   `min_items <= max_items` is one rule over the binding pair for arrays *and maps*: a resolver error where
@@ -139,6 +131,17 @@ by a factor of six.
   mid-document — doesn't exist anywhere in the reader stack.
 
 # Lower Priority
+
+## Atom constraint slots
+
+- [ ] **A quoted numeric is accepted where an integer is declared.** `xs => !array { element_type: float32
+  min_items: "3" }` resolves with `min_items` 3, and so does every other integer-typed constraint slot: the
+  family's parser reads the token's text and never consults its form, where §4 base resolution makes a quoted
+  token a *string* whatever it spells. Pre-existing and unrelated to templates -- found while checking that a
+  value type-argument keeps its form, which it does; identity keeps `<3>` and `<"3">` apart, and it is the
+  constraint slot underneath that then accepts both. The fix belongs with the atom families, next to
+  `AtomNarrowing`: a parser that takes the whole `TokenValue` can reject a quoted token at a numeric slot,
+  which is the same shape the width-derived-range checks want.
 
 ## Synthetic entry identity
 
