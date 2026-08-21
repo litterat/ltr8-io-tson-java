@@ -4,21 +4,16 @@ import io.ltr8.tson.compiler.ast.Annotation;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
-import io.ltr8.tson.compiler.ast.schema.ArrayContainerDef;
+import io.ltr8.tson.compiler.ast.schema.ArrayRef;
 import io.ltr8.tson.compiler.ast.schema.AtomRefinement;
 import io.ltr8.tson.compiler.ast.schema.ChoiceRef;
 import io.ltr8.tson.compiler.ast.schema.ConstructionDef;
-import io.ltr8.tson.compiler.ast.schema.ContainerDef;
-import io.ltr8.tson.compiler.ast.schema.ContainerTypeDef;
 import io.ltr8.tson.compiler.ast.schema.ElementType;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
 import io.ltr8.tson.compiler.ast.schema.GenericRef;
 import io.ltr8.tson.compiler.ast.schema.GroupDef;
-import io.ltr8.tson.compiler.ast.schema.InlineArrayRef;
-import io.ltr8.tson.compiler.ast.schema.InlineMapRef;
-import io.ltr8.tson.compiler.ast.schema.InlineTupleRef;
 import io.ltr8.tson.compiler.ast.schema.Instance;
-import io.ltr8.tson.compiler.ast.schema.MapContainerDef;
+import io.ltr8.tson.compiler.ast.schema.MapRef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.RecordEntry;
 import io.ltr8.tson.compiler.ast.schema.ReferenceTypeDef;
@@ -30,7 +25,7 @@ import io.ltr8.tson.compiler.ast.schema.SimpleRef;
 import io.ltr8.tson.compiler.ast.schema.SizeSpec;
 import io.ltr8.tson.compiler.ast.schema.StructuralDef;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
-import io.ltr8.tson.compiler.ast.schema.TupleContainerDef;
+import io.ltr8.tson.compiler.ast.schema.TupleRef;
 import io.ltr8.tson.compiler.ast.schema.TypeArg;
 import io.ltr8.tson.compiler.ast.schema.TypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeRef;
@@ -295,7 +290,7 @@ public final class TsonSchemaParser extends TsonDataParser {
             return new ReferenceTypeDef(typeParams, parseTypeRef());
         }
         if (check(TokenType.LBRACKET)) {
-            return new ContainerTypeDef(typeParams, parseContainerDef());
+            return new ReferenceTypeDef(typeParams, parseBracket());
         }
 
         TypeRef head = parseTypeRefHead();
@@ -342,7 +337,7 @@ public final class TsonSchemaParser extends TsonDataParser {
     private TypeDef braceTypeDef(List<String> typeParams) {
         expect(TokenType.LBRACE, "a record body's or map type's opening '{'");
         if (braceOpensMap()) {
-            return new ContainerTypeDef(typeParams, parseMapDefBody());
+            return new ReferenceTypeDef(typeParams, parseMapBody());
         }
         return new StructuralTypeDef(typeParams, false, parseRecordBody());
     }
@@ -547,18 +542,17 @@ public final class TsonSchemaParser extends TsonDataParser {
      * a type argument. <b>{@code !} is rejected here by name rather than by falling through to "expected a
      * type reference"</b> -- writing the refinement inline ({@code quantity: !integer ^ { min: 1 }}) is the
      * natural first attempt, and the grammar's answer (hoist it to its own declaration, reference it by name)
-     * is a one-line fix an author cannot guess from a token-level complaint. Same shape as the size-spec and
-     * element-{@code ?} rejections in {@link #parseInlineElement}.
+     * is a one-line fix an author cannot guess from a token-level complaint.
      */
     private TypeRef parseTypeRef() {
         if (check(TokenType.LPAREN)) {
             return parseChoiceRef();
         }
         if (check(TokenType.LBRACKET)) {
-            return parseInlineArrayOrTuple();
+            return parseBracket();
         }
         if (check(TokenType.LBRACE)) {
-            return parseInlineMap();
+            return parseMap();
         }
         if (check(TokenType.BANG)) {
             throw parseError("an atom refinement or constructor application is not permitted at a type-ref "
@@ -596,50 +590,39 @@ public final class TsonSchemaParser extends TsonDataParser {
         return new ChoiceRef(variants);
     }
 
-    private TypeRef parseInlineArrayOrTuple() {
-        expect(TokenType.LBRACKET, "an inline array or tuple's opening '['");
-        List<TypeRef> elements = new ArrayList<>();
-        elements.add(parseInlineElement());
-        while (consumeSeparatorOrCloseCheck(TokenType.RBRACKET)) {
-            elements.add(parseInlineElement());
-        }
-        expect(TokenType.RBRACKET, "an inline array or tuple's closing ']'");
-        return elements.size() == 1 ? new InlineArrayRef(elements.get(0)) : new InlineTupleRef(elements);
-    }
-
-    /** A single inline element, rejecting the declaration-level-only sugar (size specs, element {@code ?}) with a diagnostic suggesting a named declaration (§5.3). */
-    private TypeRef parseInlineElement() {
-        TypeRef ref = parseTypeRef();
-        if (check(TokenType.QUESTION)) {
-            throw parseError("element/position '?' is not permitted at an inline type-ref position (§5.3); "
-                    + "declare a named type instead (e.g. 'foo => [T?]') and reference it by name");
-        }
-        if (check(TokenType.SEMICOLON)) {
-            throw parseError("a size specifier is not permitted at an inline type-ref position (§5.3); "
-                    + "declare a named type instead (e.g. 'foo => [T; N]') and reference it by name");
-        }
-        return ref;
-    }
-
     /**
-     * {@code inline-map = "{" ws map-key ws "=>" ws type-ref ws "}"} (§12.1) -- the map sugar at an inline
-     * type-ref position. The declaration-level-only syntax the {@link MapContainerDef} tier admits (a size
-     * specifier) is rejected here the way {@link #parseInlineElement} rejects the array tier's.
+     * {@code bracket-type} (§12.1) -- the one bracket production, serving every position. One element with an
+     * optional size specifier is an {@link ArrayRef}; two or more are a {@link TupleRef}. Arity is all that
+     * distinguishes them, which is why both alternatives share a first element.
+     *
+     * <p>There is no separate inline form, and no position where a size specifier or an element {@code ?} is
+     * refused. That split existed because a sized form had no inline representation to carry it; every form
+     * lifts to an entry now, so the restriction protected nothing and is gone rather than relocated (§5.3,
+     * {@code SPEC-FEEDBACK.md} #31).
      */
-    private TypeRef parseInlineMap() {
-        expect(TokenType.LBRACE, "an inline map type's opening '{'");
-        requireMapBrace();
-        TypeRef key = parseMapKey();
-        expect(TokenType.MAP_ARROW, "a map type's '=>'");
-        TypeRef value = parseTypeRef();
-        rejectMapQuestion("value");
+    private TypeRef parseBracket() {
+        expect(TokenType.LBRACKET, "an array or tuple type's opening '['");
+        ElementType first = parseElementType();
         if (check(TokenType.SEMICOLON)) {
-            throw parseError("a size specifier is not permitted at an inline type-ref position (§5.3); "
-                    + "declare a named type instead (e.g. 'foo => {K => V; N}') and reference it by name");
+            advance();
+            SizeSpec size = parseSizeSpec(TokenType.RBRACKET);
+            expect(TokenType.RBRACKET, "an array type's closing ']'");
+            return new ArrayRef(first, Optional.of(size));
         }
-        requireMapClose();
-        expect(TokenType.RBRACE, "a map type's closing '}'");
-        return new InlineMapRef(key, value);
+        List<ElementType> elements = new ArrayList<>();
+        elements.add(first);
+        while (consumeSeparatorOrCloseCheck(TokenType.RBRACKET)) {
+            elements.add(parseElementType());
+        }
+        expect(TokenType.RBRACKET, "an array or tuple type's closing ']'");
+        return elements.size() == 1 ? new ArrayRef(first, Optional.empty()) : new TupleRef(elements);
+    }
+
+    /** {@code map-type} (§12.1) including its opening brace -- {@link #braceTypeDef} reaches the body directly, having consumed one already. */
+    private TypeRef parseMap() {
+        expect(TokenType.LBRACE, "a map type's opening '{'");
+        requireMapBrace();
+        return parseMapBody();
     }
 
     /**
@@ -711,10 +694,10 @@ public final class TsonSchemaParser extends TsonDataParser {
             return new TypeArg.Ref(parseChoiceRef());
         }
         if (t.type() == TokenType.LBRACKET) {
-            return new TypeArg.Ref(parseInlineArrayOrTuple());
+            return new TypeArg.Ref(parseBracket());
         }
         if (t.type() == TokenType.LBRACE) {
-            return new TypeArg.Ref(parseInlineMap());
+            return new TypeArg.Ref(parseMap());
         }
         if (t.type() == TokenType.ABSENT) {
             throw parseError("the absent sentinel '_' is not valid in a type argument position (§7.6)");
@@ -724,41 +707,16 @@ public final class TsonSchemaParser extends TsonDataParser {
 
     // ── Declaration-Level Container Forms (§5.3, §12.1) ──────────────────
 
-    private ContainerDef parseContainerDef() {
-        if (check(TokenType.LBRACE)) {
-            advance();
-            requireMapBrace();
-            return parseMapDefBody();
-        }
-        expect(TokenType.LBRACKET, "an array or tuple type's opening '['");
-        ElementType first = parseElementType();
-        if (check(TokenType.SEMICOLON)) {
-            advance();
-            SizeSpec size = parseSizeSpec(TokenType.RBRACKET);
-            expect(TokenType.RBRACKET, "an array type's closing ']'");
-            return new ArrayContainerDef(first, Optional.of(size));
-        }
-        List<ElementType> elements = new ArrayList<>();
-        elements.add(first);
-        while (consumeSeparatorOrCloseCheck(TokenType.RBRACKET)) {
-            elements.add(parseElementType());
-        }
-        expect(TokenType.RBRACKET, "an array or tuple type's closing ']'");
-        if (elements.size() == 1) {
-            return new ArrayContainerDef(first, Optional.empty());
-        }
-        return new TupleContainerDef(elements);
-    }
-
     /**
-     * {@code map-def} past its opening {@code '{'} (§12.1): one {@code key => value} entry, an optional size
-     * specifier after {@code ';'}, and the closing brace. The size specifier is the array tier's own, under
+     * {@code map-type} past its opening {@code '{'} (§12.1): one {@code key => value} entry, an optional size
+     * specifier after {@code ';'}, and the closing brace. The size specifier is the bracket form's own, under
      * the same grammar and the same {@code N <= M} coherence rule (§5.3).
      */
-    private MapContainerDef parseMapDefBody() {
+    private MapRef parseMapBody() {
         TypeRef key = parseMapKey();
         expect(TokenType.MAP_ARROW, "a map type's '=>'");
-        ElementType.Expr value = parseMapValue();
+        TypeRef value = parseTypeRef();
+        rejectMapQuestion("value");
         Optional<SizeSpec> size = Optional.empty();
         if (check(TokenType.SEMICOLON)) {
             advance();
@@ -766,35 +724,20 @@ public final class TsonSchemaParser extends TsonDataParser {
         }
         requireMapClose();
         expect(TokenType.RBRACE, "a map type's closing '}'");
-        return new MapContainerDef(key, value, size);
-    }
-
-    /** {@code map-value = container-def / type-ref} (§12.1) -- a nested declaration-level form, or an ordinary reference. */
-    private ElementType.Expr parseMapValue() {
-        ElementType.Expr value = nestedOrPlain();
-        rejectMapQuestion("value");
-        return value;
-    }
-
-    private ElementType parseElementType() {
-        ElementType.Expr expr = nestedOrPlain();
-        boolean optional = consumeAdjacentQuestion();
-        return new ElementType(expr, optional);
+        return new MapRef(key, new ElementType(value, false), size);
     }
 
     /**
-     * The {@code container-def / type-ref} choice both an array/tuple position and a map value are spelled
-     * with -- a {@code '['} or {@code '{'} nests the declaration-level tier, anything else is an ordinary
-     * reference.
+     * {@code element-type = type-ref ["?"]} (§12.1). Nesting needs no case of its own: a bracket or map form
+     * <em>is</em> a type-ref, so {@code [[T; 2]; 3]} is the recursion here and not a second production.
      */
-    private ElementType.Expr nestedOrPlain() {
-        return check(TokenType.LBRACKET) || check(TokenType.LBRACE)
-                ? new ElementType.Expr.Nested(parseContainerDef())
-                : new ElementType.Expr.Plain(parseTypeRef());
+    private ElementType parseElementType() {
+        TypeRef ref = parseTypeRef();
+        return new ElementType(ref, consumeAdjacentQuestion());
     }
 
     /**
-     * {@code size-spec} (§12.1), shared by the array and map tiers -- {@code closing} is the bracket or brace
+     * {@code size-spec} (§12.1), shared by the bracket and map forms -- {@code closing} is the bracket or brace
      * the open-ended {@code N..} form runs up against.
      */
     private SizeSpec parseSizeSpec(TokenType closing) {

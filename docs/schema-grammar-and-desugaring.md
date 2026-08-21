@@ -30,15 +30,25 @@ materialization, no validation (those are the resolver's/linker's jobs).
   `docs/readers-and-diagnostics.md` under "Schema-side diagnostics", with the rest of the diagnostics model.
 - **A mismatch names the construct the position admits, not the token class** — `expect` takes that
   construct in the author's voice, and every call site here is phrased that way (`"a record field's ':'"`,
-  `"a choice type's closing ')'"`), never as the enclosing construct. Three positions go further and name
-  the *fix*, all in the same shape: an inline atom refinement or constructor application (`quantity:
-  !integer ^ { min: 1 }`), an element `?`, and a size specifier, each rejected at a type-ref position with
-  the "declare a named type and reference it by name" correction (§5.3).
-- **The bracket form is parsed twice, per the spec** — `ArrayContainerDef`/`TupleContainerDef` at
-  declaration position, `InlineArrayRef`/`InlineTupleRef` at type-ref position, with `[` at type-def
-  position hard-coded to the container path (§12.1's prose tie-break; the two productions overlap and
-  `type-def` is genuinely ambiguous without it). Four node types for two concepts, and `SchemaDesugarer`
-  walks both to the same output — implemented per letter, and argued against in `SPEC-FEEDBACK.md` #31.
+  `"a choice type's closing ')'"`), never as the enclosing construct. One position goes further and names
+  the *fix*: an inline atom refinement or constructor application (`quantity: !integer ^ { min: 1 }`),
+  rejected at a type-ref position with the "declare a named type and reference it by name" correction
+  (§5.3). It used to have two companions, for an element `?` and a size specifier at a type-ref position;
+  both are legal there now and the diagnostics went with the restriction.
+- **One production per container, reachable from `type-ref`** — `ArrayRef`, `TupleRef`, `MapRef`, each
+  admitting a size specifier after `;` and an element `?` at *every* position. The grammar used to spell
+  each twice, a declaration-level form admitting both and an inline form admitting neither, with a prose
+  tie-break in §12.1 because `type-def` was otherwise ambiguous between them. The split existed because a
+  sized form had no inline representation to carry it; every form lifts to an entry, so it protected
+  nothing (`SPEC-FEEDBACK.md` #31, and the change report's D10). `type-def` reaches both through `type-ref`
+  like anything else, so the tie-break disappeared rather than being reworded.
+  - **Nesting is the recursion in `ElementType`**, which holds a plain `TypeRef` — `[[T; 2]; 3]` and
+    `{text => [order; 1..]}` need no second node family, which is what `ElementType.Expr.Nested` used to be.
+  - **An element's `?` and a field's own `?` cannot collide**: a field is `field-name ":" type-ref ["?"]`,
+    so in `xs: [T?]?` the inner belongs to `element-type` and the outer to the field.
+  - A map key stays `type-name ["<" type-args ">"]` and nothing else — not a paren type, not a bracket form
+    — which is what holds the brace dispatch below to its lookahead budget; a composite key earns a named
+    declaration and the explicit `!map { key_type: … }` form.
 - **The map sugar is parsed twice for the same reason** — `MapContainerDef` at declaration position (which
   admits a `; size-spec`), `InlineMapRef` at type-ref position (which does not). `map-value = container-def
   / type-ref`, the same pair an array element position takes, so it reuses `ElementType.Expr` and the
@@ -167,12 +177,12 @@ rebuilt and called a cache.
 - **Both declaration-level tiers desugar in place.** At declaration position the form *is* the construction
   (`pair => [integer, text]` becomes `!tuple { … }`, like `ids => [text]`, `entries => {text => integer}` and
   `contact => (A | B)`); inline, each is hoisted into its own declaration and referenced.
-- **A nested declaration-level form desugars innermost-first** (`elementRef`/`exprRef`). §5.3's
-  declaration-level container syntax nests inside itself and the inner form desugars first, so the inner
-  container is built as its own binding record, injected under its derived name, and the position that held
-  it becomes a bare reference. That is the bottom-up hoist the type-ref walk already does, one tier down, and
-  it reaches every nesting position alike — an array's element (`[[T]; 3]`), a tuple's positions
-  (`[[T; 2], U]`) and a map's value (`{text => [order; 1..]}`) — to any depth, with no per-depth case.
+- **A nested form desugars innermost-first**, and needs no machinery of its own: an element holds a
+  `TypeRef`, so `typeRef` recurses into it and the inner form is already a plain name by the time the
+  enclosing one is built. That reaches every nesting position alike — an array's element (`[[T]; 3]`), a
+  tuple's positions (`[[T; 2], U]`) and a map's value (`{text => [order; 1..]}`) — to any depth, with no
+  per-depth case and no second walk; the `hoistNested`/`exprRef` pair this replaces existed only because
+  the declaration-level tier was a separate node family.
   Because identity is structural, the injected entry is shared: one `array_integer_<hash>` serves the nested
   position, the flat declaration `[integer]` and an inline field's `[integer]` alike. An injected **tuple**'s
   name derives from its positions' *states* as well as their types, or `[T, U?]` and `[T, U]` would land on

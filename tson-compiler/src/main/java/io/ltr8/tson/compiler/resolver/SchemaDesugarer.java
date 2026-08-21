@@ -7,20 +7,15 @@ import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.ScopedValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
-import io.ltr8.tson.compiler.ast.schema.ArrayContainerDef;
+import io.ltr8.tson.compiler.ast.schema.ArrayRef;
 import io.ltr8.tson.compiler.ast.schema.ChoiceRef;
 import io.ltr8.tson.compiler.ast.schema.ConstructionDef;
-import io.ltr8.tson.compiler.ast.schema.ContainerDef;
-import io.ltr8.tson.compiler.ast.schema.ContainerTypeDef;
 import io.ltr8.tson.compiler.ast.schema.ElementType;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
 import io.ltr8.tson.compiler.ast.schema.GenericRef;
 import io.ltr8.tson.compiler.ast.schema.GroupDef;
-import io.ltr8.tson.compiler.ast.schema.InlineArrayRef;
-import io.ltr8.tson.compiler.ast.schema.InlineMapRef;
-import io.ltr8.tson.compiler.ast.schema.InlineTupleRef;
 import io.ltr8.tson.compiler.ast.schema.Instance;
-import io.ltr8.tson.compiler.ast.schema.MapContainerDef;
+import io.ltr8.tson.compiler.ast.schema.MapRef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.RecordEntry;
 import io.ltr8.tson.compiler.ast.schema.ReferenceTypeDef;
@@ -31,7 +26,7 @@ import io.ltr8.tson.compiler.ast.schema.SimpleRef;
 import io.ltr8.tson.compiler.ast.schema.SizeSpec;
 import io.ltr8.tson.compiler.ast.schema.StructuralDef;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
-import io.ltr8.tson.compiler.ast.schema.TupleContainerDef;
+import io.ltr8.tson.compiler.ast.schema.TupleRef;
 import io.ltr8.tson.compiler.ast.schema.TypeArg;
 import io.ltr8.tson.compiler.ast.schema.TypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeRef;
@@ -317,39 +312,21 @@ final class SchemaDesugarer {
                 yield body == structural.body() ? structural
                         : new StructuralTypeDef(structural.typeParams(), structural.constructor(), body);
             }
-            case ContainerTypeDef container -> {
-                if (!container.typeParams().isEmpty()) {
-                    yield container;
-                }
-                // At declaration position the bracket or brace form *is* the construction (§5.6), so it
-                // becomes the instance directly rather than a reference to an injected one -- which is what
-                // makes `score_list => [integer; 1..]` a PRODUCT entry with a real body instead of a
-                // REFERENCE to one.
-                Optional<Binding> binding = binding(container.container());
-                if (binding.isPresent()) {
-                    yield instance(binding.get());
-                }
-                ContainerDef def = containerDef(container.container());
-                yield def == container.container() ? container
-                        : new ContainerTypeDef(container.typeParams(), def);
-            }
             // A declaration's own body reference names what this declaration *is*; only its arguments are
             // expandable, so the head stays put and its own handling is unchanged.
             case ReferenceTypeDef reference -> {
                 if (!reference.typeParams().isEmpty()) {
                     yield reference;
                 }
-                // §5.4: a declaration whose body is the choice sugar *is* that construction, the same way
-                // the bracket and brace forms are -- `contact => (email | phone)` is a SUM entry with a real
-                // ChoiceBody, not a REFERENCE to one.
-                if (reference.ref() instanceof ChoiceRef choice) {
-                    List<TypeRef> variants = mapShared(choice.variants(), this::typeRef);
-                    Optional<Binding> binding = choiceBinding(variants);
-                    if (binding.isPresent()) {
-                        yield instance(binding.get());
-                    }
-                    yield variants == choice.variants() ? reference
-                            : new ReferenceTypeDef(reference.typeParams(), new ChoiceRef(variants));
+                // **A declaration's own body never lifts** (D5): the form *is* the construction, so it
+                // becomes the instance directly rather than a reference to an injected one. That is what
+                // keeps `score_list => [integer; 1..]` a PRODUCT entry with a real body, and
+                // `contact => (email | phone)` a SUM entry with a real ChoiceBody, instead of REFERENCEs to
+                // ones. Every sugar form takes this path now -- the bracket forms reach it through
+                // `type-ref` like the rest, since there is no separate declaration-level tier.
+                Optional<Binding> binding = binding(reference.ref());
+                if (binding.isPresent()) {
+                    yield instance(binding.get());
                 }
                 TypeRef ref = argumentsOnly(reference.ref());
                 yield ref == reference.ref() ? reference : new ReferenceTypeDef(reference.typeParams(), ref);
@@ -410,47 +387,6 @@ final class SchemaDesugarer {
     }
 
     /**
-     * The fallback walk for a container this phase could not reduce to a binding record: expand what is
-     * inside it and leave the shape alone.
-     */
-    private ContainerDef containerDef(ContainerDef def) {
-        return switch (def) {
-            case ArrayContainerDef array -> {
-                ElementType element = elementType(array.elementType());
-                yield element == array.elementType() ? array : new ArrayContainerDef(element, array.size());
-            }
-            case MapContainerDef map -> {
-                TypeRef key = typeRef(map.keyType());
-                ElementType.Expr value = expr(map.valueType());
-                yield key == map.keyType() && value == map.valueType() ? map
-                        : new MapContainerDef(key, value, map.size());
-            }
-            case TupleContainerDef tuple -> {
-                List<ElementType> elements = mapShared(tuple.elementTypes(), this::elementType);
-                yield elements == tuple.elementTypes() ? tuple : new TupleContainerDef(elements);
-            }
-        };
-    }
-
-    private ElementType elementType(ElementType element) {
-        ElementType.Expr expr = expr(element.expr());
-        return expr == element.expr() ? element : new ElementType(expr, element.optional());
-    }
-
-    private ElementType.Expr expr(ElementType.Expr expr) {
-        return switch (expr) {
-            case ElementType.Expr.Plain plain -> {
-                TypeRef ref = typeRef(plain.typeRef());
-                yield ref == plain.typeRef() ? expr : new ElementType.Expr.Plain(ref);
-            }
-            case ElementType.Expr.Nested nested -> {
-                ContainerDef def = containerDef(nested.container());
-                yield def == nested.container() ? expr : new ElementType.Expr.Nested(def);
-            }
-        };
-    }
-
-    /**
      * A reference at a position where a sugar form <em>is</em> expandable: expands children first, so a
      * nested form is already a plain name by the time the enclosing one is built (<code>{text =&gt;
      * [integer]}</code> injects the inner array, then the outer map referring to it).
@@ -464,27 +400,8 @@ final class SchemaDesugarer {
         }
         return switch (ref) {
             case SimpleRef simple -> simple;
-            case InlineArrayRef array -> {
-                TypeRef element = typeRef(array.elementType());
-                yield hoistOrKeep(arrayBinding(element, false, Optional.empty(), "T"),
-                        element == array.elementType() ? array : new InlineArrayRef(element));
-            }
-            case InlineMapRef map -> {
-                TypeRef key = typeRef(map.keyType());
-                TypeRef value = typeRef(map.valueType());
-                yield hoistOrKeep(mapBinding(key, value, Optional.empty()),
-                        key == map.keyType() && value == map.valueType() ? map : new InlineMapRef(key, value));
-            }
-            case InlineTupleRef tuple -> {
-                List<TypeRef> elements = mapShared(tuple.elementTypes(), this::typeRef);
-                yield hoistOrKeep(tupleBinding(elements.stream().map(e -> new Position(e, false)).toList()),
-                        elements == tuple.elementTypes() ? tuple : new InlineTupleRef(elements));
-            }
-            case ChoiceRef choice -> {
-                List<TypeRef> variants = mapShared(choice.variants(), this::typeRef);
-                yield hoistOrKeep(choiceBinding(variants),
-                        variants == choice.variants() ? choice : new ChoiceRef(variants));
-            }
+            case ArrayRef _, TupleRef _, MapRef _ -> hoistOrKeep(binding(ref), ref);
+            case ChoiceRef _ -> hoistOrKeep(binding(ref), ref);
             case GenericRef generic -> {
                 checkTemplateApplication(generic.name());
                 List<TypeArg> args = mapShared(generic.args(), this::typeArg);
@@ -506,9 +423,11 @@ final class SchemaDesugarer {
     private boolean mentionsParameter(TypeRef ref) {
         return switch (ref) {
             case SimpleRef simple -> currentParameters.contains(simple.name());
-            case InlineArrayRef array -> mentionsParameter(array.elementType());
-            case InlineMapRef map -> mentionsParameter(map.keyType()) || mentionsParameter(map.valueType());
-            case InlineTupleRef tuple -> tuple.elementTypes().stream().anyMatch(this::mentionsParameter);
+            case ArrayRef array -> mentionsParameter(array.elementType().typeRef());
+            case MapRef map -> mentionsParameter(map.keyType())
+                    || mentionsParameter(map.valueType().typeRef());
+            case TupleRef tuple -> tuple.elementTypes().stream()
+                    .anyMatch(e -> mentionsParameter(e.typeRef()));
             case ChoiceRef choice -> choice.variants().stream().anyMatch(this::mentionsParameter);
             case GenericRef generic -> currentParameters.contains(generic.name())
                     || generic.args().stream().anyMatch(arg ->
@@ -590,7 +509,6 @@ final class SchemaDesugarer {
      */
     private static boolean containsOpenSugarForm(TypeDef typeDef, List<String> parameters) {
         return switch (typeDef) {
-            case ContainerTypeDef container -> !parameters.isEmpty();
             case ReferenceTypeDef reference -> openSugarInRef(reference.ref(), parameters);
             case StructuralTypeDef structural -> openSugarInStructuralDef(structural.body(), parameters);
             default -> false;
@@ -621,8 +539,7 @@ final class SchemaDesugarer {
     private static boolean openSugarInRef(TypeRef ref, List<String> parameters) {
         return switch (ref) {
             case SimpleRef _ -> false;
-            case InlineArrayRef _, InlineMapRef _, InlineTupleRef _, ChoiceRef _ ->
-                    namesParameter(ref, parameters);
+            case ArrayRef _, MapRef _, TupleRef _, ChoiceRef _ -> namesParameter(ref, parameters);
             case GenericRef generic -> generic.args().stream()
                     .anyMatch(arg -> arg instanceof TypeArg.Ref r && openSugarInRef(r.ref(), parameters));
         };
@@ -632,11 +549,11 @@ final class SchemaDesugarer {
     private static boolean namesParameter(TypeRef ref, List<String> parameters) {
         return switch (ref) {
             case SimpleRef simple -> parameters.contains(simple.name());
-            case InlineArrayRef array -> namesParameter(array.elementType(), parameters);
-            case InlineMapRef map -> namesParameter(map.keyType(), parameters)
-                    || namesParameter(map.valueType(), parameters);
-            case InlineTupleRef tuple -> tuple.elementTypes().stream()
-                    .anyMatch(e -> namesParameter(e, parameters));
+            case ArrayRef array -> namesParameter(array.elementType().typeRef(), parameters);
+            case MapRef map -> namesParameter(map.keyType(), parameters)
+                    || namesParameter(map.valueType().typeRef(), parameters);
+            case TupleRef tuple -> tuple.elementTypes().stream()
+                    .anyMatch(e -> namesParameter(e.typeRef(), parameters));
             case ChoiceRef choice -> choice.variants().stream().anyMatch(v -> namesParameter(v, parameters));
             case GenericRef generic -> parameters.contains(generic.name())
                     || generic.args().stream().anyMatch(arg ->
@@ -647,7 +564,7 @@ final class SchemaDesugarer {
     private static List<String> typeParams(TypeDef typeDef) {
         return switch (typeDef) {
             case StructuralTypeDef structural -> structural.typeParams();
-            case ContainerTypeDef container -> container.typeParams();
+
             case ReferenceTypeDef reference -> reference.typeParams();
             default -> List.of();
         };
@@ -672,14 +589,15 @@ final class SchemaDesugarer {
      * this phase cannot reduce to a name -- which leaves the whole container unexpanded, since a partially
      * reduced one would be a differently-broken shape rather than a recognisable sugar form.
      */
-    private Optional<Binding> binding(ContainerDef def) {
-        return switch (def) {
-            case ArrayContainerDef array -> elementRef(array.elementType()).flatMap(element ->
-                    arrayBinding(element, array.elementType().optional(), array.size(),
-                            shownElement(array.elementType())));
-            case MapContainerDef map -> exprRef(map.valueType()).flatMap(value ->
-                    mapBinding(typeRef(map.keyType()), value, map.size()));
-            case TupleContainerDef tuple -> positions(tuple).flatMap(SchemaDesugarer::tupleBinding);
+    private Optional<Binding> binding(TypeRef ref) {
+        return switch (ref) {
+            case ArrayRef array -> arrayBinding(elementRef(array.elementType()),
+                    array.elementType().optional(), array.size(), shownElement(array.elementType()));
+            case MapRef map -> mapBinding(typeRef(map.keyType()), elementRef(map.valueType()), map.size());
+            case TupleRef tuple -> tupleBinding(tuple.elementTypes().stream()
+                    .map(e -> new Position(elementRef(e), e.optional())).toList());
+            case ChoiceRef choice -> choiceBinding(mapShared(choice.variants(), this::typeRef));
+            default -> Optional.empty();
         };
     }
 
@@ -874,31 +792,8 @@ final class SchemaDesugarer {
      * <p>Empty when the position holds a form this phase cannot build, which leaves the enclosing container
      * unexpanded and keeps its existing handling.
      */
-    private Optional<TypeRef> elementRef(ElementType element) {
-        return exprRef(element.expr());
-    }
-
-    private Optional<TypeRef> exprRef(ElementType.Expr expr) {
-        return switch (expr) {
-            case ElementType.Expr.Plain plain -> Optional.of(typeRef(plain.typeRef()));
-            case ElementType.Expr.Nested nested -> binding(nested.container()).map(this::hoist);
-        };
-    }
-
-    /**
-     * Every position of a declaration-level tuple reduced to a name plus its own {@code ?}, or empty as soon
-     * as one position holds a form this phase cannot build.
-     */
-    private Optional<List<Position>> positions(TupleContainerDef tuple) {
-        List<Position> positions = new ArrayList<>();
-        for (ElementType element : tuple.elementTypes()) {
-            Optional<TypeRef> ref = elementRef(element);
-            if (ref.isEmpty()) {
-                return Optional.empty();
-            }
-            positions.add(new Position(ref.get(), element.optional()));
-        }
-        return Optional.of(positions);
+    private TypeRef elementRef(ElementType element) {
+        return typeRef(element.typeRef());
     }
 
     /**
@@ -907,9 +802,7 @@ final class SchemaDesugarer {
      * whose expansion carries a derived name the author never wrote.
      */
     private static String shownElement(ElementType element) {
-        return element.expr() instanceof ElementType.Expr.Plain plain && plain.typeRef() instanceof SimpleRef simple
-                ? simple.name()
-                : "T";
+        return element.typeRef() instanceof SimpleRef simple ? simple.name() : "T";
     }
 
     private static RecordValue.Field nameField(String name, String text) {

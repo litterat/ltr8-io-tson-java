@@ -12,15 +12,16 @@ package io.ltr8.tson.compiler.ast.schema;
  *       corrected from the spec's own literal {@code data-value} -- see {@link Instance}'s own
  *       Javadoc and {@code SPEC-FEEDBACK.md})</li>
  *   <li>{@link StructuralTypeDef} -- {@code [type-params] ["~"] structural-def} (§5.7-§5.9)</li>
- *   <li>{@link ContainerTypeDef} -- {@code [type-params] container-def} (§5.3, declaration-level array/tuple)</li>
- *   <li>{@link ReferenceTypeDef} -- {@code [type-params] type-ref} (§8.3, a plain reference or inline sugar)</li>
+ *   <li>{@link ReferenceTypeDef} -- {@code [type-params] type-ref} (§8.3): a plain reference, or any
+ *       container form, since a declaration-level container reaches this through {@code type-ref} like
+ *       every other position</li>
  * </ul>
  *
  * <p>Every variant has an ABNF alternative behind it -- each is parsed, never synthesised. §5.3's sized sugar
  * is no exception: {@code [T; 1..2]} is rewritten by {@code SchemaDesugarer} into the {@link Instance} its
- * bindings denote, because a size template's application closes by routing into a construction of {@code
- * array} rather than materialising an entry of its own ({@code SPEC-FEEDBACK.md} #45).
+ * bindings denote -- the sugar names {@code array} and binds its fields, materialising no entry of its own
+ * ({@code SPEC-FEEDBACK.md} #45).
  */
 public sealed interface TypeDef
-        permits AtomRefinement, Instance, StructuralTypeDef, ContainerTypeDef, ReferenceTypeDef {
+        permits AtomRefinement, Instance, StructuralTypeDef, ReferenceTypeDef {
 }
