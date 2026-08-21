@@ -234,13 +234,24 @@ recorded open form, and replacing the application with a reference to the entry 
     (`'two' is not a valid integer`) exactly as it would for a written body. D7's split — binding names,
     REQUIRED coverage and concrete typing at the declaration; what substitution supplies, here — is the
     whole of it.
-  - **The entry is named for the form, not for the application** (§8.2). An open synthetic's own name is
+  - **The form is named for itself, not for the application** (§8.2). An open synthetic's own name is
     internal and derived, so keying its instantiations on it would make identity depend on an unstable name
     — and would leave `[text]` written directly and `[T]` closed to `text` on two entries for one type. Both
     go through `SchemaDesugarer.internalName` over the same binding record, so the two channels dedupe
     against each other and the closing usually finds the entry desugaring already injected.
-  - **No knot-tying is needed on this path**: an `instance_template`'s bindings are references to entries,
-    never a nested application of the template being closed, so closing one cannot re-enter itself.
+  - **So the application gets a second entry**, a `Reference` to the form whose `source` is the application
+    itself. One entry cannot carry two identities: the closure is a closed synthetic *and* an instantiation
+    of the template, and §8.2 keys those on different things. Without it nothing in resolver output records
+    that `grid<pixel, 3>` was written — the field would name the array and the template's name would vanish.
+    The record shape needs no second entry, since substituting a record yields a record, structurally
+    distinct from any synthetic.
+    - **A generated head mints none.** Closing `array_p0_…<pixel, 3>` is an open synthetic closing its own
+      intermediate form; nobody wrote that application, and an entry named for it would carry an internal
+      name into identity. `SchemaResolver` tells the two apart by the plainest fact available — the
+      difference between the declarations the author wrote and the ones desugaring added.
+  - **Both closure paths share one memo**, so a template that applies itself (`weird => <T> [weird<T>]`) ties
+    the knot on the entry under construction. An open instance used to short-circuit ahead of the memo and
+    the depth backstop alike, which made that spelling a `StackOverflowError`.
 - **An argument keeps the channel it was applied on.** An argument list is the one position where a type and
   a value are equally at home, so a value parameter passed straight through (`array_p0_…<N>` inside
   `<N> { a: [text; N] }`) stays a value. A parameter anywhere else is a type by construction, and a value

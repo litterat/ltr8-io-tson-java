@@ -6,6 +6,7 @@ import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.InstanceTemplate;
 import io.ltr8.tson.schema.meta.MapBody;
+import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.TemplateArgument;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -63,6 +64,17 @@ class ApplicationInContainerPositionTest {
         RecordBody body = (RecordBody) compiled.schema().entries().get(record).body();
         return body.fields().stream().filter(f -> f.name().equals(field)).findFirst().orElseThrow()
                 .type().name();
+    }
+
+    /**
+     * The entry a field's type resolves to, following the instantiation entry's hop. A closure whose body is a
+     * synthetic is named by <em>two</em> entries -- the form, and the instantiation that records the
+     * application -- so a fixture asking about the shape has to step past the second to reach the first.
+     */
+    private static TypeDefinition formBehind(TsonCompiledSchema compiled, String record, String field) {
+        TypeDefinition entry = compiled.schema().entries().get(fieldType(compiled, record, field));
+        return entry.body() instanceof Reference reference
+                ? compiled.schema().entries().get(reference.target().name()) : entry;
     }
 
     /** The entries this schema derived rather than the author declaring them -- synthetics and instantiations. */
@@ -194,32 +206,65 @@ class ApplicationInContainerPositionTest {
     }
 
     /**
-     * The <b>whole-body</b> spelling, and the one difference between the two that is visible in resolver
-     * output: it records <em>no instantiation entry at all</em>. Closing it goes through the {@code
-     * instance_template} path, which names the entry it produces for the <b>form</b> -- so the field points
-     * straight at the array, and nothing anywhere records that {@code grid<pixel, 3>} was written.
+     * The <b>whole-body</b> spelling records the application too, and needs <em>two</em> entries to do it.
+     * Its closure is a closed synthetic, whose {@code source} must name the constructor it builds -- keying
+     * it on the application would tie identity to the internal name of the open synthetic that produced it,
+     * and would split {@code [text]} written directly from {@code [T]} closed to {@code text}. So the
+     * instantiation is a separate reference entry pointing at the form.
      *
-     * <p>Both halves follow D6 and neither is a defect: a closed synthetic's {@code source} names the
-     * constructor it builds, an instantiation entry's names the application it closes. The consequence is
-     * worth pinning rather than discovering -- two spellings of what an author would call one type differ in
-     * whether the application survives §8 output.
+     * <p>The record spelling needs only one, because substituting a record yields a record -- structurally
+     * distinct from any synthetic, so it can be the instantiation itself.
      */
     @Test
-    void theWholeBodySpellingRecordsNoInstantiationEntry() {
+    void theWholeBodySpellingRecordsTheApplicationInAReferenceEntry() {
         TsonCompiledSchema compiled = compile("""
                   pixel => { r: int32 }
                   grid  => <T, N> [[T; N]; N]
                   a     => { g: grid<pixel, 3> }""");
 
-        TypeDefinition entry = compiled.schema().entries().get(fieldType(compiled, "a", "g"));
+        TypeDefinition instantiation = compiled.schema().entries().get(fieldType(compiled, "a", "g"));
+        assertInstanceOf(Reference.class, instantiation.body());
+        assertEquals("grid", instantiation.source().orElseThrow().name(), "the application, recorded");
 
-        assertInstanceOf(ArrayBody.class, entry.body(), "the array itself, not a reference to one");
-        assertEquals(TypeRef.of("array"), entry.source().orElseThrow(),
-                "sourced to the constructor it builds, so the application is not recorded anywhere");
-        assertEquals(0, derived(compiled).stream()
-                .filter(n -> compiled.schema().entries().get(n).source()
-                        .filter(s -> s.name().equals("grid")).isPresent()).count(),
-                () -> "no entry sourced to grid<...>: " + derived(compiled));
+        TypeDefinition form = formBehind(compiled, "a", "g");
+        assertInstanceOf(ArrayBody.class, form.body());
+        assertEquals(TypeRef.of("array"), form.source().orElseThrow(),
+                "the form stays sourced to the constructor it builds");
+    }
+
+    /**
+     * A generated head closing its own intermediate form mints no instantiation: nobody wrote
+     * {@code array_p0_p1_p1_06c4e11f<pixel, 3>}, and an entry named for it would carry that internal name
+     * into identity, which is exactly what D6 says must not happen.
+     */
+    @Test
+    void closingAGeneratedSyntheticRecordsNoApplication() {
+        TsonCompiledSchema compiled = compile("""
+                  pixel => { r: int32 }
+                  grid  => <T, N> [[T; N]; N]
+                  a     => { g: grid<pixel, 3> }""");
+
+        assertEquals(1, derived(compiled).stream()
+                .filter(n -> compiled.schema().entries().get(n).body() instanceof Reference).count(),
+                () -> "one instantiation, for the one application written: " + derived(compiled));
+        assertTrue(derived(compiled).stream().noneMatch(n -> n.contains("06c4e11f_")),
+                () -> "no entry named after a generated head: " + derived(compiled));
+    }
+
+    /**
+     * A template that applies itself ties the knot rather than recursing. Both closure paths share one memo
+     * now; before, an open instance short-circuited ahead of it and this was a {@code StackOverflowError}.
+     */
+    @Test
+    void aTemplateApplyingItselfTiesTheKnot() {
+        TsonCompiledSchema compiled = compile("""
+                  weird => <T> [weird<T>]
+                  use   => { w: weird<text> }""");
+
+        String instantiation = fieldType(compiled, "use", "w");
+        ArrayBody form = assertInstanceOf(ArrayBody.class, formBehind(compiled, "use", "w").body());
+
+        assertEquals(instantiation, form.elementType().name(), "the knot");
     }
 
     /**
@@ -237,8 +282,7 @@ class ApplicationInContainerPositionTest {
                   direct => { d: [pixel; 3] }""");
 
         assertEquals(fieldType(compiled, "a", "g"), fieldType(compiled, "b", "g"), "one instantiation");
-        ArrayBody outer = assertInstanceOf(ArrayBody.class,
-                compiled.schema().entries().get(fieldType(compiled, "a", "g")).body());
+        ArrayBody outer = assertInstanceOf(ArrayBody.class, formBehind(compiled, "a", "g").body());
         assertEquals(fieldType(compiled, "direct", "d"), outer.elementType().name(),
                 "the row the grid builds is the row written directly");
         assertEquals(Optional.of(BigInteger.valueOf(3)), outer.minItems());
@@ -286,8 +330,8 @@ class ApplicationInContainerPositionTest {
         assertInstanceOf(InstanceTemplate.class, compiled.schema().entries().get("grid").body());
         assertEquals(1, openSynthetics(compiled),
                 () -> "one open synthetic, shared by both closures: " + derived(compiled));
-        assertEquals(4, closedDerived(compiled),
-                () -> "two closed arrays per closure, none shared: " + derived(compiled));
+        assertEquals(6, closedDerived(compiled),
+                () -> "two closed arrays and one instantiation per closure: " + derived(compiled));
     }
 
     /**
@@ -376,10 +420,10 @@ class ApplicationInContainerPositionTest {
                   vector => <T, N> !array { element_type: T  min_items: N  max_items: N }
                   holder => { p: [vector<float32, 3>] }""");
 
-        ArrayBody outer = assertInstanceOf(ArrayBody.class, compiled.schema().entries()
-                .get(fieldType(compiled, "holder", "p")).body());
-        ArrayBody vector = assertInstanceOf(ArrayBody.class,
-                compiled.schema().entries().get(outer.elementType().name()).body());
+        ArrayBody outer = assertInstanceOf(ArrayBody.class, formBehind(compiled, "holder", "p").body());
+        TypeDefinition inner = compiled.schema().entries().get(outer.elementType().name());
+        ArrayBody vector = assertInstanceOf(ArrayBody.class, inner.body() instanceof Reference r
+                ? compiled.schema().entries().get(r.target().name()).body() : inner.body());
 
         assertEquals(Optional.of(BigInteger.valueOf(3)), vector.minItems());
         assertNotNull(compiled.get("holder")
@@ -425,8 +469,7 @@ class ApplicationInContainerPositionTest {
                   bounded => <N> !array { element_type: box<text>  min_items: N }
                   use     => { u: bounded<2> }""");
 
-        ArrayBody closed = assertInstanceOf(ArrayBody.class,
-                compiled.schema().entries().get(fieldType(compiled, "use", "u")).body());
+        ArrayBody closed = assertInstanceOf(ArrayBody.class, formBehind(compiled, "use", "u").body());
 
         assertEquals(Optional.of(BigInteger.TWO), closed.minItems());
         assertInstanceOf(RecordBody.class,

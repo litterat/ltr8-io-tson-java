@@ -208,6 +208,11 @@ public final class SchemaResolver {
                                 declaration.name(), error.getMessage(),
                                 Optional.ofNullable(positions.get(declaration)))), positions);
         Map<String, SchemaMap.Declaration> declarations = desugared.body().declarations();
+        // The names desugaring generated, as opposed to the ones the author wrote -- the difference between
+        // the two documents, and nothing subtler. An application of a generated name is machinery closing
+        // its own intermediate form; an application of an authored one is a use site worth recording.
+        Set<String> generated = new LinkedHashSet<>(declarations.keySet());
+        generated.removeAll(document.body().declarations().keySet());
 
         // Local-vs-import collisions, up front (local names are already unique -- SchemaMap dedupes them).
         for (String name : declarations.keySet()) {
@@ -270,7 +275,7 @@ public final class SchemaResolver {
         // fields, and cannot wait for the batch pass below. Sharing the instance is what makes an on-demand
         // closing and a later batch closing of the same application land on one entry.
         TemplateMaterialiser materialiser = new TemplateMaterialiser(namespaceGetter, namespace::put,
-                (type, value) -> (Top) read(metaParser.reader(type), value));
+                (type, value) -> (Top) read(metaParser.reader(type), value), generated);
 
         // The same compiled reader serves both hooks; they differ in what the caller does with the result,
         // which is why they are separate types rather than one Object-returning one.
