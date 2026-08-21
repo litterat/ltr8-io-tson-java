@@ -253,10 +253,15 @@ rebuilt and called a cache.
     `internalName` hashes) and the reference *as written*, which is what an open binding holds. Only
     `element_type`/`key_type`/`value_type` are reached this way; `tuple` and `choice` put their positions
     inside a collection and are unchanged.
-    - **A closed construction refuses one.** Its body goes through the constructor's own reader, and a
-      `type_ref`'s `arguments` cannot be read: `type_argument` is a field-group record in the kernel and a
-      sealed interface here. So `[box<text>]` is refused at the form, naming that — it was lifted; it is the
-      wire that cannot carry it. `BACKLOG.md` holds the gap.
+    - **A closed construction writes the record form and lets materialisation close it.** Its body goes
+      through the constructor's own reader, so the application has to survive a wire hop, and the resulting
+      entry names something that is not an entry yet — for exactly the window an ordinary forward reference
+      lives in, since `close()` walks every closed entry's references after the driving loop. What made this
+      possible was teaching the bind readers to read an untagged labelled choice, which is what
+      `type_argument` is (`docs/linking-and-compilation.md`).
+    - **A *value* argument still cannot make that trip.** `type_argument`'s value channel is typed `value`,
+      whose reader decodes a token to its host type, so `<3>` and `<"3">` would arrive indistinguishable —
+      and the form is exactly what identity needs. Refused at the form rather than guessed at.
   - **Two of the four sugar forms have no open representation at all.** `tuple` and `choice` bind a
     collection (`elements`, `variants`), and a `template_argument` is `param | value | type_ref` with no
     collection case — so `<T> { v: (T | text) }` is refused at the declaration that writes it, as a gap

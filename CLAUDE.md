@@ -510,11 +510,13 @@ compatibility).
   closing through the target constructor's own reader (`TemplateMaterialiser`, `docs/schema-resolution.md`).
   A container position holding an application works too, for the open case: the binding keeps the
   `type_ref` whole, so `tree => <T> { value: T  children: [tree<T>; 1..] }` ties its knot through the lifted
-  synthetic. Two things remain. `tuple` and `choice` bind a *collection*, and `template_argument` has no
-  collection case, so `<T> { v: (T | text) }` is refused at the declaration (`SPEC-FEEDBACK.md` #53). And the
-  *closed* container position (`[box<text>]`) has to write the application to the wire, where the only form
-  carrying arguments is `type_ref`'s record form — which cannot be read, because `type_argument` is a sealed
-  interface here and nothing binds a value against one (`BACKLOG.md`).
+  synthetic. A *closed* container position takes one too (`[box<text>]`, nested arguments included): the
+  slot is written in `type_ref`'s record form and materialisation rewrites it to the instantiation entry one
+  pass later, which needed `type_argument` — an untagged labelled choice — to become readable
+  (`GroupUnionBindReader`). What remains is narrower: `tuple` and `choice` bind a *collection* and
+  `template_argument` has no collection case, so `<T> { v: (T | text) }` is refused at the declaration
+  (`SPEC-FEEDBACK.md` #53); and a *value* argument in a closed slot (`[vec<text, 3>]`) is refused because the
+  `value` channel's reader decodes the token and loses the form that tells `3` from `"3"` (`BACKLOG.md`).
 - **Undocumented atom constructors** — `unknown` (and `extern`, which has no core.tn declaration) has no
   compiled-parser factory, so it compiles to `ErrorReader` (a schema merely *declaring* one still compiles).
   Neither is an ordinary missing parser waiting to be written: `extern` is a whole absent mechanism and `unknown`

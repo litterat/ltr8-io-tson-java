@@ -221,6 +221,30 @@ keeps `TsonValue` free for `tson-tree`'s own root type (`BACKLOG.md`).
   name → factory` dispatch interface) lives in the unexported `reader` package — a consumer picks a mode
   by which registry they hold, never by naming it.
 
+## Untagged labelled choices (`reader/GroupUnionBindReader`)
+
+**A record whose fields form one REQUIRED group, bound onto a Java sealed interface whose members carry those
+fields one apiece.** The kernel's `type_argument => { ( name: type_ref | value: value ) }` is the case that
+forces it, and it was unreadable until this existed — `RecordBindReader.Factory` refused a union descriptor
+for a record body, so no `type_ref` carrying `arguments` could be read at all.
+
+- **The present field is the discriminator**, which is what separates this from `VariantBindReader`. There is
+  no `!typeName` to dispatch on, and §5.6 makes one unavailable in principle: the kernel gives this record no
+  positional form precisely because a bare token could not say which member it was. So the record is read the
+  ordinary way — `RecordAbstractReader` already owns the framing — and the member is chosen by what arrived.
+- **Members match fields by the member's own single component wire-name** (`@Field` where present, the
+  component name otherwise). A member of a labelled choice carries exactly the field it is the label for, so
+  the component *is* the field; matching on anything else would need a second table to keep in step with the
+  first. `TypeArgument.Ref` carries `@Field("name")` for this reason, which also brings `toTson` closer to the
+  kernel's own spelling.
+- **Three conditions are checked, not assumed** — union target, one REQUIRED group covering every field, and
+  every member carrying one component named for one of those fields. A near-miss falls through to the
+  ordinary record path and is reported there; guessing at a partial match would bind a member to a field it
+  does not carry.
+- **The group rule is the whole contract**, so `validateGroups` is what guarantees exactly one member arrived
+  — an empty record and a two-field one are both reported before anything is constructed.
+- **Bind mode only.** Tree mode reads into `TsonValue` and has no Java shape to satisfy.
+
 ## The registries (`tson-compiler/{TsonCompiledMetaRegistry,TsonCompiledSchemaRegistry}.java`)
 
 Two registries over one shared resolution core, the compiled-side counterparts to `tson-schema`'s
