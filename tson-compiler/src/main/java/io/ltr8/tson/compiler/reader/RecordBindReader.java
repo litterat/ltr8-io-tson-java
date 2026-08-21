@@ -17,11 +17,15 @@ import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.base.NumberNarrowing;
 import io.ltr8.tson.schema.meta.FieldState;
+import io.ltr8.tson.schema.meta.ElementState;
+import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -300,6 +304,11 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             DataClass dataClass = descriptorFor(name);
 
             if (typeDefinition.subtypes().isEmpty()) {
+                Map<String, DataClassRecord> labelled = labelledChoice(body, dataClass);
+                if (labelled != null) {
+                    return new GroupUnionBindReader(name, body, labelled, resolver,
+                            context.locationOf(name, typeDefinition));
+                }
                 return new RecordBindReader(name, body, requireRecord(name, dataClass), resolver,
                         context.locationOf(name, typeDefinition), AnnotationTypes.of(context));
             }
@@ -324,6 +333,46 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
 
             throw new IllegalArgumentException("'" + name + "' resolves to " + dataClass.typeClass()
                     + ", which is neither record- nor union-shaped -- can't bind '" + name + "' as either");
+        }
+
+        /**
+         * The union members of an <b>untagged labelled choice</b>, keyed by the schema field each one
+         * carries, or {@code null} when this is not one -- see {@link GroupUnionBindReader}.
+         *
+         * <p>Three things must line up, and all three are checked rather than assumed: the Java target is a
+         * sealed union, the schema body is one REQUIRED group covering every field it declares, and each
+         * member carries exactly one component whose wire name is one of those fields. A near-miss falls
+         * through to the ordinary record path, where {@link #requireRecord} reports it -- guessing at a
+         * partial match would bind a member to a field it does not carry.
+         */
+        private Map<String, DataClassRecord> labelledChoice(RecordBody body, DataClass dataClass) {
+            if (!(dataClass instanceof DataClassUnion union) || body.groups().size() != 1) {
+                return null;
+            }
+            FieldGroup group = body.groups().get(0);
+            if (group.state() != ElementState.REQUIRED
+                    || group.members().size() != body.fields().size()
+                    || union.memberTypes().length != body.fields().size()) {
+                return null;
+            }
+            Map<String, DataClassRecord> byField = new LinkedHashMap<>();
+            for (Class<?> memberType : union.memberTypes()) {
+                DataClass member;
+                try {
+                    member = context.getDescriptor(memberType);
+                } catch (DataBindException e) {
+                    return null;
+                }
+                if (!(member instanceof DataClassRecord record)) {
+                    return null;
+                }
+                String label = GroupUnionBindReader.labelOf(record);
+                if (label == null || !group.members().contains(label)) {
+                    return null;
+                }
+                byField.put(label, record);
+            }
+            return byField.size() == body.fields().size() ? byField : null;
         }
 
         private DataClass descriptorFor(String name) {

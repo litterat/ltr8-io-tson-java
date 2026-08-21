@@ -5,6 +5,7 @@ import io.ltr8.tson.schema.TsonCanonicalIdentity;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.InstanceTemplate;
+import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.TemplateArgument;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -322,18 +323,75 @@ class ApplicationInContainerPositionTest {
     }
 
     /**
-     * The closed counterpart stays refused, and the reason is not the one it used to give. The form lifts
-     * fine; what cannot carry it is the wire, because a {@code type_ref}'s {@code arguments} has no compiled
-     * reader -- {@code type_argument} is a field-group record in the kernel and a sealed interface here.
+     * The closed counterpart, which needs no parameters anywhere: {@code [box<text>]} lifts to a synthetic
+     * whose {@code element_type} is the application itself, written in {@code type_ref}'s record form, and
+     * materialisation rewrites it to the instantiation entry one pass later.
+     *
+     * <p><b>The synthetic names something that is not an entry yet, and that is the point.</b> The window is
+     * the same one an ordinary forward reference lives in -- `close()` walks every closed entry's references
+     * after the driving loop, so by the time anything reads this array its element is a real name.
      */
     @Test
-    void aClosedContainerCannotHoldAnApplication() {
+    void aClosedContainerHoldsAnApplicationUntilMaterialisationClosesIt() {
+        TsonCompiledSchema compiled = compile("""
+                  box         => <T> { a: T }
+                  box_carrier => { a: [box<text>] }""");
+
+        ArrayBody array = assertInstanceOf(ArrayBody.class, compiled.schema().entries()
+                .get(fieldType(compiled, "box_carrier", "a")).body());
+        TypeDefinition instantiation = compiled.schema().entries().get(array.elementType().name());
+
+        assertEquals(List.of(), instantiation.parameters(), "closed");
+        assertEquals(TypeRef.of("text"), ((RecordBody) instantiation.body()).fields().get(0).type(),
+                "T bound");
+        assertNotNull(compiled.get("box_carrier")
+                .read(TestDocuments.document("{ a: [ { a: \"x\" } ] }")));
+    }
+
+    /** Arguments close innermost-first, so an application nested inside one needs no separate handling. */
+    @Test
+    void aNestedArgumentInAClosedContainerClosesInnermostFirst() {
+        TsonCompiledSchema compiled = compile("""
+                  pair => <T> { l: T  r: T }
+                  box  => <T> { a: T }
+                  deep => { d: [box<pair<int32>>] }""");
+
+        ArrayBody array = assertInstanceOf(ArrayBody.class, compiled.schema().entries()
+                .get(fieldType(compiled, "deep", "d")).body());
+        String inner = fieldType(compiled, array.elementType().name(), "a");
+
+        assertEquals(TypeRef.of("int32"),
+                ((RecordBody) compiled.schema().entries().get(inner).body()).fields().get(0).type());
+    }
+
+    /**
+     * A <b>value</b> argument cannot make the wire trip a closed slot makes. {@code type_argument}'s value
+     * channel is typed {@code value}, whose reader decodes the token to its host type, so {@code <3>} and
+     * {@code <"3">} would arrive indistinguishable -- the form is exactly what identity needs. Refused rather
+     * than guessed at; the open form keeps the reference as written and is unaffected.
+     */
+    @Test
+    void aValueArgumentInAClosedContainerIsRefusedRatherThanGuessedAt() {
         UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
                 () -> compile("""
-                          box => <T> { v: T }
-                          xs  => [box<text>]"""));
+                          vec => <T, N> !array { element_type: T  min_items: N }
+                          xs  => [vec<text, 3>]"""));
 
-        assertTrue(thrown.getMessage().contains("no compiled reader"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("loses the form"), thrown.getMessage());
+    }
+
+    /** A map's value slot takes one the same way -- the table's scalar type slots are one rule, not three. */
+    @Test
+    void aMapValueSlotHoldsAnApplicationToo() {
+        TsonCompiledSchema compiled = compile("""
+                  box => <T> { a: T }
+                  m   => { entries: {text => box<text>} }""");
+
+        MapBody map = assertInstanceOf(MapBody.class, compiled.schema().entries()
+                .get(fieldType(compiled, "m", "entries")).body());
+
+        assertEquals(TypeRef.of("text"), ((RecordBody) compiled.schema().entries()
+                .get(map.valueType().name()).body()).fields().get(0).type());
     }
 
     /** A binding whose application names no parameter is fully bound already, so it closes where it is written. */

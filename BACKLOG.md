@@ -26,16 +26,6 @@ own prose (which had gone stale on at least one of them):
   "import cycle" diagnostic naming the actual cycle path. Distinct from what
   `TsonCompiledMetaRegistry.withStandardLibrary` already does, which is scoped to just the three bundled
   schemas in a known order, not a general algorithm.
-- [ ] **`type_argument` has no usable compiled reader.** `type_argument => { ( name: type_ref | value: value ) }`
-  is an ordinary field-group record in the kernel, but `schema.meta.TypeArgument` is a sealed interface — the
-  shape that breaks `tson-bind`'s resolution cycle (the documented trap in CLAUDE.md) — so nothing can read a
-  value against it: `'type_argument' resolves to interface TypeArgument, which isn't record-shaped`. The write
-  side of that trap is recorded (`toTson` emits a spurious `!ref`/`!value` tag); this is its mirror and was
-  not. What it costs today is exactly one thing: no `type_ref` carrying `arguments` can be read, so no wire
-  form can express an unclosed application — which is what refuses `[box<text>]` above. A fix has to give
-  `tson-bind` a way to read a field-group record into a sealed union without resolving the members eagerly,
-  which is what `DefaultUnionBinder` already does for dispatch; the gap is the *untagged* group form, where
-  there is no `!name` to dispatch on and the present field is what selects the member.
 - [ ] **An empty `{}` does not count against a map's `min_items`.** Found while landing the container
   collapse and
   **pre-existing**: `b: {text => order; 1..}` with data `b: {}` validates OK, through a named declaration
@@ -53,12 +43,21 @@ own prose (which had gone stale on at least one of them):
     contradiction to the spec — D5 states the lift rule over every sugar form, D9 concedes this case has no
     resolved form — and offers both resolutions: scope the rule, or give `template_argument` a recursive
     fourth channel. Not worth implementing before that comes back.
-  - **A *closed* container position that is an application** (`[box<text>]`). The open case works now — its
-    binding holds the `type_ref` directly — but a closed one has to write the position to the wire, and the
-    only wire form that carries arguments is `type_ref`'s record form, which cannot be read (see the
-    `type_argument` item above). Refused at the form with that reason. Both halves of the fix are the same
-    piece of work: make `type_argument` readable, then let the closed lift emit the record form and
-    materialisation close it, which `close()` already does for every other ref it walks.
+  - **A *value* argument in a closed container position** (`[vec<text, 3>]`). The reference channel works —
+    `[box<text>]` and nested arguments with it — but `type_argument`'s value channel is typed `value`, whose
+    reader decodes a token to its host type, so `<3>` and `<"3">` would arrive indistinguishable and the form
+    is exactly what identity needs. Refused at the form rather than guessed at. Fixing it means a
+    token-preserving read for a slot whose bound component is `schema.meta.Token` — nothing reads one from
+    the wire today, since every other `Token` in the model is built by the resolver in Java. The open form is
+    unaffected: it keeps the reference as written and never reaches a reader.
+  - **Two entries for one type, where both channels lift the same form.** A closed lift hashes the *unclosed*
+    binding record at desugar; the open lift hashes the *closed* one at materialisation — so `[box<text>]`
+    written directly and `[box<T>]` closed with `T := text` land on different names. D6 anticipates this
+    ("identity is settled after Pass 2 ... eagerly-lifted synthetics that become structurally identical under
+    resolution merge into one entry") and that merge pass is not implemented; it never had to be, because
+    every form lifted before this one was already concrete at desugar. Deliberately deferred: two entries are
+    easier to debug than a merge firing at the wrong moment, and it is reachable only when both spellings
+    appear in one schema.
 
 - [ ] **The rest of §8.2's deferred value-level checks.** Materialisation "runs the value-level checks that
   open bounds deferred: family coherence rules whose operands were parameters". The array family's

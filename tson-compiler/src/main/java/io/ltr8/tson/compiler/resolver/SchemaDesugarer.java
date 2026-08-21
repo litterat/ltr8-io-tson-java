@@ -510,7 +510,17 @@ final class SchemaDesugarer {
         applicationSlots.put(slot, ref);
     }
 
-    /** <code>{ name: head  arguments: [ { name: A } { value: 2 } ] }</code> -- {@code type_ref}'s record form. */
+    /**
+     * <code>{ name: head  arguments: [ { name: A } ] }</code> -- {@code type_ref}'s record form, which is how
+     * a closed slot carries an application through the constructor's own reader.
+     *
+     * <p><b>A <em>value</em> argument cannot make that trip.</b> {@code type_argument}'s value channel is
+     * typed {@code value}, whose reader decodes a token to its host type (§4), so {@code box<3>} and
+     * {@code box<"3">} arrive indistinguishable -- the token's form is exactly what identity needs and
+     * exactly what decoding discards. Refused rather than reconstructed, since a guess here silently changes
+     * which type an application denotes. An <em>open</em> slot is unaffected: it keeps the reference as
+     * written and never goes near a reader.
+     */
     private static RecordValue refRecord(GenericRef generic) {
         List<ScopedValue> arguments = new ArrayList<>();
         for (TypeArg argument : generic.args()) {
@@ -519,7 +529,12 @@ final class SchemaDesugarer {
                         new RecordValue.Field(NAME, scoped(refRecord(nested)));
                 case TypeArg.Ref reference ->
                         nameField(NAME, ((SimpleRef) reference.ref()).name());
-                case TypeArg.Value value -> new RecordValue.Field("value", scoped(value.value()));
+                case TypeArg.Value value -> throw new UnsupportedOperationException("'" + generic.name()
+                        + "<...>' applies the value '" + value.value().text() + "', and a closed container "
+                        + "cannot carry a value argument: a type_argument's value channel is typed 'value', "
+                        + "whose reader decodes the token and so loses the form that tells '3' from '\"3\"' "
+                        + "(§8.1). Naming the application in its own declaration and referring to that is the "
+                        + "way to write this today");
             }))));
         }
         return new RecordValue(List.of(nameField(NAME, generic.name()),
@@ -720,24 +735,14 @@ final class SchemaDesugarer {
     /**
      * {@code !head { field: value ... }} -- the construction a binding record denotes.
      *
-     * <p><b>A closed construction cannot hold an application.</b> Its body is read through the constructor's
-     * own compiled reader, and a {@code type_ref}'s {@code arguments} cannot be read at all: {@code
-     * type_argument} is a field-group record in the kernel but a sealed interface here, the shape that breaks
-     * {@code tson-bind}'s resolution cycle, and nothing can read a value against one. So {@code [box<text>]}
-     * is refused with the reason rather than left unexpanded for the resolver to report as a form that
-     * "should have been lifted" -- it was lifted; it is the wire that cannot carry it. An <em>open</em>
-     * binding is unaffected: it holds the reference directly and never reaches a reader (see
-     * {@link #instanceTemplate}).
+     * <p><b>A slot holding an application is written in {@code type_ref}'s record form</b>, since an
+     * application has no bare-token spelling: the entry it denotes does not exist until materialisation, one
+     * phase later. The construction therefore names something that is not yet an entry, and that is fine --
+     * materialisation rewrites every closed entry's references afterwards, so {@code [box<text>]} resolves to
+     * an array whose {@code element_type} is {@code box<text>} and then, one pass on, to one whose element is
+     * the instantiation entry. The entry dangles for exactly the window an ordinary forward reference does.
      */
     private static TypeDef instance(Binding binding) {
-        if (!binding.applicationSlots().isEmpty()) {
-            String slot = binding.applicationSlots().keySet().iterator().next();
-            throw new UnsupportedOperationException("'!" + binding.head() + "' binds '" + slot + "' to a "
-                    + "template application, and a closed container cannot carry one: the entry it denotes "
-                    + "does not exist until materialisation, and a type_ref's 'arguments' has no compiled "
-                    + "reader in this implementation (§8.1). Naming the application in its own declaration "
-                    + "and referring to that is the way to write this today");
-        }
         return new Instance(new DataValue(List.of(), Optional.of(binding.head()),
                 new RecordValue(binding.fields())));
     }

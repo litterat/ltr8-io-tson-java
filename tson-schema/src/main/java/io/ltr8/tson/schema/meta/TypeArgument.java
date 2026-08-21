@@ -1,5 +1,7 @@
 package io.ltr8.tson.schema.meta;
 
+import io.ltr8.annotation.Field;
+
 /**
  * The meta-kernel's {@code type_argument} record (Part 2 §8.1, §9): one positional argument of a
  * resolved {@link TypeRef} -- {@code { (name: type_ref | value: value) }}, a REQUIRED field
@@ -27,10 +29,16 @@ package io.ltr8.tson.schema.meta;
  * type-ref the kernel's own resolved form doesn't have (a real, {@code toTson}-surfaced divergence,
  * not silently swept aside) -- same value, same field-group semantics, just an extra tag; no
  * {@code @Typename} choice removes it, since the divergence is the tag's *presence*, not its name.
+ *
+ * <p><b>{@code @Field("name")} on {@code Ref} is what makes the shape readable again.</b> A labelled choice
+ * has no tag to dispatch on, so its member is chosen by which field arrived, and the member a field selects
+ * is found by that member's own single component wire-name -- which is therefore the field's name, not the
+ * component's incidental Java one ({@code GroupUnionBindReader}). It also brings {@code toTson}'s output
+ * closer to the kernel's own spelling, which writes {@code name} here.
  */
 public sealed interface TypeArgument {
 
-    record Ref(TypeRef ref) implements TypeArgument {
+    record Ref(@Field("name") TypeRef ref) implements TypeArgument {
     }
 
     record Value(Token value) implements TypeArgument {
