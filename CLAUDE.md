@@ -515,8 +515,8 @@ compatibility).
   pass later, which needed `type_argument` — an untagged labelled choice — to become readable
   (`GroupUnionBindReader`). What remains is narrower: `tuple` and `choice` bind a *collection* and
   `template_argument` has no collection case, so `<T> { v: (T | text) }` is refused at the declaration
-  (`SPEC-FEEDBACK.md` #53); and a *value* argument in a closed slot (`[vec<text, 3>]`) is refused because the
-  `value` channel's reader decodes the token and loses the form that tells `3` from `"3"` (`BACKLOG.md`).
+  (`SPEC-FEEDBACK.md` #53); a *value* argument keeps its token, so `[vector<float32, 3>]` closes to a
+  nested array with both bounds at 3 and stays distinct from `<"3">` (`RawTokenParser`).
 - **Undocumented atom constructors** — `unknown` (and `extern`, which has no core.tn declaration) has no
   compiled-parser factory, so it compiles to `ErrorReader` (a schema merely *declaring* one still compiles).
   Neither is an ordinary missing parser waiting to be written: `extern` is a whole absent mechanism and `unknown`

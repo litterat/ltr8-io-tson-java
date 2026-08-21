@@ -135,6 +135,7 @@ final class SchemaDesugarer {
     /** {@code type_ref}'s own two fields, for the record form a slot takes when it holds an application. */
     private static final String NAME = "name";
     private static final String ARGUMENTS = "arguments";
+    private static final String VALUE = "value";
 
 
     /**
@@ -514,12 +515,10 @@ final class SchemaDesugarer {
      * <code>{ name: head  arguments: [ { name: A } ] }</code> -- {@code type_ref}'s record form, which is how
      * a closed slot carries an application through the constructor's own reader.
      *
-     * <p><b>A <em>value</em> argument cannot make that trip.</b> {@code type_argument}'s value channel is
-     * typed {@code value}, whose reader decodes a token to its host type (§4), so {@code box<3>} and
-     * {@code box<"3">} arrive indistinguishable -- the token's form is exactly what identity needs and
-     * exactly what decoding discards. Refused rather than reconstructed, since a guess here silently changes
-     * which type an application denotes. An <em>open</em> slot is unaffected: it keeps the reference as
-     * written and never goes near a reader.
+     * <p>A <em>value</em> argument makes the trip intact: {@code type_argument}'s value channel binds a raw
+     * {@code Token}, so the reader that fills it preserves the form rather than decoding it (§4 decoding
+     * would leave {@code box<3>} and {@code box<"3">} indistinguishable, and the form is exactly what
+     * identity needs). See {@code RawTokenParser}.
      */
     private static RecordValue refRecord(GenericRef generic) {
         List<ScopedValue> arguments = new ArrayList<>();
@@ -529,12 +528,7 @@ final class SchemaDesugarer {
                         new RecordValue.Field(NAME, scoped(refRecord(nested)));
                 case TypeArg.Ref reference ->
                         nameField(NAME, ((SimpleRef) reference.ref()).name());
-                case TypeArg.Value value -> throw new UnsupportedOperationException("'" + generic.name()
-                        + "<...>' applies the value '" + value.value().text() + "', and a closed container "
-                        + "cannot carry a value argument: a type_argument's value channel is typed 'value', "
-                        + "whose reader decodes the token and so loses the form that tells '3' from '\"3\"' "
-                        + "(§8.1). Naming the application in its own declaration and referring to that is the "
-                        + "way to write this today");
+                case TypeArg.Value value -> new RecordValue.Field(VALUE, scoped(value.value()));
             }))));
         }
         return new RecordValue(List.of(nameField(NAME, generic.name()),
