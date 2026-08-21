@@ -52,7 +52,9 @@ own prose (which had gone stale on at least one of them):
     Deleting that without materialisation in place regresses to a read-time failure. Tranche B retires it
     for record templates only; an application of a template containing a sugar form keeps failing until C.
 - [ ] **Instance templates — `spec/tson-cr-structure-templates.md`, Tranche C (D7, D9).** A sugar form
-  inside a template declaration, which needs both a grammar addition and an intermediate vocabulary.
+  inside a template declaration **that mentions one of the declaration's own parameters** — a concrete one
+  already lifts to an ordinary closed entry (D5's uniform rule, R2). Needs both a grammar addition and an
+  intermediate vocabulary.
   The obstruction is not the type slot — a `type_ref` may already name a parameter — but the *value* slots:
   `ArrayBody.minItems` is `Optional<BigInteger>`, so `!array { min_items: N }` cannot be an array body at
   all. The CR's answer is `template_instance` (a constructor plus a `{field_name => template_argument}`

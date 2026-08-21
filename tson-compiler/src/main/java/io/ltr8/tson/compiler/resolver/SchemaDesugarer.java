@@ -164,8 +164,16 @@ final class SchemaDesugarer {
     /** Declarations synthesised for sugar forms encountered during the walk, keyed by their generated name. */
     private final Map<String, SchemaMap.Declaration> injected = new LinkedHashMap<>();
 
-    /** This document's own declarations, for {@link #rejectTemplateApplication} -- set before the walk starts. */
+    /** This document's own declarations, for {@link #checkTemplateApplication} -- set before the walk starts. */
     private Map<String, SchemaMap.Declaration> local = Map.of();
+
+    /**
+     * The type parameters of the declaration currently being walked, or empty outside a template. A sugar
+     * form mentioning one of these is <em>open</em> -- it cannot become a closed entry, because the entry
+     * would carry a reference to a parameter nothing has bound -- so it is left exactly as written for the
+     * open representation to handle. Every other form in the same declaration lifts normally.
+     */
+    private List<String> currentParameters = List.of();
 
     /** Where an invalid sugar form is reported, or {@code null} to rethrow it and abandon the document. */
     private final DesugarFailureReporter reporter;
@@ -280,10 +288,15 @@ final class SchemaDesugarer {
     }
 
     private SchemaMap.Declaration declaration(SchemaMap.Declaration declaration) {
-        TypeDef typeDef = typeDef(declaration.typeDef());
-        return typeDef == declaration.typeDef() ? declaration
-                : new SchemaMap.Declaration(declaration.nameAnnotations(), declaration.name(),
-                        declaration.typeDefAnnotations(), typeDef);
+        currentParameters = typeParams(declaration.typeDef());
+        try {
+            TypeDef typeDef = typeDef(declaration.typeDef());
+            return typeDef == declaration.typeDef() ? declaration
+                    : new SchemaMap.Declaration(declaration.nameAnnotations(), declaration.name(),
+                            declaration.typeDefAnnotations(), typeDef);
+        } finally {
+            currentParameters = List.of();
+        }
     }
 
     /**
@@ -296,9 +309,10 @@ final class SchemaDesugarer {
     private TypeDef typeDef(TypeDef typeDef) {
         return switch (typeDef) {
             case StructuralTypeDef structural -> {
-                if (!structural.typeParams().isEmpty()) {
-                    yield structural;
-                }
+                // A template's body *is* walked: a concrete form inside it lifts to an ordinary closed
+                // entry, exactly as it would outside a template, leaving a plain record template that
+                // applies. Only a form mentioning one of the declaration's own parameters is left alone --
+                // see currentParameters.
                 StructuralDef body = structuralDef(structural.body());
                 yield body == structural.body() ? structural
                         : new StructuralTypeDef(structural.typeParams(), structural.constructor(), body);
@@ -442,6 +456,12 @@ final class SchemaDesugarer {
      * [integer]}</code> injects the inner array, then the outer map referring to it).
      */
     private TypeRef typeRef(TypeRef ref) {
+        if (isOpen(ref)) {
+            // Parameter-bearing: it cannot close, and its open form is a separate, unimplemented feature.
+            // Left as written so `checkTemplateApplication` still refuses an application of the template
+            // that holds it, rather than letting a half-expanded shape through.
+            return ref;
+        }
         return switch (ref) {
             case SimpleRef simple -> simple;
             case InlineArrayRef array -> {
@@ -470,6 +490,29 @@ final class SchemaDesugarer {
                 List<TypeArg> args = mapShared(generic.args(), this::typeArg);
                 yield args == generic.args() ? generic : new GenericRef(generic.name(), args);
             }
+        };
+    }
+
+    /**
+     * Whether {@code ref} mentions one of the declaration's own type parameters -- the test that decides
+     * whether a sugar form can lift now or must wait for the open representation. A {@link GenericRef} is
+     * excluded: an application is not a sugar form, and one carrying a parameter closes when the enclosing
+     * template is materialised.
+     */
+    private boolean isOpen(TypeRef ref) {
+        return !currentParameters.isEmpty() && !(ref instanceof GenericRef) && mentionsParameter(ref);
+    }
+
+    private boolean mentionsParameter(TypeRef ref) {
+        return switch (ref) {
+            case SimpleRef simple -> currentParameters.contains(simple.name());
+            case InlineArrayRef array -> mentionsParameter(array.elementType());
+            case InlineMapRef map -> mentionsParameter(map.keyType()) || mentionsParameter(map.valueType());
+            case InlineTupleRef tuple -> tuple.elementTypes().stream().anyMatch(this::mentionsParameter);
+            case ChoiceRef choice -> choice.variants().stream().anyMatch(this::mentionsParameter);
+            case GenericRef generic -> currentParameters.contains(generic.name())
+                    || generic.args().stream().anyMatch(arg ->
+                            arg instanceof TypeArg.Ref r && mentionsParameter(r.ref()));
         };
     }
 
@@ -525,54 +568,79 @@ final class SchemaDesugarer {
                     + head + "<...>' applies arguments to something that takes none (§5.10); drop the "
                     + "argument list");
         }
-        if (containsSugarForm(declaration.typeDef())) {
-            throw new UnsupportedOperationException("'" + head + "' is a template whose body contains a "
-                    + "container sugar form, and applying one is not implemented -- §5.3's forms have no "
-                    + "open representation yet, so '" + head + "<...>' cannot be materialised. A template "
-                    + "whose parameters occupy field types and values applies normally.");
+        if (containsOpenSugarForm(declaration.typeDef(), parameters)) {
+            throw new UnsupportedOperationException("'" + head + "' is a template whose body writes a "
+                    + "container sugar form over one of its own parameters, and applying one is not "
+                    + "implemented -- §5.3's forms have no open representation yet, so '" + head
+                    + "<...>' cannot be materialised. A template whose parameters occupy field types and "
+                    + "values applies normally, and a sugar form that mentions no parameter lifts like any "
+                    + "other.");
         }
     }
 
     /**
-     * Whether a template's body writes a §5.3/§5.4 sugar form anywhere -- the forms whose open (parameterised)
-     * representation is unimplemented. Deliberately syntactic and conservative: it walks the declaration as
-     * written, since a parameterised declaration is passed through un-rewritten and so still carries every
-     * form its author spelled.
+     * Whether a template's body writes a §5.3/§5.4 sugar form <em>over one of its own parameters</em> -- the
+     * only forms whose representation is still missing. A concrete form has already lifted to an ordinary
+     * closed entry by the time anyone applies the template, so it is no obstacle; refusing on any sugar at
+     * all rejected `<T> { a: T  b: [order] }`, which needs nothing this phase cannot do.
+     *
+     * <p>Deliberately syntactic, and run against the declaration <em>as written</em> rather than as
+     * desugared: an application may be met before the template it names has been walked, and the answer
+     * must not depend on that order.
      */
-    private static boolean containsSugarForm(TypeDef typeDef) {
+    private static boolean containsOpenSugarForm(TypeDef typeDef, List<String> parameters) {
         return switch (typeDef) {
-            case ContainerTypeDef _ -> true;
-            case ReferenceTypeDef reference -> sugarInRef(reference.ref());
-            case StructuralTypeDef structural -> sugarInStructuralDef(structural.body());
+            case ContainerTypeDef container -> !parameters.isEmpty();
+            case ReferenceTypeDef reference -> openSugarInRef(reference.ref(), parameters);
+            case StructuralTypeDef structural -> openSugarInStructuralDef(structural.body(), parameters);
             default -> false;
         };
     }
 
-    private static boolean sugarInStructuralDef(StructuralDef def) {
+    private static boolean openSugarInStructuralDef(StructuralDef def, List<String> parameters) {
         return switch (def) {
-            case RecordDef record -> record.entries().stream().anyMatch(SchemaDesugarer::sugarInEntry);
-            case RefinedDef refined -> sugarInRef(refined.target())
-                    || refined.body().entries().stream().anyMatch(SchemaDesugarer::sugarInEntry);
+            case RecordDef record -> record.entries().stream().anyMatch(e -> openSugarInEntry(e, parameters));
+            case RefinedDef refined -> openSugarInRef(refined.target(), parameters)
+                    || refined.body().entries().stream().anyMatch(e -> openSugarInEntry(e, parameters));
             case ConstructionDef construction -> construction.supertypes().stream()
-                    .anyMatch(SchemaDesugarer::sugarInRef)
+                    .anyMatch(ref -> openSugarInRef(ref, parameters))
                     || construction.body().map(body -> body.entries().stream()
-                            .anyMatch(SchemaDesugarer::sugarInEntry)).orElse(false);
+                            .anyMatch(e -> openSugarInEntry(e, parameters))).orElse(false);
         };
     }
 
-    private static boolean sugarInEntry(RecordEntry entry) {
+    private static boolean openSugarInEntry(RecordEntry entry, List<String> parameters) {
         return switch (entry) {
-            case FieldDef field -> field.type().map(type -> sugarInRef(type.typeRef())).orElse(false);
-            case GroupDef group -> group.members().stream().anyMatch(member -> sugarInRef(member.typeRef()));
+            case FieldDef field -> field.type()
+                    .map(type -> openSugarInRef(type.typeRef(), parameters)).orElse(false);
+            case GroupDef group -> group.members().stream()
+                    .anyMatch(member -> openSugarInRef(member.typeRef(), parameters));
         };
     }
 
-    private static boolean sugarInRef(TypeRef ref) {
+    private static boolean openSugarInRef(TypeRef ref, List<String> parameters) {
         return switch (ref) {
             case SimpleRef _ -> false;
-            case InlineArrayRef _, InlineMapRef _, InlineTupleRef _, ChoiceRef _ -> true;
+            case InlineArrayRef _, InlineMapRef _, InlineTupleRef _, ChoiceRef _ ->
+                    namesParameter(ref, parameters);
             case GenericRef generic -> generic.args().stream()
-                    .anyMatch(arg -> arg instanceof TypeArg.Ref r && sugarInRef(r.ref()));
+                    .anyMatch(arg -> arg instanceof TypeArg.Ref r && openSugarInRef(r.ref(), parameters));
+        };
+    }
+
+    /** {@link #mentionsParameter} against an explicit list -- the same question asked from outside the walk. */
+    private static boolean namesParameter(TypeRef ref, List<String> parameters) {
+        return switch (ref) {
+            case SimpleRef simple -> parameters.contains(simple.name());
+            case InlineArrayRef array -> namesParameter(array.elementType(), parameters);
+            case InlineMapRef map -> namesParameter(map.keyType(), parameters)
+                    || namesParameter(map.valueType(), parameters);
+            case InlineTupleRef tuple -> tuple.elementTypes().stream()
+                    .anyMatch(e -> namesParameter(e, parameters));
+            case ChoiceRef choice -> choice.variants().stream().anyMatch(v -> namesParameter(v, parameters));
+            case GenericRef generic -> parameters.contains(generic.name())
+                    || generic.args().stream().anyMatch(arg ->
+                            arg instanceof TypeArg.Ref r && namesParameter(r.ref(), parameters));
         };
     }
 
