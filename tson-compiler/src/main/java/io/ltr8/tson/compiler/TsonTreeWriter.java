@@ -43,7 +43,42 @@ public final class TsonTreeWriter {
 
     private final Map<Class<?>, VocabularyAtoms.Entry> vocabularyAtoms = VocabularyAtoms.defaults();
 
+    /** The document header this writer emits, if any -- see {@link #describing}. */
+    private final DocumentHeader header;
+
     public TsonTreeWriter() {
+        this(DocumentHeader.NONE);
+    }
+
+    private TsonTreeWriter(DocumentHeader header) {
+        this.header = header;
+    }
+
+    /**
+     * A writer whose documents are <b>self-describing</b>: {@code !!schema:"<schemaUri>"} in the header,
+     * over a root value that already names its own type. The mirror of {@link TsonTreeReader#withSchema},
+     * which is what reads such a document back.
+     *
+     * <p><b>One argument, where {@link TsonObjectWriter#describing} needs two</b>, because a tree already
+     * carries what a bound object cannot: a schema-driven read records each node's type, so the root's own
+     * {@code !typeName} is written back with it. A root that has no type-ref -- a hand-built node, or one
+     * from a schemaless read of an untagged document -- would make a document declaring a schema and then
+     * giving a reader no type to select, so writing one is refused rather than half-done.
+     *
+     * <p><b>Derivation, not a setter, and off by default.</b> Emitting a directive by default would change
+     * every document this library has ever produced ({@code tson validate --output tson} included), so the
+     * plain writer keeps writing a bare value and a caller opts in per writer, exactly as the readers derive.
+     */
+    public TsonTreeWriter describing(String schemaUri) {
+        return new TsonTreeWriter(header.describing(schemaUri));
+    }
+
+    /**
+     * A writer that names {@code documentId} in an {@code !!id} directive -- the document's own identity,
+     * emitted first when {@link #describing} is also in force (§2.2 fixes the order).
+     */
+    public TsonTreeWriter identifiedBy(String documentId) {
+        return new TsonTreeWriter(header.identifiedBy(documentId));
     }
 
     /** Writes {@code node} as TSON text -- {@link #write(TsonValue, Appendable)} into a fresh buffer. */
@@ -79,7 +114,15 @@ public final class TsonTreeWriter {
      */
     public void write(TsonValue node, Appendable out) {
         try {
-            writeNode(node, new TsonDataEmitter(out));
+            if (header.schema().isPresent() && node.typeRef().isEmpty()) {
+                throw new TsonWriteException("a document declaring !!schema \"" + header.schema().get()
+                        + "\" needs a root type-ref to select a type, and this root node carries none -- read"
+                        + " the tree against its schema (which records each node's type) or set one on the"
+                        + " root before writing", null);
+            }
+            TsonDataEmitter emitter = new TsonDataEmitter(out);
+            header.emit(emitter);
+            writeNode(node, emitter);
         } catch (DataBindException e) {
             throw new TsonWriteException("cannot write TsonValue as TSON: " + e.getMessage(), e);
         }

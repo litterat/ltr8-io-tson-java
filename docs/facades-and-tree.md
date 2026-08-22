@@ -137,6 +137,28 @@ reads one value at a cursor and polices nothing around it.
   deliberately *not* `TsonWriteException`, which means "this value cannot be written as TSON". That
   distinction needs `TsonObjectWriter`'s two `catch (Throwable)` handlers to let it past, or an IO fault
   surfaces blaming the object.
+- **A writer can emit a document header, and it is off by default.** `TsonDataEmitter` gained `documentId`/
+  `schemaRef` (the two of §3.3's four directive names that belong to a *data* document; `meta`/`import` are a
+  schema document's and this emitter does not write one), and both writers a `describing(...)` derivation
+  over a shared `DocumentHeader` carrier that knows §2.2's order — `!!id` first when both are present.
+  **Default output is unchanged**, deliberately: emitting a directive by default would rewrite every
+  document this library has ever produced, `tson validate --output tson` included.
+  - **The object writer takes the schema *and* the root type; the tree writer takes only the schema.** A
+    bound object carries neither fact — the schemaless writer emits a type-ref only where a value would not
+    read back without one — so `!!schema` alone yields a document whose own reader says "declares a
+    !!schema but has no root type-ref to select a type". Half self-describing is not self-describing, so
+    there is no one-argument form on `TsonObjectWriter` to get it half right. A tree records each node's
+    type on a schema-driven read, so the root's own `!typeName` is written back with it; a root that has
+    none is refused rather than half-written.
+  - **The root type-ref is not part of `DocumentHeader`**, however adjacent the two look on the wire: §2.2
+    is explicit that header directives are properties of the *document*, and the root value's type
+    annotation is not one of them. `TsonObjectWriter` holds it separately.
+  - **`typeRef` now refuses a second type-ref on one value**, which is what makes the root type safe to
+    declare: `data-value = *annotation [type-ref] core-value` admits exactly one, and a value that writes
+    its own (a vocabulary host type, a union member) would otherwise produce a document that does not
+    parse. The flag clears the moment a core-value starts, so nested values and annotation values are
+    unaffected. Like the directive URI check beside it, this keeps "a writer cannot emit a document that
+    will not read back" true.
 - These live in `tson-compiler`'s root package (not a separate module) because `DefinitionResolver`
   depends on `TsonObjectWriter` (atom-refinement merging) — a module depending *on* `tson-compiler`
   couldn't provide them without a cycle. `tson-bind` (what they're built on) has no such dependency.

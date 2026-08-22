@@ -27,6 +27,7 @@ import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * The write-side counterpart to {@link TsonObjectReader} -- given a Java object and its {@link
@@ -45,13 +46,66 @@ public final class TsonObjectWriter {
      */
     private final Map<Class<?>, VocabularyAtoms.Entry> vocabularyAtoms;
 
+    /** The document header this writer emits, if any -- see {@link #describing}. */
+    private final DocumentHeader header;
+
+    /**
+     * The root value's own type-ref, when {@link #describing} supplied one. Not part of {@link
+     * DocumentHeader}: §2.2 is explicit that header directives are properties of the <em>document</em> and
+     * the root value's type annotation is not one of them, however adjacent the two look on the wire.
+     */
+    private final Optional<String> rootTypeName;
+
     public TsonObjectWriter(DataBindContext context) {
-        this.context = context;
-        this.vocabularyAtoms = VocabularyAtoms.defaults();
+        this(context, DocumentHeader.NONE, Optional.empty());
     }
 
     public TsonObjectWriter() {
         this(TsonAtomContext.defaultContext());
+    }
+
+    private TsonObjectWriter(DataBindContext context, DocumentHeader header, Optional<String> rootTypeName) {
+        this.context = context;
+        this.vocabularyAtoms = VocabularyAtoms.defaults();
+        this.header = header;
+        this.rootTypeName = rootTypeName;
+    }
+
+    /**
+     * A writer whose documents are <b>self-describing</b>: {@code !!schema:"<schemaUri>"} in the header and
+     * {@code !rootTypeName} on the root value, which together are everything a reader needs to resolve the
+     * schema, pick the type and validate -- nothing out of band. The mirror of {@link
+     * TsonObjectReader#withSchema}/{@code readAs}, which is what reads such a document back.
+     *
+     * <p><b>Both, not just the directive.</b> A bound object carries neither fact: the schemaless writer
+     * emits a type-ref only where the value would not read back without one (see {@link #toTson}), so a
+     * record writes bare. A {@code !!schema} on its own therefore produces a document whose reader answers
+     * "data declares a !!schema but has no root type-ref to select a type" -- half self-describing is not
+     * self-describing, so this method takes both and there is no one-argument form to get it half right.
+     *
+     * <p><b>Derivation, not a setter, and off by default.</b> Emitting a directive by default would change
+     * every document this library has ever produced ({@code tson validate --output tson} included), so the
+     * plain writer keeps writing a bare value and a caller opts in per writer, exactly as the readers derive.
+     *
+     * <p>Both strings are the caller's to supply. Deriving them from a compiled schema the bind registry
+     * already holds is the shape that would spare a caller naming what it already knows, and it needs the
+     * schema-aware writer this library does not have yet ({@code BACKLOG.md}); nothing here forecloses it.
+     *
+     * @param schemaUri    the governing schema's identity, written as the {@code !!schema} argument
+     * @param rootTypeName the schema's own name for the root value's type, written as its type-ref. A value
+     *                     that writes a type-ref of its own -- a vocabulary host type, a union member -- is
+     *                     refused rather than written twice; see {@link TsonDataEmitter#typeRef}
+     */
+    public TsonObjectWriter describing(String schemaUri, String rootTypeName) {
+        return new TsonObjectWriter(context, header.describing(schemaUri), Optional.of(rootTypeName));
+    }
+
+    /**
+     * A writer that names {@code documentId} in an {@code !!id} directive -- the document's own identity,
+     * emitted first when {@link #describing} is also in force (§2.2 fixes the order).
+     */
+    public TsonObjectWriter identifiedBy(String documentId) {
+        return new TsonObjectWriter(context, header.identifiedBy(documentId), rootTypeName);
     }
 
     // ── Entry point ──────────────────────────────────────────────────────
@@ -116,6 +170,8 @@ public final class TsonObjectWriter {
     public void write(Object value, Appendable out) {
         try {
             TsonDataEmitter writer = new TsonDataEmitter(out);
+            header.emit(writer);
+            rootTypeName.ifPresent(writer::typeRef);
             if (value == null) {
                 writer.nullValue();
                 return;
@@ -161,9 +217,11 @@ public final class TsonObjectWriter {
             }
             writeAnnotations(value, dataClass, writer);
             writeCore(value, dataClass, writer);
-        } catch (DataBindException | UncheckedIOException e) {
-            // UncheckedIOException passes through: the sink failed, which is an IO fault and not a verdict
-            // on the value. Wrapped, it would surface as "cannot write <class> as TSON", blaming the object.
+        } catch (DataBindException | UncheckedIOException | TsonWriteException e) {
+            // Both of the non-binding failures pass through rather than being wrapped as "cannot write
+            // <class> as TSON", which would blame the object for neither being its fault: an
+            // UncheckedIOException is the sink failing, and a TsonWriteException is the emitter refusing
+            // what was asked of it (two type annotations on one value, say) and already says so exactly.
             throw e;
         } catch (Throwable t) {
             throw new DataBindException("failed to write value of type " + dataClass.typeClass(), t);
@@ -187,9 +245,11 @@ public final class TsonObjectWriter {
                 case DataClassUnion union -> writeUnion(value, union, writer);
                 default -> throw new DataBindException("unsupported DataClass for writing: " + dataClass);
             }
-        } catch (DataBindException | UncheckedIOException e) {
-            // UncheckedIOException passes through: the sink failed, which is an IO fault and not a verdict
-            // on the value. Wrapped, it would surface as "cannot write <class> as TSON", blaming the object.
+        } catch (DataBindException | UncheckedIOException | TsonWriteException e) {
+            // Both of the non-binding failures pass through rather than being wrapped as "cannot write
+            // <class> as TSON", which would blame the object for neither being its fault: an
+            // UncheckedIOException is the sink failing, and a TsonWriteException is the emitter refusing
+            // what was asked of it (two type annotations on one value, say) and already says so exactly.
             throw e;
         } catch (Throwable t) {
             throw new DataBindException("failed to write value of type " + dataClass.typeClass(), t);

@@ -3,6 +3,8 @@ package io.ltr8.tson.compiler;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TsonDataEmitterTest {
 
@@ -98,5 +100,63 @@ class TsonDataEmitterTest {
     void booleanTokens() {
         assertEquals("true", new TsonDataEmitter().booleanValue(true).toString());
         assertEquals("false", new TsonDataEmitter().booleanValue(false).toString());
+    }
+
+    // ── Header directives (§2.2, §3.3) ──────────────────────────────────
+
+    @Test
+    void directivesAreWrittenOnTheirOwnLinesInHeaderOrder() {
+        String tson = new TsonDataEmitter()
+                .documentId("https://example.test/doc-1.tn")
+                .schemaRef("https://example.test/point.tn")
+                .beginRecord().field("x").unquotedToken("1").endRecord()
+                .toString();
+
+        assertEquals("""
+                !!id:"https://example.test/doc-1.tn"
+                !!schema:"https://example.test/point.tn"
+                { x: 1 }""", tson);
+    }
+
+    /**
+     * The terminator is load-bearing, not formatting: §2.2.1 bounds the content-hash input at the id line's
+     * own terminator, so an {@code !!id} sharing a line with what follows has no defined hash.
+     */
+    @Test
+    void theIdDirectiveEndsItsLine() {
+        assertTrue(new TsonDataEmitter().documentId("https://example.test/doc-1.tn").toString().endsWith("\n"));
+    }
+
+    /** A directive argument MUST be a URI (§3.3), so a caller cannot emit a document that will not read back. */
+    @Test
+    void aDirectiveArgumentThatIsNotAUriIsRefused() {
+        TsonWriteException thrown = assertThrows(TsonWriteException.class,
+                () -> new TsonDataEmitter().schemaRef("not a uri"));
+
+        assertTrue(thrown.getMessage().contains("is not a valid URI"), thrown.getMessage());
+    }
+
+    // ── At most one type-ref per value (§3.2) ───────────────────────────
+
+    @Test
+    void asecondTypeRefOnOneValueIsRefused() {
+        TsonWriteException thrown = assertThrows(TsonWriteException.class,
+                () -> new TsonDataEmitter().typeRef("point").typeRef("uuid"));
+
+        assertTrue(thrown.getMessage().contains("two type annotations on one value"), thrown.getMessage());
+    }
+
+    /** The count is per value, not per document: a nested value's own type-ref is a different value's. */
+    @Test
+    void aNestedValueMayCarryItsOwnTypeRef() {
+        String tson = new TsonDataEmitter()
+                .typeRef("point")
+                .beginRecord()
+                .field("x").typeRef("int32").unquotedToken("1")
+                .field("y").typeRef("int32").unquotedToken("2")
+                .endRecord()
+                .toString();
+
+        assertEquals("!point { x: !int32 1 y: !int32 2 }", tson);
     }
 }
