@@ -368,9 +368,15 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
 
 ## Miscellaneous
 
-- [ ] Thread-safety — currently only `synchronized` on `TsonSchemaRegistry`/
-  `TsonCompiledSchemaRegistry`'s own `register`/`get`/`getMeta` (its `load` deliberately isn't, to
-  avoid serializing unrelated on-demand loads); everything else is an open design question.
+- [ ] Thread-safety **outside a read**. Concurrent *reads* through one `Tson` are safe and tested
+  (`ReadPathConcurrencyTest`): the compiled readers are immutable, a `Lexer`/`TsonDataStream` is per read,
+  and the two on-demand caches — the schema registry and `DataBindContext`'s descriptors — now settle a race
+  by keeping one entry instead of failing the loser. What is still open is deliberate mutation while others
+  read: `Tson.resolve`/`TsonSchemaRegistry.register`/`registerAtom` stay strict about duplicates (right for
+  a caller error, wrong if two threads are legitimately warming the same registry), nothing defines whether
+  a `DataBindContext` may be extended after first use, and a future fetching `TsonSchemaSource` will have
+  its own story. None of it is hypothetical-only: the read-path half was two real defects, found by
+  auditing and reproduced first try on 8 threads.
 - [ ] Confusable-character and bidi-formatting-character checks (§9.4-adjacent security hardening;
   opt-in, and per `SPEC-FEEDBACK.md` #42 reported as ordinary errors when enabled, not warnings) —
   the sibling gap to the numeric-literal length limit tracked in `STRUCTURED-OUTPUT.md`'s Tier 1 section;

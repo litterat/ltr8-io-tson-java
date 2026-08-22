@@ -15,6 +15,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -60,6 +61,29 @@ class TsonSchemaRegistryTest {
         registry.register(linkedSchema());
 
         assertTrue(registry.get("http://example.test/registry-test.tn1").isPresent());
+    }
+
+    /**
+     * The two registration paths differ by exactly what a second call does, and the difference is the point:
+     * {@code register} is the explicit "put this here" and a duplicate is a caller error, while
+     * {@code registerIfAbsent} is the tail of an idempotent resolve, where a duplicate means another thread
+     * got there first and its entry is the one to use.
+     */
+    @Test
+    void registerRejectsADuplicateIdentityWhereRegisterIfAbsentTakesTheEntryAlreadyThere() {
+        TsonSchemaRegistry registry = new TsonSchemaRegistry();
+        TsonLinkedSchema first = registry.register(linkedSchema());
+
+        assertThrows(TsonSchemaValidationException.class, () -> registry.register(linkedSchema()));
+        assertSame(first, registry.registerIfAbsent(linkedSchema()), "the winner's entry, not the newcomer's");
+    }
+
+    @Test
+    void registerIfAbsentStoresWhenTheIdentityIsFree() {
+        TsonSchemaRegistry registry = new TsonSchemaRegistry();
+        TsonLinkedSchema stored = registry.registerIfAbsent(linkedSchema());
+
+        assertSame(stored, registry.get("https://example.test/registry-test.tn1").orElseThrow());
     }
 
     @Test

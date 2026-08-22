@@ -63,6 +63,43 @@ public final class TsonSchemaRegistry implements TsonSchemaLoader {
     }
 
     public synchronized TsonLinkedSchema register(TsonLinkedSchema schema) {
+        String identity = checkRegistrable(schema);
+        if (schemas.containsKey(identity)) {
+            throw new TsonSchemaValidationException("a schema is already registered under '" + identity + "'");
+        }
+        schemas.put(identity, schema);
+        return schema;
+    }
+
+    /**
+     * Registers {@code schema} if its identity is free, and otherwise returns the schema already registered
+     * under it -- {@link #register} for a caller whose own contract is <em>idempotent</em> resolution rather
+     * than "register this, and fail if it is already there".
+     *
+     * <p><b>Why this exists as a second method rather than softening the first.</b> The on-demand resolve
+     * path (a data document naming a schema this registry has not seen) is a lookup that fills the cache on
+     * a miss, so two threads reaching the miss together both resolve the same document from the same source
+     * and both arrive here with equivalent results. Under {@link #register} the loser gets "a schema is
+     * already registered under ...", which on a read surfaces as a {@code SCHEMA_ERROR} against a document
+     * that has nothing wrong with it. Taking the winner's entry is the answer there, and everything
+     * downstream keys on identity, so which of two equivalent linked forms wins does not matter.
+     *
+     * <p>{@link #register} stays strict, because registering the same identity twice <em>explicitly</em> is
+     * still an error and "no overwrite" is half of what makes a registry locked. Nothing here overwrites
+     * either: the first entry for an identity is the only one that ever exists.
+     */
+    public synchronized TsonLinkedSchema registerIfAbsent(TsonLinkedSchema schema) {
+        String identity = checkRegistrable(schema);
+        TsonLinkedSchema existing = schemas.get(identity);
+        if (existing != null) {
+            return existing;
+        }
+        schemas.put(identity, schema);
+        return schema;
+    }
+
+    /** The validation both registration paths share; returns the canonical identity to key on. */
+    private static String checkRegistrable(TsonLinkedSchema schema) {
         TsonSchema unwrapped = schema.schema();
         if (selfReferential(unwrapped) && unwrapped.bootstrap()) {
             throw new TsonSchemaValidationException("'" + unwrapped.id() + "' is self-referential (its own "
@@ -71,12 +108,7 @@ public final class TsonSchemaRegistry implements TsonSchemaLoader {
                     + " which never sets bootstrap), never the bootstrap-produced form directly, "
                     + "materialized or not");
         }
-        String identity = TsonCanonicalIdentity.canonicalize(unwrapped.id());
-        if (schemas.containsKey(identity)) {
-            throw new TsonSchemaValidationException("a schema is already registered under '" + identity + "'");
-        }
-        schemas.put(identity, schema);
-        return schema;
+        return TsonCanonicalIdentity.canonicalize(unwrapped.id());
     }
 
     /**

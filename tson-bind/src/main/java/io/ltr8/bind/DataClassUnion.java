@@ -34,7 +34,13 @@ import java.util.Objects;
  */
 public class DataClassUnion extends DataClass {
 
-	private Class<?>[] memberTypes;
+	/**
+	 * Volatile because {@link #addMemberType} publishes a whole new array (copy-on-write under this
+	 * object's own lock) while readers take an unlocked snapshot: without it a reader has no
+	 * happens-before with the writer and may never see an added member at all. Every read takes a local
+	 * copy of the reference first, so one read never sees the array change under it.
+	 */
+	private volatile Class<?>[] memberTypes;
 
 	private final boolean isSealed;
 
@@ -56,8 +62,8 @@ public class DataClassUnion extends DataClass {
 	public boolean isMemberType(Class<?> dataClass) {
 		boolean found = false;
 
-		// Get a reference to latest version as this method isn't synchronized.
-		// Probably a better way to do this.
+		// One read of the volatile field, then work off that snapshot -- addMemberType replaces the array
+		// rather than mutating it, so a snapshot is always internally consistent.
 		Class<?>[] types = this.memberTypes;
 		for (Class<?> dClass : types) {
 			if (dClass.equals(dataClass)) {

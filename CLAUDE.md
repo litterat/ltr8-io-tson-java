@@ -558,8 +558,11 @@ compatibility).
   because `RecordField` has no position. A `caused by` frame chaining the author's location to the leaf
   constraint's is the other open shape (`BACKLOG.md`).
 - **Deferred design questions** — `REQUIRED_FIXED`/`OPTIONAL_FIXED` value validation, `value_param` real
-  parameter substitution, thread-safety, and a general disk/HTTP-backed `TsonSchemaSource` (with
-  whitelist/blacklist policy).
+  parameter substitution, and a general disk/HTTP-backed `TsonSchemaSource` (with whitelist/blacklist
+  policy). **Thread-safety is no longer wholly open**: concurrent reads through one `Tson` are safe (the
+  readers are immutable, the lexer/stream are per-read, and both on-demand caches settle a race by keeping
+  one entry — `docs/linking-and-compilation.md`). What is still open is everything *outside* a read:
+  registering schemas concurrently, and mutating a `DataBindContext` after use.
 - **§9.1's numeric-literal length limit** (SHOULD, DoS-hardening) — not enforced.
 - **JSON** — a future JSON reader is a whole separate stack (its own `JsonEventStream` and its own readers,
   deliberately not reusing the TSON readers). Not started, not backlogged.
