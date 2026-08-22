@@ -125,11 +125,13 @@ validate-then-fix loop the project targets.
   error plus the 64-deep non-convergence chain from the application — where R5's premise was that the
   static rule makes the depth guard an assertion that never fires (the guard should stand down, or the
   placeholder should stop the closure attempt).
-- [ ] **`tson-cr-structure-templates.md`'s own `.tn` examples use `; comment` lines**, which primed this
-  shakedown's author — the exact audience the format targets — into writing comments in a language that has
-  none (Part 1 §2.4 deliberately defines no comment syntax). An editorial fix to the CR, and possibly a
-  lexer-diagnostic one: `expected a declaration name, found ';'` could add "TSON has no comment syntax;
-  use an @doc annotation".
+- [ ] **A `;` where a declaration is expected could say that TSON has no comments.** `expected a declaration
+  name, found ';'` is accurate and tells an author who just wrote a comment line nothing: the reason no
+  declaration name is there is that they wrote something the format does not have (Part 1 §2.4 deliberately
+  defines no comment syntax), and the answer is an `@doc` annotation. The CR half of this is done — its own
+  `.tn` examples no longer carry `; comment` lines, and its `abnf` blocks, where `;` really is a comment
+  (RFC 5234 §3.9), now say so — but the priming came from a document, and the diagnostic is what meets the
+  next author who is primed by a different one.
 
 ## Miscellaneous
 

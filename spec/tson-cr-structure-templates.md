@@ -49,7 +49,7 @@ All internal entries carry structural identity. Instantiation entries: structura
 
 The answer is a distinct intermediate vocabulary rather than a widened one. `instance_template` records the constructor it will build and the bindings it will build it from; `template_argument` is the labelled three-way choice a binding may hold:
 
-```
+```tson
 template_argument => { ( param: param_name | value: value | type_ref: type_ref ) }
 instance_template => top & {
   target:   type_name
@@ -81,7 +81,7 @@ It is a production of its own rather than an optional parameter list on `instanc
 
 **The payload is a production of its own, narrower than `core-value`.** A `core-value` would admit `<T> !array [1 2 3]`, `<T> !array "x"`, and a nested record in a binding — none of which a `template_argument` can carry, since it is `param | value | type_ref` with no collection case (`<T> !choice { variants: [T text] }`, a parameter inside a collection-typed slot, has no resolved form at all). The grammar refuses what the vocabulary cannot hold. The tagged form (`{ element_type => { param: T } }`) is the *resolved* shape, defined by meta-kernel, not something an author writes:
 
-```
+```tson
 vector => <T, N> !array { element_type: T  min_items: N  max_items: N }
 ```
 
@@ -155,14 +155,18 @@ User templates are retained unchanged in declaration, application, arity checkin
 
 A template declaration may now be an **instance** as well as a record, a container or a reference (D9), so `<T, N> !array { element_type: T  min_items: 1  max_items: N }` is a well-formed type-def.
 
-The **open-body representation** is `instance_template` (D7). A sugar form inside a template declaration desugars to the same construction it would outside one — the desugar table of §4.2 is used unchanged — except that a binding whose value is a parameter is recorded as `param` rather than as a concrete `value` or `type_ref`, which is what makes the body an `instance_template` rather than an instance. Nesting needs no special member: an inner form lifts to its own **open** synthetic entry, and the outer binding holds an ordinary `type_ref` applying it. Worked, at its smallest — `box => <T> { a: [T] }`. The inline `[T]` lifts to an **open** synthetic whose source form is D9's production, and the field applies it:
+The **open-body representation** is `instance_template` (D7). A sugar form inside a template declaration desugars to the same construction it would outside one — the desugar table of §4.2 is used unchanged — except that a binding whose value is a parameter is recorded as `param` rather than as a concrete `value` or `type_ref`, which is what makes the body an `instance_template` rather than an instance. Nesting needs no special member: an inner form lifts to its own **open** synthetic entry, and the outer binding holds an ordinary `type_ref` applying it. Worked, at its smallest — `box => <T> { a: [T] }`. The inline `[T]` lifts to an **open** synthetic whose source form is D9's production, and the field applies it.
 
-```
-; desugared source form
+The desugared source form:
+
+```tson
 array_t => <T> !array { element_type: T }
 box     => <T> { a: array_t<T> }
+```
 
-; resolved form of the synthetic
+and the synthetic's resolved form:
+
+```tson
 array_t => !type_definition {
   kind:        PRODUCT
   parameters:  [T]
@@ -177,7 +181,7 @@ array_t => !type_definition {
 
 Closing `box<text>` substitutes `T := text`, which makes every binding of `array_t<text>` concrete, so the `instance_template` collapses to an ordinary constructor body — and lands on the very entry a directly written `[text]` produces (D6's cross-channel dedup):
 
-```
+```tson
 array_text_<hash> => !type_definition { kind: PRODUCT  source: array  body: !array { element_type: text } }
 ```
 
@@ -185,14 +189,13 @@ The same shape scales to the nested and sized forms, one open synthetic per form
 
 **Materialisation** closes innermost-out. Closing `grid<pixel, 3>` substitutes, and each open synthetic becomes a closed one as its bindings go concrete:
 
-```
-c1 => !array { element_type: pixel  min_items: 1  max_items: 3 }   ; source: array
-c2 => !array { element_type: c1     min_items: 2  max_items: 3 }   ; source: array
+```tson
+c1 => !array { element_type: pixel  min_items: 1  max_items: 3 }
+c2 => !array { element_type: c1     min_items: 2  max_items: 3 }
 c3 => !record { fields: [ { name: x  type: c2 } ] }
-      ; source: { name: grid  arguments: [{name: pixel} {value: 3}] }
 ```
 
-`c1` and `c2` are closed synthetics keyed on body structure, so `c1` is the same entry an independently written `[pixel; 1..3]` produces anywhere in the schema. `c3` is an instantiation entry keyed on `source`, whose head is the author's own `grid` and therefore comparable. A user declaration naming the application (`pixel_grid => grid<pixel, 3>`) is an alias to `c3` under §8.3, not a second entry.
+`c1` and `c2` are closed synthetics keyed on body structure, each recording `source: array`, so `c1` is the same entry an independently written `[pixel; 1..3]` produces anywhere in the schema. `c3` is an instantiation entry keyed on `source` — `{ name: grid  arguments: [{name: pixel} {value: 3}] }`, the application it closes — whose head is the author's own `grid` and therefore comparable. A user declaration naming the application (`pixel_grid => grid<pixel, 3>`) is an alias to `c3` under §8.3, not a second entry.
 
 **Knot-tying**: a recursive reference inside a nested form denotes, at materialisation, the instantiation entry under construction; the open synthetic's binding references that entry by its internal name before the entry is complete.
 
@@ -212,7 +215,7 @@ Delete the **parameterized heads over binding records** section and the carve-ou
 
 ### 4.8 §12 Grammar
 
-**§12.1 ABNF.** Collapse each container to a single production reachable from `type-ref` (D10), add the map forms, and add the templated-instance alternative to `type-def` (D9). `size-spec`, `size-bound`, `type-args` and `type-arg` are unchanged; `container-def`, `inline-array` and `element-type` are replaced:
+**§12.1 ABNF.** Collapse each container to a single production reachable from `type-ref` (D10), add the map forms, and add the templated-instance alternative to `type-def` (D9). `size-spec`, `size-bound`, `type-args` and `type-arg` are unchanged; `container-def`, `inline-array` and `element-type` are replaced. (The `;` in these `abnf` blocks is ABNF's own comment syntax, RFC 5234 §3.9. TSON defines none — Part 1 §2.4 — so the `tson` blocks throughout this report carry no comments, and `;` in one is the size-specifier token.)
 
 ```abnf
 type-def = atom-refinement
@@ -255,24 +258,24 @@ An element's `?` and a field's own `?` do not collide: a field is `field-name ":
 
 **§12.2 dispatch.** The brace form adopts the data grammar's consume-one-then-inspect dispatch; the prose should state explicitly that an implementation reuses its Part 1 §2.8 machinery, and that the choice is made by one consumed token plus one token of lookahead, preserving the stated lookahead budget in the same sense the data grammar does:
 
-```
-; type-def position (after =>):
-;   {              → brace form; consume "{" and dispatch on content:
-;       "}"          → empty record ({}, top's shape)
-;       "("          → record-def (leading field group)
-;       "@"          → record-def (annotations precede field names,
-;                      §6; the map sugar admits no interior
-;                      annotations — D2 — so "@" commits to a record)
-;       name ":"     → record-def (field)
-;       name "=>"    → map-def
-;       name "<"     → map-def (generic key; consume args, expect "=>")
-;       name (other) → parse error
+```text
+type-def position (after =>):
+  {              → brace form; consume "{" and dispatch on content:
+      "}"          → empty record ({}, top's shape)
+      "("          → record-def (leading field group)
+      "@"          → record-def (annotations precede field names,
+                     §6; the map sugar admits no interior
+                     annotations — D2 — so "@" commits to a record)
+      name ":"     → record-def (field)
+      name "=>"    → map-def
+      name "<"     → map-def (generic key; consume args, expect "=>")
+      name (other) → parse error
 
-; type-ref position:
-;   {              → inline-map: "{" name … "=>" required;
-;                    "{" name ":" remains a parse error (bare records
-;                    must be declared, §5.2) — the diagnostic SHOULD
-;                    say so and distinguish the two brace meanings
+type-ref position:
+  {              → inline-map: "{" name … "=>" required;
+                   "{" name ":" remains a parse error (bare records
+                   must be declared, §5.2) — the diagnostic SHOULD
+                   say so and distinguish the two brace meanings
 ```
 
 Record bodies (refinement bodies, composition tails, constructor vocabularies) are unaffected by grammar — entries remain `name ":"` — so `config ^ {text => text}` fails at the `=>`; add a diagnostic ("record body expected; `=>` begins a map type only at type positions"). Add the single-entry diagnostic for the map sugar ("a map type is a single `key => value` entry"), anticipating authors carrying the data grammar's multi-entry habit.
@@ -283,7 +286,7 @@ Record bodies (refinement bodies, composition tails, constructor vocabularies) a
 
 **`meta-kernel.tn`.** De-parameterise the container constructors and delete the size templates:
 
-```
+```tson
 array => ~product & {
   access_pattern:  product_access_type = INDEX
   size_type:       product_size_type = VARIABLE
@@ -310,29 +313,29 @@ map => ~product & {
   max_items:       integer?
 }
 
-token_set => !set { element_type: token }        ; NEW
-enum      => ~atom & { members: token_set }      ; was set<token>
+token_set => !set { element_type: token }
+enum      => ~atom & { members: token_set }
 
-record_field => {          ; unchanged
+record_field => {
   name:   field_name
   type:   type_ref
   state:  field_state ~ REQUIRED
   ( value: value | value_param: param_name )?
 }
 
-template_argument => {     ; NEW — one binding of an open form (D7)
+template_argument => {
   ( param: param_name | value: value | type_ref: type_ref )
 }
 
-instance_template => top & {        ; NEW — the open counterpart of an instance.
-  target:    type_name              ; `top &` and no `~`, exactly as `reference` is:
+instance_template => top & {
+  target:    type_name
   bindings:  {field_name => template_argument}
-}                                   ; it never describes a value, so it has no
-                                    ; access_pattern/size_type, and it is never a
-                                    ; `!` target in a schema (D7).
+}
 
-schema => {type_name => type_definition}         ; was map<type_name, type_definition>
+schema => {type_name => type_definition}
 ```
+
+Entry by entry: `token_set`, `template_argument` and `instance_template` are new; `enum`'s `members` was `set<token>` and `schema` was `map<type_name, type_definition>`; `record_field` is unchanged and is shown only for context. `template_argument` is one binding of an open form (D7). `instance_template` is the open counterpart of an instance, written `top &` and without `~` for the same reason `reference` is: it never describes a value, so it carries no `access_pattern`/`size_type`, and it is never a `!` target in a schema (D7).
 
 Delete `array_min`, `array_max`, `array_ranged`. The `token` primitive's doc comment ("core declares no sibling") is unaffected; `token_set` is a kernel-internal named entry required because inline `!` forms remain prohibited at field positions (§5.2) — a rule this change deliberately preserves. The `type_ref` doc comment's "applications of constructors are carried structurally and materialise no entries" sentence is replaced: every sugar form is an entry, and `arguments` marks an open form (§11). The constructors' shared doc comment describing `= T` type-slot routing rewrites to describe plain REQUIRED `type_ref` slots.
 
