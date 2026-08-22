@@ -257,7 +257,31 @@ the missing overload now makes hard — not a site that writes a sentence a temp
 and `TsonUnsupportedDocumentException` keep the location in `position()` and out of `getMessage()`;
 `toString()` appends it, so a stack trace still says where while the `Diagnostic` built from one carries
 `dataPosition` as the single copy. Repeating it in the message made every renderer print the location twice,
-in two formats, the second without a byte offset.
+in two formats, the second without a byte offset. `TsonReadException.toString()` does the same from its own
+diagnostic, which is what keeps a stack trace informative now that a base-syntax failure reaches a fail-fast
+caller through *it* rather than as the parse exception itself.
+
+**A base-syntax failure goes to the receiver, like every other problem with the document.** Both facades'
+whole-document entry points catch it and report `Diagnostic.ofBaseSyntaxError(e)`, so a collecting read
+never throws for a bad *document* — it hands back nothing (no tree, `null` bind) and the collector holds why.
+Three reasons this is the receiver's business rather than the caller's:
+
+- **The stream is lazy**, so a base-syntax failure surfaces *mid-read*, after any earlier value-level
+  problem has already been reported. Throwing past the receiver left a caller holding a populated collector
+  *and* an exception, with nothing saying the two belonged to one document — and `Tson.validate` resolved
+  that by discarding the collector and returning the syntax error alone, losing what it had already found.
+- **It is the same shape the facade already used** for an unreachable `!!schema` (`readAgainstSchema`):
+  report once, abandon the value. "Nothing can continue past a document that will not parse" is an argument
+  for not continuing, not for not reporting.
+- **A caller could not classify it themselves**: `LexException` is in the unexported `lexer` package, so
+  `ofBaseSyntaxError` had to be public for anyone to write the `catch` — the library conceding the
+  classification is required while making every caller ask for it.
+
+**Fail-fast is unchanged in kind, changed in type.** `throwing()` still throws at the first problem, but a
+base-syntax failure now arrives as `TsonReadException` (carrying the diagnostic, position included) rather
+than `TsonParseException`. The exception type is the whole cost of the change, and it buys `Tson.validate`
+being a plain call with no catch at all. Only a fault in *this library* still propagates as itself:
+`ofBaseSyntaxError` rethrows anything that is not one of §8.1's three.
 
 ## Schema-side diagnostics (`TsonSchemaParser`, `SchemaResolver`, `TsonSchemaLinker`, `Tson.validateSchema`)
 
