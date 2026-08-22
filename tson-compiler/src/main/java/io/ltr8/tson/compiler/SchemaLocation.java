@@ -52,8 +52,18 @@ public record SchemaLocation(String schemaId, String pointer, Optional<SourcePos
         return new SchemaLocation(schemaId, pointer + "/" + name.replace("~", "~0").replace("/", "~1"), position);
     }
 
-    /** This location's pointer, re-anchored on {@code declaration}'s own schema and line. */
+    /**
+     * This location's pointer, re-anchored on {@code declaration}'s own schema and line.
+     *
+     * <p><b>A declaration with no line of its own contributes none</b>, leaving whatever the descent had
+     * already established rather than replacing it with an absence. The entries without one are exactly
+     * those no author wrote -- a sugar form lifted to an entry, a template application materialised into
+     * one -- and for those the nearest useful line is the one that brought the type in: the field's own
+     * record, or the alias the read entered through. Taking the absence instead would answer "which line
+     * do I open" with nothing, for a document whose author has a perfectly good line to open.
+     */
     public SchemaLocation anchoredOn(SchemaLocation declaration) {
-        return new SchemaLocation(declaration.schemaId, pointer, declaration.position);
+        return new SchemaLocation(declaration.schemaId, pointer,
+                declaration.position.isPresent() ? declaration.position : position);
     }
 }

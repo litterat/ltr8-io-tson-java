@@ -13,6 +13,7 @@ import io.ltr8.tson.compiler.stream.TypeRef;
 
 import java.io.InputStream;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Binds a TSON document to a Java object of a caller-chosen target class -- the class-driven read-side
@@ -313,6 +314,10 @@ public final class TsonObjectReader {
         if (root == null) {
             return null;
         }
+        // Rooted at the name the author wrote, so a pointer into a template-derived type says
+        // /order_response/items rather than naming the entry the resolver minted. TsonTreeReader does the
+        // same; see TsonCompiledSchema.rootDeclaration for why the reader itself cannot know this.
+        ctx = root.rootDeclaration().map(ctx::underDeclaration).orElse(ctx);
         Class<?> bound = boundClass(root.typeName());
         if (bound != null && !type.isAssignableFrom(bound)) {
             return abandon(ctx, Diagnostic.Code.TYPE_MISMATCH,
@@ -385,9 +390,10 @@ public final class TsonObjectReader {
             return abandon(ctx, Diagnostic.Code.UNKNOWN_TYPE, compiled.unknownTypeMessage(name),
                     compiled.declaredTypeNames(), name);
         }
-        return new RootReader(reader, name);
+        return new RootReader(reader, name, compiled.rootDeclaration(name));
     }
 
-    private record RootReader(TsonTypeReader<?> reader, String typeName) {
+    private record RootReader(TsonTypeReader<?> reader, String typeName,
+                               Optional<SchemaLocation> rootDeclaration) {
     }
 }

@@ -359,7 +359,10 @@ one `SchemaLocation` (id + pointer + position) **accumulated as the read descend
 reader is innermost: the pointer is the path taken (`/person/age`), never the leaf it resolves to (`/int32` in
 core.tn), because the leaf names a file the author didn't write and never mentions the field they can edit.
 `schemaField` steps data and schema together where `field`/`index` step data alone; a record re-anchors
-id+position on itself, everything else offers its own declaration only as a seed for a value nothing encloses.
+id+position on itself (but a declaration with no line of its own contributes none, leaving the enclosing
+one's), everything else offers its own declaration only as a seed for a value nothing encloses — and the
+**facade** seeds the root from the name the read entered through, so a pointer into a template-derived type
+names the author's alias rather than the entry the resolver minted.
 Schema-side reporting runs through the same receiver: `TsonSchemaParser`,
 `SchemaResolver` and `TsonSchemaLinker` have reporting overloads that collect every independent problem in
 one pass (a failed declaration leaves an answer-everything placeholder, javac-style), while

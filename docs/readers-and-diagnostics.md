@@ -136,10 +136,19 @@ is small and parsed once.)
   - **`displayName` is beside `name`, never instead of it.** The entry name is what a type-ref resolves
     against (`VariantSchemaReader` dispatches on it) and what a tree node carries as its own `typeRef`, so
     substituting the display name would break dispatch and round-tripping alike.
-  - **The `schemaPointer` still roots at the internal name** (`/paged_order_e0260dd4/…`). That half is not
-    a naming problem: the compiled reader is shared by every entry point and cannot know which name a given
-    read arrived through, so it wants the facade to seed the root `SchemaLocation` with the name it looked
-    up. `BACKLOG.md` carries it.
+  - **The pointer roots at the name the read entered through**, which is a different mechanism for the same
+    principle. A compiled reader is shared by every name that reaches it — `order_response => paged<order>`
+    compiles to the instantiation entry's own reader — so the root cannot come from the reader and comes
+    from the facade, which seeds `ctx.underDeclaration(compiled.rootDeclaration(name))` before the read.
+    `inRecord` then keeps that pointer and re-anchors only identity and line, which is the interaction those
+    two methods were already written for; a non-alias root seeds exactly what the reader would have
+    established, so nothing else changes.
+  - **A declaration with no line of its own contributes none** (`SchemaLocation.anchoredOn`), leaving
+    whatever the descent had established rather than replacing it with an absence. Entries without a line
+    are exactly those nobody wrote, and taking their absence answered "which line do I open" with nothing
+    for a document whose author has a perfectly good line: the alias they wrote, or the record whose field
+    the application sits at. That half is independent of the seed — a template application at a *field*
+    already had the right pointer and was still losing its position.
 - **`EventSkip`** is the shared grammar-aware "consume and discard" utility (leading annotations + an
   optional type-ref as every reader's first step; a whole value; one core-value on a shape mismatch, to
   keep the stream correctly positioned). **`ListEventSource`** replays a pre-built event list — used for a
