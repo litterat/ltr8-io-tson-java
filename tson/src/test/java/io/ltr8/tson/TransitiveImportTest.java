@@ -1,12 +1,15 @@
 package io.ltr8.tson;
 
 import io.ltr8.tson.compiler.Diagnostic;
+import io.ltr8.tson.compiler.TsonContentHashMismatchException;
+import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -23,6 +26,7 @@ class TransitiveImportTest {
 
     private static final String CORE = "https://tson.io/2026/32/m/core.tn";
     private static final String META = "https://tson.io/2026/32/m/meta.tn";
+    private static final String CORE_SHA256 = TsonBundledSchemas.CORE_SHA256;
 
     /** A leaf schema: imports core.tn (as every practical schema does) and declares one record of its own. */
     private static String leaf(String id, String typeName) {
@@ -116,9 +120,9 @@ class TransitiveImportTest {
                 + "namespace is flat, so it is in scope, but got: " + problems);
     }
 
-    /** Listing one schema twice, or under two spellings of one canonical identity, is redundant, not an error. */
+    /** Listing one schema twice is redundant, not a collision with itself. */
     @Test
-    void thePinnedAndUnpinnedSpellingsOfOneImportUnify() {
+    void oneSchemaNamedTwiceIsRedundantNotACollision() {
         Tson tson = Tson.builder().build();
 
         List<Diagnostic> problems = tson.validateSchema("""
@@ -231,5 +235,104 @@ class TransitiveImportTest {
         } catch (TsonSchemaValidationException e) {
             throw new AssertionError("the diamond must resolve: " + e.getMessage(), e);
         }
+    }
+
+    // ── Hash pins (§2.2.1: the pin is verification metadata, not identity) ──
+
+    /** {@link #leaf} with a {@code ?sha256=} pin on its core.tn import. */
+    private static String leafPinningCore(String id, String typeName) {
+        return """
+                !!id:"%s"
+                !!meta:"%s"
+                !!import:"%s?sha256=%s"
+                {
+                  %s => { name: text }
+                }
+                """.formatted(id, META, CORE, CORE_SHA256, typeName);
+    }
+
+    /**
+     * <b>A pinned and an unpinned route to one schema unify, and the importer needs neither.</b> {@code a}
+     * pins core.tn, {@code b} does not, and {@code c} imports the two peers without naming core.tn at all --
+     * yet writes {@code text}, which reaches it transitively. Canonicalization strips the query (§2.2.1), so
+     * the pin never enters identity and the two routes are one schema.
+     */
+    @Test
+    void aPinnedAndAnUnpinnedRouteToOneSchemaUnifyAndTheImporterNeedsNeither() {
+        Tson tson = Tson.builder().build();
+        tson.resolve(leafPinningCore("https://example.test/a-pin.tn", "alpha"));
+        tson.resolve(leaf("https://example.test/b-nopin.tn", "beta"));
+
+        List<Diagnostic> problems = tson.validateSchema("""
+                !!id:"https://example.test/c-pin-1.tn"
+                !!meta:"https://tson.io/2026/32/m/meta.tn"
+                !!import:"https://example.test/a-pin.tn"
+                !!import:"https://example.test/b-nopin.tn"
+                {
+                  pair => { left: alpha  right: beta  label: text }
+                }
+                """);
+
+        assertTrue(problems.isEmpty(), () -> "a pin is verification metadata, not identity, so the two "
+                + "routes to core.tn are one schema: " + problems);
+    }
+
+    /** Importing core.tn unpinned is fine where a peer pins it -- the importer chooses its own spelling. */
+    @Test
+    void theImporterMayNameCoreUnpinnedWhereItsPeerPinsIt() {
+        Tson tson = Tson.builder().build();
+        tson.resolve(leafPinningCore("https://example.test/a-pin-2.tn", "alpha"));
+
+        List<Diagnostic> problems = tson.validateSchema("""
+                !!id:"https://example.test/c-pin-2.tn"
+                !!meta:"https://tson.io/2026/32/m/meta.tn"
+                !!import:"https://tson.io/2026/32/m/core.tn"
+                !!import:"https://example.test/a-pin-2.tn"
+                {
+                  thing => { left: alpha  label: text }
+                }
+                """);
+
+        assertTrue(problems.isEmpty(), () -> problems.toString());
+    }
+
+    /** And the reverse: the importer may pin where its peer does not. */
+    @Test
+    void theImporterMayPinCoreWhereItsPeerDoesNot() {
+        Tson tson = Tson.builder().build();
+        tson.resolve(leaf("https://example.test/b-nopin-2.tn", "beta"));
+
+        List<Diagnostic> problems = tson.validateSchema("""
+                !!id:"https://tson.io/2026/32/ltr8/example/c-pin-3.tn"
+                !!meta:"https://tson.io/2026/32/m/meta.tn"
+                !!import:"https://tson.io/2026/32/m/core.tn?sha256=%s"
+                !!import:"https://example.test/b-nopin-2.tn"
+                {
+                  thing => { right: beta  label: text }
+                }
+                """.formatted(CORE_SHA256));
+
+        assertTrue(problems.isEmpty(), () -> problems.toString());
+    }
+
+    /**
+     * The pin is still verified (§2.2.1's MUST), and unification does not launder a wrong one: reaching
+     * core.tn through an unpinned peer as well does not excuse a pin that disagrees with the content.
+     */
+    @Test
+    void aPinThatDisagreesWithTheContentIsStillRejected() {
+        Tson tson = Tson.builder().build();
+        tson.resolve(leaf("https://example.test/b-nopin-3.tn", "beta"));
+
+        String wrongPin = "0".repeat(64);
+        assertThrows(TsonContentHashMismatchException.class, () -> tson.resolve("""
+                !!id:"https://example.test/c-pin-4.tn"
+                !!meta:"https://tson.io/2026/32/m/meta.tn"
+                !!import:"https://tson.io/2026/32/m/core.tn?sha256=%s"
+                !!import:"https://example.test/b-nopin-3.tn"
+                {
+                  thing => { right: beta  label: text }
+                }
+                """.formatted(wrongPin)));
     }
 }
