@@ -249,12 +249,6 @@ writer, diagnostics, and a public event surface.
       already holds the compiled schema and the class→type binding, so a schema-aware writer could derive
       both facts instead of having the caller name what the library already knows. The explicit form stays
       either way — a caller writing against a schema it did not compile here has nothing to derive from.
-- [ ] **A `TsonValue` does not carry the schema its document named.** A schema-driven read records each
-  node's *type*, which is what lets `treeWriter().describing(uri)` write the root's `!typeName` back, but
-  the document's `!!schema` is consumed by the reader and kept nowhere — so a caller round-tripping a tree
-  has to have held onto the URI themselves. Adding it means deciding whether it belongs on the root node
-  (making `TsonValue` document-aware, which it deliberately is not) or in a document wrapper the readers
-  return, which is a facade change and a bigger one than it looks.
 - [ ] **Writers are fail-fast only, no diagnostics.** They throw `TsonWriteException` at the first
   problem, with nothing symmetric to the read side's `TsonDiagnosticsReceiver`. The `TsonValueWriter`
   above especially needs it, to report every schema violation in one pass the way the reader does — and
@@ -363,6 +357,18 @@ writer, diagnostics, and a public event surface.
 
 The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tree model" section. What's left:
 
+- [ ] **A `TsonValue` does not carry the schema its document named.** A schema-driven read records each
+  node's *type* — which is what lets `treeWriter().describing(uri)` write the root's `!typeName` back — but
+  the document's `!!schema` is consumed by the reader and kept nowhere, so a caller round-tripping a tree has
+  to have held onto the URI themselves. The residue of the write-side header work (issue #104): a document
+  this library reads can now be reproduced, but only by a caller who still remembers what governed it.
+    - The decision is *where* it lives, and both answers cost something. On the root node makes `TsonValue`
+      document-aware, which it deliberately is not — every node type is a pure value, and a schema reference
+      is a property of the document (§2.2 says so of the directive itself). In a document wrapper the readers
+      return instead, which keeps the tree pure but changes what `read` hands back, and every caller with it.
+    - Low, because the workaround is to keep the URI you already had to have in order to read the document.
+      It stops being low if a *reader* ever needs to hand a tree to something that must re-derive the schema
+      without the caller in between.
 - [ ] **Copy-on-write transforms + builders (parked).** The "new tree from old" editing half —
   `TsonRecord.with(name, value)`/`without(name)`, `TsonArray.with(i, value)`/`plus(value)`/`without(i)`,
   `TsonRecord.builder()`, and a pointer-based `set("/a/b", value) → new tree`. All pure `tson-tree`
