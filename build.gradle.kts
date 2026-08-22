@@ -7,13 +7,31 @@ allprojects {
     }
 }
 
+/**
+ * One line per module for its published POM -- the same account CLAUDE.md's own module list gives.
+ */
+val moduleDescriptions = mapOf(
+    "tson" to "TSON front door: the Tson facade over the compiler's readers, writers and registries",
+    "tson-compiler" to "TSON engine: lexer, both grammars, schema resolution, Class 2 compilation, readers, writers",
+    "tson-schema" to "TSON resolved-schema value model (schema.meta) plus the schema registry and identity algorithm",
+    "tson-tree" to "TSON data-document tree model: TsonValue and its pure immutable node types",
+    "tson-bind" to "TSON binding engine between data values and Java objects",
+    "tson-annotation" to "TSON binding annotations and the wire-annotation carrier a bound class declares",
+    "tson-regex" to "A native RFC 9485 I-Regexp engine: parse, match, and decide whether two patterns are disjoint",
+    "tson-cli" to "The tson command-line application"
+)
+
 subprojects {
     apply(plugin = "java")
+    apply(plugin = "maven-publish")
 
     configure<JavaPluginExtension> {
         toolchain {
             languageVersion.set(JavaLanguageVersion.of(25))
         }
+        // Part of the publication, not an extra: a consumer reading this API in an IDE is the audience.
+        withSourcesJar()
+        withJavadocJar()
     }
 
     tasks.withType<JavaCompile> {
@@ -37,5 +55,31 @@ subprojects {
 
     tasks.withType<Test> {
         useJUnitPlatform()
+    }
+
+    // Every module publishes, so `./gradlew publishToMavenLocal` puts the whole set in ~/.m2 and another
+    // project takes an ordinary `io.ltr8:tson:<version>` dependency instead of an included build. The jars
+    // carry real `module-info.class`es, so they work on the module path as well as the class path.
+    //
+    // **Deliberately no remote repository.** This is packaging, not release: Maven Central needs signed
+    // artifacts and a POM carrying scm/developers/url, and publishing under a name is a decision this build
+    // should not make quietly. What is here is the part a consuming project needs.
+    configure<PublishingExtension> {
+        publications {
+            create<MavenPublication>("mavenJava") {
+                from(components["java"])
+                pom {
+                    name.set(project.name)
+                    description.set(moduleDescriptions.getValue(project.name))
+                    url.set("https://github.com/litterat/ltr8-io-tson-java")
+                    licenses {
+                        license {
+                            name.set("The Apache License, Version 2.0")
+                            url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
+                        }
+                    }
+                }
+            }
+        }
     }
 }
