@@ -3214,7 +3214,7 @@ enforced only where a generic key has already committed the brace. If a better m
 place for it is the record-field diagnostic — "expected `:`; if you meant a map type, `?` is not permitted on
 a map key" — which costs no lookahead, since by then the `?` has been read.
 
-## 53. D5's one lift rule has no representation for a parameter inside a collection-valued slot
+## 53. A binding holds one `template_argument`, so no parameter can sit inside a slot that holds a collection
 
 **Section:** `tson-cr-structure-templates.md` D5 (*One lift rule*), D7 (*Structural instance templates*),
 D9 (*`instance-template`*). Related: #50, #51.
@@ -3225,47 +3225,80 @@ enclosing declaration — to an open synthetic entry capturing those parameters 
 sugar forms exist (§5.3's array, tuple and map, §5.4's choice), and the rule names none of them
 specifically, so it reads as covering all four.
 
-It cannot. The open form is an `instance_template` whose bindings are `template_argument`s, and
-`template_argument` is `param | value | type_ref` with no collection case. Two of the four constructors bind
-a **collection**: `tuple`'s `elements: [tuple_element]` and `choice`'s `variants: [type_ref]`. So
+It cannot, and the reason is one level below where it first appears. The open form is an
+`instance_template`, whose `bindings` map each field name to **one** `template_argument`. That is enough for
+a slot holding a single thing, and nothing for a slot holding a collection:
+
+| constructor | the slot | a binding would have to hold |
+|---|---|---|
+| `array`, `map` | `element_type` / `key_type` / `value_type` / `min_items` … | one `template_argument` |
+| `choice` | `variants: [type_ref]` | an **array** of them |
+| `tuple` | `elements: [tuple_element]` | an array of **records** (`element_type`, `state`) |
+| `record` | `fields: [record_field]` | an array of **records** |
+
+So the missing thing is not a channel on `template_argument`. It is that a binding's *value* cannot mirror
+the structure of the slot it binds: it is always a leaf, where the slot may be an array, or an array of
+records. The closed side already has what the open side lacks — `type_ref.arguments` is `[type_argument]`,
+a collection.
+
+**`record` is in that table, which is what shows the diagnosis is structural rather than per-constructor.**
+Every one of these is refused today:
 
 ```
-odd => <T> { v: (T | text) }        ; choice: variants would be [ {param: T}  type_ref ]
-odd => <T> { v: [T, text] }         ; tuple:  elements would be [ {element_type: {param: T}} ... ]
+<T> !record { fields: [ { name: v  type: T } ] }    refused
+<T> !tuple  { elements: [ { element_type: T } ] }   refused
+<T> !choice { variants: [T text] }                  refused
+<T> { v: T }                                        accepted
+<T> !array  { element_type: T }                     accepted
 ```
 
-have no open representation at all — not a harder one, none. D9 notes the same shortfall from the other
-direction, for the explicit spelling: "`<T> !choice { variants: [T text] }`, a parameter inside a
-collection-typed slot, has no resolved form at all", and uses it to justify keeping `template-def` narrower
-than `core-value`. But that is stated as a reason to restrict the *grammar*, and D5 is left standing as a
-rule over every sugar form. The two sit in the same document and disagree about whether
-`<T> { v: (T | text) }` is a form the language admits.
+The record *sugar* is accepted for a reason that has nothing to do with `record` being privileged: it never
+lifts to an `instance_template` at all. A `<T> { v: T }` declaration keeps a native record body, where a
+parameter is expressible in place — `record_field.type` names it, and `value_param` carries the value case.
+The division is therefore between forms that lift into `bindings` and forms that keep a body with parameter
+channels of their own, not between one constructor and another.
 
-The array and map cases are unaffected: every slot they bind is scalar (`element_type`, `key_type`,
-`value_type`, `state`, `min_items`, `max_items`), so each is one `template_argument` and the lift is exactly
-what D5 describes.
+D9 notes the shortfall from the other direction, for the explicit spelling: "`<T> !choice { variants: [T
+text] }`, a parameter inside a collection-typed slot, has no resolved form at all", and uses it to justify
+keeping `template-def` narrower than `core-value`. But that is stated as a reason to restrict the *grammar*,
+and D5 is left standing as a rule over every sugar form. The two sit in the same document and disagree about
+whether `<T> { v: (T | text) }` is a form the language admits.
 
 **Resolution: declined.** The spec author has decided not to pursue this — `template_argument` keeps its three
 channels, and a parameter inside a collection-valued slot stays without a resolved form. What the report should
 still do is say so: D5 currently states the lift rule over every sugar form, which is not true and cannot be
-made true without the fourth channel. Scoping the rule is the one-sentence edit that closes the contradiction.
-The implementation's refusal below is therefore permanent rather than provisional, and is the behaviour to
-document rather than a gap to track (it is out of `BACKLOG.md` accordingly).
+made true without extending what a binding may hold. Scoping the rule is the one-sentence edit that closes the
+contradiction. The implementation's refusal below is therefore permanent rather than provisional, and is the
+behaviour to document rather than a gap to track (it is out of `BACKLOG.md` accordingly).
 
-**Interpretation chosen:** implement D5 for the two constructors whose slots are all scalar, and refuse the
-other two at the declaration that writes them, as a not-yet-implemented gap rather than an author error —
-the verdict changes if `template_argument` grows a case, which is the test this repo's exception policy
+**The decline predates the diagnosis above**, which was corrected 2026-08-22: it was recorded against "add a
+fourth channel to `template_argument`", where the missing thing is really a binding value able to mirror its
+slot — an array, or an array of records — and `record` is affected as much as `choice` and `tuple`. That
+changes what would have to be added, not whether it can be, so the verdict stands until the author revisits
+it; the extension is larger than a fourth channel, not smaller.
+
+**Interpretation chosen:** implement D5 for the constructors whose slots are all scalar, and refuse the rest
+at the declaration that writes them, as a not-yet-implemented gap rather than an author error — the verdict
+changes if a binding may one day hold what its slot holds, which is the test this repo's exception policy
 applies (`SchemaDesugarer.instanceTemplate`, pinned by
 `ContainerSugarEndToEndTest.aParameterInsideACollectionValuedSlotHasNoOpenForm`). Refusing at the
 declaration rather than at the application is deliberate: the template itself is what has no
 representation, and the author who wrote it is the one who can change it.
 
 **Suggested resolution:** say which forms D5 covers. Either restrict the rule to the constructors whose
-bindings are all scalar and state that a parameter inside a collection-valued slot is out of scope for this
-revision, or give `template_argument` the collection case that would make the rule true as written — a
-fourth channel, `arguments: [template_argument]`, recursive like `type_argument` already is. The first is a
-one-sentence edit and matches D9's own instinct; the second is a real extension, and would also have to say
-how the closing cascade lifts from *inside* a binding, which D9 explicitly defers.
+slots are all scalar and state that a parameter inside a collection-valued slot is out of scope for this
+revision, or let a binding's value mirror its slot — a `template_argument` that may be a leaf, an array of
+`template_argument`s, or a named group of them, which is the shape `choice`, `tuple` and `record` all need
+and the recursion `type_argument` already has on the closed side. The first is a one-sentence edit and
+matches D9's own instinct; the second is a real extension, and would also have to say how the closing
+cascade lifts from *inside* a binding, which D9 explicitly defers.
+
+**Two spellings of this limitation are classified oppositely today**, which is worth settling whichever way
+the above goes. The explicit form is refused by `template-def`'s own grammar as an author error
+(`VALIDATION_ERROR`, exit 1, reported per declaration so the rest of the document still gets verdicts); the
+sugar form is refused by the desugarer as a library gap (`UnsupportedOperationException`, exit 70, aborting
+the pass). Same limitation, same document, opposite answers — and only the first does what a schema author
+needs.
 
 ## 54. A type argument's literal is called a bare token and typed `value`, and §8.2 identity depends on which
 
