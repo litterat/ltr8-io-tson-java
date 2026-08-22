@@ -85,13 +85,22 @@ across them.
 
 **Exit codes: 0 all valid, 1 any data file invalid** (bad value / unresolvable `!!schema` / unknown type /
 no root type-ref), **2 usage/classification** (no data files, an unreadable/`!!id`-less schema, a bad
-flag), **70 (`EX_SOFTWARE`) a fault in the library**, whose stack trace prints to stderr. That fourth code
+flag), **70 (`EX_SOFTWARE`) the library failing to reach a verdict at all**. That fourth code
 is what makes `Diagnostic.ofBaseSyntaxError`'s rethrow worth anything: the read loop catches only
 `IOException` (an unreadable file *is* that file's verdict), so a `RuntimeException` — which `Tson.validate`
 raises only for a bug, never for a bad document — reaches `TsonCli`'s own handler instead of being folded
 into "invalid". `UsageException` exists for the same reason one layer up: a bare `IllegalArgumentException`
 catch would relabel a library fault as "your command line is wrong", so only this CLI's own argument
 parsing throws the type that means that.
+
+**70 covers both halves of the exception-classification policy's non-verdict side, printed differently.** A
+gap (`UnsupportedOperationException` — *this library hasn't implemented that yet*) renders as `not
+implemented yet: <message>` and nothing else: those messages routinely end with the way to write the thing
+today (§8.1's collection-slot refusal names the workaround outright), and the bug-report banner plus a
+25-frame trace buried the one line worth reading while asking for a report of something already known. A
+fault (`IllegalStateException` and everything else — a broken internal invariant) keeps the trace and the
+please-report-it framing, which is where it is actually news. `TsonCli.notImplemented`/`internalError` are
+the two, ordered so the gap catch comes first.
 
 ## Configuration package (`tson-compiler/.../config/`)
 
