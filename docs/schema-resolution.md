@@ -10,7 +10,10 @@ only; history lives in git. `CLAUDE.md` holds the one-paragraph orientation; thi
 `TypeDefinition` (§4, §8, values from `schema.meta`). `TsonSchemaResolver` (public, root package, a thin
 wrapper over `SchemaResolver`) resolves a whole `SchemaDocument`: header-directive validation, deriving
 the structure namespace from the governing `!!meta`, merging `!!import` entries into the type-name
-namespace *before* any local declaration resolves.
+namespace *before* any local declaration resolves. That merge is transitive and its collisions are decided
+by entry identity, exactly as at link time (`SPEC-FEEDBACK.md` #55, and `docs/linking-and-compilation.md`
+for the rule in full) — this is the same concept discovered one phase earlier, so the two implementations
+are kept in step deliberately.
 
 - **Three namespace dependencies are constructor-fixed, via functional interfaces**, not threaded per
   call: `DefinitionGetter getTypeDefinition(name)` (the accumulating type-name namespace — typically a

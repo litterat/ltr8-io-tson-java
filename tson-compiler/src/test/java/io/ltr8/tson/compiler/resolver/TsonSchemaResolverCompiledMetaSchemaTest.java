@@ -330,7 +330,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         assertTrue(thrown.getMessage().contains("!!import"));
     }
 
-    private static final String MINI_DOCUMENT_TWO_IMPORTS_COLLIDE = """
+    private static final String MINI_DOCUMENT_DIAMOND_IMPORT = """
             !!id:"https://example.test/mini.tn1"
             !!meta:"https://tson.io/2026/32/m/meta.tn"
             !!import:"https://tson.io/2026/32/m/meta-kernel.tn"
@@ -340,17 +340,22 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
             }
             """;
 
+    /**
+     * The bundled chain's own diamond: this document imports meta-kernel directly *and* meta.tn, which
+     * imports meta-kernel itself. Every one of meta-kernel's names therefore arrives by two routes -- but
+     * they are one schema's entries, so they unify rather than colliding, and {@code unit} resolves
+     * ({@code SPEC-FEEDBACK.md} #55). A name-occurrence collision rule rejects this document instead, which
+     * is what makes the diamond unauthorable for every practical schema.
+     */
     @Test
-    void resolveSchemaRejectsTheSameNameDeclaredByMoreThanOneImport() {
-        // meta.tn's own registered entries already carry meta-kernel's whole namespace merged in
-        // (via meta.tn's own real !!import) -- so importing both here means "unit" (among many
-        // others) is declared by both imports, the "more than one !!import" case specifically.
+    void resolveSchemaUnifiesASchemaReachedByTwoImportRoutes() {
         SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
-        SchemaDocument miniDocument = new TsonSchemaParser(MINI_DOCUMENT_TWO_IMPORTS_COLLIDE).parseSchemaDocument();
+        SchemaDocument miniDocument = new TsonSchemaParser(MINI_DOCUMENT_DIAMOND_IMPORT).parseSchemaDocument();
 
-        TsonSchemaValidationException thrown = assertThrows(
-                TsonSchemaValidationException.class, () -> resolver.resolveSchema(miniDocument));
-        assertTrue(thrown.getMessage().contains("more than one !!import"));
+        TsonSchema resolved = resolver.resolveSchema(miniDocument);
+
+        assertTrue(resolved.entries().containsKey("placeholder"),
+                () -> "'unit' arrives through both imports and must unify: " + resolved.entries().keySet());
     }
 
     // ── TsonCompiledMetaRegistry's own bootstrap behavior ──

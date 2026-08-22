@@ -25,11 +25,19 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   is the identity half of §2.2.1; `TsonContentHash` is the `?sha256=` half this one strips. Prefixed for
   the reason `TsonContentHash` is — a consumer plausibly has their own `CanonicalIdentity`.
 - **`TsonSchemaLinker.link(schema, loader)`** is the pass-2 engine returning a `TsonLinkedSchema` (a thin
-  wrapper that is a compile-time proof linking ran): (1) **merge `!!import`s** — each import's entries
-  copied in as-is, keeping their home namespace, name collisions rejected, and **each merged entry's origin
-  recorded** (`TsonLinkedSchema.entryOrigins`, name → the canonical identity of the schema that *declared*
-  it, taken from the import's own `originOf` so an entry two hops away keeps its author rather than the
-  intermediary); (2) **populate `subtypes`**
+  wrapper that is a compile-time proof linking ran): (1) **merge `!!import`s** — each import's *whole
+  namespace* copied in as-is (transitive, its own imports included — a deliberate divergence from §2.2.3's
+  "imports are shallow", argued in `SPEC-FEEDBACK.md` #55), keeping their home namespace, and **each merged
+  entry's origin recorded** (`TsonLinkedSchema.entryOrigins`, name → the canonical identity of the schema
+  that *declared* it, taken from the import's own `originOf` so an entry two hops away keeps its author
+  rather than the intermediary). **Collisions are decided by that origin, not by name occurrence**: one
+  schema reached by several routes unifies (the diamond every schema importing core.tn forms — the two
+  copies differ only in the `subtypes` each route's own linking credited, so they union), two *different*
+  schemas declaring one name is an error naming both, and a local declaration may not reuse a name the
+  closure already binds — no hiding, no redefinition. Listing one schema twice, or under two spellings of
+  one canonical identity, is redundant rather than an error. Because identities carry the spec revision, a
+  closure reaching both `/2026/32/m/core.tn` and `/2026/33/m/core.tn` is rejected here rather than surfacing
+  later as a field conflict between two identically-spelled types; (2) **populate `subtypes`**
   (reverse of `supertypes`); (3) **derive `disjoint`** for every choice entry (`ChoiceDisjointness`, §5.4) —
   total and two-valued, detailed under "The disjointness derivation" below, so a linked choice always
   carries the fact;

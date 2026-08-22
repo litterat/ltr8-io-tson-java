@@ -82,18 +82,21 @@ import java.util.Set;
  * type parameter by bare name ({@code array<T>}), not a real other entry.
  *
  * <p><b>{@code !!import} merging (Part 2 §2.2.3).</b> The final namespace a schema is checked
- * against is built in two stages, in this order: (1) every {@code !!import}'s own entries, in
- * declaration order, looked up via {@code loader} by canonical identity -- shallow, per §2.2.3
- * ("only the entries declared in the imported schema's own body are imported... entries the
- * imported schema itself brought in via its own {@code !!import} directives are not transitively
- * included"), which falls out for free here since {@code loader} hands back an already-registered,
- * already-flattened {@code TsonSchema} and only *its* {@code entries()} are read, never its own
- * {@code imports()}; (2) this schema's own entries, exactly as resolved. A name collision -- between two
- * imports, or between an import and a local declaration -- is a resolver error (§2.2.3), checked as each
- * stage is merged in, not after the fact. <b>Merged entries keep their home namespace</b>: an
- * imported {@code TypeDefinition} is carried in exactly as the imported schema resolved it, never
- * re-validated against the importer's own namespace -- only the *importer's own* new material gets
- * validated here.
+ * against is built in two stages, in this order: (1) every {@code !!import}'s whole namespace, in
+ * declaration order, looked up via {@code loader} by canonical identity -- <b>transitive, not shallow</b>:
+ * {@code loader} hands back an already-registered, already-flattened {@code TsonSchema}, and all of its
+ * {@code entries()} are taken, so an import contributes its own imports' entries too; (2) this schema's own
+ * entries, exactly as resolved. This is a deliberate divergence from §2.2.3's "imports are shallow" and is
+ * argued in {@code SPEC-FEEDBACK.md} #55 -- in short, §3.3.1 already defines the {@code !!meta} half of the
+ * namespace as "the target's local declarations <i>plus its imports</i>", and a flat namespace with no
+ * hiding is the rule the rest of the format is built on.
+ *
+ * <p><b>Collisions are decided by entry identity.</b> One schema reached by several routes unifies; two
+ * *different* schemas declaring one name is the error, as is a local declaration shadowing any name the
+ * import closure already binds (no redefinition -- see {@link #mergeImports}). <b>Merged entries keep
+ * their home namespace</b>: an imported {@code TypeDefinition} is carried in exactly as the imported schema
+ * resolved it, never re-validated against the importer's own namespace -- only the *importer's own* new
+ * material gets validated here.
  */
 public final class TsonSchemaLinker {
 
@@ -551,28 +554,76 @@ public final class TsonSchemaLinker {
     }
 
     /**
-     * Stage 1: every {@code !!import}'s own entries, in declaration order, brought in as-is
-     * (§2.2.3's "merged entries keep their home namespace" -- no re-resolution here).
+     * Stage 1: every {@code !!import}'s whole namespace, in declaration order, brought in as-is (§2.2.3's
+     * "merged entries keep their home namespace" -- no re-resolution here).
+     *
+     * <p><b>The namespace is flat and the merge is transitive</b> ({@code SPEC-FEEDBACK.md} #55): an import
+     * contributes everything its own namespace holds, its own imports' entries included, exactly as {@code
+     * !!meta} contributes its target's locals *plus its imports* (§3.3.1's "Import what you expose"). So a
+     * schema reached by two routes arrives once, and the importer sees one flat name-to-type map with no
+     * hidden layers.
+     *
+     * <p><b>A collision is decided by entry identity, not by name occurrence.</b> The same schema reached
+     * through several routes -- the diamond every practical schema forms by importing core.tn -- is one set
+     * of entries, so re-arrival is unification, not conflict. Two *different* schemas declaring one name is
+     * the real collision, and it is still an error: distinct types cannot share a name in a flat namespace.
+     * That is also what makes a revision mismatch (one route reaching {@code /2026/32/m/core.tn}, another
+     * {@code /2026/33/m/core.tn}) a hard error at namespace-construction time rather than a confusing field
+     * conflict between two identically-spelled types much later.
+     *
+     * <p>Identity is the canonical one ([TSON-DATA] §2.2.1), so a pinned and an unpinned reference to one
+     * schema unify -- which is what lets an author pin their own import while a peer's is unpinned.
      */
     private static Map<String, TypeDefinition> mergeImports(List<String> imports, TsonSchemaLoader loader,
                                                             Map<String, String> origins) {
         Map<String, TypeDefinition> merged = new LinkedHashMap<>();
+        Set<String> alreadyImported = new LinkedHashSet<>();
         for (String importUri : imports) {
             String importIdentity = TsonCanonicalIdentity.canonicalize(importUri);
+            // Listing one schema twice (or under two spellings of one identity) is redundant, not an error:
+            // the second mention asks for a namespace already present and contributes nothing new.
+            if (!alreadyImported.add(importIdentity)) {
+                continue;
+            }
             TsonLinkedSchema imported = loader.load(importIdentity).orElseThrow(() -> new TsonSchemaValidationException(
                     "!!import '" + importUri + "' is not registered"));
             for (Map.Entry<String, TypeDefinition> entry : imported.schema().entries().entrySet()) {
-                if (merged.containsKey(entry.getKey())) {
-                    throw new TsonSchemaValidationException(
-                            "'" + entry.getKey() + "' is declared by more than one !!import");
-                }
-                merged.put(entry.getKey(), entry.getValue());
+                String name = entry.getKey();
                 // The import's own answer, not importIdentity: an entry it reached through an import of its
                 // own belongs to whoever declared it, however many hops away that is.
-                origins.put(entry.getKey(), imported.originOf(entry.getKey()));
+                String origin = imported.originOf(name);
+                String incumbent = origins.get(name);
+                if (incumbent != null) {
+                    if (!incumbent.equals(origin)) {
+                        throw new TsonSchemaValidationException("'" + name + "' is declared by two different "
+                                + "schemas reached through !!import ('" + incumbent + "' and '" + origin
+                                + "') -- distinct types cannot share one name in the flat namespace; import "
+                                + "one of them, or a version of each that agrees on where '" + name
+                                + "' is declared");
+                    }
+                    merged.put(name, unified(merged.get(name), entry.getValue()));
+                    continue;
+                }
+                merged.put(name, entry.getValue());
+                origins.put(name, origin);
             }
         }
         return merged;
+    }
+
+    /**
+     * One entry reached by two routes, reconciled. Both copies came from the same declaring schema, so they
+     * agree on everything the declaring schema resolved -- everything except {@code subtypes}, which each
+     * route's own linking credited against *its* view of the namespace ({@link #computeSubtypes}). The
+     * union is the answer §9 requires here: {@code subtypes} is the transitive inverse of {@code supertypes}
+     * across *this* schema's namespace, and this schema can see both routes' subtypes even though neither
+     * route could see the other's.
+     */
+    private static TypeDefinition unified(TypeDefinition incumbent, TypeDefinition arriving) {
+        if (incumbent.subtypes().containsAll(arriving.subtypes())) {
+            return incumbent;
+        }
+        return withAddedSubtypes(incumbent, new LinkedHashSet<>(arriving.subtypes()));
     }
 
     // ── Validation ───────────────────────────────────────────────────────
