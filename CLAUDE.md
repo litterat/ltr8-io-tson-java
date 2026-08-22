@@ -346,8 +346,11 @@ other value.
 locational, not categorical: a closed `Code` enum, `message`, `expected`/`actual`, and four location
 components matching JSON Schema 2020-12 §12's output unit (`path`, `schemaId`+`schemaPointer`, plus
 `dataPosition`/`schemaPosition`). Both RFC 6901 pointers are `Optional<String>` because `""` is the *root*,
-a location this really emits, not an absence. `expected` carries the **constraint that failed** — `<= 100`,
-`one of (A, B, C)` — from `AtomTypeException`'s six-shape vocabulary, never the type's name; the name leads
+a location this really emits, not an absence; the three components where `""` really is absence
+(`schemaId`/`expected`/`actual`) offer `schemaIdIfKnown()`/`expectedIfStated()`/`actualIfStated()`, so a
+renderer asks rather than remembering which convention each component uses. `expected` carries the
+**constraint that failed** — `<= 100`, `one of (A, B, C)` — from `AtomTypeException`'s six-shape
+vocabulary, never the type's name; the name leads
 `message` instead. The base-syntax exceptions keep their position out of `getMessage()` (it is in
 `position()`, and in `toString()` for a stack trace) so a diagnostic states it once. A read's schema end is
 one `SchemaLocation` (id + pointer + position) **accumulated as the read descends**, not claimed by whichever

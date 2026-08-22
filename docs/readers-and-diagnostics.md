@@ -155,6 +155,15 @@ the schema root; a base-syntax failure points at the data root), so spelling "no
 make the two indistinguishable to a consumer *and* to a renderer. A present `""` is the root; an absence is
 an absence. `schemaId`/`expected`/`actual` stay plain strings, where `""` carries no second meaning.
 
+**That split is right at the source and useless at the sink**, so `schemaIdIfKnown()`/`expectedIfStated()`/
+`actualIfStated()` say it once. Anything rendering a diagnostic onto a wire — the CLI's own `CliDiagnostic`,
+an HTTP error body, anything downstream — wants a single answer to "is there anything here", and otherwise
+has to know per component which of the two conventions applies. Nothing offers the same narrowing for the
+pointers, deliberately: there `""` is a value, and a helper that swallowed it would erase the distinction the
+paragraph above exists to keep. **The wire *shape* is not shared and should not be** — a CLI report and an
+HTTP problem body are different envelopes with different audiences — but every renderer of one re-derives
+this same absence rule, and that much belongs on the type.
+
 **The read path's schema end is one value, `SchemaLocation`** — `schemaId` + `schemaPointer` +
 `schemaPosition`, accumulated as the read descends rather than claimed by whichever reader is innermost.
 

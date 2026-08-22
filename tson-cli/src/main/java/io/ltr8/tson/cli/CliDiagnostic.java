@@ -17,11 +17,13 @@ import java.util.Optional;
  * the real {@link Diagnostic.Code} enum, since enum narrowing *is* a proven, already-used binding
  * path elsewhere in this codebase.
  *
- * <p><b>An absent field is absent, not empty.</b> {@link Diagnostic} still spells "nothing to say
- * here" as {@code ""} for {@code schemaId}/{@code expected}/{@code actual}, so those are narrowed to
- * {@link Optional} here and render as {@code null}. The two RFC 6901 pointers need no narrowing: they
- * are already {@code Optional} at the source, because for a pointer {@code ""} is not absence but the
- * root, and a document-level schema problem genuinely carries it.
+ * <p><b>An absent field is absent, not empty.</b> {@link Diagnostic} spells "nothing to say here" as
+ * {@code ""} for {@code schemaId}/{@code expected}/{@code actual}, and those render as {@code null} here --
+ * via {@link Diagnostic#schemaIdIfKnown()}/{@link Diagnostic#expectedIfStated()}/{@link
+ * Diagnostic#actualIfStated()}, which is where the knowledge of <em>which</em> components use that
+ * convention belongs: any renderer of a diagnostic needs it, and this one is not the only renderer. The two
+ * RFC 6901 pointers need no narrowing: they are already {@code Optional} at the source, because for a
+ * pointer {@code ""} is not absence but the root, and a document-level schema problem genuinely carries it.
  */
 public record CliDiagnostic(Optional<String> path, @Field("schema_pointer") Optional<String> schemaPointer,
                              @Field("schema_id") Optional<String> schemaId,
@@ -32,9 +34,9 @@ public record CliDiagnostic(Optional<String> path, @Field("schema_pointer") Opti
 
     static CliDiagnostic from(Diagnostic diagnostic) {
         return new CliDiagnostic(diagnostic.path(), diagnostic.schemaPointer(),
-                absentIfEmpty(diagnostic.schemaId()),
+                diagnostic.schemaIdIfKnown(),
                 diagnostic.code(), diagnostic.message(),
-                absentIfEmpty(diagnostic.expected()), absentIfEmpty(diagnostic.actual()),
+                diagnostic.expectedIfStated(), diagnostic.actualIfStated(),
                 diagnostic.dataPosition().map(CliDiagnostic::render),
                 diagnostic.schemaPosition().map(CliDiagnostic::render));
     }
@@ -43,11 +45,6 @@ public record CliDiagnostic(Optional<String> path, @Field("schema_pointer") Opti
     static CliDiagnostic minimal(Diagnostic.Code code, String message) {
         return new CliDiagnostic(Optional.empty(), Optional.empty(), Optional.empty(), code, message,
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
-    }
-
-    /** {@link Diagnostic}'s "nothing to say here" for a string component, as an absence. */
-    private static Optional<String> absentIfEmpty(String value) {
-        return value.isEmpty() ? Optional.empty() : Optional.of(value);
     }
 
     /** The position format every rendered diagnostic uses; stated in {@code diagnostics.tn} for consumers. */
