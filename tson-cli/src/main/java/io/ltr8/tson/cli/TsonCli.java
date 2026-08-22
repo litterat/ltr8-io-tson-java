@@ -13,10 +13,15 @@ import java.util.List;
  *
  * <p>Exit codes are Unix-conventional: 0 valid/compiled cleanly (or an explicit {@code --help}), 1 a
  * real validation/compile failure, 2 a usage error (bad arguments, a file that can't be read), and 70
- * ({@code EX_SOFTWARE}) a fault in this library rather than anything wrong with the input -- so a script or
- * agent shelling out gets a clean pass/fail signal without parsing prose, and never reads a bug as a
- * verdict. Help requested explicitly ({@code --help}/{@code -h}/{@code help}) prints to stdout and exits 0;
- * usage shown because of a mistake (no command, a bad flag) prints to stderr and exits 2.
+ * ({@code EX_SOFTWARE}) this library failing to reach a verdict rather than anything wrong with the input --
+ * so a script or agent shelling out gets a clean pass/fail signal without parsing prose, and never reads a
+ * bug as a verdict. Help requested explicitly ({@code --help}/{@code -h}/{@code help}) prints to stdout and
+ * exits 0; usage shown because of a mistake (no command, a bad flag) prints to stderr and exits 2.
+ *
+ * <p>70 covers the two ways a run can end without a verdict, and they print differently: a gap in this
+ * library ({@code UnsupportedOperationException}) renders as {@link #notImplemented} -- its own message,
+ * which usually names the workaround -- while an internal fault renders as {@link #internalError}, with the
+ * stack trace and the request to report it.
  */
 public final class TsonCli {
 
@@ -41,7 +46,7 @@ public final class TsonCli {
               --output text|json|tson    output format (default: text)
               --help, -h                 print this help
 
-            exit codes: 0 ok, 1 validation/compile failure, 2 usage error, 70 internal error""";
+            exit codes: 0 ok, 1 validation/compile failure, 2 usage error, 70 not implemented / internal error""";
 
     private static final String VALIDATE_USAGE =
             "usage: tson validate [--output text|json|tson] <file|->...   (`-` reads one data document from stdin)";
@@ -90,9 +95,32 @@ public final class TsonCli {
             System.err.println(e.getMessage());
             System.err.println(USAGE);
             return 2;
+        } catch (UnsupportedOperationException e) {
+            return notImplemented(e);
         } catch (RuntimeException e) {
             return internalError(e);
         }
+    }
+
+    /**
+     * A gap in this library, reported as one: the exception's own message is the whole report, and the exit
+     * code is 70 ({@code EX_SOFTWARE}) -- the same code as a fault, because neither is a verdict on the
+     * document.
+     *
+     * <p>The framing is what differs, and it follows the project's exception-classification policy: an {@code
+     * UnsupportedOperationException} across this pipeline means <i>this library hasn't implemented that
+     * yet</i>, a thing the person running the command can often work around, and these messages routinely
+     * name the workaround ("naming the inner form in its own declaration ... is the way to write this
+     * today"). Wrapping that in a bug report and a stack trace buries the one line worth reading, and asks
+     * for a report of something already known. The please-report-it treatment stays with {@link
+     * #internalError}, where a broken internal invariant really is news.
+     */
+    static int notImplemented(UnsupportedOperationException e) {
+        String message = e.getMessage() == null ? e.toString() : e.getMessage();
+        System.err.println("not implemented yet: " + message);
+        System.err.println("This is a gap in tson, not a problem with your document"
+                + " -- it could not be checked, which is not the same as invalid.");
+        return 70;
     }
 
     /**
@@ -105,6 +133,9 @@ public final class TsonCli {
      * running it would go looking for the mistake in their own file. Nothing here can distinguish a fault
      * from a verdict after the fact, so the two get separate codes and the trace is printed rather than
      * summarized.
+     *
+     * <p>Everything that isn't a declared gap lands here -- {@link #notImplemented} takes {@code
+     * UnsupportedOperationException} first, since a gap is known already and has nothing to report.
      */
     static int internalError(RuntimeException e) {
         System.err.println("internal error: " + e);

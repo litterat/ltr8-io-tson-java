@@ -118,14 +118,13 @@ validate-then-fix loop the project targets.
   arguments; declare `orders_page => paged<order>` and write `!orders_page` — is never stated. Wants a
   targeted diagnostic in the same posture as §4.1's migration hint. (The data grammar itself is correct to
   refuse; only the message is at issue.)
-- [ ] **The CLI renders every `UnsupportedOperationException` as "a bug in tson — please report it", burying
-  gap messages that already contain the fix.** The #53 collection-slot refusal (`<T> { v: (T | text) }`)
-  throws a UOE whose text ends with the workaround ("naming the inner form in its own declaration … is the
-  way to write this today"), but the CLI wraps it in the bug-report framing plus a 25-frame stack trace.
-  Exit 70 is right (a gap is not a verdict on the schema); the framing is not — render UOE as "not
-  implemented yet: <message>", keeping the please-report framing for `IllegalStateException` only. Related:
-  a UOE thrown inside `SchemaDesugarer` aborts the whole compile, where every other desugar failure reports
-  per declaration and resyncs.
+- [ ] **A UOE thrown inside `SchemaDesugarer` aborts the whole compile**, where every other desugar failure
+  reports per declaration and resyncs — so a schema with a gap in one declaration gets no verdict on any of
+  the others. The CLI half of this is now done (a gap renders as `not implemented yet: <message>`, the
+  please-report-it framing reserved for `IllegalStateException`, both still exit 70); what is left needs a
+  decision this one did not, because a gap is deliberately *not* a `Diagnostic` — reporting it per
+  declaration means either a second channel alongside the receiver, or resyncing past the declaration and
+  carrying the gap out to the same exit 70 at the end.
 - [ ] **Synthetic names leak into diagnostics, and `schemaPointer` roots at the instantiation entry's
   internal name.** A read error against a template-derived type says
   `'array_category_text_58d8f952_1_1dd94a70' has 0 elements`, and the JSON output's pointer begins

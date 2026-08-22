@@ -407,9 +407,11 @@ TsonValue value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_ty
 `tson validate [--output text|json|tson] <file|->...` auto-classifies a flat file list into schemas (by
 embedded `!!id`, never filename) and data, and validates each data document via `Tson.validate` — fully
 self-describing, no `--type`; `-` is stdin, at most once, always data. One `ValidationRun` envelope per
-invocation. **Exit codes: 0 all valid, 1 any data file invalid, 2 usage/classification, 70 a library
-fault** — the 1/2/70 split is load-bearing and rides on the exception-classification policy. Also `tson
-compile`, `tson hash` (stamps a `?sha256=` pin idempotently), `tson init-example`.
+invocation. **Exit codes: 0 all valid, 1 any data file invalid, 2 usage/classification, 70 a library gap or
+fault** — the 1/2/70 split is load-bearing and rides on the exception-classification policy, and 70's two
+halves print differently (a gap: `not implemented yet: <message>`, whose text usually names the workaround;
+a fault: the please-report-it banner and its stack trace). Also `tson compile`, `tson hash` (stamps a
+`?sha256=` pin idempotently), `tson init-example`.
 `TsonBundledSchemas` serves the three bundled schemas' identities, text (copied from `spec/m/` at build
 time) and published digests. `TsonContentHash` hashes every byte past the `!!id` line; pins are
 verification metadata, not identity, checked through the loader on every fetched pinned reference. The

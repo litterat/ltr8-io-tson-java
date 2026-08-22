@@ -55,6 +55,45 @@ class TsonCliTest {
         assertFalse(err.contains("usage:"), err);                      // never mistaken for a usage error
     }
 
+    /**
+     * A gap in this library shares the fault's exit code -- neither is a verdict on the document -- but not
+     * its framing: the message is the whole report, since these messages routinely name the workaround and
+     * the please-report-it banner plus a stack trace buried it.
+     */
+    @Test
+    void anUnimplementedGapExitsSeventyWithItsMessageAndNoStackTrace() throws IOException {
+        String err = captureStderr(() -> assertEquals(70, TsonCli.notImplemented(
+                new UnsupportedOperationException("naming the inner form in its own declaration is the way"))));
+
+        assertTrue(err.contains("not implemented yet"), err);
+        assertTrue(err.contains("naming the inner form in its own declaration is the way"), err);
+        assertFalse(err.contains("Please report it"), err);          // a known gap is not news
+        assertFalse(err.contains("at io.ltr8.tson.cli"), err);       // no trace to bury the one line worth reading
+        assertFalse(err.contains("usage:"), err);
+    }
+
+    /**
+     * The same routing end to end, through a schema that really reaches a gap: [TSON-SCHEMA] §8.1 gives a
+     * type parameter inside a choice no open representation, and the refusal's own message names the way to
+     * write it today. Exit 70 stays -- a gap is not a verdict on the schema.
+     */
+    @Test
+    void aSchemaReachingAGapCompilesToSeventyWithTheGapsOwnMessage(@TempDir Path dir) throws IOException {
+        Path schema = writeFile(dir, "gap.tn", """
+                !!id:"https://example.test/cli-gap.tn"
+                !!meta:"https://tson.io/2026/32/m/meta.tn"
+                !!import:"https://tson.io/2026/32/m/core.tn"
+                { boxed => <T> { v: (T | text) } }
+                """);
+
+        String err = captureStderr(() ->
+                assertEquals(70, TsonCli.run(new String[] {"compile", schema.toString()})));
+
+        assertTrue(err.startsWith("not implemented yet: "), err);
+        assertTrue(err.contains("is the way to write this today"), err);
+        assertFalse(err.contains("Please report it"), err);
+    }
+
     @Test
     void helpExitsZeroToStdout() throws IOException {
         for (String flag : new String[] {"--help", "-h", "help"}) {
