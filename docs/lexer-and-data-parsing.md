@@ -62,6 +62,16 @@ Key points:
   rejects `_` as a map key (§2.9), resolves `EmptyBrace` to a record/typed container (§2.8), or interprets
   `TokenValue` text as null/boolean/number/string (base type resolution, below). These are intentional
   gaps, not omissions.
+- **§3.2's three type-expression forms are refused by name, not by the separation rule.** Array brackets,
+  type arguments and the `?` suffix "exist only within the [TSON-SCHEMA] type-definition grammar, and their
+  appearance after `!` in a data value is a parse error" — so `parseTypeRefName` checks for each and says
+  which one was written and what to do instead. Left to the separation rule, `!paged<order>` reads as an
+  adjacency problem ("expected whitespace before `'<'`"), whose advice produces a second error one column
+  later and never states the rule that stopped it: a data type-ref is a bare name, and an application is
+  named in the schema (`my_type => paged<order>`) and referenced as `!my_type`. Argument lists are refused
+  whether or not a space precedes them, precisely because the old wording sent authors to the spaced
+  spelling; `?` only when adjacent, there being no message advising otherwise. The separation rule itself is
+  unchanged and still catches everything else (`!int32"5"`).
 - **`!!meta` in the header throws `TsonUnsupportedDocumentException`, not `TsonParseException`.** This is a
   Class 1 processor; a schema document isn't malformed input, it's a well-formed document of a kind this
   parser doesn't implement, and §8.1 requires that distinction be visible (a categorized diagnostic).

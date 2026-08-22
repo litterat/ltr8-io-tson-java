@@ -104,14 +104,6 @@ positions) compiles, validates and round-trips first try, and both data- and sch
 supported genuinely one-shot fixes — with these exceptions, ordered by how much each hurts the
 validate-then-fix loop the project targets.
 
-- [ ] **`!paged<order>` at a data type-ref position dead-ends the author.** The natural spelling of "a page
-  of orders" as a data root gets `expected whitespace after type name 'paged' before '<'`; following that
-  advice (`!paged <order>`) just produces a second parse error, and the real rule — data type-refs carry no
-  arguments; declare `orders_page => paged<order>` and write `!orders_page` — is never stated. Wants a
-  targeted diagnostic in the same posture as §4.1's migration hint. (The data grammar itself is correct to
-  refuse; only the message is at issue.) The *unapplied* spelling now states that rule where it lands
-  (`OpenTemplateReader`); this is the same rule one keystroke earlier, where the lexer refuses first and
-  nothing downstream gets to say it.
 - [ ] **A UOE thrown inside `SchemaDesugarer` aborts the whole compile**, where every other desugar failure
   reports per declaration and resyncs — so a schema with a gap in one declaration gets no verdict on any of
   the others. The CLI half of this is now done (a gap renders as `not implemented yet: <message>`, the
@@ -279,7 +271,7 @@ missing most of the mirror.
 
 ## Conformance test suite
 
-- [ ] Build out `ltr8-io-tson-test-suite` well beyond its current 123 vectors, spread across four buckets
+- [ ] Build out `ltr8-io-tson-test-suite` well beyond its current 127 vectors, spread across four buckets
   (`lexer`/`parser`/`resolver`/`vocabulary`). Still Part 1 (lexer/parser/§5 vocabulary) only — Part 2
   (resolution, linking, compilation) has no conformance-suite coverage at all yet, only this repo's own
   unit/integration tests.

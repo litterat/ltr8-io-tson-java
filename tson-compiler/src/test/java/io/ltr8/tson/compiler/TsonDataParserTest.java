@@ -34,6 +34,11 @@ class TsonDataParserTest {
         return parse(source).root();
     }
 
+    /** The parse error a source produces -- every §3.2 fixture asserts on the wording, not just the type. */
+    private static String messageOf(String source) {
+        return assertThrows(TsonParseException.class, () -> parse(source)).getMessage();
+    }
+
     private static TokenValue token(DataValue v) {
         return assertInstanceOf(TokenValue.class, v.coreValue());
     }
@@ -400,6 +405,34 @@ class TsonDataParserTest {
         DataValue v = root("!int32 \"5\"");
         assertEquals("int32", v.typeRef().orElseThrow());
         assertEquals("5", token(v).text());
+    }
+
+    /**
+     * §3.2's own sentence: array brackets, type arguments and the {@code ?} suffix "exist only within the
+     * [TSON-SCHEMA] type-definition grammar, and their appearance after {@code !} in a data value is a parse
+     * error". Each is named for what was written -- the separation rule alone answers {@code !paged<order>}
+     * with "expected whitespace before '<'", whose advice produces a second error and never states the rule.
+     */
+    @Test
+    void typeExpressionSyntaxAfterATypeRefIsRefusedForWhatItIs() {
+        assertTrue(messageOf("!paged<order> { items: [] }").contains("applies type arguments"));
+        assertTrue(messageOf("!person? { a: 1 }").contains("optional suffix"));
+        assertTrue(messageOf("![text] [ a b ]").contains("writes an array type"));
+    }
+
+    /**
+     * A space does not fix it, which is why the message says so rather than the separation rule: {@code
+     * !paged <order>} is the spelling the old advice produced, and it is the same mistake.
+     */
+    @Test
+    void aSpaceBeforeTheArgumentListIsTheSameMistake() {
+        assertTrue(messageOf("!paged <order> { items: [] }").contains("applies type arguments"));
+    }
+
+    /** The separation rule itself is untouched: a non-delimiter token still has to be separated. */
+    @Test
+    void anAdjacentNonDelimiterTokenIsStillTheSeparationError() {
+        assertTrue(messageOf("!int32\"5\"").contains("expected whitespace after type name"));
     }
 
     @Test
