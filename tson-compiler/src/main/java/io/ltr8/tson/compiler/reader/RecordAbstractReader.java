@@ -122,6 +122,10 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     }
 
     final String name;
+
+    /** What to call this entry in a message -- see {@link ArrayAbstractReader#displayName}. */
+    final String displayName;
+
     final List<CompiledField> fields;
     final Map<String, Integer> fieldIndex;
     final List<FieldGroup> groups;
@@ -137,9 +141,10 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      */
     private final String declaredFields;
 
-    RecordAbstractReader(String name, RecordBody body, TsonTypeReaderResolver resolver,
+    RecordAbstractReader(String name, String displayName, RecordBody body, TsonTypeReaderResolver resolver,
                           SchemaLocation schemaLocation) {
         this.name = name;
+        this.displayName = displayName;
         this.schemaLocation = schemaLocation;
         this.fields = buildFields(body, resolver);
         this.groups = body.groups();
@@ -205,7 +210,8 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         if (positionalFieldIndex >= 0) {
             return new ShapeResult(Shape.POSITIONAL, anchor);
         }
-        ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a record for '" + name + "', found " + TypeRefCheck.describe(e),
+        ctx.report(Diagnostic.Code.TYPE_MISMATCH,
+                "expected a record for '" + displayName + "', found " + TypeRefCheck.describe(e),
                 "a record", TypeRefCheck.describe(e));
         EventSkip.coreValue(ctx);
         return new ShapeResult(Shape.MISMATCH, anchor);
@@ -230,7 +236,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             Integer schemaIndex = fieldIndex.get(fieldName.name());
             if (schemaIndex == null) {
                 ctx.field(fieldName.name()).report(Diagnostic.Code.UNRECOGNIZED_FIELD,
-                        "unknown field '" + fieldName.name() + "' on '" + name + "' -- a record is closed "
+                        "unknown field '" + fieldName.name() + "' on '" + displayName + "' -- a record is closed "
                                 + "under its type (§7.2), whose fields are (" + declaredFields + ")",
                         declaredFields, fieldName.name());
                 EventSkip.scopedValue(ctx);
@@ -238,7 +244,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             }
             if (seen[schemaIndex]) {
                 ctx.schemaField(fieldName.name()).report(Diagnostic.Code.DUPLICATE_FIELD,
-                        "duplicate field '" + fieldName.name() + "' on '" + name + "' -- a record states each "
+                        "duplicate field '" + fieldName.name() + "' on '" + displayName + "' -- a record states each "
                                 + "field at most once (§2.5), and the repeat states a value for nothing",
                         "each field stated once", "'" + fieldName.name() + "' stated again");
             }
@@ -305,11 +311,11 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             String members = String.join(" | ", group.members());
             if (present > 1) {
                 ctx.report(Diagnostic.Code.TYPE_MISMATCH,
-                        "at most one of (" + members + ") may be present for '" + name + "', found " + present,
+                        "at most one of (" + members + ") may be present for '" + displayName + "', found " + present,
                         "at most one of (" + members + ")", present + " present");
             } else if (group.state() == ElementState.REQUIRED && present == 0) {
                 ctx.report(Diagnostic.Code.FIELD_REQUIRED,
-                        "exactly one of (" + members + ") must be present for '" + name + "'",
+                        "exactly one of (" + members + ") must be present for '" + displayName + "'",
                         "one of (" + members + ")", "none present");
             }
         }
@@ -335,7 +341,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         RecordField schema = fields.get(schemaIndex).schema();
         if (schema.state() == FieldState.REQUIRED_DEFAULT) {
             ctx.schemaField(schema.name()).report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION,
-                    "'" + schema.name() + "' on '" + name + "' is always filled from the schema and cannot be "
+                    "'" + schema.name() + "' on '" + displayName + "' is always filled from the schema and cannot be "
                             + "written '_' -- omit the field to take its default (§5.2)",
                     "the field omitted, or a value for '" + schema.name() + "'", "_");
             return precomputedValue[schemaIndex];
@@ -361,7 +367,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         return switch (schema.state()) {
             case REQUIRED -> {
                 ctx.schemaField(schema.name()).report(Diagnostic.Code.FIELD_REQUIRED,
-                        "missing required field '" + schema.name() + "' for '" + name + "'",
+                        "missing required field '" + schema.name() + "' for '" + displayName + "'",
                         "a value for '" + schema.name() + "'", "(absent)");
                 yield null;
             }
@@ -404,7 +410,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             ctx.next();
             if (schema.state() == FieldState.REQUIRED_FIXED) {
                 fieldCtx.report(Diagnostic.Code.FIELD_FIXED,
-                        "'" + fieldName + "' is fixed on '" + name + "' and cannot be absent",
+                        "'" + fieldName + "' is fixed on '" + displayName + "' and cannot be absent",
                         String.valueOf(check.value()), "_");
                 return;
             }
@@ -413,7 +419,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         if (check.mustBeAbsent()) {
             EventSkip.scopedValue(ctx);
             fieldCtx.report(Diagnostic.Code.FIELD_FIXED,
-                    "'" + fieldName + "' is fixed to absent on '" + name + "' and may only be omitted or "
+                    "'" + fieldName + "' is fixed to absent on '" + displayName + "' and may only be omitted or "
                             + "written as '_'", "_", "a value");
             return;
         }
@@ -429,7 +435,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         }
         if (!Objects.equals(written, check.value())) {
             fieldCtx.report(Diagnostic.Code.FIELD_FIXED,
-                    "'" + fieldName + "' is fixed on '" + name + "' and cannot be given another value -- the "
+                    "'" + fieldName + "' is fixed on '" + displayName + "' and cannot be given another value -- the "
                             + "schema declares it with '=' (fixed); for a default the data may override, "
                             + "use '~'",
                     String.valueOf(check.value()), String.valueOf(written));
@@ -452,12 +458,12 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     private Object readSchemaDefault(CompiledField field) {
         RecordField schema = field.schema();
         if (schema.valueParam().isPresent()) {
-            throw new UnsupportedOperationException("'" + schema.name() + "' on '" + name + "' defaults via a "
+            throw new UnsupportedOperationException("'" + schema.name() + "' on '" + displayName + "' defaults via a "
                     + "type parameter ('= " + schema.valueParam().get() + "') -- parameter substitution isn't "
                     + "implemented anywhere in this codebase yet, so this can't resolve to a concrete value");
         }
         Token token = schema.value().orElseThrow(() -> new IllegalStateException("'" + schema.name() + "' on '"
-                + name + "' is " + schema.state() + " but the schema carries neither a literal value nor a "
+                + displayName + "' is " + schema.state() + " but the schema carries neither a literal value nor a "
                 + "value parameter for it -- DefinitionResolver should never produce this"));
         TokenEvent event = new TokenEvent(token.text(), TokenForm.valueOf(token.form().name()), new Position(0, 0, 0));
         TsonReadContext syntheticCtx = TsonReadContext.throwing(new ListEventSource(List.of(event)));

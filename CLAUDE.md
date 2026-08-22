@@ -338,7 +338,9 @@ schema authoring through the meta's compiled reader); repeated fields/map keys a
 last-value-wins recovery underneath; map-key identity is the decoded host value, type-ref and annotations
 stripped (#43); a written `_` at `REQUIRED_DEFAULT` is an error where omission injects silently; `{}` is
 the empty container of the position's own type (§2.8), so a zero-entry map faces `min_items` like any
-other value.
+other value; and a reader names itself in a message by what the author wrote (`EntryDisplayName` — a
+synthetic entry renders as the sugar or application that produced it, told apart by having no source
+position), never by its content-derived entry name.
 
 ### Diagnostics — `docs/readers-and-diagnostics.md`
 

@@ -45,12 +45,21 @@ import java.util.function.Consumer;
 abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
 
     final String name;
+
+    /**
+     * What to call this entry in a message -- {@link #name} where the author wrote it, and the form they
+     * wrote where they did not (see {@link EntryDisplayName}). Separate from {@code name}, which stays the
+     * entry's real name: that is what a type-ref resolves against and what a tree node carries.
+     */
+    final String displayName;
+
     final ArrayBody body;
     final TsonTypeReader<?> elementParser;
     final SchemaLocation schemaLocation;
 
-    ArrayAbstractReader(String name, ArrayBody body, TsonTypeReaderResolver resolver, SchemaLocation schemaLocation) {
-        this(name, body, resolver.resolve(body.elementType().name()), schemaLocation);
+    ArrayAbstractReader(String name, String displayName, ArrayBody body, TsonTypeReaderResolver resolver,
+                         SchemaLocation schemaLocation) {
+        this(name, displayName, body, resolver.resolve(body.elementType().name()), schemaLocation);
     }
 
     /**
@@ -59,9 +68,10 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
      * rather than in the element loop keeps that loop, which both modes share, free of anything only one of
      * them needs.
      */
-    ArrayAbstractReader(String name, ArrayBody body, TsonTypeReader<?> elementParser,
+    ArrayAbstractReader(String name, String displayName, ArrayBody body, TsonTypeReader<?> elementParser,
                          SchemaLocation schemaLocation) {
         this.name = name;
+        this.displayName = displayName;
         this.body = body;
         this.elementParser = elementParser;
         this.schemaLocation = schemaLocation;
@@ -81,7 +91,8 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
             return true;
         }
         TsonEvent e = ctx.peek();
-        ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected an array for '" + name + "', found " + TypeRefCheck.describe(e),
+        ctx.report(Diagnostic.Code.TYPE_MISMATCH,
+                "expected an array for '" + displayName + "', found " + TypeRefCheck.describe(e),
                 "an array", TypeRefCheck.describe(e));
         EventSkip.coreValue(ctx);
         return false;
@@ -106,7 +117,7 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
                     : elementParser.read(ctx.index(index));
             if (seen != null && !seen.add(decoded)) {
                 ctx.index(index).report(Diagnostic.Code.TYPE_MISMATCH,
-                        "'" + name + "' requires unique elements, '" + decoded + "' appears more than once",
+                        "'" + displayName + "' requires unique elements, '" + decoded + "' appears more than once",
                         "a value not already present in this array", String.valueOf(decoded));
             }
             sink.accept(decoded);
@@ -120,7 +131,7 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
         ctx.next(); // consume the AbsentEvent regardless of REQUIRED/OPTIONAL
         if (body.state() == ElementState.REQUIRED) {
             ctx.index(index).report(Diagnostic.Code.FIELD_REQUIRED,
-                    "'" + name + "' element [" + index + "] is absent, but elements are required",
+                    "'" + displayName + "' element [" + index + "] is absent, but elements are required",
                     "a value", "(absent)");
         }
         return null;
@@ -130,14 +141,14 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
         body.minItems().ifPresent(min -> {
             if (BigInteger.valueOf(size).compareTo(min) < 0) {
                 ctx.report(Diagnostic.Code.TYPE_MISMATCH,
-                        "'" + name + "' has " + size + " elements, fewer than the minimum " + min,
+                        "'" + displayName + "' has " + size + " elements, fewer than the minimum " + min,
                         "at least " + min + " elements", String.valueOf(size));
             }
         });
         body.maxItems().ifPresent(max -> {
             if (BigInteger.valueOf(size).compareTo(max) > 0) {
                 ctx.report(Diagnostic.Code.TYPE_MISMATCH,
-                        "'" + name + "' has " + size + " elements, more than the maximum " + max,
+                        "'" + displayName + "' has " + size + " elements, more than the maximum " + max,
                         "at most " + max + " elements", String.valueOf(size));
             }
         });

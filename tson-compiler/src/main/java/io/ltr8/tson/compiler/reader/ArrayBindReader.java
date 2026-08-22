@@ -54,14 +54,15 @@ final class ArrayBindReader extends ArrayAbstractReader<Object> {
 
     private final DataClassArray descriptor;
 
-    public ArrayBindReader(String name, ArrayBody body, DataClassArray descriptor, TsonTypeReaderResolver resolver,
-                           SchemaLocation schemaLocation) {
-        this(name, body, descriptor, resolver, schemaLocation, AnnotationTypes.DISCARDED);
+    public ArrayBindReader(String name, String displayName, ArrayBody body, DataClassArray descriptor,
+                           TsonTypeReaderResolver resolver, SchemaLocation schemaLocation) {
+        this(name, displayName, body, descriptor, resolver, schemaLocation, AnnotationTypes.DISCARDED);
     }
 
-    public ArrayBindReader(String name, ArrayBody body, DataClassArray descriptor, TsonTypeReaderResolver resolver,
+    public ArrayBindReader(String name, String displayName, ArrayBody body, DataClassArray descriptor,
+                           TsonTypeReaderResolver resolver,
                            SchemaLocation schemaLocation, AnnotationTypes annotationTypes) {
-        super(name, body,
+        super(name, displayName, body,
                 AnnotationBoxing.wrap(resolver.resolve(body.elementType().name()), descriptor.arrayDataClass(),
                         annotationTypes),
                 schemaLocation);
@@ -172,7 +173,8 @@ final class ArrayBindReader extends ArrayAbstractReader<Object> {
                 throw new IllegalArgumentException("'" + name + "' resolves to " + dataClass.typeClass()
                         + ", which isn't array-shaped -- can't bind '" + name + "' as one");
             }
-            return new ArrayBindReader(name, body, descriptor, resolver, context.locationOf(name, typeDefinition),
+            return new ArrayBindReader(name, EntryDisplayName.of(name, typeDefinition), body, descriptor, resolver,
+                    context.locationOf(name, typeDefinition),
                     AnnotationTypes.of(context));
         }
 

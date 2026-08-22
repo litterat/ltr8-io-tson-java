@@ -85,9 +85,10 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
     private final AnnotationTypes ownAnnotationTypes;
     private final AnnotationTypes annotationTypes;
 
-    public RecordBindReader(String name, RecordBody body, DataClassRecord descriptor, TsonTypeReaderResolver resolver,
+    public RecordBindReader(String name, String displayName, RecordBody body, DataClassRecord descriptor,
+                             TsonTypeReaderResolver resolver,
                              SchemaLocation schemaLocation, AnnotationTypes annotationTypes) {
-        super(name, body, resolver, schemaLocation);
+        super(name, displayName, body, resolver, schemaLocation);
         this.descriptor = descriptor;
         this.annotationsCarrier = descriptor.annotationsCarrier().orElse(null);
         this.annotationTypes = annotationTypes;
@@ -167,13 +168,16 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
     private static TsonTypeReader<?> rebindContainerIfNeeded(CompiledField field, DataClassField target,
                                                              TsonTypeReaderResolver resolver, AnnotationTypes annotationTypes) {
         TsonTypeReader<?> parser = field.parser();
+        // The field's own name serves as both, here and only here: this rebuild deliberately drops the
+        // schema type name (see above), and a field name is already the author's own word for the value --
+        // there is nothing a derived display name would add over it.
         if (target.dataClass() instanceof DataClassArray targetArray && parser instanceof ArrayBindReader existing) {
-            return new ArrayBindReader(field.schema().name(), existing.body, targetArray, resolver,
-                    existing.schemaLocation, annotationTypes);
+            return new ArrayBindReader(field.schema().name(), field.schema().name(), existing.body, targetArray,
+                    resolver, existing.schemaLocation, annotationTypes);
         }
         if (target.dataClass() instanceof DataClassMap targetMap && parser instanceof MapBindReader existing) {
-            return new MapBindReader(field.schema().name(), existing.body, targetMap, resolver,
-                    existing.schemaLocation, annotationTypes);
+            return new MapBindReader(field.schema().name(), field.schema().name(), existing.body, targetMap,
+                    resolver, existing.schemaLocation, annotationTypes);
         }
         return parser;
     }
@@ -315,9 +319,11 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                     TsonTypeReaderResolver slotResolver =
                             tokenPreserving(name, body, labelled, resolver, location);
                     return slotResolver == null ? null
-                            : new GroupUnionBindReader(name, body, labelled, slotResolver, location);
+                            : new GroupUnionBindReader(name, EntryDisplayName.of(name, typeDefinition), body,
+                                    labelled, slotResolver, location);
                 }
-                return new RecordBindReader(name, body, requireRecord(name, dataClass), resolver,
+                return new RecordBindReader(name, EntryDisplayName.of(name, typeDefinition), body,
+                        requireRecord(name, dataClass), resolver,
                         context.locationOf(name, typeDefinition), AnnotationTypes.of(context));
             }
 
@@ -333,7 +339,8 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             }
 
             if (dataClass instanceof DataClassRecord record) {
-                RecordBindReader ownParser = new RecordBindReader(name, body, record, resolver,
+                RecordBindReader ownParser = new RecordBindReader(name, EntryDisplayName.of(name, typeDefinition),
+                        body, record, resolver,
                         context.locationOf(name, typeDefinition), AnnotationTypes.of(context));
                 return new VariantSchemaReader(name, ownParser, typeDefinition.subtypes(), resolver,
                         AnnotationTypes.DISCARDED);
