@@ -132,19 +132,40 @@ public class DataBindContext {
 		return getDescriptor(targetClass, targetClass);
 	}
 
+	/**
+	 * The descriptor for {@code parameterizedType}, resolved and cached on first use.
+	 *
+	 * <p><b>A lost race is not an error here.</b> This is a lookup that fills a cache on a miss, so two
+	 * threads asking for a type neither has seen both resolve it and both try to cache it -- and whichever
+	 * arrives second takes the first one's descriptor rather than failing. Under {@link #register}, which
+	 * throws on an already-registered type, the loser instead got "Class already registered", which a
+	 * schemaless read surfaces as a {@code SCHEMA_ERROR} against a document that has nothing wrong with it.
+	 * The two descriptors describe the same class, so which one wins does not matter; that they agree does,
+	 * which is why the winner's is returned rather than this thread's own.
+	 *
+	 * <p>Resolution deliberately runs outside any lock: it recurses back into this method for every
+	 * component type, so holding one across it would have to be reentrant over the whole graph, and the
+	 * duplicated work on a race is one descriptor. {@code computeIfAbsent} is out for the same recursion --
+	 * it is a documented deadlock/{@code IllegalStateException} on the map being computed.
+	 *
+	 * <p>{@link #register} and the {@code registerAtom} overloads stay strict: registering a type twice
+	 * <em>explicitly</em> is still a caller error.
+	 */
 	public DataClass getDescriptor(Class<?> targetClass, Type parameterizedType) throws DataBindException {
 
 		DataClass descriptor = descriptors.get(parameterizedType);
-		if (descriptor == null) {
-			descriptor = dataClassResolver.resolve(this, targetClass, parameterizedType);
-			if (descriptor == null) {
-				throw new DataBindException(
-						String.format("Unable to find suitable data descriptor for class: %s", targetClass.getName()));
-			}
-			register(parameterizedType, descriptor);
+		if (descriptor != null) {
+			return descriptor;
 		}
 
-		return descriptor;
+		DataClass resolved = dataClassResolver.resolve(this, targetClass, parameterizedType);
+		if (resolved == null) {
+			throw new DataBindException(
+					String.format("Unable to find suitable data descriptor for class: %s", targetClass.getName()));
+		}
+
+		DataClass winner = descriptors.putIfAbsent(parameterizedType, resolved);
+		return winner != null ? winner : resolved;
 	}
 
 	/**

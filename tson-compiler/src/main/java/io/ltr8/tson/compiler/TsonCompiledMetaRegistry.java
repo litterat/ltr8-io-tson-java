@@ -14,10 +14,10 @@ import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 
 import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * The compiled <b>meta-schema</b> registry, and the on-demand {@link TsonCompiledSchemaLoader} that fills
@@ -51,9 +51,17 @@ import java.util.Optional;
  * without re-fetching or double-registering ([TSON-DATA] §2.2.1: the pin is verification metadata, not
  * identity).
  *
- * <p>Not thread-safe: {@link #register}/{@link #get} are {@code synchronized}, but {@link #loadMeta}/{@link
- * #resolveLinked} (and their content-hash bookkeeping) are not -- matching {@link TsonSchemaRegistry}'s own
- * stated guarantee, no stronger.
+ * <p><b>Concurrent resolution of one identity is safe; it is not serialized.</b> {@link #register}/{@link
+ * #get} are {@code synchronized} and the content-hash map is concurrent, but {@link #loadMeta}/{@link
+ * #resolveLinked} deliberately are not: they recurse into themselves and holding a lock across a fetch
+ * would serialize unrelated loads. So two threads reaching the same cold identity both do the work, and the
+ * caches settle it -- {@link TsonSchemaRegistry#registerIfAbsent} and {@link #compileAndCache} both keep the
+ * first entry and hand it to everyone, rather than failing the loser or leaving two equivalent instances
+ * for one identity. What is duplicated on a race is work, never state.
+ *
+ * <p>Explicit registration keeps its strictness: {@link #register} and {@code TsonSchemaRegistry.register}
+ * still reject an identity that is already there, because registering the same schema twice on purpose is a
+ * caller error however many threads are involved.
  */
 public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader {
 
@@ -68,7 +76,11 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
     // hash-pinned reference to an identity is verified against it -- so conflicting pins for one
     // identity error (at most one can match the content) and a plain reference resolves to the
     // verified instance ([TSON-SCHEMA] §10.2's per-identity verification).
-    private final Map<String, String> contentHashes = new HashMap<>();
+    //
+    // Concurrent, because resolveLinked -- which writes here -- is deliberately not synchronized. A plain
+    // map loses entries under a concurrent put, and a lost entry here does not fail loudly: verifyPin finds
+    // no hash for the identity and silently verifies nothing, which is §10.2's MUST quietly skipped.
+    private final Map<String, String> contentHashes = new ConcurrentHashMap<>();
 
     /**
      * A fresh, empty {@link TsonSchemaRegistry} of its own and no fetch capability -- the common case for a
@@ -270,7 +282,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
             SchemaDocument document = parser.parseSchemaDocument();
             crossCheckId(document, uri, identity);
             TsonSchema resolved = new SchemaResolver(this).resolveSchema(document, parser.declarationPositions());
-            return schemaRegistry.register(TsonSchemaLinker.link(resolved, schemaRegistry));
+            return schemaRegistry.registerIfAbsent(TsonSchemaLinker.link(resolved, schemaRegistry));
         }
         TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
         Optional<SchemaDocument> parsed = parser.parseSchemaDocument(problems);
@@ -285,7 +297,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
         if (problems.isEmpty()) {
             TsonLinkedSchema linked = TsonSchemaLinker.link(resolved, schemaRegistry, problems);
             if (problems.isEmpty()) {
-                return schemaRegistry.register(linked);
+                return schemaRegistry.registerIfAbsent(linked);
             }
         }
         problems.diagnostics().forEach(receiver::report);
@@ -326,12 +338,24 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      * it as a {@link TsonCompiledMetaSchema}, and caches it by canonical identity. The compiled-cache half
      * of resolution, split from {@link #resolveLinked}'s register-only half. Callers guarantee the schema
      * is meta-layer ({@link #register}/{@link #loadMeta} both check first).
+     *
+     * <p><b>First one wins, rather than last.</b> {@link #loadMeta} checks the cache before doing the work,
+     * so two threads reaching the same uncached meta together both compile it; storing both would leave two
+     * equivalent instances for one identity, with whichever readers were built against the loser holding a
+     * reference nothing else shares. Overwriting is not an error -- the two are equivalent -- but one
+     * instance per identity is the property a cache is supposed to have. {@link #register}'s own path
+     * cannot reach a duplicate at all: {@code schemaRegistry.register} refuses one first.
      */
     private synchronized TsonCompiledMetaSchema compileAndCache(TsonLinkedSchema registered,
                                                                 TsonCompiledMetaSchema governingMeta) {
+        String identity = TsonCanonicalIdentity.canonicalize(registered.schema().id());
+        TsonCompiledMetaSchema existing = compiled.get(identity);
+        if (existing != null) {
+            return existing;
+        }
         TsonCompiledMetaSchema result = new TsonCompiledMetaSchema(
                 TsonSchemaCompiler.compile(registered, governingMeta), resolver);
-        compiled.put(TsonCanonicalIdentity.canonicalize(registered.schema().id()), result);
+        compiled.put(identity, result);
         return result;
     }
 

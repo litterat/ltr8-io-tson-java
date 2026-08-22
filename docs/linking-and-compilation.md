@@ -303,3 +303,18 @@ Two registries over one shared resolution core, the compiled-side counterparts t
   first resolution and checks every reference's `?sha256=` pin against it, on both fetch and cache-hit
   paths, so a conflicting pin errors rather than silently resolving to the cached instance. Verify-before-
   record, so a rejected fetch can't poison a later valid one.
+- **Concurrent first use of one identity is safe, and deliberately not serialized.** `loadMeta`/
+  `resolveLinked` recurse into themselves and hold no lock across a fetch, so two threads reaching the same
+  cold identity both do the work; the caches settle it, keeping the first entry and handing it to both
+  (`TsonSchemaRegistry.registerIfAbsent`, `compileAndCache`). **What is duplicated on a race is work, never
+  state** — one linked form and one compiled meta per identity, always. This is the fix for a real defect,
+  not a hypothetical: the old check-then-`register` shape failed the *loser*, and on a read that surfaced
+  not as a crash but as a `SCHEMA_ERROR` against a document with nothing wrong with it, on the first
+  concurrent requests a process ever served (`ReadPathConcurrencyTest` pins both halves). Explicit
+  registration stays strict — `register` on an identity already present is still an error, since doing that
+  on purpose is a caller mistake however many threads are involved. The same shape and the same fix applied
+  to `DataBindContext.getDescriptor`, the other read-path cache.
+- **The rest of the read path needs no locking at all.** A `Lexer`/`TsonDataStream` is built per read and
+  shared with nothing, and every compiled reader is immutable — the whole `reader` package holds exactly one
+  non-final instance field (`CompiledReaders.delegate`, `volatile`, rebound once at the end of a compile).
+  So a `TsonCompiledSchema` is safe to share across threads, which is what makes a `Tson` worth sharing.
