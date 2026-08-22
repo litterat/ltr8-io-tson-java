@@ -26,11 +26,6 @@ own prose (which had gone stale on at least one of them):
   "import cycle" diagnostic naming the actual cycle path. Distinct from what
   `TsonCompiledMetaRegistry.withStandardLibrary` already does, which is scoped to just the three bundled
   schemas in a known order, not a general algorithm.
-- [ ] **An empty `{}` does not count against a map's `min_items`.** `b: {text => order; 1..}` accepts data
-  `b: {}`, through a named declaration as much as through the sugar, while `max_items` reports correctly
-  (re-verified 2026-08-21). `EmptyBrace` presumably reaches the map reader as something other than a
-  zero-entry map — the concrete instance of the empty-brace primitive under Miscellaneous, and the reason
-  that one is worth doing.
 - [ ] **The rest of §8.2's deferred value-level checks.** Materialisation "runs the value-level checks that
   open bounds deferred: family coherence rules whose operands were parameters". The array family's
   `min_items <= max_items` is one rule over the binding pair for arrays *and maps*: a resolver error where
@@ -139,9 +134,11 @@ validate-then-fix loop the project targets.
 ## Miscellaneous
 
 - [ ] **General resolver-layer structural rules as reusable primitives**, rather than binding-time-only
-  behaviour — empty-brace resolution, the absent-vs-missing distinction. The map `min_items` item above is
-  what this looks like when it bites: `{}` reaches a reader as something other than a zero-entry container,
-  so a rule stated over "how many entries" silently does not apply to it.
+  behaviour — empty-brace resolution, the absent-vs-missing distinction. §2.8's "the empty container of that
+  type" is still a rule each container reader applies for itself: the map reader's own zero-entry case was
+  silently exempt from `min_items` until it was fixed one reader at a time, and nothing structural stops the
+  next container from repeating it. What a primitive would buy is the rule stated once, where "how many
+  entries does this value have" has one answer whatever spelled it.
 - [ ] **Annotations are still discarded at a dispatched position.** A dispatcher (`VariantBindReader` for a
   union, `VariantSchemaReader` under bind mode) must consume the leading annotations to reach the
   `!typeName` it dispatches on -- they precede it in `data-value = *annotation [type-ref] core-value` -- so

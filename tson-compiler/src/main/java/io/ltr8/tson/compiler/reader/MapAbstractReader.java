@@ -29,6 +29,12 @@ import java.util.function.BiConsumer;
  * pair to a {@link BiConsumer} rather than assembling a result itself, the same reasoning {@link
  * ArrayAbstractReader#readInto} documents for arrays.
  *
+ * <p><b>{@code {}} is a zero-entry map here, size rules included.</b> [TSON-DATA] §2.8 defers an empty
+ * brace to the resolver and says it resolves to "the empty container of that type" once a schema supplies
+ * one, so at a map position it is a map holding nothing -- and a map holding nothing is exactly what {@code
+ * min_items: 1} forbids. The count is therefore validated in {@link #expectMapShape}, the one funnel every
+ * map reader passes through, rather than in {@link #readInto}, which a {@code {}} never reaches.
+ *
  * <p>Unlike {@link ArrayAbstractReader}, there's no {@code unique_items}/{@code ElementState}
  * concept here at all -- {@link MapBody} carries neither: a map has no per-entry required/optional
  * state for a value the way an array element or tuple position has.
@@ -95,6 +101,10 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
         }
         if (e instanceof EmptyBraceEvent) {
             ctx.next();
+            // A map with zero entries, so its size faces min_items/max_items exactly as a stated entry list
+            // does. Checked here rather than in each subclass's own empty branch, because that is where it
+            // went missing: only readInto validated size, and {} never reaches readInto.
+            validateSize(0, ctx);
             return Shape.EMPTY;
         }
         ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a map for '" + name + "', found " + TypeRefCheck.describe(e),

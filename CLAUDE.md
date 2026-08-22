@@ -332,7 +332,9 @@ note: a stated FIXED value is checked, not obeyed; an omitted `OPTIONAL_FIXED` f
 inconsistency; records are closed under their type (§7.2, `UNRECOGNIZED_FIELD` — the same line polices
 schema authoring through the meta's compiled reader); repeated fields/map keys are errors (#41/#42) with
 last-value-wins recovery underneath; map-key identity is the decoded host value, type-ref and annotations
-stripped (#43); a written `_` at `REQUIRED_DEFAULT` is an error where omission injects silently.
+stripped (#43); a written `_` at `REQUIRED_DEFAULT` is an error where omission injects silently; `{}` is
+the empty container of the position's own type (§2.8), so a zero-entry map faces `min_items` like any
+other value.
 
 ### Diagnostics — `docs/readers-and-diagnostics.md`
 

@@ -114,6 +114,14 @@ is small and parsed once.)
   and an injection; #42 calls this its strongest case, since warn-and-inject answers "here is a value" to
   a document that said "absent". The default is still what the field decodes to — only the verdict
   changes, the same split `verifyFixed` makes for a contradicted FIXED value.
+- **`{}` is the empty container of the position's own type, size rules included.** [TSON-DATA] §2.8 defers
+  an empty brace to the resolver and resolves it to "the empty container of that type" once a schema
+  supplies one, so at a map position it is a map with zero entries and `min_items: 1` rejects it. The count
+  is validated in `MapAbstractReader.expectMapShape`, the one funnel every map reader passes through, and
+  deliberately **not** in `readInto` — an empty brace never enters the entry loop, which is exactly how the
+  rule went missing while `max_items` on the same declaration reported correctly. The record position was
+  never affected (an empty brace there reports each missing required field) and an array's `[]` is an
+  ordinary empty element list, so this closed the one position where the three disagreed.
 - **`EventSkip`** is the shared grammar-aware "consume and discard" utility (leading annotations + an
   optional type-ref as every reader's first step; a whole value; one core-value on a shape mismatch, to
   keep the stream correctly positioned). **`ListEventSource`** replays a pre-built event list — used for a
