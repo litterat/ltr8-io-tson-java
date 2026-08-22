@@ -62,6 +62,42 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
                           String message, String expected, String actual,
                           Optional<SourcePosition> dataPosition, Optional<SourcePosition> schemaPosition) {
 
+    // ── Absence, for a renderer ──────────────────────────────────────────
+    //
+    // This record spells "nothing to say here" two ways, and both are deliberate: `""` for the three
+    // components below, `Optional` for the two pointers -- where `""` is not absence but the *root*, a
+    // location a document-level schema problem genuinely carries. That split is right at the source and
+    // useless at the sink: anything rendering a diagnostic (a CLI's own wire DTO, an HTTP error body) wants
+    // one answer to "is there anything here", and had to know per component which convention applies. These
+    // three say it once, so a renderer asks rather than remembers.
+
+    /**
+     * The schema this problem is in, if the diagnostic knows -- absent for a schemaless read, and for a
+     * document that failed before its own {@code !!id} could be read.
+     */
+    public Optional<String> schemaIdIfKnown() {
+        return stated(schemaId);
+    }
+
+    /**
+     * The constraint that failed, if the throw site named one. Absent where it stated a <em>rule</em> rather
+     * than a substitution -- an adjacency violation, a trailing separator -- which has no "expected this,
+     * found that" to give.
+     */
+    public Optional<String> expectedIfStated() {
+        return stated(expected);
+    }
+
+    /** What was found instead, paired with {@link #expectedIfStated} and absent under the same rule. */
+    public Optional<String> actualIfStated() {
+        return stated(actual);
+    }
+
+    /** This record's {@code ""}-means-nothing convention, as an absence. */
+    private static Optional<String> stated(String value) {
+        return value.isEmpty() ? Optional.empty() : Optional.of(value);
+    }
+
     /**
      * {@code e} as a base-syntax {@link Code#VALIDATION_ERROR} -- the three ways a document can fail before
      * any reader sees a value: it doesn't lex, it doesn't parse, or it's a well-formed document of a kind
