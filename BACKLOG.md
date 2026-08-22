@@ -104,20 +104,14 @@ positions) compiles, validates and round-trips first try, and both data- and sch
 supported genuinely one-shot fixes — with these exceptions, ordered by how much each hurts the
 validate-then-fix loop the project targets.
 
-- [ ] **An under-applied template named as a data value's type is a user error reported as a library fault.**
-  Data `!paged { … }` against a schema declaring `paged => <T> { … }` reaches an `ErrorReader` and exits 70
-  with "This is a bug in tson, not a problem with your document" — and the `!box` variant's message even
-  blames the linker ("TsonSchemaLinker should already have rejected this"). `tson-cr-structure-templates.md`
-  §4.6 is explicit that a template with any parameter is an ordinary resolver error as a data annotation,
-  "without exception". Naming a template without its arguments is among the most likely author mistakes in
-  the target use case, so it currently gets the worst answer in the whole surface. The fix wants a real
-  diagnostic naming the route: apply the template in a schema declaration and reference that entry.
 - [ ] **`!paged<order>` at a data type-ref position dead-ends the author.** The natural spelling of "a page
   of orders" as a data root gets `expected whitespace after type name 'paged' before '<'`; following that
   advice (`!paged <order>`) just produces a second parse error, and the real rule — data type-refs carry no
   arguments; declare `orders_page => paged<order>` and write `!orders_page` — is never stated. Wants a
   targeted diagnostic in the same posture as §4.1's migration hint. (The data grammar itself is correct to
-  refuse; only the message is at issue.)
+  refuse; only the message is at issue.) The *unapplied* spelling now states that rule where it lands
+  (`OpenTemplateReader`); this is the same rule one keystroke earlier, where the lexer refuses first and
+  nothing downstream gets to say it.
 - [ ] **A UOE thrown inside `SchemaDesugarer` aborts the whole compile**, where every other desugar failure
   reports per declaration and resyncs — so a schema with a gap in one declaration gets no verdict on any of
   the others. The CLI half of this is now done (a gap renders as `not implemented yet: <message>`, the

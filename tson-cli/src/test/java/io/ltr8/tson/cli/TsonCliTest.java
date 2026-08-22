@@ -94,6 +94,35 @@ class TsonCliTest {
         assertFalse(err.contains("Please report it"), err);
     }
 
+    /**
+     * Naming a template as a data document's own type is the author's error, and gets an author's answer:
+     * exit 1 and a diagnostic naming the route. It used to reach an ErrorReader and exit 70 under "this is a
+     * bug in tson", the worst answer in the whole surface for one of the likeliest mistakes.
+     */
+    @Test
+    void dataNamingATemplateIsAnOrdinaryVerdict(@TempDir Path dir) throws IOException {
+        Path schema = writeFile(dir, "paged.tn", """
+                !!id:"https://example.test/cli-paged.tn"
+                !!meta:"https://tson.io/2026/32/m/meta.tn"
+                !!import:"https://tson.io/2026/32/m/core.tn"
+                {
+                  order => { id: text }
+                  paged => <T> { items: [T] }
+                  orders_page => paged<order>
+                }
+                """);
+        Path data = writeFile(dir, "paged-data.tn", """
+                !!schema:"https://example.test/cli-paged.tn"
+                !paged { items: [ { id: "a" } ] }
+                """);
+
+        String out = captureStdout(() ->
+                assertEquals(1, TsonCli.run(new String[] {"validate", schema.toString(), data.toString()})));
+
+        assertTrue(out.contains("is a template taking 1 type argument [T]"), out);
+        assertTrue(out.contains("my_type => paged<...>"), out);
+    }
+
     @Test
     void helpExitsZeroToStdout() throws IOException {
         for (String flag : new String[] {"--help", "-h", "help"}) {

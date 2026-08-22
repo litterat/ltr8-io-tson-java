@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -490,5 +491,71 @@ class RecordTemplateTest {
                           plain => { a: text }
                           holder => { b: plain<text> }"""));
         assertTrue(thrown.getMessage().contains("declares no type parameters"), thrown.getMessage());
+    }
+
+    // ── A template named as a data value's own type ──────────────────────
+    //    A template is not a type until it is applied, and a data type-ref carries no arguments -- so
+    //    naming one in data is the author's error, not a gap in this library. See OpenTemplateReader.
+
+    /**
+     * The mistake the target use case invites: "a page of orders" names {@code paged}, the thing the schema
+     * declares. It is a data diagnostic like any other -- collectible, and located at the type-ref the
+     * author wrote -- where it used to reach the lifted synthetic and exit on the library's own fault code
+     * complaining about a missing {@code instance_template} factory.
+     */
+    @Test
+    void namingATemplateAsADataTypeIsADataDiagnostic() {
+        TsonCompiledSchema compiled = compile("""
+                  order => { id: text }
+                  paged => <T> { items: [T] }
+                  orders_page => paged<order>""");
+        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+
+        Object value = compiled.get("paged")
+                .read(TestDocuments.document("!paged { items: [ { id: \"a\" } ] }", problems));
+
+        assertNull(value);
+        assertEquals(1, problems.diagnostics().size(), () -> problems.diagnostics().toString());
+        Diagnostic problem = problems.diagnostics().get(0);
+        assertEquals(Diagnostic.Code.UNKNOWN_TYPE_REF, problem.code());
+        assertTrue(problem.message().contains("'paged' is a template taking 1 type argument [T]"),
+                problem.message());
+        assertTrue(problem.message().contains("my_type => paged<...>"), "the route out of it: " + problem.message());
+        assertEquals("!paged", problem.actual());
+        // The applied form is a type and still reads, which is what the message points at.
+        assertNotNull(compiled.get("orders_page")
+                .read(TestDocuments.document("{ items: [ { id: \"a\" } ] }")));
+    }
+
+    /**
+     * The same for a template whose body needs no lifting at all: {@code box}'s field type is the parameter
+     * itself, which used to compile to an {@link io.ltr8.tson.compiler.reader.ErrorReader} whose message
+     * blamed the linker for not rejecting {@code T}. The entry is refused before any of that.
+     */
+    @Test
+    void aTemplateWhoseFieldIsTheParameterIsRefusedTheSameWay() {
+        TsonCompiledSchema compiled = compile("""
+                  box => <T> { v: T }
+                  int_box => box<int32>""");
+        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+
+        compiled.get("box").read(TestDocuments.document("!box { v: 1 }", problems));
+
+        assertEquals(1, problems.diagnostics().size(), () -> problems.diagnostics().toString());
+        assertTrue(problems.diagnostics().get(0).message().startsWith("'box' is a template taking"),
+                problems.diagnostics().get(0).message());
+    }
+
+    /** A fail-fast read throws the read exception every other data problem throws -- never a library fault. */
+    @Test
+    void aFailFastReadOfATemplateThrowsAReadException() {
+        TsonCompiledSchema compiled = compile("""
+                  box => <T> { v: T }
+                  int_box => box<int32>""");
+
+        TsonReadException thrown = assertThrows(TsonReadException.class,
+                () -> compiled.get("box").read(TestDocuments.document("!box { v: 1 }")));
+
+        assertTrue(thrown.getMessage().contains("is a template taking"), thrown.getMessage());
     }
 }

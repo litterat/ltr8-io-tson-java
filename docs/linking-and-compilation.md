@@ -201,6 +201,18 @@ keeps `TsonValue` free for `tson-tree`'s own root type (`BACKLOG.md`).
   throws unconditionally even in collecting mode (it's a library/schema-compile gap a caller can't fix by
   correcting data). A referenced-but-absent name is a stricter `TsonSchemaLinker` invariant violation and
   propagates uncaught.
+- **An open entry compiles to `OpenTemplateReader`, before its body is looked at at all.** An entry
+  declaring type parameters is a template, not a type (§5.10), so there is nothing a value could validate
+  against; the reader reports `UNKNOWN_TYPE_REF` against the data and skips the value, like any other reader
+  finding data the schema does not admit. Reaching it is **always** a data error: a *schema* naming a
+  template without applying it is rejected at link time (`checkArity`'s zero-argument case), so no field,
+  element or supertype routes here — only a data type-ref naming the template, `!paged` against `paged =>
+  <T> { … }`, which `tson-cr-structure-templates.md` §4.6 makes an ordinary resolver error "without
+  exception". Refusing the whole entry is what makes the verdict right: built, a parameterised body either
+  reached the parameter (`ErrorReader`, message blaming the linker for a stray `T`) or the lifted open
+  synthetic (no `instance_template` factory), both exiting 70 for a plainly invalid document. The message
+  mirrors the linker's schema-side sentence for the same mistake and adds the route — name the application
+  in the schema, write that name in the data.
 - **`TsonCompiledSchema` is `sealed permits TsonCompiledMetaSchema`.** A meta-layer schema (its `!!meta` is
   meta-kernel) compiles to the `TsonCompiledMetaSchema` subtype — a compiled schema plus its governing
   constructor vocabulary — so it can go on to govern others; every other schema is a bare
