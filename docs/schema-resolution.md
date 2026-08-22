@@ -113,8 +113,8 @@ namespace *before* any local declaration resolves.
     would make every widening compare vacuously equal).
   - **`multiple_of: 0` is the one case that was unsound rather than merely undiagnosed.** `IntegerParser` and
     `DecimalParser` validate with `value.remainder(m)`, which throws on a zero divisor — so before this check
-    a valid *data* document read against such a type exited 70 under the "this is a bug in tson" banner, an
-    author error reported as a library fault against the wrong document. `RationalParser` already guarded its
+    a valid *data* document read against such a type failed on the library's own fault code, an author error
+    reported against the wrong document. `RationalParser` already guarded its
     own divisor.
   - Unchecked by design, each documented on its class and matching that family's existing narrowing gap:
     `duration_type`'s text bounds (ordering them means parsing them — `"P1M"` vs `"P30D"` does not order
@@ -124,7 +124,7 @@ namespace *before* any local declaration resolves.
     that predates them and is nothing to do with coherence: `date_type.min`/`max` are declared `value?` in
     meta.tn (the untyped escape hatch), so a bound arrives as a `String` and the bind into `DateType`'s
     `Optional<LocalDate>` throws `ClassCastException` — surfaced as an `UnsupportedOperationException`, exit
-    70, "this is a bug in tson". `!date ^ { min: 2020-01-01 }` and the `!date`-tagged spelling fail
+    70, "not implemented yet". `!date ^ { min: 2020-01-01 }` and the `!date`-tagged spelling fail
     identically, so **no temporal bound can be written at all today**. `AtomCoherenceTest` reaches these
     families by direct construction; they go live at the resolver the moment the binding is fixed.
 - **Two exception types, and which one is deliberate.** `UnsupportedOperationException` means *this library

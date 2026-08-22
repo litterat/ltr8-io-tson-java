@@ -303,7 +303,10 @@ model).
 real Java references, **eager** so a broken entry surfaces at compile time. `TsonTypeReader<T>` is strictly
 one method, `T read(TsonReadContext)`; framing and error policy live elsewhere. A `RuntimeException` while
 building one entry becomes an `ErrorReader` (the schema compiles; reading that entry fails — a library-gap
-marker, distinct from author errors). `TsonCompiledSchema` is `sealed permits TsonCompiledMetaSchema` (a
+marker, distinct from author errors), while an entry declaring type parameters becomes an
+`OpenTemplateReader` before its body is looked at at all: a template is not a type, so naming one in *data*
+is an ordinary data diagnostic (a schema naming one unapplied was already refused at link time).
+`TsonCompiledSchema` is `sealed permits TsonCompiledMetaSchema` (a
 meta-layer schema can govern others). Two compile modes (governed / standalone) share one walk; two output
 modes (tree / bind) share each `*AbstractReader` family, selected by which factory registry you hold.
 

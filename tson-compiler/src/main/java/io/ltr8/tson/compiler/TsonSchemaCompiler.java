@@ -37,6 +37,11 @@ import java.util.function.Function;
  * covers both a constructor with no registered {@link ValueReaderFactory} at all, and a factory
  * that's registered but rejects this particular entry.
  *
+ * <p><b>An entry declaring type parameters never reaches a factory at all</b>: it is a template, not a type
+ * (§5.10), so it compiles to an {@link OpenTemplateReader} that reports against the data and skips the
+ * value. Only a <em>data</em> type-ref can reach one -- a schema naming a template without applying it is
+ * refused when it links -- and that is the author's error, not a gap. See {@link OpenTemplateReader}.
+ *
  * <p>Two compile modes share this eager walk, differing only in how a body's constructor name maps to
  * a factory. A <b>governed</b> compile ({@link #compile(TsonLinkedSchema, TsonCompiledMetaSchema)})
  * dispatches, scoped, through the governing meta-schema ({@link #governedFactory}): its own declared
@@ -183,6 +188,12 @@ public final class TsonSchemaCompiler {
         }
 
         private TsonTypeReader<?> build(String name, TypeDefinition definition) {
+            if (!definition.parameters().isEmpty()) {
+                // An open entry is a template, not a type, whatever its body says -- see OpenTemplateReader
+                // for why the refusal is the entry's own reader rather than a check at the root.
+                return new OpenTemplateReader(name, definition.parameters(),
+                        new ValueReaderContext(linked, readers).locationOf(name, definition));
+            }
             Top body = definition.body();
             if (body instanceof Reference r) {
                 return resolve(r.target().name());
