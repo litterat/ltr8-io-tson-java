@@ -3368,3 +3368,118 @@ value.
 
 Option 2 is the smaller edit; option 3 is the better answer if resolver output is meant to round-trip what
 the author wrote.
+
+---
+
+## 55. `!!import` is shallow but `!!meta` is not, and the flat namespace the format is built on needs both
+
+**Section:** §2.2.3 (`!!import`, *Imports are shallow*, *Merged entries keep their home namespace*); §3.3.1
+(*The Structure Namespace*, *Import what you expose*); §3.3.2 (*The Type-Name Namespace*). Related: #51.
+
+**Problem:** the two directives that populate a schema's namespace are given opposite depth rules, and the
+prose never says why.
+
+§3.3.1 defines the `!!meta` half as the target's *whole namespace*:
+
+> The **structure namespace** of a schema document is the namespace of its `!!meta` target — the target's
+> local declarations **plus its imports**. One hop.
+
+and states the reasoning directly:
+
+> **Import what you expose.** Because resolution is one hop, a meta-schema's namespace is the *complete*
+> vocabulary it offers everything it governs. A meta-schema MUST therefore import every schema whose entries
+> it intends to expose — this is why `meta.tn1` imports the meta-kernel: the import is the delivery mechanism
+> for the kernel's structural vocabulary … to every meta-governed schema and its resolver output.
+
+§2.2.3 gives `!!import` the opposite rule:
+
+> **Imports are shallow.** Only the entries declared in the imported schema's own body are imported — entries
+> the imported schema itself brought in via its own `!!import` directives are not transitively included.
+
+The bundled schemas depend on the first rule. core.tn declares `void => !unit {}` (line 55); `unit` is
+declared only in meta-kernel.tn, and core.tn reaches it purely because meta.tn imports meta-kernel and
+`!!meta` hands over meta.tn's *merged* namespace. So the format already relies on a flat namespace crossing
+a document boundary — for `!!meta`. `!!import` is the exception, and the asymmetry is unmotivated in the text.
+
+**Three consequences of the shallow rule.**
+
+*(a) The diamond is unauthorable.* A schema importing `a.tn` and `b.tn`, each of which imports core.tn, has
+every core.tn name arriving twice. §2.2.3's collision rule counts name *occurrences*, so this is a resolver
+error — `'void' is declared by more than one !!import` — even though both occurrences are the same entry of
+the same schema. Since every practical schema imports core.tn, a schema can reference types from exactly one
+other published schema. That is the difference between a schema library and a chain, and it is what makes a
+TSON-native API description — which by nature references several independently-published schemas —
+unwritable.
+
+*(b) Name hiding becomes legal, and the spec's own example endorses it.* §2.2.3:
+
+> If Y declares `y_id => uuid` through its own import of core, then X, importing Y but not core, receives
+> `y_id` still bound to core's `uuid` — even where X locally declares an unrelated `uuid` (no collision
+> arises: core's name was never merged into X).
+
+Two different types named `uuid` are then live in one resolution, and which one a reader of X is looking at
+depends on reconstructing X's import list. In a format with no aliasing, no qualified names and no renaming
+at an import site, that is a hazard with no corresponding benefit: the flat namespace is what makes a bare
+name mean one thing, and this clause is the one place the format gives that up.
+
+*(c) A position may admit a type the data cannot name.* §7.2's subsumption admits any subtype of a
+position's declared type. Where the position is declared in a schema two hops away, the admitted subtypes'
+names are not in the governing schema's namespace, so a data document cannot spell an annotation the schema
+says is valid there. The admission rule and the naming rule disagree about the vocabulary.
+
+**Interpretation chosen:** `!!import` contributes the imported schema's **whole namespace**, its own imports
+included — the same rule §3.3.1 already gives `!!meta`, applied to both directives — and a collision is
+decided by **entry identity** rather than by name occurrence:
+
+- One schema reached by several routes is one set of entries. Re-arrival unifies; it is not a conflict. This
+  is what makes the diamond ordinary. Identity is the canonical one (§2.2.1), so a pinned and an unpinned
+  reference to one schema unify, and listing a schema twice is redundant rather than an error.
+- Two *different* schemas declaring one name is a hard error. Distinct types cannot share a name in a flat
+  namespace.
+- A local declaration may not reuse any name the import closure binds, however many hops away it was
+  declared. No hiding, no redefinition — (b) above is refused rather than permitted.
+
+Implemented in `TsonSchemaLinker.mergeImports` and `SchemaResolver.mergeImports` (the same rule, one phase
+apart); `TsonLinkedSchema.entryOrigins` already records each entry's declaring identity transitively, which
+is exactly the key the identity comparison needs. `TransitiveImportTest` pins all of it.
+
+**A consequence worth stating with it: revision skew becomes a hard error, by design.** Schema identities
+carry the spec revision (`https://tson.io/2026/32/m/core.tn`), so two schemas published against different
+revisions declare their names in genuinely different documents. Under the identity rule, a schema whose
+import closure reaches both is rejected at namespace-construction time, naming both declaring schemas. That
+is the intended outcome and it needs no separate rule — it is the collision rule firing. The alternative the
+shallow rule produces is worse: two identically-spelled `text` types coexist silently and surface much later
+as a field conflict between types that print the same name.
+
+Two costs are accepted deliberately, and should be stated in the spec rather than discovered:
+
+1. **Every name in the closure is reserved.** Importing two peers and core.tn spends `id`, `name`, `value`,
+   `text` and the rest, with no aliasing to escape with. This is precisely what §2.2.3's `uuid` clause buys,
+   so removing it is a trade, not a free win. It is the same trade every namespace-free format makes, and it
+   buys the property that a bare name means one thing everywhere in a resolution.
+2. **Some conflicts remain unfixable by the importer.** If `a.tn` imports `x.tn` and `b.tn` imports `y.tn`
+   and both declare `id`, a schema importing `a.tn` and `b.tn` is rejected over names from schemas it never
+   named, and can only be repaired upstream. Under a flat namespace this is unavoidable; it should be
+   documented as the cost of flatness rather than left to be met in the field.
+
+**Suggested resolution:** replace the *Imports are shallow* paragraph with the transitive rule, and restate
+the collision rule in terms of identity:
+
+> **Imports are transitive.** An `!!import` contributes the imported schema's entire namespace — the entries
+> it declares and the entries it imported — exactly as `!!meta` contributes its target's namespace (§3.3.1).
+> A schema's namespace is therefore flat: one name denotes one type throughout.
+>
+> Multiple `!!import` directives are permitted and are loaded in declaration order. A schema reached through
+> more than one route contributes its entries once; naming the same schema twice, or under two spellings of
+> one canonical identity (§2.2.1), is redundant and not an error. It is a resolver error for two *different*
+> schemas to declare the same name anywhere in the import closure, or for a local declaration to reuse a name
+> the closure already binds — the schema fails to load, and the diagnostic names both declaring schemas.
+
+Then delete the *Merged entries keep their home namespace* paragraph's `uuid` example, whose point is that a
+name may denote two types at once, and keep the surrounding paragraph: an imported entry's internal
+references are still fixed at its own resolution and are not re-resolved against the importer. Those two
+statements are independent, and only the example conflicts with the rule above.
+
+§3.3.1's "One hop" also needs re-wording once `!!import` is transitive: "the target's local declarations plus
+its imports" then means the target's full closure. Nothing in the bundled chain changes (meta.tn imports only
+meta-kernel), but the sentence stops being accurate as written.

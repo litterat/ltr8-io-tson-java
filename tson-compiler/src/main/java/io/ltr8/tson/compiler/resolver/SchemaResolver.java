@@ -12,6 +12,7 @@ import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.stream.ListEventSource;
 import io.ltr8.tson.schema.TsonCanonicalIdentity;
+import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
@@ -362,21 +363,42 @@ public final class SchemaResolver {
     }
 
     /**
-     * Stage 1 of {@link #resolveSchema(SchemaDocument)} -- every {@code !!import}'s own entries, in
+     * Stage 1 of {@link #resolveSchema(SchemaDocument)} -- every {@code !!import}'s whole namespace, in
      * declaration order, merged as-is (never re-resolved against the importer). Mirrors {@code
-     * TsonSchemaLinker.mergeImports} exactly, including its collision rule, since this is the same concept
-     * discovered one stage earlier.
+     * TsonSchemaLinker.mergeImports} exactly, including its transitivity and its identity-based collision
+     * rule ({@code SPEC-FEEDBACK.md} #55), since this is the same concept discovered one stage earlier: an
+     * import contributes everything its namespace holds, one schema reached by several routes unifies, and
+     * two different schemas declaring one name is the error.
+     *
+     * <p>Unlike the linker's, this merge has no {@code subtypes} to reconcile when a route repeats --
+     * {@code subtypes} is populated at link time, one phase later, so both copies are still as their
+     * declaring schema resolved them and the first is kept.
      */
     private Map<String, TypeDefinition> mergeImports(SchemaDocument document) {
         Map<String, TypeDefinition> merged = new LinkedHashMap<>();
+        Map<String, String> origins = new LinkedHashMap<>();
+        Set<String> alreadyImported = new LinkedHashSet<>();
         for (String importUri : document.imports()) {
-            TsonSchema imported = loader.resolveLinked(importUri).schema();
-            for (Map.Entry<String, TypeDefinition> entry : imported.entries().entrySet()) {
-                if (merged.containsKey(entry.getKey())) {
-                    throw new TsonSchemaValidationException(
-                            "'" + entry.getKey() + "' is declared by more than one !!import");
+            if (!alreadyImported.add(TsonCanonicalIdentity.canonicalize(importUri))) {
+                continue;
+            }
+            TsonLinkedSchema imported = loader.resolveLinked(importUri);
+            for (Map.Entry<String, TypeDefinition> entry : imported.schema().entries().entrySet()) {
+                String name = entry.getKey();
+                String origin = imported.originOf(name);
+                String incumbent = origins.get(name);
+                if (incumbent != null) {
+                    if (!incumbent.equals(origin)) {
+                        throw new TsonSchemaValidationException("'" + name + "' is declared by two different "
+                                + "schemas reached through !!import ('" + incumbent + "' and '" + origin
+                                + "') -- distinct types cannot share one name in the flat namespace; import "
+                                + "one of them, or a version of each that agrees on where '" + name
+                                + "' is declared");
+                    }
+                    continue;
                 }
-                merged.put(entry.getKey(), entry.getValue());
+                merged.put(name, entry.getValue());
+                origins.put(name, origin);
             }
         }
         return merged;

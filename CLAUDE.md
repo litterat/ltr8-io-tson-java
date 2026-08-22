@@ -280,9 +280,14 @@ form needs no materialization.
 
 `TsonCanonicalIdentity.canonicalize` is §2.2.1's algorithm (exactly two reductions — strip scheme, strip
 query — everything else must already be canonical), public API because `TsonSchemaLoader` keys on it.
-`TsonSchemaLinker.link(schema, loader)` merges `!!import`s (recording each merged entry's origin schema id in
+`TsonSchemaLinker.link(schema, loader)` merges `!!import`s — an import's **whole namespace**, its own imports
+included (transitive, diverging from §2.2.3's "imports are shallow"; `SPEC-FEEDBACK.md` #55), with
+**collisions decided by entry identity rather than name occurrence**: one schema reached by several routes
+unifies (so the core.tn diamond is ordinary), two different schemas declaring one name is an error, and
+nothing may shadow a name the closure already binds (recording each merged entry's origin schema id in
 `TsonLinkedSchema.entryOrigins`, transitively — so a declaration's identity and its line always come from the
-same document, whichever schema flattened it in), populates `subtypes`, rejects an entry no finite document can
+same document, whichever schema flattened it in, and so the identity comparison has a key). It populates
+`subtypes`, rejects an entry no finite document can
 satisfy (`TypeInhabitance` — a least fixed point over the entry graph, exact and total; `SPEC-FEEDBACK.md`
 #25), derives choice
 `disjoint` (`ChoiceDisjointness` — total and two-valued: `true` iff every variant occupies a distinct
