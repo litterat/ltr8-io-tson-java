@@ -149,6 +149,24 @@ public sealed class TsonCompiledSchema permits TsonCompiledMetaSchema {
     }
 
     /**
+     * Where a read that entered through {@code typeName} should root its schema pointer: the name the
+     * author wrote, not the entry it resolves to.
+     *
+     * <p>The two differ exactly when the name is an alias for something the resolver minted -- {@code
+     * order_response => paged<order>} compiles to the instantiation entry's own reader, and that reader,
+     * shared by every entry point, cannot know which of its names a given read arrived through. So the
+     * facade seeds this before the reader runs; {@code inRecord} then keeps the pointer and re-anchors only
+     * the identity and line, which is the interaction those two methods were already written for.
+     *
+     * <p>Empty for a name this schema does not declare -- the caller reports that as an unknown type rather
+     * than reading anything.
+     */
+    Optional<SchemaLocation> rootDeclaration(String typeName) {
+        return Optional.ofNullable(schema().entries().get(typeName))
+                .map(entry -> SchemaLocation.of(linkedSchema.originOf(typeName), typeName, entry.position()));
+    }
+
+    /**
      * The reader for {@code typeName}, or empty if this schema has none -- the non-throwing
      * counterpart to {@link #get}, for a caller that treats an absent entry as a normal outcome
      * (e.g. building a governing meta's scoped constructor vocabulary, where a placeholder schema

@@ -328,7 +328,14 @@ public final class TsonTreeReader {
             return abandon(ctx, Diagnostic.Code.UNKNOWN_TYPE, compiled.unknownTypeMessage(name),
                     compiled.declaredTypeNames(), name);
         }
-        return (TsonValue) reader.read(ctx);
+        // Seeded with the name the author wrote, so a pointer into a template-derived type says
+        // /order_response/items rather than naming the entry the resolver minted -- see rootDeclaration.
+        return (TsonValue) reader.read(rooted(ctx, compiled, name));
+    }
+
+    /** {@code ctx} rooted at the declaration a read entered through, when the schema declares one. */
+    private static TsonReadContext rooted(TsonReadContext ctx, TsonCompiledSchema compiled, String typeName) {
+        return compiled.rootDeclaration(typeName).map(ctx::underDeclaration).orElse(ctx);
     }
 
     /**
