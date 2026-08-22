@@ -19,6 +19,12 @@ import io.ltr8.bind.DataClassUnion;
 import io.ltr8.tson.compiler.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
 
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.UncheckedIOException;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Map;
 
@@ -51,6 +57,12 @@ public final class TsonObjectWriter {
     // ── Entry point ──────────────────────────────────────────────────────
 
     /**
+     * Re-emits a structurally-read annotation value; see {@link #writeAnnotations}. Held here rather than
+     * built per call, being stateless.
+     */
+    private final TsonTreeWriter treeWriter = new TsonTreeWriter();
+
+    /**
      * Writes {@code value} as TSON text -- mainly useful as a debugging tool (inspect what a bound
      * object actually contains) rather than a guaranteed-lossless serializer. Emits a {@code
      * !typeName} type-ref only where one is actually needed for the value to read back correctly:
@@ -69,18 +81,47 @@ public final class TsonObjectWriter {
      * read produced -- a bound object writes like any other value, and one kept structurally (its name
      * resolved to no declared type) writes through the tree writer.
      */
-    private final TsonTreeWriter treeWriter = new TsonTreeWriter();
-
     public String toTson(Object value) {
+        StringBuilder text = new StringBuilder();
+        write(value, text);
+        return text.toString();
+    }
+
+    /**
+     * Writes {@code value} as TSON <b>into {@code out} as it goes</b>, so a large or open-ended document
+     * never exists as a {@code String} -- the write-side counterpart to {@link TsonObjectReader} taking an {@code
+     * InputStream}. The bytes are UTF-8 ([TSON-DATA] §9.1), the stream is <b>flushed and not closed</b>
+     * (the caller owns it -- an HTTP response body is the case this exists for), and buffering is the
+     * encoder's own.
+     *
+     * <p>{@link #toTson} is this method over a {@link StringBuilder}, kept for the callers that do want the
+     * whole document in hand.
+     */
+    public void write(Object value, OutputStream out) {
+        Writer writer = new OutputStreamWriter(out, StandardCharsets.UTF_8);
+        write(value, writer);
         try {
-            TsonDataEmitter writer = new TsonDataEmitter();
+            // Without this the encoder's own buffer is dropped, and a short document writes nothing at all.
+            writer.flush();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * As {@link #write(Object, OutputStream)}, into any {@link Appendable} -- a caller who already holds a
+     * {@code Writer}, or is assembling a larger text around this document. An {@link IOException} from
+     * {@code out} surfaces as an {@link UncheckedIOException}; see {@link TsonDataEmitter}.
+     */
+    public void write(Object value, Appendable out) {
+        try {
+            TsonDataEmitter writer = new TsonDataEmitter(out);
             if (value == null) {
                 writer.nullValue();
-                return writer.toString();
+                return;
             }
             DataClass dataClass = context.getDescriptor(value.getClass());
             write(value, dataClass, writer);
-            return writer.toString();
         } catch (DataBindException e) {
             throw new TsonWriteException("cannot write " + value.getClass() + " as TSON: " + e.getMessage(), e);
         }
@@ -120,7 +161,9 @@ public final class TsonObjectWriter {
             }
             writeAnnotations(value, dataClass, writer);
             writeCore(value, dataClass, writer);
-        } catch (DataBindException e) {
+        } catch (DataBindException | UncheckedIOException e) {
+            // UncheckedIOException passes through: the sink failed, which is an IO fault and not a verdict
+            // on the value. Wrapped, it would surface as "cannot write <class> as TSON", blaming the object.
             throw e;
         } catch (Throwable t) {
             throw new DataBindException("failed to write value of type " + dataClass.typeClass(), t);
@@ -144,7 +187,9 @@ public final class TsonObjectWriter {
                 case DataClassUnion union -> writeUnion(value, union, writer);
                 default -> throw new DataBindException("unsupported DataClass for writing: " + dataClass);
             }
-        } catch (DataBindException e) {
+        } catch (DataBindException | UncheckedIOException e) {
+            // UncheckedIOException passes through: the sink failed, which is an IO fault and not a verdict
+            // on the value. Wrapped, it would surface as "cannot write <class> as TSON", blaming the object.
             throw e;
         } catch (Throwable t) {
             throw new DataBindException("failed to write value of type " + dataClass.typeClass(), t);

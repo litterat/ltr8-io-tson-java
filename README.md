@@ -378,6 +378,17 @@ trip (the object writer, holding only a bound `long`, has no way to recover it):
 String text = new TsonTreeWriter().toTson(node);
 ```
 
+Both writers also take a sink, so a document never has to exist as a `String` — the write-direction mirror
+of every reader taking an `InputStream`. The stream is written as UTF-8, flushed, and **not closed**: it is
+the caller's, which is what makes an HTTP response body the natural case.
+
+```java
+new TsonObjectWriter().write(server, response.getOutputStream());   // or any OutputStream
+new TsonTreeWriter().write(node, appendable);                       // or any Appendable
+```
+
+`toTson` is that method over a `StringBuilder`, for when you do want the whole document in hand.
+
 ---
 
 ## Status
