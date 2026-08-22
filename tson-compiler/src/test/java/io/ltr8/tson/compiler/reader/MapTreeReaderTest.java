@@ -66,6 +66,35 @@ class MapTreeReaderTest {
         assertEquals(Map.of(), readMap(compiled, "{}"));
     }
 
+    /**
+     * [TSON-DATA] §2.8 resolves {@code {}} to "the empty container of that type", so at a map position it is
+     * a map holding nothing -- which is exactly what {@code min_items: 1} forbids. It used to be accepted
+     * silently: only the entry loop validated the count, and {@code {}} never enters the entry loop.
+     */
+    @Test
+    void emptyBraceIsAZeroEntryMapForMinItemsToo() {
+        MapBody body = new MapBody(TypeRef.of("integer"), TypeRef.of("integer"), Optional.of(BigInteger.ONE),
+                Optional.empty());
+        TsonCompiledSchema compiled = compile(body);
+        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+
+        compiled.get("scores").read(TestDocuments.document("{}", problems));
+
+        assertEquals(1, problems.diagnostics().size(), problems.diagnostics().toString());
+        assertEquals(Diagnostic.Code.TYPE_MISMATCH, problems.diagnostics().get(0).code());
+        assertTrue(problems.diagnostics().get(0).message().contains("has 0 entries, fewer than the minimum 1"),
+                problems.diagnostics().get(0).message());
+    }
+
+    /** The same count against an upper bound: zero entries satisfy any {@code max_items}, and still do. */
+    @Test
+    void emptyBraceSatisfiesMaxItems() {
+        MapBody body = new MapBody(TypeRef.of("integer"), TypeRef.of("integer"), Optional.empty(),
+                Optional.of(BigInteger.ONE));
+
+        assertEquals(Map.of(), readMap(compile(body), "{}"));
+    }
+
     @Test
     void absentSentinelAsKeyThrows() {
         TsonCompiledSchema compiled = compile(MapBody.of(TypeRef.of("integer"), TypeRef.of("integer")));

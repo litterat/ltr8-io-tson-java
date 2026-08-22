@@ -202,6 +202,31 @@ class ContainerSugarEndToEndTest {
     }
 
     /**
+     * The map tier's bounds are live in the same way -- and {@code {}} counts against them. [TSON-DATA] §2.8
+     * resolves an empty brace to "the empty container of that type", so at a map position it is a map with
+     * zero entries, not a value exempt from the size rule. It used to pass silently while {@code max_items}
+     * on the same declaration reported correctly, which is what made the gap look like a bound problem
+     * rather than a shape one.
+     */
+    @Test
+    void aSizedMapsBoundsAreEnforcedWhenReadingEmptyBracesIncluded() {
+        TsonCompiledSchema compiled = compile("""
+                  index => {text => text; 1..2}
+                  holder => { entries: index }""");
+
+        assertNotNull(compiled.get("holder")
+                .read(TestDocuments.document("{ entries: { \"a\" => \"one\" } }")));
+        assertTrue(assertThrows(TsonReadException.class,
+                () -> compiled.get("holder")
+                        .read(TestDocuments.document("{ entries: {} }"))).getMessage().contains("minimum 1"),
+                "an empty brace at a map position is a map with no entries");
+        assertTrue(assertThrows(TsonReadException.class,
+                () -> compiled.get("holder").read(TestDocuments.document(
+                        "{ entries: { \"a\" => \"1\"  \"b\" => \"2\"  \"c\" => \"3\" } }")))
+                .getMessage().contains("maximum 2"));
+    }
+
+    /**
      * §5.3's bound-coherence rule, reported where the author wrote the bounds: {@code min <= max}, checked at
      * schema load wherever both bounds are literal.
      */
