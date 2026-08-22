@@ -127,6 +127,16 @@ reads one value at a cursor and polices nothing around it.
   width, tuple-ness, and captured wire annotations are documented write-side losses). Both throw unchecked
   (`TsonReadException`/`TsonWriteException`), so the pair is symmetric and a caller writes neither a
   `throws` clause nor a try/catch for the common path.
+- **Both writers take a sink, and `toTson` is that method over a `StringBuilder`.** `write(value,
+  OutputStream)` / `write(value, Appendable)` mirror every reader taking an `InputStream`: `TsonDataEmitter`
+  holds an `Appendable` rather than its own `StringBuilder`, so nothing between the object graph and the
+  sink accumulates the document — memory is the sink's business plus the emitter's scope stack. The stream
+  is UTF-8 ([TSON-DATA] §9.1), **flushed and not closed**: unflushed, the encoder's own buffer swallows a
+  short document whole, and closing would end the HTTP response body this exists for. An `IOException` from
+  the sink becomes an `UncheckedIOException` — the same treatment `Lexer` gives a failing `InputStream`, and
+  deliberately *not* `TsonWriteException`, which means "this value cannot be written as TSON". That
+  distinction needs `TsonObjectWriter`'s two `catch (Throwable)` handlers to let it past, or an IO fault
+  surfaces blaming the object.
 - These live in `tson-compiler`'s root package (not a separate module) because `DefinitionResolver`
   depends on `TsonObjectWriter` (atom-refinement merging) — a module depending *on* `tson-compiler`
   couldn't provide them without a cycle. `tson-bind` (what they're built on) has no such dependency.

@@ -150,15 +150,6 @@ validate-then-fix loop the project targets.
   `constructor` handle, wrapping what came back.
     - Not reachable today: a union member is not a boxed position, so its carrier is always empty rather than
       wrong. Worth closing when a boxed variant becomes expressible, not before.
-- [ ] **No remote publishing — the local half is done, releasing is not.** Every subproject now publishes a
-  `mavenJava` publication (java component + sources + javadoc, POM with name/description/url/licence), so
-  `./gradlew publishToMavenLocal` gives a consuming project an ordinary `io.ltr8:tson:0.1.0-SNAPSHOT`
-  dependency, verified against a real consuming build on both the class path and the module path. What is
-  left is release, which is a decision rather than a task: a remote repository (Maven Central via Sonatype,
-  or GitHub Packages), artifact signing, the POM's `scm`/`developers`/`url` block Central requires, and a
-  version that is not a snapshot — publishing under a name the project has not claimed is not something the
-  build should start doing quietly. Until then a consuming repo can keep the included build as an opt-in for
-  co-development.
 
 ## Remaining built-in types
 
@@ -252,7 +243,9 @@ whether lexer errors feed the `Diagnostic` model at all. `STRUCTURED-OUTPUT.md` 
 The read/write matrix in the README makes the asymmetry plain: the read side has a schemaless→object
 reader, a schemaless→tree reader, a schema-driven *validating* reader, a pull-event stream, and both
 fail-fast and collecting/diagnostics modes; the write side has only the two schemaless writers and is
-missing most of the mirror.
+missing most of the mirror. The stream half of that mirror is now there — both writers take an
+`OutputStream`/`Appendable` sink and `toTson` is the wrapper — so what is left below is the schema-aware
+writer, diagnostics, and a public event surface.
 
 - [ ] **No schema-aware (Class 2) writer — `TsonValueWriter`.** Only the schemaless `TsonObjectWriter`
   (object → TSON) and `TsonTreeWriter` (`TsonValue` → TSON) exist, both with documented lossy spots
@@ -266,14 +259,11 @@ missing most of the mirror.
   the seam already exists and is write-direction-agnostic (`Diagnostic` carries a data path and both
   positions; nothing about `void report(Diagnostic)` assumes reading), so this is a matter of threading a
   receiver through the emitter, not designing a second error model.
-- [ ] **Writers materialize a `String`, not a stream.** `toTson(...)` returns the whole document in
-  memory — asymmetric with the readers, which accept an `InputStream` and never fully buffer. Writers
-  should also accept an `OutputStream`/`Writer`/`Appendable` and emit incrementally; the internal
-  `TsonDataEmitter` already builds into a `StringBuilder` and could target any `Appendable` instead.
-  (Same streaming theme as `Tson.validate(InputStream)` buffering the whole document to a `String`.)
 - [ ] **No public push/event writer.** The read side exposes a pull `TsonDataStream` (→ `TsonEvent`);
   the only emitter, `TsonDataEmitter`, is internal. A public event-driven writer would let a caller emit
-  TSON without first building a whole tree or object — the write-direction peer of `TsonDataStream`.
+  TSON without first building a whole tree or object — the write-direction peer of `TsonDataStream`. Closer
+  than it was: the emitter now writes into any `Appendable`, so what is missing is the decision to make it
+  (or an event-shaped facade over it) public API, not the streaming underneath.
 - [ ] A JSON writer (TSON data → valid JSON text) — the write-direction companion to
   `STRUCTURED-OUTPUT.md`'s "JSON compatibility" section, tracked here alongside the general writer
   since it's the same underlying gap (no schema-aware writer exists at all yet).

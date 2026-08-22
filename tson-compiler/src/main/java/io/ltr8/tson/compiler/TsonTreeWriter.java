@@ -4,6 +4,12 @@ import io.ltr8.bind.DataBindException;
 import io.ltr8.tson.tree.*;
 import io.ltr8.tson.tree.TsonValue;
 
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.UncheckedIOException;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -40,12 +46,40 @@ public final class TsonTreeWriter {
     public TsonTreeWriter() {
     }
 
-    /** Writes {@code node} as TSON text. */
+    /** Writes {@code node} as TSON text -- {@link #write(TsonValue, Appendable)} into a fresh buffer. */
     public String toTson(TsonValue node) {
+        StringBuilder text = new StringBuilder();
+        write(node, text);
+        return text.toString();
+    }
+
+    /**
+     * Writes {@code node} as TSON <b>into {@code out} as it goes</b>, so a large document never exists as a
+     * {@code String} -- the write-side counterpart to {@link TsonTreeReader} taking an {@code InputStream}.
+     * The bytes are UTF-8 ([TSON-DATA] §9.1), the stream is <b>flushed and not closed</b> (the caller owns
+     * it), and buffering is the encoder's own.
+     *
+     * <p>The tree itself is of course already in memory -- that is what a tree is. What this saves is the
+     * <em>second</em> copy: the rendered document, which for a large tree is the bigger of the two.
+     */
+    public void write(TsonValue node, OutputStream out) {
+        Writer writer = new OutputStreamWriter(out, StandardCharsets.UTF_8);
+        write(node, writer);
         try {
-            TsonDataEmitter out = new TsonDataEmitter();
-            writeNode(node, out);
-            return out.toString();
+            // Without this the encoder's own buffer is dropped, and a short document writes nothing at all.
+            writer.flush();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * As {@link #write(TsonValue, OutputStream)}, into any {@link Appendable}. An {@link IOException} from
+     * {@code out} surfaces as an {@link UncheckedIOException}; see {@link TsonDataEmitter}.
+     */
+    public void write(TsonValue node, Appendable out) {
+        try {
+            writeNode(node, new TsonDataEmitter(out));
         } catch (DataBindException e) {
             throw new TsonWriteException("cannot write TsonValue as TSON: " + e.getMessage(), e);
         }

@@ -1,5 +1,7 @@
 package io.ltr8.tson.compiler;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.regex.Pattern;
@@ -19,11 +21,29 @@ import java.util.regex.Pattern;
  * before a non-empty scope's closing delimiter -- {@code { x: 1 y: 2 }}, not {@code {x: 1, y: 2}}
  * -- valid either way, but matching this repo's own established literal style.
  *
+ * <p><b>Writes into an {@link Appendable} sink, which is what keeps a document off the heap.</b> The
+ * no-argument constructor supplies its own {@link StringBuilder} -- the whole document in memory, which is
+ * all a {@code toTson} caller wants -- while a {@code Writer} over an {@code OutputStream} lets the bytes
+ * leave as they are produced. Nothing here buffers on its own: every method appends straight to the sink, so
+ * memory is the sink's business plus this class's own scope stack. An {@link IOException} from the sink
+ * becomes an {@link UncheckedIOException}, the same treatment {@code Lexer} gives a failing {@code
+ * InputStream} on the read side.
+ *
  * <p>Not thread-safe; single-use, like {@link io.ltr8.tson.compiler.lexer.Lexer}.
  */
 public final class TsonDataEmitter {
 
-    private final StringBuilder out = new StringBuilder();
+    private final Appendable out;
+
+    /** Accumulates into a {@link StringBuilder} this emitter owns -- see {@link #toString()}. */
+    public TsonDataEmitter() {
+        this(new StringBuilder());
+    }
+
+    /** Writes into {@code out} as it goes, appending nothing this class does not immediately emit. */
+    public TsonDataEmitter(Appendable out) {
+        this.out = out;
+    }
 
     /** One entry per open record/map/array scope: how many elements written so far. */
     private final Deque<Integer> scopeElementCounts = new ArrayDeque<>();
@@ -51,7 +71,9 @@ public final class TsonDataEmitter {
     /** {@code name:} -- inserts the inter-element separator itself; the value follows directly. */
     public TsonDataEmitter field(String name) {
         beforeElement();
-        out.append(name).append(':').append(' ');
+        emit(name);
+        emit(':');
+        emit(' ');
         return this;
     }
 
@@ -63,7 +85,7 @@ public final class TsonDataEmitter {
 
     /** {@code =>} between a map entry's key and value, once the key has been written. */
     public TsonDataEmitter mapArrow() {
-        out.append(" => ");
+        emit(" => ");
         return this;
     }
 
@@ -92,7 +114,9 @@ public final class TsonDataEmitter {
      * comes next.
      */
     public TsonDataEmitter annotation(String name) {
-        out.append('@').append(name).append(' ');
+        emit('@');
+        emit(name);
+        emit(' ');
         return this;
     }
 
@@ -103,7 +127,9 @@ public final class TsonDataEmitter {
      * optional, and omitting it keeps the common {@code @doc:"..."} form compact.
      */
     public TsonDataEmitter beginAnnotation(String name) {
-        out.append('@').append(name).append(':');
+        emit('@');
+        emit(name);
+        emit(':');
         return this;
     }
 
@@ -114,7 +140,7 @@ public final class TsonDataEmitter {
      * separation is all that is needed; there is no closing delimiter to match.
      */
     public TsonDataEmitter endAnnotation() {
-        out.append(' ');
+        emit(' ');
         return this;
     }
 
@@ -122,7 +148,9 @@ public final class TsonDataEmitter {
 
     /** {@code !name }, adjacent to {@code name} per §3.2, one trailing space before the value. */
     public TsonDataEmitter typeRef(String name) {
-        out.append('!').append(name).append(' ');
+        emit('!');
+        emit(name);
+        emit(' ');
         return this;
     }
 
@@ -130,18 +158,18 @@ public final class TsonDataEmitter {
 
     /** {@code null}, the base type (§4.1) -- distinct from {@link #absentValue()}. */
     public TsonDataEmitter nullValue() {
-        out.append("null");
+        emit("null");
         return this;
     }
 
     /** {@code _}, the absent sentinel (§2.9) -- distinct from {@link #nullValue()}. */
     public TsonDataEmitter absentValue() {
-        out.append('_');
+        emit('_');
         return this;
     }
 
     public TsonDataEmitter booleanValue(boolean value) {
-        out.append(value ? "true" : "false");
+        emit(value ? "true" : "false");
         return this;
     }
 
@@ -151,7 +179,7 @@ public final class TsonDataEmitter {
      * Never used for arbitrary strings; see {@link #quotedString(String)} for those.
      */
     public TsonDataEmitter unquotedToken(String text) {
-        out.append(text);
+        emit(text);
         return this;
     }
 
@@ -162,35 +190,35 @@ public final class TsonDataEmitter {
      * otherwise) -- and leaves everything else, including non-ASCII text, literal.
      */
     public TsonDataEmitter quotedString(String text) {
-        out.append('"');
+        emit('"');
         int length = text.length();
         for (int i = 0; i < length; i++) {
             char c = text.charAt(i);
             switch (c) {
-                case '"' -> out.append("\\\"");
-                case '\\' -> out.append("\\\\");
-                case '\b' -> out.append("\\b");
-                case '\f' -> out.append("\\f");
-                case '\n' -> out.append("\\n");
-                case '\r' -> out.append("\\r");
-                case '\t' -> out.append("\\t");
+                case '"' -> emit("\\\"");
+                case '\\' -> emit("\\\\");
+                case '\b' -> emit("\\b");
+                case '\f' -> emit("\\f");
+                case '\n' -> emit("\\n");
+                case '\r' -> emit("\\r");
+                case '\t' -> emit("\\t");
                 default -> {
                     if (CONTROL_CHAR.matcher(String.valueOf(c)).matches()) {
-                        out.append(String.format("\\u%04x", (int) c));
+                        emit(String.format("\\u%04x", (int) c));
                     } else {
-                        out.append(c);
+                        emit(c);
                     }
                 }
             }
         }
-        out.append('"');
+        emit('"');
         return this;
     }
 
     // ── Scope bookkeeping ────────────────────────────────────────────────────
 
     private TsonDataEmitter open(char delimiter) {
-        out.append(delimiter);
+        emit(delimiter);
         scopeElementCounts.push(0);
         return this;
     }
@@ -198,9 +226,9 @@ public final class TsonDataEmitter {
     private TsonDataEmitter close(char delimiter) {
         int count = scopeElementCounts.pop();
         if (count > 0) {
-            out.append(' ');
+            emit(' ');
         }
-        out.append(delimiter);
+        emit(delimiter);
         return this;
     }
 
@@ -211,11 +239,38 @@ public final class TsonDataEmitter {
      */
     private void beforeElement() {
         if (!scopeElementCounts.isEmpty()) {
-            out.append(' ');
+            emit(' ');
             scopeElementCounts.push(scopeElementCounts.pop() + 1);
         }
     }
 
+    /**
+     * Appends to the sink, turning its checked {@link IOException} into an {@link UncheckedIOException} so
+     * the whole emitter stays free of checked exceptions -- a {@link StringBuilder} sink never throws one at
+     * all, and a stream sink's failure is an IO fault rather than anything about the value being written.
+     */
+    private void emit(CharSequence text) {
+        try {
+            out.append(text);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /** As {@link #emit(CharSequence)}, for the single characters the delimiters are. */
+    private void emit(char c) {
+        try {
+            out.append(c);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * The document written so far, when this emitter owns its own buffer (the no-argument constructor).
+     * With a caller-supplied sink this is the sink's own {@code toString}, which is rarely the text -- a
+     * streaming caller reads its own stream, not this.
+     */
     @Override
     public String toString() {
         return out.toString();
