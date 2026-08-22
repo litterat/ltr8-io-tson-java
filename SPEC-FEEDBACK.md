@@ -3443,6 +3443,19 @@ Implemented in `TsonSchemaLinker.mergeImports` and `SchemaResolver.mergeImports`
 apart); `TsonLinkedSchema.entryOrigins` already records each entry's declaring identity transitively, which
 is exactly the key the identity comparison needs. `TransitiveImportTest` pins all of it.
 
+**A `?sha256=` pin is verification metadata, not identity, and §2.2.3 should say so where the identity rule
+is stated.** The two rules are independent and live in different sections: §2.2.1's canonicalization strips
+the query, so `core.tn?sha256=…` and `core.tn` are one identity, while §10.2 requires every pinned reference
+to be verified against the content. Read together they settle the case §2.2.3 never mentions — two routes
+agreeing on identity but disagreeing on whether they pin. One peer pinning core.tn and another not is
+ordinary: both name one schema, both are verified against its one content hash, and the importer may pin or
+not pin independently of either. A pin that disagrees with the content is a *verification* failure, never a
+second identity, so it cannot be laundered by another route reaching the same schema unpinned. A reader
+working only from §2.2.3 could plausibly fold the pin into identity and end up with two `core.tn`s in one
+closure — which under the rule above is a name collision on every entry, and a badly misleading diagnostic
+for what is really one schema named two ways.
+
+
 **A consequence worth stating with it: revision skew becomes a hard error, by design.** Schema identities
 carry the spec revision (`https://tson.io/2026/32/m/core.tn`), so two schemas published against different
 revisions declare their names in genuinely different documents. Under the identity rule, a schema whose
@@ -3471,7 +3484,10 @@ the collision rule in terms of identity:
 >
 > Multiple `!!import` directives are permitted and are loaded in declaration order. A schema reached through
 > more than one route contributes its entries once; naming the same schema twice, or under two spellings of
-> one canonical identity (§2.2.1), is redundant and not an error. It is a resolver error for two *different*
+> one canonical identity (§2.2.1) — a `?sha256=`-pinned reference and a plain one among them — is redundant
+> and not an error. A pin is verification metadata (§10.2), never part of identity: routes that disagree
+> about pinning still name one schema, and a pin disagreeing with that schema's content is a verification
+> failure rather than a second identity. It is a resolver error for two *different*
 > schemas to declare the same name anywhere in the import closure, or for a local declaration to reuse a name
 > the closure already binds — the schema fails to load, and the diagnostic names both declaring schemas.
 
