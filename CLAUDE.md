@@ -325,7 +325,11 @@ registry.
 Every compiled reader pulls `TsonEvent`s through `TsonReadContext` — no reader requires a materialized
 tree. The context holds **no error policy**: `report(...)` hands a `Diagnostic` to the read's
 `TsonDiagnosticsReceiver` (`throwing()` / `collecting()` / caller's own), and readers ask `reported()` (a
-count) when they need to know whether children complained. Load-bearing read rules, each detailed in the
+count) when they need to know whether children complained. **A receiver sees every problem with the
+document, base syntax included** — both facades catch a document that will not lex or parse and report
+`Diagnostic.ofBaseSyntaxError(e)`, so a collecting read never throws for a bad document (it returns nothing
+and the collector says why) while fail-fast still throws, as `TsonReadException` rather than
+`TsonParseException`. A fault in the library propagates as itself. Load-bearing read rules, each detailed in the
 note: a stated FIXED value is checked, not obeyed; an omitted `OPTIONAL_FIXED` field stays absent where
 `REQUIRED_FIXED` injects (#39); collecting mode always keeps reading; **bind mode is all-or-nothing
 (`ConstructionGuard`) while tree mode keeps everything it built** — deliberate asymmetry, not

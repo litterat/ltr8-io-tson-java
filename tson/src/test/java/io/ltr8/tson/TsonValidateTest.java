@@ -56,6 +56,21 @@ class TsonValidateTest {
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, problems.getFirst().code());
     }
 
+    /**
+     * A base-syntax failure keeps the company it was found in. The stream is lazy, so the parse error
+     * surfaces after the value problem before it -- and both belong to one document, so both are returned.
+     * This used to discard the collector and answer with the syntax error alone.
+     */
+    @Test
+    void aDocumentWithAValueProblemAndASyntaxProblemReportsBoth() {
+        List<Diagnostic> problems = tsonWithPoint().validate("""
+                !!schema:"https://example.test/point-1.tn"
+                !point { x: 99999999999999  y: ,, }""");
+
+        assertEquals(List.of(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, Diagnostic.Code.VALIDATION_ERROR),
+                problems.stream().map(Diagnostic::code).toList(), problems.toString());
+    }
+
     @Test
     void aSchemaTheSourceCannotProvideIsASchemaError() {
         List<Diagnostic> problems = tsonWithPoint().validate("""

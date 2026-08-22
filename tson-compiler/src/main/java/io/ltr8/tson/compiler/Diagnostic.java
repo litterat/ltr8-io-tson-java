@@ -75,9 +75,17 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      * verdict. Classifying or rethrowing is one decision, so it is made here rather than handed back as an
      * {@code Optional} every call site has to unwrap the same way.
      *
-     * <p>Lives here rather than on a validator because two of the three exception types are in the unexported
-     * {@code lexer} package: a caller in another module cannot name them in a {@code catch} and so cannot
-     * make this classification itself.
+     * <p><b>The readers call this for you.</b> Every whole-document entry point on {@link TsonTreeReader}/
+     * {@link TsonObjectReader} routes a base-syntax failure through the read's own receiver, so a collecting
+     * read gets it as a diagnostic and a fail-fast one throws from the receiver. What is left for a caller
+     * is the case of driving a {@code TsonDataStream} or {@code TsonDataParser} directly, where there is no
+     * receiver to route through.
+     *
+     * <p>Public rather than private to the readers because a caller who does that cannot make this
+     * classification themselves: {@link io.ltr8.tson.compiler.lexer.LexException} is in the unexported
+     * {@code lexer} package, so it cannot be named in a {@code catch} from another module -- and catching
+     * {@link RuntimeException} instead is only safe if something else separates a base-syntax failure from a
+     * fault in this library, which is exactly what this does.
      */
     public static Diagnostic ofBaseSyntaxError(RuntimeException e) {
         SourcePosition position;

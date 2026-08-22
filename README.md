@@ -242,6 +242,11 @@ for (Diagnostic d : problems.diagnostics()) {
 }
 ```
 
+A receiver sees **every** problem with the document — a value the schema rejects, an unresolvable
+`!!schema`, and a document that will not lex or parse — so a collecting read never throws for a bad
+document. Only a fault in the library throws past it. (Fail-fast reads still throw at the first problem;
+for a base-syntax failure that is a `TsonReadException` carrying the diagnostic, position included.)
+
 `withDiagnostics` returns a *new* reader and leaves the original fail-fast; it works the same on
 `TsonTreeReader` and on the schema-aware readers from `tson.treeReader()`/`objectReader()`. The receiver is
 a plain `void report(Diagnostic)` sink, so a caller wanting neither built-in behaviour — write each problem

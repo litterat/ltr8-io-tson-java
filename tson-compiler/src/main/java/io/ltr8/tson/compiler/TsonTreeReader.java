@@ -37,6 +37,12 @@ import java.io.InputStream;
  * alike. That is what makes this reader, with a collecting receiver, exactly what {@code Tson#validate}
  * delegates to.
  *
+ * <p><b>Every problem with the document goes to the receiver, base syntax included.</b> A document that does
+ * not lex or parse is reported like any other failure rather than thrown past the receiver, so a collecting
+ * read never throws for a bad <i>document</i> -- it hands back no tree and the collector holds why, after
+ * whatever it had already found. A fail-fast read still throws, because {@code throwing()} is what throws.
+ * A fault in <i>this library</i> is not a document problem and still propagates as itself.
+ *
  * <p>A schemaless read also checks type-refs: a built-in name ({@code !uuid}, {@code !date}) must sit on a
  * token and that token must satisfy the atom, and any other name -- having nothing to resolve against -- is
  * {@code UNKNOWN_TYPE_REF}. {@link #preservingUnknownTypeRefs} opts out of that last rule.
@@ -139,7 +145,12 @@ public final class TsonTreeReader {
 
     /**
      * This reader, reporting through {@code receiver} instead of throwing at the first problem -- a new reader,
-     * leaving this one unchanged, sharing its compiled-schema registry:
+     * leaving this one unchanged, sharing its compiled-schema registry.
+     *
+     * <p>A receiver sees <b>every</b> problem with the document: a value the schema rejects, an unresolvable
+     * {@code !!schema}, and a document that will not lex or parse. Only a fault in this library is left to
+     * throw past it, which is the one thing a caller collecting problems must not have folded into their
+     * list.</p>
      *
      * <pre>{@code
      * var problems = TsonDiagnosticsReceiver.collecting();
@@ -204,24 +215,58 @@ public final class TsonTreeReader {
     // ── Internals ────────────────────────────────────────────────────────
 
     private TsonValue readDocument(TsonDataStream stream, boolean ignoreSchema) {
-        TsonReadContext ctx = TsonReadContext.of(stream, receiver);
-        DocumentStart start = (DocumentStart) ctx.next();
-        TsonValue result = (ignoreSchema || tree == null || start.schema().isEmpty())
-                ? schemaless.read(ctx)
-                : readAgainstSchema(start.schema().get(), ctx, null);
-        requireDocumentEnd(ctx);
-        return result;
+        try {
+            TsonReadContext ctx = TsonReadContext.of(stream, receiver);
+            DocumentStart start = (DocumentStart) ctx.next();
+            TsonValue result = (ignoreSchema || tree == null || start.schema().isEmpty())
+                    ? schemaless.read(ctx)
+                    : readAgainstSchema(start.schema().get(), ctx, null);
+            requireDocumentEnd(ctx);
+            return result;
+        } catch (RuntimeException e) {
+            return baseSyntaxFailure(e);
+        }
     }
 
     private TsonValue readDocumentAs(TsonDataStream stream, String typeName) {
         if (schemaUri == null) {
             throw new IllegalStateException("readAs needs a schema -- call withSchema(uri) first");
         }
-        TsonReadContext ctx = TsonReadContext.of(stream, receiver);
-        ctx.next(); // DocumentStart -- any !!schema it declares is overridden by withSchema
-        TsonValue result = readAgainstSchema(schemaUri, ctx, typeName);
-        requireDocumentEnd(ctx);
-        return result;
+        try {
+            TsonReadContext ctx = TsonReadContext.of(stream, receiver);
+            ctx.next(); // DocumentStart -- any !!schema it declares is overridden by withSchema
+            TsonValue result = readAgainstSchema(schemaUri, ctx, typeName);
+            requireDocumentEnd(ctx);
+            return result;
+        } catch (RuntimeException e) {
+            return baseSyntaxFailure(e);
+        }
+    }
+
+    /**
+     * A document that will not lex or parse, reported through this read's own receiver rather than thrown
+     * past it -- so a collecting read never throws for a bad <i>document</i>, and a fail-fast one still
+     * throws, because its receiver does when handed this.
+     *
+     * <p><b>Why the receiver rather than the caller.</b> The lexer is fail-fast and the stream is lazy, so a
+     * base-syntax failure surfaces mid-read, after any earlier value-level problem has already been reported
+     * -- which used to leave a collecting caller holding a populated collector <em>and</em> an exception,
+     * with no way to tell that the two belonged to one document. Reporting it is also the only way the
+     * problem reaches a caller who asked for problems: {@code Diagnostic.ofBaseSyntaxError} is public
+     * precisely because one of the three exception types is not nameable outside this module, and having
+     * every caller invoke it was the library conceding the classification is required while making each of
+     * them ask for it.
+     *
+     * <p>Nothing continues past this, and nothing pretends to: the read is over and hands back no tree. That
+     * is the same shape an unreachable {@code !!schema} already had ({@link #readAgainstSchema}) -- report
+     * once, abandon the value -- rather than a new one.
+     *
+     * <p>{@code ofBaseSyntaxError} rethrows anything that is not one of §8.1's three base-syntax failures,
+     * so a fault in this library still reaches the caller as itself: a bug is not a verdict on the document.
+     */
+    private TsonValue baseSyntaxFailure(RuntimeException e) {
+        receiver.report(Diagnostic.ofBaseSyntaxError(e));
+        return null;
     }
 
     /**

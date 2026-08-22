@@ -1,5 +1,7 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.schema.meta.SourcePosition;
+import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -7,6 +9,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -137,15 +140,56 @@ class SchemalessValidationTest {
         assertFalse(diagnostic.message().contains("column"), diagnostic.message());
     }
 
-    /** A stack trace still says where, so nothing is lost for the fail-fast caller who never builds a diagnostic. */
+    /**
+     * A stack trace still says where, so nothing is lost for the fail-fast caller.
+     *
+     * <p>The exception is {@link TsonReadException}, not {@link TsonParseException}: a base-syntax failure
+     * goes through the read's receiver like every other problem now, and for a fail-fast read the receiver
+     * is what throws. The position survives the trip -- on the diagnostic, and appended by {@code toString}
+     * for the trace -- which is the property this fixture is actually about.
+     */
     @Test
     void theExceptionItselfStillCarriesItsPositionIntoAStackTrace() {
-        TsonParseException thrown = assertThrows(TsonParseException.class,
+        TsonReadException thrown = assertThrows(TsonReadException.class,
                 () -> new TsonTreeReader().read("{ a: 1  b: ] }"));
 
+        SourcePosition position = thrown.diagnostic().dataPosition().orElseThrow();
         assertFalse(thrown.getMessage().contains("at line"), thrown.getMessage());
-        assertTrue(thrown.toString().endsWith("at line " + thrown.position().line()
-                + ", column " + thrown.position().column()), thrown.toString());
+        assertTrue(thrown.toString().endsWith("at line " + position.line()
+                + ", column " + position.column()), thrown.toString());
+    }
+
+    /**
+     * The rule a receiver is for: a collecting read does not throw for a bad <b>document</b> either. It used
+     * to, which meant the caller who asked for problems got an exception instead of the one problem that
+     * matters most, and had to reimplement {@code Tson.validate}'s own catch to see it.
+     */
+    @Test
+    void aCollectingReadDoesNotThrowForADocumentThatWillNotParse() {
+        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+
+        TsonValue tree = new TsonTreeReader().withDiagnostics(problems).read("{ a: 1  b: ] }");
+
+        assertNull(tree, "no tree: nothing continues past a document that will not parse");
+        assertEquals(1, problems.diagnostics().size(), problems.diagnostics().toString());
+        assertEquals(Diagnostic.Code.VALIDATION_ERROR, problems.diagnostics().getFirst().code());
+    }
+
+    /**
+     * And it arrives <b>after</b> what the read had already found, in one list. The stream is lazy, so a
+     * base-syntax failure surfaces mid-read -- which used to leave a collector populated and an exception
+     * thrown, with nothing saying the two belonged to one document. {@code Tson.validate} discarded the
+     * collector outright in that case and returned the syntax error alone.
+     */
+    @Test
+    void aBaseSyntaxFailureJoinsWhatTheReadHadAlreadyReported() {
+        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+
+        new TsonTreeReader().withDiagnostics(problems).read("{ a: !nope 1  b: ,, }");
+
+        assertEquals(List.of(Diagnostic.Code.UNKNOWN_TYPE_REF, Diagnostic.Code.VALIDATION_ERROR),
+                problems.diagnostics().stream().map(Diagnostic::code).toList(),
+                problems.diagnostics().toString());
     }
 
     /**

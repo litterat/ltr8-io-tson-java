@@ -135,7 +135,11 @@ public final class TsonObjectReader {
     }
 
     /**
-     * This reader, reporting through {@code receiver} instead of throwing at the first problem -- a new reader,
+     * A receiver sees <b>every</b> problem with the document -- a value the schema rejects, an unresolvable
+     * {@code !!schema}, and a document that will not lex or parse -- so a collecting read never throws for a
+     * bad document. Only a fault in this library throws past it.
+     *
+     * <p>This reader, reporting through {@code receiver} instead of throwing at the first problem -- a new reader,
      * leaving this one unchanged, sharing its compiled-schema registry:
      *
      * <pre>{@code
@@ -219,13 +223,17 @@ public final class TsonObjectReader {
 
     private <T> T readDocument(TsonDataStream stream, Class<T> type, boolean ignoreSchema) {
         Objects.requireNonNull(type, "type");
-        TsonReadContext ctx = TsonReadContext.of(stream, receiver);
-        DocumentStart start = (DocumentStart) ctx.next();
-        T result = (ignoreSchema || bind == null || start.schema().isEmpty())
-                ? schemaless.read(ctx, type)
-                : readAgainstSchema(start.schema().get(), ctx, type, null);
-        requireDocumentEnd(ctx);
-        return valid(ctx, result);
+        try {
+            TsonReadContext ctx = TsonReadContext.of(stream, receiver);
+            DocumentStart start = (DocumentStart) ctx.next();
+            T result = (ignoreSchema || bind == null || start.schema().isEmpty())
+                    ? schemaless.read(ctx, type)
+                    : readAgainstSchema(start.schema().get(), ctx, type, null);
+            requireDocumentEnd(ctx);
+            return valid(ctx, result);
+        } catch (RuntimeException e) {
+            return baseSyntaxFailure(e);
+        }
     }
 
     private <T> T readDocumentAs(TsonDataStream stream, String typeName, Class<T> type) {
@@ -233,11 +241,26 @@ public final class TsonObjectReader {
         if (schemaUri == null) {
             throw new IllegalStateException("readAs needs a schema -- call withSchema(uri) first");
         }
-        TsonReadContext ctx = TsonReadContext.of(stream, receiver);
-        ctx.next(); // DocumentStart -- any !!schema it declares is overridden by withSchema
-        T result = readAgainstSchema(schemaUri, ctx, type, typeName);
-        requireDocumentEnd(ctx);
-        return valid(ctx, result);
+        try {
+            TsonReadContext ctx = TsonReadContext.of(stream, receiver);
+            ctx.next(); // DocumentStart -- any !!schema it declares is overridden by withSchema
+            T result = readAgainstSchema(schemaUri, ctx, type, typeName);
+            requireDocumentEnd(ctx);
+            return valid(ctx, result);
+        } catch (RuntimeException e) {
+            return baseSyntaxFailure(e);
+        }
+    }
+
+    /**
+     * A document that will not lex or parse, reported through this read's own receiver rather than thrown
+     * past it -- the object-binding half of {@link TsonTreeReader}'s own rule, which carries the argument.
+     * Binds to {@code null}, the same all-or-nothing answer {@link #valid} gives a document that reported
+     * anything: nothing continues past a document that will not parse.
+     */
+    private <T> T baseSyntaxFailure(RuntimeException e) {
+        receiver.report(Diagnostic.ofBaseSyntaxError(e));
+        return null;
     }
 
     /**

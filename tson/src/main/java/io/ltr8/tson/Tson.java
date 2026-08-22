@@ -164,13 +164,10 @@ public final class Tson {
      */
     public List<Diagnostic> validate(InputStream data) {
         TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
-        try {
-            treeReader().withDiagnostics(problems).read(data);
-        } catch (RuntimeException e) {
-            // A base-syntax failure is this document's problem, so it renders like any other; anything else
-            // is a fault in this library and rethrows itself from here.
-            return List.of(Diagnostic.ofBaseSyntaxError(e));
-        }
+        // No catch: a collecting read reports a base-syntax failure through the receiver like every other
+        // problem, so it arrives in `problems` in the order it was found, after whatever the read had already
+        // reported. A fault in this library still throws itself out of here, which is the intended difference.
+        treeReader().withDiagnostics(problems).read(data);
         return problems.diagnostics();
     }
 
