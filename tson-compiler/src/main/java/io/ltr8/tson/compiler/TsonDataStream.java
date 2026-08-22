@@ -463,6 +463,11 @@ public final class TsonDataStream implements TsonEventSource {
         Token bang = advance();
         Token name = peekToken();
         if (name.type() != TokenType.UNQUOTED) {
+            if (name.type() == TokenType.LBRACKET && bang.adjacentTo(name)) {
+                throw parseError("'![...]' writes an array type, which is schema syntax and not available in a "
+                        + "data value (§3.2); write the array itself, or name the type in the schema "
+                        + "('my_type => [...]') and write '!my_type' here");
+            }
             throw parseError("expected a type name after '!', found " + describe(name));
         }
         if (!bang.adjacentTo(name)) {
@@ -471,6 +476,19 @@ public final class TsonDataStream implements TsonEventSource {
         advance();
 
         Token next = peekToken();
+        // §3.2's three type-expression forms, each named for what the author wrote rather than left to the
+        // separation rule below -- which would answer '!paged<order>' with "expected whitespace before '<'",
+        // advice whose own result is a second error and which never states the rule that stops them.
+        if (next.type() == TokenType.LESS_THAN) {
+            throw parseError("'!" + name.text() + "<...>' applies type arguments, which are schema syntax and "
+                    + "not available in a data value (§3.2): a data type-ref is a bare name. Name the "
+                    + "application in the schema ('my_type => " + name.text() + "<...>') and write '!my_type' here");
+        }
+        if (next.type() == TokenType.QUESTION && name.adjacentTo(next)) {
+            throw parseError("'!" + name.text() + "?' uses the optional suffix, which is schema syntax and not "
+                    + "available in a data value (§3.2): optionality is a field's state where the schema "
+                    + "declares it, and a value that is absent is written '_' (§2.9)");
+        }
         if (!isStructuralDelimiter(next.type()) && name.adjacentTo(next)) {
             throw parseError("expected whitespace after type name '" + name.text()
                     + "' before " + describe(next));
