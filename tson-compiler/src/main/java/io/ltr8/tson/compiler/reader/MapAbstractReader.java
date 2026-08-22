@@ -60,14 +60,19 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
     enum Shape { ENTRIES, EMPTY, MISMATCH }
 
     final String name;
+
+    /** What to call this entry in a message -- see {@link ArrayAbstractReader#displayName}. */
+    final String displayName;
+
     final MapBody body;
     final TsonTypeReader<?> keyParser;
     final TsonTypeReader<?> valueParser;
     final SchemaLocation schemaLocation;
 
-    MapAbstractReader(String name, MapBody body, TsonTypeReaderResolver resolver, SchemaLocation schemaLocation) {
-        this(name, body, resolver.resolve(body.keyType().name()), resolver.resolve(body.valueType().name()),
-                schemaLocation);
+    MapAbstractReader(String name, String displayName, MapBody body, TsonTypeReaderResolver resolver,
+                       SchemaLocation schemaLocation) {
+        this(name, displayName, body, resolver.resolve(body.keyType().name()),
+                resolver.resolve(body.valueType().name()), schemaLocation);
     }
 
     /**
@@ -76,9 +81,10 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
      * boxed {@code Annotated<T>}. Wrapping here rather than inside {@link #readInto} keeps the entry loop,
      * which both modes share, free of anything only one of them needs.
      */
-    MapAbstractReader(String name, MapBody body, TsonTypeReader<?> keyParser, TsonTypeReader<?> valueParser,
-                      SchemaLocation schemaLocation) {
+    MapAbstractReader(String name, String displayName, MapBody body, TsonTypeReader<?> keyParser,
+                      TsonTypeReader<?> valueParser, SchemaLocation schemaLocation) {
         this.name = name;
+        this.displayName = displayName;
         this.body = body;
         this.keyParser = keyParser;
         this.valueParser = valueParser;
@@ -107,7 +113,8 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
             validateSize(0, ctx);
             return Shape.EMPTY;
         }
-        ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a map for '" + name + "', found " + TypeRefCheck.describe(e),
+        ctx.report(Diagnostic.Code.TYPE_MISMATCH,
+                "expected a map for '" + displayName + "', found " + TypeRefCheck.describe(e),
                 "a map", TypeRefCheck.describe(e));
         EventSkip.coreValue(ctx);
         return Shape.MISMATCH;
@@ -134,7 +141,7 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
             if (keyPeek instanceof AbsentEvent) {
                 ctx.next(); // the absent key itself
                 ctx.report(Diagnostic.Code.TYPE_MISMATCH,
-                        "'" + name + "': the absent sentinel '_' must not appear as a map key (§2.9)",
+                        "'" + displayName + "': the absent sentinel '_' must not appear as a map key (§2.9)",
                         "a real map key, never the absent sentinel '_'", "_");
                 ctx.next(); // MapArrow
                 EventSkip.scopedValue(ctx); // no meaningful key to associate the value with -- discard it
@@ -146,7 +153,7 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
             Object key = keyParser.read(ctx.field(keySegment));
             if (ctx.reported() == before && !seen.add(key)) {
                 ctx.field(keySegment).report(Diagnostic.Code.DUPLICATE_MAP_KEY,
-                        "duplicate key '" + keySegment + "' in '" + name + "' -- a map states each key at most "
+                        "duplicate key '" + keySegment + "' in '" + displayName + "' -- a map states each key at most "
                                 + "once (§2.6), and the repeat states an entry for nothing",
                         "each key stated once", "'" + keySegment + "' stated again");
             }
@@ -174,14 +181,14 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
         body.minItems().ifPresent(min -> {
             if (BigInteger.valueOf(size).compareTo(min) < 0) {
                 ctx.report(Diagnostic.Code.TYPE_MISMATCH,
-                        "'" + name + "' has " + size + " entries, fewer than the minimum " + min,
+                        "'" + displayName + "' has " + size + " entries, fewer than the minimum " + min,
                         "at least " + min + " entries", String.valueOf(size));
             }
         });
         body.maxItems().ifPresent(max -> {
             if (BigInteger.valueOf(size).compareTo(max) > 0) {
                 ctx.report(Diagnostic.Code.TYPE_MISMATCH,
-                        "'" + name + "' has " + size + " entries, more than the maximum " + max,
+                        "'" + displayName + "' has " + size + " entries, more than the maximum " + max,
                         "at most " + max + " entries", String.valueOf(size));
             }
         });

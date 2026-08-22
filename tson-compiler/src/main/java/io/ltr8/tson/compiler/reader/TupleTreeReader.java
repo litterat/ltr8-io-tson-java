@@ -24,10 +24,10 @@ import java.util.Optional;
  */
 final class TupleTreeReader extends TupleAbstractReader<TsonValue> {
 
-    public TupleTreeReader(String name, TupleBody body, TsonTypeReaderResolver resolver,
+    public TupleTreeReader(String name, String displayName, TupleBody body, TsonTypeReaderResolver resolver,
                            SchemaLocation schemaLocation,
                             AnnotationTypes annotationTypes) {
-        super(name, body, resolver, schemaLocation);
+        super(name, displayName, body, resolver, schemaLocation);
         this.annotationTypes = annotationTypes;
     }
 
@@ -42,7 +42,8 @@ final class TupleTreeReader extends TupleAbstractReader<TsonValue> {
             if (!(typeDefinition.body() instanceof TupleBody body)) {
                 throw new IllegalArgumentException("'" + name + "' is not tuple-shaped: " + typeDefinition.body());
             }
-            return new TupleTreeReader(name, body, resolver, context.locationOf(name, typeDefinition),
+            return new TupleTreeReader(name, EntryDisplayName.of(name, typeDefinition), body, resolver,
+                    context.locationOf(name, typeDefinition),
                     AnnotationTypes.of(context));
         }
     }

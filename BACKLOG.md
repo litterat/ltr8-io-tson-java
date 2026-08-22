@@ -106,14 +106,15 @@ validate-then-fix loop the project targets.
   decision this one did not, because a gap is deliberately *not* a `Diagnostic` — reporting it per
   declaration means either a second channel alongside the receiver, or resyncing past the declaration and
   carrying the gap out to the same exit 70 at the end.
-- [ ] **Synthetic names leak into diagnostics, and `schemaPointer` roots at the instantiation entry's
-  internal name.** A read error against a template-derived type says
-  `'array_category_text_58d8f952_1_1dd94a70' has 0 elements`, and the JSON output's pointer begins
-  `/api_response_paged_order_e0260dd4_bd9a46c4/…` where the author wrote `!order_response` — an alias the
-  resolver knows. §8.2 keeps internal names non-normative, and the project's own diagnostics principle is
-  to never name a thing the author didn't write; rendering the applied spelling (`paged<order>`,
-  `[category<text>; 1..]`) or the author's alias is the fix. `tson-cr-structure-templates.md` R9(b)
-  (content-derived naming) is the adjacent, deeper item — this one is only about what diagnostics *print*.
+- [ ] **`schemaPointer` still roots at the instantiation entry's internal name.** The JSON output's pointer
+  begins `/paged_order_e0260dd4/…` where the author wrote `!order_response` — an alias the resolver knows.
+  The *message* half is done (`EntryDisplayName`: a synthetic renders as the form that produced it,
+  `[order; 1..]`/`paged<order>`, keyed on a declaration's own source position being absent), but the pointer
+  is a different problem wearing the same clothes: a compiled reader is shared by every entry point and
+  cannot know which name a given read arrived through, so the fix is for the facade to seed the root
+  `SchemaLocation` with the name it looked up, and for a record's `inRecord` re-anchor to leave that root
+  alone. A read-context change, not a naming one. `tson-cr-structure-templates.md` R9(b) (content-derived
+  naming) is the adjacent, deeper item; this is still only about what diagnostics *print*.
 - [ ] **The §4.1 migration diagnostic (SHOULD) is unimplemented.** `m => map<text, text>` reports
   "'m' has an unresolved reference 'map'" — confusing precisely because `map` visibly exists as a
   constructor. The CR specifies the answer: when a generic head fails type-name resolution but matches a

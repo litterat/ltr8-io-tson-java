@@ -25,10 +25,10 @@ import java.util.Optional;
  */
 final class RecordTreeReader extends RecordAbstractReader<TsonValue> {
 
-    public RecordTreeReader(String name, RecordBody body, TsonTypeReaderResolver resolver,
+    public RecordTreeReader(String name, String displayName, RecordBody body, TsonTypeReaderResolver resolver,
                             SchemaLocation schemaLocation,
                             AnnotationTypes annotationTypes) {
-        super(name, body, resolver, schemaLocation);
+        super(name, displayName, body, resolver, schemaLocation);
         this.annotationTypes = annotationTypes;
     }
 
@@ -43,7 +43,8 @@ final class RecordTreeReader extends RecordAbstractReader<TsonValue> {
             if (!(typeDefinition.body() instanceof RecordBody body)) {
                 throw new IllegalArgumentException("'" + name + "' is not record-shaped: " + typeDefinition.body());
             }
-            RecordTreeReader ownParser = new RecordTreeReader(name, body, resolver, context.locationOf(name, typeDefinition),
+            RecordTreeReader ownParser = new RecordTreeReader(name, EntryDisplayName.of(name, typeDefinition),
+                    body, resolver, context.locationOf(name, typeDefinition),
                     AnnotationTypes.of(context));
             if (typeDefinition.subtypes().isEmpty()) {
                 return ownParser;

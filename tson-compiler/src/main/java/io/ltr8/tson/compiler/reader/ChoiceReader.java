@@ -51,7 +51,9 @@ final class ChoiceReader {
             for (TypeRef variant : body.variants()) {
                 variantNames.add(variant.name());
             }
-            return new NamedDispatchReader(name,
+            // NamedDispatchReader's positionName is message-only, so the display name goes straight in:
+            // a choice lifted from `(a | b)` sugar has an internal name nobody wrote.
+            return new NamedDispatchReader(EntryDisplayName.of(name, typeDefinition),
                     "is a choice -- a value at this position requires an explicit type annotation (!typeName) "
                             + "naming one of its declared variants to disambiguate",
                     "declared variant", variantNames, context.readers(),

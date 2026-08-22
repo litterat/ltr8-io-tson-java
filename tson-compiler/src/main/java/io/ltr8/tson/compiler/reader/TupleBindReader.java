@@ -34,14 +34,15 @@ final class TupleBindReader extends TupleAbstractReader<Object> {
 
     private final DataClassTuple descriptor;
 
-    public TupleBindReader(String name, TupleBody body, DataClassTuple descriptor, TsonTypeReaderResolver resolver,
-                           SchemaLocation schemaLocation) {
-        this(name, body, descriptor, resolver, schemaLocation, AnnotationTypes.DISCARDED);
+    public TupleBindReader(String name, String displayName, TupleBody body, DataClassTuple descriptor,
+                           TsonTypeReaderResolver resolver, SchemaLocation schemaLocation) {
+        this(name, displayName, body, descriptor, resolver, schemaLocation, AnnotationTypes.DISCARDED);
     }
 
-    public TupleBindReader(String name, TupleBody body, DataClassTuple descriptor, TsonTypeReaderResolver resolver,
+    public TupleBindReader(String name, String displayName, TupleBody body, DataClassTuple descriptor,
+                           TsonTypeReaderResolver resolver,
                            SchemaLocation schemaLocation, AnnotationTypes annotationTypes) {
-        super(name, body, resolver, schemaLocation,
+        super(name, displayName, body, resolver, schemaLocation,
                 position -> position < descriptor.elements().length
                         ? descriptor.elements()[position].dataClass()
                         : null,
@@ -90,7 +91,8 @@ final class TupleBindReader extends TupleAbstractReader<Object> {
                 throw new IllegalArgumentException("'" + name + "' resolves to " + dataClass.typeClass()
                         + ", which isn't tuple-shaped -- can't bind '" + name + "' as one");
             }
-            return new TupleBindReader(name, body, descriptor, resolver, context.locationOf(name, typeDefinition),
+            return new TupleBindReader(name, EntryDisplayName.of(name, typeDefinition), body, descriptor, resolver,
+                    context.locationOf(name, typeDefinition),
                     AnnotationTypes.of(context));
         }
 

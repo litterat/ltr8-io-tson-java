@@ -42,9 +42,9 @@ final class GroupUnionBindReader extends RecordAbstractReader<Object> {
     /** Schema field name → the union member that field selects, already resolved. */
     private final Map<String, DataClassRecord> members;
 
-    GroupUnionBindReader(String name, RecordBody body, Map<String, DataClassRecord> members,
+    GroupUnionBindReader(String name, String displayName, RecordBody body, Map<String, DataClassRecord> members,
                           TsonTypeReaderResolver resolver, SchemaLocation schemaLocation) {
-        super(name, body, resolver, schemaLocation);
+        super(name, displayName, body, resolver, schemaLocation);
         this.members = members;
     }
 

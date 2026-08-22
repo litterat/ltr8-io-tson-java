@@ -23,10 +23,10 @@ import java.util.Optional;
  */
 final class ArrayTreeReader extends ArrayAbstractReader<TsonValue> {
 
-    public ArrayTreeReader(String name, ArrayBody body, TsonTypeReaderResolver resolver,
+    public ArrayTreeReader(String name, String displayName, ArrayBody body, TsonTypeReaderResolver resolver,
                            SchemaLocation schemaLocation,
                             AnnotationTypes annotationTypes) {
-        super(name, body, resolver, schemaLocation);
+        super(name, displayName, body, resolver, schemaLocation);
         this.annotationTypes = annotationTypes;
     }
 
@@ -41,7 +41,8 @@ final class ArrayTreeReader extends ArrayAbstractReader<TsonValue> {
             if (!(typeDefinition.body() instanceof ArrayBody body)) {
                 throw new IllegalArgumentException("'" + name + "' is not array-shaped: " + typeDefinition.body());
             }
-            return new ArrayTreeReader(name, body, resolver, context.locationOf(name, typeDefinition),
+            return new ArrayTreeReader(name, EntryDisplayName.of(name, typeDefinition), body, resolver,
+                    context.locationOf(name, typeDefinition),
                     AnnotationTypes.of(context));
         }
     }

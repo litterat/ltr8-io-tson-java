@@ -39,14 +39,15 @@ final class MapBindReader extends MapAbstractReader<Object> {
 
     private final DataClassMap descriptor;
 
-    public MapBindReader(String name, MapBody body, DataClassMap descriptor, TsonTypeReaderResolver resolver,
-                         SchemaLocation schemaLocation) {
-        this(name, body, descriptor, resolver, schemaLocation, AnnotationTypes.DISCARDED);
+    public MapBindReader(String name, String displayName, MapBody body, DataClassMap descriptor,
+                         TsonTypeReaderResolver resolver, SchemaLocation schemaLocation) {
+        this(name, displayName, body, descriptor, resolver, schemaLocation, AnnotationTypes.DISCARDED);
     }
 
-    public MapBindReader(String name, MapBody body, DataClassMap descriptor, TsonTypeReaderResolver resolver,
+    public MapBindReader(String name, String displayName, MapBody body, DataClassMap descriptor,
+                         TsonTypeReaderResolver resolver,
                          SchemaLocation schemaLocation, AnnotationTypes annotationTypes) {
-        super(name, body,
+        super(name, displayName, body,
                 AnnotationBoxing.wrap(resolver.resolve(body.keyType().name()), descriptor.keyDataClass(),
                         annotationTypes),
                 AnnotationBoxing.wrap(resolver.resolve(body.valueType().name()), descriptor.valueDataClass(),
@@ -122,7 +123,8 @@ final class MapBindReader extends MapAbstractReader<Object> {
                 throw new IllegalArgumentException("'" + name + "' resolves to " + dataClass.typeClass()
                         + ", which isn't map-shaped -- can't bind '" + name + "' as one");
             }
-            return new MapBindReader(name, body, descriptor, resolver, context.locationOf(name, typeDefinition),
+            return new MapBindReader(name, EntryDisplayName.of(name, typeDefinition), body, descriptor, resolver,
+                    context.locationOf(name, typeDefinition),
                     AnnotationTypes.of(context));
         }
 

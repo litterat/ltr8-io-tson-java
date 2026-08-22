@@ -122,6 +122,24 @@ is small and parsed once.)
   rule went missing while `max_items` on the same declaration reported correctly. The record position was
   never affected (an empty brace there reports each missing required field) and an array's `[]` is an
   ordinary empty element list, so this closed the one position where the three disagreed.
+- **A reader names itself by what the author wrote, not by its entry name** (`EntryDisplayName`, threaded to
+  every reader that puts its own name in a message as a `displayName` beside `name`). Sugar lifts each form
+  to an entry of its own and every §5.10 application materialises one, both named content-derived (§8.2), so
+  the entry name for `[order; 1..]` is `array_order_1_e9777a39` — a string in neither the author's file nor
+  the spec, and now travelling to readers who cannot open the schema at all. **A missing source position is
+  what tells the two apart**, exactly rather than by guessing at the name's shape: a parsed declaration
+  carries its own name token's position and a minted entry has none. So `tag_list => [text; 1..2]` keeps
+  `tag_list` and the anonymous form inside it renders as `[order; 1..]`, a map as `{text => order}`, a tuple
+  as `[text, int32]`, a choice as `(text | int32)`, and an instantiation entry as the application its
+  `source` records (`paged<order>`). Anything with no sugar spelling falls back to the entry name — honest
+  rather than invented, and unreachable, since a form with no spelling is a form nobody wrote.
+  - **`displayName` is beside `name`, never instead of it.** The entry name is what a type-ref resolves
+    against (`VariantSchemaReader` dispatches on it) and what a tree node carries as its own `typeRef`, so
+    substituting the display name would break dispatch and round-tripping alike.
+  - **The `schemaPointer` still roots at the internal name** (`/paged_order_e0260dd4/…`). That half is not
+    a naming problem: the compiled reader is shared by every entry point and cannot know which name a given
+    read arrived through, so it wants the facade to seed the root `SchemaLocation` with the name it looked
+    up. `BACKLOG.md` carries it.
 - **`EventSkip`** is the shared grammar-aware "consume and discard" utility (leading annotations + an
   optional type-ref as every reader's first step; a whole value; one core-value on a shape mismatch, to
   keep the stream correctly positioned). **`ListEventSource`** replays a pre-built event list — used for a

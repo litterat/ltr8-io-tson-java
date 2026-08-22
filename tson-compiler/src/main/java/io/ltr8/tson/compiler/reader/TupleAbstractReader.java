@@ -46,11 +46,16 @@ abstract class TupleAbstractReader<T> implements TsonTypeReader<T> {
     }
 
     final String name;
+
+    /** What to call this entry in a message -- see {@link ArrayAbstractReader#displayName}. */
+    final String displayName;
+
     final List<CompiledSlot> slots;
     final SchemaLocation schemaLocation;
 
-    TupleAbstractReader(String name, TupleBody body, TsonTypeReaderResolver resolver, SchemaLocation schemaLocation) {
-        this(name, body, resolver, schemaLocation, position -> null, AnnotationTypes.DISCARDED);
+    TupleAbstractReader(String name, String displayName, TupleBody body, TsonTypeReaderResolver resolver,
+                         SchemaLocation schemaLocation) {
+        this(name, displayName, body, resolver, schemaLocation, position -> null, AnnotationTypes.DISCARDED);
     }
 
     /**
@@ -59,10 +64,11 @@ abstract class TupleAbstractReader<T> implements TsonTypeReader<T> {
      * {@code Annotated<T>}. Per position rather than once, because a tuple's positions have independent
      * types and any subset of them may be boxed.
      */
-    TupleAbstractReader(String name, TupleBody body, TsonTypeReaderResolver resolver,
+    TupleAbstractReader(String name, String displayName, TupleBody body, TsonTypeReaderResolver resolver,
                          SchemaLocation schemaLocation, IntFunction<DataClass> boxedAt,
                          AnnotationTypes annotationTypes) {
         this.name = name;
+        this.displayName = displayName;
         List<CompiledSlot> slots = new ArrayList<>(body.elements().size());
         for (int position = 0; position < body.elements().size(); position++) {
             TupleElement element = body.elements().get(position);
@@ -87,7 +93,7 @@ abstract class TupleAbstractReader<T> implements TsonTypeReader<T> {
             return true;
         }
         TsonEvent e = ctx.peek();
-        ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a tuple (array-shaped) for '" + name + "', found " + TypeRefCheck.describe(e),
+        ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a tuple (array-shaped) for '" + displayName + "', found " + TypeRefCheck.describe(e),
                 "a tuple (array-shaped)", TypeRefCheck.describe(e));
         EventSkip.coreValue(ctx);
         return false;
@@ -111,7 +117,7 @@ abstract class TupleAbstractReader<T> implements TsonTypeReader<T> {
             if (index >= slots.size()) {
                 if (!reportedExtra) {
                     ctx.report(Diagnostic.Code.WRONG_ARITY,
-                            "'" + name + "' has " + slots.size() + " positions, found more than " + slots.size() + " elements",
+                            "'" + displayName + "' has " + slots.size() + " positions, found more than " + slots.size() + " elements",
                             slots.size() + " elements", "more than " + slots.size());
                     reportedExtra = true;
                 }
@@ -127,7 +133,7 @@ abstract class TupleAbstractReader<T> implements TsonTypeReader<T> {
         ctx.next(); // ArrayEnd
         if (index < slots.size()) {
             ctx.report(Diagnostic.Code.WRONG_ARITY,
-                    "'" + name + "' has " + slots.size() + " positions, found only " + index + " elements",
+                    "'" + displayName + "' has " + slots.size() + " positions, found only " + index + " elements",
                     slots.size() + " elements", String.valueOf(index));
         }
         return result;
@@ -137,7 +143,7 @@ abstract class TupleAbstractReader<T> implements TsonTypeReader<T> {
         ctx.next(); // consume the AbsentEvent regardless of REQUIRED/OPTIONAL
         if (slot.schema().state() == ElementState.REQUIRED) {
             ctx.index(index).report(Diagnostic.Code.FIELD_REQUIRED,
-                    "'" + name + "' position [" + index + "] is absent, but this position is required",
+                    "'" + displayName + "' position [" + index + "] is absent, but this position is required",
                     "a value", "(absent)");
         }
         return null;
