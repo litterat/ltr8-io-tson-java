@@ -20,10 +20,12 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # `build` reaches javadoc now: every module publishes a javadoc jar, so `assemble` runs the
+      # doclint pass that used to need a step of its own here.
       - name: Build and test
         run: ./gradlew build
 
-      # Not reached by `build` -- javadoc is its own task tree, so a broken doc comment
-      # is invisible to the line above.
-      - name: Javadoc
-        run: ./gradlew javadoc
+      # The publication itself, which nothing else exercises -- a POM or component wired wrong is
+      # otherwise invisible until someone tries to depend on the artifact.
+      - name: Publish to the local Maven repository
+        run: ./gradlew publishToMavenLocal

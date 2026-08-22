@@ -10,7 +10,8 @@ you'll actually enjoy writing.
 > API and the format itself may still change. See [STATUS.md](STATUS.md) for the full
 > checklist.
 
-**Requires Java 25.** No external runtime dependencies. **Not yet published to Maven Central.**
+**Requires Java 25.** No external runtime dependencies. **Not yet published to Maven Central** — to use it
+from another project on the same machine, see [Use it from another project](#use-it-from-another-project).
 Need Java 25? Quick install via [SDKMAN!](https://sdkman.io) (`sdk install java 25-tem`) or an
 [Adoptium](https://adoptium.net/temurin/releases/?version=25) build.
 
@@ -546,10 +547,51 @@ OK
   Pydantic's own `errors()`), or `tson` (the diagnostics rendered as a real, schema-validated TSON
   document — the CLI dogfooding the library).
 - **Exit codes** are Unix-conventional: `0` valid/compiled, `1` a real validation/compile failure,
-  `2` a usage error (bad arguments, an unreadable file), and `70` (`EX_SOFTWARE`) a bug in `tson` itself,
-  which prints its stack trace and is deliberately kept distinct so a script never reads a crash as
-  "your document is invalid" — so a script gets a clean pass/fail without parsing prose. `validate`
-  collects *every* problem in a file in one pass, not just the first.
+  `2` a usage error (bad arguments, an unreadable file), and `70` (`EX_SOFTWARE`) `tson` failing to reach a
+  verdict at all — either a gap (`not implemented yet: …`, whose message usually names the way to write the
+  thing today) or a bug, which prints its stack trace and asks for a report. That fourth code is
+  deliberately kept distinct so a script never reads a crash as "your document is invalid" — so a script
+  gets a clean pass/fail without parsing prose. `validate` collects *every* problem in a file in one pass,
+  not just the first.
+
+## Use it from another project
+
+Not on Maven Central (see [Status](#status)), but the build publishes locally, which is all a project on
+the same machine needs:
+
+```
+./gradlew publishToMavenLocal
+```
+
+That installs every module into `~/.m2/repository` under `io.ltr8`, with sources and javadoc jars beside
+each one. A consuming Gradle build then takes an ordinary dependency:
+
+```kotlin
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
+dependencies {
+    implementation("io.ltr8:tson:0.1.0-SNAPSHOT")
+}
+```
+
+`io.ltr8:tson` is the front door and pulls in the rest; depend on a single module directly
+(`io.ltr8:tson-regex`, say) if that is all you want. **The jars carry real `module-info.class`es**, so a
+consumer works either way — plain classpath, or a `module-info.java` of its own:
+
+```java
+module my.app {
+    requires io.ltr8.tson;            // Tson, TsonConfig
+    requires io.ltr8.tson.compiler;   // Diagnostic, the readers and writers
+    requires io.ltr8.tson.tree;       // TsonValue
+}
+```
+
+Nothing is published to a remote repository, deliberately: releasing needs signed artifacts and a fuller
+POM, and that is a separate decision. For the command-line tool, `./gradlew :tson-cli:installDist` (see
+[Command-line interface](#command-line-interface)).
 
 ## Requirements
 
@@ -559,7 +601,7 @@ OK
 ## Build and test
 
 ```
-./gradlew build
+./gradlew build     # compiles, tests, and builds the javadoc/sources jars, so doclint runs here too
 ./gradlew test
 ```
 

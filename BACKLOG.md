@@ -150,6 +150,15 @@ validate-then-fix loop the project targets.
   `constructor` handle, wrapping what came back.
     - Not reachable today: a union member is not a boxed position, so its carrier is always empty rather than
       wrong. Worth closing when a boxed variant becomes expressible, not before.
+- [ ] **No remote publishing — the local half is done, releasing is not.** Every subproject now publishes a
+  `mavenJava` publication (java component + sources + javadoc, POM with name/description/url/licence), so
+  `./gradlew publishToMavenLocal` gives a consuming project an ordinary `io.ltr8:tson:0.1.0-SNAPSHOT`
+  dependency, verified against a real consuming build on both the class path and the module path. What is
+  left is release, which is a decision rather than a task: a remote repository (Maven Central via Sonatype,
+  or GitHub Packages), artifact signing, the POM's `scm`/`developers`/`url` block Central requires, and a
+  version that is not a snapshot — publishing under a name the project has not claimed is not something the
+  build should start doing quietly. Until then a consuming repo can keep the included build as an opt-in for
+  co-development.
 
 ## Remaining built-in types
 
