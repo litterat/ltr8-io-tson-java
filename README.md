@@ -150,8 +150,9 @@ The write side is the mirror: a value in hand, TSON text out. The matrix:
 | a data document + your Java class | it bound (validated if it self-describes) | **`tson.objectReader()`** | your object |
 | a data document | a queryable tree (validated if it self-describes) | **`tson.treeReader()`** | a `TsonValue` tree |
 | a data document + a schema you hold | it validated as a named type | **`.withSchema(uri).readAs(…)`** on either reader | a tree / your object |
-| a Java object | it as TSON text | **`tson.objectWriter()`** | a `String` |
-| a `TsonValue` tree | it as TSON text | **`tson.treeWriter()`** | a `String` |
+| a Java object | it as TSON text | **`tson.objectWriter()`** | a `String`, or written to a sink |
+| a `TsonValue` tree | it as TSON text | **`tson.treeWriter()`** | a `String`, or written to a sink |
+| either of those | it self-describing (`!!schema` + root type) | **`.describing(…)`** on either writer | a document that reads back on its own |
 | a data document | every problem, not the value | **`tson.validate()`** | a `List<Diagnostic>` |
 | a *schema* document | every problem with the schema itself | **`tson.validateSchema()`** | a `List<Diagnostic>` |
 | a data document | the value **and** every problem | **`.withDiagnostics(…)`** on either facade reader | the value + a `List<Diagnostic>` |
@@ -165,7 +166,8 @@ declares none — the object form also checking your target class against the sc
 `readWithoutSchema(…)` opts a reader back out to a pure schemaless read. When your *data* isn't
 self-describing but you hold the schema out of band, `withSchema(uri).readAs(source, type)` supplies what
 the document didn't say. All of these stream their input — a large document is never fully buffered before
-reading begins — and take a `String` or an `InputStream`.
+reading begins — and take a `String` or an `InputStream`. The writers mirror that: `write(value, out)` takes
+an `OutputStream` or any `Appendable` and emits as it goes, with `toTson(…)` the same call over a buffer.
 
 A schemaless read still holds a `!type-ref` to account, since it is the only contract on offer: a built-in
 name (`!uuid`, `!int32`, `!date`) must sit on a scalar and satisfy that type, and any other name must name

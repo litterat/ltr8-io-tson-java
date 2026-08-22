@@ -227,9 +227,10 @@ whether lexer errors feed the `Diagnostic` model at all. `STRUCTURED-OUTPUT.md` 
 The read/write matrix in the README makes the asymmetry plain: the read side has a schemaless→object
 reader, a schemaless→tree reader, a schema-driven *validating* reader, a pull-event stream, and both
 fail-fast and collecting/diagnostics modes; the write side has only the two schemaless writers and is
-missing most of the mirror. The stream half of that mirror is now there — both writers take an
-`OutputStream`/`Appendable` sink and `toTson` is the wrapper — so what is left below is the schema-aware
-writer, diagnostics, and a public event surface.
+missing most of the mirror. Two pieces of it are now there — both writers take an `OutputStream`/`Appendable`
+sink (`toTson` being the wrapper), and both can emit a document header (`describing(…)`), so what they write
+can say what governs it. What is left below is the schema-aware writer, diagnostics, and a public event
+surface.
 
 - [ ] **No schema-aware (Class 2) writer — `TsonValueWriter`.** Only the schemaless `TsonObjectWriter`
   (object → TSON) and `TsonTreeWriter` (`TsonValue` → TSON) exist, both with documented lossy spots

@@ -28,6 +28,18 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
 - [x] Streaming reads throughout — the lexer reads from an `InputStream`, and both the schemaless
       binder (`TsonObjectReader`) and the schema-validating reader (`TsonTypeReader`) pull events one
       at a time rather than materializing a whole document tree first
+- [x] Streaming writes to match — both writers take an `OutputStream`/`Appendable` and emit as they go,
+      so a large or open-ended document is never built as a `String` first (`toTson` is that call over
+      a buffer)
+- [x] Self-describing output — a writer can emit the `!!schema`/`!!id` header the readers already
+      honour (`describing(…)`/`identifiedBy(…)`, off by default), so a document this library reads it
+      can also reproduce, and a response body says what governs it without anything out of band
+- [x] Reading a self-describing document with nothing named up front — `tson.treeReader().read(text)`
+      resolves the document's own `!!schema`, picks the type from its root type-ref (`!person`) and
+      validates against it; `tson.validate(text)` is the same read returning only the problems
+- [x] Consumable as an ordinary dependency — `./gradlew publishToMavenLocal` installs every module as
+      `io.ltr8:<module>`, with sources and javadoc, usable on the class path or the module path (see
+      the README's [Use it from another project](README.md#use-it-from-another-project))
 - [x] Part 2 schema grammar — full schema document parsing into a faithful AST (records, compositions,
       refinements, generic/array-sugar type-refs, field groups, and more), verified end-to-end against
       the spec's own real `meta-kernel.tn`/`meta.tn`/`core.tn` fixtures
@@ -52,12 +64,7 @@ tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).
 
 See [BACKLOG.md](BACKLOG.md) for the actively-tracked engineering backlog, and
 [STRUCTURED-OUTPUT.md](STRUCTURED-OUTPUT.md) for the target-use-case plan (LLM structured-output
-validation, JSON compatibility). One onboarding-relevant gap worth naming: the *CLI* now reads a
-self-describing data document — one that opens with a root type-ref (`!person`) and verifies its own
-`!!schema` header against the schema (see the README's [Command-line interface](README.md#command-line-interface)) —
-but the *library* front door doesn't yet have the equivalent one-call "read this string and auto-pick
-the reader from its own `!!schema`/type-ref" entry point; every `read` still needs you to name the
-target class or schema type up front.
+validation, JSON compatibility).
 
 See [CLAUDE.md](CLAUDE.md) for orientation, [docs/](docs/) for the per-area design notes, and
 [CONFORMANCE.md](CONFORMANCE.md) for edge-case behavior worth knowing about.
