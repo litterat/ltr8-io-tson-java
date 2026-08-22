@@ -1,5 +1,10 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.compiler.ast.TokenValue;
+import io.ltr8.tson.compiler.atom.AtomTypeException;
+import io.ltr8.tson.compiler.atom.UriParser;
+import io.ltr8.tson.compiler.ast.TokenForm;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayDeque;
@@ -47,6 +52,10 @@ public final class TsonDataEmitter {
 
     /** One entry per open record/map/array scope: how many elements written so far. */
     private final Deque<Integer> scopeElementCounts = new ArrayDeque<>();
+
+    /** Whether a {@link #typeRef} has been written for the value now being written -- see that method. */
+    private boolean typeRefPending;
+    private String pendingTypeRef;
 
     private static final Pattern CONTROL_CHAR = Pattern.compile("[\\x00-\\x1f]");
 
@@ -144,10 +153,74 @@ public final class TsonDataEmitter {
         return this;
     }
 
+    // ── Header directives (§2.2, §3.3) ──────────────────────────────────────
+
+    /**
+     * {@code !!id:"<uri>"} and its line terminator -- the document's own identity, and the <b>first</b> line
+     * when present (§2.2), so a caller writing both directives calls this one first.
+     *
+     * <p>The terminator is not cosmetic: §2.2.1 bounds the content-hash input at the id line's own
+     * terminator, so an {@code !!id} that shares a line with what follows has no defined hash.
+     */
+    public TsonDataEmitter documentId(String uri) {
+        return directive("id", uri);
+    }
+
+    /**
+     * {@code !!schema:"<uri>"} and its line terminator -- the schema governing the value that follows, which
+     * is what makes a data document self-describing: a reader resolves this, validates against it, and needs
+     * nothing out of band.
+     *
+     * <p>Legal in a document header and at a scoped-value position (§3.3); this emits it wherever the
+     * caller is, exactly like every other method here.
+     */
+    public TsonDataEmitter schemaRef(String uri) {
+        return directive("schema", uri);
+    }
+
+    /**
+     * One directive, terminated by a newline. Private because the name set is closed and positional (§3.3):
+     * of the four, only {@code id} and {@code schema} may appear in a <em>data</em> document, and those are
+     * the two methods above. {@code meta}/{@code import} belong to a schema document, which this emitter
+     * does not write.
+     *
+     * <p>{@code uri} is checked against the same atom the reader parses it with, so a caller cannot emit a
+     * document that will not read back -- a directive argument MUST be a URI (§3.3), and the failure belongs
+     * at the write that caused it rather than at whoever reads the result.
+     */
+    private TsonDataEmitter directive(String name, String uri) {
+        try {
+            UriParser.UNCONSTRAINED.read(new TokenValue(uri, TokenForm.SINGLE_LINE_QUOTED));
+        } catch (AtomTypeException e) {
+            throw new TsonWriteException("'!!" + name + "' argument \"" + uri + "\" is not a valid URI (§3.3): "
+                    + e.getMessage(), e);
+        }
+        emit("!!");
+        emit(name);
+        emit(':');
+        quotedString(uri);
+        emit('\n');
+        return this;
+    }
+
     // ── Type annotations (§3.2) ─────────────────────────────────────────────
 
-    /** {@code !name }, adjacent to {@code name} per §3.2, one trailing space before the value. */
+    /**
+     * {@code !name }, adjacent to {@code name} per §3.2, one trailing space before the value.
+     *
+     * <p><b>At most one per value</b>, which this enforces: {@code data-value = *annotation [type-ref]
+     * core-value} admits exactly one, and a second is a parse error in the document that results -- so a
+     * caller declaring a root type for a value that writes its own (a vocabulary host type, a union member)
+     * finds out here rather than at whoever tries to read it. The pending flag clears the moment a
+     * core-value starts, so a nested value's own type-ref is unaffected, and so is an annotation's.
+     */
     public TsonDataEmitter typeRef(String name) {
+        if (typeRefPending) {
+            throw new TsonWriteException("two type annotations on one value ('!" + pendingTypeRef + "' then '!"
+                    + name + "'): §3.2 admits at most one, so the result would not parse", null);
+        }
+        typeRefPending = true;
+        pendingTypeRef = name;
         emit('!');
         emit(name);
         emit(' ');
@@ -158,17 +231,20 @@ public final class TsonDataEmitter {
 
     /** {@code null}, the base type (§4.1) -- distinct from {@link #absentValue()}. */
     public TsonDataEmitter nullValue() {
+        startCoreValue();
         emit("null");
         return this;
     }
 
     /** {@code _}, the absent sentinel (§2.9) -- distinct from {@link #nullValue()}. */
     public TsonDataEmitter absentValue() {
+        startCoreValue();
         emit('_');
         return this;
     }
 
     public TsonDataEmitter booleanValue(boolean value) {
+        startCoreValue();
         emit(value ? "true" : "false");
         return this;
     }
@@ -179,6 +255,7 @@ public final class TsonDataEmitter {
      * Never used for arbitrary strings; see {@link #quotedString(String)} for those.
      */
     public TsonDataEmitter unquotedToken(String text) {
+        startCoreValue();
         emit(text);
         return this;
     }
@@ -190,6 +267,7 @@ public final class TsonDataEmitter {
      * otherwise) -- and leaves everything else, including non-ASCII text, literal.
      */
     public TsonDataEmitter quotedString(String text) {
+        startCoreValue();
         emit('"');
         int length = text.length();
         for (int i = 0; i < length; i++) {
@@ -218,6 +296,7 @@ public final class TsonDataEmitter {
     // ── Scope bookkeeping ────────────────────────────────────────────────────
 
     private TsonDataEmitter open(char delimiter) {
+        startCoreValue();
         emit(delimiter);
         scopeElementCounts.push(0);
         return this;
@@ -242,6 +321,17 @@ public final class TsonDataEmitter {
             emit(' ');
             scopeElementCounts.push(scopeElementCounts.pop() + 1);
         }
+    }
+
+    /**
+     * A core-value is starting, so whatever type-ref preceded it belongs to it and is spent -- the whole of
+     * {@link #typeRef}'s at-most-one bookkeeping. Every method that writes a value's own first character
+     * calls this, which is what keeps a nested value's type-ref (or an annotation's) independent of the
+     * value enclosing it.
+     */
+    private void startCoreValue() {
+        typeRefPending = false;
+        pendingTypeRef = null;
     }
 
     /**

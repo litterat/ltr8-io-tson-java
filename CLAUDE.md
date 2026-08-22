@@ -378,7 +378,11 @@ annotation *names* against the governing schema (#29). `TsonTreeWriter`/`TsonObj
 annotations in §7.4 order; `toTson` is mainly a debugging tool with documented losses. Both writers also
 take a sink — `write(value, OutputStream|Appendable)`, UTF-8, flushed and not closed — so a document never
 has to exist as a `String`; `TsonDataEmitter` holds an `Appendable`, and `toTson` is that method over a
-`StringBuilder`. These live in `tson-compiler`'s root package because `DefinitionResolver` depends on
+`StringBuilder`. Both can also emit a document header (`describing(schemaUri[, rootType])`/`identifiedBy`),
+**off by default** so existing output is unchanged — the object writer needs the root type too, a bound
+object carrying neither fact, where a tree already names its own; `TsonDataEmitter.typeRef` refuses a second
+type-ref on one value, which is what keeps a declared root type from writing an unparseable document.
+These live in `tson-compiler`'s root package because `DefinitionResolver` depends on
 `TsonObjectWriter`.
 
 ### Tree model: `TsonValue` (`tson-tree`) — `docs/facades-and-tree.md`

@@ -389,6 +389,24 @@ new TsonTreeWriter().write(node, appendable);                       // or any Ap
 
 `toTson` is that method over a `StringBuilder`, for when you do want the whole document in hand.
 
+**Self-describing output.** By default a writer emits a bare value. `describing(...)` adds the header the
+readers already honour, so the document says what governs it and a receiver needs nothing out of band —
+which is what makes a TSON response body self-describing in both directions:
+
+```java
+String body = tson.objectWriter().describing(schemaUri, "person").toTson(person);
+// !!schema:"https://example.com/person.tn"
+// !person { name: "Ada" age: 36 }
+
+tson.validate(body);            // [] — resolves the schema and the type from the bytes alone
+```
+
+A bound object carries neither fact, so the object writer takes both: `!!schema` alone would produce a
+document whose reader answers *"declares a !!schema but has no root type-ref to select a type"*. A
+`TsonValue` already knows its own type, so `treeWriter().describing(schemaUri)` takes just the URI.
+`identifiedBy(documentId)` adds `!!id`. All three are derivations — the writer you called them on is
+unchanged, and default output is exactly what it was.
+
 ---
 
 ## Status

@@ -245,6 +245,16 @@ writer, diagnostics, and a public event surface.
   compiled reader stack (`TsonSchemaCompiler`/`TsonTypeReader`) — checking output against a TSON schema
   and reporting what's wrong — is a whole missing half of the pipeline, and the natural home for
   round-tripping or producing guaranteed-conformant documents.
+    - It is also where `describing(schemaUri, rootType)` stops needing its arguments. A bind-mode registry
+      already holds the compiled schema and the class→type binding, so a schema-aware writer could derive
+      both facts instead of having the caller name what the library already knows. The explicit form stays
+      either way — a caller writing against a schema it did not compile here has nothing to derive from.
+- [ ] **A `TsonValue` does not carry the schema its document named.** A schema-driven read records each
+  node's *type*, which is what lets `treeWriter().describing(uri)` write the root's `!typeName` back, but
+  the document's `!!schema` is consumed by the reader and kept nowhere — so a caller round-tripping a tree
+  has to have held onto the URI themselves. Adding it means deciding whether it belongs on the root node
+  (making `TsonValue` document-aware, which it deliberately is not) or in a document wrapper the readers
+  return, which is a facade change and a bigger one than it looks.
 - [ ] **Writers are fail-fast only, no diagnostics.** They throw `TsonWriteException` at the first
   problem, with nothing symmetric to the read side's `TsonDiagnosticsReceiver`. The `TsonValueWriter`
   above especially needs it, to report every schema violation in one pass the way the reader does — and
