@@ -432,16 +432,14 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                             "an explicit type annotation naming one of " + typeDefinition.subtypes(), "(none)");
                     return null;
                 };
-                return new VariantBindReader(name, noOwnData, union, resolver,
-                        AnnotationTypes.of(context).discarding());
+                return new VariantBindReader(name, noOwnData, union, resolver);
             }
 
             if (dataClass instanceof DataClassRecord record) {
                 RecordBindReader ownParser = new RecordBindReader(name, EntryDisplayName.of(name, typeDefinition),
                         body, record, resolver,
                         context.locationOf(name, typeDefinition), AnnotationTypes.of(context), strict);
-                return new VariantSchemaReader(name, ownParser, typeDefinition.subtypes(), resolver,
-                        AnnotationTypes.of(context).discarding());
+                return new VariantSchemaReader(name, ownParser, typeDefinition.subtypes(), resolver);
             }
 
             throw new IllegalArgumentException("'" + name + "' resolves to " + dataClass.typeClass()

@@ -37,48 +37,47 @@ final class NamedDispatchReader implements TsonTypeReader<Object> {
     private final Set<String> candidateNames;
     private final TsonTypeReaderResolver resolver;
     private final Map<DiscriminationClass, String> untaggedRecovery;
-    private final AnnotationTypes annotationTypes;
 
     NamedDispatchReader(String positionName, String missingTypeRefMessage, String candidateNoun,
                          Set<String> candidateNames, TsonTypeReaderResolver resolver,
-                         Map<DiscriminationClass, String> untaggedRecovery, AnnotationTypes annotationTypes) {
+                         Map<DiscriminationClass, String> untaggedRecovery) {
         this.positionName = positionName;
         this.missingTypeRefMessage = missingTypeRefMessage;
         this.candidateNoun = candidateNoun;
         this.candidateNames = candidateNames;
         this.resolver = resolver;
         this.untaggedRecovery = untaggedRecovery;
-        this.annotationTypes = annotationTypes;
     }
 
     @Override
     public Object read(TsonReadContext ctx) {
-        List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx, annotationTypes);
-        Optional<String> typeRef = EventSkip.typeRef(ctx);
+        Optional<String> typeRef = EventSkip.typeRefAhead(ctx);
         if (typeRef.isPresent()) {
             String ref = typeRef.get();
             if (!candidateNames.contains(ref)) {
                 ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF, "'" + ref + "' is not a " + candidateNoun + " of '"
                                 + positionName + "' -- expected one of " + candidateNames,
                         "one of " + candidateNames, ref);
-                EventSkip.coreValue(ctx);
+                EventSkip.dataValue(ctx); // framing included: nothing consumed it, this value being unreadable
                 return null;
             }
-            return reattach(resolver.resolve(ref).read(ctx), annotations);
+            return resolver.resolve(ref).read(ctx);
         }
         if (!untaggedRecovery.isEmpty()) {
-            return reattach(recoverUntagged(ctx), annotations);
+            return recoverUntagged(ctx);
         }
         ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF,
                 "'" + positionName + "' " + missingTypeRefMessage + ": " + candidateNames,
                 "one of " + candidateNames, "no type annotation");
-        EventSkip.coreValue(ctx);
+        EventSkip.dataValue(ctx); // framing included: nothing consumed it, this value being unreadable
         return null;
     }
 
     /** Recovers an untagged value to the variant of its own §4 base-type class (see the class Javadoc). */
     private Object recoverUntagged(TsonReadContext ctx) {
-        TsonEvent event = ctx.peek(); // not consumed -- the variant's own reader reads it
+        // Past the annotations, which are still unread: they belong to the value, and the variant's own
+        // reader takes the whole data-value from the cursor as it stands.
+        TsonEvent event = EventSkip.aheadOfValue(ctx);
         if (event instanceof TokenEvent token) {
             DiscriminationClass valueClass = DiscriminationClass.ofValue(
                     ValueParser.INSTANCE.read(new TokenValue(token.text(), token.form())));
@@ -91,17 +90,7 @@ final class NamedDispatchReader implements TsonTypeReader<Object> {
                 "'" + positionName + "' has no variant matching this untagged value -- expected a value of one "
                         + "of " + candidateNames + ", or an explicit type annotation",
                 "one of " + candidateNames, String.valueOf(event));
-        EventSkip.coreValue(ctx);
+        EventSkip.dataValue(ctx); // framing included: nothing consumed it, this value being unreadable
         return null;
-    }
-
-    /**
-     * The annotations written on the dispatched value, re-attached to whatever the chosen reader built.
-     * Dispatch has to consume them to reach the type-ref it dispatches on ({@code data-value = *annotation
-     * [type-ref] core-value}), so the reader that actually builds the node never sees them; a non-node result
-     * (object-binding mode) has nowhere to carry them and is returned untouched.
-     */
-    private static Object reattach(Object value, List<TsonAnnotation> annotations) {
-        return value instanceof TsonValue node ? node.withAnnotations(annotations) : value;
     }
 }

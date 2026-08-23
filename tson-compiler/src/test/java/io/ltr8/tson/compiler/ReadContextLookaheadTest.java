@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.compiler.reader.EventSkip;
 import io.ltr8.tson.compiler.stream.AnnotationStart;
 import io.ltr8.tson.compiler.stream.RecordStart;
 import io.ltr8.tson.compiler.stream.TsonEvent;
@@ -16,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@code DefaultTsonReadContext.lookingAhead} -- reading further than {@link TsonReadContext#peek()} reaches
+ * {@link TsonReadContext#lookingAhead} -- reading further than {@link TsonReadContext#peek()} reaches
  * and then putting back everything read, so the readers that follow see a stream nothing has touched.
  *
  * <p>The rewind is the whole contract, and what depends on it is not obvious from the call site: a reader
@@ -44,7 +45,7 @@ class ReadContextLookaheadTest {
         TsonReadContext ctx = TestDocuments.document(DOCUMENT);
         List<String> untouched = drain(TestDocuments.document(DOCUMENT));
 
-        String found = DefaultTsonReadContext.lookingAhead(ctx, lookahead -> {
+        String found = TsonReadContext.lookingAhead(ctx, lookahead -> {
             for (int i = 0; i < 6; i++) { // an arbitrary distance: the rewind is not told how far it went
                 lookahead.next();
             }
@@ -61,7 +62,7 @@ class ReadContextLookaheadTest {
         TsonReadContext ctx = TestDocuments.document(DOCUMENT);
 
         assertInstanceOf(AnnotationStart.class, ctx.peek(), "one peek finds only the first annotation");
-        assertEquals("api", RootTypeRef.find(ctx).orElseThrow());
+        assertEquals("api", EventSkip.typeRefAhead(ctx).orElseThrow());
         assertInstanceOf(AnnotationStart.class, ctx.peek(), "and the annotations are still there afterwards");
     }
 
@@ -72,7 +73,7 @@ class ReadContextLookaheadTest {
                 @doc:"why"
                 { name: "orders" }""");
 
-        assertTrue(RootTypeRef.find(ctx).isEmpty());
+        assertTrue(EventSkip.typeRefAhead(ctx).isEmpty());
         assertInstanceOf(AnnotationStart.class, ctx.peek());
     }
 
@@ -86,9 +87,9 @@ class ReadContextLookaheadTest {
         TsonReadContext ctx = TestDocuments.document(DOCUMENT);
         List<String> untouched = drain(TestDocuments.document(DOCUMENT));
 
-        DefaultTsonReadContext.lookingAhead(ctx, outer -> {
+        TsonReadContext.lookingAhead(ctx, outer -> {
             outer.next(); // into the first annotation
-            return DefaultTsonReadContext.lookingAhead(outer, inner -> inner.next());
+            return TsonReadContext.lookingAhead(outer, inner -> inner.next());
         });
 
         assertEquals(untouched, drain(ctx));
@@ -100,7 +101,7 @@ class ReadContextLookaheadTest {
         TsonReadContext ctx = TestDocuments.document(DOCUMENT);
         List<String> untouched = drain(TestDocuments.document(DOCUMENT));
 
-        assertThrows(IllegalStateException.class, () -> DefaultTsonReadContext.lookingAhead(ctx, lookahead -> {
+        assertThrows(IllegalStateException.class, () -> TsonReadContext.lookingAhead(ctx, lookahead -> {
             lookahead.next();
             throw new IllegalStateException("boom");
         }));
@@ -117,7 +118,7 @@ class ReadContextLookaheadTest {
     void thePositionFollowsWhatTheLookaheadFound() {
         TsonReadContext ctx = TestDocuments.document(DOCUMENT);
 
-        RootTypeRef.find(ctx);
+        EventSkip.typeRefAhead(ctx);
 
         assertEquals(3, ctx.position().orElseThrow().line(), "the !api line, not the first annotation's");
     }
@@ -127,7 +128,7 @@ class ReadContextLookaheadTest {
     void rewindingReplaysRatherThanReparses() {
         TsonReadContext ctx = TestDocuments.document(DOCUMENT);
 
-        TsonEvent first = DefaultTsonReadContext.lookingAhead(ctx, TsonReadContext::next);
+        TsonEvent first = TsonReadContext.lookingAhead(ctx, TsonReadContext::next);
 
         assertEquals(first, ctx.next());
     }
@@ -137,7 +138,7 @@ class ReadContextLookaheadTest {
     void theRewoundStreamStillCarriesTheTypeRef() {
         TsonReadContext ctx = TestDocuments.document(DOCUMENT);
 
-        String name = RootTypeRef.find(ctx).orElseThrow();
+        String name = EventSkip.typeRefAhead(ctx).orElseThrow();
         while (!(ctx.peek() instanceof TypeRef)) {
             ctx.next();
         }
