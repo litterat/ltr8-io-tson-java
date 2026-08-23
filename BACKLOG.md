@@ -103,31 +103,6 @@ by a factor of six.
   silently exempt from `min_items` until it was fixed one reader at a time, and nothing structural stops the
   next container from repeating it. What a primitive would buy is the rule stated once, where "how many
   entries does this value have" has one answer whatever spelled it.
-- [ ] **Annotations are still discarded at a dispatched position.** A dispatcher (`VariantBindReader` for a
-  union, `VariantSchemaReader` under bind mode) must consume the leading annotations to reach the
-  `!typeName` it dispatches on -- they precede it in `data-value = *annotation [type-ref] core-value` -- so
-  the reader that ends up building the value never sees them. Tree mode solved this by re-attaching to the
-  finished node (`TsonValue.withAnnotations`); bind mode would do the same through `DataClassAnnotated`'s
-  `constructor` handle, wrapping what came back.
-    - **Reachable today, and silent.** A record type with subtypes, bound to a sealed interface, holding a
-      variant whose own class declares an `Annotations` carrier: `!holder { thing: @note:"why" !circle {...} }`
-      binds `circle` with `annotations=[]`. The same class read at the root of a document keeps the
-      annotation, so whether a document's prose survives depends on how deep the value sits — which is worse
-      than losing it consistently. (The note that stood here said a union member is never a boxed position so
-      its carrier is always empty rather than wrong; the carrier is real and the emptiness is a lie.)
-    - **Four sites share one false premise** — that a bound value has nowhere to put annotations.
-      `VariantBindReader` discards them without capturing; `VariantSchemaReader.reattach` and
-      `NamedDispatchReader.reattach` capture but re-attach only to a `TsonValue`; `ChoiceReader.FACTORY`
-      turns capturing off for bind mode, its Javadoc stating the premise outright. A class that declares an
-      `Annotations` component is the counter-example to all four.
-    - **`DefaultTsonReadContext.lookingAhead` is the fix, and a smaller one than re-attaching.** A dispatcher
-      can find its `!typeName` by looking ahead and rewinding, consuming nothing — so the reader it
-      dispatches to sees the annotations itself, exactly as it does when nothing dispatched to it. That
-      makes both modes agree by construction instead of by two implementations staying in step, and deletes
-      the `reattach`/`captureAnnotations` machinery rather than extending it to bind mode.
-    - **The prerequisite is done** (#144): a discarding position now checks what it drops
-      (`AnnotationTypes.discarding()`), so moving validation to the delegate loses nothing -- the delegate
-      already validates whether or not it keeps the result. What remains here is purely the drop.
 
 ## Binding strictness
 

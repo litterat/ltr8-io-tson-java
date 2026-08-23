@@ -157,4 +157,28 @@ public interface TsonReadContext {
     static TsonReadContext throwing(TsonEventSource events) {
         return of(events, TsonDiagnosticsReceiver.throwing());
     }
+
+    /**
+     * Runs {@code lookahead} against {@code ctx}'s cursor and then rewinds every event it consumed, so
+     * whatever reads next sees a stream nothing has touched.
+     *
+     * <p><b>Why one event of lookahead is not always enough.</b> {@link #peek()} answers "what is here". A
+     * reader that has to <em>dispatch</em> asks something else: {@code data-value = *annotation [type-ref]
+     * core-value}, so the type-ref it decides on sits behind a run of annotations that can be any length.
+     * Reading the annotations to get past them is not a substitute -- they belong to the value, and the
+     * reader that ends up building it would never see them, which is a silent loss rather than a failure.
+     * Looking and rewinding lets the dispatcher decide and the delegate still read the whole value, framing
+     * included, exactly as it would if nothing had dispatched to it.
+     *
+     * <p>Consumed events are replayed from a buffer rather than re-lexed, so a lookahead costs what it looked
+     * past and never the document. {@link #position()} is deliberately left where the lookahead reached
+     * rather than restored: a caller looks ahead in order to say something about what it found, and that is
+     * where the saying belongs.
+     *
+     * <p>A static method taking the context rather than an instance method, so it adds nothing an
+     * implementation of this interface has to provide.
+     */
+    static <T> T lookingAhead(TsonReadContext ctx, java.util.function.Function<TsonReadContext, T> lookahead) {
+        return DefaultTsonReadContext.lookingAhead(ctx, lookahead);
+    }
 }

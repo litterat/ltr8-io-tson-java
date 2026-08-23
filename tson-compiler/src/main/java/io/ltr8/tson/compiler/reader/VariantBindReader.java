@@ -53,11 +53,11 @@ import java.util.Optional;
  * resolver}, the same compiled-schema path every other dispatch in this codebase uses, not by
  * reflectively constructing the member class directly the way {@code TsonObjectReader} does.
  *
- * <p>The type-ref driving this decision is consumed here, after the annotations that precede it -- {@code
- * ownParser} still calls for both again on delegation (every reader does, as its own first step), which is a
- * safe no-op once nothing's left to consume. The annotations are dropped, a bound union member having nowhere
- * to carry them, but {@link AnnotationCapture#discard} still checks them against the governing schema: what
- * the reading application does with an annotation is no part of whether the document conforms.
+ * <p><b>The type-ref driving this decision is read without being consumed</b> ({@link
+ * EventSkip#typeRefAhead}), so the reader dispatched to is handed the whole data-value -- its annotations,
+ * its type-ref and its core-value -- exactly as it would be if nothing had dispatched to it. Consuming the
+ * framing here instead, which is what reaching past the annotations to the type-ref used to require, left
+ * the reader that actually builds the value unable to see annotations written on it.
  */
 final class VariantBindReader implements TsonTypeReader<Object> {
 
@@ -65,21 +65,18 @@ final class VariantBindReader implements TsonTypeReader<Object> {
     private final TsonTypeReader<?> ownParser;
     private final DataClassUnion descriptor;
     private final TsonTypeReaderResolver resolver;
-    private final AnnotationTypes annotationTypes;
 
     VariantBindReader(String name, TsonTypeReader<?> ownParser, DataClassUnion descriptor,
-                      TsonTypeReaderResolver resolver, AnnotationTypes annotationTypes) {
+                      TsonTypeReaderResolver resolver) {
         this.name = name;
         this.ownParser = ownParser;
         this.descriptor = descriptor;
         this.resolver = resolver;
-        this.annotationTypes = annotationTypes;
     }
 
     @Override
     public Object read(TsonReadContext ctx) {
-        AnnotationCapture.discard(ctx, annotationTypes);
-        Optional<String> typeRef = EventSkip.typeRef(ctx);
+        Optional<String> typeRef = EventSkip.typeRefAhead(ctx);
         if (typeRef.isEmpty() || typeRef.get().equals(name)) {
             return ownParser.read(ctx);
         }
@@ -88,7 +85,7 @@ final class VariantBindReader implements TsonTypeReader<Object> {
             ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF, "'" + ref + "' is not a member of the union '" + name
                             + "' binds against " + describeMembers(),
                     "one of " + describeMembers(), ref);
-            EventSkip.coreValue(ctx);
+            EventSkip.dataValue(ctx); // framing included: nothing consumed it, this value being unreadable
             return null;
         }
         return resolver.resolve(ref).read(ctx);

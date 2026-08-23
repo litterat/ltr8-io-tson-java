@@ -70,6 +70,30 @@ public final class EventSkip {
     }
 
     /**
+     * The event a data-value's {@code core-value} starts at -- or the {@code type-ref} before it -- found by
+     * looking <em>past</em> the leading annotations and putting them back. Consumes nothing.
+     *
+     * <p><b>For a reader that has to decide something before the value is read.</b> {@code data-value =
+     * *annotation [type-ref] core-value}, so anything keyed on the type-ref (a dispatcher choosing a
+     * variant, a facade choosing the root type) sits behind a run that can be any length, and a single
+     * {@link TsonReadContext#peek()} finds the first annotation and concludes there is none. Consuming the
+     * run to get past it is not a substitute: the annotations belong to the value, and the reader that ends
+     * up building it would never see them -- a silent loss, not a failure. See {@link
+     * TsonReadContext#lookingAhead}.
+     */
+    public static TsonEvent aheadOfValue(TsonReadContext ctx) {
+        return TsonReadContext.lookingAhead(ctx, lookahead -> {
+            annotations(lookahead);
+            return lookahead.peek();
+        });
+    }
+
+    /** The name of the type-ref {@link #aheadOfValue} finds, if it found one. Consumes nothing. */
+    public static Optional<String> typeRefAhead(TsonReadContext ctx) {
+        return aheadOfValue(ctx) instanceof TypeRef typeRef ? Optional.of(typeRef.name()) : Optional.empty();
+    }
+
+    /**
      * Consumes an optional type-ref, returning its own name if present -- the second half of a
      * data-value's {@code annotation* type-ref?} framing, split out so a reader that captures the
      * leading annotations instead of discarding them still shares this half.

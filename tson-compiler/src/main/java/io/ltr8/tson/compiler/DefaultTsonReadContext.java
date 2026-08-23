@@ -84,26 +84,9 @@ final class DefaultTsonReadContext implements TsonReadContext {
     }
 
     /**
-     * Runs {@code lookahead} against this read's cursor and then rewinds every event it consumed, so the
-     * readers that follow see a stream nothing has touched.
-     *
-     * <p><b>Why this exists at all</b>, when {@link #peek()} is the primitive every reader uses: one event
-     * of lookahead answers "what is here", and a caller occasionally has to answer "what is here <em>after
-     * the part that can repeat</em>". A document's root is the case -- {@code data-value = *annotation
-     * [type-ref] core-value}, so the type-ref that selects the root reader can sit behind any number of
-     * annotations, and a single peek finds the first annotation and concludes there is no type-ref. Reading
-     * the annotations to get past them is not an option on its own: they belong to the value, and a reader
-     * that never sees them drops them from what it builds.
-     *
-     * <p><b>Rewinding, not re-parsing.</b> The consumed events are replayed from a buffer, so the source is
-     * pulled exactly once and a lookahead over an annotation holds only that annotation's own events --
-     * proportional to what was looked past, never to the document. {@link #position()} is deliberately left
-     * where the lookahead put it rather than restored: a caller looks ahead in order to say something about
-     * what it found, and what it found is where that belongs.
-     *
-     * <p>Takes a {@link TsonReadContext} rather than being an instance method because every caller holds the
-     * interface; this class is its one implementation (see the class note), so the cast cannot fail for a
-     * context this library made.
+     * {@link TsonReadContext#lookingAhead}'s implementation, which carries the contract and the reasoning.
+     * The cast cannot fail for a context this library made: this class is the interface's one implementation
+     * (see the class note), and every context reaches a reader through {@link TsonReadContext#of}.
      */
     static <T> T lookingAhead(TsonReadContext ctx, Function<TsonReadContext, T> lookahead) {
         Cursor cursor = ((DefaultTsonReadContext) ctx).cursor;

@@ -95,7 +95,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         return new ValueReaderFactoryRegistry(baseFactories(
                 new RecordTreeReader.Factory(), new ArrayTreeReader.Factory(), new MapTreeReader.Factory(),
                 new TupleTreeReader.Factory(), AtomTypeReader.ENUM_OBJECT_MODE, TREE_UNIT, AtomTreeFactory::new,
-                ChoiceReader.CAPTURING_FACTORY));
+                ChoiceReader.FACTORY));
     }
 
     /** Tree mode's {@code unit} factory: {@code void} → {@link AbsentTreeReader}, {@code value}/{@code token} → {@link AtomTreeReader} over {@link AtomTypeReader#UNIT}'s own reader. */

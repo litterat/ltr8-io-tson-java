@@ -36,9 +36,12 @@ import java.util.Set;
  * to {@code uri_type}'s own already-compiled reader, producing a real {@code UriType}, not a
  * {@code TextType}).
  *
- * <p>The type-ref driving this decision is consumed here, via {@link EventSkip#annotationsAndTypeRef}
- * -- {@code ownParser} still calls it again on delegation (every reader does, as its own first step),
- * which is a safe no-op once nothing's left to consume.
+ * <p><b>The type-ref driving this decision is read without being consumed</b> ({@link
+ * EventSkip#typeRefAhead}), so whichever reader is chosen is handed the whole data-value -- its annotations,
+ * its type-ref and its core-value -- exactly as it would be if nothing had dispatched to it. That is what
+ * lets annotations written on a dispatched value survive: consuming the framing to reach the type-ref, which
+ * is what this used to do, left the reader that builds the value unable to see them, and re-attaching
+ * afterwards could only put them back on a {@code TsonValue}.
  */
 final class VariantSchemaReader implements TsonTypeReader<Object> {
 
@@ -46,42 +49,29 @@ final class VariantSchemaReader implements TsonTypeReader<Object> {
     private final TsonTypeReader<?> ownParser;
     private final Set<String> subtypeNames;
     private final TsonTypeReaderResolver resolver;
-    private final AnnotationTypes annotationTypes;
 
     VariantSchemaReader(String name, TsonTypeReader<?> ownParser, Collection<String> subtypeNames,
-                        TsonTypeReaderResolver resolver, AnnotationTypes annotationTypes) {
+                        TsonTypeReaderResolver resolver) {
         this.name = name;
         this.ownParser = ownParser;
         this.subtypeNames = Set.copyOf(subtypeNames);
         this.resolver = resolver;
-        this.annotationTypes = annotationTypes;
     }
 
     @Override
     public Object read(TsonReadContext ctx) {
-        List<TsonAnnotation> annotations = AnnotationCapture.annotations(ctx, annotationTypes);
-        Optional<String> typeRef = EventSkip.typeRef(ctx);
+        Optional<String> typeRef = EventSkip.typeRefAhead(ctx);
         if (typeRef.isEmpty() || typeRef.get().equals(name)) {
-            return reattach(ownParser.read(ctx), annotations);
+            return ownParser.read(ctx);
         }
         String ref = typeRef.get();
         if (!subtypeNames.contains(ref)) {
             ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF, "'" + ref + "' is not a known subtype of '" + name
                             + "' -- expected one of " + subtypeNames,
                     "one of " + subtypeNames, ref);
-            EventSkip.coreValue(ctx);
+            EventSkip.dataValue(ctx); // framing included: nothing consumed it, this value being unreadable
             return null;
         }
-        return reattach(resolver.resolve(ref).read(ctx), annotations);
-    }
-
-    /**
-     * The annotations written on the dispatched value, re-attached to whatever the chosen reader built.
-     * Dispatch has to consume them to reach the type-ref it dispatches on ({@code data-value = *annotation
-     * [type-ref] core-value}), so the reader that actually builds the node never sees them; a non-node result
-     * (object-binding mode) has nowhere to carry them and is returned untouched.
-     */
-    private static Object reattach(Object value, List<TsonAnnotation> annotations) {
-        return value instanceof TsonValue node ? node.withAnnotations(annotations) : value;
+        return resolver.resolve(ref).read(ctx);
     }
 }

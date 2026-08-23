@@ -33,34 +33,30 @@ final class ChoiceReader {
     private ChoiceReader() {
     }
 
-    /** Tree mode: a dispatched value's own annotations are captured and re-attached to the node built for it. */
-    static final ValueReaderFactory CAPTURING_FACTORY = factory(true);
-
-    /** Object-binding mode: a bound Java value has nowhere to carry annotations, so they are checked and dropped. */
-    static final ValueReaderFactory FACTORY = factory(false);
-
-    private static ValueReaderFactory factory(boolean captureAnnotations) {
-        return (name, typeDefinition, context) -> {
-            if (!(typeDefinition.body() instanceof ChoiceBody body)) {
-                throw new IllegalArgumentException("'" + name + "' is not choice-shaped: " + typeDefinition.body());
-            }
-            if (body.variants().isEmpty()) {
-                throw new IllegalStateException("'" + name + "' declares no variants -- nothing compilable here");
-            }
-            Set<String> variantNames = new LinkedHashSet<>();
-            for (TypeRef variant : body.variants()) {
-                variantNames.add(variant.name());
-            }
-            // NamedDispatchReader's positionName is message-only, so the display name goes straight in:
-            // a choice lifted from `(a | b)` sugar has an internal name nobody wrote.
-            return new NamedDispatchReader(EntryDisplayName.of(name, typeDefinition),
-                    "is a choice -- a value at this position requires an explicit type annotation (!typeName) "
-                            + "naming one of its declared variants to disambiguate",
-                    "declared variant", variantNames, context.readers(),
-                    untaggedRecovery(typeDefinition, body, context.schema()),
-                    captureAnnotations ? AnnotationTypes.of(context) : AnnotationTypes.of(context).discarding());
-        };
-    }
+    /**
+     * <b>One factory for both modes.</b> Dispatch reads the type-ref without consuming it, so the variant's
+     * own reader is handed the whole data-value and does with its annotations whatever that mode does
+     * everywhere else. There is nothing left here for a mode to differ about.
+     */
+    static final ValueReaderFactory FACTORY = (name, typeDefinition, context) -> {
+        if (!(typeDefinition.body() instanceof ChoiceBody body)) {
+            throw new IllegalArgumentException("'" + name + "' is not choice-shaped: " + typeDefinition.body());
+        }
+        if (body.variants().isEmpty()) {
+            throw new IllegalStateException("'" + name + "' declares no variants -- nothing compilable here");
+        }
+        Set<String> variantNames = new LinkedHashSet<>();
+        for (TypeRef variant : body.variants()) {
+            variantNames.add(variant.name());
+        }
+        // NamedDispatchReader's positionName is message-only, so the display name goes straight in:
+        // a choice lifted from `(a | b)` sugar has an internal name nobody wrote.
+        return new NamedDispatchReader(EntryDisplayName.of(name, typeDefinition),
+                "is a choice -- a value at this position requires an explicit type annotation (!typeName) "
+                        + "naming one of its declared variants to disambiguate",
+                "declared variant", variantNames, context.readers(),
+                untaggedRecovery(typeDefinition, body, context.schema()));
+    };
 
     /**
      * {@code discrimination class -> variant name} for untagged recovery, or empty (tag stays required)

@@ -38,7 +38,8 @@ reads one value at a cursor and polices nothing around it.
   root value (so the stream still lands on `DocumentEnd`). Under `throwing()` that is indistinguishable from
   the old behaviour; under a collector they arrive as `Diagnostic`s, which is what lets `Tson.validate`
   delegate to `treeReader()` wholesale instead of re-deriving anything.
-- **The root type-ref is found past the root value's annotations (`RootTypeRef`), not at the first event.**
+- **The root type-ref is found past the root value's annotations (`EventSkip.typeRefAhead`), not at the
+  first event.**
   `data-value = *annotation [type-ref] core-value`, and §3.3 puts the two in that order deliberately —
   augmentation attaches to the value that follows it, and the type-ref is part of that value — so
   `@doc:"…" !api { … }` annotates and types one value and its root type-ref is `!api`. This is not a
@@ -46,9 +47,10 @@ reads one value at a cursor and polices nothing around it.
   a document, and a root that cannot carry one leaves configuration, fixtures and API descriptions unable
   to say what they are for. Reading against an explicitly named type (`readAs`) never had the problem — it
   needs no lookup — which is what shows the whole reader stack below has always handled this.
-    - **Looked past by rewinding, not consuming** (`DefaultTsonReadContext.lookingAhead`, which records what
-      a lookahead reads and replays it afterwards). The annotations belong to the root value, and the reader
-      underneath builds them into what it returns — a `TsonValue`'s annotation list, a bound class's
+    - **Looked past by rewinding, not consuming** (`TsonReadContext.lookingAhead`, which records what a
+      lookahead reads and replays it afterwards — the same primitive every dispatcher uses, below). The
+      annotations belong to the root value, and the reader underneath builds them into what it returns — a
+      `TsonValue`'s annotation list, a bound class's
       `Annotations` carrier. A lookup that consumed them to reach the type-ref would select the right reader
       and hand it a value stripped of the very prose this exists to allow: a silent loss, not a failure.
       Events are replayed from a buffer rather than re-lexed, so a lookahead holds only what it looked past.
@@ -100,14 +102,23 @@ reads one value at a cursor and polices nothing around it.
   captures *first*, then calls the base/delegate, whose own framing call then finds nothing left. That's a
   no-op precisely because every one of those readers **discards** the framing result rather than using it.
   Bind mode is untouched.
-- **A dispatched value gets its annotations re-attached afterwards.** `NamedDispatchReader`/
-  `VariantSchemaReader` must consume the annotations to reach the `!typeName` they dispatch on, so the reader
-  that builds the node never sees them; they're put back with `TsonValue.withAnnotations` (a pure `tson-tree`
-  operation). Nothing flows through the context and `TsonTypeReader.read` is unchanged — a dispatched
-  annotation flows *into* the delegate's result, which is the opposite direction from the
-  `DiagnosticsReceiver` problem. Bind mode keeps nothing this way (re-attachment only acts on a `TsonValue`)
-  — a defect where the variant's own class declares an `Annotations` carrier, tracked in `BACKLOG.md`; what
-  it does do is **check** what it drops, like every other discarding position.
+- **A dispatcher reads the type-ref it decides on without consuming it** (`EventSkip.typeRefAhead`, over
+  `TsonReadContext.lookingAhead`), so the reader it chooses is handed the whole data-value — annotations,
+  type-ref and core-value — exactly as it would be if nothing had dispatched to it. `NamedDispatchReader`,
+  `VariantSchemaReader` and `VariantBindReader` all work this way, and `ChoiceReader` is one factory for both
+  modes rather than two, there being nothing left for a mode to differ about.
+    - **Consuming the framing was the whole problem.** `data-value = *annotation [type-ref] core-value`, so
+      reaching the `!typeName` meant eating the annotations, and the reader that then built the value never
+      saw them. Tree mode papered over it by re-attaching to the finished node (`TsonValue.withAnnotations`);
+      bind mode had no equivalent, so a variant class declaring an `Annotations` carrier got an empty one
+      while the *same class* read where nothing dispatched got the annotation — a document's prose surviving
+      or not according to how deep the value sat. Looking and rewinding makes both modes agree by
+      construction instead of by two implementations staying in step, and deleted the re-attachment rather
+      than growing it a bind-mode half.
+    - The error paths moved with it: a dispatch that reports (an unknown variant, no tag where one is
+      required) now discards with `EventSkip.dataValue`, framing included, since nothing else consumed it.
+      Untagged recovery reads the value's discrimination class off `EventSkip.aheadOfValue` for the same
+      reason — the value no longer starts at the cursor.
 - **A schema-driven read also type-checks annotations** (§6: an annotation *names a type*). `AnnotationTypes`
   resolves the name against the governing schema (§3.3.3's one hop — for a data document that's the
   `!!schema` target, i.e. the very schema the readers were compiled from) and the value is read by *that
