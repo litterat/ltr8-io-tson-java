@@ -24,10 +24,19 @@ import java.util.List;
 public record RecordBody(List<String> supertypes, List<RecordField> fields, List<FieldGroup> groups)
         implements Product {
 
+    /**
+     * <b>Absent and empty are the same list</b> for the two the kernel makes optional ({@code supertypes:
+     * [type_name]?}, {@code groups: [field_group]?}): a body resolved from source arrives with an empty
+     * list where one bound from a resolved-form document that omits the field arrives with {@code null},
+     * and no rule distinguishes "no supertypes stated" from "an empty supertypes list". {@code fields} is
+     * required and is deliberately not guarded -- an absent required field is a violation the reader
+     * reports and abandons the construction over, so it never reaches here, and swallowing a {@code null}
+     * would only turn some other defect into an empty record.
+     */
     public RecordBody {
-        supertypes = List.copyOf(supertypes);
+        supertypes = supertypes == null ? List.of() : List.copyOf(supertypes);
         fields = List.copyOf(fields);
-        groups = List.copyOf(groups);
+        groups = groups == null ? List.of() : List.copyOf(groups);
     }
 
     /** A fresh record body: no supertypes, no field groups, just plain fields. */

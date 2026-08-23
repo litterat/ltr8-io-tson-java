@@ -7,6 +7,7 @@ import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
+import io.ltr8.tson.compiler.atom.RawTokenParser;
 import io.ltr8.tson.schema.meta.RecordBody;
 
 import java.util.Map;
@@ -44,7 +45,15 @@ final class GroupUnionBindReader extends RecordAbstractReader<Object> {
 
     GroupUnionBindReader(String name, String displayName, RecordBody body, Map<String, DataClassRecord> members,
                           TsonTypeReaderResolver resolver, SchemaLocation schemaLocation) {
-        super(name, displayName, body, resolver, schemaLocation);
+        // Per field, so a member whose own component is a Token reads the token where its sibling of the
+        // same schema type reads the value -- see RecordBindReader.tokenAware for why a slot wants one.
+        super(name, displayName, body, field -> {
+            DataClassRecord member = members.get(field.name());
+            Class<?> component = member == null ? null : member.fields()[0].type();
+            return component == io.ltr8.tson.schema.meta.Token.class
+                    ? AtomTypeReader.of(name, RawTokenParser.INSTANCE, schemaLocation)
+                    : resolver.resolve(field.type().name());
+        }, schemaLocation);
         this.members = members;
     }
 

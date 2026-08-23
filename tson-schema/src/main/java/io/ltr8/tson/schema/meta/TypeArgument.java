@@ -12,13 +12,12 @@ import io.ltr8.annotation.Field;
  * {@code Optional} fields, even though the latter is the more literal translation of the kernel's
  * own shape.</b> {@link TypeRef} and {@code TypeArgument} are mutually recursive ({@code
  * TypeRef.arguments: List<TypeArgument>}, and a reference argument wraps a {@code TypeRef} right
- * back) -- e.g. {@code array_ranged<array_ranged<T, N, N>, N, N>}, a real desugared shape (§5.3's
- * {@code grid => <T, N> [[T; N]; N]}). {@code tson-bind}'s record resolution ({@code
+ * back) -- e.g. {@code box<box<text>>}, an ordinary nested application. {@code tson-bind}'s record
+ * resolution ({@code
  * DefaultRecordBinder}) eagerly resolves every field's descriptor as part of building the record's
- * own, with no cycle detection; tried as a plain record here, that recurses forever the moment
- * anything actually has a non-empty {@code arguments} list (confirmed empirically: every test in
- * this module started failing with {@code StackOverflowError} the moment {@code array_min}
- * resolution -- the first real user of non-empty arguments -- exercised it). {@code
+ * own, with no cycle detection; tried as a plain record here, that recurses forever the moment anything
+ * actually has a non-empty {@code arguments} list -- a {@code StackOverflowError} across the whole
+ * module, not a localised failure. {@code
  * DefaultUnionBinder} exists to defer exactly this: its own Javadoc/comment states it deliberately
  * does not resolve member descriptors up front, "by using the actual member classes the resolution
  * loop is broken." A sealed interface is therefore not a stylistic choice here -- it is the one

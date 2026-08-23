@@ -104,7 +104,8 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
     public RecordBindReader(String name, String displayName, RecordBody body, DataClassRecord descriptor,
                              TsonTypeReaderResolver resolver, SchemaLocation schemaLocation,
                              AnnotationTypes annotationTypes, boolean strict) {
-        super(name, displayName, body, resolver, schemaLocation);
+        super(name, displayName, body, tokenAware(name, descriptor.fields(),
+                descriptor.annotationsCarrier().orElse(null), resolver, schemaLocation), schemaLocation);
         this.descriptor = descriptor;
         this.annotationsCarrier = descriptor.annotationsCarrier().orElse(null);
         this.annotationTypes = annotationTypes;
@@ -227,12 +228,43 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
      * the annotations with an authored value.
      */
     private DataClassField findTargetField(DataClassField[] classFields, String fieldName) {
+        return findTargetField(classFields, annotationsCarrier, fieldName);
+    }
+
+    /** {@link #findTargetField(DataClassField[], String)} before an instance exists -- see {@link #tokenAware}. */
+    private static DataClassField findTargetField(DataClassField[] classFields, DataClassField carrier,
+                                                   String fieldName) {
         for (DataClassField classField : classFields) {
-            if (classField != annotationsCarrier && classField.name().equals(fieldName)) {
+            if (classField != carrier && classField.name().equals(fieldName)) {
                 return classField;
             }
         }
         return null;
+    }
+
+    /**
+     * Field readers that give a slot whose bound component is a {@link io.ltr8.tson.schema.meta.Token} the
+     * token itself rather than the value it denotes.
+     *
+     * <p><b>Why a slot can want the raw token.</b> The kernel types every such slot {@code value}, whose
+     * reader decodes ([TSON-DATA] §4) -- {@code 3} to an integer, {@code "3"} to a string. A component
+     * declared {@code Token} wants what was written: [TSON-SCHEMA] §5.10 calls a type argument's literal a
+     * bare token rather than the value it denotes, and {@code record_field}'s own fixed and default values
+     * are compared against what a document writes. A decoded host object cannot fill either.
+     * {@code SPEC-FEEDBACK.md} #54 records what keying identity on the spelling costs and puts the
+     * underlying disagreement -- bare token in the prose, {@code value} in the kernel -- to the spec.
+     *
+     * <p>The choice has to be made before the read, and it is made per field, so two slots of one schema
+     * type that bind different components each get what they want.
+     */
+    private static FieldReaders tokenAware(String name, DataClassField[] classFields, DataClassField carrier,
+                                            TsonTypeReaderResolver resolver, SchemaLocation location) {
+        return field -> {
+            DataClassField target = findTargetField(classFields, carrier, field.name());
+            return target != null && target.type() == io.ltr8.tson.schema.meta.Token.class
+                    ? AtomTypeReader.of(name, RawTokenParser.INSTANCE, location)
+                    : resolver.resolve(field.type().name());
+        };
     }
 
     /**
@@ -413,11 +445,8 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 Map<String, DataClassRecord> labelled = labelledChoice(body, dataClass);
                 if (labelled != null) {
                     SchemaLocation location = context.locationOf(name, typeDefinition);
-                    TsonTypeReaderResolver slotResolver =
-                            tokenPreserving(name, body, labelled, resolver, location);
-                    return slotResolver == null ? null
-                            : new GroupUnionBindReader(name, EntryDisplayName.of(name, typeDefinition), body,
-                                    labelled, slotResolver, location);
+                    return new GroupUnionBindReader(name, EntryDisplayName.of(name, typeDefinition), body,
+                            labelled, resolver, location);
                 }
                 return new RecordBindReader(name, EntryDisplayName.of(name, typeDefinition), body,
                         requireRecord(name, dataClass), resolver,
@@ -432,7 +461,10 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                             "an explicit type annotation naming one of " + typeDefinition.subtypes(), "(none)");
                     return null;
                 };
-                return new VariantBindReader(name, noOwnData, union, resolver);
+                // Membership is decided through this context's own binder, which is the only thing that
+                // knows a schema name is not always its class's own (set -> ArrayBody, and the rest of §5's
+                // array family with it). Unresolvable is not an error here -- it just is not a member.
+                return new VariantBindReader(name, noOwnData, union, resolver, this::boundClassOrNull);
             }
 
             if (dataClass instanceof DataClassRecord record) {
@@ -487,42 +519,6 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         }
 
         /**
-         * The field resolver a labelled choice reads through: the ordinary one, except that a slot whose bound
-         * component is a {@link io.ltr8.tson.schema.meta.Token} reads the token rather than the value it
-         * denotes.
-         *
-         * <p><b>Why a slot can want the raw token.</b> {@code type_argument}'s value channel is typed {@code
-         * value}, whose reader decodes ([TSON-DATA] §4), but the member it fills carries a {@code Token} --
-         * §5.10 describes a type argument's literal as a bare token rather than as the value it denotes, and
-         * a decoded host object cannot fill one. The choice has to be made before the read, which is here.
-         * {@code SPEC-FEEDBACK.md} #54 records what it costs and puts the underlying disagreement -- bare
-         * token in the prose, {@code value} in the kernel -- to the spec.
-         *
-         * <p>{@code null} when two group members share a slot type and disagree about wanting the token --
-         * the resolver is keyed by type name, so it could not serve both, and building a reader that quietly
-         * decoded one of them is worse than falling through to the ordinary record path.
-         */
-        private TsonTypeReaderResolver tokenPreserving(String name, RecordBody body,
-                Map<String, DataClassRecord> members, TsonTypeReaderResolver resolver, SchemaLocation location) {
-            Set<String> wantToken = new HashSet<>();
-            Set<String> wantValue = new HashSet<>();
-            for (RecordField field : body.fields()) {
-                DataClassRecord member = members.get(field.name());
-                Class<?> component = member.fields()[0].type();
-                (component == io.ltr8.tson.schema.meta.Token.class ? wantToken : wantValue)
-                        .add(field.type().name());
-            }
-            if (wantToken.isEmpty()) {
-                return resolver;
-            }
-            if (!Collections.disjoint(wantToken, wantValue)) {
-                return null;
-            }
-            TsonTypeReader<?> rawToken = AtomTypeReader.of(name, RawTokenParser.INSTANCE, location);
-            return typeName -> wantToken.contains(typeName) ? rawToken : resolver.resolve(typeName);
-        }
-
-        /**
          * The class this schema type binds to.
          *
          * <p><b>A missing one is a misconfiguration, not a gap.</b> It used to raise an {@code
@@ -533,6 +529,23 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
          * exists and does not fit), so it is reported the same way and at the same moment -- when the schema
          * is compiled in bind mode, naming the type nothing resolves.
          */
+        /**
+         * The Java class {@code schemaTypeName} binds to, or {@code null} where nothing does.
+         *
+         * <p>{@link #descriptorFor}'s answer without its verdict: a name that binds nowhere is a
+         * misconfiguration where a *schema* asked for it, and merely a non-member where a *document* did.
+         * Goes through this context's own {@code DataNameBinder}, which is the only thing that knows a
+         * schema name is not always its class's own -- {@code set} and {@code array} both reach {@code
+         * ArrayBody}, §5's array family resolving to one body shape.
+         */
+        private Class<?> boundClassOrNull(String schemaTypeName) {
+            try {
+                return context.getDescriptor(schemaTypeName).typeClass();
+            } catch (DataBindException | RuntimeException e) {
+                return null;
+            }
+        }
+
         private DataClass descriptorFor(String name) {
             try {
                 return context.getDescriptor(name);

@@ -96,8 +96,8 @@ import java.util.Set;
  *   exactly like an ordinary field's type-ref.</li>
  *   <li><b>The sugar forms no longer arrive here.</b> {@code SchemaDesugarer} rewrites them before
  *   resolution: {@code [T]} and any constructor application become an {@code !C value} instance
- *   (§5.6), and the sized forms become their {@code array_min}/{@code array_max}/{@code
- *   array_ranged} application (§5.3). What still reaches this class carrying arguments is a
+ *   (§5.6), and a sized form becomes one too, its bounds bound straight onto the injected {@code array}
+ *   entry with no size template in between (§5.3). What still reaches this class carrying arguments is a
  *   <em>template</em> application, resolved to a {@code REFERENCE} naming it -- see {@link
  *   #resolveTemplateApplication}. The one exception is {@code MetaKernelBootstrapResolver}, which
  *   bypasses {@code SchemaResolver} and so never desugars.</li>
@@ -129,11 +129,9 @@ import java.util.Set;
  *   {@code source} (unlike composition, which never sets it); {@code supertypes} accumulates by the
  *   same induction as composition ({@code [sourceName] + source.supertypes()}); the body's own
  *   {@code record.supertypes} stays empty (that field records only direct {@code &} compositions,
- *   §8.1, and a refinement has none). Verified end-to-end against the real fixture's {@code set}
- *   (refining {@code array}, tightening {@code REQUIRED_DEFAULT} fields to {@code REQUIRED_FIXED})
- *   and {@code array_min}/{@code array_ranged} (each routing an inherited OPTIONAL field to
- *   {@code REQUIRED} by its own value parameter -- an {@code OPTIONAL -&gt; REQUIRED} tightening,
- *   §5.7's table). A body entry may also <b>restate a group</b> (§5.11, via {@link
+ *   §8.1, and a refinement has none). Verified end-to-end against the real fixture's {@code set},
+ *   which refines {@code array}, tightening {@code REQUIRED_DEFAULT} fields to {@code REQUIRED_FIXED}
+ *   (§5.7's table). A body entry may also <b>restate a group</b> (§5.11, via {@link
  *   #restatesInheritedGroup}, shared with the composition path): same member labels in the same order,
  *   types verbatim, state tightening OPTIONAL&#8594;REQUIRED only.</li>
  * </ul>
@@ -439,8 +437,8 @@ final class DefinitionResolver {
             }
         }
         // A declaration-level container form is rewritten by SchemaDesugarer before resolution -- a sized
-        // array into its array_min/array_max/array_ranged application (§5.3), a size-less one into the
-        // `!array { ... }` construction it denotes (§5.6), and a tuple into `!tuple { elements: [...] }`.
+        // array into the `!array { ... }` construction it denotes with min_items/max_items bound directly
+        // (§5.3), a size-less one into the same without them (§5.6), and a tuple into `!tuple { ... }`.
         // A nested bracket form at either position is expanded there too, innermost first. Anything still
         // here holds an optional array element (`[T?]`), the one shape that phase does not build, and falls
         // through below.
@@ -913,8 +911,7 @@ final class DefinitionResolver {
      * A declaration whose body is an application that {@code SchemaDesugarer} did not rewrite -- in practice
      * a <em>template</em> application, since every constructor application is turned into an {@code !C value}
      * instance before resolution. It resolves to a {@link TypeKind#REFERENCE} entry targeting the application
-     * as written, which is what §5.3's sized-array sugar has always produced for {@code array_min}/{@code
-     * array_max}/{@code array_ranged}. The arguments are carried, not applied: closing the application is
+     * as written. The arguments are carried, not applied: closing the application is
      * {@code TemplateMaterialiser}'s pass, which runs over the resolved form.
      *
      * <p>{@code parameters} is the declaration's own {@code <...>} list, empty for an ordinary alias and

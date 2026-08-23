@@ -9,9 +9,8 @@ import java.util.Optional;
 /**
  * The meta-kernel's {@code array} constructor's own vocabulary, resolved (Part 2 §4.2, §5.3,
  * §8.1) -- {@code access_pattern}/{@code size_type} are fixed ({@code INDEX}/{@code VARIABLE}) and
- * never appear in output. Also backs every closure of {@code set}/{@code array_min}/{@code
- * array_max}/{@code array_ranged} (§5.3's size-refinement templates and {@code set}'s own
- * refinement all resolve to this same shape, just with different field values -- {@code set}
+ * never appear in output. Also backs {@code set}, whose own refinement resolves to this same shape
+ * with different field values -- {@code set}
  * pins {@code state: REQUIRED}, {@code unordered: true}, {@code unique_items: true}). Bound
  * through plain {@code TsonObjectWriter.toTson}, {@code state}/{@code unordered}/{@code uniqueItems}
  * always appear in written output even at their nominal default -- unlike a hand-written writer,

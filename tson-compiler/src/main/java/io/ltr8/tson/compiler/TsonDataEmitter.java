@@ -293,6 +293,67 @@ public final class TsonDataEmitter {
         return this;
     }
 
+    /**
+     * Writes {@code text} as a multi-line string token (§7.2.3) -- the third token form, alongside {@link
+     * #unquotedToken} and {@link #quotedString}.
+     *
+     * <p><b>Emitted with no common prefix at all</b>: the closing {@code """} sits at column 0 and every
+     * content line is written with its own leading whitespace and nothing else. §7.2.3 computes the prefix
+     * to strip from the closing delimiter's indent narrowed by each non-blank line's, so an empty closing
+     * indent makes the prefix empty, every line's own indentation part of the value, and the one case the
+     * spec leaves open -- a blank line shorter than the computed prefix, {@code SPEC-FEEDBACK.md} #2 --
+     * unreachable rather than guessed at.
+     *
+     * <p><b>What has to be escaped is decided by the reading order</b>, which strips trailing whitespace
+     * from each line and only then decodes escapes (§7.2.3 rule 5). So a line's trailing spaces or tabs are
+     * written as a {@code \\uXXXX} escape: it survives the strip and decodes back to the space. The same
+     * ordering is why a backslash must be doubled. A line that would otherwise begin {@code """} has its
+     * first quote escaped, since the reader would take it for the closing delimiter and end the token
+     * early. Everything else, non-ASCII included, is written literally -- the whole point of this form.
+     *
+     * <p>The result lexes back to exactly {@code text}, whatever it contains.
+     */
+    public TsonDataEmitter multiLineString(String text) {
+        startCoreValue();
+        emit("\"\"\"\n");
+        for (String line : text.split("\n", -1)) {
+            emit(escapeMultiLine(line));
+            emit('\n');
+        }
+        emit("\"\"\"");
+        return this;
+    }
+
+    /** One content line of a multi-line token, escaped so §7.2.3's own reading order returns it unchanged. */
+    private static String escapeMultiLine(String line) {
+        int trailing = line.length();
+        while (trailing > 0 && (line.charAt(trailing - 1) == ' ' || line.charAt(trailing - 1) == '\t')) {
+            trailing--;
+        }
+        StringBuilder out = new StringBuilder(line.length());
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            boolean isTrailingBlank = i >= trailing;
+            if (c == '\\') {
+                out.append("\\\\");
+            } else if (isTrailingBlank || c == '\r' || CONTROL_CHAR.matcher(String.valueOf(c)).matches()) {
+                out.append(String.format("\\u%04x", (int) c));
+            } else {
+                out.append(c);
+            }
+        }
+        // A line the reader would mistake for the closing delimiter: `"""` after its leading whitespace.
+        String content = out.toString();
+        int indent = 0;
+        while (indent < content.length() && (content.charAt(indent) == ' ' || content.charAt(indent) == '\t')) {
+            indent++;
+        }
+        if (content.startsWith("\"\"\"", indent)) {
+            return content.substring(0, indent) + "\\u0022" + content.substring(indent + 1);
+        }
+        return content;
+    }
+
     // ── Scope bookkeeping ────────────────────────────────────────────────────
 
     private TsonDataEmitter open(char delimiter) {

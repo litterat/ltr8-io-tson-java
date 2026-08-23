@@ -21,10 +21,9 @@ import java.util.Optional;
  * DataClassRecord} instead of deriving one by convention.
  *
  * <p><b>Record-scoped, deliberately, for now.</b> {@code TypeDefinition.subtypes()} is non-empty for
- * any composed kind with real subtypes, not just records ({@code reader.VariantParser} handles
- * array's own {@code set}/{@code array_min}/{@code array_max}/{@code array_ranged} too) -- but those
- * aren't meant to be dispatched to by an explicit {@code !array_min [...]} type-ref the way a record
- * subtype is; whether/how the spec should even allow that is still open. Only {@link
+ * any composed kind with real subtypes, not just records ({@code reader.VariantParser} handles array's own
+ * {@code set} too) -- but a container subtype is not meant to be dispatched to by an explicit {@code !set
+ * [...]} type-ref the way a record subtype is; whether/how the spec should even allow that is still open. Only {@link
  * RecordBindReader.Factory} constructs this class, and only for a record-shaped declaration with
  * real subtypes; {@link ArrayBindReader}/{@link MapBindReader}/{@link TupleBindReader} always read
  * as themselves, no dispatch layer at all.
@@ -66,12 +65,16 @@ final class VariantBindReader implements TsonTypeReader<Object> {
     private final DataClassUnion descriptor;
     private final TsonTypeReaderResolver resolver;
 
+    /** A schema type name to the Java class bound to it, or {@code null} where nothing is -- see {@link #isMember}. */
+    private final java.util.function.Function<String, Class<?>> boundClass;
+
     VariantBindReader(String name, TsonTypeReader<?> ownParser, DataClassUnion descriptor,
-                      TsonTypeReaderResolver resolver) {
+                      TsonTypeReaderResolver resolver, java.util.function.Function<String, Class<?>> boundClass) {
         this.name = name;
         this.ownParser = ownParser;
         this.descriptor = descriptor;
         this.resolver = resolver;
+        this.boundClass = boundClass;
     }
 
     @Override
@@ -91,7 +94,30 @@ final class VariantBindReader implements TsonTypeReader<Object> {
         return resolver.resolve(ref).read(ctx);
     }
 
+    /**
+     * Whether {@code typeRef} names one of the union's members.
+     *
+     * <p><b>The bind context is asked first, and it is the authority.</b> A schema name reaches a class
+     * through the read's own {@code DataNameBinder}, which is where a name that is not the class's own is
+     * recorded -- {@code set} binds to {@code ArrayBody} as {@code array} itself does, §5's array family
+     * resolving to one body shape. Matching the name
+     * against {@code @Typename} and simple class names alone cannot see any of that, so a conforming {@code
+     * !set} body was refused as "not a member of the union 'top'" by the one part of the pipeline that had
+     * not been told what the binder knows.
+     *
+     * <p>The name passes are kept behind it, unchanged: they are {@code TsonObjectReader.resolveUnionMember}'s
+     * own two-pass precedence, and they are what a consumer's union gets when its members are not registered
+     * under schema names at all.
+     */
     private boolean isMember(String typeRef) {
+        Class<?> bound = boundClass.apply(typeRef);
+        if (bound != null) {
+            for (Class<?> member : descriptor.memberTypes()) {
+                if (member == bound) {
+                    return true;
+                }
+            }
+        }
         for (Class<?> member : descriptor.memberTypes()) {
             Typename tn = member.getAnnotation(Typename.class);
             if (tn != null && tn.name().equals(typeRef)) {
