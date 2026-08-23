@@ -114,53 +114,30 @@ by a factor of six.
 
 ## Binding strictness
 
-A schema field the bound class has no component for is dropped, and a component the schema declares no field
-for is filled with `null` — both silently, with no diagnostic even under a collecting receiver. Reported by a
-downstream project against the multi-version case: a codec whose binder maps `order` to a v1 class reads a v2
-document and returns the v1 record with the new field gone. Tree mode over the same document keeps it, so the
-document was read correctly against its own schema; it is the bind that discards. The contrast is with §7.2's
-record closure, which this library enforces properly in the other direction — a field in the *data* the
-*schema* does not declare is `UNRECOGNIZED_FIELD`.
+A schema and the Java class bound to it must agree about a type's fields, checked when the schema is compiled
+in bind mode — startup, for anything compiling its schemas once. `docs/readers-and-diagnostics.md` has the
+rules and `CLAUDE.md` the summary; what is left here is one modelling gap the check exposed.
 
-Both directions are **static**: schema fields and class components are fixed when the reader is built, so the
-mismatch is knowable at startup rather than per document. That is the point of catching it — a misconfiguration
-found when the schema binds to its `DataClass` is fixed in minutes, where leniency lets it reach testing or
-production and present as a field that mysteriously has its default.
-
-- [x] **Strict by default, with opt-in leniency and a FIXED exemption.** *(Done.)* Instrumenting both directions and
-  running the whole suite finds **27 distinct mismatches in this library's own bundled binding**, and they
-  classify cleanly:
-  - **21 are FIXED fields and are legitimate**: `access_pattern`/`size_type` on `ArrayBody`/`MapBody`/
-    `RecordBody`/`TupleBody`, and `spec` on seven atom types, all `REQUIRED_FIXED` in meta-kernel. A fixed
-    field's value is settled by the schema, not carried by the data, so a component for it would store a
-    constant. **One rule — a FIXED-state field is exempt — covers every one of them.**
-  - **`TypeDefinition.position` is legitimate in the other direction**: source position is this
-    implementation's own addition for diagnostics, not part of §8.1's `type_definition`. So the
-    component-with-no-field direction needs an explicit per-component opt-out (an annotation), not bare
-    strictness — otherwise a class can never carry anything the wire format does not.
-  - The rest are the real defect below.
-  - Leniency stays available as a reader derivation, the way `preservingUnknownTypeRefs()` already works, so
-    the deliberate evolution case is a call-site decision rather than a silent global default.
-  - **A breaking change for consumers**, deliberately. Cheap at `0.1.0-SNAPSHOT`, much less so after a real
-    release — an argument for doing it now rather than later.
 - [ ] **`precision` and `require_timezone` are carried but not enforced** (`datetime`/`time`). The bodies
-  declare them now — a field with no component is one this model silently loses — and the parsers *refuse* a
+  declare them — a field with no component is one this model silently loses — and the parsers *refuse* a
   schema that sets either, so the facet is a stated gap rather than a constraint quietly not applied. What
   remains is enforcement, and both halves need a decision before code: `precision`'s required semantics
   (exact vs. maximum fractional-digit count) are not settled by the spec and want a `SPEC-FEEDBACK.md` entry,
   and `require_timezone: false` needs an offset-less parse path neither parser has (`true` is already the
   behaviour, RFC 3339 requiring an offset on every value these atoms accept).
-- [x] **Constructor selection by binding profile.** *(Done in `tson-bind`.)* Not by *matching* a field set,
-  which no serialization library does — Jackson and JSON-B both designate a creator instead, and JSON-B
-  forbids more than one outright. Selection is by an opaque profile name the caller sets on the context and
-  the class states per constructor, so `tson-bind` never learns what a schema is. `@Profile(fields = {...})`
-  supplies the parameter names a *secondary* constructor does not keep (a record's canonical one does; a
-  secondary one is `arg0` unless the class was compiled with `-parameters`), which is the same problem
-  `java.beans.@ConstructorProperties` solves for Jackson and Lombok.
-    - What is left is the `tson-compiler` half: nothing yet sets the profile from the schema being read, so
-      a caller wanting per-version binding builds a `DataBindContext` per version themselves. Wiring it
-      through `TsonConfig` is the obvious next step, and it is a decision about where a version's name comes
-      from rather than more mechanism.
+
+## Binding profiles
+
+`DataBindContext.Builder.profile` plus `@Profile` on a constructor lets one class bind several versions of a
+schema, and `TsonConfig.bindings`/`profile` configure it in one call. Selection is by an opaque label, never
+by matching the schema's field set — no serialization library does that, and the parameter names it would
+need are not retained for a secondary constructor.
+
+- **Deriving the profile from the schema being read is deliberately not done.** A `Tson` is one profile, and
+  routing a document to the right one stays the application's job. The alternative — the schema declaring its
+  own profile through a meta-layer annotation — links a *coding* decision to a *format* one and buys less
+  flexibility than it costs. Recorded so it is not re-opened as an oversight; reconsider only if something
+  needs to re-derive the binding without the application in between.
 
 ## Remaining built-in types
 

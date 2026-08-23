@@ -351,7 +351,10 @@ in full, and an unresolvable class is an error where the constructor is applied.
 real Java references, **eager** so a broken entry surfaces at compile time. `TsonTypeReader<T>` is strictly
 one method, `T read(TsonReadContext)`; framing and error policy live elsewhere. A `RuntimeException` while
 building one entry becomes an `ErrorReader` (the schema compiles; reading that entry fails — a library-gap
-marker, distinct from author errors), while an entry declaring type parameters becomes an
+marker, distinct from author errors), with two deliberate exceptions: a `TsonBindMismatchException` is
+rethrown so a schema and a class that disagree fail the compile rather than the first read, and its
+`TsonMissingBindingException` subclass rides an `ErrorReader` but is thrown from it **unwrapped**, being a
+misconfiguration rather than a gap. An entry declaring type parameters becomes an
 `OpenTemplateReader` before its body is looked at at all: a template is not a type, so naming one in *data*
 is an ordinary data diagnostic (a schema naming one unapplied was already refused at link time).
 `TsonCompiledSchema` is `sealed permits TsonCompiledMetaSchema` (a
