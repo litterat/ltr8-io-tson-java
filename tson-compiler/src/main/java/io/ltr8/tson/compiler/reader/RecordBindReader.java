@@ -461,7 +461,10 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                             "an explicit type annotation naming one of " + typeDefinition.subtypes(), "(none)");
                     return null;
                 };
-                return new VariantBindReader(name, noOwnData, union, resolver);
+                // Membership is decided through this context's own binder, which is the only thing that
+                // knows a schema name is not always its class's own (set -> ArrayBody, and the rest of §5's
+                // array family with it). Unresolvable is not an error here -- it just is not a member.
+                return new VariantBindReader(name, noOwnData, union, resolver, this::boundClassOrNull);
             }
 
             if (dataClass instanceof DataClassRecord record) {
@@ -526,6 +529,23 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
          * exists and does not fit), so it is reported the same way and at the same moment -- when the schema
          * is compiled in bind mode, naming the type nothing resolves.
          */
+        /**
+         * The Java class {@code schemaTypeName} binds to, or {@code null} where nothing does.
+         *
+         * <p>{@link #descriptorFor}'s answer without its verdict: a name that binds nowhere is a
+         * misconfiguration where a *schema* asked for it, and merely a non-member where a *document* did.
+         * Goes through this context's own {@code DataNameBinder}, which is the only thing that knows a
+         * schema name is not always its class's own -- {@code set}, {@code array_min}, {@code array_max},
+         * {@code array_ranged} and {@code vector} all reach {@code ArrayBody}.
+         */
+        private Class<?> boundClassOrNull(String schemaTypeName) {
+            try {
+                return context.getDescriptor(schemaTypeName).typeClass();
+            } catch (DataBindException | RuntimeException e) {
+                return null;
+            }
+        }
+
         private DataClass descriptorFor(String name) {
             try {
                 return context.getDescriptor(name);
