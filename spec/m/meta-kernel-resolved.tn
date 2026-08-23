@@ -59,7 +59,7 @@
   @doc:"Base kinds. `top` is the structural root; every type in the schema IS-A `top`."
   top => !type_definition {
     kind: PRODUCT
-    subtypes: [array atom choice enum integer_type map product record reference regex_type set sum text_type tuple unit uri_type]
+    subtypes: [array atom choice data enum instance_template integer_type map product record reference regex_type set sum text_type tuple unit uri_type]
     body: !record { fields: [] }
   }
 
@@ -84,6 +84,20 @@
     kind: PRODUCT
     supertypes: [top]
     subtypes: [choice]
+    body: !record { supertypes: [top]  fields: [] }
+  }
+
+  @doc:"""
+    Non-data base kind. The body of an entry that describes something
+    other than a data value — vocabulary a meta-schema introduces
+    beyond the kernel's own, whose instances ride along in a schema map
+    without being types. Composes with `top` directly rather than with a
+    kind that would oblige it to describe a value's shape. An entry whose
+    kind is DATA is declared by its schema but is not a type.
+    """
+  data => !type_definition {
+    kind: PRODUCT
+    supertypes: [top]
     body: !record { supertypes: [top]  fields: [] }
   }
 
@@ -357,6 +371,44 @@
     body: !record { fields: [
       !record_field { name: element_type  type: type_ref }
       !record_field { name: state         type: element_state  state: REQUIRED_DEFAULT  value: REQUIRED }
+    ] }
+  }
+
+  @doc:"""
+    One positional binding of an open constructor application — a
+    labelled choice between a parameter, a concrete literal and a
+    concrete reference. The group is REQUIRED: exactly one member is
+    present. Deliberately no positional form — a bare token cannot
+    self-classify.
+    """
+  template_argument => !type_definition {
+    kind: PRODUCT
+    body: !record { fields: [
+      !record_field { name: param     type: @alias:param_name token  state: OPTIONAL }
+      !record_field { name: value     type: value                    state: OPTIONAL }
+      !record_field { name: type_ref  type: type_ref                 state: OPTIONAL }
+    ]
+    groups: [
+      !field_group { members: [param value type_ref]  state: REQUIRED }
+    ] }
+  }
+
+  @doc:"""
+    The open counterpart of a constructor application (Part 2 Section
+    5.10): the constructor an entry will build, and the bindings it will
+    build it from, while at least one binding is still a parameter. An
+    entry's body is an instance_template exactly when the entry is open,
+    so `parameters` non-empty and this body imply each other. Composes
+    with top directly and carries no ~, as reference does: it never
+    describes a value, and no schema writes !instance_template — the
+    resolver produces it.
+    """
+  instance_template => !type_definition {
+    kind: PRODUCT
+    supertypes: [top]
+    body: !record { supertypes: [top]  fields: [
+      !record_field { name: target    type: @alias:type_name token }
+      !record_field { name: bindings  type: { name: map  arguments: [ { name: @alias:field_name token } { name: template_argument } ] } }
     ] }
   }
 
