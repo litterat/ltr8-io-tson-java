@@ -3,6 +3,7 @@ package io.ltr8.tson;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataNameBinder;
+import io.ltr8.tson.compiler.TsonMissingBindingException;
 import io.ltr8.tson.compiler.TsonSchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.consumer.Operation;
@@ -103,15 +104,22 @@ class MetaLayerConstructorThroughTsonTest {
     /**
      * Without the binder the same schema fails at resolution -- the schema, the source and every other
      * option identical. Pins that the option is what carries the case, not something else in the wiring.
+     *
+     * <p>And it fails as a <b>misconfiguration</b>, not a library gap: the consumer never registered a class
+     * for their own constructor, which is a line of wiring rather than something this library cannot do. The
+     * distinction is not cosmetic -- it used to arrive as an {@code UnsupportedOperationException}, which a
+     * downstream service mapped to a 501.
      */
     @Test
     void withoutTheBinderTheSameSchemaHasNoBoundClass() {
         Tson unextended = Tson.builder().schemaSource(SOURCE).build();
 
-        UnsupportedOperationException thrown =
-                assertThrows(UnsupportedOperationException.class, () -> unextended.resolve(API_SCHEMA));
+        TsonMissingBindingException thrown =
+                assertThrows(TsonMissingBindingException.class, () -> unextended.resolve(API_SCHEMA));
 
         assertTrue(thrown.getMessage().contains("no bound Java class for 'operation'"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("TsonConfig.bindings"), "it names the way to fix it: "
+                + thrown.getMessage());
     }
 
     /**

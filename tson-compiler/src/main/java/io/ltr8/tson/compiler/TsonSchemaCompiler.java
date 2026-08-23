@@ -177,6 +177,11 @@ public final class TsonSchemaCompiler {
                 TsonTypeReader<?> built;
                 try {
                     built = build(name, definition);
+                } catch (TsonMissingBindingException e) {
+                    // A type with no class at all is deferred, not fatal: a schema legitimately declares
+                    // types a given consumer never binds, and failing the compile for those would make bind
+                    // mode unusable. It reaches the first read of this specific type still saying what it is.
+                    built = new ErrorReader(name, e);
                 } catch (TsonBindMismatchException e) {
                     // Deliberately not an ErrorReader. Every other build failure is one entry's problem and
                     // deferring it keeps the rest of the schema usable; this one is a wiring mistake between
