@@ -15,7 +15,9 @@ import io.ltr8.tson.schema.TsonSchemaValidationException;
 
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -81,6 +83,26 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
     // map loses entries under a concurrent put, and a lost entry here does not fail loudly: verifyPin finds
     // no hash for the identity and silently verifies nothing, which is §10.2's MUST quietly skipped.
     private final Map<String, String> contentHashes = new ConcurrentHashMap<>();
+
+    /**
+     * The identities this thread is part-way through resolving, outermost first -- [TSON-DATA] §2.2.3's
+     * import-cycle guard, and the {@code !!meta} chain's too ({@link #loadMeta} reaches every link through
+     * {@link #resolveLinked}).
+     *
+     * <p><b>Why a guard is needed at all:</b> an {@code !!import} is resolved through this registry, and a
+     * schema is registered only once it is fully linked -- so while {@code a.tn} is resolving it is in no
+     * cache, and {@code b.tn} importing it back re-enters {@link #resolveLinked} for an identity already in
+     * flight. Unguarded that is unbounded recursion ending in a {@link StackOverflowError}: an {@link Error}
+     * from ordinary author input, which no diagnostic ever sees and which the exception policy cannot
+     * classify.
+     *
+     * <p><b>Per thread, not per registry.</b> Concurrent resolution of one identity by two threads is
+     * documented as safe here and settles at the caches; a registry-wide set would make the second thread's
+     * ordinary in-flight entry look like a cycle to the first. Recursion through {@code !!import}/{@code
+     * !!meta} is strictly within one thread, so per-thread is both correct and exactly the scope of the
+     * question being asked.
+     */
+    private final ThreadLocal<Set<String>> resolving = ThreadLocal.withInitial(LinkedHashSet::new);
 
     /**
      * A fresh, empty {@link TsonSchemaRegistry} of its own and no fetch capability -- the common case for a
@@ -272,6 +294,45 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
             verifyPin(uri, identity);
             return cached.get();
         }
+        Set<String> chain = resolving.get();
+        if (!chain.add(identity)) {
+            throw importCycle(chain, identity);
+        }
+        try {
+            return resolveUncached(uri, identity, receiver);
+        } finally {
+            chain.remove(identity);
+        }
+    }
+
+    /**
+     * §2.2.3's import cycle, named by the path that closes it. A schema is registered only once it has
+     * linked, so the cycle cannot be found by a cache lookup -- being <em>in flight</em> is the whole
+     * signal, and the chain of identities in flight is what makes the message actionable: any one of its
+     * links is the edge to break.
+     *
+     * <p>An author error, not a library gap: the verdict does not change when this library improves. It
+     * throws even where a {@link TsonDiagnosticsReceiver} is in play, on the same footing as an
+     * {@code !!import} that will not load or an ineligible {@code !!meta} -- what fails is the namespace
+     * itself, and carrying on would report every reference into the unresolvable half as a second problem.
+     */
+    private static TsonSchemaValidationException importCycle(Set<String> chain, String identity) {
+        StringBuilder path = new StringBuilder();
+        boolean fromCycleStart = false;
+        for (String link : chain) {
+            fromCycleStart |= link.equals(identity);
+            if (fromCycleStart) {
+                path.append(link).append(" -> ");
+            }
+        }
+        return new TsonSchemaValidationException("'" + identity + "' is part of an import cycle ("
+                + path + identity + ") -- a schema cannot depend, directly or transitively, on one that "
+                + "depends on it, since neither can be resolved before the other ([TSON-DATA] §2.2.3). "
+                + "Break the cycle by moving what both need into a third schema they each import");
+    }
+
+    /** {@link #resolveLinked(String, TsonDiagnosticsReceiver)}'s body, with the cycle guard already held. */
+    private TsonLinkedSchema resolveUncached(String uri, String identity, TsonDiagnosticsReceiver receiver) {
         String sourceText = source.fetch(uri);
         // Record this identity's content hash (first resolution) and verify this reference's pin against
         // it -- §2.2.1's MUST-verify rule. A transitive pinned !!import/!!meta is verified likewise when

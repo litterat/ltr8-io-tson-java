@@ -17,15 +17,17 @@ callers hand-sequencing registration themselves. These items are what's missing 
 spec-required case, found by re-auditing Part 2 against the current source rather than CLAUDE.md's
 own prose (which had gone stale on at least one of them):
 
-- [ ] **Automatic reference-closure resolution and import-cycle detection** ([TSON-DATA] §2.2.3,
-  [TSON-SCHEMA] §3.4.1) — no code collects a schema's transitive `!!meta`/`!!import` closure,
-  topologically orders it, and resolves it dependencies-first; every caller (including this
-  session's own `TinySchemaImportsCoreTn1Test`) has to already know and hand-sequence the correct
-  registration order itself. A real import cycle is only caught incidentally today, as an opaque
-  "not registered" error from `TsonSchemaLinker.mergeImports` — never with the spec's own required
-  "import cycle" diagnostic naming the actual cycle path. Distinct from what
+- [ ] **Automatic reference-closure resolution** ([TSON-DATA] §2.2.3, [TSON-SCHEMA] §3.4.1) — no code
+  collects a schema's transitive `!!meta`/`!!import` closure, topologically orders it, and resolves it
+  dependencies-first; every caller (including this session's own `TinySchemaImportsCoreTn1Test`) has to
+  already know and hand-sequence the correct registration order itself. Distinct from what
   `TsonCompiledMetaRegistry.withStandardLibrary` already does, which is scoped to just the three bundled
   schemas in a known order, not a general algorithm.
+    - **Cycle detection is done** and was the more urgent half: a cycle is not the "opaque *not registered*
+      error" this entry used to claim — it was a `StackOverflowError`, since a schema is registered only
+      once it has linked and so is invisible to every cache while it resolves. `resolveLinked` now holds a
+      per-thread in-flight set and reports §2.2.3's cycle naming the path that closes it. The ordering work
+      still needs it (a topological sort has to detect cycles to terminate), so that dependency is met.
 - [ ] **The rest of §8.2's deferred value-level checks.** Materialisation "runs the value-level checks that
   open bounds deferred: family coherence rules whose operands were parameters". The array family's
   `min_items <= max_items` is one rule over the binding pair for arrays *and maps*: a resolver error where
