@@ -112,6 +112,51 @@ by a factor of six.
     - Not reachable today: a union member is not a boxed position, so its carrier is always empty rather than
       wrong. Worth closing when a boxed variant becomes expressible, not before.
 
+## Binding strictness
+
+A schema field the bound class has no component for is dropped, and a component the schema declares no field
+for is filled with `null` — both silently, with no diagnostic even under a collecting receiver. Reported by a
+downstream project against the multi-version case: a codec whose binder maps `order` to a v1 class reads a v2
+document and returns the v1 record with the new field gone. Tree mode over the same document keeps it, so the
+document was read correctly against its own schema; it is the bind that discards. The contrast is with §7.2's
+record closure, which this library enforces properly in the other direction — a field in the *data* the
+*schema* does not declare is `UNRECOGNIZED_FIELD`.
+
+Both directions are **static**: schema fields and class components are fixed when the reader is built, so the
+mismatch is knowable at startup rather than per document. That is the point of catching it — a misconfiguration
+found when the schema binds to its `DataClass` is fixed in minutes, where leniency lets it reach testing or
+production and present as a field that mysteriously has its default.
+
+- [ ] **Strict by default, with opt-in leniency and a FIXED exemption.** Instrumenting both directions and
+  running the whole suite finds **27 distinct mismatches in this library's own bundled binding**, and they
+  classify cleanly:
+  - **21 are FIXED fields and are legitimate**: `access_pattern`/`size_type` on `ArrayBody`/`MapBody`/
+    `RecordBody`/`TupleBody`, and `spec` on seven atom types, all `REQUIRED_FIXED` in meta-kernel. A fixed
+    field's value is settled by the schema, not carried by the data, so a component for it would store a
+    constant. **One rule — a FIXED-state field is exempt — covers every one of them.**
+  - **`TypeDefinition.position` is legitimate in the other direction**: source position is this
+    implementation's own addition for diagnostics, not part of §8.1's `type_definition`. So the
+    component-with-no-field direction needs an explicit per-component opt-out (an annotation), not bare
+    strictness — otherwise a class can never carry anything the wire format does not.
+  - The rest are the real defect below.
+  - Leniency stays available as a reader derivation, the way `preservingUnknownTypeRefs()` already works, so
+    the deliberate evolution case is a call-site decision rather than a silent global default.
+  - **A breaking change for consumers**, deliberately. Cheap at `0.1.0-SNAPSHOT`, much less so after a real
+    release — an argument for doing it now rather than later.
+- [ ] **`DateTimeType` and `TimeType` silently drop `precision` and `require_timezone`.** A live instance of
+  the same defect, independent of the check above. `datetime_type` declares both as ordinary optional facets
+  (`precision: integer?`, `require_timezone: boolean?`) and the bound record is
+  `DateTimeType(Optional<OffsetDateTime> min, Optional<OffsetDateTime> max)` — so an author writing
+  `!datetime ^ { precision: 3  require_timezone: true }` has both dropped and never enforced. This is the
+  family `CLAUDE.md`'s own trap documents ("`UriType`/`RegexType` did both for a long time, invisibly"),
+  still live in two more classes, and it is exactly what the strictness check would have caught.
+- [ ] **Constructor selection by schema field set.** Where a class declares several constructors, the one
+  whose parameters match the schema's field set is arguably the one to bind through — a developer providing a
+  shorter constructor with defaults has stated an intention the binder could honour. Today
+  `DefaultRecordBinder` *throws* when a class has more than one public constructor unless `@Record` picks one,
+  so there is no selection to extend; this is a new feature, not a refinement of the two items above, and it
+  is deferred until they land.
+
 ## Remaining built-in types
 
 - [ ] `unknown` — no compiled-parser factory (`ValueReaderFactoryRegistry` registers it, and `extern`, to
