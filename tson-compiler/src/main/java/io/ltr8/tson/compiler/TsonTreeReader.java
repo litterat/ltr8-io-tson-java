@@ -317,12 +317,15 @@ public final class TsonTreeReader {
         }
         String name = typeName;
         if (name == null) {
-            if (!(ctx.peek() instanceof TypeRef typeRef)) {
+            // Past any leading annotations, which are part of the root value rather than something before
+            // it -- see RootTypeRef on why a peek at the first event alone reports a type-ref that is there.
+            String found = RootTypeRef.find(ctx).orElse(null);
+            if (found == null) {
                 return abandon(ctx, Diagnostic.Code.VALIDATION_ERROR,
                         "data declares a !!schema but has no root type-ref (e.g. `!person`) to select a type",
                         "a root type-ref", "(none)");
             }
-            name = typeRef.name();
+            name = found;
         }
         TsonTypeReader<?> reader = compiled.find(name).orElse(null);
         if (reader == null) {

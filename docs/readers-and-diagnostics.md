@@ -22,6 +22,16 @@ is small and parsed once.)
   reader branches on which. A reader needing to know whether its children complained asks `reported()` — a
   count, so it works for a receiver that keeps no list (the `int before = ctx.reported()` checkpoint idiom
   in `RecordBindReader`/`TupleBindReader`/`SchemalessObjectReader`/`AnnotationCapture`).
+    - **One event of lookahead, plus a rewind for the rare case that is not enough.**
+      `DefaultTsonReadContext.lookingAhead(ctx, fn)` runs `fn` against the cursor and then puts back every
+      event it consumed, so the readers after it see an untouched stream. `peek()` answers "what is here";
+      this answers "what is here *after the part that can repeat*", which the document root needs —
+      `*annotation [type-ref] core-value` puts the type-ref that selects the root reader behind any number
+      of annotations (`RootTypeRef`, `docs/facades-and-tree.md`). It is not a general escape hatch: nothing
+      in the reader stack uses it, because a reader knows its own shape from the schema. Consumed events
+      are replayed from a buffer, never re-lexed, so the cost is what was looked past rather than the
+      document; `position()` is left where the lookahead reached, since a caller looks ahead in order to
+      say something about what it found.
 - **`TsonReadContext` is deliberately still exported.** `TsonTypeReader.read(TsonReadContext)` is the sole
   abstract method a consumer receives from `TsonCompiledSchema.get`, so hiding the parameter type would
   make that method uncallable and the interface unimplementable from outside — categorically worse than the

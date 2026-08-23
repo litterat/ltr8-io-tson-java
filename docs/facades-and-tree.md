@@ -38,6 +38,21 @@ reads one value at a cursor and polices nothing around it.
   root value (so the stream still lands on `DocumentEnd`). Under `throwing()` that is indistinguishable from
   the old behaviour; under a collector they arrive as `Diagnostic`s, which is what lets `Tson.validate`
   delegate to `treeReader()` wholesale instead of re-deriving anything.
+- **The root type-ref is found past the root value's annotations (`RootTypeRef`), not at the first event.**
+  `data-value = *annotation [type-ref] core-value`, and §3.3 puts the two in that order deliberately —
+  augmentation attaches to the value that follows it, and the type-ref is part of that value — so
+  `@doc:"…" !api { … }` annotates and types one value and its root type-ref is `!api`. This is not a
+  nicety: TSON has no comment syntax (§2.4, deliberately), so an annotation is the only way to put prose in
+  a document, and a root that cannot carry one leaves configuration, fixtures and API descriptions unable
+  to say what they are for. Reading against an explicitly named type (`readAs`) never had the problem — it
+  needs no lookup — which is what shows the whole reader stack below has always handled this.
+    - **Looked past by rewinding, not consuming** (`DefaultTsonReadContext.lookingAhead`, which records what
+      a lookahead reads and replays it afterwards). The annotations belong to the root value, and the reader
+      underneath builds them into what it returns — a `TsonValue`'s annotation list, a bound class's
+      `Annotations` carrier. A lookup that consumed them to reach the type-ref would select the right reader
+      and hand it a value stripped of the very prose this exists to allow: a silent loss, not a failure.
+      Events are replayed from a buffer rather than re-lexed, so a lookahead holds only what it looked past.
+    - An annotation *after* the type-ref stays a syntax error, correctly — the grammar admits one order.
 - **A schema that *resolves* badly reports like one, even mid-read.** `tree.get(uri, receiver)` /
   `bind.get(uri, receiver)` (over `TsonCompiledMetaRegistry.resolveLinked(uri, receiver)`) resolve and link
   the named schema collecting, so validating a data document against a broken schema reports **every**
