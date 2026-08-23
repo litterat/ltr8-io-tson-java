@@ -111,6 +111,10 @@ by a factor of six.
   `constructor` handle, wrapping what came back.
     - Not reachable today: a union member is not a boxed position, so its carrier is always empty rather than
       wrong. Worth closing when a boxed variant becomes expressible, not before.
+    - There is now a second way to do it: `DefaultTsonReadContext.lookingAhead` reads ahead and rewinds, so a
+      dispatcher could find its `!typeName` without consuming the annotations at all and the reader it
+      dispatches to would see them itself. That is the smaller change of the two -- no per-mode re-attaching
+      -- and it makes both modes behave alike by construction rather than by two implementations agreeing.
 
 ## Binding strictness
 
