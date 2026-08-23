@@ -1,10 +1,8 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.compiler.config.TsonAtomContext;
 import io.ltr8.tson.compiler.consumer.Operation;
 import io.ltr8.tson.schema.TsonCanonicalIdentity;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -82,24 +80,16 @@ class MetaLayerDataConstructorTest {
 
     /**
      * (3) The bind context, composed rather than copied. {@link SchemaMetaNameBinder#INSTANCE} already
-     * resolves the kernel's own vocabulary; a consumer wants that <em>plus</em> their own, so the binder
-     * here tries the library's first and falls back to the consumer's package. {@link DataNameBinder} has a
-     * single method, so the composition is a lambda -- there is no table to duplicate and nothing to keep in
-     * sync when the kernel's own vocabulary grows.
+     * resolves the kernel's own vocabulary; a consumer wants that <em>plus</em> their own, so {@link
+     * SchemaMetaNameBinder#contextExtendedWith} asks the library's binder first and this one only for a
+     * name it does not know. Nothing here duplicates the kernel's table, and nothing needs keeping in sync
+     * when that vocabulary grows. {@code TsonConfig.metaNameBinder} is the same seam through the front door.
      */
     private static final DataNameBinder CONSUMER_NAMES = new DataNameBinder.DefaultDataNameBinder(
             Set.of("io.ltr8.tson.compiler.consumer"), Map.of());
 
-    private static final DataNameBinder BINDER = name -> {
-        try {
-            return SchemaMetaNameBinder.INSTANCE.resolve(name);
-        } catch (DataBindException notKernelVocabulary) {
-            return CONSUMER_NAMES.resolve(name);
-        }
-    };
-
     private static DataBindContext consumerContext() {
-        return TsonAtomContext.registerDefaults(DataBindContext.builder().nameBinder(BINDER).build());
+        return SchemaMetaNameBinder.contextExtendedWith(CONSUMER_NAMES);
     }
 
     private static TsonCompiledMetaRegistry core(DataBindContext context) {
@@ -174,9 +164,10 @@ class MetaLayerDataConstructorTest {
      */
     @Test
     void theSchemaConstructorBindsToTheRegisteredJavaClass() throws Exception {
-        assertEquals(Operation.class, BINDER.resolve("operation"),
+        DataNameBinder binder = SchemaMetaNameBinder.extendedWith(CONSUMER_NAMES);
+        assertEquals(Operation.class, binder.resolve("operation"),
                 "the name binder is the whole of the registration");
-        assertEquals(io.ltr8.tson.schema.meta.RecordBody.class, BINDER.resolve("record"),
+        assertEquals(io.ltr8.tson.schema.meta.RecordBody.class, binder.resolve("record"),
                 "and the library's own vocabulary still resolves through it");
 
         // No reader family and no factory registration: the ordinary record reader reads an

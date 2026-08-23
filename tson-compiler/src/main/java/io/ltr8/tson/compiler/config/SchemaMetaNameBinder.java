@@ -1,10 +1,12 @@
 package io.ltr8.tson.compiler.config;
 
 import io.ltr8.bind.DataBindContext;
+import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
 
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -41,6 +43,10 @@ import java.util.Set;
  * binder resolves the class either way -- it isn't this class's job to decide whether a resolved
  * class is usable as a record; a caller resolving one of these against a {@code Record*Reader} sees
  * that decision surface as an ordinary compile-time failure for that one entry instead.
+ *
+ * <p><b>The namespace is fixed; the binder is not the last word.</b> A meta-schema of a consumer's own may
+ * declare constructors the kernel never heard of, and their instances bind to that consumer's classes --
+ * {@link #contextExtendedWith} is how those names join this one's, by composition rather than replacement.
  */
 public final class SchemaMetaNameBinder {
 
@@ -81,6 +87,47 @@ public final class SchemaMetaNameBinder {
      * directly.
      */
     public static DataBindContext defaultContext() {
-        return TsonAtomContext.registerDefaults(DataBindContext.builder().nameBinder(INSTANCE).build());
+        return context(INSTANCE);
+    }
+
+    /**
+     * {@link #defaultContext()} extended with the names a consumer's own <b>meta layer</b> adds -- the
+     * context to resolve a schema against when its governing meta declares constructors of its own
+     * ({@code operation => ~data & { ... }}), whose instances bind to that consumer's Java classes.
+     * {@code TsonConfig.metaNameBinder} is the front-door route to it.
+     *
+     * <p>Composition, never replacement: {@link #INSTANCE} answers first and {@code additional} is asked
+     * only for a name the kernel's own vocabulary does not know. So a consumer cannot shadow {@code
+     * record}/{@code enum}, and cannot lose {@link TsonAtomContext}'s registrations by building a context
+     * that forgets them -- what the extension adds is names, and nothing else.
+     *
+     * <p>This is the whole seam. A meta-layer constructor needs three things and no more: the meta schema
+     * declaring it, a class carrying {@code @Typename} for it, and a binder that can find that class.
+     */
+    public static DataBindContext contextExtendedWith(DataNameBinder additional) {
+        return context(extendedWith(additional));
+    }
+
+    /**
+     * {@link #INSTANCE} first, {@code additional} for anything it does not resolve -- the binder half of
+     * {@link #contextExtendedWith}, for a caller assembling a {@link DataBindContext} themselves.
+     *
+     * <p>A {@link DataBindException} from {@code additional} propagates as it stands: it names the packages
+     * that consumer's own binder searched, which is where a name the kernel does not declare was expected
+     * to be.
+     */
+    public static DataNameBinder extendedWith(DataNameBinder additional) {
+        Objects.requireNonNull(additional, "additional");
+        return name -> {
+            try {
+                return INSTANCE.resolve(name);
+            } catch (DataBindException notKernelVocabulary) {
+                return additional.resolve(name);
+            }
+        };
+    }
+
+    private static DataBindContext context(DataNameBinder binder) {
+        return TsonAtomContext.registerDefaults(DataBindContext.builder().nameBinder(binder).build());
     }
 }
