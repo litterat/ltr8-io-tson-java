@@ -30,8 +30,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * SchemaDesugarerTest}'s nested-form cases, which pin the rewrite itself.
  *
  * <p>[TSON-SCHEMA] §5.3 says declaration-level container syntax nests inside itself and fixes the order --
- * {@code grid => <T, N> [[T; N]; N]} is {@code array_ranged<array_ranged<T, N, N>, N, N>}, "the inner form
- * desugaring first" -- and §12.1 says the same from the grammar side. {@code SchemaDesugarer} performs that
+ * {@code grid => <T, N> [[T; N]; N]} nests with "the inner form desugaring first" -- and §12.1 says the
+ * same from the grammar side. (Revision 32 spells that nesting as an {@code array_ranged} application; the
+ * size templates are gone from the kernel and a sized form binds its bounds directly, so what nests here is
+ * the injected {@code array} entry rather than an application of one.) {@code SchemaDesugarer} performs that
  * as a bottom-up hoist: the inner container becomes its own injected declaration and the position that held
  * it becomes a bare reference, so the outer container routes a plain name like any other. What these cover is
  * that the arrangement survives resolution, linking, compilation and a read.
@@ -76,8 +78,8 @@ class NestedContainerTest {
 
     /**
      * The whole arc for a tuple position holding a nested sized array: the position names an injected entry,
-     * that entry is the {@code array_ranged} instantiation the flat spelling would have produced, and the
-     * compiled reader takes real data.
+     * that entry is the one the flat spelling would have produced, bounds and all, and the compiled reader
+     * takes real data.
      */
     @Test
     void aTuplePositionHoldingASizedArrayResolvesCompilesAndReads() {

@@ -78,9 +78,9 @@ import java.util.Set;
  *
  * <p><b>Type-parameter exception:</b> a bare name is valid if it resolves in the schema's own
  * namespace, or if it's one of the checked entry's own declared {@code parameters} -- load-bearing
- * for every parameterized declaration ({@code array}, {@code set}, {@code map}, {@code array_min},
- * {@code array_max}, {@code array_ranged}), whose own {@code source}/body positions reference their own
- * type parameter by bare name ({@code array<T>}), not a real other entry.
+ * for every declaration that takes type parameters -- a user template ({@code box => <T> { v: T }}) and
+ * the {@code instance_template} forms lifted from one -- whose own {@code source}/body positions reference
+ * their own type parameter by bare name, not a real other entry.
  *
  * <p><b>{@code !!import} merging (Part 2 §2.2.3).</b> The final namespace a schema is checked
  * against is built in two stages, in this order: (1) every {@code !!import}'s whole namespace, in
@@ -649,8 +649,8 @@ public final class TsonSchemaLinker {
         // A supertype gets the same structure-namespace fallback as `source`, and for the same reason: it is
         // not an author-written reference but the residue of one, and §3.3.2 confines only author-written
         // type-refs to the type-name namespace (SPEC-FEEDBACK.md #32). A derived chain reaches a constructor
-        // whenever a refinement derives from one -- meta-kernel's own `array_min => <T, MIN> array<T> ^ {...}`
-        // resolves with [array, product, top]. The fallback is defensive rather than load-bearing today: a
+        // whenever a refinement derives from one -- meta-kernel's own `set => ~array ^ {...}` resolves with
+        // [array, product, top]. The fallback is defensive rather than load-bearing today: a
         // refinement source resolves through the type-name namespace alone, so a schema deriving from `array`
         // already names it. What did need it -- §8.2's transfer of a template's supertypes onto every sized
         // array materialised in a user schema -- is gone (SPEC-FEEDBACK.md #45).

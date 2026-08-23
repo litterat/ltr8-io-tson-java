@@ -18,12 +18,9 @@ import java.util.function.UnaryOperator;
  * dependency on {@code reader.TsonParserFactoryRegistry} (which is going away) or anything else in
  * {@code reader} -- deliberate, while this package's own shape is still settling.
  *
- * <p><b>{@code set}/{@code vector}/{@code array_min}/{@code array_max}/{@code array_ranged} all
- * register to the exact same {@code array} factory instance</b> -- every one of them resolves to an
- * {@code ArrayBody} regardless of which produced a given instance ({@code set}/{@code vector} via
- * refinement, per meta-kernel.tn1/meta.tn1; {@code array_min}/{@code array_max}/{@code array_ranged}
- * aren't {@code ~}-marked constructors at all, but are kept registered here too for the same
- * lookup-by-name convenience), so there's no separate shape to build a distinct factory for. This is
+ * <p><b>{@code set} registers to the exact same {@code array} factory instance</b> -- it resolves to an
+ * {@code ArrayBody} like {@code array} itself, refinement never adding or removing a field, so there is
+ * no separate shape to build a distinct factory for. This is
  * a *lookup-by-constructor-name* convenience only -- it says nothing about whether an {@code
  * array}-typed position should ever dispatch to {@code !set [...]} at read time, which {@link
  * RecordBindReader.Factory}'s own Javadoc deliberately does not attempt for any composite kind but
@@ -128,7 +125,6 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
 
         // meta.tn1
         factories.put("binary", leaf.apply(AtomTypeReader.BINARY));
-        factories.put("vector", array);
         factories.put("float_type", leaf.apply(AtomTypeReader.FLOAT_TYPE));
         factories.put("decimal_type", leaf.apply(AtomTypeReader.DECIMAL_TYPE));
         factories.put("rational_type", leaf.apply(AtomTypeReader.RATIONAL_TYPE));
@@ -146,9 +142,6 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         factories.put("cidr6_type", leaf.apply(AtomTypeReader.CIDR6_TYPE));
 
         // Sugar/alias names -- not their own `~`-marked constructors, kept for lookup convenience only.
-        factories.put("array_min", array);
-        factories.put("array_max", array);
-        factories.put("array_ranged", array);
 
         // ---- Not implemented yet -- every entry below is a real `~`-marked constructor from
         // ---- meta-kernel.tn1/meta.tn1 with no compiled reader at all. Registered to ErrorReader so a

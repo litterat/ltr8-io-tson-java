@@ -457,9 +457,9 @@ class DefinitionResolverTest {
 
     /**
      * §8.2's own worked example, one bound apart -- and deliberately not the entry it prints. {@code [text;
-     * 1920]} is {@code array_ranged<text, 1920, 1920>}, a <b>partial application</b>: its parameters occur
-     * only in labelled value channels, so it closes by routing into a construction of {@code array} rather
-     * than materialising an instantiation entry ({@code SPEC-FEEDBACK.md} #45). So {@code source} is plain
+     * 1920]} closes by routing into a construction of {@code array} rather than materialising an
+     * instantiation entry -- which is what {@code SPEC-FEEDBACK.md} #45 argued for and the kernel now does
+     * directly, the size templates it spelled this through being gone. So {@code source} is plain
      * {@code array}, exactly as {@code [text]}'s is, and the bounds live in the body where they constrain.
      *
      * <p>{@code supertypes} is empty for the same entry's reason: a constructor is a factory, not a type
@@ -1787,8 +1787,8 @@ class DefinitionResolverTest {
     /**
      * A parametric modifier lands in a REQUIRED-family state whatever the presence axis says (§5.7's "Open
      * modifiers": "a parametric `= P` places the field in REQUIRED -- from OPTIONAL this is the table's
-     * ordinary OPTIONAL → REQUIRED tightening"). That is what makes {@code array_min}'s {@code min_items: =
-     * MIN} mandatory, so the parameter branch has to sit ahead of the OPTIONAL_FIXED one.
+     * ordinary OPTIONAL → REQUIRED tightening"). A parametric {@code = P} over an inherited OPTIONAL field
+     * is the shape, so the parameter branch has to sit ahead of the OPTIONAL_FIXED one.
      */
     @Test
     void aParametricModifierOnAnInheritedOptionalFieldStillLandsInRequired() {

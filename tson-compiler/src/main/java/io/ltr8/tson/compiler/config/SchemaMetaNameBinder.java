@@ -27,9 +27,8 @@ import java.util.Set;
  * those classes' own {@code @Typename} is the *bare* constructor name (matching the instance side,
  * e.g. {@code RecordBody}'s own is {@code "record"}, not {@code "record_body"}), so this forward
  * (schema-name -> Class) direction needs the {@code "_body"} suffix added explicitly; nothing
- * recovers it mechanically from the bare name alone. {@code set}/{@code array_min}/{@code
- * array_max}/{@code array_ranged}/{@code vector} are parameterized template constructors that share
- * {@code array}'s own resolved shape rather than declaring one of their own -- their own field set
+ * recovers it mechanically from the bare name alone. {@code set} is a constructor that shares {@code
+ * array}'s own resolved shape rather than declaring one of its own -- its own field set
  * is identical to {@code array}'s (refinement never adds or removes fields, only tightens values),
  * so they alias to the same {@code ArrayBody} target rather than needing one of their own.
  *
@@ -63,10 +62,6 @@ public final class SchemaMetaNameBinder {
             Map.entry("choice", "choice_body"),
             Map.entry("enum", "enum_body"),
             Map.entry("set", "array_body"),
-            Map.entry("array_min", "array_body"),
-            Map.entry("array_max", "array_body"),
-            Map.entry("array_ranged", "array_body"),
-            Map.entry("vector", "array_body"),
             Map.entry("binary", "binary_type"),
             Map.entry("datetime_type", "date_time_type"),
             Map.entry("field_name", "token"),

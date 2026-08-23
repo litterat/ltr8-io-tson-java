@@ -535,8 +535,8 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
          * <p>{@link #descriptorFor}'s answer without its verdict: a name that binds nowhere is a
          * misconfiguration where a *schema* asked for it, and merely a non-member where a *document* did.
          * Goes through this context's own {@code DataNameBinder}, which is the only thing that knows a
-         * schema name is not always its class's own -- {@code set}, {@code array_min}, {@code array_max},
-         * {@code array_ranged} and {@code vector} all reach {@code ArrayBody}.
+         * schema name is not always its class's own -- {@code set} and {@code array} both reach {@code
+         * ArrayBody}, §5's array family resolving to one body shape.
          */
         private Class<?> boundClassOrNull(String schemaTypeName) {
             try {
