@@ -257,16 +257,22 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      * Routing its varieties apart is tracked in {@code BACKLOG.md}.
      * {@code SCHEMA_ERROR}/{@code UNKNOWN_TYPE}/{@code VALIDATION_ERROR} are infrastructure-level
      * fallbacks a caller (e.g. {@code tson-cli}) uses for a failure that happens outside any single
-     * {@link TsonReadContext} read at all -- the schema itself failed to compile, a requested type name
+     * {@link TsonReadContext} read at all -- the schema itself failed to load, a requested type name
      * doesn't exist in it, or some other unexpected exception was thrown before a collecting context ever
-     * got involved.
+     * got involved. {@code SCHEMA_ERROR} means the schema is at fault and nothing else: a failure obtaining
+     * a schema that is <em>not</em> the schema's fault carries its own code (below), rather than being
+     * flattened into this one because it arrived through the same catch.
      *
-     * <p><b>{@code NOT_IMPLEMENTED} is the one member that is not a verdict on the document.</b> It says a
-     * construct is beyond this library, so the thing it names could not be checked -- which is not the same
-     * as invalid, and a consumer that treats it as invalid is wrong in the one direction that matters. It
-     * exists so a gap can ride in the same single-pass list as the ordinary problems rather than throwing
-     * and taking their verdicts with it; the exit code the CLI picks rides on this member, where it used to
-     * ride on catching {@code UnsupportedOperationException}.
+     * <p><b>{@code NOT_IMPLEMENTED} and {@code BIND_MISMATCH} are the two members that are not a verdict on
+     * the document.</b> Both say the thing they name could not be checked, which is not the same as
+     * invalid, and a consumer that treats either as invalid is wrong in the one direction that matters.
+     * {@code NOT_IMPLEMENTED} says a construct is beyond this library; it exists so a gap can ride in the
+     * same single-pass list as the ordinary problems rather than throwing and taking their verdicts with
+     * it, and the exit code the CLI picks rides on it. {@code BIND_MISMATCH} says a schema and the Java
+     * classes bound to it disagree ({@link TsonBindMismatchException}, {@link
+     * TsonMissingBindingException}) -- a wiring mistake in the reading application, where the document may
+     * be perfectly valid and the message names one of that application's own classes. A consumer routing
+     * on these codes wants both apart from the rest: a verdict it cannot give, for two different reasons.
      */
     public enum Code {
         FIELD_REQUIRED,
@@ -281,6 +287,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
         SCHEMA_ERROR,
         UNKNOWN_TYPE,
         VALIDATION_ERROR,
-        NOT_IMPLEMENTED
+        NOT_IMPLEMENTED,
+        BIND_MISMATCH
     }
 }

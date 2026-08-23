@@ -225,6 +225,24 @@ whether lexer errors feed the `Diagnostic` model at all. `STRUCTURED-OUTPUT.md` 
     "which document declared this entry", and every reader is already handed its own declaration's location
     (`ValueReaderContext.locationOf`) — today only used as the seed for a value nothing encloses. A caused-by
     frame is what would consume it in the ordinary nested case.
+- [ ] **`TsonSchemaSource.fetch` mandates no exception type, which costs a read one distinction.**
+  `SchemaFailure` classifies a failure to obtain a compiled schema — `BIND_MISMATCH` for a schema and the
+  reading application's classes that disagree, `NOT_IMPLEMENTED` for a construct beyond this library,
+  `SCHEMA_ERROR` for everything else. That last branch is a default rather than a positive verdict: a
+  source is free to signal an unfetchable schema with any `RuntimeException`, so an unfetchable schema and
+  a broken invariant are indistinguishable by type at that boundary, and a real fault in a resolve or a
+  compile reads to a consumer as a problem with the schema. Both other classifications in the codebase
+  (`Diagnostic.ofBaseSyntaxError`/`ofSchemaSyntaxError`) end `default -> throw e` on the rule that a fault
+  propagates as itself; this is the one place that cannot.
+  - The fix is at the `fetch` contract, not at the classification. Either the interface names the exception
+    a source must throw for "cannot supply this" (`TsonSchemaValidationException` — which is already what
+    the shipped `registeredOnly()` throws, and its Javadoc already argues the case, in exactly these terms),
+    or `resolveUncached` wraps whatever `fetch` throws in one. The second is compatible with sources that
+    already exist and is probably the answer; the first is cleaner and is a breaking change to a public
+    functional interface.
+  - Low priority while `registeredOnly()` is the only implementation and a real disk/HTTP-backed
+    `TsonSchemaSource` is itself unbuilt — the two should be decided together, since a fetching source is
+    what makes the failure modes here plural.
 
 ## Write side
 

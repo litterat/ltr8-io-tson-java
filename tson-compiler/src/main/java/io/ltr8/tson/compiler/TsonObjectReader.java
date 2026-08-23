@@ -368,7 +368,10 @@ public final class TsonObjectReader {
             // rebuilt from the data cursor.
             compiled = bind.get(schemaUri, receiver);
         } catch (RuntimeException e) {
-            return abandon(ctx, Diagnostic.Code.SCHEMA_ERROR, e.getMessage(), "a resolvable schema", schemaUri);
+            // See TsonTreeReader.readAgainstSchema: what kind of problem this is decides the code, and bind
+            // mode is where a schema and the caller's own classes can disagree at all.
+            SchemaFailure failure = SchemaFailure.of(e);
+            return abandon(ctx, failure.code(), e.getMessage(), failure.expected(), schemaUri);
         }
         if (compiled == null) {
             EventSkip.dataValue(ctx);
