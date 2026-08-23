@@ -3565,3 +3565,183 @@ cannot supply the contract its values validate against. That is a larger change 
 would need the declaring schema's own compiled reader available during its own resolution, which the
 pipeline does not have at that point), and it is stated here as a design question rather than a defect: the
 rule as written is self-consistent, and the diagnostic is what the current revision is missing.
+
+---
+
+## 57. The meta layer is the sanctioned extension point, but the schema map has nowhere to put a non-type
+
+**Section:** §2.2.2 / §9 (the meta layer as extension point), §4.1 (kinds), §8.1 (`schema =>
+{type_name => type_definition}`), §6 (annotations), §3.3.1.
+
+§2.2.2 is unusually direct about where extension is meant to happen:
+
+> The meta layer is the format's sanctioned extension point: new type vocabularies arrive as alternative or
+> extended meta-schemas chaining to the kernel, never as grammar changes.
+
+and meta.tn's own `@doc` says the same from the other side: "Type constructors are a meta-schema concern:
+user schemas use them but should not define new ones." This implementation confirms the mechanism works —
+a user schema whose `!!meta` names meta-kernel loads, links, compiles and governs exactly like the bundled
+`meta.tn`, inheriting the kernel's whole vocabulary through the transitive import merge, with nothing
+privileging the bundled documents.
+
+**What is unaddressed is where an instance of such a constructor lands.** The kernel's own `schema` is
+`{type_name => type_definition}`: every entry of a schema map *is* a type definition. So a meta-schema may
+introduce vocabulary describing something that is not a data type — the motivating case is an HTTP
+operation, which must sit at the schema layer precisely because that is the only layer that can name
+request and response types *by name*, something a data document cannot do — and the resulting entry has
+nowhere to be except a type entry. The spec never says this is disallowed, and it never says what it means.
+
+Four consequences follow, each of which an implementation must decide unaided. All four were observed
+against a meta-schema declaring `operation => ~top & { path: text  method: http_method  request: type_name }`
+and a governed schema writing `search => !operation { ... }`.
+
+**1. The entry must claim a kind it does not have.** §4.1: "every type has exactly one of the four kinds",
+and `~top & { ... }` finds no base kind in its chain, so §4.1's structural default applies and the instance
+resolves to `kind: PRODUCT`. An entry that describes no data value now asserts it is a product type. There
+is no fourth answer available — the closed set is ATOM/PRODUCT/SUM/REFERENCE, and none of them means
+"describes something other than data".
+
+**2. The entry is nameable as a type, and nothing objects.** It lands in the type-name namespace like any
+other declaration, so `holder => { s: search }` resolves, links **and compiles** clean; the failure arrives
+only when a document is read against it. §3.3.1 gives no way to say that an entry may be declared but not
+referenced as a type, and §8.1 gives nothing to mark it with.
+
+**3. `~` carries two meanings at once.** §5.6/§3.3.1 gate `!C value` on `constructor: true`, so `~` is the
+permission for *a schema to write `!C ...`* — which is exactly what such a constructor wants. But `~` is
+also the §4.1/§5.5 assertion of constructor-hood in the type sense, and §5.5's kind transfer is what
+produces consequence 1. The flag is doing two jobs that this case wants separated. (§5.3's own note that
+"`~` thus sets three dials at once" already observes the overloading for other reasons.)
+
+**4. A reference the instance carries is invisible to the linker.** A slot declared `type_name` holds an
+inert token — meta-kernel's `type_name => token` — so `request: no_such_type_at_all` resolves clean, with no
+diagnostic at any phase. This one has a fix inside the current vocabulary and it is worth stating because it
+is not obvious: **declare the slot `type_ref`, not `type_name`.** §5.6's positional form means the author
+still writes a bare name (`request: search_request`), the resolved value is a self-identifying `type_ref`
+record, and a linker can then validate it generically — no per-constructor validation code, and it works for
+every future meta-layer constructor. Nothing in §9 or §8.1 points an extension author at this, and
+`type_name` is the more natural-looking choice.
+
+**The three places non-type data can ride along today each fail differently.** This is the shape of the gap:
+
+- **An annotation (§6)** validates properly and keeps the namespace clean — an annotation's value binds
+  through the type its name refers to, so §7.2 closure, field states and enum membership are all enforced,
+  and no pseudo-type is minted. But §6 frames annotations as metadata *about* a declaration, not as data in
+  their own right, and the shape has a mechanical limit besides: an annotation is not spellable at a *field*
+  position (§12.1 admits one on a declaration, not before a field's type-ref), even though §8.3's own
+  resolved output uses exactly that shape — `!record_field { name: owner  type: @alias:id uuid }`. The
+  resolver is specified to produce a form the grammar will not accept an author writing.
+- **A type entry** gets full validation of its payload but incurs consequences 1–3 above.
+- **A separate document** is honest about not being a type, but severs the link the case exists for: every
+  consumer re-implements loading the schemas, and cross-checking each name against them, by hand.
+
+**Interpretation chosen:** the type-entry route, with the payload read through the constructor's own
+compiled reader so it is validated in full — an unknown field, a wrong-typed value and a missing required
+field are all schema errors, as they are for any written body — and, as an experiment, **suggested
+resolution 2 below implemented against a locally amended meta-kernel** so the design could be judged on
+evidence rather than on argument. What follows records what that cost, since the answer bears on which
+resolution the revision should take.
+
+**Tried: `data` as a fourth base kind (resolution 2).** meta-kernel gains one declaration and one enum
+member —
+
+```tson
+sum       => top & {}
+data      => top & {}                                    # new: the non-data base kind
+type_kind => !enum [ATOM PRODUCT SUM REFERENCE DATA]     # was four members
+```
+
+— an extended meta-schema then writes `operation => ~data & { path: text  request: type_ref ... }`, and a
+governed schema writes `search => !operation { ... }`. §4.1's kind determination needs only `data` added to
+the three literal base-kind names it already checks. **Consequences 1 and 2 both close.** The entry resolves
+to `kind: DATA` rather than claiming to be a product, and — the part that matters — the kind gives the linker
+something to check, so `holder => { s: search }` becomes an author error at link time:
+
+> `'holder' field 's' names 'search', which is built with 'operation' and describes something other than a
+> data value — it is declared by this schema but is not a type, so nothing can be typed by it`
+
+where against Revision 32 it resolves, links, compiles, and fails only when a document is read. Consequence
+3 is untouched and does not need to be: `~` remains the permission to write `!C ...`, which such a
+constructor wants, and removing it is what makes `!operation` unresolvable (verified).
+
+Point 4 also has a second answer once a body can be a purpose-built model rather than a generic carrier:
+declare the slots as real references and let the body report them (`request`/`response` typed `type_ref`,
+surfaced through the body's own accessor), so a dangling name is an ordinary unresolved-reference error at
+link time. That is stronger than the generic walk, and it is available only on this route.
+
+**What it cost: nothing at the spec level, once an implementation bug was fixed.** The experiment first
+appeared to carry a serialisation cost, and this entry recorded it as one. That was wrong, and the
+correction is worth stating because the wrong version pointed at §8.1. Writing resolved output for a DATA
+entry failed —
+
+> `TsonWriteException — value of type Operation is not a member of union interface Top`
+
+— which looked like the spec having no account of how a body whose vocabulary the kernel does not fix gets
+serialised. It was not. A union collected from a sealed hierarchy flattens the sealed branches to their
+leaves but keeps a *non-sealed* branch as a member in its own right, precisely because its
+implementations cannot be known at analysis time; membership was then tested by exact class, so no
+implementation of that branch ever matched the member standing for it. Resolving the candidate against the
+open member and registering it on first sight closes the gap, and everything downstream was already generic
+— the body writes through its own descriptor, under its own type name. A DATA entry serialises in §8.1's
+ordinary shape, indistinguishable in form from any other body:
+
+```tson
+{ source: { name: "operation"  arguments: [] }  kind: "DATA"
+  parameters: []  constructor: false  supertypes: []  subtypes: []
+  body: !operation { path: "/search"  method: "GET"
+                     request:  { name: "search_request"   arguments: [] }
+                     response: { name: "search_response"  arguments: [] } } }
+```
+
+So resolution 2 costs one declaration and one enum member in the kernel, and nothing in §8.1: `body` already
+carries an instance of whichever constructor built the entry, and a meta-schema's own constructor is not a
+special case of that.
+
+**What does remain, and it is smaller than the above.** A DATA body's vocabulary is the one the kernel does
+not fix, so an implementation *reading* resolved output back (§10.1 ingest) must resolve the constructor
+name to something it can hold — and unlike every other body, no amount of kernel knowledge supplies it. That
+is the same shape as `extern`'s open membership rather than a new problem, and ingest is explicitly optional
+("MAY implement ingest"), so it is worth a sentence in §10.1 rather than a change anywhere.
+
+The kernel amendment is a **local divergence**, not a claim about Revision 32 and not something a consumer
+of this library should meet: it changes meta-kernel's content hash, and therefore meta's and core's pinned
+references to it and the digests this implementation holds for all three. Recorded here because the result
+is evidence about the resolution, whatever becomes of the experiment.
+
+**Suggested resolution.** In ascending order of cost; any of the three closes consequences 1–3, and all
+three want point 4's `type_ref` guidance stated in §9 regardless. Resolution 2 is the one tried above.
+
+1. **A kernel marker annotation**, the cheapest and the one with an exact precedent. meta-kernel already
+   declares `annotation => @annotation void`, an annotation that marks *a declaration as an annotation
+   type*. A sibling marks a constructor whose instances are data rather than types:
+
+   ```tson
+   data => @annotation void          # in meta-kernel, beside @annotation
+
+   operation => @data ~top & { ... } # in an extended meta-schema
+   ```
+
+   §3.3.1 then gains one sentence: a type-ref MUST NOT name an entry whose `source` constructor is
+   `@data`-marked. No new body shape, no new vocabulary, no change to how such an entry is read. It leaves
+   consequence 1 cosmetically unresolved — the entry still carries a kind — but makes it harmless, since
+   nothing may use the entry as a type.
+
+2. **A fifth `TypeKind`, and the base kind that goes with it.** `kind: DATA` alongside
+   ATOM/PRODUCT/SUM/REFERENCE addresses consequence 1 head-on rather than beside it, and `kind` is already
+   the discriminator every consumer switches on. It is a revision rather than an addition, `TypeKind` being
+   closed in §8.1 — but it is small in the kernel (one declaration, one enum member) and it is the only one
+   of the three that gives the *linker* a fact to check rather than a marker to look up. Tried; see above.
+
+3. **A document-level section for schema-level data** — the literal reading of "data riding along with the
+   schema". The largest change (§12.1 grammar plus §8.1 output shape), and the only one that stops such a
+   thing being a schema-map entry at all.
+
+**A wrapper type is the option worth explicitly ruling out.** The obvious shape — a kernel `data => top &
+{ type: type_name  value: unknown }` that any instance nests inside — does not work, for two independent
+reasons. It cannot live in meta-kernel: `unknown` is declared in core (`!unknown_type {}`, its constructor in
+meta), two layers above the root, which imports nothing; and the kernel's own permissive type is no
+substitute, `value` being scalar-only by its own `@doc` ("null, boolean, integer, float, or string"), so it
+cannot hold a record payload. More importantly, `unknown` accepts "any well-formed value of any type", so
+wrapping *discards the payload validation* that the direct form gets for free. Recovering it would require
+reading `value` through whatever `type` names — a dependency the kernel has already met and declined once,
+in `value`'s own `@doc`: "which must be the field's declared type — a dependency the schema language does
+not express directly."

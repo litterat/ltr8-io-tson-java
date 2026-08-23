@@ -15,6 +15,7 @@
  */
 package io.ltr8.bind;
 
+import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import java.util.Objects;
 
@@ -59,20 +60,99 @@ public class DataClassUnion extends DataClass {
 		return isSealed;
 	}
 
+	/**
+	 * Whether {@code dataClass} is a member of this union.
+	 *
+	 * <p><b>An open member stands for its implementations.</b> A union collected from a sealed hierarchy
+	 * flattens the sealed branches to their leaves but keeps a <em>non-sealed</em> permitted type as a member
+	 * in its own right -- its implementations cannot be known at analysis time, which is why such a union is
+	 * built extensible and why {@link #addMemberType} exists. Asking only whether the exact class is already
+	 * listed therefore answers "no" for every one of those implementations, and the member that was meant to
+	 * stand for them never gets consulted. So a candidate assignable to an open (non-final) member is a
+	 * member, and is <b>registered here</b> so later calls, and {@link #memberTypes}, find it directly.
+	 *
+	 * <p>Registration is what makes such a member usable rather than merely acknowledged: a caller resolves
+	 * the class's own descriptor from here, so an implementation is written and read as itself rather than as
+	 * the abstract member it arrived under. It is memoisation, not a change of answer -- the same question
+	 * asked twice gives the same result, and {@link #memberTypes} is the view that grows.
+	 *
+	 * <p>A candidate matching two open members is refused: nothing here can say which was meant, and choosing
+	 * either would make the answer depend on member order.
+	 */
 	public boolean isMemberType(Class<?> dataClass) {
-		boolean found = false;
 
-		// One read of the volatile field, then work off that snapshot -- addMemberType replaces the array
-		// rather than mutating it, so a snapshot is always internally consistent.
+		// The common case, lock-free: one read of the volatile field and a scan of that snapshot.
+		if (contains(dataClass)) {
+			return true;
+		}
+
+		if (dataClass == null || isSealed) {
+			return false;
+		}
+
+		return admitOpenImplementation(dataClass);
+	}
+
+	/**
+	 * Whether {@code dataClass} is <em>already listed</em>. The plain lookup {@link #isMemberType} used to
+	 * be, kept private: every caller asking about membership wants the real question, and the only two
+	 * places that want the listing itself are {@link #addMemberType}'s own guard -- which would otherwise
+	 * recurse, since {@link #isMemberType} may now register -- and {@link #memberTypes}, which exposes the
+	 * list directly.
+	 */
+	private boolean contains(Class<?> dataClass) {
+
+		// addMemberType replaces the array rather than mutating it, so a snapshot is always internally
+		// consistent and one read never sees it change underneath.
 		Class<?>[] types = this.memberTypes;
 		for (Class<?> dClass : types) {
 			if (dClass.equals(dataClass)) {
-				found = true;
-				break;
+				return true;
 			}
 		}
 
-		return found;
+		return false;
+	}
+
+	/** {@link #isMemberType}'s slow path -- taken only on a miss, so the common case stays lock-free. */
+	private synchronized boolean admitOpenImplementation(Class<?> dataClass) {
+
+		if (contains(dataClass)) {
+			return true; // registered between the lock-free miss and this lock
+		}
+
+		// One read of the volatile field, as everywhere else here -- redundant under the lock, but the
+		// snapshot idiom is what says at a glance that nothing in this loop can shift underneath it.
+		Class<?>[] types = this.memberTypes;
+
+		Class<?> openMember = null;
+		for (Class<?> member : types) {
+			if (member != dataClass && !Modifier.isFinal(member.getModifiers())
+					&& member.isAssignableFrom(dataClass)) {
+				if (openMember != null) {
+					return false; // ambiguous -- see this method's caller
+				}
+				openMember = member;
+			}
+		}
+
+		if (openMember == null) {
+			return false;
+		}
+
+		appendMemberType(dataClass);
+		return true;
+	}
+
+	/** Grows the member array by one. The caller has already established that the union admits additions. */
+	private synchronized void appendMemberType(Class<?> newType) {
+
+		Class<?>[] types = this.memberTypes;
+
+		Class<?>[] newMemberTypes = Arrays.copyOf(types, types.length + 1);
+		newMemberTypes[newMemberTypes.length - 1] = newType;
+
+		this.memberTypes = newMemberTypes;
 	}
 
 	/**
@@ -85,7 +165,8 @@ public class DataClassUnion extends DataClass {
 	 */
 	public synchronized void addMemberType(Class<?> newType) throws DataBindException {
 
-		if (isMemberType(newType)) {
+		// contains(), not isMemberType(): the latter may register, which would recurse back into here.
+		if (contains(newType)) {
 			return;
 		}
 
@@ -93,10 +174,7 @@ public class DataClassUnion extends DataClass {
 			throw new DataBindException("Union type is sealed. No addition member types can be added.");
 		}
 
-		Class<?>[] newMemberTypes = Arrays.copyOf(memberTypes, memberTypes.length + 1);
-		newMemberTypes[newMemberTypes.length - 1] = newType;
-
-		this.memberTypes = newMemberTypes;
+		appendMemberType(newType);
 	}
 
 	public Object checkIsMember(Object value) throws DataBindException {
@@ -105,11 +183,8 @@ public class DataClassUnion extends DataClass {
 			return value;
 		}
 
-		Class<?>[] values = this.memberTypes;
-		for (Class<?> dataClass : values) {
-			if (dataClass == value.getClass()) {
-				return value;
-			}
+		if (isMemberType(value.getClass())) {
+			return value;
 		}
 
 		throw new DataBindException(String.format("Value '%s' not in valid types %s", value.getClass().getName(),
