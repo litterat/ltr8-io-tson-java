@@ -88,9 +88,9 @@ developer-facing type, ask "would a consumer plausibly have their own class with
 and it's consumer-facing, prefix it; if it's internal machinery, leave it bare.
 
 **A schema and its bound class must agree about a type's fields** (`TsonBindMismatchException`, raised at
-bind-mode compile — startup, not first read). A field every document carries with no component, or a
-component no field fills, is refused; an OPTIONAL field with no component reports `UNBOUND_FIELD` at the read
-that writes one; a FIXED field is exempt, the schema settling its value. `@Unbound` marks a component as the
+bind-mode compile — startup, not first read). Any non-FIXED field with no component, or a component no
+field fills, is refused — optional fields included, since those are the ones that work in development and
+fail on the first caller who sends them. A FIXED field is exempt, the schema settling its value. `@Unbound` marks a component as the
 class's own, `TsonConfig.lenientBinding` opts out wholesale and is silent. `docs/readers-and-diagnostics.md`
 has the why.
 

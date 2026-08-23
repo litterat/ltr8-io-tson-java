@@ -92,9 +92,10 @@ public final class TsonConfig {
      *
      * <p>Leniency is a real position, not just an escape hatch -- versioned evolution, where a v1 consumer
      * deliberately reads a v2 document and means to ignore what it does not know. This is where that
-     * intention gets written down. Note what it does <em>not</em> silence: a schema field the class cannot
-     * hold is still reported at the read that writes one ({@code UNBOUND_FIELD}), so a collecting caller can
-     * see what was dropped without failing on it.
+     * intention gets written down -- and it is the only path on which a field is dropped at all, every
+     * mismatch otherwise being settled before a document exists. It is silent by necessity: reporting
+     * abandons the construction ({@code ConstructionGuard}), so a lenient reader that reported would hand
+     * back {@code null} for exactly the documents it exists to accept.
      *
      * <p>The narrower alternative to reaching for this is {@code @Unbound} on the one component that is the
      * class's own business rather than the wire's.

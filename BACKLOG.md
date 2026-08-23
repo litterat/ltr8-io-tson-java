@@ -143,15 +143,13 @@ production and present as a field that mysteriously has its default.
     the deliberate evolution case is a call-site decision rather than a silent global default.
   - **A breaking change for consumers**, deliberately. Cheap at `0.1.0-SNAPSHOT`, much less so after a real
     release — an argument for doing it now rather than later.
-- [ ] **`DateTimeType` and `TimeType` do not model `precision` or `require_timezone`.** `datetime_type`
-  declares both as ordinary optional facets and the bound record is `DateTimeType(Optional<OffsetDateTime>
-  min, Optional<OffsetDateTime> max)`, so an author writing `!datetime ^ { precision: 3 }` has it dropped and
-  never enforced. **No longer silent** — being OPTIONAL, it reports `UNBOUND_FIELD` at the read that writes
-  one — but still unimplemented. Both parsers document the reasons and they are real: `precision`'s required
-  semantics (exact vs. maximum fractional-digit count) are not clear from the spec, and
-  `require_timezone: false` needs an offset-less parse path neither class has. So this is a *modelling*
-  decision plus a spec question, not the mechanical omission it first looked like — closer to the
-  undocumented-atom-constructor items than to a bug.
+- [ ] **`precision` and `require_timezone` are carried but not enforced** (`datetime`/`time`). The bodies
+  declare them now — a field with no component is one this model silently loses — and the parsers *refuse* a
+  schema that sets either, so the facet is a stated gap rather than a constraint quietly not applied. What
+  remains is enforcement, and both halves need a decision before code: `precision`'s required semantics
+  (exact vs. maximum fractional-digit count) are not settled by the spec and want a `SPEC-FEEDBACK.md` entry,
+  and `require_timezone: false` needs an offset-less parse path neither parser has (`true` is already the
+  behaviour, RFC 3339 requiring an offset on every value these atoms accept).
 - [ ] **Constructor selection by schema field set.** Where a class declares several constructors, the one
   whose parameters match the schema's field set is arguably the one to bind through — a developer providing a
   shorter constructor with defaults has stated an intention the binder could honour. Today

@@ -26,12 +26,32 @@ import java.util.regex.Pattern;
  * fix short of a from-scratch time representation just for this one case, so it's left as a
  * documented limitation rather than solved.
  *
- * <p>{@code precision}/{@code require_timezone} (meta.tn1) are not modeled -- no built-in instance
- * sets either, {@code precision}'s own required semantics (exact vs. maximum fractional-digit count)
- * aren't clear from the field name alone, and {@code require_timezone: false} would need an entirely
- * different parse path (a bare offset-less time) this class doesn't have.
+ * <p>{@code precision}/{@code require_timezone} are modelled on {@link TimeType} and refused here (see the
+ * constructor). They are carried because a body must mirror its constructor's resolved shape -- a field with
+ * no component is one this model would silently lose -- and refused because neither is enforced:
+ * {@code precision}'s required semantics (exact vs. maximum fractional-digit count) are not settled by the
+ * spec, and {@code require_timezone: false} needs an offset-less parse path this class does not have.
  */
 public record TimeParser(TimeType constraints) implements AtomType<OffsetTime> {
+
+    public TimeParser {
+        // Carried on the body, unenforced here -- so a schema that sets one is refused rather than accepted
+        // and quietly ignored. An UnsupportedOperationException is the gap classification, and since a gap
+        // now travels as a Diagnostic, the author is told which declaration and why while the rest of their
+        // schema still gets its verdict.
+        if (constraints.precision().isPresent()) {
+            throw new UnsupportedOperationException("'time' does not enforce 'precision' yet, so a schema "
+                    + "setting it would be accepted without the constraint being applied -- the spec does not "
+                    + "say whether it bounds the fractional-second digits exactly or at most, and this "
+                    + "implementation will not guess. Drop it, or constrain the value another way");
+        }
+        if (constraints.requireTimezone().isPresent()) {
+            throw new UnsupportedOperationException("'time' does not enforce 'require_timezone' yet, so a "
+                    + "schema setting it would be accepted without the constraint being applied. RFC 3339 "
+                    + "requires an offset on every value this atom accepts, so 'true' is already the "
+                    + "behaviour; 'false' needs an offset-less parse this atom does not have");
+        }
+    }
 
     /** §5.4's built-in annotation name -- {@code !time}. */
     public static final String TYPENAME = "time";
@@ -40,7 +60,7 @@ public record TimeParser(TimeType constraints) implements AtomType<OffsetTime> {
     public static final TimeParser UNCONSTRAINED = new TimeParser(TimeType.UNCONSTRAINED);
 
     public TimeParser(Optional<OffsetTime> min, Optional<OffsetTime> max) {
-        this(new TimeType(min, max));
+        this(new TimeType(min, max, Optional.empty(), Optional.empty()));
     }
 
     private static final Pattern FULL_TIME = Pattern.compile("\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?([Zz]|[+-]\\d{2}:\\d{2})");

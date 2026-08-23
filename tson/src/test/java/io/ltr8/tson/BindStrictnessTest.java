@@ -116,32 +116,28 @@ class BindStrictnessTest {
     }
 
     /**
-     * An <b>optional</b> field is the one case a document settles rather than the binding: it is lost only
-     * when written. So the compile stands, and the read that writes one reports what it dropped -- which is
-     * also what keeps {@code datetime_type}'s own unmodelled {@code precision}/{@code require_timezone} from
-     * failing every bind-mode compile of the bundled chain.
-     *
-     * <p>No object comes back, and that is the ordinary all-or-nothing rule rather than a special case:
-     * bind mode never builds out of a document it has reported on ({@code ConstructionGuard}). Under a
-     * strict reader, a document carrying a value the class cannot hold is one it declines to bind.
+     * An <b>optional</b> field is not exempt, and that is the whole of the rule: the class must be able to
+     * hold what the schema declares, FIXED excepted. Leaving optional fields to the read that writes one
+     * would report the mismatch that is hardest to find -- the field that works in development and fails the
+     * first time a caller sends it -- at exactly the moment it has already gone wrong.
      */
     @Test
-    void anOptionalFieldTheClassCannotHoldIsReportedAtTheReadThatWritesIt() {
+    void anOptionalFieldTheClassCannotHoldFailsAtCompileToo() {
         Tson tson = tson(OPTIONAL_SCHEMA, OrderV1.class, false);
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
 
-        assertEquals(null, read(tson, OrderV1.class, problems));
-        assertEquals(List.of(Diagnostic.Code.UNBOUND_FIELD),
-                problems.diagnostics().stream().map(Diagnostic::code).toList());
-        assertTrue(problems.diagnostics().get(0).message().contains("read and then dropped"),
-                problems.diagnostics().get(0).message());
+        TsonBindMismatchException thrown = assertThrows(TsonBindMismatchException.class,
+                () -> tson.bindRegistry().get(ID));
+
+        assertTrue(thrown.getMessage().contains("no component for field 'currency'"), thrown.getMessage());
     }
 
     /**
-     * Leniency is the opt-out, and it is silent -- which is not a shortcut but the only coherent reading.
-     * Reporting abandons the construction, so a lenient reader that reported would hand back {@code null}
-     * for exactly the documents it exists to accept; and a diagnostic the guard is told to ignore is a
-     * severity axis under another name.
+     * Leniency is the opt-out, and it is silent -- not a shortcut but the only coherent reading. Reporting
+     * abandons the construction ({@code ConstructionGuard}: bind mode never builds out of a document it has
+     * reported on), so a lenient reader that reported would hand back {@code null} for exactly the documents
+     * it exists to accept; and a diagnostic the guard is told to ignore is a severity axis under another
+     * name. It is the one path on which a field is dropped at all, now that every mismatch is settled before
+     * a document exists.
      */
     @Test
     void lenientBindingDropsTheFieldSilently() {

@@ -115,9 +115,18 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             DataClassField target = findTargetField(descriptor.fields(), field.schema().name());
             targetField[i] = target;
             if (target == null) {
-                if (strict && alwaysPresent(field.schema().state())) {
-                    mismatches.add("no component for field '" + field.schema().name() + "', which every "
-                            + "document of this type carries (" + field.schema().state() + ")");
+                // The one exemption is FIXED (either state): the schema settles the value, so a component
+                // would hold a constant the schema already knows. It is what lets this be strict at all --
+                // 21 of the mismatches in this library's own bundled binding are FIXED fields
+                // (access_pattern, size_type, an atom's spec), every one by design.
+                //
+                // OPTIONAL is deliberately NOT exempt, though it is the tempting case: nothing is lost until
+                // a document writes one, so the mismatch could be left to the read that does. That is the
+                // worse trade -- an optional field is exactly the one that works in development and fails
+                // the first time a caller sends it, which is the bug this check exists to prevent. One rule
+                // for every field beats two that differ on when the developer finds out.
+                if (strict && !isFixed(field.schema().state())) {
+                    mismatches.add("no component for field '" + field.schema().name() + "'");
                 }
                 continue;
             }
@@ -152,22 +161,6 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                         + "(TsonConfig.lenientBinding) if dropping this is deliberate");
             }
         }
-    }
-
-    /**
-     * §5.2's presence axis, read for the question binding actually asks: <b>is this field's value carried by
-     * every conforming document?</b> REQUIRED and REQUIRED_DEFAULT are (a default fills the absent case, and
-     * data may override it), so a class with no component for one loses a value every time and the mismatch
-     * is settled before any document exists. OPTIONAL is not -- it is lost only when written, which is a fact
-     * about a document rather than about the binding, so it is reported at the read that writes it.
-     *
-     * <p>Both FIXED states are excluded on a different ground: the schema settles the value, so a component
-     * for one would hold a constant the schema already knows. That exemption is what lets this be strict at
-     * all -- 21 of the mismatches in this library's own bundled binding are FIXED fields
-     * ({@code access_pattern}, {@code size_type}, an atom's {@code spec}), every one of them by design.
-     */
-    private static boolean alwaysPresent(FieldState state) {
-        return state == FieldState.REQUIRED || state == FieldState.REQUIRED_DEFAULT;
     }
 
     /** Whether any schema field of this type binds to {@code classField}. */
@@ -302,26 +295,9 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 arguments[target.index()] = narrow(decoded, target.type());
                 return;
             }
-            // The optional half of the agreement check, and the only half a document can settle: an OPTIONAL
-            // field with no component is lost exactly when one is written, so silence here is a value that
-            // was read, validated, and then quietly discarded. The always-present fields were settled when
-            // this reader was built (see the constructor) and never reach this branch.
-            //
-            // Lenient means silent, and that is not a shortcut. Reporting abandons the construction
-            // (ConstructionGuard: bind mode never builds out of a document already reported), so a lenient
-            // reader that reported would hand back null for the very documents it exists to accept. The
-            // alternative -- a diagnostic the guard is told to ignore -- is a severity axis under another
-            // name, which SPEC-FEEDBACK.md #41/#42 argued this model does not want. Strict reports and
-            // declines to build; lenient was asked not to care.
-            if (!strict) {
-                return;
-            }
-            fieldCtx.report(Diagnostic.Code.UNBOUND_FIELD,
-                    "'" + displayName + "' declares '" + fields.get(schemaIndex).schema().name() + "' but "
-                            + descriptor.typeClass().getName() + " has no component for it, so this value is "
-                            + "read and then dropped",
-                    "a component for '" + fields.get(schemaIndex).schema().name() + "'",
-                    descriptor.typeClass().getSimpleName() + " has none");
+            // Unreachable under a strict reader: a field with no component fails when the reader is built,
+            // so nothing gets here to drop. A lenient one asked for exactly this, and asked in the one place
+            // where the intention is written down rather than inferred from silence.
         };
         boolean[] seen = switch (shapeResult.shape()) {
             case FIELDS -> readFields(ctx, sink);
