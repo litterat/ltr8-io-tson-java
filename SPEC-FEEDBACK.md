@@ -3635,15 +3635,62 @@ every future meta-layer constructor. Nothing in §9 or §8.1 points an extension
   consumer re-implements loading the schemas, and cross-checking each name against them, by hand.
 
 **Interpretation chosen:** the type-entry route, with the payload read through the constructor's own
-compiled reader so it is validated in full (an unknown field, a wrong-typed value and a missing required
-field are all schema errors, as they are for any written body), and the resolved body carried in a generic
-representation for constructors this implementation has no purpose-built model for. No marker was invented:
-consequences 1–3 stand as described, so a schema using this extension is accepted with an entry that claims
-`kind: PRODUCT` and may be named as a type. Inventing a marker unilaterally would put a name in resolved
-output that §8's vocabulary does not define, which is the thing this file exists to avoid.
+compiled reader so it is validated in full — an unknown field, a wrong-typed value and a missing required
+field are all schema errors, as they are for any written body — and, as an experiment, **suggested
+resolution 2 below implemented against a locally amended meta-kernel** so the design could be judged on
+evidence rather than on argument. What follows records what that cost, since the answer bears on which
+resolution the revision should take.
+
+**Tried: `data` as a fourth base kind (resolution 2).** meta-kernel gains one declaration and one enum
+member —
+
+```tson
+sum       => top & {}
+data      => top & {}                                    # new: the non-data base kind
+type_kind => !enum [ATOM PRODUCT SUM REFERENCE DATA]     # was four members
+```
+
+— an extended meta-schema then writes `operation => ~data & { path: text  request: type_ref ... }`, and a
+governed schema writes `search => !operation { ... }`. §4.1's kind determination needs only `data` added to
+the three literal base-kind names it already checks. **Consequences 1 and 2 both close.** The entry resolves
+to `kind: DATA` rather than claiming to be a product, and — the part that matters — the kind gives the linker
+something to check, so `holder => { s: search }` becomes an author error at link time:
+
+> `'holder' field 's' names 'search', which is built with 'operation' and describes something other than a
+> data value — it is declared by this schema but is not a type, so nothing can be typed by it`
+
+where against Revision 32 it resolves, links, compiles, and fails only when a document is read. Consequence
+3 is untouched and does not need to be: `~` remains the permission to write `!C ...`, which such a
+constructor wants, and removing it is what makes `!operation` unresolvable (verified).
+
+Point 4 also has a second answer once a body can be a purpose-built model rather than a generic carrier:
+declare the slots as real references and let the body report them (`request`/`response` typed `type_ref`,
+surfaced through the body's own accessor), so a dangling name is an ordinary unresolved-reference error at
+link time. That is stronger than the generic walk, and it is available only on this route.
+
+**What it cost, and this is the finding worth carrying into the revision.** §8.1's resolved output is
+normative, and a DATA entry's body is an instance of a constructor the spec has never seen. In this
+implementation the body model is a sealed Java hierarchy, deliberately, because the generic binder
+enumerates a sealed union's members to dispatch on them. Opening one branch so a consumer's own class can
+join it makes that branch unenumerable, and **writing resolved output for a DATA entry fails**:
+
+> `TsonWriteException — value of type Operation is not a member of union interface Top`
+
+The generic-carrier alternative fails at the same point for the mirror-image reason: its payload is an
+opaque value the binder has no conversion for. Both need the same repair — dispatching such a body by the
+constructor name it carries rather than by union membership. The general lesson for the spec is that
+**§8.1 should say how a DATA entry's body serialises**, since it is the one body shape whose vocabulary is
+not fixed by the kernel; without that, an implementation's resolved output is well-defined for every entry
+except the extension the meta layer exists to permit. Reading such output back (§10.1 ingest) has the same
+question and is at least explicitly optional.
+
+The kernel amendment is a **local divergence**, not a claim about Revision 32 and not something a consumer
+of this library should meet: it changes meta-kernel's content hash, and therefore meta's and core's pinned
+references to it and the digests this implementation holds for all three. Recorded here because the result
+is evidence about the resolution, whatever becomes of the experiment.
 
 **Suggested resolution.** In ascending order of cost; any of the three closes consequences 1–3, and all
-three want point 4's `type_ref` guidance stated in §9 regardless.
+three want point 4's `type_ref` guidance stated in §9 regardless. Resolution 2 is the one tried above.
 
 1. **A kernel marker annotation**, the cheapest and the one with an exact precedent. meta-kernel already
    declares `annotation => @annotation void`, an annotation that marks *a declaration as an annotation
@@ -3660,9 +3707,11 @@ three want point 4's `type_ref` guidance stated in §9 regardless.
    consequence 1 cosmetically unresolved — the entry still carries a kind — but makes it harmless, since
    nothing may use the entry as a type.
 
-2. **A fifth `TypeKind`.** `kind: DATA` alongside ATOM/PRODUCT/SUM/REFERENCE addresses consequence 1 head-on
-   rather than beside it, and `kind` is already the discriminator every consumer switches on. It is a
-   revision rather than an addition, `TypeKind` being closed in §8.1.
+2. **A fifth `TypeKind`, and the base kind that goes with it.** `kind: DATA` alongside
+   ATOM/PRODUCT/SUM/REFERENCE addresses consequence 1 head-on rather than beside it, and `kind` is already
+   the discriminator every consumer switches on. It is a revision rather than an addition, `TypeKind` being
+   closed in §8.1 — but it is small in the kernel (one declaration, one enum member) and it is the only one
+   of the three that gives the *linker* a fact to check rather than a marker to look up. Tried; see above.
 
 3. **A document-level section for schema-level data** — the literal reading of "data riding along with the
    schema". The largest change (§12.1 grammar plus §8.1 output shape), and the only one that stops such a
