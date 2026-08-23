@@ -327,6 +327,17 @@ public final class SchemaResolver {
         namespace.putAll(resolvedLocals);
         namespace.putAll(instantiations);
 
+        // §8.3, last because it needs everything above already in the namespace: a type position naming a
+        // REFERENCE entry is rewritten to the end of its chain and keeps the author's own name as @alias.
+        // After materialisation specifically, so an alias to an application flattens onto the entry that
+        // application minted rather than onto the alias in front of it.
+        Map<String, TypeDefinition> flatLocals =
+                ReferenceFlattener.flatten(resolvedLocals, namespace, instantiations.keySet());
+        resolvedLocals.putAll(flatLocals);
+        instantiations = ReferenceFlattener.flatten(instantiations, namespace, instantiations.keySet());
+        namespace.putAll(resolvedLocals);
+        namespace.putAll(instantiations);
+
         // §6: an annotation written before the declared name binds to the *name*, not to the definition,
         // and "the resolver does not hoist annotations from key to value". A resolved schema is a
         // {type_name => type_definition}, so the name is this map's key -- which is where they are kept.
