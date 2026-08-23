@@ -215,9 +215,10 @@ rebuilt and called a cache.
   and linking in reporting every independent problem in one pass. The reportable forms are
   `TsonSchemaValidationException`s and declaration-position-only (a size specifier at an inline type-ref
   position is a parse error): a vacuous `[T; 0..]`, an incoherent size range, and an application of something
-  that takes no type arguments. The template-application `UnsupportedOperationException` keeps propagating —
-  a gap is not a verdict on the author's schema. See `docs/readers-and-diagnostics.md` for the placeholder
-  and the no-rollback rule.
+  that takes no type arguments. **A template-application `UnsupportedOperationException` is reported too**,
+  as `NOT_IMPLEMENTED` rather than as an author error — thrown, it took every other declaration's verdict
+  with it. See `docs/readers-and-diagnostics.md` for the code split, the placeholder and the no-rollback
+  rule.
 - **Structural sharing is load-bearing, not an optimization.** Every node not being rewritten is returned
   by identity, because `TsonSchemaParser.declarationPositions()` is an `IdentityHashMap` — an
   equal-but-rebuilt `Declaration` silently loses its position, and the diagnostics that report against it.

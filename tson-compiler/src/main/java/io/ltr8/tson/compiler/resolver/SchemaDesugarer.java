@@ -272,10 +272,13 @@ final class SchemaDesugarer {
      * catch, since a library gap is not a verdict on the author's schema. So passing through would convert a
      * reported author error into an unreported abort: worse than the fail-fast behaviour it replaces.
      *
-     * <p>Only {@link TsonSchemaValidationException} is reported. The {@code UnsupportedOperationException}
-     * for applying a template is a genuine §5.10 gap and keeps propagating, by the same test {@code
-     * SchemaResolver} applies: <em>a schema error's verdict doesn't change when this library improves; a
-     * gap's does.</em>
+     * <p><b>A gap is reported too, and absorbed the same way</b> -- as {@code Diagnostic.Code.NOT_IMPLEMENTED},
+     * not as an author error. Thrown instead, it took every other declaration's verdict with it: one
+     * unimplemented construct and a document with three ordinary mistakes in it reported none of them. The
+     * classification the exception policy draws is unchanged and is what picks the code; what changes is
+     * that it no longer decides whether the pass survives. Fail-fast (a {@code null} reporter) still
+     * rethrows the original exception untouched, so every caller that never took a receiver sees exactly
+     * what it always did.
      *
      * <p><b>Anything already injected on behalf of a failed declaration stays injected</b>, and is not rolled
      * back. Injected names are derived from the binding record itself, so a later declaration containing the
@@ -287,7 +290,7 @@ final class SchemaDesugarer {
     private SchemaMap.Declaration desugarOrReport(SchemaMap.Declaration declaration) {
         try {
             return declaration(declaration);
-        } catch (TsonSchemaValidationException e) {
+        } catch (TsonSchemaValidationException | UnsupportedOperationException e) {
             if (reporter == null) {
                 throw e;
             }

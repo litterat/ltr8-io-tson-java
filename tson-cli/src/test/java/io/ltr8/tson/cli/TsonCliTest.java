@@ -75,7 +75,9 @@ class TsonCliTest {
     /**
      * The same routing end to end, through a schema that really reaches a gap: [TSON-SCHEMA] §8.1 gives a
      * type parameter inside a choice no open representation, and the refusal's own message names the way to
-     * write it today. Exit 70 stays -- a gap is not a verdict on the schema.
+     * write it today. Exit 70 stays -- a gap is not a verdict on the schema -- but it is now decided by the
+     * diagnostic's own code rather than by an exception that had to destroy the pass to be seen, so the gap
+     * arrives located, in the report, like every other problem.
      */
     @Test
     void aSchemaReachingAGapCompilesToSeventyWithTheGapsOwnMessage(@TempDir Path dir) throws IOException {
@@ -86,12 +88,41 @@ class TsonCliTest {
                 { boxed => <T> { v: (T | text) } }
                 """);
 
-        String err = captureStderr(() ->
+        String out = captureStdout(() ->
                 assertEquals(70, TsonCli.run(new String[] {"compile", schema.toString()})));
 
-        assertTrue(err.startsWith("not implemented yet: "), err);
-        assertTrue(err.contains("is the way to write this today"), err);
-        assertFalse(err.contains("Please report it"), err);
+        assertTrue(out.contains("[NOT_IMPLEMENTED] /boxed"), out);
+        assertTrue(out.contains("is the way to write this today"), out);
+        assertFalse(out.contains("Please report it"), out);
+    }
+
+    /**
+     * The point of routing a gap through the report rather than through an exception: a schema with a gap
+     * <em>and</em> an ordinary error says both, in one pass. Thrown, the gap took {@code widens}'s verdict
+     * with it and the author fixed one thing per run, learning about the next only after the first was
+     * gone.
+     *
+     * <p>The run is still 70, not 1, and the two codes are why: {@code widens} really is invalid, but
+     * something here was not checked at all, so "invalid" is not a verdict this run is entitled to give.
+     */
+    @Test
+    void aSchemaWithBothAGapAndAnOrdinaryErrorReportsBoth(@TempDir Path dir) throws IOException {
+        Path schema = writeFile(dir, "mixed.tn", """
+                !!id:"https://example.test/cli-mixed.tn"
+                !!meta:"https://tson.io/2026/32/m/meta.tn"
+                !!import:"https://tson.io/2026/32/m/core.tn"
+                {
+                  boxed  => <T> { v: (T | text) }
+                  widens => !uint8 ^ { min: -10 }
+                  fine   => int32
+                }
+                """);
+
+        String out = captureStdout(() ->
+                assertEquals(70, TsonCli.run(new String[] {"compile", schema.toString()})));
+
+        assertTrue(out.contains("[NOT_IMPLEMENTED] /boxed"), out);
+        assertTrue(out.contains("[SCHEMA_ERROR] /widens"), out);
     }
 
     /**

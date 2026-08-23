@@ -95,22 +95,6 @@ by a factor of six.
   - The natural fix for all three is the same one the narrowing check would want: an injected oracle, rather
     than moving the value model's dependencies.
 
-## Templates at the read boundary, and diagnostics UX
-
-Findings from a 2026-08-21 CLI shakedown of the finished template work: a full template-using schema
-(record templates, instance templates, nested applications, the recursive knot, sized sugar at field
-positions) compiles, validates and round-trips first try, and both data- and schema-side diagnostics
-supported genuinely one-shot fixes — with these exceptions, ordered by how much each hurts the
-validate-then-fix loop the project targets.
-
-- [ ] **A UOE thrown inside `SchemaDesugarer` aborts the whole compile**, where every other desugar failure
-  reports per declaration and resyncs — so a schema with a gap in one declaration gets no verdict on any of
-  the others. The CLI half of this is now done (a gap renders as `not implemented yet: <message>`, the
-  please-report-it framing reserved for `IllegalStateException`, both still exit 70); what is left needs a
-  decision this one did not, because a gap is deliberately *not* a `Diagnostic` — reporting it per
-  declaration means either a second channel alongside the receiver, or resyncing past the declaration and
-  carrying the gap out to the same exit 70 at the end.
-
 ## Miscellaneous
 
 - [ ] **General resolver-layer structural rules as reusable primitives**, rather than binding-time-only
