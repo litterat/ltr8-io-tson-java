@@ -223,6 +223,17 @@ recorded open form, and replacing the application with a reference to the entry 
   repeat and never nests, so nothing reaching this pass should run away, but if the static check ever has a
   hole the alternative is a `StackOverflowError`, which is neither a diagnosis nor something the exception
   policy can classify.
+- **Substitution is where a routed `=` becomes fixed.** §5.7 puts a parametric `= P` in `REQUIRED` at the
+  declaration ("nothing is fixed at declaration — the value does not exist yet") and defers the rest to one
+  sentence, *fixation happens downstream, where values are concrete*. `bindValue` is that downstream: a bound
+  field arriving as `REQUIRED` becomes `REQUIRED_FIXED` with the argument as its value, so
+  `response<order, 201>` lands on exactly what the literal `status: int32 = 201` beside it lands on. Carried
+  through unchanged instead, the closed entry held the right value on a field that did not enforce it — a
+  constraint the author wrote, silently absent from the type it governs, with no diagnostic anywhere because
+  nothing was wrong. **The two spellings are told apart by the state they arrive in**, which is the only
+  reason this is recoverable at all: §5.7 sends `= P` to `REQUIRED` and `~ P` to `REQUIRED_DEFAULT`, so a
+  routed default stays a default and data may still override it. §5.7 names only the
+  refinement-from-an-application-head case downstream and leaves this one unstated (`SPEC-FEEDBACK.md` #58).
 - **Kind checking falls out of substitution.** A value argument reaching a type position, or a type argument
   reaching a `value_param` route, is the author's error — §5.10 infers a parameter's kind from its use, so
   the body's use and the applied argument are the two things being compared. Arity is checked before any of
