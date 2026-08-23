@@ -108,11 +108,6 @@ validate-then-fix loop the project targets.
   decision this one did not, because a gap is deliberately *not* a `Diagnostic` — reporting it per
   declaration means either a second channel alongside the receiver, or resyncing past the declaration and
   carrying the gap out to the same exit 70 at the end.
-- [ ] **The §4.1 migration diagnostic (SHOULD) is unimplemented.** `m => map<text, text>` reports
-  "'m' has an unresolved reference 'map'" — confusing precisely because `map` visibly exists as a
-  constructor. The CR specifies the answer: when a generic head fails type-name resolution but matches a
-  parameterless constructor in the structure namespace, suggest the sugar (`{text => text}`) or the
-  `!C { … }` form.
 - [ ] Two cascade papercuts, both minor: after a broken template declaration is placeholder'd, a downstream
   application reports "'bl' declares no type parameters … drop the argument list", which is wrong advice in
   a cascade (the fix is upstream); and a regularity violation reports twice — the good declaration-time
