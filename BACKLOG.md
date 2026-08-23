@@ -108,12 +108,6 @@ validate-then-fix loop the project targets.
   decision this one did not, because a gap is deliberately *not* a `Diagnostic` — reporting it per
   declaration means either a second channel alongside the receiver, or resyncing past the declaration and
   carrying the gap out to the same exit 70 at the end.
-- [ ] Two cascade papercuts, both minor: after a broken template declaration is placeholder'd, a downstream
-  application reports "'bl' declares no type parameters … drop the argument list", which is wrong advice in
-  a cascade (the fix is upstream); and a regularity violation reports twice — the good declaration-time
-  error plus the 64-deep non-convergence chain from the application — where R5's premise was that the
-  static rule makes the depth guard an assertion that never fires (the guard should stand down, or the
-  placeholder should stop the closure attempt).
 
 ## Miscellaneous
 

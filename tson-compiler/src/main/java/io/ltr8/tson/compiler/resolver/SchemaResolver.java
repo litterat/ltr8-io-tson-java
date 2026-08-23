@@ -265,7 +265,7 @@ public final class SchemaResolver {
                 // itself. Same shape as TsonSchemaCompiler.Compilation.resolve substituting an ErrorReader.
                 receiver.report(Diagnostic.ofSchemaError(TsonCanonicalIdentity.canonicalize(id), name,
                         e.getMessage(), position));
-                namespace.put(name, unresolved(position));
+                namespace.put(name, unresolved(position, SchemaDesugarer.typeParams(declaration.typeDef())));
                 return namespace.get(name);
             } finally {
                 resolving.remove(name);
@@ -305,10 +305,23 @@ public final class SchemaResolver {
         // recursive step has no finite set of types to build, and catching it at the declaration means a
         // broken template is rejected even if nobody ever applies it. Materialisation's own depth guard
         // stays as a backstop.
-        TemplateRegularity.check(resolvedLocals, receiver == null ? null
+        Set<String> irregular = TemplateRegularity.check(resolvedLocals, receiver == null ? null
                 : (name, error) -> receiver.report(Diagnostic.ofSchemaError(
                         TsonCanonicalIdentity.canonicalize(id), name, error.getMessage(),
                         Optional.ofNullable(positions.get(declarations.get(name))))));
+
+        // A condemned template is replaced before materialisation, on the same terms as a declaration that
+        // failed to resolve: the verdict is in, and closing an application of one only reports the same
+        // defect a second time -- from the depth backstop, 64 instantiations deep, against whichever entry
+        // happened to apply it rather than the one that wrote it. Both maps, because the two are read by
+        // different halves: `materialise` walks `resolvedLocals`, while the application's head is looked up
+        // through the getter over `namespace`.
+        for (String name : irregular) {
+            TypeDefinition condemned = resolvedLocals.get(name);
+            TypeDefinition placeholder = unresolved(condemned.position(), condemned.parameters());
+            resolvedLocals.put(name, placeholder);
+            namespace.put(name, placeholder);
+        }
         Map<String, TypeDefinition> instantiations = materialiser.materialise(resolvedLocals,
                 receiver == null ? null : (name, error) -> receiver.report(Diagnostic.ofSchemaError(
                         TsonCanonicalIdentity.canonicalize(id), name, error.getMessage(),
@@ -357,6 +370,12 @@ public final class SchemaResolver {
      * count is the signal to stop at the phase boundary. It carries the failed declaration's own position so
      * anything that does surface it can still point at the source.
      *
+     * <p><b>It keeps the failed declaration's own type parameters.</b> Answering "how many type parameters?"
+     * with zero is answering wrongly, not absorbing: a downstream {@code bl<text>} is then told that
+     * {@code bl} "declares no type parameters ... drop the argument list", which is advice that would break
+     * the schema further, the actual fix being upstream at the declaration that failed. With the arity
+     * intact the application closes against an empty body and says nothing.
+     *
      * <p><b>An empty record, because the point is to absorb rather than to be recognised</b> -- javac's model,
      * where the error type answers every question, rather than Swift's, where every questioner must first ask
      * whether it is looking at one. A dependent that composes with a failed declaration ({@code parent =>
@@ -365,8 +384,8 @@ public final class SchemaResolver {
      * mismatch: a `Sum`-bodied placeholder makes every dependent report too, which is the cascade the
      * placeholder exists to prevent.
      */
-    private static TypeDefinition unresolved(Optional<SourcePosition> position) {
-        return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of(), false, List.of(), List.of(),
+    private static TypeDefinition unresolved(Optional<SourcePosition> position, List<String> parameters) {
+        return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, parameters, false, List.of(), List.of(),
                 Optional.empty(), RecordBody.of(List.of()), position, Annotations.empty());
     }
 

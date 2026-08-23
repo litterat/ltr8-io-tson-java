@@ -8,6 +8,7 @@ import io.ltr8.tson.schema.meta.TypeRef;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
@@ -49,8 +50,15 @@ final class TemplateRegularity {
     /**
      * Checks every template in {@code entries}, reporting each irregular application against the declaration
      * that wrote it. {@code reporter} may be {@code null}, in which case the first failure throws.
+     *
+     * @return the templates found irregular, for the caller to replace before anything closes an application
+     *         of one. A condemned template left in place materialises exactly as far as the depth backstop
+     *         allows and reports again from there -- one defect, two diagnostics, the second of them 64
+     *         instantiations long. Always empty when {@code reporter} is {@code null}, that mode having
+     *         thrown at the first failure.
      */
-    static void check(Map<String, TypeDefinition> entries, Reporter reporter) {
+    static Set<String> check(Map<String, TypeDefinition> entries, Reporter reporter) {
+        Set<String> irregular = new LinkedHashSet<>();
         Map<String, List<Application>> applications = new LinkedHashMap<>();
         for (Map.Entry<String, TypeDefinition> entry : entries.entrySet()) {
             if (!entry.getValue().parameters().isEmpty()) {
@@ -73,8 +81,10 @@ final class TemplateRegularity {
                     throw error;
                 }
                 reporter.reportIrregularRecursion(name, error);
+                irregular.add(name);
             }
         }
+        return irregular;
     }
 
     /** Where an irregular recursive application is reported, per declaration. */

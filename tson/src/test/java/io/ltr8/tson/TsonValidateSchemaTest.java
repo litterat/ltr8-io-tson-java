@@ -53,6 +53,52 @@ class TsonValidateSchemaTest {
     }
 
     /**
+     * A broken template declaration is one problem, and its applications are not further problems. The
+     * placeholder a failed declaration leaves behind keeps that declaration's own type parameters, so
+     * {@code bl<int32>} arity-checks against it and closes silently; with the parameter list dropped, the
+     * application was told that {@code bl} "declares no type parameters ... drop the argument list" -- the
+     * one piece of advice guaranteed to be wrong, since following it breaks the schema further while the
+     * real fix is upstream. Both placeholders are pinned, the desugarer's and the resolver's, because a
+     * template can fail at either phase.
+     */
+    @Test
+    void anApplicationOfABrokenTemplateAddsNoDiagnosticOfItsOwn() {
+        for (String broken : List.of("bl => <T> { v: T  v: T }", "bl => <T> [T; 0..]")) {
+            List<Diagnostic> problems = check("""
+                    {
+                      %s
+                      use => { b: bl<int32> }
+                    }
+                    """.formatted(broken));
+
+            assertEquals(List.of("/bl"),
+                    problems.stream().map(d -> d.schemaPointer().orElseThrow()).toList(), broken);
+        }
+    }
+
+    /**
+     * A regularity violation is reported where it is declared, once. The condemned template is replaced
+     * before materialisation, so nothing goes on to apply it: left in place, an application of it ran to
+     * the 64-deep backstop and reported the same defect a second time -- against the entry that applied it,
+     * carrying a chain of synthetic names the author never wrote. The depth guard itself stays exactly as
+     * it is; what it guards against is a hole in this check, not a template this check already condemned.
+     */
+    @Test
+    void anIrregularTemplateIsReportedAtItsDeclarationAndNotAgainAtItsApplication() {
+        List<Diagnostic> problems = check("""
+                {
+                  box => <T> { v: T }
+                  weird => <T> { next: weird<box<T>>? }
+                  use => { w: weird<int32> }
+                }
+                """);
+
+        assertEquals(List.of("/weird"), problems.stream().map(d -> d.schemaPointer().orElseThrow()).toList());
+        assertTrue(problems.get(0).message().contains("does not pass 'T' through unchanged"),
+                problems.get(0).message());
+    }
+
+    /**
      * An invalid sugar form is one declaration's problem, and reads as one. Desugaring runs inside
      * {@code resolveSchema}, so its throw used to land in this method's document-level catch and be reported
      * at RFC 6901's root pointer with no declaration name and no position -- one mislocated diagnostic
