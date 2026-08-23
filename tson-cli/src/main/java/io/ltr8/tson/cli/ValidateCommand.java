@@ -44,7 +44,11 @@ final class ValidateCommand {
     private ValidateCommand() {
     }
 
-    /** @return exit code: 0 every data file valid, 1 at least one invalid, 2 a usage/classification failure */
+    /**
+     * @return exit code: 0 every data file valid, 1 at least one invalid, 2 a usage/classification failure,
+     *         70 a document that could not be checked at all because a construct in its schema is a gap in
+     *         this library ({@link TsonCli#exitCodeFor})
+     */
     static int run(List<ValidateInput> inputs, OutputFormat format) {
         Map<String, String> schemas = new HashMap<>();
         // The !!id each schema file declares, verbatim and in argument order -- what an unmatched
@@ -130,7 +134,8 @@ final class ValidateCommand {
 
         ValidationRun run = ValidationRun.of(reports);
         System.out.println(format.render(run));
-        return run.valid() ? 0 : 1;
+        return run.valid() ? 0 : TsonCli.exitCodeFor(reports.stream()
+                .flatMap(report -> report.errors().stream()).map(CliDiagnostic::code).toList());
     }
 
     /**

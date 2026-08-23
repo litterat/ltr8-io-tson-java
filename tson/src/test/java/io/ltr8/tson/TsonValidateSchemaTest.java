@@ -53,6 +53,36 @@ class TsonValidateSchemaTest {
     }
 
     /**
+     * A construct this library has not implemented is reported, not thrown -- so the declarations around it
+     * still get their verdicts. Thrown, one gap cost the whole document its report, and an author fixed one
+     * thing per run.
+     *
+     * <p><b>The code is what keeps it distinguishable</b>, which is all the exception-classification policy
+     * ever needed: {@code NOT_IMPLEMENTED} says this could not be checked, where {@code SCHEMA_ERROR} says
+     * this is wrong. A consumer that conflates them is wrong in the direction that matters -- calling a
+     * document invalid that was never judged.
+     */
+    @Test
+    void aGapIsReportedBesideTheOrdinaryProblemsRatherThanReplacingThem() {
+        List<Diagnostic> problems = check("""
+                {
+                  boxed  => <T> { v: (T | text) }
+                  widens => !uint8 ^ { min: -10 }
+                  fine   => int32
+                }
+                """);
+
+        assertEquals(List.of("/boxed", "/widens"),
+                problems.stream().map(d -> d.schemaPointer().orElseThrow()).sorted().toList());
+        Diagnostic gap = problems.stream()
+                .filter(d -> d.schemaPointer().equals(Optional.of("/boxed"))).findFirst().orElseThrow();
+        assertEquals(Diagnostic.Code.NOT_IMPLEMENTED, gap.code());
+        assertTrue(gap.schemaPosition().isPresent(), "a gap is located like any other declaration's problem");
+        assertEquals(Diagnostic.Code.SCHEMA_ERROR, problems.stream()
+                .filter(d -> d.schemaPointer().equals(Optional.of("/widens"))).findFirst().orElseThrow().code());
+    }
+
+    /**
      * A broken template declaration is one problem, and its applications are not further problems. The
      * placeholder a failed declaration leaves behind keeps that declaration's own type parameters, so
      * {@code bl<int32>} arity-checks against it and closes silently; with the parameter list dropped, the

@@ -23,7 +23,7 @@ final class CompileCommand {
     private CompileCommand() {
     }
 
-    /** @return exit code: 0 compiled cleanly, 1 it didn't */
+    /** @return exit code: 0 compiled cleanly, 1 it didn't, 70 a construct in it is a gap in this library */
     static int run(Path schemaFile, OutputFormat format) {
         List<Diagnostic> problems;
         try {
@@ -40,6 +40,6 @@ final class CompileCommand {
         }
         System.out.println(format.render(
                 new ValidationReport(false, problems.stream().map(CliDiagnostic::from).toList())));
-        return 1;
+        return TsonCli.exitCodeFor(problems.stream().map(Diagnostic::code).toList());
     }
 }

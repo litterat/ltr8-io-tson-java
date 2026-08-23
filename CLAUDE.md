@@ -91,8 +91,11 @@ and it's consumer-facing, prefix it; if it's internal machinery, leave it bare.
 `TsonSchemaValidationException` means *the author's schema is wrong and the spec says so*;
 `UnsupportedOperationException` means *this library hasn't implemented that yet*; `IllegalStateException`
 means an internal invariant broke. The classification test: **a schema error's verdict doesn't change when
-this library improves; a gap's does.** Only the validation exception is ever collected into a `Diagnostic`
-— a gap is not a verdict on the author's schema, and the CLI's exit 1 vs. exit 70 rides on the split.
+this library improves; a gap's does.** A gap is not a verdict on the author's schema, and the CLI's exit 1
+vs. exit 70 rides on that distinction — **carried by `Diagnostic.Code.NOT_IMPLEMENTED`, not by the channel**.
+Both kinds are collected: a gap thrown out of a phase that reports per declaration took every other
+declaration's verdict with it, so the schema pipeline reports it beside the ordinary problems and the code
+keeps it apart. The exception classification itself is unchanged and is what picks the code.
 `DefinitionResolver`'s Javadoc lists the exact current boundary.
 
 **Project-owned schema `!!id`:** a schema this project authors (not the spec's own bundled artifacts) gets
@@ -465,9 +468,12 @@ TsonValue value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_ty
 embedded `!!id`, never filename) and data, and validates each data document via `Tson.validate` — fully
 self-describing, no `--type`; `-` is stdin, at most once, always data. One `ValidationRun` envelope per
 invocation. **Exit codes: 0 all valid, 1 any data file invalid, 2 usage/classification, 70 a library gap or
-fault** — the 1/2/70 split is load-bearing and rides on the exception-classification policy, and 70's two
-halves print differently (a gap: `not implemented yet: <message>`, whose text usually names the workaround;
-a fault: the please-report-it banner and its stack trace). Also `tson compile`, `tson hash` (stamps a
+fault** — the 1/2/70 split is load-bearing and rides on the exception-classification policy. 70's halves
+print differently: a *reported* gap rides in the report as `NOT_IMPLEMENTED` with a stderr note and
+`TsonCli.exitCodeFor` lifts the run to 70 (a mixed run is 70, not 1 — something went unchecked, so
+"invalid" is not a verdict the run can give); a gap that still escapes as an exception prints
+`not implemented yet: <message>`, whose text usually names the workaround; a fault gets the please-report-it
+banner and its stack trace. Also `tson compile`, `tson hash` (stamps a
 `?sha256=` pin idempotently), `tson init-example`.
 `TsonBundledSchemas` serves the three bundled schemas' identities, text (copied from `spec/m/` at build
 time) and published digests. `TsonContentHash` hashes every byte past the `!!id` line; pins are

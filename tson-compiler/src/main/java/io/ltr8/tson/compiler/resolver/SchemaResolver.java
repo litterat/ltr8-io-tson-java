@@ -205,8 +205,7 @@ public final class SchemaResolver {
         Map<SchemaMap.Declaration, SourcePosition> positions = new IdentityHashMap<>(declarationPositions);
         SchemaDocument desugared = SchemaDesugarer.desugar(document,
                 namespace.keySet(), receiver == null ? null : (declaration, error) ->
-                        receiver.report(Diagnostic.ofSchemaError(TsonCanonicalIdentity.canonicalize(id),
-                                declaration.name(), error.getMessage(),
+                        receiver.report(schemaProblem(id, declaration.name(), error,
                                 Optional.ofNullable(positions.get(declaration)))), positions);
         Map<String, SchemaMap.Declaration> declarations = desugared.body().declarations();
         // The names desugaring generated, as opposed to the ones the author wrote -- the difference between
@@ -253,7 +252,7 @@ public final class SchemaResolver {
                 TypeDefinition resolved = holder[0].resolve(declaration, position);
                 namespace.put(name, resolved);
                 return resolved;
-            } catch (TsonSchemaValidationException e) {
+            } catch (TsonSchemaValidationException | UnsupportedOperationException e) {
                 if (receiver == null) {
                     throw e;
                 }
@@ -263,8 +262,7 @@ public final class SchemaResolver {
                 // nested resolve -- the loop would attribute it to whichever declaration triggered it, then
                 // reach the real one and report it a second time. The memo makes it exactly once, against
                 // itself. Same shape as TsonSchemaCompiler.Compilation.resolve substituting an ErrorReader.
-                receiver.report(Diagnostic.ofSchemaError(TsonCanonicalIdentity.canonicalize(id), name,
-                        e.getMessage(), position));
+                receiver.report(schemaProblem(id, name, e, position));
                 namespace.put(name, unresolved(position, SchemaDesugarer.typeParams(declaration.typeDef())));
                 return namespace.get(name);
             } finally {
@@ -342,7 +340,7 @@ public final class SchemaResolver {
             Annotations nameAnnotations;
             try {
                 nameAnnotations = holder[0].annotationsFor(name, declarations.get(name).nameAnnotations());
-            } catch (TsonSchemaValidationException e) {
+            } catch (TsonSchemaValidationException | UnsupportedOperationException e) {
                 if (receiver == null) {
                     throw e;
                 }
@@ -384,6 +382,24 @@ public final class SchemaResolver {
      * mismatch: a `Sum`-bodied placeholder makes every dependent report too, which is the cascade the
      * placeholder exists to prevent.
      */
+    /**
+     * One declaration's failure as a {@link Diagnostic}, the code chosen by the project's own exception
+     * classification: a {@code TsonSchemaValidationException} is the author's error and an {@code
+     * UnsupportedOperationException} is this library's gap, which the reader of the report needs to tell
+     * apart -- one says fix your schema, the other says this could not be checked.
+     *
+     * <p>Both are reported per declaration and both leave a placeholder, so a gap in one declaration no
+     * longer costs every other declaration its verdict. The classification is unchanged; only its
+     * consequence for the pass is.
+     */
+    private static Diagnostic schemaProblem(String id, String declaration, RuntimeException error,
+                                            Optional<SourcePosition> position) {
+        String schemaId = TsonCanonicalIdentity.canonicalize(id);
+        return error instanceof UnsupportedOperationException
+                ? Diagnostic.ofSchemaGap(schemaId, declaration, error.getMessage(), position)
+                : Diagnostic.ofSchemaError(schemaId, declaration, error.getMessage(), position);
+    }
+
     private static TypeDefinition unresolved(Optional<SourcePosition> position, List<String> parameters) {
         return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, parameters, false, List.of(), List.of(),
                 Optional.empty(), RecordBody.of(List.of()), position, Annotations.empty());

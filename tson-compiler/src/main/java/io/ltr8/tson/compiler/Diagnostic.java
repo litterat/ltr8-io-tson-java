@@ -212,6 +212,25 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
     }
 
     /**
+     * A construct this library has not implemented, found at one declaration -- {@link #ofSchemaError}'s
+     * shape with {@link Code#NOT_IMPLEMENTED} in place of {@code SCHEMA_ERROR}, and the whole of the
+     * difference between "your schema is wrong" and "this schema could not be checked".
+     *
+     * <p><b>Why a gap travels as a diagnostic at all</b>, when the classification policy keeps the two
+     * exceptions strictly apart. A gap thrown out of a phase that reports per declaration takes the other
+     * declarations' verdicts with it: one unimplemented construct and the author learns nothing about the
+     * rest of a document that may have several ordinary errors in it. Carrying it in the same list keeps
+     * the pass single, and the code -- not the channel -- is what keeps the verdict distinguishable, which
+     * is all the policy ever needed to preserve. The exception classification itself is unchanged: this is
+     * built from an {@code UnsupportedOperationException} and from nothing else.
+     */
+    public static Diagnostic ofSchemaGap(String schemaId, String declaration, String message,
+                                         Optional<SourcePosition> position) {
+        return new Diagnostic(Optional.empty(), Optional.of(declaration.isEmpty() ? "" : "/" + declaration),
+                schemaId, Code.NOT_IMPLEMENTED, message, "", "", Optional.empty(), position);
+    }
+
+    /**
      * A stable, machine-readable identifier from a closed vocabulary -- not a free string. The first nine
      * members are produced by an actual reader against real data; {@code UNRECOGNIZED_FIELD} carries
      * [TSON-SCHEMA] §7.2's record closure, so its {@code expected} is the type's own field list.
@@ -236,11 +255,18 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      * ATOM_CONSTRAINT_VIOLATION} code, since {@code AtomValidationException} itself doesn't yet carry a
      * structured code to route on -- so that member means "the atom rejected this token", nothing finer.
      * Routing its varieties apart is tracked in {@code BACKLOG.md}.
-     * The last three ({@code SCHEMA_ERROR}/{@code
-     * UNKNOWN_TYPE}/{@code VALIDATION_ERROR}) are infrastructure-level fallbacks a caller (e.g.
-     * {@code tson-cli}) uses for a failure that happens outside any single {@link TsonReadContext}
-     * read at all -- the schema itself failed to compile, a requested type name doesn't exist in it,
-     * or some other unexpected exception was thrown before a collecting context ever got involved.
+     * {@code SCHEMA_ERROR}/{@code UNKNOWN_TYPE}/{@code VALIDATION_ERROR} are infrastructure-level
+     * fallbacks a caller (e.g. {@code tson-cli}) uses for a failure that happens outside any single
+     * {@link TsonReadContext} read at all -- the schema itself failed to compile, a requested type name
+     * doesn't exist in it, or some other unexpected exception was thrown before a collecting context ever
+     * got involved.
+     *
+     * <p><b>{@code NOT_IMPLEMENTED} is the one member that is not a verdict on the document.</b> It says a
+     * construct is beyond this library, so the thing it names could not be checked -- which is not the same
+     * as invalid, and a consumer that treats it as invalid is wrong in the one direction that matters. It
+     * exists so a gap can ride in the same single-pass list as the ordinary problems rather than throwing
+     * and taking their verdicts with it; the exit code the CLI picks rides on this member, where it used to
+     * ride on catching {@code UnsupportedOperationException}.
      */
     public enum Code {
         FIELD_REQUIRED,
@@ -254,6 +280,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
         DUPLICATE_FIELD,
         SCHEMA_ERROR,
         UNKNOWN_TYPE,
-        VALIDATION_ERROR
+        VALIDATION_ERROR,
+        NOT_IMPLEMENTED
     }
 }

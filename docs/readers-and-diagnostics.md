@@ -407,10 +407,21 @@ error* category, so this is the same layer, not a new one.
   declaration does). This is where javac and Swift both draw it: javac attributes every entry before
   `shouldStopPolicyIfError` blocks the next phase, Swift never reaches SILGen after a Sema error. **A schema
   that reported anything is never registered.**
-- **Only `TsonSchemaValidationException` becomes a diagnostic.** An `UnsupportedOperationException` is a
-  library gap and keeps propagating — a gap is not a verdict on the author's schema. The test for which is
-  which, from Swift's treatment of `expression_too_complex`: *a schema error's verdict doesn't change when
-  this library improves; a gap's does.*
+- **A gap becomes a diagnostic too, under its own code.** Both `TsonSchemaValidationException` and
+  `UnsupportedOperationException` are reported per declaration; the code is what tells them apart —
+  `SCHEMA_ERROR` for the author's mistake, `NOT_IMPLEMENTED` for a construct beyond this library. The test
+  for which is which is unchanged, and is from Swift's treatment of `expression_too_complex`: *a schema
+  error's verdict doesn't change when this library improves; a gap's does.* What changed is only its
+  consequence for the pass.
+    - **Why the channel stopped being the distinction.** Throwing a gap out of a phase that reports per
+      declaration takes every other declaration's verdict with it: one unimplemented construct, and a
+      document with three ordinary mistakes reported none of them, so the author fixed one thing per run.
+      The policy's substance is that a gap is not a verdict on the author's schema, and a code carries that
+      as well as a channel did — while letting the pass stay single, which is the property the whole
+      schema-diagnostics design exists for. `SchemaResolver.schemaProblem` is the one place that classifies;
+      `TsonCli.exitCodeFor` is what the CLI's 1-vs-70 now rides on.
+    - A gap that escapes some *other* way still throws and still exits 70 unchanged — compilation and the
+      lexer are fail-fast, and `TsonCli.notImplemented` remains for anything that reaches it.
 - **What still throws even with a receiver:** an `!!import` that won't load, a `!!meta` that may not
   govern, or a reference whose target owns a different `!!id` than it was fetched under (§2.2.1's
   cross-check, `TsonCompiledMetaRegistry.crossCheckId`). Those make the namespace itself unusable rather

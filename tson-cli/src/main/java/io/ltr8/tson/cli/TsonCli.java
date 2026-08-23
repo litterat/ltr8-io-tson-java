@@ -1,7 +1,10 @@
 package io.ltr8.tson.cli;
 
+import io.ltr8.tson.compiler.Diagnostic;
+
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -120,6 +123,29 @@ public final class TsonCli {
         System.err.println("not implemented yet: " + message);
         System.err.println("This is a gap in tson, not a problem with your document"
                 + " -- it could not be checked, which is not the same as invalid.");
+        return 70;
+    }
+
+    /**
+     * The exit code for a run that produced problems: <b>70 if any of them is a gap in this library, 1
+     * otherwise</b>. The 1-vs-70 split has not changed meaning -- 1 is a verdict on the document, 70 is the
+     * absence of one -- only how it is decided. It used to ride on catching {@link
+     * UnsupportedOperationException}, which meant a gap could only ever arrive by destroying the pass that
+     * found it; now a gap travels as {@link Diagnostic.Code#NOT_IMPLEMENTED} beside the ordinary problems,
+     * and the code carries the same information the exception type used to.
+     *
+     * <p><b>A mixed run is 70, not 1</b>, and deliberately: the ordinary problems are still printed and are
+     * still real, but something in the document was not checked at all, so "invalid" is a claim this run
+     * cannot make. Exit 1 would tell a script the document was judged and rejected. The note goes to stderr
+     * so the report on stdout stays exactly what {@code --output json|tson} promises.
+     */
+    static int exitCodeFor(Collection<Diagnostic.Code> codes) {
+        if (!codes.contains(Diagnostic.Code.NOT_IMPLEMENTED)) {
+            return 1;
+        }
+        System.err.println("note: some of this could not be checked -- a construct is not implemented yet"
+                + " (see the NOT_IMPLEMENTED entries above). That is a gap in tson, not a problem with your"
+                + " document.");
         return 70;
     }
 
