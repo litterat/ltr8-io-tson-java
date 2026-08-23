@@ -150,12 +150,17 @@ production and present as a field that mysteriously has its default.
   (exact vs. maximum fractional-digit count) are not settled by the spec and want a `SPEC-FEEDBACK.md` entry,
   and `require_timezone: false` needs an offset-less parse path neither parser has (`true` is already the
   behaviour, RFC 3339 requiring an offset on every value these atoms accept).
-- [ ] **Constructor selection by schema field set.** Where a class declares several constructors, the one
-  whose parameters match the schema's field set is arguably the one to bind through — a developer providing a
-  shorter constructor with defaults has stated an intention the binder could honour. Today
-  `DefaultRecordBinder` *throws* when a class has more than one public constructor unless `@Record` picks one,
-  so there is no selection to extend; this is a new feature, not a refinement of the two items above, and it
-  is deferred until they land.
+- [x] **Constructor selection by binding profile.** *(Done in `tson-bind`.)* Not by *matching* a field set,
+  which no serialization library does — Jackson and JSON-B both designate a creator instead, and JSON-B
+  forbids more than one outright. Selection is by an opaque profile name the caller sets on the context and
+  the class states per constructor, so `tson-bind` never learns what a schema is. `@Profile(fields = {...})`
+  supplies the parameter names a *secondary* constructor does not keep (a record's canonical one does; a
+  secondary one is `arg0` unless the class was compiled with `-parameters`), which is the same problem
+  `java.beans.@ConstructorProperties` solves for Jackson and Lombok.
+    - What is left is the `tson-compiler` half: nothing yet sets the profile from the schema being read, so
+      a caller wanting per-version binding builds a `DataBindContext` per version themselves. Wiring it
+      through `TsonConfig` is the obvious next step, and it is a decision about where a version's name comes
+      from rather than more mechanism.
 
 ## Remaining built-in types
 

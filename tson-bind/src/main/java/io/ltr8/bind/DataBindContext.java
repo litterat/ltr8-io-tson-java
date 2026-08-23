@@ -26,6 +26,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Date;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -40,6 +41,10 @@ public class DataBindContext {
 	// resolves a bare type name (e.g. a schema's own type name) to the Class getDescriptor(String) builds against
 	private final DataNameBinder nameBinder;
 
+	// This context's binding profile, selecting among a class's @Profile constructors. Empty for the
+	// ordinary single-shape case, which is every context that has never needed to say otherwise.
+	private final String profile;
+
 	public static class Builder {
 
 		boolean allowAny = false;
@@ -47,6 +52,8 @@ public class DataBindContext {
 		boolean allowSerializable = false;
 
 		Map<String, String> nameBinderAliases = Map.of();
+
+		String profile = null;
 
 		Set<String> nameBinderPackages = Set.of();
 
@@ -83,6 +90,24 @@ public class DataBindContext {
 			return this;
 		}
 
+		/**
+		 * Names this context's binding profile, so a class carrying {@code @Profile} constructors is bound
+		 * through the one that serves this name.
+		 *
+		 * <p><b>The point is one class, several shapes, several contexts.</b> A server speaking two versions
+		 * of a schema at once builds a context per version; descriptors are cached per context, so each still
+		 * maps a class to exactly one {@link DataClassRecord} -- the profile chooses which, once, rather than
+		 * being consulted per value.
+		 *
+		 * <p>The name is opaque here: it is matched by equality and nothing in this module knows what it
+		 * stands for. A class with no constructor for this profile falls back to its designated one, so
+		 * naming a context costs nothing for the classes that do not care.
+		 */
+		public Builder profile(String profile) {
+			this.profile = profile;
+			return this;
+		}
+
 		public DataBindContext build() {
 			return new DataBindContext(this);
 		}
@@ -95,6 +120,7 @@ public class DataBindContext {
 	private DataBindContext(Builder builder) {
 
 		this.dataClassResolver = new DefaultClassBinder();
+		this.profile = builder.profile;
 		this.nameBinder = builder.nameBinder != null ? builder.nameBinder
 				: new DataNameBinder.DefaultDataNameBinder(builder.nameBinderPackages, builder.nameBinderAliases);
 
@@ -125,6 +151,11 @@ public class DataBindContext {
 			throw new IllegalArgumentException(e);
 		}
 
+	}
+
+	/** This context's binding profile, empty when it has none -- see {@link Builder#profile}. */
+	public Optional<String> profile() {
+		return Optional.ofNullable(profile);
 	}
 
 	public DataClass getDescriptor(Class<?> targetClass) throws DataBindException {
