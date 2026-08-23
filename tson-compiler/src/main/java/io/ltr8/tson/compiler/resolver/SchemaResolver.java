@@ -320,10 +320,24 @@ public final class SchemaResolver {
         // and "the resolver does not hoist annotations from key to value". A resolved schema is a
         // {type_name => type_definition}, so the name is this map's key -- which is where they are kept.
         // The two sets stay separate: a declaration's own annotations are on its TypeDefinition.
+        // Binding a name's annotations can fail the same way a definition's can (an annotation type §3.3.3
+        // cannot reach), and this loop runs outside the memoized getter that catches those -- so it catches
+        // its own, once per name, leaving the entry itself intact and unannotated rather than losing the
+        // whole schema to a bad @doc.
         AnnotatedMap<String, TypeDefinition> localOnly = new AnnotatedMap<>();
         for (String name : declarations.keySet()) {
-            localOnly.put(name, resolvedLocals.get(name),
-                    holder[0].annotationsFor(name, declarations.get(name).nameAnnotations()));
+            Annotations nameAnnotations;
+            try {
+                nameAnnotations = holder[0].annotationsFor(name, declarations.get(name).nameAnnotations());
+            } catch (TsonSchemaValidationException e) {
+                if (receiver == null) {
+                    throw e;
+                }
+                receiver.report(Diagnostic.ofSchemaError(TsonCanonicalIdentity.canonicalize(id), name,
+                        e.getMessage(), Optional.ofNullable(positions.get(declarations.get(name)))));
+                nameAnnotations = Annotations.empty();
+            }
+            localOnly.put(name, resolvedLocals.get(name), nameAnnotations);
         }
         // An instantiation entry has no declared name to carry annotations from.
         instantiations.forEach(localOnly::put);
