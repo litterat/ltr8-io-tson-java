@@ -309,7 +309,7 @@
   type_kind => !type_definition {
     kind: ATOM
     source: enum
-    body: !enum { members: [ATOM PRODUCT SUM REFERENCE] }
+    body: !enum { members: [ATOM PRODUCT SUM REFERENCE DATA] }
   }
 
   @doc:"Annotation type markers."

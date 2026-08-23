@@ -75,7 +75,7 @@ public enum DiscriminationClass {
                 return Optional.empty();
             }
             if (def.body() instanceof Reference reference) {
-                current = reference.target().name();
+                current = reference.target();
                 continue;
             }
             return classify(def);

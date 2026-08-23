@@ -652,7 +652,7 @@ final class DefinitionResolver {
             if (definition == null || !(definition.body() instanceof Reference reference)) {
                 return false;
             }
-            typeName = reference.target().name();
+            typeName = reference.target();
         }
         return false;
     }

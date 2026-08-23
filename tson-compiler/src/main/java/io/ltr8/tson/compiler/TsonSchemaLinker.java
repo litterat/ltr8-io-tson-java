@@ -691,7 +691,14 @@ public final class TsonSchemaLinker {
                     }
                 }
             }
-            case Reference ref -> validateTypeRef(ref.target(), namespace, ownParameters, "'" + entryName + "'");
+            // The name alone: a reference body holds a `type_name`, so there is no argument list to check
+            // arity or nested references against. Where the alias names an *application* the arguments are
+            // in the entry's own `source`, which validateEntry already validated in full -- and the two are
+            // not always the same name (a materialised instantiation sources the application and targets
+            // the entry minted for it), which is why this checks the body's own target rather than trusting
+            // that.
+            case Reference ref -> validateReferenceTarget(ref.target(), namespace, ownParameters,
+                    "'" + entryName + "'");
             case MapBody m -> {
                 validateTypeRef(m.keyType(), namespace, ownParameters, "'" + entryName + "' key_type");
                 validateTypeRef(m.valueType(), namespace, ownParameters, "'" + entryName + "' value_type");
@@ -869,7 +876,7 @@ public final class TsonSchemaLinker {
             if (def == null || !(def.body() instanceof Reference reference)) {
                 return current;
             }
-            current = reference.target().name();
+            current = reference.target();
         }
         return current;
     }
@@ -928,7 +935,7 @@ public final class TsonSchemaLinker {
             }
             case TupleBody tuple -> tuple.elements().forEach(e -> collectNames(e.elementType(), into));
             case ChoiceBody choice -> choice.variants().forEach(v -> collectNames(v, into));
-            case Reference reference -> collectNames(reference.target(), into);
+            case Reference reference -> into.add(reference.target()); // a name, so nothing to recurse into
             case InstanceTemplate template -> template.bindings().values().forEach(binding -> {
                 switch (binding) {
                     case TemplateArgument.Param param -> into.add(param.param());
@@ -974,6 +981,21 @@ public final class TsonSchemaLinker {
             throw new IllegalStateException("'" + entryName + "' declares no parameters, so it is a closed entry, "
                     + "but its field '" + field.name() + "' routes the parameter '" + field.valueParam().get()
                     + "' -- a closed entry contains no parameter references anywhere (§5.10)");
+        }
+    }
+
+    /** {@link #validateTypeRef}'s name half, for a slot the kernel types {@code type_name} rather than {@code type_ref}. */
+    private static void validateReferenceTarget(String target, Map<String, TypeDefinition> namespace,
+                                                 List<String> ownParameters, String context) {
+        TypeDefinition definition = namespace.get(target);
+        if (definition != null && definition.body() instanceof Data notAType) {
+            throw new TsonSchemaValidationException(context + " names '" + target + "', which is built "
+                    + "with '" + TsonCompiledMetaSchema.typenameOf(notAType) + "' and describes something "
+                    + "other than a data value -- it is declared by this schema but is not a type, so "
+                    + "nothing can be typed by it");
+        }
+        if (definition == null && !ownParameters.contains(target)) {
+            throw new TsonSchemaValidationException(context + " has an unresolved reference '" + target + "'");
         }
     }
 

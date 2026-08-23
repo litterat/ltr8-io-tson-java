@@ -143,9 +143,8 @@ class RecordTemplateTest {
         assertEquals(1, instantiationsOf(compiled, "box").size());
         String made = instantiationsOf(compiled, "box").get(0);
         assertEquals(made, fieldType(compiled, "holder", "b"));
-        assertEquals(TypeRef.of(made),
-                assertInstanceOf(io.ltr8.tson.schema.meta.Reference.class,
-                        compiled.schema().entries().get("text_box").body()).target());
+        assertEquals(made, assertInstanceOf(io.ltr8.tson.schema.meta.Reference.class,
+                compiled.schema().entries().get("text_box").body()).target());
     }
 
     /** A value parameter binds the literal it was applied with, and the route is gone once bound (§5.10). */
@@ -562,7 +561,7 @@ class RecordTemplateTest {
         String instantiation = fieldType(compiled, "holder", "r");
         assertTrue(instantiation.startsWith("rows_"), instantiation);
         String synthetic = assertInstanceOf(io.ltr8.tson.schema.meta.Reference.class,
-                compiled.schema().entries().get(instantiation).body()).target().name();
+                compiled.schema().entries().get(instantiation).body()).target();
         ArrayBody array = assertInstanceOf(ArrayBody.class,
                 compiled.schema().entries().get(synthetic).body());
         assertEquals(TypeRef.of("int32"), array.elementType());
