@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.TsonMissingBindingException;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 
@@ -26,8 +27,20 @@ final public class ErrorReader implements TsonTypeReader<Object> {
         this.cause = cause;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p><b>A cause that already says what it is passes through unchanged.</b> A {@link
+     * TsonMissingBindingException} is a misconfiguration -- a type the caller never mapped -- and wrapping
+     * it in "no usable compiled reader" would relabel it as this library's gap, which is what sent a
+     * downstream service's missing configuration out as a 501. The wrapping is for the case this class was
+     * built for: a constructor with no reader implemented yet.
+     */
     @Override
     public Object read(TsonReadContext ctx) {
+        if (cause instanceof TsonMissingBindingException missing) {
+            throw missing;
+        }
         throw new UnsupportedOperationException("'" + name + "' has no usable compiled reader -- "
                 + "the schema itself compiled fine, but nothing can read a value against this type: "
                 + cause.getMessage(), cause);

@@ -13,6 +13,7 @@ import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassUnion;
 import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonBindMismatchException;
+import io.ltr8.tson.compiler.TsonMissingBindingException;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
@@ -521,11 +522,24 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             return typeName -> wantToken.contains(typeName) ? rawToken : resolver.resolve(typeName);
         }
 
+        /**
+         * The class this schema type binds to.
+         *
+         * <p><b>A missing one is a misconfiguration, not a gap.</b> It used to raise an {@code
+         * IllegalStateException}, which the compile turned into an {@code ErrorReader} and the first read of
+         * that type into "no usable compiled reader" -- a library-gap shape, for a caller who simply never
+         * mapped the type. That reading travels: a downstream service mapped it to a 501. It is the same
+         * disagreement {@link TsonBindMismatchException} already covers from the other side (a class that
+         * exists and does not fit), so it is reported the same way and at the same moment -- when the schema
+         * is compiled in bind mode, naming the type nothing resolves.
+         */
         private DataClass descriptorFor(String name) {
             try {
                 return context.getDescriptor(name);
             } catch (DataBindException e) {
-                throw new IllegalStateException("no bound Java class for '" + name + "'", e);
+                throw new TsonMissingBindingException("no bound Java class for '" + name + "': nothing in this "
+                        + "bind context resolves that schema type name. Map it (TsonConfig.bindings) or give "
+                        + "the context a DataNameBinder that can find it -- " + e.getMessage());
             }
         }
 

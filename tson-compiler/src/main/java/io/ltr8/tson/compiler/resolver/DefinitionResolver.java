@@ -1,5 +1,7 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.compiler.TsonBindMismatchException;
+import io.ltr8.tson.compiler.TsonMissingBindingException;
 import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonWriteException;
 import io.ltr8.tson.compiler.TsonDataParser;
@@ -834,6 +836,16 @@ final class DefinitionResolver {
             body = definitionMetaReader.read(constructorName, value);
         } catch (TsonReadException e) {
             throw bodyIsNotValidData(name, constructorName, e);
+        } catch (TsonBindMismatchException e) {
+            // The constructor is a meta layer's own and the consumer never registered a class for it, or
+            // registered one that disagrees. Either way it is their configuration, and it already says so --
+            // wrapping it as an UnsupportedOperationException would relabel it a library gap, which is the
+            // classification a caller acts on. Rethrown whole, naming the declaration that applied it, and
+            // keeping which of the two it is -- a type with no class at all reads differently from one whose
+            // class disagrees, and the caller's next move differs with it.
+            String where = "'" + name + "': " + e.getMessage();
+            throw e instanceof TsonMissingBindingException ? new TsonMissingBindingException(where)
+                    : new TsonBindMismatchException(where);
         } catch (RuntimeException e) {
             throw new UnsupportedOperationException(
                     "'" + name + "': failed to bind '" + constructorName + "' via the compiled meta-schema reader: "

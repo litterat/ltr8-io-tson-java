@@ -264,6 +264,13 @@ TsonValue value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_ty
   rejects the wrong one up front instead of failing on a cast at the first value. `objectReader()`/`objectWriter()` bind to this instance's `dataBindContext` (configurable via
   `TsonConfig.dataBindContext`, default `TsonAtomContext.defaultContext()`). `schemaRegistry()`/`loader()`
   reach the underlying machinery.
+- **`bindings(Map)`/`profile(String)` are the short form of `dataBindContext`**, and mutually exclusive with
+  it (a profile is fixed when a context is built, so it cannot apply to one that arrives already built). The
+  map becomes a `DataNameBinder` chained over `SchemaMetaNameBinder.INSTANCE` with
+  `TsonAtomContext.registerDefaults` applied — the last being the step nothing reminds a caller of, and the
+  reason the convenience earns its place. **The map authors the failure**: a name outside it reports
+  `bindings(...) maps [...]` with the kernel's own account as the cause, because the chain is a backstop and
+  letting the backstop speak reports a missing line of the caller's configuration as "not kernel vocabulary".
 - **Two binding seams, never merged.** `TsonConfig.dataBindContext` binds the *data* a schema describes
   (`order` → `Order`); `TsonConfig.metaNameBinder` binds a governing meta's own *vocabulary*
   (`operation` → `Operation`, the `data` base kind's case — `docs/linking-and-compilation.md`). One

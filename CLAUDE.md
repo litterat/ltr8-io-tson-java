@@ -88,7 +88,9 @@ developer-facing type, ask "would a consumer plausibly have their own class with
 and it's consumer-facing, prefix it; if it's internal machinery, leave it bare.
 
 **A schema and its bound class must agree about a type's fields** (`TsonBindMismatchException`, raised at
-bind-mode compile — startup, not first read). Any non-FIXED field with no component, or a component no
+bind-mode compile — startup, not first read; its subclass `TsonMissingBindingException` covers a type with
+*no* class at all and is deferred to the first read of that type, since a schema legitimately declares types
+a consumer never binds). Any non-FIXED field with no component, or a component no
 field fills, is refused — optional fields included, since those are the ones that work in development and
 fail on the first caller who sends them. A FIXED field is exempt, the schema settling its value. `@Unbound` marks a component as the
 class's own, `TsonConfig.lenientBinding` opts out wholesale and is silent. `docs/readers-and-diagnostics.md`
@@ -461,6 +463,9 @@ builders or transforms yet.
 ### Front door: `Tson`/`TsonConfig` (`tson` module) — `docs/facades-and-tree.md`
 
 `Tson.builder().build()` bootstraps meta-kernel/meta.tn/core.tn and returns an immutable `Tson`.
+`bindings(Map)`/`profile(String)` are the short form of the bind context — the map as a name binder chained
+over the kernel's vocabulary, plus `TsonAtomContext.registerDefaults` — and are mutually exclusive with
+`dataBindContext`, a profile being fixed when a context is built.
 `resolve(schemaText)` registers a schema by its own `!!id` (no mode — resolution is always bind-anchored);
 `treeRegistry()`/`bindRegistry()` pick the read mode; `objectReader()`/`treeReader()` return schema-aware
 facades sharing this instance's registries, so a schema compiles once per `Tson`.

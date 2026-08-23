@@ -6,6 +6,7 @@ import io.ltr8.bind.DataClass;
 import io.ltr8.bind.DataClassTuple;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
+import io.ltr8.tson.compiler.TsonMissingBindingException;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.schema.meta.TupleBody;
@@ -100,7 +101,10 @@ final class TupleBindReader extends TupleAbstractReader<Object> {
             try {
                 return context.getDescriptor(name);
             } catch (DataBindException e) {
-                throw new IllegalStateException("no bound Java class for '" + name + "'", e);
+                // A misconfiguration, not a gap -- see RecordBindReader.Factory.descriptorFor.
+                throw new TsonMissingBindingException("no bound Java class for '" + name + "': nothing in this "
+                        + "bind context resolves that schema type name. Map it (TsonConfig.bindings) or give "
+                        + "the context a DataNameBinder that can find it -- " + e.getMessage());
             }
         }
     }
