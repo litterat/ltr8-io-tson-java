@@ -42,8 +42,9 @@ are kept in step deliberately.
   base-kind names in the transitive supertype chain, and tightening in the trailing body per §5.7); the
   `^` refinement operator (§5.7, copies the source's whole field set, admits no new fields); bare
   references (§8.3); constructor application (`!C value`, §5.5, binds generically via the compiled
-  reader — no hand-rolled name→class table, `tson-bind`'s sealed-union resolution finds the `Top` leaf by
-  `@Typename`); atom refinement (`!I ^ { ... }`, §5.5/§5.7); subtraction (`A & { ... } - { f }`, §5.9);
+  reader — no hand-rolled name→class table, `tson-bind`'s union resolution finds the `Top` member by
+  `@Typename`; a kernel body is a leaf of the sealed hierarchy, and a meta-schema's own constructor is an
+  implementation of the open `Data` branch, admitted by the same lookup); atom refinement (`!I ^ { ... }`, §5.5/§5.7); subtraction (`A & { ... } - { f }`, §5.9);
   restating a field group in a refinement or composition body (§5.11 — same member labels in the same order,
   types verbatim, state tightening OPTIONAL→REQUIRED only; only the *group's* state moves, since members
   flatten as `OPTIONAL` regardless).

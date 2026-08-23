@@ -118,10 +118,12 @@ module has a real `module-info.java`; module names mirror each module's root exp
   descriptors, `DataNameBinder`, bridges). Depends only on `tson-annotation`, whose annotations and carrier
   types it reads off a class under analysis.
 - **`tson-schema`** — **only** `io.ltr8.tson.schema.meta` (the resolved-schema *value* model — pure
-  records/sealed interfaces/enums, §8's `TypeDefinition` et al.) plus the schema registry (`TsonSchemaRegistry`
-  /`TsonLinkedSchema`/`TsonSchemaLoader`/`TsonCanonicalIdentity`) and `TsonBundledSchemas`. **The linker is not
-  here** — it is an engine, not a value model, so `TsonSchemaLinker`/`ChoiceDisjointness` live in
-  `tson-compiler` with the rest of the pipeline; what stays is storage and the identity algorithm lookups
+  records/sealed interfaces/enums, §8's `TypeDefinition` et al.; `Top` is sealed except for its one
+  deliberately open branch, `Data`, which a consumer's own class implements — see below) plus the schema
+  registry (`TsonSchemaRegistry`/`TsonLinkedSchema`/`TsonSchemaLoader`/`TsonCanonicalIdentity`) and
+  `TsonBundledSchemas`. **The linker is not here** — it is an engine, not a value model, so
+  `TsonSchemaLinker`/`ChoiceDisjointness` live in `tson-compiler` with the rest of the pipeline; what
+  stays is storage and the identity algorithm lookups
   compare by. Depends only on `tson-annotation`. **`tson-compiler` depends on `tson-schema`, not
   the reverse** — the opposite of what the names suggest, deliberately so the compiler's resolver can hold
   and consult `schema.meta` types directly. `schema.meta` names no `tson-compiler` type; where it needs
@@ -299,7 +301,9 @@ satisfy (`TypeInhabitance` — a least fixed point over the entry graph, exact a
 #25), derives choice
 `disjoint` (`ChoiceDisjointness` — total and two-valued: `true` iff every variant occupies a distinct
 discrimination class, the same `DiscriminationClass` untagged reading dispatches on; `SPEC-FEEDBACK.md`
-#47), and validates every reference — including choice-variant
+#47), and validates every reference — refusing one that names a **DATA-kinded entry** (an entry describing
+something other than a data value is declared by its schema but is not a type; without this the misuse
+resolves, links *and* compiles and fails only at read), including choice-variant
 distinctness after §8.3 flattening, rejection of a variant resolving to `void` (optionality is not choice,
 `SPEC-FEEDBACK.md` #48), the author's `@disjoint` marker against the derived fact (`false` is
 an error; no third outcome exists), and
@@ -308,6 +312,21 @@ desugaring already did. `TsonSchemaRegistry.register` rejects duplicate identiti
 unmodifiable `entries()` *is* the "locked" guarantee). The linker lives in `tson-compiler` (a pipeline
 stage, next to `Diagnostic` and `tson-regex`); the registry stays in `tson-schema` (storage over the value
 model).
+
+### Meta-layer vocabulary: `Data` and the `data` base kind — `docs/linking-and-compilation.md`
+
+§2.2.2 makes the meta layer the format's extension point, but §8.1's schema map holds only type definitions,
+so an instance of a meta-schema's own constructor had nowhere to be when the thing it describes is not a data
+type (`SPEC-FEEDBACK.md` #57). meta-kernel gains a fourth base kind, **`data => top & {}`**, with `DATA`
+joining `type_kind`; `schema.meta.Data` is the matching **`non-sealed`** branch of `Top` — the one open
+point in the body model, because the constructors reaching it are declared by meta-schemas this library has
+never seen. A consumer registers a class by carrying `@Typename` and being findable by the
+`DataNameBinder`; there is no reader family and no factory entry, the ordinary record reader binding the
+payload and validating it in full, and an unresolvable class is an error where the constructor is applied.
+`Data.references()` is how a body's own type references reach the linker, declared rather than discovered.
+**Amending meta-kernel is a local divergence** from published Revision 32 — the digests
+`TsonBundledSchemas` holds are this project's own now.
+own now.
 
 ### Class 2 compilation (`TsonSchemaCompiler`, `.../reader/`) — `docs/linking-and-compilation.md`
 
