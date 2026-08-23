@@ -32,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * and all 13 {@code Instance} declarations the second pass covers (three {@code unit} instances,
  * {@code integer}, {@code text}/{@code uri}/{@code regex}, and six {@code enum} instances,
  * including one -- {@code boolean} -- declared *before* {@code enum} itself in source order)
- * resolve to the expected kind/body -- all 49 of the real fixture's declarations resolve, alongside the
+ * resolve to the expected kind/body -- all 50 of the real fixture's declarations resolve, alongside the
  * nine entries {@link SchemaDesugarer} injects for their argument-bearing applications.
  */
 class MetaKernelBootstrapResolverTest {
@@ -137,7 +137,7 @@ class MetaKernelBootstrapResolverTest {
     void theFortySevenRealFixtureDeclarationsResolveAlongsideEightDesugaredEntries() {
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
-        assertEquals(58, schema.entries().size());
+        assertEquals(59, schema.entries().size());
         for (String head : List.of("array_tuple_element", "array_field_name", "array_type_ref",
                 "array_type_name", "array_type_argument", "array_param_name", "array_field_group",
                 "array_record_field")) {

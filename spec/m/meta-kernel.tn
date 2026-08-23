@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/32/m/meta-kernel.tn?sha256=a357b93fffd24dbe3fa7132eac751a549f0eebb3fec36d6e00f86cc7589af78b"
+!!id:"https://tson.io/2026/32/m/meta-kernel.tn?sha256=0742e3a7fff82adac11dfd20199c95d079206b972b1f7b899233bdb9d1e09463"
 !!meta:"https://tson.io/2026/32/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 32 draft).
@@ -14,7 +14,7 @@
   and this document describes it.
   """
 {
-  @doc:"Base kinds. `top` is the structural root; every constructor transitively IS-A `atom`, `product`, or `sum`, each of which IS-A `top`. Construction transfers kind, not IS-A, so instances and fresh records sit under the kinds without supertypes."
+  @doc:"Base kinds. `top` is the structural root; every constructor transitively IS-A `atom`, `product`, `sum` or `data`, each of which IS-A `top`. Construction transfers kind, not IS-A, so instances and fresh records sit under the kinds without supertypes. The first three describe the shape of a data value; `data` describes something that is not one."
   top       => {}
   atom      => top & {}
   product   => top & {
@@ -22,6 +22,20 @@
     size_type:      product_size_type
   }
   sum       => top & {}
+
+  @doc:"""
+    Non-data base kind. The body of an entry that describes something
+    other than a data value — vocabulary a meta-schema introduces
+    beyond the kernel's own, whose instances ride along in a schema
+    map without being types. No data value ever has such an entry as
+    its type, so `data` composes with `top` directly rather than with
+    a kind that would oblige it to describe a value's shape.
+
+    An entry whose kind is DATA is declared by its schema but is not a
+    type: naming one where a type is expected is a resolver error.
+    """
+  data      => top & {}
+
   reference => top & {
     target: type_name
   }
@@ -240,7 +254,7 @@
   field_state         => !enum [REQUIRED REQUIRED_DEFAULT REQUIRED_FIXED
                                        OPTIONAL OPTIONAL_FIXED]
   element_state       => !enum [REQUIRED OPTIONAL]
-  type_kind           => !enum [ATOM PRODUCT SUM REFERENCE]
+  type_kind           => !enum [ATOM PRODUCT SUM REFERENCE DATA]
 
   @doc:"Annotation type markers."
   annotation    => @annotation void

@@ -43,6 +43,13 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   carries the fact;
   (4) **validate** every reference
   resolves, with a type-parameter exception (a bare name valid if it's the entry's own declared parameter);
+  **a reference to a DATA-kinded entry is refused** — §8.1's schema map holds only type definitions, so an
+  entry describing something other than a data value has no way to say "declare me, but let nothing name me
+  as a type"; the `Data` body *is* that way, and the check applies at every position a type-ref occupies (a
+  field type, a choice variant, an array element, a map value). Without it the misuse resolves, links **and**
+  compiles, and fails only when a document is finally read against it (`SPEC-FEEDBACK.md` #57). A DATA
+  entry's own references are validated too, and it is the body that says which they are — see the `Data`
+  note under compilation below;
   **a choice's variants are checked distinct** (§5.4) *after* §8.3 flattening, since an alias and its target
   are one type — so `(text | my_text)` with `my_text => text` is caught, which comparing the written names
   would miss and which is the only spelling an author can't see for themselves; the walk stops on a
@@ -102,6 +109,55 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   `TsonSchemaLoader` (`Optional<TsonLinkedSchema> load(id)`) is the pluggable import/meta lookup hook,
   registered-only by default (nothing fetched). `TsonSchemaLinker.linkBootstrap` is the one sanctioned way
   to link meta-kernel's raw bootstrap output without registering it.
+
+## `Data`: an entry that is not a type (`schema.meta.Data`, §4.1's `data` base kind)
+
+§2.2.2 calls the meta layer the format's sanctioned extension point, and a meta-schema may declare
+constructors of its own. What the kernel had no answer for is where an *instance* of such a constructor
+lands when the thing it describes is not a data type — `schema => {type_name => type_definition}` makes
+every schema-map entry a type definition. `data => top & {}` is the fourth base kind that lets one say
+otherwise, and `TypeKind.DATA` is what it resolves to. The motivating case is an HTTP operation, which must
+sit at the schema layer because that is the only layer able to name request and response types *by name*.
+
+- **`Data` is the one open branch of `Top`.** Every other branch is sealed all the way down: each leaf
+  mirrors one kernel constructor, so a body's kind is decidable by inspection and each switch over them is
+  exhaustive. This one is `non-sealed`, because the constructors reaching it are declared by meta-schemas
+  this library has never seen and their bodies are the consumer's own classes.
+- **The registration is a `@Typename` and a name binder, and nothing else.** A class carries
+  `@Typename(name = "operation")` and implements `Data`; the `DataBindContext`'s `DataNameBinder` has to be
+  able to find it. `DataNameBinder` has a single method, so a consumer composes rather than copies — try
+  `SchemaMetaNameBinder.INSTANCE` for the kernel's own vocabulary, fall back to their own package. **No
+  reader family and no `ValueReaderFactoryRegistry` entry**: the ordinary record reader binds the
+  `!operation { ... }` payload straight into the record, so §7.2 closure, field states and every atom
+  constraint in the constructor's declaration are enforced exactly as for a written body.
+- **A constructor with no resolvable class is an error where it is written**, not a value carried in some
+  generic form. A schema asserting structure nothing can interpret is worth failing on.
+- **`Data.references()` is how a body's own references reach the linker**, and it is *declared, not
+  discovered*: a payload's Java shape says nothing about which components are references, and consulting the
+  constructor's declaration would only work for slots spelled `type_ref`. A body holding a `TypeRef` returns
+  it and the name is checked against the same namespace every other reference is. A body that declares none
+  simply has none checked — that is the cost of the branch being open, and it is the reason to type a
+  reference slot `type_ref` rather than `type_name` (§5.6's positional form keeps the author writing a bare
+  name either way).
+- **The silent defaults are worth knowing.** `TypeInhabitance` calls a `Data` body inhabited and
+  `DiscriminationClass` gives it none, both by their `default` arm. Neither matters while the linker refuses
+  to let anything name such an entry as a type — which is what makes that refusal load-bearing rather than
+  a nicety.
+- **Resolved output is ordinary.** §8.1's `body` carries an instance of whichever constructor built the
+  entry, and a meta-schema's own constructor is not a special case: a DATA entry writes as
+  `body: !operation { ... }`, formally indistinguishable from `!record { ... }`. What made that work is a
+  general `tson-bind` fix (#121) — a non-sealed union branch now stands for its own implementations, where
+  exact-class membership never matched them.
+- **A meta-schema keeps a constructor this library cannot build a reader for**, its factory standing in as
+  an `ErrorReader` carrying the real cause. Dropping it — which `TsonCompiledMetaSchema` used to do — lost
+  the constructor from the scoped vocabulary silently, so a governing meta compiled and registered looking
+  healthy and the complaint landed against a *different* document: the first governed schema to apply it was
+  told the meta-schema does not declare it, which is both false and unactionable. Same treatment
+  `extern`/`unknown_type` already get, and the reason those register a factory rather than throwing.
+
+**Amending meta-kernel is a local divergence** from published Revision 32 — `spec/m/` is otherwise a cache
+of it, and the digests `TsonBundledSchemas` holds are now this project's rather than tson.io's.
+`SPEC-FEEDBACK.md` #57 is the argument for the change and carries what the experiment cost.
 
 ## The inhabitance check (`TypeInhabitance`, §3.4.1, `SPEC-FEEDBACK.md` #25)
 

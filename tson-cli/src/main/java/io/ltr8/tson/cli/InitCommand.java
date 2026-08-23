@@ -23,8 +23,8 @@ final class InitCommand {
 
     private static final String SCHEMA = """
             !!id:"https://example.com/2026/32/getting-started/person.tn?sha256=573155c579b4537d6d3cf17f0b04cda8b040cbff363578a74b45036d2bdf3426"
-            !!meta:"https://tson.io/2026/32/m/meta.tn?sha256=5f2d3a4a85d23de9331edb303712e09ff20bee58f830fe5162276a3e6659dac8"
-            !!import:"https://tson.io/2026/32/m/core.tn?sha256=5ed51742a0416c427cddf4f02a0f70a356e022927c1de78e7cda405462270a84"
+            !!meta:"https://tson.io/2026/32/m/meta.tn?sha256=4e080b780c644997bc956b08eb0540f41b7de5b045300515584d3053b3c0f952"
+            !!import:"https://tson.io/2026/32/m/core.tn?sha256=d0655c3998e96db9ad51bf5d12a41645627daa985d1bcb58c2aca5e3a2b84c49"
             @doc:"An example schema from `tson init-example` -- a short tour of TSON. Edit this file or person-data.tn, then re-run tson validate to see what changes."
             {
               role => !enum [admin member guest]

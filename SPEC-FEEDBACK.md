@@ -3641,7 +3641,7 @@ resolution 2 below implemented against a locally amended meta-kernel** so the de
 evidence rather than on argument. What follows records what that cost, since the answer bears on which
 resolution the revision should take.
 
-**Tried: `data` as a fourth base kind (resolution 2).** meta-kernel gains one declaration and one enum
+**Tried: `data` as a fourth base kind (resolution 2)** -- issue #123 in this repo carries the work. meta-kernel gains one declaration and one enum
 member —
 
 ```tson
