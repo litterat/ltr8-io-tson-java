@@ -11,6 +11,7 @@ import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.InstanceTemplate;
 import io.ltr8.tson.schema.meta.MapBody;
+import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Reference;
@@ -500,9 +501,26 @@ final class TemplateMaterialiser {
     }
 
     /**
-     * A record field whose {@code value_param} named a parameter, with the bound literal filled in and the
-     * route dropped -- the field's state is already what §5.7's parametric rules made it at resolution, so
-     * only the value changes.
+     * A record field whose {@code value_param} named a parameter, with the bound literal filled in, the
+     * route dropped, and the state taken to where §5.7 says a concrete value takes it.
+     *
+     * <p><b>This is where a routed {@code =} becomes fixed</b>, and it is the only place it can be. §5.7
+     * puts a parametric {@code = P} in {@code REQUIRED} at the declaration -- "nothing is fixed at
+     * declaration, the value does not exist yet" -- and defers the rest to one sentence: "fixation happens
+     * downstream, where values are concrete". Here is downstream. Without the promotion the closed entry
+     * carries the right value on a field that does not enforce it, so {@code response<order, 201>} accepts
+     * a status of 999 where the literal {@code status: int32 = 201} refuses it -- a constraint the author
+     * wrote, silently absent from the type it governs.
+     *
+     * <p><b>The two parametric spellings are told apart by the state they arrived in</b>, which is what
+     * makes this recoverable at all: §5.7 sends {@code = P} to {@code REQUIRED} and {@code ~ P} to {@code
+     * REQUIRED_DEFAULT}, so a bound {@code REQUIRED} field is a routed {@code =} and nothing else -- an
+     * unrouted field never reaches here, {@code value_param} being what selects it. A default stays a
+     * default: data may still override it.
+     *
+     * <p>§5.7 names only one downstream fixation site, a refinement deriving from an application head, and
+     * leaves a record template's materialised field unstated; {@code SPEC-FEEDBACK.md} #58 has the case for
+     * reading them the same way.
      */
     private static RecordField bindValue(RecordField field, String head, Map<String, TypeArgument> bindings) {
         if (field.valueParam().isEmpty()) {
@@ -517,7 +535,8 @@ final class TemplateMaterialiser {
             throw new TsonSchemaValidationException("'" + head + "' routes '" + parameter + "' into field '"
                     + field.name() + "' as a value, but a type was applied for it (§5.10)");
         }
-        return new RecordField(field.name(), field.type(), field.state(), Optional.of(value.value()),
+        FieldState state = field.state() == FieldState.REQUIRED ? FieldState.REQUIRED_FIXED : field.state();
+        return new RecordField(field.name(), field.type(), state, Optional.of(value.value()),
                 Optional.empty(), field.annotations());
     }
 

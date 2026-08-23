@@ -614,9 +614,11 @@ compatibility).
   declaration**, one level coarser than the pointer beside it — `/person/age` carries `person`'s own line,
   because `RecordField` has no position. A `caused by` frame chaining the author's location to the leaf
   constraint's is the other open shape (`BACKLOG.md`).
-- **Deferred design questions** — `REQUIRED_FIXED`/`OPTIONAL_FIXED` value validation, `value_param` real
-  parameter substitution, and a general disk/HTTP-backed `TsonSchemaSource` (with whitelist/blacklist
-  policy). **Thread-safety is no longer wholly open**: concurrent reads through one `Tson` are safe (the
+- **Deferred design questions** — `REQUIRED_FIXED`/`OPTIONAL_FIXED` value validation and a general
+  disk/HTTP-backed `TsonSchemaSource` (with whitelist/blacklist policy). **`value_param` substitution is
+  no longer one of them**: an argument bound into a routed `=` fixes the field (`REQUIRED` →
+  `REQUIRED_FIXED`, `~` staying a default), which is §5.7's "fixation happens downstream" applied to the
+  downstream it does not name (`SPEC-FEEDBACK.md` #58). **Thread-safety is no longer wholly open**: concurrent reads through one `Tson` are safe (the
   readers are immutable, the lexer/stream are per-read, and both on-demand caches settle a race by keeping
   one entry — `docs/linking-and-compilation.md`). What is still open is everything *outside* a read:
   registering schemas concurrently, and mutating a `DataBindContext` after use.

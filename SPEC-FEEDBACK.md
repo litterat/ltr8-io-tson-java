@@ -3745,3 +3745,58 @@ wrapping *discards the payload validation* that the direct form gets for free. R
 reading `value` through whatever `type` names — a dependency the kernel has already met and declined once,
 in `value`'s own `@doc`: "which must be the field's declared type — a dependency the schema language does
 not express directly."
+
+---
+
+## 58. §5.7 defers a parametric `=` to "fixation downstream", then names only one downstream
+
+**Section:** §5.7 ("Open modifiers"), §5.10 (materialisation), §5.2 (field states), §8.1 (`record_field`).
+
+§5.7 is explicit about what a parametric modifier resolves to at the declaration, and the reasoning is
+sound:
+
+> The parametric spellings do not take the concrete-value transitions, because nothing is fixed at
+> declaration — the value does not exist yet; it arrives at application … Accordingly, a parametric `~ P`
+> places the field in REQUIRED_DEFAULT, and a parametric `= P` places the field in REQUIRED … **Fixation
+> happens downstream, where values are concrete:** a refinement deriving from an application head receives
+> the arguments as REQUIRED_FIXED bindings (below).
+
+The rule is stated in general terms — *fixation happens downstream, where values are concrete* — and then
+illustrated by exactly one downstream: a refinement over an application head. The other downstream, and by
+far the commoner one for an ordinary schema author, is a **record template's own materialisation**:
+
+```tson
+response => <T, S> { status: int32 = S  body: T }
+created  => response<order, 201>
+```
+
+Nothing in §5.7, §5.10 or §8.1 says what `created`'s `status` field carries. Substitution is described as
+filling in the value ("the parameter's argument becomes the field's supplied value"), and if the state is
+carried through unchanged the closed entry is `state: REQUIRED  value: 201` — the right value on a field
+that does not enforce it. A document writing `status: 999` then validates against a type whose schema says
+the status is 201, while the literal spelling one line up (`status: int32 = 201`) refuses it.
+
+**Why this is worth stating rather than leaving to inference.** The failure is silent and it is at the
+worst end: an author writes a constraint, the schema loads clean, and the constraint is absent from the
+type it governs. There is no diagnostic, because nothing is wrong — the resolver did what the letter of
+§5.7 says. And the shape is not exotic: a status code fixed per response is close to the canonical reason
+to write a value parameter at all, so the first real template an API author writes hits it.
+
+**The reading this implementation chose.** A concrete argument fixes the field: a materialised
+`status: int32 = S` bound to `201` is `REQUIRED_FIXED` with `value: 201`, identical to the literal form.
+A parametric `~ P` stays `REQUIRED_DEFAULT`, since a default data may override is the whole distinction
+between the two spellings. Note this is recoverable only because §5.7 sends the two spellings to *different*
+states: a bound field arriving as `REQUIRED` is a routed `=` and nothing else, so the state at the
+declaration is load-bearing information and not merely a placeholder.
+
+**Suggested resolution.** Say the general rule where the general rule is stated. A sentence in §5.7 —
+"on materialisation, a field whose `value_param` is bound to a concrete argument takes the state its literal
+spelling would have: `= P` becomes REQUIRED_FIXED, `~ P` remains REQUIRED_DEFAULT" — settles it, and makes
+the refinement-from-an-application-head case an instance of the rule rather than the whole of it. Without
+it, an implementation that carries the state through is conformant and produces a schema that silently
+under-validates.
+
+**A note on where the fix does *not* belong.** The tempting reading is that the declaration is wrong and a
+parametric `=` should be `REQUIRED_FIXED` from the start. That contradicts the sentence §5.7 is unambiguous
+about, and it would mint a `REQUIRED_FIXED` field with no `value` — a shape §5.2 currently gives only to
+`= _`, where it means *fixed to absent*. The declaration is right; only the downstream is unstated.
