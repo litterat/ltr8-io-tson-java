@@ -28,15 +28,9 @@ record AnnotationTypes(boolean capture, Optional<TsonSchema> schema, TsonTypeRea
     static final AnnotationTypes UNVALIDATED = new AnnotationTypes(true, Optional.empty(), name -> null);
 
     /**
-     * Annotations are consumed and dropped -- the position they were written at has nowhere to put them.
-     * That is every position in object-binding mode except a record whose bound class declares an {@code
-     * Annotations} component: a bound scalar, array, map or tuple is a plain Java value with no slot for
-     * metadata, and a record without a carrier opted out by not declaring one.
-     *
-     * <p>Distinct from {@link #UNVALIDATED}, which keeps them without making any claim about their type:
-     * this one keeps nothing, so it also does no checking. That matters -- validating at just the handful of
-     * positions that happen to route through a capturing reader would report a document's annotation errors
-     * arbitrarily, depending on where in the shape they were written.
+     * No governing schema <em>and</em> nowhere to put an annotation: consumed and dropped, unexamined. The
+     * schemaless counterpart of {@link #discarding()}, and the only case in which dropping and not checking
+     * are the same decision.
      */
     static final AnnotationTypes DISCARDED = new AnnotationTypes(false, Optional.empty(), name -> null);
 
@@ -49,6 +43,22 @@ record AnnotationTypes(boolean capture, Optional<TsonSchema> schema, TsonTypeRea
      */
     static AnnotationTypes of(ValueReaderContext context) {
         return new AnnotationTypes(true, Optional.of(context.schema()), context.readers());
+    }
+
+    /**
+     * This vocabulary with the annotations dropped rather than kept, and <b>still checked</b> -- what a
+     * position with a governing schema but nowhere to put the result uses.
+     *
+     * <p><b>Keeping and checking are two questions, and only the first is about the reader.</b>
+     * [TSON-SCHEMA] §6 makes an annotation a typed thing: {@code @T} names a type and its value is
+     * validated against that type's contract. Whether the reader has somewhere to <em>put</em> it afterwards
+     * is a fact about the bound Java class -- a record that declares no {@code Annotations} component, a
+     * bound scalar or array with no slot for metadata -- and a document does not become conformant because
+     * the application reading it happens to throw the annotation away. Conflating the two made a document's
+     * validity depend on the shape of a class it has never heard of.
+     */
+    AnnotationTypes discarding() {
+        return capture ? new AnnotationTypes(false, schema, readers) : this;
     }
 
     /** Whether a governing schema is in scope at all, and so whether an unresolvable name is a defect. */

@@ -105,9 +105,9 @@ reads one value at a cursor and polices nothing around it.
   that builds the node never sees them; they're put back with `TsonValue.withAnnotations` (a pure `tson-tree`
   operation). Nothing flows through the context and `TsonTypeReader.read` is unchanged — a dispatched
   annotation flows *into* the delegate's result, which is the opposite direction from the
-  `DiagnosticsReceiver` problem. Bind mode is unaffected by construction (re-attachment only acts on a
-  `TsonValue`), and `AnnotationTypes.DISCARDED` keeps it from validating at just the positions that happen to
-  route through a capturing reader.
+  `DiagnosticsReceiver` problem. Bind mode keeps nothing this way (re-attachment only acts on a `TsonValue`)
+  — a defect where the variant's own class declares an `Annotations` carrier, tracked in `BACKLOG.md`; what
+  it does do is **check** what it drops, like every other discarding position.
 - **A schema-driven read also type-checks annotations** (§6: an annotation *names a type*). `AnnotationTypes`
   resolves the name against the governing schema (§3.3.3's one hop — for a data document that's the
   `!!schema` target, i.e. the very schema the readers were compiled from) and the value is read by *that
@@ -122,6 +122,17 @@ reads one value at a cursor and polices nothing around it.
   doesn't declare), which reads its value through a **preserving** reader — §1.5 already keeps an annotation
   nothing can interpret, and rejecting its innards would take that back. This is deliberately stricter than
   Class 2 conformance requires, which asks for nothing at all here (`SPEC-FEEDBACK.md` #29).
+    - **Checked wherever it is written, kept only where there is room** — the two are different questions and
+      `AnnotationTypes` now separates them (`capture()` vs `validating()`; `discarding()` is the vocabulary
+      that drops its result and checks it anyway). Whether an annotation has somewhere to land is a fact
+      about the bound Java class — a record declaring an `Annotations` component, or a bound scalar with no
+      slot at all — and a document does not conform any better for being read by a class that throws its
+      annotations away. Conflating them made the *carrier decide the verdict*: one document, one schema, one
+      mode, reported for `Carrier` and silently accepted for `Plain`. `DISCARDED` survives for the one case
+      where dropping and not checking really are the same decision — no governing schema at all.
+    - A consequence worth stating: bind mode is all-or-nothing, so an annotation a reader was going to
+      discard can now fail the whole read. That is the point — the document is invalid, and it was being
+      accepted for a property of the reading application rather than of itself.
 - **`TsonTreeWriter` re-emits them** — `TsonDataEmitter` gained `annotation`/`beginAnnotation`/
   `endAnnotation` (the valueless form's trailing space is load-bearing, §3.1) and `writeNode` writes a
   node's annotations ahead of its type-ref, per §7.4's `*annotation [type-ref] core-value` order, so a tree
