@@ -38,6 +38,11 @@ import java.util.Optional;
  * bind-anchored regardless of read mode, and {@link #resolve} takes no mode. Only the final compile of an
  * already-resolved, already-linked schema (a registry's own {@code compile}/{@code get}) picks a mode.
  *
+ * <p><b>What that fixes is the mode, not the vocabulary.</b> The resolution core's own binder knows the
+ * kernel's names; a governing meta of a consumer's own may declare constructors beyond them ({@code
+ * operation => ~data & { ... }}), and {@link TsonConfig#metaNameBinder} adds the classes those bind to --
+ * composed over the library's binder, so the mode and every kernel name stand.
+ *
  * <p>Only supports a schema governed by (and importing only from) meta-kernel/meta.tn/core.tn --
  * a real, disk/HTTP-backed {@link TsonSchemaSource} for arbitrary other
  * governing chains is its own, separately tracked backlog item; {@link TsonConfig} is the natural

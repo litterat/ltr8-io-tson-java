@@ -125,8 +125,11 @@ sit at the schema layer because that is the only layer able to name request and 
   this library has never seen and their bodies are the consumer's own classes.
 - **The registration is a `@Typename` and a name binder, and nothing else.** A class carries
   `@Typename(name = "operation")` and implements `Data`; the `DataBindContext`'s `DataNameBinder` has to be
-  able to find it. `DataNameBinder` has a single method, so a consumer composes rather than copies — try
-  `SchemaMetaNameBinder.INSTANCE` for the kernel's own vocabulary, fall back to their own package. **No
+  able to find it. A consumer composes rather than copies — `SchemaMetaNameBinder.extendedWith(theirs)` asks
+  the kernel's own vocabulary first and theirs only for a name it does not know, so the kernel's table is
+  never duplicated and nothing shadows it. `contextExtendedWith` is that binder in a ready-made context, and
+  `TsonConfig.metaNameBinder` is the same seam through the front door — the resolution core's *mode* is
+  fixed (bind, always), which names it knows is not. **No
   reader family and no `ValueReaderFactoryRegistry` entry**: the ordinary record reader binds the
   `!operation { ... }` payload straight into the record, so §7.2 closure, field states and every atom
   constraint in the constructor's declaration are enforced exactly as for a written body.

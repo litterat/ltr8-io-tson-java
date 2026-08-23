@@ -321,12 +321,13 @@ type (`SPEC-FEEDBACK.md` #57). meta-kernel gains a fourth base kind, **`data => 
 joining `type_kind`; `schema.meta.Data` is the matching **`non-sealed`** branch of `Top` — the one open
 point in the body model, because the constructors reaching it are declared by meta-schemas this library has
 never seen. A consumer registers a class by carrying `@Typename` and being findable by the
-`DataNameBinder`; there is no reader family and no factory entry, the ordinary record reader binding the
-payload and validating it in full, and an unresolvable class is an error where the constructor is applied.
+`DataNameBinder` (`TsonConfig.metaNameBinder` through the front door, composed over
+`SchemaMetaNameBinder.INSTANCE` — the resolution core's *mode* is fixed, the names it knows are not); there
+is no reader family and no factory entry, the ordinary record reader binding the payload and validating it
+in full, and an unresolvable class is an error where the constructor is applied.
 `Data.references()` is how a body's own type references reach the linker, declared rather than discovered.
 **Amending meta-kernel is a local divergence** from published Revision 32 — the digests
 `TsonBundledSchemas` holds are this project's own now.
-own now.
 
 ### Class 2 compilation (`TsonSchemaCompiler`, `.../reader/`) — `docs/linking-and-compilation.md`
 

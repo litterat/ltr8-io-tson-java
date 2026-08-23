@@ -264,3 +264,10 @@ TsonValue value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_ty
   rejects the wrong one up front instead of failing on a cast at the first value. `objectReader()`/`objectWriter()` bind to this instance's `dataBindContext` (configurable via
   `TsonConfig.dataBindContext`, default `TsonAtomContext.defaultContext()`). `schemaRegistry()`/`loader()`
   reach the underlying machinery.
+- **Two binding seams, never merged.** `TsonConfig.dataBindContext` binds the *data* a schema describes
+  (`order` → `Order`); `TsonConfig.metaNameBinder` binds a governing meta's own *vocabulary*
+  (`operation` → `Operation`, the `data` base kind's case — `docs/linking-and-compilation.md`). One
+  namespace holding both would collide the first time a schema type and a meta-layer constructor shared a
+  name. The meta binder is composed over `SchemaMetaNameBinder.INSTANCE` rather than replacing it, so what a
+  consumer supplies adds names and gives up nothing: the standard library still compiles in object-binding
+  mode, which is the thing the internal context is fixed to protect, and every kernel name still wins.
