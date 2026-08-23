@@ -93,8 +93,10 @@ bind-mode compile — startup, not first read; its subclass `TsonMissingBindingE
 a consumer never binds). Any non-FIXED field with no component, or a component no
 field fills, is refused — optional fields included, since those are the ones that work in development and
 fail on the first caller who sends them. A FIXED field is exempt, the schema settling its value. `@Unbound` marks a component as the
-class's own, `TsonConfig.lenientBinding` opts out wholesale and is silent. `docs/readers-and-diagnostics.md`
-has the why.
+class's own, `TsonConfig.lenientBinding` opts out wholesale and is silent. Reaching a read as a diagnostic
+instead (a schema compiled on demand), it keeps its own code, `Diagnostic.Code.BIND_MISMATCH` — a
+misconfiguration in the reading application is no more a verdict on the document than a gap is.
+`docs/readers-and-diagnostics.md` has the why.
 
 **Exception classification is a policy, not a style choice.** Across the schema pipeline:
 `TsonSchemaValidationException` means *the author's schema is wrong and the spec says so*;

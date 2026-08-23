@@ -303,9 +303,12 @@ public final class TsonTreeReader {
             // reports its way out of.
             compiled = tree.get(schemaUri, receiver);
         } catch (RuntimeException e) {
-            // The schema could not be reached at all (unfetchable, malformed, a bad !!id): one problem, and
-            // there is nothing to enumerate.
-            return abandon(ctx, Diagnostic.Code.SCHEMA_ERROR, e.getMessage(), "a resolvable schema", schemaUri);
+            // No compiled schema at all: one problem, and there is nothing to enumerate. What kind of
+            // problem is SchemaFailure's -- an unfetchable or malformed schema is the author's, a bind
+            // mismatch is the reading application's, and coding them alike would make the second read as
+            // the first.
+            SchemaFailure failure = SchemaFailure.of(e);
+            return abandon(ctx, failure.code(), e.getMessage(), failure.expected(), schemaUri);
         }
         if (compiled == null) {
             // Reported above; skip the value so the stream still lands on DocumentEnd.

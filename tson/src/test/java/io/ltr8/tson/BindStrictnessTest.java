@@ -17,6 +17,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -146,6 +147,26 @@ class BindStrictnessTest {
 
         assertEquals(new OrderV1("A", 1), read(tson, OrderV1.class, problems));
         assertEquals(List.of(), problems.diagnostics());
+    }
+
+    /**
+     * The same mismatch reaching a <b>collecting</b> caller keeps saying what it is. A reader that compiles
+     * its schema on demand meets the mismatch inside a read, where there is no exception to classify on --
+     * only a {@link Diagnostic} and its code. {@code SCHEMA_ERROR} would be a false verdict twice over: the
+     * document is valid, the schema is valid, and a consumer routing on the code (an HTTP status, an exit
+     * code) would blame the sender for the reader's own wiring.
+     */
+    @Test
+    void aMismatchMetDuringAReadIsCodedAsOneRatherThanAsABadSchema() {
+        Tson tson = tson(SCHEMA, OrderV1.class, false);
+        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+
+        assertNull(read(tson, OrderV1.class, problems));
+
+        assertEquals(1, problems.diagnostics().size(), problems.diagnostics().toString());
+        Diagnostic problem = problems.diagnostics().getFirst();
+        assertEquals(Diagnostic.Code.BIND_MISMATCH, problem.code());
+        assertTrue(problem.message().contains("no component for field 'currency'"), problem.message());
     }
 
     /** Tree mode is unaffected: it binds no class, so it has nothing to disagree with. */
