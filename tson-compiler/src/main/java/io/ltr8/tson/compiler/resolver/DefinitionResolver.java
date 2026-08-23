@@ -1145,8 +1145,8 @@ final class DefinitionResolver {
     }
 
     /**
-     * §4.1: a type's kind is settled by which of the kernel's three fixed base-kind names --
-     * {@code atom}/{@code product}/{@code sum}, {@code top} never counts -- appear in its
+     * §4.1: a type's kind is settled by which of the kernel's four fixed base-kind names --
+     * {@code atom}/{@code product}/{@code sum}/{@code data}, {@code top} never counts -- appear in its
      * transitive supertype chain. This checks those exact literal names, not each ancestor's own
      * resolved {@code kind} field: {@code atom} the entry is itself {@code kind: PRODUCT} (its own
      * chain is just {@code [top]}), so "inherit the nearest ancestor's kind" would give the wrong
@@ -1155,7 +1155,8 @@ final class DefinitionResolver {
     private static TypeKind determineKind(String name, List<String> transitiveSupertypes) {
         List<String> baseKindsFound = new ArrayList<>();
         for (String supertype : transitiveSupertypes) {
-            if (supertype.equals("atom") || supertype.equals("product") || supertype.equals("sum")) {
+            if (supertype.equals("atom") || supertype.equals("product") || supertype.equals("sum")
+                    || supertype.equals("data")) {
                 baseKindsFound.add(supertype);
             }
         }
@@ -1170,6 +1171,7 @@ final class DefinitionResolver {
             case "atom" -> TypeKind.ATOM;
             case "product" -> TypeKind.PRODUCT;
             case "sum" -> TypeKind.SUM;
+            case "data" -> TypeKind.DATA;
             default -> throw new IllegalStateException(baseKindsFound.get(0));
         };
     }

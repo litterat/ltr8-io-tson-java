@@ -1,8 +1,10 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.annotation.Typename;
+import io.ltr8.tson.compiler.reader.ErrorReader;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryResolver;
 import io.ltr8.tson.compiler.reader.ValueReaderFactory;
+import io.ltr8.tson.schema.meta.Data;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
@@ -40,7 +42,6 @@ public final class TsonCompiledMetaSchema extends TsonCompiledSchema {
         this.resolver = resolver;
         this.constructors = buildConstructors(this, resolver);
     }
-
 
     /**
      * This meta-schema as a plain {@link TsonCompiledSchema} -- it *is* one (this class extends it),
@@ -92,11 +93,24 @@ public final class TsonCompiledMetaSchema extends TsonCompiledSchema {
 
     /**
      * This meta-schema's scoped constructor vocabulary: every {@code constructor: true} entry it
-     * declares, paired with its instance reader and its factory. A constructor with no factory at
-     * all is left out rather than aborting the build -- a schema that actually uses it defers to a
-     * per-entry {@link io.ltr8.tson.compiler.reader.ErrorReader} at compile-dispatch time, the same
-     * treatment any other unbuildable entry gets (the bundled chain never hits this: its own gap
-     * constructors resolve to an {@code ErrorReader} factory rather than throwing).
+     * declares, paired with its instance reader and its factory.
+     *
+     * <p><b>A constructor with no factory is kept, not dropped</b>, its factory standing in as an
+     * {@link ErrorReader} that carries the real cause. Dropping it silently -- which this did -- lost the
+     * constructor from the vocabulary without complaint, so a governing meta compiled and registered
+     * looking healthy while missing a constructor it declares, and the failure surfaced against a
+     * <em>different</em> document: the first governed schema to write {@code !C ...} was told
+     * "'C' is not a constructor 'this-meta' declares", which is both false and unactionable. Keeping it
+     * puts the verdict where the gap is -- the entry that could not be built -- and states what is
+     * missing.
+     *
+     * <p>The two facets fail independently and that is the point: the <em>instance</em> reader (reading
+     * {@code !C value} while resolving a governed schema) is compiled from {@code C}'s own record-shaped
+     * declaration and usually works, while the <em>factory</em> (building a reader for a governed entry
+     * whose body <em>is</em> such a construction) needs library support for {@code C}. A governed schema
+     * that merely declares such an entry still compiles; only reading a value against it fails -- the same
+     * treatment {@code extern}/{@code unknown_type} already get, and the reason those register an
+     * {@code ErrorReader} factory rather than throwing.
      */
     private static Map<String, ReaderResolver> buildConstructors(
             TsonCompiledSchema compiledSchema, ValueReaderFactoryResolver resolver) {
@@ -106,15 +120,32 @@ public final class TsonCompiledMetaSchema extends TsonCompiledSchema {
                 continue;
             }
             String name = entry.getKey();
-            compiledSchema.find(name).ifPresent(instanceReader -> {
-                try {
-                    constructors.put(name, new ReaderResolver(instanceReader, resolver.resolve(name)));
-                } catch (RuntimeException noFactory) {
-                    // Deliberately swallowed -- see this method's own Javadoc.
-                }
-            });
+            // Already extension-substituted where one was needed -- see withExtensionReaders.
+            TsonTypeReader<?> instanceReader = compiledSchema.find(name).orElse(null);
+            if (instanceReader == null) {
+                continue;
+            }
+            ValueReaderFactory factory;
+            try {
+                factory = resolver.resolve(name);
+            } catch (RuntimeException noFactory) {
+                factory = unbuildable(compiledSchema.schema().id(), name, noFactory);
+            }
+            constructors.put(name, new ReaderResolver(instanceReader, factory));
         }
         return Map.copyOf(constructors);
+    }
+
+    /**
+     * The stand-in factory for a constructor this library cannot build a reader for. It names the
+     * constructor, the meta-schema that declares it and the entry that tried to use it, so the message
+     * identifies the gap rather than the document that ran into it.
+     */
+    private static ValueReaderFactory unbuildable(String metaId, String constructorName, RuntimeException cause) {
+        return (entryName, definition, context) -> new ErrorReader(entryName,
+                new UnsupportedOperationException("'" + entryName + "' is built with '" + constructorName
+                        + "', a constructor declared by the meta-schema '" + metaId + "' that this library has "
+                        + "no reader for: " + cause.getMessage(), cause));
     }
 
     /**
@@ -125,7 +156,9 @@ public final class TsonCompiledMetaSchema extends TsonCompiledSchema {
     static String typenameOf(Top body) {
         Typename typename = body.getClass().getAnnotation(Typename.class);
         if (typename == null) {
-            throw new IllegalStateException(body.getClass() + " has no @Typename -- every Top leaf must carry one");
+            throw new IllegalStateException(body.getClass() + " has no @Typename -- every Top leaf must carry "
+                    + "one, a " + Data.class.getSimpleName() + " implementation included (it names the "
+                    + "constructor it is the body of)");
         }
         return typename.name();
     }

@@ -13,6 +13,7 @@ import io.ltr8.tson.schema.meta.DecimalType;
 import io.ltr8.tson.schema.meta.DurationType;
 import io.ltr8.tson.schema.meta.EmailType;
 import io.ltr8.tson.schema.meta.EnumBody;
+import io.ltr8.tson.schema.meta.Data;
 import io.ltr8.tson.schema.meta.Extern;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FloatType;
@@ -783,6 +784,15 @@ public final class TsonSchemaLinker {
             }
             case Extern ignored -> {
             }
+            case Data data -> {
+                // A body describing something other than a data value. Its shape is the consumer's own Java
+                // class, so nothing here can introspect it -- what it declares through `references()` is
+                // validated like any other reference, and everything else is opaque by design.
+                for (TypeRef reference : data.references()) {
+                    validateTypeRef(reference, namespace, ownParameters,
+                            "'" + entryName + "' (!" + TsonCompiledMetaSchema.typenameOf(data) + ")");
+                }
+            }
         }
     }
 
@@ -969,6 +979,17 @@ public final class TsonSchemaLinker {
 
     private static void validateTypeRef(TypeRef ref, Map<String, TypeDefinition> namespace, List<String> ownParameters,
                                          String context) {
+        TypeDefinition target = namespace.get(ref.name());
+        if (target != null && target.body() instanceof Data notAType) {
+            // §8.1's schema map holds only type definitions, so an entry describing something else has no
+            // way to say "declare me, but do not let anything name me as a type". The Data marker is that
+            // way. Without this the misuse resolves, links AND compiles, and fails only when a document is
+            // read against it (SPEC-FEEDBACK.md #57, consequence 2).
+            throw new TsonSchemaValidationException(context + " names '" + ref.name() + "', which is built "
+                    + "with '" + TsonCompiledMetaSchema.typenameOf(notAType) + "' and describes something "
+                    + "other than a data value -- it is declared by this schema but is not a type, so "
+                    + "nothing can be typed by it");
+        }
         if (!namespace.containsKey(ref.name()) && !ownParameters.contains(ref.name())) {
             throw new TsonSchemaValidationException(context + " has an unresolved reference '" + ref.name() + "'");
         }

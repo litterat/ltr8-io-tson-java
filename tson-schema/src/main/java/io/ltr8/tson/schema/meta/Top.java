@@ -25,5 +25,5 @@ package io.ltr8.tson.schema.meta;
  * so {@code TypeBody} was deleted and {@code TypeDefinition.body} retyped to {@code Top} directly --
  * one hierarchy, matching the kernel's own naming exactly, not two.
  */
-public sealed interface Top permits Atom, Product, Sum, Reference, InstanceTemplate {
+public sealed interface Top permits Atom, Product, Sum, Reference, InstanceTemplate, Data {
 }

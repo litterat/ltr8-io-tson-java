@@ -5,5 +5,11 @@ package io.ltr8.tson.schema.meta;
  * TypeDefinition} carries exactly one, the REQUIRED, never-defaulted {@code kind} field.
  */
 public enum TypeKind {
-    ATOM, PRODUCT, SUM, REFERENCE
+    ATOM, PRODUCT, SUM, REFERENCE,
+
+    /**
+     * An entry that describes something other than a data value -- meta-schema vocabulary riding along in a
+     * schema map. Its body is a {@link Data}; nothing may be typed by it.
+     */
+    DATA
 }
