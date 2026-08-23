@@ -3668,21 +3668,39 @@ declare the slots as real references and let the body report them (`request`/`re
 surfaced through the body's own accessor), so a dangling name is an ordinary unresolved-reference error at
 link time. That is stronger than the generic walk, and it is available only on this route.
 
-**What it cost, and this is the finding worth carrying into the revision.** §8.1's resolved output is
-normative, and a DATA entry's body is an instance of a constructor the spec has never seen. In this
-implementation the body model is a sealed Java hierarchy, deliberately, because the generic binder
-enumerates a sealed union's members to dispatch on them. Opening one branch so a consumer's own class can
-join it makes that branch unenumerable, and **writing resolved output for a DATA entry fails**:
+**What it cost: nothing at the spec level, once an implementation bug was fixed.** The experiment first
+appeared to carry a serialisation cost, and this entry recorded it as one. That was wrong, and the
+correction is worth stating because the wrong version pointed at §8.1. Writing resolved output for a DATA
+entry failed —
 
 > `TsonWriteException — value of type Operation is not a member of union interface Top`
 
-The generic-carrier alternative fails at the same point for the mirror-image reason: its payload is an
-opaque value the binder has no conversion for. Both need the same repair — dispatching such a body by the
-constructor name it carries rather than by union membership. The general lesson for the spec is that
-**§8.1 should say how a DATA entry's body serialises**, since it is the one body shape whose vocabulary is
-not fixed by the kernel; without that, an implementation's resolved output is well-defined for every entry
-except the extension the meta layer exists to permit. Reading such output back (§10.1 ingest) has the same
-question and is at least explicitly optional.
+— which looked like the spec having no account of how a body whose vocabulary the kernel does not fix gets
+serialised. It was not. A union collected from a sealed hierarchy flattens the sealed branches to their
+leaves but keeps a *non-sealed* branch as a member in its own right, precisely because its
+implementations cannot be known at analysis time; membership was then tested by exact class, so no
+implementation of that branch ever matched the member standing for it. Resolving the candidate against the
+open member and registering it on first sight closes the gap, and everything downstream was already generic
+— the body writes through its own descriptor, under its own type name. A DATA entry serialises in §8.1's
+ordinary shape, indistinguishable in form from any other body:
+
+```tson
+{ source: { name: "operation"  arguments: [] }  kind: "DATA"
+  parameters: []  constructor: false  supertypes: []  subtypes: []
+  body: !operation { path: "/search"  method: "GET"
+                     request:  { name: "search_request"   arguments: [] }
+                     response: { name: "search_response"  arguments: [] } } }
+```
+
+So resolution 2 costs one declaration and one enum member in the kernel, and nothing in §8.1: `body` already
+carries an instance of whichever constructor built the entry, and a meta-schema's own constructor is not a
+special case of that.
+
+**What does remain, and it is smaller than the above.** A DATA body's vocabulary is the one the kernel does
+not fix, so an implementation *reading* resolved output back (§10.1 ingest) must resolve the constructor
+name to something it can hold — and unlike every other body, no amount of kernel knowledge supplies it. That
+is the same shape as `extern`'s open membership rather than a new problem, and ingest is explicitly optional
+("MAY implement ingest"), so it is worth a sentence in §10.1 rather than a change anywhere.
 
 The kernel amendment is a **local divergence**, not a claim about Revision 32 and not something a consumer
 of this library should meet: it changes meta-kernel's content hash, and therefore meta's and core's pinned
