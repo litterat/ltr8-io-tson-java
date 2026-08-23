@@ -81,13 +81,23 @@ public record TypeDefinition(Optional<TypeRef> source, TypeKind kind, List<Strin
     /**
      * A reference definition whose target may itself carry arguments -- an application of a
      * non-constructor template like {@code box<text>} (§5.10). {@code target} is reused as both {@code
-     * source} and {@code body.target}, which points at the application rather than at a substituted
-     * entry: §5.10 parameter substitution is not implemented, so there is no such entry to point at.
-     * An application of a real <em>constructor</em> never reaches here -- the desugar phase rewrites it
-     * into a construction well before resolution.
+     * source} and {@code body.target}, and points at the application as written; materialisation
+     * replaces it with the instantiation entry that closing it produces. An application of a real
+     * <em>constructor</em> never reaches here -- the desugar phase rewrites it into a construction well
+     * before resolution.
      */
     public static TypeDefinition reference(TypeRef target) {
-        return new TypeDefinition(Optional.of(target), TypeKind.REFERENCE, List.of(), false, List.of(),
+        return reference(target, List.of());
+    }
+
+    /**
+     * A reference definition that is itself a template -- §5.10's partial application, {@code uuid_pair =>
+     * <B> pair<uuid, B>}: {@code parameters} are the open parameters the declaration re-declares, and
+     * {@code target} is the application that leaves them open. Applying it substitutes into {@code target}'s
+     * own argument list and closes what results, so a reference template mints no entry of its own.
+     */
+    public static TypeDefinition reference(TypeRef target, List<String> parameters) {
+        return new TypeDefinition(Optional.of(target), TypeKind.REFERENCE, parameters, false, List.of(),
                 List.of(), Optional.empty(), new Reference(target));
     }
 

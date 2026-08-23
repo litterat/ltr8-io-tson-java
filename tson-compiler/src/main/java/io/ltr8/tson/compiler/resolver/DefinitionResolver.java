@@ -423,12 +423,17 @@ final class DefinitionResolver {
                 return resolveRefinement(name, refined, constructor, parameters);
             }
         }
-        if (typeDef instanceof ReferenceTypeDef referenceTypeDef && referenceTypeDef.typeParams().isEmpty()) {
+        if (typeDef instanceof ReferenceTypeDef referenceTypeDef) {
+            // A parameter list here is §5.10's partial application -- `uuid_pair => <B> pair<uuid, B>`, a
+            // reference that leaves parameters open and re-declares them, which makes the alias itself a
+            // template. It threads straight through; substituting into the recorded application is
+            // materialisation's job, and until then the open form is what the entry records.
+            List<String> parameters = referenceTypeDef.typeParams();
             if (referenceTypeDef.ref() instanceof SimpleRef simple) {
-                return TypeDefinition.reference(simple.name());
+                return TypeDefinition.reference(io.ltr8.tson.schema.meta.TypeRef.of(simple.name()), parameters);
             }
             if (referenceTypeDef.ref() instanceof GenericRef generic) {
-                return resolveTemplateApplication(name, generic);
+                return resolveTemplateApplication(name, generic, parameters);
             }
         }
         // A declaration-level container form is rewritten by SchemaDesugarer before resolution -- a sized
@@ -897,10 +902,15 @@ final class DefinitionResolver {
      * a <em>template</em> application, since every constructor application is turned into an {@code !C value}
      * instance before resolution. It resolves to a {@link TypeKind#REFERENCE} entry targeting the application
      * as written, which is what §5.3's sized-array sugar has always produced for {@code array_min}/{@code
-     * array_max}/{@code array_ranged}. Real §5.10 parameter substitution is unimplemented, so the arguments
-     * are carried rather than applied.
+     * array_max}/{@code array_ranged}. The arguments are carried, not applied: closing the application is
+     * {@code TemplateMaterialiser}'s pass, which runs over the resolved form.
+     *
+     * <p>{@code parameters} is the declaration's own {@code <...>} list, empty for an ordinary alias and
+     * non-empty for §5.10's <b>partial application</b> ({@code uuid_pair => <B> pair<uuid, B>}), where some
+     * of the arguments name parameters this declaration re-declares. It threads through untouched -- what
+     * makes the entry a template is exactly that list, and the open form is the application itself.
      */
-    private TypeDefinition resolveTemplateApplication(String name, GenericRef generic) {
+    private TypeDefinition resolveTemplateApplication(String name, GenericRef generic, List<String> parameters) {
         List<TypeArgument> arguments = new ArrayList<>();
         for (TypeArg arg : generic.args()) {
             try {
@@ -909,7 +919,8 @@ final class DefinitionResolver {
                 throw new UnsupportedOperationException("'" + name + "': " + e.getMessage());
             }
         }
-        return TypeDefinition.reference(new io.ltr8.tson.schema.meta.TypeRef(generic.name(), arguments));
+        return TypeDefinition.reference(new io.ltr8.tson.schema.meta.TypeRef(generic.name(), arguments),
+                parameters);
     }
 
     /**

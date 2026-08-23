@@ -54,7 +54,7 @@ own prose (which had gone stale on at least one of them):
 
 ## Remaining Part 2 resolution gaps
 
-Two are left. `DefinitionResolver.resolveTypeRef`'s catch-all, which used to head this section, is now
+One is left. `DefinitionResolver.resolveTypeRef`'s catch-all, which used to head this section, is now
 unreachable from a desugared document — every shape it named resolves or is refused where it is written —
 and survives only as a guard against a caller resolving raw AST with the desugar phase skipped.
 
@@ -64,13 +64,15 @@ and survives only as a guard against a caller resolving raw AST with the desugar
   parameters, which cannot close until that declaration itself materialises — so composition would have to
   be deferred to materialisation too, absorbing fields into an entry that does not exist yet. A different
   feature from closing an application, and the diagnostic now says so rather than blaming substitution.
-- [ ] **A parameterised alias — partial application** (`uuid_pair => <B> pair<uuid, B>`). A parameterised
-  declaration whose whole body is a bare application hits `DefinitionResolver.resolveTypeDef`'s
-  "got ReferenceTypeDef" catch-all (`UnsupportedOperationException`, so the CLI exits 70). Distinct from,
-  and simpler-looking than, the composition item above: no absorption is involved — the open form to record
-  is the inner application with the alias's own parameters substituted into its argument list, i.e. §5.10's
-  partial application, which `tson-cr-structure-templates.md` §4.5 lists as "retained unchanged". Found by
-  the 2026-08-21 CLI shakedown.
+- [ ] **§8.3 use-site reference flattening and `@alias`.** The spec has the resolver walk a reference chain
+  to the first non-`REFERENCE` entry, rewrite the *use site* to that entry's name, and attach `@alias:name`
+  to the type value recording the source-level alias (`type: @alias:id uuid`) — recursively inside
+  `arguments`, which is what makes instantiation identity a single-level comparison (§8.2). Resolver output
+  here keeps the hop instead: a use site names the alias entry and the compiler collapses the `Reference`
+  body at compile time, so reads are right but the emitted `type_definition` is not §8.3's shape, and
+  `@alias` appears nowhere in the codebase. Noticed while implementing §5.10 partial application, where
+  §5.10 names `@alias` as the thing that preserves an alias hop's origin at use sites — but it is not
+  specific to templates: every `name => other_name` alias is the same case.
 
 Only genuine gaps are listed here — a throw that means "your schema is wrong" is not one. Classifying the
 throw sites by that test is done across the whole schema pipeline (issue #26); if a census is ever wanted
