@@ -87,6 +87,13 @@ value is disambiguation at the call site (`TsonSchema` vs. a domain `Schema`). W
 developer-facing type, ask "would a consumer plausibly have their own class with this bare name?" — if yes
 and it's consumer-facing, prefix it; if it's internal machinery, leave it bare.
 
+**A schema and its bound class must agree about a type's fields** (`TsonBindMismatchException`, raised at
+bind-mode compile — startup, not first read). Any non-FIXED field with no component, or a component no
+field fills, is refused — optional fields included, since those are the ones that work in development and
+fail on the first caller who sends them. A FIXED field is exempt, the schema settling its value. `@Unbound` marks a component as the
+class's own, `TsonConfig.lenientBinding` opts out wholesale and is silent. `docs/readers-and-diagnostics.md`
+has the why.
+
 **Exception classification is a policy, not a style choice.** Across the schema pipeline:
 `TsonSchemaValidationException` means *the author's schema is wrong and the spec says so*;
 `UnsupportedOperationException` means *this library hasn't implemented that yet*; `IllegalStateException`

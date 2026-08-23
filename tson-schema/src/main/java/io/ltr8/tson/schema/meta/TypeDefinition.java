@@ -2,6 +2,7 @@ package io.ltr8.tson.schema.meta;
 
 import io.ltr8.annotation.Annotations;
 import io.ltr8.annotation.Record;
+import io.ltr8.annotation.Unbound;
 
 import java.util.List;
 import java.util.Objects;
@@ -25,6 +26,10 @@ import java.util.Optional;
  * practice: written output is structurally faithful but more verbose than the non-normative
  * {@code meta-kernel-resolved.tn1} fixture's own hand-authored, terser conventions.
  *
+ * <p>{@code position} is {@code @Unbound}: §8.1's {@code type_definition} declares no such field, so no
+ * schema fills it and the strict binding check would otherwise call it a mismatch. It is this
+ * implementation's own, kept for diagnostics -- exactly the case the marker exists for.
+ *
  * <p>{@code position} -- where this declaration sits in whatever schema source text it was resolved
  * from, when known -- is deliberately excluded from {@link #equals}/{@link #hashCode} (both
  * hand-written below, not generated). Every other component here is compared structurally
@@ -39,7 +44,7 @@ import java.util.Optional;
  */
 public record TypeDefinition(Optional<TypeRef> source, TypeKind kind, List<String> parameters,
                               boolean constructor, List<String> supertypes, List<String> subtypes,
-                              Optional<Boolean> disjoint, Top body, Optional<SourcePosition> position,
+                              Optional<Boolean> disjoint, Top body, @Unbound Optional<SourcePosition> position,
                               Annotations annotations) {
 
     @Record

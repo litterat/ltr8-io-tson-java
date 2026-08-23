@@ -74,7 +74,19 @@ public final class TsonCompiledSchemaRegistry {
      * that mapping.
      */
     public static TsonCompiledSchemaRegistry bind(TsonCompiledMetaRegistry core, DataBindContext context) {
-        return new TsonCompiledSchemaRegistry(core, ValueReaderFactoryRegistry.bind(context), Mode.BIND);
+        return bind(core, context, true);
+    }
+
+    /**
+     * {@link #bind(TsonCompiledMetaRegistry, DataBindContext)} with the schema-to-class agreement check made
+     * optional -- {@code strict} false is the opt-out for a caller who means to read a document whose schema
+     * declares more than their class holds (versioned evolution, where a v1 consumer reads a v2 document).
+     * What it buys back is silence, so it is worth being sure: the dropped value is gone with no trace, and
+     * the same symptom from a *mistake* is a field mysteriously holding its default.
+     */
+    public static TsonCompiledSchemaRegistry bind(TsonCompiledMetaRegistry core, DataBindContext context,
+                                                   boolean strict) {
+        return new TsonCompiledSchemaRegistry(core, ValueReaderFactoryRegistry.bind(context, strict), Mode.BIND);
     }
 
     /**

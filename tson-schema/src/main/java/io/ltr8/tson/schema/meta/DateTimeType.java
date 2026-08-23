@@ -1,6 +1,10 @@
 package io.ltr8.tson.schema.meta;
 
+import io.ltr8.annotation.Field;
+import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
+
+import java.math.BigInteger;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -12,14 +16,33 @@ import java.util.Optional;
  * {@code date-time}). Pure constraint values, no parsing/validation behavior -- {@code
  * tson-compiler}'s {@code DateTimeParser} holds one of these and does the actual reading/writing.
  *
+ * <p><b>{@code precision} and {@code require_timezone} are carried but not enforced.</b> The constructor
+ * declares them, so the body must too -- a component-less field is a value a schema states and this model
+ * silently loses ({@code RecordBindReader} refuses such a binding outright). What is missing is downstream:
+ * {@code DateTimeParser} rejects a schema that sets either, rather than accepting one and ignoring the facet.
+ *
  * <p>Also an {@link Atom} variant: {@code datetime => !datetime_type {}} is a
  * constructor-application instance (§5.5) whose resolved body is exactly {@link #UNCONSTRAINED}.
  */
 @Typename(name = "datetime_type")
-public record DateTimeType(Optional<OffsetDateTime> min, Optional<OffsetDateTime> max) implements Atom {
+public record DateTimeType(Optional<OffsetDateTime> min, Optional<OffsetDateTime> max, Optional<BigInteger> precision,
+                          @Field("require_timezone") Optional<Boolean> requireTimezone) implements Atom {
+
+    /**
+     * Carries {@code @Record} because a second constructor exists below, and {@code tson-bind}'s own
+     * constructor selection fails outright without it (see {@link IntegerSize}).
+     */
+    @Record
+    public DateTimeType {
+    }
+
+    /** The bounds alone, for the many callers that set no facet -- the two unenforced ones default to absent. */
+    public DateTimeType(Optional<OffsetDateTime> min, Optional<OffsetDateTime> max) {
+        this(min, max, Optional.empty(), Optional.empty());
+    }
 
     /** {@code datetime => !datetime_type {}} -- the unconstrained datetime, §5.4's {@code !datetime}. */
-    public static final DateTimeType UNCONSTRAINED = new DateTimeType(Optional.empty(), Optional.empty());
+    public static final DateTimeType UNCONSTRAINED = new DateTimeType(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
 
     /**
      * {@inheritDoc}

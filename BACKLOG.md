@@ -127,7 +127,7 @@ mismatch is knowable at startup rather than per document. That is the point of c
 found when the schema binds to its `DataClass` is fixed in minutes, where leniency lets it reach testing or
 production and present as a field that mysteriously has its default.
 
-- [ ] **Strict by default, with opt-in leniency and a FIXED exemption.** Instrumenting both directions and
+- [x] **Strict by default, with opt-in leniency and a FIXED exemption.** *(Done.)* Instrumenting both directions and
   running the whole suite finds **27 distinct mismatches in this library's own bundled binding**, and they
   classify cleanly:
   - **21 are FIXED fields and are legitimate**: `access_pattern`/`size_type` on `ArrayBody`/`MapBody`/
@@ -143,13 +143,13 @@ production and present as a field that mysteriously has its default.
     the deliberate evolution case is a call-site decision rather than a silent global default.
   - **A breaking change for consumers**, deliberately. Cheap at `0.1.0-SNAPSHOT`, much less so after a real
     release — an argument for doing it now rather than later.
-- [ ] **`DateTimeType` and `TimeType` silently drop `precision` and `require_timezone`.** A live instance of
-  the same defect, independent of the check above. `datetime_type` declares both as ordinary optional facets
-  (`precision: integer?`, `require_timezone: boolean?`) and the bound record is
-  `DateTimeType(Optional<OffsetDateTime> min, Optional<OffsetDateTime> max)` — so an author writing
-  `!datetime ^ { precision: 3  require_timezone: true }` has both dropped and never enforced. This is the
-  family `CLAUDE.md`'s own trap documents ("`UriType`/`RegexType` did both for a long time, invisibly"),
-  still live in two more classes, and it is exactly what the strictness check would have caught.
+- [ ] **`precision` and `require_timezone` are carried but not enforced** (`datetime`/`time`). The bodies
+  declare them now — a field with no component is one this model silently loses — and the parsers *refuse* a
+  schema that sets either, so the facet is a stated gap rather than a constraint quietly not applied. What
+  remains is enforcement, and both halves need a decision before code: `precision`'s required semantics
+  (exact vs. maximum fractional-digit count) are not settled by the spec and want a `SPEC-FEEDBACK.md` entry,
+  and `require_timezone: false` needs an offset-less parse path neither parser has (`true` is already the
+  behaviour, RFC 3339 requiring an offset on every value these atoms accept).
 - [ ] **Constructor selection by schema field set.** Where a class declares several constructors, the one
   whose parameters match the schema's field set is arguably the one to bind through — a developer providing a
   shorter constructor with defaults has stated an intention the binder could honour. Today

@@ -63,11 +63,11 @@ public final class Tson {
     private final TsonCompiledSchemaRegistry bind;
     private final DataBindContext dataBindContext;
 
-    Tson(TsonCompiledMetaRegistry core, DataBindContext dataBindContext) {
+    Tson(TsonCompiledMetaRegistry core, DataBindContext dataBindContext, boolean strictBinding) {
         this.core = core;
         this.dataBindContext = dataBindContext;
         this.tree = TsonCompiledSchemaRegistry.tree(core);
-        this.bind = TsonCompiledSchemaRegistry.bind(core, dataBindContext);
+        this.bind = TsonCompiledSchemaRegistry.bind(core, dataBindContext, strictBinding);
     }
 
     /** A fresh {@link TsonConfig} -- {@link TsonConfig#build()} bootstraps meta-kernel/meta.tn/core.tn and returns the resulting {@link Tson}. */
