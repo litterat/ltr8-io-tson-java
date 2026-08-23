@@ -3499,3 +3499,69 @@ statements are independent, and only the example conflicts with the rule above.
 §3.3.1's "One hop" also needs re-wording once `!!import` is transitive: "the target's local declarations plus
 its imports" then means the target's full closure. Nothing in the bundled chain changes (meta.tn imports only
 meta-kernel), but the sentence stops being accurate as written.
+
+
+## 56. §3.3.3's one-hop rule never says what happens to an annotation whose name it excludes
+
+**Section:** §3.3.3 (Annotation Resolution), §6 (Annotations as Types).
+
+§3.3.3 draws the annotation namespace tightly and unambiguously:
+
+> An annotation `@name` or `@name:value` resolves against the **governing target's namespace** — the `!!meta`
+> target for a schema document, the `!!schema` target for a data document — one hop, locals plus imports.
+> Neither the local declarations of the document being authored nor any further rung of the ladder
+> participates.
+
+and spells out the consequence an author will actually meet:
+
+> An annotation type declared locally in a user schema is usable by that schema's *data documents* — but not
+> within the declaring schema document itself, whose governing target is meta.
+
+What neither section states is the **failure mode**. §6 says an annotation "names a type `T`" and that its
+value "is validated against `T`'s contract", so a name the one hop cannot reach has no contract to validate
+against — but the spec never says whether that is a resolver error, a warning, or a silently retained
+annotation. §7.2 supplies a precedent going the *other* way for a neighbouring construct (an unresolved
+*type* annotation in a schemaless document "is preserved unresolved — applications SHOULD treat unresolved
+type annotations as informational"), which makes silence here a genuinely available reading rather than an
+obvious oversight.
+
+**The reading matters because the quiet outcome is the harmful one.** This implementation originally took
+the permissive route by accident: an annotation whose name missed the one hop kept its name and dropped its
+value, with no diagnostic. An author annotating declarations with a locally declared `@method:POST` /
+`@status:201` got a schema that loaded clean and metadata that was not there, discoverable only by
+inspecting resolver output. The name-plus-no-value shape is worse than either alternative — it is not the
+annotation the author wrote, and it is not an error either.
+
+**Interpretation chosen:** an annotation whose name does not resolve one hop against the governing target's
+namespace is a schema error, reported against the declaration that wrote it. The check applies to the
+valueless form as well: §6 makes bare `@T` shorthand for `@T:_`, so both forms name a type, and a marker
+whose type nothing can reach is as unresolved as a valued one. The diagnostic distinguishes the near miss —
+the name *is* declared by this schema or brought in by `!!import`, which §3.3.3 admits for the schema's data
+documents and excludes here — and names the remedy (declare the annotation type in a meta-schema and point
+`!!meta` at it). `SchemaAnnotationScopeTest` pins all of it, including the remedy working end to end.
+
+The one deliberate exception is the meta-kernel bootstrap, which has no compiled governing meta to resolve
+against while it is producing the very entries such a resolution would read through; there the name is kept
+and the value dropped, as before.
+
+**Suggested resolution:** state the failure mode in §6, beside "the value is validated against `T`'s
+contract":
+
+> A name that does not resolve one hop against the governing target's namespace is a resolver error. The
+> permissive treatment §7.2 gives an unresolved *type* annotation in a schemaless document does not extend
+> here: an annotation type is metadata the author asserts, not data whose shape a processor may pass through,
+> and there is no meaningful partial outcome — retaining the name without its value yields neither the
+> annotation written nor an error.
+
+and add the pointer §3.3.3's own bullet is one sentence short of:
+
+> Custom annotations for schema documents therefore require an extended meta-schema; writing one whose type
+> is declared locally is a resolver error, not a silently valueless annotation.
+
+**Worth reconsidering separately:** the rule itself is surprising, and the workaround it forces is a
+meta-layer schema that exists solely to hold annotation types — declaring no constructors and otherwise
+unnecessary. An annotation type is an ordinary declaration, and there is no obvious reason its own schema
+cannot supply the contract its values validate against. That is a larger change than the diagnostic (it
+would need the declaring schema's own compiled reader available during its own resolution, which the
+pipeline does not have at that point), and it is stated here as a design question rather than a defect: the
+rule as written is self-consistent, and the diagnostic is what the current revision is missing.

@@ -250,6 +250,15 @@ final class DefinitionResolver {
     private final DefinitionGetter namespaceDefinitions;
 
     /**
+     * Whether this resolver can bind annotation values at all -- false only for a caller with no compiled
+     * governing meta to read one through (the meta-kernel bootstrap, which is producing the very entries such
+     * a reader would need). It is what separates "this annotation's type is out of reach here" from "this
+     * annotation's type does not resolve", the second of which is the author's error; see
+     * {@link #bindAnnotationValue}.
+     */
+    private final boolean annotationsResolve;
+
+    /**
      * Closes a fully-bound template application into the entry it denotes, returning that entry's name.
      * Needed at the two positions that absorb a supertype's <em>fields</em> -- a composition supertype and a
      * refinement source -- because those resolve here, while the rest of §5.10 materialisation runs as a
@@ -262,22 +271,27 @@ final class DefinitionResolver {
      */
     private final ApplicationCloser applicationCloser;
 
-    /** No annotation reader: an annotation's name is kept, its value is out of reach. See {@link AnnotationValueReader}. */
+    /**
+     * No annotation reader: an annotation's name is kept, its value is out of reach, and no name is checked
+     * against the structure namespace. See {@link AnnotationValueReader}.
+     */
     DefinitionResolver(DefinitionMetaReader definitionMetaReader, DefinitionGetter metaDefinitions,
                         DefinitionGetter namespaceDefinitions) {
-        this(definitionMetaReader, (type, value) -> null, metaDefinitions, namespaceDefinitions);
+        this(definitionMetaReader, null, metaDefinitions, namespaceDefinitions, null);
     }
 
     DefinitionResolver(DefinitionMetaReader definitionMetaReader, AnnotationValueReader annotationValueReader,
                         DefinitionGetter metaDefinitions, DefinitionGetter namespaceDefinitions) {
-        this(definitionMetaReader, annotationValueReader, metaDefinitions, namespaceDefinitions, null);
+        this(definitionMetaReader, Objects.requireNonNull(annotationValueReader, "annotationValueReader"),
+                metaDefinitions, namespaceDefinitions, null);
     }
 
     DefinitionResolver(DefinitionMetaReader definitionMetaReader, AnnotationValueReader annotationValueReader,
                         DefinitionGetter metaDefinitions, DefinitionGetter namespaceDefinitions,
                         ApplicationCloser applicationCloser) {
         this.definitionMetaReader = Objects.requireNonNull(definitionMetaReader, "definitionMetaReader");
-        this.annotationValueReader = Objects.requireNonNull(annotationValueReader, "annotationValueReader");
+        this.annotationsResolve = annotationValueReader != null;
+        this.annotationValueReader = annotationValueReader == null ? (type, value) -> null : annotationValueReader;
         this.metaDefinitions = Objects.requireNonNull(metaDefinitions, "metaDefinitions");
         this.namespaceDefinitions = Objects.requireNonNull(namespaceDefinitions, "namespaceDefinitions");
         this.applicationCloser = applicationCloser;
@@ -321,11 +335,18 @@ final class DefinitionResolver {
      *
      * <p>A value is bound through the governing meta the same way §6 describes reading one: the annotation's
      * name resolves one hop against the structure namespace, and its value is read by that type's own
-     * compiled reader -- so {@code @doc:"..."} arrives as a {@code String}. <b>When the name resolves to
-     * nothing there the annotation is kept but its value is not</b>: {@code schema.meta} is a pure value
-     * model with no dependency on the grammar layer, so there is no unbound form for it to hold, and
-     * dropping the name too would lose more ([TSON-DATA] §1.5). The meta-kernel's own bootstrap is the case
-     * that hits this, having no compiled reader at all while it is being produced.
+     * compiled reader -- so {@code @doc:"..."} arrives as a {@code String}. <b>A name that does not resolve
+     * there is the author's error</b> ({@link #unresolvedAnnotation}), not a silently valueless annotation:
+     * §3.3.3's one hop is the whole annotation namespace of a schema document, and an annotation whose type
+     * is unreachable has no contract to validate its value against. The case worth its own wording is the
+     * one an author actually hits -- a type this schema declares itself, or brings in through {@code
+     * !!import}, which §3.3.3 admits for the schema's <em>data documents</em> and excludes here.
+     *
+     * <p>The check is skipped entirely by a resolver constructed with no {@link AnnotationValueReader}: there
+     * is no compiled governing meta to resolve against, so every name would fail it. That is the meta-kernel
+     * bootstrap, which is producing the very entries such a reader would read through; there the annotation's
+     * name is kept and its value dropped, {@code schema.meta} being a pure value model with no unbound form
+     * to hold one in, and dropping the name too would lose more ([TSON-DATA] §1.5).
      */
     Annotations annotationsFor(String name, List<io.ltr8.tson.compiler.ast.Annotation> written) {
         return annotationsOf(name, written);
@@ -337,10 +358,32 @@ final class DefinitionResolver {
         }
         Annotations.Builder annotations = new Annotations.Builder();
         for (io.ltr8.tson.compiler.ast.Annotation annotation : written) {
+            // The name is checked whether or not a value was written: §6's bare `@T` is shorthand for `@T:_`,
+            // so both forms name a type, and a marker whose type nothing can reach is as unresolved as a
+            // valued one.
+            if (annotationsResolve && metaDefinitions.getTypeDefinition(annotation.name()) == null) {
+                throw unresolvedAnnotation(name, annotation.name());
+            }
             annotations.add(new Annotation(annotation.name(), annotation.value().flatMap(
                     value -> Optional.ofNullable(bindAnnotationValue(name, annotation.name(), value)))));
         }
         return annotations.build();
+    }
+
+    /**
+     * §3.3.3's one hop missed: {@code annotationName} is not an entry of the governing meta-schema's own
+     * namespace. Worded from the two ways an author gets here -- a name they declared in this very schema (or
+     * imported into it), which is the near miss the rule actually catches, and a name that is simply nowhere.
+     */
+    private TsonSchemaValidationException unresolvedAnnotation(String declaration, String annotationName) {
+        boolean local = namespaceDefinitions.getTypeDefinition(annotationName) != null;
+        return new TsonSchemaValidationException("'" + declaration + "': '@" + annotationName + "' does not name "
+                + "a type in the governing meta-schema's namespace, which is the whole annotation namespace of a "
+                + "schema document (one hop through !!meta, §3.3.3)"
+                + (local ? " -- the name is declared by this schema or brought in by !!import, which makes it "
+                        + "usable by this schema's data documents but not within the schema document itself; "
+                        + "declare the annotation type in a meta-schema and point !!meta at that"
+                        : ""));
     }
 
     /** An annotation's value through the type its name refers to, or {@code null} when that type is out of reach. */

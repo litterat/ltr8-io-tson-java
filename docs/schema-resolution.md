@@ -22,6 +22,22 @@ are kept in step deliberately.
   §3.3.1), and `DefinitionMetaReader read(type, value)` (binds a constructor-application/atom-refinement
   value through the governing meta's compiled reader). A resolver with nothing to offer supplies always-
   throwing / always-null constants.
+- **An annotation on a declaration resolves one hop and only one hop** (§3.3.3): against the governing
+  meta's namespace (`metaDefinitions`), never the schema's own declarations or its `!!import`s. The name is
+  checked whether or not a value was written — §6 makes bare `@T` shorthand for `@T:_`, so both forms name a
+  type — and a name that misses is a `TsonSchemaValidationException` against the declaration that wrote it,
+  with the near miss worded separately: a type *this* schema declares (or imports) is usable by the schema's
+  **data documents** and not within the schema document itself, so the message names the remedy (move the
+  declaration into a meta-schema and point `!!meta` at it). Silence here was the harmful outcome and is what
+  the check replaces — the annotation used to keep its name and lose its value, so the schema loaded clean
+  and the metadata was not there (`SPEC-FEEDBACK.md` #56, `SchemaAnnotationScopeTest`). A value that *does*
+  resolve is read by that type's own compiled reader, so `@doc:"..."` arrives as a `String`. **The one
+  resolver that skips the check is the meta-kernel bootstrap**, which passes no `AnnotationValueReader` at
+  all: it is producing the very entries such a reader would read through, so every name would fail, and there
+  the name is kept and the value dropped as before. Both annotation sets go through this — the ones after
+  `=>` that land on the `TypeDefinition`, and the ones before the name that land on the entry's key — and
+  `SchemaResolver` catches the second set's failures itself, since that loop runs outside the memoized getter
+  that catches the first set's.
 - **What resolves:** record construction; composition (`A & B & { ... }`, §5.8, with kind from the literal
   base-kind names in the transitive supertype chain, and tightening in the trailing body per §5.7); the
   `^` refinement operator (§5.7, copies the source's whole field set, admits no new fields); bare
