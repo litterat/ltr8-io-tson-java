@@ -105,7 +105,7 @@ import java.util.function.UnaryOperator;
  * <p><b>An invalid sugar form is reported per declaration, not thrown</b>, when a {@link
  * DesugarFailureReporter} is supplied -- the same one-pass treatment {@code SchemaResolver} and {@code
  * TsonSchemaLinker} give their own phases, so an author sees every independent problem at once rather than
- * one per run. {@link #desugarOrReport} has the mechanics and {@link #ABSORBED} what a reported declaration
+ * one per run. {@link #desugarOrReport} has the mechanics and {@link #absorbed} what a reported declaration
  * leaves behind.
  */
 final class SchemaDesugarer {
@@ -149,11 +149,18 @@ final class SchemaDesugarer {
      * obligation, and the half of its model worth keeping. It can only ever be reached through a {@link
      * DesugarFailureReporter}, so a document that expanded cleanly can never contain one.
      *
-     * <p>Shared rather than built per failure: it carries nothing declaration-specific, and it is deliberately
-     * never in {@code TsonSchemaParser.declarationPositions()} -- the position belongs to the diagnostic
-     * already reported against the real declaration, not to this stand-in.
+     * <p><b>It keeps the declaration's own type parameters</b>, and that is the one declaration-specific
+     * thing it carries. Answering "how many type parameters?" with zero makes a downstream {@code bl<text>}
+     * report that {@code bl} "declares no type parameters ... drop the argument list" -- advice that is
+     * wrong, since the fix is upstream at the declaration that actually failed. Absorbing means answering
+     * every question, not answering them all with nothing.
+     *
+     * <p>It is deliberately never in {@code TsonSchemaParser.declarationPositions()} -- the position belongs
+     * to the diagnostic already reported against the real declaration, not to this stand-in.
      */
-    private static final TypeDef ABSORBED = new StructuralTypeDef(List.of(), false, new RecordDef(List.of()));
+    private static TypeDef absorbed(SchemaMap.Declaration declaration) {
+        return new StructuralTypeDef(typeParams(declaration.typeDef()), false, new RecordDef(List.of()));
+    }
 
     /**
      * Names already in scope from {@code !!import}. A sugar form that generates a name an import already
@@ -204,7 +211,7 @@ final class SchemaDesugarer {
      * when there was nothing to expand.
      *
      * <p>A declaration whose sugar form is invalid is reported to {@code reporter} and replaced with {@link
-     * #ABSORBED}, so the declarations around it still expand and go on to resolve -- see {@link
+     * #absorbed}, so the declarations around it still expand and go on to resolve -- see {@link
      * #desugarOrReport}. With a {@code null} {@code reporter} the first such form throws instead.
      */
     static SchemaDocument desugar(SchemaDocument document, Set<String> imported,
@@ -256,7 +263,7 @@ final class SchemaDesugarer {
 
     /**
      * One declaration expanded, or -- when its sugar form is invalid and a {@link DesugarFailureReporter} is
-     * in play -- reported and replaced with {@link #ABSORBED}. Per declaration, which is both the granularity
+     * in play -- reported and replaced with {@link #absorbed}. Per declaration, which is both the granularity
      * {@code SchemaResolver} reports at one phase later and the finest source positions this project has.
      *
      * <p><b>The substitution is not optional.</b> Leaving the declaration un-expanded would hand {@code
@@ -286,7 +293,7 @@ final class SchemaDesugarer {
             }
             reporter.reportFailedDeclaration(declaration, e);
             return new SchemaMap.Declaration(declaration.nameAnnotations(), declaration.name(),
-                    declaration.typeDefAnnotations(), ABSORBED);
+                    declaration.typeDefAnnotations(), absorbed(declaration));
         }
     }
 
@@ -465,7 +472,8 @@ final class SchemaDesugarer {
         }
     }
 
-    private static List<String> typeParams(TypeDef typeDef) {
+    /** A declaration's declared type parameters, or none -- also how a placeholder learns its own arity. */
+    static List<String> typeParams(TypeDef typeDef) {
         return switch (typeDef) {
             case InstanceTemplate template -> template.typeParams();
             case StructuralTypeDef structural -> structural.typeParams();

@@ -387,6 +387,18 @@ error* category, so this is the same layer, not a new one.
   *because* `child` did, reporting a consequence beside its cause. Swift's other half is kept — producing one
   means a diagnostic was already reported. It never escapes a reporting resolve, so it needs no `TypeKind`
   of its own.
+    - **It keeps the declaration's own type parameters**, which is the one declaration-specific thing it
+      carries. Answering every question is not answering them all with nothing: with the arity dropped, an
+      application `bl<int32>` of a broken template `bl => <T> …` was told that `bl` "declares no type
+      parameters … drop the argument list" — a fix that would break the schema further, the real one being
+      upstream. With the arity intact the application closes against the empty body and says nothing.
+- **A template condemned by `TemplateRegularity` is replaced before materialisation**, on the same terms.
+  `check` hands its caller the names it rejected and `SchemaResolver` substitutes a placeholder in both the
+  entry map and the namespace (the two are read by different halves — `materialise` walks the first, an
+  application's head resolves through the second). Left in place, an application of one ran to
+  `MAX_CLOSING_DEPTH` and reported the same defect a second time, against whichever entry applied it and
+  carrying a 64-link chain of synthetic names the author never wrote. **The depth guard itself does not
+  stand down**: what it guards is a hole in the static check, not a template the check already condemned.
 - **`Tson.validateSchema(schemaText)` is the front door and owns the phase boundary** — the schema-side peer
   of `validate`, and the only caller that composes all three phases. Every declaration parses before a
   verdict and a document that didn't parse whole is not resolved at all; every declaration then resolves
@@ -413,7 +425,8 @@ error* category, so this is the same layer, not a new one.
   `Diagnostic.ofSchemaError` construction in `SchemaResolver`, which alone holds the canonical id and the
   identity-keyed position table. It needs no phase boundary because it runs *inside* `resolveSchema`, so
   whatever it reports is already behind the gate the caller checks. A reported declaration is replaced with
-  `ABSORBED` (a fresh zero-field record, the AST-level twin of `SchemaResolver.unresolved`) — **not passed
+  an `absorbed` stand-in (a zero-field record keeping the declaration's type parameters, the AST-level
+  twin of `SchemaResolver.unresolved`) — **not passed
   through**, which would hand `DefinitionResolver` the very `ContainerTypeDef` the phase exists to remove and
   draw an `UnsupportedOperationException` the resolver deliberately doesn't catch, turning a reported author
   error into an unreported abort. Injected declarations are never rolled back: names are derived from the

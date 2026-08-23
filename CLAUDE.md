@@ -509,10 +509,12 @@ the class and (where noted) pinned by a test; the `docs/` notes carry the full w
   `MetaKernelBootstrapResolver` hands those same constants back — only a schema resolved through the
   compiled meta reader shows it. `DefinitionResolverTest.resolvesRegexAndUriInstancesWithEveryComposedFieldBound`
   is the guard.
-- **A desugar-reported declaration is replaced with `ABSORBED`, never passed through** — passing it through
-  hands `DefinitionResolver` the very node the phase removes and turns a reported author error into an
-  unreported abort. Injected declarations are never rolled back (later declarations may already reference
-  them).
+- **A desugar-reported declaration is replaced with an absorbing stand-in, never passed through** — passing
+  it through hands `DefinitionResolver` the very node the phase removes and turns a reported author error
+  into an unreported abort. Injected declarations are never rolled back (later declarations may already
+  reference them). **Both placeholders keep the failed declaration's own type parameters** (`absorbed`, and
+  `SchemaResolver.unresolved` one phase later): answering "how many type parameters?" with zero tells a
+  downstream `bl<text>` to "drop the argument list", which is a wrong fix for someone else's error.
 - **Atom refinement's `TsonObjectWriter` round-trip has no cheaper substitute** — the merge must run on the
   wire record before binding, or `REQUIRED`-no-default constructor fields fail `FIELD_REQUIRED`
   (`DefinitionResolverTest.atomRefinementInheritsARequiredFieldItsSourceAlreadyFixed`). This dependency is

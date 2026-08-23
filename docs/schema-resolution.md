@@ -341,6 +341,13 @@ template body, a recursive application — direct or mutual — must pass each p
   choice so it stays visible.
 - **Arity is not checked here.** A never-applied template's arity is still unverified — its own gap — so the
   comparison runs only where the arity already matches.
+- **A condemned template does not reach materialisation.** `check` returns the names it rejected and
+  `SchemaResolver` replaces each with the same placeholder a failed declaration leaves, in both the entry map
+  and the namespace — `materialise` walks the first, an application's head resolves through the second.
+  Without that, an application of a condemned template ran to `MAX_CLOSING_DEPTH` and reported the defect a
+  second time, against the entry that applied it and with a 64-link chain of synthetic names attached. The
+  depth guard stays: it exists for a hole in this check, not for a template this check has already caught,
+  and the alternative failure it prevents is a `StackOverflowError`.
 
 ## Meta-kernel bootstrap (`tson-compiler/.../resolver/MetaKernelBootstrapResolver.java`)
 
