@@ -11,9 +11,10 @@ import java.util.Objects;
 
 /**
  * Configures and builds a {@link Tson} -- reached via {@link Tson#builder()}, never constructed
- * directly. Three options: {@link #dataBindContext} (for object binding), {@link #schemaSource} (for
+ * directly. Four options: {@link #dataBindContext} (for object binding), {@link #schemaSource} (for
  * fetching user schemas beyond the bundled standard library), and {@link #metaNameBinder} (for a consumer's
- * own meta-layer constructors). {@link #build()} constructs a {@link TsonCompiledMetaRegistry} and has it
+ * own meta-layer constructors), and {@link #lenientBinding} (for a class that holds fewer fields than its
+ * schema declares). {@link #build()} constructs a {@link TsonCompiledMetaRegistry} and has it
  * load the bundled meta-kernel/meta.tn/core.tn standard library, then wraps it as a {@link Tson}.
  *
  * <p>The two binding options are deliberately separate and never merged. {@link #dataBindContext} binds
@@ -27,6 +28,7 @@ public final class TsonConfig {
     private DataBindContext dataBindContext = TsonAtomContext.defaultContext();
     private TsonSchemaSource schemaSource = TsonSchemaSource.registeredOnly();
     private DataNameBinder metaNameBinder;
+    private boolean strictBinding = true;
 
     TsonConfig() {
     }
@@ -78,6 +80,30 @@ public final class TsonConfig {
         return this;
     }
 
+    /**
+     * Lets a bound class hold fewer fields than the schema declares, silently -- off by default.
+     *
+     * <p>By default the two must agree, and a mismatch is a {@link
+     * io.ltr8.tson.compiler.TsonBindMismatchException} when the schema is compiled in bind mode, which is
+     * startup for anything compiling its schemas once. That default is the asymmetry between the two ways of
+     * being wrong: a strict reader that is wrong says so at startup, in one message naming both sides, and
+     * is fixed in minutes; a lenient one that is wrong drops a value from every document and surfaces much
+     * later as a field that mysteriously holds its default.
+     *
+     * <p>Leniency is a real position, not just an escape hatch -- versioned evolution, where a v1 consumer
+     * deliberately reads a v2 document and means to ignore what it does not know. This is where that
+     * intention gets written down. Note what it does <em>not</em> silence: a schema field the class cannot
+     * hold is still reported at the read that writes one ({@code UNBOUND_FIELD}), so a collecting caller can
+     * see what was dropped without failing on it.
+     *
+     * <p>The narrower alternative to reaching for this is {@code @Unbound} on the one component that is the
+     * class's own business rather than the wire's.
+     */
+    public TsonConfig lenientBinding() {
+        this.strictBinding = false;
+        return this;
+    }
+
     public Tson build() {
         // The resolution core is both the store and the on-demand loader; withStandardLibrary loads the
         // bundled meta-kernel/meta/core, and schemaSource is consulted only for other, later URIs. It
@@ -90,6 +116,6 @@ public final class TsonConfig {
                 ? SchemaMetaNameBinder.defaultContext()
                 : SchemaMetaNameBinder.contextExtendedWith(metaNameBinder);
         TsonCompiledMetaRegistry core = TsonCompiledMetaRegistry.withStandardLibrary(schemaContext, schemaSource);
-        return new Tson(core, dataBindContext);
+        return new Tson(core, dataBindContext, strictBinding);
     }
 }

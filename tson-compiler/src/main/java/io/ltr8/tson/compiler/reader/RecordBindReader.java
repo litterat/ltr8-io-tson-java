@@ -1,7 +1,8 @@
 package io.ltr8.tson.compiler.reader;
 
-import io.ltr8.bind.DataClassAnnotated;
 import io.ltr8.annotation.Annotations;
+import io.ltr8.annotation.Unbound;
+import io.ltr8.bind.DataClassAnnotated;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
@@ -11,6 +12,7 @@ import io.ltr8.bind.DataClassMap;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassUnion;
 import io.ltr8.tson.compiler.Diagnostic;
+import io.ltr8.tson.compiler.TsonBindMismatchException;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
@@ -24,11 +26,15 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
+import java.lang.reflect.RecordComponent;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -70,6 +76,14 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
     private final DataClassField[] targetField;
 
     /**
+     * Whether a schema field with nowhere to go is an error. Fixed when the reader is built, because that is
+     * when the question is answerable and when the answer is cheap to act on -- see {@link
+     * TsonBindMismatchException}. The lenient reading still reports what it drops (below); what it does not
+     * do is refuse to start.
+     */
+    private final boolean strict;
+
+    /**
      * The component receiving this value's own wire annotations (§3.1), if the bound class declares one.
      * Held apart from {@link #targetField}, which is keyed by <em>schema</em> field index and so has no slot
      * for a component the schema never mentions -- the carrier is filled from the framing, not from a field.
@@ -86,19 +100,25 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
     private final AnnotationTypes annotationTypes;
 
     public RecordBindReader(String name, String displayName, RecordBody body, DataClassRecord descriptor,
-                             TsonTypeReaderResolver resolver,
-                             SchemaLocation schemaLocation, AnnotationTypes annotationTypes) {
+                             TsonTypeReaderResolver resolver, SchemaLocation schemaLocation,
+                             AnnotationTypes annotationTypes, boolean strict) {
         super(name, displayName, body, resolver, schemaLocation);
         this.descriptor = descriptor;
         this.annotationsCarrier = descriptor.annotationsCarrier().orElse(null);
         this.annotationTypes = annotationTypes;
         this.ownAnnotationTypes = annotationsCarrier == null ? AnnotationTypes.DISCARDED : annotationTypes;
         this.targetField = new DataClassField[fields.size()];
+        this.strict = strict;
+        List<String> mismatches = new ArrayList<>();
         for (int i = 0; i < fields.size(); i++) {
             CompiledField field = fields.get(i);
             DataClassField target = findTargetField(descriptor.fields(), field.schema().name());
             targetField[i] = target;
             if (target == null) {
+                if (strict && alwaysPresent(field.schema().state())) {
+                    mismatches.add("no component for field '" + field.schema().name() + "', which every "
+                            + "document of this type carries (" + field.schema().state() + ")");
+                }
                 continue;
             }
             TsonTypeReader<?> rebound = rebindContainerIfNeeded(field, target, resolver, this.annotationTypes);
@@ -115,6 +135,79 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 precomputedValue[i] = narrow(precomputedValue[i], target.type());
             }
         }
+        if (strict) {
+            Set<String> unbound = unboundComponents(descriptor.typeClass());
+            for (DataClassField classField : descriptor.fields()) {
+                if (classField != annotationsCarrier && !boundByAField(classField)
+                        && !unbound.contains(classField.name())) {
+                    mismatches.add("component '" + classField.name() + "' is filled by no field, so it reaches "
+                            + "the constructor as null on every document -- annotate it @Unbound if the class "
+                            + "means to own it");
+                }
+            }
+            if (!mismatches.isEmpty()) {
+                throw new TsonBindMismatchException("'" + displayName + "' and "
+                        + descriptor.typeClass().getName() + " do not agree: " + String.join("; ", mismatches)
+                        + ". Bind the class the schema describes, or read leniently "
+                        + "(TsonConfig.lenientBinding) if dropping this is deliberate");
+            }
+        }
+    }
+
+    /**
+     * §5.2's presence axis, read for the question binding actually asks: <b>is this field's value carried by
+     * every conforming document?</b> REQUIRED and REQUIRED_DEFAULT are (a default fills the absent case, and
+     * data may override it), so a class with no component for one loses a value every time and the mismatch
+     * is settled before any document exists. OPTIONAL is not -- it is lost only when written, which is a fact
+     * about a document rather than about the binding, so it is reported at the read that writes it.
+     *
+     * <p>Both FIXED states are excluded on a different ground: the schema settles the value, so a component
+     * for one would hold a constant the schema already knows. That exemption is what lets this be strict at
+     * all -- 21 of the mismatches in this library's own bundled binding are FIXED fields
+     * ({@code access_pattern}, {@code size_type}, an atom's {@code spec}), every one of them by design.
+     */
+    private static boolean alwaysPresent(FieldState state) {
+        return state == FieldState.REQUIRED || state == FieldState.REQUIRED_DEFAULT;
+    }
+
+    /** Whether any schema field of this type binds to {@code classField}. */
+    private boolean boundByAField(DataClassField classField) {
+        for (DataClassField bound : targetField) {
+            if (bound == classField) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The components a class marked as its own ({@code @Unbound}), under the same names {@link
+     * DataClassField#name()} uses -- so an {@code @Field}-renamed component is recognised by the name
+     * binding actually matches on.
+     *
+     * <p>Read here by reflection rather than carried on {@link DataClassField}, because it answers a
+     * <em>TSON</em> question -- "is a schema field expected to fill this?" -- that {@code tson-bind}'s
+     * generic descriptor has no notion of: the descriptor knows components, not schemas. Both the record
+     * component and its accessor are consulted, so the marker works wherever a class can put it.
+     */
+    private static Set<String> unboundComponents(Class<?> type) {
+        RecordComponent[] components = type.getRecordComponents();
+        if (components == null) {
+            return Set.of();
+        }
+        Set<String> unbound = new LinkedHashSet<>();
+        for (RecordComponent component : components) {
+            if (!component.isAnnotationPresent(Unbound.class)
+                    && !component.getAccessor().isAnnotationPresent(Unbound.class)) {
+                continue;
+            }
+            io.ltr8.annotation.Field renamed = component.getAnnotation(io.ltr8.annotation.Field.class);
+            if (renamed == null) {
+                renamed = component.getAccessor().getAnnotation(io.ltr8.annotation.Field.class);
+            }
+            unbound.add(renamed != null && !renamed.value().isEmpty() ? renamed.value() : component.getName());
+        }
+        return unbound;
     }
 
     /**
@@ -202,11 +295,33 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             arguments[annotationsCarrier.index()] = annotations;
         }
 
+        TsonReadContext fieldCtx = ctx;
         FieldSink sink = (schemaIndex, decoded) -> {
             DataClassField target = targetField[schemaIndex];
             if (target != null) {
                 arguments[target.index()] = narrow(decoded, target.type());
+                return;
             }
+            // The optional half of the agreement check, and the only half a document can settle: an OPTIONAL
+            // field with no component is lost exactly when one is written, so silence here is a value that
+            // was read, validated, and then quietly discarded. The always-present fields were settled when
+            // this reader was built (see the constructor) and never reach this branch.
+            //
+            // Lenient means silent, and that is not a shortcut. Reporting abandons the construction
+            // (ConstructionGuard: bind mode never builds out of a document already reported), so a lenient
+            // reader that reported would hand back null for the very documents it exists to accept. The
+            // alternative -- a diagnostic the guard is told to ignore -- is a severity axis under another
+            // name, which SPEC-FEEDBACK.md #41/#42 argued this model does not want. Strict reports and
+            // declines to build; lenient was asked not to care.
+            if (!strict) {
+                return;
+            }
+            fieldCtx.report(Diagnostic.Code.UNBOUND_FIELD,
+                    "'" + displayName + "' declares '" + fields.get(schemaIndex).schema().name() + "' but "
+                            + descriptor.typeClass().getName() + " has no component for it, so this value is "
+                            + "read and then dropped",
+                    "a component for '" + fields.get(schemaIndex).schema().name() + "'",
+                    descriptor.typeClass().getSimpleName() + " has none");
         };
         boolean[] seen = switch (shapeResult.shape()) {
             case FIELDS -> readFields(ctx, sink);
@@ -299,8 +414,12 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
 
         private final DataBindContext context;
 
-        public Factory(DataBindContext context) {
+        /** Whether a schema field with nowhere to go fails the compile -- see {@link TsonBindMismatchException}. */
+        private final boolean strict;
+
+        public Factory(DataBindContext context, boolean strict) {
             this.context = context;
+            this.strict = strict;
         }
 
         @Override
@@ -324,7 +443,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 }
                 return new RecordBindReader(name, EntryDisplayName.of(name, typeDefinition), body,
                         requireRecord(name, dataClass), resolver,
-                        context.locationOf(name, typeDefinition), AnnotationTypes.of(context));
+                        context.locationOf(name, typeDefinition), AnnotationTypes.of(context), strict);
             }
 
             if (dataClass instanceof DataClassUnion union) {
@@ -341,7 +460,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             if (dataClass instanceof DataClassRecord record) {
                 RecordBindReader ownParser = new RecordBindReader(name, EntryDisplayName.of(name, typeDefinition),
                         body, record, resolver,
-                        context.locationOf(name, typeDefinition), AnnotationTypes.of(context));
+                        context.locationOf(name, typeDefinition), AnnotationTypes.of(context), strict);
                 return new VariantSchemaReader(name, ownParser, typeDefinition.subtypes(), resolver,
                         AnnotationTypes.DISCARDED);
             }

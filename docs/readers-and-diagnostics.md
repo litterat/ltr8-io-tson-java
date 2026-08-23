@@ -407,6 +407,30 @@ error* category, so this is the same layer, not a new one.
   declaration does). This is where javac and Swift both draw it: javac attributes every entry before
   `shouldStopPolicyIfError` blocks the next phase, Swift never reaches SILGen after a Sema error. **A schema
   that reported anything is never registered.**
+- **A schema and the class bound to it must agree about a type's fields**, and the check is where they meet
+  rather than where a document is read — both halves are fixed by the time a reader is built, so a mismatch
+  is a `TsonBindMismatchException` at bind-mode compile, which is startup for anything compiling its schemas
+  once. Three rules, each falling out of §5.2's presence axis rather than being a policy on top of it:
+    - **REQUIRED / REQUIRED_DEFAULT with no component** → refused at compile. Every conforming document
+      carries the value, so every one of them would lose it.
+    - **OPTIONAL with no component** → the compile stands; the read that actually writes one reports
+      `UNBOUND_FIELD`. It is lost only when written, which is a fact about a document, not about the
+      binding. This is also what keeps `datetime_type`'s unmodelled `precision`/`require_timezone` from
+      failing every bind-mode compile of the bundled chain.
+    - **REQUIRED_FIXED / OPTIONAL_FIXED** → exempt. The schema settles the value, so a component would hold
+      a constant. **This exemption is what makes strictness possible at all**: 21 of the mismatches in this
+      library's own bundled binding are FIXED fields (`access_pattern`, `size_type`, an atom's `spec`).
+    - The converse — a component no field fills — is refused at compile too: it reaches the constructor as
+      `null` on every document. `@Unbound` is how a class says a component is its own and not the wire's,
+      needed exactly once here (`TypeDefinition.position`, this implementation's own addition for
+      diagnostics).
+    - **Strict is the default because the two ways of being wrong are not symmetric.** A strict reader that
+      is wrong says so at startup, once, naming both sides; a lenient one that is wrong drops a value from
+      every document and surfaces later as a field mysteriously holding its default.
+      `TsonConfig.lenientBinding` is the opt-out, and it is **silent**: reporting abandons the construction
+      (`ConstructionGuard`), so a lenient reader that reported would return `null` for exactly the documents
+      it exists to accept — and a diagnostic the guard is told to ignore is a severity axis under another
+      name, which `SPEC-FEEDBACK.md` #41/#42 argued against.
 - **A gap becomes a diagnostic too, under its own code.** Both `TsonSchemaValidationException` and
   `UnsupportedOperationException` are reported per declaration; the code is what tells them apart —
   `SCHEMA_ERROR` for the author's mistake, `NOT_IMPLEMENTED` for a construct beyond this library. The test

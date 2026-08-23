@@ -177,6 +177,13 @@ public final class TsonSchemaCompiler {
                 TsonTypeReader<?> built;
                 try {
                     built = build(name, definition);
+                } catch (TsonBindMismatchException e) {
+                    // Deliberately not an ErrorReader. Every other build failure is one entry's problem and
+                    // deferring it keeps the rest of the schema usable; this one is a wiring mistake between
+                    // the schema and the caller's own classes, and deferring it to the first document that
+                    // happens to have that type is exactly what makes it expensive to find. See the
+                    // exception's own Javadoc.
+                    throw e;
                 } catch (RuntimeException e) {
                     built = new ErrorReader(name, e);
                 }

@@ -261,6 +261,11 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      * doesn't exist in it, or some other unexpected exception was thrown before a collecting context ever
      * got involved.
      *
+     * <p><b>{@code UNBOUND_FIELD} is about the reader, not the document.</b> The value satisfied the schema
+     * and was then dropped, because the class bound to that type has no component for the field -- a wiring
+     * mismatch the document happens to expose. Only the OPTIONAL case can reach a read at all: a field every
+     * document carries is settled when the reader is built, as a {@code TsonBindMismatchException}.
+     *
      * <p><b>{@code NOT_IMPLEMENTED} is the one member that is not a verdict on the document.</b> It says a
      * construct is beyond this library, so the thing it names could not be checked -- which is not the same
      * as invalid, and a consumer that treats it as invalid is wrong in the one direction that matters. It
@@ -281,6 +286,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
         SCHEMA_ERROR,
         UNKNOWN_TYPE,
         VALIDATION_ERROR,
-        NOT_IMPLEMENTED
+        NOT_IMPLEMENTED,
+        UNBOUND_FIELD
     }
 }

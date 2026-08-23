@@ -1,16 +1,17 @@
-!!id:"https://tson.io/2026/32/ltr8/cli/diagnostics-7.tn"
+!!id:"https://tson.io/2026/32/ltr8/cli/diagnostics-8.tn"
 !!meta:"https://tson.io/2026/32/m/meta.tn"
 !!import:"https://tson.io/2026/32/m/core.tn"
 @doc:"""
   This project's own schema !!id convention (see CLAUDE.md's "Project-owned schema !!id
   convention"): /2026/32 is the spec revision this schema is written against, ltr8 is the
-  publishing org, cli is this module's own schema group, and the trailing -7 is this schema's
+  publishing org, cli is this module's own schema group, and the trailing -8 is this schema's
   own version -- bumped when file_report/validation_run were added, so `validate` can name the
   file each verdict belongs to inside one document; when the fields that may have nothing to
   say became optional rather than empty; when path/schema_pointer joined them, DUPLICATE_FIELD
   having been missing from diagnostic_code all along; when FIELD_FIXED joined that same enum;
   and when NOT_IMPLEMENTED did, so a construct this library has not implemented can be reported
-  beside the ordinary problems instead of aborting the pass that found them. Per that same
+  beside the ordinary problems instead of aborting the pass that found them; and when UNBOUND_FIELD
+  did, for a value a schema declares and the class bound to it cannot hold. Per that same
   convention's "bump it, under a new name" rule, never edit a published schema's own content in
   place.
   """
@@ -18,7 +19,7 @@
   diagnostic_code => !enum [
     FIELD_REQUIRED FIELD_FIXED TYPE_MISMATCH WRONG_ARITY UNKNOWN_TYPE_REF ATOM_CONSTRAINT_VIOLATION
     UNRECOGNIZED_FIELD DUPLICATE_MAP_KEY DUPLICATE_FIELD SCHEMA_ERROR UNKNOWN_TYPE VALIDATION_ERROR
-    NOT_IMPLEMENTED
+    NOT_IMPLEMENTED UNBOUND_FIELD
   ]
   @doc:"""
     One problem, located at up to two ends: the value in the data (path, data_position) and the rule
