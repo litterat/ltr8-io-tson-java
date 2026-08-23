@@ -366,6 +366,23 @@ Two registries over one shared resolution core, the compiled-side counterparts t
   deliberately distinct from the core's internal `SchemaMetaNameBinder`-based resolution context. A user
   schema importing core.tn gets core.tn's entries flattened into its own linked form (by `link`) and
   compiled inline, which is why the core never needs core.tn compiled.
+- **An import cycle is caught by what is *in flight*, not by a cache lookup** (§2.2.3). A schema is
+  registered only once it has linked, so while `a.tn` is resolving it is in no registry at all and `b.tn`
+  importing it back re-enters `resolveLinked` for the same identity and fetches it again — unguarded, that
+  is unbounded recursion ending in a `StackOverflowError`: an `Error` raised by ordinary author input, which
+  no `Diagnostic` ever sees and which the exception policy cannot classify. `resolving` holds the identities
+  this thread is part-way through, and the chain closing the cycle is what the message names, so any one of
+  its links is the edge to break. The same guard covers a `!!meta` chain, every link of which is reached
+  through `resolveLinked`.
+    - **Per thread, not per registry**, and that is not incidental: concurrent resolution of one identity by
+      two threads is safe here by design (below), and a registry-wide set would make the second thread's
+      ordinary in-flight entry look like a cycle to the first. Recursion through `!!import`/`!!meta` is
+      strictly within one thread, which is exactly the scope of the question.
+    - It **throws even with a receiver in play**, on the same footing as an unloadable `!!import` or an
+      ineligible `!!meta`: what fails is the namespace itself, so carrying on would report every reference
+      into the unresolvable half as a second problem. What is *not* here is the ordering half — collecting a
+      schema's transitive closure and resolving it dependencies-first, so callers stop hand-sequencing
+      registration (`BACKLOG.md`).
 - **Content-hash verification is per identity** (§10.2): the core records an identity's content hash on
   first resolution and checks every reference's `?sha256=` pin against it, on both fetch and cache-hit
   paths, so a conflicting pin errors rather than silently resolving to the cached instance. Verify-before-

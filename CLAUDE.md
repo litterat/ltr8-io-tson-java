@@ -346,7 +346,8 @@ modes (tree / bind) share each `*AbstractReader` family, selected by which facto
 
 `TsonCompiledMetaRegistry` is the shared meta/resolution core: compiles and caches **only** meta-layer
 schemas, resolves/links/registers everything else (`resolveLinked`) without compiling it, owns content-hash
-verification and the bootstrap. `TsonCompiledSchemaRegistry` (`dom(core)` / `bind(core, context)`) is a
+verification, the bootstrap, and §2.2.3's import-cycle guard (a per-thread in-flight set — a schema is
+registered only once linked, so a cycle is invisible to every cache and was a `StackOverflowError`). `TsonCompiledSchemaRegistry` (`dom(core)` / `bind(core, context)`) is a
 per-mode registry of compiled user schemas — **the read mode is which registry you hold**, not a compile
 parameter. Resolution is always bind-anchored (meta instances bind to `schema.meta.Top`), so every read
 registry shares the one bind-mode core; core.tn is never compiled in the core, only inline in a read
