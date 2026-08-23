@@ -268,8 +268,11 @@ arguments, so substitution is a walk over `schema.meta` values and the entry it 
 application aliases it; arguments close innermost-first; the memo is registered before the body is
 substituted, so regular recursion ties the knot on the entry under construction. Non-regular recursion —
 where the argument grows every level and the memo never fires — is caught by a depth guard rather than run
-into a `StackOverflowError`. Scope is the **record** template; one whose body writes a container sugar form
-is still refused at the application site.
+into a `StackOverflowError`. Three template shapes close, by three paths: a **record** template is
+substituted and kept; an **open instance** (a container sugar form over a parameter) stops being a template
+and binds through its constructor's own reader; a **reference** template — §5.10's partial application,
+`uuid_pair => <B> pair<uuid, B>` — composes its argument list into the application it names and mints no
+entry of its own, so a chain of aliases collapses to the one type at the end of it.
 
 ### Meta-kernel bootstrap (`MetaKernelBootstrapResolver`) — `docs/schema-resolution.md`
 

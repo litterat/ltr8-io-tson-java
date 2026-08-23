@@ -498,6 +498,126 @@ class RecordTemplateTest {
     //    naming one in data is the author's error, not a gap in this library. See OpenTemplateReader.
 
     /**
+     * A <b>parameterised alias</b> (§5.10 partial application): a declaration whose whole body is an
+     * application, and which is itself a template because some of that application's arguments are its own
+     * parameters. Applying the alias substitutes into the inner argument list and closes what results, so
+     * {@code uuid_pair<int32>} is the same entry {@code pair<text, int32>} written directly denotes.
+     */
+    @Test
+    void aParameterisedAliasClosesThroughTheApplicationItNames() {
+        TsonCompiledSchema compiled = compile("""
+                  pair      => <A, B> { first: A  second: B }
+                  uuid_pair => <B> pair<text, B>
+                  holder    => { p: uuid_pair<int32>  q: pair<text, int32> }""");
+
+        assertEquals(List.of("B"), compiled.schema().entries().get("uuid_pair").parameters(),
+                "the alias is itself a template");
+        assertEquals(1, instantiationsOf(compiled, "pair").size(), "one entry for the one closed pair");
+        String closed = fieldType(compiled, "holder", "p");
+        assertEquals(closed, fieldType(compiled, "holder", "q"), "the alias and the direct form are one type");
+        assertEquals(TypeRef.of("text"), fieldOf(compiled, closed, "first").type());
+        assertEquals(TypeRef.of("int32"), fieldOf(compiled, closed, "second").type());
+    }
+
+    /**
+     * §5.10 is explicit that a reference template composes during substitution with "no intermediate entry
+     * per alias hop", so a chain of them lands on the one entry the innermost application denotes.
+     */
+    @Test
+    void aChainOfParameterisedAliasesComposesToOneEntry() {
+        TsonCompiledSchema compiled = compile("""
+                  pair   => <A, B> { first: A  second: B }
+                  keyed  => <B> pair<text, B>
+                  keyed2 => <C> keyed<C>
+                  holder => { p: keyed2<int32> }""");
+
+        assertEquals(List.of(), instantiationsOf(compiled, "keyed"), "the alias hops mint nothing");
+        assertEquals(List.of(), instantiationsOf(compiled, "keyed2"));
+        assertEquals(1, instantiationsOf(compiled, "pair").size());
+        assertEquals(instantiationsOf(compiled, "pair").get(0), fieldType(compiled, "holder", "p"));
+    }
+
+    /** The degenerate reference template: its body <em>is</em> the parameter, so applying it is the argument. */
+    @Test
+    void aReferenceTemplateWhoseBodyIsTheParameterClosesToTheArgument() {
+        TsonCompiledSchema compiled = compile("""
+                  box    => <T> { v: T }
+                  ident  => <T> T
+                  holder => { a: box<ident<text>> }""");
+
+        assertEquals(1, instantiationsOf(compiled, "box").size(), "ident<text> is text, so only box is closed");
+        assertEquals(TypeRef.of("text"), fieldOf(compiled, fieldType(compiled, "holder", "a"), "v").type());
+    }
+
+    /** An alias over an <em>open instance</em> template closes by that path, one hop further in. */
+    @Test
+    void aParameterisedAliasMayNameAnOpenInstanceTemplate() {
+        TsonCompiledSchema compiled = compile("""
+                  rows   => <T, N> [T; N]
+                  triple => <T> rows<T, 3>
+                  holder => { r: triple<int32> }""");
+
+        // `triple` itself mints nothing; the entry the field names is `rows<int32, 3>`, the open instance
+        // one hop in, which references the closed array synthetic that closing it produced.
+        String instantiation = fieldType(compiled, "holder", "r");
+        assertTrue(instantiation.startsWith("rows_"), instantiation);
+        String synthetic = assertInstanceOf(io.ltr8.tson.schema.meta.Reference.class,
+                compiled.schema().entries().get(instantiation).body()).target().name();
+        ArrayBody array = assertInstanceOf(ArrayBody.class,
+                compiled.schema().entries().get(synthetic).body());
+        assertEquals(TypeRef.of("int32"), array.elementType());
+        assertEquals(Optional.of(BigInteger.valueOf(3)), array.minItems());
+        assertEquals(Optional.of(BigInteger.valueOf(3)), array.maxItems());
+    }
+
+    /** Arity is the <b>alias's</b> own parameter list, not the arity of the application it names. */
+    @Test
+    void aParameterisedAliasIsAppliedAtItsOwnArity() {
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class, () -> compile("""
+                  pair   => <A, B> { first: A  second: B }
+                  keyed  => <B> pair<text, B>
+                  holder => { p: keyed<int32, text> }"""));
+
+        assertTrue(thrown.getMessage().contains("'keyed' takes 1 type argument [B], but 2 were applied"),
+                thrown.getMessage());
+    }
+
+    /**
+     * A reference template that applies itself never reaches a body, and -- unlike a recursive record --
+     * mints no entry a knot could be tied on. Diagnosed as the author's error rather than handing a field
+     * the name of an entry nothing defines.
+     */
+    @Test
+    void aSelfApplyingReferenceTemplateIsASchemaError() {
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class, () -> compile("""
+                  loop   => <T> loop<T>
+                  holder => { p: loop<text> }"""));
+
+        assertTrue(thrown.getMessage().contains("reference template whose own body applies it again"),
+                thrown.getMessage());
+    }
+
+    /** End to end: a document validates through the alias exactly as through the application it names. */
+    @Test
+    void aDocumentReadsThroughAParameterisedAlias() {
+        TsonCompiledSchema compiled = compile("""
+                  pair      => <A, B> { first: A  second: B }
+                  text_pair => <B> pair<text, B>
+                  holder    => { p: text_pair<int32> }""");
+        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+
+        TsonValue value = (TsonValue) compiled.get("holder")
+                .read(TestDocuments.document("{ p: { first: \"a\"  second: 1 } }", problems));
+
+        assertEquals(List.of(), problems.diagnostics());
+        assertEquals(Optional.of("a"), value.at("/p/first").asString());
+
+        TsonDiagnosticsCollector rejected = TsonDiagnosticsReceiver.collecting();
+        compiled.get("holder").read(TestDocuments.document("{ p: { first: \"a\"  second: \"x\" } }", rejected));
+        assertEquals(1, rejected.diagnostics().size(), () -> rejected.diagnostics().toString());
+    }
+
+    /**
      * The mistake the target use case invites: "a page of orders" names {@code paged}, the thing the schema
      * declares. It is a data diagnostic like any other -- collectible, and located at the type-ref the
      * author wrote -- where it used to reach the lifted synthetic and exit on the library's own fault code

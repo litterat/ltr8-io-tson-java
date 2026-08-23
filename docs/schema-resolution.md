@@ -271,6 +271,23 @@ recorded open form, and replacing the application with a reference to the entry 
   - **Both closure paths share one memo**, so a template that applies itself (`weird => <T> [weird<T>]`) ties
     the knot on the entry under construction. An open instance used to short-circuit ahead of the memo and
     the depth backstop alike, which made that spelling a `StackOverflowError`.
+- **A reference template composes rather than minting an entry.** §5.10's *partial application* —
+  `uuid_pair => <B> pair<uuid, B>` — is a declaration whose whole body is an application some of whose
+  arguments name parameters it re-declares, which makes the alias itself a template. `DefinitionResolver`
+  records it as a `REFERENCE` entry with those parameters and the application verbatim; applying it binds
+  the arguments into that inner argument list and closes what results, so `uuid_pair<int32>` *is* the entry
+  `pair<uuid, int32>` written directly denotes. §5.10 is explicit that this mints no intermediate entry per
+  alias hop, so a chain of aliases collapses and the origin survives only in the composed entry's own
+  `source`. The degenerate spelling closes the same way: `ident => <T> T` applied to `text` is `text`.
+  - **A self-applying alias is the author's error, not a knot.** The knot-tying memo answers a recursive
+    application with the name of the entry under construction, and this path constructs none — so
+    `loop => <T> loop<T>`, applied, would hand a field a name nothing ever defines. A second set tracks
+    reference-template applications in flight and reports the cycle instead (`SPEC-FEEDBACK.md` #45 names
+    the same rule: routing has no entry to tie a knot through). Left unapplied, the declaration is caught
+    earlier still, by `TypeInhabitance`.
+  - **Arity is the alias's own**, checked against its `parameters` before any composition, so
+    `uuid_pair<int32, text>` names `uuid_pair`'s one parameter rather than `pair`'s two. An unused one is
+    the linker's existing §5.10 check, which reads a `Reference` body like any other.
 - **An argument keeps the channel it was applied on.** An argument list is the one position where a type and
   a value are equally at home, so a value parameter passed straight through (`array_p0_…<N>` inside
   `<N> { a: [text; N] }`) stays a value. A parameter anywhere else is a type by construction, and a value

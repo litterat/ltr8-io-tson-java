@@ -44,12 +44,15 @@ import java.util.function.UnaryOperator;
  * instead would reuse {@code SchemaDesugarer}'s injection machinery but has no channel for that {@code
  * source}, and would put type-level work back into a phase Tranche A made purely syntactic.
  *
- * <p><b>Two shapes close here, by two paths.</b> A <b>record</b> template -- parameters occupying field
+ * <p><b>Three shapes close here, by three paths.</b> A <b>record</b> template -- parameters occupying field
  * types and field values -- is substituted and kept: the result is still a record, one with its parameters
  * filled in. An <b>open instance</b>, whose body is an {@code instance_template} (what a sugar form over a
  * parameter lifts to), stops being a template altogether once its bindings go concrete: it is the
  * constructor body those bindings always described, so it is bound through that constructor's own reader
- * and the entry carries an ordinary body. See {@link #closeInstanceTemplate}.
+ * and the entry carries an ordinary body. See {@link #closeInstanceTemplate}. A <b>reference</b> template --
+ * §5.10's partial application, {@code uuid_pair => <B> pair<uuid, B>} -- is neither: it <em>is</em> the
+ * application it names with some arguments still open, so applying it composes the two argument lists and
+ * closes the result, minting no entry of its own (§5.10: "no intermediate entry per alias hop").
  *
  * <p><b>Identity (§8.2).</b> An instantiation entry is keyed on the flattened application recorded in
  * {@code source}, so two {@code box<text>} anywhere in the schema land on one entry. The derived name is
@@ -77,6 +80,14 @@ final class TemplateMaterialiser {
 
     /** Applications currently being closed, for the knot-tying memo and the termination guard's chain. */
     private final Set<String> closing = new LinkedHashSet<>();
+
+    /**
+     * Applications of <em>reference</em> templates currently composing. They mint no entry of their own
+     * (§5.10: "no intermediate entry per alias hop"), so {@link #closing}'s knot-tying answer -- name the
+     * entry under construction -- has nothing to name for them, and an alias that applies itself would hand
+     * back a name nothing ever defines. Tracked separately so that case is a diagnosis instead.
+     */
+    private final Set<String> aliasClosing = new LinkedHashSet<>();
 
     /** The author-written head each link of {@link #closing} came from, outermost first. */
     private final List<String> heads = new ArrayList<>();
@@ -233,6 +244,12 @@ final class TemplateMaterialiser {
                     + arguments.size() + " " + (arguments.size() == 1 ? "was" : "were") + " applied (§5.10)");
         }
         String name = internalName(head, arguments);
+        if (aliasClosing.contains(name)) {
+            throw new TsonSchemaValidationException("'" + head + "<...>' is a reference template whose own "
+                    + "body applies it again, so composing it never reaches a type with a body (§5.10). The "
+                    + "chain begins " + chain() + ". A reference template must eventually name a declared "
+                    + "type; recursion belongs in a record, tuple or choice body, where a field can carry it");
+        }
         if (materialised.containsKey(name) || !closing.add(name)) {
             return name; // already built, or under construction -- the knot-tying case
         }
@@ -264,12 +281,22 @@ final class TemplateMaterialiser {
                 publish.accept(name, alias);
                 return name;
             }
+            if (template.body() instanceof Reference alias) {
+                // §5.10 partial application. A reference template *is* the application it names with some
+                // arguments still open, so applying it composes the two argument lists and closes the
+                // result: `uuid_pair<int32>` is `pair<text, int32>`, the same entry writing that directly
+                // denotes. §5.10 is explicit that this mints no intermediate entry per alias hop -- the
+                // origin survives in the composed entry's own `source`.
+                aliasClosing.add(name);
+                return close(bindRef(alias.target(), bind(parameters, arguments))).name();
+            }
             TypeDefinition instantiation = substitute(template, head, parameters, arguments);
             materialised.put(name, instantiation);
             publish.accept(name, instantiation);
             return name;
         } finally {
             closing.remove(name);
+            aliasClosing.remove(name);
             heads.remove(heads.size() - 1);
         }
     }
