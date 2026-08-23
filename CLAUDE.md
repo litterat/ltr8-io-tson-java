@@ -440,7 +440,9 @@ readers share the original's compiled-schema registry. Failures reaching or reso
 diagnostics, not exceptions. A schemaless read still checks type-refs (`TypeRefCheck`: built-in name →
 must satisfy the atom; names-the-target → accepted, bind only; else `UNKNOWN_TYPE_REF` — a reader policy,
 `SPEC-FEEDBACK.md` #7). Both tree paths capture wire annotations; a schema-driven read also type-checks
-annotation *names* against the governing schema (#29). `TsonTreeWriter`/`TsonObjectWriter` re-emit
+annotation *names* against the governing schema (#29) — **wherever they are written, not only where the
+reader keeps them**, since whether a bound class has an `Annotations` carrier is no part of whether the
+document conforms. `TsonTreeWriter`/`TsonObjectWriter` re-emit
 annotations in §7.4 order; `toTson` is mainly a debugging tool with documented losses. Both writers also
 take a sink — `write(value, OutputStream|Appendable)`, UTF-8, flushed and not closed — so a document never
 has to exist as a `String`; `TsonDataEmitter` holds an `Appendable`, and `toTson` is that method over a

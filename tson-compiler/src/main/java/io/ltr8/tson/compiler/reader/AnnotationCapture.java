@@ -21,7 +21,8 @@ import java.util.Optional;
  * Captures a data-value's own leading wire annotations ([TSON-DATA] §3.1) as {@link TsonAnnotation}s, and --
  * when a governing schema is in scope -- resolves and checks each one against the type it names
  * ([TSON-SCHEMA] §6). The capturing counterpart to {@link EventSkip#annotationsAndTypeRef}, which discards.
- * Used by every tree-producing reader; a reader with nowhere to put an annotation keeps discarding.
+ * Used by every tree-producing reader; a reader with nowhere to put an annotation still checks what it
+ * drops ({@link #discard}).
  *
  * <p>Consumes only the {@code *annotation} half of a value's {@code annotation* type-ref?} framing, so a
  * caller follows this with {@link EventSkip#typeRef} (or lets whatever it delegates to consume the type-ref
@@ -108,8 +109,8 @@ final class AnnotationCapture {
     }
 
     /**
-     * Whether there is anything to capture and this mode wants it -- consuming and discarding when it does
-     * not, so the cursor is correctly positioned either way. Returns false, allocating nothing, for the
+     * Whether there is anything to capture and this mode wants it -- {@link #discard}ing when it does not,
+     * so the cursor is correctly positioned either way. Returns false, allocating nothing, for the
      * overwhelmingly common unannotated case.
      */
     private static boolean capturing(TsonReadContext ctx, AnnotationTypes types) {
@@ -117,10 +118,37 @@ final class AnnotationCapture {
             return false;
         }
         if (!types.capture()) {
-            EventSkip.annotations(ctx);
+            discard(ctx, types);
             return false;
         }
         return true;
+    }
+
+    /**
+     * Consumes a run of annotations this position has nowhere to keep -- <b>checking each one under a
+     * governing schema</b>, exactly as the capturing path does, and keeping nothing.
+     *
+     * <p><b>Checked even though it is dropped</b>, because the two are different questions. [TSON-SCHEMA] §6
+     * makes {@code @T} name a type whose contract its value must satisfy; whether the reader has somewhere
+     * to put the result is a fact about the bound Java class, and a document does not conform any better for
+     * being read by a class that discards its annotations. Skipping the run outright made a document's
+     * validity depend on the shape of a class it has never heard of -- the same annotation reported by a
+     * class with an {@code Annotations} component and ignored by one without.
+     *
+     * <p>With no schema in scope there is nothing to check against and this is a plain skip, which is
+     * {@link AnnotationTypes#DISCARDED}'s whole case.
+     */
+    static void discard(TsonReadContext ctx, AnnotationTypes types) {
+        if (!types.validating()) {
+            EventSkip.annotations(ctx);
+            return;
+        }
+        while (ctx.peek() instanceof AnnotationStart start) {
+            ctx.next();
+            // Reads the value through the reader for the type the annotation names, reporting what does not
+            // fit and consuming the AnnotationEnd either way. The value itself has nowhere to go.
+            value(ctx, start, types, STRUCTURAL);
+        }
     }
 
     /**

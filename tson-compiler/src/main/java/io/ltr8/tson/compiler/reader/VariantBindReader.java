@@ -53,9 +53,11 @@ import java.util.Optional;
  * resolver}, the same compiled-schema path every other dispatch in this codebase uses, not by
  * reflectively constructing the member class directly the way {@code TsonObjectReader} does.
  *
- * <p>The type-ref driving this decision is consumed here, via {@link EventSkip#annotationsAndTypeRef}
- * -- {@code ownParser} still calls it again on delegation (every reader does, as its own first step),
- * which is a safe no-op once nothing's left to consume.
+ * <p>The type-ref driving this decision is consumed here, after the annotations that precede it -- {@code
+ * ownParser} still calls for both again on delegation (every reader does, as its own first step), which is a
+ * safe no-op once nothing's left to consume. The annotations are dropped, a bound union member having nowhere
+ * to carry them, but {@link AnnotationCapture#discard} still checks them against the governing schema: what
+ * the reading application does with an annotation is no part of whether the document conforms.
  */
 final class VariantBindReader implements TsonTypeReader<Object> {
 
@@ -63,18 +65,21 @@ final class VariantBindReader implements TsonTypeReader<Object> {
     private final TsonTypeReader<?> ownParser;
     private final DataClassUnion descriptor;
     private final TsonTypeReaderResolver resolver;
+    private final AnnotationTypes annotationTypes;
 
     VariantBindReader(String name, TsonTypeReader<?> ownParser, DataClassUnion descriptor,
-                      TsonTypeReaderResolver resolver) {
+                      TsonTypeReaderResolver resolver, AnnotationTypes annotationTypes) {
         this.name = name;
         this.ownParser = ownParser;
         this.descriptor = descriptor;
         this.resolver = resolver;
+        this.annotationTypes = annotationTypes;
     }
 
     @Override
     public Object read(TsonReadContext ctx) {
-        Optional<String> typeRef = EventSkip.annotationsAndTypeRef(ctx);
+        AnnotationCapture.discard(ctx, annotationTypes);
+        Optional<String> typeRef = EventSkip.typeRef(ctx);
         if (typeRef.isEmpty() || typeRef.get().equals(name)) {
             return ownParser.read(ctx);
         }

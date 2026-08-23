@@ -36,7 +36,7 @@ final class ChoiceReader {
     /** Tree mode: a dispatched value's own annotations are captured and re-attached to the node built for it. */
     static final ValueReaderFactory CAPTURING_FACTORY = factory(true);
 
-    /** Object-binding mode: a bound Java value has nowhere to carry annotations, so they are dropped as before. */
+    /** Object-binding mode: a bound Java value has nowhere to carry annotations, so they are checked and dropped. */
     static final ValueReaderFactory FACTORY = factory(false);
 
     private static ValueReaderFactory factory(boolean captureAnnotations) {
@@ -58,7 +58,7 @@ final class ChoiceReader {
                             + "naming one of its declared variants to disambiguate",
                     "declared variant", variantNames, context.readers(),
                     untaggedRecovery(typeDefinition, body, context.schema()),
-                    captureAnnotations ? AnnotationTypes.of(context) : AnnotationTypes.DISCARDED);
+                    captureAnnotations ? AnnotationTypes.of(context) : AnnotationTypes.of(context).discarding());
         };
     }
 

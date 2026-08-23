@@ -92,7 +92,8 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
     private final DataClassField annotationsCarrier;
 
     /**
-     * What this record captures for <em>itself</em> -- {@code DISCARDED} unless it declares a carrier.
+     * What this record captures for <em>itself</em> -- discarding unless it declares a carrier, which drops
+     * what it reads but still checks it (see {@link AnnotationTypes#discarding()}).
      * Distinct from {@link #annotationTypes}, which is the vocabulary in scope and is handed to nested
      * positions regardless: a record with no carrier of its own may still hold a field, or a map key, that
      * is boxed and does want them.
@@ -107,7 +108,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         this.descriptor = descriptor;
         this.annotationsCarrier = descriptor.annotationsCarrier().orElse(null);
         this.annotationTypes = annotationTypes;
-        this.ownAnnotationTypes = annotationsCarrier == null ? AnnotationTypes.DISCARDED : annotationTypes;
+        this.ownAnnotationTypes = annotationsCarrier == null ? annotationTypes.discarding() : annotationTypes;
         this.targetField = new DataClassField[fields.size()];
         this.strict = strict;
         List<String> mismatches = new ArrayList<>();
@@ -273,8 +274,8 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
     public Object read(TsonReadContext ctx) {
         ctx = ctx.inRecord(schemaLocation);
         // Hoisted ahead of the shape check, like the tree readers: the base consumes the framing and
-        // discards it, so capturing first leaves that call a no-op. Nothing to capture when the bound class
-        // declares no carrier, in which case annotationTypes is DISCARDED and this consumes and drops.
+        // discards it, so capturing first leaves that call a no-op. Nothing to *keep* when the bound class
+        // declares no carrier -- ownAnnotationTypes is then discarding, which still checks what it drops.
         Annotations annotations = AnnotationCapture.bound(ctx, ownAnnotationTypes);
         ShapeResult shapeResult = expectRecordShape(ctx);
         if (shapeResult.shape() == Shape.MISMATCH) {
@@ -431,7 +432,8 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                             "an explicit type annotation naming one of " + typeDefinition.subtypes(), "(none)");
                     return null;
                 };
-                return new VariantBindReader(name, noOwnData, union, resolver);
+                return new VariantBindReader(name, noOwnData, union, resolver,
+                        AnnotationTypes.of(context).discarding());
             }
 
             if (dataClass instanceof DataClassRecord record) {
@@ -439,7 +441,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                         body, record, resolver,
                         context.locationOf(name, typeDefinition), AnnotationTypes.of(context), strict);
                 return new VariantSchemaReader(name, ownParser, typeDefinition.subtypes(), resolver,
-                        AnnotationTypes.DISCARDED);
+                        AnnotationTypes.of(context).discarding());
             }
 
             throw new IllegalArgumentException("'" + name + "' resolves to " + dataClass.typeClass()

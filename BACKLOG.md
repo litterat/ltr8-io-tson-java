@@ -125,12 +125,9 @@ by a factor of six.
       dispatches to sees the annotations itself, exactly as it does when nothing dispatched to it. That
       makes both modes agree by construction instead of by two implementations staying in step, and deletes
       the `reattach`/`captureAnnotations` machinery rather than extending it to bind mode.
-    - **One thing to settle first:** the capturing dispatchers also *validate* annotation names against the
-      governing schema (§6) at the dispatch point. Rewinding moves that to the delegate, and
-      `AnnotationTypes.DISCARDED` deliberately does no checking — so a bind-mode value with no carrier would
-      stop having its annotation names checked unless `DISCARDED` starts validating what it drops. That is
-      arguably the right shape anyway (its own Javadoc argues checking should not depend on which reader
-      happens to run), but it is a decision, not a detail.
+    - **The prerequisite is done** (#144): a discarding position now checks what it drops
+      (`AnnotationTypes.discarding()`), so moving validation to the delegate loses nothing -- the delegate
+      already validates whether or not it keeps the result. What remains here is purely the drop.
 
 ## Binding strictness
 
