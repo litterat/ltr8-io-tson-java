@@ -36,7 +36,16 @@ copy. `spec/` holds local snapshots (revision 32) for quick reference: `spec/tso
 `spec/tson-part2-schema.md`, and `spec/m/{meta-kernel,meta,core}.tn` (the spec's own bundled schema
 documents — the meta-kernel bootstrap layer, the meta-schema built on it, and the core type library built
 on that) plus their non-normative `*-resolved.tn` resolver-output fixtures. Treat `spec/` as a cache, not
-a source of truth.
+a source of truth — with one standing exception: the three `.tn` schemas are **packaged from here at build
+time** and carry this project's own meta-kernel amendment (`SPEC-FEEDBACK.md` #57), so they are the live
+copies rather than a snapshot.
+
+**The `*-resolved.tn` fixtures are checked, not decoration.** They carry the instruction in their own
+`@doc` — "Parse the source schema, run the resolver, canonicalise, compare" — and `ResolvedFixtureTest`
+does it: every entry must read back into `schema.meta` and have a counterpart here, and what may still
+differ is pinned per schema. They are the only external statement of what a conforming resolver produces,
+so a change that moves those counts wants looking at rather than renumbering. Keep them in step with the
+`.tn` beside them; both have drifted before.
 
 **Status:** Part 1 is complete and frozen. Part 2's grammar, resolution, linking, and Class 2 compilation
 all work: the three bundled schemas resolve/register/compile in full, user schemas governed by them
@@ -293,6 +302,15 @@ substituted and kept; an **open instance** (a container sugar form over a parame
 and binds through its constructor's own reader; a **reference** template — §5.10's partial application,
 `uuid_pair => <B> pair<uuid, B>` — composes its argument list into the application it names and mints no
 entry of its own, so a chain of aliases collapses to the one type at the end of it.
+
+**Use-site flattening (`ReferenceFlattener`)** is §8.3 and the last thing resolution does: a type position
+naming a `REFERENCE` entry is rewritten to the end of its chain and keeps the name the author wrote as
+`@alias` (`type: @alias:field_name token`), which is what makes §8.2's instantiation identity a single-level
+comparison. `TypeRef` carries an `Annotations` component for it, excluded from `equals` — identity is where
+a reference *points*, an alias records where it *came from*. An alias entry keeps its own hop (the chain
+must stay walkable) and the walk stops at a materialised instantiation (this model gives one an extra
+`REFERENCE` hop the spec's does not, and that entry is what identity keys on). Runs on the bootstrap route
+too, whose output governs anything whose `!!meta` is meta-kernel.
 
 ### Meta-kernel bootstrap (`MetaKernelBootstrapResolver`) — `docs/schema-resolution.md`
 

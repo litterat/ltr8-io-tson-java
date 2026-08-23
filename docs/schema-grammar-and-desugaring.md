@@ -177,8 +177,8 @@ rebuilt and called a cache.
   as every other defaulted vocabulary field is. Nothing rides on trust: the emitted body binds through the
   governing meta's compiled reader, where an undeclared member is `UNRECOGNIZED_FIELD` under §7.2's closure.
   §5.4's "each variant resolves to a distinct type" is deliberately not checked here — it is a question about
-  what names *resolve to*, after §8.3 flattening, which this phase can't answer (`BACKLOG.md`'s
-  reference-closure item).
+  what names *resolve to*, after §8.3 flattening, which runs at the end of resolution and so cannot have
+  happened yet when this phase runs (`ReferenceFlattener`, `docs/schema-resolution.md`).
 - **Both declaration-level tiers desugar in place.** At declaration position the form *is* the construction
   (`pair => [integer, text]` becomes `!tuple { … }`, like `ids => [text]`, `entries => {text => integer}` and
   `contact => (A | B)`); inline, each is hoisted into its own declaration and referenced.

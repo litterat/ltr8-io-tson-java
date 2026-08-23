@@ -66,16 +66,6 @@ and survives only as a guard against a caller resolving raw AST with the desugar
   parameters, which cannot close until that declaration itself materialises — so composition would have to
   be deferred to materialisation too, absorbing fields into an entry that does not exist yet. A different
   feature from closing an application, and the diagnostic now says so rather than blaming substitution.
-- [ ] **§8.3 use-site reference flattening and `@alias`.** The spec has the resolver walk a reference chain
-  to the first non-`REFERENCE` entry, rewrite the *use site* to that entry's name, and attach `@alias:name`
-  to the type value recording the source-level alias (`type: @alias:id uuid`) — recursively inside
-  `arguments`, which is what makes instantiation identity a single-level comparison (§8.2). Resolver output
-  here keeps the hop instead: a use site names the alias entry and the compiler collapses the `Reference`
-  body at compile time, so reads are right but the emitted `type_definition` is not §8.3's shape, and
-  `@alias` appears nowhere in the codebase. Noticed while implementing §5.10 partial application, where
-  §5.10 names `@alias` as the thing that preserves an alias hop's origin at use sites — but it is not
-  specific to templates: every `name => other_name` alias is the same case.
-
 Only genuine gaps are listed here — a throw that means "your schema is wrong" is not one. Classifying the
 throw sites by that test is done across the whole schema pipeline (issue #26); if a census is ever wanted
 again, take it fresh rather than trusting a recorded one, since the last recorded numbers had gone stale

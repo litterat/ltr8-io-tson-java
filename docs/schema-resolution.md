@@ -324,6 +324,38 @@ recorded open form, and replacing the application with a reference to the entry 
     possible was `type_argument` becoming readable, value channel included
     (`docs/linking-and-compilation.md`).
 
+## Use-site flattening (`tson-compiler/.../resolver/ReferenceFlattener.java`)
+
+§8.3, and the last thing resolution does: **a type position naming a `REFERENCE` entry is rewritten to the
+end of its chain, and the name the author wrote survives on the reference as `@alias`.** meta-kernel's own
+resolved fixture states the rule in a line — "Reference-kind names at type positions are flattened with
+@alias" — and spells the result `type: @alias:field_name token`.
+
+- **What it buys is §8.2's single-level identity.** An instantiation's `source` is compared as a flat
+  application, so a use site still naming an alias would have to be chased before two of them could be told
+  apart. Flattening moves that walk to schema-load time, once per use site; the `@alias` is what keeps the
+  author's own word recoverable for a diagnostic, a renderer or a writer.
+- **The representation came first.** `TypeRef` carries an `Annotations` component for this — §8.3 attaches
+  the alias to the *type value*, not to the field around it — with `equals`/`hashCode` excluding it, exactly
+  as `RecordField` does. That exclusion is what makes the carrier safe to add: identity is where a reference
+  *points*, an alias records where it *came from*, so two use sites of one type stay equal however spelled.
+- **An alias entry keeps its own hop.** `doc => documentation` stays one hop though `documentation` aliases
+  `text`, and the fixture agrees. The chain has to stay walkable for anything that wants the intermediate
+  names, and the entry is what records it — flattening there would erase the alias rather than relocate it.
+  `supertypes`/`subtypes` are untouched for a different reason: they are name lists with no annotation
+  channel, and §8.2 calls them resolver-managed indexes rather than use sites.
+- **The walk stops at a materialised instantiation.** This model gives one an extra `REFERENCE` hop over the
+  form that holds the shape, which the spec's model does not have, and that entry is what §8.2 keys identity
+  on — walking through it leaves a use site naming a form nobody wrote. An author's alias *to* an application
+  still flattens onto it, which is §8.3's own worked example (`type: @alias:string_triple array_ranged_text_9d4`).
+- **Runs after materialisation**, so an alias to an application lands on the entry that application minted
+  rather than on the alias in front of it — and **on the bootstrap route too**
+  (`MetaKernelBootstrapResolver`), which is a shorter route to the same resolved form and whose output
+  governs every schema whose `!!meta` is meta-kernel. Leaving that one unflattened would be two answers to
+  one question.
+- Pinned end to end by `ResolvedFixtureTest`, which compares this resolver against the spec's own
+  `spec/m/*-resolved.tn` — the check those files ask for in their own `@doc`.
+
 ## Template regularity (`tson-compiler/.../resolver/TemplateRegularity.java`)
 
 §5.10's regularity boundary, checked over the resolved entries before anything materialises: **within a
