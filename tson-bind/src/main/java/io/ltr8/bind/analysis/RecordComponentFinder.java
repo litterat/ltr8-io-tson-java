@@ -16,11 +16,13 @@
 package io.ltr8.bind.analysis;
 
 import io.ltr8.annotation.Field;
+import io.ltr8.annotation.Profile;
 import io.ltr8.annotation.Union;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.RecordComponent;
 import java.lang.reflect.Type;
@@ -48,6 +50,15 @@ public class RecordComponentFinder implements ComponentFinder {
         RecordComponent[] components = clss.getRecordComponents();
         if (components == null) {
             throw new CodeAnalysisException(String.format("Class '%s' is not a record", clss.getName()));
+        }
+
+        if (!isCanonical(constructor, components)) {
+            // A profile selected a constructor other than the canonical one, so the record's own component
+            // list is no longer the shape being bound -- it describes the whole class, where this constructor
+            // takes a subset. The parameters decide, and each one is matched back to the component of that
+            // name for its accessor and type. See findProfiledComponents.
+            findProfiledComponents(clss, constructor, components, fields);
+            return;
         }
 
         MethodHandles.Lookup lookup = MethodHandles.publicLookup();
@@ -85,5 +96,105 @@ public class RecordComponentFinder implements ComponentFinder {
 
             fields.add(info);
         }
+    }
+
+    /**
+     * Whether {@code constructor} is the record's canonical one -- its parameters being the components, in
+     * order. Compared by type rather than by name, since a secondary constructor's parameter names are
+     * {@code arg0}/{@code arg1} unless the class was compiled with {@code -parameters}.
+     *
+     * <p>A secondary constructor that happens to take the same types in the same order is indistinguishable
+     * from the canonical one here, and binding through either produces the same values, so the ambiguity
+     * costs nothing.
+     */
+    private static boolean isCanonical(Constructor<?> constructor, RecordComponent[] components) {
+        if (constructor.getParameterCount() != components.length) {
+            return false;
+        }
+        Class<?>[] parameters = constructor.getParameterTypes();
+        for (int x = 0; x < components.length; x++) {
+            if (!parameters[x].equals(components[x].getType())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * The components of a record bound through a constructor that takes a subset of them -- one
+     * {@link ComponentInfo} per parameter, in parameter order, each carrying the accessor of the record
+     * component it names.
+     *
+     * <p><b>Where the names come from</b>, in order: {@code @Profile(fields = ...)} on the constructor, then
+     * {@link Field} on the parameter, then the parameter's own reflected name. The last works only where the
+     * class was compiled with {@code -parameters} -- a secondary constructor's names are otherwise
+     * {@code arg0} -- which is why the first two exist. A name that matches no component is an error rather
+     * than a component invented from the parameter, since the accessor has to come from somewhere.
+     *
+     * <p>Components the constructor omits are simply not part of this profile's shape. That is the feature:
+     * a class serving an older schema version binds the fields that version had, and fills the rest itself.
+     */
+    private static void findProfiledComponents(Class<?> clss, Constructor<?> constructor,
+            RecordComponent[] components, List<ComponentInfo> fields) throws CodeAnalysisException {
+        MethodHandles.Lookup lookup = MethodHandles.publicLookup();
+        Profile profile = constructor.getAnnotation(Profile.class);
+        String[] declared = profile == null ? new String[0] : profile.fields();
+        Parameter[] parameters = constructor.getParameters();
+        if (declared.length != 0 && declared.length != parameters.length) {
+            throw new CodeAnalysisException(String.format(
+                    "@Profile on '%s' lists %d field name(s) for a constructor taking %d parameter(s)",
+                    clss.getName(), declared.length, parameters.length));
+        }
+
+        for (int x = 0; x < parameters.length; x++) {
+            String name = nameOf(clss, parameters[x], declared, x);
+            RecordComponent component = componentNamed(clss, components, name);
+            ComponentInfo info = new ComponentInfo(name, component.getType());
+            info.setConstructorArgument(x);
+            try {
+                info.setReadMethod(lookup.unreflect(component.getAccessor()));
+            } catch (IllegalAccessException e) {
+                throw new CodeAnalysisException(String.format(
+                        "Failed to access accessor for record component '%s' on '%s'", name, clss.getName()), e);
+            }
+            if (component.getGenericType() instanceof ParameterizedType parameterizedType) {
+                info.setParamType(parameterizedType);
+            }
+            Field renamed = parameters[x].getAnnotation(Field.class);
+            if (renamed != null) {
+                info.setField(renamed);
+            }
+            fields.add(info);
+        }
+    }
+
+    private static String nameOf(Class<?> clss, Parameter parameter, String[] declared, int index)
+            throws CodeAnalysisException {
+        if (declared.length != 0) {
+            return declared[index];
+        }
+        Field renamed = parameter.getAnnotation(Field.class);
+        if (renamed != null && !renamed.value().isEmpty()) {
+            return renamed.value();
+        }
+        if (parameter.isNamePresent()) {
+            return parameter.getName();
+        }
+        throw new CodeAnalysisException(String.format(
+                "Cannot name parameter %d of the selected constructor on '%s': a secondary constructor keeps no "
+                        + "parameter names unless the class was compiled with -parameters. List them with "
+                        + "@Profile(fields = {...}) or name this one with @Field", index, clss.getName()));
+    }
+
+    private static RecordComponent componentNamed(Class<?> clss, RecordComponent[] components, String name)
+            throws CodeAnalysisException {
+        for (RecordComponent component : components) {
+            if (component.getName().equals(name)) {
+                return component;
+            }
+        }
+        throw new CodeAnalysisException(String.format(
+                "'%s' names no component '%s', so the selected constructor's parameter has no accessor to read "
+                        + "it back through", clss.getName(), name));
     }
 }

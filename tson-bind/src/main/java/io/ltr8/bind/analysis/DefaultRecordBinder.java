@@ -4,6 +4,7 @@ import io.ltr8.annotation.DataBridge;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.FieldOrder;
+import io.ltr8.annotation.Profile;
 import io.ltr8.annotation.Record;
 import io.ltr8.annotation.ToData;
 import io.ltr8.annotation.Union;
@@ -150,7 +151,7 @@ public class DefaultRecordBinder {
 		List<ComponentInfo> components = new ArrayList<>();
 
 		// get the constructor.
-		Constructor<?> ctor = getConstructor(targetClass);
+		Constructor<?> ctor = getConstructor(targetClass, context.profile().orElse(null));
 
 		if (targetClass.isRecord()) {
 			// A genuine Java record's components come straight from the JDK's own
@@ -193,7 +194,7 @@ public class DefaultRecordBinder {
 
 		// get the correct data constructor method handle. Either a constructor or a
 		// static method tagged with @Data.
-		MethodHandle dataConstructor = getDataConstructor(targetClass);
+		MethodHandle dataConstructor = getDataConstructor(targetClass, context.profile().orElse(null));
 
 		// Build a MethodHandle that creates object and also calls setters with order of
 		// fields as defined in components.
@@ -721,9 +722,29 @@ public class DefaultRecordBinder {
 	 * dataClass as a static constructor might be used instead. getDataConstructor is used to retrieve
 	 * the MethodHandle for the correct data constructor.
 	 */
-	private Constructor<?> getConstructor(Class<?> dataClass)
+	private Constructor<?> getConstructor(Class<?> dataClass, String profile)
 			throws CodeAnalysisException, NoSuchMethodException, SecurityException {
-		Constructor<?>[] constructors = dataClass.getConstructors();
+		Constructor<?>[] declared = dataClass.getConstructors();
+		Constructor<?>[] constructors = declared;
+
+		// A profiled constructor wins, and wins ahead of everything -- including the single-constructor
+		// shortcut, so a class with one constructor and a profile on it still means what it says. Selection
+		// is by name equality and nothing here knows what the name stands for; see @Profile.
+		if (profile != null) {
+			for (Constructor<?> constructor : constructors) {
+				Profile annotation = constructor.getAnnotation(Profile.class);
+				if (annotation != null && List.of(annotation.value()).contains(profile)) {
+					return constructor;
+				}
+			}
+		}
+
+		// Nothing serves this profile, so fall back -- but only among the constructors that claim no profile
+		// of their own. Another profile's constructor is not a candidate for this one: it exists to bind a
+		// shape this context is not asking for, and picking it would quietly bind the wrong version. With
+		// those set aside a record's canonical constructor is the ordinary fallback, so naming a context
+		// costs nothing for the classes that do not care.
+		constructors = unprofiled(constructors, profile != null);
 
 		// only one custructor. this must be it.
 		if (constructors.length == 1) {
@@ -753,13 +774,45 @@ public class DefaultRecordBinder {
 			}
 		}
 
+		// Nothing designated at all -- not even a single unprofiled constructor to fall back to. When the
+		// context named a profile, say so and list what the class does offer:
+		// the likeliest cause is a name that disagrees in one of the two places it has to match, and the
+		// fallback would otherwise surface later as a field mismatch against the wrong constructor.
+		if (profile != null) {
+			List<String> offered = new ArrayList<>();
+			for (Constructor<?> constructor : declared) {
+				Profile annotation = constructor.getAnnotation(Profile.class);
+				if (annotation != null) {
+					offered.addAll(List.of(annotation.value()));
+				}
+			}
+			throw new CodeAnalysisException("No constructor for profile '" + profile + "' on " + dataClass.getName()
+					+ (offered.isEmpty()
+							? " -- it declares no @Profile constructors, and none is designated with @Record"
+							: ", which offers " + offered + " -- and none is designated with @Record as the "
+									+ "fallback for profiles it does not name"));
+		}
+
 		throw new CodeAnalysisException("Could not find constructor: " + dataClass);
 
 	}
 
-	private MethodHandle getDataConstructor(Class<?> dataClass)
+	private MethodHandle getDataConstructor(Class<?> dataClass, String profile)
 			throws CodeAnalysisException, NoSuchMethodException, SecurityException, IllegalAccessException {
 		Constructor<?>[] constructors = dataClass.getConstructors();
+
+		// Same order as getConstructor above, so the handle invoked is the constructor whose parameters the
+		// components were built from -- the two picking differently would fill the right names into the
+		// wrong slots.
+		if (profile != null) {
+			for (Constructor<?> constructor : constructors) {
+				Profile annotation = constructor.getAnnotation(Profile.class);
+				if (annotation != null && List.of(annotation.value()).contains(profile)) {
+					return MethodHandles.publicLookup().unreflectConstructor(constructor);
+				}
+			}
+		}
+		constructors = unprofiled(constructors, profile != null);
 
 		// only one custructor. this must be it.
 		if (constructors.length == 1) {
@@ -1074,6 +1127,27 @@ public class DefaultRecordBinder {
 
 		return arrayIndexGetter;
 
+	}
+
+
+	/**
+	 * {@code constructors} minus the ones claiming a {@link Profile}, for the fallback path. A constructor
+	 * built for another profile is not a candidate for this one -- it binds a shape this context is not
+	 * asking for.
+	 *
+	 * <p><b>An empty result is left empty when a profile was asked for</b>, so a class whose every
+	 * constructor is profiled and none of them this one fails rather than binding whichever shape happens to
+	 * be the only candidate. It would otherwise silently bind another version's fields. With no profile
+	 * asked for there is nothing to be wrong about, so the constructors stand as they are.
+	 */
+	private static Constructor<?>[] unprofiled(Constructor<?>[] constructors, boolean profileAsked) {
+		List<Constructor<?>> plain = new ArrayList<>();
+		for (Constructor<?> constructor : constructors) {
+			if (constructor.getAnnotation(Profile.class) == null) {
+				plain.add(constructor);
+			}
+		}
+		return plain.isEmpty() && !profileAsked ? constructors : plain.toArray(new Constructor<?>[0]);
 	}
 
 }

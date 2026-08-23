@@ -126,7 +126,11 @@ module has a real `module-info.java`; module names mirror each module's root exp
   `tson-schema` (whose `schema.meta` model is itself a bind target) and consumer code all see.
 - **`tson-bind`** — the generic `DataValue`↔Java-object binding engine (`DataBindContext`, `DataClass`
   descriptors, `DataNameBinder`, bridges). Depends only on `tson-annotation`, whose annotations and carrier
-  types it reads off a class under analysis.
+  types it reads off a class under analysis. A context may name a **binding profile**
+  (`DataBindContext.Builder.profile`), selecting among a class's `@Profile` constructors so one class binds
+  several shapes — one context per schema version, descriptors still cached per context. The name is opaque
+  here: matched by equality, with nothing in the module knowing what it stands for, which is what keeps
+  selection out of the schema layer.
 - **`tson-schema`** — **only** `io.ltr8.tson.schema.meta` (the resolved-schema *value* model — pure
   records/sealed interfaces/enums, §8's `TypeDefinition` et al.; `Top` is sealed except for its one
   deliberately open branch, `Data`, which a consumer's own class implements — see below) plus the schema
