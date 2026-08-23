@@ -28,7 +28,8 @@ final class RecordTreeReader extends RecordAbstractReader<TsonValue> {
     public RecordTreeReader(String name, String displayName, RecordBody body, TsonTypeReaderResolver resolver,
                             SchemaLocation schemaLocation,
                             AnnotationTypes annotationTypes) {
-        super(name, displayName, body, resolver, schemaLocation);
+        // By schema type alone: a tree reader has no binding target to consult (see FieldReaders).
+        super(name, displayName, body, FieldReaders.byType(resolver), schemaLocation);
         this.annotationTypes = annotationTypes;
     }
 

@@ -564,7 +564,7 @@ class DefinitionResolverTest {
                         + "body: !record { supertypes: [] fields: [ "
                         + "{ name: \"element_type\" type: { name: \"type_ref\" arguments: [] } state: \"REQUIRED\" } "
                         + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } state: \"REQUIRED_DEFAULT\" "
-                        + "value: { text: \"REQUIRED\" form: \"UNQUOTED\" } } "
+                        + "value: REQUIRED } "
                         + "] groups: [] } }",
                 write(tupleElement));
     }
@@ -584,7 +584,7 @@ class DefinitionResolverTest {
                         + "body: !record { supertypes: [] fields: [ "
                         + "{ name: \"members\" type: { name: \"array_field_name_f1a73e72\" arguments: [] } state: \"REQUIRED\" } "
                         + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } state: \"REQUIRED_DEFAULT\" "
-                        + "value: { text: \"REQUIRED\" form: \"UNQUOTED\" } } "
+                        + "value: REQUIRED } "
                         + "] groups: [] } }",
                 write(fieldGroup));
     }
@@ -598,7 +598,7 @@ class DefinitionResolverTest {
         assertEquals("{ kind: \"PRODUCT\" parameters: [] constructor: false supertypes: [] subtypes: [] "
                         + "body: !record { supertypes: [] fields: [ "
                         + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: { text: \"INDEX\" form: \"UNQUOTED\" } } "
+                        + "state: \"REQUIRED_FIXED\" value: INDEX } "
                         + "] groups: [] } }",
                 write(pinned));
     }
@@ -656,17 +656,17 @@ class DefinitionResolverTest {
                         + "supertypes: [ \"product\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [ \"product\" ] fields: [ "
                         + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: { text: \"INDEX\" form: \"UNQUOTED\" } } "
+                        + "state: \"REQUIRED_FIXED\" value: INDEX } "
                         + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: { text: \"VARIABLE\" form: \"UNQUOTED\" } } "
+                        + "state: \"REQUIRED_FIXED\" value: VARIABLE } "
                         + "{ name: \"element_type\" type: { name: \"type_ref\" arguments: [] } "
                         + "state: \"REQUIRED\" } "
                         + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } "
-                        + "state: \"REQUIRED_DEFAULT\" value: { text: \"REQUIRED\" form: \"UNQUOTED\" } } "
+                        + "state: \"REQUIRED_DEFAULT\" value: REQUIRED } "
                         + "{ name: \"unordered\" type: { name: \"boolean\" arguments: [] } "
-                        + "state: \"REQUIRED_DEFAULT\" value: { text: \"false\" form: \"UNQUOTED\" } } "
+                        + "state: \"REQUIRED_DEFAULT\" value: false } "
                         + "{ name: \"unique_items\" type: { name: \"boolean\" arguments: [] } "
-                        + "state: \"REQUIRED_DEFAULT\" value: { text: \"false\" form: \"UNQUOTED\" } } "
+                        + "state: \"REQUIRED_DEFAULT\" value: false } "
                         + "{ name: \"min_items\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
                         + "{ name: \"max_items\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
                         + "] groups: [] } }",
@@ -690,9 +690,9 @@ class DefinitionResolverTest {
                         + "supertypes: [ \"product\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [ \"product\" ] fields: [ "
                         + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: { text: \"NAMED\" form: \"UNQUOTED\" } } "
+                        + "state: \"REQUIRED_FIXED\" value: NAMED } "
                         + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: { text: \"VARIABLE\" form: \"UNQUOTED\" } } "
+                        + "state: \"REQUIRED_FIXED\" value: VARIABLE } "
                         + "{ name: \"key_type\" type: { name: \"type_ref\" arguments: [] } "
                         + "state: \"REQUIRED\" } "
                         + "{ name: \"value_type\" type: { name: \"type_ref\" arguments: [] } "
@@ -737,7 +737,7 @@ class DefinitionResolverTest {
         assertEquals("{ kind: \"PRODUCT\" parameters: [] constructor: false supertypes: [ \"config\" ] subtypes: [] "
                         + "body: !record { supertypes: [ \"config\" ] fields: [ "
                         + "{ name: \"host\" type: { name: \"text\" arguments: [] } state: \"REQUIRED_FIXED\" "
-                        + "value: { text: \"prod.example.com\" form: \"SINGLE_LINE_QUOTED\" } } "
+                        + "value: \"prod.example.com\" } "
                         + "{ name: \"port\" type: { name: \"integer\" arguments: [] } state: \"REQUIRED\" } "
                         + "] groups: [] } }",
                 write(production));
@@ -792,17 +792,17 @@ class DefinitionResolverTest {
                         + "supertypes: [ \"array\" \"product\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [] fields: [ "
                         + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: { text: \"INDEX\" form: \"UNQUOTED\" } } "
+                        + "state: \"REQUIRED_FIXED\" value: INDEX } "
                         + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: { text: \"VARIABLE\" form: \"UNQUOTED\" } } "
+                        + "state: \"REQUIRED_FIXED\" value: VARIABLE } "
                         + "{ name: \"element_type\" type: { name: \"type_ref\" arguments: [] } "
                         + "state: \"REQUIRED\" } "
                         + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: { text: \"REQUIRED\" form: \"UNQUOTED\" } } "
+                        + "state: \"REQUIRED_FIXED\" value: REQUIRED } "
                         + "{ name: \"unordered\" type: { name: \"boolean\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: { text: \"true\" form: \"UNQUOTED\" } } "
+                        + "state: \"REQUIRED_FIXED\" value: true } "
                         + "{ name: \"unique_items\" type: { name: \"boolean\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: { text: \"true\" form: \"UNQUOTED\" } } "
+                        + "state: \"REQUIRED_FIXED\" value: true } "
                         + "{ name: \"min_items\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
                         + "{ name: \"max_items\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
                         + "] groups: [] } }",

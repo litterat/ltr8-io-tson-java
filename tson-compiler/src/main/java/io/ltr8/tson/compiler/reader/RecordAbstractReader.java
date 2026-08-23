@@ -141,12 +141,12 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      */
     private final String declaredFields;
 
-    RecordAbstractReader(String name, String displayName, RecordBody body, TsonTypeReaderResolver resolver,
+    RecordAbstractReader(String name, String displayName, RecordBody body, FieldReaders readers,
                           SchemaLocation schemaLocation) {
         this.name = name;
         this.displayName = displayName;
         this.schemaLocation = schemaLocation;
-        this.fields = buildFields(body, resolver);
+        this.fields = buildFields(body, readers);
         this.groups = body.groups();
         this.fieldIndex = new HashMap<>();
         this.precomputedValue = new Object[fields.size()];
@@ -177,10 +177,32 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         this.declaredFields = fields.stream().map(field -> field.schema().name()).collect(Collectors.joining(" | "));
     }
 
-    private static List<CompiledField> buildFields(RecordBody body, TsonTypeReaderResolver resolver) {
+    /**
+     * How one record's field readers are chosen.
+     *
+     * <p><b>Per field, not per schema type name.</b> {@link #byType} is what a reader with no binding target
+     * in view can do, and is what tree mode uses: the field's declared type names its reader and nothing
+     * else is known. Object-binding mode knows more -- which Java component the field will fill -- and two
+     * fields of the same schema type can want different readers because their components differ. Handing
+     * the choice the {@link RecordField} rather than its type name is what lets that be said; a resolver
+     * keyed by type name cannot express it, and a reader built from one has to give up where two slots of a
+     * type disagree.
+     */
+    @FunctionalInterface
+    interface FieldReaders {
+
+        TsonTypeReader<?> forField(RecordField field);
+
+        /** By the field's declared schema type alone. */
+        static FieldReaders byType(TsonTypeReaderResolver resolver) {
+            return field -> resolver.resolve(field.type().name());
+        }
+    }
+
+    private static List<CompiledField> buildFields(RecordBody body, FieldReaders readers) {
         List<CompiledField> fields = new ArrayList<>(body.fields().size());
         for (RecordField field : body.fields()) {
-            fields.add(new CompiledField(field, resolver.resolve(field.type().name())));
+            fields.add(new CompiledField(field, readers.forField(field)));
         }
         return fields;
     }

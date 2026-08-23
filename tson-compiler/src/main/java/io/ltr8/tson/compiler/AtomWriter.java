@@ -4,8 +4,9 @@ import io.ltr8.bind.DataBindException;
 import io.ltr8.tson.compiler.atom.FloatParser;
 
 /**
- * The write-side counterpart to {@link AtomBinder}, for values that were never bound through the
- * built-in vocabulary at all (§4's default resolution, not §5) -- boolean/number/string/null.
+ * The write-side counterpart to {@link AtomBinder}: <b>framing a value that carries no type-ref of its
+ * own</b>. Mostly that is §4's default resolution -- boolean/number/string/null -- where the framing follows
+ * from the host type, since that is all such a value has to go on.
  * Formatting a *vocabulary* atom's value is each atom's own job now ({@code
  * io.ltr8.tson.compiler.atom.AtomType#write}), looked up through {@code
  * TsonObjectWriter}'s own registry rather than duplicated here; see {@code
@@ -30,6 +31,17 @@ final class AtomWriter {
             case Number n -> writer.unquotedToken(n.toString());
             case String s -> writer.quotedString(s);
             case Character c -> writer.quotedString(c.toString());
+            // The one value that knows its own framing rather than having it inferred: a Token records the
+            // form it was written in, and at a `value`-typed slot that form is part of the value -- `3` and
+            // `"3"` are different values there ([TSON-DATA] §4 resolves them to a number and a string). Every
+            // other case here reads its framing off the host type because it has nothing better.
+            case io.ltr8.tson.schema.meta.Token t -> {
+                switch (t.form()) {
+                    case UNQUOTED -> writer.unquotedToken(t.text());
+                    case SINGLE_LINE_QUOTED -> writer.quotedString(t.text());
+                    case MULTI_LINE_QUOTED -> writer.multiLineString(t.text());
+                }
+            }
             default -> throw new DataBindException("don't know how to write a value of type " + value.getClass());
         }
     }

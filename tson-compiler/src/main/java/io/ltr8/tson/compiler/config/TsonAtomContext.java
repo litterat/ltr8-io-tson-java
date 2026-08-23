@@ -48,6 +48,12 @@ public final class TsonAtomContext {
             context.registerAtom(URI.class);
             context.registerAtom(Inet4Address.class);
             context.registerAtom(Inet6Address.class);
+            // An atom, not a record: a Token *is* one token on the wire -- the text plus the form that
+            // produced it -- where binding it structurally writes it as `{ text: ... form: ... }`, a record
+            // where [TSON-SCHEMA] §8's resolved form has a scalar. Reading is unaffected (the slot's own
+            // reader decides -- see RecordBindReader.tokenAware); this is what stops the writer inventing a
+            // shape, and AtomWriter frames it from its own form.
+            context.registerAtom(io.ltr8.tson.schema.meta.Token.class);
             // schema.meta.TypeDefinition.position is typed SourcePosition, not tson-compiler's own
             // Position, specifically so tson-schema never has to name it -- an interface with no
             // sealed/@Union signal tson-bind could auto-detect, so it needs this same explicit
