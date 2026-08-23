@@ -54,7 +54,7 @@ class ValueParamFixedFieldTest {
     private static RecordField statusOf(TsonLinkedSchema linked, String entry) {
         var definition = linked.schema().entries().get(entry);
         if (definition.body() instanceof Reference alias) {
-            definition = linked.schema().entries().get(alias.target().name());
+            definition = linked.schema().entries().get(alias.target());
         }
         return ((RecordBody) definition.body()).fields().stream()
                 .filter(field -> field.name().equals("status")).findFirst().orElseThrow();

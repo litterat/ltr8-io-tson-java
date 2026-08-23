@@ -101,7 +101,7 @@ final class TypeInhabitance {
             // branches rather than conjoins, and the reason `(leaf | node)` survives a non-productive `node`.
             case ChoiceBody choice -> choice.variants().stream()
                     .anyMatch(variant -> refInhabited(variant, namespace, inhabited));
-            case Reference reference -> refInhabited(reference.target(), namespace, inhabited);
+            case Reference reference -> refInhabited(TypeRef.of(reference.target()), namespace, inhabited);
             case io.ltr8.tson.schema.meta.InstanceTemplate template ->
                     openContainerInhabited(template, namespace, inhabited);
             default -> true; // an atom's own satisfiability is its family's question, not this one
@@ -279,8 +279,8 @@ final class TypeInhabitance {
             case io.ltr8.tson.schema.meta.TupleBody tuple -> tuple.elements().stream()
                     .filter(element -> !positionInhabited(element, namespace, inhabited))
                     .map(element -> element.elementType().name()).findFirst().orElse(null);
-            case Reference reference -> refInhabited(reference.target(), namespace, inhabited)
-                    ? null : reference.target().name();
+            case Reference reference -> refInhabited(TypeRef.of(reference.target()), namespace, inhabited)
+                    ? null : reference.target();
             case io.ltr8.tson.schema.meta.InstanceTemplate template ->
                     template.bindings().values().stream()
                             .filter(TemplateArgument.Ref.class::isInstance)

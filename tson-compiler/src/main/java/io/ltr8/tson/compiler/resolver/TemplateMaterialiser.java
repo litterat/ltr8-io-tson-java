@@ -282,14 +282,20 @@ final class TemplateMaterialiser {
                 publish.accept(name, alias);
                 return name;
             }
-            if (template.body() instanceof Reference alias) {
+            if (template.body() instanceof Reference) {
                 // §5.10 partial application. A reference template *is* the application it names with some
                 // arguments still open, so applying it composes the two argument lists and closes the
                 // result: `uuid_pair<int32>` is `pair<text, int32>`, the same entry writing that directly
                 // denotes. §5.10 is explicit that this mints no intermediate entry per alias hop -- the
                 // origin survives in the composed entry's own `source`.
+                //
+                // The application comes from `source`, not from the body: a reference body holds a bare
+                // `type_name` and has nowhere to keep the still-open argument list (see Reference).
+                TypeRef application = template.source().orElseThrow(() -> new IllegalStateException(
+                        "reference template '" + name + "' has no source to apply -- TypeDefinition.reference "
+                                + "records the application there, and nothing else can reconstruct it"));
                 aliasClosing.add(name);
-                return close(bindRef(alias.target(), bind(parameters, arguments))).name();
+                return close(bindRef(application, bind(parameters, arguments))).name();
             }
             TypeDefinition instantiation = substitute(template, head, parameters, arguments);
             materialised.put(name, instantiation);
@@ -404,7 +410,7 @@ final class TemplateMaterialiser {
      */
     private static TypeDefinition instantiationOf(String head, List<TypeArgument> arguments, String formName) {
         return new TypeDefinition(Optional.of(new TypeRef(head, arguments)), TypeKind.REFERENCE, List.of(),
-                false, List.of(), List.of(), Optional.empty(), new Reference(TypeRef.of(formName)));
+                false, List.of(), List.of(), Optional.empty(), new Reference(formName));
     }
 
     /** The same open body with every {@code param} binding replaced by the argument applied for it. */
@@ -544,10 +550,34 @@ final class TemplateMaterialiser {
 
     /** Every {@link TypeRef} a definition holds, mapped -- {@code source}, and whatever its body carries. */
     private static TypeDefinition mapRefs(TypeDefinition definition, UnaryOperator<TypeRef> map) {
-        return new TypeDefinition(definition.source().map(map), definition.kind(), definition.parameters(),
+        Optional<TypeRef> source = definition.source().map(map);
+        return new TypeDefinition(source, definition.kind(), definition.parameters(),
                 definition.constructor(), definition.supertypes(), definition.subtypes(),
-                definition.disjoint(), mapBodyRefs(definition.body(), map), definition.position(),
+                definition.disjoint(), mapAliasBody(definition, source, map), definition.position(),
                 definition.annotations());
+    }
+
+    /**
+     * {@link #mapBodyRefs}, plus the one case a body cannot map for itself: <b>a declaration that aliases an
+     * application</b>. {@code created => response<text, 201>} records the application in {@code source} and
+     * its head in the {@link Reference} body, a reference body holding a bare {@code type_name} with no
+     * arguments of its own. Closing renames what {@code source} denotes -- to the entry just minted for it
+     * -- and the body has to follow, since mapping a name that carries no arguments leaves it unchanged and
+     * the alias pointing at the open template instead of its instantiation.
+     *
+     * <p>Only where the body was tracking {@code source} to begin with. A materialised instantiation targets
+     * the entry minted for it rather than its own source's head ({@link #instantiationOf}), and that is not
+     * a body following anything.
+     */
+    private static Top mapAliasBody(TypeDefinition definition, Optional<TypeRef> mappedSource,
+                                     UnaryOperator<TypeRef> map) {
+        Top body = mapBodyRefs(definition.body(), map);
+        if (body instanceof Reference reference && definition.source().isPresent() && mappedSource.isPresent()
+                && reference.target().equals(definition.source().get().name())
+                && !reference.target().equals(mappedSource.get().name())) {
+            return new Reference(mappedSource.get().name());
+        }
+        return body;
     }
 
     /**
@@ -567,7 +597,9 @@ final class TemplateMaterialiser {
             case TupleBody tuple -> new TupleBody(tuple.elements().stream()
                     .map(element -> new TupleElement(map.apply(element.elementType()), element.state())).toList());
             case ChoiceBody choice -> new ChoiceBody(choice.variants().stream().map(map).toList());
-            case Reference reference -> new Reference(map.apply(reference.target()));
+            // A bare name still substitutes: the head itself may be a parameter. It cannot gain arguments
+            // doing so -- a reference body has no channel for them -- so only the name is taken back.
+            case Reference reference -> new Reference(map.apply(TypeRef.of(reference.target())).name());
             case InstanceTemplate template -> {
                 Map<String, TemplateArgument> bindings = new LinkedHashMap<>();
                 template.bindings().forEach((slot, binding) -> bindings.put(slot,

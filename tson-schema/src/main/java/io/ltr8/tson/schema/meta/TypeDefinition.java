@@ -49,9 +49,12 @@ public record TypeDefinition(Optional<TypeRef> source, TypeKind kind, List<Strin
 
     @Record
     public TypeDefinition {
-        parameters = List.copyOf(parameters);
-        supertypes = List.copyOf(supertypes);
-        subtypes = List.copyOf(subtypes);
+        // Absent and empty are the same list here. [TSON-SCHEMA] declares all three OPTIONAL with no
+        // default ([param_name]? / [type_name]?), so a definition bound from a resolved-form document that
+        // omits one arrives with null where one resolved from source arrives with an empty list.
+        parameters = parameters == null ? List.of() : List.copyOf(parameters);
+        supertypes = supertypes == null ? List.of() : List.copyOf(supertypes);
+        subtypes = subtypes == null ? List.of() : List.copyOf(subtypes);
         annotations = annotations == null ? Annotations.empty() : annotations;
     }
 
@@ -100,10 +103,14 @@ public record TypeDefinition(Optional<TypeRef> source, TypeKind kind, List<Strin
      * <B> pair<uuid, B>}: {@code parameters} are the open parameters the declaration re-declares, and
      * {@code target} is the application that leaves them open. Applying it substitutes into {@code target}'s
      * own argument list and closes what results, so a reference template mints no entry of its own.
+     *
+     * <p>The application is recorded in {@code source}; the {@link Reference} body takes its head alone,
+     * a reference body having no channel for arguments (see that type). {@code source} is where an applier
+     * reads the argument list back from.
      */
     public static TypeDefinition reference(TypeRef target, List<String> parameters) {
         return new TypeDefinition(Optional.of(target), TypeKind.REFERENCE, parameters, false, List.of(),
-                List.of(), Optional.empty(), new Reference(target));
+                List.of(), Optional.empty(), new Reference(target.name()));
     }
 
     /** A copy of this definition with {@code position} replaced -- every other component unchanged. */
