@@ -594,7 +594,12 @@ test-suite vectors in the same session as any lexer/parser/resolver work**, not 
 standing exception: the suite's `resolver` layer is Part 1 *base-type* resolution, and there is **no Part 2
 layer at all** (no schema-resolution, linking or compilation vectors, and no sidecar schema for them). Part 2
 work therefore has nowhere to put a vector today, and the honest move is to say so rather than wedge one into
-a Part 1 bucket. Opening that layer is its own `BACKLOG.md` item.
+a Part 1 bucket. **The suite lives at `../../ltr8-io-tson-test-suite` relative to the *module* directory** —
+`github/ltr8-io-tson-test-suite`, beside this repo, not one level above it; checking the wrong path and
+concluding it is absent is a mistake worth not repeating. A vector whose sidecar carries `encoding` is fed
+the file's bytes unchanged (`checkEncodingVector`), because the ordinary string round-trip would re-encode
+exactly the bytes such a vector exists to test; an encoding this implementation does not read is skipped,
+not failed. Opening that layer is its own `BACKLOG.md` item.
 
 ## Build and test
 
