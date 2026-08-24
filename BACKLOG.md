@@ -429,9 +429,12 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
       23,464 bytes), and half the per-character cost of a long quoted token (10.5 → 5.8 bytes per character
       of input). The scanner already knows whether it consumed a backslash, so the decode pass runs only
       when there is something to decode.
-    - [ ] Smaller sites the same profile named, none yet measured on its own: `Token` snapshots per token,
-      `DateTimeParser` building a `HashMap` per value read, and an `Optional` per `TsonReadContext.peek`.
-      Together they are a few percent; the four items above were 60%.
+    - [x] **The `Optional` per `peek`/`next` is gone** — the cursor holds the event's own `SourcePosition`
+      and `position()` wraps it when asked, which is once per diagnostic rather than once per pull:
+      **-2.6 KB per read** (23,464 → 20,840) for four lines in one file, the best ratio in the exercise.
+    - [ ] Smaller sites the same profile named, none yet measured on its own: `Token` snapshots per token
+      (a two-slot lookahead paying per token), the `Position` inside every event (structural — it makes
+      `TsonEventSource` a cursor), and `DateTimeParser` building a `HashMap` per value read.
 
   **Where the read path stands after all four** (346-character self-describing document, bind read):
   61,824 → **23,464 bytes** and 1,213 → ~800 objects per read, 19.5 → ~13 µs, with retention still a

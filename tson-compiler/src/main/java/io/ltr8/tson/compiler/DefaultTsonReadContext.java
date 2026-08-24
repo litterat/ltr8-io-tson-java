@@ -30,7 +30,16 @@ final class DefaultTsonReadContext implements TsonReadContext {
     private static final class Cursor {
         final TsonEventSource events;
         final TsonDiagnosticsReceiver receiver;
-        Optional<SourcePosition> position = Optional.empty();
+
+        /**
+         * Where the cursor is: the position of the last event {@link #peek()} or {@link #next()} returned,
+         * {@code null} before the first. <b>Held as the event's own {@link SourcePosition}, not wrapped</b>
+         * -- {@link #position()} wraps it when asked, which is once per diagnostic, where this is assigned
+         * on every pull. An {@link Optional} per pull was 2.6 KB of the ~23 KB a read allocated, for a value
+         * the event already carries and almost no read ever looks at.
+         */
+        SourcePosition position;
+
         int reported;
 
         /**
@@ -110,14 +119,14 @@ final class DefaultTsonReadContext implements TsonReadContext {
     @Override
     public TsonEvent peek() {
         TsonEvent e = cursor.rewound.isEmpty() ? cursor.events.peek() : cursor.rewound.peekFirst();
-        cursor.position = Optional.of(e.position());
+        cursor.position = e.position();
         return e;
     }
 
     @Override
     public TsonEvent next() {
         TsonEvent e = cursor.rewound.isEmpty() ? cursor.events.next() : cursor.rewound.removeFirst();
-        cursor.position = Optional.of(e.position());
+        cursor.position = e.position();
         if (cursor.recording != null) {
             cursor.recording.add(e);
         }
@@ -151,7 +160,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
 
     @Override
     public Optional<SourcePosition> position() {
-        return positionOverride.isPresent() ? positionOverride : cursor.position;
+        return positionOverride.isPresent() ? positionOverride : Optional.ofNullable(cursor.position);
     }
 
     /** Built on demand, from {@link #schemaRoot} plus the marked steps -- see {@link PathStep}. */

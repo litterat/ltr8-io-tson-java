@@ -167,6 +167,20 @@ is small and parsed once.)
   `DataValueEvents`, for replaying an already-resolved `DataValue` tree through a compiled reader (the one
   place `resolver` still has a `DataValue` in hand).
 
+### The cursor's position is wrapped when it is asked for, not when it is set
+
+`peek`/`next` record the event's own `SourcePosition` in the cursor as it is; `position()` wraps it in an
+`Optional` on the way out. The reverse — wrapping on every pull — cost an allocation per event for a value
+the event already carries and that only `report` ever reads, which measured 2.6 KB of a ~23 KB read. The
+same shape as the pointers below: build the object where the diagnostic is built.
+
+What it does *not* do is remove the `Position` from the event, which is the structural version of the same
+question and a much larger change: every event holds one, so the sources (`TsonDataStream`'s queue, the
+rewind buffer, `ListEventSource`'s replayed lists) would all have to carry line/column/offset alongside the
+event instead — which is to say `TsonEventSource` becomes a cursor with accessors rather than a producer of
+objects. Worth roughly another 1 KB here and much more in a port where an object is not a pointer bump; see
+the porting notes.
+
 ### Both pointers are built when a diagnostic is, not while descending
 
 A step of the descent is one `PathStep` node linked to the step before it, and the RFC 6901 pointers are
