@@ -9,6 +9,8 @@ import io.ltr8.tson.schema.meta.IntegerSize;
 import io.ltr8.tson.schema.meta.IntegerType;
 
 import java.math.BigInteger;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Parses and validates against meta-kernel's {@code integer_type} constructor (§5.6's integer
@@ -94,8 +96,8 @@ public record IntegerParser(IntegerType constraints) implements AtomType<Number>
 
     private void validate(BigInteger value, String text) {
         constraints.size().ifPresent(s -> {
-            BigInteger min = minValue(s);
-            BigInteger max = maxValue(s);
+            BigInteger min = bounds(s)[0];
+            BigInteger max = bounds(s)[1];
             if (value.compareTo(min) < 0 || value.compareTo(max) > 0) {
                 throw new AtomValidationException("'" + text + "' is out of range for a "
                         + (s.signed() ? "signed" : "unsigned") + " " + s.bits() + "-bit integer ["
@@ -127,6 +129,35 @@ public record IntegerParser(IntegerType constraints) implements AtomType<Number>
                 throw new AtomValidationException("'" + text + "' is not a multiple of " + m, "a multiple of " + m);
             }
         });
+    }
+
+    /**
+     * {@code {min, max}} for {@code size} -- from {@link #STANDARD_BOUNDS} where the width is one the
+     * vocabulary declares, computed where it is not.
+     */
+    private static BigInteger[] bounds(IntegerSize size) {
+        BigInteger[] standard = STANDARD_BOUNDS.get(size);
+        return standard != null ? standard : new BigInteger[] {minValue(size), maxValue(size)};
+    }
+
+    /**
+     * The width bounds precomputed, because they are constants of the type and were being rebuilt on every
+     * value validated: {@code BigInteger.TWO.pow(bits)} per bound per integer read, which profiling put at
+     * 5% of everything a bind read allocated. Keyed by {@link IntegerSize} and covering the ladder core.tn
+     * declares; an exotic width falls through to {@link #bounds} computing its own, so nothing here grows
+     * with what a schema declares.
+     */
+    private static final Map<IntegerSize, BigInteger[]> STANDARD_BOUNDS = standardBounds();
+
+    private static Map<IntegerSize, BigInteger[]> standardBounds() {
+        Map<IntegerSize, BigInteger[]> table = new HashMap<>();
+        for (int bits : new int[] {8, 16, 32, 64, 128}) {
+            for (boolean signed : new boolean[] {true, false}) {
+                IntegerSize size = new IntegerSize(BigInteger.valueOf(bits), signed);
+                table.put(size, new BigInteger[] {minValue(size), maxValue(size)});
+            }
+        }
+        return Map.copyOf(table);
     }
 
     private static BigInteger minValue(IntegerSize size) {

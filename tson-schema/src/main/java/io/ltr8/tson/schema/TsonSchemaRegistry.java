@@ -1,7 +1,7 @@
 package io.ltr8.tson.schema;
 
-import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.Optional;
 
 /**
@@ -46,7 +46,16 @@ import java.util.Optional;
  */
 public final class TsonSchemaRegistry implements TsonSchemaLoader {
 
-    private final Map<String, TsonLinkedSchema> schemas = new LinkedHashMap<>();
+    /**
+     * Identity -&gt; schema. <b>Concurrent, and read without a lock</b>: every data read reaches a lookup here
+     * (through the resolution cache above it), and in a server that registered its schemas at startup the
+     * answer is present essentially every time. A monitor around that is contention with nothing to show
+     * for it -- the writes it would order all happen before the reads that matter, and the two that do not
+     * (a schema registered on demand, and the deliberate no-overwrite rule) are settled by {@code
+     * putIfAbsent} being atomic rather than by excluding readers. No iteration order is exposed, so nothing
+     * depends on the map's own.
+     */
+    private final Map<String, TsonLinkedSchema> schemas = new ConcurrentHashMap<>();
     private final TsonSchemaLoader loader;
 
     /** Default loader: resolves an import only if it's already registered -- nothing is ever fetched. */
@@ -59,15 +68,14 @@ public final class TsonSchemaRegistry implements TsonSchemaLoader {
      *               {@code null} falls back to the registered-only default (this registry itself).
      */
     public TsonSchemaRegistry(TsonSchemaLoader loader) {
-        this.loader = loader != null ? loader : this::lookupByCanonicalIdentity;
+        this.loader = loader != null ? loader : this::getByCanonicalIdentity;
     }
 
-    public synchronized TsonLinkedSchema register(TsonLinkedSchema schema) {
+    public TsonLinkedSchema register(TsonLinkedSchema schema) {
         String identity = checkRegistrable(schema);
-        if (schemas.containsKey(identity)) {
+        if (schemas.putIfAbsent(identity, schema) != null) {
             throw new TsonSchemaValidationException("a schema is already registered under '" + identity + "'");
         }
-        schemas.put(identity, schema);
         return schema;
     }
 
@@ -88,14 +96,10 @@ public final class TsonSchemaRegistry implements TsonSchemaLoader {
      * still an error and "no overwrite" is half of what makes a registry locked. Nothing here overwrites
      * either: the first entry for an identity is the only one that ever exists.
      */
-    public synchronized TsonLinkedSchema registerIfAbsent(TsonLinkedSchema schema) {
+    public TsonLinkedSchema registerIfAbsent(TsonLinkedSchema schema) {
         String identity = checkRegistrable(schema);
-        TsonLinkedSchema existing = schemas.get(identity);
-        if (existing != null) {
-            return existing;
-        }
-        schemas.put(identity, schema);
-        return schema;
+        TsonLinkedSchema existing = schemas.putIfAbsent(identity, schema);
+        return existing != null ? existing : schema;
     }
 
     /** The validation both registration paths share; returns the canonical identity to key on. */
@@ -122,15 +126,24 @@ public final class TsonSchemaRegistry implements TsonSchemaLoader {
     }
 
     @Override
-    public synchronized Optional<TsonLinkedSchema> load(String canonicalIdentity) {
-        return lookupByCanonicalIdentity(canonicalIdentity);
+    public Optional<TsonLinkedSchema> load(String canonicalIdentity) {
+        return getByCanonicalIdentity(canonicalIdentity);
     }
 
-    public synchronized Optional<TsonLinkedSchema> get(String uri) {
-        return lookupByCanonicalIdentity(TsonCanonicalIdentity.canonicalize(uri));
+    public Optional<TsonLinkedSchema> get(String uri) {
+        return getByCanonicalIdentity(TsonCanonicalIdentity.canonicalize(uri));
     }
 
-    private synchronized Optional<TsonLinkedSchema> lookupByCanonicalIdentity(String canonicalIdentity) {
+    /**
+     * {@link #get} for a caller that has <b>already</b> canonicalized -- the identity is taken as given and
+     * not checked, so passing a raw URI here silently misses.
+     *
+     * <p>Exists because canonicalizing is a {@code new URI(...)} parse and the read path was doing it three
+     * times for one document: once here, once in the resolution cache above it, once in the compiled-schema
+     * cache above that. One canonicalization now happens at the top of a read and is passed down. {@link
+     * #get} stays the door for anyone holding a URI as written.
+     */
+    public Optional<TsonLinkedSchema> getByCanonicalIdentity(String canonicalIdentity) {
         return Optional.ofNullable(schemas.get(canonicalIdentity));
     }
 }

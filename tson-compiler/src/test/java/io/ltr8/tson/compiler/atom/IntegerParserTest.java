@@ -221,4 +221,30 @@ class IntegerParserTest {
         IntegerParser uint32 = new IntegerParser(new IntegerSize(32, false));
         assertEquals("255", uint32.write(uint32.read(token("0xFF"))));
     }
+
+    /**
+     * The standard widths' bounds are precomputed (they are constants of the type, and rebuilding them per
+     * value validated was 5% of a bind read's allocation); a width outside that table computes its own. Both
+     * paths must enforce the same range, so this pins the one the table does not cover.
+     */
+    @Test
+    void anExoticWidthEnforcesItsRangeThroughTheComputedPath() {
+        IntegerParser int24 = new IntegerParser(new IntegerSize(24, true));
+
+        assertEquals(8_388_607, int24.read(token("8388607")).intValue());
+        assertEquals(-8_388_608, int24.read(token("-8388608")).intValue());
+        assertThrows(AtomValidationException.class, () -> int24.read(token("8388608")));
+        assertThrows(AtomValidationException.class, () -> int24.read(token("-8388609")));
+    }
+
+    /** The table is keyed by the whole size, so a signed and an unsigned width of the same bits differ. */
+    @Test
+    void aTabledWidthKeepsSignednessApart() {
+        assertThrows(AtomValidationException.class,
+                () -> new IntegerParser(new IntegerSize(8, false)).read(token("-1")));
+        assertEquals(-1, new IntegerParser(new IntegerSize(8, true)).read(token("-1")).intValue());
+        assertEquals(255, new IntegerParser(new IntegerSize(8, false)).read(token("255")).intValue());
+        assertThrows(AtomValidationException.class,
+                () -> new IntegerParser(new IntegerSize(8, true)).read(token("255")));
+    }
 }

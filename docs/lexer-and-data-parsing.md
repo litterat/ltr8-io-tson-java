@@ -14,6 +14,16 @@ tokens, modes, or character-classification changes).
   requires the whole document resident as a `String`. **Code-point addressed, not char-addressed**
   (surrogate pairs are never split; supplementary-plane identifiers per UAX #31 work). `Position` tracks
   line, code-point column, and a UTF-8 byte offset (§8.1 error reporting).
+- **Characters come off the reader a block at a time** (a 512-char buffer the lexer owns, drained by
+  `readRawChar`), not one `Reader.read()` per character. That is an allocation decision, not a lookahead
+  one: `InputStreamReader.read()` allocates a `char[]` and wraps it in a `CharBuffer` on *every call*, so
+  reading character-by-character — the natural shape for a code-point-addressed lexer — cost about 40 bytes
+  of garbage per character of input, 47% of everything a bind read allocated and proportional to the
+  document rather than fixed. The block is deliberately modest, because it is throughput and not a window:
+  the lookahead is still two code points, and a bigger block would only make a short document pay more.
+  Every lexical rule now runs across refill boundaries invisible to it, including a surrogate pair whose
+  halves land in different blocks — `LexerTest` walks token boundaries and a split pair across the seam,
+  and `AllocationHarnessTest` pins the per-character cost.
 - **`Token` is a flat record of six raw `int` coordinates plus type/text**, not nested `Position` objects,
   to keep allocation off the high-throughput read path; `start()`/`end()` materialize a `Position` on
   demand.

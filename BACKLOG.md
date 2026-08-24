@@ -384,42 +384,47 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
 - [ ] Thread-safety **outside a read**. Concurrent *reads* through one `Tson` are safe and tested
   (`ReadPathConcurrencyTest`): the compiled readers are immutable, a `Lexer`/`TsonDataStream` is per read,
   and the two on-demand caches — the schema registry and `DataBindContext`'s descriptors — now settle a race
-  by keeping one entry instead of failing the loser. What is still open is deliberate mutation while others
+  by keeping one entry instead of failing the loser. A read now also takes **no lock on the caches it hits**
+  (`TsonSchemaRegistry` is a `ConcurrentHashMap` read without a monitor; the compiled cache does a `get`
+  before `computeIfAbsent`), which measured small here — ~6% at 32 threads on 16 CPUs, nothing below that —
+  and matters at a core count this machine does not have. What is still open is deliberate mutation while others
   read: `Tson.resolve`/`TsonSchemaRegistry.register`/`registerAtom` stay strict about duplicates (right for
   a caller error, wrong if two threads are legitimately warming the same registry), nothing defines whether
   a `DataBindContext` may be extended after first use, and a future fetching `TsonSchemaSource` will have
   its own story. None of it is hypothetical-only: the read-path half was two real defects, found by
   auditing and reproduced first try on 8 threads.
-- [ ] **Read-path garbage, profiled and attributed.** `AllocationHarnessTest` measures ~62 KB allocated per
-  bind read of a 346-character self-describing document, none of it surviving a collection (retention is a
-  measured 0 bytes per read, and a JFR recording of 300,000 reads holds a single `OldObjectSample`). So this
-  is throughput and GC pressure, not a leak. A JFR `ObjectAllocationSample` run attributes it — the sampled
-  total came within 1% of the harness's own number, so the shares below are trustworthy:
+- [x] **Read-path garbage, profiled and attributed** — three of the five items below are done, taking a
+  346-character bind read from **61.8 KB to 47.8 KB allocated (-23%)** and 19.5 to 15.4 µs. None of it ever
+  survived a collection (retention is a measured 0 bytes per read, and a JFR recording of 300,000 reads
+  holds one `OldObjectSample`), so this is throughput and GC pressure, not a leak. Done, each measured on
+  its own by reverting it:
+    - **Read in blocks, not one character at a time** — **12.1 KB/read**, the largest single item on the
+      path. `Lexer` called `Reader.read()` per character and `InputStreamReader` allocates a `char[]` plus a
+      `CharBuffer` on every call. Guarded by `AllocationHarnessTest.lexingDoesNotAllocatePerCharacterOfInput`
+      (50.9 → 11.0 bytes per character of input).
+    - **One URI canonicalization per read** — **1.1 KB/read**. It was three: the compiled-schema cache's
+      key, the resolution cache's key, and the schema registry's own lookup, each a `new URI(...)` parse.
+    - **Precomputed integer bounds** — **0.5 KB/read**. `BigInteger.TWO.pow(bits)` was rebuilt per value
+      validated for a bound fixed by the type.
+    - **A caveat on the method, worth keeping:** JFR's per-site attribution put the last two at ~3 KB each,
+      about 3x and 6x their measured worth, while its *total* matched the harness within 1%. At that sample
+      density the aggregate is trustworthy and an individual small site is not — take a site as a pointer to
+      where to look, then measure the change by reverting it.
 
-  | bytes/read | share | what | why |
-  |---|---|---|---|
-  | ~29,500 | 47% | `HeapCharBuffer` + `char[]` @ `Lexer.readRawChar` | `Lexer` calls `Reader.read()` **once per character**, and `StreamDecoder.read()` allocates a `char[2]` and wraps it in a `CharBuffer` on every call |
-  | ~13,800 | 22% | `Matcher`, `IntHashSet[]`, `int[]`, `Object[]` @ `NumberGrammar` | a `Pattern` match per number token — and `Matcher.group("sign")` costs an extra map copy per named-group lookup on top of the `Matcher` itself |
-  | ~3,700 | 6% | `byte[]` @ `Lexer.<init>` | the `StreamDecoder`'s 8 KB byte buffer, one per read whatever the document's size |
-  | ~3,400 | 5% | `byte[]` @ `Lexer.decodeAllEscapes` | escape decoding builds a `String` per quoted token even when nothing is escaped |
-  | ~3,100 | 5% | `BigInteger` @ `IntegerParser.maxValue` | `BigInteger.TWO.pow(bits)` recomputed on every integer validated, for a bound fixed by the type |
-  | ~3,100 | 5% | `byte[]`/`URI` @ `TsonCanonicalIdentity.canonicalize` | `TsonCompiledSchemaRegistry.get` canonicalises the URI (a `new URI(...)` parse) on every read, *before* the cache lookup it keys |
-
-  Roughly in fix order, cheapest and largest first:
-    - **Buffer the lexer's reads.** A `BufferedReader` between `Lexer` and its `InputStreamReader` takes a
-      346-character document from 22.3 KB to 9.6 KB of decoding garbage — measured, one line, no behaviour
-      change. Reading into a `char[]` the lexer owns is the same win without the extra wrapper.
-    - **Decode UTF-8 in `Lexer` itself** to remove the remaining ~9.6 KB: the `StreamDecoder`'s buffers are
-      fixed cost, so a 300-byte request pays what a 300 KB one does. `Lexer` is already code-point addressed
-      and already tracks the byte offset, so it is well placed for it. Behaviour is frozen (§1.3); internals
-      are not.
-    - **Cache the integer bounds** on `IntegerSize` (or precompute them at compile) — the value is a constant
-      of the type.
-    - **Look up the compiled schema by the URI as written**, canonicalising only on a miss.
-    - **Hand-write the number scanner.** Unlike the per-character regex already removed from
-      `TsonDataEmitter`, this is regex used as a parser rather than as a comparison, so it is the approach's
-      cost rather than waste — but at 22% of a read it is worth measuring a scanner against, and dropping
-      the named groups (`m.group("sign")`) is a cheaper first step with most of the same effect.
+  What is left, in the same order:
+    - [ ] **Decode UTF-8 in `Lexer` itself.** The `StreamDecoder`'s 8 KB byte buffer is ~5 KB/read of what
+      remains and is fixed cost — a 300-byte request pays what a 300 KB one does. `Lexer` is already
+      code-point addressed and already tracks the byte offset, so it is well placed for it. Behaviour is
+      frozen (§1.3); internals are not.
+    - [ ] **Hand-write the number scanner.** `NumberGrammar` matches a `Pattern` per number token
+      (`tryInteger`/`tryFloat`/`tryBasedInteger`), and `Matcher.group("sign")` costs a map copy per
+      named-group lookup on top of the `Matcher` itself. Unlike the per-character regex already removed from
+      `TsonDataEmitter` this is regex used as a parser rather than as a comparison, so it is the approach's
+      cost rather than waste — but it is the biggest remaining item, and dropping the named groups is a
+      cheaper first step with much of the same effect.
+    - [ ] Smaller sites the same profile named, none yet measured on its own: `Token` snapshots per token,
+      `DateTimeParser` building a `HashMap` per value read, `Lexer.decodeAllEscapes` copying a quoted
+      token's text even when nothing is escaped, and an `Optional` per `TsonReadContext.peek`.
 - [ ] Confusable-character and bidi-formatting-character checks (§9.4-adjacent security hardening;
   opt-in, and per `SPEC-FEEDBACK.md` #42 reported as ordinary errors when enabled, not warnings) —
   the sibling gap to the numeric-literal length limit tracked in `STRUCTURED-OUTPUT.md`'s Tier 1 section;
