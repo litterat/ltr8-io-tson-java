@@ -439,7 +439,9 @@ vocabulary, never the type's name; the name leads
 one `SchemaLocation` (id + pointer + position) **accumulated as the read descends**, not claimed by whichever
 reader is innermost: the pointer is the path taken (`/person/age`), never the leaf it resolves to (`/int32` in
 core.tn), because the leaf names a file the author didn't write and never mentions the field they can edit.
-`schemaField` steps data and schema together where `field`/`index` step data alone; a record re-anchors
+`schemaField` steps data and schema together where `field`/`index` step data alone — each step a linked
+node, both pointers rendered only when a diagnostic is built, since concatenating per step is quadratic in
+depth and thrown away by every read that reports nothing; a record re-anchors
 id+position on itself (but a declaration with no line of its own contributes none, leaving the enclosing
 one's), everything else offers its own declaration only as a seed for a value nothing encloses — and the
 **facade** seeds the root from the name the read entered through, so a pointer into a template-derived type

@@ -419,6 +419,12 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
       counted from the input. It also settles a question the spec leaves open: malformed UTF-8 is now a
       lexer error rather than a U+FFFD substitution, overlong forms and encoded surrogates included
       (`SPEC-FEEDBACK.md` #59).
+    - [x] **Build the diagnostic path lazily** — done. A step of the descent is a linked node and both RFC
+      6901 pointers render only when a diagnostic is built: **-1.7 KB per read** (26,152 → 24,488 bytes).
+      The part that matters for a port is not the bytes: concatenating a step onto the last is quadratic in
+      nesting depth, and every read of a valid document — nearly all of them — threw the result away
+      unbuilt. `AllocationHarnessTest.nestingCostsTheSameAtEveryDepth` prices a level of nesting shallow and
+      deep and requires the two to agree, which is the property rather than a byte count.
     - [ ] Smaller sites the same profile named, none yet measured on its own: `Token` snapshots per token,
       `DateTimeParser` building a `HashMap` per value read, `Lexer.decodeAllEscapes` copying a quoted
       token's text even when nothing is escaped, and an `Optional` per `TsonReadContext.peek`.

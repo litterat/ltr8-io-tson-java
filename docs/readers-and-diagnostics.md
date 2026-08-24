@@ -13,8 +13,9 @@ is small and parsed once.)
 
 - **`TsonReadContext`** is the pull cursor: `peek()`/`next()` (over one shared `TsonEventSource`),
   `position()` derived live from the last event, `path()` (RFC 6901), `field(name)`/`index(i)` (push a
-  path segment), `at`/`withSchemaPosition`/`withPosition`, `report(code, message, expected, actual)`,
-  `reported()`. One factory, `of(events, receiver)` (plus `throwing(events)` sugar), over one
+  path segment — a *node*, not a string, see below), `at`/`withSchemaPosition`/`withPosition`,
+  `report(code, message, expected, actual)`, `reported()`. One factory, `of(events, receiver)` (plus
+  `throwing(events)` sugar), over one
   implementation. **The context holds no error policy**: `report` builds the `Diagnostic` from the path and
   positions it tracks and hands it to the read's **`TsonDiagnosticsReceiver`**, which decides its fate —
   `throwing()` raises `TsonReadException` at the first problem, `collecting()` accumulates into a
@@ -165,6 +166,26 @@ is small and parsed once.)
   schema default (`readSchemaDefault` wraps a literal `Token` as one synthetic event) and, via
   `DataValueEvents`, for replaying an already-resolved `DataValue` tree through a compiled reader (the one
   place `resolver` still has a `DataValue` in hand).
+
+### Both pointers are built when a diagnostic is, not while descending
+
+A step of the descent is one `PathStep` node linked to the step before it, and the RFC 6901 pointers are
+rendered from that chain only when `report` (or a caller) asks. Concatenating each step onto the last —
+what this did — is **quadratic in depth**: every level copies the whole prefix again, and a read that
+reports nothing throws all of it away, which is every read of a valid document. `schemaToo` on each step is
+what keeps the two pointers apart in one chain: every schema step is a data step, but an array index moves
+through the document without moving through the schema, whose element type is declared once for the array.
+
+The schema end keeps its identity and line beside the chain rather than in it, because a re-anchoring
+record replaces those while the pointer keeps growing — `inRecord`/`underDeclaration` set them, the chain
+does not. `SchemaLocation` is unchanged and is still what `schemaLocation()` hands back; it is simply built
+on demand instead of once per field.
+
+`AllocationHarnessTest.nestingCostsTheSameAtEveryDepth` pins the shape rather than a byte count: it prices
+a level of nesting in a shallow part of a document and in a deep one and requires the two to agree. The
+per-level structural cost (events, tokens, a node, a context) is flat and large enough to hide the pointer
+in an absolute measurement — eager building shows up as the *deep* level costing ~200 bytes more than the
+shallow one, and more at greater depth.
 
 ### What a read leaves behind: nothing
 
