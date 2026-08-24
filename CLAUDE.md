@@ -605,7 +605,18 @@ No system Gradle — always use the wrapper:
 ./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.TsonCompiledSchemaRegistryTest"
 ./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.resolver.DefinitionResolverTest"
 ./gradlew :tson-cli:installDist   # then tson-cli/build/install/tson/bin/tson validate ...
+./gradlew :tson:allocationReport  # the allocation harness alone, numbers on stdout
 ```
+
+**Allocation is measured, not assumed** (`AllocationHarnessTest`, `tson/src/test/.../perf/`). Two separate
+questions over the bind read path: **retention** — settled heap across 20,000 reads of one schema, plus a
+weak-reference check that no read output stays reachable, both currently a flat **0 bytes per read**, which
+is what the "resolve every schema at startup, then read" design claims and nothing else asserts — and
+**transient bytes**, reported per read with a ceiling loose enough to survive a JDK upgrade and tight enough
+to catch a 50x mistake (a `Pattern` per character was one, at 188 bytes per character written). Numbers move
+with the JDK and the machine; treat the *shape* as the signal — `whereAReadsBytesGo` splits a read into
+stream/tree/bind so a change says which stage moved. `AllocationProbe`'s Javadoc has the Flight Recorder
+flags for when the next question is "where".
 
 **Publishing is packaging, not release.** Every subproject applies `maven-publish` with a `mavenJava`
 publication (the `java` component plus sources and javadoc jars) and a POM carrying name/description/

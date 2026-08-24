@@ -37,3 +37,21 @@ tasks.named<Test>("test") {
     systemProperty("tson.examples.dir", rootProject.projectDir.resolve("examples").absolutePath)
     systemProperty("tson.modules.dir", layout.buildDirectory.dir("modules").get().asFile.absolutePath)
 }
+
+// The allocation harness alone, with its report on stdout -- `./gradlew :tson:allocationReport`. It also runs
+// as part of `test`, where its assertions are the point and the numbers scroll past; this task is for when
+// the numbers *are* the point. Add `-Dtson.alloc.jfr=build/alloc.jfr` to record the run under Flight
+// Recorder, for allocation by call site rather than in total.
+tasks.register<Test>("allocationReport") {
+    group = "verification"
+    description = "Runs the allocation harness alone, printing bytes allocated and retained per read."
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    filter { includeTestsMatching("io.ltr8.tson.perf.*") }
+    testLogging { showStandardStreams = true }
+    outputs.upToDateWhen { false }   // a measurement is never up to date
+    val recording = providers.systemProperty("tson.alloc.jfr")
+    if (recording.isPresent) {
+        jvmArgs("-XX:StartFlightRecording=settings=profile,filename=${recording.get()}")
+    }
+}

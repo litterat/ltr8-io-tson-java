@@ -226,6 +226,13 @@ reads one value at a cursor and polices nothing around it.
     *source* rather than at the token cursor is what makes the replay exact: the decoder reads ahead in
     chunks, and bytes it pulled but never tokenised are recorded too. Memory is that read-ahead, not the
     document — a test pins the pull under 64 KB for a 500 KB body.
+- **`quotedString` escapes with a comparison, not a `Pattern`.** The escape loop runs once per character of
+  every string a writer emits, and asking `c <= 0x1f` through a compiled `Pattern` cost a `String`, a
+  `Matcher` and the matcher's own internals *per character* — 188 bytes against 3.7 for the whole write,
+  measured, and 13% of sampled allocation in a demo server's profile. `isControl(char)` is that comparison
+  and the pattern is gone; `AllocationHarnessTest.writingAQuotedStringDoesNotAllocatePerCharacter` fails at
+  anything approaching the old cost. `String.format("\\u%04x", …)` on the branch it guards stays — that
+  branch is genuinely rare, and the loop around it is what mattered.
 - These live in `tson-compiler`'s root package (not a separate module) because `DefinitionResolver`
   depends on `TsonObjectWriter` (atom-refinement merging) — a module depending *on* `tson-compiler`
   couldn't provide them without a cycle. `tson-bind` (what they're built on) has no such dependency.

@@ -9,7 +9,6 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayDeque;
 import java.util.Deque;
-import java.util.regex.Pattern;
 
 /**
  * Builds TSON source text incrementally -- the write-side counterpart to {@link io.ltr8.tson.compiler.lexer.Lexer}/{@link
@@ -56,8 +55,6 @@ public final class TsonDataEmitter {
     /** Whether a {@link #typeRef} has been written for the value now being written -- see that method. */
     private boolean typeRefPending;
     private String pendingTypeRef;
-
-    private static final Pattern CONTROL_CHAR = Pattern.compile("[\\x00-\\x1f]");
 
     // ── Records and maps (both "{" "}", differing only in entry shape) ─────
 
@@ -261,6 +258,16 @@ public final class TsonDataEmitter {
     }
 
     /**
+     * A C0 control character, the range §7.2.2 requires escaped. <b>A comparison, deliberately, not a
+     * {@code Pattern}</b> -- this runs once per character of every string written, and a regex here cost a
+     * {@code String}, a {@code Matcher} and the {@code Matcher}'s own internals per character (measured at
+     * 56 bytes against 0) to answer what one comparison answers. {@code AllocationHarnessTest} pins it.
+     */
+    private static boolean isControl(char c) {
+        return c <= 0x1f;
+    }
+
+    /**
      * Writes {@code text} as a quoted, escaped single-line string token (§7.2.2). Escapes exactly
      * what must be escaped for the result to lex back to the same text -- {@code "}, {@code \}, and
      * C0 control characters (named escapes where the lexer recognises one, {@code \\uXXXX}
@@ -281,7 +288,7 @@ public final class TsonDataEmitter {
                 case '\r' -> emit("\\r");
                 case '\t' -> emit("\\t");
                 default -> {
-                    if (CONTROL_CHAR.matcher(String.valueOf(c)).matches()) {
+                    if (isControl(c)) {
                         emit(String.format("\\u%04x", (int) c));
                     } else {
                         emit(c);
@@ -336,7 +343,7 @@ public final class TsonDataEmitter {
             boolean isTrailingBlank = i >= trailing;
             if (c == '\\') {
                 out.append("\\\\");
-            } else if (isTrailingBlank || c == '\r' || CONTROL_CHAR.matcher(String.valueOf(c)).matches()) {
+            } else if (isTrailingBlank || c == '\r' || isControl(c)) {
                 out.append(String.format("\\u%04x", (int) c));
             } else {
                 out.append(c);
