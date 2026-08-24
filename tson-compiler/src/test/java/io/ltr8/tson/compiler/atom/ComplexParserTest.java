@@ -21,6 +21,19 @@ class ComplexParserTest {
                 ComplexParser.UNCONSTRAINED.read(token("3+4i")));
     }
 
+    /**
+     * A zero-led magnitude reaches the atom now: the grammar always admitted it (§7.6's {@code
+     * decimal-natural} is {@code "0" / nonzero-digit ...}), and the regex it was written as did not --
+     * see {@code NumberGrammarTest.complexAdmitsAZeroLedMagnitude}.
+     */
+    @Test
+    void acceptsAZeroLedMagnitude() {
+        assertEquals(new Complex(new BigDecimal("0"), new BigDecimal("0.5")),
+                ComplexParser.UNCONSTRAINED.read(token("0.5i")));
+        assertEquals(new Complex(new BigDecimal("0.5"), new BigDecimal("-0.25")),
+                ComplexParser.UNCONSTRAINED.read(token("0.5-0.25i")));
+    }
+
     @Test
     void acceptsNegativeRealAndImaginaryParts() {
         assertEquals(new Complex(new BigDecimal("-3.5"), new BigDecimal("-2")),
