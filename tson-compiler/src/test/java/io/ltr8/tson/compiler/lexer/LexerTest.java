@@ -8,6 +8,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LexerTest {
 
@@ -464,5 +465,80 @@ class LexerTest {
         assertEquals(2, second.startLine());
         assertEquals(1, second.startColumn());
         assertEquals(padding.length() + 3, second.startByteOffset(), "two quotes and a newline");
+    }
+
+    // ── UTF-8 decoding (§9.1), done here rather than by a platform decoder ──
+
+    private static List<Token> lexBytes(int... unsigned) {
+        byte[] raw = new byte[unsigned.length];
+        for (int i = 0; i < unsigned.length; i++) {
+            raw[i] = (byte) unsigned[i];
+        }
+        return new Lexer(new ByteArrayInputStream(raw)).tokenize();
+    }
+
+    private static void assertNotUtf8(String why, int... unsigned) {
+        LexException thrown = assertThrows(LexException.class, () -> lexBytes(unsigned), why);
+        assertTrue(thrown.getMessage().startsWith("the document is not valid UTF-8"), thrown.getMessage());
+    }
+
+    /**
+     * Bytes that are not UTF-8 are refused, not replaced. A replacing decoder -- the platform default, and
+     * what this lexer used to inherit -- turns the same broken byte into an error outside a quoted token
+     * and into silent content inside one. See {@code SPEC-FEEDBACK.md} #59.
+     */
+    @Test
+    void refusesBytesThatAreNotUtf8() {
+        assertNotUtf8("a continuation byte with nothing to continue", 0x80);
+        assertNotUtf8("a two-byte sequence cut off by end of input", 0xC3);
+        assertNotUtf8("a second byte that is not a continuation", 0xC3, 0x28);
+        assertNotUtf8("a five-byte form, which UTF-8 has never had", 0xF8, 0x88, 0x80, 0x80, 0x80);
+    }
+
+    /** Two spellings of one character is the encoding layer's confusability problem (§9.4's, one level down). */
+    @Test
+    void refusesOverlongFormsAndEncodedSurrogates() {
+        assertNotUtf8("'/' written in two bytes instead of one", 0xC0, 0xAF);
+        assertNotUtf8("U+0000 written in two bytes", 0xC0, 0x80);
+        assertNotUtf8("U+D800, a surrogate, encoded as if it were a character", 0xED, 0xA0, 0x80);
+        assertNotUtf8("a value beyond U+10FFFF", 0xF5, 0x80, 0x80, 0x80);
+    }
+
+    /** The case a replacing decoder gets most wrong: the document reads, with a character nobody wrote. */
+    @Test
+    void refusesAMalformedByteInsideAQuotedToken() {
+        assertNotUtf8("inside a quoted token", '"', 'a', 0xFF, 'b', '"');
+    }
+
+    @Test
+    void decodesEveryUtf8SequenceLength() {
+        List<Token> ts = tokens("\"a\u00E9\u20AC\uD83D\uDE80\"");   // 1-, 2-, 3- and 4-byte sequences
+
+        assertEquals(1, ts.size());
+        assertToken(ts.get(0), TokenType.SINGLE_LINE_STRING, "a\u00E9\u20AC\uD83D\uDE80");
+    }
+
+    /**
+     * §8.1 requires a byte offset in every error report, and it is counted from the input rather than
+     * re-derived from the decoded character -- so it stays right for multi-byte characters, and would stay
+     * right for a malformed sequence, where a derived length is exactly wrong.
+     */
+    @Test
+    void byteOffsetsCountTheInputsOwnBytes() {
+        List<Token> ts = tokens("\"\u00E9\u20AC\uD83D\uDE80\" second");
+
+        Token second = ts.get(1);
+        assertEquals(12, second.startByteOffset(), "two quotes, 2 + 3 + 4 bytes of content, and a space");
+        assertEquals(7, second.startColumn(), "columns count code points: quote, three characters, quote, space");
+    }
+
+    /** A BOM is an encoding artifact discarded before lexing (§7.1) -- it is not the character at offset zero. */
+    @Test
+    void aLeadingBomCountsTowardNoOffset() {
+        List<Token> ts = lexBytes(0xEF, 0xBB, 0xBF, 'a', 'b');
+
+        assertEquals(0, ts.get(0).startByteOffset());
+        assertEquals(1, ts.get(0).startColumn());
+        assertToken(ts.get(0), TokenType.UNQUOTED, "ab");
     }
 }

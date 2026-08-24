@@ -203,8 +203,11 @@ note named at the head of each.
 ### Lexer (`tson-compiler/.../lexer/`) — `docs/lexer-and-data-parsing.md`
 
 `Lexer` is a single hand-written scanner producing `Token`s off `nextToken()` (never a batch), **complete
-and frozen for the whole series** (§1.3). Constructed from an `InputStream`, code-point addressed (never
-char-addressed), with `Position` tracking line / code-point column / UTF-8 byte offset. NFC normalization
+and frozen for the whole series** (§1.3). Constructed from an `InputStream` whose **UTF-8 it decodes
+itself** (§9.1), code-point
+addressed (never char-addressed), with `Position` tracking line / code-point column / UTF-8 byte offset —
+counted from the input rather than re-derived from the decoded character, and malformed UTF-8 is a
+`LexException` rather than a U+FFFD substitution (`SPEC-FEEDBACK.md` #59). NFC normalization
 applies to *unquoted* tokens only; Pattern_White_Space is the spec's fixed 11-character set, hardcoded.
 `Character.isUnicodeIdentifierStart/Part` stands in for XID_Start/XID_Continue — a known, deliberate
 approximation. Errors are fail-fast (`LexException`); multi-error recovery is deferred.

@@ -412,18 +412,13 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
       where to look, then measure the change by reverting it.
 
   What is left, in the same order:
-    - [ ] **Decode UTF-8 in `Lexer` itself.** The `StreamDecoder`'s 8 KB byte buffer is ~5 KB/read of what
-      remains and is fixed cost — a 300-byte request pays what a 300 KB one does. `Lexer` is already
-      code-point addressed and already tracks the byte offset, so it is well placed for it. Behaviour is
-      frozen (§1.3); internals are not.
-    - [x] **Hand-write the number scanner** — done. `NumberScanner`, one method per ABNF rule, under an
-      unchanged `NumberGrammar` API: **-12.5 KB and -247 objects per read** (47,816 → 35,320 bytes, 1,213 →
-      966 objects, 15.4 → 13.9 µs), the `Matcher`/`IntHashSet[]`/`int[]` cohort gone entirely. The reason to
-      do it before a port was that the grammar was stated as a Java regex; the reason it was worth the fuzz
-      is that swapping it **found a real defect** — a zero-led complex magnitude (`0.5i`, `0e3j`,
-      `0.5-0.25i`) was refused where §7.6 admits it, because `decimal-natural`'s bare alternation was
-      spliced into the magnitude's. Regression tests at both levels; `NumberScannerEquivalenceTest` keeps
-      the old patterns as an oracle.
+    - [x] **Decode UTF-8 in `Lexer` itself** — done. The lexer reads 512-byte blocks off the stream and
+      decodes them, with no `InputStreamReader` between: **-9.2 KB per read** (35,320 → 26,152 bytes; the
+      token stream alone 23,264 → 13,955). The reason to do it before a port was that a port writes this
+      loop anyway, and that §8.1's byte offset was being re-derived from the decoded character rather than
+      counted from the input. It also settles a question the spec leaves open: malformed UTF-8 is now a
+      lexer error rather than a U+FFFD substitution, overlong forms and encoded surrogates included
+      (`SPEC-FEEDBACK.md` #59).
     - [ ] Smaller sites the same profile named, none yet measured on its own: `Token` snapshots per token,
       `DateTimeParser` building a `HashMap` per value read, `Lexer.decodeAllEscapes` copying a quoted
       token's text even when nothing is escaped, and an `Optional` per `TsonReadContext.peek`.

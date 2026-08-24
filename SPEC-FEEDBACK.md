@@ -3800,3 +3800,43 @@ under-validates.
 parametric `=` should be `REQUIRED_FIXED` from the start. That contradicts the sentence §5.7 is unambiguous
 about, and it would mint a `REQUIRED_FIXED` field with no `value` — a shape §5.2 currently gives only to
 `= _`, where it means *fixed to absent*. The declaration is right; only the downstream is unstated.
+
+## 59. A document is "encoded in Unicode", and nothing says what a decoder does with bytes that are not
+
+**Section:** §9.1 ("Encoding"), §8.1 ("Error reporting"), §2.2.1 (content addressing).
+
+§9.1 says what a document is encoded in:
+
+> TSON documents are encoded in Unicode. UTF-8 is RECOMMENDED; UTF-16 and UTF-32 are permitted.
+> Content-addressed documents MUST be UTF-8 (§2.2.1).
+
+What it does not say is what happens to a byte sequence that is not valid in the encoding — a stray
+continuation byte, a sequence truncated by end of input, an overlong form, an encoded surrogate, a value
+above U+10FFFF. §8.1 lists the lexer errors and encoding is not among them; §7.2.4's "unrecognised
+character" is about characters the grammar does not admit, which presumes a character was decoded at all.
+
+**Why it is not merely theoretical.** The default behaviour of every mainstream decoder — Java's
+`CharsetDecoder`, Python's `errors="replace"`, Go's `[]rune` conversion — is to substitute U+FFFD and carry
+on. Under that default a malformed byte inside a quoted token becomes *content*: the document parses, and a
+value nobody wrote reaches the application. Outside a quoted token it usually surfaces as an unrecognised
+character, so the same broken byte is an error in one position and silent data corruption in another. For a
+format whose canonical identity can be a hash of its own bytes (§2.2.1), silently substituting bytes is
+particularly awkward: two byte sequences that hash differently decode to the same document.
+
+It also interacts with §8.1's byte offset. An implementation decoding through a replacing decoder sees
+U+FFFD and, if it derives the offset from the decoded character rather than counting input bytes, advances
+by the replacement's own length rather than the malformed sequence's — so the position in the error report
+is wrong precisely where a reader most needs it.
+
+**What this implementation does:** rejects, as a lexer error, with the byte offset of the offending
+sequence's first byte. Overlong forms, encoded surrogates and out-of-range values are rejected too, not
+just structurally broken sequences — the first two are two spellings of one character, which is the
+encoding-layer version of the confusability concern §9.4 raises for the character layer, and a validator
+upstream may have seen only one of them.
+
+**Suggested resolution:** state it in §9.1, in one sentence. Something like: *a byte sequence that is not
+valid in the document's encoding is a lexer error (§8.1); a decoder MUST NOT substitute replacement
+characters. Overlong encodings, encoded surrogate code points, and values above U+10FFFF are not valid
+UTF-8.* The last clause is worth spelling out even though it follows from the Unicode standard, because
+"decode it with the platform's library" produces a different answer for each of the three on some
+platforms.
