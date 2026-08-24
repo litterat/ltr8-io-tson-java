@@ -183,6 +183,10 @@ class ConformanceSuiteTest {
 
     private static void checkLexerVector(String bucket, Path subject, RecordValue sidecar) throws IOException {
         String outcome = fieldText(sidecar, "outcome");
+        if (hasField(sidecar, "encoding")) {
+            checkEncodingVector(subject, sidecar, outcome);
+            return;
+        }
         String raw = resolvedRaw(subject, sidecar);
         switch (outcome) {
             case "valid" -> {
@@ -200,6 +204,31 @@ class ConformanceSuiteTest {
             }
             case "error" -> assertThrows(LexException.class,
                     () -> new Lexer(new ByteArrayInputStream(raw.getBytes(StandardCharsets.UTF_8))).tokenize());
+            default -> fail("unknown lexer-layer outcome: " + outcome);
+        }
+    }
+
+    /**
+     * A vector whose subject is <b>not plain UTF-8</b> (its sidecar says so with {@code encoding}), fed to
+     * the lexer as the bytes on disk.
+     *
+     * <p>Every other vector is read into a {@code String} and re-encoded, which is harmless for text and
+     * destroys exactly this kind of vector: the decode replaces the malformed bytes with U+FFFD before the
+     * lexer ever sees them, so the test would assert that a *different* document is rejected. The suite's
+     * own README says the subject is a raw file precisely because "several things this suite needs to test
+     * only exist as raw bytes".
+     *
+     * <p>{@code utf-16}/{@code utf-32} are skipped rather than failed: §9.1 permits them and this
+     * implementation reads only UTF-8, which is a gap in the implementation and not a vector to fail on.
+     */
+    private static void checkEncodingVector(Path subject, RecordValue sidecar, String outcome) throws IOException {
+        String encoding = fieldText(sidecar, "encoding");
+        Assumptions.assumeTrue("invalid-utf8".equals(encoding),
+                "this implementation reads only UTF-8 (§9.1 permits utf-16/utf-32); vector encoding: " + encoding);
+        byte[] raw = Files.readAllBytes(subject);
+        switch (outcome) {
+            case "error" -> assertThrows(LexException.class, () -> new Lexer(new ByteArrayInputStream(raw)).tokenize());
+            case "valid" -> fail("an 'invalid-utf8' subject cannot lex cleanly: " + subject.getFileName());
             default -> fail("unknown lexer-layer outcome: " + outcome);
         }
     }
