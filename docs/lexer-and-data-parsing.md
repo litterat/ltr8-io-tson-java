@@ -10,20 +10,32 @@ the one-paragraph orientation; this file holds the detail.
 `tokenize()` batch). **Complete and frozen for the whole series** (§1.3: higher parts introduce no new
 tokens, modes, or character-classification changes).
 
-- **Constructed from an `InputStream`**, decoded UTF-8 and buffered a few code points of lookahead — never
-  requires the whole document resident as a `String`. **Code-point addressed, not char-addressed**
+- **Constructed from an `InputStream`**, decoding UTF-8 and buffering a few code points of lookahead —
+  never requires the whole document resident as a `String`. **Code-point addressed, not char-addressed**
   (surrogate pairs are never split; supplementary-plane identifiers per UAX #31 work). `Position` tracks
   line, code-point column, and a UTF-8 byte offset (§8.1 error reporting).
-- **Characters come off the reader a block at a time** (a 512-char buffer the lexer owns, drained by
-  `readRawChar`), not one `Reader.read()` per character. That is an allocation decision, not a lookahead
-  one: `InputStreamReader.read()` allocates a `char[]` and wraps it in a `CharBuffer` on *every call*, so
-  reading character-by-character — the natural shape for a code-point-addressed lexer — cost about 40 bytes
-  of garbage per character of input, 47% of everything a bind read allocated and proportional to the
-  document rather than fixed. The block is deliberately modest, because it is throughput and not a window:
-  the lookahead is still two code points, and a bigger block would only make a short document pay more.
-  Every lexical rule now runs across refill boundaries invisible to it, including a surrogate pair whose
-  halves land in different blocks — `LexerTest` walks token boundaries and a split pair across the seam,
-  and `AllocationHarnessTest` pins the per-character cost.
+- **The lexer decodes UTF-8 itself**, off a 512-byte block it reads from the `InputStream` — no
+  `InputStreamReader`, no `char[]` in between. Three reasons, and only the third is performance:
+  - **A port has to do this.** A language without Java's charset machinery writes exactly this loop, so a
+    reference that hides it behind the platform decoder omits the one part it exists to show. §9.1 makes
+    UTF-8 RECOMMENDED and permits UTF-16/UTF-32; this implementation has only ever read UTF-8, and the byte
+    layer being explicit is what would make a BOM-sniffing choice of decoder a local change.
+  - **§8.1's byte offset is counted, not derived.** Each buffered code point carries the byte length it was
+    decoded from (`lookaheadByteLengths`), where the offset used to be recomputed from the decoded value —
+    right only while the input is well-formed, which is the one case where the offset matters least.
+  - **A decoder that reports what it rejects can reject.** Malformed UTF-8 is a `LexException`, not a
+    U+FFFD substitution: a replacing decoder makes the same broken byte an error outside a quoted token and
+    silent content inside one, and for a format whose identity can be a hash of its bytes, substituting
+    bytes is the wrong default. Overlong forms, encoded surrogates and values above U+10FFFF are refused
+    too — two spellings of one character is §9.4's confusability problem one layer down. The spec does not
+    say (`SPEC-FEEDBACK.md` #59); this is the choice made and why.
+  - Blocks are also what keeps reading cheap: a byte (or character) at a time costs a call and, through a
+    `Reader`, an allocation per character — 47% of everything a bind read allocated, proportional to the
+    document rather than fixed. The block is deliberately modest, because it is throughput and not a
+    window: the lookahead is still two code points. Every lexical rule runs across refill boundaries
+    invisible to it, including a multi-byte sequence or a surrogate pair split across one — `LexerTest`
+    walks token boundaries and a split pair across the seam, and `AllocationHarnessTest` pins the
+    per-character cost.
 - **`Token` is a flat record of six raw `int` coordinates plus type/text**, not nested `Position` objects,
   to keep allocation off the high-throughput read path; `start()`/`end()` materialize a `Position` on
   demand.

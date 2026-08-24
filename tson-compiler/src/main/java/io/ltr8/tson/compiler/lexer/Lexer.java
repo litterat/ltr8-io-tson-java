@@ -4,10 +4,7 @@ import io.ltr8.tson.compiler.Position;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.Reader;
 import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.List;
@@ -16,10 +13,10 @@ import java.util.List;
  * Converts TSON source bytes into a stream of {@link Token}s per spec §7.2–§7.3.
  *
  * <p>The lexer is a single hand-written scanner over UTF-8 bytes read incrementally from an
- * {@link InputStream}, decoded via {@link InputStreamReader} and addressed one Unicode code point
+ * {@link InputStream}, decoding UTF-8 itself (§9.1) and addressed one Unicode code point
  * at a time (so supplementary-plane characters, which are valid in identifiers per UAX #31, are
  * never split). At most a couple of code points of lookahead beyond the cursor are ever buffered
- * ({@link #lookahead}) — every lexical rule in this class needs to peek at most one or two code
+ * ({@link #lookaheadCodePoints}) — every lexical rule in this class needs to peek at most one or two code
  * points ahead of the current position (`""` disambiguation, the `..` range-vs-continuation check,
  * `\r\n` pairing), never further back or further forward — so memory held at any point is bounded
  * regardless of source size, the same "never materialize the whole input" principle
@@ -48,28 +45,44 @@ import java.util.List;
  */
 public final class Lexer {
 
-    private final Reader reader;
+    private final InputStream source;
 
     /**
-     * Characters pulled off {@link #reader} in bulk, drained one at a time by {@link #readRawChar()}.
+     * Bytes pulled off {@link #source} in bulk, decoded one code point at a time by {@link
+     * #decodeCodePoint()}.
      *
-     * <p><b>The bulk read is the point, not the buffer's size.</b> {@code Reader.read()} on an {@code
-     * InputStreamReader} allocates a {@code char[]} and wraps it in a {@code CharBuffer} on <em>every
-     * call</em>, so reading a document one character at a time -- which is what a code-point-addressed
-     * lexer naturally wants to do -- cost about 40 bytes of garbage per character of input: 47% of
-     * everything a read allocated, and a cost proportional to the document rather than fixed. Reading a
-     * block at a time makes that per-block, and the block is deliberately modest: it is throughput, not a
-     * lookahead window ({@link #lookahead} is that, and stays two code points deep), so a large document
+     * <p><b>The bulk read is the point, not the buffer's size.</b> Reading a byte (or a character) at a
+     * time from the stream -- which is what a code-point-addressed lexer naturally wants to do -- costs a
+     * call and, through a {@code Reader}, an allocation per character. Reading a block at a
+     * time makes that per-block, and the block is deliberately modest: it is throughput, not a lookahead
+     * window ({@link #lookaheadCodePoints} is that, and stays two code points deep), so a large document
      * gains nothing from a larger one and a small document should not pay for it.
      * {@code AllocationHarnessTest} pins the result.
      */
-    private final char[] buffer = new char[512];
-    private int bufferPosition;
-    private int bufferLimit;
+    private final byte[] bytes = new byte[512];
+    private int bytePosition;
+    private int byteLimit;
+    private boolean sourceExhausted;
 
-    /** Code points read from {@link #reader} but not yet consumed by {@link #advance()} -- never holds more than a couple of elements, the most any lexical rule here ever needs to look ahead. */
-    private final List<Integer> lookahead = new ArrayList<>();
-    private boolean streamExhausted;
+    /**
+     * Bytes decoded so far -- {@link #byteOffset}'s bytes plus the lookahead's, on the same base (a leading
+     * BOM counts toward neither, §7.1). The difference across one {@link #decodeCodePoint()} is that code
+     * point's own byte length, which is how the offset is counted rather than derived.
+     */
+    private int bytesDecoded;
+
+    /**
+     * Code points decoded but not yet consumed by {@link #advance()}, with the byte length each was decoded
+     * from -- never more than two, the most any lexical rule here looks ahead.
+     *
+     * <p>The lengths are carried rather than recomputed from the code point, which is what makes {@link
+     * #byteOffset} <b>counted, not derived</b>: §8.1 requires a byte offset in every error report, and a
+     * length re-derived from the decoded value is only right while the input is well-formed UTF-8 -- the
+     * exact case where an offset matters most is the one where it would be wrong.
+     */
+    private final int[] lookaheadCodePoints = new int[4];
+    private final int[] lookaheadByteLengths = new int[4];
+    private int lookaheadCount;
 
     private int line;       // 1-based; also the most recently lexed token's own *end* line
     private int col;        // 1-based, counted in code points; also that token's own end column
@@ -83,7 +96,7 @@ public final class Lexer {
     private String tokenText;
 
     public Lexer(InputStream source) {
-        this.reader = new InputStreamReader(source, StandardCharsets.UTF_8);
+        this.source = source;
         this.line = 1;
         this.col = 1;
         this.byteOffset = 0;
@@ -95,7 +108,8 @@ public final class Lexer {
     /** A single leading BOM is discarded invisibly -- not counted toward {@link #line}/{@link #col}/{@link #byteOffset}, matching §7.1. A BOM anywhere else is left alone, falling through to "unrecognised character" naturally. */
     private void stripLeadingBom() {
         if (peekCodePointAt(0) == BOM) {
-            lookahead.remove(0);
+            bytesDecoded -= lookaheadByteLengths[0];   // §7.1: not a character at offset zero -- not there at all
+            dropBufferedCodePoint();
         }
     }
 
@@ -684,71 +698,158 @@ public final class Lexer {
     /** Looks ahead {@code ahead} code points from the cursor without consuming; -1 past the end. Never called with more than 1, the most any lexical rule here needs. */
     private int peekCodePointAt(int ahead) {
         ensureBuffered(ahead + 1);
-        return ahead < lookahead.size() ? lookahead.get(ahead) : -1;
+        return ahead < lookaheadCount ? lookaheadCodePoints[ahead] : -1;
     }
 
-    /** Buffers code points from {@link #reader} until {@link #lookahead} holds at least {@code count} (or the stream is exhausted). */
+    /** Decodes code points until the lookahead holds at least {@code count} (or the input is exhausted). */
     private void ensureBuffered(int count) {
-        while (lookahead.size() < count && !streamExhausted) {
-            int cp = readCodePointFromReader();
+        while (lookaheadCount < count && !sourceExhausted) {
+            int start = bytesDecoded;
+            int cp = decodeCodePoint();
             if (cp == -1) {
-                streamExhausted = true;
+                sourceExhausted = true;
             } else {
-                lookahead.add(cp);
+                lookaheadCodePoints[lookaheadCount] = cp;
+                lookaheadByteLengths[lookaheadCount] = bytesDecoded - start;
+                lookaheadCount++;
             }
         }
     }
 
-    /** Reads one full code point off {@link #reader} -- two {@code char}s for a surrogate pair, one otherwise. */
-    private int readCodePointFromReader() {
-        int c1 = readRawChar();
-        if (c1 == -1) {
+    // ── UTF-8 (§9.1) ─────────────────────────────────────────────────────
+
+    /**
+     * One code point, decoded from {@link #source}'s bytes; -1 at end of input.
+     *
+     * <p><b>Decoded here rather than by a {@code Reader}</b>, for three reasons that all outlive this
+     * implementation. A port to a language without Java's charset machinery has to do exactly this, so a
+     * reference that hides it behind the platform's own decoder shows the one thing it cannot show. §8.1's
+     * byte offset falls out of the decoding instead of being re-derived from the decoded value -- which is
+     * only correct while the input is well-formed. And a decoder that reports what it rejects can reject:
+     * see {@link #malformed}.
+     *
+     * <p>UTF-8 only. §9.1 makes it RECOMMENDED and permits UTF-16 and UTF-32; this implementation has only
+     * ever read UTF-8, and the byte layer being explicit is what would make a BOM-sniffing choice of
+     * decoder a local change rather than a rewrite.
+     */
+    private int decodeCodePoint() {
+        int sequenceStart = bytesDecoded;
+        int first = nextByte();
+        if (first < 0) {
             return -1;
         }
-        if (Character.isHighSurrogate((char) c1)) {
-            int c2 = readRawChar();
-            if (c2 != -1 && Character.isLowSurrogate((char) c2)) {
-                return Character.toCodePoint((char) c1, (char) c2);
+        if (first < 0x80) {
+            return first;
+        }
+
+        int continuations;
+        int codePoint;
+        if ((first & 0xE0) == 0xC0) {
+            continuations = 1;
+            codePoint = first & 0x1F;
+        } else if ((first & 0xF0) == 0xE0) {
+            continuations = 2;
+            codePoint = first & 0x0F;
+        } else if ((first & 0xF8) == 0xF0) {
+            continuations = 3;
+            codePoint = first & 0x07;
+        } else {
+            // A continuation byte with nothing to continue, or a 5-/6-byte form UTF-8 has never had.
+            throw malformed(sequenceStart, "0x%02X is not a valid first byte of a UTF-8 sequence".formatted(first));
+        }
+
+        for (int i = 0; i < continuations; i++) {
+            int next = nextByte();
+            if (next < 0) {
+                throw malformed(sequenceStart, "the document ends in the middle of a UTF-8 sequence");
             }
-            // A UTF-8-decoding InputStreamReader always emits well-formed UTF-16 (malformed input
-            // bytes decode to the replacement character, U+FFFD, not a raw lone surrogate) -- this
-            // is unreachable for any real byte input, so it fails loudly rather than silently
-            // fabricating a codepoint.
-            throw new IllegalStateException(
-                    "a UTF-8-decoding reader produced a lone high surrogate (U+%04X), which is not a valid UTF-16 sequence"
-                            .formatted(c1));
+            if ((next & 0xC0) != 0x80) {
+                throw malformed(sequenceStart, "0x%02X is not a UTF-8 continuation byte".formatted(next));
+            }
+            codePoint = (codePoint << 6) | (next & 0x3F);
         }
-        return c1;
+
+        // The three ways a well-formed-looking sequence still is not one. Overlong forms and encoded
+        // surrogates are the classic smuggling routes -- two spellings of one character, one of which a
+        // validator upstream may not have seen (§9.4's confusability concern, at the encoding layer).
+        int shortestForm = switch (continuations) {
+            case 1 -> 0x80;
+            case 2 -> 0x800;
+            default -> 0x10000;
+        };
+        if (codePoint < shortestForm) {
+            throw malformed(sequenceStart, "U+%04X is written in %d bytes where UTF-8 requires the shortest form"
+                    .formatted(codePoint, continuations + 1));
+        }
+        if (codePoint >= 0xD800 && codePoint <= 0xDFFF) {
+            throw malformed(sequenceStart,
+                    "U+%04X is a surrogate code point, which UTF-8 does not encode".formatted(codePoint));
+        }
+        if (codePoint > 0x10FFFF) {
+            throw malformed(sequenceStart, "U+%04X is beyond the last Unicode code point".formatted(codePoint));
+        }
+        return codePoint;
     }
 
-    /** The next character, from {@link #buffer}, refilling it when drained; {@code -1} at end of input. */
-    private int readRawChar() {
-        if (bufferPosition >= bufferLimit && !fillBuffer()) {
+    /**
+     * A byte sequence that is not UTF-8 is <b>rejected, not replaced</b>. §9.1 says a document is encoded
+     * in Unicode and §8.1 requires errors to be reported; neither says what to do with bytes that are
+     * neither ({@code SPEC-FEEDBACK.md} #59). Silent U+FFFD replacement -- what a {@code CharsetDecoder}
+     * does by default, and what this lexer used to inherit -- turns a broken byte inside a quoted token
+     * into content, so a document that cannot be decoded still reads, with a value nobody wrote. For a
+     * format whose identity can be a hash of its bytes, that is the wrong default.
+     *
+     * <p>The byte offset is the offending sequence's own first byte, exactly. Line and column name the
+     * cursor, which is at most two code points behind it.
+     */
+    private LexException malformed(int sequenceStart, String detail) {
+        return new LexException("the document is not valid UTF-8: " + detail,
+                new Position(line, col, sequenceStart));
+    }
+
+    /** The next byte as an unsigned value, refilling {@link #bytes} when drained; -1 at end of input. */
+    private int nextByte() {
+        if (bytePosition >= byteLimit && !fillBytes()) {
             return -1;
         }
-        return buffer[bufferPosition++];
+        bytesDecoded++;
+        return bytes[bytePosition++] & 0xFF;
     }
 
-    /** Refills {@link #buffer}, answering whether anything was read. */
-    private boolean fillBuffer() {
+    /** Refills {@link #bytes}, answering whether anything was read. */
+    private boolean fillBytes() {
         try {
-            int read = reader.read(buffer, 0, buffer.length);
+            int read = source.read(bytes, 0, bytes.length);
             if (read <= 0) {
                 return false;
             }
-            bufferPosition = 0;
-            bufferLimit = read;
+            bytePosition = 0;
+            byteLimit = read;
             return true;
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
+    /**
+     * Removes the buffered code point at the cursor <b>without counting its bytes</b>. {@link #advance()}
+     * counts them first; {@link #stripLeadingBom} is the one caller that must not, §7.1 making a leading
+     * BOM an encoding artifact that is discarded before lexing rather than a character at offset zero.
+     */
+    private void dropBufferedCodePoint() {
+        lookaheadCount--;
+        for (int i = 0; i < lookaheadCount; i++) {
+            lookaheadCodePoints[i] = lookaheadCodePoints[i + 1];
+            lookaheadByteLengths[i] = lookaheadByteLengths[i + 1];
+        }
+    }
+
     /** Consumes and returns the code point at the cursor, advancing position and line/column tracking. */
     private int advance() {
         ensureBuffered(1);
-        int cp = lookahead.remove(0);
-        byteOffset += utf8Length(cp);
+        int cp = lookaheadCodePoints[0];
+        byteOffset += lookaheadByteLengths[0];
+        dropBufferedCodePoint();
 
         if (cp == '\n' || cp == 0x0085 || cp == 0x2028 || cp == 0x2029) {
             line++;
@@ -764,18 +865,6 @@ public final class Lexer {
             col++;
         }
         return cp;
-    }
-
-    private static int utf8Length(int cp) {
-        if (cp <= 0x7F) {
-            return 1;
-        } else if (cp <= 0x7FF) {
-            return 2;
-        } else if (cp <= 0xFFFF) {
-            return 3;
-        } else {
-            return 4;
-        }
     }
 
     /** Records {@code text} as the just-lexed token's own text and returns {@code type} -- the end position needs no recording at all, it's simply wherever the live cursor now sits (see this class's own Javadoc). */
