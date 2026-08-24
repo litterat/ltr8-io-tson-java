@@ -166,6 +166,25 @@ is small and parsed once.)
   `DataValueEvents`, for replaying an already-resolved `DataValue` tree through a compiled reader (the one
   place `resolver` still has a `DataValue` in hand).
 
+### What a read leaves behind: nothing
+
+A read is transient by construction — the compiled schema, the reader graph and the bind descriptors are
+built once and meant to live for the process, and a read holds no cache of its own. `AllocationHarnessTest`
+(`tson/src/test/.../perf/`, `./gradlew :tson:allocationReport`) makes that a checked fact rather than a
+belief, over the bind path:
+
+- **Retention is 0 bytes per read**, measured as settled heap across 20,000 reads of one schema through one
+  long-lived reader, and again across 10,000 reads through a reader *derived per read* (the shape a server
+  writes). A cache keyed per document — the classic accidental leak, and the one thing that would make this
+  design's "resolve at startup" advice a lie — shows up here and nowhere else in the test suite.
+- **Every read result is collectable**, asserted with weak references rather than a measurement, so the
+  answer carries no noise: 500 bound objects, all cleared once the collector has demonstrably run.
+- **Transient bytes are reported per read**, with a ceiling that only a gross regression trips.
+  `whereAReadsBytesGo` splits one read into event stream / schemaless tree / schema tree / bind, which is
+  what turns "allocation went up" into "which stage". Today the token stream is over half of a small
+  document's cost and most of *that* is one `InputStreamReader` per read — fixed cost, unrelated to
+  document size, tracked in `BACKLOG.md`.
+
 ## Diagnostics (`Diagnostic`, root package)
 
 `Diagnostic` is the structured value every `TsonDiagnosticsReceiver` receives, identical shape whichever

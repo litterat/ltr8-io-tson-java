@@ -390,6 +390,22 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
   a `DataBindContext` may be extended after first use, and a future fetching `TsonSchemaSource` will have
   its own story. None of it is hypothetical-only: the read-path half was two real defects, found by
   auditing and reproduced first try on 8 threads.
+- [ ] **A read's fixed per-document cost is the decoder's buffers, and they dominate a small document.**
+  `AllocationHarnessTest` (`./gradlew :tson:allocationReport`) measures a 346-character self-describing
+  document at ~62 KB allocated per bind read, of which ~35 KB is the token stream alone — and ~22 KB of
+  *that* is one `InputStreamReader` per read: `Lexer` wraps its `InputStream` in one, and the
+  `StreamDecoder` beneath allocates an 8 KB byte buffer plus an 8 KB `char[]` on first read whatever the
+  document's size. A 300-byte request pays the same 22 KB a 300 KB one does. None of it survives a
+  collection (retention is a measured 0 bytes per read), so this is throughput and GC pressure rather than
+  a leak, but it is the largest single item on the read path and it is fixed cost, which is the worst kind
+  on a short document. Decoding UTF-8 in `Lexer` itself — it is already code-point addressed and already
+  owns the byte offset — would remove the wrapper, the intermediate `char[]`, and the `String.getBytes`
+  copy the `String` constructors make. Lexer behaviour is frozen (§1.3); its *internals* are not.
+- [ ] `NumberGrammar` matches a `Pattern` per number token (`tryInteger`/`tryFloat`/`tryBasedInteger`), so a
+  number-heavy document pays a `Matcher` per number. Unlike the per-character regex that prompted the
+  harness this is regex used as a parser rather than as a comparison, so it is the approach's cost rather
+  than waste — worth measuring against a hand-written scanner before deciding, and worth doing only after
+  the decoder item above, which is several times larger.
 - [ ] Confusable-character and bidi-formatting-character checks (§9.4-adjacent security hardening;
   opt-in, and per `SPEC-FEEDBACK.md` #42 reported as ordinary errors when enabled, not warnings) —
   the sibling gap to the numeric-literal length limit tracked in `STRUCTURED-OUTPUT.md`'s Tier 1 section;
