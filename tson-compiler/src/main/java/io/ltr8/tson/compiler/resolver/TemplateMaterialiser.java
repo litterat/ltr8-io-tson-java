@@ -209,6 +209,13 @@ final class TemplateMaterialiser {
     /**
      * One type-ref with its application closed, or itself when it carries no arguments. Arguments close
      * first, so {@code box<box<text>>} produces the inner entry before the outer one names it.
+     *
+     * <p>An application this pass cannot close <b>keeps its argument list</b>, rather than collapsing to its
+     * bare head. The list is the evidence the author supplied arguments, and the linker reports on what it is
+     * handed: a head stripped of its arguments in a {@code source} position -- the one slot whose lookup falls
+     * back to the governing meta's structure namespace -- is found there and then faulted for supplying no
+     * arguments, which is the opposite of what the author wrote. Keeping them lets the honest verdict through:
+     * a name the type-name namespace does not hold is an unresolved reference, applied or not.
      */
     private TypeRef close(TypeRef ref) {
         if (ref.arguments().isEmpty()) {
@@ -220,18 +227,19 @@ final class TemplateMaterialiser {
                     ? new TypeArgument.Ref(close(nested.ref()))
                     : argument);
         }
-        return TypeRef.of(instantiate(ref.name(), arguments));
+        String entry = instantiate(ref.name(), arguments);
+        return entry == null ? new TypeRef(ref.name(), arguments, ref.annotations()) : TypeRef.of(entry);
     }
 
     /**
-     * The entry name a fully-bound application denotes, creating the entry on first sight. An application
-     * whose head names nothing in scope is left for {@code TsonSchemaLinker} to report as an unresolved
-     * reference rather than guessed at here.
+     * The entry name a fully-bound application denotes, creating the entry on first sight, or {@code null}
+     * when the head names nothing in scope -- that is {@code TsonSchemaLinker}'s verdict to give as an
+     * unresolved reference, not this pass's to guess at.
      */
     private String instantiate(String head, List<TypeArgument> arguments) {
         TypeDefinition template = namespace.getTypeDefinition(head);
         if (template == null) {
-            return head; // unresolved head -- the linker's verdict, not this pass's
+            return null; // unresolved head -- the linker's verdict, not this pass's
         }
         List<String> parameters = template.parameters();
         if (parameters.isEmpty()) {

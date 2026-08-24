@@ -63,6 +63,10 @@ class MetaLayerDataConstructorTest {
                 request:  type_ref
                 response: type_ref
               }
+              status_code => text
+              plain       => { a: text }
+              envelope    => <T> { body: T }
+              pair        => <A, B> { a: A  b: B }
             }
             """;
 
@@ -300,6 +304,50 @@ class MetaLayerDataConstructorTest {
                 .read(TestDocuments.document("{ q: \"hello\" }"));
 
         assertEquals(Optional.of("hello"), value.get("q").asString());
+    }
+
+    // ── A meta layer's own vocabulary is not in the governed schema's namespace ──────────────────
+
+    /**
+     * <b>Every reference form gives the same verdict, applied or not.</b> {@code !!meta} says where this
+     * schema's constructors come from; it merges nothing into the type-name namespace (§3.3.2), so a name the
+     * meta layer declares -- atom, record, or template -- is simply unresolved in a schema it governs.
+     *
+     * <p>The applied row is the one that used to disagree. An application this schema cannot close reached
+     * {@code source}, the one slot whose lookup falls back to the governing meta's structure namespace, found
+     * the template there, and reported it as taking arguments the author had in fact written -- sending them
+     * to check the argument list, which was never the problem. Two lookup paths disagreeing about what is in
+     * scope is the defect; the arity complaint was only how it surfaced.
+     */
+    @Test
+    void aMetaLayerNameIsUnresolvedInAGovernedSchemaWhetherOrNotItIsApplied() {
+        record Reference(String label, String declaration, String unresolved) {
+        }
+        List<Reference> references = List.of(
+                new Reference("atom", "x => { s: status_code }", "status_code"),
+                new Reference("record", "x => { s: plain }", "plain"),
+                new Reference("template", "x => { s: envelope }", "envelope"),
+                new Reference("appliedInField", "x => { s: envelope<text> }", "envelope"),
+                new Reference("applied", "x => envelope<text>", "envelope"),
+                new Reference("appliedWithWrongArity", "x => pair<text>", "pair"));
+
+        for (Reference reference : references) {
+            TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                    () -> linked("scope" + reference.label(), SEARCH + "\n  " + reference.declaration()),
+                    () -> "expected " + reference.label() + " to be refused");
+
+            assertTrue(thrown.getMessage().contains("unresolved reference '" + reference.unresolved() + "'"),
+                    reference.label() + ": " + thrown.getMessage());
+        }
+    }
+
+    /** The control: the same template declared locally applies exactly as it always has. */
+    @Test
+    void theSameTemplateDeclaredLocallyStillApplies() {
+        TsonLinkedSchema schema = linked("localtemplate",
+                SEARCH + "\n  envelope => <T> { body: T }\n  x => envelope<text>");
+
+        assertTrue(schema.schema().entries().containsKey("x"));
     }
 
     /** §8.1's resolved output carries the body under the constructor that built it, like any other. */

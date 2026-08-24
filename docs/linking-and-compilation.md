@@ -80,7 +80,16 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   because a wrong `!!meta` is an authoring error, not a library fault (which is what lets the CLI keep exit 1
   and exit 70 apart). `source`
   validation additionally falls back to the governing meta's namespace (a `source` naming a constructor is
-  one of §3.3.1's constructor roles); no other reference does. **The linker does not materialize anything** —
+  one of §3.3.1's constructor roles); no other reference does — **and not a `source` carrying arguments**,
+  which is the one shape the fallback would reach past its own justification. Desugar rewrites every
+  constructor application long before resolution, so arguments surviving into a `source` mean a §5.10
+  user-template head, which §3.3.1 resolves in the type-name namespace only. Without the exclusion
+  `x => tmpl<text>` against a `tmpl` its governing meta declares found the template through the fallback and
+  then faulted it on *arity* — telling the author to supply arguments they had written, or that they had
+  written the wrong number of them, when the real answer is the one every other reference form gives: the
+  name is not in scope. Its other half is in `TemplateMaterialiser` (`docs/schema-resolution.md`): an
+  application that cannot be closed keeps its argument list rather than collapsing to its bare head, so what
+  the linker judges is what the author wrote. **The linker does not materialize anything** —
   `SchemaDesugarer` already turned every sugar form into a real declaration, one phase earlier and in the
   module that can bind a constructor generically. The only argument-bearing `type_ref` it ever sees is inside
   a template declaration, which the desugar phase passes through whole (`box<T>` in `box`'s own body), and
@@ -157,6 +166,19 @@ sit at the schema layer because that is the only layer able to name request and 
   healthy and the complaint landed against a *different* document: the first governed schema to apply it was
   told the meta-schema does not declare it, which is both false and unactionable. Same treatment
   `extern`/`unknown_type` already get, and the reason those register a factory rather than throwing.
+
+- **A meta layer is not a vocabulary channel, and this is the first thing an author tries.** The instinct on
+  declaring `operation` in a meta layer is to put the shared types beside it — a `status_code` atom, an
+  envelope template — and let the governed schemas name them. They cannot: `!!meta` says where this schema's
+  *constructors* come from and merges nothing into the type-name namespace (§3.3.2), so every such name is an
+  unresolved reference in a schema the layer governs, whether it is written bare, in a field, or applied with
+  its arguments. **Shared vocabulary goes in a third ordinary schema**, `!!import`ed by whoever needs it,
+  including the meta layer itself if it needs it too. Nor is `!!import`ing the meta layer a way round it: a
+  layer chaining to meta-kernel imports meta.tn, which imports meta-kernel, and imports are transitive here
+  (`SPEC-FEEDBACK.md` #55), so meta-kernel's `void` arrives alongside core.tn's and collides — correctly, and
+  with a diagnostic naming both origins. The constraint is real and worth stating; what is not acceptable is
+  discovering it through a message about the wrong thing, which is what the `source` fallback's
+  argument-bearing case above used to give.
 
 **Amending meta-kernel is a local divergence** from published Revision 32 — `spec/m/` is otherwise a cache
 of it, and the digests `TsonBundledSchemas` holds are now this project's rather than tson.io's.
