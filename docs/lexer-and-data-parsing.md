@@ -97,8 +97,26 @@ Key points:
   four grammar alternatives matches and extracts structural pieces into `NumberForm` — it does **not**
   convert to `long`/`double`/`BigInteger`/`BigDecimal`. The spec leaves that mapping to the implementation
   (§4.3); binding is where the required `255`/`0xFF`, `.5`/`0.5` equivalences get enforced, and different
-  consumers want different host types. Each number alternative is its own anchored regex (Java forbids a
-  named group repeating across alternation).
+  consumers want different host types.
+- **The grammar is hand-written, one method per ABNF rule** (`NumberScanner`, package-private beneath
+  `NumberGrammar`), and that is a decision about what a *reference* implementation should contain rather
+  than a performance one. A grammar stated as a `java.util.regex` pattern with named groups is stated in a
+  dialect no other language shares — an unspecified host dependency in the artifact other implementations
+  copy, and TSON pins I-Regexp for a schema's `pattern` facets while saying nothing about how a number is
+  recognized. (This repo's own `tson-regex` is not the substitute: I-Regexp deliberately has no named
+  groups, so it cannot extract what `NumberForm` carries.) The scanner is single-pass, with explicit
+  `mark`/`reset` at the two places the grammar is genuinely optional — a float's fraction and its exponent —
+  because a regex backtracks there and the two must agree. It also removed a fifth of a read's allocation:
+  nine anchored patterns tried in turn cost a `Matcher` and its internals per attempt, 47 of them per read
+  of a document holding seven numbers.
+  - **Swapping it out found a real defect**, which is the argument for the oracle test rather than a
+    coincidence. `MAGNITUDE` (the complex form's part, deliberately group-less because a named group cannot
+    repeat) spliced `decimal-natural`'s own bare `|` into a larger alternation, so its `0` branch ended the
+    alternative and a zero-led magnitude with anything after it — `0.5i`, `0e3j`, `0.5-0.25i` — was refused
+    where §7.6 admits it. `1.5i` always worked, which is how it survived. `NumberScannerEquivalenceTest`
+    holds the old patterns as an oracle (with that one defect corrected, and the correction explained),
+    running both over every string up to length four across the grammar's own alphabet and 120,000 fuzzed
+    longer ones, comparing whole `NumberForm`s rather than match/no-match.
 - **Quoted tokens always resolve to `StringValue`** regardless of content (§4.4) — form is consulted once,
   here. `"42"` and unquoted `42` differ even though their text is identical.
 - **§4's applicability clause is load-bearing, and `BaseValue.NullValue` is where it shows.** Base

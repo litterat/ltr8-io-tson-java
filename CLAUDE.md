@@ -224,7 +224,10 @@ schema document is unsupported, not malformed).
 
 `BaseTypeResolver.resolve(TokenValue)` implements §4's fixed order (null → boolean → number → string) for
 untyped tokens; `NumberGrammar.tryParse` recognizes the number production and extracts structure into
-`NumberForm` **without** converting to a host type — binding decides the host type and enforces the
+`NumberForm` **without** converting to a host type — over a hand-written `NumberScanner`, one method per
+ABNF rule, because a reference implementation should not state the grammar in a host regex dialect no port
+shares (`NumberScannerEquivalenceTest` fuzzes it against the patterns it replaced) — binding decides the
+host type and enforces the
 `255`/`0xFF` equivalences. Quoted tokens always resolve to `StringValue` (§4.4); form is consulted once,
 here.
 

@@ -416,12 +416,14 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
       remains and is fixed cost — a 300-byte request pays what a 300 KB one does. `Lexer` is already
       code-point addressed and already tracks the byte offset, so it is well placed for it. Behaviour is
       frozen (§1.3); internals are not.
-    - [ ] **Hand-write the number scanner.** `NumberGrammar` matches a `Pattern` per number token
-      (`tryInteger`/`tryFloat`/`tryBasedInteger`), and `Matcher.group("sign")` costs a map copy per
-      named-group lookup on top of the `Matcher` itself. Unlike the per-character regex already removed from
-      `TsonDataEmitter` this is regex used as a parser rather than as a comparison, so it is the approach's
-      cost rather than waste — but it is the biggest remaining item, and dropping the named groups is a
-      cheaper first step with much of the same effect.
+    - [x] **Hand-write the number scanner** — done. `NumberScanner`, one method per ABNF rule, under an
+      unchanged `NumberGrammar` API: **-12.5 KB and -247 objects per read** (47,816 → 35,320 bytes, 1,213 →
+      966 objects, 15.4 → 13.9 µs), the `Matcher`/`IntHashSet[]`/`int[]` cohort gone entirely. The reason to
+      do it before a port was that the grammar was stated as a Java regex; the reason it was worth the fuzz
+      is that swapping it **found a real defect** — a zero-led complex magnitude (`0.5i`, `0e3j`,
+      `0.5-0.25i`) was refused where §7.6 admits it, because `decimal-natural`'s bare alternation was
+      spliced into the magnitude's. Regression tests at both levels; `NumberScannerEquivalenceTest` keeps
+      the old patterns as an oracle.
     - [ ] Smaller sites the same profile named, none yet measured on its own: `Token` snapshots per token,
       `DateTimeParser` building a `HashMap` per value read, `Lexer.decodeAllEscapes` copying a quoted
       token's text even when nothing is escaped, and an `Optional` per `TsonReadContext.peek`.

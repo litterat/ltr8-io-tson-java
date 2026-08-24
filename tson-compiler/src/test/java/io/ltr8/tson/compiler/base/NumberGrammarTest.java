@@ -370,6 +370,32 @@ class NumberGrammarTest {
         assertTrue(NumberGrammar.tryComplex("3 4i").isEmpty());
     }
 
+    /**
+     * A magnitude may be zero-led -- {@code magnitude = decimal-natural [ "." digits ] [ exponent ]}, and
+     * {@code decimal-natural} is {@code "0" / nonzero-digit ...}. The patterns this grammar was written as
+     * refused these: {@code decimal-natural}'s own alternation was spliced unparenthesized into the
+     * magnitude's, so the {@code 0} branch ended the alternative and nothing could follow the zero.
+     * {@code 1.5i} worked throughout, which is how it stayed hidden.
+     */
+    @Test
+    void complexAdmitsAZeroLedMagnitude() {
+        assertEquals("0.5", NumberGrammar.tryComplex("0.5i").orElseThrow().imaginaryMagnitude());
+        assertEquals("0e3", NumberGrammar.tryComplex("0e3j").orElseThrow().imaginaryMagnitude());
+
+        ComplexForm twoPart = NumberGrammar.tryComplex("0.5-0.25i").orElseThrow();
+        assertEquals(Optional.of("0.5"), twoPart.realMagnitude());
+        assertEquals("0.25", twoPart.imaginaryMagnitude());
+    }
+
+    /** A radix prefix whose digits do not follow is not a number, and must not leave the prefix eaten. */
+    @Test
+    void aRadixPrefixWithNoDigitsOfItsOwnIsNotANumber() {
+        assertTrue(NumberGrammar.tryParse("0o9").isEmpty());
+        assertTrue(NumberGrammar.tryParse("0b2").isEmpty());
+        assertTrue(NumberGrammar.tryParse("0xG").isEmpty());
+        assertTrue(NumberGrammar.tryParse("0x").isEmpty());
+    }
+
     @Test
     void complexImaginaryOnlyForm() {
         ComplexForm f = NumberGrammar.tryComplex("4i").orElseThrow();
