@@ -41,10 +41,10 @@ hash" is the spec's own term throughout §2.2.1/§10.2, never shortened to "hash
 ## CLI (`tson-cli`)
 
 `tson validate [--output text|json|tson] <file|->...` takes a **flat list of files**, auto-classifies each
-as schema or data (a header peek — `!!id`-carrying schema vs `DocumentStart` data), exposes the schema files
-through a `TsonSchemaSource`, and validates each data document via `Tson.validate` — the `!!schema` URI
-selects the schema, the root type-ref selects the type, no `!!schema` means schemaless. **Fully
-self-describing: no `--type`.**
+as schema or data (`TsonDocumentHeader.peek` — a header carrying `!!meta` is a schema document), exposes the
+schema files through a `TsonSchemaSource`, and validates each data document via `Tson.validate` — the
+`!!schema` URI selects the schema, the root type-ref selects the type, no `!!schema` means schemaless.
+**Fully self-describing: no `--type`.**
 
 **`-` is standard input, at most once, and always a data document.** `ValidateInput` is the sealed argument
 type (`OfFile`/`OfStdin`) that keeps this out of `Path`-with-a-magic-value territory; its `OfStdin.open()`

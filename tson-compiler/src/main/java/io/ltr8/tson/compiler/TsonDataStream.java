@@ -4,6 +4,7 @@ import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.atom.AtomParseException;
 import io.ltr8.tson.compiler.atom.UriParser;
+import io.ltr8.tson.compiler.lexer.LexException;
 import io.ltr8.tson.compiler.lexer.Lexer;
 import io.ltr8.tson.compiler.lexer.Token;
 import io.ltr8.tson.compiler.lexer.TokenType;
@@ -206,6 +207,48 @@ public final class TsonDataStream implements TsonEventSource {
     }
 
     // ── Startup: header directives (§2.2), mirroring TsonDataParser.parseDocument ───────
+
+    /**
+     * §2.2's header directives at {@code stream}'s start and nothing after them -- the scan behind {@link
+     * TsonDocumentHeader#peek}, which is where its contract is stated. Static over a freshly constructed
+     * stream because the scan leaves the cursor mid-document: a stream this has read is a stream whose
+     * events would start after the header, so none is ever handed back.
+     *
+     * <p>Unlike {@link #ensureStarted()} this accepts {@code !!meta} rather than rejecting the document --
+     * classifying a schema document is the point (§7.1), not a failure -- and it stops at any directive
+     * that is neither, leaving whether the document goes on to parse to whoever parses it.
+     */
+    static TsonDocumentHeader peekHeader(TsonDataStream stream) {
+        return stream.readHeader();
+    }
+
+    /**
+     * Total in the document's own content: a header that will not lex or parse yields whatever directives
+     * were read before it went wrong, never a throw. The document is still there to be read properly, and
+     * that read is where a malformed document earns a real diagnostic -- a peek's one job is not to answer
+     * with a schema the document does not name. An {@link java.io.UncheckedIOException} is not that: the
+     * source itself failed, no header was read or not read, and it propagates.
+     */
+    private TsonDocumentHeader readHeader() {
+        Optional<String> id = Optional.empty();
+        try {
+            if (check(TokenType.DIRECTIVE) && "id".equals(peekDirectiveName())) {
+                id = Optional.of(parseNamedDirective("id"));
+            }
+            if (check(TokenType.DIRECTIVE)) {
+                String name = peekDirectiveName();
+                if ("meta".equals(name)) {
+                    return new TsonDocumentHeader(id, Optional.empty(), Optional.of(parseNamedDirective("meta")));
+                }
+                if ("schema".equals(name)) {
+                    return new TsonDocumentHeader(id, Optional.of(parseNamedDirective("schema")), Optional.empty());
+                }
+            }
+        } catch (TsonParseException | LexException e) {
+            // Not this method's verdict to give -- see above.
+        }
+        return new TsonDocumentHeader(id, Optional.empty(), Optional.empty());
+    }
 
     private void ensureStarted() {
         if (started) {

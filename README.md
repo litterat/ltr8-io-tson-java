@@ -156,6 +156,7 @@ The write side is the mirror: a value in hand, TSON text out. The matrix:
 | a data document | every problem, not the value | **`tson.validate()`** | a `List<Diagnostic>` |
 | a *schema* document | every problem with the schema itself | **`tson.validateSchema()`** | a `List<Diagnostic>` |
 | a data document | the value **and** every problem | **`.withDiagnostics(…)`** on either facade reader | the value + a `List<Diagnostic>` |
+| a data document | only what it *declares* — before reading it | **`TsonDocumentHeader.peek(…)`** | its `!!id` / `!!schema` (or `!!meta`) |
 | a data document | a grammar-faithful AST | **`TsonDataParser`** | a `Document` AST |
 | a data document | to pull events lazily | **`TsonDataStream`** | a `TsonEvent` stream |
 
@@ -363,6 +364,41 @@ target class against the schema's root type up front, before reading. `readWitho
 one back out to a pure schemaless read.
 
 ▶ Runnable: [`examples/SchemaAwareRead.java`](examples/SchemaAwareRead.java) — `java --module-path tson/build/modules --add-modules io.ltr8.tson examples/SchemaAwareRead.java`
+
+### 6. Read only the header — `TsonDocumentHeader.peek`
+
+Sometimes the routing decision comes *before* the read: which schema version governs this body, is this
+upload a schema document or a data one, which handler gets it. [TSON-DATA] §7.1 is explicit that
+classification "requires at most two directives of lookahead and no value parsing, so streams, previews,
+and content sniffers can classify a document from its opening bytes" — `peek` is that door. It reads
+`!!id` and `!!schema` (or `!!meta`, which means the document is a *schema* document) and stops before the
+value:
+
+```java
+TsonDocumentHeader header = TsonDocumentHeader.peek(text);   // or an InputStream
+if (header.isSchemaDocument()) { … }                       // it carries !!meta
+String schemaUri = header.schema().orElse(DEFAULT_SCHEMA);  // route on what it names
+```
+
+It is **total**: a header it cannot read yields nothing rather than throwing, and what it never does is
+answer with a schema the document does not name — a `!!schema` written *inside* the value is that value's
+text. Whatever is wrong with the document is reported properly by the read that follows.
+
+A peek reads from an `InputStream` without rewinding it, which is fine when the source can be opened twice.
+When it can't — an HTTP request body, a socket — `peekResumable` hands the document back whole: the bytes
+it buffered in front of the rest of the stream, so the reader that follows sees the document from its first
+byte, header included.
+
+```java
+TsonDocumentPeek peeked = TsonDocumentHeader.peekResumable(request.getInputStream());
+TsonValue value = tson.treeReader()
+        .withSchema(versionFor(peeked.header()))
+        .readAs(peeked.document(), "order");
+```
+
+Only the read-ahead is buffered (one decoder chunk), never the document — a 500 KB body still streams.
+
+▶ Runnable: [`examples/DocumentRouting.java`](examples/DocumentRouting.java) — `java --module-path tson/build/modules --add-modules io.ltr8.tson examples/DocumentRouting.java`
 
 ### Writing TSON back out — `TsonObjectWriter` / `TsonTreeWriter`
 

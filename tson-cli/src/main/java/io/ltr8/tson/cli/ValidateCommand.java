@@ -2,15 +2,15 @@ package io.ltr8.tson.cli;
 
 import io.ltr8.tson.Tson;
 import io.ltr8.tson.compiler.Diagnostic;
-import io.ltr8.tson.compiler.TsonDataStream;
+import io.ltr8.tson.compiler.TsonDocumentHeader;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.TsonSchemaSource;
-import io.ltr8.tson.compiler.TsonUnsupportedDocumentException;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonCanonicalIdentity;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.FileSystemException;
 import java.nio.file.Files;
@@ -179,15 +179,12 @@ final class ValidateCommand {
                 || id.equals(TsonBundledSchemas.CORE_ID);
     }
 
-    /** A file whose header carries {@code !!meta} is a schema document (per the data grammar's own rejection of it). */
+    /** A file whose header carries {@code !!meta} is a schema document ([TSON-SCHEMA] §12.1 requires one). */
     private static boolean isSchemaDocument(Path file) throws IOException {
         try (InputStream in = Files.newInputStream(file)) {
-            new TsonDataStream(in).next();   // reads the header; DocumentStart for data
-            return false;
-        } catch (TsonUnsupportedDocumentException e) {
-            return true;
-        } catch (RuntimeException e) {
-            return false;   // malformed as data -> let Tson.validate report the real error
+            return TsonDocumentHeader.peek(in).isSchemaDocument();
+        } catch (UncheckedIOException e) {
+            return false;   // unreadable -> data, so Tson.validate reports the real error rather than this
         }
     }
 }

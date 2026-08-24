@@ -44,13 +44,13 @@ public final class TsonTreeWriter {
     private final Map<Class<?>, VocabularyAtoms.Entry> vocabularyAtoms = VocabularyAtoms.defaults();
 
     /** The document header this writer emits, if any -- see {@link #describing}. */
-    private final DocumentHeader header;
+    private final TsonDocumentHeader header;
 
     public TsonTreeWriter() {
-        this(DocumentHeader.NONE);
+        this(TsonDocumentHeader.NONE);
     }
 
-    private TsonTreeWriter(DocumentHeader header) {
+    private TsonTreeWriter(TsonDocumentHeader header) {
         this.header = header;
     }
 
