@@ -22,6 +22,7 @@ java --module-path tson/build/modules --add-modules io.ltr8.tson examples/TreeWa
 java --module-path tson/build/modules --add-modules io.ltr8.tson examples/EventStream.java
 java --module-path tson/build/modules --add-modules io.ltr8.tson examples/SchemaValidation.java
 java --module-path tson/build/modules --add-modules io.ltr8.tson examples/SchemaAwareRead.java
+java --module-path tson/build/modules --add-modules io.ltr8.tson examples/DocumentRouting.java
 ```
 
 - `--module-path tson/build/modules` puts the five `tson` module jars on the module path.
@@ -38,7 +39,7 @@ Requires **Java 25** (see the main [README](../README.md#getting-started) for ho
 Every file here is run as a real subprocess by `ExamplesTest` (part of `./gradlew :tson:test`), so a
 change that breaks an example fails the build instead of quietly rotting the docs.
 
-These are the five numbered reader entry points from the main [README](../README.md#reading-tson-choosing-an-entry-point):
+These are the six numbered reader entry points from the main [README](../README.md#reading-tson-choosing-an-entry-point):
 
 | File | Shows |
 |---|---|
@@ -47,3 +48,4 @@ These are the five numbered reader entry points from the main [README](../README
 | [`EventStream.java`](EventStream.java) | Schemaless — pull a lazy `TsonEvent` stream without materializing a tree. |
 | [`SchemaValidation.java`](SchemaValidation.java) | Schema-driven — compile a TSON *schema* and validate data against a type, collecting every problem in one pass. |
 | [`SchemaAwareRead.java`](SchemaAwareRead.java) | Schema-aware facade — `tson.treeReader()` reads a *self-describing* document (its own `!!schema`), validating automatically, and falls back to a schemaless read when none is declared. |
+| [`DocumentRouting.java`](DocumentRouting.java) | Header only — `TsonDocumentHeader.peek` reads what a document *declares* (`!!id`/`!!schema`, or `!!meta` for a schema document) before reading it, and `peekResumable` hands a one-shot stream back whole. |

@@ -47,24 +47,24 @@ public final class TsonObjectWriter {
     private final Map<Class<?>, VocabularyAtoms.Entry> vocabularyAtoms;
 
     /** The document header this writer emits, if any -- see {@link #describing}. */
-    private final DocumentHeader header;
+    private final TsonDocumentHeader header;
 
     /**
      * The root value's own type-ref, when {@link #describing} supplied one. Not part of {@link
-     * DocumentHeader}: §2.2 is explicit that header directives are properties of the <em>document</em> and
-     * the root value's type annotation is not one of them, however adjacent the two look on the wire.
+     * TsonDocumentHeader}: §2.2 is explicit that header directives are properties of the <em>document</em>
+     * and the root value's type annotation is not one of them, however adjacent the two look on the wire.
      */
     private final Optional<String> rootTypeName;
 
     public TsonObjectWriter(DataBindContext context) {
-        this(context, DocumentHeader.NONE, Optional.empty());
+        this(context, TsonDocumentHeader.NONE, Optional.empty());
     }
 
     public TsonObjectWriter() {
         this(TsonAtomContext.defaultContext());
     }
 
-    private TsonObjectWriter(DataBindContext context, DocumentHeader header, Optional<String> rootTypeName) {
+    private TsonObjectWriter(DataBindContext context, TsonDocumentHeader header, Optional<String> rootTypeName) {
         this.context = context;
         this.vocabularyAtoms = VocabularyAtoms.defaults();
         this.header = header;

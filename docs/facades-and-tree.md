@@ -177,7 +177,7 @@ reads one value at a cursor and polices nothing around it.
 - **A writer can emit a document header, and it is off by default.** `TsonDataEmitter` gained `documentId`/
   `schemaRef` (the two of §3.3's four directive names that belong to a *data* document; `meta`/`import` are a
   schema document's and this emitter does not write one), and both writers a `describing(...)` derivation
-  over a shared `DocumentHeader` carrier that knows §2.2's order — `!!id` first when both are present.
+  over a shared `TsonDocumentHeader` carrier that knows §2.2's order — `!!id` first when both are present.
   **Default output is unchanged**, deliberately: emitting a directive by default would rewrite every
   document this library has ever produced, `tson validate --output tson` included.
   - **The object writer takes the schema *and* the root type; the tree writer takes only the schema.** A
@@ -187,7 +187,7 @@ reads one value at a cursor and polices nothing around it.
     there is no one-argument form on `TsonObjectWriter` to get it half right. A tree records each node's
     type on a schema-driven read, so the root's own `!typeName` is written back with it; a root that has
     none is refused rather than half-written.
-  - **The root type-ref is not part of `DocumentHeader`**, however adjacent the two look on the wire: §2.2
+  - **The root type-ref is not part of `TsonDocumentHeader`**, however adjacent the two look on the wire: §2.2
     is explicit that header directives are properties of the *document*, and the root value's type
     annotation is not one of them. `TsonObjectWriter` holds it separately.
   - **`typeRef` now refuses a second type-ref on one value**, which is what makes the root type safe to
@@ -196,6 +196,36 @@ reads one value at a cursor and polices nothing around it.
     parse. The flag clears the moment a core-value starts, so nested values and annotation values are
     unaffected. Like the directive URI check beside it, this keeps "a writer cannot emit a document that
     will not read back" true.
+- **`TsonDocumentHeader.peek` reads a header and stops**, which is the same carrier from the reading end —
+  [TSON-DATA] §7.1's "at most two directives of lookahead and no value parsing, so streams, previews, and
+  content sniffers can classify a document from its opening bytes". A caller routing to the right schema
+  version has to know what a document names *before* choosing how to read it, and every other public entry
+  point reads the whole document to answer that. `peek` takes a `String` or an `InputStream`, runs the same
+  `Lexer`/`TsonDataStream` cursor the real read runs (`TsonDataStream.peekHeader`, static over a fresh
+  stream — the scan leaves the cursor mid-document, so no half-read stream is ever handed back), and never
+  touches the value.
+  - **`!!meta` classifies rather than fails.** `ensureStarted` throws `TsonUnsupportedDocumentException` on
+    it because a *data* stream cannot go on; a peek exists precisely to say "schema document" and answers
+    with `meta()` present (§12.1 requires exactly one, so `isSchemaDocument()` is that question). `tson
+    validate`'s file classification is this call.
+  - **What it will not do is guess — and that makes it total.** A malformed *value* is not its business and
+    still yields a header; a malformed *header* yields the directives read before it went wrong rather than
+    throwing, and a directive §2.2 does not admit there stops the scan. The read that follows is where a
+    malformed document earns a real diagnostic, so a peek loses nothing by staying silent, where a throw
+    would force every caller sniffing arbitrary bytes to wrap it. The one answer it must never give is a
+    schema the document does not name, so a `!!schema` written inside the value or after it is that value's
+    text and nothing more — `TsonDocumentHeaderTest` is adversarial about it. An `UncheckedIOException` does
+    propagate: the *source* failed, which is not a verdict on the document.
+  - **A peeked `InputStream` is not rewound**, so a source that can be read twice is peeked on one and read
+    on the other — which is what `tson validate` does, re-opening each file it classifies.
+  - **`peekResumable` is the one-shot-stream form**, for an HTTP request body, a socket, a pipe: the routing
+    decision needs the header, the body is gone once read, and there is no second stream to be had. It
+    records every byte the peek pulls off the source and returns a `TsonDocumentPeek` whose `document()` is
+    that prefix in front of the rest — the document from its **first** byte, header directives included, so
+    the reader that follows sees exactly what it would have seen had no one peeked. Recording at the
+    *source* rather than at the token cursor is what makes the replay exact: the decoder reads ahead in
+    chunks, and bytes it pulled but never tokenised are recorded too. Memory is that read-ahead, not the
+    document — a test pins the pull under 64 KB for a 500 KB body.
 - These live in `tson-compiler`'s root package (not a separate module) because `DefinitionResolver`
   depends on `TsonObjectWriter` (atom-refinement merging) — a module depending *on* `tson-compiler`
   couldn't provide them without a cycle. `tson-bind` (what they're built on) has no such dependency.

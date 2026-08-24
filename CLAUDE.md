@@ -470,7 +470,12 @@ has to exist as a `String`; `TsonDataEmitter` holds an `Appendable`, and `toTson
 `StringBuilder`. Both can also emit a document header (`describing(schemaUri[, rootType])`/`identifiedBy`),
 **off by default** so existing output is unchanged — the object writer needs the root type too, a bound
 object carrying neither fact, where a tree already names its own; `TsonDataEmitter.typeRef` refuses a second
-type-ref on one value, which is what keeps a declared root type from writing an unparseable document.
+type-ref on one value, which is what keeps a declared root type from writing an unparseable document. The
+same `TsonDocumentHeader` carrier reads: `peek(String|InputStream)` is §7.1's classification from the opening
+bytes — `!!id` plus `!!schema`, or `!!meta` and it is a schema document — for a caller that must route on
+what a document names before reading it, **total** (a header it cannot read yields nothing rather than
+throwing, never a schema the document does not name), and `peekResumable` hands a one-shot stream back whole
+(`TsonDocumentPeek`) so an HTTP body can be routed and then read.
 These live in `tson-compiler`'s root package because `DefinitionResolver` depends on
 `TsonObjectWriter`.
 
