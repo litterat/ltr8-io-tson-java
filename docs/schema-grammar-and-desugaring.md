@@ -98,11 +98,15 @@ targets "the implicit desugar targets of the sugar forms" — this implements th
 splitting it across the resolver (declaration position) and the linker (field position), which is what it
 replaces.
 
-**The injected-entry half is a deliberate divergence** — §8.2 says a constructor application never
-materialises an entry and is carried structurally at the use site; declaration position, where the spec
-agrees, is correct. It is argued as spec feedback rather than tracked as debt (`SPEC-FEEDBACK.md` #49/#50,
-and #51 for the `!!import` visibility that rides on it), and those entries stay open on purpose, as
-discussion points for the revision.
+**The injected-entry half is the spec's own rule now.** It began as a divergence — revision 32's §8.2 has a
+constructor application carried structurally at the use site and materialising no entry — and was argued as
+spec feedback rather than tracked as debt (`SPEC-FEEDBACK.md` #49/#50, and #51 for the `!!import` visibility
+that rides on it). The structure-templates CR settles all three the other way: **D3** de-parameterises
+`array`/`set`/`map`, so a container at a use site cannot be an application at all — nothing in meta-kernel
+takes type parameters, `map` holding `key_type`/`value_type` as ordinary fields — and **D5** states one lift
+rule, "every sugar form lifts at desugar: a concrete form to a closed synthetic entry". The resolved
+fixtures were written against the older shape and were brought onto this one; `ResolvedFixtureTest` now
+asserts the two agree entry for entry.
 
 **The rule this settles on:** `TypeRef.arguments` non-empty means an **open** form — a template application,
 whose arguments are what materialisation substitutes. Everything closed is an entry, referenced by a bare

@@ -255,9 +255,12 @@ lookahead budget is `SPEC-FEEDBACK.md` #52.
 
 An AST→AST rewrite between parsing and resolution: every sugar form — `[T]` and the sized forms, `[T, U]`,
 `{K => V}`, `(A | B)` — becomes the `!C value` construction it denotes, at declaration position simply *being*
-one and anywhere else becoming an injected declaration plus a bare reference (**a deliberate divergence** from
-§8.2's carried-structurally rule; `SPEC-FEEDBACK.md` #49/#50/#51 have the account, and are deliberately left
-open as revision discussion points). The rule this settles on: **`TypeRef.arguments` non-empty means an open
+one and anywhere else becoming an injected declaration plus a bare reference — **which is now the spec's own
+rule**, not a divergence: the structure-templates CR (`spec/tson-cr-structure-templates.md`, accepted as
+baseline) de-parameterises `array`/`set`/`map` (D3) so a container at a use site cannot be an application at
+all, and states one lift rule (D5: "every sugar form lifts at desugar: a concrete form to a closed synthetic
+entry"). `SPEC-FEEDBACK.md` #49/#50/#51 argued for exactly this and are settled by it.
+The rule this settles on: **`TypeRef.arguments` non-empty means an open
 form — a template application — and everything closed is an entry referenced by a bare name.** So
 `DefinitionResolver` only ever sees a bare
 reference or `!C value`. **The phase is purely syntactic and consults no governing meta**: the sugar set is
