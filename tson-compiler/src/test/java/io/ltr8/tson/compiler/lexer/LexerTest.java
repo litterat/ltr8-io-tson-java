@@ -541,4 +541,37 @@ class LexerTest {
         assertEquals(1, ts.get(0).startColumn());
         assertToken(ts.get(0), TokenType.UNQUOTED, "ab");
     }
+
+    // ── Escape decoding: the copy a token without escapes does not need ──
+
+    /**
+     * A quoted token holding no escape is its own text, and the decode pass is skipped rather than run to
+     * discover that. These are the characters that most look like they might be escape syntax and are not.
+     */
+    @Test
+    void aQuotedTokenWithNoEscapesKeepsItsTextExactly() {
+        for (String content : List.of("plain", "with spaces", "a/b", "~0~1", "$100 & 50%", "caf\u00E9 \u4E2D\u6587",
+                "trailing backslash-free", "100% \u2014 done")) {
+            List<Token> ts = tokens("\"" + content + "\"");
+
+            assertEquals(1, ts.size(), content);
+            assertToken(ts.get(0), TokenType.SINGLE_LINE_STRING, content);
+        }
+    }
+
+    /** Escapes still decode, and the fast path must not shadow a token that mixes escaped and plain text. */
+    @Test
+    void aQuotedTokenMixingPlainTextAndEscapesDecodesFully() {
+        List<Token> ts = tokens("\"plain\\tthen\\u0041 more/text\"");
+
+        assertToken(ts.get(0), TokenType.SINGLE_LINE_STRING, "plain\tthenA more/text");
+    }
+
+    /** A multi-line token decodes line by line, so one token may take both paths. */
+    @Test
+    void aMultiLineTokenMixesEscapedAndUnescapedLines() {
+        List<Token> ts = tokens("\"\"\"\nplain line\nescaped\\tline\nplain again\n\"\"\"");
+
+        assertToken(ts.get(0), TokenType.MULTI_LINE_STRING, "plain line\nescaped\tline\nplain again");
+    }
 }

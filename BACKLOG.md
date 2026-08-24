@@ -425,9 +425,19 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
       nesting depth, and every read of a valid document — nearly all of them — threw the result away
       unbuilt. `AllocationHarnessTest.nestingCostsTheSameAtEveryDepth` prices a level of nesting shallow and
       deep and requires the two to agree, which is the property rather than a byte count.
+    - [x] **An escape-free quoted token is not copied twice** — done. **-1.0 KB per read** (24,488 →
+      23,464 bytes), and half the per-character cost of a long quoted token (10.5 → 5.8 bytes per character
+      of input). The scanner already knows whether it consumed a backslash, so the decode pass runs only
+      when there is something to decode.
     - [ ] Smaller sites the same profile named, none yet measured on its own: `Token` snapshots per token,
-      `DateTimeParser` building a `HashMap` per value read, `Lexer.decodeAllEscapes` copying a quoted
-      token's text even when nothing is escaped, and an `Optional` per `TsonReadContext.peek`.
+      `DateTimeParser` building a `HashMap` per value read, and an `Optional` per `TsonReadContext.peek`.
+      Together they are a few percent; the four items above were 60%.
+
+  **Where the read path stands after all four** (346-character self-describing document, bind read):
+  61,824 → **23,464 bytes** and 1,213 → ~800 objects per read, 19.5 → ~13 µs, with retention still a
+  measured 0. Two conformance fixes came out of the work and matter more than the bytes for something about
+  to be ported: a zero-led complex magnitude is accepted (§7.6), and malformed UTF-8 is refused rather than
+  silently replaced (`SPEC-FEEDBACK.md` #59).
 - [ ] Confusable-character and bidi-formatting-character checks (§9.4-adjacent security hardening;
   opt-in, and per `SPEC-FEEDBACK.md` #42 reported as ordinary errors when enabled, not warnings) —
   the sibling gap to the numeric-literal length limit tracked in `STRUCTURED-OUTPUT.md`'s Tier 1 section;

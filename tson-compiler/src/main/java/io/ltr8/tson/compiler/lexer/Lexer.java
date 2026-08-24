@@ -383,6 +383,7 @@ public final class Lexer {
 
     private TokenType lexSingleLineToken() {
         StringBuilder raw = new StringBuilder();
+        boolean escaped = false;
         while (true) {
             if (atEnd()) {
                 throw errorAtTokenStart("unterminated single-line token");
@@ -393,6 +394,7 @@ public final class Lexer {
                 break;
             }
             if (cp == '\\') {
+                escaped = true;
                 raw.appendCodePoint(advance());
                 if (atEnd()) {
                     throw errorHere("unterminated escape sequence");
@@ -408,7 +410,11 @@ public final class Lexer {
             }
             raw.appendCodePoint(advance());
         }
-        return finish(TokenType.SINGLE_LINE_STRING, decodeAllEscapes(raw.toString()));
+        // A token with no escape in it is already its own text: the decode pass would copy it to say so.
+        // The scanner has just read every character, so whether there was one is known rather than searched
+        // for -- most quoted tokens in most documents have none.
+        String text = raw.toString();
+        return finish(TokenType.SINGLE_LINE_STRING, escaped ? decodeAllEscapes(text) : text);
     }
 
     private TokenType lexMultilineToken() {
@@ -547,8 +553,17 @@ public final class Lexer {
     // live cursor has already moved past the whole token, so there's no "current position" left
     // to report against here the way the main scan loop's own errorHere() calls can.
 
+    /**
+     * {@code raw} with every escape sequence replaced by what it denotes -- <b>{@code raw} itself when it
+     * holds none</b>, which is the common case and the whole reason for the check: decoding builds a second
+     * copy of a token's text to discover that it already had the right one. {@link #lexSingleLineToken}
+     * knows the answer without looking; a multi-line token's lines are checked here, once each.
+     */
     private String decodeAllEscapes(String raw) {
-        StringBuilder sb = new StringBuilder();
+        if (raw.indexOf('\\') < 0) {
+            return raw;
+        }
+        StringBuilder sb = new StringBuilder(raw.length());
         int i = 0;
         while (i < raw.length()) {
             char c = raw.charAt(i);

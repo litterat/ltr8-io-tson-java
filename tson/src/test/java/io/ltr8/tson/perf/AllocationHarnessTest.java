@@ -228,9 +228,11 @@ class AllocationHarnessTest {
         double perChar = perLex / document.length();
 
         report("allocated per character of input (lexed)", perChar, "bytes/char");
-        assertTrue(perChar < 25, "lexing cost " + perChar + " bytes per character of input -- the token's own "
-                + "text and the copies made building it are most of that; the per-character read() this "
-                + "replaced added about 40 on top, which is what the ceiling is set to catch");
+        assertTrue(perChar < 8, "lexing cost " + perChar + " bytes per character of input -- the token's own "
+                + "text is 2 of that and the builder it accumulates in most of the rest. This ceiling is "
+                + "tighter than the others here (about 40% over what it measures) because the regression it "
+                + "guards is only 1.8x: decoding a token that holds no escape copies its text a second time. "
+                + "Reading the input a character at a time, the other regression, is far above it");
     }
 
     /**
