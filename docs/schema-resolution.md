@@ -234,6 +234,14 @@ recorded open form, and replacing the application with a reference to the entry 
   reason this is recoverable at all: §5.7 sends `= P` to `REQUIRED` and `~ P` to `REQUIRED_DEFAULT`, so a
   routed default stays a default and data may still override it. §5.7 names only the
   refinement-from-an-application-head case downstream and leaves this one unstated (`SPEC-FEEDBACK.md` #58).
+- **An application whose head names nothing in scope is left whole, arguments and all.** This pass gives no
+  verdict on an unresolvable head — that is the linker's, as an unresolved reference — but it still has to
+  hand the linker something faithful, and collapsing the application to its bare head is not that. The one
+  slot where the difference showed is `source`, whose lookup falls back to the governing meta's structure
+  namespace: a stripped head found a template the schema cannot name and was faulted for supplying no
+  arguments, when the author had written them. Keeping the list means the linker judges what was written.
+  The fallback's own half of the fix is in `docs/linking-and-compilation.md` — it does not apply to an
+  argument-bearing `source` at all, a §5.10 head being resolved in the type-name namespace only (§3.3.1).
 - **Kind checking falls out of substitution.** A value argument reaching a type position, or a type argument
   reaching a `value_param` route, is the author's error — §5.10 infers a parameter's kind from its use, so
   the body's use and the applied argument are the two things being compared. Arity is checked before any of

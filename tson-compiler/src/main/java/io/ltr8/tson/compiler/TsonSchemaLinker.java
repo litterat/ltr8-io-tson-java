@@ -642,9 +642,18 @@ public final class TsonSchemaLinker {
             // on `structureNamespace` for why this matters concretely: `void => !unit {}`'s own
             // `source: unit` is exactly this case -- `unit` lives in meta-kernel, reachable from
             // core.tn only via its `!!meta` chain, never a local declaration or `!!import`.
-            Map<String, TypeDefinition> sourceLookup = structureNamespace.isEmpty() ? namespace
-                    : mergeWithFallback(namespace, structureNamespace);
-            validateTypeRef(def.source().get(), sourceLookup, def.parameters(), "'" + name + "' source");
+            //
+            // The one `source` shape the fallback does *not* cover is an application -- a `source` carrying
+            // arguments. Desugar rewrites every constructor application long before resolution, so arguments
+            // surviving to here mean a §5.10 user-template head, which §3.3.1 resolves in the type-name
+            // namespace only. Letting it reach the governing meta finds a template the schema cannot name and
+            // faults it on arity, when the verdict every other reference form gives for that name is that it
+            // is unresolved.
+            TypeRef source = def.source().get();
+            Map<String, TypeDefinition> sourceLookup =
+                    structureNamespace.isEmpty() || !source.arguments().isEmpty() ? namespace
+                            : mergeWithFallback(namespace, structureNamespace);
+            validateTypeRef(source, sourceLookup, def.parameters(), "'" + name + "' source");
         }
         // A supertype gets the same structure-namespace fallback as `source`, and for the same reason: it is
         // not an author-written reference but the residue of one, and §3.3.2 confines only author-written
