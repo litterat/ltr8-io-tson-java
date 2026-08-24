@@ -234,6 +234,51 @@ class AllocationHarnessTest {
     }
 
     /**
+     * A diagnostic's RFC 6901 pointer is built when a diagnostic is built, not while descending -- so the
+     * cost of nesting is flat per level rather than growing with depth.
+     *
+     * <p>Concatenating each step onto the last is <b>quadratic in depth</b>: every level copies the whole
+     * prefix again. A level's own structural cost (events, tokens, a node, a context) is flat and large
+     * enough to hide that, so this measures the cost of a level in a shallow part of the document and in a
+     * deep one and compares the two. Flat is the answer laziness gives; eager building makes the deeper
+     * level cost hundreds of bytes more, and more still at greater depth. Every read of a valid document
+     * throws the pointer away unbuilt, which is nearly all of them, and a port descends the same way.
+     */
+    @Test
+    void nestingCostsTheSameAtEveryDepth() {
+        double shallowLevel = perLevelBetween(4, 32);
+        double deepLevel = perLevelBetween(32, 60);
+
+        report("allocated per level of nesting (shallow)", shallowLevel, "bytes");
+        report("allocated per level of nesting (deep)", deepLevel, "bytes");
+        assertTrue(deepLevel - shallowLevel < 150, "a level 32 deep cost " + (deepLevel - shallowLevel)
+                + " bytes more than a level 4 deep -- a pointer built while descending copies the whole "
+                + "prefix at every level, so the cost of a level grows with how deep it is");
+    }
+
+    /** Bytes per level of nesting between two depths, the flat per-read cost cancelling out. */
+    private static double perLevelBetween(int shallow, int deep) {
+        double atDeep = AllocationProbe.allocatedPerOperation(2_000, () ->
+                AllocationProbe.sink = new TsonTreeReader().read(nested(deep)));
+        double atShallow = AllocationProbe.allocatedPerOperation(2_000, () ->
+                AllocationProbe.sink = new TsonTreeReader().read(nested(shallow)));
+        return (atDeep - atShallow) / (deep - shallow);
+    }
+
+    /** {@code { deeply: { deeply: ... { leaf: 1 } } }} at the given depth. */
+    private static String nested(int depth) {
+        StringBuilder document = new StringBuilder();
+        for (int i = 0; i < depth; i++) {
+            document.append("{ deeply: ");
+        }
+        document.append("{ leaf: 1 }");
+        for (int i = 0; i < depth; i++) {
+            document.append(" }");
+        }
+        return document.toString();
+    }
+
+    /**
      * The write path's own per-character question, and the regression guard for the fix that prompted this
      * harness: {@code quotedString} asked "is this a control character?" with a {@code Pattern}, costing a
      * {@code String}, a {@code Matcher} and the matcher's internals for every character of every string
