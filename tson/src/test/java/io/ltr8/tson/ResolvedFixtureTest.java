@@ -46,14 +46,25 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ResolvedFixtureTest {
 
     /**
-     * Where this schema and the fixture disagree, per schema. Every one is [TSON-SCHEMA] §8.2's
-     * carried-structurally rule against this resolver's container lifting ({@code SPEC-FEEDBACK.md}
-     * #49/#50/#51, deliberately left open as a revision discussion point). Bring these down; a rise is a
-     * regression.
+     * A synthetic entry's name ends in a content hash of its resolved binding record, and <b>that hash is
+     * not normative</b> -- the CR's D6 keys a closed synthetic on structural equality, "one entry per
+     * distinct concrete form schema-wide", leaving the spelling to the implementation. The fixtures write
+     * {@code xxhash} where a real one goes, so both sides are reduced to that before comparing and this
+     * stays a test of structure rather than of a hash function.
      */
-    private static final int CORE_DIFFERENCES = 0;
-    private static final int META_DIFFERENCES = 5;
-    private static final int META_KERNEL_DIFFERENCES = 7;
+    private static final java.util.regex.Pattern SYNTHETIC_HASH =
+            java.util.regex.Pattern.compile("_[0-9a-f]{8}$");
+
+    /** The same, unanchored -- a synthetic's name appears inside a body as well as being an entry's own. */
+    private static final java.util.regex.Pattern SYNTHETIC_HASH_ANYWHERE =
+            java.util.regex.Pattern.compile("_[0-9a-f]{8}\\b");
+
+    private static final java.util.regex.Pattern SOURCE_POSITION =
+            java.util.regex.Pattern.compile("position=Optional\\[Position\\[[^\\]]*\\]\\]");
+
+    private static String withoutHash(String name) {
+        return SYNTHETIC_HASH.matcher(name).replaceFirst("_xxhash");
+    }
 
     private static Tson tson() {
         return Tson.builder().dataBindContext(SchemaMetaNameBinder.defaultContext()).build();
@@ -64,24 +75,6 @@ class ResolvedFixtureTest {
     private record Comparison(String label, Map<String, TypeDefinition> fixture,
                                Map<String, TypeDefinition> ours) {
 
-        /** Entry names present on both sides whose canonicalised definitions are not equal. */
-        List<String> differing() {
-            List<String> differing = new ArrayList<>();
-            fixture.forEach((name, definition) -> {
-                TypeDefinition mine = ours.get(name);
-                if (mine != null && !canonical(mine).equals(canonical(definition))) {
-                    differing.add(name);
-                }
-            });
-            return differing;
-        }
-
-        /** Entry names this resolver produces that the fixture has no counterpart for. */
-        List<String> onlyOurs() {
-            var extra = new TreeSet<>(ours.keySet());
-            extra.removeAll(fixture.keySet());
-            return List.copyOf(extra);
-        }
     }
 
     /**
@@ -96,6 +89,21 @@ class ResolvedFixtureTest {
                 definition.constructor(), definition.supertypes().stream().sorted().toList(),
                 definition.subtypes().stream().sorted().toList(), definition.disjoint(), definition.body(),
                 definition.position(), definition.annotations());
+    }
+
+    /**
+     * A definition reduced to what the comparison is about: canonicalised, then with every synthetic's
+     * content hash replaced by the {@code xxhash} the fixtures write. Compared as text rather than through
+     * {@code equals} because a synthetic's name appears at any depth of a body -- as the type of a field,
+     * inside an argument list -- and normalising it in place would mean rebuilding every body shape here.
+     */
+    private static String rendered(TypeDefinition definition) {
+        String text = SYNTHETIC_HASH_ANYWHERE.matcher(String.valueOf(canonical(definition)))
+                .replaceAll("_xxhash");
+        // `position` is this model's own: an @Unbound component recording where a declaration was written,
+        // which §8's resolved form has no field for and no fixture carries. Normalised away rather than
+        // compared, exactly as TypeDefinition's own equals leaves it out.
+        return SOURCE_POSITION.matcher(text).replaceAll("position=Optional.empty");
     }
 
     private static Comparison compare(String label, String fixtureFile, String id) throws Exception {
@@ -118,7 +126,7 @@ class ResolvedFixtureTest {
         String canonical = TsonCanonicalIdentity.canonicalize(id);
         linked.schema().entries().forEach((name, definition) -> {
             if (linked.originOf(name).equals(canonical)) {
-                own.put(name, definition);
+                own.put(withoutHash(name), definition);
             }
         });
         return own;
@@ -168,65 +176,34 @@ class ResolvedFixtureTest {
         }
     }
 
-    // ── What may still differ ────────────────────────────────────────────
+    // ── The substance ────────────────────────────────────────────────────
 
-    /**
-     * The count of disagreeing entries, pinned per schema. A rise is a regression; a fall means something
-     * was closed and the constant should follow it down.
-     */
+    /** Both directions: neither side declares an entry the other does not. */
     @Test
-    void nothingDiffersBeyondWhatIsAlreadyKnownTo() throws Exception {
-        List<Comparison> all = all();
-        assertEquals(CORE_DIFFERENCES, all.get(0).differing().size(), () -> detail(all.get(0)));
-        assertEquals(META_DIFFERENCES, all.get(1).differing().size(), () -> detail(all.get(1)));
-        assertEquals(META_KERNEL_DIFFERENCES, all.get(2).differing().size(), () -> detail(all.get(2)));
-    }
-
-    /**
-     * <b>Every remaining difference is one deliberate thing.</b> §8.2 carries a container at a type position
-     * structurally -- {@code type: array<token>} -- where this resolver lifts it to an injected declaration
-     * and leaves a bare reference behind ({@code type: array_field_name_f1a73e72}). {@code SPEC-FEEDBACK.md}
-     * #49/#50/#51 hold the argument and are open revision questions, not defects.
-     *
-     * <p>Asserted as a <em>shape</em> rather than a list of entry names: a synthetic's name is derived from
-     * its content, so a list would break on any change to that derivation while saying nothing, where this
-     * still fails the moment a difference of some other kind appears. The lifted names are gathered across
-     * all three schemas, since a schema may reference a container lifted by one it imports.
-     */
-    @Test
-    void everyRemainingDifferenceIsAContainerThisResolverLifted() throws Exception {
-        List<Comparison> all = all();
-        // Across all three: meta.tn's own `extern` names a container lifted in meta-kernel, so a check
-        // scoped to one schema's own extras would miss it.
-        var lifted = new TreeSet<String>();
-        all.forEach(comparison -> lifted.addAll(comparison.onlyOurs()));
-        for (Comparison comparison : all) {
-            for (String name : comparison.differing()) {
-                assertTrue(mentionsALiftedContainer(comparison, name, lifted),
-                        comparison.label() + ": " + name + " differs for some reason other than container "
-                                + "lifting, which is the only difference this comparison knows about."
-                                + firstDifference(canonical(comparison.fixture().get(name)),
-                                        canonical(comparison.ours().get(name))));
-            }
+    void theEntrySetsAreIdentical() throws Exception {
+        for (Comparison comparison : all()) {
+            assertEquals(new TreeSet<>(comparison.fixture().keySet()), new TreeSet<>(comparison.ours().keySet()),
+                    comparison.label() + ": the two do not declare the same entries");
         }
     }
 
     /**
-     * The extra entries this resolver produces are exactly the lifted containers -- an injected declaration
-     * has no counterpart in a fixture that carries the container structurally, so it can only appear here.
+     * <b>And every entry resolves to the same thing.</b> No category of difference is expected or tolerated:
+     * this resolver's output and the spec's own published resolver output agree, entry for entry, over
+     * {@code kind}, {@code source}, {@code parameters}, {@code constructor}, {@code supertypes}, {@code
+     * subtypes}, {@code disjoint}, {@code body} and the annotations each carries.
+     *
+     * <p>It was not always so, and what closed the gap is worth knowing before changing any of it: the
+     * container forms were carried as applications of a parameterized {@code array}/{@code map}, which the
+     * structure-templates CR removed (D3, "array, set, and map lose their parameter lists"), and every sugar
+     * form now lifts to a synthetic entry instead (D5). The fixtures were written against the older shape.
      */
     @Test
-    void everyExtraEntryIsALiftedContainer() throws Exception {
+    void everyEntryResolvesIdentically() throws Exception {
         for (Comparison comparison : all()) {
-            for (String name : comparison.onlyOurs()) {
-                TypeDefinition extra = comparison.ours().get(name);
-                assertTrue(extra.body() instanceof ArrayBody || extra.body() instanceof MapBody,
-                        comparison.label() + ": " + name + " is an extra entry that is not a lifted "
-                                + "container -- " + extra.body());
-                assertTrue(extra.position().isEmpty(),
-                        comparison.label() + ": " + name + " is extra but has a source position, so someone "
-                                + "declared it -- an injected declaration has none");
-            }
+            comparison.fixture().forEach((name, fixtureDefinition) -> assertEquals(
+                    rendered(fixtureDefinition), rendered(comparison.ours().get(name)),
+                    comparison.label() + ": " + name + " does not resolve to what the fixture records"));
         }
     }
 
@@ -242,23 +219,4 @@ class ResolvedFixtureTest {
         return lifted.stream().anyMatch(ours::contains);
     }
 
-    /** Where two renderings first diverge, with a window either side -- a whole body is unreadable. */
-    private static String firstDifference(TypeDefinition theirs, TypeDefinition mine) {
-        String a = String.valueOf(theirs);
-        String b = String.valueOf(mine);
-        int i = 0;
-        while (i < Math.min(a.length(), b.length()) && a.charAt(i) == b.charAt(i)) {
-            i++;
-        }
-        return "\n  fixture: …" + window(a, i) + "\n  ours   : …" + window(b, i);
-    }
-
-    private static String window(String s, int at) {
-        return s.substring(Math.max(0, at - 60), Math.min(s.length(), at + 90));
-    }
-
-    private static String detail(Comparison comparison) {
-        return comparison.label() + " differs on " + comparison.differing()
-                + " -- if that is smaller than the pinned count, bring the constant down with it";
-    }
 }

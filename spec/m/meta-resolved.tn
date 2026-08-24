@@ -44,7 +44,7 @@
     supertypes: [sum top]
     body: !record { supertypes: [sum]  fields: [
       !record_field { name: schema  type: uri }
-      !record_field { name: types   type: { name: array  arguments: [ { name: @alias:type_name token } ] }  state: OPTIONAL }
+      !record_field { name: types   type: array_type_name_xxhash  state: OPTIONAL }
     ] }
   }
 
@@ -225,8 +225,8 @@
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
       !record_field { name: spec       type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc3986" }
-      !record_field { name: within     type: { name: array  arguments: [ { name: value } ] }  state: OPTIONAL }
-      !record_field { name: excluding  type: { name: array  arguments: [ { name: value } ] }  state: OPTIONAL }
+      !record_field { name: within     type: array_value_xxhash  state: OPTIONAL }
+      !record_field { name: excluding  type: array_value_xxhash  state: OPTIONAL }
     ] }
   }
 
@@ -237,8 +237,8 @@
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
       !record_field { name: spec       type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc4291" }
-      !record_field { name: within     type: { name: array  arguments: [ { name: value } ] }  state: OPTIONAL }
-      !record_field { name: excluding  type: { name: array  arguments: [ { name: value } ] }  state: OPTIONAL }
+      !record_field { name: within     type: array_value_xxhash  state: OPTIONAL }
+      !record_field { name: excluding  type: array_value_xxhash  state: OPTIONAL }
     ] }
   }
 
@@ -251,8 +251,8 @@
       !record_field { name: spec        type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc4632" }
       !record_field { name: min_prefix  type: integer  state: OPTIONAL }
       !record_field { name: max_prefix  type: integer  state: OPTIONAL }
-      !record_field { name: within      type: { name: array  arguments: [ { name: value } ] }  state: OPTIONAL }
-      !record_field { name: excluding   type: { name: array  arguments: [ { name: value } ] }  state: OPTIONAL }
+      !record_field { name: within      type: array_value_xxhash  state: OPTIONAL }
+      !record_field { name: excluding   type: array_value_xxhash  state: OPTIONAL }
     ] }
   }
 
@@ -265,8 +265,8 @@
       !record_field { name: spec        type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc4291" }
       !record_field { name: min_prefix  type: integer  state: OPTIONAL }
       !record_field { name: max_prefix  type: integer  state: OPTIONAL }
-      !record_field { name: within      type: { name: array  arguments: [ { name: value } ] }  state: OPTIONAL }
-      !record_field { name: excluding   type: { name: array  arguments: [ { name: value } ] }  state: OPTIONAL }
+      !record_field { name: within      type: array_value_xxhash  state: OPTIONAL }
+      !record_field { name: excluding   type: array_value_xxhash  state: OPTIONAL }
     ] }
   }
 
@@ -343,4 +343,14 @@
     body: !reference { target: text }
   }
 
+  @doc:"""
+    Synthetic entries — the closed forms the sugar lifts to (CR D5); see
+    meta-kernel-resolved.tn's own note. `xxhash` stands for a content hash
+    of the resolved binding record and is not a conformance point.
+    """
+  array_value_xxhash => !type_definition {
+    kind: PRODUCT
+    source: array
+    body: !array { element_type: value }
+  }
 }
