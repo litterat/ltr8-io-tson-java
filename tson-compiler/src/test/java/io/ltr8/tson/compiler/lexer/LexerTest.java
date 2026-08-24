@@ -400,4 +400,69 @@ class LexerTest {
     void bomOutsideLeadingPositionIsLexError() {
         assertThrows(LexException.class, () -> lex("{\uFEFF}"));
     }
+
+    // ── Reading in blocks: nothing may depend on where a refill lands ────
+
+    /**
+     * The lexer pulls characters off its reader a block at a time rather than one at a time (which cost a
+     * {@code CharBuffer} per character), so every lexical rule now runs across a refill boundary that is
+     * invisible to it. These pin that invisibility: the block is an implementation detail of reading, not a
+     * limit on tokens, and a rule must not care where it falls.
+     */
+    @Test
+    void aTokenLongerThanTheReadBlockLexesWhole() {
+        String text = "a".repeat(5_000);
+
+        List<Token> ts = tokens("\"" + text + "\"");
+
+        assertEquals(1, ts.size());
+        assertToken(ts.get(0), TokenType.SINGLE_LINE_STRING, text);
+    }
+
+    /** Every token boundary walked across the refill point, one character at a time. */
+    @Test
+    void everyTokenBoundaryStraddlingARefillLexesTheSame() {
+        for (int padding = 490; padding <= 540; padding++) {
+            String source = "{ pad: \"" + "x".repeat(padding) + "\"  n: 12345  t: !uuid tail }";
+
+            List<Token> ts = tokens(source);
+
+            assertToken(ts.get(3), TokenType.SINGLE_LINE_STRING, "x".repeat(padding));
+            assertToken(ts.get(6), TokenType.UNQUOTED, "12345");
+            assertToken(ts.get(ts.size() - 2), TokenType.UNQUOTED, "tail");
+        }
+    }
+
+    /**
+     * The one case a block read could genuinely break: a surrogate pair whose halves land in different
+     * blocks. The lexer reassembles a code point from two chars, and the second may be the one that
+     * triggers the refill.
+     */
+    @Test
+    void aSurrogatePairSplitAcrossARefillIsOneCodePoint() {
+        String emoji = "\uD83D\uDE80";   // U+1F680, a surrogate pair
+        for (int padding = 500; padding <= 530; padding++) {
+            String text = "x".repeat(padding) + emoji + "y";
+            String source = "\"" + text + "\"";
+
+            List<Token> ts = tokens(source);
+
+            assertEquals(1, ts.size(), "padding " + padding);
+            assertToken(ts.get(0), TokenType.SINGLE_LINE_STRING, text);
+        }
+    }
+
+    /** Positions are counted in code points and UTF-8 bytes, neither of which knows about a refill. */
+    @Test
+    void positionsAreUnaffectedByWhereARefillLands() {
+        String padding = "x".repeat(600);
+        String source = "\"" + padding + "\"\nsecond";
+
+        List<Token> ts = tokens(source);
+
+        Token second = ts.get(1);
+        assertEquals(2, second.startLine());
+        assertEquals(1, second.startColumn());
+        assertEquals(padding.length() + 3, second.startByteOffset(), "two quotes and a newline");
+    }
 }

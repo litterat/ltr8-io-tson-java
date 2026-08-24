@@ -44,6 +44,25 @@ class BundledSchemaPinTest {
                 tson.loader().resolveLinked(TsonBundledSchemas.CORE_ID + "?sha256=" + "a".repeat(64)));
     }
 
+    /**
+     * The pin is verified on <b>every</b> reference, not only the one that first resolved the schema -- the
+     * compiled-schema cache sits above the resolution the check rides on, so a cache hit that skipped
+     * straight to the compiled reader would accept a reference whose pin is wrong. Load-bearing since the
+     * read path canonicalizes once and passes the identity down: that is a shortcut past the URI parse,
+     * and this pins that it is not a shortcut past the check.
+     */
+    @Test
+    void aWrongPinIsRejectedEvenOnceTheSchemaIsCompiledAndCached() {
+        Tson tson = Tson.builder().build();
+        String pinned = TsonBundledSchemas.CORE_ID + "?sha256=" + TsonBundledSchemas.CORE_SHA256;
+
+        assertDoesNotThrow(() -> tson.treeRegistry().get(pinned));   // compiles, and caches by identity
+        assertDoesNotThrow(() -> tson.treeRegistry().get(pinned));   // a cache hit still verifies
+
+        assertThrows(TsonContentHashMismatchException.class,
+                () -> tson.treeRegistry().get(TsonBundledSchemas.CORE_ID + "?sha256=" + "b".repeat(64)));
+    }
+
     private static void assertDigestMatches(String id, String heldDigest) {
         assertEquals(heldDigest,
                 TsonContentHash.sha256(TsonBundledSchemas.fetch(id).getBytes(StandardCharsets.UTF_8)), id);

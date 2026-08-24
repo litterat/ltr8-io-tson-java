@@ -99,8 +99,9 @@ public final class TsonCompiledSchemaRegistry {
      * core caches the resolution itself, so a repeat is cheap.
      */
     public TsonCompiledSchema get(String uri) {
-        TsonLinkedSchema linked = core.resolveLinked(uri);
-        return compiled.computeIfAbsent(TsonCanonicalIdentity.canonicalize(uri), id -> compile(linked));
+        String identity = TsonCanonicalIdentity.canonicalize(uri);
+        TsonLinkedSchema linked = core.resolveLinked(uri, identity, null);
+        return compiledFor(identity, linked);
     }
 
     /**
@@ -113,11 +114,25 @@ public final class TsonCompiledSchemaRegistry {
      * compiled cleanly gets an entry.
      */
     public TsonCompiledSchema get(String uri, TsonDiagnosticsReceiver receiver) {
-        TsonLinkedSchema linked = core.resolveLinked(uri, receiver);
+        String identity = TsonCanonicalIdentity.canonicalize(uri);
+        TsonLinkedSchema linked = core.resolveLinked(uri, identity, receiver);
         if (linked == null) {
             return null;
         }
-        return compiled.computeIfAbsent(TsonCanonicalIdentity.canonicalize(uri), id -> compile(linked));
+        return compiledFor(identity, linked);
+    }
+
+    /**
+     * The cached compilation for {@code identity}, compiling on a miss. <b>A plain {@code get} first, and
+     * {@code computeIfAbsent} only when it misses</b>: every read reaches this and all but the first hit,
+     * and {@code computeIfAbsent} takes the bin's lock where a colliding key sits behind the first node,
+     * where {@code get} never locks at all. On the miss the race is harmless either way -- two threads
+     * compiling one schema, one entry kept -- so the atomicity is worth having and worth not paying for on
+     * the path that does not need it.
+     */
+    private TsonCompiledSchema compiledFor(String identity, TsonLinkedSchema linked) {
+        TsonCompiledSchema cached = compiled.get(identity);
+        return cached != null ? cached : compiled.computeIfAbsent(identity, id -> compile(linked));
     }
 
     /** Compiles an already-resolved, already-linked schema in this registry's mode -- standalone, uncached. */

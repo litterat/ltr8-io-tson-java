@@ -288,8 +288,20 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      * behaviour of the other overload, which never returns {@code null}.
      */
     public TsonLinkedSchema resolveLinked(String uri, TsonDiagnosticsReceiver receiver) {
-        String identity = TsonCanonicalIdentity.canonicalize(uri);
-        Optional<TsonLinkedSchema> cached = schemaRegistry.get(uri);
+        return resolveLinked(uri, TsonCanonicalIdentity.canonicalize(uri), receiver);
+    }
+
+    /**
+     * {@link #resolveLinked(String, TsonDiagnosticsReceiver)} for a caller that has already canonicalized
+     * {@code uri} -- {@code identity} must be exactly what {@code canonicalize(uri)} returns.
+     *
+     * <p>Canonicalizing is a {@code new URI(...)} parse, and a read reaches this three times for one
+     * document (here, in the registry's own lookup, and in the compiled-schema cache above). One
+     * canonicalization at the top of a read now serves all three. Not a shortcut past anything else: the
+     * resolution and the {@code ?sha256=} pin verification below run exactly as they did.
+     */
+    public TsonLinkedSchema resolveLinked(String uri, String identity, TsonDiagnosticsReceiver receiver) {
+        Optional<TsonLinkedSchema> cached = schemaRegistry.getByCanonicalIdentity(identity);
         if (cached.isPresent()) {
             verifyPin(uri, identity);
             return cached.get();

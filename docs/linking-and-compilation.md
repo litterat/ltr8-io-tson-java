@@ -420,6 +420,25 @@ Two registries over one shared resolution core, the compiled-side counterparts t
   registration stays strict — `register` on an identity already present is still an error, since doing that
   on purpose is a caller mistake however many threads are involved. The same shape and the same fix applied
   to `DataBindContext.getDescriptor`, the other read-path cache.
+- **A hit takes no lock either.** Every data read reaches two caches — `TsonSchemaRegistry`'s identity map
+  (through `resolveLinked`) and `TsonCompiledSchemaRegistry`'s compiled map — and in a process that
+  registered its schemas at startup, which is what this design asks for, both hit essentially every time.
+  So neither hit is allowed to serialize: `TsonSchemaRegistry` holds a `ConcurrentHashMap` and its lookups
+  are plain reads where they were `synchronized` methods, and the compiled cache does a `get` before
+  `computeIfAbsent`, which takes a bin lock only for a key sitting behind the first node. The
+  no-overwrite rule is unaffected — it moves from "check and put under the monitor" to `putIfAbsent`, which
+  is the same guarantee stated atomically, and `register` still refuses a second registration of one
+  identity. **Measured, this is small on a 16-CPU machine** (~6% at 32 threads, nothing below that): the
+  critical section was a map lookup, and a JVM absorbs an uncontended monitor well. It is here because a
+  monitor on the read path is a ceiling that arrives with the core count rather than a cost that shows up
+  in a profile, and because the section can only grow.
+- **A read canonicalizes its schema URI once.** `TsonCanonicalIdentity.canonicalize` is a `new URI(...)`
+  parse, and it used to run three times for one document — the compiled-schema cache's key, the resolution
+  cache's key, and the schema registry's own lookup. The identity is now computed at the top and passed
+  down (`resolveLinked(uri, identity, receiver)`, `TsonSchemaRegistry.getByCanonicalIdentity`), with the
+  single-argument forms kept as the door for anyone holding a URI as written. **Not a shortcut past the pin
+  check**: `verifyPin` runs on every reference as before, and `BundledSchemaPinTest` pins that a wrong pin
+  is still rejected once the schema is compiled and cached.
 - **The rest of the read path needs no locking at all.** A `Lexer`/`TsonDataStream` is built per read and
   shared with nothing, and every compiled reader is immutable — the whole `reader` package holds exactly one
   non-final instance field (`CompiledReaders.delegate`, `volatile`, rebound once at the end of a compile).

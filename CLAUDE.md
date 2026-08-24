@@ -679,8 +679,9 @@ compatibility).
   no longer one of them**: an argument bound into a routed `=` fixes the field (`REQUIRED` →
   `REQUIRED_FIXED`, `~` staying a default), which is §5.7's "fixation happens downstream" applied to the
   downstream it does not name (`SPEC-FEEDBACK.md` #58). **Thread-safety is no longer wholly open**: concurrent reads through one `Tson` are safe (the
-  readers are immutable, the lexer/stream are per-read, and both on-demand caches settle a race by keeping
-  one entry — `docs/linking-and-compilation.md`). What is still open is everything *outside* a read:
+  readers are immutable, the lexer/stream are per-read, both on-demand caches settle a race by keeping
+  one entry, and a cache *hit* — which is every read, in a process that resolved its schemas at startup —
+  takes no lock at all; `docs/linking-and-compilation.md`). What is still open is everything *outside* a read:
   registering schemas concurrently, and mutating a `DataBindContext` after use.
 - **§9.1's numeric-literal length limit** (SHOULD, DoS-hardening) — not enforced.
 - **JSON** — a future JSON reader is a whole separate stack (its own `JsonEventStream` and its own readers,

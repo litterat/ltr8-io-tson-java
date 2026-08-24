@@ -50,6 +50,23 @@ public final class Lexer {
 
     private final Reader reader;
 
+    /**
+     * Characters pulled off {@link #reader} in bulk, drained one at a time by {@link #readRawChar()}.
+     *
+     * <p><b>The bulk read is the point, not the buffer's size.</b> {@code Reader.read()} on an {@code
+     * InputStreamReader} allocates a {@code char[]} and wraps it in a {@code CharBuffer} on <em>every
+     * call</em>, so reading a document one character at a time -- which is what a code-point-addressed
+     * lexer naturally wants to do -- cost about 40 bytes of garbage per character of input: 47% of
+     * everything a read allocated, and a cost proportional to the document rather than fixed. Reading a
+     * block at a time makes that per-block, and the block is deliberately modest: it is throughput, not a
+     * lookahead window ({@link #lookahead} is that, and stays two code points deep), so a large document
+     * gains nothing from a larger one and a small document should not pay for it.
+     * {@code AllocationHarnessTest} pins the result.
+     */
+    private final char[] buffer = new char[512];
+    private int bufferPosition;
+    private int bufferLimit;
+
     /** Code points read from {@link #reader} but not yet consumed by {@link #advance()} -- never holds more than a couple of elements, the most any lexical rule here ever needs to look ahead. */
     private final List<Integer> lookahead = new ArrayList<>();
     private boolean streamExhausted;
@@ -704,9 +721,24 @@ public final class Lexer {
         return c1;
     }
 
+    /** The next character, from {@link #buffer}, refilling it when drained; {@code -1} at end of input. */
     private int readRawChar() {
+        if (bufferPosition >= bufferLimit && !fillBuffer()) {
+            return -1;
+        }
+        return buffer[bufferPosition++];
+    }
+
+    /** Refills {@link #buffer}, answering whether anything was read. */
+    private boolean fillBuffer() {
         try {
-            return reader.read();
+            int read = reader.read(buffer, 0, buffer.length);
+            if (read <= 0) {
+                return false;
+            }
+            bufferPosition = 0;
+            bufferLimit = read;
+            return true;
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

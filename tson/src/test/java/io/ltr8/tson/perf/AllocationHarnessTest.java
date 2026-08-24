@@ -209,6 +209,31 @@ class AllocationHarnessTest {
     }
 
     /**
+     * The read path's per-character question, and the guard for the fix that came out of profiling this
+     * harness: {@code Lexer} pulled its input one character at a time, and {@code Reader.read()} allocates a
+     * {@code char[]} and wraps it in a {@code CharBuffer} on every call -- about 40 bytes of garbage per
+     * character of input, 47% of everything a read allocated, and proportional to the document rather than
+     * fixed. Reading in blocks leaves the per-character cost as the token text itself.
+     */
+    @Test
+    void lexingDoesNotAllocatePerCharacterOfInput() {
+        String document = "{ note: \"" + "x".repeat(20_000) + "\" }";
+
+        double perLex = AllocationProbe.allocatedPerOperation(2_000, () -> {
+            TsonDataStream stream = new TsonDataStream(document);
+            while (stream.hasNext()) {
+                AllocationProbe.sink = stream.next();
+            }
+        });
+        double perChar = perLex / document.length();
+
+        report("allocated per character of input (lexed)", perChar, "bytes/char");
+        assertTrue(perChar < 25, "lexing cost " + perChar + " bytes per character of input -- the token's own "
+                + "text and the copies made building it are most of that; the per-character read() this "
+                + "replaced added about 40 on top, which is what the ceiling is set to catch");
+    }
+
+    /**
      * The write path's own per-character question, and the regression guard for the fix that prompted this
      * harness: {@code quotedString} asked "is this a control character?" with a {@code Pattern}, costing a
      * {@code String}, a {@code Matcher} and the matcher's internals for every character of every string
