@@ -36,6 +36,12 @@ tokens, modes, or character-classification changes).
     invisible to it, including a multi-byte sequence or a surrogate pair split across one — `LexerTest`
     walks token boundaries and a split pair across the seam, and `AllocationHarnessTest` pins the
     per-character cost.
+- **A quoted token that holds no escape is its own text.** Decoding used to run over every quoted token,
+  building a second copy to discover the first was already right — and `lexSingleLineToken` has just read
+  every character, so whether there was a backslash is *known* rather than searched for. A multi-line
+  token's lines are checked individually (`decodeAllEscapes` returns its argument when it finds none), since
+  one token may hold both kinds of line. Halves the per-character cost of lexing a long quoted token
+  (10.5 → 5.8 bytes per character of input, which `AllocationHarnessTest` pins).
 - **`Token` is a flat record of six raw `int` coordinates plus type/text**, not nested `Position` objects,
   to keep allocation off the high-throughput read path; `start()`/`end()` materialize a `Position` on
   demand.
