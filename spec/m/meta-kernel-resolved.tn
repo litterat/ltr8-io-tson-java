@@ -279,7 +279,7 @@
     kind: PRODUCT
     body: !record { fields: [
       !record_field { name: name       type: @alias:type_name token }
-      !record_field { name: arguments  type: { name: array  arguments: [ { name: type_argument } ] }  state: OPTIONAL }
+      !record_field { name: arguments  type: array_type_argument_xxhash  state: OPTIONAL }
     ] }
   }
 
@@ -408,7 +408,7 @@
     supertypes: [top]
     body: !record { supertypes: [top]  fields: [
       !record_field { name: target    type: @alias:type_name token }
-      !record_field { name: bindings  type: { name: map  arguments: [ { name: @alias:field_name token } { name: template_argument } ] } }
+      !record_field { name: bindings  type: map_field_name_template_argument_xxhash }
     ] }
   }
 
@@ -416,7 +416,7 @@
   field_group => !type_definition {
     kind: PRODUCT
     body: !record { fields: [
-      !record_field { name: members  type: { name: array  arguments: [ { name: @alias:field_name token } ] } }
+      !record_field { name: members  type: array_field_name_xxhash }
       !record_field { name: state    type: element_state  state: REQUIRED_DEFAULT  value: REQUIRED }
     ] }
   }
@@ -429,9 +429,9 @@
     body: !record { supertypes: [product]  fields: [
       !record_field { name: access_pattern  type: product_access_type  state: REQUIRED_FIXED  value: NAMED }
       !record_field { name: size_type       type: product_size_type    state: REQUIRED_FIXED  value: FIXED }
-      !record_field { name: fields          type: { name: array  arguments: [ { name: record_field } ] } }
-      !record_field { name: groups          type: { name: array  arguments: [ { name: field_group } ] }  state: OPTIONAL }
-      !record_field { name: supertypes      type: { name: array  arguments: [ { name: @alias:type_name token } ] }  state: OPTIONAL }
+      !record_field { name: fields          type: array_record_field_xxhash }
+      !record_field { name: groups          type: array_field_group_xxhash  state: OPTIONAL }
+      !record_field { name: supertypes      type: array_type_name_xxhash  state: OPTIONAL }
     ] }
   }
 
@@ -489,7 +489,7 @@
     body: !record { supertypes: [product]  fields: [
       !record_field { name: access_pattern  type: product_access_type  state: REQUIRED_FIXED  value: INDEX }
       !record_field { name: size_type       type: product_size_type    state: REQUIRED_FIXED  value: FIXED }
-      !record_field { name: elements        type: { name: array  arguments: [ { name: tuple_element } ] } }
+      !record_field { name: elements        type: array_tuple_element_xxhash }
     ] }
   }
 
@@ -514,7 +514,7 @@
     constructor: true
     supertypes: [sum top]
     body: !record { supertypes: [sum]  fields: [
-      !record_field { name: variants  type: { name: array  arguments: [ { name: type_ref } ] } }
+      !record_field { name: variants  type: array_type_ref_xxhash }
     ] }
   }
 
@@ -524,10 +524,10 @@
     body: !record { fields: [
       !record_field { name: source       type: type_ref  state: OPTIONAL }
       !record_field { name: kind         type: type_kind }
-      !record_field { name: parameters   type: { name: array  arguments: [ { name: @alias:param_name token } ] }  state: OPTIONAL }
+      !record_field { name: parameters   type: array_param_name_xxhash  state: OPTIONAL }
       !record_field { name: constructor  type: boolean  state: REQUIRED_DEFAULT  value: false }
-      !record_field { name: supertypes   type: { name: array  arguments: [ { name: @alias:type_name token } ] }  state: OPTIONAL }
-      !record_field { name: subtypes     type: { name: array  arguments: [ { name: @alias:type_name token } ] }  state: OPTIONAL }
+      !record_field { name: supertypes   type: array_type_name_xxhash  state: OPTIONAL }
+      !record_field { name: subtypes     type: array_type_name_xxhash  state: OPTIONAL }
       !record_field { name: disjoint     type: boolean  state: OPTIONAL }
       !record_field { name: body         type: top }
     ] }
@@ -537,5 +537,70 @@
     kind: PRODUCT
     source: map
     body: !map { key_type: @alias:type_name token  value_type: type_definition }
+  }
+
+  @doc:"""
+    Synthetic entries — the closed forms the sugar lifts to (CR D5: "every
+    sugar form lifts at desugar: a concrete form to a closed synthetic
+    entry"). Each is named by derivation from the form it came from rather
+    than declared, sources the constructor it builds, and is referenced by
+    the field that wrote the sugar. The trailing `xxhash` stands for a
+    content hash of the resolved binding record: identity is structural
+    (D6, "one entry per distinct concrete form schema-wide") and the
+    spelling of the hash is an implementation's own business, not a
+    conformance point.
+    """
+  array_type_name_xxhash => !type_definition {
+    kind: PRODUCT
+    source: array
+    body: !array { element_type: @alias:type_name token }
+  }
+
+  array_field_name_xxhash => !type_definition {
+    kind: PRODUCT
+    source: array
+    body: !array { element_type: @alias:field_name token }
+  }
+
+  array_param_name_xxhash => !type_definition {
+    kind: PRODUCT
+    source: array
+    body: !array { element_type: @alias:param_name token }
+  }
+
+  array_type_ref_xxhash => !type_definition {
+    kind: PRODUCT
+    source: array
+    body: !array { element_type: type_ref }
+  }
+
+  array_type_argument_xxhash => !type_definition {
+    kind: PRODUCT
+    source: array
+    body: !array { element_type: type_argument }
+  }
+
+  array_record_field_xxhash => !type_definition {
+    kind: PRODUCT
+    source: array
+    body: !array { element_type: record_field }
+  }
+
+  array_field_group_xxhash => !type_definition {
+    kind: PRODUCT
+    source: array
+    body: !array { element_type: field_group }
+  }
+
+  array_tuple_element_xxhash => !type_definition {
+    kind: PRODUCT
+    source: array
+    body: !array { element_type: tuple_element }
+  }
+
+  map_field_name_template_argument_xxhash => !type_definition {
+    kind: PRODUCT
+    source: map
+    body: !map { key_type: @alias:field_name token  value_type: template_argument }
   }
 }
