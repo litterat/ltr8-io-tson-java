@@ -168,7 +168,7 @@ class ContainerSugarEndToEndTest {
     /**
      * Every spelling of an array declaration agrees about the hierarchy: a bound is a constraint, not a
      * change of place. All of them close to a binding record headed by a constructor, and a constructor is not
-     * something a value can have as its type -- so none records a supertype ({@code spec/tson-rev33-changelog.md} #33/#45).
+     * something a value can have as its type -- so none records a supertype (§5.6: "no supertypes").
      */
     @Test
     void everySpellingOfAnArrayDeclarationRecordsNoSupertypes() {

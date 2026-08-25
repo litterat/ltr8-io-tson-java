@@ -105,8 +105,8 @@ class MapTreeReaderTest {
     }
 
     /**
-     * [TSON-DATA] §2.6 words a repeated key as a SHOULD-warn with "last value wins" as the recovery; this
-     * implementation reports it ({@code spec/tson-rev33-changelog.md} #41/#42) and applies the recovery anyway.
+     * [TSON-DATA] §2.6 makes a repeated key MUST NOT; this reports it and applies the last-value-wins
+     * recovery underneath anyway.
      */
     @Test
     void duplicateKeyIsAValidationError() {

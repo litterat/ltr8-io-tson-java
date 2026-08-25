@@ -37,7 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>{@code TupleTreeReader} and {@code MapTreeReader} got the same treatment as the other containers but
  * have no fixture here -- no test in this repo builds a tuple from a schema, and a map-typed field does not
- * link yet ({@code BACKLOG.md}, {@code spec/tson-rev33-changelog.md} #28).
+ * link yet ({@code BACKLOG.md}).
  */
 class SchemaDrivenTreeAnnotationTest {
 

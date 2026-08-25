@@ -174,7 +174,7 @@ class SchemaResolverDiagnosticsTest {
 
     /**
      * Both sugar forms the desugar phase can reject, in one schema, alongside a good declaration. Neither is
-     * a consequence of the other: a vacuous floor of zero ({@code spec/tson-rev33-changelog.md} #42) and a size range no
+     * a consequence of the other: a vacuous floor of zero (§5.3's resolver error) and a size range no
      * array can satisfy (§5.3's {@code min_items <= max_items}, deferred to the materialising application by
      * §8.2). Before this, the first of them aborted the run.
      *

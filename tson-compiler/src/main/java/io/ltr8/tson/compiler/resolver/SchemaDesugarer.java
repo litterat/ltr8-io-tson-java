@@ -679,9 +679,9 @@ final class SchemaDesugarer {
      * and maps alike, since both constructors declare the same two fields. An exact {@code N} pins both, so
      * {@code [T; 3]} and {@code [T; 3..3]} land on the very same entry.
      *
-     * <p><b>A zero floor is rejected</b> rather than desugared. §5.3 calls it vacuous and asks the resolver to
-     * warn while desugaring it anyway; rejecting the spelling is {@code spec/tson-rev33-changelog.md} #42's position, and
-     * here the warning would be guarding more than a style nit -- identity is structural (§8.2), so the form
+     * <p><b>A zero floor is rejected</b> rather than desugared, which is §5.3's own rule: "a lower bound of
+     * {@code 0} with no upper bound ({@code 0..}) is a resolver error". More than a style nit --
+     * identity is structural (§8.2), so the form
      * lands on an entry <em>distinct from</em> the unbounded one that means exactly the same thing. That is an
      * identity trap, and the author's fix is the one §5.3 itself names. Only a literal {@code 0} is caught: a
      * bound naming a value parameter is not concrete until materialisation.

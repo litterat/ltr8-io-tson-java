@@ -378,8 +378,8 @@ class TsonSchemaParserTest {
      * {@code {text? => integer}} is rejected, but as a <b>record</b>: {@code text} followed by anything that
      * is not {@code =>} or {@code <} commits the brace to a record body, and the {@code ?} is then a field
      * name missing its {@code :}. Pinned because it is the one place the dispatch's answer and the author's
-     * intent visibly diverge, and closing it would cost a third token of lookahead ({@code SPEC-FEEDBACK.md}
-     * #52).
+     * intent visibly diverge, and closing it would cost a third token of lookahead -- more than §12.2's
+     * stated budget of one consumed token plus one of lookahead.
      */
     @Test
     void aQuestionMarkOnAPlainMapKeyIsAnsweredByTheBraceDispatch() {

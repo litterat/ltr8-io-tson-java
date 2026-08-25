@@ -160,7 +160,7 @@ class ApplicationInContainerPositionTest {
      * §8's own spelling pins {@code 1..} on the recursive position <em>and</em> leaves the field REQUIRED, so
      * every node needs a child and nothing can ever be a {@code tree}. The {@code ?} the fixtures above carry
      * is the whole difference -- and it is the schema that is rejected now, not the document
-     * ({@code spec/tson-rev33-changelog.md} #25).
+     * (§5.10.1's productivity rule).
      */
     @Test
     void theSpecsOwnTreeSpellingIsRejectedAsUninhabited() {

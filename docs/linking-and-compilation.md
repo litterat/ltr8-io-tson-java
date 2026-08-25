@@ -26,8 +26,8 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   the reason `TsonContentHash` is — a consumer plausibly has their own `CanonicalIdentity`.
 - **`TsonSchemaLinker.link(schema, loader)`** is the pass-2 engine returning a `TsonLinkedSchema` (a thin
   wrapper that is a compile-time proof linking ran): (1) **merge `!!import`s** — each import's *whole
-  namespace* copied in as-is (transitive, its own imports included — a deliberate divergence from §2.2.3's
-  "imports are shallow", argued in `spec/tson-rev33-changelog.md` #55), keeping their home namespace, and **each merged
+  namespace* copied in as-is (transitive, its own imports included — §2.2.3: "an `!!import` contributes the
+  imported schema's entire namespace"), keeping their home namespace, and **each merged
   entry's origin recorded** (`TsonLinkedSchema.entryOrigins`, name → the canonical identity of the schema
   that *declared* it, taken from the import's own `originOf` so an entry two hops away keeps its author
   rather than the intermediary). **Collisions are decided by that origin, not by name occurrence**: one
@@ -47,7 +47,8 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   entry describing something other than a data value has no way to say "declare me, but let nothing name me
   as a type"; the `Data` body *is* that way, and the check applies at every position a type-ref occupies (a
   field type, a choice variant, an array element, a map value). Without it the misuse resolves, links **and**
-  compiles, and fails only when a document is finally read against it (`spec/tson-rev33-changelog.md` #57). A DATA
+  compiles, and fails only when a document is finally read against it (§4.1 makes naming one where a type is
+  expected a resolver error). A DATA
   entry's own references are validated too, and it is the body that says which they are — see the `Data`
   note under compilation below;
   **a choice's variants are checked distinct** (§5.4) *after* §8.3 flattening, since an alias and its target
@@ -55,12 +56,12 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   would miss and which is the only spelling an author can't see for themselves; the walk stops on a
   reference cycle rather than hanging, and an alias cycle is then caught by the inhabitance check below; **an author's
   `@disjoint` marker is checked against the derived fact** (§5.4) — `true` verifies it silently, `false` is
-  an error, and there is no third outcome because the derivation is total (`spec/tson-rev33-changelog.md` #47, which
-  resolves #42's "pin the decision procedure" case: §5.4's warn-on-unprovable can never arise, and there is
-  no severity axis and none coming). The marker is read from both places §6 puts it,
+  an error, and there is no third outcome because §5.4's derivation is total. There is no unprovable state
+  to warn about, and no severity axis to warn on: §8.1 states that a conforming processor has one.
+  The marker is read from both places §6 puts it,
   the definition and the map key, which is why the check runs last, after `withNameAnnotations`;
   and a **constructor-eligibility** check with two halves, the same §2.2.2 question asked from both ends
-  (see `spec/tson-rev33-changelog.md` #19): a locally-declared `constructor: true` entry is valid only if the schema's
+  (§2.2.2, §4.2): a locally-declared `constructor: true` entry is valid only if the schema's
   `!!meta` is exactly meta-kernel's identity, and a schema named as this one's **`!!meta` target** is valid
   only if *its* `!!meta` is — so an ordinary type library can't govern (naming core.tn as `!!meta` is the
   `!!import` confusion, and core.tn declares no constructors to supply). The target half is judged only when
@@ -175,18 +176,16 @@ sit at the schema layer because that is the only layer able to name request and 
   its arguments. **Shared vocabulary goes in a third ordinary schema**, `!!import`ed by whoever needs it,
   including the meta layer itself if it needs it too. Nor is `!!import`ing the meta layer a way round it: a
   layer chaining to meta-kernel imports meta.tn, which imports meta-kernel, and imports are transitive here
-  (`spec/tson-rev33-changelog.md` #55), so meta-kernel's `void` arrives alongside core.tn's and collides — correctly, and
+  (§2.2.3), so meta-kernel's `void` arrives alongside core.tn's and collides — correctly, and
   with a diagnostic naming both origins. The constraint is real and worth stating; what is not acceptable is
   discovering it through a message about the wrong thing, which is what the `source` fallback's
   argument-bearing case above used to give.
 
-**The amendment landed upstream.** `data` and `DATA` were this project's own addition to meta-kernel for
-one revision; published Revision 33 declares both, so `spec/m/` is a plain cache of the spec again and the
-experiment is over. `spec/tson-rev33-changelog.md` #57 is the argument that produced them. What still differs is the
-hash pins: the published drafts spell them `xxhash` and compute real digests at publication, so these copies
-carry digests over their own bytes and `TsonBundledSchemas` holds those rather than tson.io's.
+**`spec/m/` is a cache of the spec, with one difference: the hash pins.** The published drafts spell them
+`xxhash` and compute real digests at publication, so these copies carry digests over their own bytes and
+`TsonBundledSchemas` holds those rather than tson.io's.
 
-## The inhabitance check (`TypeInhabitance`, §3.4.1, `spec/tson-rev33-changelog.md` #25)
+## The inhabitance check (`TypeInhabitance`, §3.4.1, §5.10.1's productivity rule)
 
 **An entry no finite document can satisfy is rejected.** `x => { y: y }` with `y => { x: x }` resolves and
 links cleanly otherwise, and fails at the first document as `missing required field 'x'` — blaming the data
@@ -226,9 +225,8 @@ for a defect in the schema, at a line the data's author does not control.
 
 `ChoiceDisjointness.derive` decides §5.4's question for a choice **totally and two-valued**: `disjoint` is
 `true` exactly when every variant has a *discrimination class* and no class appears twice, `false`
-otherwise — never absent. This is a deliberate departure from §5.4's written value-set derivation (bound
-intervals, MAY-prove record and pattern cases, "MUST leave absent when it cannot"), recorded as
-`spec/tson-rev33-changelog.md` #47: the question the fact exists to answer is not "do the value sets intersect" but
+otherwise — never absent, and §5.4 asks for exactly this: "a resolver MUST record exactly this — it MUST
+NOT prove more ... or less". The question the fact exists to answer is not "do the value sets intersect" but
 "can an encoding's single form-resolution pass tell the variants apart", and *that* is a total function of
 the declarations. A value-set prover (interval algebra, exact I-Regexp intersection-emptiness, record
 closure) was built and discarded during PR #36's review: it answered questions no conforming reader may
@@ -248,12 +246,12 @@ discrimination the wire can't deliver) and `bracket` (arrays and tuples). A vari
 choice, an extern, an unresolved name — makes the choice `false`, the conservative side. A `void` variant
 never even gets that far: the linker rejects the declaration outright (`checkVariantsAreNotVoid`, after
 §8.3 flattening) — `(T | void)` confuses optionality with choice, which belongs to the position (`?`, `_`),
-per `spec/tson-rev33-changelog.md` #48.
+per §5.4's "a variant MUST NOT resolve to `void`", judged after §8.3 flattening as it is here.
 
 **`disjoint` ⇔ the tag is droppable — one fact, not two.** `ChoiceReader.untaggedRecovery` builds its
 `class → variant` dispatch map through the same `DiscriminationClass.of` the derivation classifies with,
-so the derived fact and the reader's separability can never disagree (`spec/tson-rev33-changelog.md` #23's two
-carefully-held-apart facts collapse into one). Recovery still engages only when every class is *scalar* —
+so the derived fact and the reader's separability can never disagree — one fact, not a derivation and a
+dispatch rule held carefully in step. Recovery still engages only when every class is *scalar* —
 a `brace`/`bracket` variant is honestly disjoint from a scalar, but recovery dispatches on a token's
 resolved class and structural recovery from an opening delimiter isn't attempted yet. **The class table is
 pinned twice over**: it decides which schemas load (`@disjoint` on a `false` choice is an error) and which

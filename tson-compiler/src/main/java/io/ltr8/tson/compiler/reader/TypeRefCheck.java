@@ -31,8 +31,8 @@ import io.ltr8.tson.compiler.stream.TsonEvent;
  * and {@code TsonDataParser} keep every name they see. What a reader actively type-checking a value does with
  * a marker it cannot link to anything is the layer above, where a typo like {@code !Uuid} (case-sensitive per
  * §5.1, so not {@code !uuid}) silently disabling the validation its author intended is the worse failure. Both
- * schemaless readers therefore report by default and offer preservation as an opt-in -- see {@code
- * spec/tson-rev33-changelog.md} #7, whose suggested resolution this is.
+ * schemaless readers therefore report by default and offer preservation as an opt-in; §7.1's
+ * "informational" is the floor this sits above.
  */
 final class TypeRefCheck {
 

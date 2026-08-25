@@ -476,9 +476,8 @@ class ConformanceSuiteTest {
      * value-based {@code equals} in Java). On an {@code error} vector, {@code category} is
      * additionally checked against which of {@link
      * AtomParseException}/{@link AtomValidationException} was actually thrown, per this
-     * implementation's own interpretation of the §5.2/§8.1 categorization question the test suite's
-     * own README flags as unsettled (see spec/tson-rev33-changelog.md #8): parse-shape failures as {@code
-     * resolver}, range/constraint failures as {@code validation}.
+     * §5.2/§8.1's own split, which the test suite's README still flags as unsettled: a token the atom's
+     * grammar rejects is a resolver error, a parsed value violating its range a validation error.
      */
     private static void checkVocabularyVector(String bucket, Path subject, RecordValue sidecar) throws IOException {
         String outcome = fieldText(sidecar, "outcome");

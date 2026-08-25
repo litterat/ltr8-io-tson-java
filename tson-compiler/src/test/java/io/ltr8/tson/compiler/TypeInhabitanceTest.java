@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * §3.4.1 / {@code spec/tson-rev33-changelog.md} #25: a type no finite document can satisfy is rejected where it is
+ * §3.4.1 / §5.10.1's productivity rule: a type no finite document can satisfy is rejected where it is
  * written, not at the first document that tries to be one.
  *
  * <p>The rule is a least fixed point over the entry graph ({@link TypeInhabitance}), so what these fixtures

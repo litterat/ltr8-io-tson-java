@@ -12,25 +12,12 @@ revision closes.** It is an input to the next revision's adjudication, so its nu
 that revision's change log will answer against — a stable index of the open set, not an archive of
 everything ever raised.
 
-The four entries below are what Revision 33 leaves open, renumbered from the 59 raised against Revision 32.
-`spec/tson-rev33-changelog.md` §2 records a disposition for all 59 under *their* numbers, and that table is
-where a Revision 32 number resolves. **The two numbering schemes overlap and mean different things** — old
-#1 was multi-line trailing whitespace, this #1 is `!duration` and `PnW` — so a citation must name the
-document it belongs to: `spec/tson-rev33-changelog.md #N` for anything raised against Revision 32,
-`SPEC-FEEDBACK.md #N` only for the open set below. Citations across `docs/` and the Javadoc are kept on that
-rule as the register changes.
-
-| Was | Is | |
-|---|---|---|
-| #12 | **#1** | `!duration` and `PnW` — deliberately carried |
-| #26 | **#2** | the hash pin in the URI query — deliberately carried |
-| #34 | **#3** | §9.4 and UTS #39 — deliberately carried |
-| #54 | **#4** | a type argument's literal — deliberately carried |
-
-Two more stood here briefly: the review of Revision 33 found #15 (`field-modifier` overstated) and #42 (no
-warning severity) accepted in the change log but not fully executed in the text, and both were corrected on
-the spot — see the change log's *Post-review corrections*. What is left is only what Revision 33 chose to
-carry.
+The four below are what Revision 33 leaves open, renumbered from #1; the 55 raised against Revision 32 that
+it resolved are gone from here, because the spec now carries their rules and that is where the answer
+belongs. **Cite the spec, not the argument that got it there:** `docs/` and the Javadoc name the section
+that requires a behaviour, and a `SPEC-FEEDBACK.md #N` citation is for an entry below, where there is no
+section to point at yet. When an entry closes, its citations become spec citations and the entry is deleted
+— nothing here is an archive.
 
 ---
 

@@ -75,24 +75,24 @@ no simple shape to shim in front of `URI`'s constructor the way a four-group hex
 and writing an RFC 3986 validator from scratch isn't worth it at this stage, so `java.net.URI`'s behavior
 is accepted as `!uri`'s actual contract for now. See `UriParser`'s Javadoc.
 
-**Two deliberate departures from the published vocabulary, both toward core.tn.** §5.6's table lists four
-integer atoms where core.tn defines the full `int8`..`int256`/`uint8`..`uint256` ladder plus four bound-only
-refinements, and §5.5's table omits `email` while listing every one of its "Network Types" siblings. Both
-are seeded here as core.tn defines them, on §5.1's own invitation to treat the core library as the
-vocabulary's source of truth. See `spec/tson-rev33-changelog.md` #6 and #5.
+**The vocabulary is the published one.** §5.6 lists the full `int8`..`int256`/`uint8`..`uint256` ladder plus
+the four bound-only refinements, and §5.5 carries `!email` beside its "Network Types" siblings, so what is
+seeded here matches both the tables and core.tn — the two read paths agree by construction rather than by
+this implementation choosing core.tn over a shorter table.
 
 **`!email` implements a subset of RFC 5322, not the whole grammar.** `email_type`'s `spec` is
 `REQUIRED_FIXED` to RFC 5322, but `EmailParser` accepts only the `dot-atom "@" dot-atom` core; quoted local
 parts (`"a b"@example.com`), domain literals (`user@[192.0.2.1]`) and embedded comments are rejected though
 the RFC admits them. Accepting them would admit spaces, brackets and parentheses into a scalar consumers
-treat as a token. The same kind of call as the `!uri` gap above, and pinned by `EmailParserTest` so it stays
-a decision. See `spec/tson-rev33-changelog.md` #5 and #22.
+treat as a token — and §5.5 scopes the pin to exactly that core, so this is the contract rather than a
+narrowing of it. Pinned by `EmailParserTest`.
 
 **`RegexParser` is a real RFC 9485 (I-Regexp) validator, not `java.util.regex`.** The `tson-regex` module
 parses I-Regexp to its own AST and matches with a Thompson-NFA/Pike-VM — linear-time, so ReDoS-safe — which
 means this implementation defines I-Regexp behaviour rather than inheriting the JVM's Perl-derived superset.
-`TextParser`/`UriParser` match their `pattern` constraint through the same engine. See `RegexParser`'s
-Javadoc and `spec/tson-rev33-changelog.md` #22.
+`TextParser`/`UriParser` match their `pattern` constraint through the same engine. [TSON-SCHEMA] §9 makes
+the pin a strict gate and requires an implementation to document any divergence it cannot avoid; the
+divergences here are not yet written down (`BACKLOG.md`). See `RegexParser`'s Javadoc.
 
 **One open question.** Whether `!duration` accepts ISO 8601's alternative `PnW` week form is genuinely
 ambiguous — §5.4's table shows only `PnYnMnDTnHnMnS`. This implementation rejects `PnW` as the more

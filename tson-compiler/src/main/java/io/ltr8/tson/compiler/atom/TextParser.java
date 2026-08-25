@@ -13,9 +13,10 @@ import java.util.Optional;
  * rather than duplicating its constraint checks). Holds a {@link TextType} -- the pure constraint
  * values, unchanged by this split -- rather than declaring those fields itself.
  *
- * <p>Not part of Part 1's published built-in vocabulary (§5) -- see {@code spec/tson-rev33-changelog.md} #9 --
- * so unlike every other {@code AtomType} in this package, {@code TextParser} is never registered in
- * {@link BuiltinTypeVocabulary} and has no {@code TYPENAME} constant. It exists purely as groundwork
+ * <p><b>Not registered in {@link BuiltinTypeVocabulary} yet, though §5 now requires it.</b> {@code !text} is
+ * Part 1's unconstrained text atom -- every token accepted, the host value the token's text -- so the
+ * schemaless path should resolve it here; it does not, and this class has no {@code TYPENAME} constant to
+ * register with ({@code BACKLOG.md}). It serves meanwhile as groundwork
  * for Part 2's schema layer, which will resolve {@code text_type}/{@code text} through actual schema
  * machinery rather than a fixed §5 name table.
  */

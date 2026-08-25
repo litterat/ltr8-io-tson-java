@@ -27,8 +27,8 @@ tokens, modes, or character-classification changes).
     U+FFFD substitution: a replacing decoder makes the same broken byte an error outside a quoted token and
     silent content inside one, and for a format whose identity can be a hash of its bytes, substituting
     bytes is the wrong default. Overlong forms, encoded surrogates and values above U+10FFFF are refused
-    too — two spellings of one character is §9.4's confusability problem one layer down. The spec does not
-    say (`spec/tson-rev33-changelog.md` #59); this is the choice made and why.
+    too — two spellings of one character is §9.4's confusability problem one layer down. §7.1 requires
+    exactly this: a decoder MUST NOT substitute U+FFFD and continue.
   - Blocks are also what keeps reading cheap: a byte (or character) at a time costs a call and, through a
     `Reader`, an allocation per character — 47% of everything a bind read allocated, proportional to the
     document rather than fixed. The block is deliberately modest, because it is throughput and not a
@@ -104,7 +104,7 @@ Key points:
   Class 1 processor; a schema document isn't malformed input, it's a well-formed document of a kind this
   parser doesn't implement, and §8.1 requires that distinction be visible (a categorized diagnostic).
 - **Nested annotation value-scope is right-recursive** and can legitimately leave an outer data-value
-  without a core-value (`@a:@b:val`) — see `spec/tson-rev33-changelog.md` #3; documented as intentional, not a bug.
+  without a core-value (`@a:@b:val`) — §3.1's own worked example says so; intentional, not a bug.
 
 ## Base type resolution (`tson-compiler/.../base/`)
 
@@ -170,7 +170,8 @@ fixed, closed name→`AtomType` table (§5).
 - **`unit`'s three instances are three separate parsers**, not one: `value` (runs base-type resolution to
   the natural host), `token` (raw NFC-normalized token text, unconstrained), `void` (`VoidReader`, accepts
   only the absent sentinel `_`). They resolve to the byte-identical `Unit` body — nothing in the *schema*
-  distinguishes them — so dispatch is keyed on the declaration's own name (see `spec/tson-rev33-changelog.md` #18).
+  distinguishes them — so dispatch is keyed on the declaration's own name, which [TSON-SCHEMA] §4.2
+  requires ("implementations MUST dispatch `value`, `token`, and `void` by their declared names").
 - **The network family reuses one grammar per address form, never a second copy.** `Ipv6Parser` parses
   RFC 4291 §2.2's embedded IPv4 tail through `Ipv4Parser`'s own strict `dec-octet` pattern, and
   `Cidr4Parser`/`Cidr6Parser` parse the address half of a network through those two — so the leniency gap
@@ -181,5 +182,4 @@ fixed, closed name→`AtomType` table (§5).
   being a materially bigger piece of work than a scalar bound. Their host type is `String` — the authored
   text, validated and handed back — for `MacParser`'s reason: Java has no type to map onto, and the
   round trip stays exact.
-- The full `int8`..`int256` width ladder is seeded, versus the four §5.6 explicitly lists — a known
-  departure tracked in `SPEC-FEEDBACK.md`.
+- The full `int8`..`int256` width ladder is seeded, which is what §5.6's table lists.

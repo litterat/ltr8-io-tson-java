@@ -160,10 +160,10 @@ public final class SchemalessTreeReader {
 
     /**
      * A field name stated twice is reported ({@code DUPLICATE_FIELD}, §2.5) and its value still overwrites
-     * the earlier one -- §2.5's "last value wins" recovery, which the {@code LinkedHashMap} applies anyway.
-     * The rule is Part 1's and needs no schema to see, so it holds on this path exactly as it does under a
-     * compiled one; a document whose verdict changed depending on whether a schema was in scope would be
-     * the interoperability failure {@code spec/tson-rev33-changelog.md} #41/#42 is arguing against.
+     * the earlier one -- the last-value-wins recovery, which the {@code LinkedHashMap} applies anyway.
+     * §2.5's MUST NOT is Part 1's and needs no schema to see, so it holds on this path exactly as it does
+     * under a compiled one; a document whose verdict changed depending on whether a schema was in scope
+     * would be an interoperability failure the rule exists to prevent.
      */
     private TsonRecord readRecord(TsonReadContext ctx, Optional<String> typeRef, List<TsonAnnotation> annotations) {
         ctx.next(); // RecordStart
@@ -267,13 +267,11 @@ public final class SchemalessTreeReader {
      * {@code @doc} is in neither. Comparing whole {@link TsonValue} nodes instead would read {@code !text
      * a} and {@code a} as two keys, which §2.6 says they are not.
      *
-     * <p>Equating on the <em>decoded</em> value rather than the source text is a deliberate divergence in
-     * the other direction, and the one place this reader is stricter than §2.6: {@code 0xFF} and {@code
-     * 255} are textually distinct and land on one identity here. {@code spec/tson-rev33-changelog.md} #43 makes the
-     * argument and asks the spec to name the layer -- §2.6 defines textual identity for the parser and
-     * [TSON-SCHEMA] §7.7 typed identity for a schema-governed resolver, leaving a Class 1 <em>reader</em>,
-     * which has run §4 base resolution but has no declared types, between the two with nothing said about
-     * it.
+     * <p>Equating on the <em>decoded</em> value rather than the source text is what §2.6 asks of a reader
+     * that decodes: textual identity is the parser's minimum, "a processor that decodes values compares
+     * decoded values" is the layer above it, and a declared key type ([TSON-SCHEMA] §7.7) may only make
+     * more keys equal still. So {@code 0xFF} and {@code 255} are textually distinct and one key here, which
+     * is also what the host {@code Map} would have done with them.
      */
     private static Object keyIdentity(TsonValue key) {
         return switch (key) {

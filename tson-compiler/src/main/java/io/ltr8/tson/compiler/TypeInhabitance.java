@@ -23,7 +23,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Which entries some finite document can satisfy (Part 2 §3.4.1, §5.9, {@code spec/tson-rev33-changelog.md} #25). A type
+ * Which entries some finite document can satisfy (Part 2 §3.4.1, §5.9, §5.10.1's productivity rule). A type
  * can be perfectly well-formed -- every reference resolving, every constraint coherent -- and still have no
  * value at all, because its recursion never reaches a base case:
  *

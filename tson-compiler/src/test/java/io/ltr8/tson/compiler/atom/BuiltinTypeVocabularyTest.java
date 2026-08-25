@@ -11,15 +11,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BuiltinTypeVocabularyTest {
 
-    // §5.6 as published: only these four widths. See spec/tson-rev33-changelog.md #6 for the rest.
+    // The four widths §5.6's table has always carried; the rest of the ladder is below.
     @ParameterizedTest
     @ValueSource(strings = {"int32", "int64", "uint32", "uint64"})
     void publishedFixedWidthIntegersAreRegistered(String name) {
         assertTrue(BuiltinTypeVocabulary.lookup(name).isPresent());
     }
 
-    // core.tn1's full width ladder, extended per spec/tson-rev33-changelog.md #6 (confirmed oversight, not
-    // deliberate scoping).
+    // The rest of §5.6's ladder, which core.tn defines from the same constructor.
     @ParameterizedTest
     @ValueSource(strings = {
             "int8", "int16", "int32", "int64", "int128", "int256",
@@ -100,20 +99,22 @@ class BuiltinTypeVocabularyTest {
     }
 
     /**
-     * {@code email} is registered although §5.5's table has no row for it -- a known departure, like the
-     * integer width ladder. core.tn groups it with {@code uuid}/{@code ipv4}/{@code mac} identically, and a
-     * real parser exists, so withholding it would only make the schemaless and schema-driven paths disagree
-     * about what {@code !email} means. See {@code spec/tson-rev33-changelog.md} #5.
+     * {@code email} is a §5.5 built-in beside {@code uuid}/{@code ipv4}/{@code mac}, with the same shape
+     * core.tn gives it, so the schemaless and schema-driven paths agree about what {@code !email} means.
      */
     @org.junit.jupiter.api.Test
-    void emailAtomIsRegisteredDespiteNotBeingInTheTable() {
+    void emailAtomIsRegistered() {
         assertTrue(BuiltinTypeVocabulary.lookup("email").isPresent());
     }
 
+    /**
+     * <b>Pins a known gap, not a decision.</b> §5 carries {@code !text} as the unconstrained text atom, so
+     * this vocabulary should resolve it and does not -- {@code TextParser} exists but has no {@code
+     * TYPENAME} and is never registered ({@code BACKLOG.md}). The assertion is here so closing the gap
+     * fails loudly rather than silently, and it should be inverted when it is closed.
+     */
     @org.junit.jupiter.api.Test
-    void textIsDeliberatelyNotRegistered() {
-        // text_type exists in meta-kernel.tn1 but !text never appears in §5's published table --
-        // see spec/tson-rev33-changelog.md #9.
+    void textIsNotRegisteredYetAlthoughSection5NowCarriesIt() {
         assertFalse(BuiltinTypeVocabulary.lookup("text").isPresent());
     }
 

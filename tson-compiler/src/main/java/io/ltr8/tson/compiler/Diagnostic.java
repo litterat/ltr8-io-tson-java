@@ -245,11 +245,10 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      * <p>{@code DUPLICATE_MAP_KEY} and {@code DUPLICATE_FIELD} are the same mistake at the two container
      * shapes TSON keeps apart -- a key stated twice in one map ([TSON-DATA] §2.6), a field name stated
      * twice in one record (§2.5) -- and they stay two codes because the constructs are two, exactly as
-     * {@code UNRECOGNIZED_FIELD} is record-specific. Both spec rules are written as a SHOULD-warn with a
-     * defined recovery ("last value wins"); this implementation reports them as ordinary errors, which is
-     * {@code spec/tson-rev33-changelog.md} #41/#42's position: a warning presumes a human reader exercising judgment,
-     * and the format's target consumer is a generate-validate-retry loop with exactly two behaviors, so a
-     * severity axis would be machinery neither this type nor the format needs.
+     * {@code UNRECOGNIZED_FIELD} is record-specific. Both are MUST NOT, reported at the repeated occurrence,
+     * with last-value-wins surviving only as the recovery underneath. There is no severity component here
+     * and none is coming: §8.1 states that a conforming processor has one severity and that nothing
+     * normative is satisfied, relaxed, or deferred by an advisory notice.
      *
      * <p>Every {@link io.ltr8.tson.compiler.atom.AtomTypeException} maps to the single {@code
      * ATOM_CONSTRAINT_VIOLATION} code, since {@code AtomValidationException} itself doesn't yet carry a

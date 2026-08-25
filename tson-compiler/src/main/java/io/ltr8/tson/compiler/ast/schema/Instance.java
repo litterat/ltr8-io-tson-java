@@ -3,12 +3,11 @@ package io.ltr8.tson.compiler.ast.schema;
 import io.ltr8.tson.compiler.ast.DataValue;
 
 /**
- * {@code instance = "!" type-name ws core-value} (Part 2 §12.1, §5.5, corrected -- the spec's own
- * literal grammar says {@code data-value}, i.e. {@code *annotation [type-ref] core-value}
- * [TSON-DATA] §2.3, which would let a constructor-application payload carry its own further
- * annotations and a second, competing type-ref; see {@code SPEC-FEEDBACK.md} for the full writeup)
- * -- constructor application: produces a fresh atom-family instance filled with {@code value}'s
- * own core-value.
+ * {@code instance = "!" type-name ws core-value} (Part 2 §12.1, §5.5) -- constructor application:
+ * produces a fresh atom-family instance filled with {@code value}'s own core-value. The payload is
+ * deliberately narrower than a {@code data-value} ({@code *annotation [type-ref] core-value},
+ * [TSON-DATA] §2.3), which would let it carry its own further annotations and a second, competing
+ * type-ref; §12.1 states that no production of the schema grammar takes the full {@code data-value}.
  *
  * <p>No separate {@code target} field -- {@link DataValue} already has exactly the right shape to
  * carry the constructor name: its own {@code typeRef}, an {@code Optional<String>}. {@link #target()}

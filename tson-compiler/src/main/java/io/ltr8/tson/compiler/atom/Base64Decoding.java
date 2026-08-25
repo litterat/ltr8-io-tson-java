@@ -9,11 +9,10 @@ import java.util.Base64;
  *
  * <p>{@link Base64.Decoder} accepts missing padding outright -- {@code "TWE"} decodes identically
  * to the correctly-padded {@code "TWE="} (confirmed empirically before writing this). RFC 4648 §3.2:
- * "Implementations MUST include appropriate pad characters at the end of encoded data unless the
- * specification referring to this document explicitly states otherwise" -- §5.3 doesn't state
- * otherwise, so padding is treated as required here: {@link #decode} rejects any input whose length
- * isn't a multiple of 4 before ever reaching the JDK decoder, which alone wouldn't catch this. See
- * {@code spec/tson-rev33-changelog.md} #10 for why this needed a judgment call at all.
+ * §5.3 requires it -- "Padding is REQUIRED for the padded encodings ... a token whose length is not a
+ * multiple of the scheme's quantum is a resolver error", and "implementations MUST NOT accept unpadded input
+ * merely because a host library tolerates it". {@link #decode} rejects any input whose length isn't a
+ * multiple of 4 before ever reaching the JDK decoder, which alone wouldn't catch this.
  *
  * <p>Not similarly strict about non-canonical trailing padding bits ({@code "TR=="}, whose last
  * character's low bits should be zero and aren't, per RFC 4648 §3.5) -- that section says decoders

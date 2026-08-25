@@ -245,7 +245,7 @@ class RecordTreeReaderTest {
      * injection rule names REQUIRED_DEFAULT and REQUIRED_FIXED and <em>not</em> OPTIONAL_FIXED, so an
      * omitted OPTIONAL_FIXED field stays absent instead of materialising a value the document never wrote.
      * Reading it as injected made the two states indistinguishable and the {@code ?} decide nothing
-     * ({@code spec/tson-rev33-changelog.md} #39 asks the spec to say this outright).
+     * (§5.2 says it outright: OPTIONAL and OPTIONAL_FIXED fields are never injected).
      */
     @Test
     void optionalFixedFieldStaysAbsentWhenOmittedButIsPresentWhenWritten() {
@@ -295,9 +295,9 @@ class RecordTreeReaderTest {
     }
 
     /**
-     * Omission and a written {@code _} are two different documents at a REQUIRED_DEFAULT field. §5.2 asks
-     * the decoder to warn and inject for the second; {@code spec/tson-rev33-changelog.md} #42 calls that its strongest
-     * case for an error, since warn-and-inject answers "here is a value" to a document that said "absent".
+     * Omission and a written {@code _} are two different documents at a REQUIRED_DEFAULT field. §5.2 makes
+     * an explicit {@code _} at any REQUIRED-family field a validation error, omission remaining the
+     * injection route -- injecting silently would answer "here is a value" to a document that said "absent".
      * The default is still what the field decodes to -- only the verdict changes.
      */
     @Test

@@ -479,7 +479,7 @@ class TsonDataParserTest {
     void nestedAnnotationValueScopeSpecExample() {
         // Spec §3.1: "In `@a:@b:val target`, `@a`'s value is the data-value `@b:val target`: the
         // core value `target`, annotated by `@b`, whose own value is `val`." Traced by hand
-        // (see spec/tson-rev33-changelog.md #3): `@a:@b:val target` alone can't be a complete data-value --
+        // (§3.1 states it): `@a:@b:val target` alone can't be a complete data-value --
         // it needs one more trailing token for the outermost core-value. This is that smallest
         // valid extension.
         DataValue v = root("@a:@b:val target extra");
@@ -495,8 +495,7 @@ class TsonDataParserTest {
 
     @Test
     void nestedAnnotationValueScopeAloneIsIncomplete() {
-        // See spec/tson-rev33-changelog.md #3: the spec's example as literally written has no core-value at
-        // the outermost level once @a's nested value consumes everything.
+        // §3.1: once @a's nested value consumes everything, the outermost level has no core-value.
         assertThrows(TsonParseException.class, () -> parse("@a:@b:val target"));
     }
 

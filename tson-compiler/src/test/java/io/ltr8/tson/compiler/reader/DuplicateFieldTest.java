@@ -28,12 +28,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * A record field named twice is a validation error ({@code DUPLICATE_FIELD}) -- [TSON-DATA] §2.5's
- * SHOULD-warn taken as an error, per {@code spec/tson-rev33-changelog.md} #41/#42 -- and the "last value wins"
+ * MUST NOT, reported at the repeated occurrence -- and the last-value-wins
  * recovery still runs underneath it, because {@link RecordAbstractReader} reads forward in one pass and
  * has no way to skip an occurrence it cannot yet know is shadowed.
  *
- * <p>That is also what settles {@code spec/tson-rev33-changelog.md} #21: every occurrence is decoded, so a shadowed
- * one's own problems are reported alongside the duplication itself rather than going unvalidated.
+ * <p>It also settles what a shadowed occurrence is worth: every occurrence is decoded, so its own problems
+ * are reported alongside the duplication itself rather than going unvalidated.
  */
 class DuplicateFieldTest {
 

@@ -13,9 +13,10 @@ import io.ltr8.tson.compiler.ast.TokenValue;
  * <p><b>{@code unit}'s own kernel doc is explicit that its instances -- {@code value}, {@code
  * token}, {@code void} -- are "distinguished by name and prose-level parsing contract, not by
  * schema shape"</b>: all three resolve to the identical empty body, so nothing in the resolved
- * schema itself can tell them apart. This class implements *only* {@code token}'s own contract now
- * (previously named {@code UnitParser} and shared, incorrectly, across all three -- see {@code
- * SPEC-FEEDBACK.md}). {@code value} routes through {@link io.ltr8.tson.compiler.base.BaseTypeResolver}
+ * schema itself can tell them apart, which is why [TSON-SCHEMA] §4.2 requires an implementation to
+ * dispatch {@code value}, {@code token} and {@code void} by their declared names. This class implements
+ * *only* {@code token}'s own contract.
+ * {@code value} routes through {@link io.ltr8.tson.compiler.base.BaseTypeResolver}
  * instead ({@link ValueParser}), and {@code void} accepts only the absent sentinel {@code _}, not a
  * token at all -- see {@code io.ltr8.tson.compiler.reader.VoidReader}, since that
  * contract doesn't fit {@link AtomType}'s {@code read(TokenValue)} shape in the first place.

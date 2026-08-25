@@ -16,14 +16,16 @@ materialization, no validation (those are the resolver's/linker's jobs).
 - **`SchemaMap.declarations` is a `Map<String, Declaration>`** (a `LinkedHashMap`, insertion order
   preserved) — §3.4.1's Pass 1 shape and the schema's own `{type_name => type_definition}`. A duplicate
   name overwrites, same "grammar layer doesn't dedupe" treatment the data grammar gives duplicate fields.
-- **Three spec defects implemented per intent, not per letter** (each with an AST reshape and a
-  `SPEC-FEEDBACK.md` entry): `instance`'s ABNF says `data-value` but the intended production is the
-  narrower `core-value` (#16 — `Instance` wraps a `DataValue` with `typeRef` pre-set, no separate
-  `target`); `construction-def`'s ABNF doesn't admit the implicit `&` before its trailing `record-def`
-  (#14); `field-modifier`'s value is a bare token or the absent sentinel, not a full `data-value` (#15).
-  `atom-refinement` has the same `data-value`-vs-`core-value` defect as `instance` but is left as-is (its
-  own note in #16). An unquoted non-numeric type-argument always parses as a type reference, never a value
-  literal — a deliberate grammar-layer deferral, classified at a later semantic layer.
+- **Three ABNF defects were implemented per intent before the spec caught up, and it since has.**
+  `instance`'s payload is a `core-value`, not the full `data-value` (`Instance` wraps a `DataValue` with
+  `typeRef` pre-set, no separate `target`); `construction-def` admits the implicit `&` before its trailing
+  `record-def`; `field-modifier`'s value is a bare token or the absent sentinel. §12.1 now spells all three
+  that way, and states that no production of the schema grammar takes the full `data-value`.
+  - **`atom-refinement` is the one that did not follow, and is now a gap.** Its production is `"!"
+    type-name ws "^" ws record-def`, and this parser still calls `parseDataValue()` there, so
+    `!integer ^ 5` parses where the grammar refuses it (`BACKLOG.md`).
+  - An unquoted non-numeric type-argument always parses as a type reference, never a value literal — a
+    deliberate grammar-layer deferral, classified at a later semantic layer.
 - **A `!` head behind a parameter list is an `instance-template`, a production of its own** (§12.1) --
   `vector => <T, N> !array { element_type: T  min_items: N }`. Not `[type-params] instance`: the surface
   syntax is the same, but the two payloads resolve against different vocabulary, an `Instance` binding
@@ -53,7 +55,8 @@ materialization, no validation (those are the resolver's/linker's jobs).
   each twice, a declaration-level form admitting both and an inline form admitting neither, with a prose
   tie-break in §12.1 because `type-def` was otherwise ambiguous between them. The split existed because a
   sized form had no inline representation to carry it; every form lifts to an entry, so it protected
-  nothing (`spec/tson-rev33-changelog.md` #31, and the change report's D10). `type-def` reaches both through `type-ref`
+  nothing; §12.1 now has one bracket production, and size specifiers and element/position `?` are legal at
+  every type-ref position. `type-def` reaches both through `type-ref`
   like anything else, so the tie-break disappeared rather than being reworded.
   - **Nesting is the recursion in `ElementType`**, which holds a plain `TypeRef` — `[[T; 2]; 3]` and
     `{text => [order; 1..]}` need no second node family, which is what `ElementType.Expr.Nested` used to be.
@@ -83,9 +86,9 @@ materialization, no validation (those are the resolver's/linker's jobs).
   - **One consequence of the dispatch is worth knowing before you write the test.** `{text? => integer}` is
     `name` followed by `?`, so it commits to a *record* before the `=>` is read, and the author gets a
     record-field diagnostic — while `{pair<text>? => integer}`, whose `<` commits to a map first, gets the
-    map rule. Both are rejected; only one of them mentions maps. `spec/tson-rev33-changelog.md` #52 argues the change
-    report should state this where it states the dispatch, and why buying the better message with a third
-    token of lookahead is a bad trade.
+    map rule. Both are rejected; only one of them mentions maps. §5.3 states the interaction at the dispatch,
+    and buying the better message with a third token of lookahead is a bad trade §12.2's stated budget —
+    one consumed token plus one of lookahead — declines on the same terms.
 
 ## Desugaring (`tson-compiler/.../resolver/SchemaDesugarer.java`)
 
@@ -98,10 +101,10 @@ targets "the implicit desugar targets of the sugar forms" — this implements th
 splitting it across the resolver (declaration position) and the linker (field position), which is what it
 replaces.
 
-**The injected-entry half is the spec's own rule now.** It began as a divergence — revision 32's §8.2 has a
-constructor application carried structurally at the use site and materialising no entry — and was argued as
-spec feedback rather than tracked as debt (`spec/tson-rev33-changelog.md` #49/#50, and #51 for the `!!import` visibility
-that rides on it). The structure-templates CR settles all three the other way: **D3** de-parameterises
+**The injected-entry half is the spec's own rule.** §8.2: "**Every application materialises** ... Nothing is
+carried structurally in place: a use site holds a bare reference to its entry", and the materialised entries
+merge under `!!import` by the same structural identities they have within a schema. The structure-templates
+CR, now the baseline, is where that came from: **D3** de-parameterises
 `array`/`set`/`map`, so a container at a use site cannot be an application at all — nothing in meta-kernel
 takes type parameters, `map` holding `key_type`/`value_type` as ordinary fields — and **D5** states one lift
 rule, "every sugar form lifts at desugar: a concrete form to a closed synthetic entry". The resolved
@@ -211,9 +214,9 @@ rebuilt and called a cache.
   four spellings binds the pair directly, an exact `N` pinning both. §5.3's bound coherence (`min <= max`) is
   checked here, where the bounds are literal at schema load; a bound naming a value parameter is
   materialisation's question. So is the rejection of a **vacuous `[T; 0..]`**: §5.3 calls the form vacuous
-  and asks for a warning while desugaring it anyway, and `spec/tson-rev33-changelog.md` #42 rejects the spelling instead
-  — §5.3's own sentence says why, since structural identity (§8.2) makes it an entry *distinct from* `[T]`
-  that means the same thing. Only a literal `0` is caught.
+  and rejects it: §5.3 makes `0..` a resolver error, because structural identity (§8.2) makes it an entry
+  *distinct from* `[T]` that means the same thing, and the diagnostic SHOULD say so. Only a literal `0` is
+  caught.
 - **An invalid sugar form is reported per declaration, not thrown**, when a `DesugarFailureReporter` is
   supplied — `SchemaResolver` always supplies one on its reporting overload, so the phase joins resolution
   and linking in reporting every independent problem in one pass. The reportable forms are
@@ -271,7 +274,8 @@ rebuilt and called a cache.
   - **Two of the four sugar forms have no open representation at all.** `tuple` and `choice` bind a
     collection (`elements`, `variants`), and a `template_argument` is `param | value | type_ref` with no
     collection case — so `<T> { v: (T | text) }` is refused at the declaration that writes it, as a gap
-    rather than an author error. `spec/tson-rev33-changelog.md` #53 has the account; array and map bind only scalar
-    slots and are unaffected.
+    rather than an author error — §5.10 makes a parameter inside a collection-typed slot a resolver error at
+    the declaration, a deliberate boundary of this revision. Array and map bind only scalar slots and are
+    unaffected.
 - **The meta-kernel runs this phase too, with no accommodation at all** — its governing meta is itself, and
   with the table fixed there is nothing to look up.

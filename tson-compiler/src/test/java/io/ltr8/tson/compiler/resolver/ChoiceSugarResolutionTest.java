@@ -84,9 +84,9 @@ class ChoiceSugarResolutionTest {
 
     /**
      * At a field position the choice is hoisted into its own declaration and the field refers to it by name.
-     * §5.4 says an inline choice materialises no entry; this implementation injects one, for the reason
-     * recorded in {@code SPEC-FEEDBACK.md} -- nothing downstream reads a {@code type_ref}'s arguments, so the
-     * structural form would resolve and then have nothing to compile against.
+     * §8.2 requires it: every application materialises an entry, and a use site holds a bare reference to
+     * it -- nothing downstream reads a {@code type_ref}'s arguments, so a structural form would resolve and
+     * then have nothing to compile against.
      */
     @Test
     void anInlineChoiceIsHoistedAndReferredToByName() {

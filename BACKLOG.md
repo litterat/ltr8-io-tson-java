@@ -93,9 +93,9 @@ by a factor of six.
   rescue it either, since `^` is not a `core-value`. `TsonSchemaParser.parseAtomRefinementOrInstance` calls
   `parseDataValue()` on that branch, which is `*annotation [type-ref] core-value` — so `!integer ^ 5`,
   `!integer ^ !foo { min: 1 }` and `!integer ^ @doc:"d" { min: 1 }` all parse today. It was conforming until
-  Revision 33: Revision 32 spelled the production `... ws data-value`, and the entry that argued it down
-  (change log #16) proposed narrowing **both** `!` forms — the `instance` branch took its half
-  (`parseCoreValue()`, with a comment saying so) and this one did not.
+  Revision 33: Revision 32 spelled the production `... ws data-value`, and the spec feedback that argued it
+  down proposed narrowing **both** `!` forms — the `instance` branch took its half (`parseCoreValue()`, with
+  a comment saying so) and this one did not.
   - **The knock-on is the reason to fix it rather than file it as cosmetic.** Slipping past the parser, the
     form reaches `DefinitionResolver`, which reports `expected a braced record of constraint bindings (§5.5)`
     under `Diagnostic.Code.NOT_IMPLEMENTED` — so `tson validate` exits **70** (library gap, please report it)
@@ -140,6 +140,14 @@ need are not retained for a secondary constructor.
   needs to re-derive the binding without the application in between.
 
 ## Remaining built-in types
+
+- [ ] **`!text` is a Part 1 built-in and this vocabulary does not carry it.** [TSON-DATA] §5 lists `!text` as
+  the unconstrained text atom — "it accepts every token and its host value is the token's text" — and §5.5
+  builds `uri`, `regex` and `email` on the same `text_type` family. `TextParser` exists and holds a real
+  `TextType`, but it has no `TYPENAME` constant and is not in `BuiltinTypeVocabulary`, so a schemaless
+  `!text 42` is an `UNKNOWN_TYPE_REF` where the spec says it is a string. It was conforming when §5's table
+  had no row for it; Revision 33 added one. The fix is the constant plus one `types.put`, and a vocabulary
+  vector so the two read paths agree.
 
 - [ ] `unknown` — no compiled-parser factory (`ValueReaderFactoryRegistry` registers it, and `extern`, to
   `ErrorReader`), pinned down exactly by
@@ -460,7 +468,7 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
       loop anyway, and that §8.1's byte offset was being re-derived from the decoded character rather than
       counted from the input. It also settles a question the spec leaves open: malformed UTF-8 is now a
       lexer error rather than a U+FFFD substitution, overlong forms and encoded surrogates included
-      (`spec/tson-rev33-changelog.md` #59).
+      ([TSON-DATA] §7.1).
     - [x] **Build the diagnostic path lazily** — done. A step of the descent is a linked node and both RFC
       6901 pointers render only when a diagnostic is built: **-1.7 KB per read** (26,152 → 24,488 bytes).
       The part that matters for a port is not the bytes: concatenating a step onto the last is quadratic in
@@ -482,9 +490,9 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
   61,824 → **23,464 bytes** and 1,213 → ~800 objects per read, 19.5 → ~13 µs, with retention still a
   measured 0. Two conformance fixes came out of the work and matter more than the bytes for something about
   to be ported: a zero-led complex magnitude is accepted (§7.6), and malformed UTF-8 is refused rather than
-  silently replaced (`spec/tson-rev33-changelog.md` #59).
+  silently replaced ([TSON-DATA] §7.1).
 - [ ] Confusable-character and bidi-formatting-character checks (§9.4-adjacent security hardening;
-  opt-in, and per `spec/tson-rev33-changelog.md` #42 reported as ordinary errors when enabled, not warnings) —
+  opt-in, and reported as ordinary errors when enabled — §8.1 gives a conforming processor one severity) —
   the sibling gap to the numeric-literal length limit tracked in `STRUCTURED-OUTPUT.md`'s Tier 1 section;
   neither is enforced anywhere yet. `SPEC-FEEDBACK.md` #3 is the fuller treatment: which UTS #39 mechanism
   applies where, the comparison scopes TSON can actually name, and why a normative requirement would oblige

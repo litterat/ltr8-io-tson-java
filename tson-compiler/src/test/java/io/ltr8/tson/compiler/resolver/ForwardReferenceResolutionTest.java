@@ -54,7 +54,7 @@ class ForwardReferenceResolutionTest {
     void aSelfRecursiveRecordResolvesWithoutFalseTrippingCycleDetection() {
         // item references itself by field type -- a bare name, so it never enters the resolving set the way a
         // self-composition would. Resolves fine. (Unsatisfiable with a REQUIRED field -- no finite value --
-        // which resolution deliberately doesn't police; see spec/tson-rev33-changelog.md #25.)
+        // which resolution deliberately doesn't police -- §5.10.1's productivity rule is the linker's.)
         TsonSchema resolved = resolve("  item => { inner: item }");
 
         assertNotNull(resolved.entries().get("item"));
