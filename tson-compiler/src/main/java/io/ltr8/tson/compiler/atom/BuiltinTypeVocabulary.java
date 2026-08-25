@@ -12,9 +12,8 @@ import java.util.Optional;
  * transliteration of the relevant {@code core.tn1} instances, since the vocabulary is a fixed,
  * closed set (§5.1) that a Class 1 processor never resolves via schema machinery.
  *
- * <p>Seeded with the {@code integer_type} family (see {@code SPEC-FEEDBACK.md} #6): §5.6 as
- * published lists just {@code int32}/{@code int64}/{@code uint32}/{@code uint64}, but {@code
- * core.tn1} defines the same constructor applied across the full {@code int8}..{@code int256}/
+ * <p>Seeded with the {@code integer_type} family: §5.6 lists the full ladder, and {@code
+ * core.tn} defines the same constructor applied across the full {@code int8}..{@code int256}/
  * {@code uint8}..{@code uint256} width ladder plus the {@code positive_integer} / {@code
  * non_negative_integer} / {@code negative_integer} / {@code non_positive_integer} bound-only
  * refinements, and omitting the other eight widths and the refinement family from §5.6's table was
@@ -24,9 +23,8 @@ import java.util.Optional;
  * <p>Also seeded with {@code decimal_type} ({@code number}), {@code float_type} ({@code float32}/
  * {@code float64}), {@code rational_type} ({@code rational}), and {@code complex_type} ({@code
  * complex}) -- all fully published in §5.6's table as-is, unlike the integer family. And with {@code
- * uuid_type} ({@code uuid}, §5.5) -- deliberately *not* {@code text_type}, despite existing in
- * meta-kernel.tn1, since {@code !text} never appears in §5's published table at all (see {@code
- * SPEC-FEEDBACK.md} #9). And with the full {@code binary} family (§5.3) -- {@code base64}, {@code
+ * uuid_type} ({@code uuid}, §5.5) and {@code text_type} ({@code text}, §5's unconstrained text atom).
+ * And with the full {@code binary} family (§5.3) -- {@code base64}, {@code
  * base64url}, {@code base32}, {@code hex} -- four instances of one {@link BinaryParser} constructor,
  * each a distinct {@code binary_encoding} value, not one generic {@code !binary} annotation,
  * matching §5.3's own "there is no generic {@code !binary} annotation." And with the temporal
@@ -42,12 +40,9 @@ import java.util.Optional;
  * ({@code mac}, §5.5, EUI-48 per RFC 9542).
  *
  * <p><b>{@code email} is seeded too, which §5.5's table does not list</b> -- a known departure, the same
- * kind as the integer ladder above. core.tn groups {@code email} with {@code uuid}/{@code ipv4}/{@code mac}
- * under one "Network Types" banner and gives it the identical shape, §5.1 invites a reader to treat core.tn
- * as the vocabulary's source of truth, and a real {@link EmailParser} exists -- withholding it from the
- * schemaless path would only make the two read paths disagree about what {@code !email} means. See {@code
- * SPEC-FEEDBACK.md} #5, which asks the spec to add the row and say what conformance to its RFC 5322 pin
- * actually obliges.
+ * §5.5's own row, beside {@code uuid}/{@code ipv4}/{@code mac} in the "Network Types" group and with the
+ * identical shape core.tn gives it -- and the RFC 5322 pin is scoped there to the {@code dot-atom "@"
+ * dot-atom} core, which is exactly what {@link EmailParser} accepts.
  */
 public final class BuiltinTypeVocabulary {
 

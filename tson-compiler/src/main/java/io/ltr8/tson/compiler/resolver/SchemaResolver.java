@@ -426,7 +426,7 @@ public final class SchemaResolver {
      * Stage 1 of {@link #resolveSchema(SchemaDocument)} -- every {@code !!import}'s whole namespace, in
      * declaration order, merged as-is (never re-resolved against the importer). Mirrors {@code
      * TsonSchemaLinker.mergeImports} exactly, including its transitivity and its identity-based collision
-     * rule ({@code SPEC-FEEDBACK.md} #55), since this is the same concept discovered one stage earlier: an
+     * rule (§2.2.3), since this is the same concept applied one stage earlier: an
      * import contributes everything its namespace holds, one schema reached by several routes unifies, and
      * two different schemas declaring one name is the error.
      *

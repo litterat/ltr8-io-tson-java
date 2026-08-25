@@ -1,7 +1,7 @@
-!!id:"https://tson.io/2026/32/m/meta-kernel-resolved.tn"
-!!schema:"https://tson.io/2026/32/m/meta-kernel.tn"
+!!id:"https://tson.io/2026/33/m/meta-kernel-resolved.tn"
+!!schema:"https://tson.io/2026/33/m/meta-kernel.tn"
 @doc:"""
-  Resolver-output fixture for meta-kernel.tn (2026 Revision 32 draft).
+  Resolver-output fixture for meta-kernel.tn (2026 Revision 33 draft).
   Parse the source schema, run the resolver, canonicalise, compare.
 
   Conventions:
@@ -22,12 +22,13 @@
     (Part 2 Section 8.3), recursively inside type arguments.
   - Type-reference positions (`record_field.type`,
     `tuple_element.element_type`, `type_definition.source`, choice
-    variant elements, binding-record type slots, and the resolved
-    `value` of a `type_ref`-typed pin) hold type_ref values; `name`
-    is type_ref's only REQUIRED field, so a bare name token is the
-    positional form (Part 2 Section 5.6, general over schema-backed
-    data) and a braced record appears only when `arguments` is
-    present.
+    variant elements, and binding-record type slots) hold type_ref
+    values; `name` is type_ref's only REQUIRED field, so a bare name
+    token is the positional form (Part 2 Section 5.6, general over
+    schema-backed data) and a braced record appears only when
+    `arguments` is present — which, in output, is only where an
+    application is still open: template bodies and `source`
+    provenance (Part 2 Section 8.1).
   - The container constructors carry no parameters: their type
     slots are plain REQUIRED `type_ref`-typed fields, filled by the
     construction (or by a sugar form's desugaring) like any other
@@ -43,12 +44,23 @@
   - `supertypes`, `subtypes`, and `reference.target` are name-level
     indexes; a declaration's structured provenance lives in
     `source`, which records the applied form.
-  - Open templates carry vocabulary-record bodies (`!record`, with
-    `value_param` members for parameter-routed values); closed
-    definitions carry binding-record bodies headed by the nearest
-    `~` constructor. Instantiation entries are internally named
+  - Open record templates carry vocabulary-record bodies (`!record`,
+    with `value_param` members for parameter-routed values); open
+    instance-form templates carry `!instance_template` bodies; closed
+    definitions carry binding-record bodies headed by the applied
+    constructor. Instantiation entries are internally named
     (implementation-chosen, non-normative); none appear here, as
     nothing in this schema applies a non-constructor template.
+  - Synthetic entries — the closed forms the sugar lifts to — carry
+    the derived `@synthetic` marker at their schema-map keys
+    (Part 2 Sections 6, 8.2); on ingest the marker is discarded and
+    recomputed, like `@alias`. Their internal names here follow the
+    convention `<constructor>_<operands>_xxhash`, where the trailing
+    `xxhash` is a placeholder for a content hash of the resolved
+    binding record: the *shape* of the data — one internally named,
+    `@synthetic`-marked entry per distinct concrete form — is the
+    conformance point; the hash spelling is an implementation's own
+    business and the placeholder is deliberately not a real digest.
   - Bare parameter names (e.g. T) in bodies are read against the
     enclosing entry's `parameters` list.
   - Entry-level source @doc strings longer than one line are
@@ -351,6 +363,12 @@
     body: !reference { target: text }
   }
 
+  synthetic => @annotation !type_definition {
+    kind: REFERENCE
+    source: void
+    body: !reference { target: void }
+  }
+
   @doc:"Supporting records."
   record_field => !type_definition {
     kind: PRODUCT
@@ -540,65 +558,68 @@
   }
 
   @doc:"""
-    Synthetic entries — the closed forms the sugar lifts to (CR D5: "every
-    sugar form lifts at desugar: a concrete form to a closed synthetic
-    entry"). Each is named by derivation from the form it came from rather
-    than declared, sources the constructor it builds, and is referenced by
-    the field that wrote the sugar. The trailing `xxhash` stands for a
-    content hash of the resolved binding record: identity is structural
-    (D6, "one entry per distinct concrete form schema-wide") and the
-    spelling of the hash is an implementation's own business, not a
-    conformance point.
+    Synthetic entries — the closed forms the sugar lifts to (Part 2
+    Section 5.3: "every sugar form lifts at desugar; a concrete form
+    to a closed synthetic entry"). Each is named by derivation from
+    the form it came from rather than declared, sources the
+    constructor it builds, is referenced by the field that wrote the
+    sugar, and carries the derived `@synthetic` marker at its key
+    (Part 2 Sections 6, 8.2). The trailing `xxhash` stands for a
+    content hash of the resolved binding record: identity is
+    structural ("one entry per distinct concrete form schema-wide")
+    and the spelling of the hash is an implementation's own
+    business, not a conformance point — the placeholder keeps the
+    hash value non-normative.
     """
-  array_type_name_xxhash => !type_definition {
+  @synthetic array_type_name_xxhash => !type_definition {
     kind: PRODUCT
     source: array
     body: !array { element_type: @alias:type_name token }
   }
 
-  array_field_name_xxhash => !type_definition {
+  @synthetic array_field_name_xxhash => !type_definition {
     kind: PRODUCT
     source: array
     body: !array { element_type: @alias:field_name token }
   }
 
-  array_param_name_xxhash => !type_definition {
+  @synthetic array_param_name_xxhash => !type_definition {
     kind: PRODUCT
     source: array
     body: !array { element_type: @alias:param_name token }
   }
 
-  array_type_ref_xxhash => !type_definition {
+  @synthetic array_type_ref_xxhash => !type_definition {
     kind: PRODUCT
     source: array
     body: !array { element_type: type_ref }
   }
 
-  array_type_argument_xxhash => !type_definition {
+  @synthetic array_type_argument_xxhash => !type_definition {
     kind: PRODUCT
     source: array
     body: !array { element_type: type_argument }
   }
 
-  array_record_field_xxhash => !type_definition {
+  @synthetic array_record_field_xxhash => !type_definition {
     kind: PRODUCT
     source: array
     body: !array { element_type: record_field }
   }
 
-  array_field_group_xxhash => !type_definition {
+  @synthetic array_field_group_xxhash => !type_definition {
     kind: PRODUCT
     source: array
     body: !array { element_type: field_group }
   }
 
-  array_tuple_element_xxhash => !type_definition {
+  @synthetic array_tuple_element_xxhash => !type_definition {
     kind: PRODUCT
     source: array
     body: !array { element_type: tuple_element }
   }
 
-  map_field_name_template_argument_xxhash => !type_definition {
+  @synthetic map_field_name_template_argument_xxhash => !type_definition {
     kind: PRODUCT
     source: map
     body: !map { key_type: @alias:field_name token  value_type: template_argument }

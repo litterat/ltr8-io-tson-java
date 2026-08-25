@@ -441,19 +441,18 @@ public final class TsonSchemaParser extends TsonDataParser {
             advance();
             return new AtomRefinement(target, parseDataValue());
         }
-        // instance = "!" type-name ws core-value, not the spec's own literal "data-value" -- see
-        // Instance's own Javadoc and SPEC-FEEDBACK.md. The constructor name goes straight into the
-        // wrapping DataValue's own typeRef; there's no room in this corrected grammar for the
-        // payload to carry further annotations or a second, competing type-ref.
+        // instance = "!" type-name ws core-value (§12.1) -- see Instance's own Javadoc. The constructor
+        // name goes straight into the wrapping DataValue's own typeRef; there is no room in this
+        // production for the payload to carry further annotations or a second, competing type-ref.
         return new Instance(new DataValue(List.of(), Optional.of(target), parseCoreValue()));
     }
 
     /**
      * Supertype chain, trailing body, and removal set (§5.8, §5.9). {@code first} is already
      * consumed. On each {@code &}, one token of lookahead decides whether {@code {} } terminates
-     * the chain as the trailing body or another supertype follows -- see {@code
-     * ConstructionDef}'s own Javadoc and {@code SPEC-FEEDBACK.md} #14 on why this, not the literal
-     * ABNF, is the correct reading.
+     * the chain as the trailing body or another supertype follows -- see {@code ConstructionDef}'s own
+     * Javadoc; §12.1's {@code construction-def} draws its operands from {@code supertype-ref} and admits the
+     * trailing {@code record-def} on each alternative.
      */
     private ConstructionDef parseConstructionDefContinuation(TypeRef first) {
         List<TypeRef> supertypes = new ArrayList<>();
@@ -661,8 +660,8 @@ public final class TsonSchemaParser extends TsonDataParser {
      *
      * <p>There is no separate inline form, and no position where a size specifier or an element {@code ?} is
      * refused. That split existed because a sized form had no inline representation to carry it; every form
-     * lifts to an entry now, so the restriction protected nothing and is gone rather than relocated (§5.3,
-     * {@code SPEC-FEEDBACK.md} #31).
+     * lifts to an entry now, so the restriction protected nothing and is gone rather than relocated: §12.1
+     * has one bracket production, and §5.3 makes both legal at every type-ref position.
      */
     private TypeRef parseBracket() {
         expect(TokenType.LBRACKET, "an array or tuple type's opening '['");

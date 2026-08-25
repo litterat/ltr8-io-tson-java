@@ -1,7 +1,7 @@
-!!id:"https://tson.io/2026/32/m/meta-kernel.tn?sha256=0742e3a7fff82adac11dfd20199c95d079206b972b1f7b899233bdb9d1e09463"
-!!meta:"https://tson.io/2026/32/m/meta-kernel.tn"
+!!id:"https://tson.io/2026/33/m/meta-kernel.tn?sha256=43d9669ca9319c891bd1827953d0d3274ed03249a90d0c126289ed740990f3ac"
+!!meta:"https://tson.io/2026/33/m/meta-kernel.tn"
 @doc:"""
-  TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 32 draft).
+  TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 33 draft).
 
   The root of the schema ladder, written in the Part 2 schema grammar:
   a braced schema map of `name => definition` declarations, one entry
@@ -12,6 +12,12 @@
   circularity in the series, closed by pre-loading rather than by
   resolution: implementations ship the kernel's resolved structure,
   and this document describes it.
+
+  Hash pins here are real digests over the bytes of this copy,
+  computed bottom-up (kernel body, then each dependent's pins and
+  digest) so the chain verifies as shipped. Hash *values* are not
+  normative — only the pin's shape is; the published drafts spell
+  them `xxhash` and pin at publication instead.
   """
 {
   @doc:"Base kinds. `top` is the structural root; every constructor transitively IS-A `atom`, `product`, `sum` or `data`, each of which IS-A `top`. Construction transfers kind, not IS-A, so instances and fresh records sit under the kinds without supertypes. The first three describe the shape of a data value; `data` describes something that is not one."
@@ -209,18 +215,19 @@
     `name` directly, and a braced record is the explicit form,
     canonical only when `arguments` is present.
 
-    Inline sugar forms are carried structurally and materialise no
-    entries; their positional `arguments` take their meaning from
-    the desugar table ([TSON-SCHEMA] §5.3), so an inline
-    constructor argument is always a type reference. A fully-bound
-    application of a template materialises an entry: the applied
-    form is recorded in the entry's `source`, the substituted
-    binding record becomes its body headed by the nearest `~`
-    constructor, and the entry's name is internal —
-    implementation-chosen and non-normative, since identity is
-    structural equality of the flattened application recorded in
-    `source` ([TSON-SCHEMA] §8.2). An entry with an empty
-    `parameters` list contains no parameter references at any
+    Every application materialises an entry ([TSON-SCHEMA] §8.2):
+    a sugar form lifts to a synthetic entry, closed or open per the
+    lift rule ([TSON-SCHEMA] §5.3), and a fully-bound application
+    of a template materialises an instantiation entry — the applied
+    form recorded in its `source`, the substituted binding record
+    its body, headed by the applied constructor. A use site holds a
+    bare reference to its entry, so `arguments` appears only where
+    an application is still open — inside template bodies and in
+    `source` provenance — and means "an application", nothing else.
+    Entry names are internal — implementation-chosen and
+    non-normative, since identity is structural ([TSON-SCHEMA]
+    §8.2). An entry with an empty `parameters` list contains no
+    parameter references and no instance_template body at any
     depth ([TSON-SCHEMA] §5.10).
     """
   type_ref => {
@@ -237,9 +244,10 @@
     literal. `value` holds concrete literals only, so the
     reference/literal split is structural and value-typed tokens
     (enum members) are never ambiguous with parameter names. The
-    split is needed for template applications only — an inline
-    sugar form's arguments are always references ([TSON-SCHEMA]
-    §5.3). The group is REQUIRED: exactly one member is present.
+    split carries the application's open/closed signal:
+    substitution replaces a parameter-naming member with the bound
+    argument as parameters close ([TSON-SCHEMA] §8.1). The group
+    is REQUIRED: exactly one member is present.
     Deliberately no positional form — a bare token cannot
     self-classify as reference or literal, so the braced record is
     load-bearing.
@@ -256,11 +264,12 @@
   element_state       => !enum [REQUIRED OPTIONAL]
   type_kind           => !enum [ATOM PRODUCT SUM REFERENCE DATA]
 
-  @doc:"Annotation type markers."
+  @doc:"Annotation type markers. `alias` and `synthetic` are resolver-attached and derived: discarded and recomputed on ingest ([TSON-SCHEMA] §6, §8.1). `synthetic` marks a resolver-materialised synthetic entry at its schema-map key ([TSON-SCHEMA] §8.2)."
   annotation    => @annotation void
   documentation => @annotation text
   doc           => @annotation documentation
   alias         => @annotation text
+  synthetic     => @annotation void
 
   @doc:"""
     Supporting records. record_field's value group: `value` carries

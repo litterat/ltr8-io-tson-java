@@ -14,7 +14,7 @@ import io.ltr8.tson.schema.meta.Token;
  *
  * <p><b>What that choice costs is real and is not this class's to settle.</b> Identity is derived from the
  * token, so {@code vector<float32, 255>} and {@code vector<float32, 0xFF>} are two applications where §4
- * makes them one number -- see {@code SPEC-FEEDBACK.md} #54, which puts the disagreement to the spec: the
+ * makes them one number -- see {@code SPEC-FEEDBACK.md} #4, which puts the disagreement to the spec: the
  * same slot is called a bare token in the prose and typed {@code value} in the kernel.
  *
  * <p>Selected per slot rather than per type, by the bound component's own Java type -- see {@code

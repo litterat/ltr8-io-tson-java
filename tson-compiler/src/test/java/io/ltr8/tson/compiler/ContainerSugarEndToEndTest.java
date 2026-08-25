@@ -45,8 +45,8 @@ class ContainerSugarEndToEndTest {
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/container-sugar.tn"
-                !!meta:"https://tson.io/2026/32/m/meta.tn"
-                !!import:"https://tson.io/2026/32/m/core.tn"
+                !!meta:"https://tson.io/2026/33/m/meta.tn"
+                !!import:"https://tson.io/2026/33/m/core.tn"
                 {
                 %s
                 }
@@ -168,7 +168,7 @@ class ContainerSugarEndToEndTest {
     /**
      * Every spelling of an array declaration agrees about the hierarchy: a bound is a constraint, not a
      * change of place. All of them close to a binding record headed by a constructor, and a constructor is not
-     * something a value can have as its type -- so none records a supertype ({@code SPEC-FEEDBACK.md} #33/#45).
+     * something a value can have as its type -- so none records a supertype (§5.6: "no supertypes").
      */
     @Test
     void everySpellingOfAnArrayDeclarationRecordsNoSupertypes() {

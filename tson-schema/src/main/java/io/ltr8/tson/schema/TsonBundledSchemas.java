@@ -28,12 +28,6 @@ import java.util.Optional;
  * exactly, so a `tson-compiler`-side caller needing a real {@code TsonSchemaSource} instance passes
  * the method reference {@code TsonBundledSchemas::fetch} directly; no adapter class needed on either
  * side.
- *
- * <p><b>Replaces the old, standalone {@code BundledSchemaSource} class</b> (`tson-compiler`, deleted
- * once this existed) -- once this class already held the one canonical copy of all three identities
- * (2026-07-29), keeping the fetch capability split out in a different module, in front of a
- * fixed table keyed by those same three identities, bought nothing further; consolidating both here
- * removed the split entirely, not just moved it.
  */
 public final class TsonBundledSchemas {
 
@@ -43,13 +37,13 @@ public final class TsonBundledSchemas {
      * {@code TsonSchemaLinker.isMetaKernelGoverned}'s own Javadoc for why that check needs this to be
      * a specific, fixed identity rather than a structural "is this schema self-referencing" test.
      */
-    public static final String META_KERNEL_ID = "https://tson.io/2026/32/m/meta-kernel.tn";
+    public static final String META_KERNEL_ID = "https://tson.io/2026/33/m/meta-kernel.tn";
 
     /** meta's own real, published identity -- see {@code spec/m/meta.tn}'s own {@code !!id}. */
-    public static final String META_ID = "https://tson.io/2026/32/m/meta.tn";
+    public static final String META_ID = "https://tson.io/2026/33/m/meta.tn";
 
     /** core's own real, published identity -- see {@code spec/m/core.tn}'s own {@code !!id}. */
-    public static final String CORE_ID = "https://tson.io/2026/32/m/core.tn";
+    public static final String CORE_ID = "https://tson.io/2026/33/m/core.tn";
 
     /**
      * meta-kernel's own published content-hash digest -- the {@code ?sha256=} on {@code
@@ -57,13 +51,13 @@ public final class TsonBundledSchemas {
      * library holds it so a hash-pinned reference to a pre-loaded schema can be verified, and so the
      * shipped resource can be checked against its own published digest ({@link #declaredSha256}).
      */
-    public static final String META_KERNEL_SHA256 = "0742e3a7fff82adac11dfd20199c95d079206b972b1f7b899233bdb9d1e09463";
+    public static final String META_KERNEL_SHA256 = "43d9669ca9319c891bd1827953d0d3274ed03249a90d0c126289ed740990f3ac";
 
     /** meta's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/meta.tn}'s {@code !!id}. See {@link #META_KERNEL_SHA256}. */
-    public static final String META_SHA256 = "4e080b780c644997bc956b08eb0540f41b7de5b045300515584d3053b3c0f952";
+    public static final String META_SHA256 = "3a5ab56c0f919e251e05d1646e946010f8278a8f08d768fe70693097558fb4f1";
 
     /** core's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/core.tn}'s {@code !!id}. See {@link #META_KERNEL_SHA256}. */
-    public static final String CORE_SHA256 = "d0655c3998e96db9ad51bf5d12a41645627daa985d1bcb58c2aca5e3a2b84c49";
+    public static final String CORE_SHA256 = "34d4f2ffe4744691e3310a185f96761c3c7f33da41b72da9681b90554504de3d";
 
     private static final Map<String, String> RESOURCES = Map.of(
             META_KERNEL_ID, "/meta-kernel.tn",
@@ -89,9 +83,8 @@ public final class TsonBundledSchemas {
 
     /**
      * Returns one of the three bundled schemas' own raw source text, straight off this module's own
-     * classpath (the same resources {@code tson-schema/build.gradle.kts}'s own {@code
-     * processResources} task copies in from the repo's own {@code spec/m/}, mirroring {@code
-     * MetaKernelBootstrapResolver}'s identical one-file-to-keep-in-sync reasoning).
+     * classpath -- the resources {@code tson-schema/build.gradle.kts}'s {@code processResources} task
+     * copies in from the repo's own {@code spec/m/}.
      *
      * @throws IllegalStateException if {@code uri} isn't one of {@link #META_KERNEL_ID}/{@link
      *                                #META_ID}/{@link #CORE_ID}

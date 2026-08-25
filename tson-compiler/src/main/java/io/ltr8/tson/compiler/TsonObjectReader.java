@@ -161,8 +161,9 @@ public final class TsonObjectReader {
      * this one unchanged, sharing its compiled-schema registry.
      *
      * <p>A schemaless bind reports a type-ref naming neither a built-in type nor the target being bound,
-     * rather than treating it as a marker to skip past ({@code SPEC-FEEDBACK.md} #7). This is the
-     * forward-compatible passthrough that entry asks for: a document tagged with names this reader knows
+     * rather than treating it as a marker to skip past -- §7.1's "informational" is the floor, not a ceiling.
+     * {@link #preservingUnknownTypeRefs} is the forward-compatible passthrough: a document tagged with
+     * names this reader knows
      * nothing about still binds on the strength of the target class alone. Built-in names are still checked,
      * so {@code !uuid nope} remains a problem. Affects the schemaless path only.
      */

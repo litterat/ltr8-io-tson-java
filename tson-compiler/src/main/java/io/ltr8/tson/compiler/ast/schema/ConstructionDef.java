@@ -14,9 +14,9 @@ import java.util.Optional;
  * <p><b>The ABNF's {@code construction-def} alternative 1 doesn't literally admit a trailing body
  * after a multi-supertype chain</b> (its {@code record-def} slot has no leading {@code "&"}), even
  * though §5.8's own worked example (and §12.2's disambiguation note) shows exactly that shape --
- * see {@code SPEC-FEEDBACK.md} #14. This type, and the compiler that builds it, follow the documented
- * intent: {@code body} is reached through a {@code &} like any other supertype join, not bolted on
- * without one.
+ * §12.1's own alternatives now spell the {@code & record-def} join out. This type, and the compiler that
+ * builds it, follow it: {@code body} is reached through a {@code &} like any other supertype join, not
+ * bolted on without one.
  */
 public record ConstructionDef(List<TypeRef> supertypes, Optional<RecordDef> body, Optional<RemovalSet> removal)
         implements StructuralDef {

@@ -11,7 +11,7 @@ only; history lives in git. `CLAUDE.md` holds the one-paragraph orientation; thi
 wrapper over `SchemaResolver`) resolves a whole `SchemaDocument`: header-directive validation, deriving
 the structure namespace from the governing `!!meta`, merging `!!import` entries into the type-name
 namespace *before* any local declaration resolves. That merge is transitive and its collisions are decided
-by entry identity, exactly as at link time (`SPEC-FEEDBACK.md` #55, and `docs/linking-and-compilation.md`
+by entry identity, exactly as at link time (§2.2.3, and `docs/linking-and-compilation.md`
 for the rule in full) — this is the same concept discovered one phase earlier, so the two implementations
 are kept in step deliberately.
 
@@ -30,7 +30,8 @@ are kept in step deliberately.
   **data documents** and not within the schema document itself, so the message names the remedy (move the
   declaration into a meta-schema and point `!!meta` at it). Silence here was the harmful outcome and is what
   the check replaces — the annotation used to keep its name and lose its value, so the schema loaded clean
-  and the metadata was not there (`SPEC-FEEDBACK.md` #56, `SchemaAnnotationScopeTest`). A value that *does*
+  and the metadata was not there; §6 makes an unresolved annotation name a resolver error, the valueless
+  form included (`SchemaAnnotationScopeTest`). A value that *does*
   resolve is read by that type's own compiled reader, so `@doc:"..."` arrives as a `String`. **The one
   resolver that skips the check is the meta-kernel bootstrap**, which passes no `AnnotationValueReader` at
   all: it is producing the very entries such a reader would read through, so every name would fail, and there
@@ -78,14 +79,16 @@ are kept in step deliberately.
   **emptied** (the contract — so §7.2's subsumption check won't let a subtracted type stand where its source
   is expected), while `record.supertypes` keeps the head's list as authorial lineage. `kind` still comes off
   the lineage chain. **Every** supertype goes, including one that contributed nothing to the removal — `A & B
-  - { f }` with `f` from `A` drops IS-A with `B` too, though `B`'s fields all survive. That is §5.9's letter
-  against §4.3's "composition grants IS-A per parent"; `SPEC-FEEDBACK.md` #37 has the per-ancestor
-  alternative, and the workaround (subtract first, compose second) that makes an author's intent explicit.
+  - { f }` with `f` from `A` drops IS-A with `B` too, though `B`'s fields all survive. §4.3 states the break
+  at composition's own precision ("subtraction revokes IS-A for every parent while keeping lineage") and
+  §5.9 gives the reason: the clause is head-level, so its effect is readable without scanning the parents'
+  field sets. Subtract first and compose second where an author wants partial retention.
   Groups follow §5.11: a removed member leaves `members`, a group down to one member is
   dissolved into a plain field taking the *group's* state (members flatten as `OPTIONAL` whatever the group
   says, so the survivor would otherwise silently lose a REQUIRED group's "exactly one"), and a group with no
-  members left is dropped — the one arity §5.11 doesn't legislate (`SPEC-FEEDBACK.md` #36).
-- **Chained atom refinement merges with the source, it does not replace it** (`SPEC-FEEDBACK.md` #17):
+  members left is dropped — §5.11 runs the arity ladder to zero and states the two-member minimum as an
+  invariant of resolved output.
+- **Chained atom refinement merges with the source, it does not replace it** (§5.6's merge semantics):
   `bounded => !int8 ^ { min: -100 }` must still carry `int8`'s own `size`. `mergeWithSource` re-serializes the
   source's bound value via `TsonObjectWriter` and merges field-by-field (explicit values win) — no
   per-atom-class merge logic needed. **The merge runs on the wire record, before binding, and has to**: a
@@ -108,7 +111,8 @@ are kept in step deliberately.
   design, each documented on its class: `pattern` against `pattern` (regular-language containment, and
   `tson-schema` has no `tson-regex` dependency), `duration_type`'s text bounds, and **selector** facets
   (`component`/`format`/`encoding`/`version`) — core.tn's own prose calls a selector swap a narrowing, so
-  rejecting one would reject a documented construct (`SPEC-FEEDBACK.md` #27).
+  rejecting one would reject a documented construct — §5.7 states the rule per facet kind, and a selector is
+  settable where the source leaves it at the constructor's default, identity-only once bound.
 - **An atom body must also be coherent with itself**, which is the other question about the same facets and
   needs no source to compare against. `checkCoherent` asks `Atom.coherenceCheck()` — one rule per family over
   the shared `AtomCoherence` mechanics, the `AtomNarrowing` twin — and throws `TsonSchemaValidationException`
@@ -158,7 +162,8 @@ are kept in step deliberately.
   loosens REQUIRED→OPTIONAL (§5.11), a source or supertype whose body is a binding record and so has no
   vocabulary (§5.7's "finished"), a choice or bracketed form at a supertype position (`&` composes record
   types; §12.1 admits these only because `construction-def` draws its operands from `type-ref` where
-  `refined-def` takes a name — `SPEC-FEEDBACK.md` #38), a name in a `!` position resolving in neither
+  `refined-def` takes a name; §12.1's `supertype-ref` narrows those operands to named references), a name in
+  a `!` position resolving in neither
   namespace (the plain typo, §3.3.1), a `!` form aimed at the wrong kind of target — refining a
   constructor, applying a non-constructor, refining a non-atom — each answered with the form the author
   probably meant, and **a body the constructor's own vocabulary rejects** (an unknown member, a wrong-typed
@@ -232,8 +237,9 @@ recorded open form, and replacing the application with a reference to the entry 
   constraint the author wrote, silently absent from the type it governs, with no diagnostic anywhere because
   nothing was wrong. **The two spellings are told apart by the state they arrive in**, which is the only
   reason this is recoverable at all: §5.7 sends `= P` to `REQUIRED` and `~ P` to `REQUIRED_DEFAULT`, so a
-  routed default stays a default and data may still override it. §5.7 names only the
-  refinement-from-an-application-head case downstream and leaves this one unstated (`SPEC-FEEDBACK.md` #58).
+  routed default stays a default and data may still override it. §5.7 names the downstream: fixation happens
+  at materialisation, where a field whose `value_param` binds to a concrete argument takes the state its
+  literal spelling would have.
 - **An application whose head names nothing in scope is left whole, arguments and all.** This pass gives no
   verdict on an unresolvable head — that is the linker's, as an unresolved reference — but it still has to
   hand the linker something faithful, and collapsing the application to its bare head is not that. The one
@@ -302,8 +308,8 @@ recorded open form, and replacing the application with a reference to the entry 
   - **A self-applying alias is the author's error, not a knot.** The knot-tying memo answers a recursive
     application with the name of the entry under construction, and this path constructs none — so
     `loop => <T> loop<T>`, applied, would hand a field a name nothing ever defines. A second set tracks
-    reference-template applications in flight and reports the cycle instead (`SPEC-FEEDBACK.md` #45 names
-    the same rule: routing has no entry to tie a knot through). Left unapplied, the declaration is caught
+    reference-template applications in flight and reports the cycle instead — routing has no entry to tie a
+    knot through. Left unapplied, the declaration is caught
     earlier still, by `TypeInhabitance`.
   - **Arity is the alias's own**, checked against its `parameters` before any composition, so
     `uuid_pair<int32, text>` names `uuid_pair`'s one parameter rather than `pair`'s two. An unused one is

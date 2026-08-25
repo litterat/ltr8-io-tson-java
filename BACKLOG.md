@@ -87,6 +87,24 @@ by a factor of six.
 
 ## Miscellaneous
 
+- [ ] **`!I ^ <anything>` parses where §12.1 admits only a braced record, and the resolver then reports the
+  author's mistake as a library gap.** `atom-refinement = "!" type-name ws "^" ws record-def`, and the
+  grammar does not backtrack, so `!integer ^ 5` commits at the `^` and is a parse error; `instance` cannot
+  rescue it either, since `^` is not a `core-value`. `TsonSchemaParser.parseAtomRefinementOrInstance` calls
+  `parseDataValue()` on that branch, which is `*annotation [type-ref] core-value` — so `!integer ^ 5`,
+  `!integer ^ !foo { min: 1 }` and `!integer ^ @doc:"d" { min: 1 }` all parse today. It was conforming until
+  Revision 33: Revision 32 spelled the production `... ws data-value`, and the spec feedback that argued it
+  down proposed narrowing **both** `!` forms — the `instance` branch took its half (`parseCoreValue()`, with
+  a comment saying so) and this one did not.
+  - **The knock-on is the reason to fix it rather than file it as cosmetic.** Slipping past the parser, the
+    form reaches `DefinitionResolver`, which reports `expected a braced record of constraint bindings (§5.5)`
+    under `Diagnostic.Code.NOT_IMPLEMENTED` — so `tson validate` exits **70** (library gap, please report it)
+    on a plain author typo, where the classification test says the verdict never changes as this library
+    improves and the code should be an ordinary schema error. Worth checking the other `NOT_IMPLEMENTED`
+    sites against the same test while in there, rather than patching this one.
+  - Fix is the one call site plus a per-declaration syntax error at `^`, with vectors for the three spellings
+    above; the resolver fallback then stops being reachable from source, and can say so.
+
 - [ ] **General resolver-layer structural rules as reusable primitives**, rather than binding-time-only
   behaviour — empty-brace resolution, the absent-vs-missing distinction. §2.8's "the empty container of that
   type" is still a rule each container reader applies for itself: the map reader's own zero-entry case was
@@ -123,6 +141,14 @@ need are not retained for a secondary constructor.
 
 ## Remaining built-in types
 
+- [ ] **`!text` is a Part 1 built-in and this vocabulary does not carry it.** [TSON-DATA] §5 lists `!text` as
+  the unconstrained text atom — "it accepts every token and its host value is the token's text" — and §5.5
+  builds `uri`, `regex` and `email` on the same `text_type` family. `TextParser` exists and holds a real
+  `TextType`, but it has no `TYPENAME` constant and is not in `BuiltinTypeVocabulary`, so a schemaless
+  `!text 42` is an `UNKNOWN_TYPE_REF` where the spec says it is a string. It was conforming when §5's table
+  had no row for it; Revision 33 added one. The fix is the constant plus one `types.put`, and a vocabulary
+  vector so the two read paths agree.
+
 - [ ] `unknown` — no compiled-parser factory (`ValueReaderFactoryRegistry` registers it, and `extern`, to
   `ErrorReader`), pinned down exactly by
   `CoreSchemaImportTest.exactlyTheUnknownAtomConstructorCompilesToAnErrorReader`. Not an unwritten atom
@@ -151,9 +177,24 @@ need are not retained for a secondary constructor.
 
 ## Synthetic entry identity
 
+- [ ] **Nothing marks a synthetic entry as synthetic.** Revision 33 adds `synthetic => @annotation void` to
+  meta-kernel and classifies it with `@alias` as a derived, name-position marker: resolver output puts
+  `@synthetic` on the schema-map *key* of every entry the resolver materialised, and ingest discards and
+  recomputes it ([TSON-SCHEMA] §6, §8.1, §8.2). This resolver materialises those entries and names them by a
+  content hash of the binding record, but attaches no marker, so a consumer of our output cannot tell a
+  synthetic entry from a declared one except by pattern-matching the name — which the spec makes
+  non-normative in the same breath. Two halves, and the second is why this has been invisible:
+- [ ] **Key-position annotations do not reach `TypeDefinition.annotations()` at all.** `@doc` before a
+  declared name, `@alias`, `@synthetic` — the whole name-position channel [TSON-SCHEMA] §6 calls "metadata
+  about the declaration" — is dropped on read and never written. `ResolvedFixtureTest` cannot catch it: the
+  Revision 33 fixtures carry `@synthetic` on nine keys and `@doc` on many more, and both sides of the
+  comparison render an empty `Annotations`, so the entries compare equal for the wrong reason. Fixing the
+  read side is what makes the marker testable; a test that reads a fixture key's `@synthetic` back should
+  land with it, or the emit side will pass on the same blind spot.
+
 - [ ] **Two entries for one type, where the argument is one number spelled two ways.** `vector<float32, 255>`
   and `vector<float32, 0xFF>` produce entries with byte-identical bodies, because identity derives from the
-  argument's token text where §4 makes the two one number. Blocked on `SPEC-FEEDBACK.md` #54 rather than on
+  argument's token text where §4 makes the two one number. Blocked on `SPEC-FEEDBACK.md` #4 rather than on
   effort: normalising numeric tokens before hashing is a three-line change, and doing it now would be this
   implementation inventing an identity rule the spec does not state, disagreeing with any implementation that
   read §5.10's "bare token" literally. The entry offers three resolutions and names the one that keeps both
@@ -320,6 +361,15 @@ surface.
 
 ## Documentation
 
+- [ ] **`tson-regex`'s divergences from RFC 9485 are undocumented, and the spec now requires them stated.**
+  [TSON-SCHEMA] §9 makes the `regex` atom's `spec` pin a strict gate and adds: an implementation "MUST
+  implement the pinned dialect as specified -- not a host library's near-relative -- and MUST document any
+  divergence it cannot avoid". `TsonRegex` is a native I-Regexp engine rather than a `java.util.regex`
+  wrapper, which is the hard half; what is missing is the statement -- which constructs are unenforced, that
+  `\p{...}` resolves through `Character.getType` and therefore against the JDK's Unicode version rather than
+  a pinned one, and where the disjointness decision is exact. A short section in the module's
+  `package-info.java` or a `docs/` note, linked from `regex`'s own documentation.
+
 - [ ] User-facing documentation on how to use the library — today only `CLAUDE.md`'s own dense,
   session-oriented internal narrative exists.
 - [ ] AI skills for using the library.
@@ -418,7 +468,7 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
       loop anyway, and that §8.1's byte offset was being re-derived from the decoded character rather than
       counted from the input. It also settles a question the spec leaves open: malformed UTF-8 is now a
       lexer error rather than a U+FFFD substitution, overlong forms and encoded surrogates included
-      (`SPEC-FEEDBACK.md` #59).
+      ([TSON-DATA] §7.1).
     - [x] **Build the diagnostic path lazily** — done. A step of the descent is a linked node and both RFC
       6901 pointers render only when a diagnostic is built: **-1.7 KB per read** (26,152 → 24,488 bytes).
       The part that matters for a port is not the bytes: concatenating a step onto the last is quadratic in
@@ -440,10 +490,10 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
   61,824 → **23,464 bytes** and 1,213 → ~800 objects per read, 19.5 → ~13 µs, with retention still a
   measured 0. Two conformance fixes came out of the work and matter more than the bytes for something about
   to be ported: a zero-led complex magnitude is accepted (§7.6), and malformed UTF-8 is refused rather than
-  silently replaced (`SPEC-FEEDBACK.md` #59).
+  silently replaced ([TSON-DATA] §7.1).
 - [ ] Confusable-character and bidi-formatting-character checks (§9.4-adjacent security hardening;
-  opt-in, and per `SPEC-FEEDBACK.md` #42 reported as ordinary errors when enabled, not warnings) —
+  opt-in, and reported as ordinary errors when enabled — §8.1 gives a conforming processor one severity) —
   the sibling gap to the numeric-literal length limit tracked in `STRUCTURED-OUTPUT.md`'s Tier 1 section;
-  neither is enforced anywhere yet. `SPEC-FEEDBACK.md` #34 is the fuller treatment: which UTS #39 mechanism
+  neither is enforced anywhere yet. `SPEC-FEEDBACK.md` #3 is the fuller treatment: which UTS #39 mechanism
   applies where, the comparison scopes TSON can actually name, and why a normative requirement would oblige
   every implementation to ship UCD data the JDK does not expose.

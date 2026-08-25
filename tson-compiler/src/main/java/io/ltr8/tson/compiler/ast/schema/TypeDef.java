@@ -7,10 +7,10 @@ package io.ltr8.tson.compiler.ast.schema;
  * one variant per top-level ABNF alternative:
  *
  * <ul>
- *   <li>{@link AtomRefinement} -- {@code "!" type-name ws "^" ws data-value} (§5.5)</li>
- *   <li>{@link Instance} -- {@code "!" type-name ws core-value} (§5.5, constructor application;
- *       corrected from the spec's own literal {@code data-value} -- see {@link Instance}'s own
- *       Javadoc and {@code SPEC-FEEDBACK.md})</li>
+ *   <li>{@link AtomRefinement} -- {@code "!" type-name ws "^" ws record-def} (§5.5); this parser still
+ *       accepts a full {@code data-value} there, a known gap ({@code BACKLOG.md})</li>
+ *   <li>{@link Instance} -- {@code "!" type-name ws core-value} (§5.5, constructor application -- see
+ *       {@link Instance}'s own Javadoc)</li>
  *   <li>{@link InstanceTemplate} -- {@code type-params ws "!" type-name ws template-def} (§12.1, a
  *       constructor application carrying parameters -- a production of its own, since its payload resolves
  *       against different vocabulary from {@link Instance}'s)</li>
@@ -22,8 +22,8 @@ package io.ltr8.tson.compiler.ast.schema;
  *
  * <p>Every variant has an ABNF alternative behind it -- each is parsed, never synthesised. §5.3's sized sugar
  * is no exception: {@code [T; 1..2]} is rewritten by {@code SchemaDesugarer} into the {@link Instance} its
- * bindings denote -- the sugar names {@code array} and binds its fields, materialising no entry of its own
- * ({@code SPEC-FEEDBACK.md} #45).
+ * bindings denote -- the sugar names {@code array} and binds its fields directly, with no size template in
+ * between.
  */
 public sealed interface TypeDef
         permits AtomRefinement, Instance, InstanceTemplate, StructuralTypeDef, ReferenceTypeDef {

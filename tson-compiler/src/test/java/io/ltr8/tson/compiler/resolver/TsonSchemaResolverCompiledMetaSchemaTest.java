@@ -194,7 +194,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT = """
             !!id:"https://example.test/mini.tn1"
-            !!meta:"https://tson.io/2026/32/m/meta.tn"
+            !!meta:"https://tson.io/2026/33/m/meta.tn"
             {
               void => !unit {}
             }
@@ -226,7 +226,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
     }
 
     private static final String MINI_DOCUMENT_NO_ID = """
-            !!meta:"https://tson.io/2026/32/m/meta.tn"
+            !!meta:"https://tson.io/2026/33/m/meta.tn"
             {
               void => !unit {}
             }
@@ -245,7 +245,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT_MALFORMED_ID = """
             !!id:"mini.tn1"
-            !!meta:"https://tson.io/2026/32/m/meta.tn"
+            !!meta:"https://tson.io/2026/33/m/meta.tn"
             {
               void => !unit {}
             }
@@ -263,7 +263,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT_MALFORMED_IMPORT = """
             !!id:"https://example.test/mini.tn1"
-            !!meta:"https://tson.io/2026/32/m/meta.tn"
+            !!meta:"https://tson.io/2026/33/m/meta.tn"
             !!import:"meta-kernel.tn"
             {
               void => !unit {}
@@ -282,8 +282,8 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT_IMPORT_MERGED = """
             !!id:"https://example.test/mini.tn1"
-            !!meta:"https://tson.io/2026/32/m/meta.tn"
-            !!import:"https://tson.io/2026/32/m/meta-kernel.tn"
+            !!meta:"https://tson.io/2026/33/m/meta.tn"
+            !!import:"https://tson.io/2026/33/m/meta-kernel.tn"
             {
               my_type => unit & {}
             }
@@ -309,8 +309,8 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT_IMPORT_COLLIDES_WITH_LOCAL = """
             !!id:"https://example.test/mini.tn1"
-            !!meta:"https://tson.io/2026/32/m/meta.tn"
-            !!import:"https://tson.io/2026/32/m/meta-kernel.tn"
+            !!meta:"https://tson.io/2026/33/m/meta.tn"
+            !!import:"https://tson.io/2026/33/m/meta-kernel.tn"
             {
               void => !unit {}
             }
@@ -332,9 +332,9 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT_DIAMOND_IMPORT = """
             !!id:"https://example.test/mini.tn1"
-            !!meta:"https://tson.io/2026/32/m/meta.tn"
-            !!import:"https://tson.io/2026/32/m/meta-kernel.tn"
-            !!import:"https://tson.io/2026/32/m/meta.tn"
+            !!meta:"https://tson.io/2026/33/m/meta.tn"
+            !!import:"https://tson.io/2026/33/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/33/m/meta.tn"
             {
               placeholder => unit
             }
@@ -344,7 +344,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
      * The bundled chain's own diamond: this document imports meta-kernel directly *and* meta.tn, which
      * imports meta-kernel itself. Every one of meta-kernel's names therefore arrives by two routes -- but
      * they are one schema's entries, so they unify rather than colliding, and {@code unit} resolves
-     * ({@code SPEC-FEEDBACK.md} #55). A name-occurrence collision rule rejects this document instead, which
+     * (§2.2.3). A name-occurrence collision rule rejects this document instead, which
      * is what makes the diamond unauthorable for every practical schema.
      */
     @Test
@@ -371,13 +371,13 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         // Completing at all is the proof; the assertions below just confirm it's genuinely usable.
         TsonCompiledMetaSchema compiled = loader.loadMeta(TsonBundledSchemas.META_KERNEL_ID);
 
-        // 59, matching a genuinely registered meta-kernel: the one-off bootstrap runs
+        // 60, matching a genuinely registered meta-kernel: the one-off bootstrap runs
         // MetaKernelBootstrapResolver's own raw output through TsonSchemaLinker.linkBootstrap (no
         // registry involved at all) purely so TsonSchemaLinker's own materialization step -- which
         // synthesizes 9 extra entries for argument-bearing type-refs, e.g. enum's own "members:
         // set<token>" -- runs before compiling. Never cached (see the next test) -- only the
         // *quality* of the one-off result changed, not its lifetime.
-        assertEquals(59, compiled.schema().entries().size());
+        assertEquals(60, compiled.schema().entries().size());
         // Genuinely usable: a concrete entry reads cleanly (the marker root `top` deliberately can't be
         // read without an explicit type-ref, so it isn't the check here).
         assertNotNull(compiled.compiledSchema().get("integer_size")
@@ -406,7 +406,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         TsonCompiledSchemaLoader loader = registry;
 
         TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
-                () -> loader.loadMeta("https://tson.io/2026/32/m/meta.tn"));
+                () -> loader.loadMeta("https://tson.io/2026/33/m/meta.tn"));
         assertTrue(thrown.getMessage().contains("no fetch capability"));
     }
 

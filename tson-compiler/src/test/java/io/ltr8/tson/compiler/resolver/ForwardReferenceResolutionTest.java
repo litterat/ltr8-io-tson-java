@@ -23,7 +23,7 @@ class ForwardReferenceResolutionTest {
     private static TsonSchema resolve(String body) {
         String document = """
                 !!id:"https://example.test/fwd.tn"
-                !!meta:"https://tson.io/2026/32/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/33/m/meta-kernel.tn"
                 {
                 """ + body + "\n}\n";
         SchemaResolver resolver = new SchemaResolver(new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext()));
@@ -54,7 +54,7 @@ class ForwardReferenceResolutionTest {
     void aSelfRecursiveRecordResolvesWithoutFalseTrippingCycleDetection() {
         // item references itself by field type -- a bare name, so it never enters the resolving set the way a
         // self-composition would. Resolves fine. (Unsatisfiable with a REQUIRED field -- no finite value --
-        // which resolution deliberately doesn't police; see SPEC-FEEDBACK.md #25.)
+        // which resolution deliberately doesn't police -- §5.10.1's productivity rule is the linker's.)
         TsonSchema resolved = resolve("  item => { inner: item }");
 
         assertNotNull(resolved.entries().get("item"));

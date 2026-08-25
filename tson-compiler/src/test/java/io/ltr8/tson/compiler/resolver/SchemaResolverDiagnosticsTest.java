@@ -43,8 +43,8 @@ class SchemaResolverDiagnosticsTest {
      */
     private static final String FOUR_BROKEN = """
             !!id:"https://example.test/broken.tn"
-            !!meta:"https://tson.io/2026/32/m/meta.tn"
-            !!import:"https://tson.io/2026/32/m/core.tn"
+            !!meta:"https://tson.io/2026/33/m/meta.tn"
+            !!import:"https://tson.io/2026/33/m/core.tn"
             {
               widens => !uint8 ^ { min: -10  max: 300 }
               fine => int32
@@ -129,8 +129,8 @@ class SchemaResolverDiagnosticsTest {
     void aDeclarationThatFailsWhileNestedIsReportedOnceAndAgainstItself() {
         List<Diagnostic> diagnostics = resolveCollecting("""
                 !!id:"https://example.test/broken.tn"
-                !!meta:"https://tson.io/2026/32/m/meta.tn"
-                !!import:"https://tson.io/2026/32/m/core.tn"
+                !!meta:"https://tson.io/2026/33/m/meta.tn"
+                !!import:"https://tson.io/2026/33/m/core.tn"
                 {
                   child => !uint8 ^ { min: -10 }
                   parent => child & { extra: int32 }
@@ -152,8 +152,8 @@ class SchemaResolverDiagnosticsTest {
     void aBodyTheConstructorsVocabularyRejectsJoinsTheOtherDiagnostics() {
         List<Diagnostic> diagnostics = resolveCollecting("""
                 !!id:"https://example.test/broken.tn"
-                !!meta:"https://tson.io/2026/32/m/meta.tn"
-                !!import:"https://tson.io/2026/32/m/core.tn"
+                !!meta:"https://tson.io/2026/33/m/meta.tn"
+                !!import:"https://tson.io/2026/33/m/core.tn"
                 {
                   bad_min => !integer ^ { min: "abc" }
                   bad_max => !integer ^ { max: "xyz" }
@@ -174,7 +174,7 @@ class SchemaResolverDiagnosticsTest {
 
     /**
      * Both sugar forms the desugar phase can reject, in one schema, alongside a good declaration. Neither is
-     * a consequence of the other: a vacuous floor of zero ({@code SPEC-FEEDBACK.md} #42) and a size range no
+     * a consequence of the other: a vacuous floor of zero (§5.3's resolver error) and a size range no
      * array can satisfy (§5.3's {@code min_items <= max_items}, deferred to the materialising application by
      * §8.2). Before this, the first of them aborted the run.
      *
@@ -187,8 +187,8 @@ class SchemaResolverDiagnosticsTest {
     void everyInvalidSugarFormIsReportedInOnePass() {
         List<Diagnostic> diagnostics = resolveCollecting("""
                 !!id:"https://example.test/broken.tn"
-                !!meta:"https://tson.io/2026/32/m/meta.tn"
-                !!import:"https://tson.io/2026/32/m/core.tn"
+                !!meta:"https://tson.io/2026/33/m/meta.tn"
+                !!import:"https://tson.io/2026/33/m/core.tn"
                 {
                   vacuous => [int32; 0..]
                   inverted => [int32; 5..3]
@@ -215,8 +215,8 @@ class SchemaResolverDiagnosticsTest {
     void aSugarFormErrorAndAResolutionErrorAreBothReported() {
         List<Diagnostic> diagnostics = resolveCollecting("""
                 !!id:"https://example.test/broken.tn"
-                !!meta:"https://tson.io/2026/32/m/meta.tn"
-                !!import:"https://tson.io/2026/32/m/core.tn"
+                !!meta:"https://tson.io/2026/33/m/meta.tn"
+                !!import:"https://tson.io/2026/33/m/core.tn"
                 {
                   vacuous => [int32; 0..]
                   widens => !uint8 ^ { min: -10  max: 300 }
@@ -240,8 +240,8 @@ class SchemaResolverDiagnosticsTest {
     void aDependentOfAFailedSugarFormDoesNotReportAConsequence() {
         List<Diagnostic> diagnostics = resolveCollecting("""
                 !!id:"https://example.test/broken.tn"
-                !!meta:"https://tson.io/2026/32/m/meta.tn"
-                !!import:"https://tson.io/2026/32/m/core.tn"
+                !!meta:"https://tson.io/2026/33/m/meta.tn"
+                !!import:"https://tson.io/2026/33/m/core.tn"
                 {
                   vacuous => [int32; 0..]
                   user => vacuous & { extra: int32 }
@@ -257,8 +257,8 @@ class SchemaResolverDiagnosticsTest {
     void withoutAReceiverAnInvalidSugarFormStillThrows() {
         TsonSchemaParser parser = new TsonSchemaParser("""
                 !!id:"https://example.test/broken.tn"
-                !!meta:"https://tson.io/2026/32/m/meta.tn"
-                !!import:"https://tson.io/2026/32/m/core.tn"
+                !!meta:"https://tson.io/2026/33/m/meta.tn"
+                !!import:"https://tson.io/2026/33/m/core.tn"
                 {
                   vacuous => [int32; 0..]
                   fine => int32

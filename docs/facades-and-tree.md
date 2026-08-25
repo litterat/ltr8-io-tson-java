@@ -72,7 +72,8 @@ reads one value at a cursor and polices nothing around it.
   **Rule 3 is a reader policy, not a parsing one** — the parse step still preserves every marker per §5.1;
   what a reader *type-checking* a value does with one it can't link is the layer above, where a
   case-sensitive typo (`!Uuid`) silently disabling the author's intended validation is the worse failure
-  (`SPEC-FEEDBACK.md` #7, whose suggested resolution this is). `preservingUnknownTypeRefs()` on either
+  (a reader policy: §7.1 asks only that an unresolved type annotation be treated as informational, and
+  reporting it is the stricter reading). `preservingUnknownTypeRefs()` on either
   facade opts out of rule 3 only — built-in names stay checked — and is what round-tripping through
   `TsonTreeWriter`, or reading the wire of a document whose `!!schema` is deliberately out of scope, wants.
 - **Rule 2 is looser for a container than for an atom, deliberately.** `TypeRefCheck.names` (a `@Typename`,
@@ -131,8 +132,8 @@ reads one value at a cursor and polices nothing around it.
   data-value, so the type-ref rules above reach into it: it is read by the enclosing reader itself, hence
   exactly as strictly. The one exception is the schema-driven *fallback* (a name the governing schema
   doesn't declare), which reads its value through a **preserving** reader — §1.5 already keeps an annotation
-  nothing can interpret, and rejecting its innards would take that back. This is deliberately stricter than
-  Class 2 conformance requires, which asks for nothing at all here (`SPEC-FEEDBACK.md` #29).
+  nothing can interpret, and rejecting its innards would take that back. §1.3's Class 2 list requires the
+  resolution and validation; the preserving reader is how the two rules meet.
     - **Checked wherever it is written, kept only where there is room** — the two are different questions and
       `AnnotationTypes` now separates them (`capture()` vs `validating()`; `discarding()` is the vocabulary
       that drops its result and checks it anyway). Whether an annotation has somewhere to land is a fact
@@ -272,8 +273,7 @@ annotation-aware, every node carrying its own `typeRef()` and `annotations()`.
   kind: `TsonAbsent` is what a consumer asks about, and a JSON-shaped `null` reaching a tree read means
   the same thing `_` does. Two consequences worth knowing — a schemaless `null` re-emits as `_` through
   `TsonTreeWriter` (absence has one written form), and a `_` map key and a `null` map key share one
-  identity in `SchemalessTreeReader`'s duplicate check, an extension of the decoded-vs-textual divergence
-  `SPEC-FEEDBACK.md` #43 already argues.
+  identity in `SchemalessTreeReader`'s duplicate check, an extension of the decoded-value layer §2.6 names.
 - **None of this reaches a schema-typed position.** [TSON-SCHEMA] §7.3: `null` "has no special status when
   a schema is in scope — [its] meaning is determined entirely by the position's type", so `null` at a
   `text` position is the string `"null"`. The sole exception is a `void`-typed position, where `VoidReader`

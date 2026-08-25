@@ -40,7 +40,8 @@ public record ComplexType(Component component) implements Atom {
      * progressively smaller ones. Treating it as an identity facet a refinement may restate but not
      * swap would reject core.tn's own documented usage, which calls {@code !complex ^ { component:
      * FLOAT64 } } a narrowing of a {@code component: NUMBER} source even though approximate binary64
-     * values are not a subset of the exact tier. §5.7 leaves "tightens" undefined for a facet that
-     * does not order, so nothing here is decidable -- see {@code SPEC-FEEDBACK.md} #27.
+     * values are not a subset of the exact tier. §5.7's per-facet rule settles it: a selector "may be set
+     * where the source leaves it at the constructor's default ... and is thereafter identity-only", which is
+     * exactly core.tn's usage, so nothing here narrows in the ordered sense.
      */
 }

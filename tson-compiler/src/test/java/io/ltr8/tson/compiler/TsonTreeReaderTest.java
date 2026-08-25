@@ -197,7 +197,7 @@ class TsonTreeReaderTest {
     /**
      * §2.5/§2.6 are Part 1 rules, so a repeat is an error with no schema in scope too -- a document whose
      * verdict turned on whether a schema happened to be in scope is exactly the interoperability failure
-     * {@code SPEC-FEEDBACK.md} #41/#42 argues against. The recovery still applies to the record's fields;
+     * the MUST NOT exists to prevent. The recovery still applies to the record's fields;
      * the map is structure-preserving and keeps both entries, the diagnostic being the verdict.
      */
     @Test
@@ -216,9 +216,8 @@ class TsonTreeReaderTest {
     }
 
     /**
-     * Two spellings of one number are one key: the comparison is on the decoded value, not the wire text.
-     * §2.6's own rule is textual and would keep these apart — the deliberate divergence
-     * {@code SPEC-FEEDBACK.md} #43 argues for and asks the spec to settle.
+     * Two spellings of one number are one key: the comparison is on the decoded value, not the wire text,
+     * which is §2.6's own second layer -- "a processor that decodes values compares decoded values".
      */
     @Test
     void aRepeatedKeyIsJudgedOnTheDecodedValue() {

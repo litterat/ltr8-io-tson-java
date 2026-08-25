@@ -84,7 +84,7 @@ class DurationParserTest {
     @Test
     void weekFormIsNotAccepted() {
         // ISO 8601 also defines a PnW alternative form -- TSON's own table gives the format as
-        // literally PnYnMnDTnHnMnS with no W, read here as exhaustive. See SPEC-FEEDBACK.md #12.
+        // literally PnYnMnDTnHnMnS with no W, read here as exhaustive. See SPEC-FEEDBACK.md #1.
         assertThrows(AtomParseException.class, () -> DurationParser.UNCONSTRAINED.read(token("P3W")));
     }
 

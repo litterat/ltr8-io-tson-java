@@ -24,7 +24,7 @@ import java.util.Set;
  * NamedDispatchReader}. The derived {@code disjoint} fact already <em>is</em> class-distinctness -- {@code
  * ChoiceDisjointness} classifies through the same {@link DiscriminationClass#of} -- so a same-class pair
  * (two numbers, two strings) is never disjoint and always keeps the tag, no matter how separated its value
- * sets ({@code (email | uri)}); see {@code SPEC-FEEDBACK.md} #47. A {@code BRACE}/{@code BRACKET} variant
+ * sets ({@code (email | uri)}), which §5.4 forbids proving. A {@code BRACE}/{@code BRACKET} variant
  * still keeps the tag here: recovery dispatches on a scalar token's resolved class, and structural recovery
  * from a container's opening delimiter isn't attempted yet.
  */

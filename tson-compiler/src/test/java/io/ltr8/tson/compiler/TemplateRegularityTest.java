@@ -26,8 +26,8 @@ class TemplateRegularityTest {
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/regularity.tn"
-                !!meta:"https://tson.io/2026/32/m/meta.tn"
-                !!import:"https://tson.io/2026/32/m/core.tn"
+                !!meta:"https://tson.io/2026/33/m/meta.tn"
+                !!import:"https://tson.io/2026/33/m/core.tn"
                 {
                   box => <T> { v: T }
                 %s

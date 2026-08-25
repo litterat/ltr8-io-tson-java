@@ -32,8 +32,8 @@ class SchemaAnnotationScopeTest {
     private static final String LIB_ID = "https://example.test/annotation-lib.tn";
     private static final String LIB = """
             !!id:"https://example.test/annotation-lib.tn"
-            !!meta:"https://tson.io/2026/32/m/meta.tn"
-            !!import:"https://tson.io/2026/32/m/core.tn"
+            !!meta:"https://tson.io/2026/33/m/meta.tn"
+            !!import:"https://tson.io/2026/33/m/core.tn"
             {
               status => @annotation int32
             }
@@ -43,8 +43,8 @@ class SchemaAnnotationScopeTest {
     private static final String META_HTTP_ID = "https://example.test/meta-http.tn";
     private static final String META_HTTP = """
             !!id:"https://example.test/meta-http.tn"
-            !!meta:"https://tson.io/2026/32/m/meta-kernel.tn"
-            !!import:"https://tson.io/2026/32/m/meta.tn"
+            !!meta:"https://tson.io/2026/33/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/33/m/meta.tn"
             {
               method => @annotation text
             }
@@ -79,8 +79,8 @@ class SchemaAnnotationScopeTest {
     void aLocallyDeclaredAnnotationTypeIsReportedAtEveryUseSite() {
         List<Diagnostic> problems = validate("""
                 !!id:"https://example.test/local-annotations.tn"
-                !!meta:"https://tson.io/2026/32/m/meta.tn"
-                !!import:"https://tson.io/2026/32/m/core.tn"
+                !!meta:"https://tson.io/2026/33/m/meta.tn"
+                !!import:"https://tson.io/2026/33/m/core.tn"
                 {
                   method => @annotation text
                   @method:"POST" order => { id: int32 }
@@ -100,8 +100,8 @@ class SchemaAnnotationScopeTest {
     void anImportedAnnotationTypeIsReportedTheSameWay() {
         List<Diagnostic> problems = validate("""
                 !!id:"https://example.test/imported-annotations.tn"
-                !!meta:"https://tson.io/2026/32/m/meta.tn"
-                !!import:"https://tson.io/2026/32/m/core.tn"
+                !!meta:"https://tson.io/2026/33/m/meta.tn"
+                !!import:"https://tson.io/2026/33/m/core.tn"
                 !!import:"https://example.test/annotation-lib.tn"
                 {
                   order => @status:201 { id: int32 }
@@ -120,8 +120,8 @@ class SchemaAnnotationScopeTest {
     void anAnnotationTypeThatExistsNowhereIsReportedToo() {
         List<Diagnostic> problems = validate("""
                 !!id:"https://example.test/unknown-annotation.tn"
-                !!meta:"https://tson.io/2026/32/m/meta.tn"
-                !!import:"https://tson.io/2026/32/m/core.tn"
+                !!meta:"https://tson.io/2026/33/m/meta.tn"
+                !!import:"https://tson.io/2026/33/m/core.tn"
                 {
                   order => @no_such_annotation:"x" { id: int32 }
                 }
@@ -141,8 +141,8 @@ class SchemaAnnotationScopeTest {
     void aValuelessMarkerIsCheckedAsWell() {
         List<Diagnostic> problems = validate("""
                 !!id:"https://example.test/marker-annotation.tn"
-                !!meta:"https://tson.io/2026/32/m/meta.tn"
-                !!import:"https://tson.io/2026/32/m/core.tn"
+                !!meta:"https://tson.io/2026/33/m/meta.tn"
+                !!import:"https://tson.io/2026/33/m/core.tn"
                 {
                   reviewed => @annotation void
                   order => @reviewed { id: int32 }
@@ -163,7 +163,7 @@ class SchemaAnnotationScopeTest {
         String schema = """
                 !!id:"https://example.test/meta-governed.tn"
                 !!meta:"https://example.test/meta-http.tn"
-                !!import:"https://tson.io/2026/32/m/core.tn"
+                !!import:"https://tson.io/2026/33/m/core.tn"
                 {
                   @method:"POST" order => { id: int32 }
                   item => @method:"GET" { id: int32 }

@@ -30,8 +30,8 @@ class ValueParamFixedFieldTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/value-param.tn"
-            !!meta:"https://tson.io/2026/32/m/meta.tn"
-            !!import:"https://tson.io/2026/32/m/core.tn"
+            !!meta:"https://tson.io/2026/33/m/meta.tn"
+            !!import:"https://tson.io/2026/33/m/core.tn"
             {
               order    => { id: text }
               literal  => { status: int32 = 201  body: order }

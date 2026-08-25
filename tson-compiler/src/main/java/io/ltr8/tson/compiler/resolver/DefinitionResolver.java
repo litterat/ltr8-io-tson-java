@@ -329,9 +329,10 @@ final class DefinitionResolver {
      * A declaration's own annotations -- the ones written <em>after</em> {@code =>}, which §6 says annotate
      * the definition. Those written before the name annotate the <em>name</em> instead, and §6 is explicit
      * that a resolver "does not hoist annotations from key to value", so they are not collected here.
-     * <b>They are dropped</b>: §8.1's {@code type_definition} is what resolution produces and a name-bound
-     * annotation is not part of it, so keeping them would require a parallel name-keyed structure with no
-     * defined consumer (see {@code SPEC-FEEDBACK.md}).
+     * <b>They are dropped, and that is now a gap</b>: §6 and §8.1 place a name-position annotation on the
+     * output schema-map <em>key</em> and preserve it there -- documentation, lifecycle, and the resolver's
+     * own derived {@code @alias}/{@code @synthetic} markers all live in that channel. Carrying it needs a
+     * name-keyed structure this model does not have ({@code BACKLOG.md}).
      *
      * <p>A value is bound through the governing meta the same way §6 describes reading one: the annotation's
      * name resolves one hop against the structure namespace, and its value is read by that type's own
@@ -466,7 +467,8 @@ final class DefinitionResolver {
      * or this is a resolver error (the spec's own suggested diagnostic: "did you mean atom
      * refinement?"). {@code value} is bound via {@link #bindAtomInstance} directly --
      * {@code instance.value().typeRef()} already names {@code C} (per {@code Instance}'s own
-     * reshape, {@code SPEC-FEEDBACK.md} #16); positional form (§5.6) and schema-composed defaults
+     * reshape, matching §12.1's {@code instance = "!" type-name ws core-value}); positional form (§5.6) and
+     * schema-composed defaults
      * (§5.2/§5.7) are handled uniformly by the compiled {@code Record*Reader} itself (see {@code
      * RecordAbstractReader}'s own Javadoc), not by a separate normalization step here -- {@code C}'s
      * own body is always record-shaped (checked below), so every real call reaches one. Construction
@@ -668,8 +670,8 @@ final class DefinitionResolver {
      * {@code integer}).
      *
      * <p>Unlike {@link #resolveInstance}, {@code refinement.bindings()}'s own {@code typeRef} is not
-     * pre-set by the grammar ({@code atom-refinement}'s own grammar defect, {@code
-     * SPEC-FEEDBACK.md} #16), so this attaches {@code I}'s constructor name to the value's type-ref
+     * pre-set by the grammar -- §12.1's {@code atom-refinement} takes a bare {@code record-def}, naming no
+     * constructor -- so this attaches {@code I}'s constructor name to the value's type-ref
      * itself before binding through {@link #bindAtomInstance}. No positional-form wrapping (unlike
      * {@code Instance}) -- §5.5 guarantees a refinement body is always a braced record; {@link
      * #mergeWithSource} rejects anything else.
@@ -752,8 +754,8 @@ final class DefinitionResolver {
     }
 
     /**
-     * §5.7's "Body materialisation" rule, applied to atom refinement (§5.6, {@code
-     * SPEC-FEEDBACK.md} #17): {@code newBindings} merged *over* {@code sourceBody}'s own
+     * §5.7's "Body materialisation" rule, applied to atom refinement (§5.6's chained-refinement merge):
+     * {@code newBindings} merged *over* {@code sourceBody}'s own
      * already-bound fields, not replacing them. {@code sourceBody} is re-serialized back to plain
      * record wire form via {@code TsonObjectWriter.toTson} (writing a {@code Top}-typed value by its
      * own runtime class never emits a type-ref -- exactly the plain-record shape wanted here) and
@@ -996,7 +998,8 @@ final class DefinitionResolver {
                 // A choice or an inline array/tuple at a supertype position. §12.1 lets these through only
                 // because `construction-def` draws its operands from `type-ref` where `refined-def` takes a
                 // name -- nothing here could ever denote a record, so there is no field set to compose with
-                // and no implementation to wait for. SPEC-FEEDBACK.md #38 argues the production is the defect.
+                // and no implementation to wait for; §12.1's `supertype-ref` narrows the operands to named
+                // references, so this shape is the grammar's own error to refuse.
                 throw new TsonSchemaValidationException("'" + name + "': a "
                         + (supertypeRef instanceof ChoiceRef ? "choice" : "bracketed array/tuple")
                         + " cannot be a supertype -- '&' composes record types, and this form has "
@@ -1011,10 +1014,8 @@ final class DefinitionResolver {
                         + "' names no type this schema declares or imports");
             }
             if (!(supertypeDef.body() instanceof RecordBody supertypeBody)) {
-                // §5.8 states no equivalent of §5.7's "Refinement requires a vocabulary body", though
-                // composition has the same need -- it copies the parent's fields, and a binding record has
-                // none to copy. Read as the author's error under the same principle; SPEC-FEEDBACK.md #38
-                // asks for the rule to be stated.
+                // §4.3 generalises §5.7's vocabulary-body requirement to composition, which has the same
+                // need: it copies the parent's fields, and a binding record has none to copy.
                 throw new TsonSchemaValidationException("'" + name + "': supertype '" + supertypeName
                         + "' has no fields to contribute -- its body is a binding record, not a vocabulary, so "
                         + "there is nothing for '&' to compose with (§5.8, and §5.7's vocabulary-body rule "
@@ -1057,9 +1058,9 @@ final class DefinitionResolver {
         //
         // Emptied for EVERY supertype, including one that contributed nothing to the removal: `A & B - { f }`
         // with `f` from A loses IS-A with B as well, though every field B declares survives untouched. That is
-        // §5.9's letter ("the IS-A lattice is empty") against §4.3's "composition grants IS-A per parent";
-        // SPEC-FEEDBACK.md #37 argues the per-ancestor alternative and why this implementation conforms
-        // anyway. An author wanting partial IS-A subtracts first and composes second, which says it outright.
+        // §4.3's own precision ("subtraction revokes IS-A for every parent while keeping lineage"), for the
+        // reason §5.9 gives: the clause is head-level, so its effect must be readable without scanning the
+        // parents' field sets. An author wanting partial IS-A subtracts first and composes second.
         List<String> contract = construction.removal().isPresent() ? List.of() : transitiveSupertypes;
         return new TypeDefinition(Optional.empty(), kind, parameters, constructor, contract, List.of(),
                 Optional.empty(), body);
@@ -1097,8 +1098,8 @@ final class DefinitionResolver {
      * <p>Groups (§5.11): a removed member leaves its group's {@code members}, and a group left with one member
      * is dissolved -- the survivor becomes an ordinary field taking the group's own state, since a group's
      * members are flattened as {@code OPTIONAL} whatever the group says. Removing every member of a group
-     * drops the group with them; §5.11 speaks only of the reduced-to-one case, and there is nothing left for
-     * an empty group to constrain ({@code SPEC-FEEDBACK.md} #36).
+     * drops the group with them -- §5.11 runs the ladder to zero and states the two-member minimum as an
+     * invariant of resolved output.
      */
     private static void applyRemovals(String declarationName, RemovalSet removal, Set<String> bodyDeclared,
                                        List<RecordField> fields, List<FieldGroup> groups) {
@@ -1737,7 +1738,7 @@ final class DefinitionResolver {
      * <p><b>That last branch is unreachable through the ordinary pipeline</b>: {@link SchemaDesugarer}
      * materialises an entry for every application and leaves a bare reference behind, so this method
      * sees {@link SimpleRef} where §5.3 would put a structural {@code type_ref}. The materialising
-     * choice is deliberate and argued in {@code SPEC-FEEDBACK.md} #50 -- §8.2's {@code type_argument}
+     * choice is §8.2's own ("every application materialises") -- and {@code type_argument}
      * binds positionally against the head's declared parameters and so cannot carry a vocabulary field
      * no parameter routes. The branch is kept because it is the shape the structural form takes, and
      * because a caller reaching this resolver without the desugar pass still resolves.

@@ -638,8 +638,7 @@ public final class TsonDataStream implements TsonEventSource {
      * A bare {@code core-value} (§2.3, §7.4) -- no annotation/type-ref layer. Split out of {@link
      * DataValueFrame} so {@link #nextCoreValueEvents()} can drive exactly this narrower
      * production directly, for [TSON-SCHEMA] §5.5's {@code instance} ({@code "!" type-name ws
-     * core-value}, corrected from the spec's own literal {@code data-value} -- see {@code
-     * SPEC-FEEDBACK.md}), which must not accept a payload with its own competing annotations/type-ref.
+     * core-value}), which must not accept a payload with its own competing annotations/type-ref.
      */
     private final class CoreValueFrame extends Frame {
         @Override

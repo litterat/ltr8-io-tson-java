@@ -32,8 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>The motivating case is an HTTP API described at the schema layer, because that is the only layer that
  * can name request and response types <em>by name</em> -- a data document can only instantiate a type. The
- * kernel's {@code data} base kind is what lets such an entry say it is not a type ([TSON-SCHEMA] §4.1,
- * {@code SPEC-FEEDBACK.md} #57).
+ * kernel's {@code data} base kind is what lets such an entry say it is not a type ([TSON-SCHEMA] §4.1).
  *
  * <p><b>The wiring, in full, is three things</b> -- there is nothing else to register:
  * <ol>
@@ -54,8 +53,8 @@ class MetaLayerDataConstructorTest {
     /** (1) The meta-layer schema. `~data &`: an operation describes an endpoint, not a data value. */
     private static final String META_HTTP_SCHEMA = """
             !!id:"https://example.test/meta-http.tn"
-            !!meta:"https://tson.io/2026/32/m/meta-kernel.tn"
-            !!import:"https://tson.io/2026/32/m/meta.tn"
+            !!meta:"https://tson.io/2026/33/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/33/m/meta.tn"
             {
               operation => ~data & {
                 path:     text
@@ -114,7 +113,7 @@ class MetaLayerDataConstructorTest {
         DOCUMENTS.put(id, """
                 !!id:"%s"
                 !!meta:"https://example.test/meta-http.tn"
-                !!import:"https://tson.io/2026/32/m/core.tn"
+                !!import:"https://tson.io/2026/33/m/core.tn"
                 {
                   search_request  => { q: text }
                   search_response => { hits: [text] }

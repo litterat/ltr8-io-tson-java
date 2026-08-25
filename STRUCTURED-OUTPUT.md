@@ -53,8 +53,8 @@ backend.
     carry a structured code to route on yet (still open, see below); `UNRECOGNIZED_FIELD` now lands too,
     carrying the type's real field list in `expected` (§7.2's record closure — the one place `expected`
     already says what this bullet's item (4) asks for); `DUPLICATE_MAP_KEY` is produced for real, and
-    `DUPLICATE_FIELD` joined it for the record half — §2.5/§2.6 word both as *warnings*, but per
-    `SPEC-FEEDBACK.md` #41/#42 every warn-shaped rule is implemented as an ordinary error.
+    `DUPLICATE_FIELD` joined it for the record half — §2.5/§2.6 make both MUST NOT, and §8.1 gives a
+    conforming processor one severity, so there is no warn-shaped rule left to implement as anything else.
   - `message` — landed, **hand-composed at each call site, and staying that way**. Synthesizing it from
     `code` + params was reconsidered and dropped; see item (5) below for the reasoning.
   - `expected`/`actual` — landed, both carrying what they should. `actual` is the offending value
@@ -247,16 +247,17 @@ all, with no decoder integration required.
   would be `TsonJsonParser`) that produces the *same* `DataValue`/`CoreValue` AST
   `TsonDataParser` does is what lets everything downstream — resolution, the compiled Class 2
   reader stack — be reused completely unchanged.
-- [ ] **Duplicate object member names are a genuine fork, and the JSON front-end has to pick.** TSON §2.5
-  is last-value-wins, and this implementation overwrites as it streams (`SPEC-FEEDBACK.md` #21 covers the
-  TSON side, including that a shadowed occurrence is still validated). JEP 540 goes the other way for JSON
-  and argues it at length: duplicates are an unconditional parse error, on the grounds that RFC 8259's
-  "SHOULD be unique" leaves an ambiguous object whose "behavior of software that receives such an object is
-  unpredictable", citing RFC 9413 on robust protocols, and betting the 2013-era documents that motivated
-  the leniency have since been fixed. A `TsonJsonParser` producing the same `DataValue`/`CoreValue` AST
-  inherits TSON's rule by default, silently — so this needs deciding, not discovering. Reading JSON
-  *against a TSON schema* is the case that matters: accepting a duplicate there means validating a
-  document the JDK's own parser would reject.
+- [ ] **Duplicate object member names: the fork has closed, and the JSON front-end should inherit
+  deliberately rather than by accident.** TSON §2.5/§2.6 now reject duplicates outright, with the diagnostic
+  at the repeated occurrence, and this implementation does (last-value-wins survives only as the recovery
+  underneath). JEP 540 lands in the same place for JSON and argues it at length: duplicates are an
+  unconditional parse error, on the grounds that RFC 8259's "SHOULD be unique" leaves an ambiguous object
+  whose "behavior of software that receives such an object is unpredictable", citing RFC 9413 on robust
+  protocols, and betting the 2013-era documents that motivated the leniency have since been fixed. So a
+  `TsonJsonParser` producing the same `DataValue`/`CoreValue` AST inherits the right rule by default — what
+  remains is to assert it, since the agreement is now load-bearing for the case that matters: reading JSON
+  *against a TSON schema*, where accepting a duplicate would validate a document the JDK's own parser
+  rejects.
 
 - [ ] **JSON `null` at a non-`void` position reads as the string `"null"`, and that is the spec's answer,
   not a bug.** [TSON-SCHEMA] §7.3 gives `null` no special status under a schema — "their meaning is

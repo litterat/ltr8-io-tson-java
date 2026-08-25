@@ -104,7 +104,7 @@ final class TemplateMaterialiser {
      * failure, if that check ever has a hole, is a {@link StackOverflowError} -- not a diagnosis, and not
      * something the exception policy can classify. One comparison for that is worth paying.
      *
-     * <p>Distinct from {@code SPEC-FEEDBACK.md} #25, which is about a type with no finite <em>data</em>
+     * <p>Distinct from §5.10.1's productivity rule, which is about a type with no finite <em>data</em>
      * model; the regularity rule is about one with no finite <em>type</em> model.
      */
     private static final int MAX_CLOSING_DEPTH = 64;
@@ -532,9 +532,9 @@ final class TemplateMaterialiser {
      * unrouted field never reaches here, {@code value_param} being what selects it. A default stays a
      * default: data may still override it.
      *
-     * <p>§5.7 names only one downstream fixation site, a refinement deriving from an application head, and
-     * leaves a record template's materialised field unstated; {@code SPEC-FEEDBACK.md} #58 has the case for
-     * reading them the same way.
+     * <p>§5.7 names this downstream outright: "fixation happens at materialisation, where values are
+     * concrete" -- a field whose {@code value_param} binds to a concrete argument takes the state its
+     * literal spelling would have.
      */
     private static RecordField bindValue(RecordField field, String head, Map<String, TypeArgument> bindings) {
         if (field.valueParam().isEmpty()) {

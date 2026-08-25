@@ -15,8 +15,8 @@ import java.util.Optional;
  * four different constructors. Pure constraint values, no parsing/validation behavior -- {@code
  * tson-compiler}'s {@code BinaryParser} holds one of these and does the actual reading/writing.
  *
- * <p>Named {@code BinaryType} here despite meta.tn1's constructor being spelled {@code binary}, not
- * {@code binary_type} like every other constructor -- see {@code SPEC-FEEDBACK.md} #11. The
+ * <p>Named {@code BinaryType} here despite meta.tn's constructor being spelled {@code binary}, not
+ * {@code binary_type} like every other constructor. The
  * {@code @Typename} below is {@code "binary"} to match, not {@code "binary_type"}.
  *
  * <p>{@code minLength}/{@code maxLength} are modeled for structural fidelity (meta.tn1 defines

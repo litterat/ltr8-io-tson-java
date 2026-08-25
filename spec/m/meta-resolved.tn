@@ -1,7 +1,7 @@
-!!id:"https://tson.io/2026/32/m/meta-resolved.tn"
-!!schema:"https://tson.io/2026/32/m/meta-kernel.tn"
+!!id:"https://tson.io/2026/33/m/meta-resolved.tn"
+!!schema:"https://tson.io/2026/33/m/meta-kernel.tn"
 @doc:"""
-  Resolver-output fixture for meta.tn (2026 Revision 32 draft).
+  Resolver-output fixture for meta.tn (2026 Revision 33 draft).
   Parse the source schema, run the resolver, canonicalise, compare.
   Conventions as in meta-kernel-resolved.tn.
 
@@ -344,11 +344,14 @@
   }
 
   @doc:"""
-    Synthetic entries — the closed forms the sugar lifts to (CR D5); see
-    meta-kernel-resolved.tn's own note. `xxhash` stands for a content hash
-    of the resolved binding record and is not a conformance point.
+    Synthetic entries — the closed forms the sugar lifts to; see
+    meta-kernel-resolved.tn's own note. Each key carries the derived
+    `@synthetic` marker (Part 2 Sections 6, 8.2). `xxhash` stands for
+    a content hash of the resolved binding record and is a
+    placeholder — the hash value is not a conformance point, only
+    the shape of the entry.
     """
-  array_value_xxhash => !type_definition {
+  @synthetic array_value_xxhash => !type_definition {
     kind: PRODUCT
     source: array
     body: !array { element_type: value }

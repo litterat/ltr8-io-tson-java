@@ -27,8 +27,8 @@ class ValidateCommandTest {
 
     private static final String RECORD_SCHEMA = """
             !!id:"https://example.test/cli-validate.tn1"
-            !!meta:"https://tson.io/2026/32/m/meta.tn"
-            !!import:"https://tson.io/2026/32/m/core.tn"
+            !!meta:"https://tson.io/2026/33/m/meta.tn"
+            !!import:"https://tson.io/2026/33/m/core.tn"
             {
               my_record => { a: int32  b: int32 }
             }
@@ -158,8 +158,8 @@ class ValidateCommandTest {
         Path recordSchema = writeFile(dir, "record.tn1", RECORD_SCHEMA);
         Path pointSchema = writeFile(dir, "point.tn1", """
                 !!id:"https://example.test/cli-point.tn1"
-                !!meta:"https://tson.io/2026/32/m/meta.tn"
-                !!import:"https://tson.io/2026/32/m/core.tn"
+                !!meta:"https://tson.io/2026/33/m/meta.tn"
+                !!import:"https://tson.io/2026/33/m/core.tn"
                 { point => { x: int32  y: int32 } }
                 """);
         Path recordData = writeFile(dir, "rec.tson", selfDescribing("{ a: 1  b: 2 }"));
@@ -289,8 +289,8 @@ class ValidateCommandTest {
         // canonical identity (the hash is not identity), so it still validates.
         Path schema = writeFile(dir, "schema.tn1",
                 "!!id:\"https://example.test/cli-validate.tn1?sha256=" + "a".repeat(64) + "\"\n"
-                        + "!!meta:\"https://tson.io/2026/32/m/meta.tn\"\n"
-                        + "!!import:\"https://tson.io/2026/32/m/core.tn\"\n"
+                        + "!!meta:\"https://tson.io/2026/33/m/meta.tn\"\n"
+                        + "!!import:\"https://tson.io/2026/33/m/core.tn\"\n"
                         + "{ my_record => { a: int32  b: int32 } }\n");
         Path data = writeFile(dir, "data.tson", selfDescribing("{ a: 1  b: 2 }"));
 
@@ -305,8 +305,8 @@ class ValidateCommandTest {
         // Overriding meta-kernel/meta/core isn't supported -- the file is skipped, not used, and a
         // note goes to stderr so it isn't silently dropped.
         Path fake = writeFile(dir, "core.tn", """
-                !!id:"https://tson.io/2026/32/m/core.tn"
-                !!meta:"https://tson.io/2026/32/m/meta.tn"
+                !!id:"https://tson.io/2026/33/m/core.tn"
+                !!meta:"https://tson.io/2026/33/m/meta.tn"
                 { my_thing => int32 }
                 """);
         Path data = writeFile(dir, "data.tson", "42");   // plain -> schemaless -> valid

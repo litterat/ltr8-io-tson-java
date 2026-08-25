@@ -1,8 +1,8 @@
-!!id:"https://tson.io/2026/32/m/meta.tn?sha256=4e080b780c644997bc956b08eb0540f41b7de5b045300515584d3053b3c0f952"
-!!meta:"https://tson.io/2026/32/m/meta-kernel.tn?sha256=0742e3a7fff82adac11dfd20199c95d079206b972b1f7b899233bdb9d1e09463"
-!!import:"https://tson.io/2026/32/m/meta-kernel.tn?sha256=0742e3a7fff82adac11dfd20199c95d079206b972b1f7b899233bdb9d1e09463"
+!!id:"https://tson.io/2026/33/m/meta.tn?sha256=3a5ab56c0f919e251e05d1646e946010f8278a8f08d768fe70693097558fb4f1"
+!!meta:"https://tson.io/2026/33/m/meta-kernel.tn?sha256=43d9669ca9319c891bd1827953d0d3274ed03249a90d0c126289ed740990f3ac"
+!!import:"https://tson.io/2026/33/m/meta-kernel.tn?sha256=43d9669ca9319c891bd1827953d0d3274ed03249a90d0c126289ed740990f3ac"
 @doc:"""
-  TSON meta-schema — 2026 Revision 32 draft.
+  TSON meta-schema — 2026 Revision 33 draft.
 
   The canonical meta-schema for user schemas: a schema governed by the
   meta-kernel that adds the type constructors the core type library
@@ -15,6 +15,9 @@
   libraries replacing meta, or extensions of the meta layer itself
   (the format's sanctioned extension point: new type vocabularies
   arrive as new meta layers, never as grammar changes).
+
+  Hash pins here are real digests over the bytes of this copy; see
+  meta-kernel.tn's note.
 
   Three families of constructors live here:
 
