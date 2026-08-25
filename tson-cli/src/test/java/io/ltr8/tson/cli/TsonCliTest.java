@@ -11,6 +11,7 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -85,14 +86,17 @@ class TsonCliTest {
                 !!id:"https://example.test/cli-gap.tn"
                 !!meta:"https://tson.io/2026/33/m/meta.tn"
                 !!import:"https://tson.io/2026/33/m/core.tn"
-                { boxed => <T> { v: (T | text) } }
+                {
+                  box     => <T> { v: T }
+                  plain   => { n: int32 }
+                  derived => <T> plain & box<T>
+                }
                 """);
 
         String out = captureStdout(() ->
                 assertEquals(70, TsonCli.run(new String[] {"compile", schema.toString()})));
 
-        assertTrue(out.contains("[NOT_IMPLEMENTED] /boxed"), out);
-        assertTrue(out.contains("is the way to write this today"), out);
+        assertTrue(out.contains("[NOT_IMPLEMENTED] /derived"), out);
         assertFalse(out.contains("Please report it"), out);
     }
 
@@ -112,17 +116,47 @@ class TsonCliTest {
                 !!meta:"https://tson.io/2026/33/m/meta.tn"
                 !!import:"https://tson.io/2026/33/m/core.tn"
                 {
-                  boxed  => <T> { v: (T | text) }
-                  widens => !uint8 ^ { min: -10 }
-                  fine   => int32
+                  box     => <T> { v: T }
+                  plain   => { n: int32 }
+                  derived => <T> plain & box<T>
+                  widens  => !uint8 ^ { min: -10 }
+                  fine    => int32
                 }
                 """);
 
         String out = captureStdout(() ->
                 assertEquals(70, TsonCli.run(new String[] {"compile", schema.toString()})));
 
-        assertTrue(out.contains("[NOT_IMPLEMENTED] /boxed"), out);
+        assertTrue(out.contains("[NOT_IMPLEMENTED] /derived"), out);
         assertTrue(out.contains("[SCHEMA_ERROR] /widens"), out);
+    }
+
+    /**
+     * <b>An author's schema error exits 1, and never 70.</b> Exit 70 prints "a gap in tson, not a problem
+     * with your document" -- a false verdict for a construct the spec itself refuses, and one that sends the
+     * author to file a bug instead of fixing their schema. Two that used to land there, both refused by
+     * [TSON-SCHEMA]: a parameter in a collection-valued slot (§5.10 makes it "a resolver error at the
+     * declaration"), and a refinement body that is not a braced record (§12.1's {@code atom-refinement}
+     * takes a {@code record-def}) -- the latter now caught a phase earlier still, by the parser.
+     */
+    @Test
+    void aSchemaErrorTheSpecRefusesExitsOneNotSeventy(@TempDir Path dir) throws IOException {
+        for (String body : List.of("{ boxed => <T> { v: (T | text) } }", "{ narrow => !uint8 ^ 5 }")) {
+            Path schema = writeFile(dir, "authorerror.tn", """
+                    !!id:"https://example.test/cli-author-error.tn"
+                    !!meta:"https://tson.io/2026/33/m/meta.tn"
+                    !!import:"https://tson.io/2026/33/m/core.tn"
+                    %s
+                    """.formatted(body));
+
+            String err = captureStderr(() -> {
+                String out = captureStdout(() ->
+                        assertEquals(1, TsonCli.run(new String[] {"compile", schema.toString()}), body));
+                assertFalse(out.contains("NOT_IMPLEMENTED"), out);
+                assertFalse(out.contains("Please report it"), out);
+            });
+            assertFalse(err.contains("a gap in tson"), err);
+        }
     }
 
     /**

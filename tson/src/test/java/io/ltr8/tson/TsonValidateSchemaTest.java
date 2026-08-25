@@ -2,6 +2,8 @@ package io.ltr8.tson;
 
 import io.ltr8.tson.compiler.Diagnostic;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.List;
 import java.util.Optional;
@@ -25,6 +27,25 @@ class TsonValidateSchemaTest {
 
     private static List<Diagnostic> check(String body) {
         return Tson.builder().build().validateSchema(HEADER + body);
+    }
+
+    /**
+     * <b>An author's mistake is never {@code NOT_IMPLEMENTED}.</b> That code says a construct is beyond this
+     * library, and the CLI turns it into exit 70 with "a gap in tson, not a problem with your document" --
+     * a false verdict for anything the spec itself refuses, and one whose verdict will not change however
+     * much this library improves. §5.10: "Collection-valued slots are not parameterizable -- a parameter
+     * inside a collection-typed slot ... has no open representation, and a declaration writing one is a
+     * resolver error at the declaration; this is a deliberate boundary of this revision."
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "{ box => <T> { v: (T | text) } }",     // a parameter inside `choice`'s variants
+            "{ box => <T> { v: [T, text] } }"})     // ... and inside `tuple`'s elements
+    void aParameterInACollectionSlotIsTheAuthorsErrorNotAGap(String body) {
+        List<Diagnostic> problems = check(body);
+
+        assertEquals(1, problems.size(), problems::toString);
+        assertEquals(Diagnostic.Code.SCHEMA_ERROR, problems.getFirst().code(), problems::toString);
     }
 
     @Test
@@ -61,21 +82,28 @@ class TsonValidateSchemaTest {
      * ever needed: {@code NOT_IMPLEMENTED} says this could not be checked, where {@code SCHEMA_ERROR} says
      * this is wrong. A consumer that conflates them is wrong in the direction that matters -- calling a
      * document invalid that was never judged.
+     *
+     * <p>The gap here is a <b>parameterized supertype</b> ({@code plain & box<T>}), one of the §5.10
+     * substitution cases this resolver does not close yet. It has to be a real one: the case this fixture
+     * used to carry, a parameter in a collection-valued slot, is the author's error and reports {@code
+     * SCHEMA_ERROR} now.
      */
     @Test
     void aGapIsReportedBesideTheOrdinaryProblemsRatherThanReplacingThem() {
         List<Diagnostic> problems = check("""
                 {
-                  boxed  => <T> { v: (T | text) }
-                  widens => !uint8 ^ { min: -10 }
-                  fine   => int32
+                  box     => <T> { v: T }
+                  plain   => { n: int32 }
+                  derived => <T> plain & box<T>
+                  widens  => !uint8 ^ { min: -10 }
+                  fine    => int32
                 }
                 """);
 
-        assertEquals(List.of("/boxed", "/widens"),
+        assertEquals(List.of("/derived", "/widens"),
                 problems.stream().map(d -> d.schemaPointer().orElseThrow()).sorted().toList());
         Diagnostic gap = problems.stream()
-                .filter(d -> d.schemaPointer().equals(Optional.of("/boxed"))).findFirst().orElseThrow();
+                .filter(d -> d.schemaPointer().equals(Optional.of("/derived"))).findFirst().orElseThrow();
         assertEquals(Diagnostic.Code.NOT_IMPLEMENTED, gap.code());
         assertTrue(gap.schemaPosition().isPresent(), "a gap is located like any other declaration's problem");
         assertEquals(Diagnostic.Code.SCHEMA_ERROR, problems.stream()
