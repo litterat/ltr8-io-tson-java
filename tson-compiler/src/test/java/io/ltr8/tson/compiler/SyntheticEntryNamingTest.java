@@ -27,8 +27,8 @@ class SyntheticEntryNamingTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/naming.tn"
-            !!meta:"https://tson.io/2026/32/m/meta.tn"
-            !!import:"https://tson.io/2026/32/m/core.tn"
+            !!meta:"https://tson.io/2026/33/m/meta.tn"
+            !!import:"https://tson.io/2026/33/m/core.tn"
             {
               order => { id: text }
               paged => <T> { items: [T; 1..] }

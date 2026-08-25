@@ -759,7 +759,7 @@ conforming implementation MUST reject a hypothetical core.tn1 that *did* declare
 
 **Interpretation chosen:** Enforced as a resolver/linker-level rule, and stricter than "structurally
 self-referencing": an entry with `constructor: true` is only valid if the declaring schema's own
-`!!meta` target is *exactly* `https://tson.io/2026/32/m/meta-kernel.tn1` — the one specific
+`!!meta` target is *exactly* `https://tson.io/2026/33/m/meta-kernel.tn1` — the one specific
 meta-kernel identity this implementation's own compiled-reader machinery is built against
 (`TsonBundledSchemas.META_KERNEL_ID`), not merely "some schema whose own `!!meta` happens to equal its
 own `!!id`." This distinction matters beyond pedantry: every resolved `TypeDefinition.body` and every
@@ -808,7 +808,7 @@ form.
 
 Yet the spec's own bundled, normative fixtures are already published using that exact extension,
 during this explicitly-unstable period: `meta-kernel.tn1`, `meta.tn1`, and `core.tn1` (Part 2 §9) are
-served at `https://tson.io/2026/32/m/meta-kernel.tn1`, `.../meta.tn1`, `.../core.tn1` — real,
+served at `https://tson.io/2026/33/m/meta-kernel.tn1`, `.../meta.tn1`, `.../core.tn1` — real,
 resolvable URLs an implementation is required to fetch/pre-load verbatim to be conformant at all,
 carrying a `2026/32` (year/revision) path segment that is, by the spec's own words, not "TSON version
 1." A file extension defined as "this document will not change" is already load-bearing on documents
@@ -3457,7 +3457,7 @@ for what is really one schema named two ways.
 
 
 **A consequence worth stating with it: revision skew becomes a hard error, by design.** Schema identities
-carry the spec revision (`https://tson.io/2026/32/m/core.tn`), so two schemas published against different
+carry the spec revision (`https://tson.io/2026/33/m/core.tn`), so two schemas published against different
 revisions declare their names in genuinely different documents. Under the identity rule, a schema whose
 import closure reaches both is rejected at namespace-construction time, naming both declaring schemas. That
 is the intended outcome and it needs no separate rule — it is the collision rule firing. The alternative the

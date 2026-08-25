@@ -24,11 +24,11 @@ import java.util.List;
  * type is expected ({@code TsonSchemaLinker.validateTypeRef}), so {@code holder => { s: search }} is an
  * author error rather than something that resolves, links and compiles and then fails at read.
  *
- * <p><b>No kernel declaration stands behind this yet.</b> The natural spelling is a fourth base kind,
- * {@code data => top & {}} in meta-kernel, with {@code operation => ~data & { ... }} composing against it
- * and a matching {@code TypeKind}. Neither exists in Revision 32 -- {@code type_kind} is
- * {@code !enum [ATOM PRODUCT SUM REFERENCE]} and the kernel has no {@code data} -- so a meta-schema writes
- * {@code ~top & { ... }} and the Java side carries the distinction alone. See {@code SPEC-FEEDBACK.md} #57.
+ * <p><b>A kernel declaration stands behind this.</b> meta-kernel declares the fourth base kind,
+ * {@code data => top & {}}, and {@code type_kind} carries {@code DATA} beside {@code ATOM}/{@code PRODUCT}/
+ * {@code SUM}/{@code REFERENCE}, so a meta-schema composes its own constructor against it
+ * ({@code operation => ~data & { ... }}) and the kind is a fact of the resolved schema rather than one the
+ * Java side carries alone. See {@code SPEC-FEEDBACK.md} #57 for the argument that produced it.
  */
 public non-sealed interface Data extends Top {
 

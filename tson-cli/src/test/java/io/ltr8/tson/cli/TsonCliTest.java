@@ -83,8 +83,8 @@ class TsonCliTest {
     void aSchemaReachingAGapCompilesToSeventyWithTheGapsOwnMessage(@TempDir Path dir) throws IOException {
         Path schema = writeFile(dir, "gap.tn", """
                 !!id:"https://example.test/cli-gap.tn"
-                !!meta:"https://tson.io/2026/32/m/meta.tn"
-                !!import:"https://tson.io/2026/32/m/core.tn"
+                !!meta:"https://tson.io/2026/33/m/meta.tn"
+                !!import:"https://tson.io/2026/33/m/core.tn"
                 { boxed => <T> { v: (T | text) } }
                 """);
 
@@ -109,8 +109,8 @@ class TsonCliTest {
     void aSchemaWithBothAGapAndAnOrdinaryErrorReportsBoth(@TempDir Path dir) throws IOException {
         Path schema = writeFile(dir, "mixed.tn", """
                 !!id:"https://example.test/cli-mixed.tn"
-                !!meta:"https://tson.io/2026/32/m/meta.tn"
-                !!import:"https://tson.io/2026/32/m/core.tn"
+                !!meta:"https://tson.io/2026/33/m/meta.tn"
+                !!import:"https://tson.io/2026/33/m/core.tn"
                 {
                   boxed  => <T> { v: (T | text) }
                   widens => !uint8 ^ { min: -10 }
@@ -134,8 +134,8 @@ class TsonCliTest {
     void dataNamingATemplateIsAnOrdinaryVerdict(@TempDir Path dir) throws IOException {
         Path schema = writeFile(dir, "paged.tn", """
                 !!id:"https://example.test/cli-paged.tn"
-                !!meta:"https://tson.io/2026/32/m/meta.tn"
-                !!import:"https://tson.io/2026/32/m/core.tn"
+                !!meta:"https://tson.io/2026/33/m/meta.tn"
+                !!import:"https://tson.io/2026/33/m/core.tn"
                 {
                   order => { id: text }
                   paged => <T> { items: [T] }
@@ -177,8 +177,8 @@ class TsonCliTest {
         // when schema files are also present. A plain, well-formed value is valid.
         Path schema = writeFile(dir, "schema.tn1", """
                 !!id:"https://example.test/cli-arg-test.tn1"
-                !!meta:"https://tson.io/2026/32/m/meta.tn"
-                !!import:"https://tson.io/2026/32/m/core.tn"
+                !!meta:"https://tson.io/2026/33/m/meta.tn"
+                !!import:"https://tson.io/2026/33/m/core.tn"
                 { my_int => int32 }
                 """);
         Path data = writeFile(dir, "data.tson", "42");
@@ -193,8 +193,8 @@ class TsonCliTest {
     void validateEndToEndThroughMainDispatchExitsZeroForValidData(@TempDir Path dir) throws IOException {
         Path schema = writeFile(dir, "schema.tn1", """
                 !!id:"https://example.test/cli-arg-test-2.tn1"
-                !!meta:"https://tson.io/2026/32/m/meta.tn"
-                !!import:"https://tson.io/2026/32/m/core.tn"
+                !!meta:"https://tson.io/2026/33/m/meta.tn"
+                !!import:"https://tson.io/2026/33/m/core.tn"
                 { my_int => int32 }
                 """);
         Path data = writeFile(dir, "data.tson", """
@@ -213,8 +213,8 @@ class TsonCliTest {
     void dashReadsOneDataDocumentFromStandardInput(@TempDir Path dir) throws IOException {
         Path schema = writeFile(dir, "schema.tn1", """
                 !!id:"https://example.test/cli-stdin.tn1"
-                !!meta:"https://tson.io/2026/32/m/meta.tn"
-                !!import:"https://tson.io/2026/32/m/core.tn"
+                !!meta:"https://tson.io/2026/33/m/meta.tn"
+                !!import:"https://tson.io/2026/33/m/core.tn"
                 { my_int => int32 }
                 """);
         String data = "!!schema:\"https://example.test/cli-stdin.tn1\"\n!my_int 42\n";

@@ -26,13 +26,13 @@ A from-scratch Java implementation of TSON (Typed Schema Object Notation), built
 spec series (2026 revision):
 
 - Part 1 — lexer, structural grammar, base type resolution, built-in type vocabulary:
-  https://tson.io/raw/2026/32/tson-part1-data.md
+  https://tson.io/raw/2026/33/tson-part1-data.md
 - Part 2 — schema grammar, type system, resolution, linking, compilation:
-  https://tson.io/raw/2026/32/tson-part2-schema.md
+  https://tson.io/raw/2026/33/tson-part2-schema.md
 
 The spec is a *working revision* that changes between revisions without compatibility guarantees. When in
 doubt, **re-fetch the current URL** and check the revision number at the top rather than trusting a cached
-copy. `spec/` holds local snapshots (revision 32) for quick reference: `spec/tson-part1-data.md`,
+copy. `spec/` holds local snapshots (revision 33) for quick reference: `spec/tson-part1-data.md`,
 `spec/tson-part2-schema.md`, and `spec/m/{meta-kernel,meta,core}.tn` (the spec's own bundled schema
 documents — the meta-kernel bootstrap layer, the meta-schema built on it, and the core type library built
 on that) plus their non-normative `*-resolved.tn` resolver-output fixtures. Treat `spec/` as a cache, not
@@ -119,7 +119,7 @@ keeps it apart. The exception classification itself is unchanged and is what pic
 `DefinitionResolver`'s Javadoc lists the exact current boundary.
 
 **Project-owned schema `!!id`:** a schema this project authors (not the spec's own bundled artifacts) gets
-`https://tson.io/2026/32/ltr8/<group>/<name>-<version>.tn` — `/2026/32` is the spec revision, `ltr8` the
+`https://tson.io/2026/33/ltr8/<group>/<name>-<version>.tn` — `/2026/33` is the spec revision, `ltr8` the
 publishing org, `<group>` the subsystem (`cli`), `<name>-<version>` the schema name with a trailing
 integer version. Bump the version under a new name (`diagnostics-2.tn`, not an in-place edit) whenever the
 shape changes (§10's immutability rule). **Use `.tn`, not `.tn1`** — `.tn1` is a stability claim §7.1
@@ -371,8 +371,10 @@ never seen. A consumer registers a class by carrying `@Typename` and being finda
 is no reader family and no factory entry, the ordinary record reader binding the payload and validating it
 in full, and an unresolvable class is an error where the constructor is applied.
 `Data.references()` is how a body's own type references reach the linker, declared rather than discovered.
-**Amending meta-kernel is a local divergence** from published Revision 32 — the digests
-`TsonBundledSchemas` holds are this project's own now.
+The kind is the spec's own now: what this project first amended into its meta-kernel is declared by
+published Revision 33 (`SPEC-FEEDBACK.md` #57, accepted), so `spec/m/` is a plain cache again. The digests
+`TsonBundledSchemas` holds are still this project's own — the published drafts spell their pins `xxhash`
+and pin at publication, so these copies carry real digests over their own bytes.
 
 ### Class 2 compilation (`TsonSchemaCompiler`, `.../reader/`) — `docs/linking-and-compilation.md`
 

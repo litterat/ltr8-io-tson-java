@@ -23,8 +23,8 @@ class TsonValidateTest {
     private static final String POINT_ID = "https://example.test/point-1.tn";
     private static final String POINT_SCHEMA = """
             !!id:"https://example.test/point-1.tn"
-            !!meta:"https://tson.io/2026/32/m/meta.tn"
-            !!import:"https://tson.io/2026/32/m/core.tn"
+            !!meta:"https://tson.io/2026/33/m/meta.tn"
+            !!import:"https://tson.io/2026/33/m/core.tn"
             { point => { x: int32  y: int32 } }
             """;
 
@@ -261,8 +261,8 @@ class TsonValidateTest {
         Tson tson = Tson.builder().build();
         tson.resolve("""
                 !!id:"https://example.test/nested-1.tn"
-                !!meta:"https://tson.io/2026/32/m/meta.tn"
-                !!import:"https://tson.io/2026/32/m/core.tn"
+                !!meta:"https://tson.io/2026/33/m/meta.tn"
+                !!import:"https://tson.io/2026/33/m/core.tn"
                 {
                   person => { home: address }
 
@@ -293,7 +293,7 @@ class TsonValidateTest {
 
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, problem.code());
         assertEquals(Optional.of("/int32"), problem.schemaPointer());
-        assertEquals("tson.io/2026/32/m/core.tn", problem.schemaId(), "where int32 is actually declared");
+        assertEquals("tson.io/2026/33/m/core.tn", problem.schemaId(), "where int32 is actually declared");
     }
 
     /**
@@ -307,8 +307,8 @@ class TsonValidateTest {
         Tson tson = Tson.builder().build();
         tson.resolve("""
                 !!id:"https://example.test/tags-1.tn"
-                !!meta:"https://tson.io/2026/32/m/meta.tn"
-                !!import:"https://tson.io/2026/32/m/core.tn"
+                !!meta:"https://tson.io/2026/33/m/meta.tn"
+                !!import:"https://tson.io/2026/33/m/core.tn"
                 { tagged => { tags: [text] } }
                 """);
 
@@ -367,8 +367,8 @@ class TsonValidateTest {
         String schemaId = "https://example.test/pct-1.tn";
         String schema = """
                 !!id:"https://example.test/pct-1.tn"
-                !!meta:"https://tson.io/2026/32/m/meta.tn"
-                !!import:"https://tson.io/2026/32/m/core.tn"
+                !!meta:"https://tson.io/2026/33/m/meta.tn"
+                !!import:"https://tson.io/2026/33/m/core.tn"
                 {
                   my_percentage => !positive_integer ^ { max: 100 }
                   reading => { pct: my_percentage }
@@ -420,8 +420,8 @@ class TsonValidateTest {
         String schemaId = "https://example.test/facets-1.tn";
         String schema = """
                 !!id:"https://example.test/facets-1.tn"
-                !!meta:"https://tson.io/2026/32/m/meta.tn"
-                !!import:"https://tson.io/2026/32/m/core.tn"
+                !!meta:"https://tson.io/2026/33/m/meta.tn"
+                !!import:"https://tson.io/2026/33/m/core.tn"
                 {
                   status => !enum [PENDING SHIPPED DELIVERED]
                   label  => !text ^ { max_length: 4 }

@@ -180,9 +180,11 @@ sit at the schema layer because that is the only layer able to name request and 
   discovering it through a message about the wrong thing, which is what the `source` fallback's
   argument-bearing case above used to give.
 
-**Amending meta-kernel is a local divergence** from published Revision 32 — `spec/m/` is otherwise a cache
-of it, and the digests `TsonBundledSchemas` holds are now this project's rather than tson.io's.
-`SPEC-FEEDBACK.md` #57 is the argument for the change and carries what the experiment cost.
+**The amendment landed upstream.** `data` and `DATA` were this project's own addition to meta-kernel for
+one revision; published Revision 33 declares both, so `spec/m/` is a plain cache of the spec again and the
+experiment is over. `SPEC-FEEDBACK.md` #57 is the argument that produced them. What still differs is the
+hash pins: the published drafts spell them `xxhash` and compute real digests at publication, so these copies
+carry digests over their own bytes and `TsonBundledSchemas` holds those rather than tson.io's.
 
 ## The inhabitance check (`TypeInhabitance`, §3.4.1, `SPEC-FEEDBACK.md` #25)
 

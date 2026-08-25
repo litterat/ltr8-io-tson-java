@@ -2,8 +2,8 @@
 
 ← back to the [README](README.md)
 
-Built against TSON Part 1 (lexer + data format), a working draft: https://tson.io/raw/2026/32/tson-part1-data.md,
-and Part 2 (schema grammar + type system), also a working draft: https://tson.io/raw/2026/32/tson-part2-schema.md
+Built against TSON Part 1 (lexer + data format), a working draft: https://tson.io/raw/2026/33/tson-part1-data.md,
+and Part 2 (schema grammar + type system), also a working draft: https://tson.io/raw/2026/33/tson-part2-schema.md
 
 This is the spec's first implementation. Issues and ambiguities found in the spec while implementing are
 tracked in [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md).

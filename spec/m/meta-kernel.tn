@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/33/m/meta-kernel.tn?sha256=xxhash"
+!!id:"https://tson.io/2026/33/m/meta-kernel.tn?sha256=43d9669ca9319c891bd1827953d0d3274ed03249a90d0c126289ed740990f3ac"
 !!meta:"https://tson.io/2026/33/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 33 draft).
@@ -13,10 +13,11 @@
   resolution: implementations ship the kernel's resolved structure,
   and this document describes it.
 
-  Hash pins in this draft are placeholders: `xxhash` stands for the
-  content digest computed bottom-up at publication (kernel body,
-  then each dependent's pins and digest). The placeholder keeps the
-  pin's *shape* normative without freezing draft byte content.
+  Hash pins here are real digests over the bytes of this copy,
+  computed bottom-up (kernel body, then each dependent's pins and
+  digest) so the chain verifies as shipped. Hash *values* are not
+  normative — only the pin's shape is; the published drafts spell
+  them `xxhash` and pin at publication instead.
   """
 {
   @doc:"Base kinds. `top` is the structural root; every constructor transitively IS-A `atom`, `product`, `sum` or `data`, each of which IS-A `top`. Construction transfers kind, not IS-A, so instances and fresh records sit under the kinds without supertypes. The first three describe the shape of a data value; `data` describes something that is not one."

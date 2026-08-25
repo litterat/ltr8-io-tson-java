@@ -18,9 +18,9 @@ void main() {
     // A tiny schema, handed to the reader on demand by URI. A real app plugs in a disk/HTTP-backed
     // source with its own fetch policy; here a one-liner just returns our schema text.
     String schema = """
-            !!id:"https://example.com/2026/32/app/server-1.tn"
-            !!meta:"https://tson.io/2026/32/m/meta.tn"
-            !!import:"https://tson.io/2026/32/m/core.tn"
+            !!id:"https://example.com/2026/33/app/server-1.tn"
+            !!meta:"https://tson.io/2026/33/m/meta.tn"
+            !!import:"https://tson.io/2026/33/m/core.tn"
             {
                 server => { hostname: text  port: int32 }
             }""";
@@ -32,7 +32,7 @@ void main() {
     // Self-describing: the document names its own schema and root type. No other arguments needed --
     // the reader resolves the schema, selects the `server` type, and validates as it builds the tree.
     TsonValue server = tson.treeReader().read("""
-            !!schema:"https://example.com/2026/32/app/server-1.tn"
+            !!schema:"https://example.com/2026/33/app/server-1.tn"
             !server { hostname: "web-01"  port: 8080 }""");
     IO.println("validated hostname: " + server.get("hostname").asString().orElseThrow());   // web-01
     IO.println("validated port:     " + server.at("/port").asInt().orElseThrow());         // 8080
@@ -44,7 +44,7 @@ void main() {
     // A value that violates the schema is rejected fail-fast, rather than returned wrong.
     try {
         tson.treeReader().read("""
-                !!schema:"https://example.com/2026/32/app/server-1.tn"
+                !!schema:"https://example.com/2026/33/app/server-1.tn"
                 !server { hostname: "bad"  port: 99999999999999 }""");   // out of int32 range
         IO.println("unexpected: bad port was accepted");
     } catch (TsonReadException rejected) {

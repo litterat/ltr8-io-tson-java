@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/33/m/core.tn?sha256=xxhash"
-!!meta:"https://tson.io/2026/33/m/meta.tn?sha256=xxhash"
+!!id:"https://tson.io/2026/33/m/core.tn?sha256=34d4f2ffe4744691e3310a185f96761c3c7f33da41b72da9681b90554504de3d"
+!!meta:"https://tson.io/2026/33/m/meta.tn?sha256=3a5ab56c0f919e251e05d1646e946010f8278a8f08d768fe70693097558fb4f1"
 @doc:"""
   TSON Core Type Library — canonical types for data interchange
   (2026 Revision 33 draft).
@@ -17,8 +17,8 @@
       uint8            => !integer ^ { size: { bits: 8  signed: false } }
       non_empty_text   => !text ^ { min_length: 1 }
 
-  Hash pins in this draft are placeholders (`xxhash`), computed at
-  publication; see meta-kernel.tn's note.
+  Hash pins here are real digests over the bytes of this copy; see
+  meta-kernel.tn's note.
 
   Annotation types (`@ordered`, `@bounded`, `@exact`, `@numeric`,
   `@deprecated`, `@since`, `@todo`, `@lang`) live in meta.tn —

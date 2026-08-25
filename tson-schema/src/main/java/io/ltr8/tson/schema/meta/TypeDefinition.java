@@ -113,13 +113,13 @@ public record TypeDefinition(Optional<TypeRef> source, TypeKind kind, List<Strin
                 List.of(), Optional.empty(), new Reference(target.name()));
     }
 
-    /** A copy of this definition with {@code position} replaced -- every other component unchanged. */
     /** A copy of this definition with {@code body} replaced -- every other component unchanged. */
     public TypeDefinition withBody(Top body) {
         return new TypeDefinition(source, kind, parameters, constructor, supertypes, subtypes, disjoint, body,
                 position, annotations);
     }
 
+    /** A copy of this definition with {@code position} replaced -- every other component unchanged. */
     public TypeDefinition withPosition(Optional<SourcePosition> position) {
         return new TypeDefinition(source, kind, parameters, constructor, supertypes, subtypes, disjoint, body,
                 position, annotations);

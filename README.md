@@ -6,7 +6,7 @@ one hash verifies the whole chain. The finishing touch, TSON's data format is a 
 you'll actually enjoy writing.
 
 > **Status:** first implementation of TSON, built against a working-draft spec (2026
-> revision 32). Part 1 (data format) and most of Part 2 (schema layer) are implemented; the
+> revision 33). Part 1 (data format) and most of Part 2 (schema layer) are implemented; the
 > API and the format itself may still change. See [STATUS.md](STATUS.md) for the full
 > checklist.
 
@@ -39,33 +39,34 @@ Try it (the data names its own schema and type, so no --type is needed):
 ```
 
 Here's the `person.tn` schema created. It shows a few of the basic schema features,
-including records, record groups, enums and some in-built types. The `2026/32` in the
+including records, record groups, enums and some in-built types. The `2026/33` in the
 URIs is the draft year/revision marker from the spec's release scheme.
 
 ```tson
-!!id:"https://example.com/2026/32/getting-started/person.tn?sha256=4dc19d46d2e788b19e7eb2d1bc361c6e39203298255a31e94c578bd58ec6a3d2"
-!!meta:"https://tson.io/2026/32/m/meta.tn?sha256=4e080b780c644997bc956b08eb0540f41b7de5b045300515584d3053b3c0f952"
-!!import:"https://tson.io/2026/32/m/core.tn?sha256=d0655c3998e96db9ad51bf5d12a41645627daa985d1bcb58c2aca5e3a2b84c49"
+!!id:"https://example.com/2026/33/getting-started/person.tn?sha256=13cf46617c13225c7df1e292f60798d99af6ae6593657ca117b5a617220b0c51"
+!!meta:"https://tson.io/2026/33/m/meta.tn?sha256=3a5ab56c0f919e251e05d1646e946010f8278a8f08d768fe70693097558fb4f1"
+!!import:"https://tson.io/2026/33/m/core.tn?sha256=34d4f2ffe4744691e3310a185f96761c3c7f33da41b72da9681b90554504de3d"
+@doc:"An example schema from `tson init-example` -- a short tour of TSON. Edit this file or person-data.tn, then re-run tson validate to see what changes."
 {
-    role => !enum [admin member guest]
+  role => !enum [admin member guest]
 
-    address => {
-        street: text
-        city: text
-        country: text
-    }
+  address => {
+    street: text
+    city: text
+    country: text
+  }
 
-    person => {
-        id: uuid
-        name: text
-        age: int32
-        role: role
-        joined: date
-        email: text?
-        address: address
-        skills: [text]
-        ( phone: text | mobile: text )?
-    }
+  person => {
+    id: uuid
+    name: text
+    age: int32
+    role: role
+    joined: date
+    email: text?
+    address: address
+    skills: [text]
+    ( phone: text | mobile: text )?
+  }
 }
 ```
 
@@ -81,20 +82,20 @@ And here's a corresponding `person-data.tn` *data* document. It's *self-describi
 `!!schema` header names the schema it conforms to, and the leading `!person` says which type:
 
 ```tson
-!!schema:"https://example.com/2026/32/getting-started/person.tn"
+!!schema:"https://example.com/2026/33/getting-started/person.tn"
 !person {
-    id: !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09
-    name: "Ada Lovelace"
-    age: 30
-    role: member
-    joined: !date 1843-12-10
-    address: {
-        street: "12 Analytical Ave"
-        city: "London"
-        country: "UK"
-    }
-    skills: [ mathematics analysis "computing" ]
-    mobile: "+44 20 7946 0958"
+  id: !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09
+  name: "Ada Lovelace"
+  age: 30
+  role: member
+  joined: !date 1843-12-10
+  address: {
+    street: "12 Analytical Ave"
+    city: "London"
+    country: "UK"
+  }
+  skills: [ mathematics analysis "computing" ]
+  mobile: "+44 20 7946 0958"
 }
 ```
 
@@ -308,9 +309,9 @@ import io.ltr8.tson.tree.TsonValue;
 Tson tson = Tson.builder().build();
 
 String schema = """
-        !!id:"https://example.com/2026/32/app/server-1.tn"
-        !!meta:"https://tson.io/2026/32/m/meta.tn"
-        !!import:"https://tson.io/2026/32/m/core.tn"
+        !!id:"https://example.com/2026/33/app/server-1.tn"
+        !!meta:"https://tson.io/2026/33/m/meta.tn"
+        !!import:"https://tson.io/2026/33/m/core.tn"
         {
             server => { hostname: text  port: int32 }
         }""";
@@ -318,7 +319,7 @@ String schema = """
 tson.resolve(schema);
 
 TsonValue value = tson.treeReader()
-        .withSchema("https://example.com/2026/32/app/server-1.tn")
+        .withSchema("https://example.com/2026/33/app/server-1.tn")
         .readAs("{ hostname: \"web-01\"  port: 8080 }", "server");
 
 value.get("hostname").asString();          // Optional[web-01] — validated against the schema
@@ -352,7 +353,7 @@ Tson tson = Tson.builder()
 
 // Self-describing: it names its own schema and root type — no other arguments needed.
 TsonValue server = tson.treeReader().read("""
-        !!schema:"https://example.com/2026/32/app/server-1.tn"
+        !!schema:"https://example.com/2026/33/app/server-1.tn"
         !server { hostname: "web-01"  port: 8080 }""");        // validated as it builds the tree
 
 // No !!schema? The same reader reads schemalessly, straight off the wire.
@@ -570,9 +571,9 @@ nothing to reopen, so piped input is always treated as data.
 For a hand-written schema `person.tn` and a self-describing data file `ada.tn`:
 
 ```tson
-!!id:"https://example.com/2026/32/app/person-1.tn"
-!!meta:"https://tson.io/2026/32/m/meta.tn"
-!!import:"https://tson.io/2026/32/m/core.tn"
+!!id:"https://example.com/2026/33/app/person-1.tn"
+!!meta:"https://tson.io/2026/33/m/meta.tn"
+!!import:"https://tson.io/2026/33/m/core.tn"
 {
     person => { name: text  age: int32 }
 }
@@ -584,7 +585,7 @@ OK
 
 $ tson validate --output json person.tn bad.tn   # bad.tn = !!schema:"…/person-1.tn" !person { age: 30 }
 {"valid":false,"files":[{"file":"bad.tn","valid":false,"errors":[{"path":"/name",
-  "schemaPointer":"/person/name","schemaId":"example.com/2026/32/app/person-1.tn",
+  "schemaPointer":"/person/name","schemaId":"example.com/2026/33/app/person-1.tn",
   "code":"FIELD_REQUIRED","message":"missing required field 'name' for 'person'",
   "expected":"a value for 'name'","actual":"(absent)","dataPosition":"2:9:63",
   "schemaPosition":"5:5:145"}]}],"errors":[]}
