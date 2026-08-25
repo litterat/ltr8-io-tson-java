@@ -108,14 +108,31 @@ class BuiltinTypeVocabularyTest {
     }
 
     /**
-     * <b>Pins a known gap, not a decision.</b> §5 carries {@code !text} as the unconstrained text atom, so
-     * this vocabulary should resolve it and does not -- {@code TextParser} exists but has no {@code
-     * TYPENAME} and is never registered ({@code BACKLOG.md}). The assertion is here so closing the gap
-     * fails loudly rather than silently, and it should be inverted when it is closed.
+     * §5.5's unconstrained text atom. Every token is accepted and the host value is the token's text, so the
+     * only thing to assert about the parse is that no token is turned away and no form is re-interpreted --
+     * a quoted numeric under {@code !text} is the string, which is §5.5's own stated reason for the atom
+     * existing at all when §4.4 already resolves an unannotated token to a string.
      */
     @org.junit.jupiter.api.Test
-    void textIsNotRegisteredYetAlthoughSection5NowCarriesIt() {
-        assertFalse(BuiltinTypeVocabulary.lookup("text").isPresent());
+    void textIsRegistered() {
+        assertTrue(BuiltinTypeVocabulary.lookup("text").isPresent());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"hello", "42", "0xFF", "true", "null", "", "  spaced  ", "a\nb"})
+    void textAcceptsEveryTokenAndYieldsItsTextUnchanged(String content) {
+        AtomType<?> text = BuiltinTypeVocabulary.lookup("text").orElseThrow();
+
+        assertEquals(content, text.read(new TokenValue(content, TokenForm.SINGLE_LINE_QUOTED)));
+    }
+
+    /** Form is not meaning (§2.4): the same content quoted or not is the same string. */
+    @org.junit.jupiter.api.Test
+    void textReadsAQuotedNumericAsTheString() {
+        AtomType<?> text = BuiltinTypeVocabulary.lookup("text").orElseThrow();
+
+        assertEquals("42", text.read(new TokenValue("42", TokenForm.SINGLE_LINE_QUOTED)));
+        assertEquals("42", text.read(new TokenValue("42", TokenForm.UNQUOTED)));
     }
 
     @org.junit.jupiter.api.Test

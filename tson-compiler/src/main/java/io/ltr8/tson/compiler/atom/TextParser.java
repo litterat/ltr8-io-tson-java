@@ -13,14 +13,19 @@ import java.util.Optional;
  * rather than duplicating its constraint checks). Holds a {@link TextType} -- the pure constraint
  * values, unchanged by this split -- rather than declaring those fields itself.
  *
- * <p><b>Not registered in {@link BuiltinTypeVocabulary} yet, though §5 now requires it.</b> {@code !text} is
- * Part 1's unconstrained text atom -- every token accepted, the host value the token's text -- so the
- * schemaless path should resolve it here; it does not, and this class has no {@code TYPENAME} constant to
- * register with ({@code BACKLOG.md}). It serves meanwhile as groundwork
- * for Part 2's schema layer, which will resolve {@code text_type}/{@code text} through actual schema
- * machinery rather than a fixed §5 name table.
+ * <p><b>{@code !text} is §5.5's unconstrained text atom</b>: every token accepted, the host value the
+ * token's text. It adds nothing an unannotated token's base resolution (§4.4) does not already give, and
+ * that is the point -- it lets the string case be asserted, so a quoted numeric under {@code !text} is
+ * unambiguously the string rather than a number that happened to be quoted.
+ *
+ * <p><b>No reverse mapping.</b> {@code VocabularyAtoms} maps a host class to the name a writer annotates it
+ * with, and this one's host class is {@code String} -- what both writers emit bare. An entry there would put
+ * {@code !text} on every string in every document.
  */
 public record TextParser(TextType constraints) implements AtomType<String> {
+
+    /** The §5.5 annotation name this atom is reached by. */
+    public static final String TYPENAME = "text";
 
     /** {@code text => !text_type {}} -- the unconstrained text type. */
     public static final TextParser UNCONSTRAINED = new TextParser(TextType.UNCONSTRAINED);

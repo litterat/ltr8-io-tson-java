@@ -12,10 +12,8 @@ import java.util.regex.Pattern;
  * checks its own, plus an address-shape check on top -- without that last part {@code !email} would say
  * nothing {@code text} doesn't.
  *
- * <p><b>Registered in {@link BuiltinTypeVocabulary} although §5.5's table has no row for it</b> -- a known
- * departure, the same kind as the {@code int8}..{@code int256} ladder. §5.5 promotes every sibling in
- * §5.5's "Network Types" group ({@code uuid}, {@code ipv4}, {@code ipv6}, {@code cidr4}, {@code cidr6},
- * {@code mac}), which core.tn gives the identical shape.
+ * <p><b>A §5.5 built-in</b>, carried in the same "Network Types" group as {@code uuid}, {@code ipv4},
+ * {@code ipv6}, {@code cidr4}, {@code cidr6} and {@code mac}, and given the identical shape by core.tn.
  *
  * <p><b>The format check is a documented subset of RFC 5322, not the whole grammar.</b> Accepted is the
  * {@code dot-atom "@" dot-atom} core: one or more dot-separated atoms of RFC 5322's {@code atext} on each

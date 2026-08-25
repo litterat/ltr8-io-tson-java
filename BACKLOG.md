@@ -123,13 +123,6 @@ need are not retained for a secondary constructor.
 
 ## Remaining built-in types
 
-- [ ] **`!text` is a Part 1 built-in and this vocabulary does not carry it.** [TSON-DATA] §5 lists `!text` as
-  the unconstrained text atom — "it accepts every token and its host value is the token's text" — and §5.5
-  builds `uri`, `regex` and `email` on the same `text_type` family. `TextParser` exists and holds a real
-  `TextType`, but it has no `TYPENAME` constant and is not in `BuiltinTypeVocabulary`, so a schemaless
-  `!text 42` is an `UNKNOWN_TYPE_REF` where the spec says it is a string. It was conforming when §5's table
-  had no row for it; Revision 33 added one. The fix is the constant plus one `types.put`, and a vocabulary
-  vector so the two read paths agree.
 
 - [ ] `unknown` — no compiled-parser factory (`ValueReaderFactoryRegistry` registers it, and `extern`, to
   `ErrorReader`), pinned down exactly by

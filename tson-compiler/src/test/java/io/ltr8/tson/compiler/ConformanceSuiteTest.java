@@ -562,10 +562,12 @@ class ConformanceSuiteTest {
                 assertArrayEquals(HexFormat.of().parseHex(fieldText(sidecar, "value")), actual.getAddress(),
                         "vocabulary value");
             }
-            case "cidr4", "cidr6", "mac", "email" -> {
-                // The atoms whose host value is the authored text itself (Java has no type to map onto --
-                // see Cidr4Parser/MacParser), so the oracle is a plain string compare with no parse in
-                // between. Deliberately not folded into the numeric default arm below.
+            case "text", "cidr4", "cidr6", "mac", "email" -> {
+                // The atoms whose host value is the authored text itself, so the oracle is a plain string
+                // compare with no parse in between. Deliberately not folded into the numeric default arm
+                // below. Three reasons converge here: `text` is text by definition (§5.5, "the host value is
+                // the token's text"), while `cidr4`/`cidr6`/`mac` keep their text because Java has no type to
+                // map onto (see Cidr4Parser/MacParser) and `email` because the address shape is the contract.
                 String actual = (String) atomType.read(token, String.class);
                 assertEquals(fieldText(sidecar, "value"), actual, "vocabulary value");
             }
