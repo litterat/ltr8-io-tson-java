@@ -25,10 +25,13 @@ import io.ltr8.tson.compiler.ast.schema.TypeArg;
 import io.ltr8.tson.compiler.ast.schema.TypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeRef;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -602,6 +605,54 @@ class TsonSchemaParserTest {
                 !!meta:"https://tson.io/2026/33/m/meta.tn"
                 { t => <T> !array { } }"""));
         assertTrue(thrown.getMessage().contains("binds at least one field"), thrown.getMessage());
+    }
+
+    /**
+     * {@code atom-refinement = "!" type-name ws "^" ws record-def} (§12.1) -- a braced record of constraint
+     * bindings and nothing else. The grammar does not backtrack, so {@code !integer ^} has already committed
+     * to this production and anything but a brace is a parse error here; {@code instance} cannot rescue it
+     * either, {@code ^} being no {@code core-value}. Revision 32 spelled the payload {@code data-value},
+     * which is how a bare token, a second type-ref and a leading annotation all used to parse.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "t => !integer ^ 5",                      // a bare token where a record-def is required
+            "t => !integer ^ \"5\"",                   // ... quoted, in case form were mistaken for shape
+            "t => !integer ^ _",                      // ... the absent sentinel
+            "t => !integer ^ [1 2]",                  // ... an array: a core-value, still not a record-def
+            "t => !integer ^ !integer_type { min: 1 }",   // a second, competing type-ref on the payload
+            "t => !integer ^ @doc:\"d\" { min: 1 }"})     // an annotation layer on the payload
+    void anAtomRefinementBodyMustBeABracedRecord(String declaration) {
+        TsonParseException thrown = assertThrows(TsonParseException.class, () -> parse("""
+                !!meta:"https://tson.io/2026/33/m/meta.tn"
+                { %s }""".formatted(declaration)));
+        assertTrue(thrown.getMessage().contains("'{'"), thrown.getMessage());
+    }
+
+    /** The two spellings that are record-defs: bindings, and the empty body a fresh instance takes. */
+    @ParameterizedTest
+    @ValueSource(strings = {"age => !integer ^ { min: 0 }", "age => !integer ^ {}"})
+    void anAtomRefinementBodyMayBeEmptyOrBound(String declaration) {
+        assertInstanceOf(AtomRefinement.class, declOf(declaration).typeDef());
+    }
+
+    /**
+     * And it resyncs like any other declaration-level syntax error, rather than taking the whole document
+     * with it -- the recovering parse is what {@code Tson.validateSchema} runs.
+     */
+    @Test
+    void aRefinementBodyErrorIsReportedPerDeclarationAndTheParseContinues() {
+        List<Diagnostic> problems = new ArrayList<>();
+        new TsonSchemaParser("""
+                !!meta:"https://tson.io/2026/33/m/meta.tn"
+                {
+                  bad  => !integer ^ 5
+                  good => { n: int32 }
+                }""").parseSchemaDocument(problems::add);
+
+        assertEquals(1, problems.size(), problems::toString);
+        assertEquals(Diagnostic.Code.VALIDATION_ERROR, problems.getFirst().code(), problems::toString);
+        assertTrue(problems.getFirst().schemaPointer().orElseThrow().contains("bad"), problems::toString);
     }
 
     /** {@code atom-refinement} keeps its unparameterised form -- refining an atom instance binds nothing. */

@@ -281,11 +281,17 @@ class ContainerSugarEndToEndTest {
      * value | type_ref} with no collection case (§8.1), so a parameter inside {@code choice}'s {@code
      * variants} -- or {@code tuple}'s {@code elements} -- has nowhere to sit. Refused at the declaration that
      * writes it, not at the application: the template itself is what cannot be represented.
+     *
+     * <p><b>The author's error, not a gap</b>, and the exception type is the carrier: §5.10 makes a
+     * parameter in a collection-typed slot "a resolver error at the declaration ... a deliberate boundary of
+     * this revision", so the verdict does not change as this library improves. As an {@code
+     * UnsupportedOperationException} it reported {@code NOT_IMPLEMENTED} and exited 70 under "a gap in tson,
+     * not a problem with your document".
      */
     @Test
     void aParameterInsideACollectionValuedSlotHasNoOpenForm() {
         for (String body : List.of("(T | text)", "[T, text]")) {
-            UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
+            TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
                     () -> compile("  odd => <T> { v: %s }".formatted(body)), body);
             assertTrue(thrown.getMessage().contains("no collection case"), thrown.getMessage());
         }

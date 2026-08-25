@@ -439,7 +439,15 @@ public final class TsonSchemaParser extends TsonDataParser {
 
         if (check(TokenType.CARET)) {
             advance();
-            return new AtomRefinement(target, parseDataValue());
+            // atom-refinement = "!" type-name ws "^" ws record-def (§12.1) -- a braced record of constraint
+            // bindings, and nothing wider. The `^` has already committed this production and the grammar
+            // does not backtrack, so anything but a brace is this production's own error rather than a
+            // fall-through to `instance`, whose payload could not start with `^` either.
+            if (!check(TokenType.LBRACE)) {
+                throw mismatch("'{' -- an atom refinement's body is a braced record of constraint "
+                        + "bindings (§5.5), never a bare value, a second type-ref or an annotation");
+            }
+            return new AtomRefinement(target, new DataValue(List.of(), Optional.empty(), parseCoreValue()));
         }
         // instance = "!" type-name ws core-value (§12.1) -- see Instance's own Javadoc. The constructor
         // name goes straight into the wrapping DataValue's own typeRef; there is no room in this

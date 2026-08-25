@@ -772,7 +772,13 @@ final class SchemaDesugarer {
                 // is `param | value | type_ref` with no collection case (§8.1), so a parameter inside one has
                 // no open form to lift to at all. The closed forms are unaffected: this is reached only once
                 // a parameter has already been found in the record.
-                throw new UnsupportedOperationException("'!" + binding.head() + "' binds '" + field.name()
+                //
+                // The author's error, not a gap: §5.10 makes a parameter inside a collection-typed slot "a
+                // resolver error at the declaration", called "a deliberate boundary of this revision". The
+                // verdict does not change as this library improves, which is the test the exception policy
+                // turns on -- and reporting it as NOT_IMPLEMENTED would exit 70 with "a gap in tson, not a
+                // problem with your document" over a construct the spec itself refuses.
+                throw new TsonSchemaValidationException("'!" + binding.head() + "' binds '" + field.name()
                         + "' to a collection, and a template_argument has no collection case (§8.1), so a "
                         + "type parameter inside one has no open representation -- naming the inner form in "
                         + "its own declaration and referring to that is the way to write this today");

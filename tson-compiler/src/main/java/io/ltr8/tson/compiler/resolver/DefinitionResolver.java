@@ -786,7 +786,11 @@ final class DefinitionResolver {
                 merged.put(field.name(), field);
             }
         } else if (!(newBindings.coreValue() instanceof EmptyBrace)) {
-            throw new UnsupportedOperationException("'" + name + "': expected a braced record of constraint "
+            // The author's error, not a gap: §12.1's `atom-refinement` takes a `record-def`, so this verdict
+            // does not change as this library improves. Unreachable from source -- `TsonSchemaParser` refuses
+            // a non-braced body at the `^` -- but the resolver is also driven directly, and coding it
+            // NOT_IMPLEMENTED would exit 70 over a construct the grammar itself refuses.
+            throw new TsonSchemaValidationException("'" + name + "': expected a braced record of constraint "
                     + "bindings (§5.5), found " + newBindings.coreValue());
         }
         return new DataValue(newBindings.annotations(), Optional.of(constructorName), new RecordValue(List.copyOf(merged.values())));

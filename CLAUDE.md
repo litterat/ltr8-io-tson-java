@@ -259,8 +259,8 @@ validation. `extends TsonDataParser` (same package) because §12.1 imports Part 
 `SchemaMap.declarations` is a `LinkedHashMap` and duplicate names overwrite (grammar layer doesn't dedupe).
 Two entry points: `parseSchemaDocument()` is fail-fast, `parseSchemaDocument(receiver)` reports each
 declaration's syntax error and resyncs to the next.
-§12.1's productions are implemented as written, with one gap: the `^` branch still takes a full
-`data-value` where `atom-refinement` admits only a `record-def` (`BACKLOG.md`). The bracket
+§12.1's productions are implemented as written — `instance` takes a `core-value`, `atom-refinement` a
+braced `record-def`, `field-modifier` a bare token or the absent sentinel. The bracket
 form is parsed twice per the spec's own overlapping productions, and the `{K => V}` map sugar twice
 alongside it. A `{` at a type position dispatches by consuming one token and inspecting — Part 1 §2.8's
 record/map idiom, imported wholesale — and `{` is a map and only a map everywhere except type-def position,

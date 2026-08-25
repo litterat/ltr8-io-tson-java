@@ -21,9 +21,11 @@ materialization, no validation (those are the resolver's/linker's jobs).
   `typeRef` pre-set, no separate `target`); `construction-def` admits the implicit `&` before its trailing
   `record-def`; `field-modifier`'s value is a bare token or the absent sentinel. §12.1 now spells all three
   that way, and states that no production of the schema grammar takes the full `data-value`.
-  - **`atom-refinement` is the one that did not follow, and is now a gap.** Its production is `"!"
-    type-name ws "^" ws record-def`, and this parser still calls `parseDataValue()` there, so
-    `!integer ^ 5` parses where the grammar refuses it (`BACKLOG.md`).
+  - **`atom-refinement` followed late.** Its production is `"!" type-name ws "^" ws record-def`, and the
+    `^` branch took a full `data-value` for a revision longer than the `instance` branch did — so
+    `!integer ^ 5`, `!integer ^ !foo { … }` and `!integer ^ @doc:"d" { … }` all parsed. The branch now
+    requires a brace and reports at the offending token, per declaration like every other schema syntax
+    error.
   - An unquoted non-numeric type-argument always parses as a type reference, never a value literal — a
     deliberate grammar-layer deferral, classified at a later semantic layer.
 - **A `!` head behind a parameter list is an `instance-template`, a production of its own** (§12.1) --
@@ -273,9 +275,10 @@ rebuilt and called a cache.
       so `<255>` and `<0xFF>` are two applications, is `SPEC-FEEDBACK.md` #4.
   - **Two of the four sugar forms have no open representation at all.** `tuple` and `choice` bind a
     collection (`elements`, `variants`), and a `template_argument` is `param | value | type_ref` with no
-    collection case — so `<T> { v: (T | text) }` is refused at the declaration that writes it, as a gap
-    rather than an author error — §5.10 makes a parameter inside a collection-typed slot a resolver error at
-    the declaration, a deliberate boundary of this revision. Array and map bind only scalar slots and are
-    unaffected.
+    collection case — so `<T> { v: (T | text) }` is refused at the declaration that writes it, as **the
+    author's error**: §5.10 makes a parameter inside a collection-typed slot a resolver error at the
+    declaration, a deliberate boundary of this revision. It reported `NOT_IMPLEMENTED` until the spec
+    settled it, which exited 70 over a construct the spec refuses. Array and map bind only scalar slots and
+    are unaffected.
 - **The meta-kernel runs this phase too, with no accommodation at all** — its governing meta is itself, and
   with the table fixed there is nothing to look up.
