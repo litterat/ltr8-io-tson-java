@@ -10,6 +10,14 @@ you'll actually enjoy writing.
 > API and the format itself may still change. See [STATUS.md](STATUS.md) for the full
 > checklist.
 
+**Reads from a stream, not a string.** Every facade reader takes an `InputStream` and pulls events through
+it (`TsonDataStream`), so memory is proportional to nesting depth rather than document size — worth naming
+now that JSON is arriving in the JDK itself, where JEP 540 states the opposite as a deliberate choice: "We
+assume that input JSON documents can fit in memory … if we were to allow JSON sources such as files or
+network connections, issues such as insufficient memory would be possible with large documents." Streaming
+is one of four things here that JEP 540 names as non-goals; schemas, binding and collected diagnostics are
+the others.
+
 **Requires Java 25.** No external runtime dependencies. **Not yet published to Maven Central** — to use it
 from another project on the same machine, see [Use it from another project](#use-it-from-another-project).
 Need Java 25? Quick install via [SDKMAN!](https://sdkman.io) (`sdk install java 25-tem`) or an
@@ -252,9 +260,34 @@ document. Only a fault in the library throws past it. (Fail-fast reads still thr
 for a base-syntax failure that is a `TsonReadException` carrying the diagnostic, position included.)
 
 `withDiagnostics` returns a *new* reader and leaves the original fail-fast; it works the same on
-`TsonTreeReader` and on the schema-aware readers from `tson.treeReader()`/`objectReader()`. The receiver is
-a plain `void report(Diagnostic)` sink, so a caller wanting neither built-in behaviour — write each problem
-to stdout as it arrives, stop after twenty, feed a metrics counter — implements it directly.
+`TsonTreeReader` and on the schema-aware readers from `tson.treeReader()`/`objectReader()`.
+
+The two built-ins are not the interesting part. `TsonDiagnosticsReceiver` is a plain `void
+report(Diagnostic)` sink — one method — so a caller wanting neither behaviour implements it directly. It is
+called as problems are found, not at the end, which is what makes streaming and capping possible at all:
+
+```java
+// Report as they arrive, and stop keeping them after twenty.
+final class Capped implements TsonDiagnosticsReceiver {
+    private final List<Diagnostic> kept = new ArrayList<>();
+
+    @Override
+    public void report(Diagnostic d) {
+        if (kept.size() < 20) {
+            kept.add(d);
+            System.err.printf("%s %s: %s%n", d.code(), d.path().orElse("/"), d.message());
+        }
+    }
+
+    List<Diagnostic> diagnostics() {
+        return List.copyOf(kept);
+    }
+}
+```
+
+A `Diagnostic` locates itself at both ends — `path()` into the document, `schemaId()` with
+`schemaPointer()` into the schema that rejected it, and a position for each — so a receiver has what it
+needs to render, group or route without holding on to the document.
 
 It composes with `withSchema(…)` too, so an out-of-band read (§4 below) collects the same way:
 

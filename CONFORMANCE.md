@@ -91,8 +91,11 @@ narrowing of it. Pinned by `EmailParserTest`.
 parses I-Regexp to its own AST and matches with a Thompson-NFA/Pike-VM — linear-time, so ReDoS-safe — which
 means this implementation defines I-Regexp behaviour rather than inheriting the JVM's Perl-derived superset.
 `TextParser`/`UriParser` match their `pattern` constraint through the same engine. [TSON-SCHEMA] §9 makes
-the pin a strict gate and requires an implementation to document any divergence it cannot avoid; the
-divergences here are not yet written down (`BACKLOG.md`). See `RegexParser`'s Javadoc.
+the pin a strict gate and requires an implementation to document any divergence it cannot avoid; that
+statement is `io.ltr8.tson.regex`'s own `package-info`. The short version: the grammar admits exactly RFC
+9485 §3's, matching is whole-string, and the one divergence is not a departure from the RFC but a limit of
+its silence — it pins no Unicode version, so `\p{...}` answers against the running JDK's, and two
+conforming implementations can disagree about a code point assigned between two Unicode releases.
 
 **One open question.** Whether `!duration` accepts ISO 8601's alternative `PnW` week form is genuinely
 ambiguous — §5.4's table shows only `PnYnMnDTnHnMnS`. This implementation rejects `PnW` as the more

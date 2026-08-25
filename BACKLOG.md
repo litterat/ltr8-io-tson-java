@@ -336,15 +336,6 @@ surface.
 
 ## Documentation
 
-- [ ] **`tson-regex`'s divergences from RFC 9485 are undocumented, and the spec now requires them stated.**
-  [TSON-SCHEMA] §9 makes the `regex` atom's `spec` pin a strict gate and adds: an implementation "MUST
-  implement the pinned dialect as specified -- not a host library's near-relative -- and MUST document any
-  divergence it cannot avoid". `TsonRegex` is a native I-Regexp engine rather than a `java.util.regex`
-  wrapper, which is the hard half; what is missing is the statement -- which constructs are unenforced, that
-  `\p{...}` resolves through `Character.getType` and therefore against the JDK's Unicode version rather than
-  a pinned one, and where the disjointness decision is exact. A short section in the module's
-  `package-info.java` or a `docs/` note, linked from `regex`'s own documentation.
-
 - [ ] User-facing documentation on how to use the library — today only `CLAUDE.md`'s own dense,
   session-oriented internal narrative exists.
 - [ ] AI skills for using the library.
@@ -352,21 +343,6 @@ surface.
   every `@doc` string across the three bundled schemas survives resolution and linking, reachable as
   `schema.entries().getAnnotations(name).value("doc", String.class)`, and core.tn documents every one of its
   declarations. What's missing is the renderer, not the data.
-- [ ] **State the streaming contrast in README positioning.** JEP 540 makes its in-memory limit an explicit
-  design decision, not an omission: "We assume that input JSON documents can fit in memory, as either a
-  `String` or a `char` array... if we were to allow JSON sources such as files or network connections,
-  issues such as insufficient memory would be possible with large documents." That is the cleanest
-  available statement of what this library's reader stack buys — `TsonDataStream` pulls events, every
-  facade reader takes an `InputStream` and never fully buffers, and memory is proportional to nesting
-  depth rather than document size. Worth a line, because when JSON ships in the JDK the question becomes
-  "why not just use that?", and the honest answer is a short list: schema, binding, streaming, collected
-  diagnostics — each of which JEP 540 names as a non-goal.
-
-- [ ] Documentation for the *diagnostics* story specifically — `TsonDiagnosticsReceiver` is the seam a
-  consumer implements to route problems anywhere (a formatter writing to stdout as they arrive, a capped
-  collector, a metrics sink), and only the two built-ins are shown anywhere today. The README covers the
-  collector; a worked custom receiver is the obvious missing example, and it is what
-  `STRUCTURED-OUTPUT.md`'s Tier 1.5 streaming consumer will be built on.
 
 ## Front door / ergonomics
 

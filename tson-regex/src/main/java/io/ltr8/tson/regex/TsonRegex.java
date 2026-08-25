@@ -9,7 +9,9 @@ import java.util.Objects;
  * against the RFC 9485 grammar and builds its {@link #ast() AST}, rejecting anything outside the interoperable
  * subset -- {@code \d}/{@code \w}/{@code \s}, character-class subtraction, capture/back-references, lookaround,
  * Unicode blocks, and so on. (I-Regexp treats {@code ^} and {@code $} as ordinary literal characters, not
- * anchors, so a pattern using them parses -- as literals.)
+ * anchors, so a pattern using them parses -- as literals.) This package's {@code package-info} carries the
+ * conformance statement [TSON-SCHEMA] §9 requires, including the one divergence: the RFC pins no Unicode
+ * version, and {@code \p{...}} resolves against the running JDK's.
  *
  * <p>{@link #matches(String)} tests a whole string against the pattern in guaranteed linear time (a Thompson
  * NFA, no backtracking -- no ReDoS). The {@code Tson} prefix disambiguates from {@code java.util.regex} and
@@ -54,9 +56,12 @@ public final class TsonRegex {
     /**
      * Whether this pattern and {@code other} are <b>disjoint</b> -- no string matches both. Exact (regular
      * languages have a decidable intersection-emptiness), so this is a definitive yes/no, never "unknown".
-     * The building block for a schema resolver's §5.4 pattern-disjointness derivation over {@code
-     * regex}-constrained atoms, where two variants whose patterns are disjoint may drop their discriminating
-     * tag.
+     *
+     * <p><b>Not a choice-disjointness derivation.</b> [TSON-SCHEMA] §5.4 decides that by discrimination
+     * class and forbids proving more -- "value-set separation such as disjoint numeric bounds or disjoint
+     * patterns does not make a choice disjoint" -- so two {@code regex}-constrained variants are both
+     * string-class and keep their tags however separated their languages. This answers the narrower
+     * question, for a schema author reasoning about their own patterns.
      */
     public boolean isDisjointFrom(TsonRegex other) {
         Objects.requireNonNull(other, "other");
