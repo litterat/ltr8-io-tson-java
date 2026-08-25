@@ -208,11 +208,12 @@ public final class SchemaResolver {
                         receiver.report(schemaProblem(id, declaration.name(), error,
                                 Optional.ofNullable(positions.get(declaration)))), positions);
         Map<String, SchemaMap.Declaration> declarations = desugared.body().declarations();
-        // The names desugaring generated, as opposed to the ones the author wrote -- the difference between
-        // the two documents, and nothing subtler. An application of a generated name is machinery closing
-        // its own intermediate form; an application of an authored one is a use site worth recording.
-        Set<String> generated = new LinkedHashSet<>(declarations.keySet());
-        generated.removeAll(document.body().declarations().keySet());
+        // The names desugaring generated, as opposed to the ones the author wrote. These are the schema's
+        // synthetic entries (§5.3's lift rule), so they are both what carries the derived @synthetic marker
+        // at its key below (§8.2) and what tells a generated head closing its own intermediate form from an
+        // authored one: an application of a generated name is machinery, an application of an authored one
+        // is a use site worth recording.
+        Set<String> generated = SchemaDesugarer.lifted(document, desugared);
 
         // Local-vs-import collisions, up front (local names are already unique -- SchemaMap dedupes them).
         for (String name : declarations.keySet()) {
@@ -359,11 +360,45 @@ public final class SchemaResolver {
                         e.getMessage(), Optional.ofNullable(positions.get(declarations.get(name)))));
                 nameAnnotations = Annotations.empty();
             }
-            localOnly.put(name, resolvedLocals.get(name), nameAnnotations);
+            // §8.2: a synthetic entry's key carries the derived @synthetic marker. A lifted declaration has
+            // no name annotations of its own -- there is no source text in front of a name nobody wrote --
+            // so this is the whole of what its key carries, but it is added to whatever is there rather than
+            // replacing it, since the two channels are independent.
+            localOnly.put(name, resolvedLocals.get(name), generated.contains(name)
+                    ? DerivedAnnotations.plusSynthetic(nameAnnotations) : nameAnnotations);
         }
-        // An instantiation entry has no declared name to carry annotations from.
-        instantiations.forEach(localOnly::put);
+        // An entry the materialiser minted has no declared name to carry author annotations from. The
+        // synthetic half of them still gets the derived marker: a template's open form closes into the same
+        // closed synthetic a directly-written form lifts to, and §8.2 marks it wherever it came from. An
+        // instantiation entry gets none, by the same section -- its source is an application, which is what
+        // tells the two families apart without a marker.
+        Set<String> minted = materialiser.syntheticNames();
+        instantiations.forEach((name, definition) -> {
+            if (minted.contains(name)) {
+                localOnly.put(name, definition, DerivedAnnotations.synthetic());
+            } else {
+                localOnly.put(name, definition);
+            }
+        });
         return new TsonSchema(id, document.meta(), document.imports(), localOnly, false);
+    }
+
+    /**
+     * One declaration's failure as a {@link Diagnostic}, the code chosen by the project's own exception
+     * classification: a {@code TsonSchemaValidationException} is the author's error and an {@code
+     * UnsupportedOperationException} is this library's gap, which the reader of the report needs to tell
+     * apart -- one says fix your schema, the other says this could not be checked.
+     *
+     * <p>Both are reported per declaration and both leave a placeholder, so a gap in one declaration no
+     * longer costs every other declaration its verdict. The classification is unchanged; only its
+     * consequence for the pass is.
+     */
+    private static Diagnostic schemaProblem(String id, String declaration, RuntimeException error,
+                                            Optional<SourcePosition> position) {
+        String schemaId = TsonCanonicalIdentity.canonicalize(id);
+        return error instanceof UnsupportedOperationException
+                ? Diagnostic.ofSchemaGap(schemaId, declaration, error.getMessage(), position)
+                : Diagnostic.ofSchemaError(schemaId, declaration, error.getMessage(), position);
     }
 
     /**
@@ -393,24 +428,6 @@ public final class SchemaResolver {
      * mismatch: a `Sum`-bodied placeholder makes every dependent report too, which is the cascade the
      * placeholder exists to prevent.
      */
-    /**
-     * One declaration's failure as a {@link Diagnostic}, the code chosen by the project's own exception
-     * classification: a {@code TsonSchemaValidationException} is the author's error and an {@code
-     * UnsupportedOperationException} is this library's gap, which the reader of the report needs to tell
-     * apart -- one says fix your schema, the other says this could not be checked.
-     *
-     * <p>Both are reported per declaration and both leave a placeholder, so a gap in one declaration no
-     * longer costs every other declaration its verdict. The classification is unchanged; only its
-     * consequence for the pass is.
-     */
-    private static Diagnostic schemaProblem(String id, String declaration, RuntimeException error,
-                                            Optional<SourcePosition> position) {
-        String schemaId = TsonCanonicalIdentity.canonicalize(id);
-        return error instanceof UnsupportedOperationException
-                ? Diagnostic.ofSchemaGap(schemaId, declaration, error.getMessage(), position)
-                : Diagnostic.ofSchemaError(schemaId, declaration, error.getMessage(), position);
-    }
-
     private static TypeDefinition unresolved(Optional<SourcePosition> position, List<String> parameters) {
         return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, parameters, false, List.of(), List.of(),
                 Optional.empty(), RecordBody.of(List.of()), position, Annotations.empty());

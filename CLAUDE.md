@@ -331,6 +331,16 @@ must stay walkable) and the walk stops at a materialised instantiation (this mod
 `REFERENCE` hop the spec's does not, and that entry is what identity keys on). Runs on the bootstrap route
 too, whose output governs anything whose `!!meta` is meta-kernel.
 
+**The derived markers (`DerivedAnnotations`)** are `@alias` and its sibling `@synthetic`: §8.2 puts the bare
+marker on the schema-map **key** of every entry the resolver materialised from a sugar form, and on no other
+— an instantiation entry deliberately carries none, its `source` being an application where a synthetic's is
+a bare constructor. Both are built by name rather than resolved through the governing meta (there is no
+author to resolve against) and both are *derived*: ingest discards and recomputes them. The two mint sites
+are the desugar lift (`SchemaDesugarer.lifted`, the document's own set difference) and materialisation
+closing an open synthetic (`TemplateMaterialiser.syntheticNames`); the bootstrap route marks its nine too.
+Key position, never the `TypeDefinition` value — §6 forbids hoisting between the two — so `AnnotatedMap`
+carries it and the linker re-attaches it, imports included.
+
 ### Meta-kernel bootstrap (`MetaKernelBootstrapResolver`) — `docs/schema-resolution.md`
 
 Meta-kernel's `!!meta` names itself (§1.5's one deliberate circularity), so ordinary resolution can't

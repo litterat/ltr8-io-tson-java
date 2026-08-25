@@ -370,6 +370,43 @@ resolved fixture states the rule in a line — "Reference-kind names at type pos
 - Pinned end to end by `ResolvedFixtureTest`, which compares this resolver against the spec's own
   `spec/m/*-resolved.tn` — the check those files ask for in their own `@doc`.
 
+## The derived markers (`tson-compiler/.../resolver/DerivedAnnotations.java`)
+
+Two annotations are attached by the resolver rather than written by an author (§8.1): `@alias:name` on a
+flattened use-site reference (above), and the bare **`@synthetic` on the key of every entry the resolver
+materialised from a sugar form** (§6, §8.2). Both are declared in the meta-kernel like any other annotation
+type, and both are *derived* — on ingest they are discarded and recomputed, so neither carries decode force
+and neither can be forged into a resolved document to change how it reads. They are built by name here
+rather than resolved through the governing meta the way an author-written annotation is: there is no author
+to resolve against, and the value is fixed.
+
+- **Key position, per §6.** An annotation before a declared name is metadata *about the declaration*, and a
+  resolved schema is a `{type_name => type_definition}` — so the marker lands on the map's key, which
+  `TsonSchema.entries()` keeps reachable through `AnnotatedMap.getAnnotations(name)`, never on the
+  `TypeDefinition` value. §6 forbids hoisting between the two positions and nothing here does.
+- **Marked: exactly the synthetic entries, from both channels.** The desugar lift produces them by the
+  document's own set difference (`SchemaDesugarer.lifted`, `docs/schema-grammar-and-desugaring.md`), and
+  materialisation produces more of the same kind when it closes an open synthetic —
+  `TemplateMaterialiser.syntheticNames()` reports which of its minted entries those are. A declaration's own
+  sugar body is **not** one: `tag_list => [text; 1..2]` *is* the construction, not a lift of one (§5.3).
+- **Unmarked: instantiation entries.** §8.2 draws that line itself — "the two families are distinguishable
+  (an instantiation's `source` is an application; a synthetic's is a bare constructor), and only synthetics
+  are the fold-back-into-display case the marker serves." Marking too much would be as wrong as marking too
+  little, so `SyntheticEntryMarkerTest` asserts both halves.
+- **Why a marker at all, when the names are distinctive.** A synthetic is named by derivation from its own
+  content, but §8.2 makes that spelling non-normative — an implementation picks its own — so pattern-matching
+  the name is not a way to recognise one. Without the marker a consumer of this resolver's output cannot tell
+  a materialised entry from a declared one at all.
+- **It survives linking and the import merge**, which is where a key-side fact is easiest to lose: the linker
+  rebuilds its entry map several times and re-attaches key annotations at the one point every entry passes
+  through (`withNameAnnotations`), imports included, so an imported synthetic keeps the marker its own schema
+  gave it.
+- **The bootstrap route marks too.** meta-kernel writes plenty of sugar; nine forms lift, and the kernel's own
+  resolved fixture marks exactly those nine. `ResolvedFixtureTest.theSameEntriesAreMarkedSyntheticOnBothSides`
+  compares the two sets per schema — reading the fixture's marked keys from its *text*, because a
+  key-position annotation is still dropped when a resolved-form document is read back (`BACKLOG.md`), and a
+  bound comparison would have both sides render nothing and agree for the wrong reason.
+
 ## Template regularity (`tson-compiler/.../resolver/TemplateRegularity.java`)
 
 §5.10's regularity boundary, checked over the resolved entries before anything materialises: **within a
