@@ -25,6 +25,12 @@ import java.util.UUID;
  * (many names, e.g. {@code int8}..{@code int256}, bind to one host type, so a bound {@code long} carries no
  * way to know which produced it), so those are written bare on the default-atom path instead -- see {@link
  * TsonObjectWriter#toTson}.
+ *
+ * <p><b>{@code text} is deliberately absent, though it is a §5.5 built-in like {@code uuid}.</b> Its host
+ * class is {@code String}, which is what a writer emits bare, so a reverse entry would annotate every
+ * string in every document with {@code !text} -- and §5.5's own point is that the annotation exists to
+ * <em>assert</em> the string case where it is in doubt, not to restate it everywhere. The same reasoning
+ * keeps the numeric families out, one step further along.
  */
 final class VocabularyAtoms {
 

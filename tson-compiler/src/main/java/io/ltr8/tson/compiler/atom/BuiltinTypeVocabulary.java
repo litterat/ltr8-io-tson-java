@@ -74,6 +74,7 @@ public final class BuiltinTypeVocabulary {
         types.put(RationalParser.TYPENAME, RationalParser.UNCONSTRAINED);
         types.put(ComplexParser.TYPENAME, ComplexParser.UNCONSTRAINED);
 
+        types.put(TextParser.TYPENAME, TextParser.UNCONSTRAINED);
         types.put(UuidParser.TYPENAME, UuidParser.UNCONSTRAINED);
 
         types.put(BinaryParser.BASE64.typeName(), BinaryParser.BASE64);
