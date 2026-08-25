@@ -1,5 +1,7 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.annotation.Annotation;
+import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeArgument;
@@ -11,6 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -38,6 +41,8 @@ import java.util.Set;
  * any other, and a use of it lands on the instantiation with {@code @alias:string_triple}.
  */
 final class ReferenceFlattener {
+
+    private static final String ALIAS = "alias";
 
     private ReferenceFlattener() {
     }
@@ -70,8 +75,14 @@ final class ReferenceFlattener {
         if (terminal.equals(ref.name())) {
             return withArguments;
         }
-        return new TypeRef(terminal, withArguments.arguments(),
-                DerivedAnnotations.plusAlias(withArguments.annotations(), ref.name()));
+        return new TypeRef(terminal, withArguments.arguments(), plusAlias(withArguments.annotations(), ref.name()));
+    }
+
+    /** {@code annotations} with {@code @alias:written} added -- the carrier is immutable, so this rebuilds it. */
+    private static Annotations plusAlias(Annotations annotations, String written) {
+        Annotations.Builder builder = new Annotations.Builder();
+        annotations.values().forEach(builder::add);
+        return builder.add(new Annotation(ALIAS, Optional.of(written))).build();
     }
 
     private static TypeRef flattenArguments(TypeRef ref, Map<String, TypeDefinition> namespace,

@@ -1,6 +1,7 @@
 package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.annotation.AnnotatedMap;
+import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
@@ -52,6 +53,15 @@ import java.util.Set;
  * the resolver sees each newly-added entry on the very next loop iteration.
  */
 public final class SchemaResolver {
+
+    /**
+     * [TSON-SCHEMA] §8.2's derived marker, attached below to the key of every entry this resolver
+     * materialised from a sugar form. Valueless -- presence at the key is the whole of the information --
+     * and built by name rather than resolved through the governing meta the way an author-written annotation
+     * is: there is no author to resolve against, and §8.1 makes it derived, discarded and recomputed on
+     * ingest rather than read from a document.
+     */
+    private static final Annotations SYNTHETIC = Annotations.of(List.of(Annotation.of("synthetic")));
 
     private final TsonCompiledSchemaLoader loader;
 
@@ -360,12 +370,10 @@ public final class SchemaResolver {
                         e.getMessage(), Optional.ofNullable(positions.get(declarations.get(name)))));
                 nameAnnotations = Annotations.empty();
             }
-            // §8.2: a synthetic entry's key carries the derived @synthetic marker. A lifted declaration has
-            // no name annotations of its own -- there is no source text in front of a name nobody wrote --
-            // so this is the whole of what its key carries, but it is added to whatever is there rather than
-            // replacing it, since the two channels are independent.
-            localOnly.put(name, resolvedLocals.get(name), generated.contains(name)
-                    ? DerivedAnnotations.plusSynthetic(nameAnnotations) : nameAnnotations);
+            // §8.2: a synthetic entry's key carries the derived @synthetic marker, and a lifted declaration
+            // has nothing else at its key -- there is no source text in front of a name nobody wrote.
+            localOnly.put(name, resolvedLocals.get(name),
+                    generated.contains(name) ? SYNTHETIC : nameAnnotations);
         }
         // An entry the materialiser minted has no declared name to carry author annotations from. The
         // synthetic half of them still gets the derived marker: a template's open form closes into the same
@@ -375,30 +383,12 @@ public final class SchemaResolver {
         Set<String> minted = materialiser.syntheticNames();
         instantiations.forEach((name, definition) -> {
             if (minted.contains(name)) {
-                localOnly.put(name, definition, DerivedAnnotations.synthetic());
+                localOnly.put(name, definition, SYNTHETIC);
             } else {
                 localOnly.put(name, definition);
             }
         });
         return new TsonSchema(id, document.meta(), document.imports(), localOnly, false);
-    }
-
-    /**
-     * One declaration's failure as a {@link Diagnostic}, the code chosen by the project's own exception
-     * classification: a {@code TsonSchemaValidationException} is the author's error and an {@code
-     * UnsupportedOperationException} is this library's gap, which the reader of the report needs to tell
-     * apart -- one says fix your schema, the other says this could not be checked.
-     *
-     * <p>Both are reported per declaration and both leave a placeholder, so a gap in one declaration no
-     * longer costs every other declaration its verdict. The classification is unchanged; only its
-     * consequence for the pass is.
-     */
-    private static Diagnostic schemaProblem(String id, String declaration, RuntimeException error,
-                                            Optional<SourcePosition> position) {
-        String schemaId = TsonCanonicalIdentity.canonicalize(id);
-        return error instanceof UnsupportedOperationException
-                ? Diagnostic.ofSchemaGap(schemaId, declaration, error.getMessage(), position)
-                : Diagnostic.ofSchemaError(schemaId, declaration, error.getMessage(), position);
     }
 
     /**
@@ -428,6 +418,24 @@ public final class SchemaResolver {
      * mismatch: a `Sum`-bodied placeholder makes every dependent report too, which is the cascade the
      * placeholder exists to prevent.
      */
+    /**
+     * One declaration's failure as a {@link Diagnostic}, the code chosen by the project's own exception
+     * classification: a {@code TsonSchemaValidationException} is the author's error and an {@code
+     * UnsupportedOperationException} is this library's gap, which the reader of the report needs to tell
+     * apart -- one says fix your schema, the other says this could not be checked.
+     *
+     * <p>Both are reported per declaration and both leave a placeholder, so a gap in one declaration no
+     * longer costs every other declaration its verdict. The classification is unchanged; only its
+     * consequence for the pass is.
+     */
+    private static Diagnostic schemaProblem(String id, String declaration, RuntimeException error,
+                                            Optional<SourcePosition> position) {
+        String schemaId = TsonCanonicalIdentity.canonicalize(id);
+        return error instanceof UnsupportedOperationException
+                ? Diagnostic.ofSchemaGap(schemaId, declaration, error.getMessage(), position)
+                : Diagnostic.ofSchemaError(schemaId, declaration, error.getMessage(), position);
+    }
+
     private static TypeDefinition unresolved(Optional<SourcePosition> position, List<String> parameters) {
         return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, parameters, false, List.of(), List.of(),
                 Optional.empty(), RecordBody.of(List.of()), position, Annotations.empty());

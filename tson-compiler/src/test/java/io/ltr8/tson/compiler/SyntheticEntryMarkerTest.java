@@ -2,7 +2,6 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonCanonicalIdentity;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import org.junit.jupiter.api.Test;
@@ -37,6 +36,9 @@ class SyntheticEntryMarkerTest {
 
     private static final String ID = "https://example.test/marker.tn";
 
+    /** A second schema, which reaches the first one's entries -- synthetics included -- through !!import. */
+    private static final String IMPORTER_ID = "https://example.test/importer.tn";
+
     /**
      * One of each: a plain record, a template and its application, a declaration whose <em>own</em> body is a
      * sugar form (which never lifts, §5.3), and a record holding two inline forms (which do).
@@ -62,27 +64,34 @@ class SyntheticEntryMarkerTest {
     private static final Set<String> DECLARED =
             Set.of("order", "paged", "order_response", "tag_list", "holder");
 
+    private static final String IMPORTER = """
+            !!id:"https://example.test/importer.tn"
+            !!meta:"https://tson.io/2026/33/m/meta.tn"
+            !!import:"https://example.test/marker.tn"
+            {
+              shipment => { of: order }
+            }
+            """;
+
+    private static TsonCompiledMetaRegistry registry() {
+        return TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), uri -> {
+            if (TsonCanonicalIdentity.sameIdentity(uri, ID)) {
+                return SCHEMA;
+            }
+            if (TsonCanonicalIdentity.sameIdentity(uri, IMPORTER_ID)) {
+                return IMPORTER;
+            }
+            throw new IllegalStateException("unexpected fetch: " + uri);
+        });
+    }
+
     private static AnnotatedMap<String, TypeDefinition> entriesOf(String id) {
-        TsonCompiledMetaRegistry core = TsonCompiledMetaRegistry.withStandardLibrary(
-                SchemaMetaNameBinder.defaultContext(), uri -> {
-                    if (TsonCanonicalIdentity.sameIdentity(uri, ID)) {
-                        return SCHEMA;
-                    }
-                    throw new IllegalStateException("unexpected fetch: " + uri);
-                });
-        return core.resolveLinked(id).schema().entries();
+        return registry().resolveLinked(id).schema().entries();
     }
 
     /** This schema's own entries, the merged {@code !!import} closure left out. */
     private static Map<String, TypeDefinition> localEntries() {
-        TsonCompiledMetaRegistry core = TsonCompiledMetaRegistry.withStandardLibrary(
-                SchemaMetaNameBinder.defaultContext(), uri -> {
-                    if (TsonCanonicalIdentity.sameIdentity(uri, ID)) {
-                        return SCHEMA;
-                    }
-                    throw new IllegalStateException("unexpected fetch: " + uri);
-                });
-        var linked = core.resolveLinked(ID);
+        var linked = registry().resolveLinked(ID);
         String canonical = TsonCanonicalIdentity.canonicalize(ID);
         Map<String, TypeDefinition> local = new LinkedHashMap<>();
         linked.schema().entries().forEach((name, definition) -> {
@@ -168,24 +177,24 @@ class SyntheticEntryMarkerTest {
     }
 
     /**
-     * And it survives the linker, which rebuilds its entry map several times over, and the transitive import
-     * merge: meta.tn sees meta-kernel's synthetics through its own {@code !!import}, still marked by the
-     * schema that materialised them.
+     * And it survives the linker, which rebuilds its entry map several times over, and the {@code !!import}
+     * merge: §2.2.3 contributes an imported schema's whole namespace, synthetic entries included, and each
+     * arrives marked by the schema that materialised it rather than by whoever imported it.
      */
     @Test
     void anImportedSyntheticKeepsItsMarker() {
-        AnnotatedMap<String, TypeDefinition> kernel = entriesOf(TsonBundledSchemas.META_KERNEL_ID);
-        AnnotatedMap<String, TypeDefinition> meta = entriesOf(TsonBundledSchemas.META_ID);
+        AnnotatedMap<String, TypeDefinition> declaring = entriesOf(ID);
+        AnnotatedMap<String, TypeDefinition> importing = entriesOf(IMPORTER_ID);
 
-        Set<String> kernelSynthetics = new TreeSet<>();
-        kernel.keySet().forEach(name -> {
-            if (marked(kernel, name)) {
-                kernelSynthetics.add(name);
+        Set<String> synthetics = new TreeSet<>();
+        declaring.keySet().forEach(name -> {
+            if (marked(declaring, name)) {
+                synthetics.add(name);
             }
         });
-        assertEquals(9, kernelSynthetics.size(), "meta-kernel lifts nine forms, got " + kernelSynthetics);
-        for (String name : kernelSynthetics) {
-            assertTrue(marked(meta, name), name + " lost its marker on the way through meta.tn's !!import");
+        assertEquals(4, synthetics.size(), "expected four synthetic entries, got " + synthetics);
+        for (String name : synthetics) {
+            assertTrue(marked(importing, name), name + " lost its marker on the way through !!import");
         }
     }
 }

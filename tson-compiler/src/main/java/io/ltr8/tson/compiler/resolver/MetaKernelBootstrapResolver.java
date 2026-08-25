@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.resolver;
 
-import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.TsonSchemaSource;
 import io.ltr8.tson.compiler.ast.ArrayValue;
@@ -100,27 +99,15 @@ public final class MetaKernelBootstrapResolver {
     public static TsonSchema getMetaKernelSchema() {
         String source = TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID);
         SchemaDocument document = new TsonSchemaParser(source).parseSchemaDocument();
-        // Desugaring runs here rather than inside resolveEntries because both its output and the names it
-        // lifted are wanted: the second is this schema's synthetic entries, marked below.
-        SchemaDocument desugared = SchemaDesugarer.desugar(document, Set.of());
-        Map<String, TypeDefinition> resolved = resolveEntries(desugared);
         // §8.3 applies here as it does to any other schema. The bootstrap is a shorter route to the same
         // resolved form, not a different one, and this output governs anything whose !!meta is meta-kernel
         // -- so a use site flattened by ordinary resolution and unflattened here would be two answers to
         // one question. No minted entries to stop at: the bootstrap runs no materialisation, and meta-kernel
         // imports nothing, so its own map is the whole namespace a chain can walk.
-        Map<String, TypeDefinition> flattened = ReferenceFlattener.flatten(resolved, resolved, Set.of());
+        Map<String, TypeDefinition> resolved = resolveEntries(document);
+        Map<String, TypeDefinition> entries = ReferenceFlattener.flatten(resolved, resolved, Set.of());
         String id = document.id().orElseThrow(() -> new IllegalStateException(
                 "meta-kernel.tn has no !!id -- this should never happen for the real, bundled fixture"));
-        // And §8.2 the same way: meta-kernel writes plenty of sugar, every form of it lifts to a synthetic
-        // entry, and each of those keys carries the derived @synthetic marker -- the kernel's own resolved
-        // fixture marks exactly the nine this produces.
-        AnnotatedMap<String, TypeDefinition> entries = AnnotatedMap.of(flattened);
-        for (String name : SchemaDesugarer.lifted(document, desugared)) {
-            if (entries.containsKey(name)) {
-                entries = entries.withAnnotations(name, DerivedAnnotations.synthetic());
-            }
-        }
         return new TsonSchema(id, document.meta(), document.imports(), entries, true);
     }
 
@@ -141,14 +128,11 @@ public final class MetaKernelBootstrapResolver {
     /** Meta-kernel governs itself, so it has no separate structure namespace to fall back to -- this class's own first pass never reaches {@link DefinitionResolver#resolveInstance} at all, the one place a structure namespace is ever consulted. */
     private static final DefinitionGetter EMPTY_META_DEFINITIONS = name -> null;
 
-    /**
-     * Every declaration of the already-desugared {@code document}, in this class's own two passes. Meta-kernel
-     * desugars like every other schema and needs no special case: the desugar table is fixed by the sugar
-     * forms (§5.3), so the phase consults no governing meta -- which for meta-kernel would have been the very
-     * entries this method is in the middle of producing. It runs in the caller, which also needs to know
-     * which names it lifted.
-     */
     private static Map<String, TypeDefinition> resolveEntries(SchemaDocument document) {
+        // Meta-kernel desugars like every other schema, and needs no special case: the desugar table is fixed
+        // by the sugar forms (§5.3), so the phase consults no governing meta -- which for meta-kernel would
+        // have been the very entries this method is in the middle of producing.
+        document = SchemaDesugarer.desugar(document, Set.of());
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         DefinitionResolver resolver = new DefinitionResolver(NEVER_CALLED, EMPTY_META_DEFINITIONS, entries::get);
         List<SchemaMap.Declaration> instances = new ArrayList<>();
