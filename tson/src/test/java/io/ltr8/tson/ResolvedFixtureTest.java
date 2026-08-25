@@ -132,6 +132,40 @@ class ResolvedFixtureTest {
         return own;
     }
 
+    /**
+     * The names each fixture marks {@code @synthetic} at its schema-map key, read from the fixture's own
+     * <em>text</em>.
+     *
+     * <p>Text, and not the bound document every other comparison here uses, because a key-position annotation
+     * is dropped when a resolved-form document is read back -- the second half of {@code BACKLOG.md}'s
+     * synthetic-entry item. Both sides of a bound comparison would therefore render no annotations at all and
+     * agree for the wrong reason. Scanning the source is what makes the marker checkable against the spec's
+     * own output before that channel exists; when it does, this can read the keys like anything else.
+     */
+    private static Set<String> fixtureSynthetics(String file) throws Exception {
+        Set<String> marked = new TreeSet<>();
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("@synthetic\\s+([A-Za-z0-9_]+)\\s*=>")
+                .matcher(Files.readString(specDirectory().resolve(file)));
+        while (matcher.find()) {
+            marked.add(matcher.group(1));
+        }
+        return marked;
+    }
+
+    /** The same, from this resolver: the local entries whose keys carry the marker, hashes normalised. */
+    private static Set<String> ourSynthetics(String id) {
+        var linked = tson().bindRegistry().core().resolveLinked(id);
+        var entries = linked.schema().entries();
+        String canonical = TsonCanonicalIdentity.canonicalize(id);
+        Set<String> marked = new TreeSet<>();
+        entries.forEach((name, definition) -> {
+            if (linked.originOf(name).equals(canonical) && entries.getAnnotations(name).has("synthetic")) {
+                marked.add(withoutHash(name));
+            }
+        });
+        return marked;
+    }
+
     /** {@code spec/m}, found by walking up rather than assumed relative to a working directory. */
     private static Path specDirectory() {
         Path directory = Path.of("").toAbsolutePath();
@@ -205,6 +239,29 @@ class ResolvedFixtureTest {
                     rendered(fixtureDefinition), rendered(comparison.ours().get(name)),
                     comparison.label() + ": " + name + " does not resolve to what the fixture records"));
         }
+    }
+
+    /**
+     * <b>And the same entries are synthetic on both sides.</b> [TSON-SCHEMA] §8.2 puts the derived
+     * {@code @synthetic} marker on the schema-map key of every entry the resolver materialised from a sugar
+     * form, and on no other -- an instantiation entry deliberately carries none. The fixtures mark nine keys
+     * in meta-kernel and one in meta.tn; core.tn writes no inline form and has none, which is as much a
+     * statement as the other two.
+     *
+     * <p>This is the one assertion here that does not go through the bound document -- see {@link
+     * #fixtureSynthetics}.
+     */
+    @Test
+    void theSameEntriesAreMarkedSyntheticOnBothSides() throws Exception {
+        // Non-vacuous: the fixtures really do mark keys, so an empty-equals-empty pass is not available to a
+        // scan that stopped matching or a resolver that stopped marking.
+        assertEquals(9, fixtureSynthetics("meta-kernel-resolved.tn").size(), "meta-kernel.tn marks nine keys");
+        assertEquals(1, fixtureSynthetics("meta-resolved.tn").size(), "meta.tn marks one");
+
+        assertEquals(fixtureSynthetics("meta-kernel-resolved.tn"),
+                ourSynthetics(TsonBundledSchemas.META_KERNEL_ID), "meta-kernel.tn");
+        assertEquals(fixtureSynthetics("meta-resolved.tn"), ourSynthetics(TsonBundledSchemas.META_ID), "meta.tn");
+        assertEquals(fixtureSynthetics("core-resolved.tn"), ourSynthetics(TsonBundledSchemas.CORE_ID), "core.tn");
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────

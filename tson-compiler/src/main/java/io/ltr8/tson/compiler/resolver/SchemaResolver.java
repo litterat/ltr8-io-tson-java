@@ -1,6 +1,7 @@
 package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.annotation.AnnotatedMap;
+import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
@@ -52,6 +53,15 @@ import java.util.Set;
  * the resolver sees each newly-added entry on the very next loop iteration.
  */
 public final class SchemaResolver {
+
+    /**
+     * [TSON-SCHEMA] §8.2's derived marker, attached below to the key of every entry this resolver
+     * materialised from a sugar form. Valueless -- presence at the key is the whole of the information --
+     * and built by name rather than resolved through the governing meta the way an author-written annotation
+     * is: there is no author to resolve against, and §8.1 makes it derived, discarded and recomputed on
+     * ingest rather than read from a document.
+     */
+    private static final Annotations SYNTHETIC = Annotations.of(List.of(Annotation.of("synthetic")));
 
     private final TsonCompiledSchemaLoader loader;
 
@@ -208,11 +218,12 @@ public final class SchemaResolver {
                         receiver.report(schemaProblem(id, declaration.name(), error,
                                 Optional.ofNullable(positions.get(declaration)))), positions);
         Map<String, SchemaMap.Declaration> declarations = desugared.body().declarations();
-        // The names desugaring generated, as opposed to the ones the author wrote -- the difference between
-        // the two documents, and nothing subtler. An application of a generated name is machinery closing
-        // its own intermediate form; an application of an authored one is a use site worth recording.
-        Set<String> generated = new LinkedHashSet<>(declarations.keySet());
-        generated.removeAll(document.body().declarations().keySet());
+        // The names desugaring generated, as opposed to the ones the author wrote. These are the schema's
+        // synthetic entries (§5.3's lift rule), so they are both what carries the derived @synthetic marker
+        // at its key below (§8.2) and what tells a generated head closing its own intermediate form from an
+        // authored one: an application of a generated name is machinery, an application of an authored one
+        // is a use site worth recording.
+        Set<String> generated = SchemaDesugarer.lifted(document, desugared);
 
         // Local-vs-import collisions, up front (local names are already unique -- SchemaMap dedupes them).
         for (String name : declarations.keySet()) {
@@ -359,10 +370,24 @@ public final class SchemaResolver {
                         e.getMessage(), Optional.ofNullable(positions.get(declarations.get(name)))));
                 nameAnnotations = Annotations.empty();
             }
-            localOnly.put(name, resolvedLocals.get(name), nameAnnotations);
+            // §8.2: a synthetic entry's key carries the derived @synthetic marker, and a lifted declaration
+            // has nothing else at its key -- there is no source text in front of a name nobody wrote.
+            localOnly.put(name, resolvedLocals.get(name),
+                    generated.contains(name) ? SYNTHETIC : nameAnnotations);
         }
-        // An instantiation entry has no declared name to carry annotations from.
-        instantiations.forEach(localOnly::put);
+        // An entry the materialiser minted has no declared name to carry author annotations from. The
+        // synthetic half of them still gets the derived marker: a template's open form closes into the same
+        // closed synthetic a directly-written form lifts to, and §8.2 marks it wherever it came from. An
+        // instantiation entry gets none, by the same section -- its source is an application, which is what
+        // tells the two families apart without a marker.
+        Set<String> minted = materialiser.syntheticNames();
+        instantiations.forEach((name, definition) -> {
+            if (minted.contains(name)) {
+                localOnly.put(name, definition, SYNTHETIC);
+            } else {
+                localOnly.put(name, definition);
+            }
+        });
         return new TsonSchema(id, document.meta(), document.imports(), localOnly, false);
     }
 

@@ -76,8 +76,19 @@ final class TemplateMaterialiser {
      */
     private final DefinitionGetter namespace;
 
-    /** The instantiation entries produced, keyed by their derived internal name, in creation order. */
+    /** The entries produced, keyed by their derived internal name, in creation order. */
     private final Map<String, TypeDefinition> materialised = new LinkedHashMap<>();
+
+    /**
+     * Which of {@link #materialised} are <b>synthetic</b> entries rather than instantiation entries -- the
+     * closed forms {@link #closeInstanceTemplate} mints, which are indistinguishable from the entry a
+     * directly-written {@code [pixel; 1920]} lifts to and are the same entry when both appear (§8.2).
+     *
+     * <p>§8.2 marks only these: an instantiation entry carries no {@code @synthetic}, its {@code source}
+     * being an application where a synthetic's is a bare constructor. The caller reads this set to put the
+     * marker on the right keys.
+     */
+    private final Set<String> synthetics = new LinkedHashSet<>();
 
     /** Applications currently being closed, for the knot-tying memo and the termination guard's chain. */
     private final Set<String> closing = new LinkedHashSet<>();
@@ -183,6 +194,15 @@ final class TemplateMaterialiser {
             }
         }
         return pass.materialised;
+    }
+
+    /**
+     * The subset of what {@link #materialise} returned that is a synthetic entry, whose key carries the
+     * derived {@code @synthetic} marker (§8.2). Everything else it returned is an instantiation entry, which
+     * deliberately carries none.
+     */
+    Set<String> syntheticNames() {
+        return Set.copyOf(synthetics);
     }
 
     /** Where an application this pass cannot close is reported, entry by entry. */
@@ -405,6 +425,7 @@ final class TemplateMaterialiser {
         TypeDefinition closed = new TypeDefinition(Optional.of(TypeRef.of(target)), template.kind(), List.of(),
                 false, List.of(), List.of(), Optional.empty(), body);
         materialised.put(formName, closed);
+        synthetics.add(formName);
         publish.accept(formName, closed);
         return formName;
     }

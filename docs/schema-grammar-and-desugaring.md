@@ -280,5 +280,12 @@ rebuilt and called a cache.
     declaration, a deliberate boundary of this revision. It reported `NOT_IMPLEMENTED` until the spec
     settled it, which exited 70 over a construct the spec refuses. Array and map bind only scalar slots and
     are unaffected.
+- **Every entry it lifts is a *synthetic* entry, and is marked as one.** `SchemaDesugarer.lifted(original,
+  desugared)` is the set difference between the two documents, and that set is exactly what §8.2's derived
+  `@synthetic` marker goes on — attached at the schema-map key by the caller, not here, since this phase
+  deals in AST and the marker belongs to resolved output (`docs/schema-resolution.md`). A set difference
+  rather than a field on the pass, because `hoist` deliberately does *not* inject a form an `!!import`
+  already declares: that entry is the same form resolved by the schema that owns it, and marking it here
+  would put this document's derived marker on someone else's key.
 - **The meta-kernel runs this phase too, with no accommodation at all** — its governing meta is itself, and
   with the table fixed there is nothing to look up.

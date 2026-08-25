@@ -40,6 +40,7 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -204,6 +205,24 @@ final class SchemaDesugarer {
     /** {@link #desugar(SchemaDocument, Set, DesugarFailureReporter, Map)}, throwing at the first invalid sugar form. */
     static SchemaDocument desugar(SchemaDocument document, Set<String> imported) {
         return desugar(document, imported, null, new IdentityHashMap<>());
+    }
+
+    /**
+     * The names {@code desugared} holds that {@code original} did not: the entries this phase lifted, and so
+     * exactly the schema's <b>synthetic entries</b> ([TSON-SCHEMA] §5.3's lift rule -- closed for a concrete
+     * form, open for a parameter-bearing one). Both callers of {@link #desugar} need the set: one to mark
+     * each of them {@code @synthetic} at its key (§8.2), and {@code SchemaResolver} also to tell a generated
+     * head closing its own intermediate form from an authored one.
+     *
+     * <p>A set difference rather than a field on the pass, because {@link #hoist} does not inject a form an
+     * {@code !!import} already declares -- the imported entry <em>is</em> the same form, resolved by the
+     * schema that owns it, and marking it here would put this schema's own derived marker on someone else's
+     * key. What the difference reports is what this document gained.
+     */
+    static Set<String> lifted(SchemaDocument original, SchemaDocument desugared) {
+        Set<String> lifted = new LinkedHashSet<>(desugared.body().declarations().keySet());
+        lifted.removeAll(original.body().declarations().keySet());
+        return lifted;
     }
 
     /**

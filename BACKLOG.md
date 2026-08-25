@@ -152,20 +152,18 @@ need are not retained for a secondary constructor.
 
 ## Synthetic entry identity
 
-- [ ] **Nothing marks a synthetic entry as synthetic.** Revision 33 adds `synthetic => @annotation void` to
-  meta-kernel and classifies it with `@alias` as a derived, name-position marker: resolver output puts
-  `@synthetic` on the schema-map *key* of every entry the resolver materialised, and ingest discards and
-  recomputes it ([TSON-SCHEMA] §6, §8.1, §8.2). This resolver materialises those entries and names them by a
-  content hash of the binding record, but attaches no marker, so a consumer of our output cannot tell a
-  synthetic entry from a declared one except by pattern-matching the name — which the spec makes
-  non-normative in the same breath. Two halves, and the second is why this has been invisible:
-- [ ] **Key-position annotations do not reach `TypeDefinition.annotations()` at all.** `@doc` before a
-  declared name, `@alias`, `@synthetic` — the whole name-position channel [TSON-SCHEMA] §6 calls "metadata
-  about the declaration" — is dropped on read and never written. `ResolvedFixtureTest` cannot catch it: the
-  Revision 33 fixtures carry `@synthetic` on nine keys and `@doc` on many more, and both sides of the
-  comparison render an empty `Annotations`, so the entries compare equal for the wrong reason. Fixing the
-  read side is what makes the marker testable; a test that reads a fixture key's `@synthetic` back should
-  land with it, or the emit side will pass on the same blind spot.
+- [ ] **Key-position annotations are lost on the resolved-form round trip.** A schema *source* carries them
+  through now: §6's name-position channel — `@doc` before a declared name, and the resolver's own derived
+  `@alias`/`@synthetic` — reaches `TsonSchema.entries()` as key annotations (`AnnotatedMap`) and survives
+  linking and the import merge. The *document* round trip is what does not: reading a resolved-form
+  `{type_name => type_definition}` document back binds the map with no key annotations at all, and nothing
+  writes them. `ResolvedFixtureTest` therefore cannot compare the marker the way it compares everything else
+  — the Revision 33 fixtures carry `@synthetic` on nine keys and `@doc` on many more, and the bound side
+  renders none of them, so the entries would compare equal for the wrong reason;
+  `theSameEntriesAreMarkedSyntheticOnBothSides` scans the fixture text instead. Fixing the read side is what
+  lets that test read those keys like anything else, and the emit side has the same blind spot waiting behind
+  it — [TSON-SCHEMA] §8.1's ingest rule is the consumer of both halves: derived markers are discarded and
+  recomputed, author-written key annotations are preserved as data.
 
 - [ ] **Two entries for one type, where the argument is one number spelled two ways.** `vector<float32, 255>`
   and `vector<float32, 0xFF>` produce entries with byte-identical bodies, because identity derives from the
