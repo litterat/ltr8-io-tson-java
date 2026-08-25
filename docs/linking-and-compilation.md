@@ -355,7 +355,7 @@ for a record body, so no `type_ref` carrying `arguments` could be read at all.
   serve both.
   - **It costs an identity split, recorded rather than papered over.** Identity derives from the token, so
     `vector<float32, 255>` and `vector<float32, 0xFF>` are two applications with byte-identical bodies where
-    §4 makes them one number. `SPEC-FEEDBACK.md` #6 puts the disagreement underneath it to the spec — the
+    §4 makes them one number. `SPEC-FEEDBACK.md` #4 puts the disagreement underneath it to the spec — the
     same slot is a bare token in the prose and a `value` in the kernel, and §8.2's identity rule inherits the
     ambiguity. Normalising numeric tokens before hashing would recover §4's equivalence, and is deliberately
     not done here: it would be this implementation inventing an identity rule the spec does not state.

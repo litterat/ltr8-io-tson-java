@@ -530,7 +530,7 @@ final class SchemaDesugarer {
      * {@code Token}, §5.10 describing a type argument's literal as a bare token rather than as the value it
      * denotes, so the reader that fills it preserves the token instead of decoding it ({@code
      * RawTokenParser}). What that costs -- identity keyed on the spelling, so {@code <255>} and {@code
-     * <0xFF>} are two applications -- is {@code SPEC-FEEDBACK.md} #6.
+     * <0xFF>} are two applications -- is {@code SPEC-FEEDBACK.md} #4.
      */
     private static RecordValue refRecord(GenericRef generic) {
         List<ScopedValue> arguments = new ArrayList<>();
@@ -680,7 +680,7 @@ final class SchemaDesugarer {
      * {@code [T; 3]} and {@code [T; 3..3]} land on the very same entry.
      *
      * <p><b>A zero floor is rejected</b> rather than desugared. §5.3 calls it vacuous and asks the resolver to
-     * warn while desugaring it anyway; rejecting the spelling is {@code SPEC-FEEDBACK.md} #5's position, and
+     * warn while desugaring it anyway; rejecting the spelling is {@code spec/tson-rev33-changelog.md} #42's position, and
      * here the warning would be guarding more than a style nit -- identity is structural (§8.2), so the form
      * lands on an entry <em>distinct from</em> the unbounded one that means exactly the same thing. That is an
      * identity trap, and the author's fix is the one §5.3 itself names. Only a literal {@code 0} is caught: a

@@ -681,7 +681,7 @@ compatibility).
   `template_argument` has no collection case, so `<T> { v: (T | text) }` is refused at the declaration
   (`spec/tson-rev33-changelog.md` #53); a *value* argument keeps its token, so `[vector<float32, 3>]` closes to a
   nested array with both bounds at 3 (`RawTokenParser`) — at the cost of identity being keyed on the
-  spelling, so `<255>` and `<0xFF>` are two applications (`SPEC-FEEDBACK.md` #6).
+  spelling, so `<255>` and `<0xFF>` are two applications (`SPEC-FEEDBACK.md` #4).
 - **Undocumented atom constructors** — `unknown` (and `extern`, which has no core.tn declaration) has no
   compiled-parser factory, so it compiles to `ErrorReader` (a schema merely *declaring* one still compiles).
   Neither is an ordinary missing parser waiting to be written: `extern` is a whole absent mechanism and `unknown`

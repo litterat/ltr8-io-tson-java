@@ -337,6 +337,26 @@ instance-form templates carry `instance_template`; `@synthetic` convention state
 `complex.component`) may be set while a source-bound one (`int8.size`) is identity-only —
 core.tn's `complex` doc now agrees with the rule as stated.
 
+**Post-review corrections (executed 2026-08-25).** Verification against the spec text —
+rather than this table — found two accepted dispositions that had not fully reached the
+documents; both are now applied. **#15:** the "`data-value` at exactly three points"
+sentence stood uncorrected in the P2 §12.1 lead *and* had been added to the §1
+introduction, so the overstatement existed in two places; both are rewritten, and the
+count is re-derived against #16's executed grammar — the schema grammar now imports
+`core-value` at exactly one point (the `instance` payload) and uses the full `data-value`
+at none (refinement bodies are braced `record-def`s; field-modifier values are
+`( token / absent )`), so §12.1's import list also corrects `data-value` → `core-value`.
+**#42:** the warn-level inventory had fully landed (neither document contains a normative
+warning), but the property held only by exhaustion — the one-severity sentence the
+disposition called for is now stated once, in P1 §8.1 beside the canonical error
+phrasings, which P2 §1.3's diagnostics bullet already inherits by reference. Both table
+rows stand as accepted; #42's residual was exactly that sentence. The same pass caught one
+more instance of the #15/#16 defect class: §5.5/§5.6's prose still called the constructor
+payload "the data-value after `!C`" — three occurrences now read "core value", matching
+the executed `instance` production. The remaining `data-value` mentions in P2 (annotation
+values, §6; the absent sentinel's data-value positions, §7.6) are correct uses of the
+[TSON-DATA] production and stand.
+
 **Developer Guide (executed 2026-08-25).** tson-guide.md ships with Revision 33, revised
 on two principles: it describes the design as it stands, and it does not hold the full
 history of decisions — per-revision history lives in the revision change logs, and the

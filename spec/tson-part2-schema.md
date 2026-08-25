@@ -26,7 +26,7 @@ TSON is a schema system, and this document is its centre: a type system of immut
 
 This document defines the TSON **type system and schema layer**: the schema grammar and its type-definition forms, the type system and its operations, the schema chain and its resolution model, the resolver output contract, the text encoding rules, and the schema-layer directive operations.
 
-[TSON-DATA] defines the lexer, the data grammar, base type resolution, and the built-in type vocabulary. This document introduces no lexical changes: a schema document is parsed by a second body grammar over the same frozen lexer, selected by the document header ([TSON-DATA] §2.2), and every operator it uses is a token that lexer already emits — the reserved special tokens of [TSON-DATA] §7.2.5 receive their meaning here. The schema grammar imports [TSON-DATA]'s `data-value` production at exactly three points — constructor-application values and atom-refinement values (§5.5), and field-modifier values (§5.2) — and the coupling is one-directional: nothing in the data grammar depends on this document.
+[TSON-DATA] defines the lexer, the data grammar, base type resolution, and the built-in type vocabulary. This document introduces no lexical changes: a schema document is parsed by a second body grammar over the same frozen lexer, selected by the document header ([TSON-DATA] §2.2), and every operator it uses is a token that lexer already emits — the reserved special tokens of [TSON-DATA] §7.2.5 receive their meaning here. The schema grammar imports [TSON-DATA]'s value grammar at exactly one point — the constructor-application payload, a `core-value` (§5.5, §12.1); every other value position is deliberately narrower (a refinement body is a braced record, §5.5; a field-modifier value is a bare token or the absent sentinel, §5.2) — and the coupling is one-directional: nothing in the data grammar depends on this document.
 
 
 ### 1.1 The TSON Specification Series
@@ -563,7 +563,7 @@ A choice discriminates by variant *type name*; for labelled disjunction — mutu
 
 Within the type-definition grammar, the `!` prefix always takes a **constructor**; the invariant the data format teaches therefore holds in every grammar of the series: `!T x` describes a value shaped by `T` — in schema source, in data documents, and in resolver output alike. Two forms follow the prefix, distinguished by the `^` operator; the name after `!` resolves per §3.3.1.
 
-**Constructor application — `!C value`.** Produces a constructor instance filled with specific values. The data-value after `!C` is a record of bindings interpreted against the constructor's record shape — the field list `C` declared as its narrowable vocabulary — or the positional form of §5.6. This form does NOT establish IS-A: construction transfers only the constructor's `kind`; the result records `source: C` with empty `supertypes`. Resolving a non-constructor after a bare `!` is a resolver error (§3.3.1).
+**Constructor application — `!C value`.** Produces a constructor instance filled with specific values. The core value after `!C` (§12.1) is a record of bindings interpreted against the constructor's record shape — the field list `C` declared as its narrowable vocabulary — or the positional form of §5.6. This form does NOT establish IS-A: construction transfers only the constructor's `kind`; the result records `source: C` with empty `supertypes`. Resolving a non-constructor after a bare `!` is a resolver error (§3.3.1).
 
 ```
 integer => !integer_type {}
@@ -587,7 +587,7 @@ positive_integer => !integer ^ { min: 1 }
 
 **Construction creates siblings, not subtypes.** One constructor may found any number of nominally distinct families: `dogs => !integer_type {}` is a fresh atom family with the same body as `integer` and no relation to it, and `small_dog_count => !dogs ^ { min: 0  max: 5 }` refines `dogs`, not `integer`. The only IS-A the `!` forms ever create is the refinement's single hop to its instance — recorded in `type_definition.supertypes` and deliberately nowhere in the body: the canonical form (§5.6) erases the surface distinction, so `supertypes` is the sole carrier of the atom family's direct IS-A fact (§8.1).
 
-**Single-required-field positional form.** When a constructor has exactly one REQUIRED field, the data-value after `!C` fills that field directly; see §5.6. The positional form applies to constructor application only — a refinement body is always a braced record.
+**Single-required-field positional form.** When a constructor has exactly one REQUIRED field, the core value after `!C` fills that field directly; see §5.6. The positional form applies to constructor application only — a refinement body is always a braced record.
 
 
 ### 5.6 Canonical Form and Desugaring
@@ -600,7 +600,7 @@ All type-definition bodies ultimately take a single canonical form:
 
 where `C` names a constructor and `bindings` is a record literal filling the constructor's fields. Every other form — inline type expressions, positional constructor forms, atom refinements — is syntactic sugar that desugars to this form during resolution; resolver output always records the fully expanded canonical form in the `body` field.
 
-**Positional form.** When a constructor has exactly one field in state `REQUIRED` (no default, no fixed value), the data-value after `!C` may be that field's value directly:
+**Positional form.** When a constructor has exactly one field in state `REQUIRED` (no default, no fixed value), the core value after `!C` may be that field's value directly:
 
 ```
 !enum [true false]    →  !enum { members: [true false] }
@@ -1283,7 +1283,7 @@ This section defines the schema grammar — the schema document's body grammar, 
 
 ### 12.1 The Schema Grammar
 
-The schema-document header is defined entirely by [TSON-DATA]'s grammar; this document defines the schema body: `schema-map`, the annotated, braced declaration map that [TSON-DATA]'s `schema-doc` production delegates here. `annotation`, `separator`, `field-name`, and `data-value` are imported from [TSON-DATA] §7.4; `data-value` appears at exactly three points — constructor-application values, atom-refinement values, and field-modifier values.
+The schema-document header is defined entirely by [TSON-DATA]'s grammar; this document defines the schema body: `schema-map`, the annotated, braced declaration map that [TSON-DATA]'s `schema-doc` production delegates here. `annotation`, `separator`, `field-name`, and `core-value` are imported from [TSON-DATA] §7.4; `core-value` appears at exactly one point — the constructor-application payload (`instance`, §5.5–§5.6). No production of this grammar uses the full `data-value`: an atom-refinement body is a braced `record-def` (§5.5), and a field-modifier value is restricted to a bare token or the absent sentinel (§5.2), never annotations, a type-ref, or a container.
 
 A `schema-map` copies the shape of [TSON-DATA]'s `map` production but requires at least one entry — `{}` at schema-body position is a parse error. An entry is called a **declaration**. Annotations before the opening brace bind to the schema; annotations at the head of an entry bind to the key; annotations after `=>` bind to the type definition (§2.1, §6).
 

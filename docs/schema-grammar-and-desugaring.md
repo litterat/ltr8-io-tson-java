@@ -211,7 +211,7 @@ rebuilt and called a cache.
   four spellings binds the pair directly, an exact `N` pinning both. §5.3's bound coherence (`min <= max`) is
   checked here, where the bounds are literal at schema load; a bound naming a value parameter is
   materialisation's question. So is the rejection of a **vacuous `[T; 0..]`**: §5.3 calls the form vacuous
-  and asks for a warning while desugaring it anyway, and `SPEC-FEEDBACK.md` #5 rejects the spelling instead
+  and asks for a warning while desugaring it anyway, and `spec/tson-rev33-changelog.md` #42 rejects the spelling instead
   — §5.3's own sentence says why, since structural identity (§8.2) makes it an entry *distinct from* `[T]`
   that means the same thing. Only a literal `0` is caught.
 - **An invalid sugar form is reported per declaration, not thrown**, when a `DesugarFailureReporter` is
@@ -267,7 +267,7 @@ rebuilt and called a cache.
     - **A *value* argument makes the trip intact.** `type_argument`'s value channel binds a raw `Token` —
       §5.10 calls a type argument's literal a bare token rather than the value it denotes — so the slot reads
       the token rather than decoding it (`RawTokenParser`). What that costs, identity keyed on the spelling
-      so `<255>` and `<0xFF>` are two applications, is `SPEC-FEEDBACK.md` #6.
+      so `<255>` and `<0xFF>` are two applications, is `SPEC-FEEDBACK.md` #4.
   - **Two of the four sugar forms have no open representation at all.** `tuple` and `choice` bind a
     collection (`elements`, `variants`), and a `template_argument` is `param | value | type_ref` with no
     collection case — so `<T> { v: (T | text) }` is refused at the declaration that writes it, as a gap

@@ -347,7 +347,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      * The value a field takes when the document wrote {@code _} at it, which differs from never mentioning
      * it at all ({@link #valueForAbsentField}) in exactly one state. At REQUIRED_DEFAULT, §5.2 asks the
      * decoder to warn and inject the default; this reports a validation error and injects it anyway. The
-     * error is {@code SPEC-FEEDBACK.md} #5's strongest case: warn-and-inject substitutes a value the
+     * error is {@code spec/tson-rev33-changelog.md} #42's strongest case: warn-and-inject substitutes a value the
      * document explicitly disclaimed, and for the retry loop the format targets, {@code _} at a defaulted
      * field means the emitter misread the schema -- exactly the signal injection papers over. It also
      * completes §7.6's table, whose REQUIRED_DEFAULT cell was the lone warn among states that already

@@ -12,22 +12,27 @@ revision closes.** It is an input to the next revision's adjudication, so its nu
 that revision's change log will answer against — a stable index of the open set, not an archive of
 everything ever raised.
 
-The six entries below are the Revision 33 set, renumbered from the 59 raised against Revision 32.
+The four entries below are what Revision 33 leaves open, renumbered from the 59 raised against Revision 32.
 `spec/tson-rev33-changelog.md` §2 records a disposition for all 59 under *their* numbers, and that table is
 where a Revision 32 number resolves. **The two numbering schemes overlap and mean different things** — old
-#1 was multi-line trailing whitespace, new #1 is `!duration` and `PnW` — so a citation must name the
+#1 was multi-line trailing whitespace, this #1 is `!duration` and `PnW` — so a citation must name the
 document it belongs to: `spec/tson-rev33-changelog.md #N` for anything raised against Revision 32,
-`SPEC-FEEDBACK.md #N` only for the open set below. Citations across `docs/` and the Javadoc were rewritten
-on that rule when this renumbering happened.
+`SPEC-FEEDBACK.md #N` only for the open set below. Citations across `docs/` and the Javadoc are kept on that
+rule as the register changes.
 
 | Was | Is | |
 |---|---|---|
-| #12 | **#1** | `!duration` and `PnW` — open, carried by Revision 33 |
-| #15 | **#2** | `field-modifier` overstated — accepted, edit did not land |
-| #26 | **#3** | the hash pin in the URI query — open, carried |
-| #34 | **#4** | §9.4 and UTS #39 — open, carried |
-| #42 | **#5** | no warning severity — inventory landed, statement did not |
-| #54 | **#6** | a type argument's literal — open, carried |
+| #12 | **#1** | `!duration` and `PnW` — deliberately carried |
+| #26 | **#2** | the hash pin in the URI query — deliberately carried |
+| #34 | **#3** | §9.4 and UTS #39 — deliberately carried |
+| #54 | **#4** | a type argument's literal — deliberately carried |
+
+Two more stood here briefly: the review of Revision 33 found #15 (`field-modifier` overstated) and #42 (no
+warning severity) accepted in the change log but not fully executed in the text, and both were corrected on
+the spot — see the change log's *Post-review corrections*. What is left is only what Revision 33 chose to
+carry.
+
+---
 
 ---
 
@@ -66,44 +71,7 @@ revisited in a later revision", and §5.4's table is unchanged — `!duration` s
 
 ---
 
-## 2. §12.1's own summary claims `field-modifier` reuses `data-value`, but its ABNF restricts it to `token`/`absent`
-
-**Section:** §12.1 (introductory prose) vs. its own ABNF, cross-referenced against §5.2.
-
-**Problem:** §12.1's lead paragraph states: "`data-value` appears at exactly three points —
-constructor-application values and atom-refinement values, and field-modifier values." But the ABNF two
-lines later gives `field-modifier = ws ("~" / "=") ws ( token / absent )` — not `data-value`. The two are
-materially different productions: `data-value` is `*annotation [type-ref] core-value` (annotations, an
-optional type-ref, and any core-value, including nested records/maps/arrays), while `token / absent` is a
-single unannotated, untyped leaf. This isn't just loose wording — §5.2 itself independently confirms the
-narrower ABNF is the intended rule: "Value modifiers are restricted to scalar tokens — quoted or
-unquoted — covering strings, numbers, booleans, and null; complex modifier values (arrays, records,
-maps) are not supported in v1." So the summary sentence overstates what the grammar and §5.2's own prose
-both agree `field-modifier` actually accepts.
-
-**Interpretation chosen:** Implemented per the ABNF and §5.2 (the two mutually-consistent sources): a
-field modifier's value is a bare token or the absent sentinel — no annotations, no type-ref, never a
-container. `tson-compiler`'s `FieldDef.Modifier` models this as a plain `TokenValue`/`AbsentValue` (reusing
-`io.ltr8.tson.compiler.ast`'s existing leaf types), not a full `DataValue`.
-
-**Suggested resolution:** Fix the summary sentence in §12.1's lead paragraph to read "...and
-field-modifier values, which are restricted to a bare token or the absent sentinel (§5.2), not full
-`data-value`s" — or simply drop `field-modifier` from that sentence's list, since it isn't actually an
-instance of the `data-value` import the sentence is introducing.
-
-**Status against Revision 33:** **accepted but not executed.** The change log dispositions this
-"Accept — correct the sentence (P2 §12.1)", and the ABNF is now `field-modifier = ws ("~" / "=") ws
-( token / absent )` as before — but the sentence it was to correct still stands, and now stands twice:
-§1.3 ("the schema grammar imports [TSON-DATA]'s `data-value` production at exactly three points —
-constructor-application values and atom-refinement values (§5.5), and field-modifier values (§5.2)") and
-§12.1's lead ("`data-value` appears at exactly three points — constructor-application values,
-atom-refinement values, and field-modifier values"). Both overstate what `field-modifier` accepts, in the
-same way and for the same reason; §5.2's own "restricted to scalar tokens" sentence still contradicts
-them. The edit wants making in both places.
-
----
-
-## 3. Content-hash pinning rides in the URI query (`?sha256=`), where a hash is neither a request parameter nor part of identity — external review suggests a fragment, or a structured `{ url, sha256 }` directive, instead
+## 2. Content-hash pinning rides in the URI query (`?sha256=`), where a hash is neither a request parameter nor part of identity — external review suggests a fragment, or a structured `{ url, sha256 }` directive, instead
 
 **Section:** Part 1 §2.2.1 (canonical identity / hash-pinned references), §10.2 (per-identity verification).
 
@@ -155,7 +123,7 @@ something silently retained. The placement question itself is untouched.
 
 ---
 
-## 4. §9.4 cites UTS #39 but names the one mechanism that cannot be applied to a document in isolation, and leaves the rest unmentioned
+## 3. §9.4 cites UTS #39 but names the one mechanism that cannot be applied to a document in isolation, and leaves the rest unmentioned
 
 **Section:** [TSON-DATA] §9.4 (Confusable Characters), §7.1 (UAX #31 profile), §2.5 (field-name identity),
 §7.2.1 (NFC normalization); [TSON-SCHEMA] §2.2.3 (`!!import` name disjointness).
@@ -254,46 +222,7 @@ no Identifier_Status profile at §7.1, no scoped comparison set, and no stated a
 
 ---
 
-## 5. The series has no warning severity, but never says so
-
-**Section:** Part 2 §1.3 ("Conformance"), Part 1 §8.1 ("Error Categories"). Related: change log #41, #47,
-#25 — the duplicate, disjointness and productivity rules whose warn-level spellings this entry argued away.
-
-**Problem:** As raised against Revision 32, this entry inventoried roughly ten warn-level rules across
-both parts and argued each to an error or a deletion, on the ground that a warning presumes a human reader
-exercising judgment where TSON's stated near-term consumer — an LLM in a generate-validate-retry loop —
-has none: a validating processor has two behaviours, fail the document or don't, so every WARN forces each
-implementation to privately promote it or silently drop it, and two conforming processors then disagree
-about the same bytes with the spec's blessing.
-
-Revision 33 executed the whole inventory. Duplicate fields and map keys are MUST NOT (Part 1 §2.5/§2.6);
-a set-position duplicate is a validation error (§7.5); a type-aware duplicate key is a Class 2 validation
-error (§7.7); `_` at REQUIRED_DEFAULT is a validation error with omission still the injection route
-(§5.2); `0..` is a resolver error (§5.3); an unused parameter and a parameter shadowing a schema type are
-resolver errors (§5.10); non-productive recursion is a resolver error with "guarded" defined (§5.10.1);
-`@disjoint` has exactly two outcomes over a total derivation (§5.4); the inline-nesting MAY-warn is gone;
-and a validating processor MUST report an unannotated root under `!!schema` (§7.1). Neither part contains
-the word "warning" in a normative rule any more.
-
-**What is left:** the positive statement. The change log's disposition was to "state once: *a conforming
-TSON processor has one severity; this specification never asks for a warning*", and that sentence is
-nowhere in either document. Part 1 §8.1 defines four error *categories* — lexer, parse, resolver,
-validation — and its "canonical phrasing" paragraph pins each rule to one of them, but categories are a
-taxonomy of *where a problem is detected*, not a statement about severity, and a reader who has built a
-processor with a warning channel finds nothing telling them not to. The property currently holds by
-exhaustion — true of the text as it stands, and re-derivable only by grepping it.
-
-**Interpretation chosen:** unchanged and unaffected: `Diagnostic` has no severity component, a non-empty
-`Tson.validate` result means invalid, and every case above is an error at the reader or the schema
-pipeline.
-
-**Suggested resolution:** Add the sentence to Part 1 §8.1, beside the canonical-phrasing paragraph, so the
-absence of a warning tier is a stated property of the series rather than an accident a future rule could
-undo without anyone noticing.
-
----
-
-## 6. A type argument's literal is called a bare token and typed `value`, and §8.2 identity depends on which
+## 4. A type argument's literal is called a bare token and typed `value`, and §8.2 identity depends on which
 
 **Section:** Part 2 §5.10 (type arguments), §8.1 (`type_argument`), §8.2 (instantiation identity); Part 1 §4
 (base type resolution), §7.6 (number). Related: change log #43, and D6 of the structure-templates CR, now

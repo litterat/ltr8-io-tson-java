@@ -296,7 +296,7 @@ class RecordTreeReaderTest {
 
     /**
      * Omission and a written {@code _} are two different documents at a REQUIRED_DEFAULT field. §5.2 asks
-     * the decoder to warn and inject for the second; {@code SPEC-FEEDBACK.md} #5 calls that its strongest
+     * the decoder to warn and inject for the second; {@code spec/tson-rev33-changelog.md} #42 calls that its strongest
      * case for an error, since warn-and-inject answers "here is a value" to a document that said "absent".
      * The default is still what the field decodes to -- only the verdict changes.
      */

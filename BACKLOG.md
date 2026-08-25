@@ -168,7 +168,7 @@ need are not retained for a secondary constructor.
 
 - [ ] **Two entries for one type, where the argument is one number spelled two ways.** `vector<float32, 255>`
   and `vector<float32, 0xFF>` produce entries with byte-identical bodies, because identity derives from the
-  argument's token text where §4 makes the two one number. Blocked on `SPEC-FEEDBACK.md` #6 rather than on
+  argument's token text where §4 makes the two one number. Blocked on `SPEC-FEEDBACK.md` #4 rather than on
   effort: normalising numeric tokens before hashing is a three-line change, and doing it now would be this
   implementation inventing an identity rule the spec does not state, disagreeing with any implementation that
   read §5.10's "bare token" literally. The entry offers three resolutions and names the one that keeps both
@@ -466,8 +466,8 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
   to be ported: a zero-led complex magnitude is accepted (§7.6), and malformed UTF-8 is refused rather than
   silently replaced (`spec/tson-rev33-changelog.md` #59).
 - [ ] Confusable-character and bidi-formatting-character checks (§9.4-adjacent security hardening;
-  opt-in, and per `SPEC-FEEDBACK.md` #5 reported as ordinary errors when enabled, not warnings) —
+  opt-in, and per `spec/tson-rev33-changelog.md` #42 reported as ordinary errors when enabled, not warnings) —
   the sibling gap to the numeric-literal length limit tracked in `STRUCTURED-OUTPUT.md`'s Tier 1 section;
-  neither is enforced anywhere yet. `SPEC-FEEDBACK.md` #4 is the fuller treatment: which UTS #39 mechanism
+  neither is enforced anywhere yet. `SPEC-FEEDBACK.md` #3 is the fuller treatment: which UTS #39 mechanism
   applies where, the comparison scopes TSON can actually name, and why a normative requirement would oblige
   every implementation to ship UCD data the JDK does not expose.
