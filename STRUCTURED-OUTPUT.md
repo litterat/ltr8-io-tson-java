@@ -54,7 +54,7 @@ backend.
     carrying the type's real field list in `expected` (§7.2's record closure — the one place `expected`
     already says what this bullet's item (4) asks for); `DUPLICATE_MAP_KEY` is produced for real, and
     `DUPLICATE_FIELD` joined it for the record half — §2.5/§2.6 word both as *warnings*, but per
-    `SPEC-FEEDBACK.md` #41/#42 every warn-shaped rule is implemented as an ordinary error.
+    `spec/tson-rev33-changelog.md` #41/#42 every warn-shaped rule is implemented as an ordinary error.
   - `message` — landed, **hand-composed at each call site, and staying that way**. Synthesizing it from
     `code` + params was reconsidered and dropped; see item (5) below for the reasoning.
   - `expected`/`actual` — landed, both carrying what they should. `actual` is the offending value
@@ -248,7 +248,7 @@ all, with no decoder integration required.
   `TsonDataParser` does is what lets everything downstream — resolution, the compiled Class 2
   reader stack — be reused completely unchanged.
 - [ ] **Duplicate object member names are a genuine fork, and the JSON front-end has to pick.** TSON §2.5
-  is last-value-wins, and this implementation overwrites as it streams (`SPEC-FEEDBACK.md` #21 covers the
+  is last-value-wins, and this implementation overwrites as it streams (`spec/tson-rev33-changelog.md` #21 covers the
   TSON side, including that a shadowed occurrence is still validated). JEP 540 goes the other way for JSON
   and argues it at length: duplicates are an unconditional parse error, on the grounds that RFC 8259's
   "SHOULD be unique" leaves an ambiguous object whose "behavior of software that receives such an object is

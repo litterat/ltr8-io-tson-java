@@ -485,7 +485,7 @@ class LexerTest {
     /**
      * Bytes that are not UTF-8 are refused, not replaced. A replacing decoder -- the platform default, and
      * what this lexer used to inherit -- turns the same broken byte into an error outside a quoted token
-     * and into silent content inside one. See {@code SPEC-FEEDBACK.md} #59.
+     * and into silent content inside one. See {@code spec/tson-rev33-changelog.md} #59.
      */
     @Test
     void refusesBytesThatAreNotUtf8() {

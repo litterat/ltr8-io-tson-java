@@ -79,24 +79,24 @@ is accepted as `!uri`'s actual contract for now. See `UriParser`'s Javadoc.
 integer atoms where core.tn defines the full `int8`..`int256`/`uint8`..`uint256` ladder plus four bound-only
 refinements, and §5.5's table omits `email` while listing every one of its "Network Types" siblings. Both
 are seeded here as core.tn defines them, on §5.1's own invitation to treat the core library as the
-vocabulary's source of truth. See `SPEC-FEEDBACK.md` #6 and #5.
+vocabulary's source of truth. See `spec/tson-rev33-changelog.md` #6 and #5.
 
 **`!email` implements a subset of RFC 5322, not the whole grammar.** `email_type`'s `spec` is
 `REQUIRED_FIXED` to RFC 5322, but `EmailParser` accepts only the `dot-atom "@" dot-atom` core; quoted local
 parts (`"a b"@example.com`), domain literals (`user@[192.0.2.1]`) and embedded comments are rejected though
 the RFC admits them. Accepting them would admit spaces, brackets and parentheses into a scalar consumers
 treat as a token. The same kind of call as the `!uri` gap above, and pinned by `EmailParserTest` so it stays
-a decision. See `SPEC-FEEDBACK.md` #5 and #22.
+a decision. See `spec/tson-rev33-changelog.md` #5 and #22.
 
 **`RegexParser` is a real RFC 9485 (I-Regexp) validator, not `java.util.regex`.** The `tson-regex` module
 parses I-Regexp to its own AST and matches with a Thompson-NFA/Pike-VM — linear-time, so ReDoS-safe — which
 means this implementation defines I-Regexp behaviour rather than inheriting the JVM's Perl-derived superset.
 `TextParser`/`UriParser` match their `pattern` constraint through the same engine. See `RegexParser`'s
-Javadoc and `SPEC-FEEDBACK.md` #22.
+Javadoc and `spec/tson-rev33-changelog.md` #22.
 
 **One open question.** Whether `!duration` accepts ISO 8601's alternative `PnW` week form is genuinely
 ambiguous — §5.4's table shows only `PnYnMnDTnHnMnS`. This implementation rejects `PnW` as the more
-conservative of the two readings, not a confident call — see [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #12.
+conservative of the two readings, not a confident call — see [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #1.
 
 **`toTson`'s round trip is intentionally lossy in a few specific, documented ways.** It's a debugging
 tool, not a guaranteed-lossless serializer: a `!typeName` type-ref is only re-emitted where a value

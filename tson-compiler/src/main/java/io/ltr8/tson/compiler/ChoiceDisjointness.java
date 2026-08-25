@@ -19,7 +19,7 @@ import java.util.Set;
  * declarations answer by inspection. Same-class variants -- two numeric families, two string-form atoms,
  * two records -- are not disjoint however separated their value sets, because separating them would take
  * exactly the type-directed second inspection of the value's form that [TSON-DATA] §2.4's once-only rule
- * forbids a reader. {@code SPEC-FEEDBACK.md} #47 records the departure from §5.4's written value-set
+ * forbids a reader. {@code spec/tson-rev33-changelog.md} #47 records the departure from §5.4's written value-set
  * derivation and the MAY-prove latitude this deletes.
  *
  * <p><b>The fact is load-bearing twice, so the class table is pinned.</b> {@code

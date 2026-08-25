@@ -7,24 +7,31 @@ See `CLAUDE.md` for why this file exists and when to add to it. Spec quotes belo
 Format per entry: spec section, the problem, the interpretation this implementation chose, and a
 suggested resolution where there is one.
 
-**This register holds what is still open, not everything ever raised.** Revision 33 adjudicated all 59
-entries raised against Revision 32, and `spec/tson-rev33-changelog.md` §2 records a disposition for every
-one of them by number. An entry whose resolution reached the Revision 33 text is removed from here. What
-remains is the four questions Revision 33 carried forward deliberately (#12, #26, #34, #54) and two whose
-accepted disposition did not fully land in the text (#15, #42).
+**This register holds what is open against the current revision, and it renumbers from #1 each time a
+revision closes.** It is an input to the next revision's adjudication, so its numbering is the numbering
+that revision's change log will answer against — a stable index of the open set, not an archive of
+everything ever raised.
 
-**Following a citation to a number that is not below:** it was resolved, and the change log's §2 table is
-where it went — the numbers there are the numbers here. Citations of the form `SPEC-FEEDBACK.md #N`
-throughout `docs/` and the Javadoc are left as written rather than rewritten to point at the change log:
-one pointer here beats a hundred rewordings, and the argument a citation is reaching for is usually
-recorded in the change log's disposition line for that number.
+The six entries below are the Revision 33 set, renumbered from the 59 raised against Revision 32.
+`spec/tson-rev33-changelog.md` §2 records a disposition for all 59 under *their* numbers, and that table is
+where a Revision 32 number resolves. **The two numbering schemes overlap and mean different things** — old
+#1 was multi-line trailing whitespace, new #1 is `!duration` and `PnW` — so a citation must name the
+document it belongs to: `spec/tson-rev33-changelog.md #N` for anything raised against Revision 32,
+`SPEC-FEEDBACK.md #N` only for the open set below. Citations across `docs/` and the Javadoc were rewritten
+on that rule when this renumbering happened.
 
-Entry numbers are permanent and the list is never compacted. A new finding takes the next number after the
-highest ever used (#59), never a gap left by a removed entry.
+| Was | Is | |
+|---|---|---|
+| #12 | **#1** | `!duration` and `PnW` — open, carried by Revision 33 |
+| #15 | **#2** | `field-modifier` overstated — accepted, edit did not land |
+| #26 | **#3** | the hash pin in the URI query — open, carried |
+| #34 | **#4** | §9.4 and UTS #39 — open, carried |
+| #42 | **#5** | no warning severity — inventory landed, statement did not |
+| #54 | **#6** | a type argument's literal — open, carried |
 
 ---
 
-## 12. Does `!duration` accept ISO 8601's `PnW` week form, or only `PnYnMnDTnHnMnS`?
+## 1. Does `!duration` accept ISO 8601's `PnW` week form, or only `PnYnMnDTnHnMnS`?
 
 **Section:** §5.4.
 
@@ -59,7 +66,7 @@ revisited in a later revision", and §5.4's table is unchanged — `!duration` s
 
 ---
 
-## 15. §12.1's own summary claims `field-modifier` reuses `data-value`, but its ABNF restricts it to `token`/`absent`
+## 2. §12.1's own summary claims `field-modifier` reuses `data-value`, but its ABNF restricts it to `token`/`absent`
 
 **Section:** §12.1 (introductory prose) vs. its own ABNF, cross-referenced against §5.2.
 
@@ -96,7 +103,7 @@ them. The edit wants making in both places.
 
 ---
 
-## 26. Content-hash pinning rides in the URI query (`?sha256=`), where a hash is neither a request parameter nor part of identity — external review suggests a fragment, or a structured `{ url, sha256 }` directive, instead
+## 3. Content-hash pinning rides in the URI query (`?sha256=`), where a hash is neither a request parameter nor part of identity — external review suggests a fragment, or a structured `{ url, sha256 }` directive, instead
 
 **Section:** Part 1 §2.2.1 (canonical identity / hash-pinned references), §10.2 (per-identity verification).
 
@@ -148,7 +155,7 @@ something silently retained. The placement question itself is untouched.
 
 ---
 
-## 34. §9.4 cites UTS #39 but names the one mechanism that cannot be applied to a document in isolation, and leaves the rest unmentioned
+## 4. §9.4 cites UTS #39 but names the one mechanism that cannot be applied to a document in isolation, and leaves the rest unmentioned
 
 **Section:** [TSON-DATA] §9.4 (Confusable Characters), §7.1 (UAX #31 profile), §2.5 (field-name identity),
 §7.2.1 (NFC normalization); [TSON-SCHEMA] §2.2.3 (`!!import` name disjointness).
@@ -204,7 +211,8 @@ unconstrained route for every character the profile excludes — the hardening i
 the same sentence prescribes. Whatever §9.4 eventually requires needs to say whether it applies to quoted
 names, and if it does not, §7.1 should not describe quoting as the remedy.
 
-**5. Nothing here is conformance-visible.** As with #29, a SHOULD-consider in Security Considerations makes
+**5. Nothing here is conformance-visible.** As with the annotation-conformance entry Revision 33 accepted
+(change log #29), a SHOULD-consider in Security Considerations makes
 no implementation measurably better than one that ignores it, and there is no vector a test suite could
 carry.
 
@@ -246,9 +254,10 @@ no Identifier_Status profile at §7.1, no scoped comparison set, and no stated a
 
 ---
 
-## 42. The series has no warning severity, but never says so
+## 5. The series has no warning severity, but never says so
 
-**Section:** Part 2 §1.3 ("Conformance"), Part 1 §8.1 ("Error Categories"). Related: #41, #47, #25.
+**Section:** Part 2 §1.3 ("Conformance"), Part 1 §8.1 ("Error Categories"). Related: change log #41, #47,
+#25 — the duplicate, disjointness and productivity rules whose warn-level spellings this entry argued away.
 
 **Problem:** As raised against Revision 32, this entry inventoried roughly ten warn-level rules across
 both parts and argued each to an error or a deletion, on the ground that a warning presumes a human reader
@@ -284,10 +293,11 @@ undo without anyone noticing.
 
 ---
 
-## 54. A type argument's literal is called a bare token and typed `value`, and §8.2 identity depends on which
+## 6. A type argument's literal is called a bare token and typed `value`, and §8.2 identity depends on which
 
 **Section:** Part 2 §5.10 (type arguments), §8.1 (`type_argument`), §8.2 (instantiation identity); Part 1 §4
-(base type resolution), §7.6 (number). Related: #43, `tson-cr-structure-templates.md` D6.
+(base type resolution), §7.6 (number). Related: change log #43, and D6 of the structure-templates CR, now
+folded into Revision 33 as its baseline.
 
 **Problem:** three statements about the same slot, which do not agree.
 

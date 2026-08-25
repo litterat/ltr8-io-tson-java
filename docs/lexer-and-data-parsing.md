@@ -28,7 +28,7 @@ tokens, modes, or character-classification changes).
     silent content inside one, and for a format whose identity can be a hash of its bytes, substituting
     bytes is the wrong default. Overlong forms, encoded surrogates and values above U+10FFFF are refused
     too — two spellings of one character is §9.4's confusability problem one layer down. The spec does not
-    say (`SPEC-FEEDBACK.md` #59); this is the choice made and why.
+    say (`spec/tson-rev33-changelog.md` #59); this is the choice made and why.
   - Blocks are also what keeps reading cheap: a byte (or character) at a time costs a call and, through a
     `Reader`, an allocation per character — 47% of everything a bind read allocated, proportional to the
     document rather than fixed. The block is deliberately modest, because it is throughput and not a
@@ -104,7 +104,7 @@ Key points:
   Class 1 processor; a schema document isn't malformed input, it's a well-formed document of a kind this
   parser doesn't implement, and §8.1 requires that distinction be visible (a categorized diagnostic).
 - **Nested annotation value-scope is right-recursive** and can legitimately leave an outer data-value
-  without a core-value (`@a:@b:val`) — see `SPEC-FEEDBACK.md` #3; documented as intentional, not a bug.
+  without a core-value (`@a:@b:val`) — see `spec/tson-rev33-changelog.md` #3; documented as intentional, not a bug.
 
 ## Base type resolution (`tson-compiler/.../base/`)
 
@@ -170,7 +170,7 @@ fixed, closed name→`AtomType` table (§5).
 - **`unit`'s three instances are three separate parsers**, not one: `value` (runs base-type resolution to
   the natural host), `token` (raw NFC-normalized token text, unconstrained), `void` (`VoidReader`, accepts
   only the absent sentinel `_`). They resolve to the byte-identical `Unit` body — nothing in the *schema*
-  distinguishes them — so dispatch is keyed on the declaration's own name (see `SPEC-FEEDBACK.md` #18).
+  distinguishes them — so dispatch is keyed on the declaration's own name (see `spec/tson-rev33-changelog.md` #18).
 - **The network family reuses one grammar per address form, never a second copy.** `Ipv6Parser` parses
   RFC 4291 §2.2's embedded IPv4 tail through `Ipv4Parser`'s own strict `dec-octet` pattern, and
   `Cidr4Parser`/`Cidr6Parser` parse the address half of a network through those two — so the leniency gap

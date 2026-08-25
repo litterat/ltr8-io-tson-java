@@ -18,7 +18,7 @@ import java.util.regex.Pattern;
  * {@code mac}) and omits only this one, with no stated rationale; §5.1 invites a reader to treat core.tn as
  * the vocabulary's source of truth. Given a working parser, withholding it from the schemaless path would
  * buy nothing and would leave the two read paths disagreeing about what {@code !email} means. See {@code
- * SPEC-FEEDBACK.md} #5.
+ * spec/tson-rev33-changelog.md} #5.
  *
  * <p><b>The format check is a documented subset of RFC 5322, not the whole grammar.</b> Accepted is the
  * {@code dot-atom "@" dot-atom} core: one or more dot-separated atoms of RFC 5322's {@code atext} on each
@@ -28,7 +28,7 @@ import java.util.regex.Pattern;
  * Those forms are legal, essentially unused in the data-interchange setting TSON targets, and accepting
  * them would mean admitting addresses containing spaces and parentheses into a field most consumers treat
  * as a simple token. The narrower rule rejects some valid RFC 5322 addresses; that is the trade, and it is
- * stated here rather than discovered. {@code SPEC-FEEDBACK.md} #22 raises the general question this is an
+ * stated here rather than discovered. {@code spec/tson-rev33-changelog.md} #22 raises the general question this is an
  * instance of -- whether an RFC pin is a strict conformance gate, and whether divergence must be documented.
  *
  * <p>Host type is {@link String}: an address IS-A piece of text (it composes {@code text_type}), so like

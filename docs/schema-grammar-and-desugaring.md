@@ -53,7 +53,7 @@ materialization, no validation (those are the resolver's/linker's jobs).
   each twice, a declaration-level form admitting both and an inline form admitting neither, with a prose
   tie-break in §12.1 because `type-def` was otherwise ambiguous between them. The split existed because a
   sized form had no inline representation to carry it; every form lifts to an entry, so it protected
-  nothing (`SPEC-FEEDBACK.md` #31, and the change report's D10). `type-def` reaches both through `type-ref`
+  nothing (`spec/tson-rev33-changelog.md` #31, and the change report's D10). `type-def` reaches both through `type-ref`
   like anything else, so the tie-break disappeared rather than being reworded.
   - **Nesting is the recursion in `ElementType`**, which holds a plain `TypeRef` — `[[T; 2]; 3]` and
     `{text => [order; 1..]}` need no second node family, which is what `ElementType.Expr.Nested` used to be.
@@ -83,7 +83,7 @@ materialization, no validation (those are the resolver's/linker's jobs).
   - **One consequence of the dispatch is worth knowing before you write the test.** `{text? => integer}` is
     `name` followed by `?`, so it commits to a *record* before the `=>` is read, and the author gets a
     record-field diagnostic — while `{pair<text>? => integer}`, whose `<` commits to a map first, gets the
-    map rule. Both are rejected; only one of them mentions maps. `SPEC-FEEDBACK.md` #52 argues the change
+    map rule. Both are rejected; only one of them mentions maps. `spec/tson-rev33-changelog.md` #52 argues the change
     report should state this where it states the dispatch, and why buying the better message with a third
     token of lookahead is a bad trade.
 
@@ -100,7 +100,7 @@ replaces.
 
 **The injected-entry half is the spec's own rule now.** It began as a divergence — revision 32's §8.2 has a
 constructor application carried structurally at the use site and materialising no entry — and was argued as
-spec feedback rather than tracked as debt (`SPEC-FEEDBACK.md` #49/#50, and #51 for the `!!import` visibility
+spec feedback rather than tracked as debt (`spec/tson-rev33-changelog.md` #49/#50, and #51 for the `!!import` visibility
 that rides on it). The structure-templates CR settles all three the other way: **D3** de-parameterises
 `array`/`set`/`map`, so a container at a use site cannot be an application at all — nothing in meta-kernel
 takes type parameters, `map` holding `key_type`/`value_type` as ordinary fields — and **D5** states one lift
@@ -211,7 +211,7 @@ rebuilt and called a cache.
   four spellings binds the pair directly, an exact `N` pinning both. §5.3's bound coherence (`min <= max`) is
   checked here, where the bounds are literal at schema load; a bound naming a value parameter is
   materialisation's question. So is the rejection of a **vacuous `[T; 0..]`**: §5.3 calls the form vacuous
-  and asks for a warning while desugaring it anyway, and `SPEC-FEEDBACK.md` #42 rejects the spelling instead
+  and asks for a warning while desugaring it anyway, and `SPEC-FEEDBACK.md` #5 rejects the spelling instead
   — §5.3's own sentence says why, since structural identity (§8.2) makes it an entry *distinct from* `[T]`
   that means the same thing. Only a literal `0` is caught.
 - **An invalid sugar form is reported per declaration, not thrown**, when a `DesugarFailureReporter` is
@@ -267,11 +267,11 @@ rebuilt and called a cache.
     - **A *value* argument makes the trip intact.** `type_argument`'s value channel binds a raw `Token` —
       §5.10 calls a type argument's literal a bare token rather than the value it denotes — so the slot reads
       the token rather than decoding it (`RawTokenParser`). What that costs, identity keyed on the spelling
-      so `<255>` and `<0xFF>` are two applications, is `SPEC-FEEDBACK.md` #54.
+      so `<255>` and `<0xFF>` are two applications, is `SPEC-FEEDBACK.md` #6.
   - **Two of the four sugar forms have no open representation at all.** `tuple` and `choice` bind a
     collection (`elements`, `variants`), and a `template_argument` is `param | value | type_ref` with no
     collection case — so `<T> { v: (T | text) }` is refused at the declaration that writes it, as a gap
-    rather than an author error. `SPEC-FEEDBACK.md` #53 has the account; array and map bind only scalar
+    rather than an author error. `spec/tson-rev33-changelog.md` #53 has the account; array and map bind only scalar
     slots and are unaffected.
 - **The meta-kernel runs this phase too, with no accommodation at all** — its governing meta is itself, and
   with the table fixed there is nothing to look up.

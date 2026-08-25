@@ -247,7 +247,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      * twice in one record (§2.5) -- and they stay two codes because the constructs are two, exactly as
      * {@code UNRECOGNIZED_FIELD} is record-specific. Both spec rules are written as a SHOULD-warn with a
      * defined recovery ("last value wins"); this implementation reports them as ordinary errors, which is
-     * {@code SPEC-FEEDBACK.md} #41/#42's position: a warning presumes a human reader exercising judgment,
+     * {@code spec/tson-rev33-changelog.md} #41/#42's position: a warning presumes a human reader exercising judgment,
      * and the format's target consumer is a generate-validate-retry loop with exactly two behaviors, so a
      * severity axis would be machinery neither this type nor the format needs.
      *

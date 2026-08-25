@@ -809,7 +809,7 @@ public final class Lexer {
     /**
      * A byte sequence that is not UTF-8 is <b>rejected, not replaced</b>. §9.1 says a document is encoded
      * in Unicode and §8.1 requires errors to be reported; neither says what to do with bytes that are
-     * neither ({@code SPEC-FEEDBACK.md} #59). Silent U+FFFD replacement -- what a {@code CharsetDecoder}
+     * neither ({@code spec/tson-rev33-changelog.md} #59). Silent U+FFFD replacement -- what a {@code CharsetDecoder}
      * does by default, and what this lexer used to inherit -- turns a broken byte inside a quoted token
      * into content, so a document that cannot be decoded still reads, with a value nobody wrote. For a
      * format whose identity can be a hash of its bytes, that is the wrong default.

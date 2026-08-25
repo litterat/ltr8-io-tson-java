@@ -53,7 +53,7 @@ is small and parsed once.)
   document. **The two FIXED states differ in exactly one thing:** §5.2's injection rule names
   `REQUIRED_DEFAULT` and `REQUIRED_FIXED` and *not* `OPTIONAL_FIXED`, so an omitted `OPTIONAL_FIXED` field
   stays **absent** while an omitted `REQUIRED_FIXED` one is injected. Reading it the other way makes the two
-  states indistinguishable and the `?` decide nothing (`SPEC-FEEDBACK.md` #39). `_` is a validation error at
+  states indistinguishable and the `?` decide nothing (`spec/tson-rev33-changelog.md` #39). `_` is a validation error at
   `REQUIRED_FIXED`, fine at `OPTIONAL_FIXED`; a `= _` field (`OPTIONAL_FIXED` with no value) admits only
   omission or `_`. There is no pre-seeding pass any more: every field the document didn't state goes through
   one `valueForAbsentField` switch over all five states.
@@ -97,13 +97,13 @@ is small and parsed once.)
   this code. **The same rule polices schema authoring**, through the same line: a constructor body is bound
   by replaying it through the governing meta's compiled reader, so `!integer ^ { minimum: 1 }` (JSON
   Schema's spelling of `min`) is rejected instead of compiling clean and constraining nothing — §5.5/§5.7
-  never say so themselves, which is `SPEC-FEEDBACK.md` #40. In bind
+  never say so themselves, which is `spec/tson-rev33-changelog.md` #40. In bind
   mode a reported record still binds to `null` — the all-or-nothing rule above, not something closure chose.
 - **A repeated record field name or map key is an error** (`DUPLICATE_FIELD`/`DUPLICATE_MAP_KEY`,
   §2.5/§2.6), reported at the repeat's own position, with the spec's "last value wins" recovery still
   running underneath: a single-pass pull stream can't know a name recurs without buffering, so every
   occurrence is decoded (hence validated) and a later one overwrites an earlier. Both spec rules are
-  written as SHOULD-warn; `SPEC-FEEDBACK.md` #41/#42 makes them errors, which also dissolves #21's
+  written as SHOULD-warn; `spec/tson-rev33-changelog.md` #41/#42 makes them errors, which also dissolves #21's
   shadowed-occurrence question — the repeat *is* the error, so whether its value was going to be used
   decides nothing. **The same rules hold on the schemaless path** (`SchemalessTreeReader`/
   `SchemalessObjectReader`), these being Part 1 rules a document violates with or without a schema; a
@@ -116,7 +116,7 @@ is small and parsed once.)
   divergence from §2.6**, which defines key identity *textually* at the parser layer (`Alice`/`"Alice"`
   are duplicates, `1`/`1.0` are not) and leaves typed equality to §7.7's MAY — the series names no
   equality for the Class 1 *reader* in between, which has run §4 base resolution but has no declared
-  types. `SPEC-FEEDBACK.md` #43 has the table and the argument: a key realised as a host value is one key
+  types. `spec/tson-rev33-changelog.md` #43 has the table and the argument: a key realised as a host value is one key
   whatever §2.6 says, since that is what the host `Map` will do with it. `SchemalessTreeReader.keyIdentity`
   does the stripping explicitly; the other two readers compare bound host values, which strips both by
   construction.
@@ -499,7 +499,7 @@ error* category, so this is the same layer, not a new one.
       **silent**: reporting abandons the construction
       (`ConstructionGuard`), so a lenient reader that reported would return `null` for exactly the documents
       it exists to accept — and a diagnostic the guard is told to ignore is a severity axis under another
-      name, which `SPEC-FEEDBACK.md` #41/#42 argued against.
+      name, which `spec/tson-rev33-changelog.md` #41/#42 argued against.
 - **A gap becomes a diagnostic too, under its own code.** Both `TsonSchemaValidationException` and
   `UnsupportedOperationException` are reported per declaration; the code is what tells them apart —
   `SCHEMA_ERROR` for the author's mistake, `NOT_IMPLEMENTED` for a construct beyond this library. The test

@@ -88,7 +88,7 @@ import java.util.Set;
  * {@code loader} hands back an already-registered, already-flattened {@code TsonSchema}, and all of its
  * {@code entries()} are taken, so an import contributes its own imports' entries too; (2) this schema's own
  * entries, exactly as resolved. This is a deliberate divergence from §2.2.3's "imports are shallow" and is
- * argued in {@code SPEC-FEEDBACK.md} #55 -- in short, §3.3.1 already defines the {@code !!meta} half of the
+ * argued in {@code spec/tson-rev33-changelog.md} #55 -- in short, §3.3.1 already defines the {@code !!meta} half of the
  * namespace as "the target's local declarations <i>plus its imports</i>", and a flat namespace with no
  * hiding is the rule the rest of the format is built on.
  *
@@ -285,7 +285,7 @@ public final class TsonSchemaLinker {
 
     /**
      * §3.4.1: an entry no finite document can satisfy is rejected, with the chain that has to be broken
-     * ({@code SPEC-FEEDBACK.md} #25, {@link TypeInhabitance}). {@code x => { y: y }} with {@code y => { x: x }}
+     * ({@code spec/tson-rev33-changelog.md} #25, {@link TypeInhabitance}). {@code x => { y: y }} with {@code y => { x: x }}
      * resolves and links cleanly otherwise, and fails at the first document as {@code missing required field
      * 'x'} -- blaming the data for a defect in the schema.
      *
@@ -322,7 +322,7 @@ public final class TsonSchemaLinker {
      * <p><b>Two outcomes, because the fact is two-valued.</b> {@code disjoint: true} verifies the assertion,
      * silently; {@code false} makes it an error. The derivation ({@link ChoiceDisjointness}) is total, so
      * §5.4's third outcome -- unprovable, where the spec asks for a warning -- cannot arise ({@code
-     * SPEC-FEEDBACK.md} #47, resolving #42's case for a pinned decision procedure), which is what makes
+     * spec/tson-rev33-changelog.md} #47, resolving #42's case for a pinned decision procedure), which is what makes
      * {@code @disjoint} mean <em>machine-verified</em>, the only reading an encoding can rely on to drop a
      * tag. Note §5.4 is explicit that the reportable condition is the assertion, never mere
      * non-disjointness -- an unannotated choice is asked nothing here.
@@ -558,7 +558,7 @@ public final class TsonSchemaLinker {
      * Stage 1: every {@code !!import}'s whole namespace, in declaration order, brought in as-is (§2.2.3's
      * "merged entries keep their home namespace" -- no re-resolution here).
      *
-     * <p><b>The namespace is flat and the merge is transitive</b> ({@code SPEC-FEEDBACK.md} #55): an import
+     * <p><b>The namespace is flat and the merge is transitive</b> ({@code spec/tson-rev33-changelog.md} #55): an import
      * contributes everything its own namespace holds, its own imports' entries included, exactly as {@code
      * !!meta} contributes its target's locals *plus its imports* (§3.3.1's "Import what you expose"). So a
      * schema reached by two routes arrives once, and the importer sees one flat name-to-type map with no
@@ -657,12 +657,12 @@ public final class TsonSchemaLinker {
         }
         // A supertype gets the same structure-namespace fallback as `source`, and for the same reason: it is
         // not an author-written reference but the residue of one, and §3.3.2 confines only author-written
-        // type-refs to the type-name namespace (SPEC-FEEDBACK.md #32). A derived chain reaches a constructor
+        // type-refs to the type-name namespace (spec/tson-rev33-changelog.md #32). A derived chain reaches a constructor
         // whenever a refinement derives from one -- meta-kernel's own `set => ~array ^ {...}` resolves with
         // [array, product, top]. The fallback is defensive rather than load-bearing today: a
         // refinement source resolves through the type-name namespace alone, so a schema deriving from `array`
         // already names it. What did need it -- §8.2's transfer of a template's supertypes onto every sized
-        // array materialised in a user schema -- is gone (SPEC-FEEDBACK.md #45).
+        // array materialised in a user schema -- is gone (spec/tson-rev33-changelog.md #45).
         for (String supertype : def.supertypes()) {
             if (!namespace.containsKey(supertype) && !structureNamespace.containsKey(supertype)) {
                 throw new TsonSchemaValidationException("'" + name + "' has an unresolved supertype '" + supertype + "'");
@@ -850,7 +850,7 @@ public final class TsonSchemaLinker {
     }
 
     /**
-     * A variant must not resolve to {@code void} ({@code SPEC-FEEDBACK.md} #48): {@code (T | void)} spells
+     * A variant must not resolve to {@code void} ({@code spec/tson-rev33-changelog.md} #48): {@code (T | void)} spells
      * optionality as a choice, and optionality belongs to the position -- a field's {@code ?} state, the
      * {@code _} sentinel -- never to the type occupying it. Judged after §8.3 flattening, like
      * distinctness, so an alias of {@code void} is caught under whatever name the author wrote.
@@ -1015,7 +1015,7 @@ public final class TsonSchemaLinker {
             // §8.1's schema map holds only type definitions, so an entry describing something else has no
             // way to say "declare me, but do not let anything name me as a type". The Data marker is that
             // way. Without this the misuse resolves, links AND compiles, and fails only when a document is
-            // read against it (SPEC-FEEDBACK.md #57, consequence 2).
+            // read against it (spec/tson-rev33-changelog.md #57, consequence 2).
             throw new TsonSchemaValidationException(context + " names '" + ref.name() + "', which is built "
                     + "with '" + TsonCompiledMetaSchema.typenameOf(notAType) + "' and describes something "
                     + "other than a data value -- it is declared by this schema but is not a type, so "

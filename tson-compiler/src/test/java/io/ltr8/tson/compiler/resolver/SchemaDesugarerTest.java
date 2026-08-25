@@ -289,7 +289,7 @@ class SchemaDesugarerTest {
 
     /**
      * §5.3 calls {@code [T; 0..]} vacuous and asks for a warning while desugaring it anyway;
-     * {@code SPEC-FEEDBACK.md} #42 rejects the spelling instead, and §5.3's own sentence says why it is
+     * {@code SPEC-FEEDBACK.md} #5 rejects the spelling instead, and §5.3's own sentence says why it is
      * worth rejecting rather than tolerating: structural identity (§8.2) makes it a distinct entry meaning
      * exactly what the unconstrained form means.
      */

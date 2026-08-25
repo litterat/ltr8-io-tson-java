@@ -344,7 +344,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
      * The bundled chain's own diamond: this document imports meta-kernel directly *and* meta.tn, which
      * imports meta-kernel itself. Every one of meta-kernel's names therefore arrives by two routes -- but
      * they are one schema's entries, so they unify rather than colliding, and {@code unit} resolves
-     * ({@code SPEC-FEEDBACK.md} #55). A name-occurrence collision rule rejects this document instead, which
+     * ({@code spec/tson-rev33-changelog.md} #55). A name-occurrence collision rule rejects this document instead, which
      * is what makes the diamond unauthorable for every practical schema.
      */
     @Test

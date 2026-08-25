@@ -23,7 +23,7 @@ package io.ltr8.tson.compiler.ast.schema;
  * <p>Every variant has an ABNF alternative behind it -- each is parsed, never synthesised. §5.3's sized sugar
  * is no exception: {@code [T; 1..2]} is rewritten by {@code SchemaDesugarer} into the {@link Instance} its
  * bindings denote -- the sugar names {@code array} and binds its fields, materialising no entry of its own
- * ({@code SPEC-FEEDBACK.md} #45).
+ * ({@code spec/tson-rev33-changelog.md} #45).
  */
 public sealed interface TypeDef
         permits AtomRefinement, Instance, InstanceTemplate, StructuralTypeDef, ReferenceTypeDef {

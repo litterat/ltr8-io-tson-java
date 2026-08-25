@@ -41,6 +41,6 @@ public record ComplexType(Component component) implements Atom {
      * swap would reject core.tn's own documented usage, which calls {@code !complex ^ { component:
      * FLOAT64 } } a narrowing of a {@code component: NUMBER} source even though approximate binary64
      * values are not a subset of the exact tier. §5.7 leaves "tightens" undefined for a facet that
-     * does not order, so nothing here is decidable -- see {@code SPEC-FEEDBACK.md} #27.
+     * does not order, so nothing here is decidable -- see {@code spec/tson-rev33-changelog.md} #27.
      */
 }

@@ -13,7 +13,7 @@ import java.util.Base64;
  * specification referring to this document explicitly states otherwise" -- §5.3 doesn't state
  * otherwise, so padding is treated as required here: {@link #decode} rejects any input whose length
  * isn't a multiple of 4 before ever reaching the JDK decoder, which alone wouldn't catch this. See
- * {@code SPEC-FEEDBACK.md} #10 for why this needed a judgment call at all.
+ * {@code spec/tson-rev33-changelog.md} #10 for why this needed a judgment call at all.
  *
  * <p>Not similarly strict about non-canonical trailing padding bits ({@code "TR=="}, whose last
  * character's low bits should be zero and aren't, per RFC 4648 §3.5) -- that section says decoders

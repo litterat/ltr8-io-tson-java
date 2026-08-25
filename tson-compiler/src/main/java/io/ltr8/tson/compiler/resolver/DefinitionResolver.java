@@ -466,7 +466,7 @@ final class DefinitionResolver {
      * or this is a resolver error (the spec's own suggested diagnostic: "did you mean atom
      * refinement?"). {@code value} is bound via {@link #bindAtomInstance} directly --
      * {@code instance.value().typeRef()} already names {@code C} (per {@code Instance}'s own
-     * reshape, {@code SPEC-FEEDBACK.md} #16); positional form (§5.6) and schema-composed defaults
+     * reshape, {@code spec/tson-rev33-changelog.md} #16); positional form (§5.6) and schema-composed defaults
      * (§5.2/§5.7) are handled uniformly by the compiled {@code Record*Reader} itself (see {@code
      * RecordAbstractReader}'s own Javadoc), not by a separate normalization step here -- {@code C}'s
      * own body is always record-shaped (checked below), so every real call reaches one. Construction
@@ -669,7 +669,7 @@ final class DefinitionResolver {
      *
      * <p>Unlike {@link #resolveInstance}, {@code refinement.bindings()}'s own {@code typeRef} is not
      * pre-set by the grammar ({@code atom-refinement}'s own grammar defect, {@code
-     * SPEC-FEEDBACK.md} #16), so this attaches {@code I}'s constructor name to the value's type-ref
+     * spec/tson-rev33-changelog.md} #16), so this attaches {@code I}'s constructor name to the value's type-ref
      * itself before binding through {@link #bindAtomInstance}. No positional-form wrapping (unlike
      * {@code Instance}) -- §5.5 guarantees a refinement body is always a braced record; {@link
      * #mergeWithSource} rejects anything else.
@@ -753,7 +753,7 @@ final class DefinitionResolver {
 
     /**
      * §5.7's "Body materialisation" rule, applied to atom refinement (§5.6, {@code
-     * SPEC-FEEDBACK.md} #17): {@code newBindings} merged *over* {@code sourceBody}'s own
+     * spec/tson-rev33-changelog.md} #17): {@code newBindings} merged *over* {@code sourceBody}'s own
      * already-bound fields, not replacing them. {@code sourceBody} is re-serialized back to plain
      * record wire form via {@code TsonObjectWriter.toTson} (writing a {@code Top}-typed value by its
      * own runtime class never emits a type-ref -- exactly the plain-record shape wanted here) and
@@ -996,7 +996,7 @@ final class DefinitionResolver {
                 // A choice or an inline array/tuple at a supertype position. §12.1 lets these through only
                 // because `construction-def` draws its operands from `type-ref` where `refined-def` takes a
                 // name -- nothing here could ever denote a record, so there is no field set to compose with
-                // and no implementation to wait for. SPEC-FEEDBACK.md #38 argues the production is the defect.
+                // and no implementation to wait for. spec/tson-rev33-changelog.md #38 argues the production is the defect.
                 throw new TsonSchemaValidationException("'" + name + "': a "
                         + (supertypeRef instanceof ChoiceRef ? "choice" : "bracketed array/tuple")
                         + " cannot be a supertype -- '&' composes record types, and this form has "
@@ -1013,7 +1013,7 @@ final class DefinitionResolver {
             if (!(supertypeDef.body() instanceof RecordBody supertypeBody)) {
                 // §5.8 states no equivalent of §5.7's "Refinement requires a vocabulary body", though
                 // composition has the same need -- it copies the parent's fields, and a binding record has
-                // none to copy. Read as the author's error under the same principle; SPEC-FEEDBACK.md #38
+                // none to copy. Read as the author's error under the same principle; spec/tson-rev33-changelog.md #38
                 // asks for the rule to be stated.
                 throw new TsonSchemaValidationException("'" + name + "': supertype '" + supertypeName
                         + "' has no fields to contribute -- its body is a binding record, not a vocabulary, so "
@@ -1058,7 +1058,7 @@ final class DefinitionResolver {
         // Emptied for EVERY supertype, including one that contributed nothing to the removal: `A & B - { f }`
         // with `f` from A loses IS-A with B as well, though every field B declares survives untouched. That is
         // §5.9's letter ("the IS-A lattice is empty") against §4.3's "composition grants IS-A per parent";
-        // SPEC-FEEDBACK.md #37 argues the per-ancestor alternative and why this implementation conforms
+        // spec/tson-rev33-changelog.md #37 argues the per-ancestor alternative and why this implementation conforms
         // anyway. An author wanting partial IS-A subtracts first and composes second, which says it outright.
         List<String> contract = construction.removal().isPresent() ? List.of() : transitiveSupertypes;
         return new TypeDefinition(Optional.empty(), kind, parameters, constructor, contract, List.of(),
@@ -1098,7 +1098,7 @@ final class DefinitionResolver {
      * is dissolved -- the survivor becomes an ordinary field taking the group's own state, since a group's
      * members are flattened as {@code OPTIONAL} whatever the group says. Removing every member of a group
      * drops the group with them; §5.11 speaks only of the reduced-to-one case, and there is nothing left for
-     * an empty group to constrain ({@code SPEC-FEEDBACK.md} #36).
+     * an empty group to constrain ({@code spec/tson-rev33-changelog.md} #36).
      */
     private static void applyRemovals(String declarationName, RemovalSet removal, Set<String> bodyDeclared,
                                        List<RecordField> fields, List<FieldGroup> groups) {
@@ -1737,7 +1737,7 @@ final class DefinitionResolver {
      * <p><b>That last branch is unreachable through the ordinary pipeline</b>: {@link SchemaDesugarer}
      * materialises an entry for every application and leaves a bare reference behind, so this method
      * sees {@link SimpleRef} where §5.3 would put a structural {@code type_ref}. The materialising
-     * choice is deliberate and argued in {@code SPEC-FEEDBACK.md} #50 -- §8.2's {@code type_argument}
+     * choice is deliberate and argued in {@code spec/tson-rev33-changelog.md} #50 -- §8.2's {@code type_argument}
      * binds positionally against the head's declared parameters and so cannot carry a vocabulary field
      * no parameter routes. The branch is kept because it is the shape the structural form takes, and
      * because a caller reaching this resolver without the desugar pass still resolves.

@@ -52,7 +52,7 @@ import java.util.stream.Collectors;
  * DUPLICATE_FIELD}): {@link #readFields} consumes {@code FieldName} events strictly in stream order,
  * decoding (and thus validating) every occurrence of a recognized field name, reporting the second and
  * later ones at their own positions. [TSON-DATA] §2.5 words this as a SHOULD-warn with "last value wins"
- * defined as the recovery; reporting it outright is {@code SPEC-FEEDBACK.md} #41/#42's position, and it
+ * defined as the recovery; reporting it outright is {@code spec/tson-rev33-changelog.md} #41/#42's position, and it
  * dissolves #21's shadowed-occurrence question -- the repeat <em>is</em> the error, so whether its value
  * was going to be used decides nothing. The recovery still runs underneath: a later occurrence's decoded
  * value replaces an earlier one's in whatever {@link FieldSink} the caller supplies, which is what lets a
@@ -347,7 +347,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      * The value a field takes when the document wrote {@code _} at it, which differs from never mentioning
      * it at all ({@link #valueForAbsentField}) in exactly one state. At REQUIRED_DEFAULT, §5.2 asks the
      * decoder to warn and inject the default; this reports a validation error and injects it anyway. The
-     * error is {@code SPEC-FEEDBACK.md} #42's strongest case: warn-and-inject substitutes a value the
+     * error is {@code SPEC-FEEDBACK.md} #5's strongest case: warn-and-inject substitutes a value the
      * document explicitly disclaimed, and for the retry loop the format targets, {@code _} at a defaulted
      * field means the emitter misread the schema -- exactly the signal injection papers over. It also
      * completes §7.6's table, whose REQUIRED_DEFAULT cell was the lone warn among states that already
@@ -399,7 +399,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             case REQUIRED_DEFAULT, REQUIRED_FIXED -> precomputedValue[schemaIndex];
             // OPTIONAL_FIXED is *not* on that list, and that omission is the whole difference between it and
             // REQUIRED_FIXED: an omitted OPTIONAL_FIXED field stays absent rather than materialising a value
-            // the document never wrote. The spec never says so outright -- SPEC-FEEDBACK.md #39 asks it to.
+            // the document never wrote. The spec never says so outright -- spec/tson-rev33-changelog.md #39 asks it to.
             case OPTIONAL_FIXED -> null;
         };
     }

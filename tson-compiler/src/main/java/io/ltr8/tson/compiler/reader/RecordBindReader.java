@@ -251,7 +251,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
      * declared {@code Token} wants what was written: [TSON-SCHEMA] §5.10 calls a type argument's literal a
      * bare token rather than the value it denotes, and {@code record_field}'s own fixed and default values
      * are compared against what a document writes. A decoded host object cannot fill either.
-     * {@code SPEC-FEEDBACK.md} #54 records what keying identity on the spelling costs and puts the
+     * {@code SPEC-FEEDBACK.md} #6 records what keying identity on the spelling costs and puts the
      * underlying disagreement -- bare token in the prose, {@code value} in the kernel -- to the spec.
      *
      * <p>The choice has to be made before the read, and it is made per field, so two slots of one schema

@@ -308,7 +308,7 @@ public final class TsonDataEmitter {
      * content line is written with its own leading whitespace and nothing else. §7.2.3 computes the prefix
      * to strip from the closing delimiter's indent narrowed by each non-blank line's, so an empty closing
      * indent makes the prefix empty, every line's own indentation part of the value, and the one case the
-     * spec leaves open -- a blank line shorter than the computed prefix, {@code SPEC-FEEDBACK.md} #2 --
+     * spec leaves open -- a blank line shorter than the computed prefix, {@code spec/tson-rev33-changelog.md} #2 --
      * unreachable rather than guessed at.
      *
      * <p><b>What has to be escaped is decided by the reading order</b>, which strips trailing whitespace

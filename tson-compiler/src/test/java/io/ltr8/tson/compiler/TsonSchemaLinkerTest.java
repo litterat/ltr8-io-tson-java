@@ -252,7 +252,7 @@ class TsonSchemaLinkerTest {
      * A pure alias cycle -- an {@code a} is a {@code b} is an {@code a} -- has no base case, so nothing can
      * ever be one. It used to link cleanly, with this fixture asserting only that the variant-flattening walk
      * terminated rather than hanging; the diagnostic it called "separate and unimplemented" now exists
-     * ({@code SPEC-FEEDBACK.md} #25). Termination is still what the walk needs and is still proved here --
+     * ({@code spec/tson-rev33-changelog.md} #25). Termination is still what the walk needs and is still proved here --
      * by a verdict arriving at all.
      */
     @Test
@@ -334,7 +334,7 @@ class TsonSchemaLinkerTest {
     }
 
     /**
-     * The derivation is two-valued and class-based ({@code SPEC-FEEDBACK.md} #47), so an assertion §5.4's
+     * The derivation is two-valued and class-based ({@code spec/tson-rev33-changelog.md} #47), so an assertion §5.4's
      * value-set reading would call merely unprovable is simply refuted here: {@code even} and {@code small}
      * are both number-class, and no encoding's single form-resolution pass separates a same-class pair,
      * however their value sets relate.
@@ -372,7 +372,7 @@ class TsonSchemaLinkerTest {
         assertEquals(Optional.of(false), linked.schema().entries().get("contact").disjoint());
     }
 
-    /** §5.4 per {@code SPEC-FEEDBACK.md} #48: {@code (T | void)} spells optionality as a choice -- rejected. */
+    /** §5.4 per {@code spec/tson-rev33-changelog.md} #48: {@code (T | void)} spells optionality as a choice -- rejected. */
     @Test
     void rejectsAVoidChoiceVariant() {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
@@ -615,7 +615,7 @@ class TsonSchemaLinkerTest {
     void rejectsACollisionBetweenTwoImports() {
         // Two genuinely *different* schemas -- distinct !!ids -- each declaring the name. That is the real
         // collision: one name cannot denote two types in a flat namespace, so it is still rejected under the
-        // identity-based rule (SPEC-FEEDBACK.md #55). The ids have to differ for this to be the case under
+        // identity-based rule (spec/tson-rev33-changelog.md #55). The ids have to differ for this to be the case under
         // test at all; two copies claiming one id are one schema reached twice, which unifies (below).
         TsonLinkedSchema importedOne = new TsonLinkedSchema(
                 schemaOf("https://example.test/import-one.tn1", List.of(), Map.of("shared_name", emptyRecord())),
@@ -643,7 +643,7 @@ class TsonSchemaLinkerTest {
      * The other side of the identity rule: <b>one</b> schema reached by two routes unifies. {@code b.tn}
      * imports {@code shared.tn} and the importer names both, so every one of {@code shared.tn}'s entries
      * arrives twice -- the diamond every schema importing core.tn forms. A name-occurrence rule rejects it;
-     * an identity rule sees one set of entries ({@code SPEC-FEEDBACK.md} #55).
+     * an identity rule sees one set of entries ({@code spec/tson-rev33-changelog.md} #55).
      */
     @Test
     void unifiesOneSchemaReachedThroughTwoImportRoutes() {

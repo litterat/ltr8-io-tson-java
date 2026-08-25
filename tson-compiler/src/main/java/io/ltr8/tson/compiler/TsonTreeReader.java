@@ -133,7 +133,7 @@ public final class TsonTreeReader {
      * leaving this one unchanged, sharing its compiled-schema registry.
      *
      * <p>A schemaless read has nothing to resolve {@code !person} against, so by default it is {@code
-     * UNKNOWN_TYPE_REF} ({@code SPEC-FEEDBACK.md} #7). This is the opt-out for a caller who wants the wire
+     * UNKNOWN_TYPE_REF} ({@code spec/tson-rev33-changelog.md} #7). This is the opt-out for a caller who wants the wire
      * back as authored: reading the structure of a document whose {@code !!schema} defines those names but is
      * deliberately out of scope, or round-tripping a tree through {@link TsonTreeWriter}. Built-in type-refs
      * are still checked -- {@code !uuid nope} is a problem either way. Affects the schemaless path only; a

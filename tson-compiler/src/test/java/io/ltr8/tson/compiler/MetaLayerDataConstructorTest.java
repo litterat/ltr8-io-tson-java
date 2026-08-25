@@ -33,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>The motivating case is an HTTP API described at the schema layer, because that is the only layer that
  * can name request and response types <em>by name</em> -- a data document can only instantiate a type. The
  * kernel's {@code data} base kind is what lets such an entry say it is not a type ([TSON-SCHEMA] §4.1,
- * {@code SPEC-FEEDBACK.md} #57).
+ * {@code spec/tson-rev33-changelog.md} #57).
  *
  * <p><b>The wiring, in full, is three things</b> -- there is nothing else to register:
  * <ol>

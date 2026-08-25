@@ -28,7 +28,7 @@ import java.util.List;
  * {@code data => top & {}}, and {@code type_kind} carries {@code DATA} beside {@code ATOM}/{@code PRODUCT}/
  * {@code SUM}/{@code REFERENCE}, so a meta-schema composes its own constructor against it
  * ({@code operation => ~data & { ... }}) and the kind is a fact of the resolved schema rather than one the
- * Java side carries alone. See {@code SPEC-FEEDBACK.md} #57 for the argument that produced it.
+ * Java side carries alone. See {@code spec/tson-rev33-changelog.md} #57 for the argument that produced it.
  */
 public non-sealed interface Data extends Top {
 

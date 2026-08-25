@@ -12,7 +12,7 @@ import java.util.Optional;
  * transliteration of the relevant {@code core.tn1} instances, since the vocabulary is a fixed,
  * closed set (§5.1) that a Class 1 processor never resolves via schema machinery.
  *
- * <p>Seeded with the {@code integer_type} family (see {@code SPEC-FEEDBACK.md} #6): §5.6 as
+ * <p>Seeded with the {@code integer_type} family (see {@code spec/tson-rev33-changelog.md} #6): §5.6 as
  * published lists just {@code int32}/{@code int64}/{@code uint32}/{@code uint64}, but {@code
  * core.tn1} defines the same constructor applied across the full {@code int8}..{@code int256}/
  * {@code uint8}..{@code uint256} width ladder plus the {@code positive_integer} / {@code
@@ -26,7 +26,7 @@ import java.util.Optional;
  * complex}) -- all fully published in §5.6's table as-is, unlike the integer family. And with {@code
  * uuid_type} ({@code uuid}, §5.5) -- deliberately *not* {@code text_type}, despite existing in
  * meta-kernel.tn1, since {@code !text} never appears in §5's published table at all (see {@code
- * SPEC-FEEDBACK.md} #9). And with the full {@code binary} family (§5.3) -- {@code base64}, {@code
+ * spec/tson-rev33-changelog.md} #9). And with the full {@code binary} family (§5.3) -- {@code base64}, {@code
  * base64url}, {@code base32}, {@code hex} -- four instances of one {@link BinaryParser} constructor,
  * each a distinct {@code binary_encoding} value, not one generic {@code !binary} annotation,
  * matching §5.3's own "there is no generic {@code !binary} annotation." And with the temporal
@@ -46,7 +46,7 @@ import java.util.Optional;
  * under one "Network Types" banner and gives it the identical shape, §5.1 invites a reader to treat core.tn
  * as the vocabulary's source of truth, and a real {@link EmailParser} exists -- withholding it from the
  * schemaless path would only make the two read paths disagree about what {@code !email} means. See {@code
- * SPEC-FEEDBACK.md} #5, which asks the spec to add the row and say what conformance to its RFC 5322 pin
+ * spec/tson-rev33-changelog.md} #5, which asks the spec to add the row and say what conformance to its RFC 5322 pin
  * actually obliges.
  */
 public final class BuiltinTypeVocabulary {

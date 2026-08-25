@@ -32,7 +32,7 @@ public record FieldDef(List<Annotation> annotations, String name, Optional<Field
      * {@code field-modifier = ws ("~" / "=") ws (token / absent)} -- {@code ~} is {@link
      * Kind#DEFAULT}, {@code =} is {@link Kind#FIXED} (§5.2). The value is a bare token or the
      * absent sentinel only -- never annotated, never typed, never a container (see {@code
-     * SPEC-FEEDBACK.md} #15 on why this is narrower than a full {@code data-value} despite §12.1's
+     * SPEC-FEEDBACK.md} #2 on why this is narrower than a full {@code data-value} despite §12.1's
      * own introductory prose suggesting otherwise).
      */
     public record Modifier(Kind kind, Value value) {

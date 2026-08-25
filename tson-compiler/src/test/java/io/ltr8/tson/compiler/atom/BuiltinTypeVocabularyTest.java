@@ -11,14 +11,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BuiltinTypeVocabularyTest {
 
-    // §5.6 as published: only these four widths. See SPEC-FEEDBACK.md #6 for the rest.
+    // §5.6 as published: only these four widths. See spec/tson-rev33-changelog.md #6 for the rest.
     @ParameterizedTest
     @ValueSource(strings = {"int32", "int64", "uint32", "uint64"})
     void publishedFixedWidthIntegersAreRegistered(String name) {
         assertTrue(BuiltinTypeVocabulary.lookup(name).isPresent());
     }
 
-    // core.tn1's full width ladder, extended per SPEC-FEEDBACK.md #6 (confirmed oversight, not
+    // core.tn1's full width ladder, extended per spec/tson-rev33-changelog.md #6 (confirmed oversight, not
     // deliberate scoping).
     @ParameterizedTest
     @ValueSource(strings = {
@@ -103,7 +103,7 @@ class BuiltinTypeVocabularyTest {
      * {@code email} is registered although §5.5's table has no row for it -- a known departure, like the
      * integer width ladder. core.tn groups it with {@code uuid}/{@code ipv4}/{@code mac} identically, and a
      * real parser exists, so withholding it would only make the schemaless and schema-driven paths disagree
-     * about what {@code !email} means. See {@code SPEC-FEEDBACK.md} #5.
+     * about what {@code !email} means. See {@code spec/tson-rev33-changelog.md} #5.
      */
     @org.junit.jupiter.api.Test
     void emailAtomIsRegisteredDespiteNotBeingInTheTable() {
@@ -113,7 +113,7 @@ class BuiltinTypeVocabularyTest {
     @org.junit.jupiter.api.Test
     void textIsDeliberatelyNotRegistered() {
         // text_type exists in meta-kernel.tn1 but !text never appears in §5's published table --
-        // see SPEC-FEEDBACK.md #9.
+        // see spec/tson-rev33-changelog.md #9.
         assertFalse(BuiltinTypeVocabulary.lookup("text").isPresent());
     }
 

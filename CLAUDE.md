@@ -76,11 +76,14 @@ pick an interpretation — a resolved ambiguity is invisible again three session
 Several such findings are load-bearing and are cited by number (`SPEC-FEEDBACK.md` #N) throughout the
 `docs/` notes.
 
-**The register holds what is open, not everything raised.** An entry whose resolution lands in a spec
-revision is removed from `SPEC-FEEDBACK.md`, and that revision's change log in `spec/` keeps its number and
-its disposition. Numbers are permanent and never reused: a new finding takes the next number after the
-highest ever used, never a gap. Citations left pointing at a removed number are deliberate — the register's
-header says where they go — so don't rewrite them, and don't renumber to close a gap.
+**The register holds what is open against the current revision, and renumbers from #1 when a revision
+closes.** It is an input to the next revision's adjudication, so its numbering is what that revision's
+change log will answer against. Entries whose resolution landed are deleted; the closing revision's change
+log in `spec/` keeps all of them under *their* numbers. **The two schemes overlap and mean different
+things**, so a citation must name its document: `spec/tson-rev33-changelog.md #N` for anything raised
+against Revision 32, `SPEC-FEEDBACK.md #N` only for an entry still open. At the next renumbering, every
+citation to an entry that closes moves to that revision's change log, and the surviving entries' citations
+move to their new numbers — the register's own "Was / Is" table is the bridge.
 
 ## Conventions
 
@@ -131,7 +134,7 @@ keeps it apart. The exception classification itself is unchanged and is what pic
 publishing org, `<group>` the subsystem (`cli`), `<name>-<version>` the schema name with a trailing
 integer version. Bump the version under a new name (`diagnostics-2.tn`, not an in-place edit) whenever the
 shape changes (§10's immutability rule). **Use `.tn`, not `.tn1`** — `.tn1` is a stability claim §7.1
-reserves for the eventual frozen "TSON version 1", which hasn't happened (see `SPEC-FEEDBACK.md` #20).
+reserves for the eventual frozen "TSON version 1", which hasn't happened (see `spec/tson-rev33-changelog.md` #20).
 
 **Line wrapping:** wrap both comments and code to 125 characters.
 
@@ -215,7 +218,7 @@ and frozen for the whole series** (§1.3). Constructed from an `InputStream` who
 itself** (§9.1), code-point
 addressed (never char-addressed), with `Position` tracking line / code-point column / UTF-8 byte offset —
 counted from the input rather than re-derived from the decoded character, and malformed UTF-8 is a
-`LexException` rather than a U+FFFD substitution (`SPEC-FEEDBACK.md` #59). NFC normalization
+`LexException` rather than a U+FFFD substitution (`spec/tson-rev33-changelog.md` #59). NFC normalization
 applies to *unquoted* tokens only; Pattern_White_Space is the spec's fixed 11-character set, hardcoded.
 `Character.isUnicodeIdentifierStart/Part` stands in for XID_Start/XID_Continue — a known, deliberate
 approximation. Errors are fail-fast (`LexException`); multi-error recovery is deferred.
@@ -249,7 +252,7 @@ table (§5). Each constructor splits into a constraint-values record in `schema.
 plus a same-named `*Parser` in `atom` that holds one and does the work. Pattern facets stay `String`, not
 `Pattern` — validated and matched via `tson-regex` (I-Regexp, ReDoS-safe), never `java.util.regex`.
 `unit`'s three instances are three separate parsers dispatched on the declaration's own name
-(`SPEC-FEEDBACK.md` #18).
+(`spec/tson-rev33-changelog.md` #18).
 
 ### Schema grammar (`TsonSchemaParser`, `.../ast/schema/`) — `docs/schema-grammar-and-desugaring.md`
 
@@ -258,12 +261,12 @@ validation. `extends TsonDataParser` (same package) because §12.1 imports Part 
 `SchemaMap.declarations` is a `LinkedHashMap` and duplicate names overwrite (grammar layer doesn't dedupe).
 Two entry points: `parseSchemaDocument()` is fail-fast, `parseSchemaDocument(receiver)` reports each
 declaration's syntax error and resyncs to the next.
-Three spec defects are implemented per intent with `SPEC-FEEDBACK.md` entries (#14/#15/#16); the bracket
+Three spec defects are implemented per intent with `spec/tson-rev33-changelog.md` entries (#14/#15/#16); the bracket
 form is parsed twice per the spec's own overlapping productions (#31), and the `{K => V}` map sugar twice
 alongside it. A `{` at a type position dispatches by consuming one token and inspecting — Part 1 §2.8's
 record/map idiom, imported wholesale — and `{` is a map and only a map everywhere except type-def position,
 since a bare record body is not spellable at a type position (§5.2). One consequence of the dispatch's
-lookahead budget is `SPEC-FEEDBACK.md` #52.
+lookahead budget is `spec/tson-rev33-changelog.md` #52.
 
 ### Desugaring (`.../resolver/SchemaDesugarer.java`) — `docs/schema-grammar-and-desugaring.md`
 
@@ -273,7 +276,7 @@ one and anywhere else becoming an injected declaration plus a bare reference —
 rule**, not a divergence: the structure-templates CR (`spec/tson-cr-structure-templates.md`, accepted as
 baseline) de-parameterises `array`/`set`/`map` (D3) so a container at a use site cannot be an application at
 all, and states one lift rule (D5: "every sugar form lifts at desugar: a concrete form to a closed synthetic
-entry"). `SPEC-FEEDBACK.md` #49/#50/#51 argued for exactly this and are settled by it.
+entry"). `spec/tson-rev33-changelog.md` #49/#50/#51 argued for exactly this and are settled by it.
 The rule this settles on: **`TypeRef.arguments` non-empty means an open
 form — a template application — and everything closed is an entry referenced by a bare name.** So
 `DefinitionResolver` only ever sees a bare
@@ -299,7 +302,7 @@ round-trip and is checked to genuinely narrow), subtraction (which empties `type
 purpose), group restatement, all six field-state spellings. An annotation on a declaration resolves **one hop
 against the governing meta** and nowhere else (§3.3.3): a name the schema declares itself or `!!import`s is
 usable by the schema's *data* documents but not within the schema document, and writing one is an error, not
-an annotation that keeps its name and drops its value (`SPEC-FEEDBACK.md` #56). Every atom body is checked
+an annotation that keeps its name and drops its value (`spec/tson-rev33-changelog.md` #56). Every atom body is checked
 twice over, by two
 per-family rules asking different questions: `Atom.constraintsCheck` (over `AtomNarrowing`) that a refinement
 tightens its source, and `Atom.coherenceCheck` (over `AtomCoherence`) that a single body's own facets admit
@@ -343,7 +346,7 @@ form needs no materialization.
 `TsonCanonicalIdentity.canonicalize` is §2.2.1's algorithm (exactly two reductions — strip scheme, strip
 query — everything else must already be canonical), public API because `TsonSchemaLoader` keys on it.
 `TsonSchemaLinker.link(schema, loader)` merges `!!import`s — an import's **whole namespace**, its own imports
-included (transitive, diverging from §2.2.3's "imports are shallow"; `SPEC-FEEDBACK.md` #55), with
+included (transitive, diverging from §2.2.3's "imports are shallow"; `spec/tson-rev33-changelog.md` #55), with
 **collisions decided by entry identity rather than name occurrence**: one schema reached by several routes
 unifies (so the core.tn diamond is ordinary), two different schemas declaring one name is an error, and
 nothing may shadow a name the closure already binds (recording each merged entry's origin schema id in
@@ -358,9 +361,9 @@ discrimination class, the same `DiscriminationClass` untagged reading dispatches
 something other than a data value is declared by its schema but is not a type; without this the misuse
 resolves, links *and* compiles and fails only at read), including choice-variant
 distinctness after §8.3 flattening, rejection of a variant resolving to `void` (optionality is not choice,
-`SPEC-FEEDBACK.md` #48), the author's `@disjoint` marker against the derived fact (`false` is
+`spec/tson-rev33-changelog.md` #48), the author's `@disjoint` marker against the derived fact (`false` is
 an error; no third outcome exists), and
-constructor eligibility from both ends (§2.2.2, `SPEC-FEEDBACK.md` #19). The linker materializes nothing —
+constructor eligibility from both ends (§2.2.2, `spec/tson-rev33-changelog.md` #19). The linker materializes nothing —
 desugaring already did. `TsonSchemaRegistry.register` rejects duplicate identities (no overwrite: that plus
 unmodifiable `entries()` *is* the "locked" guarantee). The linker lives in `tson-compiler` (a pipeline
 stage, next to `Diagnostic` and `tson-regex`); the registry stays in `tson-schema` (storage over the value
@@ -370,7 +373,7 @@ model).
 
 §2.2.2 makes the meta layer the format's extension point, but §8.1's schema map holds only type definitions,
 so an instance of a meta-schema's own constructor had nowhere to be when the thing it describes is not a data
-type (`SPEC-FEEDBACK.md` #57). meta-kernel gains a fourth base kind, **`data => top & {}`**, with `DATA`
+type (`spec/tson-rev33-changelog.md` #57). meta-kernel gains a fourth base kind, **`data => top & {}`**, with `DATA`
 joining `type_kind`; `schema.meta.Data` is the matching **`non-sealed`** branch of `Top` — the one open
 point in the body model, because the constructors reaching it are declared by meta-schemas this library has
 never seen. A consumer registers a class by carrying `@Typename` and being findable by the
@@ -380,7 +383,7 @@ is no reader family and no factory entry, the ordinary record reader binding the
 in full, and an unresolvable class is an error where the constructor is applied.
 `Data.references()` is how a body's own type references reach the linker, declared rather than discovered.
 The kind is the spec's own now: what this project first amended into its meta-kernel is declared by
-published Revision 33 (`SPEC-FEEDBACK.md` #57, accepted), so `spec/m/` is a plain cache again. The digests
+published Revision 33 (`spec/tson-rev33-changelog.md` #57, accepted), so `spec/m/` is a plain cache again. The digests
 `TsonBundledSchemas` holds are still this project's own — the published drafts spell their pins `xxhash`
 and pin at publication, so these copies carry real digests over their own bytes.
 
@@ -478,7 +481,7 @@ Jackson-style); from a `Tson` facade = schema-aware (a self-describing document 
 readers share the original's compiled-schema registry. Failures reaching or resolving the schema are
 diagnostics, not exceptions. A schemaless read still checks type-refs (`TypeRefCheck`: built-in name →
 must satisfy the atom; names-the-target → accepted, bind only; else `UNKNOWN_TYPE_REF` — a reader policy,
-`SPEC-FEEDBACK.md` #7). Both tree paths capture wire annotations; a schema-driven read also type-checks
+`spec/tson-rev33-changelog.md` #7). Both tree paths capture wire annotations; a schema-driven read also type-checks
 annotation *names* against the governing schema (#29) — **wherever they are written, not only where the
 reader keeps them**, since whether a bound class has an `Annotations` carrier is no part of whether the
 document conforms. `TsonTreeWriter`/`TsonObjectWriter` re-emit
@@ -676,9 +679,9 @@ compatibility).
   pass later, which needed `type_argument` — an untagged labelled choice — to become readable
   (`GroupUnionBindReader`). What remains is narrower: `tuple` and `choice` bind a *collection* and
   `template_argument` has no collection case, so `<T> { v: (T | text) }` is refused at the declaration
-  (`SPEC-FEEDBACK.md` #53); a *value* argument keeps its token, so `[vector<float32, 3>]` closes to a
+  (`spec/tson-rev33-changelog.md` #53); a *value* argument keeps its token, so `[vector<float32, 3>]` closes to a
   nested array with both bounds at 3 (`RawTokenParser`) — at the cost of identity being keyed on the
-  spelling, so `<255>` and `<0xFF>` are two applications (`SPEC-FEEDBACK.md` #54).
+  spelling, so `<255>` and `<0xFF>` are two applications (`SPEC-FEEDBACK.md` #6).
 - **Undocumented atom constructors** — `unknown` (and `extern`, which has no core.tn declaration) has no
   compiled-parser factory, so it compiles to `ErrorReader` (a schema merely *declaring* one still compiles).
   Neither is an ordinary missing parser waiting to be written: `extern` is a whole absent mechanism and `unknown`
@@ -687,7 +690,7 @@ compatibility).
   host-bits-zero rules on top. **`email` is
   seeded into `BuiltinTypeVocabulary` although §5.5's table has no row for it** — a known departure like the
   integer ladder, because core.tn groups it with its siblings identically and withholding it would only make
-  the two read paths disagree (`SPEC-FEEDBACK.md` #5). Its format check is a documented subset of RFC 5322 —
+  the two read paths disagree (`spec/tson-rev33-changelog.md` #5). Its format check is a documented subset of RFC 5322 —
   the `dot-atom` core, without quoted local parts, domain literals or comments.
 - **Schema-side diagnostics** — parsing, desugaring, resolution and linking all report through a
   `TsonDiagnosticsReceiver` (see `docs/readers-and-diagnostics.md`), and read- and schema-side diagnostics
@@ -701,7 +704,8 @@ compatibility).
   disk/HTTP-backed `TsonSchemaSource` (with whitelist/blacklist policy). **`value_param` substitution is
   no longer one of them**: an argument bound into a routed `=` fixes the field (`REQUIRED` →
   `REQUIRED_FIXED`, `~` staying a default), which is §5.7's "fixation happens downstream" applied to the
-  downstream it does not name (`SPEC-FEEDBACK.md` #58). **Thread-safety is no longer wholly open**: concurrent reads through one `Tson` are safe (the
+  downstream it does not name (`spec/tson-rev33-changelog.md` #58). **Thread-safety is no longer wholly
+  open**: concurrent reads through one `Tson` are safe (the
   readers are immutable, the lexer/stream are per-read, both on-demand caches settle a race by keeping
   one entry, and a cache *hit* — which is every read, in a process that resolved its schemas at startup —
   takes no lock at all; `docs/linking-and-compilation.md`). What is still open is everything *outside* a read:

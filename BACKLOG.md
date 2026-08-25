@@ -168,7 +168,7 @@ need are not retained for a secondary constructor.
 
 - [ ] **Two entries for one type, where the argument is one number spelled two ways.** `vector<float32, 255>`
   and `vector<float32, 0xFF>` produce entries with byte-identical bodies, because identity derives from the
-  argument's token text where §4 makes the two one number. Blocked on `SPEC-FEEDBACK.md` #54 rather than on
+  argument's token text where §4 makes the two one number. Blocked on `SPEC-FEEDBACK.md` #6 rather than on
   effort: normalising numeric tokens before hashing is a three-line change, and doing it now would be this
   implementation inventing an identity rule the spec does not state, disagreeing with any implementation that
   read §5.10's "bare token" literally. The entry offers three resolutions and names the one that keeps both
@@ -442,7 +442,7 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
       loop anyway, and that §8.1's byte offset was being re-derived from the decoded character rather than
       counted from the input. It also settles a question the spec leaves open: malformed UTF-8 is now a
       lexer error rather than a U+FFFD substitution, overlong forms and encoded surrogates included
-      (`SPEC-FEEDBACK.md` #59).
+      (`spec/tson-rev33-changelog.md` #59).
     - [x] **Build the diagnostic path lazily** — done. A step of the descent is a linked node and both RFC
       6901 pointers render only when a diagnostic is built: **-1.7 KB per read** (26,152 → 24,488 bytes).
       The part that matters for a port is not the bytes: concatenating a step onto the last is quadratic in
@@ -464,10 +464,10 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
   61,824 → **23,464 bytes** and 1,213 → ~800 objects per read, 19.5 → ~13 µs, with retention still a
   measured 0. Two conformance fixes came out of the work and matter more than the bytes for something about
   to be ported: a zero-led complex magnitude is accepted (§7.6), and malformed UTF-8 is refused rather than
-  silently replaced (`SPEC-FEEDBACK.md` #59).
+  silently replaced (`spec/tson-rev33-changelog.md` #59).
 - [ ] Confusable-character and bidi-formatting-character checks (§9.4-adjacent security hardening;
-  opt-in, and per `SPEC-FEEDBACK.md` #42 reported as ordinary errors when enabled, not warnings) —
+  opt-in, and per `SPEC-FEEDBACK.md` #5 reported as ordinary errors when enabled, not warnings) —
   the sibling gap to the numeric-literal length limit tracked in `STRUCTURED-OUTPUT.md`'s Tier 1 section;
-  neither is enforced anywhere yet. `SPEC-FEEDBACK.md` #34 is the fuller treatment: which UTS #39 mechanism
+  neither is enforced anywhere yet. `SPEC-FEEDBACK.md` #4 is the fuller treatment: which UTS #39 mechanism
   applies where, the comparison scopes TSON can actually name, and why a normative requirement would oblige
   every implementation to ship UCD data the JDK does not expose.

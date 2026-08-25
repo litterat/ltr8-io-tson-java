@@ -105,7 +105,7 @@ class SchemalessTreeAnnotationTest {
         // §3.1 Value scope is right-recursive: in `@a:@b:val target`, @a's value is the whole data-value
         // `@b:val target` -- the core value `target`, annotated by @b, whose own value is `val`. The
         // trailing `extra` is what the enclosing value takes as its own core-value; without it the outer
-        // data-value has none and this is a parse error, which is SPEC-FEEDBACK.md #3 (the spec's own
+        // data-value has none and this is a parse error, which is spec/tson-rev33-changelog.md #3 (the spec's own
         // worked example is one token short of standing alone).
         TsonValue node = read("{ x: @a:@b:val target extra }").get("x");
 

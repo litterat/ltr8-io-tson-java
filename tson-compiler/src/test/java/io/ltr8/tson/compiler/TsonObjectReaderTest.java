@@ -106,7 +106,7 @@ class TsonObjectReaderTest {
     @Test
     void duplicateFieldNameIsAnError() throws DataBindException {
         // §2.5 words a repeated field as a SHOULD-warn with "the last value wins" as the recovery;
-        // SPEC-FEEDBACK.md #41/#42 makes it an error. The recovery still runs underneath -- see
+        // spec/tson-rev33-changelog.md #41/#42 makes it an error. The recovery still runs underneath -- see
         // DuplicateFieldTest, which can observe it; bind mode is all-or-nothing (ConstructionGuard), so a
         // reported document binds to null whatever the problem was and this one asserts the verdict only.
         TsonReadException thrown = assertThrows(TsonReadException.class,
@@ -599,7 +599,7 @@ class TsonObjectReaderTest {
 
     @Test
     void unrecognizedTypeRefThrowsRatherThanSilentlyFallingThrough() throws DataBindException {
-        // SPEC-FEEDBACK.md #7: §5.1's "preserved as an uninterpreted marker" rule governs the
+        // spec/tson-rev33-changelog.md #7: §5.1's "preserved as an uninterpreted marker" rule governs the
         // Class 1 processing step (tson-compiler), not this binding layer -- an unresolvable
         // annotation on a value we're actively binding to a declared type is treated as an error,
         // so a typo doesn't silently disable the validation the author intended.
@@ -769,7 +769,7 @@ class TsonObjectReaderTest {
 
     @Test
     void extendedIntegerFamilyWidthsAreReachableThroughTheMapper() throws DataBindException {
-        // SPEC-FEEDBACK.md #6: int16 isn't in §5.6's published table but is implemented anyway.
+        // spec/tson-rev33-changelog.md #6: int16 isn't in §5.6's published table but is implemented anyway.
         assertEquals(30000L, mapper.read("{ value: !int16 30000 }", WideInt.class).value());
     }
 

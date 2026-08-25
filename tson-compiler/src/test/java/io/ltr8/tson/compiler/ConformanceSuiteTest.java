@@ -477,7 +477,7 @@ class ConformanceSuiteTest {
      * additionally checked against which of {@link
      * AtomParseException}/{@link AtomValidationException} was actually thrown, per this
      * implementation's own interpretation of the §5.2/§8.1 categorization question the test suite's
-     * own README flags as unsettled (see SPEC-FEEDBACK.md #8): parse-shape failures as {@code
+     * own README flags as unsettled (see spec/tson-rev33-changelog.md #8): parse-shape failures as {@code
      * resolver}, range/constraint failures as {@code validation}.
      */
     private static void checkVocabularyVector(String bucket, Path subject, RecordValue sidecar) throws IOException {

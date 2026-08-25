@@ -452,7 +452,7 @@ public final class TsonSchemaParser extends TsonDataParser {
      * Supertype chain, trailing body, and removal set (§5.8, §5.9). {@code first} is already
      * consumed. On each {@code &}, one token of lookahead decides whether {@code {} } terminates
      * the chain as the trailing body or another supertype follows -- see {@code
-     * ConstructionDef}'s own Javadoc and {@code SPEC-FEEDBACK.md} #14 on why this, not the literal
+     * ConstructionDef}'s own Javadoc and {@code spec/tson-rev33-changelog.md} #14 on why this, not the literal
      * ABNF, is the correct reading.
      */
     private ConstructionDef parseConstructionDefContinuation(TypeRef first) {
@@ -662,7 +662,7 @@ public final class TsonSchemaParser extends TsonDataParser {
      * <p>There is no separate inline form, and no position where a size specifier or an element {@code ?} is
      * refused. That split existed because a sized form had no inline representation to carry it; every form
      * lifts to an entry now, so the restriction protected nothing and is gone rather than relocated (§5.3,
-     * {@code SPEC-FEEDBACK.md} #31).
+     * {@code spec/tson-rev33-changelog.md} #31).
      */
     private TypeRef parseBracket() {
         expect(TokenType.LBRACKET, "an array or tuple type's opening '['");

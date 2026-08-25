@@ -104,7 +104,7 @@ final class TemplateMaterialiser {
      * failure, if that check ever has a hole, is a {@link StackOverflowError} -- not a diagnosis, and not
      * something the exception policy can classify. One comparison for that is worth paying.
      *
-     * <p>Distinct from {@code SPEC-FEEDBACK.md} #25, which is about a type with no finite <em>data</em>
+     * <p>Distinct from {@code spec/tson-rev33-changelog.md} #25, which is about a type with no finite <em>data</em>
      * model; the regularity rule is about one with no finite <em>type</em> model.
      */
     private static final int MAX_CLOSING_DEPTH = 64;
@@ -533,7 +533,7 @@ final class TemplateMaterialiser {
      * default: data may still override it.
      *
      * <p>§5.7 names only one downstream fixation site, a refinement deriving from an application head, and
-     * leaves a record template's materialised field unstated; {@code SPEC-FEEDBACK.md} #58 has the case for
+     * leaves a record template's materialised field unstated; {@code spec/tson-rev33-changelog.md} #58 has the case for
      * reading them the same way.
      */
     private static RecordField bindValue(RecordField field, String head, Map<String, TypeArgument> bindings) {

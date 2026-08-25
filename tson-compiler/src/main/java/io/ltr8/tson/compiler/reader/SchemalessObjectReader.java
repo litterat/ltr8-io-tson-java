@@ -74,7 +74,7 @@ import java.util.function.BiConsumer;
  * binding error rather than a marker to ignore. That is not a contradiction of §5.1's "preserve an
  * unrecognized annotation as an uninterpreted marker": that rule is about passive preservation during
  * parsing, not about what an application actively binding to a caller-declared Java type should do with a
- * marker it can't interpret (see {@code SPEC-FEEDBACK.md} #7, whose suggested resolution this is). {@link
+ * marker it can't interpret (see {@code spec/tson-rev33-changelog.md} #7, whose suggested resolution this is). {@link
  * #preserving} is the opt-in passthrough that resolution also asks for.
  *
  * <p>The two positions differ in how a name gets to "names the target". A <b>container</b> accepts the

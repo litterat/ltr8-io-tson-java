@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * {@code !!import} contributes an imported schema's <b>whole namespace</b>, its own imports included, and a
  * collision is decided by entry <b>identity</b> rather than by name occurrence -- a deliberate divergence
- * from [TSON-SCHEMA] §2.2.3's "imports are shallow", argued in {@code SPEC-FEEDBACK.md} #55.
+ * from [TSON-SCHEMA] §2.2.3's "imports are shallow", argued in {@code spec/tson-rev33-changelog.md} #55.
  *
  * <p>The two halves are one rule. Because the namespace is flat and transitive, the diamond every practical
  * schema forms -- two imports that both import core.tn -- must unify rather than collide; because it is flat,
