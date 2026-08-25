@@ -261,7 +261,8 @@ validation. `extends TsonDataParser` (same package) because §12.1 imports Part 
 `SchemaMap.declarations` is a `LinkedHashMap` and duplicate names overwrite (grammar layer doesn't dedupe).
 Two entry points: `parseSchemaDocument()` is fail-fast, `parseSchemaDocument(receiver)` reports each
 declaration's syntax error and resyncs to the next.
-Three spec defects are implemented per intent with `spec/tson-rev33-changelog.md` entries (#14/#15/#16); the bracket
+Three spec defects are implemented per intent with `spec/tson-rev33-changelog.md` entries (#14/#15/#16 — #16's
+refinement half is still outstanding, see `BACKLOG.md`); the bracket
 form is parsed twice per the spec's own overlapping productions (#31), and the `{K => V}` map sugar twice
 alongside it. A `{` at a type position dispatches by consuming one token and inspecting — Part 1 §2.8's
 record/map idiom, imported wholesale — and `{` is a map and only a map everywhere except type-def position,

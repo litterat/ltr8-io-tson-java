@@ -87,6 +87,24 @@ by a factor of six.
 
 ## Miscellaneous
 
+- [ ] **`!I ^ <anything>` parses where §12.1 admits only a braced record, and the resolver then reports the
+  author's mistake as a library gap.** `atom-refinement = "!" type-name ws "^" ws record-def`, and the
+  grammar does not backtrack, so `!integer ^ 5` commits at the `^` and is a parse error; `instance` cannot
+  rescue it either, since `^` is not a `core-value`. `TsonSchemaParser.parseAtomRefinementOrInstance` calls
+  `parseDataValue()` on that branch, which is `*annotation [type-ref] core-value` — so `!integer ^ 5`,
+  `!integer ^ !foo { min: 1 }` and `!integer ^ @doc:"d" { min: 1 }` all parse today. It was conforming until
+  Revision 33: Revision 32 spelled the production `... ws data-value`, and the entry that argued it down
+  (change log #16) proposed narrowing **both** `!` forms — the `instance` branch took its half
+  (`parseCoreValue()`, with a comment saying so) and this one did not.
+  - **The knock-on is the reason to fix it rather than file it as cosmetic.** Slipping past the parser, the
+    form reaches `DefinitionResolver`, which reports `expected a braced record of constraint bindings (§5.5)`
+    under `Diagnostic.Code.NOT_IMPLEMENTED` — so `tson validate` exits **70** (library gap, please report it)
+    on a plain author typo, where the classification test says the verdict never changes as this library
+    improves and the code should be an ordinary schema error. Worth checking the other `NOT_IMPLEMENTED`
+    sites against the same test while in there, rather than patching this one.
+  - Fix is the one call site plus a per-declaration syntax error at `^`, with vectors for the three spellings
+    above; the resolver fallback then stops being reachable from source, and can say so.
+
 - [ ] **General resolver-layer structural rules as reusable primitives**, rather than binding-time-only
   behaviour — empty-brace resolution, the absent-vs-missing distinction. §2.8's "the empty container of that
   type" is still a rule each container reader applies for itself: the map reader's own zero-entry case was
