@@ -126,21 +126,22 @@ class MetaKernelBootstrapResolverTest {
 
     /**
      * The bootstrap runs {@link SchemaDesugarer} over its own document like every other schema does, so its
-     * output is the 47 declarations the fixture writes plus one injected declaration per distinct sugar form
-     * within them -- eight {@code array} entries from §5.3's {@code [X]} field-type sugar. They are the same
-     * entries the linker used to synthesize; producing them here is what leaves the linker with nothing to
-     * materialize (see {@code MetaKernelSchemaRegistryTest}). {@code enum}'s member set is no longer among
-     * them: it is the fixture's own {@code token_set} declaration, since {@code set} has no sugar and a
-     * {@code !} form stays prohibited at a field position (§5.2).
+     * output is the 51 declarations the fixture writes plus one injected declaration per distinct sugar form
+     * within them -- eight {@code array} entries from §5.3's {@code [X]} field-type sugar and one {@code map}
+     * entry from the {@code {K => V}} sugar in {@code instance_template.bindings}. They are the same entries
+     * the linker used to synthesize; producing them here is what leaves the linker with nothing to
+     * materialize (see {@code MetaKernelSchemaRegistryTest}). {@code enum}'s member set is not among them:
+     * it is the fixture's own {@code token_set} declaration, since {@code set} has no sugar and a {@code !}
+     * form stays prohibited at a field position (§5.2).
      */
     @Test
-    void theFortySevenRealFixtureDeclarationsResolveAlongsideEightDesugaredEntries() {
+    void theFiftyOneFixtureDeclarationsResolveAlongsideNineDesugaredEntries() {
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
-        assertEquals(59, schema.entries().size());
+        assertEquals(60, schema.entries().size());
         for (String head : List.of("array_tuple_element", "array_field_name", "array_type_ref",
                 "array_type_name", "array_type_argument", "array_param_name", "array_field_group",
-                "array_record_field")) {
+                "array_record_field", "map_field_name_template_argument")) {
             assertTrue(schema.entries().keySet().stream().anyMatch(name -> name.startsWith(head + "_")),
                     "expected a desugared entry with head '" + head + "'");
         }
