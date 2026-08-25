@@ -37,8 +37,10 @@ copy. `spec/` holds local snapshots (revision 33) for quick reference: `spec/tso
 documents — the meta-kernel bootstrap layer, the meta-schema built on it, and the core type library built
 on that) plus their non-normative `*-resolved.tn` resolver-output fixtures. Treat `spec/` as a cache, not
 a source of truth — with one standing exception: the three `.tn` schemas are **packaged from here at build
-time** and carry this project's own meta-kernel amendment (`SPEC-FEEDBACK.md` #57), so they are the live
-copies rather than a snapshot.
+time**, and they carry real `?sha256=` digests over their own bytes where the published drafts spell the
+pin `xxhash` and pin at publication, so they are the live copies rather than a snapshot. Also in `spec/`:
+`tson-rev33-changelog.md`, the revision's own change log, which records a disposition for all 59
+`SPEC-FEEDBACK.md` entries raised against Revision 32 — the standing answer to "what happened to #N?".
 
 **The `*-resolved.tn` fixtures are checked, not decoration.** They carry the instruction in their own
 `@doc` — "Parse the source schema, run the resolver, canonicalise, compare" — and `ResolvedFixtureTest`
@@ -73,6 +75,12 @@ description, the interpretation this implementation chose and why, suggested res
 pick an interpretation — a resolved ambiguity is invisible again three sessions later unless written down.
 Several such findings are load-bearing and are cited by number (`SPEC-FEEDBACK.md` #N) throughout the
 `docs/` notes.
+
+**The register holds what is open, not everything raised.** An entry whose resolution lands in a spec
+revision is removed from `SPEC-FEEDBACK.md`, and that revision's change log in `spec/` keeps its number and
+its disposition. Numbers are permanent and never reused: a new finding takes the next number after the
+highest ever used, never a gap. Citations left pointing at a removed number are deliberate — the register's
+header says where they go — so don't rewrite them, and don't renumber to close a gap.
 
 ## Conventions
 

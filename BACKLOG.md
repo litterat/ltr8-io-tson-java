@@ -151,6 +151,21 @@ need are not retained for a secondary constructor.
 
 ## Synthetic entry identity
 
+- [ ] **Nothing marks a synthetic entry as synthetic.** Revision 33 adds `synthetic => @annotation void` to
+  meta-kernel and classifies it with `@alias` as a derived, name-position marker: resolver output puts
+  `@synthetic` on the schema-map *key* of every entry the resolver materialised, and ingest discards and
+  recomputes it ([TSON-SCHEMA] §6, §8.1, §8.2). This resolver materialises those entries and names them by a
+  content hash of the binding record, but attaches no marker, so a consumer of our output cannot tell a
+  synthetic entry from a declared one except by pattern-matching the name — which the spec makes
+  non-normative in the same breath. Two halves, and the second is why this has been invisible:
+- [ ] **Key-position annotations do not reach `TypeDefinition.annotations()` at all.** `@doc` before a
+  declared name, `@alias`, `@synthetic` — the whole name-position channel [TSON-SCHEMA] §6 calls "metadata
+  about the declaration" — is dropped on read and never written. `ResolvedFixtureTest` cannot catch it: the
+  Revision 33 fixtures carry `@synthetic` on nine keys and `@doc` on many more, and both sides of the
+  comparison render an empty `Annotations`, so the entries compare equal for the wrong reason. Fixing the
+  read side is what makes the marker testable; a test that reads a fixture key's `@synthetic` back should
+  land with it, or the emit side will pass on the same blind spot.
+
 - [ ] **Two entries for one type, where the argument is one number spelled two ways.** `vector<float32, 255>`
   and `vector<float32, 0xFF>` produce entries with byte-identical bodies, because identity derives from the
   argument's token text where §4 makes the two one number. Blocked on `SPEC-FEEDBACK.md` #54 rather than on
@@ -319,6 +334,15 @@ surface.
   `outcome`-discriminated shapes are.
 
 ## Documentation
+
+- [ ] **`tson-regex`'s divergences from RFC 9485 are undocumented, and the spec now requires them stated.**
+  [TSON-SCHEMA] §9 makes the `regex` atom's `spec` pin a strict gate and adds: an implementation "MUST
+  implement the pinned dialect as specified -- not a host library's near-relative -- and MUST document any
+  divergence it cannot avoid". `TsonRegex` is a native I-Regexp engine rather than a `java.util.regex`
+  wrapper, which is the hard half; what is missing is the statement -- which constructs are unenforced, that
+  `\p{...}` resolves through `Character.getType` and therefore against the JDK's Unicode version rather than
+  a pinned one, and where the disjointness decision is exact. A short section in the module's
+  `package-info.java` or a `docs/` note, linked from `regex`'s own documentation.
 
 - [ ] User-facing documentation on how to use the library — today only `CLAUDE.md`'s own dense,
   session-oriented internal narrative exists.
