@@ -159,42 +159,7 @@ class TsonSchemaLinkerTest {
         assertEquals(2, result.schema().entries().size(), "no synthetic entry created for a type-parameter application in source");
     }
 
-    /**
-     * §5.10: "an entry whose {@code parameters} list is empty MUST contain no parameter references anywhere:
-     * no {@code value_param} members". An {@link IllegalStateException} rather than a validation error
-     * because the spec calls it a rule on <em>resolver output</em> -- an author cannot write a {@code
-     * value_param}, so a violation is this library emitting a malformed entry. The open twin below is what
-     * makes the closed case a rule at all.
-     */
-    @Test
-    void rejectsAClosedEntryWhoseFieldStillRoutesAParameter() {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("integer", emptyRecord());
-        entries.put("closed", TypeDefinition.product(RecordBody.of(List.of(
-                new RecordField("min_items", TypeRef.of("integer"), FieldState.REQUIRED_FIXED,
-                        Optional.empty(), Optional.of("MIN"))))));
-
-        IllegalStateException ex = assertThrows(IllegalStateException.class,
-                () -> TsonSchemaLinker.link(schemaOf(entries), null));
-        assertTrue(ex.getMessage().contains("MIN"), ex.getMessage());
-        assertTrue(ex.getMessage().contains("closed entry"), ex.getMessage());
-    }
-
     /** The same body under a declared parameter is a template, which is exactly what may route one. */
-    @Test
-    void acceptsTheSameRoutedParameterOnAnOpenEntry() {
-        Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("integer", emptyRecord());
-        entries.put("open", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of("MIN"), true,
-                List.of(), List.of(), Optional.empty(), RecordBody.of(List.of(
-                        new RecordField("min_items", TypeRef.of("integer"), FieldState.REQUIRED_FIXED,
-                                Optional.empty(), Optional.of("MIN"))))));
-
-        TsonLinkedSchema result = TsonSchemaLinker.link(schemaOf(entries), null);
-
-        assertEquals(2, result.schema().entries().size());
-    }
-
     @Test
     void rejectsAFieldReferencingAnUndeclaredType() {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();

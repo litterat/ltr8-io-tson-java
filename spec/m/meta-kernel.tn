@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/33/m/meta-kernel.tn?sha256=43d9669ca9319c891bd1827953d0d3274ed03249a90d0c126289ed740990f3ac"
+!!id:"https://tson.io/2026/33/m/meta-kernel.tn?sha256=570f0616f3818f4b575450eac7db692d0a2b263d7c41547d492a093acc20bc03"
 !!meta:"https://tson.io/2026/33/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 33 draft).
@@ -42,8 +42,25 @@
     """
   data      => top & {}
 
+  @doc:"""
+    Aliasing body — the entry `target` names. `target` is a type_ref
+    rather than a bare name so that a partial application
+    ([TSON-SCHEMA] §5.10, `uuid_pair => <B> pair<uuid, B>`) can state
+    the arguments it already binds: an alias to an application has an
+    argument list, and a name-typed slot has nowhere to put one.
+
+    That is what lets every open entry be written as a constructor
+    application, `<params> !C core-value`, this one included — so
+    substitution is the same walk over a body at every shape and no
+    template needs its arguments recorded beside its body.
+
+    A use site is flattened past a REFERENCE entry ([TSON-SCHEMA] §8.3)
+    but this slot is not: the chain must stay walkable, and an alias
+    records where it points. The walk stops at an argument-bearing
+    target, which is an application rather than a further hop.
+    """
   reference => top & {
-    target: type_name
+    target: type_ref
   }
 
   @doc:"""
@@ -222,13 +239,13 @@
     form recorded in its `source`, the substituted binding record
     its body, headed by the applied constructor. A use site holds a
     bare reference to its entry, so `arguments` appears only where
-    an application is still open — inside template bodies and in
-    `source` provenance — and means "an application", nothing else.
-    Entry names are internal — implementation-chosen and
-    non-normative, since identity is structural ([TSON-SCHEMA]
-    §8.2). An entry with an empty `parameters` list contains no
-    parameter references and no instance_template body at any
-    depth ([TSON-SCHEMA] §5.10).
+    an application is still open — inside template bodies, in an
+    alias's `reference.target`, and in `source` provenance — and
+    means "an application", nothing else. Entry names are internal —
+    implementation-chosen and non-normative, since identity is
+    structural ([TSON-SCHEMA] §8.2). An entry with an empty
+    `parameters` list contains no parameter references at any depth
+    ([TSON-SCHEMA] §5.10).
     """
   type_ref => {
     name:       type_name
@@ -272,66 +289,33 @@
   synthetic     => @annotation void
 
   @doc:"""
-    Supporting records. record_field's value group: `value` carries
-    a concrete fixed or default value, read against the field's
-    declared type — for a type_ref-typed slot, a reference in the
-    bare positional form; compound references never reach this
-    channel, since source modifiers are scalar tokens and
-    substitution writes compound arguments only into binding
-    records. `value_param`, legal only in template bodies, routes
-    the field's value or default from a parameter (`= P` and `~ P`,
-    [TSON-SCHEMA] §5.7) — a value parameter on a scalar-typed
-    field, a type parameter on a type_ref-typed slot ([TSON-SCHEMA]
-    §5.10). The labelled split exists because the value channel
-    must distinguish a bound value from a pending parameter: on
-    scalar fields a bare token is always a literal, so the label is
-    also the only way a parameter is expressible there at all.
+    Supporting records. `value` carries a concrete fixed or default
+    value, read against the field's declared type — for a
+    type_ref-typed slot, a reference in the bare positional form.
+
+    Within a template body it also carries a parameter, and needs no
+    label to do so: a held body is not read against this vocabulary
+    until materialisation has substituted its parameters away, so a
+    token there is a parameter exactly when its text resolves into
+    the enclosing entry's `parameters` ([TSON-SCHEMA] §8.1's
+    shadowing rule). A closed entry has no parameters for one to
+    resolve into, so the same slot is unambiguous at both ends.
+
+    [TSON-SCHEMA] §5.7's fixation is what the single channel costs
+    and where it is paid: a parametric `= P` is REQUIRED with the
+    parameter in `value`, and becomes REQUIRED_FIXED when
+    substitution makes the value concrete.
     """
   record_field => {
     name:   field_name
     type:   type_ref
     state:  field_state ~ REQUIRED
-    ( value: value | value_param: param_name )?
+    value:  value?
   }
 
   tuple_element => {
     element_type: type_ref
     state:        element_state ~ REQUIRED
-  }
-
-  @doc:"""
-    One binding of an instance template — a labelled choice between a
-    parameter, a concrete literal and a concrete reference. `param`
-    marks the slot as unbound, and is canonical for every slot kind:
-    a type slot could carry a parameter through `type_ref`, since a
-    type_ref may name one, but then a single binding would have two
-    spellings and body identity would depend on the choice. `value`
-    holds concrete literals, `type_ref` concrete references. The group
-    is REQUIRED: exactly one member is present. Deliberately no
-    positional form — a bare token cannot self-classify.
-    """
-  template_argument => {
-    ( param: param_name | value: value | type_ref: type_ref )
-  }
-
-  @doc:"""
-    The open counterpart of a constructor application ([TSON-SCHEMA]
-    §5.10): the constructor an entry will build, and the bindings it
-    will build it from, while at least one binding is still a
-    parameter. An entry's body is an `instance_template` exactly when
-    the entry is open, so `parameters` non-empty and this body imply
-    each other. Materialisation is the transition and it is total:
-    once substitution leaves no `param`, the bindings are read against
-    the target's own vocabulary and the result is an ordinary body.
-
-    Composes with `top` directly and carries no `~`, as `reference`
-    does and for the same reasons: it never describes a value, so
-    `product`'s access_pattern/size_type would be filler, and no
-    schema writes `!instance_template` — the resolver produces it.
-    """
-  instance_template => top & {
-    target:    type_name
-    bindings:  {field_name => template_argument}
   }
 
   @doc:"""

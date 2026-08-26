@@ -129,28 +129,6 @@ refuses it. `SPEC-FEEDBACK.md` #5 is the proposal, written as the design that wo
   what keeps the common errors located where the author can act on them, so this is the residue rather than
   the bulk.
 
-- [ ] **Widen the kernel's `reference` from `target: type_name` to a `type_ref`.** A partial application
-  (`uuid_pair => <B> pair<uuid, B>`) is the one template that holds nothing — it keeps the `type_ref` with
-  arguments it already resolves to, because a `reference` body has nowhere to put an argument list. Widening
-  the slot would let it carry one, making **every** template body an application and restoring the
-  biconditional `TemplateBody`'s Javadoc currently has to weaken (a held body means a template, but not the
-  reverse).
-  - **It is the only case left, which is what makes it more than a modelling tidy.** An open entry's body is a
-    `HeldBody` or a `Reference` and nothing else, so closing this one collapses `TemplateMaterialiser.close`
-    from two branches to one. Still worth proposing on its own merits rather than folding into #5. Interacts with §8.3: the flattening walk would have to stop at an application, the way it already
-  stops at a materialised instantiation. Worth proposing on its own merits rather than folding into #5.
-
-- [ ] **meta-kernel drops `instance_template` and `template_argument` once a revision carries the design.**
-  Both are declared in `spec/m/meta-kernel.tn` and nothing produces them any more. `record_field`'s
-  `( value | value_param )?` group narrows to `value?` at the same time, nothing producing `value_param` any
-  more either. Not
-  done here on purpose — the bundled schemas are Revision 33's artifacts and stay byte-identical, so no
-  digest and no `*-resolved.tn` fixture moves for a divergence the spec has not adopted. When it lands:
-  three declarations out of the kernel, the `map_field_name_template_argument_xxhash` synthetic out of
-  `meta-kernel-resolved.tn`, and every pin re-stamped bottom-up.
-
-## Miscellaneous
-
 - [ ] **General resolver-layer structural rules as reusable primitives**, rather than binding-time-only
   behaviour — empty-brace resolution, the absent-vs-missing distinction. §2.8's "the empty container of that
   type" is still a rule each container reader applies for itself: the map reader's own zero-entry case was

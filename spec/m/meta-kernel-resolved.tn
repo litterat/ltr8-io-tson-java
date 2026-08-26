@@ -32,25 +32,30 @@
   - The container constructors carry no parameters: their type
     slots are plain REQUIRED `type_ref`-typed fields, filled by the
     construction (or by a sugar form's desugaring) like any other
-    required field. A `value_param` member on a REQUIRED field is a
-    user template's routing spelling only (a parametric `= P` fixes
-    nothing and promotes OPTIONAL to REQUIRED, `~ P` yields
-    REQUIRED_DEFAULT — Part 2 Section 5.7); a closed binding record
-    supplies the bound reference as the field's value.
+    required field. Within a template body `value` also carries a
+    parameter, unlabelled: a token there is a parameter exactly when
+    its text resolves into the enclosing entry's `parameters`
+    (Part 2 Section 8.1's shadowing rule), and a closed entry has
+    none for one to resolve into. A parametric `= P` fixes nothing
+    and stays REQUIRED until materialisation makes the value
+    concrete; `~ P` yields REQUIRED_DEFAULT (Part 2 Section 5.7).
   - `arguments` elements are type_argument records: `{ name: ... }`
     is a reference — including, in template bodies, parameter
     references of either kind, read against `parameters` — and
     `{ value: ... }` is a concrete literal.
-  - `supertypes`, `subtypes`, and `reference.target` are name-level
-    indexes; a declaration's structured provenance lives in
-    `source`, which records the applied form.
-  - Open record templates carry vocabulary-record bodies (`!record`,
-    with `value_param` members for parameter-routed values); open
-    instance-form templates carry `!instance_template` bodies; closed
-    definitions carry binding-record bodies headed by the applied
-    constructor. Instantiation entries are internally named
-    (implementation-chosen, non-normative); none appear here, as
-    nothing in this schema applies a non-constructor template.
+  - `supertypes` and `subtypes` are name-level indexes.
+    `reference.target` is a `type_ref`, so an alias to an
+    application states the arguments it binds; a declaration's
+    provenance lives in `source`, which records the applied form.
+  - Every open entry is written as the constructor application it
+    denotes, `<params> !C core-value` — a record template as
+    `!record`, a container as `!array`/`!map`/`!choice`, an alias as
+    `!reference` — and its body is held unread until materialisation
+    substitutes the parameters away. Closed definitions carry
+    binding-record bodies headed by the applied constructor.
+    Instantiation entries are internally named (implementation-
+    chosen, non-normative); none appear here, as nothing in this
+    schema applies a non-constructor template.
   - Synthetic entries — the closed forms the sugar lifts to — carry
     the derived `@synthetic` marker at their schema-map keys
     (Part 2 Sections 6, 8.2); on ingest the marker is discarded and
@@ -71,7 +76,7 @@
   @doc:"Base kinds. `top` is the structural root; every type in the schema IS-A `top`."
   top => !type_definition {
     kind: PRODUCT
-    subtypes: [array atom choice data enum instance_template integer_type map product record reference regex_type set sum text_type tuple unit uri_type]
+    subtypes: [array atom choice data enum integer_type map product record reference regex_type set sum text_type tuple unit uri_type]
     body: !record { fields: [] }
   }
 
@@ -117,7 +122,7 @@
     kind: PRODUCT
     supertypes: [top]
     body: !record { supertypes: [top]  fields: [
-      !record_field { name: target  type: @alias:type_name token }
+      !record_field { name: target  type: type_ref }
     ] }
   }
 
@@ -377,10 +382,8 @@
       !record_field { name: type         type: type_ref }
       !record_field { name: state        type: field_state  state: REQUIRED_DEFAULT  value: REQUIRED }
       !record_field { name: value        type: value  state: OPTIONAL }
-      !record_field { name: value_param  type: @alias:param_name token  state: OPTIONAL }
     ]
     groups: [
-      !field_group { members: [value value_param]  state: OPTIONAL }
     ] }
   }
 
@@ -389,44 +392,6 @@
     body: !record { fields: [
       !record_field { name: element_type  type: type_ref }
       !record_field { name: state         type: element_state  state: REQUIRED_DEFAULT  value: REQUIRED }
-    ] }
-  }
-
-  @doc:"""
-    One positional binding of an open constructor application — a
-    labelled choice between a parameter, a concrete literal and a
-    concrete reference. The group is REQUIRED: exactly one member is
-    present. Deliberately no positional form — a bare token cannot
-    self-classify.
-    """
-  template_argument => !type_definition {
-    kind: PRODUCT
-    body: !record { fields: [
-      !record_field { name: param     type: @alias:param_name token  state: OPTIONAL }
-      !record_field { name: value     type: value                    state: OPTIONAL }
-      !record_field { name: type_ref  type: type_ref                 state: OPTIONAL }
-    ]
-    groups: [
-      !field_group { members: [param value type_ref]  state: REQUIRED }
-    ] }
-  }
-
-  @doc:"""
-    The open counterpart of a constructor application (Part 2 Section
-    5.10): the constructor an entry will build, and the bindings it will
-    build it from, while at least one binding is still a parameter. An
-    entry's body is an instance_template exactly when the entry is open,
-    so `parameters` non-empty and this body imply each other. Composes
-    with top directly and carries no ~, as reference does: it never
-    describes a value, and no schema writes !instance_template — the
-    resolver produces it.
-    """
-  instance_template => !type_definition {
-    kind: PRODUCT
-    supertypes: [top]
-    body: !record { supertypes: [top]  fields: [
-      !record_field { name: target    type: @alias:type_name token }
-      !record_field { name: bindings  type: map_field_name_template_argument_xxhash }
     ] }
   }
 
@@ -617,11 +582,5 @@
     kind: PRODUCT
     source: array
     body: !array { element_type: tuple_element }
-  }
-
-  @synthetic map_field_name_template_argument_xxhash => !type_definition {
-    kind: PRODUCT
-    source: map
-    body: !map { key_type: @alias:field_name token  value_type: template_argument }
   }
 }

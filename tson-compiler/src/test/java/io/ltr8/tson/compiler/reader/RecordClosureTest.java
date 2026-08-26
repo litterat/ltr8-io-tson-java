@@ -143,14 +143,10 @@ class RecordClosureTest {
         entries.put("integer", atom(IntegerType.UNCONSTRAINED));
         entries.put("text", atom(TextType.UNCONSTRAINED));
         entries.put("text_type", TypeDefinition.product(RecordBody.of(List.of(
-                new RecordField("min_length", TypeRef.of("integer"), FieldState.OPTIONAL, Optional.empty(),
-                        Optional.empty()),
-                new RecordField("max_length", TypeRef.of("integer"), FieldState.OPTIONAL, Optional.empty(),
-                        Optional.empty()),
-                new RecordField("length", TypeRef.of("integer"), FieldState.OPTIONAL, Optional.empty(),
-                        Optional.empty()),
-                new RecordField("pattern", TypeRef.of("text"), FieldState.OPTIONAL, Optional.empty(),
-                        Optional.empty())))));
+                new RecordField("min_length", TypeRef.of("integer"), FieldState.OPTIONAL, Optional.empty()),
+                new RecordField("max_length", TypeRef.of("integer"), FieldState.OPTIONAL, Optional.empty()),
+                new RecordField("length", TypeRef.of("integer"), FieldState.OPTIONAL, Optional.empty()),
+                new RecordField("pattern", TypeRef.of("text"), FieldState.OPTIONAL, Optional.empty())))));
         TsonSchema schema = new TsonSchema("https://example.test/bind-closure.tn",
                 "https://example.test/meta.tn", List.of(), entries);
         DataBindContext context = SchemaMetaNameBinder.defaultContext();

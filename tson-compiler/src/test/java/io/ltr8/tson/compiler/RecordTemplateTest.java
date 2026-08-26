@@ -145,7 +145,7 @@ class RecordTemplateTest {
         String made = instantiationsOf(compiled, "box").get(0);
         assertEquals(made, fieldType(compiled, "holder", "b"));
         assertEquals(made, assertInstanceOf(io.ltr8.tson.schema.meta.Reference.class,
-                compiled.schema().entries().get("text_box").body()).target());
+                compiled.schema().entries().get("text_box").body()).target().name());
     }
 
     /** A value parameter binds the literal it was applied with, and the route is gone once bound (§5.10). */
@@ -157,7 +157,7 @@ class RecordTemplateTest {
 
         RecordField attempts = fieldOf(compiled, fieldType(compiled, "holder", "r"), "attempts");
         assertEquals("3", attempts.value().orElseThrow().text());
-        assertTrue(attempts.valueParam().isEmpty(), "the route is spent once the value is bound");
+        assertEquals(FieldState.REQUIRED_DEFAULT, attempts.state(), "a routed default stays a default");
     }
 
     /**
@@ -611,7 +611,7 @@ class RecordTemplateTest {
         String instantiation = fieldType(compiled, "holder", "r");
         assertTrue(instantiation.startsWith("rows_"), instantiation);
         String synthetic = assertInstanceOf(io.ltr8.tson.schema.meta.Reference.class,
-                compiled.schema().entries().get(instantiation).body()).target();
+                compiled.schema().entries().get(instantiation).body()).target().name();
         ArrayBody array = assertInstanceOf(ArrayBody.class,
                 compiled.schema().entries().get(synthetic).body());
         assertEquals(TypeRef.of("int32"), array.elementType());

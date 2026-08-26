@@ -57,7 +57,7 @@ class ValueParamFixedFieldTest {
     private static RecordField statusOf(TsonLinkedSchema linked, String entry) {
         var definition = linked.schema().entries().get(entry);
         if (definition.body() instanceof Reference alias) {
-            definition = linked.schema().entries().get(alias.target());
+            definition = linked.schema().entries().get(alias.target().name());
         }
         return ((RecordBody) definition.body()).fields().stream()
                 .filter(field -> field.name().equals("status")).findFirst().orElseThrow();
@@ -168,18 +168,17 @@ class ValueParamFixedFieldTest {
     }
 
     /**
-     * <b>{@code record_field.value_param} has no producer left in resolver output.</b> Every open body is
-     * held, and a held body writes a routed parameter into the ordinary {@code value} slot with §8.1's
-     * shadowing rule to tell it from a literal -- so the separate channel, which existed only because a body
-     * read as constructor vocabulary at its declaration cannot otherwise say which of the two a token is, is
-     * never filled. It stays in the model and in the kernel because {@code spec/m} is Revision 33's artifact
-     * and stays byte-identical; {@code BACKLOG.md} carries the removal.
+     * <b>The kernel declares one value channel, and a schema exercising every template shape resolves
+     * against it.</b> {@code record_field}'s labelled {@code ( value | value_param )?} group is gone: a
+     * routed parameter rides {@code value} like any other token, with §8.1's shadowing rule to tell it from a
+     * literal. The separate channel existed only because a body read as constructor vocabulary at its
+     * declaration cannot otherwise say which of the two a token is, and no body is read that way any more.
      *
-     * <p>Asserted over every entry, templates and their closures alike, rather than over one field: the point
-     * is the absence of a producer, and a single fixture would not show it.
+     * <p>The fixture covers all four shapes at once, because the assertion is about the vocabulary rather
+     * than about one field: if anything still needed a second channel, one of these would fail to resolve.
      */
     @Test
-    void noResolvedEntryCarriesAValueParam() {
+    void everyTemplateShapeResolvesAgainstTheSingleValueChannel() {
         String schema = """
                 !!id:"https://example.test/value-param.tn"
                 !!meta:"https://tson.io/2026/33/m/meta.tn"
@@ -200,11 +199,11 @@ class ValueParamFixedFieldTest {
         TsonSchemaSource source = uri -> schema;
         TsonLinkedSchema linked = Tson.builder().schemaSource(source).build().resolve(schema);
 
-        linked.schema().entries().forEach((name, definition) -> {
-            if (definition.body() instanceof RecordBody record) {
-                record.fields().forEach(field -> assertTrue(field.valueParam().isEmpty(),
-                        () -> name + '.' + field.name() + " still routes through value_param"));
-            }
-        });
+        // The kernel field is gone, so the compile-time proof is that this resolves at all; what is worth
+        // asserting beyond that is that each closure kept the value its argument supplied.
+        for (String entry : List.of("a", "b", "c")) {
+            assertEquals("201", statusOf(linked, entry).value().orElseThrow().text(), entry);
+        }
+        assertTrue(linked.schema().entries().containsKey("d"), "the sized shape resolved too");
     }
 }

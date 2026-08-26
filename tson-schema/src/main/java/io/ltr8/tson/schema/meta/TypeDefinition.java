@@ -104,13 +104,13 @@ public record TypeDefinition(Optional<TypeRef> source, TypeKind kind, List<Strin
      * {@code target} is the application that leaves them open. Applying it substitutes into {@code target}'s
      * own argument list and closes what results, so a reference template mints no entry of its own.
      *
-     * <p>The application is recorded in {@code source}; the {@link Reference} body takes its head alone,
-     * a reference body having no channel for arguments (see that type). {@code source} is where an applier
-     * reads the argument list back from.
+     * <p>The body carries the application whole, so an applier reads it from there. {@code source} records
+     * the same reference as provenance, which is what §8.2 keys identity on -- one fact in two components
+     * because they answer different questions, not because either is missing the other's.
      */
     public static TypeDefinition reference(TypeRef target, List<String> parameters) {
         return new TypeDefinition(Optional.of(target), TypeKind.REFERENCE, parameters, false, List.of(),
-                List.of(), Optional.empty(), new Reference(target.name()));
+                List.of(), Optional.empty(), new Reference(target));
     }
 
     /** A copy of this definition with {@code body} replaced -- every other component unchanged. */

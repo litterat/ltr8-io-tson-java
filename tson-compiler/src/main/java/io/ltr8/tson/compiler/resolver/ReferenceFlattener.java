@@ -122,7 +122,13 @@ final class ReferenceFlattener {
             if (minted.contains(current)) {
                 return current;
             }
-            current = reference.target();
+            // An argument-bearing target is an application, not a further hop -- it names a template plus the
+            // arguments this alias binds, and there is no entry at the end of it until materialisation mints
+            // one. Only a template's own body can hold one, and a template is never a use site.
+            if (!reference.target().arguments().isEmpty()) {
+                return current;
+            }
+            current = reference.target().name();
         }
         return current;
     }

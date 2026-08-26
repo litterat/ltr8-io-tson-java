@@ -796,29 +796,6 @@ final class SchemaDesugarer {
     }
 
     /**
-     * The same {@code !record { … }} held body, built from a body that is <b>already resolved</b> -- the form
-     * a composition or refinement template arrives in, since both absorb fields from a source and so cannot
-     * be rewritten before there is a namespace to absorb from.
-     *
-     * <p><b>It lives here, next to {@link #recordBinding}, because the spelling is what must not fork.</b>
-     * Two producers of the held wire form are fine; two <em>spellings</em> of it are not, and that is the
-     * whole lesson of the record case. So both go through {@link #refValue} and {@link #nameField} and write
-     * the same shape: an unquoted token where the writer would quote, a bare name where the writer would
-     * state {@code { name: X  arguments: [] }}, and nothing at all where the constructor's own default says
-     * it. {@code TsonObjectWriter} cannot serve: its output is canonical-explicit and fully quoted, which is
-     * a different language from the one a held body is written in -- {@code TemplateBody.names()} and
-     * substitution both key on a token being unquoted, so a quoted body references no parameters at all.
-     *
-     * <p><b>{@code annotationValue} is the one thing this cannot do itself.</b> A resolved annotation carries
-     * its value as a <em>bound object</em> ({@code Annotation.value} is {@code Optional<Object>}), and
-     * unbinding one is exactly what an object writer is for -- so the caller passes that single leaf in and
-     * everything structural stays here.
-     *
-     * <p><b>{@code value_param} does not survive the trip, deliberately.</b> A routed parameter is written
-     * into the ordinary {@code value} slot like every other token, which is what retires the channel for this
-     * shape; §5.7's fixation then happens at materialisation, where the value is concrete.
-     */
-    /**
      * The held body an <b>error placeholder</b> carries -- {@code !record { fields: [] }}, the zero-field
      * record both absorbing stand-ins already stood for, now held like every other open body.
      *
@@ -837,6 +814,25 @@ final class SchemaDesugarer {
                 new RecordValue.Field(FIELDS, scoped(new ArrayValue(List.of()))))));
     }
 
+    /**
+     * The same {@code !record { … }} held body, built from a body that is <b>already resolved</b> -- the form
+     * a composition or refinement template arrives in, since both absorb fields from a source and so cannot
+     * be rewritten before there is a namespace to absorb from.
+     *
+     * <p><b>It lives here, next to {@link #recordBinding}, because the spelling is what must not fork.</b>
+     * Two producers of the held wire form are fine; two <em>spellings</em> of it are not, and that is the
+     * whole lesson of the record case. So both go through {@link #refValue} and {@link #nameField} and write
+     * the same shape: an unquoted token where the writer would quote, a bare name where the writer would
+     * state {@code { name: X  arguments: [] }}, and nothing at all where the constructor's own default says
+     * it. {@code TsonObjectWriter} cannot serve: its output is canonical-explicit and fully quoted, which is
+     * a different language from the one a held body is written in -- {@code TemplateBody.names()} and
+     * substitution both key on a token being unquoted, so a quoted body references no parameters at all.
+     *
+     * <p><b>{@code annotationValue} is the one thing this cannot do itself.</b> A resolved annotation carries
+     * its value as a <em>bound object</em> ({@code Annotation.value} is {@code Optional<Object>}), and
+     * unbinding one is exactly what an object writer is for -- so the caller passes that single leaf in and
+     * everything structural stays here.
+     */
     static DataValue heldRecord(RecordBody body, Function<Object, DataValue> annotationValue) {
         List<ScopedValue> fields = new ArrayList<>();
         for (RecordField field : body.fields()) {
@@ -850,7 +846,6 @@ final class SchemaDesugarer {
             // is a bare name standing where the literal would.
             field.value().ifPresent(token -> members.add(new RecordValue.Field(VALUE,
                     scoped(new TokenValue(token.text(), tokenForm(token.form()))))));
-            field.valueParam().ifPresent(parameter -> members.add(nameField(VALUE, parameter)));
             fields.add(scoped(new RecordValue(members), annotations(field.annotations(), annotationValue)));
         }
         List<ScopedValue> groups = new ArrayList<>();

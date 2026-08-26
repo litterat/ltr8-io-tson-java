@@ -73,7 +73,7 @@ class ApplicationInContainerPositionTest {
     private static TypeDefinition formBehind(TsonCompiledSchema compiled, String record, String field) {
         TypeDefinition entry = compiled.schema().entries().get(fieldType(compiled, record, field));
         return entry.body() instanceof Reference reference
-                ? compiled.schema().entries().get(reference.target()) : entry;
+                ? compiled.schema().entries().get(reference.target().name()) : entry;
     }
 
     /** The entries this schema derived rather than the author declaring them -- synthetics and instantiations. */
@@ -425,7 +425,7 @@ class ApplicationInContainerPositionTest {
         ArrayBody outer = assertInstanceOf(ArrayBody.class, formBehind(compiled, "holder", "p").body());
         TypeDefinition inner = compiled.schema().entries().get(outer.elementType().name());
         ArrayBody vector = assertInstanceOf(ArrayBody.class, inner.body() instanceof Reference r
-                ? compiled.schema().entries().get(r.target()).body() : inner.body());
+                ? compiled.schema().entries().get(r.target().name()).body() : inner.body());
 
         assertEquals(Optional.of(BigInteger.valueOf(3)), vector.minItems());
         assertNotNull(compiled.get("holder")

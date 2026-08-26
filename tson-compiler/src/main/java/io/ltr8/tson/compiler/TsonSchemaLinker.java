@@ -31,6 +31,7 @@ import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.RegexType;
 import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.TimeType;
+import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TupleElement;
@@ -748,7 +749,6 @@ public final class TsonSchemaLinker {
                 for (RecordField field : r.fields()) {
                     validateTypeRef(field.type(), namespace, ownParameters,
                             "'" + entryName + "' field '" + field.name() + "'");
-                    checkClosedEntryIsParameterFree(entryName, field, ownParameters);
                 }
                 for (FieldGroup group : r.groups()) {
                     for (String member : group.members()) {
@@ -765,7 +765,7 @@ public final class TsonSchemaLinker {
             // not always the same name (a materialised instantiation sources the application and targets
             // the entry minted for it), which is why this checks the body's own target rather than trusting
             // that.
-            case Reference ref -> validateReferenceTarget(ref.target(), namespace, ownParameters,
+            case Reference ref -> validateTypeRef(ref.target(), namespace, ownParameters,
                     "'" + entryName + "'");
             case MapBody m -> {
                 validateTypeRef(m.keyType(), namespace, ownParameters, "'" + entryName + "' key_type");
@@ -930,10 +930,11 @@ public final class TsonSchemaLinker {
         String current = name;
         while (walked.add(current)) {
             TypeDefinition def = namespace.get(current);
-            if (def == null || !(def.body() instanceof Reference reference)) {
-                return current;
+            if (def == null || !(def.body() instanceof Reference reference)
+                    || !reference.target().arguments().isEmpty()) {
+                return current; // an argument-bearing target is an application, not a hop to another entry
             }
-            current = reference.target();
+            current = reference.target().name();
         }
         return current;
     }
@@ -947,15 +948,19 @@ public final class TsonSchemaLinker {
     }
 
     /**
-     * The converse of {@link #checkClosedEntryIsParameterFree}, and the other half of the same §5.10 rule:
-     * an <em>open</em> entry references every parameter it declares. {@code box => <T> { v: text }} declares
+     * §5.10's parameter-usage rule: an <em>open</em> entry references every parameter it declares. {@code box => <T> { v: text }} declares
      * {@code T} and never uses it, so no application of it could differ from any other -- the parameter is a
      * mistake, not a degenerate-but-legal template.
      *
-     * <p><b>A {@link TsonSchemaValidationException}, unlike its twin.</b> The closed-entry rule is an
-     * {@link IllegalStateException} because an author cannot write a {@code value_param}, so a violation
-     * means this library emitted a malformed entry. A parameter list is author-written, so an unused one is
-     * the author's error and reported as such.
+     * <p><b>A {@link TsonSchemaValidationException}.</b> A parameter list is author-written, so an unused one
+     * is the author's error rather than a library fault.
+     *
+     * <p>Its old converse -- §5.10's closed-entry rule, checked over {@code record_field.value_param} -- has
+     * no sound form now that a parameter and a literal share one slot: at a closed entry there are no
+     * parameters for a token to resolve into, so a token there <em>is</em> a literal (§8.1's shadowing rule)
+     * and there is nothing to detect. The rule's reference half is unaffected, and needs no code of its own:
+     * {@link #validateTypeRef} accepts a name only if the namespace holds it or {@code ownParameters} lists
+     * it, so at a closed entry a parameter reference is already an unresolved one.
      *
      * <p>Deciding this rather than admitting the degenerate form also settles a question the open
      * representation would otherwise have to answer: with an unreferenced parameter rejected, a template
@@ -983,7 +988,9 @@ public final class TsonSchemaLinker {
         switch (body) {
             case RecordBody record -> record.fields().forEach(field -> {
                 collectNames(field.type(), into);
-                field.valueParam().ifPresent(into::add);
+                // A routed parameter rides `value` like any other token, so it is named here too -- which is
+                // what keeps `<S> base ^ { status: = S }` from reading as a template that never uses S.
+                field.value().map(Token::text).ifPresent(into::add);
             });
             case ArrayBody array -> collectNames(array.elementType(), into);
             case MapBody map -> {
@@ -992,7 +999,7 @@ public final class TsonSchemaLinker {
             }
             case TupleBody tuple -> tuple.elements().forEach(e -> collectNames(e.elementType(), into));
             case ChoiceBody choice -> choice.variants().forEach(v -> collectNames(v, into));
-            case Reference reference -> into.add(reference.target()); // a name, so nothing to recurse into
+            case Reference reference -> collectNames(reference.target(), into);
             // The one question a held body answers without being resolved, and it answers it about tokens
             // rather than about references -- which is the same rule substitution follows when it decides
             // what to rewrite.
@@ -1007,48 +1014,6 @@ public final class TsonSchemaLinker {
             if (argument instanceof TypeArgument.Ref nested) {
                 collectNames(nested.ref(), into);
             }
-        }
-    }
-
-    /**
-     * §5.10's closed-entry rule -- "an entry whose {@code parameters} list is empty MUST contain no parameter
-     * references anywhere: no {@code value_param} members, and no reference {@code name} ... that resolves to
-     * a parameter, at any depth" -- for the {@code value_param} half. The reference half needs no code of its
-     * own: {@link #validateTypeRef} accepts a name only if the namespace holds it or {@code ownParameters}
-     * lists it, so at a closed entry, where that list is empty, a parameter reference is already an
-     * unresolved one. {@link RecordField} is the only type carrying a {@code value_param} at all, so one
-     * condition covers every position the rule names.
-     *
-     * <p><b>An {@link IllegalStateException}, not a {@link TsonSchemaValidationException}</b>, because the
-     * spec calls this "a well-formedness rule on resolver output": a schema author cannot write a
-     * {@code value_param} -- only the kernel's own templates carry one, and those are not in a user schema's
-     * type-name namespace -- so a violation is this library emitting a malformed entry, and the verdict
-     * would not change if the library improved. It becomes an author-facing check at the other place §5.10
-     * points, resolved-form ingest (§8.1), which does not exist yet. What it guards meanwhile is §5.10
-     * substitution: a materialisation that leaves a routed {@code value_param} behind on the closed entry it
-     * produces fails here, rather than downstream at a reader asked to fill a field nothing can fill.
-     */
-    private static void checkClosedEntryIsParameterFree(String entryName, RecordField field,
-                                                         List<String> ownParameters) {
-        if (ownParameters.isEmpty() && field.valueParam().isPresent()) {
-            throw new IllegalStateException("'" + entryName + "' declares no parameters, so it is a closed entry, "
-                    + "but its field '" + field.name() + "' routes the parameter '" + field.valueParam().get()
-                    + "' -- a closed entry contains no parameter references anywhere (§5.10)");
-        }
-    }
-
-    /** {@link #validateTypeRef}'s name half, for a slot the kernel types {@code type_name} rather than {@code type_ref}. */
-    private static void validateReferenceTarget(String target, Map<String, TypeDefinition> namespace,
-                                                 List<String> ownParameters, String context) {
-        TypeDefinition definition = namespace.get(target);
-        if (definition != null && definition.body() instanceof Data notAType) {
-            throw new TsonSchemaValidationException(context + " names '" + target + "', which is built "
-                    + "with '" + TsonCompiledMetaSchema.typenameOf(notAType) + "' and describes something "
-                    + "other than a data value -- it is declared by this schema but is not a type, so "
-                    + "nothing can be typed by it");
-        }
-        if (definition == null && !ownParameters.contains(target)) {
-            throw new TsonSchemaValidationException(context + " has an unresolved reference '" + target + "'");
         }
     }
 

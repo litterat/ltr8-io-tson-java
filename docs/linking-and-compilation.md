@@ -101,10 +101,13 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
     all**. That last is the one that mattered: naming a template without applying it (`use => { u: box }`)
     linked and compiled clean, then failed at *read* time with "no usable compiled reader" and a
     library-fault exit code, because the eager-rejection discipline guarded applications and never bare
-    names. *Parameter usage*, the converse of the closed-entry rule below: an open entry references every
-    parameter it declares, so `box => <T> { v: text }` is rejected — every application of it would denote
-    the same type. That one is a `TsonSchemaValidationException` where its twin is an
-    `IllegalStateException`, because a parameter list is author-written where a `value_param` is not.
+    names. *Parameter usage*: an open entry references every parameter it declares, so
+    `box => <T> { v: text }` is rejected — every application of it would denote the same type, and a
+    parameter list is author-written, so an unused one is a `TsonSchemaValidationException`.
+    - Its old converse — §5.10's closed-entry rule, checked over `record_field.value_param` — has no sound
+      form now the kernel declares one `value` slot: at a closed entry there are no parameters for a token to
+      resolve into, so a token there *is* a literal and there is nothing to detect. The rule's reference half
+      needs no code either — a parameter reference at a closed entry is already an unresolved one.
   - **A held body answers the arity rule for the *applications* it writes** (`checkHeldArity`). A held body
     withholds one thing — what a reference *resolves to*, which no argument settles until substitution — so
     type-kind validation and inhabitance wait for materialisation. Arity does not depend on that: it counts

@@ -1100,7 +1100,7 @@ final class DefinitionResolver {
             RecordField field = fields.get(i);
             if (field.name().equals(member)) {
                 fields.set(i, new RecordField(field.name(), field.type(), state, field.value(),
-                        field.valueParam(), field.annotations()));
+                        field.annotations()));
                 return;
             }
         }
@@ -1488,17 +1488,14 @@ final class DefinitionResolver {
                 ? field.type().get().optional()
                 : inherited.map(source -> isOptionalState(source.state())).orElse(false);
 
+        // A parameter and a literal share the `value` slot: §8.1's shadowing rule tells them apart, a token
+        // being a parameter exactly when its text resolves into the enclosing entry's own `parameters`.
+        // What still differs is the *state* -- §5.7 leaves a parametric `= P` at REQUIRED, nothing being
+        // fixed until the value is concrete -- and that is what FieldModifiers decides.
         FieldModifiers.Resolved resolved =
                 FieldModifiers.of(field.name(), optional, field.modifier(), parameters);
-        // A parameter keeps the separate `value_param` channel here, where a held body does not: this body
-        // is read as constructor vocabulary at its own declaration, so nothing downstream could tell a
-        // parameter standing in `value` from a literal spelled the same way (§5.10).
-        if (resolved.parametric()) {
-            return new RecordField(field.name(), type, resolved.state(), Optional.empty(),
-                    resolved.value().map(TokenValue::text));
-        }
         return new RecordField(field.name(), type, resolved.state(),
-                resolved.value().map(DefinitionResolver::toMetaToken), Optional.empty());
+                resolved.value().map(DefinitionResolver::toMetaToken));
     }
 
     /** §5.2's presence axis: the two states under which a conforming value may leave the field out. */
@@ -1650,7 +1647,7 @@ final class DefinitionResolver {
 
     private RecordField resolveGroupMember(GroupDef.Member member) {
         return new RecordField(member.name(), resolveTypeRef(member.typeRef()), FieldState.OPTIONAL,
-                Optional.empty(), Optional.empty());
+                Optional.empty());
     }
 
     /**
