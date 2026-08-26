@@ -130,6 +130,9 @@ final class SchemaDesugarer {
     /** §5.2's desugar target for a bare record body {@code { x: T }} -- the constructor it denotes. */
     private static final String RECORD = "record";
 
+    /** §5.10's desugar target for a partial application {@code <B> pair<text, B>} -- an alias body. */
+    private static final String REFERENCE = "reference";
+
     /** The vocabulary fields the desugar table binds -- fixed by the table, not looked up in a governing meta. */
     private static final String ELEMENT_TYPE = "element_type";
     private static final String KEY_TYPE = "key_type";
@@ -146,6 +149,7 @@ final class SchemaDesugarer {
     private static final String MEMBERS = "members";
     private static final String FIELD_NAME = "name";
     private static final String TYPE = "type";
+    private static final String TARGET = "target";
     private static final String SUPERTYPES = "supertypes";
 
     /** {@code type_ref}'s own two fields, for the record form a slot takes when it holds an application. */
@@ -396,7 +400,13 @@ final class SchemaDesugarer {
                     yield instance(binding.get(), reference.typeParams());
                 }
                 if (!reference.typeParams().isEmpty()) {
-                    yield reference;
+                    // §5.10's partial application, and the last open form that was not a constructor
+                    // application: `uuid_pair => <B> pair<text, B>` denotes `!reference { target:
+                    // pair<text, B> }`, so it is written that way here and closes by the same walk as
+                    // every other template. Spellable only because `reference.target` is a `type_ref`.
+                    yield instance(new Binding(REFERENCE, List.of(
+                            new RecordValue.Field(TARGET, scoped(refValue(reference.ref()))))),
+                            reference.typeParams());
                 }
                 TypeRef ref = argumentsOnly(reference.ref());
                 yield ref == reference.ref() ? reference : new ReferenceTypeDef(reference.typeParams(), ref);

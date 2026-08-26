@@ -567,10 +567,18 @@ final class DefinitionResolver {
      * <p>A positional payload (§5.6) carries no field names, so neither check applies to it; the reader
      * settles it at materialisation like any other positional form.
      */
+    private static final String REFERENCE = "reference";
+
     private TypeDefinition resolveInstanceTemplate(String name, Instance template) {
         String target = template.target();
         TypeDefinition constructor = resolveConstructorTarget(name, target);
-        if (!constructor.constructor()) {
+        // `reference` is the one head whose kind cannot come from its supertype chain and whose eligibility
+        // cannot come from a `~`: §4.1 gives an alias `kind: REFERENCE`, which is a type_kind and not a base
+        // kind, and the kernel deliberately leaves `reference` unmarked because it describes no value. Both
+        // facts are the kernel's own, so the head is dispatched here rather than judged by the generic rule.
+        // The binding check below still runs -- `reference`'s vocabulary is a record like any other.
+        boolean alias = REFERENCE.equals(target);
+        if (!alias && !constructor.constructor()) {
             throw new TsonSchemaValidationException("'" + name + "': '!" + target + "' does not resolve to a "
                     + "constructor (§3.3.1), so there is nothing for '<...> !" + target + " { ... }' to build");
         }
@@ -582,7 +590,8 @@ final class DefinitionResolver {
         if (template.value().coreValue() instanceof RecordValue bindings) {
             checkTemplateBindings(name, target, vocabulary, bindings);
         }
-        return new TypeDefinition(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of(target)), constructor.kind(),
+        return new TypeDefinition(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of(target)),
+                alias ? TypeKind.REFERENCE : constructor.kind(),
                 template.typeParams(), false, List.of(), List.of(), Optional.empty(),
                 new HeldBody(template.value()));
     }

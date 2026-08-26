@@ -293,6 +293,14 @@ rebuilt and called a cache.
     serves both, since a parameter in a slot is simply the token standing there. `instance(binding,
     typeParams)` builds either, and the phase needs no rule for how to quote a parameter — only for whether
     the declaration around it has one.
+- **A parameterised alias is normalised here as well** (§5.10's partial application). `uuid_pair => <B>
+  pair<text, B>` leaves this phase as `<B> !reference { target: pair<text, B> }` — §8.1's own reading of what
+  an alias body is, spellable because the kernel's `reference.target` is a `type_ref` rather than a bare name.
+  It was the last open form that was not a constructor application; with it, §12.1's
+  `[type-params] "!" type-name ws core-value` covers every template and one walk closes them all.
+  - Only a *parameterised* one. A closed alias (`text_box => box<text>`) resolves to a `REFERENCE` entry
+    directly, the way a closed record resolves to a `RecordBody`: nothing about it is deferred, so there is
+    nothing to hold.
 - **A record template is normalised here too, and for the same reason the sugar forms are** (`recordBinding`).
   §5.2 says a bare record body denotes `!record { fields: [ … ] }`, so `test => <T> { x: T }` leaves this
   phase as `test => <T> !record { fields: [ { name: x  type: T } ] }` — a held application like `<T> [T]`, and

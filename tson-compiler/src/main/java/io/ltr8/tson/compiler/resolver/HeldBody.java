@@ -40,14 +40,16 @@ import java.util.Set;
  * A parameterized <b>atom refinement</b> is not a form at all: §12.1 gives {@code atom-refinement} no
  * parameter list, a refinement of an atom instance having no parameter to take.
  *
- * <p><b>So {@code record_field.value_param} has no producer left in resolver output.</b> Every open body is
- * held, and a held body writes a routed parameter into the ordinary {@code value} slot; the channel stays in
- * the model and in the kernel only because {@code spec/m} is Revision 33's artifact and stays byte-identical.
- * {@code ValueParamFixedFieldTest.noResolvedEntryCarriesAValueParam} is the guard.
+ * <p><b>Which is why the kernel declares one {@code value} slot and no labelled group.</b> Every open body is
+ * held, so a routed parameter rides {@code value} like any other token and {@code record_field.value_param}
+ * had nothing left to disambiguate; it is gone, along with {@code instance_template} and
+ * {@code template_argument}, the vocabulary that quoted an open body slot by slot.
  *
- * <p><b>A reference template holds nothing.</b> {@code <B> pair<uuid, B>} keeps the {@code type_ref} with
- * arguments it already resolves to, a parameter in an argument riding the reference channel like any other
- * name -- so {@code TypeDefinition.parameters} being non-empty does not imply a held body, only the reverse.
+ * <p><b>An alias holds one too.</b> {@code <B> pair<uuid, B>} is the {@code !reference { target: pair<uuid,
+ * B> }} §8.1 says it denotes, which is spellable because {@code reference.target} is a {@code type_ref}. So
+ * {@code TypeDefinition.parameters} being non-empty and the body being held now imply each other, with no
+ * exception left -- which is what lets materialisation dispatch on the constructor head rather than on what
+ * shape the body happened to arrive in.
  *
  * <p><b>Held, so it needs no label for a parameter.</b> A parameter in a value slot is the one thing a typed
  * open vocabulary cannot spell without one -- a bare token there is always a literal, so a
