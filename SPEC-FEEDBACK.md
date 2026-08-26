@@ -375,6 +375,19 @@ explicitly, because it manufactures false errors on precisely the slots this who
 `<N> !integer ^ { min: N max: 3 }` is correct for every argument anyone will pass and fails the `min <= max`
 coherence check under a stand-in of 10. A deferred verdict is strictly better than a fabricated one.
 
+**What holding costs, stated plainly, because rule 3 understates it.** A held body has no slot types — that
+is what it is for — so every check keyed on which slot a thing sits in is unavailable until materialisation
+binds the body, and one of them does not survive the trip at all. §5.10's argument-kind rule ("a reference
+argument binds a type parameter, a literal binds a value parameter") is enforced today by
+`record_field.value_param`, whose presence says *this slot expects a value*; once the parameter stands in the
+ordinary `value` slot, a type name substituted there is a token like any other and `<V> { v: int32 = V }`
+applied to a type passes. The same absence has a second face: `type_ref` and `type_argument` both spell their
+first member `name`, so an uninterpreted walk cannot tell a referenced type's name from an argument's name
+channel. Neither is a reason against the design, but §5.10 should say which checks are declaration-time and
+which are materialisation-time under it, rather than leaving an implementation to discover that one of them
+is neither. If the kind rule is to be kept, the open form has to carry the slot's expectation somewhere —
+which is what `value_param` was, under another name.
+
 **One consequence of rule 1 worth stating in §12.1 rather than leaving to be discovered.** Folding
 `instance-template` back into `instance` makes the payload exactly Part 1's `core-value` for the open and
 closed forms alike, and a `core-value` cannot spell an application: `!array { element_type: box<text> }` does

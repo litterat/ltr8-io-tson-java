@@ -170,6 +170,34 @@ Steps are ordered so each lands with the suite green.
       refusal as its example of a spec-refused construct), and `TypeInhabitanceTest` — where an uninhabited
       template is now caught when it closes rather than where it is written, verified both ways.
 
+- [ ] **3. Records and compositions onto held bodies, retiring `value_param`.** Attempted and **parked**;
+  the working patch is in this session's scratchpad (`step3-wip.patch`). The shape is right and most of it
+  works — a structural template resolves as today and the resolved `RecordBody` is written back to wire form
+  and held, so composition flattens and refinement merges before holding, and the writer handles states,
+  groups, annotations and defaults with no shape remembered twice. `resolveRecordBody` puts a parametric
+  modifier's token in `value` rather than `value_param`, and §5.7's fixation (REQUIRED + a value present →
+  `REQUIRED_FIXED`) moves to where the substituted body is read back. A record template's closure stays the
+  instantiation entry itself rather than gaining a synthetic hop (§8.2). Three findings stopped it:
+    - **A held body has no slot types, and two checks depend on them.** This is the finding, and it is a
+      property of holding rather than a defect in the patch. §5.10's argument-kind rule — "a reference
+      argument binds a type parameter, a literal binds a value parameter" — was enforced by `value_param`
+      saying *this slot expects a value*; with the parameter standing in the ordinary `value` slot, a type
+      name substituted there is just a token and `box => <V> { v: int32 = V }` applied as `box<text>` passes
+      silently. The same absence has a second face: `type_ref` and `type_argument` both spell their first
+      member `name`, so a walk over an uninterpreted tree cannot tell a referenced type's name from an
+      argument's name channel, and the `name`→`value` move a literal argument needs fires in both. **Both are
+      accepted losses** — the argument check goes, and the member collision is logged as not implemented
+      rather than worked around.
+    - **`<N> { v: [text; N..] }` throws `NoSuchElementException`** on the lifted-synthetic path — an ordinary
+      bug in the parked patch, undiagnosed, and the one thing here that is not a design consequence.
+    - Two tests invert with it and are already written in the patch: the open template's parametric fixed
+      field is read off the held wire record rather than off a `RecordField`, and §5.10.1's regularity check
+      moves from `TemplateRegularity` at the declaration to the depth guard at materialisation.
+    - **`TemplateRegularity` becomes unreachable** once every template body is held, and wants either
+      deletion or an `applications()` on `TemplateBody` — the same shape as `names()`, returning the
+      applications the held tree holds — which would put §5.10.1 back at the declaration and give the
+      author a diagnostic naming their own template instead of a chain of synthetic names.
+
 - [ ] **5. Linker: templates leave the entry graph.** A held body is opaque to `TsonSchemaLinker`, so
   references inside a template body are no longer validated at link time, `TypeInhabitance` must not count an
   open entry as uninhabited (it has no body to walk), and §5.10.1's regularity rule effectively moves to
