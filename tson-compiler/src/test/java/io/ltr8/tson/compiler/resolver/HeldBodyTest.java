@@ -2,7 +2,7 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.compiler.ast.schema.ReferenceTypeDef;
 import io.ltr8.tson.compiler.ast.schema.SimpleRef;
-import io.ltr8.tson.schema.meta.OpenBody;
+import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
@@ -30,7 +30,7 @@ class HeldBodyTest {
     }
 
     /**
-     * The point of declaring {@link OpenBody} in {@code schema.meta} at all: {@code tson-compiler}'s own AST
+     * The point of declaring {@link TemplateBody} in {@code schema.meta} at all: {@code tson-compiler}'s own AST
      * can stand as a resolved body without {@code tson-schema} naming a {@code tson-compiler} type, so an
      * open entry needs no second body component and {@code TypeDefinition.body} stays REQUIRED.
      */
@@ -38,7 +38,7 @@ class HeldBodyTest {
     void aHeldDeclarationIsABodyTheValueModelCanCarry() {
         Top body = openEntry("text").body();
 
-        assertInstanceOf(OpenBody.class, body);
+        assertInstanceOf(TemplateBody.class, body);
         assertInstanceOf(HeldBody.class, body);
     }
 

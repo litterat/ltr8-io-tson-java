@@ -103,27 +103,28 @@ knot-tying, and every reader all stay as they are.
 
 Steps are ordered so each lands with the suite green.
 
-- [x] **1. Decide what is held, and get it across the module boundary.** Done. `schema.meta.OpenBody` is a
+- [x] **1. Decide what is held, and get it across the module boundary.** Done. `schema.meta.TemplateBody` is a
   `non-sealed Top` branch declaring the seat; `tson-compiler`'s `resolver.HeldBody` is its one implementation,
   wrapping the post-desugar `ast.schema.TypeDef`. That is the same arrangement `SourcePosition` has with
   `Position` — the depended-on module declares an interface its dependent satisfies — so `schema.meta` still
   names no compiler type. Three things settled along the way:
-    - **`TypeDef`, not head-plus-`CoreValue`.** Every declaration form can be a template — record, instance,
-      partial application, parameterized refinement — and all four are branches of that one hierarchy, so
-      holding it covers them uniformly instead of covering the instance case and forcing the rest into a
-      second representation. It also makes step 6 fall out: the declaration goes in and the declaration comes
-      back.
-    - **A wrapper, rather than `TypeDef` implementing `OpenBody` directly.** The AST models surface syntax
+    - **`TypeDef`, not `DataValue`.** `DefinitionResolver.resolveTypeDef` takes a `TypeDef` and routes every
+      declaration form, so materialisation re-enters resolution at the same door the declaration entered.
+      `DataValue` is data grammar and covers only the instance template; a record template's field modifiers,
+      a partial application's argument list, and a refinement's `^` have no data spelling, so holding one
+      would leave three of the four forms in a second representation. It also makes step 6 fall out: the
+      declaration goes in and the declaration comes back.
+    - **A wrapper, rather than `TypeDef` implementing `TemplateBody` directly.** The AST models surface syntax
       and `schema.meta` models resolved bodies; a node is a body only in that role, and saying so once keeps
       the grammar types out of the value model's root hierarchy.
     - **`Top` keeps `body` REQUIRED**, since the held body occupies the seat `InstanceTemplate` already held
       for the same "never describes a value" reason — no `Optional<Top>`, no second body component. `Top` now
-      has two non-sealed branches, and `OpenBody`'s Javadoc says why it is not an extension point the way
+      has two non-sealed branches, and `TemplateBody`'s Javadoc says why it is not an extension point the way
       `Data` is.
     - `HeldBodyTest` pins the part that is a decision rather than a mechanism: a held body **participates in
       `TypeDefinition.equals`**, the opposite of `position` beside it. Verified to fail with `body` dropped
       from the hand-written `equals`.
-    - `TsonSchemaLinker.validateBody` gained its `OpenBody` case early, because the exhaustive switch forced
+    - `TsonSchemaLinker.validateBody` gained its `TemplateBody` case early, because the exhaustive switch forced
       it. The case is empty and carries step 5's reasoning: a held body is opaque at link time, and what
       moves to materialisation moves with it.
 

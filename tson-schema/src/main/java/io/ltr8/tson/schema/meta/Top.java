@@ -19,8 +19,8 @@ package io.ltr8.tson.schema.meta;
  * own README "Under development" history for the bug this fixed).
  *
  * <p>Two branches describe something other than a constructed value, and both compose with {@code top}
- * directly for that reason: {@link Data}, the meta layer's extension point, and {@link OpenBody}, the held
+ * directly for that reason: {@link Data}, the meta layer's extension point, and {@link TemplateBody}, the held
  * body of an entry that declares type parameters.
  */
-public sealed interface Top permits Atom, Product, Sum, Reference, InstanceTemplate, Data, OpenBody {
+public sealed interface Top permits Atom, Product, Sum, Reference, InstanceTemplate, Data, TemplateBody {
 }

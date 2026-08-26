@@ -23,7 +23,7 @@ import io.ltr8.tson.schema.meta.Ipv4Type;
 import io.ltr8.tson.schema.meta.Ipv6Type;
 import io.ltr8.tson.schema.meta.MacType;
 import io.ltr8.tson.schema.meta.MapBody;
-import io.ltr8.tson.schema.meta.OpenBody;
+import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.RationalType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
@@ -763,7 +763,7 @@ public final class TsonSchemaLinker {
             // checking one by substituting stand-in arguments would report errors on templates that are
             // correct for every argument anyone passes (`<N> !integer ^ { min: N max: 3 }`).
             // The closed-entry rule is unaffected -- a closed entry is validated in full, above.
-            case OpenBody ignored -> {
+            case TemplateBody ignored -> {
             }
             case Unit ignored -> {
             }

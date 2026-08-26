@@ -1,9 +1,9 @@
 package io.ltr8.tson.schema.meta;
 
 /**
- * The body of an <b>open</b> entry -- one declaring type parameters -- held in the form it was written rather
- * than resolved into constructor vocabulary. An entry's {@link TypeDefinition#parameters} being non-empty and
- * its {@link TypeDefinition#body} being one of these imply each other.
+ * The body of a template -- an entry declaring type parameters, which §5.10 calls open -- held in the form it
+ * was written rather than resolved into constructor vocabulary. An entry's {@link TypeDefinition#parameters}
+ * being non-empty and its {@link TypeDefinition#body} being one of these imply each other.
  *
  * <p><b>Why the body is held rather than quoted.</b> A slot that holds names can hold a parameter for free,
  * because a parameter is a name -- {@link TypeRef#name} may be one, at any depth, so {@code [T]},
@@ -34,5 +34,5 @@ package io.ltr8.tson.schema.meta;
  * which is excluded so that two parses of one declaration compare equal, two templates with different bodies
  * are different templates.
  */
-public non-sealed interface OpenBody extends Top {
+public non-sealed interface TemplateBody extends Top {
 }
