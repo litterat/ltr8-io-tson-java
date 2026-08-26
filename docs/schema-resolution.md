@@ -269,11 +269,22 @@ recorded open form, and replacing the application with a reference to the entry 
     — it cannot close until `vip` itself materialises, and deferring composition that far is a different
     feature. Before this, refinement did not refuse: it copied the template's body with parameters unbound
     and reported an unresolved reference to a parameter the author never wrote.
-- **An open *instance* closes on a second path, and produces an ordinary body.** A template whose body is an
-  `instance_template` — what a sugar form over a parameter lifts to — is not substituted-and-kept like a
-  record template: once its bindings go concrete it is no longer a template at all, but the constructor body
-  those bindings always described. So it is bound through **that constructor's own compiled reader**, the
+- **An open *instance* closes on a second path, and produces an ordinary body.** A template whose body is
+  **held** — a `TemplateBody`, which a sugar form over a parameter lifts to — is not substituted-and-kept like
+  a record template: once its parameters go concrete it is no longer a template at all, but the constructor
+  body those bindings always described. So it is bound through **that constructor's own compiled reader**, the
   same one a written `!array { … }` binds through, and the entry carries an ordinary `ArrayBody`/`MapBody`.
+  - **Substitution is one rule, at every depth.** The body was never read against constructor vocabulary, so
+    a parameter in a slot, one inside an application a slot holds (`tree<p0>` becoming `tree<text>`), and one
+    inside a collection are the same thing here: a token in a tree, rewritten when its text resolves into the
+    entry's `parameters` (§8.1's shadowing rule). Quoting does not enter into it — a token's form is a
+    schemaless-data concern ([TSON-DATA] §4.4) — which is why a held body needs no `param`/`value` label
+    where a typed open vocabulary did, and why the collection boundary went with the vocabulary
+    (`SPEC-FEEDBACK.md` #5).
+  - **Applications inside it close before the entry is named**, which is what keeps one type on one entry:
+    the desugar phase lifts innermost-first, so a form it writes already names the entry its inner form
+    became, and a form closed here has to agree or `[[pixel; 3]; 3]` written out and `grid<pixel, 3>` closed
+    would be two entries for one type.
   - **That is where §8.2's deferred value-level check lands**, and it needs no code of its own:
     `<N> [text; N]` is a fine declaration, `<"two">` is where it stops being one, and the reader reports it
     (`'two' is not a valid integer`) exactly as it would for a written body. D7's split — binding names,

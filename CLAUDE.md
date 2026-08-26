@@ -273,10 +273,9 @@ unreachable for the common spelling.
 An AST→AST rewrite between parsing and resolution: every sugar form — `[T]` and the sized forms, `[T, U]`,
 `{K => V}`, `(A | B)` — becomes the `!C value` construction it denotes, at declaration position simply *being*
 one and anywhere else becoming an injected declaration plus a bare reference — **which is now the spec's own
-rule**, not a divergence: the structure-templates CR (`spec/tson-cr-structure-templates.md`, accepted as
-baseline) de-parameterises `array`/`set`/`map` (D3) so a container at a use site cannot be an application at
-all, and states one lift rule (D5: "every sugar form lifts at desugar: a concrete form to a closed synthetic
-entry"). The rule this settles on: **`TypeRef.arguments` non-empty means an open
+rule**, not a divergence: Revision 33 de-parameterises `array`/`set`/`map` (§4.2) so a container at a use site
+cannot be an application at all, and §5.3 states one lift rule — every sugar form lifts at desugar, a concrete
+form to a closed synthetic entry. The rule this settles on: **`TypeRef.arguments` non-empty means an open
 form — a template application — and everything closed is an entry referenced by a bare name.** So
 `DefinitionResolver` only ever sees a bare
 reference or `!C value`. **The phase is purely syntactic and consults no governing meta**: the sugar set is
@@ -675,22 +674,24 @@ compatibility).
   `DefinitionResolver`'s Javadoc is the exact current boundary and `BACKLOG.md` carries the detail. Only
   about half the `UnsupportedOperationException` sites in the pipeline are gaps at all; the rest are
   schema-author errors or internal faults wearing the wrong exception type, and the classification is done.
-- **A sugar form over a parameter whose slots are not all scalar, and a container position that is an
-  application.** §5.10 substitution itself works for both template shapes now: a **record** template
-  (parameters occupying field types and values) and an **open instance** — `<T> { v: [T] }`, or the explicit
-  `<T, N> !array { element_type: T  min_items: N }` — the latter lifting to an `instance_template` body and
-  closing through the target constructor's own reader (`TemplateMaterialiser`, `docs/schema-resolution.md`).
-  A container position holding an application works too, for the open case: the binding keeps the
-  `type_ref` whole, so `tree => <T> { value: T  children: [tree<T>; 1..] }` ties its knot through the lifted
-  synthetic. A *closed* container position takes one too (`[box<text>]`, nested arguments included): the
-  slot is written in `type_ref`'s record form and materialisation rewrites it to the instantiation entry one
-  pass later, which needed `type_argument` — an untagged labelled choice — to become readable
-  (`GroupUnionBindReader`). What remains is narrower: `tuple` and `choice` bind a *collection* and
-  `template_argument` has no collection case, so `<T> { v: (T | text) }` is refused at the declaration
-  (§5.10: collection-valued slots are not parameterizable); a *value* argument keeps its token, so
-  `[vector<float32, 3>]` closes to a
-  nested array with both bounds at 3 (`RawTokenParser`) — at the cost of identity being keyed on the
-  spelling, so `<255>` and `<0xFF>` are two applications (`SPEC-FEEDBACK.md` #4).
+- **A container position that is an application, and what a held open body still cannot say.** §5.10
+  substitution works for both template shapes: a **record** template (parameters occupying field types and
+  values) and an **open instance** — `<T> { v: [T] }`, or the explicit `<T, N> !array { element_type: T
+  min_items: N }`. An open instance's body is **held** rather than quoted — the application as written, unread
+  until materialisation substitutes its parameters away (`TemplateBody`/`HeldBody`, `docs/schema-resolution.md`)
+  — which is what removes Revision 33's collection boundary: `result => <T> ( T | error )`, `<T> [T, text]`
+  and `<T> { v: (T | text) }` all resolve, where §5.10 refuses them by rule (`SPEC-FEEDBACK.md` #5, a
+  deliberate divergence implemented as proof for the next revision). A container position holding an
+  application works too: the binding keeps the `type_ref` whole, so `tree => <T> { value: T  children:
+  [tree<T>; 1..] }` ties its knot through the lifted synthetic. A *closed* container position takes one as
+  well (`[box<text>]`, nested arguments included): the slot is written in `type_ref`'s record form and
+  materialisation rewrites it to the instantiation entry one pass later, which needed `type_argument` — an
+  untagged labelled choice — to become readable (`GroupUnionBindReader`). What remains is narrower: a *value*
+  argument keeps its token, so `[vector<float32, 3>]` closes to a nested array with both bounds at 3
+  (`RawTokenParser`) — at the cost of identity being keyed on the spelling, so `<255>` and `<0xFF>` are two
+  applications (`SPEC-FEEDBACK.md` #4). **Record and composition templates still resolve at their
+  declaration** and keep `record_field.value_param`; moving them onto held bodies is `BACKLOG.md`'s parked
+  step 3, and what parking it costs is written down there.
 - **Undocumented atom constructors** — `unknown` (and `extern`, which has no core.tn declaration) has no
   compiled-parser factory, so it compiles to `ErrorReader` (a schema merely *declaring* one still compiles).
   Neither is an ordinary missing parser waiting to be written: `extern` is a whole absent mechanism and `unknown`

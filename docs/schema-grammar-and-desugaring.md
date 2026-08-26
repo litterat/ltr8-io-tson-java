@@ -28,17 +28,24 @@ materialization, no validation (those are the resolver's/linker's jobs).
     error.
   - An unquoted non-numeric type-argument always parses as a type reference, never a value literal — a
     deliberate grammar-layer deferral, classified at a later semantic layer.
-- **A `!` head behind a parameter list is an `instance-template`, a production of its own** (§12.1) --
-  `vector => <T, N> !array { element_type: T  min_items: N }`. Not `[type-params] instance`: the surface
-  syntax is the same, but the two payloads resolve against different vocabulary, an `Instance` binding
-  through the *constructor's* own reader while this yields an `instance_template`. `Instance` stays
-  unparameterised, so nothing gains an optional parameter list that could be silently dropped, and
-  `parseTypeDef` reads the parameter list *before* dispatching on `!` — one token then decides.
-  - **The payload is narrower than a `core-value`**, mirroring `template_argument` one-for-one: a name, a
-    name with arguments, or a literal. A `core-value` would admit an array payload, a scalar payload and a
-    nested record in a binding, none of which the resolved form can carry — it has no collection case, so a
-    parameter inside a collection-typed slot has no resolved shape at all. `element_type: [T]` is therefore
-    a parse error, not a form that quietly reads `[T]` as a data array of one token.
+- **A `!` head behind a parameter list is the same production as one without** (§12.1's `instance =
+  [type-params] "!" type-name ws core-value`) -- `vector => <T, N> !array { element_type: T  min_items: N }`.
+  Revision 33 gave it a production of its own, `instance-template`, over a payload narrower than a
+  `core-value`; that is gone with the vocabulary that motivated it (`SPEC-FEEDBACK.md` #5). `Instance` carries
+  the parameter list, and `parseTypeDef` reads that list *before* dispatching on `!` -- one token then
+  decides.
+  - **The payload is a `core-value`, and nothing narrower.** An open entry's body is held rather than read
+    against its constructor's vocabulary until materialisation substitutes, so there is no per-slot quotation
+    to constrain it and a collection payload is as ordinary as a scalar one: `<T> !choice { variants:
+    [T error] }` parses and resolves, where the old `template-def` refused it because `template_argument` had
+    no collection case.
+  - **What it cannot spell is an application**, and neither can a closed instance: `!array { element_type:
+    box<text> }` is not a `core-value`, in either form. That line falls where the grammars already divide --
+    a *type* position is schema grammar and takes `box<text>` directly, while `!C value` takes data, so an
+    application inside one is written in `type_ref`'s record form, which is what the sugar expands to anyway.
+  - A parameterized **atom refinement** is still no form at all: §12.1 gives `atom-refinement` no parameter
+    list, a refinement of an atom instance having no parameter to take, and the parser says so where the
+    `^` is read.
   - The **resolved** form does not exist yet, so `DefinitionResolver` refuses one by name rather than
     dropping its parameters into an ordinary construction.
 - **Two entry points, one grammar.** `parseSchemaDocument()` is fail-fast; `parseSchemaDocument(receiver)`
@@ -115,10 +122,12 @@ asserts the two agree entry for entry.
 
 **The rule this settles on:** `TypeRef.arguments` non-empty means an **open** form — a template application,
 whose arguments are what materialisation substitutes. Everything closed is an entry, referenced by a bare
-name. Its counterpart at the body is `instance_template` present ⟺ open entry (D7), and together the two
-make the closed-entry rule checkable structurally, with no vocabulary needed to read a `type_ref`.
+name. Its counterpart at the body is a held body present ⟹ open entry, and together the two make the closed-entry
+rule checkable structurally, with no vocabulary needed to read a `type_ref`. One direction only: a partial
+application (`<B> pair<uuid, B>`) is a template that holds nothing, keeping the `type_ref` with arguments it
+already resolves to.
 
-`spec/tson-cr-structure-templates.md` D8 proposed the opposite — inline sugar riding as a structural
+The structure-templates change report proposed the opposite — inline sugar riding as a structural
 `type_ref` rather than as an injected entry, with the compiler building readers from those refs — and is
 **deliberately not implemented**. Four arguments were weighed for it and none holds:
 
@@ -242,7 +251,7 @@ rebuilt and called a cache.
     An *injected* declaration still has no position, correctly — it has no source text of its own.
 - **Which entry a form lifts to is D5's one rule, and the enclosing declaration's parameters do not enter
   it.** A form naming none of them lifts *closed*, template or not; a form naming one lifts *open* — an
-  `InstanceTemplate` over just the parameters it uses, with the position that held it applying them straight
+  `Instance` carrying just the parameters it uses, with the position that held it applying them straight
   back (`<T> { a: [T] }` injects `array_p0_… => <p0> !array { element_type: p0 }` and the field becomes
   `array_p0_…<T>`). So `<T> { a: [T]  b: [order] }` injects one of each, and only the first waits for
   materialisation.
@@ -251,7 +260,7 @@ rebuilt and called a cache.
     the name. The prefix grows (`p`, `pp`, …) until it collides with nothing the record already names: a
     binding may hold a concrete reference to a type genuinely called `p0`.
   - **A declaration's own sugar body is the open construction**, one tier up from the same rule:
-    `vector => <T> [T]` *is* the `InstanceTemplate`, and its parameters are the declaration's list as
+    `vector => <T> [T]` *is* the open construction, and its parameters are the declaration's list as
     written, not the subset the body names — a declared parameter the body never uses is an error the linker
     reports, and dropping it here would hide the very thing it looks for.
   - **A binding's channel follows §12.1's own `type-arg` rule**, not the slot: a quoted or number-shaped
@@ -273,13 +282,17 @@ rebuilt and called a cache.
       §5.10 calls a type argument's literal a bare token rather than the value it denotes — so the slot reads
       the token rather than decoding it (`RawTokenParser`). What that costs, identity keyed on the spelling
       so `<255>` and `<0xFF>` are two applications, is `SPEC-FEEDBACK.md` #4.
-  - **Two of the four sugar forms have no open representation at all.** `tuple` and `choice` bind a
-    collection (`elements`, `variants`), and a `template_argument` is `param | value | type_ref` with no
-    collection case — so `<T> { v: (T | text) }` is refused at the declaration that writes it, as **the
-    author's error**: §5.10 makes a parameter inside a collection-typed slot a resolver error at the
-    declaration, a deliberate boundary of this revision. It reported `NOT_IMPLEMENTED` until the spec
-    settled it, which exited 70 over a construct the spec refuses. Array and map bind only scalar slots and
-    are unaffected.
+  - **All four sugar forms lift open, collections included.** `tuple` and `choice` bind a collection
+    (`elements`, `variants`), which Revision 33 could not represent: `template_argument` is `param | value |
+    type_ref` with no collection case, so `<T> { v: (T | text) }` was refused at the declaration that wrote
+    it (§5.10, "a deliberate boundary of this revision"). A held body is not read against that vocabulary at
+    all until materialisation substitutes, so a parameter inside a collection is a token inside an array and
+    lifts like any other. `SPEC-FEEDBACK.md` #5 carries the argument; this is a deliberate divergence from
+    Revision 33, implemented as proof for the next.
+  - **The open form is the closed form**, which is what removed the per-slot analysis: one binding record
+    serves both, since a parameter in a slot is simply the token standing there. `instance(binding,
+    typeParams)` builds either, and the phase needs no rule for how to quote a parameter — only for whether
+    the declaration around it has one.
 - **Every entry it lifts is a *synthetic* entry, and is marked as one.** `SchemaDesugarer.lifted(original,
   desugared)` is the set difference between the two documents, and that set is exactly what §8.2's derived
   `@synthetic` marker goes on — attached at the schema-map key by the caller, not here, since this phase

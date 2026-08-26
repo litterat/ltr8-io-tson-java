@@ -209,12 +209,15 @@ for a defect in the schema, at a line the data's author does not control.
   never uses (§5.10). So an uninhabited *variant* is rejected even where the choice around it still works.
   Imported entries are skipped: they were judged when their own schema linked, and repeating the verdict
   would report one defect once per importer.
-- **A template is judged too, with its parameters assumed inhabited.** No document ever has a template as its
-  type, so this could have been left to its closures — but then a template nobody applies ships broken, which
-  is the failure `TemplateRegularity` prevents for the neighbouring rule. The assumption is sound in the
-  direction that matters: a body that cannot be satisfied even when every argument can has no application
-  that can be. An open container's guard is read off its `instance_template` bindings, and **a bound still
-  held by a parameter counts as possibly-empty** (`<N> [vec<N>; N]` could be applied with `0`).
+- **A template with a *resolved* body is judged too, with its parameters assumed inhabited** — a record or
+  composition template, which still resolves at its declaration. The assumption is sound in the direction
+  that matters: a body that cannot be satisfied even when every argument can has no application that can be.
+- **A template with a *held* body is not judged here, and its closure is judged instead.** Its element types
+  and bounds are tokens meaning nothing until an application supplies the arguments, so there is nothing to
+  read; the closure materialisation mints is an ordinary entry in this map by the time linking runs, and is
+  judged like any other. §8's own `tree` fixture is therefore caught the moment anything applies it, and a
+  template nobody applies is judged nowhere — the same answer §5.10's deferred checking gives everywhere
+  else. `TypeInhabitanceTest` pins both halves.
 - **An unresolved reference is inhabited by fiat.** `validateEntry` has already reported it against this very
   entry; calling it uninhabited too would report one defect twice, the second time in words naming a
   different problem. The check runs after that validation for exactly this reason.
@@ -296,10 +299,9 @@ keeps `TsonValue` free for `tson-tree`'s own root type (`BACKLOG.md`).
   finding data the schema does not admit. Reaching it is **always** a data error: a *schema* naming a
   template without applying it is rejected at link time (`checkArity`'s zero-argument case), so no field,
   element or supertype routes here — only a data type-ref naming the template, `!paged` against `paged =>
-  <T> { … }`, which `tson-cr-structure-templates.md` §4.6 makes an ordinary resolver error "without
-  exception". Refusing the whole entry is what makes the verdict right: built, a parameterised body either
+  <T> { … }`, which §5.10 makes an ordinary resolver error rather than anything exceptional. Refusing the whole entry is what makes the verdict right: built, a parameterised body either
   reached the parameter (`ErrorReader`, message blaming the linker for a stray `T`) or the lifted open
-  synthetic (no `instance_template` factory), both exiting 70 for a plainly invalid document. The message
+  synthetic (no factory for an open body), both exiting 70 for a plainly invalid document. The message
   mirrors the linker's schema-side sentence for the same mistake and adds the route — name the application
   in the schema, write that name in the data.
 - **`TsonCompiledSchema` is `sealed permits TsonCompiledMetaSchema`.** A meta-layer schema (its `!!meta` is

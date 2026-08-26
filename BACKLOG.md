@@ -45,10 +45,12 @@ own prose (which had gone stale on at least one of them):
   `subtypes`/`disjoint` recomputed and verified, the closed-entry parameter-free rule reverified, an
   instantiation entry checked against its own `source` by recomputation, a construction's binding
   record checked for parameter-slot agreement with its `source` application. Entirely unimplemented
-  — "ingest" doesn't appear anywhere in the codebase. Note `spec/tson-cr-structure-templates.md` §4.7
-  extends what ingest must reverify: the closed-entry rule gains "carries no `instance_template` body", the
-  invariant that makes open and closed entries tell apart by inspection, and synthetic entries must pass
-  under the existing integrity checks. Note it would introduce a *second* way to build a
+  — "ingest" doesn't appear anywhere in the codebase. §5.10 extends what ingest must reverify: the
+  closed-entry rule, which makes open and closed entries tell apart by inspection, and synthetic entries,
+  which must pass under the existing integrity checks. Note that an open entry has no ingest story here at
+  all — a held body never serialises as a `type_definition` (`SPEC-FEEDBACK.md` #5), so a resolved document
+  either carries only closed entries or carries open ones as declarations, and ingest would have to say
+  which. Note it would introduce a *second* way to build a
   `TsonSchema` — bound from a document rather than resolved from source — and the two would have to agree,
   including on where a declaration's annotations land (the name's on the map key, the definition's on the
   entry). Lower priority than the rest of this section: the spec marks this path explicitly **optional**
@@ -271,13 +273,16 @@ Steps are ordered so each lands with the suite green.
   must invert: `TsonValidateSchemaTest`, `TsonCliTest`, `ContainerSugarEndToEndTest`. Note honestly that the
   sibling conformance suite has no Part 2 layer, so there is nowhere to put a vector for any of this.
 
-- [ ] **10. Docs, in the same session as the change.** `docs/schema-grammar-and-desugaring.md` (the desugarer
-  stops being parameter-aware), `docs/schema-resolution.md` (held bodies, one substitution rule, the deferred
-  checking and where its diagnostics land), `docs/linking-and-compilation.md` (what the linker no longer
-  sees), and `CLAUDE.md`'s pipeline and "Not yet implemented" sections. Fold in the housekeeping while there:
-  `spec/tson-cr-structure-templates.md` is no longer in the repo, but `CLAUDE.md`, `BACKLOG.md` (the
-  resolved-form-ingest item above) and two `docs/` notes still cite it by path — re-point them at the
-  Revision 33 sections that executed it, or at the addendum that supersedes it.
+- [x] **10. Docs.** Done. `CLAUDE.md`'s desugar section, its "Not yet implemented" bullet on template
+  substitution, and the three `docs/` notes now describe held bodies rather than the quotation vocabulary:
+  `schema-grammar-and-desugaring.md` (one `instance` production for open and closed alike, all four sugar
+  forms lifting open, the open form *being* the closed form), `schema-resolution.md` (substitution as one
+  token-rewrite rule at every depth, and why applications close before an entry is named),
+  `linking-and-compilation.md` (a held body is not walked, and its closure is judged instead).
+    - The dangling `spec/tson-cr-structure-templates.md` citations are re-pointed at the Revision 33 sections
+      that executed the change report, in `CLAUDE.md`, both `BACKLOG.md` sites and both `docs/` notes.
+    - Two mentions of `template_argument` are kept deliberately, as history: they say what Revision 33 could
+      not represent and why, which is the argument `SPEC-FEEDBACK.md` #5 makes.
 
 ## Miscellaneous
 
@@ -287,6 +292,23 @@ Steps are ordered so each lands with the suite green.
   silently exempt from `min_items` until it was fixed one reader at a time, and nothing structural stops the
   next container from repeating it. What a primitive would buy is the rule stated once, where "how many
   entries does this value have" has one answer whatever spelled it.
+
+## Transparent wrappers in `tson-bind`
+
+- [ ] **A single-component wrapper should bind and write as the thing it wraps.** `HeldBody` is a holder for
+  a `DataValue` and nothing else, so a written template body reads `!template { application: !choice
+  { variants: [T error] } }` where `!choice { variants: [T error] }` is what it means — the wrapper names
+  itself in output it contributes nothing to. Rather than teach the writer about that one class, `tson-bind`
+  wants a general notion of a wrapper that is framing rather than shape.
+    - **Precedent for the shape, and a candidate mechanism.** `DataClassAnnotated` is already exactly this
+      and is already handled by hand: `TsonObjectWriter` unwraps it with the comment "the box is framing, not
+      a value shape". A general form would subsume that special case rather than adding a second one.
+      `DataClassBridge` may already be the mechanism — a bridge converts between a Java type and what is
+      bound, which is what transparency is — so the first question is whether this needs new vocabulary at
+      all or just a bridge on `HeldBody`.
+    - Worth settling before, not after, the question of whether an open body *is* a `!template` the kernel
+      declares (`SPEC-FEEDBACK.md` #5): if a wrapper can be transparent, the body writes as its
+      application and the question is moot for output, leaving only the model question.
 
 ## Binding strictness
 
