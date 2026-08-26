@@ -117,6 +117,22 @@ class TypeInhabitanceTest {
                   use  => tree<text>""");
     }
 
+    /**
+     * The chain names what the author wrote, at every link. A derived entry's name is content-derived and
+     * §8.2 makes it non-normative, so a chain reading {@code tree_text_a7f070f6 needs
+     * array_tree_text_a7f070f6_1_f3d1a035} would name two entries the author never wrote, about a recursion
+     * they did -- the same rule {@code EntryDisplayName} already applies on the read side, which is where
+     * this borrows its rendering from.
+     */
+    @Test
+    void theChainIsSpelledTheWayTheAuthorWroteIt() {
+        String message = rejection("""
+                  tree => <T> { value: T  children: [tree<T>; 1..] }
+                  use  => tree<text>""");
+
+        assertTrue(message.contains("use needs tree<text> needs [tree<text>; 1..] needs tree<text>"), message);
+    }
+
     /** The other half of the same rule: unapplied, it is not judged, and that is not a warning either. */
     @Test
     void aTemplateNobodyAppliesGetsNoVerdict() {

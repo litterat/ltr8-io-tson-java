@@ -10,6 +10,7 @@ import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.math.BigInteger;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -35,26 +36,43 @@ import java.util.stream.Collectors;
  * {@code paged&lt;order&gt;}. Anything with no sugar spelling falls back to the entry name -- honest rather
  * than invented, and unreachable in practice, since a form with no spelling is a form nobody wrote.
  */
-final class EntryDisplayName {
+public final class EntryDisplayName {
 
     private EntryDisplayName() {
     }
 
     /** {@code name} if the author wrote it, else the form that produced this entry. */
-    static String of(String name, TypeDefinition definition) {
+    public static String of(String name, TypeDefinition definition) {
+        return of(name, definition, Map.of());
+    }
+
+    /**
+     * The same, resolving the names <em>inside</em> a form through {@code namespace} as well, so a form built
+     * over another derived entry renders whole -- {@code [tree<text>; 1..]} rather than
+     * {@code [tree_text_a7f070f6; 1..]}. A caller with no namespace to hand gets the one-level rendering,
+     * which is what a reader already has and enough for the value it is reporting on.
+     */
+    public static String of(String name, TypeDefinition definition, Map<String, TypeDefinition> namespace) {
         if (definition.position().isPresent()) {
             return name;
         }
         return application(definition).orElseGet(() -> switch (definition.body()) {
-            case ArrayBody array -> "[" + array.elementType().name() + size(array.minItems(), array.maxItems()) + "]";
-            case MapBody map -> "{" + map.keyType().name() + " => " + map.valueType().name()
+            case ArrayBody array -> "[" + shown(array.elementType(), namespace)
+                    + size(array.minItems(), array.maxItems()) + "]";
+            case MapBody map -> "{" + shown(map.keyType(), namespace) + " => " + shown(map.valueType(), namespace)
                     + size(map.minItems(), map.maxItems()) + "}";
-            case TupleBody tuple -> tuple.elements().stream().map(TupleElement::elementType).map(TypeRef::name)
-                    .collect(Collectors.joining(", ", "[", "]"));
-            case ChoiceBody choice -> choice.variants().stream().map(TypeRef::name)
+            case TupleBody tuple -> tuple.elements().stream().map(TupleElement::elementType)
+                    .map(ref -> shown(ref, namespace)).collect(Collectors.joining(", ", "[", "]"));
+            case ChoiceBody choice -> choice.variants().stream().map(ref -> shown(ref, namespace))
                     .collect(Collectors.joining(" | ", "(", ")"));
             default -> name;
         });
+    }
+
+    /** One name inside a form, itself display-rendered when the namespace knows it and it is derived. */
+    private static String shown(TypeRef ref, Map<String, TypeDefinition> namespace) {
+        TypeDefinition referenced = namespace.get(ref.name());
+        return referenced == null ? ref.name() : of(ref.name(), referenced, namespace);
     }
 
     /**

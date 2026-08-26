@@ -1,6 +1,7 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.schema.*;
+import io.ltr8.tson.compiler.reader.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.BinaryType;
 import io.ltr8.tson.schema.meta.ChoiceBody;
@@ -304,7 +305,12 @@ public final class TsonSchemaLinker {
             if (inhabited.contains(name)) {
                 continue;
             }
-            List<String> chain = TypeInhabitance.cycleThrough(name, merged, inhabited);
+            // Rendered the way a read renders it: a derived entry is named by the form or application that
+            // produced it, never by the content-derived name §8.2 makes non-normative. A chain reading
+            // `tree_text_a7f070f6 needs array_tree_text_a7f070f6_1_f3d1a035` names two entries the author
+            // never wrote, about a recursion they did.
+            List<String> chain = TypeInhabitance.cycleThrough(name, merged, inhabited).stream()
+                    .map(entry -> EntryDisplayName.of(entry, merged.get(entry), merged)).toList();
             report(receiver, schema, name, merged.get(name), "'" + name + "' can never be satisfied by any "
                     + "document: " + String.join(" needs ", chain)
                     + ", and nothing in that chain can be left out or left empty (§3.4.1). A recursion "

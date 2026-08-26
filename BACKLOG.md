@@ -198,11 +198,23 @@ Steps are ordered so each lands with the suite green.
       applications the held tree holds — which would put §5.10.1 back at the declaration and give the
       author a diagnostic naming their own template instead of a chain of synthetic names.
 
-- [ ] **5. Linker: templates leave the entry graph.** A held body is opaque to `TsonSchemaLinker`, so
-  references inside a template body are no longer validated at link time, `TypeInhabitance` must not count an
-  open entry as uninhabited (it has no body to walk), and §5.10.1's regularity rule effectively moves to
-  materialisation, where the depth guard already lives. Nothing here breaks silently — but each is a rule
-  moving phase, so each wants a test that pins where the error now comes from.
+- [x] **5. The linker stops walking into a held body — but keeps the entry.** Done, mostly as fallout from
+  step 2. A template entry is retained through linking and compilation exactly as before; what changed is
+  that `TsonSchemaLinker.validateBody` and `TypeInhabitance` no longer walk *inside* a held one, its
+  references being tokens that mean nothing until substitution supplies the arguments. §5.10's
+  unreferenced-parameter rule survives through `TemplateBody.names()`; §5.10.1's regularity check still runs
+  at the declaration for record templates (which still resolve) and would move to the depth guard only when
+  step 3 lands. Each is pinned by a test naming where the error now comes from.
+    - **The real content turned out to be the diagnostics.** An audit of the schema- and data-side messages
+      found one leak: the inhabitance chain named derived entries by their content-derived names — `use needs
+      tree_text_a7f070f6 needs array_tree_text_a7f070f6_1_f3d1a035` — about a recursion the author wrote as
+      `tree<text>` and `[tree<T>; 1..]`. §8.2 makes those names non-normative, so the message named two
+      entries nobody wrote. It now reads `use needs tree<text> needs [tree<text>; 1..] needs tree<text>`.
+    - `EntryDisplayName` is the fix and was already the rule on the read side; it becomes `public` within its
+      unexported package so the linker can share it, and gains a namespace-aware overload so a form built over
+      another derived entry renders whole rather than one level deep. Everything else surveyed was already
+      clean — the regularity message, the substitution-failure message, and the read-side size and atom
+      messages all name what the author wrote.
 
 - [ ] **6. Write side: an open entry emits as its declaration.** Resolved output for an open entry is the
   declaration round-tripped (`test => <T> !array { element_type: T }`), not a `type_definition` instance —
