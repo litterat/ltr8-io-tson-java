@@ -411,8 +411,12 @@ final class DefinitionResolver {
             boolean constructor = structural.constructor();
             if (structural.body() instanceof RecordDef recordDef) {
                 RecordBody body = resolveRecordBody(recordDef.entries(), parameters);
-                return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, parameters, constructor,
-                        List.of(), List.of(), Optional.empty(), body);
+                // Only an error placeholder is both parameterised and still a bare RecordDef here -- the
+                // desugar phase rewrote every real record template into the `!record { ... }` §5.2 says it
+                // denotes. Holding it anyway is what leaves no parameterised RecordBody anywhere, so
+                // materialisation needs only the one substitution path. See SchemaDesugarer.heldEmptyRecord.
+                return holdIfOpen(name, new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, parameters,
+                        constructor, List.of(), List.of(), Optional.empty(), body));
             }
             if (structural.body() instanceof ConstructionDef construction) {
                 return holdIfOpen(name, resolveComposition(name, construction, constructor, parameters));
@@ -473,6 +477,9 @@ final class DefinitionResolver {
     private TypeDefinition holdIfOpen(String name, TypeDefinition resolved) {
         if (resolved.parameters().isEmpty() || !(resolved.body() instanceof RecordBody record)) {
             return resolved;
+        }
+        if (record.fields().isEmpty() && record.groups().isEmpty() && record.supertypes().isEmpty()) {
+            return resolved.withBody(new HeldBody(SchemaDesugarer.heldEmptyRecord()));
         }
         return resolved.withBody(new HeldBody(SchemaDesugarer.heldRecord(record,
                 value -> annotationWireValue(name, value))));

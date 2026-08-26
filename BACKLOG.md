@@ -168,7 +168,12 @@ refuses it. `SPEC-FEEDBACK.md` #5 is the proposal, written as the design that wo
   arguments it already resolves to, because a `reference` body has nowhere to put an argument list. Widening
   the slot would let it carry one, making **every** template body an application and restoring the
   biconditional `TemplateBody`'s Javadoc currently has to weaken (a held body means a template, but not the
-  reverse). Interacts with §8.3: the flattening walk would have to stop at an application, the way it already
+  reverse).
+  - **Its value went up once every other shape started holding.** An open entry's body is now a `HeldBody` or
+    a `Reference` and nothing else, so this is the *only* remaining case — closing it collapses
+    `TemplateMaterialiser.close` from two branches to one, the way holding the error placeholder already
+    collapsed it from three to two and deleted `substitute`/`mapFields`/`bindValue` with it. Still worth
+    proposing on its own merits rather than folding into #5, but it is no longer only a modelling tidy. Interacts with §8.3: the flattening walk would have to stop at an application, the way it already
   stops at a materialised instantiation. Worth proposing on its own merits rather than folding into #5.
 
 - [ ] **meta-kernel drops `instance_template` and `template_argument` once a revision carries the design.**

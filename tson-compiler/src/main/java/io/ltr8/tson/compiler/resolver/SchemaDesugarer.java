@@ -173,6 +173,12 @@ final class SchemaDesugarer {
      *
      * <p>It is deliberately never in {@code TsonSchemaParser.declarationPositions()} -- the position belongs
      * to the diagnostic already reported against the real declaration, not to this stand-in.
+     *
+     * <p><b>Keeping those parameters used to make it the last parameterised {@code RecordBody} in the
+     * system</b>, and so kept a whole second substitution path alive in {@code TemplateMaterialiser} to
+     * serve a body with no fields to substitute into. It is held like every other open body now
+     * ({@link #heldEmptyRecord}, applied by {@code DefinitionResolver.holdIfOpen} where this resolves), which
+     * is what lets that path delete.
      */
     private static TypeDef absorbed(SchemaMap.Declaration declaration) {
         return new StructuralTypeDef(typeParams(declaration.typeDef()), false, new RecordDef(List.of()));
@@ -812,6 +818,25 @@ final class SchemaDesugarer {
      * into the ordinary {@code value} slot like every other token, which is what retires the channel for this
      * shape; §5.7's fixation then happens at materialisation, where the value is concrete.
      */
+    /**
+     * The held body an <b>error placeholder</b> carries -- {@code !record { fields: [] }}, the zero-field
+     * record both absorbing stand-ins already stood for, now held like every other open body.
+     *
+     * <p><b>It exists so that "an open entry's body is held or a {@code Reference}" has no exceptions.</b>
+     * A placeholder keeps its declaration's type parameters on purpose (answering "how many?" with zero
+     * sends a downstream {@code bl<text>} to fix the wrong declaration), which used to make it the last
+     * producer of a parameterised {@code RecordBody} -- and so kept a whole second substitution path alive
+     * to serve a body that has no fields to substitute into.
+     *
+     * <p>Built structurally rather than through {@link #heldRecord}: a placeholder is what a <em>reported</em>
+     * declaration leaves behind, so the one thing it must not do is fail again, and an empty record needs
+     * neither a namespace nor a writer to state.
+     */
+    static DataValue heldEmptyRecord() {
+        return new DataValue(List.of(), Optional.of(RECORD), new RecordValue(List.of(
+                new RecordValue.Field(FIELDS, scoped(new ArrayValue(List.of()))))));
+    }
+
     static DataValue heldRecord(RecordBody body, Function<Object, DataValue> annotationValue) {
         List<ScopedValue> fields = new ArrayList<>();
         for (RecordField field : body.fields()) {

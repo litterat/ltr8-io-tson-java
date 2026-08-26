@@ -437,8 +437,12 @@ public final class SchemaResolver {
     }
 
     private static TypeDefinition unresolved(Optional<SourcePosition> position, List<String> parameters) {
+        // An open placeholder holds its body like every other open entry, so nothing downstream has to keep
+        // a second substitution path for the one shape that did not -- see SchemaDesugarer.heldEmptyRecord.
+        Top body = parameters.isEmpty() ? RecordBody.of(List.of())
+                : new HeldBody(SchemaDesugarer.heldEmptyRecord());
         return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, parameters, false, List.of(), List.of(),
-                Optional.empty(), RecordBody.of(List.of()), position, Annotations.empty());
+                Optional.empty(), body, position, Annotations.empty());
     }
 
     /** One already-resolved {@code DataValue} replayed through a compiled reader. */

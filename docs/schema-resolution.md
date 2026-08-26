@@ -292,6 +292,13 @@ recorded open form, and replacing the application with a reference to the entry 
     to a **synthetic** named for the form, which the instantiation then references — a form has no
     author-written name for identity to key on. That is the whole of the divergence; everything before it is
     shared.
+  - **There is no third case, and that is what deletes the old machinery.** Every open entry's body is a
+    `HeldBody` or a `Reference` — an *error placeholder* included, which holds an empty record rather than
+    staying the one parameterised `RecordBody` left in the system (`SchemaDesugarer.heldEmptyRecord`). While
+    that one shape survived, `TemplateMaterialiser` had to keep a general substitution over *resolved* bodies
+    beside the held one — `substitute`/`mapFields`/`bindValue`, ~75 lines — to serve a placeholder with no
+    fields to substitute into. Holding it makes `close` total on two branches and the third an
+    `IllegalStateException` naming the invariant.
   - **§5.7's fixation happens here** (`fixRoutedValues`), which is what a held record body's retirement of
     `value_param` costs and where §5.7 says to pay it: a field routed by `= P` is held as `state: REQUIRED`
     with the parameter standing in `value`, and a REQUIRED field carrying a value is that and nothing else —

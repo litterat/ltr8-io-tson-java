@@ -60,6 +60,12 @@ import java.util.function.UnaryOperator;
  * open, so applying it composes the two argument lists and closes the result, minting no entry of its own
  * (§5.10: "no intermediate entry per alias hop").
  *
+ * <p><b>And there is no third case</b>, which is what makes {@link #close} total on two branches instead of
+ * carrying a general substitution over resolved bodies beside them. Every open entry's body is a {@link
+ * HeldBody} or a {@code Reference} -- an error placeholder included, which holds an empty record rather than
+ * staying the one parameterised {@code RecordBody} left in the system ({@code
+ * SchemaDesugarer.heldEmptyRecord}). Anything else reaching {@link #close} is a broken invariant.
+ *
  * <p><b>Identity (§8.2).</b> An instantiation entry is keyed on the flattened application recorded in
  * {@code source}, so two {@code box<text>} anywhere in the schema land on one entry. The derived name is
  * built by {@link #internalName} from the application itself, which is what makes that dedup fall out of
@@ -348,10 +354,14 @@ final class TemplateMaterialiser {
                 aliasClosing.add(name);
                 return close(bindRef(application, bind(parameters, arguments))).name();
             }
-            TypeDefinition instantiation = substitute(template, head, parameters, arguments);
-            materialised.put(name, instantiation);
-            publish.accept(name, instantiation);
-            return name;
+            // Every open entry's body is one of the two above. A record, composition or refinement template
+            // holds its body; a sugar form's lift holds its body; a partial application is a Reference. An
+            // error placeholder holds an empty record rather than staying a bare RecordBody, which is what
+            // makes this total (SchemaDesugarer.heldEmptyRecord). So this is a broken invariant, not an
+            // author error and not a gap.
+            throw new IllegalStateException("'" + head + "' declares type parameters but its body is a "
+                    + template.body().getClass().getSimpleName() + " -- an open entry's body is held or is a "
+                    + "reference, and nothing else can be substituted into");
         } finally {
             closing.remove(name);
             aliasClosing.remove(name);
@@ -363,23 +373,6 @@ final class TemplateMaterialiser {
     private String chain() {
         List<String> shown = closing.stream().limit(4).toList();
         return String.join(" -> ", shown) + (closing.size() > shown.size() ? " -> ..." : "");
-    }
-
-    /**
-     * The template's open form with each parameter replaced by its argument, recorded as an instantiation
-     * entry: {@code parameters} empty, {@code source} the flattened application §8.2 compares by, and the
-     * body rewritten so any application it contained is closed too.
-     */
-    private TypeDefinition substitute(TypeDefinition template, String head, List<String> parameters,
-            List<TypeArgument> arguments) {
-        Map<String, TypeArgument> bindings = bind(parameters, arguments);
-        TypeDefinition bound = mapFields(mapRefs(template, ref -> bindRef(ref, bindings)),
-                field -> bindValue(field, head, bindings));
-        // Only the *body* is closed. `source` records the application as written -- it is the key §8.2
-        // compares by, so closing it would replace `box<text>` with the very entry it identifies.
-        return new TypeDefinition(Optional.of(new TypeRef(head, arguments)), bound.kind(), List.of(),
-                bound.constructor(), bound.supertypes(), bound.subtypes(), bound.disjoint(),
-                mapBodyRefs(bound.body(), this::close), Optional.empty(), bound.annotations());
     }
 
     /** Each parameter of the applied signature against the argument applied for it, in order. */
@@ -709,46 +702,6 @@ final class TemplateMaterialiser {
                 : new TypeArgument.Ref(bindRef(nested.ref(), bindings));
     }
 
-    /**
-     * A record field whose {@code value_param} named a parameter, with the bound literal filled in, the
-     * route dropped, and the state taken to where §5.7 says a concrete value takes it.
-     *
-     * <p><b>This is where a routed {@code =} becomes fixed</b>, and it is the only place it can be. §5.7
-     * puts a parametric {@code = P} in {@code REQUIRED} at the declaration -- "nothing is fixed at
-     * declaration, the value does not exist yet" -- and defers the rest to one sentence: "fixation happens
-     * downstream, where values are concrete". Here is downstream. Without the promotion the closed entry
-     * carries the right value on a field that does not enforce it, so {@code response<order, 201>} accepts
-     * a status of 999 where the literal {@code status: int32 = 201} refuses it -- a constraint the author
-     * wrote, silently absent from the type it governs.
-     *
-     * <p><b>The two parametric spellings are told apart by the state they arrived in</b>, which is what
-     * makes this recoverable at all: §5.7 sends {@code = P} to {@code REQUIRED} and {@code ~ P} to {@code
-     * REQUIRED_DEFAULT}, so a bound {@code REQUIRED} field is a routed {@code =} and nothing else -- an
-     * unrouted field never reaches here, {@code value_param} being what selects it. A default stays a
-     * default: data may still override it.
-     *
-     * <p>§5.7 names this downstream outright: "fixation happens at materialisation, where values are
-     * concrete" -- a field whose {@code value_param} binds to a concrete argument takes the state its
-     * literal spelling would have.
-     */
-    private static RecordField bindValue(RecordField field, String head, Map<String, TypeArgument> bindings) {
-        if (field.valueParam().isEmpty()) {
-            return field;
-        }
-        String parameter = field.valueParam().get();
-        TypeArgument bound = bindings.get(parameter);
-        if (bound == null) {
-            return field; // a parameter of an enclosing template, still open -- left for its own closing
-        }
-        if (!(bound instanceof TypeArgument.Value value)) {
-            throw new TsonSchemaValidationException("'" + head + "' routes '" + parameter + "' into field '"
-                    + field.name() + "' as a value, but a type was applied for it (§5.10)");
-        }
-        FieldState state = field.state() == FieldState.REQUIRED ? FieldState.REQUIRED_FIXED : field.state();
-        return new RecordField(field.name(), field.type(), state, Optional.of(value.value()),
-                Optional.empty(), field.annotations());
-    }
-
     // ── Structural walks ─────────────────────────────────────────────────────────────────────────
 
     /** Every {@link TypeRef} a definition holds, mapped -- {@code source}, and whatever its body carries. */
@@ -808,18 +761,6 @@ final class TemplateMaterialiser {
             // substitution supplies the arguments.
             default -> body; // an atom body holds no type references
         };
-    }
-
-    /** Every {@link RecordField} a definition holds, mapped -- only a record body has any. */
-    private static TypeDefinition mapFields(TypeDefinition definition, UnaryOperator<RecordField> map) {
-        if (!(definition.body() instanceof RecordBody record)) {
-            return definition;
-        }
-        RecordBody mapped = new RecordBody(record.supertypes(), record.fields().stream().map(map).toList(),
-                record.groups());
-        return new TypeDefinition(definition.source(), definition.kind(), definition.parameters(),
-                definition.constructor(), definition.supertypes(), definition.subtypes(),
-                definition.disjoint(), mapped, definition.position(), definition.annotations());
     }
 
     /**
