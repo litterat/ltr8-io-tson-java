@@ -58,9 +58,14 @@ own prose (which had gone stale on at least one of them):
 
 ## Remaining Part 2 resolution gaps
 
-One is left. `DefinitionResolver.resolveTypeRef`'s catch-all, which used to head this section, is now
+Two are left. `DefinitionResolver.resolveTypeRef`'s catch-all, which used to head this section, is now
 unreachable from a desugared document — every shape it named resolves or is refused where it is written —
 and survives only as a guard against a caller resolving raw AST with the desugar phase skipped.
+
+Only genuine gaps are listed here — a throw that means "your schema is wrong" is not one. Classifying the
+throw sites by that test is done across the whole schema pipeline (issue #26); if a census is ever wanted
+again, take it fresh rather than trusting a recorded one, since the last recorded numbers had gone stale
+by a factor of six.
 
 - [ ] **Composing or refining against a template application that is still open** (`vip => <T> customer &
   box<T>`, §5.8's "Parameterized references"). The *fully-bound* case closes on demand now, at both
@@ -68,10 +73,6 @@ and survives only as a guard against a caller resolving raw AST with the desugar
   parameters, which cannot close until that declaration itself materialises — so composition would have to
   be deferred to materialisation too, absorbing fields into an entry that does not exist yet. A different
   feature from closing an application, and the diagnostic now says so rather than blaming substitution.
-Only genuine gaps are listed here — a throw that means "your schema is wrong" is not one. Classifying the
-throw sites by that test is done across the whole schema pipeline (issue #26); if a census is ever wanted
-again, take it fresh rather than trusting a recorded one, since the last recorded numbers had gone stale
-by a factor of six.
 
 - [ ] **Atom-body coherence, the parts that need a parser this module doesn't have.** `Atom.coherenceCheck`
   (issue #50) now rejects an atom body whose own facets admit nothing, but three gaps are left, each
@@ -92,7 +93,12 @@ by a factor of six.
 An open entry's body is the constructor application as written, held unread until materialisation
 substitutes its parameters away (`TemplateBody`/`HeldBody`, `docs/schema-resolution.md`), which is what
 removes Revision 33's collection-slot boundary — `result => <T> ( T | error )` resolves here and §5.10
-refuses it. `SPEC-FEEDBACK.md` #5 is the proposal, written as the design that works. What is left:
+refuses it. `SPEC-FEEDBACK.md` #5 is the proposal, written as the design that works; #7 is the `reference`
+widening the last shape needed.
+
+**Every shape now holds**, so §12.1's `[type-params] "!" type-name ws core-value` covers every open entry and
+one walk closes them all — records, compositions, refinements, container sugar and §5.10's partial
+application alike. What is left are consequences of holding rather than shapes still outside it:
 
 - [ ] **A field's `~`/`=` value is never checked against the field's own declared type, and the failure wears
   the wrong clothes.** meta-kernel's `@doc` on `value` states the dependency outright -- `record_field.value`
@@ -128,13 +134,6 @@ refuses it. `SPEC-FEEDBACK.md` #5 is the proposal, written as the design that wo
   already (§5.11 uniqueness in the desugar phase, §5.10.1 regularity and §5.10 arity at the linker), which is
   what keeps the common errors located where the author can act on them, so this is the residue rather than
   the bulk.
-
-- [ ] **General resolver-layer structural rules as reusable primitives**, rather than binding-time-only
-  behaviour — empty-brace resolution, the absent-vs-missing distinction. §2.8's "the empty container of that
-  type" is still a rule each container reader applies for itself: the map reader's own zero-entry case was
-  silently exempt from `min_items` until it was fixed one reader at a time, and nothing structural stops the
-  next container from repeating it. What a primitive would buy is the rule stated once, where "how many
-  entries does this value have" has one answer whatever spelled it.
 
 ## Transparent wrappers in `tson-bind`
 
@@ -437,6 +436,13 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
       which turns this item's deferral from a shrug into a decision.
 
 ## Miscellaneous
+
+- [ ] **General resolver-layer structural rules as reusable primitives**, rather than binding-time-only
+  behaviour — empty-brace resolution, the absent-vs-missing distinction. §2.8's "the empty container of that
+  type" is still a rule each container reader applies for itself: the map reader's own zero-entry case was
+  silently exempt from `min_items` until it was fixed one reader at a time, and nothing structural stops the
+  next container from repeating it. What a primitive would buy is the rule stated once, where "how many
+  entries does this value have" has one answer whatever spelled it.
 
 - [ ] Thread-safety **outside a read**. Concurrent *reads* through one `Tson` are safe and tested
   (`ReadPathConcurrencyTest`): the compiled readers are immutable, a `Lexer`/`TsonDataStream` is per read,
