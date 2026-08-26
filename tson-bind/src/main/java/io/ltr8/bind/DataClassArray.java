@@ -167,12 +167,6 @@ public class DataClassArray extends DataClass {
 		return this.get;
 	}
 
-	/** A held descriptor's class name, without pulling one that is still deferred. */
-	private static String shown(Memoized<DataClass> held) {
-		DataClass known = held.peek();
-		return known != null ? known.typeClass().getName() : "<deferred>";
-	}
-
 	@Override
 	public String toString() {
 		return "DataClassArray [ typeClass=" + typeClass().getName() + ", arrayDataClass="

@@ -212,12 +212,6 @@ public class DataClassMap extends DataClass {
 		return put;
 	}
 
-	/** A held descriptor's class name, without pulling one that is still deferred. */
-	private static String shown(Memoized<DataClass> held) {
-		DataClass known = held.peek();
-		return known != null ? known.typeClass().getName() : "<deferred>";
-	}
-
 	@Override
 	public String toString() {
 		return "DataClassMap [ typeClass=" + typeClass().getName() + ", keyDataClass="
