@@ -50,10 +50,10 @@ class TopKindHierarchyTest {
 
     @Test
     void referenceIsTopDirectlyNotThroughAnyBaseKind() {
-        // reference => top & { target: type_name } -- composes with top directly, not through
+        // reference => top & { target: type_ref } -- composes with top directly, not through
         // atom/product/sum, so Reference implements Top but is sealed out of all three base kinds
         // (Reference isn't in Atom's/Product's/Sum's own permits lists).
-        Reference reference = new Reference("token");
+        Reference reference = new Reference(TypeRef.of("token"));
         assertInstanceOf(Top.class, reference);
     }
 }

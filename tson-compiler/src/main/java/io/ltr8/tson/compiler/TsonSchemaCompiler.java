@@ -208,7 +208,7 @@ public final class TsonSchemaCompiler {
             }
             Top body = definition.body();
             if (body instanceof Reference r) {
-                return resolve(r.target());
+                return resolve(r.target().name());
             }
             ValueReaderFactory factory = factoryFor.apply(TsonCompiledMetaSchema.typenameOf(body));
             return factory.create(name, definition, new ValueReaderContext(linked, readers));

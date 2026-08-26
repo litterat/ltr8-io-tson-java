@@ -37,8 +37,8 @@ materialization, no validation (those are the resolver's/linker's jobs).
   - **The payload is a `core-value`, and nothing narrower.** An open entry's body is held rather than read
     against its constructor's vocabulary until materialisation substitutes, so there is no per-slot quotation
     to constrain it and a collection payload is as ordinary as a scalar one: `<T> !choice { variants:
-    [T error] }` parses and resolves, where the old `template-def` refused it because `template_argument` had
-    no collection case.
+    [T error] }` parses and resolves, where Revision 33's `template-def` refused it: its `template_argument`
+    vocabulary had no collection case. Both it and `instance_template` are gone from the kernel here.
   - **What it cannot spell is an application**, and neither can a closed instance: `!array { element_type:
     box<text> }` is not a `core-value`, in either form. That line falls where the grammars already divide --
     a *type* position is schema grammar and takes `box<text>` directly, while `!C value` takes data, so an
@@ -283,9 +283,9 @@ rebuilt and called a cache.
       the token rather than decoding it (`RawTokenParser`). What that costs, identity keyed on the spelling
       so `<255>` and `<0xFF>` are two applications, is `SPEC-FEEDBACK.md` #4.
   - **All four sugar forms lift open, collections included.** `tuple` and `choice` bind a collection
-    (`elements`, `variants`), which Revision 33 could not represent: `template_argument` is `param | value |
-    type_ref` with no collection case, so `<T> { v: (T | text) }` was refused at the declaration that wrote
-    it (§5.10, "a deliberate boundary of this revision"). A held body is not read against that vocabulary at
+    (`elements`, `variants`), which Revision 33 could not represent: its `template_argument` was
+    `param | value | type_ref` with no collection case, so `<T> { v: (T | text) }` was refused at the
+    declaration that wrote it (§5.10, "a deliberate boundary of this revision"). A held body is not read against that vocabulary at
     all until materialisation substitutes, so a parameter inside a collection is a token inside an array and
     lifts like any other. `SPEC-FEEDBACK.md` #5 carries the argument; this is a deliberate divergence from
     Revision 33, implemented as proof for the next.
@@ -314,7 +314,8 @@ rebuilt and called a cache.
     entry for one type. One producer, one spelling: `refValue` is the single place a type slot's shape is
     decided.
   - **A parameter rides the ordinary `value` slot**, with §8.1's shadowing rule to tell it from a literal,
-    which retires `record_field.value_param`. §5.7's fixation then happens at materialisation
+    which is why the kernel declares one `value` slot and no labelled group. §5.7's fixation then happens at
+    materialisation
     (`TemplateMaterialiser.fixRoutedValues`), where the value is concrete.
   - **A composition or refinement template is held too, but from one phase later** (`heldRecord`, called by
     `DefinitionResolver.holdIfOpen`). Both absorb fields from a source, and the form to hold is the
@@ -325,7 +326,8 @@ rebuilt and called a cache.
     - **`TsonObjectWriter` cannot serve as that second producer**, which is why `heldRecord` exists rather
       than a round-trip. Measured against the desugar spelling it differs five ways: `{ name: "text"
       arguments: [] }` for a bare `text`, `!ref { … }` for a `type_argument`, every token quoted, `state:
-      REQUIRED` written where the default covers it, and `value_param` kept. The first two are the
+      REQUIRED` written where the default covers it, and the retired `value_param` channel emitted. The
+      first two are the
       two-spellings problem; the third is fatal on its own, since `TemplateBody.names()` and substitution
       both key on a token being *unquoted*, so a fully-quoted body references no parameters at all. Its
       output is canonical-explicit — a different language from the one a held body is written in.

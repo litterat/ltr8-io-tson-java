@@ -52,8 +52,8 @@ URIs is the draft year/revision marker from the spec's release scheme.
 
 ```tson
 !!id:"https://example.com/2026/33/getting-started/person.tn?sha256=13cf46617c13225c7df1e292f60798d99af6ae6593657ca117b5a617220b0c51"
-!!meta:"https://tson.io/2026/33/m/meta.tn?sha256=3a5ab56c0f919e251e05d1646e946010f8278a8f08d768fe70693097558fb4f1"
-!!import:"https://tson.io/2026/33/m/core.tn?sha256=34d4f2ffe4744691e3310a185f96761c3c7f33da41b72da9681b90554504de3d"
+!!meta:"https://tson.io/2026/33/m/meta.tn?sha256=baff2014c0e7cc5f2d0ecac43a1262691db29bf7a7ae0be2f605c185d244af91"
+!!import:"https://tson.io/2026/33/m/core.tn?sha256=47cc7d4b9ad7de345d1cd4c5667e0face81391c90ede151fea15e4b31cd9b32b"
 @doc:"An example schema from `tson init-example` -- a short tour of TSON. Edit this file or person-data.tn, then re-run tson validate to see what changes."
 {
   role => !enum [admin member guest]

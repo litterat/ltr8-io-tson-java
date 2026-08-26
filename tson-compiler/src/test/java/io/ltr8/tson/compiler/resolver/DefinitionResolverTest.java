@@ -343,7 +343,7 @@ class DefinitionResolverTest {
         // reference: one brand-new field.
         assertEquals("{ kind: \"PRODUCT\" parameters: [] constructor: false supertypes: [ \"top\" ] subtypes: [] "
                 + "body: !record { supertypes: [ \"top\" ] fields: [ "
-                + "{ name: \"target\" type: { name: \"type_name\" arguments: [] } state: \"REQUIRED\" } "
+                + "{ name: \"target\" type: { name: \"type_ref\" arguments: [] } state: \"REQUIRED\" } "
                 + "] groups: [] } }", write(reference));
     }
 
@@ -406,7 +406,7 @@ class DefinitionResolverTest {
 
         assertEquals("{ source: { name: \"token\" arguments: [] } kind: \"REFERENCE\" parameters: [] "
                 + "constructor: false supertypes: [] subtypes: [] "
-                + "body: !reference { target: \"token\" } }", write(typeName));
+                + "body: !reference { target: { name: \"token\" arguments: [] } } }", write(typeName));
         assertEquals(write(typeName), write(fieldName));
         assertEquals(write(typeName), write(paramName));
 
@@ -416,16 +416,16 @@ class DefinitionResolverTest {
         // type_definition has no annotations field, and does not need one.
         assertEquals("@annotation { source: { name: \"void\" arguments: [] } kind: \"REFERENCE\" parameters: [] "
                 + "constructor: false supertypes: [] subtypes: [] "
-                + "body: !reference { target: \"void\" } }", write(annotation));
+                + "body: !reference { target: { name: \"void\" arguments: [] } } }", write(annotation));
 
         // doc => @annotation documentation => @annotation text -- a chain of references, each
         // resolved independently (no following the chain here, just the immediate target).
         assertEquals("@annotation { source: { name: \"text\" arguments: [] } kind: \"REFERENCE\" parameters: [] "
                 + "constructor: false supertypes: [] subtypes: [] "
-                + "body: !reference { target: \"text\" } }", write(documentation));
+                + "body: !reference { target: { name: \"text\" arguments: [] } } }", write(documentation));
         assertEquals("@annotation { source: { name: \"documentation\" arguments: [] } kind: \"REFERENCE\" parameters: [] "
                 + "constructor: false supertypes: [] subtypes: [] "
-                + "body: !reference { target: \"documentation\" } }", write(doc));
+                + "body: !reference { target: { name: \"documentation\" arguments: [] } } }", write(doc));
 
         // alias => @annotation text -- same shape as documentation (both target "text").
         assertEquals(write(documentation), write(alias));

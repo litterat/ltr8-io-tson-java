@@ -10,13 +10,19 @@ import io.ltr8.annotation.Typename;
  * alias}, and (later) materialised template instantiations (§5.10, §8.2). For a simple alias
  * {@code target} equals the entry's own {@code source}; see {@link TypeDefinition#reference}.
  *
- * <p><b>{@code target} is a name, not a {@link TypeRef}</b>, because the kernel declares it {@code target:
- * type_name} -- a bare token, with no argument list. The distinction is not cosmetic: an application
- * ({@code pair<uuid, B>}) is a thing a reference body has no channel to hold, so a model that typed this as
- * a {@code TypeRef} admitted a state no conforming document can carry. Where an alias names an application
- * -- [TSON-SCHEMA] §5.10's partial application, {@code uuid_pair => <B> pair<uuid, B>} -- the arguments live
- * in the entry's own {@code source}, which <em>is</em> a {@code type_ref}, and this holds the head alone.
+ * <p><b>{@code target} is a {@link TypeRef}, so an alias to an application states its own arguments.</b>
+ * [TSON-SCHEMA] §5.10's partial application, {@code uuid_pair => <B> pair<uuid, B>}, is an alias whose target
+ * carries an argument list; a name-typed slot had nowhere to put one, so the arguments had to be read back
+ * from the entry's {@code source} -- which §8.2 keys identity on, giving one component two jobs and letting
+ * an alias exist with no way to say what it aliased. The body says it now, and {@code source} is provenance
+ * only.
+ *
+ * <p><b>A closed alias never carries arguments.</b> Materialisation rewrites {@code text_box => box<text>} to
+ * name the entry it minted, so an argument-bearing target appears only where an application is still open --
+ * inside a template. §8.3 flattens a use site past a REFERENCE entry but never this slot: the chain has to
+ * stay walkable, and the walk stops at an argument-bearing target, which is an application rather than a
+ * further hop.
  */
 @Typename(name = "reference")
-public record Reference(String target) implements Top {
+public record Reference(TypeRef target) implements Top {
 }

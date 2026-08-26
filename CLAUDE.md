@@ -701,10 +701,13 @@ compatibility).
   it there, where the body is written; a **composition or refinement** template is held one phase later
   (`DefinitionResolver.holdIfOpen`), because both absorb fields from a source and the form to hold is the
   *flattened* one — but through `SchemaDesugarer.heldRecord`, so two producers of the wire form share one
-  spelling. `record_field.value_param` therefore has **no producer left in resolver output**: a routed
-  parameter rides `value`, with §5.7's fixation moved to materialisation. The channel stays in the kernel
-  because `spec/m` is Revision 33's artifact. What a held body cannot enforce is half of §5.10's
-  argument-kind rule — see "Not yet implemented".
+  spelling. **An alias is written the same way** — `uuid_pair => <B> !reference { target: pair<text, B> }` —
+  which is what widening the kernel's `reference.target` from `type_name` to `type_ref` buys: an alias to an
+  application can state the arguments it binds, so no template keeps them beside its body in `source`.
+  `record_field.value_param`, `instance_template` and `template_argument` are **gone from the kernel**: a
+  routed parameter rides `value` with §8.1's shadowing rule to tell it from a literal, and §5.7's fixation
+  moves to materialisation. What a held body cannot enforce is half of §5.10's argument-kind rule — see
+  "Not yet implemented".
 - **Undocumented atom constructors** — `unknown` (and `extern`, which has no core.tn declaration) has no
   compiled-parser factory, so it compiles to `ErrorReader` (a schema merely *declaring* one still compiles).
   Neither is an ordinary missing parser waiting to be written: `extern` is a whole absent mechanism and `unknown`
@@ -730,7 +733,7 @@ compatibility).
   put it there or the author wrote it literally, and is the FIXED/DEFAULT value validation listed below.
   `SPEC-FEEDBACK.md` #5 carries the spec-side question.
 - **Deferred design questions** — `REQUIRED_FIXED`/`OPTIONAL_FIXED` value validation and a general
-  disk/HTTP-backed `TsonSchemaSource` (with whitelist/blacklist policy). **`value_param` substitution is
+  disk/HTTP-backed `TsonSchemaSource` (with whitelist/blacklist policy). **Routed-value substitution is
   no longer one of them**: an argument bound into a routed `=` fixes the field (`REQUIRED` →
   `REQUIRED_FIXED`, `~` staying a default), which is §5.7's "fixation happens downstream" applied to the
   downstream §5.7 now names ("fixation happens at materialisation"). **Thread-safety is no longer wholly

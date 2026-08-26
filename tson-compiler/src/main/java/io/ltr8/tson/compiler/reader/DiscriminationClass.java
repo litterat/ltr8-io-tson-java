@@ -74,8 +74,10 @@ public enum DiscriminationClass {
             if (def == null) {
                 return Optional.empty();
             }
-            if (def.body() instanceof Reference reference) {
-                current = reference.target();
+            // An argument-bearing target is an application rather than a hop, and has no entry to classify
+            // until materialisation mints one -- which it has, for every entry a compiled choice can reach.
+            if (def.body() instanceof Reference reference && reference.target().arguments().isEmpty()) {
+                current = reference.target().name();
                 continue;
             }
             return classify(def);

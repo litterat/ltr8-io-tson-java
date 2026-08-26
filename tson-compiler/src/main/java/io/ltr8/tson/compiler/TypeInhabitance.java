@@ -101,7 +101,7 @@ final class TypeInhabitance {
             // branches rather than conjoins, and the reason `(leaf | node)` survives a non-productive `node`.
             case ChoiceBody choice -> choice.variants().stream()
                     .anyMatch(variant -> refInhabited(variant, namespace, inhabited));
-            case Reference reference -> refInhabited(TypeRef.of(reference.target()), namespace, inhabited);
+            case Reference reference -> refInhabited(reference.target(), namespace, inhabited);
             // A held body is not walked: its element type and bounds are tokens that mean nothing until
             // substitution supplies the arguments, so a template is inhabited here and the closure that does
             // supply them is judged on its own -- it is an ordinary entry in this map by the time linking
@@ -247,8 +247,8 @@ final class TypeInhabitance {
             case io.ltr8.tson.schema.meta.TupleBody tuple -> tuple.elements().stream()
                     .filter(element -> !positionInhabited(element, namespace, inhabited))
                     .map(element -> element.elementType().name()).findFirst().orElse(null);
-            case Reference reference -> refInhabited(TypeRef.of(reference.target()), namespace, inhabited)
-                    ? null : reference.target();
+            case Reference reference -> refInhabited(reference.target(), namespace, inhabited)
+                    ? null : reference.target().name();
             default -> null; // a choice fails on every variant at once, so no single link continues the chain
         };
     }

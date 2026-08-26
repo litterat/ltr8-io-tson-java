@@ -41,8 +41,9 @@ class BootstrapFlatteningTest {
 
         assertEquals("token", field(recordField, "name").type().name());
         assertEquals(Optional.of("field_name"), alias(field(recordField, "name")));
-        assertEquals("token", field(recordField, "value_param").type().name());
-        assertEquals(Optional.of("param_name"), alias(field(recordField, "value_param")));
+        TypeDefinition typeRef = kernel.entries().get("type_ref");
+        assertEquals("token", field(typeRef, "name").type().name());
+        assertEquals(Optional.of("type_name"), alias(field(typeRef, "name")));
     }
 
     /** And what is not an alias is untouched here as well. */
@@ -60,7 +61,7 @@ class BootstrapFlatteningTest {
     void anAliasEntryKeepsItsHopOnTheBootstrapRoute() {
         TypeDefinition typeName = MetaKernelBootstrapResolver.getMetaKernelSchema().entries().get("type_name");
 
-        assertEquals("token",
+        assertEquals(io.ltr8.tson.schema.meta.TypeRef.of("token"),
                 assertInstanceOf(io.ltr8.tson.schema.meta.Reference.class, typeName.body()).target());
     }
 }

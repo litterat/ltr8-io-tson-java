@@ -479,14 +479,9 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      */
     private Object readSchemaDefault(CompiledField field) {
         RecordField schema = field.schema();
-        if (schema.valueParam().isPresent()) {
-            throw new UnsupportedOperationException("'" + schema.name() + "' on '" + displayName + "' defaults via a "
-                    + "type parameter ('= " + schema.valueParam().get() + "') -- parameter substitution isn't "
-                    + "implemented anywhere in this codebase yet, so this can't resolve to a concrete value");
-        }
         Token token = schema.value().orElseThrow(() -> new IllegalStateException("'" + schema.name() + "' on '"
-                + displayName + "' is " + schema.state() + " but the schema carries neither a literal value nor a "
-                + "value parameter for it -- DefinitionResolver should never produce this"));
+                + displayName + "' is " + schema.state() + " but the schema carries no value for it -- "
+                + "DefinitionResolver should never produce this"));
         TokenEvent event = new TokenEvent(token.text(), TokenForm.valueOf(token.form().name()), new Position(0, 0, 0));
         TsonReadContext syntheticCtx = TsonReadContext.throwing(new ListEventSource(List.of(event)));
         return field.parser().read(syntheticCtx);

@@ -255,7 +255,7 @@ class ResolvedFixtureTest {
     void theSameEntriesAreMarkedSyntheticOnBothSides() throws Exception {
         // Non-vacuous: the fixtures really do mark keys, so an empty-equals-empty pass is not available to a
         // scan that stopped matching or a resolver that stopped marking.
-        assertEquals(9, fixtureSynthetics("meta-kernel-resolved.tn").size(), "meta-kernel.tn marks nine keys");
+        assertEquals(8, fixtureSynthetics("meta-kernel-resolved.tn").size(), "meta-kernel.tn marks eight keys");
         assertEquals(1, fixtureSynthetics("meta-resolved.tn").size(), "meta.tn marks one");
 
         assertEquals(fixtureSynthetics("meta-kernel-resolved.tn"),

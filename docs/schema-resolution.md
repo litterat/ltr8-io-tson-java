@@ -238,7 +238,7 @@ recorded open form, and replacing the application with a reference to the entry 
   nothing was wrong. **The two spellings are told apart by the state they arrive in**, which is the only
   reason this is recoverable at all: §5.7 sends `= P` to `REQUIRED` and `~ P` to `REQUIRED_DEFAULT`, so a
   routed default stays a default and data may still override it. §5.7 names the downstream: fixation happens
-  at materialisation, where a field whose `value_param` binds to a concrete argument takes the state its
+  at materialisation, where a field whose routed parameter binds to a concrete argument takes the state its
   literal spelling would have.
 - **An application whose head names nothing in scope is left whole, arguments and all.** This pass gives no
   verdict on an unresolvable head — that is the linker's, as an unresolved reference — but it still has to
@@ -249,7 +249,7 @@ recorded open form, and replacing the application with a reference to the entry 
   The fallback's own half of the fix is in `docs/linking-and-compilation.md` — it does not apply to an
   argument-bearing `source` at all, a §5.10 head being resolved in the type-name namespace only (§3.3.1).
 - **Kind checking falls out of substitution, for the shapes that still resolve at their declaration.** A value
-  argument reaching a type position, or a type argument reaching a `value_param` route, is the author's error
+  argument reaching a type position is the author's error
   — §5.10 infers a parameter's kind from its use, so the body's use and the applied argument are the two
   things being compared. Arity is checked before any of it, against the template's own `parameters`.
   - **A *held* body has no slot types, so it can only enforce half of it**, which is §5.10's open question
@@ -300,7 +300,8 @@ recorded open form, and replacing the application with a reference to the entry 
     fields to substitute into. Holding it makes `close` total on two branches and the third an
     `IllegalStateException` naming the invariant.
   - **§5.7's fixation happens here** (`fixRoutedValues`), which is what a held record body's retirement of
-    `value_param` costs and where §5.7 says to pay it: a field routed by `= P` is held as `state: REQUIRED`
+    the single `value` channel costs and where §5.7 says to pay it: a field routed by `= P` is held as
+    `state: REQUIRED`
     with the parameter standing in `value`, and a REQUIRED field carrying a value is that and nothing else —
     a closed REQUIRED field has none, which is what `REQUIRED_FIXED` means. A `~ P` default arrives as
     `REQUIRED_DEFAULT` and stays one: data may still override it.
@@ -516,7 +517,7 @@ order, so it can't handle `boolean` preceding `enum`; this two-pass ordering liv
   hand-picking them is simplest — "the bootstrap can do whatever tricks it needs, including not compiling,
   just calling `new Xxx(...)`."
 - **Desugaring needs no equivalent trick, and used to.** The phase once read a constructor's `parameters()`
-  and its fields' `value_param` routing off the governing meta; for meta-kernel those would have had to come
+  and its fields' parameter routing off the governing meta; for meta-kernel those would have had to come
   from the entries this class is in the middle of producing, so the routing for the three constructors it
   applies to itself was written out by hand. With the container constructors parameterless the desugar table
   is fixed by the sugar forms and nothing is looked up, so the bootstrap special case and the general case

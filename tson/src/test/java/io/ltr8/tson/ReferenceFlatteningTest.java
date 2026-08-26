@@ -46,8 +46,11 @@ class ReferenceFlatteningTest {
 
         assertEquals("token", fieldType(recordField, "name").name());
         assertEquals(Optional.of("field_name"), alias(fieldType(recordField, "name")));
-        assertEquals("token", fieldType(recordField, "value_param").name());
-        assertEquals(Optional.of("param_name"), alias(fieldType(recordField, "value_param")));
+
+        TypeDefinition typeRef = tson().bindRegistry().core()
+                .resolveLinked(TsonBundledSchemas.META_KERNEL_ID).schema().entries().get("type_ref");
+        assertEquals("token", fieldType(typeRef, "name").name());
+        assertEquals(Optional.of("type_name"), alias(fieldType(typeRef, "name")));
     }
 
     /** A position naming something that is not a reference is left exactly as it was. */
@@ -96,7 +99,8 @@ class ReferenceFlatteningTest {
                   b => a
                   holder => { f: b }""", "b");
 
-        assertEquals("a", assertInstanceOf(io.ltr8.tson.schema.meta.Reference.class, b.body()).target());
+        assertEquals(TypeRef.of("a"),
+                assertInstanceOf(io.ltr8.tson.schema.meta.Reference.class, b.body()).target());
     }
 
     /** Inside an argument list too, which is what makes a nested application's identity single-level. */

@@ -97,7 +97,7 @@ class RecordTreeReaderTest {
     @Test
     void absentOptionalFieldReadsAsNull() {
         RecordField optional = new RecordField("value", TypeRef.of("integer"), FieldState.OPTIONAL,
-                Optional.empty(), Optional.empty());
+                Optional.empty());
         TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED), optional));
 
         assertNull(read(compiled, "{}").get("value"));
@@ -106,8 +106,7 @@ class RecordTreeReaderTest {
 
     private static RecordField fixed(FieldState state, String token) {
         return new RecordField("value", TypeRef.of("integer"), state,
-                token == null ? Optional.empty() : Optional.of(new Token(token, Token.Form.UNQUOTED)),
-                Optional.empty());
+                token == null ? Optional.empty() : Optional.of(new Token(token, Token.Form.UNQUOTED)));
     }
 
     /**
@@ -287,7 +286,7 @@ class RecordTreeReaderTest {
     @Test
     void requiredDefaultFieldFillsFromTheSchemaWhenAbsentButExplicitValueStillWins() {
         RecordField defaulted = new RecordField("value", TypeRef.of("integer"), FieldState.REQUIRED_DEFAULT,
-                Optional.of(new Token("7", Token.Form.UNQUOTED)), Optional.empty());
+                Optional.of(new Token("7", Token.Form.UNQUOTED)));
         TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED), defaulted));
 
         assertEquals(BigInteger.valueOf(7), read(compiled, "{}").get("value"));
@@ -303,7 +302,7 @@ class RecordTreeReaderTest {
     @Test
     void requiredDefaultFieldRejectsAWrittenAbsentSentinelWhileOmissionStillInjects() {
         RecordField defaulted = new RecordField("value", TypeRef.of("integer"), FieldState.REQUIRED_DEFAULT,
-                Optional.of(new Token("7", Token.Form.UNQUOTED)), Optional.empty());
+                Optional.of(new Token("7", Token.Form.UNQUOTED)));
         TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED), defaulted));
 
         assertEquals(BigInteger.valueOf(7), read(compiled, "{}").get("value"));
