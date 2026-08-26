@@ -16,6 +16,7 @@
 package io.ltr8.test.bind;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Assertions;
@@ -26,6 +27,7 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClassArray;
 import io.ltr8.bind.DataClassField;
+import io.ltr8.bind.DataClassMap;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassUnion;
 
@@ -68,6 +70,16 @@ public class RecursiveModelTest {
 	}
 
 	public record Holder(String tag, Body body) {
+	}
+
+	/** The cycle closing through a map's value, a tuple's element, and an annotated position. */
+	public record Keyed(String tag, Map<String, Keyed> children) {
+	}
+
+	public record Pair(String tag, Nested nested) {
+	}
+
+	public record Nested(Pair left, Pair right) {
 	}
 
 	private DataBindContext context;
@@ -123,6 +135,30 @@ public class RecursiveModelTest {
 		DataClassRecord node = (DataClassRecord) context.getDescriptor(Node.class);
 
 		Assertions.assertSame(context.getDescriptor(Node.class), fieldNamed(node, "next").dataClass());
+	}
+
+	/**
+	 * A cycle closing through a map's value rather than through a field or an array. Each component kind
+	 * resolves its own descriptors, so each is its own path to the same defect -- and a fix that converts
+	 * only the paths a first test happens to walk leaves the rest to fail later.
+	 */
+	@Test
+	public void aCycleThroughAMapValueResolves() throws DataBindException {
+		DataClassRecord keyed = (DataClassRecord) context.getDescriptor(Keyed.class);
+
+		DataClassMap children = (DataClassMap) fieldNamed(keyed, "children").dataClass();
+		Assertions.assertSame(keyed, children.valueDataClass(), "the map's value closes the cycle");
+		Assertions.assertNotNull(children.keyDataClass(), "and its key resolves as it always did");
+	}
+
+	/** The same, closing through a tuple's elements -- a record bound as a tuple by its own components. */
+	@Test
+	public void aCycleThroughATupleElementResolves() throws DataBindException {
+		DataClassRecord pair = (DataClassRecord) context.getDescriptor(Pair.class);
+
+		DataClassRecord nested = (DataClassRecord) fieldNamed(pair, "nested").dataClass();
+		Assertions.assertSame(pair, fieldNamed(nested, "left").dataClass());
+		Assertions.assertSame(pair, fieldNamed(nested, "right").dataClass());
 	}
 
 	private static DataClassField fieldNamed(DataClassRecord record, String name) {

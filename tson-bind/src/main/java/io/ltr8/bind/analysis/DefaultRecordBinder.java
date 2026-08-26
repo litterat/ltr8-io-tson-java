@@ -36,6 +36,7 @@ import java.util.OptionalDouble;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
 import java.util.stream.Collectors;
+import java.util.function.Supplier;
 
 /**
  * In a code-first schema, the record binder creates the DataClassRecord and from that information
@@ -371,7 +372,8 @@ public class DefaultRecordBinder {
 		MethodHandle isPresent = MethodHandles.dropArguments(
 				MethodHandles.constant(boolean.class, true), 0, targetClass);
 
-		return new DataClassField(index, fieldName, info.getType(), null, true, isPresent, accessor, null);
+		return new DataClassField(index, fieldName, info.getType(), (DataClass) null, true, isPresent,
+				accessor, null);
 	}
 
 	/**
@@ -385,7 +387,7 @@ public class DefaultRecordBinder {
 	 */
 	private DataClassField resolveSimpleField(DataBindContext context, Class<?> targetClass, ComponentInfo info, int index)
 			throws DataBindException, NoSuchMethodException, IllegalAccessException {
-		DataClass dataClass = context.getDescriptor(info.getType(),
+		Supplier<DataClass> dataClass = context.componentSource(info.getType(),
 				(info.getParamType() != null ? info.getParamType() : info.getType()));
 
 		MethodHandle accessor = accessor(info);
@@ -393,7 +395,10 @@ public class DefaultRecordBinder {
 		boolean isRequired = isRequired(info);
 		String fieldName = fieldName(info);
 
-		if (dataClass.typeClass().isPrimitive()) {
+		// Asked of the component's own declared type rather than of its descriptor: the descriptor may be
+		// deferred on a cyclic edge, and pulling it here would resolve it in the middle of the resolution
+		// that deferred it.
+		if (info.getType().isPrimitive()) {
 			isRequired = true;
 		}
 
@@ -504,7 +509,7 @@ public class DefaultRecordBinder {
 		}
 
 		// Recursively get hold of the data class descriptor.
-		DataClass tupleData = context.getDescriptor(bridgeDataClass, bridgeDataType);
+		Supplier<DataClass> tupleData = context.componentSource(bridgeDataClass, bridgeDataType);
 
 		if (!bridgeObjectClass.isAssignableFrom(info.getType())) {
 			throw new CodeAnalysisException("Bridge object type not assignable from field type");
@@ -563,7 +568,7 @@ public class DefaultRecordBinder {
 
 		Class<?> optionalType = (Class<?>) info.getParamType().getActualTypeArguments()[0];
 
-		DataClass dataClass = context.getDescriptor(optionalType);
+		Supplier<DataClass> dataClass = context.componentSource(optionalType, optionalType);
 
 		Lookup lookup = MethodHandles.publicLookup();
 
@@ -625,7 +630,7 @@ public class DefaultRecordBinder {
 		}
 
 		// Get data class for int, long or double.
-		DataClass dataClass = context.getDescriptor(optionalNullableType);
+		Supplier<DataClass> dataClass = context.componentSource(optionalNullableType, optionalNullableType);
 
 		Lookup lookup = MethodHandles.publicLookup();
 

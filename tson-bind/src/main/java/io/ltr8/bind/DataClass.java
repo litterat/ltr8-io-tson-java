@@ -32,21 +32,6 @@ public abstract class DataClass {
 
 	private final Optional<DataClassBridge> bridge;
 
-	/**
-	 * The descriptor a holder should hand out for one it was given -- itself, unless it is the placeholder a
-	 * cyclic type graph forced, in which case the descriptor it stands for.
-	 *
-	 * <p>Every accessor returning a descriptor it holds passes it through here, which is what confines cycle
-	 * repair to one line per holder and keeps {@link DataClassDeferred} from reaching a consumer. Package
-	 * visible rather than protected, because two of the holders ({@link DataClassField}, {@link
-	 * DataClassElement}) describe a component rather than being a descriptor themselves. See that
-	 * class for why the alternative -- a lazy proxy standing in for the real descriptor -- is not available:
-	 * callers pattern-match on the concrete descriptor type.
-	 */
-	static DataClass settled(DataClass held) {
-		return held instanceof DataClassDeferred deferred ? deferred.settled() : held;
-	}
-
 	public DataClass( Class<?> targetType, DataClassBridge bridge) {
 		this.typeClass = Objects.requireNonNull(targetType);
 		this.bridge = Optional.ofNullable(bridge);

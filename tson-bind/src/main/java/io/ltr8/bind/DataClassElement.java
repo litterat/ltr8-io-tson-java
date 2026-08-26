@@ -16,6 +16,8 @@
 package io.ltr8.bind;
 
 import java.lang.invoke.MethodHandle;
+import java.util.function.Supplier;
+import io.ltr8.bind.internal.Memoized;
 
 /**
  * One positional slot of a {@link DataClassTuple} -- the tuple analogue of {@link DataClassField},
@@ -30,14 +32,28 @@ public class DataClassElement {
 	private final int index;
 
 	// the DataClass for this slot's own type.
-	private final DataClass dataClass;
+	/**
+	 * Kept memoised rather than resolved, because a cyclic type graph has one edge that cannot be resolved
+	 * while the descriptor it points back to is still being built. Known at construction on every other edge,
+	 * which is all of them but that one -- see {@code DataBindContext.componentSource}.
+	 */
+	private final Memoized<DataClass> dataClass;
+
+
 
 	// <value> accessor( <tuple> ); -- the component's own declared type, not forced to Object.
 	private final MethodHandle accessor;
 
+	/** The same, for a component on a cycle in the type graph -- see {@code DataBindContext.componentSource}. */
+	public DataClassElement(int index, Supplier<DataClass> dataClass, MethodHandle accessor) {
+		this.index = index;
+		this.dataClass = Memoized.deferred(dataClass);
+		this.accessor = accessor;
+	}
+
 	public DataClassElement(int index, DataClass dataClass, MethodHandle accessor) {
 		this.index = index;
-		this.dataClass = dataClass;
+		this.dataClass = Memoized.of(dataClass);
 		this.accessor = accessor;
 	}
 
@@ -46,7 +62,7 @@ public class DataClassElement {
 	}
 
 	public DataClass dataClass() {
-		return DataClass.settled(dataClass);
+		return dataClass.get();
 	}
 
 	/**

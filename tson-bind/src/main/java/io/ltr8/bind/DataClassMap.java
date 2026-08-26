@@ -16,6 +16,8 @@
 package io.ltr8.bind;
 
 import java.lang.invoke.MethodHandle;
+import java.util.function.Supplier;
+import io.ltr8.bind.internal.Memoized;
 
 /**
  *
@@ -69,10 +71,24 @@ import java.lang.invoke.MethodHandle;
 public class DataClassMap extends DataClass {
 
 	// data class for the map's key type.
-	private final DataClass keyDataClass;
+	/**
+	 * Kept memoised rather than resolved, because a cyclic type graph has one edge that cannot be resolved
+	 * while the descriptor it points back to is still being built. Known at construction on every other edge,
+	 * which is all of them but that one -- see {@code DataBindContext.componentSource}.
+	 */
+	private final Memoized<DataClass> keyDataClass;
+
+
 
 	// data class for the map's value type.
-	private final DataClass valueDataClass;
+	/**
+	 * Kept memoised rather than resolved, because a cyclic type graph has one edge that cannot be resolved
+	 * while the descriptor it points back to is still being built. Known at construction on every other edge,
+	 * which is all of them but that one -- see {@code DataBindContext.componentSource}.
+	 */
+	private final Memoized<DataClass> valueDataClass;
+
+
 
 	// <map> constructor( int size );
 	private final MethodHandle constructor;
@@ -96,13 +112,30 @@ public class DataClassMap extends DataClass {
 	private final MethodHandle put;
 
 
+	/** The same, for a component on a cycle in the type graph -- see {@code DataBindContext.componentSource}. */
+	public DataClassMap(Class<?> targetType, Supplier<DataClass> keyDataClass,
+			Supplier<DataClass> valueDataClass, MethodHandle constructor, MethodHandle size,
+			MethodHandle iterator, MethodHandle next, MethodHandle key, MethodHandle value, MethodHandle put) {
+		super(targetType);
+
+		this.keyDataClass = Memoized.deferred(keyDataClass);
+		this.valueDataClass = Memoized.deferred(valueDataClass);
+		this.constructor = constructor;
+		this.size = size;
+		this.iterator = iterator;
+		this.next = next;
+		this.key = key;
+		this.value = value;
+		this.put = put;
+	}
+
 	public DataClassMap(Class<?> targetType, DataClass keyDataClass, DataClass valueDataClass,
 			MethodHandle constructor, MethodHandle size, MethodHandle iterator, MethodHandle next,
 			MethodHandle key, MethodHandle value, MethodHandle put) {
 		super(targetType);
 
-		this.keyDataClass = keyDataClass;
-		this.valueDataClass = valueDataClass;
+		this.keyDataClass = Memoized.of(keyDataClass);
+		this.valueDataClass = Memoized.of(valueDataClass);
 		this.constructor = constructor;
 		this.size = size;
 		this.iterator = iterator;
@@ -117,14 +150,14 @@ public class DataClassMap extends DataClass {
 	 * @return The DataClass type for the map's keys.
 	 */
 	public DataClass keyDataClass() {
-		return settled(keyDataClass);
+		return keyDataClass.get();
 	}
 
 	/**
 	 * @return The DataClass type for the map's values.
 	 */
 	public DataClass valueDataClass() {
-		return settled(valueDataClass);
+		return valueDataClass.get();
 	}
 
 	/**
@@ -179,10 +212,16 @@ public class DataClassMap extends DataClass {
 		return put;
 	}
 
+	/** A held descriptor's class name, without pulling one that is still deferred. */
+	private static String shown(Memoized<DataClass> held) {
+		DataClass known = held.peek();
+		return known != null ? known.typeClass().getName() : "<deferred>";
+	}
+
 	@Override
 	public String toString() {
 		return "DataClassMap [ typeClass=" + typeClass().getName() + ", keyDataClass="
-				+ keyDataClass.typeClass().getName() + ", valueDataClass=" + valueDataClass.typeClass().getName()
+				+ shown(keyDataClass) + ", valueDataClass=" + shown(valueDataClass)
 				+ "]";
 	}
 

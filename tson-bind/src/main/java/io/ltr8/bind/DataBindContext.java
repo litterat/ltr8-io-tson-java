@@ -29,6 +29,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class DataBindContext {
@@ -197,14 +198,13 @@ public class DataBindContext {
 			return descriptor;
 		}
 
-		// A type graph may contain a cycle -- a record reaching itself, directly or through others -- and
-		// resolution follows the types rather than a value, so it has no reason of its own to stop. The cache
-		// cannot help: it is filled once resolution *completes*, which for a cyclic type is never. Re-entry
-		// therefore hands back a placeholder, settled from this same cache by whichever holder keeps it, once
-		// the resolution now in progress has finished. See DataClassDeferred.
 		Set<Type> active = inFlight.get();
 		if (!active.add(parameterizedType)) {
-			return new DataClassDeferred(this, targetClass, parameterizedType);
+			throw new DataBindException(String.format(
+					"Descriptor for %s is already being resolved on this thread: its type graph contains a "
+							+ "cycle, so this component must be taken through componentSource rather than "
+							+ "resolved here",
+					targetClass.getName()));
 		}
 
 		DataClass resolved;
@@ -220,6 +220,40 @@ public class DataBindContext {
 
 		DataClass winner = descriptors.putIfAbsent(parameterizedType, resolved);
 		return winner != null ? winner : resolved;
+	}
+
+	/**
+	 * The descriptor for a <em>component</em> of the type being described -- a field's type, an array's
+	 * element, a map's key or value -- as something the holder resolves rather than as the descriptor itself.
+	 *
+	 * <p><b>A type graph may contain a cycle</b>: a record reaching itself, directly or through others.
+	 * Resolution follows the types rather than a value, so it has no reason of its own to stop, and the cache
+	 * cannot help because it is filled once resolution <em>completes</em> -- which for a cyclic type is never.
+	 * A component on such an edge is therefore taken as a supplier, resolved by its holder after the
+	 * resolution now in progress has finished and the cache has the answer.
+	 *
+	 * <p><b>Only the cyclic edge is deferred.</b> Every other component is resolved here and handed back as a
+	 * constant, so a component type that cannot be described still fails while the descriptor is being built
+	 * rather than at first use. Which of the two a caller gets is not its concern: both are a supplier, and
+	 * the holder memoises what it pulls.
+	 */
+	public Supplier<DataClass> componentSource(Class<?> targetClass, Type parameterizedType)
+			throws DataBindException {
+
+		if (inFlight.get().contains(parameterizedType)) {
+			return () -> {
+				try {
+					return getDescriptor(targetClass, parameterizedType);
+				} catch (DataBindException e) {
+					// The type resolved once already -- reaching this edge means it is in the cache -- so a
+					// failure here is not the holder's to handle and has nowhere useful to be declared.
+					throw new IllegalStateException(
+							"failed to resolve the deferred descriptor for " + targetClass.getName(), e);
+				}
+			};
+		}
+		DataClass resolved = getDescriptor(targetClass, parameterizedType);
+		return () -> resolved;
 	}
 
 	/**

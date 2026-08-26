@@ -24,6 +24,7 @@ import java.lang.invoke.MethodType;
 import java.lang.reflect.Type;
 import java.util.Collection;
 import java.util.Map;
+import java.util.function.Supplier;
 
 public class DefaultClassBinder {
 
@@ -48,9 +49,17 @@ public class DefaultClassBinder {
 		tupleBinder = new DefaultTupleBinder();
 	}
 
-	/** {@code value} presented as a boxed position -- an annotated map's key, which carries its own metadata. */
-	static DataClass boxed(DataClass value) throws DataBindException {
-		return annotatedHandles(Annotated.class, value);
+	/**
+	 * {@code value} presented as a boxed position -- an annotated map's key, which carries its own metadata.
+	 *
+	 * <p>Takes and yields a source rather than a descriptor, because the key it boxes may sit on a cycle in
+	 * the type graph: the box is built when the key it wraps can be resolved, and not before.
+	 */
+	static Supplier<DataClass> boxed(Supplier<DataClass> value) throws DataBindException {
+		// The box is built now; only the key it wraps may be deferred, and the box holds that as a source
+		// exactly as any other holder does.
+		DataClass box = annotatedHandles(Annotated.class, value);
+		return () -> box;
 	}
 
 	/** {@code Annotated<T>}'s descriptor, with the handles a reader builds and reads a box through. */
@@ -59,7 +68,7 @@ public class DefaultClassBinder {
 		return annotatedHandles(targetClass, annotatedValueDescriptor(context, parameterizedType));
 	}
 
-	private static DataClass annotatedHandles(Class<?> targetClass, DataClass valueDescriptor)
+	private static DataClass annotatedHandles(Class<?> targetClass, Supplier<DataClass> valueDescriptor)
 			throws DataBindException {
 		try {
 			MethodHandles.Lookup lookup = MethodHandles.publicLookup();
@@ -80,7 +89,7 @@ public class DefaultClassBinder {
 	 * {@code Annotated} has none to take, and is rejected rather than guessed at -- the box exists to carry a
 	 * value of a known type, so an unparameterized one has nothing to read.
 	 */
-	private static DataClass annotatedValueDescriptor(DataBindContext context, Type parameterizedType)
+	private static Supplier<DataClass> annotatedValueDescriptor(DataBindContext context, Type parameterizedType)
 			throws DataBindException {
 		if (!(parameterizedType instanceof ParameterizedType parameterized)) {
 			throw new DataBindException("Annotated must be declared with its value type (Annotated<T>), found a raw "
@@ -90,7 +99,7 @@ public class DefaultClassBinder {
 		Class<?> valueClass = argument instanceof ParameterizedType nested
 				? (Class<?>) nested.getRawType()
 				: (Class<?>) argument;
-		return context.getDescriptor(valueClass, argument);
+		return context.componentSource(valueClass, argument);
 	}
 
 	public DataClass resolve(DataBindContext context,  Class<?> targetClass, Type parameterizedType)
