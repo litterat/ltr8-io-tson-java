@@ -85,6 +85,106 @@ by a factor of six.
   - The natural fix for all three is the same one the narrowing check would want: an injected oracle, rather
     than moving the value model's dependencies.
 
+## Open form: hold the template body (Revision 34 proof)
+
+`SPEC-FEEDBACK.md` #5 has the argument; this is the plan. Today an open entry's body is a typed quotation
+(`instance_template` + `template_argument` for instances, `record_field.value_param` for records), which is
+why a parameter in a collection-valued slot has nowhere to go and is refused at the declaration. The
+replacement: an entry with type parameters **holds its body in the form it was written** — sugar expanded,
+nothing lifted — and materialisation substitutes into it and then runs the ordinary desugar-and-resolve path.
+Substitution becomes one rule at any depth, the collection boundary dissolves rather than being widened, and
+the quotation vocabulary deletes rather than growing a collection case per slot kind.
+
+Two things this deliberately does **not** touch. The bundled schemas stay byte-identical: meta-kernel keeps
+declaring `instance_template`/`template_argument` even though nothing produces them, because an open entry
+never serialises as a `type_definition` under this design, so no digest and no `*-resolved.tn` fixture moves
+for the kernel. And nothing about closed entries changes — identity, instantiation `source`, flattening,
+knot-tying, and every reader all stay as they are.
+
+Steps are ordered so each lands with the suite green.
+
+- [ ] **1. Decide what is held, and get it across the module boundary.** `TypeDefinition` lives in
+  `tson-schema`; `CoreValue` lives in `tson-compiler`'s `ast` package, and the dependency runs
+  compiler → schema, so `schema.meta` cannot name the AST. Use the stand-in pattern already in the module
+  (`schema.meta.Token` mirrors `ast.TokenValue`; `schema.meta.SourcePosition` is an interface `Position`
+  implements): declare a marker in `schema.meta` that the held AST node implements, and let only
+  `tson-compiler` see inside it. Preferred carrier is **`InstanceTemplate` repurposed** — it is already a
+  `Top` branch that composes `top` directly for exactly the "never describes a value" reason, so replacing its
+  two typed components with one held-form component keeps `TypeDefinition.body` REQUIRED and needs no new
+  branch and no `Optional<Top>`. Rename it to what it becomes. Open question to settle here: whether the held
+  node is the post-desugar `TypeDef` (which already encodes head-vs-structural, so record and instance
+  templates hold the same thing) or a head-plus-`CoreValue` pair; `TypeDef` looks right and is the smaller
+  diff. Unlike `position`, the held body **participates in `equals`** — it is content, and two different
+  templates must not compare equal. `CoreValue` is position-free records, so structural equality is already
+  available.
+
+- [ ] **2. Desugar: expand inside a template body, lift nothing.** The fork becomes one syntactic check at the
+  declaration ("does this declaration carry type parameters?"), and the whole per-slot analysis goes:
+  `SchemaDesugarer.instanceTemplate()`, `applicationSlots`, the literal-vs-reference routing in that path, and
+  the collection refusal all delete. **The desugarer stops knowing what a parameter is** — inside a template
+  body nothing lifts, so no parameter detection is needed at any depth, and outside one there are no
+  parameters. That finally makes the phase's stated contract ("purely syntactic, consults no governing meta")
+  true rather than nearly true. The one new rule to name and test: sugar **expands in place** inside a
+  template body — `<T> [T]` holds `!array { element_type: T }`, not `[T]` verbatim (or one template has two
+  resolved spellings) and not a lifted synthetic (that is the category being deleted).
+
+- [ ] **3. Resolve: stop resolving a template body.** `DefinitionResolver` returns an entry carrying the held
+  body whenever `parameters` is non-empty, and the record-template path (`RecordField.valueParam` resolution,
+  `~ P` / `= P` routing) goes with it. `TypeDefinition.parameters` non-empty ⟺ held body present becomes a
+  one-place invariant. No stand-in substitution, no masked walk: per #5's rule 3, an unapplied template gets
+  no verdict.
+
+- [ ] **4. Materialise: substitute the held body, then run the ordinary path.** `TemplateMaterialiser`
+  substitution collapses to one rule — rewrite tokens that resolve into the entry's `parameters` — over the
+  held AST, replacing the three shape-specific paths with one. It then re-enters desugar (expand *and* lift,
+  now that the body is concrete) and the resolver, landing on `DefinitionResolver.bindAtomInstance` for
+  instances, which already takes a `DataValue` and dispatches through the constructor's own compiled reader
+  with no name→class table. Keep what is already right: the memo registered before substitution (so regular
+  recursion ties the knot), the depth guard for non-regular recursion, `source` recording the flattened
+  application, and `internalName` deriving the entry name from it. Re-entrancy from materialisation into
+  binding already exists for open instances; what is new is that record templates resolve here too.
+
+- [ ] **5. Linker: templates leave the entry graph.** A held body is opaque to `TsonSchemaLinker`, so
+  references inside a template body are no longer validated at link time, `TypeInhabitance` must not count an
+  open entry as uninhabited (it has no body to walk), and §5.10.1's regularity rule effectively moves to
+  materialisation, where the depth guard already lives. Nothing here breaks silently — but each is a rule
+  moving phase, so each wants a test that pins where the error now comes from.
+
+- [ ] **6. Write side: an open entry emits as its declaration.** Resolved output for an open entry is the
+  declaration round-tripped (`test => <T> !array { element_type: T }`), not a `type_definition` instance —
+  which could not carry it anyway, `body: top` being REQUIRED. Resolved output stays a valid schema document
+  under §12.1 and stays re-resolvable. `ResolvedFixtureTest` splits its check by entry kind: closed entries
+  must still read back into `schema.meta`, open entries need only parse as a tree with valid annotations and
+  type-refs. That is an honestly weaker guarantee for open entries and it is the right one — no stronger claim
+  is available for a body containing `T`.
+
+- [ ] **7. Diagnostics: locate a materialisation error at the template's declaration.** With checking deferred,
+  the location is what keeps it survivable: a bad reference inside `<T> { x: some_typo }` must report at the
+  template's own line with the application as context, not at `box<text>`'s use site. `TypeDefinition`
+  already carries the declaration's `position` (the `@Unbound` component), so the location is in hand; this
+  is the `caused by` chain already tracked under "Schema-side diagnostics", and it stops being a nicety here.
+
+- [ ] **8. Delete the quotation vocabulary.** `TemplateArgument`, the `TemplateBinding` carrier, and
+  `RecordField.valueParam` — plus the `@Typename` binding on the repurposed `InstanceTemplate`, which no
+  longer binds against anything, since it is never serialised. `RecordField` returns to a plain
+  `Optional<Token> value`.
+
+- [ ] **9. Tests.** The flagship first: `result => <T> ( T | error )` closed via `result<text>`, which should
+  yield one instantiation entry with body `!choice { variants: [text error] }` and `disjoint` derived by the
+  ordinary machinery. Then `<T> [T, text]`, nested sized forms over a parameter, parametric enum members, and
+  `<N> !integer ^ { min: N }` — a form §12.1 currently has to forbid at the grammar and which becomes
+  ordinary once a refinement is held like anything else. Three existing tests assert the current refusal and
+  must invert: `TsonValidateSchemaTest`, `TsonCliTest`, `ContainerSugarEndToEndTest`. Note honestly that the
+  sibling conformance suite has no Part 2 layer, so there is nowhere to put a vector for any of this.
+
+- [ ] **10. Docs, in the same session as the change.** `docs/schema-grammar-and-desugaring.md` (the desugarer
+  stops being parameter-aware), `docs/schema-resolution.md` (held bodies, one substitution rule, the deferred
+  checking and where its diagnostics land), `docs/linking-and-compilation.md` (what the linker no longer
+  sees), and `CLAUDE.md`'s pipeline and "Not yet implemented" sections. Fold in the housekeeping while there:
+  `spec/tson-cr-structure-templates.md` is no longer in the repo, but `CLAUDE.md`, `BACKLOG.md` (the
+  resolved-form-ingest item above) and two `docs/` notes still cite it by path — re-point them at the
+  Revision 33 sections that executed it, or at the addendum that supersedes it.
+
 ## Miscellaneous
 
 - [ ] **General resolver-layer structural rules as reusable primitives**, rather than binding-time-only
