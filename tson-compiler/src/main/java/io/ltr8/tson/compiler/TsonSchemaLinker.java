@@ -32,7 +32,6 @@ import io.ltr8.tson.schema.meta.RegexType;
 import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.TimeType;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TupleElement;
 import io.ltr8.tson.schema.meta.TypeArgument;
@@ -791,17 +790,16 @@ public final class TsonSchemaLinker {
                 checkVariantsAreDistinct(entryName, c, namespace);
                 checkVariantsAreNotVoid(entryName, c, namespace);
             }
-            // A held body is opaque here, deliberately, and nothing about it is checkable at link time: it is
-            // the declaration as written, whose references cannot be resolved until substitution supplies the
-            // arguments. Reference validation, inhabitance, and §5.10.1's regularity rule therefore apply to
-            // it at materialisation instead, where the whole body resolves at once and the diagnostics carry
-            // the template's own declaration as their location. An unapplied template is checked nowhere and
-            // gets no verdict, which is the deliberate half: nothing in the document is wrong yet, and
-            // checking one by substituting stand-in arguments would report errors on templates that are
+            // A held body is opaque to everything that needs to know what a reference *resolves to*: that
+            // cannot be settled until substitution supplies the arguments, so type-kind validation and
+            // inhabitance apply to it at materialisation instead, where the whole body resolves at once.
+            // Checking it here by substituting stand-in arguments would report errors on templates that are
             // correct for every argument anyone passes (`<N> !integer ^ { min: N max: 3 }`).
-            // The closed-entry rule is unaffected -- a closed entry is validated in full, above.
-            case TemplateBody ignored -> {
-            }
+            //
+            // Arity is the exception, and it is decidable: it asks how many parameters the *referenced*
+            // entry declares, which no argument changes. See checkHeldArity for why that has to be asked
+            // here rather than left to an application that may never happen.
+            case TemplateBody held -> checkHeldArity(entryName, held, namespace, ownParameters);
             case Unit ignored -> {
             }
             case EnumBody ignored -> {
@@ -1076,6 +1074,36 @@ public final class TsonSchemaLinker {
                 validateTypeRef(nested.ref(), namespace, ownParameters, context);
             }
             // TypeArgument.Value is a literal token, not a type reference -- nothing to validate.
+        }
+    }
+
+    /**
+     * §5.10's arity rule over the <b>applications</b> a held body writes -- {@code chain => <T> { tail:
+     * chain<T, T>? }} applies two arguments to a one-parameter template, and nothing ever closes that
+     * application, so deferring the check would let the template ship with the mistake in it.
+     *
+     * <p><b>It can be answered without substituting</b>, which is why it belongs here at all: arity compares
+     * the argument count written against the parameter count the referenced entry declares, and neither
+     * number depends on what the arguments resolve to -- the only thing holding withholds.
+     *
+     * <p><b>Applications only, never bare names.</b> The rule's other half -- a template named without being
+     * applied -- is not decidable against a held body: its tokens are field names, states, literals and type
+     * references alike, so "this token names a template" rejects a correct schema whose field happens to be
+     * called {@code box} beside a template of that name. An application is a distinguishable shape in the
+     * wire tree; a bare name is not. So that half runs where the reference is unambiguous, on the entry
+     * materialisation mints -- and an unapplied template gets no verdict, which is the open form's own
+     * position rather than a shortfall ({@code SPEC-FEEDBACK.md} #5: "an unapplied template is checked no
+     * further and gets no verdict").
+     */
+    private static void checkHeldArity(String entryName, TemplateBody held,
+            Map<String, TypeDefinition> namespace, List<String> ownParameters) {
+        for (TypeRef application : held.applications()) {
+            checkArity(application, namespace, ownParameters, "'" + entryName + "'");
+            for (TypeArgument argument : application.arguments()) {
+                if (argument instanceof TypeArgument.Ref nested) {
+                    checkArity(nested.ref(), namespace, ownParameters, "'" + entryName + "'");
+                }
+            }
         }
     }
 

@@ -94,27 +94,22 @@ substitutes its parameters away (`TemplateBody`/`HeldBody`, `docs/schema-resolut
 removes Revision 33's collection-slot boundary — `result => <T> ( T | error )` resolves here and §5.10
 refuses it. `SPEC-FEEDBACK.md` #5 is the proposal, written as the design that works. What is left:
 
-- [ ] **Records and compositions onto held bodies, retiring `value_param`.** Attempted and **parked**; the
-  working patch is in the session scratchpad (`step3-wip.patch`). The shape is right and most of it works — a
-  structural template resolves as today and the resolved `RecordBody` is written back to wire form and held,
-  so composition flattens and refinement merges before holding, and the writer carries states, groups,
-  annotations and defaults with no shape remembered twice. `resolveRecordBody` puts a parametric modifier's
-  token in `value` rather than `value_param`, and §5.7's fixation (REQUIRED + a value present →
-  `REQUIRED_FIXED`) moves to where the substituted body is read back. A record template's closure stays the
-  instantiation entry itself rather than gaining a synthetic hop (§8.2). Three findings stopped it:
-    - **A held body has no slot types, and two checks depend on them.** The finding, and a property of
-      holding rather than a defect in the patch. §5.10's argument-kind rule — "a reference argument binds a
-      type parameter, a literal binds a value parameter" — is enforced by `value_param` saying *this slot
-      expects a value*; with the parameter in the ordinary `value` slot, a type name substituted there is
-      just a token and `box => <V> { v: int32 = V }` applied as `box<text>` passes silently. The same absence
-      has a second face: `type_ref` and `type_argument` both spell their first member `name`, so an
-      uninterpreted walk cannot tell a referenced type's name from an argument's name channel.
-    - **`<N> { v: [text; N..] }` throws `NoSuchElementException`** on the lifted-synthetic path — an ordinary
-      bug in the parked patch, undiagnosed, and the one thing there that is not a design consequence.
-    - **`TemplateRegularity` becomes unreachable** once every template body is held, and wants either
-      deletion or an `applications()` on `TemplateBody` — the same shape as `names()`, returning the
-      applications the held tree holds — which would put §5.10.1 back at the declaration.
-    - Two tests invert with it and are written in the patch already.
+- [ ] **A field's `~`/`=` value is never checked against the field's own declared type, and the failure wears
+  the wrong clothes.** meta-kernel's `@doc` on `value` states the dependency outright -- `record_field.value`
+  holds "the type of fixed/default values, **which must be the field's declared type** -- a dependency the
+  schema language does not express directly" -- and nothing enforces it. `{ first: int32 ~ "nope" }` resolves,
+  links and compiles; the first read of that type throws
+  `UnsupportedOperationException: '…' has no usable compiled reader … 'nope' is not a valid integer`.
+  - **Not template-specific**, and worth saying so: `test1 => <T, N> { first: T ~ N }` applied as
+    `test1<int32, "nope">` behaves *identically* to the literal spelling beside it. The template inherits the
+    hole rather than opening one, which is also why §5.10's argument-kind rule is the wrong instrument --
+    both sides there are correctly kinded (a value argument bound to a value parameter) and the kind rule has
+    nothing to say, where value-conformance catches it. `SPEC-FEEDBACK.md` #5 carries the recommendation.
+  - **The exception classification is wrong today**, which is the part that is a defect rather than a gap. A
+    default that is not valid for its field's type is an author error whose verdict does not change as this
+    library improves, so it belongs in `TsonSchemaValidationException` at the declaration -- not in the
+    `ErrorReader` path, whose `UnsupportedOperationException` says "library gap" and carries the CLI's exit 70.
+    Reachable from an ordinary schema, so this half is worth fixing even before the check itself lands.
 
 - [ ] **A parametric enum member is classified as a type argument and fails.** `e => <M> !enum { members:
   [a b M] }` applied as `e<c>` reports `'e<c>' source has an unresolved reference 'c'`: an unquoted
@@ -127,21 +122,28 @@ refuses it. `SPEC-FEEDBACK.md` #5 is the proposal, written as the design that wo
   A defect inside a held body reports at the application (`/use`) rather than the template (`/box`), because
   the walk back to a positioned entry finds the application first. Recording which declaration each derived
   entry was minted for would fix it: message text is unchanged, only the location moves — from the line that
-  used the template to the line that contains the mistake. Modest today, since a desugar-lifted form already
-  lands correctly and the form is named either way. **It stops being modest if records are held**: every
-  template defect then moves to the use site, so this and the item above are one job.
+  used the template to the line that contains the mistake. It applies to every defect only *materialisation*
+  can reach: `box<3>` against `box => <T> { v: T }` says `'box<3>' field 'v' has an unresolved reference '3'`,
+  naming the application rather than the line holding the mistake. The declaration-time checks land correctly
+  already (§5.11 uniqueness in the desugar phase, §5.10.1 regularity and §5.10 arity at the linker), which is
+  what keeps the common errors located where the author can act on them, so this is the residue rather than
+  the bulk.
 
 - [ ] **Widen the kernel's `reference` from `target: type_name` to a `type_ref`.** A partial application
   (`uuid_pair => <B> pair<uuid, B>`) is the one template that holds nothing — it keeps the `type_ref` with
   arguments it already resolves to, because a `reference` body has nowhere to put an argument list. Widening
   the slot would let it carry one, making **every** template body an application and restoring the
   biconditional `TemplateBody`'s Javadoc currently has to weaken (a held body means a template, but not the
-  reverse). Interacts with §8.3: the flattening walk would have to stop at an application, the way it already
+  reverse).
+  - **It is the only case left, which is what makes it more than a modelling tidy.** An open entry's body is a
+    `HeldBody` or a `Reference` and nothing else, so closing this one collapses `TemplateMaterialiser.close`
+    from two branches to one. Still worth proposing on its own merits rather than folding into #5. Interacts with §8.3: the flattening walk would have to stop at an application, the way it already
   stops at a materialised instantiation. Worth proposing on its own merits rather than folding into #5.
 
 - [ ] **meta-kernel drops `instance_template` and `template_argument` once a revision carries the design.**
-  Both are declared in `spec/m/meta-kernel.tn` and nothing produces them any more; `record_field`'s
-  `( value | value_param )?` group narrows to `value?` at the same time, when records hold their bodies. Not
+  Both are declared in `spec/m/meta-kernel.tn` and nothing produces them any more. `record_field`'s
+  `( value | value_param )?` group narrows to `value?` at the same time, nothing producing `value_param` any
+  more either. Not
   done here on purpose — the bundled schemas are Revision 33's artifacts and stay byte-identical, so no
   digest and no `*-resolved.tn` fixture moves for a divergence the spec has not adopted. When it lands:
   three declarations out of the kernel, the `map_field_name_template_argument_xxhash` synthetic out of

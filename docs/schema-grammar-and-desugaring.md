@@ -293,6 +293,51 @@ rebuilt and called a cache.
     serves both, since a parameter in a slot is simply the token standing there. `instance(binding,
     typeParams)` builds either, and the phase needs no rule for how to quote a parameter — only for whether
     the declaration around it has one.
+- **A record template is normalised here too, and for the same reason the sugar forms are** (`recordBinding`).
+  §5.2 says a bare record body denotes `!record { fields: [ … ] }`, so `test => <T> { x: T }` leaves this
+  phase as `test => <T> !record { fields: [ { name: x  type: T } ] }` — a held application like `<T> [T]`, and
+  closed by the same process. The rule is as fixed and as closed as the sugar table: §5.2's six field
+  spellings decide `state` and `value` from the two marks the author wrote, and nothing else is consulted.
+  - **Only a *template*.** A closed record still resolves at its declaration into a `RecordBody`, because
+    nothing about it is deferred. The two paths share the §5.2 state table (`FieldModifiers`) so the six
+    spellings and the errors around them cannot drift apart between a template and the closed record beside it.
+  - **Only what the author wrote is written.** `access_pattern` and `size_type` are `REQUIRED_FIXED` on the
+    `record` constructor, and an unmarked field's `REQUIRED` is that constructor's own default, so none of the
+    three is stated — the same economy `arrayBinding` makes with an unmarked element's `state`, and what keeps
+    the held form the one the author would recognise.
+  - **The rewrite has to be here rather than in the resolver**, and that is the finding the earlier attempt
+    turned on. Resolving the body and writing the resolved form back out puts a *second producer* in front of
+    a wire form two later phases read, and they disagree: `TsonObjectWriter` states a no-argument `type_ref`
+    in the explicit record form (`{ name: N  arguments: [] }`) where this phase states it positionally (`N`).
+    That makes a `type_argument` indistinguishable from a `type_ref` application to a walk that reads neither
+    against a vocabulary — and since `internalName` hashes what is written, a second spelling is also a second
+    entry for one type. One producer, one spelling: `refValue` is the single place a type slot's shape is
+    decided.
+  - **A parameter rides the ordinary `value` slot**, with §8.1's shadowing rule to tell it from a literal,
+    which retires `record_field.value_param`. §5.7's fixation then happens at materialisation
+    (`TemplateMaterialiser.fixRoutedValues`), where the value is concrete.
+  - **A composition or refinement template is held too, but from one phase later** (`heldRecord`, called by
+    `DefinitionResolver.holdIfOpen`). Both absorb fields from a source, and the form to hold is the
+    *flattened* one — a §5.7 tightening entry states a modifier and no type-ref, so it is not a `record_field`
+    at all until the inherited field supplies one. That needs a namespace this phase does not have, so the
+    rewrite happens in the resolver; the **spelling** stays here, which is the whole point. `heldRecord` and
+    `recordBinding` are two producers of the wire form and one producer of its spelling.
+    - **`TsonObjectWriter` cannot serve as that second producer**, which is why `heldRecord` exists rather
+      than a round-trip. Measured against the desugar spelling it differs five ways: `{ name: "text"
+      arguments: [] }` for a bare `text`, `!ref { … }` for a `type_argument`, every token quoted, `state:
+      REQUIRED` written where the default covers it, and `value_param` kept. The first two are the
+      two-spellings problem; the third is fatal on its own, since `TemplateBody.names()` and substitution
+      both key on a token being *unquoted*, so a fully-quoted body references no parameters at all. Its
+      output is canonical-explicit — a different language from the one a held body is written in.
+    - **The writer is still used for exactly one leaf**: a resolved annotation carries its value as a *bound
+      object* (`Annotation.value` is `Optional<Object>`), and unbinding one is what an object writer is for.
+      That is a self-contained value rather than part of the spelling, so it goes through
+      `DefinitionResolver.annotationWireValue` and nothing structural does.
+  - **§5.11's uniqueness rule is asked here as well**, and asking it twice is not duplication: the resolver's
+    copy sees a closed record body and this one sees a template's, which after normalisation are two
+    different phases. Left to the constructor's own reader instead, the wire form carries two `record_field`
+    records in an array, where repetition is not an error at all — so `bl => <T> { v: T  v: T }` would ship
+    with no verdict.
 - **Every entry it lifts is a *synthetic* entry, and is marked as one.** `SchemaDesugarer.lifted(original,
   desugared)` is the set difference between the two documents, and that set is exactly what §8.2's derived
   `@synthetic` marker goes on — attached at the schema-map key by the caller, not here, since this phase

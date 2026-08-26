@@ -1,6 +1,7 @@
 package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -160,6 +161,13 @@ final class TemplateRegularity {
      */
     private static List<Application> applicationsIn(TypeDefinition template) {
         List<Application> found = new ArrayList<>();
+        // A held body is not rewritable, so it answers for itself: `applications()` is the same kind of
+        // declared question as `names()`, and returning the applications the wire tree holds is what keeps
+        // this rule at the declaration now that every open body is held.
+        if (template.body() instanceof TemplateBody held) {
+            held.applications().forEach(ref -> collect(ref, found));
+            return found;
+        }
         TemplateMaterialiser.mapBodyRefs(template.body(), ref -> {
             collect(ref, found);
             return ref;

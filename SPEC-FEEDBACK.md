@@ -401,15 +401,51 @@ that what is proposed and what is known to work are the same thing.
 survive the trip. §5.10's argument-kind rule ("a reference argument binds a type parameter, a literal binds a
 value parameter") is enforced today by `record_field.value_param`, whose presence is what says *this slot
 expects a value*; where a parameter stands in an ordinary value slot, a type name substituted there is a
-token like any other. If the kind rule is to be kept, the open form has to carry the slot's expectation
-somewhere — which is what `value_param` is, under another name. §5.10 should say which of its checks are
-declaration-time and which are materialisation-time under an open form, rather than leaving an implementation
-to discover that one of them is neither.
+token like any other. §5.10 should say which of its checks are declaration-time and which are
+materialisation-time under an open form, rather than leaving an implementation to discover that one of them
+is neither.
 
-**Scope of what is built.** Instance templates — the sugar forms and the explicit `<T> !C { … }` — hold their
-bodies here, and that is what the flagship case turns on. Record and composition templates still resolve at
-their declaration and still use `record_field.value_param` for a parameter routed into a field's value; §5.10
-would presumably want them held too, and the argument-kind finding above is the open question in the way.
+Built out, the loss is **half the rule, and the wrong half to worry about**. A literal applied where the body
+uses the parameter as a *type* is still refused, because the substituted token stands in a type position and
+nothing declares a type called `3` — the verdict arrives as an unresolved reference rather than as a kind
+error, but it arrives. Only the converse escapes: a type name applied where the body routes the parameter into
+a field's *value*, which `value` (§4's escape-hatch atom) accepts.
+
+**And the converse is better closed by a rule §5.2 already states than by the kind rule.** meta-kernel's own
+`@doc` on `value` says `record_field.value` holds "the type of fixed/default values, **which must be the
+field's declared type** — a dependency the schema language does not express directly". Enforce that and
+`retry => <N> { attempts: int32 ~ N }` applied as `retry<text>` fails because `text` is not an `int32` —
+whether a parameter put it there or the author wrote it literally, and with no notion of a parameter's kind
+involved. What it would not catch is a type name applied into a `text`-typed value slot, which is a value slot
+holding a valid value: no error to give. **So the recommendation is to drop the argument-kind rule rather than
+find a home for the slot's expectation**, and to state the value-conformance dependency §8.1 currently
+describes as inexpressible. That removes the one check holding cannot carry, and removes it by strengthening a
+rule the format wanted anyway.
+
+**Scope of what is built.** **Every** template shape holds its body, and one process closes them all: the sugar
+forms, the explicit `<T> !C { … }`, record templates, and composition and refinement templates. §5.2 already
+says a bare record body denotes `!record { fields: [ … ] }`, so `<T> { x: T }` is normalised to that and closes
+the way `<T> [T]` does. A composition or refinement is resolved against its namespace first and the *flattened*
+record is held — a §5.7 tightening entry states a modifier and no type-ref, so it is not a `record_field` until
+the inherited field supplies one — which is the one reason those two are normalised a phase later than the rest.
+
+**So `record_field.value_param` has no producer left**, and §5.10 can retire the channel along with
+`instance_template` and `template_argument`. A routed parameter rides the ordinary `value` slot with §8.1's
+shadowing rule to tell it from a literal, and §5.7's fixation moves to materialisation — where §5.7 already says
+it belongs ("fixation happens downstream, where values are concrete"). The kernel's `record_field` group narrows
+from `( value | value_param )?` to `value?`.
+
+**One implementation note the spec should absorb, because it is a property of the design and not of this
+codebase: the open form needs one spelling, however many phases produce it.** An open body is read by later
+phases as wire form, and an entry's derived name is a hash of what is written, so two *spellings* of one form
+are two entries for one type — and worse, a serialiser that states a no-argument `type_ref` in the explicit
+record form where the sugar table states it positionally makes `type_argument` and `type_ref`
+indistinguishable to a walk that reads neither against a vocabulary. The trap is concrete: an ordinary
+canonical-explicit object writer is exactly the wrong producer, and not only for that reason — it quotes every
+token, where a held body's whole parameter mechanism keys on a token being *unquoted*, so a written-out body
+references no parameters at all. Two of the four shapes here genuinely cannot be normalised syntactically
+(composition and refinement need a namespace to flatten against), so "produce it in one phase" is not
+achievable; "produce it in one spelling" is, and is what §5.10 should require.
 
 **If Revision 34 wants a smaller edit than all of that**, one scoped change resolves the flagship case
 against Revision 33 as shipped: restate §5.10's uniformity rule so that an open entry carries an ordinary
@@ -422,8 +458,9 @@ of templates that already work, `<T> { v: [T] }` ceasing to lift an `instance_te
 **Status against Revision 33:** open, new against this revision. The same gap was raised against Revision 32
 as #53 and declined, §5.10 gaining the explicit boundary sentence and §8.1 the uniform-quotation rationale in
 response. The design above is implemented here and passing: the flagship `result => <T> ( T | error )`,
-`<T> [T, text]`, `<T> { v: (T | text) }` and nested sized forms all resolve, and every schema that resolved
-before produces the same entries it did.
+`<T> [T, text]`, `<T> { v: (T | text) }` and nested sized forms all resolve, every template shape holds its
+body, `value_param` has no producer left, and every schema that resolved before produces the same entries it
+did.
 
 ---
 

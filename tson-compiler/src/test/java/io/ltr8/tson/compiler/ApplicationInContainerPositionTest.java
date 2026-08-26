@@ -130,8 +130,12 @@ class ApplicationInContainerPositionTest {
                   tree => <T> { value: T  children: [tree<T>; 1..]? }
                   use  => { t: tree<text> }""");
 
-        TypeDefinition open = compiled.schema().entries().values().stream()
-                .filter(d -> d.body() instanceof TemplateBody).findFirst().orElseThrow();
+        // The lifted synthetic, by its derived name: `tree` itself holds a body too now (a record template
+        // is normalised into the `!record { ... }` §5.2 says it denotes), so "the first held body" no longer
+        // names this one.
+        TypeDefinition open = compiled.schema().entries().entrySet().stream()
+                .filter(e -> e.getKey().startsWith("array_") && e.getValue().body() instanceof TemplateBody)
+                .findFirst().orElseThrow().getValue();
         TemplateBody body = (TemplateBody) open.body();
 
         assertEquals(List.of("p0"), open.parameters(), "renamed positionally, as every open synthetic is");

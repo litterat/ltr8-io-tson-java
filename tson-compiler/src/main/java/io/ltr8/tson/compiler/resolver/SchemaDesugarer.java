@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.compiler.ast.Annotation;
 import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
@@ -31,7 +32,12 @@ import io.ltr8.tson.compiler.ast.schema.TypeArg;
 import io.ltr8.tson.compiler.ast.schema.TypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeRef;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.schema.meta.ElementState;
+import io.ltr8.tson.schema.meta.FieldGroup;
+import io.ltr8.tson.schema.meta.FieldState;
+import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.SourcePosition;
 
 import java.math.BigInteger;
@@ -43,6 +49,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 /**
@@ -82,12 +89,11 @@ import java.util.function.UnaryOperator;
  * holding one has the inner form injected under its own derived name and becomes a bare reference to it.
  * The enclosing container then routes a plain name like any other, at any depth. See {@link #elementRef}.
  *
- * <p><b>An application is a user template, and applying one is not implemented.</b> {@code name&lt;args&gt;}
- * resolves its head through the type-name namespace only (§3.3.1) -- parameters, then locals, then imports
- * -- so it can only ever be a §5.10 template application. Substitution has no implementation, and leaving
- * the application alone produced a schema that linked and compiled and then failed on the first read that
- * reached the field, so it is rejected here, at the site that writes it. See {@link
- * #rejectTemplateApplication}.
+ * <p><b>An application is a user template, and it passes through.</b> {@code name&lt;args&gt;} resolves its
+ * head through the type-name namespace only (§3.3.1) -- parameters, then locals, then imports -- so it can
+ * only ever be a §5.10 template application, and {@code TemplateMaterialiser} closes it over the
+ * <em>resolved</em> form one phase later. What is checked here is the one thing an AST alone decides: a head
+ * this document declares with no parameters takes no arguments at all. See {@link #checkTemplateApplication}.
  *
  * <p><b>Structural sharing.</b> Every method returns its input unchanged when nothing beneath it changed, so
  * a document with no sugar comes back as the same object graph. Source positions live in identity-keyed side
@@ -121,6 +127,9 @@ final class SchemaDesugarer {
     /** §5.4's desugar target for {@code (A | B)}. */
     private static final String CHOICE = "choice";
 
+    /** §5.2's desugar target for a bare record body {@code { x: T }} -- the constructor it denotes. */
+    private static final String RECORD = "record";
+
     /** The vocabulary fields the desugar table binds -- fixed by the table, not looked up in a governing meta. */
     private static final String ELEMENT_TYPE = "element_type";
     private static final String KEY_TYPE = "key_type";
@@ -130,6 +139,14 @@ final class SchemaDesugarer {
     private static final String MAX_ITEMS = "max_items";
     private static final String ELEMENTS = "elements";
     private static final String VARIANTS = "variants";
+
+    /** {@code record}'s own collection fields, and {@code record_field}'s scalar ones. */
+    private static final String FIELDS = "fields";
+    private static final String GROUPS = "groups";
+    private static final String MEMBERS = "members";
+    private static final String FIELD_NAME = "name";
+    private static final String TYPE = "type";
+    private static final String SUPERTYPES = "supertypes";
 
     /** {@code type_ref}'s own two fields, for the record form a slot takes when it holds an application. */
     private static final String NAME = "name";
@@ -156,6 +173,12 @@ final class SchemaDesugarer {
      *
      * <p>It is deliberately never in {@code TsonSchemaParser.declarationPositions()} -- the position belongs
      * to the diagnostic already reported against the real declaration, not to this stand-in.
+     *
+     * <p><b>Keeping those parameters used to make it the last parameterised {@code RecordBody} in the
+     * system</b>, and so kept a whole second substitution path alive in {@code TemplateMaterialiser} to
+     * serve a body with no fields to substitute into. It is held like every other open body now
+     * ({@link #heldEmptyRecord}, applied by {@code DefinitionResolver.holdIfOpen} where this resolves), which
+     * is what lets that path delete.
      */
     private static TypeDef absorbed(SchemaMap.Declaration declaration) {
         return new StructuralTypeDef(typeParams(declaration.typeDef()), false, new RecordDef(List.of()));
@@ -344,6 +367,13 @@ final class SchemaDesugarer {
                 // applies. Only a form mentioning one of the declaration's own parameters is left alone --
                 // see currentParameters.
                 StructuralDef body = structuralDef(structural.body());
+                // §5.2's own rewrite, applied where the body is written: a bare record body denotes
+                // `!record { fields: [ ... ] }`, so a record template becomes the construction it always
+                // was and is held like every other open form. See recordBinding.
+                if (!structural.typeParams().isEmpty() && !structural.constructor()
+                        && body instanceof RecordDef record) {
+                    yield instance(recordBinding(record), structural.typeParams());
+                }
                 yield body == structural.body() ? structural
                         : new StructuralTypeDef(structural.typeParams(), structural.constructor(), body);
             }
@@ -530,12 +560,21 @@ final class SchemaDesugarer {
      */
     private static void refSlot(String slot, TypeRef ref, List<RecordValue.Field> fields,
             Map<String, TypeRef> applicationSlots) {
-        if (ref instanceof SimpleRef simple) {
-            fields.add(nameField(slot, simple.name()));
-            return;
+        fields.add(new RecordValue.Field(slot, scoped(refValue(ref))));
+        if (!(ref instanceof SimpleRef)) {
+            applicationSlots.put(slot, ref);
         }
-        fields.add(new RecordValue.Field(slot, scoped(refRecord((GenericRef) ref))));
-        applicationSlots.put(slot, ref);
+    }
+
+    /**
+     * What a {@code type_ref}-typed slot holds: a bare token for a plain name, {@code type_ref}'s record
+     * form for an application. <b>One spelling per shape, produced in one place</b> -- a slot written two
+     * ways is a slot two phases disagree about, and {@link #internalName} hashes what is written, so a
+     * second spelling of one reference splits one type across two entries.
+     */
+    private static CoreValue refValue(TypeRef ref) {
+        return ref instanceof SimpleRef simple ? new TokenValue(simple.name(), TokenForm.UNQUOTED)
+                : refRecord((GenericRef) ref);
     }
 
     /**
@@ -688,6 +727,237 @@ final class SchemaDesugarer {
         }
         return Optional.of(new Binding(CHOICE,
                 List.of(new RecordValue.Field(VARIANTS, scoped(new ArrayValue(members))))));
+    }
+
+    /**
+     * {@code !record { fields: [ { name: x  type: T } ... ] }} -- §5.2's own rewrite of a bare record body,
+     * applied where the body is written so that a record template holds an application like every other open
+     * form.
+     *
+     * <p><b>Why here rather than in the resolver.</b> The alternative is to resolve the body and write the
+     * result back out, and it does not work: the wire form is what {@link #internalName} hashes and what
+     * substitution walks, so a second producer of it is a second spelling of the same thing --
+     * {@code TsonObjectWriter} states a no-argument {@code type_ref} in the explicit record form where this
+     * phase states it positionally, which makes a {@code type_argument} indistinguishable from a
+     * {@code type_ref} application to a walk that reads neither against a vocabulary. §5.2's rewrite is
+     * syntactic, as fixed and as closed as the sugar table above, so it belongs beside it.
+     *
+     * <p><b>Only what the author wrote is written.</b> {@code access_pattern} and {@code size_type} are
+     * {@code REQUIRED_FIXED} on the {@code record} constructor and a field's unmarked {@code REQUIRED} is
+     * that constructor's own default, so neither is stated -- the same economy {@link #arrayBinding} makes
+     * with an unmarked element's {@code state}, and what keeps the held form the one the author would
+     * recognise.
+     *
+     * <p><b>A parameter rides the ordinary {@code value} slot</b>, with §8.1's shadowing rule to tell it from
+     * a literal. That is what a held body buys and what retires {@code record_field.value_param}: the
+     * separate channel existed because a body read as constructor vocabulary at its declaration cannot
+     * otherwise say which of the two a token is, and a held body is read as vocabulary only once its
+     * parameters are gone. §5.7's fixation then happens at materialisation, where {@code TemplateMaterialiser}
+     * turns a {@code REQUIRED} field that has acquired a value into {@code REQUIRED_FIXED}.
+     */
+    private Binding recordBinding(RecordDef record) {
+        List<ScopedValue> fields = new ArrayList<>();
+        List<ScopedValue> groups = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
+        for (RecordEntry entry : record.entries()) {
+            switch (entry) {
+                case FieldDef field -> {
+                    requireFieldNameUnseen(field.name(), seen, "this body declares it twice");
+                    fields.add(recordField(field));
+                }
+                case GroupDef group -> {
+                    List<ScopedValue> members = new ArrayList<>();
+                    for (GroupDef.Member member : group.members()) {
+                        requireFieldNameUnseen(member.name(), seen, "a group member repeats it -- member "
+                                + "labels share the enclosing record's field namespace");
+                        // A group's members are ordinary OPTIONAL fields of the record, and the group records
+                        // only their names and its own state (§5.11) -- the same shape the resolver builds.
+                        fields.add(scoped(new RecordValue(List.of(
+                                nameField(FIELD_NAME, member.name()),
+                                new RecordValue.Field(TYPE, scoped(refValue(member.typeRef()))),
+                                nameField(STATE, FieldState.OPTIONAL.name()))), member.annotations()));
+                        members.add(scoped(new TokenValue(member.name(), TokenForm.UNQUOTED)));
+                    }
+                    List<RecordValue.Field> groupFields = new ArrayList<>();
+                    groupFields.add(new RecordValue.Field(MEMBERS, scoped(new ArrayValue(members))));
+                    if (group.optional()) {
+                        groupFields.add(nameField(STATE, ElementState.OPTIONAL.name()));
+                    }
+                    groups.add(scoped(new RecordValue(groupFields), group.annotations()));
+                }
+            }
+        }
+        List<RecordValue.Field> binding = new ArrayList<>();
+        binding.add(new RecordValue.Field(FIELDS, scoped(new ArrayValue(fields))));
+        if (!groups.isEmpty()) {
+            binding.add(new RecordValue.Field(GROUPS, scoped(new ArrayValue(groups))));
+        }
+        return new Binding(RECORD, binding);
+    }
+
+    /**
+     * The same {@code !record { … }} held body, built from a body that is <b>already resolved</b> -- the form
+     * a composition or refinement template arrives in, since both absorb fields from a source and so cannot
+     * be rewritten before there is a namespace to absorb from.
+     *
+     * <p><b>It lives here, next to {@link #recordBinding}, because the spelling is what must not fork.</b>
+     * Two producers of the held wire form are fine; two <em>spellings</em> of it are not, and that is the
+     * whole lesson of the record case. So both go through {@link #refValue} and {@link #nameField} and write
+     * the same shape: an unquoted token where the writer would quote, a bare name where the writer would
+     * state {@code { name: X  arguments: [] }}, and nothing at all where the constructor's own default says
+     * it. {@code TsonObjectWriter} cannot serve: its output is canonical-explicit and fully quoted, which is
+     * a different language from the one a held body is written in -- {@code TemplateBody.names()} and
+     * substitution both key on a token being unquoted, so a quoted body references no parameters at all.
+     *
+     * <p><b>{@code annotationValue} is the one thing this cannot do itself.</b> A resolved annotation carries
+     * its value as a <em>bound object</em> ({@code Annotation.value} is {@code Optional<Object>}), and
+     * unbinding one is exactly what an object writer is for -- so the caller passes that single leaf in and
+     * everything structural stays here.
+     *
+     * <p><b>{@code value_param} does not survive the trip, deliberately.</b> A routed parameter is written
+     * into the ordinary {@code value} slot like every other token, which is what retires the channel for this
+     * shape; §5.7's fixation then happens at materialisation, where the value is concrete.
+     */
+    /**
+     * The held body an <b>error placeholder</b> carries -- {@code !record { fields: [] }}, the zero-field
+     * record both absorbing stand-ins already stood for, now held like every other open body.
+     *
+     * <p><b>It exists so that "an open entry's body is held or a {@code Reference}" has no exceptions.</b>
+     * A placeholder keeps its declaration's type parameters on purpose (answering "how many?" with zero
+     * sends a downstream {@code bl<text>} to fix the wrong declaration), which used to make it the last
+     * producer of a parameterised {@code RecordBody} -- and so kept a whole second substitution path alive
+     * to serve a body that has no fields to substitute into.
+     *
+     * <p>Built structurally rather than through {@link #heldRecord}: a placeholder is what a <em>reported</em>
+     * declaration leaves behind, so the one thing it must not do is fail again, and an empty record needs
+     * neither a namespace nor a writer to state.
+     */
+    static DataValue heldEmptyRecord() {
+        return new DataValue(List.of(), Optional.of(RECORD), new RecordValue(List.of(
+                new RecordValue.Field(FIELDS, scoped(new ArrayValue(List.of()))))));
+    }
+
+    static DataValue heldRecord(RecordBody body, Function<Object, DataValue> annotationValue) {
+        List<ScopedValue> fields = new ArrayList<>();
+        for (RecordField field : body.fields()) {
+            List<RecordValue.Field> members = new ArrayList<>();
+            members.add(nameField(FIELD_NAME, field.name()));
+            members.add(new RecordValue.Field(TYPE, scoped(refValue(field.type()))));
+            if (field.state() != FieldState.REQUIRED) {
+                members.add(nameField(STATE, field.state().name()));
+            }
+            // The two channels collapse into one: a literal keeps its own token form, and a routed parameter
+            // is a bare name standing where the literal would.
+            field.value().ifPresent(token -> members.add(new RecordValue.Field(VALUE,
+                    scoped(new TokenValue(token.text(), tokenForm(token.form()))))));
+            field.valueParam().ifPresent(parameter -> members.add(nameField(VALUE, parameter)));
+            fields.add(scoped(new RecordValue(members), annotations(field.annotations(), annotationValue)));
+        }
+        List<ScopedValue> groups = new ArrayList<>();
+        for (FieldGroup group : body.groups()) {
+            List<RecordValue.Field> members = new ArrayList<>();
+            members.add(new RecordValue.Field(MEMBERS, scoped(new ArrayValue(group.members().stream()
+                    .map(member -> scoped(new TokenValue(member, TokenForm.UNQUOTED))).toList()))));
+            if (group.state() != ElementState.REQUIRED) {
+                members.add(nameField(STATE, group.state().name()));
+            }
+            groups.add(scoped(new RecordValue(members)));
+        }
+        List<RecordValue.Field> binding = new ArrayList<>();
+        if (!body.supertypes().isEmpty()) {
+            binding.add(new RecordValue.Field(SUPERTYPES, scoped(new ArrayValue(body.supertypes().stream()
+                    .map(supertype -> scoped(new TokenValue(supertype, TokenForm.UNQUOTED))).toList()))));
+        }
+        binding.add(new RecordValue.Field(FIELDS, scoped(new ArrayValue(fields))));
+        if (!groups.isEmpty()) {
+            binding.add(new RecordValue.Field(GROUPS, scoped(new ArrayValue(groups))));
+        }
+        return new DataValue(List.of(), Optional.of(RECORD), new RecordValue(binding));
+    }
+
+    /** A resolved annotation carrier back in wire form, its bound value unbound by the caller's writer. */
+    private static List<Annotation> annotations(Annotations resolved, Function<Object, DataValue> annotationValue) {
+        if (resolved.values().isEmpty()) {
+            return List.of();
+        }
+        List<Annotation> written = new ArrayList<>();
+        for (io.ltr8.annotation.Annotation annotation : resolved.values()) {
+            written.add(new Annotation(annotation.name(), annotation.value().map(annotationValue)));
+        }
+        return written;
+    }
+
+    /** A resolved type reference in the held spelling: a bare name, or {@code type_ref}'s record form. */
+    private static CoreValue refValue(io.ltr8.tson.schema.meta.TypeRef ref) {
+        if (ref.arguments().isEmpty()) {
+            return new TokenValue(ref.name(), TokenForm.UNQUOTED);
+        }
+        List<ScopedValue> arguments = new ArrayList<>();
+        for (io.ltr8.tson.schema.meta.TypeArgument argument : ref.arguments()) {
+            arguments.add(scoped(new RecordValue(List.of(switch (argument) {
+                case io.ltr8.tson.schema.meta.TypeArgument.Ref reference ->
+                        new RecordValue.Field(NAME, scoped(refValue(reference.ref())));
+                case io.ltr8.tson.schema.meta.TypeArgument.Value literal ->
+                        new RecordValue.Field(VALUE, scoped(new TokenValue(literal.value().text(),
+                                tokenForm(literal.value().form()))));
+            }))));
+        }
+        return new RecordValue(List.of(nameField(NAME, ref.name()),
+                new RecordValue.Field(ARGUMENTS, scoped(new ArrayValue(arguments)))));
+    }
+
+    private static TokenForm tokenForm(io.ltr8.tson.schema.meta.Token.Form form) {
+        return switch (form) {
+            case UNQUOTED -> TokenForm.UNQUOTED;
+            case SINGLE_LINE_QUOTED -> TokenForm.SINGLE_LINE_QUOTED;
+            case MULTI_LINE_QUOTED -> TokenForm.MULTI_LINE_QUOTED;
+        };
+    }
+
+    /**
+     * §5.11's uniqueness rule, over the body this phase is rewriting: a field name is unique across a
+     * record's plain fields and all its groups' members.
+     *
+     * <p><b>It has to be asked here as well as in the resolver</b>, and asking it twice is not duplication:
+     * the resolver's copy sees a closed record body, this one sees a template's, and after normalisation
+     * those are two different phases. The rule is syntactic -- two entries, one name -- so it needs nothing
+     * the resolver has and this phase does not. Left to the constructor's own reader instead, the wire form
+     * would carry two {@code record_field} records in an array, where repetition is not an error at all.
+     */
+    private static void requireFieldNameUnseen(String name, Set<String> seen, String explanation) {
+        if (!seen.add(name)) {
+            throw new TsonSchemaValidationException("field '" + name + "' is declared more than once -- "
+                    + explanation + " (§5.11: a field name is unique across a record's plain fields and all "
+                    + "its groups' members)");
+        }
+    }
+
+    /**
+     * One {@code record_field}, with {@code state} and {@code value} written only where the author's marks
+     * say something the constructor's own defaults do not.
+     *
+     * <p>A field with no type-ref is a §5.7 tightening entry, which needs a source to elide toward and so
+     * cannot appear in the fresh record body this builds -- {@link FieldModifiers} has no view of an
+     * inherited field, and neither does this phase.
+     */
+    private ScopedValue recordField(FieldDef field) {
+        if (field.type().isEmpty()) {
+            throw new TsonSchemaValidationException("field '" + field.name() + "' states only a modifier and no "
+                    + "type-ref, but names no inherited field to take a type from -- a modifier-only entry is "
+                    + "always a tightening, so it is only meaningful in a refinement or composition body, "
+                    + "against a field the source declares (§5.7)");
+        }
+        FieldDef.FieldType type = field.type().orElseThrow();
+        FieldModifiers.Resolved resolved =
+                FieldModifiers.of(field.name(), type.optional(), field.modifier(), currentParameters);
+        List<RecordValue.Field> members = new ArrayList<>();
+        members.add(nameField(FIELD_NAME, field.name()));
+        members.add(new RecordValue.Field(TYPE, scoped(refValue(type.typeRef()))));
+        if (resolved.state() != FieldState.REQUIRED) {
+            members.add(nameField(STATE, resolved.state().name()));
+        }
+        resolved.value().ifPresent(token -> members.add(new RecordValue.Field(VALUE, scoped(token))));
+        return scoped(new RecordValue(members), field.annotations());
     }
 
     /**
@@ -981,7 +1251,16 @@ final class SchemaDesugarer {
 
     /** A bare value in a field or element position -- no schema directive, no annotations, no type-ref of its own. */
     private static ScopedValue scoped(CoreValue value) {
-        return new ScopedValue(Optional.empty(), new DataValue(List.of(), Optional.empty(), value));
+        return scoped(value, List.of());
+    }
+
+    /**
+     * The same, carrying the annotations written on the construct it stands for. §6 puts a field's own
+     * annotations on the {@code record_field} in resolver output, and a held body reaches that through the
+     * wire value, so they travel here rather than being re-attached after the fact.
+     */
+    private static ScopedValue scoped(CoreValue value, List<Annotation> annotations) {
+        return new ScopedValue(Optional.empty(), new DataValue(annotations, Optional.empty(), value));
     }
 
     // ── Internal names (§8.2) ────────────────────────────────────────────────────────────────────
