@@ -2,8 +2,11 @@ package io.ltr8.tson.schema.meta;
 
 /**
  * The body of a template -- an entry declaring type parameters, which §5.10 calls open -- held in the form it
- * was written rather than resolved into constructor vocabulary. An entry's {@link TypeDefinition#parameters}
- * being non-empty and its {@link TypeDefinition#body} being one of these imply each other.
+ * was written rather than resolved into constructor vocabulary. One direction only: a {@link
+ * TypeDefinition#body} that is one of these means the entry declares {@link TypeDefinition#parameters}, but
+ * not every template has one -- a partial application ({@code <B> pair<uuid, B>}) keeps the {@code type_ref}
+ * with arguments it already resolves to, a parameter in an argument being an ordinary name on the reference
+ * channel.
  *
  * <p><b>Why the body is held rather than quoted.</b> A slot that holds names can hold a parameter for free,
  * because a parameter is a name -- {@link TypeRef#name} may be one, at any depth, so {@code [T]},

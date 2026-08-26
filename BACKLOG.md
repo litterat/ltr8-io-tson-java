@@ -108,12 +108,21 @@ Steps are ordered so each lands with the suite green.
   wrapping the post-desugar `ast.schema.TypeDef`. That is the same arrangement `SourcePosition` has with
   `Position` — the depended-on module declares an interface its dependent satisfies — so `schema.meta` still
   names no compiler type. Three things settled along the way:
-    - **`TypeDef`, not `DataValue`.** `DefinitionResolver.resolveTypeDef` takes a `TypeDef` and routes every
-      declaration form, so materialisation re-enters resolution at the same door the declaration entered.
-      `DataValue` is data grammar and covers only the instance template; a record template's field modifiers,
-      a partial application's argument list, and a refinement's `^` have no data spelling, so holding one
-      would leave three of the four forms in a second representation. It also makes step 6 fall out: the
-      declaration goes in and the declaration comes back.
+    - **`DataValue`, because every held body is an application.** Three normalisations get it there: a bare
+      record body is rewritten to the `!record { fields: [...] }` it denotes (§5.2) where it is written; a
+      composition is flattened against its supertypes first and the flattened form held — the same
+      resolve-then-round-trip merge atom refinement already performs, which is why a composition template
+      normalises in the resolver where a plain record normalises at desugar; and a parameterized atom
+      refinement is not a form at all, §12.1 giving `atom-refinement` no parameter list. Materialisation then
+      hands the substituted value straight to `DefinitionResolver.bindAtomInstance`, which already takes a
+      `DataValue` and dispatches through the constructor's own compiled reader.
+    - **A reference template holds nothing.** `<B> pair<uuid, B>` keeps the `type_ref` with arguments it
+      already resolves to (`resolveTypeDef` threads it through today), a parameter in an argument being an
+      ordinary name on the reference channel. So the implication runs one way only: a held body means a
+      template, not the reverse. Normalising this away too would mean widening the kernel's `reference` from
+      `target: type_name` to a `type_ref` so an alias can carry arguments — worth proposing for Revision 34
+      alongside the rest of #5, since it would make *every* template body an application, but not needed to
+      land any of this.
     - **A wrapper, rather than `TypeDef` implementing `TemplateBody` directly.** The AST models surface syntax
       and `schema.meta` models resolved bodies; a node is a body only in that role, and saying so once keeps
       the grammar types out of the value model's root hierarchy.
