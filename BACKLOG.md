@@ -94,39 +94,6 @@ substitutes its parameters away (`TemplateBody`/`HeldBody`, `docs/schema-resolut
 removes Revision 33's collection-slot boundary — `result => <T> ( T | error )` resolves here and §5.10
 refuses it. `SPEC-FEEDBACK.md` #5 is the proposal, written as the design that works. What is left:
 
-- [x] **A record template holds its body, and `value_param` retires with it.** §5.2 says a bare record body
-  denotes `!record { fields: [ ... ] }`, so `SchemaDesugarer` rewrites it **there, where the body is written**
-  — `test => <T> { x: T }` leaves the phase as `test => <T> !record { fields: [ { name: x  type: T } ] }` and
-  closes by the same process `<T> [T]` does. A record template's closure stays the instantiation entry itself
-  rather than gaining a synthetic hop (§8.2), and §5.7's fixation (REQUIRED + a concrete value →
-  `REQUIRED_FIXED`) happens at materialisation, where the section says it does.
-  - **The placement is the whole finding.** The earlier attempt resolved the body and wrote the *resolved*
-    form back out through `TsonObjectWriter`, and it does not work: that puts a second producer in front of a
-    wire form two later phases read, and the two spell a no-argument `type_ref` differently (`{ name: N
-    arguments: [] }` against a bare `N`). That makes a `type_argument` indistinguishable from a `type_ref`
-    application to an uninterpreted walk — the `NoSuchElementException` recorded here as "an ordinary bug,
-    undiagnosed" was that, six failures with one cause, and a design consequence rather than a defect. It is
-    the same finding as the argument-kind one below, seen from the other side.
-  - **Two checks had to follow the body.** §5.10.1's regularity rule reads `TemplateBody.applications()`, the
-    declared sibling of `names()`; §5.11's uniqueness rule is asked in the desugar phase, since a wire array
-    of `record_field` records makes a repeat no error at all. §5.10's arity rule moved into the linker's
-    held-body case (`checkHeldArity`) — it counts parameters the *referenced* entry declares, which holding
-    never hid, and both halves of it are about a reference that never becomes an application.
-
-- [x] **Composition and refinement templates onto held bodies, and `value_param` loses its last producer.**
-  `vip => <T> base & { v: T }` resolves against its namespace first — the form held is the *flattened* one,
-  since a §5.7 tightening entry states a modifier and no type-ref and is not a `record_field` until the
-  inherited field supplies one — and is then written back through `SchemaDesugarer.heldRecord`. Two producers
-  of the wire form, one producer of its spelling, which is the property that matters.
-  - **`TsonObjectWriter` could not be that second producer**, and the measurement is worth keeping: against
-    the desugar spelling it differs five ways — `{ name: "text"  arguments: [] }` for a bare `text`,
-    `!ref { … }` for a `type_argument`, every token quoted, `state: REQUIRED` written where the default covers
-    it, and `value_param` kept. The quoting alone is fatal: `TemplateBody.names()` and substitution both key
-    on a token being unquoted, so a fully-quoted body references no parameters at all. It is still used for
-    the one leaf that genuinely needs unbinding, a resolved annotation's `Optional<Object>` value.
-  - `ValueParamFixedFieldTest.noResolvedEntryCarriesAValueParam` is the guard that the channel is unfilled;
-    `everyTemplateShapeFixesARoutedValueTheSameWay` is the guard that all three shapes agree.
-
 - [ ] **A field's `~`/`=` value is never checked against the field's own declared type, and the failure wears
   the wrong clothes.** meta-kernel's `@doc` on `value` states the dependency outright -- `record_field.value`
   holds "the type of fixed/default values, **which must be the field's declared type** -- a dependency the
@@ -155,13 +122,12 @@ refuses it. `SPEC-FEEDBACK.md` #5 is the proposal, written as the design that wo
   A defect inside a held body reports at the application (`/use`) rather than the template (`/box`), because
   the walk back to a positioned entry finds the application first. Recording which declaration each derived
   entry was minted for would fix it: message text is unchanged, only the location moves — from the line that
-  used the template to the line that contains the mistake. Modest today, since a desugar-lifted form already
-  lands correctly and the form is named either way. **Records are held now, so this is no longer modest**:
-  any defect a held record body's *materialisation* finds reports at the use site — `box<3>` against
-  `box => <T> { v: T }` says `'box<3>' field 'v' has an unresolved reference '3'`, naming the application
-  rather than the line holding the mistake. The declaration-time checks are unaffected and still land on the
-  template (§5.11 uniqueness in the desugar phase, §5.10.1 regularity and §5.10 arity at the linker), which is
-  what keeps the common errors located correctly; what moved is the residue only substitution can reach.
+  used the template to the line that contains the mistake. It applies to every defect only *materialisation*
+  can reach: `box<3>` against `box => <T> { v: T }` says `'box<3>' field 'v' has an unresolved reference '3'`,
+  naming the application rather than the line holding the mistake. The declaration-time checks land correctly
+  already (§5.11 uniqueness in the desugar phase, §5.10.1 regularity and §5.10 arity at the linker), which is
+  what keeps the common errors located where the author can act on them, so this is the residue rather than
+  the bulk.
 
 - [ ] **Widen the kernel's `reference` from `target: type_name` to a `type_ref`.** A partial application
   (`uuid_pair => <B> pair<uuid, B>`) is the one template that holds nothing — it keeps the `type_ref` with
@@ -169,11 +135,9 @@ refuses it. `SPEC-FEEDBACK.md` #5 is the proposal, written as the design that wo
   the slot would let it carry one, making **every** template body an application and restoring the
   biconditional `TemplateBody`'s Javadoc currently has to weaken (a held body means a template, but not the
   reverse).
-  - **Its value went up once every other shape started holding.** An open entry's body is now a `HeldBody` or
-    a `Reference` and nothing else, so this is the *only* remaining case — closing it collapses
-    `TemplateMaterialiser.close` from two branches to one, the way holding the error placeholder already
-    collapsed it from three to two and deleted `substitute`/`mapFields`/`bindValue` with it. Still worth
-    proposing on its own merits rather than folding into #5, but it is no longer only a modelling tidy. Interacts with §8.3: the flattening walk would have to stop at an application, the way it already
+  - **It is the only case left, which is what makes it more than a modelling tidy.** An open entry's body is a
+    `HeldBody` or a `Reference` and nothing else, so closing this one collapses `TemplateMaterialiser.close`
+    from two branches to one. Still worth proposing on its own merits rather than folding into #5. Interacts with §8.3: the flattening walk would have to stop at an application, the way it already
   stops at a materialised instantiation. Worth proposing on its own merits rather than folding into #5.
 
 - [ ] **meta-kernel drops `instance_template` and `template_argument` once a revision carries the design.**
