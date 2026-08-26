@@ -37,8 +37,15 @@ copy. `spec/` holds local snapshots (revision 33) for quick reference: `spec/tso
 documents — the meta-kernel bootstrap layer, the meta-schema built on it, and the core type library built
 on that) plus their non-normative `*-resolved.tn` resolver-output fixtures. Treat `spec/` as a cache, not
 a source of truth — with one standing exception: the three `.tn` schemas are **packaged from here at build
-time**, and they carry real `?sha256=` digests over their own bytes where the published drafts spell the
-pin `xxhash` and pin at publication, so they are the live copies rather than a snapshot.
+time**, so they are the live copies rather than a snapshot. Two things follow. They carry real `?sha256=`
+digests over their own bytes where the published drafts spell the pin `xxhash` and pin at publication. And
+their **content** now diverges from Revision 33 as well: meta-kernel declares `reference.target` as a
+`type_ref` rather than a `type_name`, and no longer declares `instance_template`, `template_argument` or
+`record_field.value_param` — the quoted open-body vocabulary held bodies replaced (`SPEC-FEEDBACK.md` #5,
+#7). So a diff against the published draft shows three declarations missing, not only different pin values.
+**Changing them means re-stamping all three digests bottom-up** (`tson hash`, kernel first), moving the
+matching `*-resolved.tn` entries, and updating `TsonBundledSchemas`, `InitCommand` and `README.md`, which
+carry the published values.
 
 **The `*-resolved.tn` fixtures are checked, not decoration.** They carry the instruction in their own
 `@doc` — "Parse the source schema, run the resolver, canonicalise, compare" — and `ResolvedFixtureTest`

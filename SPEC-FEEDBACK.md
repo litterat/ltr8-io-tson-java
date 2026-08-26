@@ -381,9 +381,16 @@ that what is proposed and what is known to work are the same thing.
      agree, or `[[pixel; 3]; 3]` written out and `grid<pixel, 3>` closed land on two entries for one type.
 4. **The resolved form of an open entry is its declaration**, not a `type_definition` value — which could not
    carry it in any case, the kernel declaring `body: top` REQUIRED with no `top` an open body could be. This
-   keeps resolved output a valid schema document under §12.1, so it stays re-resolvable, and it keeps the
-   kernel unchanged: no new primitive, no `( body | template )` field group. §1.3 is unaffected, a conforming
-   consumer of resolved output meeting only closed entries and instantiations.
+   keeps resolved output a valid schema document under §12.1, so it stays re-resolvable, and it **needs no
+   new kernel vocabulary**: no new primitive, no `( body | template )` field group. §1.3 is unaffected, a
+   conforming consumer of resolved output meeting only closed entries and instantiations.
+   - **It does, however, retire three declarations**, which is a subtraction rather than an addition and is
+     the other half of adopting this design. `instance_template` and `template_argument` exist only to quote
+     an open body slot by slot; a held body has no producer for either. `record_field`'s
+     `( value | value_param )?` group narrows to `value?` with them — a routed parameter rides `value`, told
+     from a literal by §8.1's shadowing rule, and a held body is not read as this vocabulary until its
+     parameters are gone, so the label has nothing left to disambiguate. All three are gone from the kernel
+     shipped here, and §5.10/§8.1 should drop them when the design lands.
 5. **Checking splits, and §5.10 should say where.** Two questions are answered at the declaration from the
    binding record's own field names, needing no stand-in values and so unable to fabricate a verdict: that
    each name is a field the constructor declares, and that every REQUIRED-without-default field is bound.
@@ -513,3 +520,59 @@ them, which is the layer a user's own `box => <T> { ... }` lives in.
 `ContainerSugarEndToEndTest` pins the resulting entry sets.
 
 ---
+
+---
+
+## 7. An alias to an application cannot state the arguments it binds, so `reference` is the one open body that is not a constructor application
+
+**Section:** Part 2 §8.1 (`reference`), §5.10 (partial application), §8.2 (identity keyed on `source`), §8.3
+(use-site flattening), §9 (a slot holding a type reference).
+
+**Problem:** §5.10's partial application is an alias *to an application*:
+
+```
+uuid_pair => <B> pair<text, B>
+```
+
+The kernel gives it nowhere to say so:
+
+```
+reference => top & {
+  target: type_name      ← a bare name; `pair<text, B>` does not fit
+}
+```
+
+So an implementation has to keep the argument list somewhere else, and the only place available is the
+entry's own `source` — which §8.2 keys instantiation identity on. That gives one component two jobs
+depending on whether the entry is open, and it makes an alias with no recoverable target a representable
+state: nothing in the vocabulary says a `reference` entry must carry a `source`, so nothing prevents one
+that cannot say what it aliased.
+
+It is also inconsistent with §9's own guidance for extension meta-schemas — "a slot holding a type reference
+MUST be typed `type_ref`" — which `reference.target` plainly is and plainly is not.
+
+The deeper cost is uniformity. Every other open entry is a constructor application, `<params> !C core-value`,
+which is what lets substitution be one walk: rewrite the parameter tokens in a held `core-value`, then read
+the result through the named constructor. A partial application is the one shape that cannot be written that
+way, because `!reference { target: pair<text, B> }` is not spellable while `target` is a name.
+
+**Interpretation chosen:** widened to `target: type_ref` here, and the alias states its own arguments. That
+deletes the `source` double-duty, the guard against an alias with no recoverable target, and the special case
+that kept a name-only body in step with `source` whenever materialisation rewrote it.
+
+**Suggested resolution:** declare `reference => top & { target: type_ref }`.
+
+- **A closed alias never carries arguments**, so resolved output is unaffected in practice: materialisation
+  rewrites `text_box => box<text>` to name the entry it minted. An argument-bearing target appears only where
+  an application is still open — inside a template.
+- **§8.3 needs one sentence.** A use site is flattened past a REFERENCE entry; this slot is not, because the
+  chain must stay walkable and an alias records where it points. The walk additionally stops *at* an
+  argument-bearing target: that is an application, not a hop to another entry, and there is no entry at the
+  end of it until materialisation mints one.
+- **What it unlocks** is writing the partial application as `<B> !reference { target: pair<text, B> }`, which
+  brings the last template shape onto §12.1's one open-form production and lets a resolver close every
+  template by a single walk. That is a separate proposal; this one is its prerequisite and stands on the
+  §8.1/§9 inconsistency on its own.
+
+**Status against Revision 33:** open, new against this revision. Implemented here, which makes it the first
+change to the bundled `spec/m/` artifacts' *content* — the three digests move with it.
