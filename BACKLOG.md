@@ -216,13 +216,27 @@ Steps are ordered so each lands with the suite green.
       clean — the regularity message, the substitution-failure message, and the read-side size and atom
       messages all name what the author wrote.
 
-- [ ] **6. Write side: an open entry emits as its declaration.** Resolved output for an open entry is the
-  declaration round-tripped (`test => <T> !array { element_type: T }`), not a `type_definition` instance —
-  which could not carry it anyway, `body: top` being REQUIRED. Resolved output stays a valid schema document
-  under §12.1 and stays re-resolvable. `ResolvedFixtureTest` splits its check by entry kind: closed entries
-  must still read back into `schema.meta`, open entries need only parse as a tree with valid annotations and
-  type-refs. That is an honestly weaker guarantee for open entries and it is the right one — no stronger claim
-  is available for a body containing `T`.
+- [x] **6. A held body writes as the application it holds.** Done, and smaller than this item claimed: there
+  is no resolved-output emitter to teach, since nothing in main code writes a schema out — `ResolvedFixtureTest`
+  only reads the spec's fixtures in, and `tson compile` prints diagnostics. What existed to break was
+  `TsonObjectWriter`, which a template made throw outright.
+    - **`AstWriter`** is the missing return leg: `TsonDataParser` went text → AST and nothing came back. It
+      joins `TsonObjectWriter` (bound object) and `TsonTreeWriter` (`TsonValue` tree) as the third writer, and
+      the only one that writes *syntax* — an AST records what an author wrote, token forms and field order
+      included, so it puts them back rather than deciding them again. Package-private in the root `compiler`
+      package rather than in `ast`, which would have meant a package cycle (`ast` → `compiler` on top of the
+      existing `compiler` → `ast`) and a public class, its caller being in another package.
+    - **The writer's rule is about the AST, not about templates**: a `DataValue` is source, so it is written
+      rather than bound. Anything carrying a parsed value writes correctly, and `TsonObjectWriter` needs no
+      knowledge of `HeldBody`. It joins the existing category — `writeAnnotationValue` already writes a
+      structurally-kept annotation through the tree writer for the same reason.
+    - **`@Typename("template")` sits on `HeldBody`, not on `TemplateBody`**: `tson-bind` reads the annotation
+      off the concrete class, so on the interface it is inert. A body now writes `!template { application:
+      !choice { variants: [T error] } }`. Whether it should instead be the application *unwrapped* — which is
+      what #5's rule 2 asks for — or a `template` the kernel really declares, is left open there.
+    - Still open, and worth naming: the entry around it still writes `position`, which is `@Unbound` and has
+      no kernel field, so a written `type_definition` carries something §7.2's closure rule would refuse on
+      read-back. Pre-existing and independent of templates.
 
 - [ ] **7. Diagnostics: locate a materialisation error at the template's declaration.** With checking deferred,
   the location is what keeps it survivable: a bad reference inside `<T> { x: some_typo }` must report at the

@@ -1,5 +1,12 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.compiler.TsonDataParser;
+import io.ltr8.tson.compiler.TsonObjectWriter;
+import io.ltr8.tson.compiler.ast.ArrayValue;
+import io.ltr8.tson.compiler.ast.CoreValue;
+import io.ltr8.tson.compiler.ast.ScopedValue;
+import io.ltr8.tson.compiler.ast.TokenForm;
+import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.schema.meta.TemplateBody;
@@ -52,6 +59,42 @@ class HeldBodyTest {
     void twoTemplatesDifferingOnlyInTheirHeldBodyAreNotEqual() {
         assertEquals(template("record"), template("record"));
         assertNotEquals(template("record"), template("array"));
+    }
+
+    /**
+     * A held body writes as the application it holds, because the AST is written as syntax rather than bound
+     * as a value ({@code AstWriter}). Bound, it would render a faithful description of the wrong thing --
+     * {@code !recordvalue { fields: [ ... ] }} -- and the token forms an author chose would be decided again
+     * rather than put back.
+     */
+    @Test
+    void aHeldBodyWritesAsTheApplicationItHolds() {
+        HeldBody held = new HeldBody(new DataValue(List.of(), Optional.of("choice"),
+                new RecordValue(List.of(new RecordValue.Field("variants", scoped(new ArrayValue(List.of(
+                        scoped(new TokenValue("T", TokenForm.UNQUOTED)),
+                        scoped(new TokenValue("error", TokenForm.UNQUOTED))))))))));
+
+        // Written on its own, so no discriminating type-ref: `!template` is emitted where a held body sits
+        // in a `Top` position and something has to say which branch it is.
+        assertEquals("{ application: !choice { variants: [ T error ] } }", new TsonObjectWriter().toTson(held));
+    }
+
+    /** What it writes reads back, which is the point of writing the source rather than a description of it. */
+    @Test
+    void whatAHeldBodyWritesParsesAgain() {
+        DataValue application = new DataValue(List.of(), Optional.of("array"),
+                new RecordValue(List.of(new RecordValue.Field("element_type",
+                        scoped(new TokenValue("T", TokenForm.UNQUOTED))))));
+
+        String written = new TsonObjectWriter().toTson(new HeldBody(application));
+        String payload = written.substring(written.indexOf("application: ") + "application: ".length(),
+                written.lastIndexOf(" }"));
+
+        assertEquals(application, new TsonDataParser(payload).parseDocument().root());
+    }
+
+    private static ScopedValue scoped(CoreValue value) {
+        return new ScopedValue(Optional.empty(), new DataValue(List.of(), Optional.empty(), value));
     }
 
     @Test

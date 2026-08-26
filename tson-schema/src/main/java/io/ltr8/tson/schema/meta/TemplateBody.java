@@ -28,6 +28,12 @@ import java.util.Set;
  * whose implementations are consumer classes this library has never seen, exactly one class implements this,
  * and it lives one module up.
  *
+ * <p><b>The name lives on the implementation, and is provisional.</b> {@code tson-bind} reads
+ * {@code @Typename} off the concrete class, so it is {@code HeldBody} that says {@code template} and an
+ * annotation here would be inert. Whether an open body <em>is</em> a {@code !template} -- a type the kernel
+ * would declare, with this as its bound class -- or whether it should be written unwrapped as the
+ * application it holds, is left to the revision that settles the open form ({@code SPEC-FEEDBACK.md} #5).
+ *
  * <p><b>It never serialises.</b> An open entry's resolved form is its declaration round-tripped, not a
  * {@code type_definition} value -- which could not carry it in any case, the kernel declaring {@code body:
  * top} REQUIRED with no {@code top} an open body could be. So no implementation carries {@code @Typename},

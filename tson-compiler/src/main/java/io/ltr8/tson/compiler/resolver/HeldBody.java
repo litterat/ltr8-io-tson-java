@@ -6,6 +6,7 @@ import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
+import io.ltr8.annotation.Typename;
 import io.ltr8.tson.schema.meta.TemplateBody;
 
 import java.util.LinkedHashSet;
@@ -36,10 +37,17 @@ import java.util.Set;
  * The cost is the same one shadowing carries everywhere: a literal spelled like a live parameter is
  * unreachable inside that template.
  *
+ * <p><b>Named {@code template}, provisionally.</b> Nothing in the kernel declares it -- an open entry never
+ * serialises as a {@code type_definition} -- so this only decides what a written body calls itself, and
+ * {@code !template { application: !choice { variants: [T error] } }} is a better answer than a lowercased
+ * Java class name. Whether it should be the application unwrapped, or a {@code template} the kernel really
+ * declares, is {@code SPEC-FEEDBACK.md} #5's to settle.
+ *
  * <p><b>A wrapper rather than {@code DataValue} implementing {@link TemplateBody} directly.</b> The AST
  * models surface syntax and the {@code schema.meta} hierarchy models resolved bodies; a value is a body only
  * in this role, and saying so once here keeps the grammar types out of the value model's root hierarchy.
  */
+@Typename(name = "template")
 public record HeldBody(DataValue application) implements TemplateBody {
 
     @Override
