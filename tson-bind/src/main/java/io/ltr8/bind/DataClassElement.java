@@ -46,7 +46,7 @@ public class DataClassElement {
 	}
 
 	public DataClass dataClass() {
-		return dataClass;
+		return DataClass.settled(dataClass);
 	}
 
 	/**

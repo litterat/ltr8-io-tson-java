@@ -92,7 +92,7 @@ public class DataClassField {
 	}
 
 	public DataClass dataClass() {
-		return dataClass;
+		return DataClass.settled(dataClass);
 	}
 
 	/**

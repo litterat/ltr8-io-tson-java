@@ -117,14 +117,14 @@ public class DataClassMap extends DataClass {
 	 * @return The DataClass type for the map's keys.
 	 */
 	public DataClass keyDataClass() {
-		return keyDataClass;
+		return settled(keyDataClass);
 	}
 
 	/**
 	 * @return The DataClass type for the map's values.
 	 */
 	public DataClass valueDataClass() {
-		return valueDataClass;
+		return settled(valueDataClass);
 	}
 
 	/**

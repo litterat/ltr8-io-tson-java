@@ -25,6 +25,7 @@ import java.lang.reflect.Type;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -34,6 +35,13 @@ public class DataBindContext {
 
 	// Resolved class information
 	private final ConcurrentHashMap<Type, DataClass> descriptors = new ConcurrentHashMap<>();
+
+	/**
+	 * The types this thread is part-way through resolving, for the cycle guard in {@link #getDescriptor}.
+	 * Per thread because resolution is per thread: two threads resolving the same cyclic type each build a
+	 * complete descriptor and one of them wins the cache, exactly as for an acyclic one.
+	 */
+	private final ThreadLocal<Set<Type>> inFlight = ThreadLocal.withInitial(HashSet::new);
 
 	// default resolver
 	private final DefaultClassBinder dataClassResolver;
@@ -189,7 +197,22 @@ public class DataBindContext {
 			return descriptor;
 		}
 
-		DataClass resolved = dataClassResolver.resolve(this, targetClass, parameterizedType);
+		// A type graph may contain a cycle -- a record reaching itself, directly or through others -- and
+		// resolution follows the types rather than a value, so it has no reason of its own to stop. The cache
+		// cannot help: it is filled once resolution *completes*, which for a cyclic type is never. Re-entry
+		// therefore hands back a placeholder, settled from this same cache by whichever holder keeps it, once
+		// the resolution now in progress has finished. See DataClassDeferred.
+		Set<Type> active = inFlight.get();
+		if (!active.add(parameterizedType)) {
+			return new DataClassDeferred(this, targetClass, parameterizedType);
+		}
+
+		DataClass resolved;
+		try {
+			resolved = dataClassResolver.resolve(this, targetClass, parameterizedType);
+		} finally {
+			active.remove(parameterizedType);
+		}
 		if (resolved == null) {
 			throw new DataBindException(
 					String.format("Unable to find suitable data descriptor for class: %s", targetClass.getName()));

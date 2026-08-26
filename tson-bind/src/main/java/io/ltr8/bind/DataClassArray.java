@@ -111,7 +111,7 @@ public class DataClassArray extends DataClass {
 	 * @return The DataClass type for the array.
 	 */
 	public DataClass arrayDataClass() {
-		return arrayDataClass;
+		return settled(arrayDataClass);
 	}
 
 	/**

@@ -40,7 +40,7 @@ public final class DataClassAnnotated extends DataClass {
 
 	/** The descriptor for {@code T}, the value inside the box. */
 	public DataClass valueClass() {
-		return valueClass;
+		return settled(valueClass);
 	}
 
 	/** {@code box(value, annotations)} -- how a reader builds one without naming the carrier class. */
