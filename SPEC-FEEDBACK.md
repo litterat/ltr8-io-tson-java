@@ -375,6 +375,17 @@ explicitly, because it manufactures false errors on precisely the slots this who
 `<N> !integer ^ { min: N max: 3 }` is correct for every argument anyone will pass and fails the `min <= max`
 coherence check under a stand-in of 10. A deferred verdict is strictly better than a fabricated one.
 
+**One consequence of rule 1 worth stating in §12.1 rather than leaving to be discovered.** Folding
+`instance-template` back into `instance` makes the payload exactly Part 1's `core-value` for the open and
+closed forms alike, and a `core-value` cannot spell an application: `!array { element_type: box<text> }` does
+not parse, in either form. That is the right line, and it falls where the grammars already divide — a *type*
+position is schema grammar and spells an application directly (`t: box<text>`, `[box<text>]`), while `!C
+value` takes data, so an application inside one is written in `type_ref`'s own record form, `{ name: box
+arguments: [{ name: text }] }`, which is exactly what the sugar expands to. Revision 33's `template-def` gave
+the open form a spelling the closed form never had; removing the asymmetry is part of the point, not a cost
+of it. The resolved output is unchanged either way — the application closes at materialisation and the slot
+ends up naming the instantiation entry.
+
 **If Revision 34 wants a smaller edit than that**, one scoped change resolves the flagship case against the
 shipped design: restate §5.10's uniformity rule so that an open entry carries an ordinary constructor body
 whenever every parameter occurrence sits at a `type_ref` position, requiring `instance_template` only where a
