@@ -291,8 +291,9 @@ keys identity on the spelling, so this implementation has two.
 
 **Section:** Part 2 §5.10 (the two parameter kinds, and the collection boundary), §8.1 (`template_argument`,
 `type_ref`, `record_field.value_param`), §5.3 (the lift rule), §5.10.1 (regularity), §12.1
-(`instance-template`). Related: `spec/tson-cr-structure-templates-addendum.md`, which raises the same defect
-against Revision 33 and proposes two endpoints for it; and the item declined at Revision 33 as #53.
+(`instance-template`). Supersedes the item declined at Revision 33 as #53. A longer treatment, including the
+designs weighed and rejected, is in `spec/tson-cr-structure-templates-addendum.md`; nothing below depends on
+reading it.
 
 **Problem:** §5.10 says, plainly:
 
@@ -334,85 +335,95 @@ headline use of generic schemas and is inexpressible by rule. §5.10's declared 
 there is no second template to name when the parameter *is* a variant, so the sum must be monomorphised by
 hand at every use.
 
-**Interpretation chosen:** implemented as written. `SchemaDesugarer` refuses a parameter in a
-collection-valued slot at the declaration, classified as a schema-author error (`TsonSchemaValidationException`)
-rather than a library gap — the verdict does not change as this implementation improves, which is the test
-this project's exception policy turns on, and reporting it as a gap would exit 70 over a construct the spec
-itself refuses. Everything else in §5.10 resolves: record templates, open instances, partial application,
-regular recursion, and closed container positions including nested arguments.
+**Interpretation chosen:** implemented as written first — `SchemaDesugarer` refused a parameter in a
+collection-valued slot at the declaration, classified as a schema-author error rather than a library gap,
+the verdict being one that does not change as this implementation improves. That refusal is now **replaced**
+by the design below, built here and running: `result => <T> ( T | error )` resolves, closing to an ordinary
+`choice` body over `[text, error]`. This is a deliberate divergence from Revision 33, offered as evidence
+rather than as a conformance claim.
 
-**Suggested resolution:** delete the boundary by holding the open body instead of quoting it. Three rules,
-which together remove `instance_template`, `template_argument` and `value_param` rather than extending them:
+**Suggested resolution: hold an open body rather than quoting it.** What follows is the design as built, so
+that what is proposed and what is known to work are the same thing.
 
-1. **An open entry stores its body in the form it was written** — head plus core-value, sugar expanded but
-   nothing lifted — not in a typed open vocabulary. Substitution is then one rule at every depth (rewrite
-   tokens that resolve into `parameters`), uniform across type slots, value slots, collection elements and
-   nesting, and materialisation binds against constructor vocabulary exactly once, at the only moment binding
-   is decidable. §12.1's `instance-template`/`template-def`/`template-bind` productions delete and
-   `[type-params]` is reinstated on the instance alternative; §5.3's open-lift case deletes (a template holds
-   one body and lifts nothing; materialisation substitutes, then desugars-and-lifts the now-concrete forms
-   innermost-out); open synthetic entries disappear as a category, taking §8.2's open-synthetic identity
-   clause with them.
-2. **The resolved form of an open entry is its declaration, round-tripped** — not a `type_definition`
-   instance, which could not carry it in any case, since `body: top` is REQUIRED and an open entry has no
-   `top` to put there. This keeps resolved output a valid schema document under §12.1's own grammar, so it
-   stays re-resolvable, and it keeps the kernel unchanged: no `form` primitive, no `( body | template )` field
-   group. It also makes the open form *better* for cross-schema use than a typed quotation would be — an
-   importing schema materialising an imported template runs the ordinary desugar-and-bind pipeline over
-   source-shaped content, with no second path from quotation to body. §1.3 is unaffected: a conforming
-   consumer of resolved output meets only closed entries and instantiations.
-3. **Checking moves with the body.** A template body is not resolved at its declaration, so an unapplied
-   template gets **no verdict** — not a warning, no verdict; nothing in the document is wrong yet, and data
-   validation is unaffected. Everything is checked at materialisation, where substitution resolves the whole
-   body rather than a path through it. Two corollaries the spec should state rather than leave to be
-   discovered: a materialisation diagnostic must be **located at the template's own declaration**, with the
-   application as context, or the author (increasingly, a generator) edits the use site for a defect in the
-   declaration; and §5.10.1's regularity rule and the inhabitance check move from declaration time to
-   materialisation time, since the linker can no longer see references inside a held body.
+1. **An open entry's body is the constructor application as written, held and unread** until materialisation
+   substitutes its parameters away. Not a typed quotation of the constructor vocabulary. Substitution is then
+   **one rule at any depth** — rewrite a token whose text resolves into the entry's `parameters` (§8.1's
+   shadowing rule) — uniform across type slots, value slots, collection elements and nesting alike, because
+   nothing has been classified by slot kind. Materialisation binds against constructor vocabulary exactly
+   once, at the only moment binding is decidable.
+   - **A held token needs no channel label, and that is what removes the boundary.** `template_argument`
+     needs `param` because a bare token in a value slot is otherwise always a literal; a held body is not
+     read as that vocabulary until the parameters are gone, so a parameter in `variants` is a token inside an
+     array like any other. Quoting is no part of it — a token's form is a schemaless-data concern (§4.4),
+     which is why the rule is on the token's text.
+   - The cost is shadowing's usual one: inside a template, a literal spelled like a live parameter is
+     unreachable.
+2. **§12.1's `instance` production takes a parameter list**, and the `instance-template` / `template-def` /
+   `template-bind` productions delete with the vocabulary that motivated them. Open and closed share one
+   production and one payload grammar, which is what admits a collection payload. A parameterized
+   `atom-refinement` remains no form at all, as §12.1 already has it.
+   - **What no payload can spell is an application**, in either form: `!array { element_type: box<text> }`
+     does not parse, `box<text>` being schema grammar where `instance` takes a `core-value`. The line falls
+     where the grammars already divide — a *type* position takes `box<text>` directly, while `!C value` takes
+     data, so an application inside one is written in `type_ref`'s own record form, which is what the sugar
+     expands to anyway. Revision 33 gave the open form a spelling the closed form never had; losing the
+     asymmetry is part of the point.
+3. **Lifting is unchanged, and open synthetic entries remain a category.** This is worth stating because the
+   opposite is the obvious guess and it does not work: a template's body cannot simply hold everything
+   nested inside it. A `type_ref` slot names a type and nothing else, so a sugar form inside a template body
+   — `<T> { a: [T] }` — must still lift to an entry, and a lifted form naming a parameter lifts **open**.
+   §5.3's lift rule therefore stands as written, and §8.2's identity-up-to-consistent-renaming of parameters
+   is still required, since two open synthetics alike up to renaming must land on one entry.
+   - What changes is only what an open synthetic's *body* is: held, not quoted. `<T> { a: [T] }` still
+     injects `array_p0_… => <p0> !array { element_type: p0 }` and the field still reads `array_p0_…<T>`.
+   - **Applications inside a held body close before its entry is named.** Desugar lifts innermost-first, so a
+     form it writes already names the entry its inner form became; a form closed at materialisation must
+     agree, or `[[pixel; 3]; 3]` written out and `grid<pixel, 3>` closed land on two entries for one type.
+4. **The resolved form of an open entry is its declaration**, not a `type_definition` value — which could not
+   carry it in any case, the kernel declaring `body: top` REQUIRED with no `top` an open body could be. This
+   keeps resolved output a valid schema document under §12.1, so it stays re-resolvable, and it keeps the
+   kernel unchanged: no new primitive, no `( body | template )` field group. §1.3 is unaffected, a conforming
+   consumer of resolved output meeting only closed entries and instantiations.
+5. **Checking splits, and §5.10 should say where.** Two questions are answered at the declaration from the
+   binding record's own field names, needing no stand-in values and so unable to fabricate a verdict: that
+   each name is a field the constructor declares, and that every REQUIRED-without-default field is bound.
+   §5.10's unreferenced-parameter rule is answered there too, from the tokens the held body names. Everything
+   value-shaped waits for materialisation, where the whole body binds through the constructor's own reader.
+   An **unapplied** template is checked no further and gets no verdict — not a warning, no verdict.
+   - Checking an unapplied template by substituting stand-ins should be ruled out explicitly, because it
+     manufactures false errors on exactly the slots this mechanism exists for: `<N> !integer ^ { min: N max:
+     3 }` is correct for every argument anyone passes and fails under a stand-in of 10.
+   - A materialisation diagnostic must be **located at the template's own declaration**, with the application
+     as context. Deferred checking is survivable only if the author is sent to the line they can edit.
 
-The alternative to rule 3 — checking an unapplied template by substituting stand-ins — should be rejected
-explicitly, because it manufactures false errors on precisely the slots this whole mechanism exists for:
-`<N> !integer ^ { min: N max: 3 }` is correct for every argument anyone will pass and fails the `min <= max`
-coherence check under a stand-in of 10. A deferred verdict is strictly better than a fabricated one.
+**What holding costs, and where §5.10 should say so.** A held body has no slot types — that is what it is for
+— so every check keyed on which slot a thing sits in waits for materialisation, and one of them does not
+survive the trip. §5.10's argument-kind rule ("a reference argument binds a type parameter, a literal binds a
+value parameter") is enforced today by `record_field.value_param`, whose presence is what says *this slot
+expects a value*; where a parameter stands in an ordinary value slot, a type name substituted there is a
+token like any other. If the kind rule is to be kept, the open form has to carry the slot's expectation
+somewhere — which is what `value_param` is, under another name. §5.10 should say which of its checks are
+declaration-time and which are materialisation-time under an open form, rather than leaving an implementation
+to discover that one of them is neither.
 
-**What holding costs, stated plainly, because rule 3 understates it.** A held body has no slot types — that
-is what it is for — so every check keyed on which slot a thing sits in is unavailable until materialisation
-binds the body, and one of them does not survive the trip at all. §5.10's argument-kind rule ("a reference
-argument binds a type parameter, a literal binds a value parameter") is enforced today by
-`record_field.value_param`, whose presence says *this slot expects a value*; once the parameter stands in the
-ordinary `value` slot, a type name substituted there is a token like any other and `<V> { v: int32 = V }`
-applied to a type passes. The same absence has a second face: `type_ref` and `type_argument` both spell their
-first member `name`, so an uninterpreted walk cannot tell a referenced type's name from an argument's name
-channel. Neither is a reason against the design, but §5.10 should say which checks are declaration-time and
-which are materialisation-time under it, rather than leaving an implementation to discover that one of them
-is neither. If the kind rule is to be kept, the open form has to carry the slot's expectation somewhere —
-which is what `value_param` was, under another name.
+**Scope of what is built.** Instance templates — the sugar forms and the explicit `<T> !C { … }` — hold their
+bodies here, and that is what the flagship case turns on. Record and composition templates still resolve at
+their declaration and still use `record_field.value_param` for a parameter routed into a field's value; §5.10
+would presumably want them held too, and the argument-kind finding above is the open question in the way.
 
-**One consequence of rule 1 worth stating in §12.1 rather than leaving to be discovered.** Folding
-`instance-template` back into `instance` makes the payload exactly Part 1's `core-value` for the open and
-closed forms alike, and a `core-value` cannot spell an application: `!array { element_type: box<text> }` does
-not parse, in either form. That is the right line, and it falls where the grammars already divide — a *type*
-position is schema grammar and spells an application directly (`t: box<text>`, `[box<text>]`), while `!C
-value` takes data, so an application inside one is written in `type_ref`'s own record form, `{ name: box
-arguments: [{ name: text }] }`, which is exactly what the sugar expands to. Revision 33's `template-def` gave
-the open form a spelling the closed form never had; removing the asymmetry is part of the point, not a cost
-of it. The resolved output is unchanged either way — the application closes at materialisation and the slot
-ends up naming the instantiation entry.
+**If Revision 34 wants a smaller edit than all of that**, one scoped change resolves the flagship case
+against Revision 33 as shipped: restate §5.10's uniformity rule so that an open entry carries an ordinary
+constructor body whenever every parameter occurrence sits at a `type_ref` position, requiring
+`instance_template` only where a value slot is parameter-bound, and narrowing the collection error to
+parameters at *value* positions inside collections. Choice, tuple, `[T]` and `{K => V}` templates fall out
+immediately. Note it is not free for implementations that shipped Revision 33: it changes the resolved output
+of templates that already work, `<T> { v: [T] }` ceasing to lift an `instance_template`.
 
-**If Revision 34 wants a smaller edit than that**, one scoped change resolves the flagship case against the
-shipped design: restate §5.10's uniformity rule so that an open entry carries an ordinary constructor body
-whenever every parameter occurrence sits at a `type_ref` position, requiring `instance_template` only where a
-value slot is parameter-bound, and narrowing the collection error to parameters at *value* positions inside
-collections. Choice, tuple, `[T]` and `{K => V}` templates fall out immediately, and the body-identity concern
-is answered by determinism rather than uniformity. Note that this is not free for implementations that shipped
-Revision 33: it changes the resolved output of templates that already work today, since `<T> { v: [T] }` stops
-lifting an `instance_template` and carries an ordinary body.
-
-**Status against Revision 33:** open, new against this revision. The addendum in `spec/` records that the same
-gap was raised against Revision 32 as #53 and declined, with §5.10 gaining the explicit boundary sentence and
-§8.1 the uniform-quotation rationale in response. This implementation refuses the construct as the spec
-requires; the held-body design above is being implemented here as proof for Revision 34 (`BACKLOG.md`, "Open
-form: hold the template body").
+**Status against Revision 33:** open, new against this revision. The same gap was raised against Revision 32
+as #53 and declined, §5.10 gaining the explicit boundary sentence and §8.1 the uniform-quotation rationale in
+response. The design above is implemented here and passing: the flagship `result => <T> ( T | error )`,
+`<T> [T, text]`, `<T> { v: (T | text) }` and nested sized forms all resolve, and every schema that resolved
+before produces the same entries it did.
 
 ---
 
