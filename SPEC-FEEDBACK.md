@@ -569,10 +569,18 @@ that kept a name-only body in step with `source` whenever materialisation rewrot
   chain must stay walkable and an alias records where it points. The walk additionally stops *at* an
   argument-bearing target: that is an application, not a hop to another entry, and there is no entry at the
   end of it until materialisation mints one.
-- **What it unlocks** is writing the partial application as `<B> !reference { target: pair<text, B> }`, which
-  brings the last template shape onto §12.1's one open-form production and lets a resolver close every
-  template by a single walk. That is a separate proposal; this one is its prerequisite and stands on the
-  §8.1/§9 inconsistency on its own.
+- **What it unlocks, and what is built here**, is writing the partial application as
+  `<B> !reference { target: pair<text, B> }`. That brings the last template shape onto §12.1's one open-form
+  production: every open entry is now `[type-params] "!" type-name ws core-value` with a held `core-value`
+  body, so substitution is one token walk for all of them and a resolver tells the cases apart by the
+  constructor head — `record` closes to the instantiation entry, `reference` composes and mints nothing
+  (§5.10's "no intermediate entry per alias hop"), everything else closes to a synthetic.
+- **Two kernel facts make `reference` a dispatched head rather than an ordinary one**, and §5.10 should say
+  so if it adopts this. `reference` is deliberately not a `~` constructor — it describes no value — so the
+  generic "`!C value` requires a constructor" rule refuses it; and §4.1 gives an alias `kind: REFERENCE`,
+  which is a `type_kind` with no base kind in the composition hierarchy to supply it. Neither is a property
+  of the alias form; both are the kernel's own, and an implementation has to special-case the head either
+  way.
 
 **Status against Revision 33:** open, new against this revision. Implemented here, which makes it the first
 change to the bundled `spec/m/` artifacts' *content* — the three digests move with it.

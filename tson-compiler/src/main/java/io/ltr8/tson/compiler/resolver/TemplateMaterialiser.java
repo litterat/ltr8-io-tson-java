@@ -55,16 +55,16 @@ import java.util.function.UnaryOperator;
  * every other held form closes to a <em>synthetic</em> named for the form, which the instantiation then
  * references ({@link #closeHeldTemplate}), because a form has no author-written name to be keyed on.
  *
- * <p><b>A reference template holds nothing and closes by neither path.</b> §5.10's partial application,
- * {@code uuid_pair => <B> pair<uuid, B>}, <em>is</em> the application it names with some arguments still
- * open, so applying it composes the two argument lists and closes the result, minting no entry of its own
- * (§5.10: "no intermediate entry per alias hop").
+ * <p><b>An alias closes by a third path and mints nothing.</b> §5.10's partial application,
+ * {@code uuid_pair => <B> pair<uuid, B>}, holds {@code !reference { target: pair<uuid, B> }} like any other
+ * open entry, but it <em>is</em> the application it names with some arguments still open -- so closing it
+ * composes the two argument lists and hands back what that denotes, minting no entry of its own (§5.10: "no
+ * intermediate entry per alias hop"). See {@link #closeHeldAlias}.
  *
- * <p><b>And there is no third case</b>, which is what makes {@link #close} total on two branches instead of
- * carrying a general substitution over resolved bodies beside them. Every open entry's body is a {@link
- * HeldBody} or a {@code Reference} -- an error placeholder included, which holds an empty record rather than
- * staying the one parameterised {@code RecordBody} left in the system ({@code
- * SchemaDesugarer.heldEmptyRecord}). Anything else reaching {@link #close} is a broken invariant.
+ * <p><b>So the three cases are told apart by the constructor head, not by the body's shape.</b> Every open
+ * entry's body is a {@link HeldBody} -- a record, composition or refinement template, a sugar form's lift,
+ * an alias, and an error placeholder alike ({@code SchemaDesugarer.heldEmptyRecord}). {@code record} closes
+ * to the instantiation, {@code reference} to a name, everything else to a synthetic.
  *
  * <p><b>Identity (§8.2).</b> An instantiation entry is keyed on the flattened application recorded in
  * {@code source}, so two {@code box<text>} anywhere in the schema land on one entry. The derived name is
@@ -94,6 +94,12 @@ final class TemplateMaterialiser {
 
     /** The constructor a held record template carries -- its closure is the instantiation itself. */
     private static final String RECORD = "record";
+
+    /** The constructor a held alias carries -- §5.10's partial application, which mints no entry. */
+    private static final String REFERENCE = "reference";
+
+    /** {@code reference}'s own member, the one an alias closes through. */
+    private static final String TARGET = "target";
 
     /** The entries produced, keyed by their derived internal name, in creation order. */
     private final Map<String, TypeDefinition> materialised = new LinkedHashMap<>();
@@ -313,10 +319,20 @@ final class TemplateMaterialiser {
         }
         heads.add(head);
         try {
-            // Both template shapes reach here, so both get the memo, the depth backstop and one publish
+            // Every shape reaches here, so every shape gets the memo, the depth backstop and one publish
             // path. An open *instance* used to short-circuit ahead of all three, which left a template
             // applying itself (`weird => <T> [weird<T>]`) recursing to a StackOverflowError instead of
             // tying the knot.
+            // §5.10's partial application mints nothing at all: the alias *is* the application it names
+            // with some arguments still open, so closing it composes the two argument lists and hands back
+            // whatever that denotes -- `uuid_pair<int32>` is the entry `pair<text, int32>` already produced.
+            // "No intermediate entry per alias hop" is the rule, which is why this returns a name rather
+            // than making one, and why it is the head that tells the three cases apart rather than the body.
+            if (template.body() instanceof HeldBody open
+                    && REFERENCE.equals(open.application().typeRef().orElseThrow())) {
+                aliasClosing.add(name);
+                return closeHeldAlias(head, template, open, bind(parameters, arguments));
+            }
             // A record template's closure is the instantiation itself, where every other held form closes to
             // a synthetic the instantiation then references -- see closeHeldRecord.
             if (template.body() instanceof HeldBody open
@@ -339,27 +355,14 @@ final class TemplateMaterialiser {
                 publish.accept(name, alias);
                 return name;
             }
-            if (template.body() instanceof Reference alias) {
-                // §5.10 partial application. A reference template *is* the application it names with some
-                // arguments still open, so applying it composes the two argument lists and closes the
-                // result: `uuid_pair<int32>` is `pair<text, int32>`, the same entry writing that directly
-                // denotes. §5.10 is explicit that this mints no intermediate entry per alias hop -- the
-                // origin survives in the composed entry's own `source`.
-                //
-                // The application comes from the body, which is where an alias says what it aliases.
-                // `source` records the same reference as provenance and is what §8.2 keys identity on;
-                // reading it here instead conflated the two, and left no way to say a body was missing.
-                aliasClosing.add(name);
-                return close(bindRef(alias.target(), bind(parameters, arguments))).name();
-            }
-            // Every open entry's body is one of the two above. A record, composition or refinement template
-            // holds its body; a sugar form's lift holds its body; a partial application is a Reference. An
-            // error placeholder holds an empty record rather than staying a bare RecordBody, which is what
-            // makes this total (SchemaDesugarer.heldEmptyRecord). So this is a broken invariant, not an
-            // author error and not a gap.
+            // Every open entry's body is held -- a record, composition or refinement template, a sugar
+            // form's lift, an alias, and an error placeholder alike (SchemaDesugarer.heldEmptyRecord). The
+            // three branches above are the whole of §12.1's open form, told apart by the head they carry
+            // rather than by what shape the body arrived in. So this is a broken invariant, not an author
+            // error and not a gap.
             throw new IllegalStateException("'" + head + "' declares type parameters but its body is a "
-                    + template.body().getClass().getSimpleName() + " -- an open entry's body is held or is a "
-                    + "reference, and nothing else can be substituted into");
+                    + template.body().getClass().getSimpleName() + " -- every open entry's body is held, and "
+                    + "nothing else can be substituted into");
         } finally {
             closing.remove(name);
             aliasClosing.remove(name);
@@ -423,6 +426,35 @@ final class TemplateMaterialiser {
         synthetics.add(formName);
         publish.accept(formName, definition);
         return formName;
+    }
+
+    /**
+     * A held <b>alias</b> closed: §5.10's partial application, which mints no entry of its own.
+     *
+     * <p>The first two steps are every held body's -- substitute the parameters, then close the application
+     * standing in a slot. What differs is what is left afterwards: nothing to build. {@code
+     * uuid_pair<int32>} composed to {@code pair<text, int32>}, and closing that already produced the entry,
+     * so its name is the answer. §5.10 is explicit that an alias hop mints no intermediate entry; the origin
+     * survives in the composed entry's own {@code source}.
+     *
+     * <p><b>The knot-tying memo cannot serve this path</b>, which is why {@link #aliasClosing} exists. That
+     * memo answers a recursive application with the name of the entry under construction, and this
+     * constructs none -- so a self-applying alias ({@code loop => <B> loop<B>}) would be handed a name
+     * nothing ever defines. {@link #close} checks {@code aliasClosing} before reaching here and reports the
+     * cycle instead.
+     */
+    private String closeHeldAlias(String head, TypeDefinition template, HeldBody open,
+            Map<String, TypeArgument> bindings) {
+        CoreValue substituted = substitute(open.application().coreValue(), head, template.parameters(),
+                bindings);
+        CoreValue closed = closeApplications(substituted);
+        CoreValue target = closed instanceof RecordValue record ? field(record, TARGET).orElse(null) : null;
+        if (!(target instanceof TokenValue token)) {
+            throw new IllegalStateException("'" + head + "<...>' is an alias whose target did not close to a "
+                    + "name: " + target + " -- SchemaDesugarer writes `!reference { target: <type_ref> }` and "
+                    + "closeApplications reduces an application there to the entry it denotes");
+        }
+        return token.text();
     }
 
     /**

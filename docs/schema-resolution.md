@@ -339,12 +339,22 @@ recorded open form, and replacing the application with a reference to the entry 
   - **Both closure paths share one memo**, so a template that applies itself (`weird => <T> [weird<T>]`) ties
     the knot on the entry under construction. An open instance used to short-circuit ahead of the memo and
     the depth backstop alike, which made that spelling a `StackOverflowError`.
-- **A reference template composes rather than minting an entry.** §5.10's *partial application* —
-  `uuid_pair => <B> pair<uuid, B>` — is a declaration whose whole body is an application some of whose
-  arguments name parameters it re-declares, which makes the alias itself a template. `DefinitionResolver`
-  records it as a `REFERENCE` entry with those parameters and the application verbatim; applying it binds
-  the arguments into that inner argument list and closes what results, so `uuid_pair<int32>` *is* the entry
-  `pair<uuid, int32>` written directly denotes. §5.10 is explicit that this mints no intermediate entry per
+- **An alias holds its body too, and closes by composing rather than minting an entry.** §5.10's *partial
+  application* — `uuid_pair => <B> pair<uuid, B>` — is a declaration whose whole body is an application some
+  of whose arguments name parameters it re-declares, which makes the alias itself a template. §8.1 says that
+  body denotes `!reference { target: pair<uuid, B> }`, and `SchemaDesugarer` writes it there — spellable
+  because `reference.target` is a `type_ref`. So it substitutes by the same token walk as every other held
+  form; applying it binds the arguments into that inner argument list and closes what results, so
+  `uuid_pair<int32>` *is* the entry `pair<uuid, int32>` written directly denotes.
+  - **`reference` is the one head materialisation dispatches to a name rather than an entry**
+    (`closeHeldAlias`). The first two steps are shared — substitute, then close the application in the slot —
+    and what differs is that there is nothing left to build. That is also why `close` tells the three cases
+    apart by the constructor head: the body shape no longer distinguishes them, every open entry's being held.
+  - **`reference` is not a `~` constructor and its kind is not a base kind**, so `DefinitionResolver`
+    dispatches the head instead of judging it by the generic `!C value` rule: §4.1 gives an alias
+    `kind: REFERENCE`, which is a `type_kind` with nothing in the supertype chain to supply it, and the
+    kernel leaves `reference` unmarked because it describes no value. Both facts are the kernel's own. The
+    binding check still runs — `reference`'s vocabulary is a record like any other. §5.10 is explicit that this mints no intermediate entry per
   alias hop, so a chain of aliases collapses and the origin survives only in the composed entry's own
   `source`. The degenerate spelling closes the same way: `ident => <T> T` applied to `text` is `text`.
   - **A self-applying alias is the author's error, not a knot.** The knot-tying memo answers a recursive

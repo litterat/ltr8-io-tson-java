@@ -708,9 +708,11 @@ compatibility).
   it there, where the body is written; a **composition or refinement** template is held one phase later
   (`DefinitionResolver.holdIfOpen`), because both absorb fields from a source and the form to hold is the
   *flattened* one — but through `SchemaDesugarer.heldRecord`, so two producers of the wire form share one
-  spelling. **An alias is written the same way** — `uuid_pair => <B> !reference { target: pair<text, B> }` —
-  which is what widening the kernel's `reference.target` from `type_name` to `type_ref` buys: an alias to an
-  application can state the arguments it binds, so no template keeps them beside its body in `source`.
+  spelling. **An alias is written the same way**, and is: `uuid_pair => <B> pair<text, B>` leaves the desugar
+  phase as `<B> !reference { target: pair<text, B> }`, spellable because the kernel's `reference.target` is a
+  `type_ref`. So **every** open entry's body is held, with no exception — which is what lets materialisation
+  dispatch on the constructor head (`record` closes to the instantiation, `reference` to a name, everything
+  else to a synthetic) rather than on what shape the body arrived in.
   `record_field.value_param`, `instance_template` and `template_argument` are **gone from the kernel**: a
   routed parameter rides `value` with §8.1's shadowing rule to tell it from a literal, and §5.7's fixation
   moves to materialisation. What a held body cannot enforce is half of §5.10's argument-kind rule — see
