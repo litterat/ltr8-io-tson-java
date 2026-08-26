@@ -248,10 +248,19 @@ recorded open form, and replacing the application with a reference to the entry 
   arguments, when the author had written them. Keeping the list means the linker judges what was written.
   The fallback's own half of the fix is in `docs/linking-and-compilation.md` — it does not apply to an
   argument-bearing `source` at all, a §5.10 head being resolved in the type-name namespace only (§3.3.1).
-- **Kind checking falls out of substitution.** A value argument reaching a type position, or a type argument
-  reaching a `value_param` route, is the author's error — §5.10 infers a parameter's kind from its use, so
-  the body's use and the applied argument are the two things being compared. Arity is checked before any of
-  it, against the template's own `parameters`.
+- **Kind checking falls out of substitution, for the shapes that still resolve at their declaration.** A value
+  argument reaching a type position, or a type argument reaching a `value_param` route, is the author's error
+  — §5.10 infers a parameter's kind from its use, so the body's use and the applied argument are the two
+  things being compared. Arity is checked before any of it, against the template's own `parameters`.
+  - **A *held* body has no slot types, so it can only enforce half of it**, which is §5.10's open question
+    rather than a defect here (`SPEC-FEEDBACK.md` #5). A literal applied where the body uses the parameter as
+    a type is still refused, because the substituted token stands in a type position and nothing declares a
+    type called `3` — the verdict arrives as an unresolved reference rather than as a kind error. Its converse,
+    a type name applied where the body routes the parameter into a field's *value*, is accepted: `value` is
+    §4's escape-hatch atom and takes any token. **What closes that is not the kind rule** but §5.2's own
+    dependency — `record_field.value` must be the field's declared type — which catches `int32 ~ text`
+    whether a parameter put it there or the author wrote it literally. It is `BACKLOG.md`'s deferred
+    FIXED/DEFAULT value validation, and it subsumes this case.
 - **Failures report per entry**, through the same receiver resolution uses, so two bad applications in one
   schema are both reported against their own declarations rather than the first aborting the document.
 - **Two positions close on demand, during resolution, rather than waiting for the pass.** A composition
@@ -269,11 +278,25 @@ recorded open form, and replacing the application with a reference to the entry 
     — it cannot close until `vip` itself materialises, and deferring composition that far is a different
     feature. Before this, refinement did not refuse: it copied the template's body with parameters unbound
     and reported an unresolved reference to a parameter the author never wrote.
-- **An open *instance* closes on a second path, and produces an ordinary body.** A template whose body is
-  **held** — a `TemplateBody`, which a sugar form over a parameter lifts to — is not substituted-and-kept like
-  a record template: once its parameters go concrete it is no longer a template at all, but the constructor
-  body those bindings always described. So it is bound through **that constructor's own compiled reader**, the
-  same one a written `!array { … }` binds through, and the entry carries an ordinary `ArrayBody`/`MapBody`.
+- **A held body closes by one process, whatever wrote it** (`closeHeld`). `<T> [T]` and `<T> { x: T }` are both
+  an application with a parameter standing in a slot — `!array { element_type: T }` and
+  `!record { fields: [ { name: x  type: T } ] }` — so both substitute by the same walk and are then bound
+  through **their own constructor's compiled reader**, the same one a written `!array { … }` or `!record { … }`
+  binds through. Once its parameters go concrete a held body is no longer a template at all, but the
+  constructor body those bindings always described, and the entry carries an ordinary
+  `ArrayBody`/`MapBody`/`RecordBody`.
+  - **What differs between the shapes is only what the result *is*.** A **record** template's closure is the
+    instantiation entry itself (`closeHeldRecord`): a substituted record is the type the author named by
+    writing the application, so there is nothing for an extra hop to record and the entry carries the
+    application in its own `source` the way §8.2 says every instantiation does. Every other held form closes
+    to a **synthetic** named for the form, which the instantiation then references — a form has no
+    author-written name for identity to key on. That is the whole of the divergence; everything before it is
+    shared.
+  - **§5.7's fixation happens here** (`fixRoutedValues`), which is what a held record body's retirement of
+    `value_param` costs and where §5.7 says to pay it: a field routed by `= P` is held as `state: REQUIRED`
+    with the parameter standing in `value`, and a REQUIRED field carrying a value is that and nothing else —
+    a closed REQUIRED field has none, which is what `REQUIRED_FIXED` means. A `~ P` default arrives as
+    `REQUIRED_DEFAULT` and stays one: data may still override it.
   - **Substitution is one rule, at every depth.** The body was never read against constructor vocabulary, so
     a parameter in a slot, one inside an application a slot holds (`tree<p0>` becoming `tree<text>`), and one
     inside a collection are the same thing here: a token in a tree, rewritten when its text resolves into the

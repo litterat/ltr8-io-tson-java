@@ -6,6 +6,7 @@ import io.ltr8.tson.schema.TsonCanonicalIdentity;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Reference;
 
@@ -14,6 +15,8 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -69,15 +72,21 @@ class ValueParamFixedFieldTest {
      * field in REQUIRED, "because nothing is fixed at declaration -- the value does not exist yet". Pinned
      * because the obvious fix for the defect below is to make this REQUIRED_FIXED, which would put this
      * implementation at odds with the one sentence the spec is explicit about.
+     *
+     * <p>The template's body is <b>held</b>, so the state and the parameter are read off the wire record it
+     * holds rather than off a {@code RecordField}: {@code record_field.value_param} is gone, the parameter
+     * standing in the ordinary {@code value} slot with §8.1's shadowing rule to tell it from a literal.
      */
     @Test
     void anOpenTemplatesParametricFixedFieldStaysRequiredWithTheParameterRecorded() {
         TsonLinkedSchema linked = tson().resolve(SCHEMA);
 
-        RecordField open = ((RecordBody) linked.schema().entries().get("response").body()).fields().get(0);
-        assertEquals(FieldState.REQUIRED, open.state());
-        assertTrue(open.value().isEmpty(), "nothing is fixed at declaration");
-        assertEquals("S", open.valueParam().orElseThrow(), "the parameter rides the value channel");
+        TemplateBody held = assertInstanceOf(TemplateBody.class,
+                linked.schema().entries().get("response").body());
+
+        assertTrue(held.names().contains("S"), () -> "the parameter is named in the body: " + held.names());
+        assertFalse(held.names().contains(FieldState.REQUIRED_FIXED.name()),
+                () -> "nothing is fixed at declaration: " + held.names());
     }
 
     /**
@@ -122,5 +131,80 @@ class ValueParamFixedFieldTest {
         assertEquals(Diagnostic.Code.FIELD_FIXED, validate(tson, "literal").get(0).code());
         assertEquals(Diagnostic.Code.FIELD_FIXED, validate(tson, "created").get(0).code(),
                 "999 against a type whose schema says the status is 201 must be refused");
+    }
+
+    /**
+     * <b>All three template shapes route a value the same way</b>, which is what holding every open body
+     * bought: a record template, a composition template absorbing a supertype's fields, and a refinement
+     * template tightening its source all reach {@code REQUIRED_FIXED} with the applied argument. The two
+     * absorbing shapes hold the <em>flattened</em> body, so what is substituted is one record however many
+     * declarations contributed to it.
+     */
+    @Test
+    void everyTemplateShapeFixesARoutedValueTheSameWay() {
+        String schema = """
+                !!id:"https://example.test/value-param.tn"
+                !!meta:"https://tson.io/2026/33/m/meta.tn"
+                !!import:"https://tson.io/2026/33/m/core.tn"
+                {
+                  order    => { id: text }
+                  base     => { status: int32  body: order }
+                  fresh    => <T, S> { status: int32 = S  body: T }
+                  composed => <T, S> base & { status: = S  body: T }
+                  refined  => <S> base ^ { status: = S }
+                  a => fresh<order, 201>
+                  b => composed<order, 201>
+                  c => refined<201>
+                }
+                """;
+        TsonSchemaSource source = uri -> schema;
+        TsonLinkedSchema linked = Tson.builder().schemaSource(source).build().resolve(schema);
+
+        for (String entry : List.of("a", "b", "c")) {
+            RecordField status = statusOf(linked, entry);
+            assertEquals(FieldState.REQUIRED_FIXED, status.state(), entry);
+            assertEquals("201", status.value().orElseThrow().text(), entry);
+        }
+    }
+
+    /**
+     * <b>{@code record_field.value_param} has no producer left in resolver output.</b> Every open body is
+     * held, and a held body writes a routed parameter into the ordinary {@code value} slot with §8.1's
+     * shadowing rule to tell it from a literal -- so the separate channel, which existed only because a body
+     * read as constructor vocabulary at its declaration cannot otherwise say which of the two a token is, is
+     * never filled. It stays in the model and in the kernel because {@code spec/m} is Revision 33's artifact
+     * and stays byte-identical; {@code BACKLOG.md} carries the removal.
+     *
+     * <p>Asserted over every entry, templates and their closures alike, rather than over one field: the point
+     * is the absence of a producer, and a single fixture would not show it.
+     */
+    @Test
+    void noResolvedEntryCarriesAValueParam() {
+        String schema = """
+                !!id:"https://example.test/value-param.tn"
+                !!meta:"https://tson.io/2026/33/m/meta.tn"
+                !!import:"https://tson.io/2026/33/m/core.tn"
+                {
+                  order    => { id: text }
+                  base     => { status: int32  body: order }
+                  fresh    => <T, S> { status: int32 = S  body: T }
+                  composed => <T, S> base & { status: = S  body: T }
+                  refined  => <S> base ^ { status: = S }
+                  sized    => <N> { xs: [text; N..] }
+                  a => fresh<order, 201>
+                  b => composed<order, 201>
+                  c => refined<201>
+                  d => sized<2>
+                }
+                """;
+        TsonSchemaSource source = uri -> schema;
+        TsonLinkedSchema linked = Tson.builder().schemaSource(source).build().resolve(schema);
+
+        linked.schema().entries().forEach((name, definition) -> {
+            if (definition.body() instanceof RecordBody record) {
+                record.fields().forEach(field -> assertTrue(field.valueParam().isEmpty(),
+                        () -> name + '.' + field.name() + " still routes through value_param"));
+            }
+        });
     }
 }

@@ -46,15 +46,19 @@ import java.util.function.UnaryOperator;
  * instead would reuse {@code SchemaDesugarer}'s injection machinery but has no channel for that {@code
  * source}, and would put type-level work back into a phase Tranche A made purely syntactic.
  *
- * <p><b>Three shapes close here, by three paths.</b> A <b>record</b> template -- parameters occupying field
- * types and field values -- is substituted and kept: the result is still a record, one with its parameters
- * filled in. An <b>open instance</b>, whose body is an {@code instance_template} (what a sugar form over a
- * parameter lifts to), stops being a template altogether once its bindings go concrete: it is the
- * constructor body those bindings always described, so it is bound through that constructor's own reader
- * and the entry carries an ordinary body. See {@link #closeInstanceTemplate}. A <b>reference</b> template --
- * §5.10's partial application, {@code uuid_pair => <B> pair<uuid, B>} -- is neither: it <em>is</em> the
- * application it names with some arguments still open, so applying it composes the two argument lists and
- * closes the result, minting no entry of its own (§5.10: "no intermediate entry per alias hop").
+ * <p><b>A held body closes by one process, whatever wrote it.</b> {@code <T> [T]} and {@code <T> { x: T }}
+ * are both an application with a parameter standing in a slot -- {@code !array { element_type: T }} and
+ * {@code !record { fields: [ { name: x  type: T } ] }} -- so both substitute by the same walk and are read
+ * back through their own constructor's reader. See {@link #closeHeld}. What differs is only what the result
+ * <em>is</em>: a <b>record</b> template's closure is the instantiation entry itself ({@link
+ * #closeHeldRecord}), because a substituted record is the type the author named by writing the application;
+ * every other held form closes to a <em>synthetic</em> named for the form, which the instantiation then
+ * references ({@link #closeHeldTemplate}), because a form has no author-written name to be keyed on.
+ *
+ * <p><b>A reference template holds nothing and closes by neither path.</b> §5.10's partial application,
+ * {@code uuid_pair => <B> pair<uuid, B>}, <em>is</em> the application it names with some arguments still
+ * open, so applying it composes the two argument lists and closes the result, minting no entry of its own
+ * (§5.10: "no intermediate entry per alias hop").
  *
  * <p><b>Identity (§8.2).</b> An instantiation entry is keyed on the flattened application recorded in
  * {@code source}, so two {@code box<text>} anywhere in the schema land on one entry. The derived name is
@@ -77,17 +81,20 @@ final class TemplateMaterialiser {
      */
     private final DefinitionGetter namespace;
 
-    /** The entries produced, keyed by their derived internal name, in creation order. */
     /** {@code type_ref}'s own member names -- the one place a held token's channel still matters. */
     private static final String NAME = "name";
     private static final String VALUE = "value";
     private static final String ARGUMENTS = "arguments";
 
+    /** The constructor a held record template carries -- its closure is the instantiation itself. */
+    private static final String RECORD = "record";
+
+    /** The entries produced, keyed by their derived internal name, in creation order. */
     private final Map<String, TypeDefinition> materialised = new LinkedHashMap<>();
 
     /**
      * Which of {@link #materialised} are <b>synthetic</b> entries rather than instantiation entries -- the
-     * closed forms {@link #closeInstanceTemplate} mints, which are indistinguishable from the entry a
+     * closed forms {@link #closeHeldTemplate} mints, which are indistinguishable from the entry a
      * directly-written {@code [pixel; 1920]} lifts to and are the same entry when both appear (§8.2).
      *
      * <p>§8.2 marks only these: an instantiation entry carries no {@code @synthetic}, its {@code source}
@@ -304,6 +311,16 @@ final class TemplateMaterialiser {
             // path. An open *instance* used to short-circuit ahead of all three, which left a template
             // applying itself (`weird => <T> [weird<T>]`) recursing to a StackOverflowError instead of
             // tying the knot.
+            // A record template's closure is the instantiation itself, where every other held form closes to
+            // a synthetic the instantiation then references -- see closeHeldRecord.
+            if (template.body() instanceof HeldBody open
+                    && RECORD.equals(open.application().typeRef().orElseThrow())) {
+                TypeDefinition instantiation =
+                        closeHeldRecord(head, template, open, arguments, bind(parameters, arguments));
+                materialised.put(name, instantiation);
+                publish.accept(name, instantiation);
+                return name;
+            }
             if (template.body() instanceof HeldBody open) {
                 String formName = closeHeldTemplate(head, template, open, bind(parameters, arguments));
                 if (generated.contains(head)) {
@@ -398,28 +415,60 @@ final class TemplateMaterialiser {
     private String closeHeldTemplate(String head, TypeDefinition template, HeldBody open,
             Map<String, TypeArgument> bindings) {
         String target = open.application().typeRef().orElseThrow();
+        Closed closed = closeHeld(head, template, open, bindings);
+        // Named before the entry is built and from the wire slots as written, which is what keeps one type on
+        // one entry: the desugar phase lifts innermost-first, so a form it writes already names the entry its
+        // inner form became, and a form closed here has to agree with it or `[[pixel; 3]; 3]` written out and
+        // `grid<pixel, 3>` closed would be two entries for one type.
+        List<RecordValue.Field> fields =
+                closed.wire() instanceof RecordValue record ? record.fields() : List.of();
+        String formName = SchemaDesugarer.internalName(target, fields);
+        if (namespace.getTypeDefinition(formName) != null) {
+            return formName; // already built, here or by the desugar phase -- one entry per form, schema-wide
+        }
+        TypeDefinition definition = new TypeDefinition(Optional.of(TypeRef.of(target)), template.kind(),
+                List.of(), false, List.of(), List.of(), Optional.empty(), closed.body());
+        materialised.put(formName, definition);
+        synthetics.add(formName);
+        publish.accept(formName, definition);
+        return formName;
+    }
+
+    /**
+     * A <b>record</b> template's closure, which is the instantiation entry itself rather than a synthetic
+     * with a reference to it. Substituting a record yields a record -- what the author declared, not a form
+     * derived from a sugar spelling -- so there is nothing for the extra hop to record, and the entry carries
+     * the application in its own {@code source} the way §8.2 says every instantiation does.
+     *
+     * <p><b>Which is why the two shapes part company here and nowhere earlier.</b> Everything up to this
+     * point is common: one held body, one substitution, one set of closed inner applications. What differs is
+     * only what the result <em>is</em> -- a form that needs a name of its own, or the type the author named
+     * by writing the application.
+     */
+    private TypeDefinition closeHeldRecord(String head, TypeDefinition template, HeldBody open,
+            List<TypeArgument> arguments, Map<String, TypeArgument> bindings) {
+        Closed closed = closeHeld(head, template, open, bindings);
+        return new TypeDefinition(Optional.of(new TypeRef(head, arguments)), template.kind(), List.of(),
+                template.constructor(), template.supertypes(), template.subtypes(), Optional.empty(),
+                fixRoutedValues(closed.body()));
+    }
+
+    /** A held body substituted, its inner applications closed, and read back through its constructor. */
+    private Closed closeHeld(String head, TypeDefinition template, HeldBody open,
+            Map<String, TypeArgument> bindings) {
+        String target = open.application().typeRef().orElseThrow();
         // One walk does what three steps used to: a parameter in a slot, a parameter inside an application a
         // slot holds (`tree<p0>` becoming `tree<text>`), and a parameter inside a collection are all the same
         // thing here -- a token in a tree -- because the body was never read against the constructor's
         // vocabulary in the first place.
         CoreValue substituted = substitute(open.application().coreValue(), head, template.parameters(), bindings);
-        // Applications inside it close *before* the name is derived, which is what keeps one type on one
-        // entry: the desugar phase lifts innermost-first, so a form it writes already names the entry its
-        // inner form became, and a form closed here has to agree with it or `[[pixel; 3]; 3]` written out and
-        // `grid<pixel, 3>` closed would be two entries for one type.
-        CoreValue closed = closeApplications(substituted);
-        List<RecordValue.Field> fields = closed instanceof RecordValue record ? record.fields() : List.of();
-        String formName = SchemaDesugarer.internalName(target, fields);
-        if (namespace.getTypeDefinition(formName) != null) {
-            return formName; // already built, here or by the desugar phase -- one entry per form, schema-wide
-        }
+        CoreValue wire = closeApplications(substituted);
         if (metaReader == null) {
             throw new IllegalStateException("'" + head + "<...>' closes to a '" + target + "' body, and this "
                     + "materialiser was built without a compiled meta reader to bind it through");
         }
-        Top body;
         try {
-            body = metaReader.read(target, new DataValue(List.of(), Optional.of(target), closed));
+            return new Closed(wire, metaReader.read(target, new DataValue(List.of(), Optional.of(target), wire)));
         } catch (TsonReadException e) {
             // The bindings a template defers are checked here and nowhere else (§8.2): `<T, N> [T; N]` is a
             // fine declaration, and `vector<text, "two">` is where it stops being one.
@@ -427,12 +476,30 @@ final class TemplateMaterialiser {
                     + "valid data for '" + target + "', the constructor's own constraint vocabulary -- "
                     + e.getMessage(), e);
         }
-        TypeDefinition definition = new TypeDefinition(Optional.of(TypeRef.of(target)), template.kind(),
-                List.of(), false, List.of(), List.of(), Optional.empty(), body);
-        materialised.put(formName, definition);
-        synthetics.add(formName);
-        publish.accept(formName, definition);
-        return formName;
+    }
+
+    /** A closed held body, and the wire form it was read from -- the one an entry name derives from. */
+    private record Closed(CoreValue wire, Top body) {
+    }
+
+    /**
+     * §5.7's fixation, applied where the section says it happens: "fixation happens downstream, where values
+     * are concrete". A field routed by {@code = P} is held as {@code state: REQUIRED} with the parameter
+     * standing in {@code value}, and a REQUIRED field carrying a value is that and nothing else -- a closed
+     * REQUIRED field has none, which is what {@code REQUIRED_FIXED} means. Once substitution has made the
+     * value concrete the field takes the state its literal spelling would have had. A {@code ~ P} default
+     * arrives as {@code REQUIRED_DEFAULT} and stays one: data may still override it.
+     */
+    private static Top fixRoutedValues(Top body) {
+        if (!(body instanceof RecordBody record)) {
+            return body;
+        }
+        return new RecordBody(record.supertypes(), record.fields().stream()
+                .map(field -> field.state() == FieldState.REQUIRED && field.value().isPresent()
+                        ? new RecordField(field.name(), field.type(), FieldState.REQUIRED_FIXED, field.value(),
+                                field.valueParam(), field.annotations())
+                        : field)
+                .toList(), record.groups());
     }
 
     /**
@@ -458,13 +525,19 @@ final class TemplateMaterialiser {
         };
     }
 
-    /** {@code type_ref}'s record form is the one shape carrying both members; a bare name is a token. */
-    private static boolean isApplication(RecordValue record) {
+    /**
+     * {@code type_ref}'s record form is the one shape carrying both members; a bare name is a token, and a
+     * {@code type_argument} carries {@code name} or {@code value} but never {@code arguments}. Package-visible
+     * so {@link HeldBody} recognises an application by the same test that closes one -- a held body is written
+     * by one phase and read by two, and a second opinion about what an application looks like is what makes
+     * one of them wrong.
+     */
+    static boolean isApplication(RecordValue record) {
         return field(record, NAME).isPresent() && field(record, ARGUMENTS).isPresent();
     }
 
     /** {@code { name: head  arguments: [ ... ] }} back as the reference it spells. */
-    private static TypeRef typeRefOf(RecordValue record) {
+    static TypeRef typeRefOf(RecordValue record) {
         CoreValue name = field(record, NAME).orElseThrow();
         String head = name instanceof TokenValue token ? token.text()
                 : typeRefOf((RecordValue) name).name();

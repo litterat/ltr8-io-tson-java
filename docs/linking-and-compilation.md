@@ -105,6 +105,19 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
     parameter it declares, so `box => <T> { v: text }` is rejected — every application of it would denote
     the same type. That one is a `TsonSchemaValidationException` where its twin is an
     `IllegalStateException`, because a parameter list is author-written where a `value_param` is not.
+  - **A held body answers the arity rule for the *applications* it writes** (`checkHeldArity`). A held body
+    withholds one thing — what a reference *resolves to*, which no argument settles until substitution — so
+    type-kind validation and inhabitance wait for materialisation. Arity does not depend on that: it counts
+    parameters the *referenced* entry declares. And nothing ever closes `chain => <T> { tail: chain<T, T>? }`,
+    so deferring it would let that template ship with the mistake in it.
+    - **Applications only, never bare names**, and the distinction is load-bearing.
+      `TemplateBody.applications()` returns a shape nothing else in the wire tree shares;
+      `TemplateBody.names()` returns *every* token — field names, states, literals and type references alike.
+      Asking the zero-argument half ("this token names an unapplied template") off `names()` rejects a
+      correct schema whose field happens to be called `box` beside a template of that name, which is a worse
+      failure than a late verdict. So that half runs on the entry materialisation mints, and an unapplied
+      template gets no verdict — the open form's own position (`SPEC-FEEDBACK.md` #5: "an unapplied template
+      is checked no further and gets no verdict"), not a shortfall.
   - **`entryOrigins` is on `TsonLinkedSchema`, not on `TsonSchema` or `TypeDefinition`**, because it is a
     fact *linking* establishes rather than part of the resolved schema value §9 defines — and because
     `schema.meta` is a bind target with a hand-written `equals` and the `@Record` constructor-selection trap,

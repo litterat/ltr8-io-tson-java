@@ -8,22 +8,42 @@ import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.annotation.Typename;
 import io.ltr8.tson.schema.meta.TemplateBody;
+import io.ltr8.tson.schema.meta.TypeRef;
 
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
  * The one implementation of {@link TemplateBody}: a constructor application in wire form, standing as the
  * body of the template that declares it, unread until materialisation substitutes its parameters away.
  *
- * <p><b>Every held body is an application, so a {@link DataValue} carries all of them.</b> Three
- * normalisations get it there. A bare record body is the {@code !record { fields: [ ... ] }} it denotes
- * (§5.2), rewritten where it is written, so a record template holds an application like any other. A
- * composition is flattened against its supertypes first and the flattened form is held -- the same
- * resolve-then-round-trip-through-{@code TsonObjectWriter} merge atom refinement already performs, and the
- * reason a composition template is normalised in the resolver where a plain record is normalised at desugar.
- * A parameterized atom refinement is not a form at all: §12.1 gives {@code atom-refinement} no parameter
- * list, a refinement of an atom instance having no parameter to take.
+ * <p><b>Every held body is an application, so a {@link DataValue} carries all of them.</b> A sugar form
+ * already is one, by the desugar table. A bare record body becomes one: it is the
+ * {@code !record { fields: [ ... ] }} §5.2 says it denotes, and {@code SchemaDesugarer} rewrites it there,
+ * where the body is written, so a record template holds an application like every other open form and one
+ * process closes them all.
+ *
+ * <p><b>The rewrite belongs in the desugar phase and nowhere else.</b> The alternative -- resolve the body,
+ * then write the resolved form back out -- puts a second producer in front of a wire form that two later
+ * phases read, and they do not agree: {@code TsonObjectWriter} states a no-argument {@code type_ref} in the
+ * explicit record form where the desugar table states it positionally, which leaves a {@code type_argument}
+ * indistinguishable from a {@code type_ref} application to a walk that reads neither against a vocabulary.
+ * The entry name is derived from what is written, so a second spelling is also a second entry for one type.
+ *
+ * <p><b>A composition or refinement template is held too, from one phase later.</b> Both absorb fields from a
+ * source (§5.8's supertypes, §5.7's refinement source), so the form to hold is the <em>flattened</em> one --
+ * a §5.7 tightening entry states a modifier and no type-ref, and is not a {@code record_field} at all until
+ * the inherited field supplies one. So {@code DefinitionResolver} resolves the body against the namespace and
+ * then writes it back through {@code SchemaDesugarer.heldRecord}, which is the same spelling by construction.
+ * A parameterized <b>atom refinement</b> is not a form at all: §12.1 gives {@code atom-refinement} no
+ * parameter list, a refinement of an atom instance having no parameter to take.
+ *
+ * <p><b>So {@code record_field.value_param} has no producer left in resolver output.</b> Every open body is
+ * held, and a held body writes a routed parameter into the ordinary {@code value} slot; the channel stays in
+ * the model and in the kernel only because {@code spec/m} is Revision 33's artifact and stays byte-identical.
+ * {@code ValueParamFixedFieldTest.noResolvedEntryCarriesAValueParam} is the guard.
  *
  * <p><b>A reference template holds nothing.</b> {@code <B> pair<uuid, B>} keeps the {@code type_ref} with
  * arguments it already resolves to, a parameter in an argument riding the reference channel like any other
@@ -55,6 +75,30 @@ public record HeldBody(DataValue application) implements TemplateBody {
         Set<String> names = new LinkedHashSet<>();
         collect(application.coreValue(), names);
         return names;
+    }
+
+    @Override
+    public List<TypeRef> applications() {
+        List<TypeRef> applications = new ArrayList<>();
+        collectApplications(application.coreValue(), applications);
+        return applications;
+    }
+
+    /**
+     * Every {@code type_ref} record form the held tree holds. It does <b>not</b> descend into one it finds:
+     * an application's own arguments come back inside the {@link TypeRef} it yields, and the caller that
+     * cares about nesting walks those -- descending here as well would report each nested application twice.
+     */
+    private static void collectApplications(CoreValue value, List<TypeRef> into) {
+        switch (value) {
+            case RecordValue record when TemplateMaterialiser.isApplication(record) ->
+                    into.add(TemplateMaterialiser.typeRefOf(record));
+            case RecordValue record -> record.fields()
+                    .forEach(field -> collectApplications(field.value().value().coreValue(), into));
+            case ArrayValue array -> array.elements()
+                    .forEach(element -> collectApplications(element.value().coreValue(), into));
+            default -> { } // a token names a type but applies nothing
+        }
     }
 
     private static void collect(CoreValue value, Set<String> into) {

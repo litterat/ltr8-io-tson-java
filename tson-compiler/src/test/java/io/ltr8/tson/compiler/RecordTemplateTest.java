@@ -4,6 +4,7 @@ import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonCanonicalIdentity;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.schema.meta.ArrayBody;
+import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeArgument;
@@ -157,6 +158,34 @@ class RecordTemplateTest {
         RecordField attempts = fieldOf(compiled, fieldType(compiled, "holder", "r"), "attempts");
         assertEquals("3", attempts.value().orElseThrow().text());
         assertTrue(attempts.valueParam().isEmpty(), "the route is spent once the value is bound");
+    }
+
+    /**
+     * <b>One field, both parameter kinds</b> -- {@code <T, N> { first: T ~ N }} puts a type parameter in the
+     * field's type and a value parameter in its default. This is the shape a labelled open vocabulary needed
+     * {@code value_param} for, and a held body needs nothing: {@code T} and {@code N} are two tokens in a
+     * wire record, and which one is a type is decided by <em>where it stands</em>, not by a channel it was
+     * written on. Substitution is the same rewrite for both.
+     *
+     * <p>The converse spelling is the check that the positions really are load-bearing: applied backwards,
+     * the literal lands in the type slot and resolves to nothing.
+     */
+    @Test
+    void oneFieldMayCarryATypeParameterAndAValueParameterAtOnce() {
+        TsonCompiledSchema compiled = compile("""
+                  test1 => <T, N> { first: T ~ N }
+                  holder => { d: test1<int32, 10> }""");
+
+        RecordField first = fieldOf(compiled, fieldType(compiled, "holder", "d"), "first");
+        assertEquals(TypeRef.of("int32"), first.type(), "T stood in the type slot");
+        assertEquals("10", first.value().orElseThrow().text(), "N stood in the value slot");
+        assertEquals(FieldState.REQUIRED_DEFAULT, first.state(), "~ is a default, and stays one");
+
+        TsonSchemaValidationException swapped = assertThrows(TsonSchemaValidationException.class,
+                () -> compile("""
+                          test1 => <T, N> { first: T ~ N }
+                          holder => { d: test1<10, int32> }"""));
+        assertTrue(swapped.getMessage().contains("unresolved reference '10'"), swapped.getMessage());
     }
 
     /** An inner application closes before the outer one names it, so nesting needs no special case. */
@@ -437,22 +466,43 @@ class RecordTemplateTest {
         assertTrue(thrown.getMessage().contains("takes 2 type arguments"), thrown.getMessage());
     }
 
+    /**
+     * A literal applied where the body uses the parameter as a <b>type</b> is still refused -- the substituted
+     * token stands in a type position, and nothing declares a type called {@code 3}.
+     *
+     * <p><b>The verdict arrives as an unresolved reference rather than as a kind error</b>, because a held
+     * body has no slot types: §5.10's argument-kind rule ("a reference argument binds a type parameter, a
+     * literal binds a value parameter") is enforced by knowing what the slot expected, and holding is
+     * precisely not knowing that until materialisation. What survives is the consequence -- a literal in a
+     * type position resolves to nothing -- which is why this half is caught and its converse below is not.
+     */
     @Test
     void applyingAValueWhereTheBodyUsesAParameterAsATypeIsAnError() {
         TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
                 () -> compile("""
                           box => <T> { v: T }
                           holder => { b: box<3> }"""));
-        assertTrue(thrown.getMessage().contains("used as a type"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("unresolved reference '3'"), thrown.getMessage());
     }
 
+    /**
+     * <b>The converse is a known gap, pinned here so it stays visible.</b> A type name applied where the body
+     * routes the parameter into a field's <em>value</em> is accepted: substitution puts {@code text} in the
+     * {@code value} slot, {@code value} is §4's escape-hatch atom that accepts any token, and no rule
+     * downstream compares a field's default against the field's own declared type.
+     *
+     * <p><b>What would close it is not the kind rule.</b> §5.2's own dependency -- "record_field.value ... must
+     * be the field's declared type" -- catches this and needs no notion of a parameter's kind: {@code text} is
+     * not an {@code int32}, whether a parameter put it there or the author wrote it literally. That check is
+     * {@code BACKLOG.md}'s deferred FIXED/DEFAULT value validation, and it subsumes this case. The residue it
+     * would not catch -- a type name applied into a {@code text}-typed value slot -- is a value slot holding a
+     * valid value, which is no error to give.
+     */
     @Test
-    void applyingATypeWhereTheBodyRoutesAValueIsAnError() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
-                () -> compile("""
-                          retry => <N> { attempts: int32 ~ N }
-                          holder => { r: retry<text> }"""));
-        assertTrue(thrown.getMessage().contains("as a value"), thrown.getMessage());
+    void applyingATypeWhereTheBodyRoutesAValueIsNotYetCaught() {
+        assertNotNull(compile("""
+                  retry => <N> { attempts: int32 ~ N }
+                  holder => { r: retry<text> }"""), "accepted today; see this test's own note");
     }
 
     /**

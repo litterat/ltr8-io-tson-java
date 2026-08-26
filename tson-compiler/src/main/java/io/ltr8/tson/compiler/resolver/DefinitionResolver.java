@@ -415,10 +415,10 @@ final class DefinitionResolver {
                         List.of(), List.of(), Optional.empty(), body);
             }
             if (structural.body() instanceof ConstructionDef construction) {
-                return resolveComposition(name, construction, constructor, parameters);
+                return holdIfOpen(name, resolveComposition(name, construction, constructor, parameters));
             }
             if (structural.body() instanceof RefinedDef refined) {
-                return resolveRefinement(name, refined, constructor, parameters);
+                return holdIfOpen(name, resolveRefinement(name, refined, constructor, parameters));
             }
         }
         if (typeDef instanceof ReferenceTypeDef referenceTypeDef) {
@@ -453,6 +453,43 @@ final class DefinitionResolver {
                 "'" + name + "': only fresh record constructions, composition, simple type references, "
                         + "declaration-level sized arrays, constructor application, and atom refinement are "
                         + "resolved so far, got " + typeDef.getClass().getSimpleName());
+    }
+
+    /**
+     * A composition or refinement template's body, <b>held</b> like every other open body -- so that one
+     * process closes them all and {@code record_field.value_param} has one fewer producer.
+     *
+     * <p><b>Why these two are held here and a plain record body at desugar.</b> Both absorb fields from a
+     * source (§5.8's supertypes, §5.7's refinement source), and the form to hold is the <em>flattened</em>
+     * one: a §5.7 tightening entry states a modifier and no type-ref, which is not a {@code record_field} at
+     * all until the inherited field supplies one. So the rewrite has to happen where a namespace is in hand,
+     * which is here -- but the <em>spelling</em> stays {@code SchemaDesugarer}'s, through {@link
+     * SchemaDesugarer#heldRecord}, because two spellings of the held form is the one thing this design cannot
+     * survive.
+     *
+     * <p>Only a record-shaped body: a parameterized atom refinement is not a form §12.1 admits, and an atom
+     * body has no parameters to hold open.
+     */
+    private TypeDefinition holdIfOpen(String name, TypeDefinition resolved) {
+        if (resolved.parameters().isEmpty() || !(resolved.body() instanceof RecordBody record)) {
+            return resolved;
+        }
+        return resolved.withBody(new HeldBody(SchemaDesugarer.heldRecord(record,
+                value -> annotationWireValue(name, value))));
+    }
+
+    /**
+     * One resolved annotation's bound value back in wire form. The object writer is the right tool for
+     * exactly this leaf and no more of the body: unbinding is what it does, and an annotation value is a
+     * self-contained value rather than part of the spelling the held form has to keep.
+     */
+    private DataValue annotationWireValue(String name, Object value) {
+        try {
+            return new TsonDataParser(writer.toTson(value)).parseDocument().root();
+        } catch (RuntimeException e) {
+            throw new UnsupportedOperationException("'" + name + "': failed to re-serialize an annotation "
+                    + "value while holding the template's body: " + e.getMessage(), e);
+        }
     }
 
     // ── Constructor application (§5.5, §5.6) ────────────────────────────────
@@ -1444,49 +1481,17 @@ final class DefinitionResolver {
                 ? field.type().get().optional()
                 : inherited.map(source -> isOptionalState(source.state())).orElse(false);
 
-        if (field.modifier().isEmpty()) {
-            FieldState state = optional ? FieldState.OPTIONAL : FieldState.REQUIRED;
-            return new RecordField(field.name(), type, state, Optional.empty(), Optional.empty());
+        FieldModifiers.Resolved resolved =
+                FieldModifiers.of(field.name(), optional, field.modifier(), parameters);
+        // A parameter keeps the separate `value_param` channel here, where a held body does not: this body
+        // is read as constructor vocabulary at its own declaration, so nothing downstream could tell a
+        // parameter standing in `value` from a literal spelled the same way (§5.10).
+        if (resolved.parametric()) {
+            return new RecordField(field.name(), type, resolved.state(), Optional.empty(),
+                    resolved.value().map(TokenValue::text));
         }
-        FieldDef.Modifier modifier = field.modifier().get();
-        boolean fixed = modifier.kind() == FieldDef.Modifier.Kind.FIXED;
-
-        if (modifier.value() instanceof FieldDef.Modifier.Value.Absent) {
-            // §5.2's sixth spelling, `field: type? = _`: OPTIONAL_FIXED carrying no value at all, so the
-            // field MUST be omitted or written as `_`. Its output encoding is a record_field *without* a
-            // `value` member (§8.1), which Optional.empty() gives directly.
-            if (!fixed) {
-                throw new TsonSchemaValidationException("field '" + field.name() + "' uses '~ _' -- a required "
-                        + "field cannot fall back to not-being-filled, so an absent default is a resolver "
-                        + "error on any field (§5.2). Write 'type?' for a field that may be absent");
-            }
-            if (!optional) {
-                throw new TsonSchemaValidationException("field '" + field.name() + "' fixes a required field to "
-                        + "absent ('= _') -- a field cannot be both required and forbidden from being present "
-                        + "(§5.2). Make it optional ('" + field.name() + ": type? = _') to forbid its value "
-                        + "while keeping it in the contract");
-            }
-            return new RecordField(field.name(), type, FieldState.OPTIONAL_FIXED, Optional.empty(),
-                    Optional.empty());
-        }
-
-        FieldDef.Modifier.Value.Literal literal = (FieldDef.Modifier.Value.Literal) modifier.value();
-        if (optional && !fixed) {
-            throw new TsonSchemaValidationException("field '" + field.name() + "' gives an optional field a "
-                    + "default ('type? ~ value') -- a default implies the field is always present, which "
-                    + "contradicts optional (§5.2). Use 'type ~ value' for a fallback, 'type?' for absence, "
-                    + "or 'type? = value' for present-implies-value");
-        }
-        // §5.7's "Open modifiers": a parametric modifier lands in a REQUIRED-family state whatever the
-        // presence axis says, because nothing is fixed at declaration -- the value arrives at application,
-        // and every application MUST bind every parameter.
-        if (parameters.contains(literal.token().text())) {
-            FieldState state = fixed ? FieldState.REQUIRED : FieldState.REQUIRED_DEFAULT;
-            return new RecordField(field.name(), type, state, Optional.empty(), Optional.of(literal.token().text()));
-        }
-        FieldState state = optional ? FieldState.OPTIONAL_FIXED
-                : (fixed ? FieldState.REQUIRED_FIXED : FieldState.REQUIRED_DEFAULT);
-        return new RecordField(field.name(), type, state, Optional.of(toMetaToken(literal.token())), Optional.empty());
+        return new RecordField(field.name(), type, resolved.state(),
+                resolved.value().map(DefinitionResolver::toMetaToken), Optional.empty());
     }
 
     /** §5.2's presence axis: the two states under which a conforming value may leave the field out. */

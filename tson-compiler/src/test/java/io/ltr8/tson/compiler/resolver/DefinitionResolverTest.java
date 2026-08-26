@@ -24,6 +24,7 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RegexType;
 import io.ltr8.tson.schema.meta.UriType;
 import io.ltr8.tson.schema.meta.RecordField;
+import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.schema.meta.BinaryType;
 import io.ltr8.tson.schema.meta.ChoiceBody;
@@ -515,21 +516,45 @@ class DefinitionResolverTest {
     //    Threaded straight into TypeDefinition.parameters, with no substitution or
     //    validation that a field actually uses each parameter.
 
+    /**
+     * A record template's body is <b>held</b>, as every open body is: {@code { first: A  second: B }} is the
+     * {@code !record { fields: [ ... ] }} §5.2 says it denotes, normalised at desugar and left unread until
+     * materialisation substitutes the parameters away. The entry is a {@code record} construction, so
+     * {@code source} names that constructor -- the same shape {@code <T> [T]} has with {@code array}.
+     */
     @Test
-    void resolvesAFreshRecordsTypeParameters() throws DataBindException {
+    void resolvesAFreshRecordTemplateAsAHeldRecordConstruction() throws DataBindException {
         TypeDefinition pair = resolveSnippet("pair => <A, B> { first: A  second: B }");
 
         assertEquals(List.of("A", "B"), pair.parameters());
-        assertEquals("{ kind: \"PRODUCT\" parameters: [ \"A\" \"B\" ] constructor: false supertypes: [] subtypes: [] "
+        assertEquals("{ source: { name: \"record\" arguments: [] } kind: \"PRODUCT\" "
+                        + "parameters: [ \"A\" \"B\" ] constructor: false supertypes: [] subtypes: [] "
+                        + "body: !template { application: !record { fields: [ "
+                        + "{ name: first type: A } { name: second type: B } ] } } }",
+                write(pair));
+    }
+
+    /** A <b>closed</b> record still resolves at its declaration -- only an open body is held. */
+    @Test
+    void resolvesAClosedRecordAsAnOrdinaryRecordBody() throws DataBindException {
+        TypeDefinition pair = resolveSnippet("pair => { first: text  second: text }");
+
+        assertEquals("{ kind: \"PRODUCT\" parameters: [] constructor: false supertypes: [] subtypes: [] "
                         + "body: !record { supertypes: [] fields: [ "
-                        + "{ name: \"first\" type: { name: \"A\" arguments: [] } state: \"REQUIRED\" } "
-                        + "{ name: \"second\" type: { name: \"B\" arguments: [] } state: \"REQUIRED\" } "
+                        + "{ name: \"first\" type: { name: \"text\" arguments: [] } state: \"REQUIRED\" } "
+                        + "{ name: \"second\" type: { name: \"text\" arguments: [] } state: \"REQUIRED\" } "
                         + "] groups: [] } }",
                 write(pair));
     }
 
+    /**
+     * A <b>composition</b> template holds its body too, so one process closes every open form. What it holds
+     * is the <em>flattened</em> record -- resolved against its supertypes first, since §5.8's absorption and
+     * §5.7's tightening both need a namespace -- written back in the held spelling. Everything outside the
+     * body is the composition's own: {@code constructor}, and both supertype lists.
+     */
     @Test
-    void resolvesACompositionsTypeParameters() throws DataBindException {
+    void resolvesACompositionTemplateAsAHeldFlattenedRecord() throws DataBindException {
         SchemaMap schemaMap = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/33/m/meta-kernel.tn1"
                 {
@@ -543,11 +568,30 @@ class DefinitionResolverTest {
         assertEquals(List.of("T"), box.parameters());
         assertTrue(box.constructor());
         assertEquals(List.of("base"), box.supertypes());
-        assertEquals("{ kind: \"PRODUCT\" parameters: [ \"T\" ] constructor: true supertypes: [ \"base\" ] subtypes: [] "
-                        + "body: !record { supertypes: [ \"base\" ] fields: [ "
-                        + "{ name: \"value\" type: { name: \"T\" arguments: [] } state: \"REQUIRED\" } "
-                        + "] groups: [] } }",
+        assertEquals("{ kind: \"PRODUCT\" parameters: [ \"T\" ] constructor: true supertypes: [ \"base\" ] "
+                        + "subtypes: [] body: !template { application: !record { supertypes: [ base ] "
+                        + "fields: [ { name: value type: T } ] } } }",
                 write(box));
+    }
+
+    /**
+     * The flattening is the point, so it is pinned against a supertype that actually contributes: {@code id}
+     * is absorbed from {@code base} and stands in the held body beside the template's own field, which is
+     * what makes the held form readable by the {@code record} constructor at all -- a §5.7 tightening entry
+     * states a modifier and no type-ref, and is not a {@code record_field} until the inherited field gives it
+     * one.
+     */
+    @Test
+    void aCompositionTemplateHoldsTheFieldsItAbsorbed() throws DataBindException {
+        Map<String, TypeDefinition> entries = resolveAll("""
+                base => { id: text }
+                box  => <T> base & { value: T }
+                """);
+
+        assertEquals("{ kind: \"PRODUCT\" parameters: [ \"T\" ] constructor: false supertypes: [ \"base\" ] "
+                        + "subtypes: [] body: !template { application: !record { supertypes: [ base ] "
+                        + "fields: [ { name: id type: text } { name: value type: T } ] } } }",
+                write(entries.get("box")));
     }
 
     // ── Field modifiers (§5.2, §5.10): default (~) and fixed (=) values ───
@@ -603,34 +647,40 @@ class DefinitionResolverTest {
                 write(pinned));
     }
 
+    /**
+     * A parameter routed into a field's value rides the <b>ordinary {@code value} slot</b>, which is what a
+     * held body buys and what retires {@code record_field.value_param}. §8.1's shadowing rule tells it from a
+     * literal: inside a template a token that resolves into {@code parameters} is a parameter, and a closed
+     * record has no parameters for one to resolve into.
+     *
+     * <p>{@code state} is the unmarked {@code REQUIRED} and so is not written: nothing is fixed at
+     * declaration, because the value does not exist yet. §5.7's fixation to {@code REQUIRED_FIXED} happens at
+     * materialisation, where the value is concrete -- {@code ValueParamFixedFieldTest} pins both ends.
+     */
     @Test
-    void resolvesAParametricFixedValueAsAValueParamNotALiteral() throws DataBindException {
-        // Mirrors array's own "element_type: type_ref = T" without the surrounding composition --
-        // T is one of the declaration's own type parameters, so it's a parameter reference (routed,
-        // not fixed): state stays at its unmarked REQUIRED, and the modifier's token is recorded as
-        // value_param, not value.
+    void aParametricFixedValueRidesTheValueSlotAndFixesNothingYet() throws DataBindException {
         TypeDefinition sized = resolveSnippet("sized => <T> { value: type_ref = T }");
 
         assertEquals(List.of("T"), sized.parameters());
-        assertEquals("{ kind: \"PRODUCT\" parameters: [ \"T\" ] constructor: false supertypes: [] subtypes: [] "
-                        + "body: !record { supertypes: [] fields: [ "
-                        + "{ name: \"value\" type: { name: \"type_ref\" arguments: [] } state: \"REQUIRED\" "
-                        + "value_param: \"T\" } "
-                        + "] groups: [] } }",
+        assertEquals("{ source: { name: \"record\" arguments: [] } kind: \"PRODUCT\" parameters: [ \"T\" ] "
+                        + "constructor: false supertypes: [] subtypes: [] "
+                        + "body: !template { application: !record { fields: [ "
+                        + "{ name: value type: type_ref value: T } ] } } }",
                 write(sized));
     }
 
+    /**
+     * {@code ~ P} promotes to {@code REQUIRED_DEFAULT} exactly as a literal default does (§5.10), and stays
+     * one through materialisation: data may still override a default where it may not override a fixed value.
+     */
     @Test
-    void resolvesAParametricDefaultValueAsAValueParamPromotedToRequiredDefault() throws DataBindException {
-        // "~ P" (default routed by parameter) still promotes to REQUIRED_DEFAULT, identically to a
-        // literal default (§5.10) -- only the value/value_param label differs.
+    void aParametricDefaultValueIsPromotedToRequiredDefault() throws DataBindException {
         TypeDefinition retry = resolveSnippet("retry_policy => <N> { attempts: integer ~ N }");
 
-        assertEquals("{ kind: \"PRODUCT\" parameters: [ \"N\" ] constructor: false supertypes: [] subtypes: [] "
-                        + "body: !record { supertypes: [] fields: [ "
-                        + "{ name: \"attempts\" type: { name: \"integer\" arguments: [] } state: \"REQUIRED_DEFAULT\" "
-                        + "value_param: \"N\" } "
-                        + "] groups: [] } }",
+        assertEquals("{ source: { name: \"record\" arguments: [] } kind: \"PRODUCT\" parameters: [ \"N\" ] "
+                        + "constructor: false supertypes: [] subtypes: [] "
+                        + "body: !template { application: !record { fields: [ "
+                        + "{ name: attempts type: integer state: REQUIRED_DEFAULT value: N } ] } } }",
                 write(retry));
     }
 
@@ -1789,6 +1839,11 @@ class DefinitionResolverTest {
      * modifiers": "a parametric `= P` places the field in REQUIRED -- from OPTIONAL this is the table's
      * ordinary OPTIONAL → REQUIRED tightening"). A parametric {@code = P} over an inherited OPTIONAL field
      * is the shape, so the parameter branch has to sit ahead of the OPTIONAL_FIXED one.
+     *
+     * <p>A refinement <b>template</b> holds its body, so the state is read off the wire record it holds. The
+     * body is the <em>flattened</em> form -- the refinement is resolved against its source first, which is
+     * what gives {@code bound: = MIN} a type at all -- and the parameter stands in the ordinary {@code value}
+     * slot, {@code value_param} having no producer left.
      */
     @Test
     void aParametricModifierOnAnInheritedOptionalFieldStillLandsInRequired() {
@@ -1797,10 +1852,13 @@ class DefinitionResolverTest {
                 bounded => <MIN> base ^ { bound: = MIN }
                 """);
 
-        RecordField bound = bodyOf(entries.get("bounded")).fields().get(0);
-        assertEquals(FieldState.REQUIRED, bound.state());
-        assertEquals(Optional.of("MIN"), bound.valueParam());
-        assertEquals(Optional.empty(), bound.value());
+        TemplateBody held = assertInstanceOf(TemplateBody.class, entries.get("bounded").body());
+        assertTrue(held.names().contains("MIN"), () -> "the parameter is in the body: " + held.names());
+        assertTrue(held.names().contains("integer"), () -> "the type came from the source: " + held.names());
+        // REQUIRED is the constructor's own default and so is not written at all -- which is the assertion:
+        // the inherited OPTIONAL did not survive, and no FIXED state was reached either.
+        assertFalse(held.names().contains(FieldState.OPTIONAL.name()), () -> held.names().toString());
+        assertFalse(held.names().contains(FieldState.OPTIONAL_FIXED.name()), () -> held.names().toString());
     }
 
     // ── Group presence under tightening (§5.11) ───────────────────────────

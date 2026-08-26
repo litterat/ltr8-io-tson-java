@@ -696,9 +696,15 @@ compatibility).
   untagged labelled choice — to become readable (`GroupUnionBindReader`). What remains is narrower: a *value*
   argument keeps its token, so `[vector<float32, 3>]` closes to a nested array with both bounds at 3
   (`RawTokenParser`) — at the cost of identity being keyed on the spelling, so `<255>` and `<0xFF>` are two
-  applications (`SPEC-FEEDBACK.md` #4). **Record and composition templates still resolve at their
-  declaration** and keep `record_field.value_param`; moving them onto held bodies is `BACKLOG.md`'s parked
-  step 3, and what parking it costs is written down there.
+  applications (`SPEC-FEEDBACK.md` #4). **Every template holds its body**, so one process closes them all.
+  §5.2 says `{ x: T }` denotes `!record { fields: [ { name: x  type: T } ] }`, and `SchemaDesugarer` rewrites
+  it there, where the body is written; a **composition or refinement** template is held one phase later
+  (`DefinitionResolver.holdIfOpen`), because both absorb fields from a source and the form to hold is the
+  *flattened* one — but through `SchemaDesugarer.heldRecord`, so two producers of the wire form share one
+  spelling. `record_field.value_param` therefore has **no producer left in resolver output**: a routed
+  parameter rides `value`, with §5.7's fixation moved to materialisation. The channel stays in the kernel
+  because `spec/m` is Revision 33's artifact. What a held body cannot enforce is half of §5.10's
+  argument-kind rule — see "Not yet implemented".
 - **Undocumented atom constructors** — `unknown` (and `extern`, which has no core.tn declaration) has no
   compiled-parser factory, so it compiles to `ErrorReader` (a schema merely *declaring* one still compiles).
   Neither is an ordinary missing parser waiting to be written: `extern` is a whole absent mechanism and `unknown`
@@ -715,6 +721,14 @@ compatibility).
   declaration**, one level coarser than the pointer beside it — `/person/age` carries `person`'s own line,
   because `RecordField` has no position. A `caused by` frame chaining the author's location to the leaf
   constraint's is the other open shape (`BACKLOG.md`).
+- **Half of §5.10's argument-kind rule, on a held record body.** A held body has no slot types — that is what
+  it is for — so it cannot say *this slot expected a value*. A literal applied where the body uses the
+  parameter as a type is still refused (nothing declares a type called `3`, so the verdict arrives as an
+  unresolved reference); its converse, a type name applied into a field's `value`, is accepted, `value` being
+  §4's escape-hatch atom. **What closes it is not the kind rule** but §5.2's own dependency —
+  `record_field.value` must be the field's declared type — which catches `int32 ~ text` whether a parameter
+  put it there or the author wrote it literally, and is the FIXED/DEFAULT value validation listed below.
+  `SPEC-FEEDBACK.md` #5 carries the spec-side question.
 - **Deferred design questions** — `REQUIRED_FIXED`/`OPTIONAL_FIXED` value validation and a general
   disk/HTTP-backed `TsonSchemaSource` (with whitelist/blacklist policy). **`value_param` substitution is
   no longer one of them**: an argument bound into a routed `=` fixes the field (`REQUIRED` →

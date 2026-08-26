@@ -3,7 +3,11 @@ package io.ltr8.tson.compiler.resolver;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
+import io.ltr8.tson.compiler.ast.ArrayValue;
+import io.ltr8.tson.compiler.ast.CoreValue;
+import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
+import io.ltr8.tson.compiler.ast.ScopedValue;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
 import io.ltr8.tson.compiler.ast.schema.GenericRef;
 import io.ltr8.tson.compiler.ast.schema.Instance;
@@ -20,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -517,10 +522,13 @@ class SchemaDesugarerTest {
         assertEquals(new TokenValue("p0", TokenForm.UNQUOTED),
                 payload.fields().getFirst().value().value().coreValue());
 
-        RecordDef box = (RecordDef) ((StructuralTypeDef) document.body().declarations().get("box").typeDef())
-                .body();
-        assertEquals(new GenericRef(lifted.name(), List.of(new TypeArg.Ref(new SimpleRef("T")))),
-                ((FieldDef) box.entries().get(0)).type().orElseThrow().typeRef());
+        // `box` itself is `!record { ... }` by the time it leaves this phase (§5.2), so the field applying
+        // the lifted form is a `type_ref` record inside the held binding record rather than a `GenericRef`
+        // in the AST.
+        Instance boxTemplate =
+                assertInstanceOf(Instance.class, document.body().declarations().get("box").typeDef());
+        assertEquals("record", boxTemplate.target());
+        assertEquals(applicationValue(lifted.name(), "T"), fieldSlot(boxTemplate, 0, "type"));
     }
 
     /** Two templates differing only in what they call their parameter are one template, so one entry (§8.2). */
@@ -557,15 +565,36 @@ class SchemaDesugarerTest {
     }
 
     /**
-     * A <b>record</b> template's application passes through untouched. Substitution happens over the
-     * <em>resolved</em> open form (`TemplateMaterialiser`), not over the AST, so this phase leaves the head
-     * and its arguments alone and the application reaches resolution intact.
+     * A record <b>template</b> is normalised here -- §5.2's own rewrite, {@code { v: T }} into the
+     * {@code !record { fields: [ ... ] }} it denotes -- so that every open body is a held application and one
+     * process closes them all. The <b>application</b> of it still passes through untouched: substitution
+     * happens over the resolved open form ({@code TemplateMaterialiser}), not over the AST, so this phase
+     * leaves {@code box<text>}'s head and arguments alone.
      */
     @Test
-    void applyingARecordTemplateIsLeftForMaterialisation() {
-        SchemaDocument document = parse("""
+    void aRecordTemplateIsNormalisedAndItsApplicationLeftForMaterialisation() {
+        SchemaDocument document = desugar("""
                   box => <T> { v: T }
                   holder => { b: box<text> }""");
+
+        Instance box = assertInstanceOf(Instance.class, document.body().declarations().get("box").typeDef());
+        assertEquals("record", box.target());
+        assertEquals(List.of("T"), box.typeParams(), "the declaration's own list, as written");
+        assertEquals(new TokenValue("v", TokenForm.UNQUOTED), fieldSlot(box, 0, "name"));
+        assertEquals(new TokenValue("T", TokenForm.UNQUOTED), fieldSlot(box, 0, "type"),
+                "the parameter stands in the slot, as it does in every other held form");
+
+        RecordDef holder = (RecordDef) ((StructuralTypeDef) document.body().declarations().get("holder")
+                .typeDef()).body();
+        assertEquals(new GenericRef("box", List.of(new TypeArg.Ref(new SimpleRef("text")))),
+                ((FieldDef) holder.entries().get(0)).type().orElseThrow().typeRef(),
+                "the application is untouched");
+    }
+
+    /** A <b>closed</b> record is not normalised: only a template's body is held, so only a template is rewritten. */
+    @Test
+    void aClosedRecordIsLeftExactlyAsItWasWritten() {
+        SchemaDocument document = parse("  plain => { v: text }");
 
         assertSame(document, SchemaDesugarer.desugar(document, Set.of()));
     }
@@ -657,6 +686,30 @@ class SchemaDesugarerTest {
         return "{ variants: [" + elements.elements().stream()
                 .map(e -> ((io.ltr8.tson.compiler.ast.TokenValue) e.value().coreValue()).text())
                 .reduce((a, b) -> a + " " + b).orElse("") + "] }";
+    }
+
+    /** One member of the {@code n}th {@code record_field} in a held {@code !record} binding record. */
+    private static CoreValue fieldSlot(Instance template, int n, String member) {
+        RecordValue binding = (RecordValue) template.value().coreValue();
+        ArrayValue fields = (ArrayValue) binding.fields().stream().filter(f -> f.name().equals("fields"))
+                .findFirst().orElseThrow().value().value().coreValue();
+        RecordValue field = (RecordValue) fields.elements().get(n).value().coreValue();
+        return field.fields().stream().filter(f -> f.name().equals(member)).findFirst().orElseThrow()
+                .value().value().coreValue();
+    }
+
+    /** {@code type_ref}'s record form, {@code { name: head  arguments: [ { name: arg } ] }}. */
+    private static CoreValue applicationValue(String head, String argument) {
+        CoreValue argumentRecord = new RecordValue(List.of(new RecordValue.Field("name",
+                scoped(new TokenValue(argument, TokenForm.UNQUOTED)))));
+        CoreValue arguments = new ArrayValue(List.of(scoped(argumentRecord)));
+        return new RecordValue(List.of(
+                new RecordValue.Field("name", scoped(new TokenValue(head, TokenForm.UNQUOTED))),
+                new RecordValue.Field("arguments", scoped(arguments))));
+    }
+
+    private static ScopedValue scoped(CoreValue value) {
+        return new ScopedValue(Optional.empty(), new DataValue(List.of(), Optional.empty(), value));
     }
 
     /** Renders an {@code Instance}'s binding record as {@code { field: value  ... }} for readable assertions. */

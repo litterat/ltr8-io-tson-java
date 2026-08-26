@@ -111,15 +111,29 @@ class TemplateRegularityTest {
     }
 
     /**
-     * The same rule inside the template's own body, which is where a recursive reference forgets its
-     * arguments. `head: T` is not decoration: without it the parameter's *only* use would have been the
-     * missing argument list, and the unused-parameter rule below fires first. Both verdicts are true of
-     * `chain => <T> { tail: chain? }`; which one is more helpful depends on what the author meant.
+     * A recursive reference that forgets its arguments is caught <b>when the template is applied</b>, not at
+     * its declaration -- and an unapplied one gets no verdict at all.
+     *
+     * <p><b>The bare-name half of the rule cannot run against a held body.</b> Arity over an *application* is
+     * decidable there ({@code chain<T, T>} below), because an application is a distinguishable shape in the
+     * wire tree. A bare name is not: a held body's tokens are field names, states, literals and type
+     * references alike, so "this token names a template" would reject a schema whose field happens to be
+     * called {@code box} beside a template of that name. A false verdict on a correct schema is worse than a
+     * late one on an incorrect schema, so the check runs where the shape is unambiguous.
+     *
+     * <p>An unapplied template getting no verdict is the design's own position, not a shortfall it tolerates
+     * -- {@code SPEC-FEEDBACK.md} #5: "an unapplied template is checked no further and gets no verdict".
+     * `head: T` is not decoration: without it the parameter's only use would have been the missing argument
+     * list, and the unused-parameter rule -- which *is* answerable from a held body -- fires first.
      */
     @Test
-    void aRecursiveReferenceWithoutArgumentsIsRejected() {
-        assertTrue(rejected("  chain => <T> { head: T  tail: chain? }")
-                .contains("not a type until it is applied"));
+    void aRecursiveReferenceWithoutArgumentsIsRejectedWhereItIsApplied() {
+        assertNotNull(compile("  chain => <T> { head: T  tail: chain? }"),
+                "unapplied, it gets no verdict");
+
+        assertTrue(rejected("""
+                  chain => <T> { head: T  tail: chain? }
+                  use   => { c: chain<text> }""").contains("not a type until it is applied"));
     }
 
     /**
