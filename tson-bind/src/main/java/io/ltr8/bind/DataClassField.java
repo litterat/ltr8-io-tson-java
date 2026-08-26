@@ -17,6 +17,8 @@ package io.ltr8.bind;
 
 import java.lang.invoke.MethodHandle;
 import java.util.Optional;
+import java.util.function.Supplier;
+import io.ltr8.bind.internal.Memoized;
 
 /**
  * 
@@ -54,7 +56,14 @@ public class DataClassField {
 	// type of the field
 	private final Class<?> type;
 
-	private final DataClass dataClass;
+	/**
+	 * Kept memoised rather than resolved, because a cyclic type graph has one edge that cannot be resolved
+	 * while the descriptor it points back to is still being built. Known at construction on every other edge,
+	 * which is all of them but that one -- see {@code DataBindContext.componentSource}.
+	 */
+	private final Memoized<DataClass> dataClass;
+
+
 
 	// Is the field required to be set.
 	private final boolean isRequired;
@@ -67,12 +76,25 @@ public class DataClassField {
 	// setter write handle. signature object.setT( type t);
 	private final Optional<MethodHandle> setter;
 
+	/** The same, for a component on a cycle in the type graph -- see {@link #dataClass}. */
+	public DataClassField(int index, String name, Class<?> type, Supplier<DataClass> dataClassSource,
+			boolean isRequired, MethodHandle isPresent, MethodHandle readHandle, MethodHandle setter) {
+		this.index = index;
+		this.name = name;
+		this.type = type;
+		this.dataClass = Memoized.deferred(dataClassSource);
+		this.isRequired = isRequired;
+		this.isPresent = isPresent;
+		this.accessor = readHandle;
+		this.setter = Optional.ofNullable(setter);
+	}
+
 	public DataClassField(int index, String name, Class<?> type, DataClass dataClass, boolean isRequired,
 			MethodHandle isPresent, MethodHandle readHandle, MethodHandle setter) {
 		this.index = index;
 		this.name = name;
 		this.type = type;
-		this.dataClass = dataClass;
+		this.dataClass = Memoized.of(dataClass);
 		this.isRequired = isRequired;
 		this.isPresent = isPresent;
 		this.accessor = readHandle;
@@ -92,7 +114,7 @@ public class DataClassField {
 	}
 
 	public DataClass dataClass() {
-		return dataClass;
+		return dataClass.get();
 	}
 
 	/**

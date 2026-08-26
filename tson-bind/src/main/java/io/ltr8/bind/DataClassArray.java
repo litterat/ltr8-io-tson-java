@@ -16,6 +16,8 @@
 package io.ltr8.bind;
 
 import java.lang.invoke.MethodHandle;
+import java.util.function.Supplier;
+import io.ltr8.bind.internal.Memoized;
 
 /**
  * 
@@ -70,7 +72,14 @@ import java.lang.invoke.MethodHandle;
 public class DataClassArray extends DataClass {
 
 	// data class.
-	private final DataClass arrayDataClass;
+	/**
+	 * Kept memoised rather than resolved, because a cyclic type graph has one edge that cannot be resolved
+	 * while the descriptor it points back to is still being built. Known at construction on every other edge,
+	 * which is all of them but that one -- see {@code DataBindContext.componentSource}.
+	 */
+	private final Memoized<DataClass> arrayDataClass;
+
+
 
 	// <array> constructor( int size );
 	private final MethodHandle constructor;
@@ -87,12 +96,26 @@ public class DataClassArray extends DataClass {
 	// <value> get( <array>, <iter> );
 	private final MethodHandle get;
 
+	/** The same, for an element type on a cycle in the type graph -- see {@link #arrayDataClass}. */
+	public DataClassArray(Class<?> targetType, Supplier<DataClass> arrayDataClassSource,
+			MethodHandle constructor, MethodHandle size, MethodHandle iterator, MethodHandle get, MethodHandle put)
+			throws NoSuchMethodException, IllegalAccessException {
+		super(targetType);
+
+		this.arrayDataClass = Memoized.deferred(arrayDataClassSource);
+		this.constructor = constructor;
+		this.iterator = iterator;
+		this.size = size;
+		this.get = get;
+		this.put = put;
+	}
+
 	public DataClassArray(Class<?> targetType, DataClass arrayDataClass,
 			MethodHandle constructor, MethodHandle size, MethodHandle iterator, MethodHandle get, MethodHandle put)
 			throws NoSuchMethodException, IllegalAccessException {
 		super(targetType);
 
-		this.arrayDataClass = arrayDataClass;
+		this.arrayDataClass = Memoized.of(arrayDataClass);
 		this.constructor = constructor;
 		this.iterator = iterator;
 		this.size = size;
@@ -111,7 +134,7 @@ public class DataClassArray extends DataClass {
 	 * @return The DataClass type for the array.
 	 */
 	public DataClass arrayDataClass() {
-		return arrayDataClass;
+		return arrayDataClass.get();
 	}
 
 	/**
@@ -147,7 +170,7 @@ public class DataClassArray extends DataClass {
 	@Override
 	public String toString() {
 		return "DataClassArray [ typeClass=" + typeClass().getName() + ", arrayDataClass="
-				+ arrayDataClass.typeClass().getName() + "]";
+				+ shown(arrayDataClass) + "]";
 	}
 
 }

@@ -17,6 +17,7 @@ package io.ltr8.bind;
 
 import java.util.Objects;
 import java.util.Optional;
+import io.ltr8.bind.internal.Memoized;
 
 /**
  * 
@@ -31,6 +32,20 @@ public abstract class DataClass {
 	private final Class<?> typeClass;
 
 	private final Optional<DataClassBridge> bridge;
+
+	/**
+	 * A held component descriptor's class name for a {@code toString}, without resolving one that is still
+	 * deferred -- pulling a descriptor as a side effect of printing one would be a trap in exactly the place
+	 * a trap is hardest to see.
+	 *
+	 * <p>Package visible rather than protected: both callers are descriptors in this package, and a
+	 * {@code protected} signature would put {@link Memoized}, which this module does not export, into the
+	 * surface a subclass outside it compiles against.
+	 */
+	static String shown(Memoized<DataClass> held) {
+		DataClass known = held.peek();
+		return known != null ? known.typeClass().getName() : "<deferred>";
+	}
 
 	public DataClass( Class<?> targetType, DataClassBridge bridge) {
 		this.typeClass = Objects.requireNonNull(targetType);

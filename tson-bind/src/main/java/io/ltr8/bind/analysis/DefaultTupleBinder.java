@@ -10,6 +10,7 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.RecordComponent;
+import java.util.function.Supplier;
 
 /**
  * Resolves an {@code @Tuple}-annotated genuine Java {@code record} into a {@link DataClassTuple}.
@@ -44,7 +45,8 @@ public class DefaultTupleBinder {
 				RecordComponent component = components[i];
 				componentTypes[i] = component.getType();
 
-				DataClass elementDataClass = context.getDescriptor(component.getType(), component.getGenericType());
+				Supplier<DataClass> elementDataClass =
+						context.componentSource(component.getType(), component.getGenericType());
 				MethodHandle accessor = lookup.unreflect(component.getAccessor());
 
 				elements[i] = new DataClassElement(i, elementDataClass, accessor);

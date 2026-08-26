@@ -16,6 +16,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Supplier;
 
 /**
  * Resolves a {@link Map} target into a {@link DataClassMap}, the same role {@link
@@ -43,8 +44,8 @@ public class DefaultMapBinder {
 			}
 
 			Type[] typeArguments = ((ParameterizedType) parameterizedType).getActualTypeArguments();
-			DataClass keyDataClass = resolveTypeArgument(context, typeArguments[0]);
-			DataClass valueDataClass = resolveTypeArgument(context, typeArguments[1]);
+			Supplier<DataClass> keyDataClass = resolveTypeArgument(context, typeArguments[0]);
+			Supplier<DataClass> valueDataClass = resolveTypeArgument(context, typeArguments[1]);
 
 			// Produces the MethodHandles for the DataClassMap.
 			MapAccessBridge mapBridge = new MapAccessBridge(targetClass);
@@ -70,13 +71,14 @@ public class DefaultMapBinder {
 		return descriptor;
 	}
 
-	private static DataClass resolveTypeArgument(DataBindContext context, Type typeArgument)
+	private static Supplier<DataClass> resolveTypeArgument(DataBindContext context, Type typeArgument)
 			throws DataBindException {
 		if (typeArgument instanceof Class) {
-			return context.getDescriptor((Class<?>) typeArgument);
+			return context.componentSource((Class<?>) typeArgument, typeArgument);
 		} else if (typeArgument instanceof ParameterizedType) {
 			ParameterizedType parameterizedTypeArgument = (ParameterizedType) typeArgument;
-			return context.getDescriptor((Class<?>) parameterizedTypeArgument.getRawType(), parameterizedTypeArgument);
+			return context.componentSource((Class<?>) parameterizedTypeArgument.getRawType(),
+					parameterizedTypeArgument);
 		}
 		throw new CodeAnalysisException("Unrecognized parameterized type for map key/value");
 	}

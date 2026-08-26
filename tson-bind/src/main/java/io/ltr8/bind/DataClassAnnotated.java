@@ -1,6 +1,8 @@
 package io.ltr8.bind;
 
 import java.lang.invoke.MethodHandle;
+import java.util.function.Supplier;
+import io.ltr8.bind.internal.Memoized;
 
 /**
  * A position declared as {@code io.ltr8.annotation.Annotated<T>} -- the value's own descriptor, plus the
@@ -21,7 +23,14 @@ import java.lang.invoke.MethodHandle;
  */
 public final class DataClassAnnotated extends DataClass {
 
-	private final DataClass valueClass;
+	/**
+	 * Kept memoised rather than resolved, because a cyclic type graph has one edge that cannot be resolved
+	 * while the descriptor it points back to is still being built. Known at construction on every other edge,
+	 * which is all of them but that one -- see {@code DataBindContext.componentSource}.
+	 */
+	private final Memoized<DataClass> valueClass;
+
+
 
 	private final MethodHandle constructor;
 
@@ -29,10 +38,20 @@ public final class DataClassAnnotated extends DataClass {
 
 	private final MethodHandle annotations;
 
+	/** The same, for a component on a cycle in the type graph -- see {@code DataBindContext.componentSource}. */
+	public DataClassAnnotated(Class<?> targetType, Supplier<DataClass> valueClass, MethodHandle constructor,
+			MethodHandle value, MethodHandle annotations) {
+		super(targetType, null);
+		this.valueClass = Memoized.deferred(valueClass);
+		this.constructor = constructor;
+		this.value = value;
+		this.annotations = annotations;
+	}
+
 	public DataClassAnnotated(Class<?> targetType, DataClass valueClass, MethodHandle constructor,
 			MethodHandle value, MethodHandle annotations) {
 		super(targetType, null);
-		this.valueClass = valueClass;
+		this.valueClass = Memoized.of(valueClass);
 		this.constructor = constructor;
 		this.value = value;
 		this.annotations = annotations;
@@ -40,7 +59,7 @@ public final class DataClassAnnotated extends DataClass {
 
 	/** The descriptor for {@code T}, the value inside the box. */
 	public DataClass valueClass() {
-		return valueClass;
+		return valueClass.get();
 	}
 
 	/** {@code box(value, annotations)} -- how a reader builds one without naming the carrier class. */

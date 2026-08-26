@@ -16,6 +16,7 @@ import java.lang.reflect.Type;
 import java.util.*;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.LinkedBlockingDeque;
+import java.util.function.Supplier;
 
 public class DefaultArrayBinder {
 
@@ -29,7 +30,7 @@ public class DefaultArrayBinder {
 
 		try {
 
-			DataClass arrayDataClass;
+			Supplier<DataClass> arrayDataClass;
 
 			// Find the type of the Array collection.
 			if (targetClass.isArray()) {
@@ -37,7 +38,7 @@ public class DefaultArrayBinder {
 				Class<?> arrayClass = targetClass.getComponentType();
 
 				// Java arrays type is easily available via reflection.
-				arrayDataClass = context.getDescriptor(targetClass.getComponentType());
+				arrayDataClass = context.componentSource(targetClass.getComponentType(), targetClass.getComponentType());
 
 			} else if (Collection.class.isAssignableFrom(targetClass)) {
 
@@ -51,10 +52,10 @@ public class DefaultArrayBinder {
 				if (paramType instanceof Class) {
 					Class<?> arrayClass = (Class<?>) paramType;
 
-					arrayDataClass = context.getDescriptor(arrayClass);
+					arrayDataClass = context.componentSource(arrayClass, arrayClass);
 				} else if (paramType instanceof ParameterizedType) {
 					ParameterizedType arrayParamType = (ParameterizedType) paramType;
-					arrayDataClass = context.getDescriptor((Class<?>) arrayParamType.getRawType(), arrayParamType);
+					arrayDataClass = context.componentSource((Class<?>) arrayParamType.getRawType(), arrayParamType);
 				} else {
 					throw new CodeAnalysisException("Unrecognized parameterized type");
 				}
