@@ -1,7 +1,15 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.compiler.ast.ArrayValue;
+import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
+import io.ltr8.tson.compiler.ast.RecordValue;
+import io.ltr8.tson.compiler.ast.TokenForm;
+import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.TemplateBody;
+
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 /**
  * The one implementation of {@link TemplateBody}: a constructor application in wire form, standing as the
@@ -33,6 +41,24 @@ import io.ltr8.tson.schema.meta.TemplateBody;
  * in this role, and saying so once here keeps the grammar types out of the value model's root hierarchy.
  */
 public record HeldBody(DataValue application) implements TemplateBody {
+
+    @Override
+    public Set<String> names() {
+        Set<String> names = new LinkedHashSet<>();
+        collect(application.coreValue(), names);
+        return names;
+    }
+
+    private static void collect(CoreValue value, Set<String> into) {
+        switch (value) {
+            case TokenValue token when token.form() == TokenForm.UNQUOTED -> into.add(token.text());
+            case ArrayValue array -> array.elements()
+                    .forEach(element -> collect(element.value().coreValue(), into));
+            case RecordValue record -> record.fields()
+                    .forEach(field -> collect(field.value().value().coreValue(), into));
+            default -> { } // a quoted token is a literal, and nothing else carries a name
+        }
+    }
 
     public HeldBody {
         if (application == null) {

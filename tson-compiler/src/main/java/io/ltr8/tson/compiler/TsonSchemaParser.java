@@ -13,7 +13,6 @@ import io.ltr8.tson.compiler.ast.schema.FieldDef;
 import io.ltr8.tson.compiler.ast.schema.GenericRef;
 import io.ltr8.tson.compiler.ast.schema.GroupDef;
 import io.ltr8.tson.compiler.ast.schema.Instance;
-import io.ltr8.tson.compiler.ast.schema.InstanceTemplate;
 import io.ltr8.tson.compiler.ast.schema.MapRef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.RecordEntry;
@@ -24,7 +23,6 @@ import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.ast.schema.SimpleRef;
 import io.ltr8.tson.compiler.ast.schema.SizeSpec;
-import io.ltr8.tson.compiler.ast.schema.TemplateBinding;
 import io.ltr8.tson.compiler.ast.schema.StructuralDef;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.compiler.ast.schema.TupleRef;
@@ -281,7 +279,7 @@ public final class TsonSchemaParser extends TsonDataParser {
         List<String> typeParams = parseTypeParamsOpt();
 
         if (check(TokenType.BANG)) {
-            return typeParams.isEmpty() ? parseAtomRefinementOrInstance() : parseInstanceTemplate(typeParams);
+            return parseAtomRefinementOrInstance(typeParams);
         }
 
         if (check(TokenType.TILDE)) {
@@ -365,66 +363,7 @@ public final class TsonSchemaParser extends TsonDataParser {
         }
     }
 
-    /**
-     * {@code instance-template} past its parameter list (§12.1) -- a {@code !} head over a
-     * {@code template-def} payload. Distinguished from {@link #parseAtomRefinementOrInstance} by the
-     * parameter list alone, and it admits no {@code ^}: refining an atom instance has no parameter to take.
-     */
-    private TypeDef parseInstanceTemplate(List<String> typeParams) {
-        Token bang = expect(TokenType.BANG, "a constructor application ('!name')");
-        Token name = peek();
-        if (name.type() != TokenType.UNQUOTED) {
-            throw mismatch("a type name immediately after '!'");
-        }
-        if (!bang.end().equals(name.start())) {
-            throw parseError("'!' must be immediately adjacent to the type name (no whitespace)");
-        }
-        advance();
-        rejectNumericTypeName(name);
-        if (check(TokenType.CARET)) {
-            throw parseError("a parameterized atom refinement is not a type-def (§12.1): '^' takes no type "
-                    + "parameters, since a refinement of an atom instance has none to bind");
-        }
-        return new InstanceTemplate(typeParams, name.text(), parseTemplateDef());
-    }
-
-    /**
-     * {@code template-def} (§12.1) -- one or more {@code field-name: template-arg} bindings.
-     *
-     * <p>It is narrower than a {@code core-value} on purpose, and mirrors {@code template_argument}
-     * one-for-one: a bare name, a name carrying type arguments, or a literal. A {@code core-value} would
-     * admit an array payload, a scalar payload, and a nested record in a binding, none of which the resolved
-     * form can carry -- {@code template_argument} has no collection case, so a parameter inside a
-     * collection-typed slot has no resolved shape at all. The grammar refuses what the vocabulary cannot
-     * hold.
-     */
-    private List<TemplateBinding> parseTemplateDef() {
-        expect(TokenType.LBRACE, "an instance template's opening '{'");
-        if (check(TokenType.RBRACE)) {
-            throw parseError("an instance template binds at least one field (§12.1); '{}' binds nothing, so "
-                    + "no application of it could differ from the constructor's own defaults");
-        }
-        List<TemplateBinding> bindings = new ArrayList<>();
-        bindings.add(parseTemplateBinding());
-        while (consumeSeparatorOrCloseCheck(TokenType.RBRACE)) {
-            bindings.add(parseTemplateBinding());
-        }
-        expect(TokenType.RBRACE, "an instance template's closing '}'");
-        return bindings;
-    }
-
-    private TemplateBinding parseTemplateBinding() {
-        Token name = expectFieldNameToken("a bound field's name");
-        expect(TokenType.COLON, "an instance template binding's ':'");
-        if (check(TokenType.LBRACKET) || check(TokenType.LBRACE) || check(TokenType.LPAREN)) {
-            throw parseError("a container or choice form is not permitted in an instance template binding "
-                    + "(§12.1); the binding takes a type name, an application, or a literal -- declare a "
-                    + "named type for anything else and reference it by name");
-        }
-        return new TemplateBinding(name.text(), parseTypeArg());
-    }
-
-    private TypeDef parseAtomRefinementOrInstance() {
+    private TypeDef parseAtomRefinementOrInstance(List<String> typeParams) {
         Token bang = expect(TokenType.BANG, "an atom refinement or constructor application ('!name')");
         Token name = peek();
         if (name.type() != TokenType.UNQUOTED) {
@@ -438,6 +377,13 @@ public final class TsonSchemaParser extends TsonDataParser {
         String target = name.text();
 
         if (check(TokenType.CARET)) {
+            // §12.1 gives `atom-refinement` no parameter list: a refinement of an atom instance has no
+            // parameter to take, so the two forms are told apart here rather than by a production of their
+            // own.
+            if (!typeParams.isEmpty()) {
+                throw parseError("a parameterized atom refinement is not a type-def (§12.1): '^' takes no type "
+                        + "parameters, since a refinement of an atom instance has none to bind");
+            }
             advance();
             // atom-refinement = "!" type-name ws "^" ws record-def (§12.1) -- a braced record of constraint
             // bindings, and nothing wider. The `^` has already committed this production and the grammar
@@ -449,10 +395,15 @@ public final class TsonSchemaParser extends TsonDataParser {
             }
             return new AtomRefinement(target, new DataValue(List.of(), Optional.empty(), parseCoreValue()));
         }
-        // instance = "!" type-name ws core-value (§12.1) -- see Instance's own Javadoc. The constructor
-        // name goes straight into the wrapping DataValue's own typeRef; there is no room in this
+        // instance = [type-params] "!" type-name ws core-value (§12.1) -- see Instance's own Javadoc. The
+        // constructor name goes straight into the wrapping DataValue's own typeRef; there is no room in this
         // production for the payload to carry further annotations or a second, competing type-ref.
-        return new Instance(new DataValue(List.of(), Optional.of(target), parseCoreValue()));
+        //
+        // A parameter list makes it a template and changes nothing else, which is the point: the payload is
+        // held rather than read against the constructor's own vocabulary, so every core-value the closed form
+        // admits the open one admits too -- a collection included, which is what the separate template-def
+        // production could not express.
+        return new Instance(typeParams, new DataValue(List.of(), Optional.of(target), parseCoreValue()));
     }
 
     /**

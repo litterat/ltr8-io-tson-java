@@ -8,8 +8,7 @@ package io.ltr8.tson.schema.meta;
  * product => top & { ... }}, and {@code sum => top & {}} become {@link Atom}/{@link Product}/
  * {@link Sum} each {@code extends Top}, and {@code reference => top & { target: type_name } }
  * (which composes with {@code top} directly, not through one of the three base kinds) becomes
- * {@link Reference} implementing this interface directly -- as does {@link InstanceTemplate}, whose kernel
- * declaration composes with {@code top} for the same reason. Lets a consumer test kind ancestry with
+ * {@link Reference} implementing this interface directly. Lets a consumer test kind ancestry with
  * an ordinary {@code instanceof Product}/{@code instanceof Atom} rather than switching on {@link
  * TypeKind} by hand, and also lets {@code tson-bind}'s generic writer/reader dispatch on this same
  * sealed hierarchy directly for {@code !record}/{@code !array}/etc. type-refs -- {@code
@@ -22,5 +21,5 @@ package io.ltr8.tson.schema.meta;
  * directly for that reason: {@link Data}, the meta layer's extension point, and {@link TemplateBody}, the held
  * body of an entry that declares type parameters.
  */
-public sealed interface Top permits Atom, Product, Sum, Reference, InstanceTemplate, Data, TemplateBody {
+public sealed interface Top permits Atom, Product, Sum, Reference, Data, TemplateBody {
 }

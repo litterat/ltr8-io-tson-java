@@ -3,20 +3,21 @@ package io.ltr8.tson.compiler.resolver;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.compiler.TsonReadException;
+import io.ltr8.tson.compiler.ast.ArrayValue;
+import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.ScopedValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.ChoiceBody;
-import io.ltr8.tson.schema.meta.InstanceTemplate;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.TemplateArgument;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TupleElement;
 import io.ltr8.tson.schema.meta.TypeArgument;
@@ -77,6 +78,11 @@ final class TemplateMaterialiser {
     private final DefinitionGetter namespace;
 
     /** The entries produced, keyed by their derived internal name, in creation order. */
+    /** {@code type_ref}'s own member names -- the one place a held token's channel still matters. */
+    private static final String NAME = "name";
+    private static final String VALUE = "value";
+    private static final String ARGUMENTS = "arguments";
+
     private final Map<String, TypeDefinition> materialised = new LinkedHashMap<>();
 
     /**
@@ -298,8 +304,8 @@ final class TemplateMaterialiser {
             // path. An open *instance* used to short-circuit ahead of all three, which left a template
             // applying itself (`weird => <T> [weird<T>]`) recursing to a StackOverflowError instead of
             // tying the knot.
-            if (template.body() instanceof InstanceTemplate open) {
-                String formName = closeInstanceTemplate(head, template, open, bind(parameters, arguments));
+            if (template.body() instanceof HeldBody open) {
+                String formName = closeHeldTemplate(head, template, open, bind(parameters, arguments));
                 if (generated.contains(head)) {
                     // A generated head closing its own intermediate form: the form entry *is* the answer, and
                     // an instantiation naming this head would carry an internal name into identity.
@@ -389,20 +395,20 @@ final class TemplateMaterialiser {
      * template shape gets this for free, since substituting a record yields a record -- structurally distinct
      * from any synthetic, so it can be the instantiation itself.
      */
-    private String closeInstanceTemplate(String head, TypeDefinition template, InstanceTemplate open,
+    private String closeHeldTemplate(String head, TypeDefinition template, HeldBody open,
             Map<String, TypeArgument> bindings) {
-        // Three steps, and the order is the whole of it: replace the `param` bindings, then bind the
-        // parameters *inside* an application a binding holds (`tree<p0>` becomes `tree<text>`), and only then
-        // close what results. Closing before binding would close `tree<p0>` -- an application of an argument
-        // nothing has supplied.
-        InstanceTemplate substituted = substituteBindings(open, head, bindings);
-        InstanceTemplate bound = (InstanceTemplate) mapBodyRefs(
-                mapBodyRefs(substituted, ref -> bindRef(ref, bindings)), this::close);
-        String target = bound.target();
-        List<RecordValue.Field> fields = new ArrayList<>();
-        for (Map.Entry<String, TemplateArgument> binding : bound.bindings().entrySet()) {
-            fields.add(new RecordValue.Field(binding.getKey(), wire(head, binding)));
-        }
+        String target = open.application().typeRef().orElseThrow();
+        // One walk does what three steps used to: a parameter in a slot, a parameter inside an application a
+        // slot holds (`tree<p0>` becoming `tree<text>`), and a parameter inside a collection are all the same
+        // thing here -- a token in a tree -- because the body was never read against the constructor's
+        // vocabulary in the first place.
+        CoreValue substituted = substitute(open.application().coreValue(), head, template.parameters(), bindings);
+        // Applications inside it close *before* the name is derived, which is what keeps one type on one
+        // entry: the desugar phase lifts innermost-first, so a form it writes already names the entry its
+        // inner form became, and a form closed here has to agree with it or `[[pixel; 3]; 3]` written out and
+        // `grid<pixel, 3>` closed would be two entries for one type.
+        CoreValue closed = closeApplications(substituted);
+        List<RecordValue.Field> fields = closed instanceof RecordValue record ? record.fields() : List.of();
         String formName = SchemaDesugarer.internalName(target, fields);
         if (namespace.getTypeDefinition(formName) != null) {
             return formName; // already built, here or by the desugar phase -- one entry per form, schema-wide
@@ -411,10 +417,9 @@ final class TemplateMaterialiser {
             throw new IllegalStateException("'" + head + "<...>' closes to a '" + target + "' body, and this "
                     + "materialiser was built without a compiled meta reader to bind it through");
         }
-        DataValue value = new DataValue(List.of(), Optional.of(target), new RecordValue(fields));
         Top body;
         try {
-            body = metaReader.read(target, value);
+            body = metaReader.read(target, new DataValue(List.of(), Optional.of(target), closed));
         } catch (TsonReadException e) {
             // The bindings a template defers are checked here and nowhere else (§8.2): `<T, N> [T; N]` is a
             // fine declaration, and `vector<text, "two">` is where it stops being one.
@@ -422,12 +427,155 @@ final class TemplateMaterialiser {
                     + "valid data for '" + target + "', the constructor's own constraint vocabulary -- "
                     + e.getMessage(), e);
         }
-        TypeDefinition closed = new TypeDefinition(Optional.of(TypeRef.of(target)), template.kind(), List.of(),
-                false, List.of(), List.of(), Optional.empty(), body);
-        materialised.put(formName, closed);
+        TypeDefinition definition = new TypeDefinition(Optional.of(TypeRef.of(target)), template.kind(),
+                List.of(), false, List.of(), List.of(), Optional.empty(), body);
+        materialised.put(formName, definition);
         synthetics.add(formName);
-        publish.accept(formName, closed);
+        publish.accept(formName, definition);
         return formName;
+    }
+
+    /**
+     * Every application still written in {@code type_ref}'s record form, closed to a bare reference to the
+     * entry it denotes -- the inverse of the shape {@code SchemaDesugarer} writes when a slot holds one.
+     *
+     * <p>It runs on the wire value rather than on the body read from it because the <em>name</em> depends on
+     * it: {@code SchemaDesugarer.internalName} reads the slots as written, and the desugar phase expands
+     * innermost-first, so by the time it names an outer form the inner one is already a bare name. Closing
+     * here in the same order is what makes the two phases agree on what a form is called.
+     */
+    private CoreValue closeApplications(CoreValue value) {
+        return switch (value) {
+            case RecordValue record when isApplication(record) ->
+                    new TokenValue(close(typeRefOf(record)).name(), TokenForm.UNQUOTED);
+            case RecordValue record -> new RecordValue(record.fields().stream()
+                    .map(field -> new RecordValue.Field(field.name(),
+                            rescope(field.value(), closeApplications(field.value().value().coreValue()))))
+                    .toList());
+            case ArrayValue array -> new ArrayValue(array.elements().stream()
+                    .map(element -> rescope(element, closeApplications(element.value().coreValue()))).toList());
+            default -> value;
+        };
+    }
+
+    /** {@code type_ref}'s record form is the one shape carrying both members; a bare name is a token. */
+    private static boolean isApplication(RecordValue record) {
+        return field(record, NAME).isPresent() && field(record, ARGUMENTS).isPresent();
+    }
+
+    /** {@code { name: head  arguments: [ ... ] }} back as the reference it spells. */
+    private static TypeRef typeRefOf(RecordValue record) {
+        CoreValue name = field(record, NAME).orElseThrow();
+        String head = name instanceof TokenValue token ? token.text()
+                : typeRefOf((RecordValue) name).name();
+        List<TypeArgument> arguments = new ArrayList<>();
+        if (field(record, ARGUMENTS).orElseThrow() instanceof ArrayValue array) {
+            for (ScopedValue element : array.elements()) {
+                arguments.add(argumentOf((RecordValue) element.value().coreValue()));
+            }
+        }
+        return new TypeRef(head, arguments);
+    }
+
+    /** One argument record: {@code value} carries a literal, {@code name} a reference, simple or compound. */
+    private static TypeArgument argumentOf(RecordValue argument) {
+        Optional<CoreValue> literal = field(argument, VALUE);
+        if (literal.isPresent()) {
+            TokenValue token = (TokenValue) literal.get();
+            return new TypeArgument.Value(new Token(token.text(), switch (token.form()) {
+                case UNQUOTED -> Token.Form.UNQUOTED;
+                case SINGLE_LINE_QUOTED -> Token.Form.SINGLE_LINE_QUOTED;
+                case MULTI_LINE_QUOTED -> Token.Form.MULTI_LINE_QUOTED;
+            }));
+        }
+        CoreValue name = field(argument, NAME).orElseThrow();
+        return new TypeArgument.Ref(name instanceof TokenValue token ? TypeRef.of(token.text())
+                : typeRefOf((RecordValue) name));
+    }
+
+    private static Optional<CoreValue> field(RecordValue record, String name) {
+        return record.fields().stream().filter(f -> f.name().equals(name))
+                .map(f -> f.value().value().coreValue()).findFirst();
+    }
+
+    /**
+     * The held body with every token naming one of the template's parameters replaced by the argument applied
+     * for it -- at any depth, in a value slot, a type slot, an argument list, or inside a collection alike.
+     *
+     * <p><b>A held token needs no channel label, and that is the whole economy of holding.</b> A typed open
+     * vocabulary has to record which kind of thing each slot was bound to, because a bare token in a value
+     * slot is a literal and nothing else; here the body is uninterpreted until this substitution finishes, so
+     * §8.1's shadowing rule decides it -- a token that resolves into {@code parameters} is a parameter, and
+     * anything else is what it looks like. The one place the channel still shows is inside a {@code type_ref}
+     * record, whose {@code name} member takes a reference: a parameter there bound to a literal moves to the
+     * {@code value} member, since an argument list distinguishes the two by which member holds it.
+     */
+    private static CoreValue substitute(CoreValue value, String head, List<String> parameters,
+            Map<String, TypeArgument> bindings) {
+        return switch (value) {
+            case TokenValue token when token.form() == TokenForm.UNQUOTED
+                    && parameters.contains(token.text()) ->
+                    token(argumentFor(token.text(), head, bindings));
+            case ArrayValue array -> new ArrayValue(array.elements().stream()
+                    .map(element -> rescope(element, substitute(element.value().coreValue(), head, parameters,
+                            bindings))).toList());
+            case RecordValue record -> new RecordValue(record.fields().stream()
+                    .map(field -> substituteField(field, head, parameters, bindings)).toList());
+            default -> value;
+        };
+    }
+
+    /**
+     * One field of a held record, with {@code type_ref}'s own {@code name}/{@code value} split honoured: a
+     * {@code name} member bound to a value argument is that argument's literal on the {@code value} member,
+     * because §8.1 tells a reference argument from a literal one by which member carries it.
+     */
+    private static RecordValue.Field substituteField(RecordValue.Field field, String head,
+            List<String> parameters, Map<String, TypeArgument> bindings) {
+        CoreValue held = field.value().value().coreValue();
+        if (NAME.equals(field.name()) && held instanceof TokenValue token
+                && token.form() == TokenForm.UNQUOTED && parameters.contains(token.text())
+                && argumentFor(token.text(), head, bindings) instanceof TypeArgument.Value literal) {
+            return new RecordValue.Field(VALUE, rescope(field.value(), token(literal)));
+        }
+        return new RecordValue.Field(field.name(),
+                rescope(field.value(), substitute(held, head, parameters, bindings)));
+    }
+
+    private static TypeArgument argumentFor(String parameter, String head, Map<String, TypeArgument> bindings) {
+        TypeArgument argument = bindings.get(parameter);
+        if (argument == null) {
+            // A parameter of an enclosing template, still open: this application is not the one that closes
+            // it. Nothing today reaches here -- an application is closed only once every argument is concrete
+            // -- and saying so is what keeps that true rather than assuming it.
+            throw new UnsupportedOperationException("'" + head + "<...>' holds the parameter '" + parameter
+                    + "', which this application does not supply, and closing an open form onto another open "
+                    + "form is not implemented (§5.10)");
+        }
+        return argument;
+    }
+
+    /**
+     * One closed argument as the wire token the constructor's reader expects -- a bare token either way,
+     * since a reference in the positional form (§5.6) and a literal are spelled alike.
+     */
+    private static TokenValue token(TypeArgument argument) {
+        return switch (argument) {
+            case TypeArgument.Ref reference -> new TokenValue(reference.ref().name(), TokenForm.UNQUOTED);
+            case TypeArgument.Value value -> new TokenValue(value.value().text(),
+                    switch (value.value().form()) {
+                        case UNQUOTED -> TokenForm.UNQUOTED;
+                        case SINGLE_LINE_QUOTED -> TokenForm.SINGLE_LINE_QUOTED;
+                        case MULTI_LINE_QUOTED -> TokenForm.MULTI_LINE_QUOTED;
+                    });
+        };
+    }
+
+    /** The same scoped value carrying a rewritten core value -- annotations and type-ref kept as written. */
+    private static ScopedValue rescope(ScopedValue original, CoreValue rewritten) {
+        DataValue value = original.value();
+        return new ScopedValue(original.schemaRef(),
+                new DataValue(value.annotations(), value.typeRef(), rewritten));
     }
 
     /**
@@ -440,53 +588,6 @@ final class TemplateMaterialiser {
     private static TypeDefinition instantiationOf(String head, List<TypeArgument> arguments, String formName) {
         return new TypeDefinition(Optional.of(new TypeRef(head, arguments)), TypeKind.REFERENCE, List.of(),
                 false, List.of(), List.of(), Optional.empty(), new Reference(formName));
-    }
-
-    /** The same open body with every {@code param} binding replaced by the argument applied for it. */
-    private static InstanceTemplate substituteBindings(InstanceTemplate open, String head,
-            Map<String, TypeArgument> bindings) {
-        Map<String, TemplateArgument> substituted = new LinkedHashMap<>();
-        for (Map.Entry<String, TemplateArgument> binding : open.bindings().entrySet()) {
-            if (!(binding.getValue() instanceof TemplateArgument.Param parameter)) {
-                substituted.put(binding.getKey(), binding.getValue());
-                continue;
-            }
-            TypeArgument argument = bindings.get(parameter.param());
-            if (argument == null) {
-                // A parameter of an enclosing template, still open: this application is not the one that
-                // closes it. Nothing today reaches here -- an application is closed only once every argument
-                // is concrete -- and leaving the binding open is what keeps that true rather than assuming it.
-                throw new UnsupportedOperationException("'" + head + "<...>' leaves binding '"
-                        + binding.getKey() + "' bound to '" + parameter.param() + "', a parameter this "
-                        + "application does not supply, and closing an open form onto another open form is "
-                        + "not implemented (§5.10)");
-            }
-            substituted.put(binding.getKey(), argument instanceof TypeArgument.Ref reference
-                    ? new TemplateArgument.Ref(reference.ref())
-                    : new TemplateArgument.Value(((TypeArgument.Value) argument).value()));
-        }
-        return new InstanceTemplate(open.target(), substituted);
-    }
-
-    /**
-     * One closed binding as the wire value the constructor's reader expects: a bare token either way, since
-     * a reference in the positional form (§5.6) and a literal are spelled alike. The channel it arrived on is
-     * what said which it was, and that question is now answered.
-     */
-    private static ScopedValue wire(String head, Map.Entry<String, TemplateArgument> binding) {
-        TokenValue token = switch (binding.getValue()) {
-            case TemplateArgument.Value value -> new TokenValue(value.value().text(),
-                    switch (value.value().form()) {
-                        case UNQUOTED -> TokenForm.UNQUOTED;
-                        case SINGLE_LINE_QUOTED -> TokenForm.SINGLE_LINE_QUOTED;
-                        case MULTI_LINE_QUOTED -> TokenForm.MULTI_LINE_QUOTED;
-                    });
-            case TemplateArgument.Ref reference -> new TokenValue(reference.typeRef().name(), TokenForm.UNQUOTED);
-            case TemplateArgument.Param parameter -> throw new IllegalStateException("'" + head
-                    + "<...>' still binds '" + binding.getKey() + "' to the parameter '" + parameter.param()
-                    + "' after substitution");
-        };
-        return new ScopedValue(Optional.empty(), new DataValue(List.of(), Optional.empty(), token));
     }
 
     /**
@@ -629,14 +730,9 @@ final class TemplateMaterialiser {
             // A bare name still substitutes: the head itself may be a parameter. It cannot gain arguments
             // doing so -- a reference body has no channel for them -- so only the name is taken back.
             case Reference reference -> new Reference(map.apply(TypeRef.of(reference.target())).name());
-            case InstanceTemplate template -> {
-                Map<String, TemplateArgument> bindings = new LinkedHashMap<>();
-                template.bindings().forEach((slot, binding) -> bindings.put(slot,
-                        binding instanceof TemplateArgument.Ref reference
-                                ? new TemplateArgument.Ref(map.apply(reference.typeRef()))
-                                : binding));
-                yield new InstanceTemplate(template.target(), bindings);
-            }
+            // A held body maps nothing: its references are tokens that have not been resolved against
+            // anything yet, and rewriting one would be rewriting a name whose meaning is not settled until
+            // substitution supplies the arguments.
             default -> body; // an atom body holds no type references
         };
     }

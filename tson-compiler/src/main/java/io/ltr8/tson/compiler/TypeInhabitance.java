@@ -8,8 +8,8 @@ import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Reference;
-import io.ltr8.tson.schema.meta.TemplateArgument;
 import io.ltr8.tson.schema.meta.TupleElement;
+import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeRef;
 
@@ -102,46 +102,14 @@ final class TypeInhabitance {
             case ChoiceBody choice -> choice.variants().stream()
                     .anyMatch(variant -> refInhabited(variant, namespace, inhabited));
             case Reference reference -> refInhabited(TypeRef.of(reference.target()), namespace, inhabited);
-            case io.ltr8.tson.schema.meta.InstanceTemplate template ->
-                    openContainerInhabited(template, namespace, inhabited);
+            // A held body is not walked: its element type and bounds are tokens that mean nothing until
+            // substitution supplies the arguments, so a template is inhabited here and the closure that does
+            // supply them is judged on its own -- it is an ordinary entry in this map by the time linking
+            // runs, materialisation having minted it. A template nobody applies is judged nowhere, which is
+            // the same answer §5.10's deferred checking gives everywhere else.
+            case TemplateBody ignored -> true;
             default -> true; // an atom's own satisfiability is its family's question, not this one
         };
-    }
-
-    /**
-     * The same guard, read off an open container's bindings rather than off a closed body: a container may be
-     * empty, and if it may not, its element must be inhabited. Only the two container constructors have such a
-     * guard to read -- everything else an open entry can target is judged when it closes.
-     *
-     * <p><b>A bound still held by a parameter counts as possibly-empty.</b> {@code <N> [tree; N]} could be
-     * applied with {@code 0}, so refusing it here would reject a template on the strength of an argument
-     * nobody has supplied -- and the closure that does supply one is judged on its own.
-     */
-    private static boolean openContainerInhabited(io.ltr8.tson.schema.meta.InstanceTemplate template,
-            Map<String, TypeDefinition> namespace, Set<String> inhabited) {
-        String element = switch (template.target()) {
-            case "array", "set" -> "element_type";
-            case "map" -> "value_type";
-            default -> null;
-        };
-        if (element == null) {
-            return true;
-        }
-        TemplateArgument minItems = template.bindings().get("min_items");
-        if (!(minItems instanceof TemplateArgument.Value bound) || isEmptyAllowed(naturalOf(bound))) {
-            return true;
-        }
-        return !(template.bindings().get(element) instanceof TemplateArgument.Ref ref)
-                || refInhabited(ref.typeRef(), namespace, inhabited);
-    }
-
-    /** A bound as a number, or absent when its token is not one -- an unreadable bound constrains nothing here. */
-    private static Optional<BigInteger> naturalOf(TemplateArgument.Value bound) {
-        try {
-            return Optional.of(new BigInteger(bound.value().text()));
-        } catch (NumberFormatException e) {
-            return Optional.empty();
-        }
     }
 
     /**
@@ -281,12 +249,6 @@ final class TypeInhabitance {
                     .map(element -> element.elementType().name()).findFirst().orElse(null);
             case Reference reference -> refInhabited(TypeRef.of(reference.target()), namespace, inhabited)
                     ? null : reference.target();
-            case io.ltr8.tson.schema.meta.InstanceTemplate template ->
-                    template.bindings().values().stream()
-                            .filter(TemplateArgument.Ref.class::isInstance)
-                            .map(binding -> ((TemplateArgument.Ref) binding).typeRef())
-                            .filter(ref -> !refInhabited(ref, namespace, inhabited))
-                            .map(TypeRef::name).findFirst().orElse(null);
             default -> null; // a choice fails on every variant at once, so no single link continues the chain
         };
     }

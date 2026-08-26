@@ -12,7 +12,7 @@ revision closes.** It is an input to the next revision's adjudication, so its nu
 that revision's change log will answer against — a stable index of the open set, not an archive of
 everything ever raised.
 
-The five below are what Revision 33 leaves open, renumbered from #1; the 55 raised against Revision 32 that
+The six below are what Revision 33 leaves open, renumbered from #1; the 55 raised against Revision 32 that
 it resolved are gone from here, because the spec now carries their rules and that is where the answer
 belongs. **Cite the spec, not the argument that got it there:** `docs/` and the Javadoc name the section
 that requires a behaviour, and a `SPEC-FEEDBACK.md #N` citation is for an entry below, where there is no
@@ -389,5 +389,55 @@ gap was raised against Revision 32 as #53 and declined, with §5.10 gaining the 
 §8.1 the uniform-quotation rationale in response. This implementation refuses the construct as the spec
 requires; the held-body design above is being implemented here as proof for Revision 34 (`BACKLOG.md`, "Open
 form: hold the template body").
+
+---
+
+## 6. Every schema that writes a container sugar form inside a template mints its own copy of the same few templates
+
+**Section:** Part 2 §5.3 (the lift rule), §8.2 (synthetic entry identity and content-derived naming), §9 (what
+the kernel declares). Related: #5, whose held-body proposal does not change this either way.
+
+**Problem:** a sugar form inside a template body lifts to an *open* synthetic entry — `<T> { a: [T] }` mints
+
+```
+array_p0_358380cd => <p0> !array { element_type: p0 }
+```
+
+and `box`'s field references it as `array_p0_358380cd<T>`. That entry is the same entry in every schema that
+writes `[T]` inside a template, up to a content-derived name §8.2 already declares non-normative. The lift
+rule mints it per schema because it has nowhere else to put it, so a fixed, tiny set of templates is
+re-derived by every author who uses generics over a container.
+
+The kernel already takes the other route one level down: rather than have every schema inline
+`!set { element_type: token }`, §9 declares `token_set` once and `enum.members` references it. The same
+argument applies to the open forms, and nothing but availability decides it.
+
+**Interpretation chosen:** mint per schema, as §5.3 specifies. `SchemaDesugarer` injects the lifted
+declaration into the document being desugared, with `positionalNames`/`rename` alpha-normalising the
+parameters so that two spellings of one form land on one entry within that document.
+
+**Suggested resolution:** consider declaring the fixed-arity open forms in the kernel — `<T> !array
+{ element_type: T }`, its `state: OPTIONAL` sibling, and the `map` pair — so that §5.3's lift targets a
+declared name rather than an injection. Two things to weigh, both real:
+
+1. **Only part of the family is fixed-arity.** The size specifier's variants differ by which bounds are
+   present (`[T; 3]`, `[T; 1..]`, `[T; 1..2]` are three shapes, since an absent `max_items` is not a
+   defaulted one), and `tuple` and `choice` are variadic, so `[T, U]` and `( T | error )` have no
+   fixed-arity template at all. A kernel set would cover the commonest case and leave the lift rule in
+   place for the rest, which is a smaller win than "declare them once" suggests.
+2. **Availability is the hard part.** A schema's type-name namespace is its own declarations plus its
+   `!!import`s (§3.3.1, §2.2.3); it does not include the namespace of the schema its `!!meta` names. So a
+   kernel-declared `array_of` is not in scope for a schema that has not imported the kernel, and a lift
+   targeting it would make desugaring — a phase whose whole virtue is being syntactic, consulting no
+   governing meta and no namespace — depend on the import set. Either §5.3 would have to name these as
+   always-available regardless of import (a new category of name), or they would have to live somewhere
+   every schema already reaches.
+
+Note this is **not** a proposal to re-parameterize `array`/`set`/`map`: those stay de-parameterized
+constructors with `element_type` as an ordinary field, and what is proposed here is named templates *over*
+them, which is the layer a user's own `box => <T> { ... }` lives in.
+
+**Status against Revision 33:** open, new against this revision. This implementation mints per schema and
+`ContainerSugarEndToEndTest` pins the resulting entry sets.
 
 ---

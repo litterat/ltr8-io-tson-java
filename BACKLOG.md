@@ -137,31 +137,38 @@ Steps are ordered so each lands with the suite green.
       it. The case is empty and carries step 5's reasoning: a held body is opaque at link time, and what
       moves to materialisation moves with it.
 
-- [ ] **2. Desugar: expand inside a template body, lift nothing.** The fork becomes one syntactic check at the
-  declaration ("does this declaration carry type parameters?"), and the whole per-slot analysis goes:
-  `SchemaDesugarer.instanceTemplate()`, `applicationSlots`, the literal-vs-reference routing in that path, and
-  the collection refusal all delete. **The desugarer stops knowing what a parameter is** — inside a template
-  body nothing lifts, so no parameter detection is needed at any depth, and outside one there are no
-  parameters. That finally makes the phase's stated contract ("purely syntactic, consults no governing meta")
-  true rather than nearly true. The one new rule to name and test: sugar **expands in place** inside a
-  template body — `<T> [T]` holds `!array { element_type: T }`, not `[T]` verbatim (or one template has two
-  resolved spellings) and not a lifted synthetic (that is the category being deleted).
-
-- [ ] **3. Resolve: stop resolving a template body.** `DefinitionResolver` returns an entry carrying the held
-  body whenever `parameters` is non-empty, and the record-template path (`RecordField.valueParam` resolution,
-  `~ P` / `= P` routing) goes with it. `TypeDefinition.parameters` non-empty ⟺ held body present becomes a
-  one-place invariant. No stand-in substitution, no masked walk: per #5's rule 3, an unapplied template gets
-  no verdict.
-
-- [ ] **4. Materialise: substitute the held body, then run the ordinary path.** `TemplateMaterialiser`
-  substitution collapses to one rule — rewrite tokens that resolve into the entry's `parameters` — over the
-  held AST, replacing the three shape-specific paths with one. It then re-enters desugar (expand *and* lift,
-  now that the body is concrete) and the resolver, landing on `DefinitionResolver.bindAtomInstance` for
-  instances, which already takes a `DataValue` and dispatches through the constructor's own compiled reader
-  with no name→class table. Keep what is already right: the memo registered before substitution (so regular
-  recursion ties the knot), the depth guard for non-regular recursion, `source` recording the flattened
-  application, and `internalName` deriving the entry name from it. Re-entrancy from materialisation into
-  binding already exists for open instances; what is new is that record templates resolve here too.
+- [x] **2-4. The representation swap: an instance template holds its wire record.** Done, as one change --
+  the three steps could not land apart, since the desugarer's output type, the resolver's dispatch and the
+  materialiser's input are the same handover. §12.1's `instance` production reinstates `[type-params]`, so
+  `Instance` carries a parameter list and `ast.schema.InstanceTemplate`/`TemplateBinding` and
+  `schema.meta.InstanceTemplate`/`TemplateArgument` all delete. `SchemaDesugarer.instanceTemplate()` collapses
+  into `instance()` — one binding record serves open and closed alike — taking the collection refusal with it.
+  `DefinitionResolver` wraps a parameterized `Instance` in a `HeldBody` rather than resolving it, and
+  `TemplateMaterialiser` substitutes over the held tree: one walk now does what three steps used to, since a
+  parameter in a slot, inside an application, and inside a collection are all just tokens.
+    - **The naming order is load-bearing, and not the one that looks right.** Applications inside a held body
+      must close *before* `internalName` runs. Desugar lifts innermost-first, so a form it writes already
+      names the entry its inner form became; naming from the unclosed shape puts a generated head inside
+      another entry's name and splits `[[pixel; 3]; 3]` from `grid<pixel, 3>` into two entries for one type.
+      `ApplicationInContainerPositionTest.closingAGeneratedSyntheticRecordsNoApplication` is the guard, and it
+      caught exactly this.
+    - **Two declaration-time checks survive and should**: that each binding names a field the constructor
+      declares, and that every REQUIRED-without-default field is bound. Both read field *names* off the held
+      record, so they need no stand-in values and cannot fabricate a verdict — the hazard that rules out
+      checking the value side. So "an unapplied template gets no verdict" is narrower than #5 states, in the
+      direction of more checking.
+    - **`TemplateBody.names()`** is how §5.10's unreferenced-parameter rule survives: the linker asks which
+      unquoted tokens the held body mentions, declared on the interface the way `Data.references()` is. It
+      must return exactly what substitution would rewrite, or the check and the rewrite disagree about what a
+      parameter reference is.
+    - **What an explicit template payload loses**: `<N> !array { element_type: box<text> ... }` no longer
+      parses, `box<text>` being schema grammar where §12.1's `instance` takes a `core-value`. An application
+      reaches a slot in `type_ref`'s record form, which is what the sugar `[box<text>; N..]` expands to —
+      the same rule that has always governed a closed instance's payload.
+    - Four tests inverted, each a deliberate behaviour change: the two collection refusals
+      (`TsonValidateSchemaTest`, `ContainerSugarEndToEndTest`), the CLI's exit-1 fixture (which used the
+      refusal as its example of a spec-refused construct), and `TypeInhabitanceTest` — where an uninhabited
+      template is now caught when it closes rather than where it is written, verified both ways.
 
 - [ ] **5. Linker: templates leave the entry graph.** A held body is opaque to `TsonSchemaLinker`, so
   references inside a template body are no longer validated at link time, `TypeInhabitance` must not count an

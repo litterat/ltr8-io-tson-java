@@ -1,5 +1,7 @@
 package io.ltr8.tson.schema.meta;
 
+import java.util.Set;
+
 /**
  * The body of a template -- an entry declaring type parameters, which §5.10 calls open -- held in the form it
  * was written rather than resolved into constructor vocabulary. One direction only: a {@link
@@ -38,4 +40,16 @@ package io.ltr8.tson.schema.meta;
  * are different templates.
  */
 public non-sealed interface TemplateBody extends Top {
+
+    /**
+     * Every unquoted name this body mentions, at any depth -- the one question about a held body that can be
+     * answered without resolving it, and the one §5.10 asks at link time: a declared parameter the body never
+     * references is an author error.
+     *
+     * <p><b>Declared rather than discovered</b>, as {@link Data#references()} is and for the same reason: the
+     * carrier's shape is the implementing module's business. What it must return is exactly the set of tokens
+     * substitution would rewrite -- unquoted ones, a quoted token in a value slot being a literal and never a
+     * name -- or the check and the rewrite disagree about what a parameter reference is.
+     */
+    Set<String> names();
 }

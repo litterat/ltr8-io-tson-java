@@ -4,11 +4,10 @@ import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonCanonicalIdentity;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.schema.meta.ArrayBody;
-import io.ltr8.tson.schema.meta.InstanceTemplate;
+import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.TemplateArgument;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeRef;
 
@@ -86,7 +85,7 @@ class ApplicationInContainerPositionTest {
     /** Derived entries still carrying parameters -- the open half of §8's counts. */
     private static List<String> openNames(TsonCompiledSchema compiled) {
         return derived(compiled).stream()
-                .filter(n -> compiled.schema().entries().get(n).body() instanceof InstanceTemplate).toList();
+                .filter(n -> compiled.schema().entries().get(n).body() instanceof TemplateBody).toList();
     }
 
     private static long openSynthetics(TsonCompiledSchema compiled) {
@@ -132,14 +131,13 @@ class ApplicationInContainerPositionTest {
                   use  => { t: tree<text> }""");
 
         TypeDefinition open = compiled.schema().entries().values().stream()
-                .filter(d -> d.body() instanceof InstanceTemplate).findFirst().orElseThrow();
-        InstanceTemplate body = (InstanceTemplate) open.body();
+                .filter(d -> d.body() instanceof TemplateBody).findFirst().orElseThrow();
+        TemplateBody body = (TemplateBody) open.body();
 
         assertEquals(List.of("p0"), open.parameters(), "renamed positionally, as every open synthetic is");
-        TemplateArgument.Ref element = assertInstanceOf(TemplateArgument.Ref.class,
-                body.bindings().get("element_type"));
-        assertEquals("tree", element.typeRef().name());
-        assertEquals(1, element.typeRef().arguments().size(), "still an application, awaiting p0");
+        // The application is held whole, so the names it mentions are simply the tokens in the body -- its
+        // own head and the parameter it still awaits.
+        assertTrue(body.names().containsAll(List.of("tree", "p0")), () -> "held names: " + body.names());
     }
 
     /**
@@ -327,7 +325,7 @@ class ApplicationInContainerPositionTest {
                   three => { g: grid<pixel, 3> }
                   four  => { g: grid<pixel, 4> }""");
 
-        assertInstanceOf(InstanceTemplate.class, compiled.schema().entries().get("grid").body());
+        assertInstanceOf(TemplateBody.class, compiled.schema().entries().get("grid").body());
         assertEquals(1, openSynthetics(compiled),
                 () -> "one open synthetic, shared by both closures: " + derived(compiled));
         assertEquals(6, closedDerived(compiled),
@@ -461,12 +459,19 @@ class ApplicationInContainerPositionTest {
                 .get(map.valueType().name()).body()).fields().get(0).type());
     }
 
-    /** A binding whose application names no parameter is fully bound already, so it closes where it is written. */
+    /**
+     * A binding whose application names no parameter is fully bound already, so it closes where it is written.
+     *
+     * <p>Written as sugar rather than as an explicit binding, because §12.1's {@code instance} takes a
+     * {@code core-value} and {@code box<text>} is schema grammar, not data: an application reaches a slot in
+     * {@code type_ref}'s record form, which is what the sugar expands to. The open and closed forms share one
+     * production now, so this is the same rule that has always governed a closed instance's payload.
+     */
     @Test
     void aConcreteApplicationInABindingClosesAtTheDeclaration() {
         TsonCompiledSchema compiled = compile("""
                   box     => <T> { v: T }
-                  bounded => <N> !array { element_type: box<text>  min_items: N }
+                  bounded => <N> [box<text>; N..]
                   use     => { u: bounded<2> }""");
 
         ArrayBody closed = assertInstanceOf(ArrayBody.class, formBehind(compiled, "use", "u").body());

@@ -1,10 +1,12 @@
 package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.compiler.TsonSchemaParser;
+import io.ltr8.tson.compiler.ast.TokenForm;
+import io.ltr8.tson.compiler.ast.TokenValue;
+import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
 import io.ltr8.tson.compiler.ast.schema.GenericRef;
 import io.ltr8.tson.compiler.ast.schema.Instance;
-import io.ltr8.tson.compiler.ast.schema.InstanceTemplate;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
@@ -505,10 +507,15 @@ class SchemaDesugarerTest {
 
         SchemaMap.Declaration lifted = document.body().declarations().values().stream()
                 .filter(declaration -> declaration.name().startsWith("array_p0_")).findFirst().orElseThrow();
-        InstanceTemplate template = assertInstanceOf(InstanceTemplate.class, lifted.typeDef());
+        Instance template = assertInstanceOf(Instance.class, lifted.typeDef());
         assertEquals(List.of("p0"), template.typeParams());
         assertEquals("array", template.target());
-        assertEquals(new TypeArg.Ref(new SimpleRef("p0")), template.bindings().get(0).value());
+        // The open form is the closed form: one binding record, with the parameter simply standing where a
+        // concrete element type would. There is no per-slot quotation to assert against.
+        RecordValue payload = assertInstanceOf(RecordValue.class, template.value().coreValue());
+        assertEquals(List.of("element_type"), payload.fields().stream().map(RecordValue.Field::name).toList());
+        assertEquals(new TokenValue("p0", TokenForm.UNQUOTED),
+                payload.fields().getFirst().value().value().coreValue());
 
         RecordDef box = (RecordDef) ((StructuralTypeDef) document.body().declarations().get("box").typeDef())
                 .body();
@@ -533,7 +540,7 @@ class SchemaDesugarerTest {
     void aTemplatesOwnSugarBodyIsTheInstanceTemplate() {
         SchemaDocument document = desugar("  vector => <T> [T]");
 
-        InstanceTemplate template = assertInstanceOf(InstanceTemplate.class,
+        Instance template = assertInstanceOf(Instance.class,
                 document.body().declarations().get("vector").typeDef());
         assertEquals(List.of("T"), template.typeParams(), "the declaration's own parameters, as written");
         assertEquals("array", template.target());

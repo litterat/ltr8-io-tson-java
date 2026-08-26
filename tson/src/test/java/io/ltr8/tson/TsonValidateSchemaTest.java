@@ -30,22 +30,20 @@ class TsonValidateSchemaTest {
     }
 
     /**
-     * <b>An author's mistake is never {@code NOT_IMPLEMENTED}.</b> That code says a construct is beyond this
-     * library, and the CLI turns it into exit 70 with "a gap in tson, not a problem with your document" --
-     * a false verdict for anything the spec itself refuses, and one whose verdict will not change however
-     * much this library improves. §5.10: "Collection-valued slots are not parameterizable -- a parameter
-     * inside a collection-typed slot ... has no open representation, and a declaration writing one is a
-     * resolver error at the declaration; this is a deliberate boundary of this revision."
+     * <b>A parameter inside a collection-valued slot is ordinary.</b> Revision 33 refused it at the
+     * declaration -- {@code template_argument} being a typed quotation with no collection case, so a
+     * parameter in {@code variants} or {@code elements} had no open representation to lift to. An open
+     * entry's body is held here instead, uninterpreted until materialisation substitutes, so a parameter in
+     * a collection is a token inside an array and the phase that would have had to quote it does not run.
+     * {@code SPEC-FEEDBACK.md} #5 carries the argument; this is the flagship case it turns on.
      */
     @ParameterizedTest
     @ValueSource(strings = {
-            "{ box => <T> { v: (T | text) } }",     // a parameter inside `choice`'s variants
-            "{ box => <T> { v: [T, text] } }"})     // ... and inside `tuple`'s elements
-    void aParameterInACollectionSlotIsTheAuthorsErrorNotAGap(String body) {
-        List<Diagnostic> problems = check(body);
-
-        assertEquals(1, problems.size(), problems::toString);
-        assertEquals(Diagnostic.Code.SCHEMA_ERROR, problems.getFirst().code(), problems::toString);
+            "{ result => <T> ( T | error )  use => result<text>  error => { code: text } }",  // §5.4 variants
+            "{ box => <T> { v: (T | text) }  use => box<int32> }",                            // ... nested
+            "{ pair => <T> [T, text]  use => pair<int32> }"})                                 // tuple elements
+    void aParameterInACollectionSlotIsOrdinary(String body) {
+        assertEquals(List.of(), check(body));
     }
 
     @Test

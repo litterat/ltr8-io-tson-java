@@ -17,7 +17,6 @@ import io.ltr8.tson.schema.meta.Data;
 import io.ltr8.tson.schema.meta.Extern;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FloatType;
-import io.ltr8.tson.schema.meta.InstanceTemplate;
 import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.Ipv4Type;
 import io.ltr8.tson.schema.meta.Ipv6Type;
@@ -29,10 +28,10 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.RegexType;
-import io.ltr8.tson.schema.meta.TemplateArgument;
 import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.TimeType;
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TupleElement;
 import io.ltr8.tson.schema.meta.TypeArgument;
@@ -733,27 +732,6 @@ public final class TsonSchemaLinker {
                 checkVariantsAreDistinct(entryName, c, namespace);
                 checkVariantsAreNotVoid(entryName, c, namespace);
             }
-            // An open entry's bindings. `target` names a constructor, which lives in the structure namespace
-            // and was resolved when the template was; what is left is the references the bindings carry, and
-            // that every `param` names a parameter this entry actually declares.
-            case InstanceTemplate template -> {
-                for (Map.Entry<String, TemplateArgument> binding : template.bindings().entrySet()) {
-                    String where = "'" + entryName + "' binding '" + binding.getKey() + "'";
-                    switch (binding.getValue()) {
-                        case TemplateArgument.Ref ref ->
-                                validateTypeRef(ref.typeRef(), namespace, ownParameters, where);
-                        case TemplateArgument.Param param -> {
-                            if (!ownParameters.contains(param.param())) {
-                                throw new TsonSchemaValidationException(where + " is bound to '" + param.param()
-                                        + "', which is not a type parameter of '" + entryName + "' " + ownParameters
-                                        + " (§5.10)");
-                            }
-                        }
-                        case TemplateArgument.Value ignored -> {
-                        }
-                    }
-                }
-            }
             // A held body is opaque here, deliberately, and nothing about it is checkable at link time: it is
             // the declaration as written, whose references cannot be resolved until substitution supplies the
             // arguments. Reference validation, inhabitance, and §5.10.1's regularity rule therefore apply to
@@ -958,14 +936,10 @@ public final class TsonSchemaLinker {
             case TupleBody tuple -> tuple.elements().forEach(e -> collectNames(e.elementType(), into));
             case ChoiceBody choice -> choice.variants().forEach(v -> collectNames(v, into));
             case Reference reference -> into.add(reference.target()); // a name, so nothing to recurse into
-            case InstanceTemplate template -> template.bindings().values().forEach(binding -> {
-                switch (binding) {
-                    case TemplateArgument.Param param -> into.add(param.param());
-                    case TemplateArgument.Ref ref -> collectNames(ref.typeRef(), into);
-                    case TemplateArgument.Value ignored -> {
-                    }
-                }
-            });
+            // The one question a held body answers without being resolved, and it answers it about tokens
+            // rather than about references -- which is the same rule substitution follows when it decides
+            // what to rewrite.
+            case TemplateBody held -> into.addAll(held.names());
             default -> { } // an atom body names no type
         }
     }

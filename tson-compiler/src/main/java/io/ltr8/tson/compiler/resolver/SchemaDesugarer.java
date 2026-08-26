@@ -15,7 +15,6 @@ import io.ltr8.tson.compiler.ast.schema.FieldDef;
 import io.ltr8.tson.compiler.ast.schema.GenericRef;
 import io.ltr8.tson.compiler.ast.schema.GroupDef;
 import io.ltr8.tson.compiler.ast.schema.Instance;
-import io.ltr8.tson.compiler.ast.schema.InstanceTemplate;
 import io.ltr8.tson.compiler.ast.schema.MapRef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
 import io.ltr8.tson.compiler.ast.schema.RecordEntry;
@@ -25,7 +24,6 @@ import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.ast.schema.SimpleRef;
 import io.ltr8.tson.compiler.ast.schema.SizeSpec;
-import io.ltr8.tson.compiler.ast.schema.TemplateBinding;
 import io.ltr8.tson.compiler.ast.schema.StructuralDef;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.compiler.ast.schema.TupleRef;
@@ -365,8 +363,7 @@ final class SchemaDesugarer {
                     // Its parameters are the declaration's own list as written, not the subset the body
                     // happens to name -- a declared parameter the body never uses is an error the linker
                     // reports (§5.10), and dropping it here would hide the very thing it looks for.
-                    yield reference.typeParams().isEmpty() ? instance(binding.get())
-                            : instanceTemplate(binding.get(), reference.typeParams());
+                    yield instance(binding.get(), reference.typeParams());
                 }
                 if (!reference.typeParams().isEmpty()) {
                     yield reference;
@@ -497,7 +494,7 @@ final class SchemaDesugarer {
     /** A declaration's declared type parameters, or none -- also how a placeholder learns its own arity. */
     static List<String> typeParams(TypeDef typeDef) {
         return switch (typeDef) {
-            case InstanceTemplate template -> template.typeParams();
+            case Instance instance -> instance.typeParams();
             case StructuralTypeDef structural -> structural.typeParams();
 
             case ReferenceTypeDef reference -> reference.typeParams();
@@ -768,45 +765,24 @@ final class SchemaDesugarer {
      * the instantiation entry. The entry dangles for exactly the window an ordinary forward reference does.
      */
     private static TypeDef instance(Binding binding) {
-        return new Instance(new DataValue(List.of(), Optional.of(binding.head()),
-                new RecordValue(binding.fields())));
+        return instance(binding, List.of());
     }
 
     /**
-     * {@code <p0> !head { field: p0 ... }} -- the open counterpart, for a form naming a parameter of the
-     * declaration it sits in. {@code typeParams} is that form's own parameter list, already renamed.
+     * The same construction with a parameter list, for a form naming a parameter of the declaration it sits
+     * in -- {@code <p0> !array { element_type: p0 }}. {@code typeParams} is that form's own list, already
+     * renamed positionally.
+     *
+     * <p><b>The open form is the closed form.</b> One binding record serves both, because an open entry's
+     * body is held rather than read against its constructor's vocabulary until materialisation has
+     * substituted: a parameter in a slot is simply the token that stands there, and the phase needs no
+     * per-slot analysis to decide how to quote it. That is what removes the collection boundary -- a
+     * parameter in {@code variants} or {@code elements} is a token inside an array like any other, where a
+     * typed quotation had no case for it.
      */
-    private static TypeDef instanceTemplate(Binding binding, List<String> typeParams) {
-        List<TemplateBinding> bindings = new ArrayList<>();
-        for (RecordValue.Field field : binding.fields()) {
-            TypeRef application = binding.applicationSlots().get(field.name());
-            if (application != null) {
-                // Kept whole rather than read back out of the wire record beside it: an open binding holds a
-                // `type_ref`, and the one this slot was written with is already in hand.
-                bindings.add(new TemplateBinding(field.name(), new TypeArg.Ref(application)));
-                continue;
-            }
-            if (!(field.value().value().coreValue() instanceof TokenValue token)) {
-                // A collection-valued slot -- `tuple`'s `elements`, `choice`'s `variants`. `template_argument`
-                // is `param | value | type_ref` with no collection case (§8.1), so a parameter inside one has
-                // no open form to lift to at all. The closed forms are unaffected: this is reached only once
-                // a parameter has already been found in the record.
-                //
-                // The author's error, not a gap: §5.10 makes a parameter inside a collection-typed slot "a
-                // resolver error at the declaration", called "a deliberate boundary of this revision". The
-                // verdict does not change as this library improves, which is the test the exception policy
-                // turns on -- and reporting it as NOT_IMPLEMENTED would exit 70 with "a gap in tson, not a
-                // problem with your document" over a construct the spec itself refuses.
-                throw new TsonSchemaValidationException("'!" + binding.head() + "' binds '" + field.name()
-                        + "' to a collection, and a template_argument has no collection case (§8.1), so a "
-                        + "type parameter inside one has no open representation -- naming the inner form in "
-                        + "its own declaration and referring to that is the way to write this today");
-            }
-            bindings.add(new TemplateBinding(field.name(), isLiteral(token)
-                    ? new TypeArg.Value(token)
-                    : new TypeArg.Ref(new SimpleRef(token.text()))));
-        }
-        return new InstanceTemplate(typeParams, binding.head(), bindings);
+    private static TypeDef instance(Binding binding, List<String> typeParams) {
+        return new Instance(typeParams, new DataValue(List.of(), Optional.of(binding.head()),
+                new RecordValue(binding.fields())));
     }
 
     /**
@@ -861,7 +837,7 @@ final class SchemaDesugarer {
         String name = bindingName(normalised);
         if (!imported.contains(name)) {
             injected.computeIfAbsent(name, n -> new SchemaMap.Declaration(List.of(), n, List.of(),
-                    instanceTemplate(normalised, renamed)));
+                    instance(normalised, renamed)));
         }
         return new GenericRef(name, parameters.stream()
                 .<TypeArg>map(parameter -> new TypeArg.Ref(new SimpleRef(parameter))).toList());

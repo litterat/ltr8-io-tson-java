@@ -2,6 +2,9 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonCanonicalIdentity;
+import io.ltr8.tson.schema.meta.ChoiceBody;
+import io.ltr8.tson.schema.meta.TupleBody;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.MapBody;
@@ -22,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -277,23 +281,27 @@ class ContainerSugarEndToEndTest {
     }
 
     /**
-     * The one sugar form with no open representation at all. A {@code template_argument} is {@code param |
-     * value | type_ref} with no collection case (§8.1), so a parameter inside {@code choice}'s {@code
-     * variants} -- or {@code tuple}'s {@code elements} -- has nowhere to sit. Refused at the declaration that
-     * writes it, not at the application: the template itself is what cannot be represented.
-     *
-     * <p><b>The author's error, not a gap</b>, and the exception type is the carrier: §5.10 makes a
-     * parameter in a collection-typed slot "a resolver error at the declaration ... a deliberate boundary of
-     * this revision", so the verdict does not change as this library improves. As an {@code
-     * UnsupportedOperationException} it reported {@code NOT_IMPLEMENTED} and exited 70 under "a gap in tson,
-     * not a problem with your document".
+     * The sugar form Revision 33 had no open representation for, and now the ordinary case. A {@code
+     * template_argument} was {@code param | value | type_ref} with no collection case (§8.1), so a parameter
+     * inside {@code choice}'s {@code variants} -- or {@code tuple}'s {@code elements} -- had nowhere to sit,
+     * and the declaration writing one was refused. A held body is not read against that vocabulary at all
+     * until materialisation substitutes, so the parameter is a token inside an array and lifts like any
+     * other form ({@code SPEC-FEEDBACK.md} #5).
      */
     @Test
-    void aParameterInsideACollectionValuedSlotHasNoOpenForm() {
+    void aParameterInsideACollectionValuedSlotLiftsLikeAnyOther() {
         for (String body : List.of("(T | text)", "[T, text]")) {
-            TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
-                    () -> compile("  odd => <T> { v: %s }".formatted(body)), body);
-            assertTrue(thrown.getMessage().contains("no collection case"), thrown.getMessage());
+            TsonCompiledSchema compiled = assertDoesNotThrow(
+                    () -> compile("  odd => <T> { v: %s }\n  use => odd<int32>".formatted(body)), body);
+
+            // The closure is a real body of the constructor the sugar names, not a deferred anything.
+            String closure = compiled.schema().entries().keySet().stream()
+                    .filter(n -> n.startsWith("odd_int32_")).findFirst().orElseThrow();
+            RecordBody closed = assertInstanceOf(RecordBody.class,
+                    compiled.schema().entries().get(closure).body(), body);
+            Top variant = compiled.schema().entries().get(closed.fields().getFirst().type().name()).body();
+            assertTrue(variant instanceof ChoiceBody || variant instanceof TupleBody,
+                    () -> body + " closed to " + variant);
         }
     }
 
