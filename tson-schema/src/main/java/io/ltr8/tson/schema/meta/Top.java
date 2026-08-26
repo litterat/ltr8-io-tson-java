@@ -18,12 +18,9 @@ package io.ltr8.tson.schema.meta;
  * makes binding straight against {@code Top}/{@link Atom} practical at all (see {@code tson-bind}'s
  * own README "Under development" history for the bug this fixed).
  *
- * <p>Until 2026-07-24 this lived alongside a separate, single-level sealed union ({@code
- * TypeBody}) that {@code TypeDefinition.body}/{@code tson-bind}'s writer actually used, kept apart
- * only because binding directly against a multi-level sealed hierarchy like this one didn't work
- * yet. Once the {@code DefaultUnionBinder} fix landed, that separation no longer bought anything,
- * so {@code TypeBody} was deleted and {@code TypeDefinition.body} retyped to {@code Top} directly --
- * one hierarchy, matching the kernel's own naming exactly, not two.
+ * <p>Two branches describe something other than a constructed value, and both compose with {@code top}
+ * directly for that reason: {@link Data}, the meta layer's extension point, and {@link OpenBody}, the held
+ * body of an entry that declares type parameters.
  */
-public sealed interface Top permits Atom, Product, Sum, Reference, InstanceTemplate, Data {
+public sealed interface Top permits Atom, Product, Sum, Reference, InstanceTemplate, Data, OpenBody {
 }

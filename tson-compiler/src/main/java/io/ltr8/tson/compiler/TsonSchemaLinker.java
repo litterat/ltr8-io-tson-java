@@ -23,6 +23,7 @@ import io.ltr8.tson.schema.meta.Ipv4Type;
 import io.ltr8.tson.schema.meta.Ipv6Type;
 import io.ltr8.tson.schema.meta.MacType;
 import io.ltr8.tson.schema.meta.MapBody;
+import io.ltr8.tson.schema.meta.OpenBody;
 import io.ltr8.tson.schema.meta.RationalType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
@@ -752,6 +753,17 @@ public final class TsonSchemaLinker {
                         }
                     }
                 }
+            }
+            // A held body is opaque here, deliberately, and nothing about it is checkable at link time: it is
+            // the declaration as written, whose references cannot be resolved until substitution supplies the
+            // arguments. Reference validation, inhabitance, and §5.10.1's regularity rule therefore apply to
+            // it at materialisation instead, where the whole body resolves at once and the diagnostics carry
+            // the template's own declaration as their location. An unapplied template is checked nowhere and
+            // gets no verdict, which is the deliberate half: nothing in the document is wrong yet, and
+            // checking one by substituting stand-in arguments would report errors on templates that are
+            // correct for every argument anyone passes (`<N> !integer ^ { min: N max: 3 }`).
+            // The closed-entry rule is unaffected -- a closed entry is validated in full, above.
+            case OpenBody ignored -> {
             }
             case Unit ignored -> {
             }
