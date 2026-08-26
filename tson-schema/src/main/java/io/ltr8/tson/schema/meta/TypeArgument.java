@@ -9,19 +9,17 @@ import io.ltr8.annotation.Field;
  * never both, never neither.
  *
  * <p><b>Modeled as a sealed interface ({@code Ref}/{@code Value}), not a plain record with two
- * {@code Optional} fields, even though the latter is the more literal translation of the kernel's
- * own shape.</b> {@link TypeRef} and {@code TypeArgument} are mutually recursive ({@code
- * TypeRef.arguments: List<TypeArgument>}, and a reference argument wraps a {@code TypeRef} right
- * back) -- e.g. {@code box<box<text>>}, an ordinary nested application. {@code tson-bind}'s record
- * resolution ({@code
- * DefaultRecordBinder}) eagerly resolves every field's descriptor as part of building the record's
- * own, with no cycle detection; tried as a plain record here, that recurses forever the moment anything
- * actually has a non-empty {@code arguments} list -- a {@code StackOverflowError} across the whole
- * module, not a localised failure. {@code
- * DefaultUnionBinder} exists to defer exactly this: its own Javadoc/comment states it deliberately
- * does not resolve member descriptors up front, "by using the actual member classes the resolution
- * loop is broken." A sealed interface is therefore not a stylistic choice here -- it is the one
- * shape that lets {@code tson-bind} bind a mutually-recursive pair like this at all today.
+ * {@code Optional} fields.</b> It is the labelled choice the kernel declares, and modelling a choice as a
+ * choice is the whole of the reason. A plain record with two {@code Optional} fields would be the more
+ * literal translation of the wire shape and a worse model of it: nothing in the type would say that exactly
+ * one is present.
+ *
+ * <p>It also used to be the only shape that <em>worked</em>. {@link TypeRef} and {@code TypeArgument} are
+ * mutually recursive ({@code TypeRef.arguments: List<TypeArgument>}, and a reference argument wraps a
+ * {@code TypeRef} right back) -- {@code box<box<text>>}, an ordinary nested application -- and
+ * {@code tson-bind} resolved every component's descriptor eagerly with no cycle detection, so a plain record
+ * here recursed until the stack went. {@code DataBindContext} carries a cycle guard now, so that constraint
+ * is gone and this shape stands on its own merits.
  *
  * <p>The cost: since {@code Ref}/{@code Value} are {@code DataClassUnion} members with no {@code
  * @Typename}, {@code TsonObjectWriter.toTson} writes them with a spurious {@code !ref}/{@code !value}

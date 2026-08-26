@@ -152,7 +152,11 @@ module has a real `module-info.java`; module names mirror each module's root exp
   (`DataBindContext.Builder.profile`), selecting among a class's `@Profile` constructors so one class binds
   several shapes — one context per schema version, descriptors still cached per context. The name is opaque
   here: matched by equality, with nothing in the module knowing what it stands for, which is what keeps
-  selection out of the schema layer.
+  selection out of the schema layer. **A cyclic type graph resolves** — a record reaching itself, directly or
+  through others: `getDescriptor` hands a re-entrant call a deferred supplier and each holder keeps it in a
+  final `Memoized`, so laziness is confined to the cyclic edge and every other component still resolves
+  eagerly. The AST is the case that needs it (`DataValue` → `CoreValue` → `RecordValue` → `ScopedValue` →
+  `DataValue`), which is what lets a held template body be written at all.
 - **`tson-schema`** — **only** `io.ltr8.tson.schema.meta` (the resolved-schema *value* model — pure
   records/sealed interfaces/enums, §8's `TypeDefinition` et al.; `Top` is sealed except for its one
   deliberately open branch, `Data`, which a consumer's own class implements — see below) plus the schema
@@ -563,9 +567,12 @@ differing by exactly the name binder.
 Hard-won invariants that look like cleanup targets or are easy to break silently. Each is documented at
 the class and (where noted) pinned by a test; the `docs/` notes carry the full why.
 
-- **`TypeArgument` is a sealed interface (`Ref`/`Value`), never a plain record.** `TypeRef`/`TypeArgument`
-  are mutually recursive and `tson-bind`'s record binder has no cycle protection — a plain record
-  `StackOverflowError`s on first bind. Re-read its Javadoc before touching it.
+- **`TypeArgument` is a sealed interface (`Ref`/`Value`), never a plain record.** It is the labelled choice
+  the kernel declares, and a plain record with two `Optional`s would be a worse model: nothing in the type
+  would say exactly one is present. It used to be the only shape that *worked* as well — `TypeRef`/
+  `TypeArgument` are mutually recursive and the record binder had no cycle protection — but
+  `DataBindContext` carries a cycle guard now (`Memoized`, `RecursiveModelTest`), so that half is history
+  and the shape rests on the modelling argument alone.
 - **`SchemaDesugarer` returns un-rewritten nodes by identity** — `declarationPositions()` is an
   `IdentityHashMap`, so an equal-but-rebuilt `Declaration` silently loses its source position and its
   diagnostics. `SchemaDesugarerTest` asserts `assertSame`.
