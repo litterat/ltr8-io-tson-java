@@ -1,6 +1,7 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.schema.*;
+import io.ltr8.tson.compiler.reader.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.BinaryType;
 import io.ltr8.tson.schema.meta.ChoiceBody;
@@ -17,21 +18,21 @@ import io.ltr8.tson.schema.meta.Data;
 import io.ltr8.tson.schema.meta.Extern;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FloatType;
-import io.ltr8.tson.schema.meta.InstanceTemplate;
 import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.Ipv4Type;
 import io.ltr8.tson.schema.meta.Ipv6Type;
 import io.ltr8.tson.schema.meta.MacType;
 import io.ltr8.tson.schema.meta.MapBody;
+import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.RationalType;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.RegexType;
-import io.ltr8.tson.schema.meta.TemplateArgument;
 import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.TimeType;
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TupleElement;
 import io.ltr8.tson.schema.meta.TypeArgument;
@@ -188,6 +189,54 @@ public final class TsonSchemaLinker {
         return false;
     }
 
+    /**
+     * The declaration a failure is reported against: the entry itself when the author wrote it, and otherwise
+     * the nearest one that references it and has a line of its own.
+     *
+     * <p><b>A derived entry has no line, and reporting one against itself leaves nothing to edit.</b>
+     * {@code use => { u: [some_typo] }} lifts an {@code array_some_typo_95c9a10f} whose {@code element_type}
+     * does not resolve -- a real error, whose diagnostic named an entry the author never wrote and carried no
+     * position at all, while the same mistake spelled {@code u: some_typo} landed on {@code /use} with its
+     * line. Walking back to the first referrer that has a position puts the two on the same footing. It is
+     * the form that is named in the message ({@code EntryDisplayName}) and the declaration that is pointed at.
+     *
+     * <p>Runs only when something has already failed, so the scan costs nothing on a clean link. Follows
+     * references rather than {@code source}, since a lifted form's {@code source} is the bare constructor it
+     * applies and leads away from the author rather than back to them.
+     */
+    private static String reportedAgainst(String name, Map<String, TypeDefinition> entries) {
+        Set<String> seen = new LinkedHashSet<>();
+        String current = name;
+        while (seen.add(current)) {
+            TypeDefinition definition = entries.get(current);
+            if (definition == null || definition.position().isPresent()) {
+                return current;
+            }
+            String referrer = firstReferrerOf(current, entries);
+            if (referrer == null) {
+                return name; // nothing points at it: its own name is the best that can be said
+            }
+            current = referrer;
+        }
+        return name;
+    }
+
+    /** The first entry whose own body or source names {@code target} -- insertion order, so it is stable. */
+    private static String firstReferrerOf(String target, Map<String, TypeDefinition> entries) {
+        for (Map.Entry<String, TypeDefinition> candidate : entries.entrySet()) {
+            if (candidate.getKey().equals(target)) {
+                continue;
+            }
+            Set<String> named = new LinkedHashSet<>();
+            collectBodyNames(candidate.getValue().body(), named);
+            candidate.getValue().source().ifPresent(source -> collectNames(source, named));
+            if (named.contains(target)) {
+                return candidate.getKey();
+            }
+        }
+        return null;
+    }
+
     /** One entry's failure as a {@link Diagnostic}, positioned at that entry's own declaration. */
     private static Diagnostic schemaError(TsonSchema schema, String name, TypeDefinition def, String message) {
         return Diagnostic.ofSchemaError(TsonCanonicalIdentity.canonicalize(schema.id()), name, message,
@@ -265,12 +314,17 @@ public final class TsonSchemaLinker {
 
         for (Map.Entry<String, TypeDefinition> entry : merged.entrySet()) {
             try {
-                validateEntry(entry.getKey(), entry.getValue(), merged, structureNamespace);
+                // Named by what the author wrote, not by the content-derived name a derived entry carries:
+                // `[some_typo]` is a form they can find in their source where `array_some_typo_95c9a10f` is
+                // a name §8.2 makes non-normative and nobody ever typed.
+                validateEntry(EntryDisplayName.of(entry.getKey(), entry.getValue(), merged), entry.getValue(),
+                        merged, structureNamespace);
             } catch (TsonSchemaValidationException e) {
                 if (receiver == null) {
                     throw e;
                 }
-                receiver.report(schemaError(schema, entry.getKey(), entry.getValue(), e.getMessage()));
+                String at = reportedAgainst(entry.getKey(), merged);
+                receiver.report(schemaError(schema, at, merged.get(at), e.getMessage()));
             }
         }
 
@@ -304,7 +358,12 @@ public final class TsonSchemaLinker {
             if (inhabited.contains(name)) {
                 continue;
             }
-            List<String> chain = TypeInhabitance.cycleThrough(name, merged, inhabited);
+            // Rendered the way a read renders it: a derived entry is named by the form or application that
+            // produced it, never by the content-derived name §8.2 makes non-normative. A chain reading
+            // `tree_text_a7f070f6 needs array_tree_text_a7f070f6_1_f3d1a035` names two entries the author
+            // never wrote, about a recursion they did.
+            List<String> chain = TypeInhabitance.cycleThrough(name, merged, inhabited).stream()
+                    .map(entry -> EntryDisplayName.of(entry, merged.get(entry), merged)).toList();
             report(receiver, schema, name, merged.get(name), "'" + name + "' can never be satisfied by any "
                     + "document: " + String.join(" needs ", chain)
                     + ", and nothing in that chain can be left out or left empty (§3.4.1). A recursion "
@@ -732,26 +791,16 @@ public final class TsonSchemaLinker {
                 checkVariantsAreDistinct(entryName, c, namespace);
                 checkVariantsAreNotVoid(entryName, c, namespace);
             }
-            // An open entry's bindings. `target` names a constructor, which lives in the structure namespace
-            // and was resolved when the template was; what is left is the references the bindings carry, and
-            // that every `param` names a parameter this entry actually declares.
-            case InstanceTemplate template -> {
-                for (Map.Entry<String, TemplateArgument> binding : template.bindings().entrySet()) {
-                    String where = "'" + entryName + "' binding '" + binding.getKey() + "'";
-                    switch (binding.getValue()) {
-                        case TemplateArgument.Ref ref ->
-                                validateTypeRef(ref.typeRef(), namespace, ownParameters, where);
-                        case TemplateArgument.Param param -> {
-                            if (!ownParameters.contains(param.param())) {
-                                throw new TsonSchemaValidationException(where + " is bound to '" + param.param()
-                                        + "', which is not a type parameter of '" + entryName + "' " + ownParameters
-                                        + " (§5.10)");
-                            }
-                        }
-                        case TemplateArgument.Value ignored -> {
-                        }
-                    }
-                }
+            // A held body is opaque here, deliberately, and nothing about it is checkable at link time: it is
+            // the declaration as written, whose references cannot be resolved until substitution supplies the
+            // arguments. Reference validation, inhabitance, and §5.10.1's regularity rule therefore apply to
+            // it at materialisation instead, where the whole body resolves at once and the diagnostics carry
+            // the template's own declaration as their location. An unapplied template is checked nowhere and
+            // gets no verdict, which is the deliberate half: nothing in the document is wrong yet, and
+            // checking one by substituting stand-in arguments would report errors on templates that are
+            // correct for every argument anyone passes (`<N> !integer ^ { min: N max: 3 }`).
+            // The closed-entry rule is unaffected -- a closed entry is validated in full, above.
+            case TemplateBody ignored -> {
             }
             case Unit ignored -> {
             }
@@ -946,14 +995,10 @@ public final class TsonSchemaLinker {
             case TupleBody tuple -> tuple.elements().forEach(e -> collectNames(e.elementType(), into));
             case ChoiceBody choice -> choice.variants().forEach(v -> collectNames(v, into));
             case Reference reference -> into.add(reference.target()); // a name, so nothing to recurse into
-            case InstanceTemplate template -> template.bindings().values().forEach(binding -> {
-                switch (binding) {
-                    case TemplateArgument.Param param -> into.add(param.param());
-                    case TemplateArgument.Ref ref -> collectNames(ref.typeRef(), into);
-                    case TemplateArgument.Value ignored -> {
-                    }
-                }
-            });
+            // The one question a held body answers without being resolved, and it answers it about tokens
+            // rather than about references -- which is the same rule substitution follows when it decides
+            // what to rewrite.
+            case TemplateBody held -> into.addAll(held.names());
             default -> { } // an atom body names no type
         }
     }

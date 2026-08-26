@@ -12,7 +12,7 @@ revision closes.** It is an input to the next revision's adjudication, so its nu
 that revision's change log will answer against — a stable index of the open set, not an archive of
 everything ever raised.
 
-The four below are what Revision 33 leaves open, renumbered from #1; the 55 raised against Revision 32 that
+The six below are what Revision 33 leaves open, renumbered from #1; the 55 raised against Revision 32 that
 it resolved are gone from here, because the spec now carries their rules and that is where the answer
 belongs. **Cite the spec, not the argument that got it there:** `docs/` and the Javadoc name the section
 that requires a behaviour, and a `SPEC-FEEDBACK.md #N` citation is for an entry below, where there is no
@@ -284,5 +284,195 @@ structure-templates design. §5.3 now says an unquoted token argument "is classi
 signature's parameter kinds", which settles *what kind* of thing an argument is but not the identity
 question this entry asks: whether `<255>` and `<0xFF>` are one application or two. `RawTokenParser` still
 keys identity on the spelling, so this implementation has two.
+
+---
+
+## 5. §5.10's collection-slot boundary refuses what the kernel's own vocabulary licenses, and it excludes the sum-typed result envelope
+
+**Section:** Part 2 §5.10 (the two parameter kinds, and the collection boundary), §8.1 (`template_argument`,
+`type_ref`, `record_field.value_param`), §5.3 (the lift rule), §5.10.1 (regularity), §12.1
+(`instance-template`). Supersedes the item declined at Revision 33 as #53. A longer treatment, including the
+designs weighed and rejected, is in `spec/tson-cr-structure-templates-addendum.md`; nothing below depends on
+reading it.
+
+**Problem:** §5.10 says, plainly:
+
+> Collection-valued slots are not parameterizable — a parameter inside a collection-typed slot (an enum's
+> member list, a choice's `variants`, a tuple's `elements`, a record's `fields`) has no open representation,
+> and a declaration writing one is a resolver error at the declaration; this is a deliberate boundary of this
+> revision, and nesting goes through a second named template instead.
+
+That is not ambiguous, and this entry is not an ambiguity report. What is inconsistent is that the kernel's
+own vocabulary licenses exactly what the prose refuses. `type_ref`'s `@doc` in meta-kernel says `name` is
+"the referenced type — or, within a template body, a parameter of either kind, read against the enclosing
+definition's `parameters` list", and `choice` is declared
+
+```
+choice => ~sum & { variants: [type_ref] }
+```
+
+so every variant position is already a channel licensed to hold a parameter, at any depth. `!choice {
+variants: [T error] }` is spellable in the vocabulary that describes resolved schemas and forbidden by the
+prose that describes resolution.
+
+The refusal traces to one place, and it is not the constructor vocabulary. `template_argument` is
+`( param: param_name | value: value | type_ref: type_ref )` with no collection case, and §5.10's uniformity
+clause requires every open instance body to be an `instance_template`. So a body the reference channel could
+have carried unchanged must instead be re-expressed in a vocabulary that cannot hold it. The boundary is a
+property of the chosen open representation, not of the problem being represented.
+
+The asymmetry underneath it is worth stating on its own, because it decides how much mechanism the problem
+actually needs: **a slot that holds names can hold a parameter for free, because a parameter is a name; a
+slot that holds an immediate value cannot.** Type slots ride `type_ref` and never needed a spelling. Only
+immediate value slots did — `min_items: N`, `format: F` — and `record_field.value_param` is that spelling,
+already shipped, for exactly one node. §8.1's stated reason for quoting type slots anyway (a parameter in a
+type slot "would have two spellings and body identity would depend on the choice") buys a property that is
+obtainable by construction — make the body form a function of the body, and no entry has two spellings —
+at the price of the boundary.
+
+The cost is not theoretical. `result => <T> ( T | error )`, the sum-typed result envelope, is the likeliest
+headline use of generic schemas and is inexpressible by rule. §5.10's declared workaround does not reach it:
+there is no second template to name when the parameter *is* a variant, so the sum must be monomorphised by
+hand at every use.
+
+**Interpretation chosen:** implemented as written first — `SchemaDesugarer` refused a parameter in a
+collection-valued slot at the declaration, classified as a schema-author error rather than a library gap,
+the verdict being one that does not change as this implementation improves. That refusal is now **replaced**
+by the design below, built here and running: `result => <T> ( T | error )` resolves, closing to an ordinary
+`choice` body over `[text, error]`. This is a deliberate divergence from Revision 33, offered as evidence
+rather than as a conformance claim.
+
+**Suggested resolution: hold an open body rather than quoting it.** What follows is the design as built, so
+that what is proposed and what is known to work are the same thing.
+
+1. **An open entry's body is the constructor application as written, held and unread** until materialisation
+   substitutes its parameters away. Not a typed quotation of the constructor vocabulary. Substitution is then
+   **one rule at any depth** — rewrite a token whose text resolves into the entry's `parameters` (§8.1's
+   shadowing rule) — uniform across type slots, value slots, collection elements and nesting alike, because
+   nothing has been classified by slot kind. Materialisation binds against constructor vocabulary exactly
+   once, at the only moment binding is decidable.
+   - **A held token needs no channel label, and that is what removes the boundary.** `template_argument`
+     needs `param` because a bare token in a value slot is otherwise always a literal; a held body is not
+     read as that vocabulary until the parameters are gone, so a parameter in `variants` is a token inside an
+     array like any other. Quoting is no part of it — a token's form is a schemaless-data concern (§4.4),
+     which is why the rule is on the token's text.
+   - The cost is shadowing's usual one: inside a template, a literal spelled like a live parameter is
+     unreachable.
+2. **§12.1's `instance` production takes a parameter list**, and the `instance-template` / `template-def` /
+   `template-bind` productions delete with the vocabulary that motivated them. Open and closed share one
+   production and one payload grammar, which is what admits a collection payload. A parameterized
+   `atom-refinement` remains no form at all, as §12.1 already has it.
+   - **What no payload can spell is an application**, in either form: `!array { element_type: box<text> }`
+     does not parse, `box<text>` being schema grammar where `instance` takes a `core-value`. The line falls
+     where the grammars already divide — a *type* position takes `box<text>` directly, while `!C value` takes
+     data, so an application inside one is written in `type_ref`'s own record form, which is what the sugar
+     expands to anyway. Revision 33 gave the open form a spelling the closed form never had; losing the
+     asymmetry is part of the point.
+3. **Lifting is unchanged, and open synthetic entries remain a category.** This is worth stating because the
+   opposite is the obvious guess and it does not work: a template's body cannot simply hold everything
+   nested inside it. A `type_ref` slot names a type and nothing else, so a sugar form inside a template body
+   — `<T> { a: [T] }` — must still lift to an entry, and a lifted form naming a parameter lifts **open**.
+   §5.3's lift rule therefore stands as written, and §8.2's identity-up-to-consistent-renaming of parameters
+   is still required, since two open synthetics alike up to renaming must land on one entry.
+   - What changes is only what an open synthetic's *body* is: held, not quoted. `<T> { a: [T] }` still
+     injects `array_p0_… => <p0> !array { element_type: p0 }` and the field still reads `array_p0_…<T>`.
+   - **Applications inside a held body close before its entry is named.** Desugar lifts innermost-first, so a
+     form it writes already names the entry its inner form became; a form closed at materialisation must
+     agree, or `[[pixel; 3]; 3]` written out and `grid<pixel, 3>` closed land on two entries for one type.
+4. **The resolved form of an open entry is its declaration**, not a `type_definition` value — which could not
+   carry it in any case, the kernel declaring `body: top` REQUIRED with no `top` an open body could be. This
+   keeps resolved output a valid schema document under §12.1, so it stays re-resolvable, and it keeps the
+   kernel unchanged: no new primitive, no `( body | template )` field group. §1.3 is unaffected, a conforming
+   consumer of resolved output meeting only closed entries and instantiations.
+5. **Checking splits, and §5.10 should say where.** Two questions are answered at the declaration from the
+   binding record's own field names, needing no stand-in values and so unable to fabricate a verdict: that
+   each name is a field the constructor declares, and that every REQUIRED-without-default field is bound.
+   §5.10's unreferenced-parameter rule is answered there too, from the tokens the held body names. Everything
+   value-shaped waits for materialisation, where the whole body binds through the constructor's own reader.
+   An **unapplied** template is checked no further and gets no verdict — not a warning, no verdict.
+   - Checking an unapplied template by substituting stand-ins should be ruled out explicitly, because it
+     manufactures false errors on exactly the slots this mechanism exists for: `<N> !integer ^ { min: N max:
+     3 }` is correct for every argument anyone passes and fails under a stand-in of 10.
+   - A materialisation diagnostic must be **located at the template's own declaration**, with the application
+     as context. Deferred checking is survivable only if the author is sent to the line they can edit.
+
+**What holding costs, and where §5.10 should say so.** A held body has no slot types — that is what it is for
+— so every check keyed on which slot a thing sits in waits for materialisation, and one of them does not
+survive the trip. §5.10's argument-kind rule ("a reference argument binds a type parameter, a literal binds a
+value parameter") is enforced today by `record_field.value_param`, whose presence is what says *this slot
+expects a value*; where a parameter stands in an ordinary value slot, a type name substituted there is a
+token like any other. If the kind rule is to be kept, the open form has to carry the slot's expectation
+somewhere — which is what `value_param` is, under another name. §5.10 should say which of its checks are
+declaration-time and which are materialisation-time under an open form, rather than leaving an implementation
+to discover that one of them is neither.
+
+**Scope of what is built.** Instance templates — the sugar forms and the explicit `<T> !C { … }` — hold their
+bodies here, and that is what the flagship case turns on. Record and composition templates still resolve at
+their declaration and still use `record_field.value_param` for a parameter routed into a field's value; §5.10
+would presumably want them held too, and the argument-kind finding above is the open question in the way.
+
+**If Revision 34 wants a smaller edit than all of that**, one scoped change resolves the flagship case
+against Revision 33 as shipped: restate §5.10's uniformity rule so that an open entry carries an ordinary
+constructor body whenever every parameter occurrence sits at a `type_ref` position, requiring
+`instance_template` only where a value slot is parameter-bound, and narrowing the collection error to
+parameters at *value* positions inside collections. Choice, tuple, `[T]` and `{K => V}` templates fall out
+immediately. Note it is not free for implementations that shipped Revision 33: it changes the resolved output
+of templates that already work, `<T> { v: [T] }` ceasing to lift an `instance_template`.
+
+**Status against Revision 33:** open, new against this revision. The same gap was raised against Revision 32
+as #53 and declined, §5.10 gaining the explicit boundary sentence and §8.1 the uniform-quotation rationale in
+response. The design above is implemented here and passing: the flagship `result => <T> ( T | error )`,
+`<T> [T, text]`, `<T> { v: (T | text) }` and nested sized forms all resolve, and every schema that resolved
+before produces the same entries it did.
+
+---
+
+## 6. Every schema that writes a container sugar form inside a template mints its own copy of the same few templates
+
+**Section:** Part 2 §5.3 (the lift rule), §8.2 (synthetic entry identity and content-derived naming), §9 (what
+the kernel declares). Related: #5, whose held-body proposal does not change this either way.
+
+**Problem:** a sugar form inside a template body lifts to an *open* synthetic entry — `<T> { a: [T] }` mints
+
+```
+array_p0_358380cd => <p0> !array { element_type: p0 }
+```
+
+and `box`'s field references it as `array_p0_358380cd<T>`. That entry is the same entry in every schema that
+writes `[T]` inside a template, up to a content-derived name §8.2 already declares non-normative. The lift
+rule mints it per schema because it has nowhere else to put it, so a fixed, tiny set of templates is
+re-derived by every author who uses generics over a container.
+
+The kernel already takes the other route one level down: rather than have every schema inline
+`!set { element_type: token }`, §9 declares `token_set` once and `enum.members` references it. The same
+argument applies to the open forms, and nothing but availability decides it.
+
+**Interpretation chosen:** mint per schema, as §5.3 specifies. `SchemaDesugarer` injects the lifted
+declaration into the document being desugared, with `positionalNames`/`rename` alpha-normalising the
+parameters so that two spellings of one form land on one entry within that document.
+
+**Suggested resolution:** consider declaring the fixed-arity open forms in the kernel — `<T> !array
+{ element_type: T }`, its `state: OPTIONAL` sibling, and the `map` pair — so that §5.3's lift targets a
+declared name rather than an injection. Two things to weigh, both real:
+
+1. **Only part of the family is fixed-arity.** The size specifier's variants differ by which bounds are
+   present (`[T; 3]`, `[T; 1..]`, `[T; 1..2]` are three shapes, since an absent `max_items` is not a
+   defaulted one), and `tuple` and `choice` are variadic, so `[T, U]` and `( T | error )` have no
+   fixed-arity template at all. A kernel set would cover the commonest case and leave the lift rule in
+   place for the rest, which is a smaller win than "declare them once" suggests.
+2. **Availability is the hard part.** A schema's type-name namespace is its own declarations plus its
+   `!!import`s (§3.3.1, §2.2.3); it does not include the namespace of the schema its `!!meta` names. So a
+   kernel-declared `array_of` is not in scope for a schema that has not imported the kernel, and a lift
+   targeting it would make desugaring — a phase whose whole virtue is being syntactic, consulting no
+   governing meta and no namespace — depend on the import set. Either §5.3 would have to name these as
+   always-available regardless of import (a new category of name), or they would have to live somewhere
+   every schema already reaches.
+
+Note this is **not** a proposal to re-parameterize `array`/`set`/`map`: those stay de-parameterized
+constructors with `element_type` as an ordinary field, and what is proposed here is named templates *over*
+them, which is the layer a user's own `box => <T> { ... }` lives in.
+
+**Status against Revision 33:** open, new against this revision. This implementation mints per schema and
+`ContainerSugarEndToEndTest` pins the resulting entry sets.
 
 ---

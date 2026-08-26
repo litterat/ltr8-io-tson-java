@@ -8,8 +8,7 @@ package io.ltr8.tson.schema.meta;
  * product => top & { ... }}, and {@code sum => top & {}} become {@link Atom}/{@link Product}/
  * {@link Sum} each {@code extends Top}, and {@code reference => top & { target: type_name } }
  * (which composes with {@code top} directly, not through one of the three base kinds) becomes
- * {@link Reference} implementing this interface directly -- as does {@link InstanceTemplate}, whose kernel
- * declaration composes with {@code top} for the same reason. Lets a consumer test kind ancestry with
+ * {@link Reference} implementing this interface directly. Lets a consumer test kind ancestry with
  * an ordinary {@code instanceof Product}/{@code instanceof Atom} rather than switching on {@link
  * TypeKind} by hand, and also lets {@code tson-bind}'s generic writer/reader dispatch on this same
  * sealed hierarchy directly for {@code !record}/{@code !array}/etc. type-refs -- {@code
@@ -18,12 +17,9 @@ package io.ltr8.tson.schema.meta;
  * makes binding straight against {@code Top}/{@link Atom} practical at all (see {@code tson-bind}'s
  * own README "Under development" history for the bug this fixed).
  *
- * <p>Until 2026-07-24 this lived alongside a separate, single-level sealed union ({@code
- * TypeBody}) that {@code TypeDefinition.body}/{@code tson-bind}'s writer actually used, kept apart
- * only because binding directly against a multi-level sealed hierarchy like this one didn't work
- * yet. Once the {@code DefaultUnionBinder} fix landed, that separation no longer bought anything,
- * so {@code TypeBody} was deleted and {@code TypeDefinition.body} retyped to {@code Top} directly --
- * one hierarchy, matching the kernel's own naming exactly, not two.
+ * <p>Two branches describe something other than a constructed value, and both compose with {@code top}
+ * directly for that reason: {@link Data}, the meta layer's extension point, and {@link TemplateBody}, the held
+ * body of an entry that declares type parameters.
  */
-public sealed interface Top permits Atom, Product, Sum, Reference, InstanceTemplate, Data {
+public sealed interface Top permits Atom, Product, Sum, Reference, Data, TemplateBody {
 }

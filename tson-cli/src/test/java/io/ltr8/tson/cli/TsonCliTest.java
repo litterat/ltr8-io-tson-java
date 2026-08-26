@@ -135,13 +135,13 @@ class TsonCliTest {
      * <b>An author's schema error exits 1, and never 70.</b> Exit 70 prints "a gap in tson, not a problem
      * with your document" -- a false verdict for a construct the spec itself refuses, and one that sends the
      * author to file a bug instead of fixing their schema. Two that used to land there, both refused by
-     * [TSON-SCHEMA]: a parameter in a collection-valued slot (§5.10 makes it "a resolver error at the
-     * declaration"), and a refinement body that is not a braced record (§12.1's {@code atom-refinement}
-     * takes a {@code record-def}) -- the latter now caught a phase earlier still, by the parser.
+     * [TSON-SCHEMA]: a refinement body that is not a braced record (§12.1's {@code atom-refinement} takes a
+     * {@code record-def}), now caught a phase earlier still by the parser, and an atom refinement that
+     * widens rather than narrows (§5.7).
      */
     @Test
     void aSchemaErrorTheSpecRefusesExitsOneNotSeventy(@TempDir Path dir) throws IOException {
-        for (String body : List.of("{ boxed => <T> { v: (T | text) } }", "{ narrow => !uint8 ^ 5 }")) {
+        for (String body : List.of("{ widens => !uint8 ^ { min: -10 } }", "{ narrow => !uint8 ^ 5 }")) {
             Path schema = writeFile(dir, "authorerror.tn", """
                     !!id:"https://example.test/cli-author-error.tn"
                     !!meta:"https://tson.io/2026/33/m/meta.tn"

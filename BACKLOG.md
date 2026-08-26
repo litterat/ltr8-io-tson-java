@@ -45,10 +45,12 @@ own prose (which had gone stale on at least one of them):
   `subtypes`/`disjoint` recomputed and verified, the closed-entry parameter-free rule reverified, an
   instantiation entry checked against its own `source` by recomputation, a construction's binding
   record checked for parameter-slot agreement with its `source` application. Entirely unimplemented
-  — "ingest" doesn't appear anywhere in the codebase. Note `spec/tson-cr-structure-templates.md` §4.7
-  extends what ingest must reverify: the closed-entry rule gains "carries no `instance_template` body", the
-  invariant that makes open and closed entries tell apart by inspection, and synthetic entries must pass
-  under the existing integrity checks. Note it would introduce a *second* way to build a
+  — "ingest" doesn't appear anywhere in the codebase. §5.10 extends what ingest must reverify: the
+  closed-entry rule, which makes open and closed entries tell apart by inspection, and synthetic entries,
+  which must pass under the existing integrity checks. Note that an open entry has no ingest story here at
+  all — a held body never serialises as a `type_definition` (`SPEC-FEEDBACK.md` #5), so a resolved document
+  either carries only closed entries or carries open ones as declarations, and ingest would have to say
+  which. Note it would introduce a *second* way to build a
   `TsonSchema` — bound from a document rather than resolved from source — and the two would have to agree,
   including on where a declaration's annotations land (the name's on the map key, the definition's on the
   entry). Lower priority than the rest of this section: the spec marks this path explicitly **optional**
@@ -85,6 +87,66 @@ by a factor of six.
   - The natural fix for all three is the same one the narrowing check would want: an injected oracle, rather
     than moving the value model's dependencies.
 
+## Open form: the held template body
+
+An open entry's body is the constructor application as written, held unread until materialisation
+substitutes its parameters away (`TemplateBody`/`HeldBody`, `docs/schema-resolution.md`), which is what
+removes Revision 33's collection-slot boundary — `result => <T> ( T | error )` resolves here and §5.10
+refuses it. `SPEC-FEEDBACK.md` #5 is the proposal, written as the design that works. What is left:
+
+- [ ] **Records and compositions onto held bodies, retiring `value_param`.** Attempted and **parked**; the
+  working patch is in the session scratchpad (`step3-wip.patch`). The shape is right and most of it works — a
+  structural template resolves as today and the resolved `RecordBody` is written back to wire form and held,
+  so composition flattens and refinement merges before holding, and the writer carries states, groups,
+  annotations and defaults with no shape remembered twice. `resolveRecordBody` puts a parametric modifier's
+  token in `value` rather than `value_param`, and §5.7's fixation (REQUIRED + a value present →
+  `REQUIRED_FIXED`) moves to where the substituted body is read back. A record template's closure stays the
+  instantiation entry itself rather than gaining a synthetic hop (§8.2). Three findings stopped it:
+    - **A held body has no slot types, and two checks depend on them.** The finding, and a property of
+      holding rather than a defect in the patch. §5.10's argument-kind rule — "a reference argument binds a
+      type parameter, a literal binds a value parameter" — is enforced by `value_param` saying *this slot
+      expects a value*; with the parameter in the ordinary `value` slot, a type name substituted there is
+      just a token and `box => <V> { v: int32 = V }` applied as `box<text>` passes silently. The same absence
+      has a second face: `type_ref` and `type_argument` both spell their first member `name`, so an
+      uninterpreted walk cannot tell a referenced type's name from an argument's name channel.
+    - **`<N> { v: [text; N..] }` throws `NoSuchElementException`** on the lifted-synthetic path — an ordinary
+      bug in the parked patch, undiagnosed, and the one thing there that is not a design consequence.
+    - **`TemplateRegularity` becomes unreachable** once every template body is held, and wants either
+      deletion or an `applications()` on `TemplateBody` — the same shape as `names()`, returning the
+      applications the held tree holds — which would put §5.10.1 back at the declaration.
+    - Two tests invert with it and are written in the patch already.
+
+- [ ] **A parametric enum member is classified as a type argument and fails.** `e => <M> !enum { members:
+  [a b M] }` applied as `e<c>` reports `'e<c>' source has an unresolved reference 'c'`: an unquoted
+  non-numeric argument rides the reference channel (§12.1's own `type-arg` rule) and `c` is an enum member,
+  not a type. §5.10 settles a parameter's kind from its *use*, and an enum member position is a use nothing
+  recognises as a value channel. Same root as the argument-kind finding above — a held body has no slot
+  types — so the two want settling together.
+
+- [ ] **A derived entry's failure could name the declaration that minted it, not the one that applied it.**
+  A defect inside a held body reports at the application (`/use`) rather than the template (`/box`), because
+  the walk back to a positioned entry finds the application first. Recording which declaration each derived
+  entry was minted for would fix it: message text is unchanged, only the location moves — from the line that
+  used the template to the line that contains the mistake. Modest today, since a desugar-lifted form already
+  lands correctly and the form is named either way. **It stops being modest if records are held**: every
+  template defect then moves to the use site, so this and the item above are one job.
+
+- [ ] **Widen the kernel's `reference` from `target: type_name` to a `type_ref`.** A partial application
+  (`uuid_pair => <B> pair<uuid, B>`) is the one template that holds nothing — it keeps the `type_ref` with
+  arguments it already resolves to, because a `reference` body has nowhere to put an argument list. Widening
+  the slot would let it carry one, making **every** template body an application and restoring the
+  biconditional `TemplateBody`'s Javadoc currently has to weaken (a held body means a template, but not the
+  reverse). Interacts with §8.3: the flattening walk would have to stop at an application, the way it already
+  stops at a materialised instantiation. Worth proposing on its own merits rather than folding into #5.
+
+- [ ] **meta-kernel drops `instance_template` and `template_argument` once a revision carries the design.**
+  Both are declared in `spec/m/meta-kernel.tn` and nothing produces them any more; `record_field`'s
+  `( value | value_param )?` group narrows to `value?` at the same time, when records hold their bodies. Not
+  done here on purpose — the bundled schemas are Revision 33's artifacts and stay byte-identical, so no
+  digest and no `*-resolved.tn` fixture moves for a divergence the spec has not adopted. When it lands:
+  three declarations out of the kernel, the `map_field_name_template_argument_xxhash` synthetic out of
+  `meta-kernel-resolved.tn`, and every pin re-stamped bottom-up.
+
 ## Miscellaneous
 
 - [ ] **General resolver-layer structural rules as reusable primitives**, rather than binding-time-only
@@ -93,6 +155,23 @@ by a factor of six.
   silently exempt from `min_items` until it was fixed one reader at a time, and nothing structural stops the
   next container from repeating it. What a primitive would buy is the rule stated once, where "how many
   entries does this value have" has one answer whatever spelled it.
+
+## Transparent wrappers in `tson-bind`
+
+- [ ] **A single-component wrapper should bind and write as the thing it wraps.** `HeldBody` is a holder for
+  a `DataValue` and nothing else, so a written template body reads `!template { application: !choice
+  { variants: [T error] } }` where `!choice { variants: [T error] }` is what it means — the wrapper names
+  itself in output it contributes nothing to. Rather than teach the writer about that one class, `tson-bind`
+  wants a general notion of a wrapper that is framing rather than shape.
+    - **Precedent for the shape, and a candidate mechanism.** `DataClassAnnotated` is already exactly this
+      and is already handled by hand: `TsonObjectWriter` unwraps it with the comment "the box is framing, not
+      a value shape". A general form would subsume that special case rather than adding a second one.
+      `DataClassBridge` may already be the mechanism — a bridge converts between a Java type and what is
+      bound, which is what transparency is — so the first question is whether this needs new vocabulary at
+      all or just a bridge on `HeldBody`.
+    - Worth settling before, not after, the question of whether an open body *is* a `!template` the kernel
+      declares (`SPEC-FEEDBACK.md` #5): if a wrapper can be transparent, the body writes as its
+      application and the question is moot for output, leaving only the model question.
 
 ## Binding strictness
 
@@ -122,7 +201,6 @@ need are not retained for a secondary constructor.
   needs to re-derive the binding without the application in between.
 
 ## Remaining built-in types
-
 
 - [ ] `unknown` — no compiled-parser factory (`ValueReaderFactoryRegistry` registers it, and `extern`, to
   `ErrorReader`), pinned down exactly by
@@ -392,54 +470,6 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
   a `DataBindContext` may be extended after first use, and a future fetching `TsonSchemaSource` will have
   its own story. None of it is hypothetical-only: the read-path half was two real defects, found by
   auditing and reproduced first try on 8 threads.
-- [x] **Read-path garbage, profiled and attributed** — three of the five items below are done, taking a
-  346-character bind read from **61.8 KB to 47.8 KB allocated (-23%)** and 19.5 to 15.4 µs. None of it ever
-  survived a collection (retention is a measured 0 bytes per read, and a JFR recording of 300,000 reads
-  holds one `OldObjectSample`), so this is throughput and GC pressure, not a leak. Done, each measured on
-  its own by reverting it:
-    - **Read in blocks, not one character at a time** — **12.1 KB/read**, the largest single item on the
-      path. `Lexer` called `Reader.read()` per character and `InputStreamReader` allocates a `char[]` plus a
-      `CharBuffer` on every call. Guarded by `AllocationHarnessTest.lexingDoesNotAllocatePerCharacterOfInput`
-      (50.9 → 11.0 bytes per character of input).
-    - **One URI canonicalization per read** — **1.1 KB/read**. It was three: the compiled-schema cache's
-      key, the resolution cache's key, and the schema registry's own lookup, each a `new URI(...)` parse.
-    - **Precomputed integer bounds** — **0.5 KB/read**. `BigInteger.TWO.pow(bits)` was rebuilt per value
-      validated for a bound fixed by the type.
-    - **A caveat on the method, worth keeping:** JFR's per-site attribution put the last two at ~3 KB each,
-      about 3x and 6x their measured worth, while its *total* matched the harness within 1%. At that sample
-      density the aggregate is trustworthy and an individual small site is not — take a site as a pointer to
-      where to look, then measure the change by reverting it.
-
-  What is left, in the same order:
-    - [x] **Decode UTF-8 in `Lexer` itself** — done. The lexer reads 512-byte blocks off the stream and
-      decodes them, with no `InputStreamReader` between: **-9.2 KB per read** (35,320 → 26,152 bytes; the
-      token stream alone 23,264 → 13,955). The reason to do it before a port was that a port writes this
-      loop anyway, and that §8.1's byte offset was being re-derived from the decoded character rather than
-      counted from the input. It also settles a question the spec leaves open: malformed UTF-8 is now a
-      lexer error rather than a U+FFFD substitution, overlong forms and encoded surrogates included
-      ([TSON-DATA] §7.1).
-    - [x] **Build the diagnostic path lazily** — done. A step of the descent is a linked node and both RFC
-      6901 pointers render only when a diagnostic is built: **-1.7 KB per read** (26,152 → 24,488 bytes).
-      The part that matters for a port is not the bytes: concatenating a step onto the last is quadratic in
-      nesting depth, and every read of a valid document — nearly all of them — threw the result away
-      unbuilt. `AllocationHarnessTest.nestingCostsTheSameAtEveryDepth` prices a level of nesting shallow and
-      deep and requires the two to agree, which is the property rather than a byte count.
-    - [x] **An escape-free quoted token is not copied twice** — done. **-1.0 KB per read** (24,488 →
-      23,464 bytes), and half the per-character cost of a long quoted token (10.5 → 5.8 bytes per character
-      of input). The scanner already knows whether it consumed a backslash, so the decode pass runs only
-      when there is something to decode.
-    - [x] **The `Optional` per `peek`/`next` is gone** — the cursor holds the event's own `SourcePosition`
-      and `position()` wraps it when asked, which is once per diagnostic rather than once per pull:
-      **-2.6 KB per read** (23,464 → 20,840) for four lines in one file, the best ratio in the exercise.
-    - [ ] Smaller sites the same profile named, none yet measured on its own: `Token` snapshots per token
-      (a two-slot lookahead paying per token), the `Position` inside every event (structural — it makes
-      `TsonEventSource` a cursor), and `DateTimeParser` building a `HashMap` per value read.
-
-  **Where the read path stands after all four** (346-character self-describing document, bind read):
-  61,824 → **23,464 bytes** and 1,213 → ~800 objects per read, 19.5 → ~13 µs, with retention still a
-  measured 0. Two conformance fixes came out of the work and matter more than the bytes for something about
-  to be ported: a zero-led complex magnitude is accepted (§7.6), and malformed UTF-8 is refused rather than
-  silently replaced ([TSON-DATA] §7.1).
 - [ ] Confusable-character and bidi-formatting-character checks (§9.4-adjacent security hardening;
   opt-in, and reported as ordinary errors when enabled — §8.1 gives a conforming processor one severity) —
   the sibling gap to the numeric-literal length limit tracked in `STRUCTURED-OUTPUT.md`'s Tier 1 section;

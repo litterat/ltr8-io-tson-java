@@ -17,6 +17,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -50,6 +51,11 @@ class TypeInhabitanceTest {
         TsonCompiledMetaRegistry core =
                 TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source);
         return TsonCompiledSchemaRegistry.tree(core).get(ID);
+    }
+
+    /** Compiles without complaint -- the "no verdict" half of the deferred-checking rule. */
+    private static void accepted(String declarations) {
+        assertDoesNotThrow(() -> compile(declarations), () -> "expected no verdict for: " + declarations);
     }
 
     private static String rejection(String declarations) {
@@ -98,13 +104,39 @@ class TypeInhabitanceTest {
     }
 
     /**
-     * A template is judged with its parameters assumed inhabited, so one that could never be applied usefully
-     * is rejected where it is written rather than at its first user's application site -- the same move
-     * {@code TemplateRegularity} makes for the neighbouring rule. This is §8's own {@code tree} fixture.
+     * A template is judged when it closes, not where it is written: its body is held until materialisation
+     * substitutes, so the bounds and element types this rule reads are tokens meaning nothing until an
+     * application supplies the arguments. The closure is an ordinary entry by the time linking runs, so
+     * §8's own {@code tree} fixture is caught the moment anything applies it -- and a template nobody applies
+     * is judged nowhere, the same answer §5.10's deferred checking gives everywhere else.
      */
     @Test
-    void aTemplateNobodyAppliesIsStillRejected() {
-        rejection("  tree => <T> { value: T  children: [tree<T>; 1..] }");
+    void anUninhabitedTemplateIsRejectedWhereItCloses() {
+        rejection("""
+                  tree => <T> { value: T  children: [tree<T>; 1..] }
+                  use  => tree<text>""");
+    }
+
+    /**
+     * The chain names what the author wrote, at every link. A derived entry's name is content-derived and
+     * §8.2 makes it non-normative, so a chain reading {@code tree_text_a7f070f6 needs
+     * array_tree_text_a7f070f6_1_f3d1a035} would name two entries the author never wrote, about a recursion
+     * they did -- the same rule {@code EntryDisplayName} already applies on the read side, which is where
+     * this borrows its rendering from.
+     */
+    @Test
+    void theChainIsSpelledTheWayTheAuthorWroteIt() {
+        String message = rejection("""
+                  tree => <T> { value: T  children: [tree<T>; 1..] }
+                  use  => tree<text>""");
+
+        assertTrue(message.contains("use needs tree<text> needs [tree<text>; 1..] needs tree<text>"), message);
+    }
+
+    /** The other half of the same rule: unapplied, it is not judged, and that is not a warning either. */
+    @Test
+    void aTemplateNobodyAppliesGetsNoVerdict() {
+        accepted("  tree => <T> { value: T  children: [tree<T>; 1..] }");
     }
 
     /** An uninhabited variant is a mistake even where the choice around it still works. */

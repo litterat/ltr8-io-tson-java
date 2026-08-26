@@ -16,6 +16,7 @@ import io.ltr8.bind.DataClassMap;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassTuple;
 import io.ltr8.bind.DataClassUnion;
+import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
 
@@ -202,6 +203,15 @@ public final class TsonObjectWriter {
         try {
             if (value == null) {
                 writer.nullValue();
+                return;
+            }
+            if (value instanceof DataValue ast) {
+                // The AST is source, not a value: it records what an author wrote, including which token was
+                // quoted and in what order a record's fields stood. Bound like anything else it would write as
+                // a faithful description of the wrong thing -- `!recordvalue { fields: [ ... ] }` -- so it is
+                // written as the syntax it is (AstWriter). The rule is about the AST rather than about the one
+                // body that holds one, so anything carrying a parsed value writes correctly.
+                AstWriter.write(ast, writer);
                 return;
             }
             if (dataClass instanceof DataClassAnnotated boxed) {

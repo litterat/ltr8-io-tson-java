@@ -1,6 +1,7 @@
 package io.ltr8.tson;
 
 import io.ltr8.tson.compiler.Diagnostic;
+import io.ltr8.tson.schema.meta.SourcePosition;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -30,22 +31,43 @@ class TsonValidateSchemaTest {
     }
 
     /**
-     * <b>An author's mistake is never {@code NOT_IMPLEMENTED}.</b> That code says a construct is beyond this
-     * library, and the CLI turns it into exit 70 with "a gap in tson, not a problem with your document" --
-     * a false verdict for anything the spec itself refuses, and one whose verdict will not change however
-     * much this library improves. §5.10: "Collection-valued slots are not parameterizable -- a parameter
-     * inside a collection-typed slot ... has no open representation, and a declaration writing one is a
-     * resolver error at the declaration; this is a deliberate boundary of this revision."
+     * <b>A parameter inside a collection-valued slot is ordinary.</b> Revision 33 refused it at the
+     * declaration -- {@code template_argument} being a typed quotation with no collection case, so a
+     * parameter in {@code variants} or {@code elements} had no open representation to lift to. An open
+     * entry's body is held here instead, uninterpreted until materialisation substitutes, so a parameter in
+     * a collection is a token inside an array and the phase that would have had to quote it does not run.
+     * {@code SPEC-FEEDBACK.md} #5 carries the argument; this is the flagship case it turns on.
      */
     @ParameterizedTest
     @ValueSource(strings = {
-            "{ box => <T> { v: (T | text) } }",     // a parameter inside `choice`'s variants
-            "{ box => <T> { v: [T, text] } }"})     // ... and inside `tuple`'s elements
-    void aParameterInACollectionSlotIsTheAuthorsErrorNotAGap(String body) {
-        List<Diagnostic> problems = check(body);
+            "{ result => <T> ( T | error )  use => result<text>  error => { code: text } }",  // §5.4 variants
+            "{ box => <T> { v: (T | text) }  use => box<int32> }",                            // ... nested
+            "{ pair => <T> [T, text]  use => pair<int32> }"})                                 // tuple elements
+    void aParameterInACollectionSlotIsOrdinary(String body) {
+        assertEquals(List.of(), check(body));
+    }
 
-        assertEquals(1, problems.size(), problems::toString);
-        assertEquals(Diagnostic.Code.SCHEMA_ERROR, problems.getFirst().code(), problems::toString);
+    /**
+     * A failure inside a <b>derived</b> entry is reported against the declaration that caused it, and names
+     * the form rather than the entry. Neither half was true: {@code use => { u: [some_typo] }} reported
+     * against {@code array_some_typo_95c9a10f} -- a content-derived name §8.2 makes non-normative, that the
+     * author never wrote -- and carried no position at all, while the same mistake spelled {@code u:
+     * some_typo} landed on {@code /use} with its own line. The two now agree.
+     *
+     * <p>Nothing here involves a template: every sugar form lifts an entry, so this was every schema's
+     * problem and not the open form's.
+     */
+    @Test
+    void aFailureInsideALiftedFormIsReportedAgainstTheDeclarationThatWroteIt() {
+        List<Diagnostic> lifted = check("{ use => { u: [some_typo] } }");
+        List<Diagnostic> plain = check("{ use => { u: some_typo } }");
+
+        assertEquals(1, lifted.size(), lifted::toString);
+        assertEquals(plain.getFirst().schemaPointer(), lifted.getFirst().schemaPointer(), "same declaration");
+        assertEquals(plain.getFirst().schemaPosition().map(SourcePosition::line),
+                lifted.getFirst().schemaPosition().map(SourcePosition::line), "and the same line");
+        assertTrue(lifted.getFirst().message().contains("'[some_typo]'"),
+                () -> "named by the form the author wrote: " + lifted.getFirst().message());
     }
 
     @Test
