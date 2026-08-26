@@ -1,6 +1,7 @@
 package io.ltr8.tson;
 
 import io.ltr8.tson.compiler.Diagnostic;
+import io.ltr8.tson.schema.meta.SourcePosition;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -44,6 +45,29 @@ class TsonValidateSchemaTest {
             "{ pair => <T> [T, text]  use => pair<int32> }"})                                 // tuple elements
     void aParameterInACollectionSlotIsOrdinary(String body) {
         assertEquals(List.of(), check(body));
+    }
+
+    /**
+     * A failure inside a <b>derived</b> entry is reported against the declaration that caused it, and names
+     * the form rather than the entry. Neither half was true: {@code use => { u: [some_typo] }} reported
+     * against {@code array_some_typo_95c9a10f} -- a content-derived name §8.2 makes non-normative, that the
+     * author never wrote -- and carried no position at all, while the same mistake spelled {@code u:
+     * some_typo} landed on {@code /use} with its own line. The two now agree.
+     *
+     * <p>Nothing here involves a template: every sugar form lifts an entry, so this was every schema's
+     * problem and not the open form's.
+     */
+    @Test
+    void aFailureInsideALiftedFormIsReportedAgainstTheDeclarationThatWroteIt() {
+        List<Diagnostic> lifted = check("{ use => { u: [some_typo] } }");
+        List<Diagnostic> plain = check("{ use => { u: some_typo } }");
+
+        assertEquals(1, lifted.size(), lifted::toString);
+        assertEquals(plain.getFirst().schemaPointer(), lifted.getFirst().schemaPointer(), "same declaration");
+        assertEquals(plain.getFirst().schemaPosition().map(SourcePosition::line),
+                lifted.getFirst().schemaPosition().map(SourcePosition::line), "and the same line");
+        assertTrue(lifted.getFirst().message().contains("'[some_typo]'"),
+                () -> "named by the form the author wrote: " + lifted.getFirst().message());
     }
 
     @Test

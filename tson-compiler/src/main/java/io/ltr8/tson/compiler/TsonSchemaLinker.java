@@ -189,6 +189,54 @@ public final class TsonSchemaLinker {
         return false;
     }
 
+    /**
+     * The declaration a failure is reported against: the entry itself when the author wrote it, and otherwise
+     * the nearest one that references it and has a line of its own.
+     *
+     * <p><b>A derived entry has no line, and reporting one against itself leaves nothing to edit.</b>
+     * {@code use => { u: [some_typo] }} lifts an {@code array_some_typo_95c9a10f} whose {@code element_type}
+     * does not resolve -- a real error, whose diagnostic named an entry the author never wrote and carried no
+     * position at all, while the same mistake spelled {@code u: some_typo} landed on {@code /use} with its
+     * line. Walking back to the first referrer that has a position puts the two on the same footing. It is
+     * the form that is named in the message ({@code EntryDisplayName}) and the declaration that is pointed at.
+     *
+     * <p>Runs only when something has already failed, so the scan costs nothing on a clean link. Follows
+     * references rather than {@code source}, since a lifted form's {@code source} is the bare constructor it
+     * applies and leads away from the author rather than back to them.
+     */
+    private static String reportedAgainst(String name, Map<String, TypeDefinition> entries) {
+        Set<String> seen = new LinkedHashSet<>();
+        String current = name;
+        while (seen.add(current)) {
+            TypeDefinition definition = entries.get(current);
+            if (definition == null || definition.position().isPresent()) {
+                return current;
+            }
+            String referrer = firstReferrerOf(current, entries);
+            if (referrer == null) {
+                return name; // nothing points at it: its own name is the best that can be said
+            }
+            current = referrer;
+        }
+        return name;
+    }
+
+    /** The first entry whose own body or source names {@code target} -- insertion order, so it is stable. */
+    private static String firstReferrerOf(String target, Map<String, TypeDefinition> entries) {
+        for (Map.Entry<String, TypeDefinition> candidate : entries.entrySet()) {
+            if (candidate.getKey().equals(target)) {
+                continue;
+            }
+            Set<String> named = new LinkedHashSet<>();
+            collectBodyNames(candidate.getValue().body(), named);
+            candidate.getValue().source().ifPresent(source -> collectNames(source, named));
+            if (named.contains(target)) {
+                return candidate.getKey();
+            }
+        }
+        return null;
+    }
+
     /** One entry's failure as a {@link Diagnostic}, positioned at that entry's own declaration. */
     private static Diagnostic schemaError(TsonSchema schema, String name, TypeDefinition def, String message) {
         return Diagnostic.ofSchemaError(TsonCanonicalIdentity.canonicalize(schema.id()), name, message,
@@ -266,12 +314,17 @@ public final class TsonSchemaLinker {
 
         for (Map.Entry<String, TypeDefinition> entry : merged.entrySet()) {
             try {
-                validateEntry(entry.getKey(), entry.getValue(), merged, structureNamespace);
+                // Named by what the author wrote, not by the content-derived name a derived entry carries:
+                // `[some_typo]` is a form they can find in their source where `array_some_typo_95c9a10f` is
+                // a name §8.2 makes non-normative and nobody ever typed.
+                validateEntry(EntryDisplayName.of(entry.getKey(), entry.getValue(), merged), entry.getValue(),
+                        merged, structureNamespace);
             } catch (TsonSchemaValidationException e) {
                 if (receiver == null) {
                     throw e;
                 }
-                receiver.report(schemaError(schema, entry.getKey(), entry.getValue(), e.getMessage()));
+                String at = reportedAgainst(entry.getKey(), merged);
+                receiver.report(schemaError(schema, at, merged.get(at), e.getMessage()));
             }
         }
 

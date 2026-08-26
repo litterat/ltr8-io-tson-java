@@ -238,11 +238,25 @@ Steps are ordered so each lands with the suite green.
       no kernel field, so a written `type_definition` carries something §7.2's closure rule would refuse on
       read-back. Pre-existing and independent of templates.
 
-- [ ] **7. Diagnostics: locate a materialisation error at the template's declaration.** With checking deferred,
-  the location is what keeps it survivable: a bad reference inside `<T> { x: some_typo }` must report at the
-  template's own line with the application as context, not at `box<text>`'s use site. `TypeDefinition`
-  already carries the declaration's `position` (the `@Unbound` component), so the location is in hand; this
-  is the `caused by` chain already tracked under "Schema-side diagnostics", and it stops being a nicety here.
+- [x] **7. A derived entry's failure is reported against the declaration that caused it.** Done, and the
+  defect turned out to be older and wider than this item assumed. The case it described — a bad reference in
+  a template body — already reported at the declaration, since step 3 is parked and record templates still
+  resolve there. What was broken was any failure inside an entry the resolver *derived*, template or not:
+  `use => { u: [some_typo] }` reported against `array_some_typo_95c9a10f` with **no position at all**, where
+  the same mistake spelled `u: some_typo` landed on `/use` with its line. Every sugar form lifts an entry, so
+  this was every schema's problem rather than the open form's.
+    - Two halves, both using machinery that already existed. The **name** in the message comes from
+      `EntryDisplayName`, so it is the form the author wrote (`[some_typo]`) rather than a content-derived
+      name §8.2 makes non-normative. The **location** walks back to the first entry that references it and
+      has a line of its own, using the linker's own `collectBodyNames`. It follows references rather than
+      `source`, since a lifted form's `source` is the bare constructor it applies and leads away from the
+      author rather than back.
+    - Runs only when something has already failed, so a clean link pays nothing.
+    - What it does not do: land on the *template* for a defect inside a held body. `<T> !array
+      { element_type: some_typo }` applied by `use` reports at `/use`, because the walk finds the application
+      before the declaration. Correct in the sense that `use` is on the path, and better than the derived
+      name, but the declaration is the more useful answer — reaching it needs the minting phase to record
+      which declaration each derived entry came from, which nothing carries today.
 
 - [ ] **8. Delete the quotation vocabulary.** `TemplateArgument`, the `TemplateBinding` carrier, and
   `RecordField.valueParam` — plus the `@Typename` binding on the repurposed `InstanceTemplate`, which no
