@@ -1,5 +1,7 @@
 package io.ltr8.tson.cli;
 
+import io.ltr8.tson.compiler.Diagnostic;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -74,64 +76,24 @@ class TsonCliTest {
     }
 
     /**
-     * The same routing end to end, through a schema that really reaches a gap: one template applied to
-     * another at a supertype, where substitution would write the inner application's head and drop its
-     * argument list, and the refusal's own message names the way to write it today. Exit 70 stays -- a gap
-     * is not a verdict on the schema -- but it is decided by the diagnostic's own code rather than by an
-     * exception that had to destroy the pass to be seen, so the gap arrives located, in the report, like
-     * every other problem.
-     */
-    @Test
-    void aSchemaReachingAGapCompilesToSeventyWithTheGapsOwnMessage(@TempDir Path dir) throws IOException {
-        Path schema = writeFile(dir, "gap.tn", """
-                !!id:"https://example.test/cli-gap.tn"
-                !!meta:"https://tson.io/2026/33/m/meta.tn"
-                !!import:"https://tson.io/2026/33/m/core.tn"
-                {
-                  box     => <T> { v: T }
-                  inner   => <U> { u: U }
-                  plain   => { n: int32 }
-                  derived => <T> plain & box<inner<T>>
-                }
-                """);
-
-        String out = captureStdout(() ->
-                assertEquals(70, TsonCli.run(new String[] {"compile", schema.toString()})));
-
-        assertTrue(out.contains("[NOT_IMPLEMENTED] /derived"), out);
-        assertFalse(out.contains("Please report it"), out);
-    }
-
-    /**
-     * The point of routing a gap through the report rather than through an exception: a schema with a gap
-     * <em>and</em> an ordinary error says both, in one pass. Thrown, the gap took {@code widens}'s verdict
-     * with it and the author fixed one thing per run, learning about the next only after the first was
-     * gone.
+     * The load-bearing half of the 1-vs-70 split: a run holding <em>both</em> a gap and an ordinary error is
+     * 70, not 1. Something went unchecked, so "invalid" is not a verdict that run is entitled to give, and
+     * the two codes are what let the CLI tell them apart in one pass.
      *
-     * <p>The run is still 70, not 1, and the two codes are why: {@code widens} really is invalid, but
-     * something here was not checked at all, so "invalid" is not a verdict this run is entitled to give.
+     * <p><b>Exercised over the codes rather than over a schema, because no schema reaches a gap any more.</b>
+     * The fixtures here used to be real: a parameter in a collection-valued slot, then a parameterized
+     * supertype ({@code plain & box<T>}), then one template applied to another ({@code plain &
+     * box<inner<T>>}) -- each closed in turn, and the schema pipeline now has no reachable {@code
+     * NOT_IMPLEMENTED} left. Rather than fabricate one, this pins the rule the fixtures existed to protect.
+     * {@code BACKLOG.md} carries the note to restore an end-to-end fixture the day a gap reappears; the
+     * read side still has one ({@code extern}), but it escapes as an exception rather than riding in a report.
      */
     @Test
-    void aSchemaWithBothAGapAndAnOrdinaryErrorReportsBoth(@TempDir Path dir) throws IOException {
-        Path schema = writeFile(dir, "mixed.tn", """
-                !!id:"https://example.test/cli-mixed.tn"
-                !!meta:"https://tson.io/2026/33/m/meta.tn"
-                !!import:"https://tson.io/2026/33/m/core.tn"
-                {
-                  box     => <T> { v: T }
-                  inner   => <U> { u: U }
-                  plain   => { n: int32 }
-                  derived => <T> plain & box<inner<T>>
-                  widens  => !uint8 ^ { min: -10 }
-                  fine    => int32
-                }
-                """);
-
-        String out = captureStdout(() ->
-                assertEquals(70, TsonCli.run(new String[] {"compile", schema.toString()})));
-
-        assertTrue(out.contains("[NOT_IMPLEMENTED] /derived"), out);
-        assertTrue(out.contains("[SCHEMA_ERROR] /widens"), out);
+    void aRunHoldingBothAGapAndAnOrdinaryErrorIsSeventyRatherThanOne() {
+        assertEquals(70, TsonCli.exitCodeFor(List.of(
+                Diagnostic.Code.NOT_IMPLEMENTED, Diagnostic.Code.SCHEMA_ERROR)));
+        assertEquals(70, TsonCli.exitCodeFor(List.of(Diagnostic.Code.NOT_IMPLEMENTED)));
+        assertEquals(1, TsonCli.exitCodeFor(List.of(Diagnostic.Code.SCHEMA_ERROR)));
     }
 
     /**

@@ -892,8 +892,18 @@ final class SchemaDesugarer {
         return written;
     }
 
-    /** A resolved type reference in the held spelling: a bare name, or {@code type_ref}'s record form. */
-    private static CoreValue refValue(io.ltr8.tson.schema.meta.TypeRef ref) {
+    /**
+     * A resolved type reference in the held spelling: a bare name, or {@code type_ref}'s record form.
+     *
+     * <p><b>The {@code arguments().isEmpty()} branch is load-bearing, not an optimisation.</b> A held body is
+     * read by later phases as wire form, and {@code type_argument} is told from {@code type_ref} by which
+     * shape a slot carries -- so stating a no-argument reference in the record form would make the two
+     * indistinguishable to a walk that reads neither against a vocabulary, and would give one type two entry
+     * names, since a name derives from what is written. That is why {@link TemplateMaterialiser}'s
+     * substitution writes a bound reference through this rather than spelling one of its own: the open form
+     * needs one spelling however many phases produce it.
+     */
+    static CoreValue refValue(io.ltr8.tson.schema.meta.TypeRef ref) {
         if (ref.arguments().isEmpty()) {
             return new TokenValue(ref.name(), TokenForm.UNQUOTED);
         }

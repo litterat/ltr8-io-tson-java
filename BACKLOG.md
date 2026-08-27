@@ -55,17 +55,16 @@ throw sites by that test is done across the whole schema pipeline (issue #26); i
 again, take it fresh rather than trusting a recorded one, since the last recorded numbers had gone stale
 by a factor of six.
 
-- [ ] **One template applied to another at an absorbing position** (`vip => <T> plain & box<inner<T>>`).
-  Composing or refining against an application applied to the declaration's own parameter works now
-  (`OpenOperandCompositionTest`) — the operand's held body is substituted parameter-for-parameter and its
-  fields absorbed, no closure involved. What is left is an argument that is itself an application:
-  substitution writes a binding as one token, so `inner<T>` would land as `inner` and the argument list would
-  be dropped silently. Reported as the gap it is rather than closed wrongly, and it is the last
-  schema-reachable `NOT_IMPLEMENTED` in the resolver — `TsonValidateSchemaTest` and `TsonCliTest` both use it
-  as their gap fixture, so closing it means finding them another one.
-  - Fixing it properly means a binding that can carry an application rather than a token, which is the same
-    shape `SPEC-FEEDBACK.md` #4's identity question sits on: what a type argument *is*. Worth doing after that
-    settles, not before.
+- [ ] **No schema-side gap is reachable, so two tests state a rule where they used to show a case.** The
+  schema pipeline reports `SCHEMA_ERROR` for everything it refuses today: the last `NOT_IMPLEMENTED` in it
+  closed with substitution keeping an application whole. `TsonValidateSchemaTest`'s
+  `everyBrokenDeclarationIsReportedInOnePass` and `TsonCliTest`'s
+  `aRunHoldingBothAGapAndAnOrdinaryErrorIsSeventyRatherThanOne` carry the note. The machinery is untouched
+  — `SchemaResolver` still routes an `UnsupportedOperationException`
+  through the receiver — so **the day a gap reappears, restore an end-to-end fixture** rather than leaving
+  both as rules. Not work in itself; a standing instruction attached to the next gap.
+  - The read side still has one (`extern`, and `unknown`), but it escapes as an exception rather than riding
+    in a report, so it does not exercise the same path.
 
 - [ ] **Atom-body coherence, the parts that need a parser this module doesn't have.** `Atom.coherenceCheck`
   (issue #50) now rejects an atom body whose own facets admit nothing, but three gaps are left, each

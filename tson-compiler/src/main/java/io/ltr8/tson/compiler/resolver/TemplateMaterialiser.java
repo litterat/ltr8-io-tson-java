@@ -618,7 +618,7 @@ final class TemplateMaterialiser {
         return switch (value) {
             case TokenValue token when token.form() == TokenForm.UNQUOTED
                     && parameters.contains(token.text()) ->
-                    token(argumentFor(token.text(), head, bindings));
+                    argumentValue(argumentFor(token.text(), head, bindings));
             case ArrayValue array -> new ArrayValue(array.elements().stream()
                     .map(element -> rescope(element, substitute(element.value().coreValue(), head, parameters,
                             bindings))).toList());
@@ -639,7 +639,7 @@ final class TemplateMaterialiser {
         if (NAME.equals(field.name()) && held instanceof TokenValue token
                 && token.form() == TokenForm.UNQUOTED && parameters.contains(token.text())
                 && argumentFor(token.text(), head, bindings) instanceof TypeArgument.Value literal) {
-            return new RecordValue.Field(VALUE, rescope(field.value(), token(literal)));
+            return new RecordValue.Field(VALUE, rescope(field.value(), argumentValue(literal)));
         }
         return new RecordValue.Field(field.name(),
                 rescope(field.value(), substitute(held, head, parameters, bindings)));
@@ -659,12 +659,28 @@ final class TemplateMaterialiser {
     }
 
     /**
-     * One closed argument as the wire token the constructor's reader expects -- a bare token either way,
-     * since a reference in the positional form (§5.6) and a literal are spelled alike.
+     * One argument in the held spelling, standing where the parameter it binds stood.
+     *
+     * <p>A <b>literal</b> is its own token. A <b>reference</b> goes through {@link SchemaDesugarer#refValue},
+     * which spells a no-argument one positionally (§5.6, where a reference and a literal look alike) and one
+     * carrying arguments in {@code type_ref}'s own record form. Writing the head name alone would be the
+     * shorter code and is wrong: {@code box<inner<T>>} would put {@code inner} where {@code inner<T>} belongs
+     * and drop the argument list with no diagnostic, because a token has nowhere to keep it.
+     *
+     * <p><b>Reusing the desugarer's producer is the requirement, not the convenience.</b> Two spellings of
+     * one form are two entries for one type, an entry name deriving from what is written -- so the phase that
+     * substitutes and the phase that lifts have to agree down to whether a no-argument reference is a token
+     * or a record. Sharing the function is what makes that true by construction.
+     *
+     * <p>Every slot a parameter can occupy takes either spelling: a field's {@code type}, an {@code
+     * element_type}, a {@code variants}/{@code elements} entry, and {@code type_argument}'s own {@code name}
+     * member are all typed {@code type_ref}. The one position that would not is a {@code type_ref}'s
+     * <em>head</em> -- {@code type_ref.name} is a {@code type_name} -- and a parameter cannot stand there:
+     * {@code T<text>} applies a parameter, which is no form §12.1 has.
      */
-    private static TokenValue token(TypeArgument argument) {
+    private static CoreValue argumentValue(TypeArgument argument) {
         return switch (argument) {
-            case TypeArgument.Ref reference -> new TokenValue(reference.ref().name(), TokenForm.UNQUOTED);
+            case TypeArgument.Ref reference -> SchemaDesugarer.refValue(reference.ref());
             case TypeArgument.Value value -> new TokenValue(value.value().text(),
                     switch (value.value().form()) {
                         case UNQUOTED -> TokenForm.UNQUOTED;

@@ -688,15 +688,18 @@ compatibility).
 
 ## Not yet implemented
 
-- **Part 2 resolution gaps** — the identity-diagonal FIXED-value invariant, plus a generic type-ref whose
-  argument is itself an application (`plain & box<inner<T>>`), which is the last schema-reachable
-  `NOT_IMPLEMENTED` in the resolver: substitution writes a binding as one token, so the inner argument list
-  would be dropped. A **parameterized supertype** is no longer among them — `vip => <T> customer & box<T>`
-  absorbs the operand's fields while the application is open (`OpenOperandCompositionTest`), the operand
-  contributing its own supertypes but not its name, a template being no type.
-  `DefinitionResolver`'s Javadoc is the exact current boundary and `BACKLOG.md` carries the detail. Only
-  about half the `UnsupportedOperationException` sites in the pipeline are gaps at all; the rest are
+- **Part 2 resolution gaps** — the identity-diagonal FIXED-value invariant. Otherwise **none: no
+  `NOT_IMPLEMENTED` is reachable from a schema any more**, the pipeline reporting `SCHEMA_ERROR` for
+  everything it refuses. A parameterized supertype resolves (`vip => <T> customer & box<T>` absorbs the
+  operand's fields while the application is open, the operand contributing its own supertypes but not its
+  name, a template being no type), and so does an argument that is itself an application (`box<inner<T>>` —
+  substitution writes a bound reference through `SchemaDesugarer.refValue`, which spells one carrying
+  arguments in `type_ref`'s record form). `OpenOperandCompositionTest` pins both, including the two IS-A
+  edges an open operand does and does not give. `DefinitionResolver`'s Javadoc is the exact current boundary.
+  Only about half the `UnsupportedOperationException` sites in the pipeline are gaps at all; the rest are
   schema-author errors or internal faults wearing the wrong exception type, and the classification is done.
+  **A gap reaching a read still exists** (`extern`, `unknown` — below), and two tests carry a standing note to
+  restore an end-to-end schema-side fixture if one ever reappears (`BACKLOG.md`).
 - **A container position that is an application, and what a held open body still cannot say.** §5.10
   substitution works for both template shapes: a **record** template (parameters occupying field types and
   values) and an **open instance** — `<T> { v: [T] }`, or the explicit `<T, N> !array { element_type: T

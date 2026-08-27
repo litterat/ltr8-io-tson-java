@@ -80,6 +80,21 @@ class TsonValidateSchemaTest {
                 """));
     }
 
+    /**
+     * Every broken declaration gets its own verdict in one pass, rather than the first aborting the document.
+     *
+     * <p><b>This now carries what a gap fixture used to demonstrate beside it, because no schema-side gap is
+     * reachable any more.</b> A construct this library has not implemented is reported and not thrown, so the
+     * declarations around it still get their verdicts, and the code is what keeps the two apart: {@code
+     * NOT_IMPLEMENTED} says this could not be checked where {@code SCHEMA_ERROR} says this is wrong -- a
+     * consumer conflating them is wrong in the direction that matters, calling a document invalid that was
+     * never judged. Three fixtures held that in turn and each was closed by the work that followed it: a
+     * parameter in a collection-valued slot (the author's error now), a parameterized supertype, and one
+     * template applied to another. The machinery is untouched -- {@code SchemaResolver} still routes an
+     * {@code UnsupportedOperationException} through the receiver, in the catch inside its memoized getter --
+     * so the day a gap reappears this should become a fixture again. {@code BACKLOG.md} carries that note,
+     * and {@code TsonCliTest} pins the exit-code rule the split rides on.
+     */
     @Test
     void everyBrokenDeclarationIsReportedInOnePass() {
         List<Diagnostic> problems = check("""
@@ -93,45 +108,6 @@ class TsonValidateSchemaTest {
 
         assertEquals(List.of("/declared_twice", "/typo_in_source", "/widens"),
                 problems.stream().map(d -> d.schemaPointer().orElseThrow()).sorted().toList());
-    }
-
-    /**
-     * A construct this library has not implemented is reported, not thrown -- so the declarations around it
-     * still get their verdicts. Thrown, one gap cost the whole document its report, and an author fixed one
-     * thing per run.
-     *
-     * <p><b>The code is what keeps it distinguishable</b>, which is all the exception-classification policy
-     * ever needed: {@code NOT_IMPLEMENTED} says this could not be checked, where {@code SCHEMA_ERROR} says
-     * this is wrong. A consumer that conflates them is wrong in the direction that matters -- calling a
-     * document invalid that was never judged.
-     *
-     * <p>The gap here is <b>one template applied to another at a supertype</b> ({@code plain &
-     * box<inner<T>>}), where substitution would write the inner application's head and drop its argument
-     * list. It has to be a real one, and the supply keeps shrinking: a plain parameterized supertype
-     * ({@code plain & box<T>}) resolves now, and a parameter in a collection-valued slot -- the case this
-     * fixture carried before that -- is the author's error and reports {@code SCHEMA_ERROR}.
-     */
-    @Test
-    void aGapIsReportedBesideTheOrdinaryProblemsRatherThanReplacingThem() {
-        List<Diagnostic> problems = check("""
-                {
-                  box     => <T> { v: T }
-                  inner   => <U> { u: U }
-                  plain   => { n: int32 }
-                  derived => <T> plain & box<inner<T>>
-                  widens  => !uint8 ^ { min: -10 }
-                  fine    => int32
-                }
-                """);
-
-        assertEquals(List.of("/derived", "/widens"),
-                problems.stream().map(d -> d.schemaPointer().orElseThrow()).sorted().toList());
-        Diagnostic gap = problems.stream()
-                .filter(d -> d.schemaPointer().equals(Optional.of("/derived"))).findFirst().orElseThrow();
-        assertEquals(Diagnostic.Code.NOT_IMPLEMENTED, gap.code());
-        assertTrue(gap.schemaPosition().isPresent(), "a gap is located like any other declaration's problem");
-        assertEquals(Diagnostic.Code.SCHEMA_ERROR, problems.stream()
-                .filter(d -> d.schemaPointer().equals(Optional.of("/widens"))).findFirst().orElseThrow().code());
     }
 
     /**

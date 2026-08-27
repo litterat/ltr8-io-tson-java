@@ -1361,17 +1361,10 @@ final class DefinitionResolver {
         }
         Map<String, TypeArgument> bindings = new LinkedHashMap<>();
         for (int i = 0; i < template.parameters().size(); i++) {
-            TypeArg arg = application.args().get(i);
-            if (arg instanceof TypeArg.Ref(GenericRef nested)) {
-                // An argument that is itself an application. Substitution writes a binding as one token, so
-                // `box<inner<T>>` would put `inner` where `inner<T>` belongs and silently drop the argument
-                // list. A gap and reported as one: the schema is well-formed and this cannot yet close it.
-                throw new UnsupportedOperationException("'" + name + "': the " + position + " '" + head
-                        + "<" + nested.name() + "<...>>' applies one template to another, and substituting an "
-                        + "application into an operand still open is not implemented (§5.8, §5.10). Name the "
-                        + "inner application in a declaration of its own and apply that");
-            }
-            bindings.put(template.parameters().get(i), typeArgument(arg));
+            // An argument that is itself an application needs no special case: substitution writes a bound
+            // reference in `type_ref`'s record form when it carries arguments, so `box<inner<T>>` keeps
+            // `inner<T>` whole and the absorbing declaration's own materialisation closes it.
+            bindings.put(template.parameters().get(i), typeArgument(application.args().get(i)));
         }
         DataValue body = held.application();
         CoreValue substituted = TemplateMaterialiser.substitute(body.coreValue(), head,
