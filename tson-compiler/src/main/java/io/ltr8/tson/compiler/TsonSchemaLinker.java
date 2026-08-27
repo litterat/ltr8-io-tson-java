@@ -203,6 +203,12 @@ public final class TsonSchemaLinker {
      * <p>Runs only when something has already failed, so the scan costs nothing on a clean link. Follows
      * references rather than {@code source}, since a lifted form's {@code source} is the bare constructor it
      * applies and leads away from the author rather than back to them.
+     *
+     * <p><b>This answers "who reached it", which is the right question only when the defect is in what the
+     * author reached it <em>with</em>.</b> A defect a held body deferred is not: it is in the template's own
+     * text, and every applier reaches that equally. {@link #heldDeclarationNaming} answers that one from the
+     * offending name and runs first; this is the fallback, and stays the whole answer for a sugar lift, for
+     * an argument the applier wrote, and for every defect no template deferred.
      */
     private static String reportedAgainst(String name, Map<String, TypeDefinition> entries) {
         Set<String> seen = new LinkedHashSet<>();
@@ -219,6 +225,103 @@ public final class TsonSchemaLinker {
             current = referrer;
         }
         return name;
+    }
+
+    /**
+     * A reference resolving to nothing, carried in <b>parts</b> rather than as a finished sentence.
+     *
+     * <p>A held body defers every question about what its references resolve to, so an unresolved one
+     * surfaces on the entry materialisation minted -- {@code box<int32>} -- when the name was written in the
+     * template's own text. The two statements of that one fact differ in the subject alone, so the subject
+     * is supplied at the point the fact is stated rather than baked in at the point it is discovered.
+     *
+     * <p><b>Linker-internal, and never escapes.</b> It is caught in the one place it is thrown from and
+     * re-stated as a {@link TsonSchemaValidationException}, whose classification this shares: an unresolved
+     * reference is the author's error, and a verdict this library will not change its mind about. It is not
+     * a subclass of it because that type is deliberately {@code final} and lives in {@code tson-schema},
+     * which holds no pipeline machinery.
+     */
+    private static final class UnresolvedReference extends RuntimeException {
+
+        private static final long serialVersionUID = 1L;
+
+        private final String trail;
+        private final String name;
+
+        UnresolvedReference(String subject, String trail, String name) {
+            super(sentence(subject, trail, name));
+            this.trail = trail;
+            this.name = name;
+        }
+
+        /** The name that resolved to nothing -- what decides which declaration wrote it. */
+        String name() {
+            return name;
+        }
+
+        /** The same fact stated against a different declaration. */
+        String against(String subject) {
+            return sentence(subject, trail, name);
+        }
+
+        private static String sentence(String subject, String trail, String name) {
+            return "'" + subject + "'" + trail + " has an unresolved reference '" + name + "'";
+        }
+    }
+
+    /**
+     * The declaration a <b>deferred</b> defect belongs to: the open declaration whose held text wrote the
+     * name, when the entry that failed is one this resolver derived.
+     *
+     * <p><b>Holding is what makes this necessary.</b> A closed declaration's references are checked where the
+     * author wrote them. A template's are not -- nothing about them can be settled until an application
+     * supplies arguments -- so {@code box => <T> { v: T  w: no_such_type }} gets no verdict at its own
+     * declaration and one verdict per applier instead, each against a line that is not wrong and does not
+     * contain the name. Deferred checking is what holding buys, and it is survivable only if the author is
+     * sent to the line they can edit.
+     *
+     * <p><b>The offending name is the evidence, not the entry.</b> Walking the derived entry's own lineage
+     * cannot answer this: a sugar lift's {@code source} is the bare constructor it applies, and an alias
+     * composes its argument into someone else's application ({@code half => <B> pair<no_such_type, B>}
+     * closes to a {@code pair} instantiation, and {@code pair} is not at fault). Asking instead which held
+     * body <em>mentions the name</em> reaches {@code half} directly, and reaches nothing at all when the
+     * name came from an argument the applier wrote -- {@code box<3>} and {@code box<some_typo>} keep their
+     * existing verdict at the application, which is where those two mistakes are.
+     *
+     * <p><b>Both filters are load-bearing.</b> Only a derived entry is retargeted, or a closed declaration's
+     * own typo would be blamed on any template that happens to name it; and only a {@link TemplateBody}
+     * declaration is a candidate, since a defect no held body deferred is already located correctly.
+     * {@link TemplateBody#names()} cannot tell a type reference from a field name, which is why it is asked
+     * only about a name already known to resolve to nothing -- a field of that name is then the one
+     * remaining way to mislead it, and it misleads no worse than naming the applier does.
+     *
+     * @return the declaration to blame, or {@code null} to leave the failure where it surfaced
+     */
+    private static String heldDeclarationNaming(String name, TypeDefinition failed,
+                                                 Map<String, TypeDefinition> entries) {
+        if (failed.position().isPresent()) {
+            return null; // the author's own declaration: it already names the line they wrote
+        }
+        for (Map.Entry<String, TypeDefinition> candidate : entries.entrySet()) {
+            TypeDefinition definition = candidate.getValue();
+            if (definition.position().isPresent() && definition.body() instanceof TemplateBody held
+                    && held.names().contains(name)) {
+                return candidate.getKey();
+            }
+        }
+        return null;
+    }
+
+    /** One entry's failure, reported when there is a receiver and rethrown as a schema error when there is not. */
+    private static void reportOrThrow(TsonDiagnosticsReceiver receiver, TsonSchema schema, String at,
+                                       Map<String, TypeDefinition> entries, String message, RuntimeException cause) {
+        if (receiver == null) {
+            if (cause instanceof TsonSchemaValidationException original && message.equals(cause.getMessage())) {
+                throw original; // untouched, which is the fail-fast overloads' standing contract
+            }
+            throw new TsonSchemaValidationException(message, cause);
+        }
+        receiver.report(schemaError(schema, at, entries.get(at), message));
     }
 
     /** The first entry whose own body or source names {@code target} -- insertion order, so it is stable. */
@@ -312,6 +415,7 @@ public final class TsonSchemaLinker {
         merged = computeSubtypes(merged, localNames);
         merged = computeDisjointness(merged);
 
+        Set<String> blamedOnce = new LinkedHashSet<>();
         for (Map.Entry<String, TypeDefinition> entry : merged.entrySet()) {
             try {
                 // Named by what the author wrote, not by the content-derived name a derived entry carries:
@@ -319,12 +423,23 @@ public final class TsonSchemaLinker {
                 // a name §8.2 makes non-normative and nobody ever typed.
                 validateEntry(EntryDisplayName.of(entry.getKey(), entry.getValue(), merged), entry.getValue(),
                         merged, structureNamespace);
-            } catch (TsonSchemaValidationException e) {
-                if (receiver == null) {
-                    throw e;
+            } catch (UnresolvedReference e) {
+                String author = heldDeclarationNaming(e.name(), entry.getValue(), merged);
+                if (author == null) { // the applier's own text, or a name no held body wrote: as before
+                    reportOrThrow(receiver, schema, reportedAgainst(entry.getKey(), merged), merged,
+                            e.getMessage(), e);
+                    continue;
                 }
-                String at = reportedAgainst(entry.getKey(), merged);
-                receiver.report(schemaError(schema, at, merged.get(at), e.getMessage()));
+                // One mistake in a template is one mistake however many declarations apply it: each
+                // application mints its own entry and each fails identically, so the verdict that names the
+                // template would otherwise be repeated once per applier.
+                String message = e.against(author);
+                if (blamedOnce.add(author + "\u0000" + message)) {
+                    reportOrThrow(receiver, schema, author, merged, message, e);
+                }
+            } catch (TsonSchemaValidationException e) {
+                reportOrThrow(receiver, schema, reportedAgainst(entry.getKey(), merged), merged,
+                        e.getMessage(), e);
             }
         }
 
@@ -712,7 +827,7 @@ public final class TsonSchemaLinker {
             Map<String, TypeDefinition> sourceLookup =
                     structureNamespace.isEmpty() || !source.arguments().isEmpty() ? namespace
                             : mergeWithFallback(namespace, structureNamespace);
-            validateTypeRef(source, sourceLookup, def.parameters(), "'" + name + "' source");
+            validateTypeRef(source, sourceLookup, def.parameters(), name, " source");
         }
         // A supertype gets the same structure-namespace fallback as `source`, and for the same reason: it is
         // not an author-written reference but the residue of one, and §3.3.2 confines only author-written
@@ -747,8 +862,8 @@ public final class TsonSchemaLinker {
                     }
                 }
                 for (RecordField field : r.fields()) {
-                    validateTypeRef(field.type(), namespace, ownParameters,
-                            "'" + entryName + "' field '" + field.name() + "'");
+                    validateTypeRef(field.type(), namespace, ownParameters, entryName,
+                            " field '" + field.name() + "'");
                 }
                 for (FieldGroup group : r.groups()) {
                     for (String member : group.members()) {
@@ -765,26 +880,25 @@ public final class TsonSchemaLinker {
             // not always the same name (a materialised instantiation sources the application and targets
             // the entry minted for it), which is why this checks the body's own target rather than trusting
             // that.
-            case Reference ref -> validateTypeRef(ref.target(), namespace, ownParameters,
-                    "'" + entryName + "'");
+            case Reference ref -> validateTypeRef(ref.target(), namespace, ownParameters, entryName, "");
             case MapBody m -> {
-                validateTypeRef(m.keyType(), namespace, ownParameters, "'" + entryName + "' key_type");
-                validateTypeRef(m.valueType(), namespace, ownParameters, "'" + entryName + "' value_type");
+                validateTypeRef(m.keyType(), namespace, ownParameters, entryName, " key_type");
+                validateTypeRef(m.valueType(), namespace, ownParameters, entryName, " value_type");
             }
-            case ArrayBody a -> validateTypeRef(a.elementType(), namespace, ownParameters,
-                    "'" + entryName + "' element_type");
+            case ArrayBody a -> validateTypeRef(a.elementType(), namespace, ownParameters, entryName,
+                    " element_type");
             case TupleBody t -> {
                 int index = 0;
                 for (TupleElement element : t.elements()) {
-                    validateTypeRef(element.elementType(), namespace, ownParameters,
-                            "'" + entryName + "' element[" + index + "]");
+                    validateTypeRef(element.elementType(), namespace, ownParameters, entryName,
+                            " element[" + index + "]");
                     index++;
                 }
             }
             case ChoiceBody c -> {
                 int index = 0;
                 for (TypeRef variant : c.variants()) {
-                    validateTypeRef(variant, namespace, ownParameters, "'" + entryName + "' variant[" + index + "]");
+                    validateTypeRef(variant, namespace, ownParameters, entryName, " variant[" + index + "]");
                     index++;
                 }
                 checkVariantsAreDistinct(entryName, c, namespace);
@@ -853,8 +967,8 @@ public final class TsonSchemaLinker {
                 // class, so nothing here can introspect it -- what it declares through `references()` is
                 // validated like any other reference, and everything else is opaque by design.
                 for (TypeRef reference : data.references()) {
-                    validateTypeRef(reference, namespace, ownParameters,
-                            "'" + entryName + "' (!" + TsonCompiledMetaSchema.typenameOf(data) + ")");
+                    validateTypeRef(reference, namespace, ownParameters, entryName,
+                            " (!" + TsonCompiledMetaSchema.typenameOf(data) + ")");
                 }
             }
         }
@@ -1017,8 +1131,16 @@ public final class TsonSchemaLinker {
         }
     }
 
+    /**
+     * One reference validated. The entry it sits in is passed as {@code subject} and the path within that
+     * entry as {@code trail} ({@code " field 'w'"}, {@code " element[1]"}) rather than pre-joined, because
+     * {@link UnresolvedReference} has to be able to re-state itself against a different subject: a defect a
+     * held body deferred surfaces on the entry materialisation minted and belongs to the declaration whose
+     * text wrote it, and only the subject differs between the two statements of it.
+     */
     private static void validateTypeRef(TypeRef ref, Map<String, TypeDefinition> namespace, List<String> ownParameters,
-                                         String context) {
+                                         String subject, String trail) {
+        String context = "'" + subject + "'" + trail;
         TypeDefinition target = namespace.get(ref.name());
         if (target != null && target.body() instanceof Data notAType) {
             // §8.1's schema map holds only type definitions, so an entry describing something else has no
@@ -1031,12 +1153,12 @@ public final class TsonSchemaLinker {
                     + "nothing can be typed by it");
         }
         if (!namespace.containsKey(ref.name()) && !ownParameters.contains(ref.name())) {
-            throw new TsonSchemaValidationException(context + " has an unresolved reference '" + ref.name() + "'");
+            throw new UnresolvedReference(subject, trail, ref.name());
         }
         checkArity(ref, namespace, ownParameters, context);
         for (TypeArgument arg : ref.arguments()) {
             if (arg instanceof TypeArgument.Ref nested) {
-                validateTypeRef(nested.ref(), namespace, ownParameters, context);
+                validateTypeRef(nested.ref(), namespace, ownParameters, subject, trail);
             }
             // TypeArgument.Value is a literal token, not a type reference -- nothing to validate.
         }

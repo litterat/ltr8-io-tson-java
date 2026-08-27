@@ -422,16 +422,23 @@ that what is proposed and what is known to work are the same thing.
    - Checking an unapplied template by substituting stand-ins should be ruled out explicitly, because it
      manufactures false errors on exactly the slots this mechanism exists for: `<N> !integer ^ { min: N max:
      3 }` is correct for every argument anyone passes and fails under a stand-in of 10.
-   - A materialisation diagnostic must be **located at the template's own declaration**, with the application
-     as context. Deferred checking is survivable only if the author is sent to the line they can edit.
-     - **This is the one recommendation here that is a requirement rather than a report.** It is what the
-       design owes an author in exchange for deferring the checks, and it is not yet met: this implementation
-       locates a defect inside a held body at the *application*, `box => <T> !array { element_type: some_typo
-       }` applied by `use` reporting at `/use` rather than `/box`, because the walk back to a positioned entry
-       finds the application first. Reaching the declaration needs the minting phase to record which
-       declaration each derived entry came from — a bookkeeping change, not a design one, which is why it is
-       offered as a rule the spec should state rather than a cost of holding. Stated here rather than
-       discovered later, since the rest of this entry is reporting what runs.
+   - A materialisation diagnostic must be **located at the declaration whose text wrote the offending name**,
+     with the application as context. Deferred checking is survivable only if the author is sent to the line
+     they can edit. This is a requirement rather than a report — what the design owes an author in exchange
+     for deferring the checks — and it runs here.
+     - **The rule is not "the template".** `box => <T> { v: T  w: no_such_type }` applied by `holder` belongs
+       to `/box`: `holder` is correct, does not contain the name, and would be blamed once per applier, each
+       under a different subject (`'box<text>'`, `'box<int32>'`). But `box => <T> { v: T }` applied as
+       `box<3>` belongs to `/holder`, which wrote the `3`. A blanket "locate at the template" sends that
+       author to a declaration with no `3` in it, so the spec should state the rule over the **name**, not
+       over the entry.
+     - **What that costs an implementation is one lookup, not bookkeeping through the minting phase.** The
+       offending name is the evidence: the declaration to blame is the open one whose held body mentions it,
+       and there is none when the name arrived in the argument list. Tracking derived-entry lineage instead
+       gets the alias case wrong — `half => <B> pair<no_such_type, B>` closes to an entry sourced on `pair`,
+       which is faultless — so the name is both the cheaper and the more accurate key.
+     - **One defect earns one diagnostic**, however many declarations apply the template; otherwise the count
+       an author sees is a property of the schema's callers rather than of the mistake.
 
 **What holding costs, and where §5.10 should say so.** A held body has no slot types — that is what it is for
 — so every check keyed on which slot a thing sits in waits for materialisation, and one of them does not
