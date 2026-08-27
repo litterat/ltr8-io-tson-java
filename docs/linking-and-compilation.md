@@ -369,12 +369,14 @@ for a record body, so no `type_ref` carrying `arguments` could be read at all.
   bound component is `schema.meta.Token`, by the component's own Java type — and refuses to build at all if
   two group members share a slot type and disagree, since the resolver is keyed by type name and could not
   serve both.
-  - **It costs an identity split, recorded rather than papered over.** Identity derives from the token, so
-    `vector<float32, 255>` and `vector<float32, 0xFF>` are two applications with byte-identical bodies where
-    §4 makes them one number. `SPEC-FEEDBACK.md` #4 puts the disagreement underneath it to the spec — the
-    same slot is a bare token in the prose and a `value` in the kernel, and §8.2's identity rule inherits the
-    ambiguity. Normalising numeric tokens before hashing would recover §4's equivalence, and is deliberately
-    not done here: it would be this implementation inventing an identity rule the spec does not state.
+  - **The token reaches identity, and §4.3's equivalence is applied there** (`NumericIdentity`), so
+    `vector<float32, 255>` and `vector<float32, 0xFF>` are one application rather than two entries with
+    byte-identical bodies. The stake is a verdict: §5.4 can only ask "are these variants distinct types?" of
+    entry names, so two names for one type admitted `( [float32; 255] | [float32; 0xFF] )` — a choice between
+    two identical, non-disjoint variants no untagged read can discriminate — where two spellings of one name
+    were refused. `SPEC-FEEDBACK.md` #4 puts the underlying disagreement to the spec: the same slot is a bare
+    token in the prose and a `value` in the kernel, and §8.2's identity rule inherits the ambiguity. What is
+    recorded stays the token, so resolved output still shows the author's spelling.
 - **Bind mode only.** Tree mode reads into `TsonValue` and has no Java shape to satisfy.
 
 ## The registries (`tson-compiler/{TsonCompiledMetaRegistry,TsonCompiledSchemaRegistry}.java`)

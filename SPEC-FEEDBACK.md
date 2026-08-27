@@ -240,8 +240,7 @@ recorded in `source`". Structural equality of *what*? The two readings differ, a
   entries;
 - **as values**, they are one application and one entry.
 
-This is not hypothetical. This implementation reads the token, and the two produce entries whose bodies are
-byte-identical:
+This is not hypothetical. Reading the token, the two produce entries whose bodies are byte-identical:
 
 ```
 vector<float32, 255>   → array_float32_255_255_5c5f53f7    ArrayBody[minItems=255, maxItems=255]
@@ -257,12 +256,35 @@ Note this is not an artifact of *how* the argument reaches the resolver. A decla
 (`a => vector<float32, 255>`) never goes near a wire form and splits identically, because the split is in
 what identity compares, not in how the argument was parsed.
 
-**Interpretation chosen:** the token, because the model has to fill a `Token`-typed component and §5.10's
-"bare token" is the only prose that speaks to it (`schema.meta.Token`, `RawTokenParser`). The consequence
-above is accepted and recorded rather than worked around: normalising numeric tokens before hashing would
-get §4's equivalence back, but it would be this implementation inventing an identity rule the spec does not
-state, and the resulting entry set would then disagree with any implementation that took the prose at face
-value.
+**And the cost is a wrong verdict, not a redundant entry** — which is what moved this from a recorded
+consequence to a fixed one. §5.4 requires a choice's variants to resolve to distinct types, and it can only
+ask that of entry names, so two names for one type pass a check two spellings of one name fail:
+
+```
+u => ( [float32; 255] | [float32; 0xFF] )     accepted, disjoint=false
+u => ( [float32; 255] | [float32; 255]  )     "'u' lists the variant 'array_float32_255_255_…' twice
+                                               -- §5.4 requires each variant to resolve to a distinct type"
+```
+
+The accepted one is worse than untidy: a choice between two structurally identical variants, correctly
+derived non-disjoint, that no untagged read can ever discriminate. Under the value reading a conforming
+resolver must refuse it, and under the token reading it must not — one schema, opposite verdicts, decided by
+a spelling §4 spends a paragraph making irrelevant.
+
+**Interpretation chosen: option 3 below.** The slot stays a `Token` — §5.10's "bare token" is the only prose
+that speaks to what is *recorded*, and resolved output still shows the author's spelling — and §4.3's
+equivalence is applied where identity is derived, at both naming sites (`NumericIdentity`, consumed by
+`SchemaDesugarer`'s lift and `TemplateMaterialiser`'s instantiation). This is a change of position: the split
+was previously accepted and recorded here on the grounds that normalising would be inventing a rule. The §5.4
+evidence above is what settles it — leaving the two apart is not neutrality between the readings, it is the
+token reading, and it is the one that admits a schema no reader can use.
+
+**The equivalence applied is exactly the one §4.3 states, and no wider.** Radix, digit separators and a
+redundant sign fall away (`255`/`0xFF`/`0b1111_1111`/`0o377`/`+255`); a float's written scale does too
+(`.5`/`0.5`, `1.0`/`1.00`/`1e0`); `.inf` and `.infinity` are one value. What does **not** fall away is the
+base type: §4 resolves `1` to an integer and `1.0` to a float, so those stay two arguments even though one
+magnitude covers both. A spec adopting option 3 should say that boundary out loud, since "the same number"
+alone does not decide it.
 
 **Suggested resolution:** say which, in §8.2, and make §8.1 agree with it.
 
@@ -281,11 +303,21 @@ value.
 Option 2 is the smaller edit; option 3 is the better answer if resolver output is meant to round-trip what
 the author wrote.
 
-**Status against Revision 33:** open, carried deliberately — deferred to the next revision of the
-structure-templates design. §5.3 now says an unquoted token argument "is classified against the applied
-signature's parameter kinds", which settles *what kind* of thing an argument is but not the identity
-question this entry asks: whether `<255>` and `<0xFF>` are one application or two. `RawTokenParser` still
-keys identity on the spelling, so this implementation has two.
+**Status against Revision 33:** open on the spec's side; **option 3 is built here**, so the recommendation
+is a report rather than a proposal. §5.3 now says an unquoted token argument "is classified against the
+applied signature's parameter kinds", which settles *what kind* of thing an argument is but not the identity
+question this entry asks: whether `<255>` and `<0xFF>` are one application or two. This implementation says
+one, and refuses the §5.4 choice above accordingly. §8.2 still does not say, and until it does an
+implementation reading §5.10's "bare token" at face value gets a different entry set and the opposite verdict
+on that choice — which is the interoperability cost of leaving it unstated.
+
+**Coupled to #5's D6 merge, which is not obvious and is easy to decide by accident.** D6 says eagerly-lifted
+synthetics that become "structurally identical under resolution" merge into one entry. Re-deriving a
+synthetic's name from its *resolved* record — the natural implementation — normalises the value channel as a
+side effect and settles this entry in favour of option 2/3 without anyone choosing it. The two splits live in
+different channels of the same derived name (a reference argument that is itself an application, versus a
+value argument's spelling), so an implementation that wants D6 without prejudging this one must re-derive
+from resolved references while leaving value tokens as written.
 
 ---
 
