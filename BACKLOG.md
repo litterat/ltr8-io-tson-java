@@ -50,24 +50,6 @@ own prose (which had gone stale on at least one of them):
   atom-body self-coherence item below, which shares that destination but has no parameter or
   materialisation dimension at all.
 
-## Remaining Part 2 resolution gaps
-
-Only genuine gaps belong here — a throw that means "your schema is wrong" is not one.
-
-- [ ] **Atom-body coherence, the parts that need a parser this module doesn't have.** `Atom.coherenceCheck`
-  (issue #50) now rejects an atom body whose own facets admit nothing, but three gaps are left, each
-  matching that family's existing *narrowing* gap and each blocked on the same thing — `tson-schema` has no
-  dependency on a parser for the values involved:
-  - `duration_type`'s bounds are unparsed ISO 8601 text. `"P1M"` vs `"P30D"` does not order lexically, so
-    judging them as strings would call a coherent body empty. Needs `DurationParser`/`IsoDuration`, which
-    live in `tson-compiler`.
-  - `pattern` emptiness — a regex matching no string at all, or none of a permitted length. Needs
-    `tson-regex`, the same boundary the narrowing check's containment gap sits behind.
-  - CIDR `within`/`excluding` admitting no network between them. Needs real containment arithmetic; the
-    family has no CIDR parser.
-  - The natural fix for all three is the same one the narrowing check would want: an injected oracle, rather
-    than moving the value model's dependencies.
-
 ## Open form: the held template body
 
 An open entry's body is the constructor application as written, held unread until materialisation
@@ -92,7 +74,6 @@ the proposals it answers. What is left below are consequences of holding, not sh
     library improves, so it belongs in `TsonSchemaValidationException` at the declaration -- not in the
     `ErrorReader` path, whose `UnsupportedOperationException` says "library gap" and carries the CLI's exit 70.
     Reachable from an ordinary schema, so this half is worth fixing even before the check itself lands.
-
 - [ ] **A parametric enum member is classified as a type argument and fails.** `e => <M> !enum { members:
   [a b M] }` applied as `e<c>` reports `'e<c>' source has an unresolved reference 'c'`: an unquoted
   non-numeric argument rides the reference channel (§12.1's own `type-arg` rule) and `c` is an enum member,
@@ -102,65 +83,6 @@ the proposals it answers. What is left below are consequences of holding, not sh
   holding gives a *wrong* verdict rather than a late one, and names the two spec-side answers: make
   `enum.members` a value channel in §5.10's kind table, or require the quoted spelling `e<"c">`. Which one
   lands decides what is built here, so this waits on the revision rather than on effort.
-
-## Binding strictness
-
-A schema and the Java class bound to it must agree about a type's fields, checked when the schema is compiled
-in bind mode — startup, for anything compiling its schemas once. `docs/readers-and-diagnostics.md` has the
-rules and `CLAUDE.md` the summary; what is left here is one modelling gap the check exposed.
-
-- [ ] **`precision` and `require_timezone` are carried but not enforced** (`datetime`/`time`). The bodies
-  declare them — a field with no component is one this model silently loses — and the parsers refuse to
-  *read* against a schema that sets either, so the facet is a stated gap rather than a constraint quietly
-  not applied. The refusal is at read, not at load: such a schema resolves, links and compiles clean, and
-  the first document to reach the field gets `ErrorReader`'s gap and exit 70 — so it lands on whoever sends
-  data, not on the author who wrote the facet. What
-  remains is enforcement, and both halves need a decision before code: `precision`'s required semantics
-  (exact vs. maximum fractional-digit count) are not settled by the spec and want a `SPEC-FEEDBACK.md` entry,
-  and `require_timezone: false` needs an offset-less parse path neither parser has (`true` is already the
-  behaviour, RFC 3339 requiring an offset on every value these atoms accept).
-
-- [ ] **A read-time gap escapes as an exception and takes the whole report with it.** Every remaining gap
-  is at read (`unknown`, `extern`, and `datetime`/`time` with `precision` or `require_timezone`), and
-  `ErrorReader` throws where the schema pipeline reports: the `UnsupportedOperationException` is caught at
-  the top of `TsonCli.run`, not per document, so `tson validate schema.tn gap.tn invalid.tn` prints nothing
-  on stdout and the invalid document is never judged — in either order. That is the failure the schema
-  pipeline gave up throwing gaps to avoid, still present on the read side; the exit code is already right, so
-  what is missing is reach, not classification. Routing `ErrorReader`'s gap through the read's
-  `TsonDiagnosticsReceiver` as `Diagnostic.Code.NOT_IMPLEMENTED` is the shape — the code and
-  `TsonCli.exitCodeFor` already exist and are unreachable end to end without it. Pinned as it stands by
-  `TsonCliTest.aReadGapCurrentlyTakesEveryOtherDocumentsVerdictWithIt`, which inverts when this lands.
-
-## Remaining built-in types
-
-- [ ] `unknown` — no compiled-parser factory (`ValueReaderFactoryRegistry` registers it, and `extern`, to
-  `ErrorReader`), pinned down exactly by
-  `CoreSchemaImportTest.exactlyTheUnknownAtomConstructorCompilesToAnErrorReader`. Not an unwritten atom
-  grammar: `unknown` accepts any well-formed value of any type, so what it needs is a reader deferring to
-  the document's own type-ref (or to schemaless base-type resolution when there is none) — a design
-  question about where that dispatch lives.
-- [ ] `extern` ([TSON-SCHEMA] §7.8) — materially bigger than the item above, and a different kind of gap
-  again. `Extern` (`schema.meta`) is a record-only placeholder with no
-  parsing/validation behavior at all (its own Javadoc says so explicitly: "not to add real
-  cross-schema reference resolution"); the real mechanism — a value at an extern-matched position
-  carrying its own scoped `!!schema` plus a mandatory `!type` tag, switching schema scope
-  mid-document — doesn't exist anywhere in the reader stack.
-
-# Lower Priority
-
-## Atom constraint slots
-
-- [ ] **A quoted numeric is accepted where an integer is declared.** `xs => !array { element_type: float32
-  min_items: "3" }` resolves with `min_items` 3, and so does every other integer-typed constraint slot: the
-  family's parser reads the token's text and never consults its form, where §4 base resolution makes a quoted
-  token a *string* whatever it spells. Pre-existing and unrelated to templates -- found while checking that a
-  value type-argument keeps its form, which it does; identity keeps `<3>` and `<"3">` apart, and it is the
-  constraint slot underneath that then accepts both. The fix belongs with the atom families, next to
-  `AtomNarrowing`: a parser that takes the whole `TokenValue` can reject a quoted token at a numeric slot,
-  which is the same shape the width-derived-range checks want.
-
-## Synthetic entry identity
-
 - [ ] **Key-position annotations are lost on the resolved-form round trip.** A schema *source* carries them
   through now: §6's name-position channel — `@doc` before a declared name, and the resolver's own derived
   `@alias`/`@synthetic` — reaches `TsonSchema.entries()` as key annotations (`AnnotatedMap`) and survives
@@ -173,7 +95,6 @@ rules and `CLAUDE.md` the summary; what is left here is one modelling gap the ch
   test read those keys like anything else, which is the whole of the payoff — `ResolvedFixtureTest` is the
   only consumer, and the emit side behind it has none. §8.1 settles the shape either way: derived markers
   discarded and recomputed, author-written key annotations preserved as data.
-
 - [ ] **Two entries for one type, where both lift channels produce the same form.** A closed lift hashes the
   *unclosed* binding record at desugar; the open lift hashes the *closed* one at materialisation — so
   `[box<text>]` written directly and `[box<T>]` closed with `T := text` land on different names. D6
@@ -191,6 +112,62 @@ rules and `CLAUDE.md` the summary; what is left here is one modelling gap the ch
   (`ContainerSugarEndToEndTest.aFormClosedFromATemplateIsTheSameEntryADirectOneProduces`): only an element
   that is itself an application splits, the closed lift hashing the binding record before its inner
   application is rewritten.
+
+## Built-in types
+
+- [ ] `unknown` — no compiled-parser factory (`ValueReaderFactoryRegistry` registers it, and `extern`, to
+  `ErrorReader`), pinned down exactly by
+  `CoreSchemaImportTest.exactlyTheUnknownAtomConstructorCompilesToAnErrorReader`. Not an unwritten atom
+  grammar: `unknown` accepts any well-formed value of any type, so what it needs is a reader deferring to
+  the document's own type-ref (or to schemaless base-type resolution when there is none) — a design
+  question about where that dispatch lives.
+- [ ] `extern` ([TSON-SCHEMA] §7.8) — materially bigger than the item above, and a different kind of gap
+  again. `Extern` (`schema.meta`) is a record-only placeholder with no
+  parsing/validation behavior at all (its own Javadoc says so explicitly: "not to add real
+  cross-schema reference resolution"); the real mechanism — a value at an extern-matched position
+  carrying its own scoped `!!schema` plus a mandatory `!type` tag, switching schema scope
+  mid-document — doesn't exist anywhere in the reader stack.
+- [ ] **Atom-body coherence, the parts that need a parser this module doesn't have.** `Atom.coherenceCheck`
+  (issue #50) now rejects an atom body whose own facets admit nothing, but three gaps are left, each
+  matching that family's existing *narrowing* gap and each blocked on the same thing — `tson-schema` has no
+  dependency on a parser for the values involved:
+    - `duration_type`'s bounds are unparsed ISO 8601 text. `"P1M"` vs `"P30D"` does not order lexically, so
+      judging them as strings would call a coherent body empty. Needs `DurationParser`/`IsoDuration`, which
+      live in `tson-compiler`.
+    - `pattern` emptiness — a regex matching no string at all, or none of a permitted length. Needs
+      `tson-regex`, the same boundary the narrowing check's containment gap sits behind.
+    - CIDR `within`/`excluding` admitting no network between them. Needs real containment arithmetic; the
+      family has no CIDR parser.
+    - The natural fix for all three is the same one the narrowing check would want: an injected oracle, rather
+      than moving the value model's dependencies.
+- [ ] **A read-time gap escapes as an exception and takes the whole report with it.** Every remaining gap
+  is at read (`unknown`, `extern`, and `datetime`/`time` with `precision` or `require_timezone`), and
+  `ErrorReader` throws where the schema pipeline reports: the `UnsupportedOperationException` is caught at
+  the top of `TsonCli.run`, not per document, so `tson validate schema.tn gap.tn invalid.tn` prints nothing
+  on stdout and the invalid document is never judged — in either order. That is the failure the schema
+  pipeline gave up throwing gaps to avoid, still present on the read side; the exit code is already right, so
+  what is missing is reach, not classification. Routing `ErrorReader`'s gap through the read's
+  `TsonDiagnosticsReceiver` as `Diagnostic.Code.NOT_IMPLEMENTED` is the shape — the code and
+  `TsonCli.exitCodeFor` already exist and are unreachable end to end without it. Pinned as it stands by
+  `TsonCliTest.aReadGapCurrentlyTakesEveryOtherDocumentsVerdictWithIt`, which inverts when this lands.
+- [ ] **A quoted numeric is accepted where an integer is declared.** `xs => !array { element_type: float32
+  min_items: "3" }` resolves with `min_items` 3, and so does every other integer-typed constraint slot: the
+  family's parser reads the token's text and never consults its form, where §4 base resolution makes a quoted
+  token a *string* whatever it spells. Pre-existing and unrelated to templates -- found while checking that a
+  value type-argument keeps its form, which it does; identity keeps `<3>` and `<"3">` apart, and it is the
+  constraint slot underneath that then accepts both. The fix belongs with the atom families, next to
+  `AtomNarrowing`: a parser that takes the whole `TokenValue` can reject a quoted token at a numeric slot,
+  which is the same shape the width-derived-range checks want.
+- [ ] **`precision` and `require_timezone` are carried but not enforced** (`datetime`/`time`). The bodies
+  declare them — a field with no component is one this model silently loses — and the parsers refuse to
+  *read* against a schema that sets either, so the facet is a stated gap rather than a constraint quietly
+  not applied. The refusal is at read, not at load: such a schema resolves, links and compiles clean, and
+  the first document to reach the field gets `ErrorReader`'s gap and exit 70 — so it lands on whoever sends
+  data, not on the author who wrote the facet. What
+  remains is enforcement, and both halves need a decision before code: `precision`'s required semantics
+  (exact vs. maximum fractional-digit count) are not settled by the spec and want a `SPEC-FEEDBACK.md` entry,
+  and `require_timezone: false` needs an offset-less parse path neither parser has (`true` is already the
+  behaviour, RFC 3339 requiring an offset on every value these atoms accept).
 
 ## Schema-side diagnostics
 
