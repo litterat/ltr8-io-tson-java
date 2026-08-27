@@ -305,6 +305,34 @@ tson.resolve(schemaText);                      // registers the schema by its ow
 TsonValue value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_type");
 ```
 
+- **Two schema sources ship, and `TsonConfig` carries the short form of each.** `TsonHttpSchemaSource`
+  fetches over HTTPS under a host allow-list; `TsonFileSchemaSource` reads from a directory. `httpSchemas(…)`
+  and `fileSchemas(host, dir)` are the one-call forms, repeatable and accumulating into one source;
+  `schemaSource(…)` stays the general seam and the three are mutually exclusive, on the precedent
+  `bindings`/`dataBindContext` already set — each builds one source, so mixing them would drop one rather
+  than compose it. A deployment needing both writes the composition itself, where the order it tries them in
+  is stated rather than assumed.
+  - **Identity is not location, and that is what makes two sources one design** ([TSON-DATA] §2.2.1). A
+    reference's identity is its lowercase host plus path — the scheme "a transport hint, not part of the
+    name", no port, no userinfo, no fragment — so `https://schemas.example.com/order-1.tn` may legitimately
+    be served from a directory, and moving a schema between the two renames nothing. `SchemaReference`
+    holds those rules once, for both: two sources enforcing them separately is two places for one to drift
+    lenient, and this is a security check.
+  - **The reference is attacker-controlled**, since a document names its own schema and in a server that
+    string came out of a request body. Both deny by default and match a host exactly (a suffix test for
+    `.example.com` also matches `evil-example.com`). Beyond that they guard different primitives: the HTTP
+    one is an SSRF risk, so it never follows redirects and caps size against bytes delivered rather than
+    `Content-Length`; the file one is an arbitrary-read risk, so containment is checked **after**
+    `toRealPath`, which settles `..` and symlink escape together — checking the unresolved path is the usual
+    way that control is defeated.
+  - **Neither verifies the `?sha256=` pin or the fetched document's `!!id`** — the loader does both, after a
+    source returns, and a second implementation would only drift from it. What the loader cannot express is
+    *requiring* a pin, since it verifies only one that is present; `requireContentHashPin` is that.
+  - **Caching is by canonical identity and never re-checked**, which rests on §10's immutability rule rather
+    than on the transport: a file edited in place is not seen, and under §10 editing it was the mistake. A
+    cached entry survives its file being removed, which is why the file source's policy check touches no
+    filesystem. Policy is re-checked on every reference, cached or not — a hit skips the fetch, never the
+    allow-list.
 - **The read mode is which registry you hold:** `treeRegistry()` (an immutable, queryable `TsonValue` tree)
   and `bindRegistry()` (real Java objects, bound via `dataBindContext()`), both over one shared bind-mode
   resolution core.

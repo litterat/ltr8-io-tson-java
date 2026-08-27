@@ -316,11 +316,6 @@ surface.
 
 ## Front door / ergonomics
 
-- [ ] A real disk/HTTP-backed `TsonSchemaSource` with whitelist/blacklist policy — today the only
-  `TsonSchemaSource` is `TsonSchemaSource.registeredOnly()` (nothing fetched); the bundled standard
-  library is served internally by `TsonCompiledSchemaRegistry` from `TsonBundledSchemas`, not through
-  a source.
-
 ## Tree model (`TsonValue`)
 
 The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tree model" section. What's left:
