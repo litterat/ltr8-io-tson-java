@@ -135,23 +135,6 @@ application alike. What is left are consequences of holding rather than shapes s
   what keeps the common errors located where the author can act on them, so this is the residue rather than
   the bulk.
 
-## Transparent wrappers in `tson-bind`
-
-- [ ] **A single-component wrapper should bind and write as the thing it wraps.** `HeldBody` is a holder for
-  a `DataValue` and nothing else, so a written template body reads `!template { application: !choice
-  { variants: [T error] } }` where `!choice { variants: [T error] }` is what it means — the wrapper names
-  itself in output it contributes nothing to. Rather than teach the writer about that one class, `tson-bind`
-  wants a general notion of a wrapper that is framing rather than shape.
-    - **Precedent for the shape, and a candidate mechanism.** `DataClassAnnotated` is already exactly this
-      and is already handled by hand: `TsonObjectWriter` unwraps it with the comment "the box is framing, not
-      a value shape". A general form would subsume that special case rather than adding a second one.
-      `DataClassBridge` may already be the mechanism — a bridge converts between a Java type and what is
-      bound, which is what transparency is — so the first question is whether this needs new vocabulary at
-      all or just a bridge on `HeldBody`.
-    - Worth settling before, not after, the question of whether an open body *is* a `!template` the kernel
-      declares (`SPEC-FEEDBACK.md` #5): if a wrapper can be transparent, the body writes as its
-      application and the question is moot for output, leaving only the model question.
-
 ## Binding strictness
 
 A schema and the Java class bound to it must agree about a type's fields, checked when the schema is compiled

@@ -4,6 +4,7 @@ package io.ltr8.bind.analysis;
 import io.ltr8.annotation.Atom;
 import io.ltr8.annotation.Record;
 import io.ltr8.annotation.ToData;
+import io.ltr8.annotation.Transparent;
 import io.ltr8.annotation.Tuple;
 import io.ltr8.annotation.Union;
 import io.ltr8.bind.DataBindContext;
@@ -37,6 +38,7 @@ public class DefaultClassBinder {
 	private final DefaultArrayBinder arrayBinder;
 	private final DefaultMapBinder mapBinder;
 	private final DefaultTupleBinder tupleBinder;
+	private final TransparentBinder transparentBinder;
 
 
 	public DefaultClassBinder() {
@@ -47,6 +49,7 @@ public class DefaultClassBinder {
 		arrayBinder = new DefaultArrayBinder();
 		mapBinder = new DefaultMapBinder();
 		tupleBinder = new DefaultTupleBinder();
+		transparentBinder = new TransparentBinder();
 	}
 
 	/**
@@ -115,6 +118,11 @@ public class DefaultClassBinder {
 			// Checked before isRecord: Annotated is itself a record, and binding it as one would make its
 			// annotations an authored field rather than the framing they are.
 			result = annotatedDescriptor(context, targetClass, parameterizedType);
+		} else if (targetClass.isAnnotationPresent(Transparent.class)) {
+			// Checked ahead of every kind test, and of isRecord in particular: a transparent wrapper is
+			// always a record, so isRecord would claim it first and bind the framing as the shape. What
+			// comes back is the wrapped component's own descriptor with a bridge, never a kind of its own.
+			result = transparentBinder.resolve(context, targetClass);
 		} else if (isTuple(targetClass)) {
 			// Checked ahead of isRecord: a genuine Java record annotated @Tuple would otherwise be
 			// claimed by isRecord()'s own isRecord() check first.
