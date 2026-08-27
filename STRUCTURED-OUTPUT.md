@@ -141,8 +141,6 @@ backend.
   wants a specific case that bites before it becomes work.
 - [ ] `REQUIRED_FIXED`/`OPTIONAL_FIXED` identity-diagonal invariant (a restated fixed field's value
   must not change) — never checked.
-- [ ] `value_param` — parametric field modifiers are recorded but never substituted at application
-  time.
 - [ ] §9.1's numeric-literal length limit (SHOULD, default 4096 digits, DoS hardening) — not
   enforced anywhere.
 

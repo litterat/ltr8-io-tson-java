@@ -30,10 +30,12 @@ final class FieldModifiers {
      * output encoding is a {@code record_field} without a {@code value} member (§8.1).
      *
      * <p>{@code parametric} says the token names a type parameter of the enclosing declaration rather than a
-     * literal (§5.7's "Open modifiers"). Where the value channel it belongs in differs by caller, this is
-     * what the caller reads to decide: a held body puts it in {@code value} like any other token and leans on
-     * §8.1's shadowing rule, while a body resolved at its declaration keeps the separate {@code value_param}
-     * channel it needs to tell the two apart.
+     * literal (§5.7's "Open modifiers"). It decides nothing about <em>where</em> the token is written: both
+     * callers put it in {@code value} like any other token, and §8.1's shadowing rule -- a token is a
+     * parameter exactly when its text resolves into the enclosing entry's own {@code parameters} -- is what
+     * tells the two apart downstream. The distinction the flag does carry is the {@code state} this record
+     * already holds: §5.7 leaves a parametric {@code = P} in a REQUIRED-family state, nothing being fixed
+     * until the argument arrives.
      */
     record Resolved(FieldState state, Optional<TokenValue> value, boolean parametric) {
     }

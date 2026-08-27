@@ -1434,17 +1434,20 @@ final class DefinitionResolver {
     }
 
     /**
-     * A field's default (`{@code ~}`) or fixed (`{@code =}`) modifier value (§5.2, §5.10) resolves
-     * one of two ways: when the modifier's token names one of the *declaration's own* type
-     * parameters (e.g. {@code array}'s {@code element_type: type_ref = T}, {@code T} declared by
-     * {@code array => <T> ...}), it is a parameter reference, not a literal -- recorded as {@code
-     * value_param} rather than {@code value} (§5.10's "labelled form", used uniformly whether the
-     * routed field is a scalar or {@code type_ref}-typed). A parametric {@code =} leaves the field's
-     * state at its unmarked {@code REQUIRED} (nothing is actually fixed at declaration -- the
-     * argument arrives at application, §5.10 -- so {@code array}'s own {@code element_type} omits
-     * {@code state} entirely in output); a parametric {@code ~} still promotes to {@link
-     * FieldState#REQUIRED_DEFAULT}, identically to a literal default. Any other modifier token is an
-     * ordinary literal, recorded as {@code value} with {@code state} promoted to {@link
+     * A field's default (`{@code ~}`) or fixed (`{@code =}`) modifier value (§5.2, §5.10) is recorded in
+     * {@code value} whether it is a literal or a parameter reference -- a parameter and a literal share
+     * the one slot, and §8.1's shadowing rule tells them apart: a token is a parameter exactly when its
+     * text resolves into the enclosing entry's own {@code parameters}. There is no separate
+     * {@code value_param} channel; the kernel no longer declares one, a held body being unread until
+     * its parameters are gone.
+     *
+     * <p>What a parametric modifier still changes is the field's <b>state</b>. A parametric {@code =}
+     * (e.g. {@code array}'s {@code element_type: type_ref = T}, {@code T} declared by {@code array =>
+     * <T> ...}) leaves the field at its unmarked {@code REQUIRED} -- nothing is actually fixed at
+     * declaration, the argument arriving at application (§5.10), so {@code array}'s own {@code
+     * element_type} omits {@code state} entirely in output -- and fixation happens at materialisation
+     * (§5.7). A parametric {@code ~} still promotes to {@link FieldState#REQUIRED_DEFAULT}, identically
+     * to a literal default. A literal modifier promotes {@code state} to {@link
      * FieldState#REQUIRED_DEFAULT} ({@code ~}) or {@link FieldState#REQUIRED_FIXED} ({@code =}) -- or, on
      * an optional field, to {@link FieldState#OPTIONAL_FIXED}. The absent sentinel ({@code = _}) is §5.2's
      * sixth spelling: {@code OPTIONAL_FIXED} carrying no value, forbidding the field's value while keeping

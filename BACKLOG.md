@@ -111,6 +111,9 @@ application alike. What is left are consequences of holding rather than shapes s
     hole rather than opening one, which is also why §5.10's argument-kind rule is the wrong instrument --
     both sides there are correctly kinded (a value argument bound to a value parameter) and the kind rule has
     nothing to say, where value-conformance catches it. `SPEC-FEEDBACK.md` #5 carries the recommendation.
+  - **`SPEC-FEEDBACK.md` #5 offers this check to the spec as the replacement for §5.10's argument-kind rule**,
+    and marks it there as a recommendation rather than a report. Building it is what would let that
+    recommendation stand on the same evidence as the rest of the entry.
   - **The exception classification is wrong today**, which is the part that is a defect rather than a gap. A
     default that is not valid for its field's type is an author error whose verdict does not change as this
     library improves, so it belongs in `TsonSchemaValidationException` at the declaration -- not in the
@@ -122,9 +125,15 @@ application alike. What is left are consequences of holding rather than shapes s
   non-numeric argument rides the reference channel (§12.1's own `type-arg` rule) and `c` is an enum member,
   not a type. §5.10 settles a parameter's kind from its *use*, and an enum member position is a use nothing
   recognises as a value channel. Same root as the argument-kind finding above — a held body has no slot
-  types — so the two want settling together.
+  types — so the two want settling together. `SPEC-FEEDBACK.md` #5 now carries it as the one position where
+  holding gives a *wrong* verdict rather than a late one, and names the two spec-side answers: make
+  `enum.members` a value channel in §5.10's kind table, or require the quoted spelling `e<"c">`. Which one
+  lands decides what is built here, so this waits on the revision rather than on effort.
 
-- [ ] **A derived entry's failure could name the declaration that minted it, not the one that applied it.**
+- [ ] **A derived entry's failure must name the declaration that minted it, not the one that applied it.**
+  `SPEC-FEEDBACK.md` #5 asks the spec to *require* this — deferred checking is what holding buys, and it is
+  survivable only if the author is sent to the line they can edit — so this is the one item in this section
+  the register states as an obligation rather than a nicety.
   A defect inside a held body reports at the application (`/use`) rather than the template (`/box`), because
   the walk back to a positioned entry finds the application first. Recording which declaration each derived
   entry was minted for would fix it: message text is unchanged, only the location moves — from the line that
@@ -221,7 +230,21 @@ need are not retained for a secondary constructor.
   on the spec author's own call: two entries are easier to debug than a merge firing at the wrong moment, and
   it is reachable only when both spellings appear in one schema. Doing it properly means a pass at the end of
   resolution that re-derives each synthetic's name from its resolved record and merges collisions — not a
-  patch to naming.
+  patch to naming. **Disclosed in `SPEC-FEEDBACK.md` #5**, which asks Revision 34 to say whether D6's merge
+  is required or incidental — an implementation reading it as an optimisation skips it and gets the second
+  entry. The simple case does agree and is pinned
+  (`ContainerSugarEndToEndTest.aFormClosedFromATemplateIsTheSameEntryADirectOneProduces`): only an element
+  that is itself an application splits, the closed lift hashing the binding record before its inner
+  application is rewritten.
+
+## Retired vocabulary, residue
+
+- [ ] **`FieldModifiers.Resolved.parametric` is written and never read.** Its only consumer was the
+  `value_param` routing, which the kernel no longer declares: both callers now put a parametric modifier
+  token in `value` and lean on §8.1's shadowing rule. The state distinction §5.7 needs is decided inside
+  `FieldModifiers.of` and rides `state`, so the component carries nothing. Delete it and the record narrows
+  to `(state, value)`. Trivial, and worth doing while `SPEC-FEEDBACK.md` #5's headline subtraction to the
+  spec — "`record_field.value_param` has no producer left" — is in front of a reviewer.
 
 ## Schema-side diagnostics
 

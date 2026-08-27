@@ -90,6 +90,13 @@ there.** Prose and Javadoc state the rule as built and name the current section 
 an entry closes, the citations to it become spec citations — the reasoning has served its purpose and the
 spec now carries the rule.
 
+**The register is the as-built record, and it is self-contained.** It is what goes to the spec reviewer, so
+an entry proposing a design this implementation has built states the design, what is running, and what is
+not, rather than pointing at a design document beside it. Where an entry's recommendation is a proposal
+rather than a report, it says so at the point it makes it — a reviewer adopting a rule needs to know which
+claims are running code. Working design documents are not kept in `spec/`: once a design lands, the entry
+absorbs what survives of the argument and the document goes, git history keeping it.
+
 ## Conventions
 
 **Javadoc documents current contract only, no change history.** Java source Javadoc describes an element's
