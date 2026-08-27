@@ -555,8 +555,12 @@ makes a header a property of the document and not of its root value. No `meta` c
 *schema* document, whose model is `schema.meta`, and `TsonDocumentHeader` (which carries all three) answers
 the different question of classifying a document before reading it. `treeReader().readDocument(...)` returns
 one and `read` is unchanged beside it; `TsonTreeWriter.toTson(TsonDocument)` writes it back, the document's
-own directives beating the writer's where it has them. The object side still carries neither its schema nor
-its root type (`BACKLOG.md`).
+own directives beating the writer's where it has them. **`TsonObjectDocument<T>`** (in `tson-compiler`, beside
+the facades) is the object side's, and a distinct type rather than the same one: it needs a fourth component,
+`rootType`, a `TsonValue` naming its own type where a bound object names nothing. What it carries is what the
+*read* established — the class and its context already fix the schema, but `!!id` is per-document data and
+`rootType` is a name a `DataNameBinder` cannot invert, which is also why `TsonObjectWriter.describing` takes
+two arguments where the tree writer's takes one.
 
 ### Front door: `Tson`/`TsonConfig` (`tson` module) — `docs/facades-and-tree.md`
 

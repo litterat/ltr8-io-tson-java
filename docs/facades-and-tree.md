@@ -261,9 +261,23 @@ annotation-aware, every node carrying its own `typeRef()` and `annotations()`.
     directives winning over the writer's component by component and only where it has one — so reproducing a
     document reproduces it, while a writer configured for something the document does not state still
     contributes it.
-  - The object side has the worse version of the same gap and is not closed: a bound object carries neither
-    the schema nor its root type, which is why `TsonObjectWriter.describing` needs the type as a second
-    argument where the tree writer does not (`BACKLOG.md`).
+  - **`TsonObjectDocument<T>` is the object side's own**, and deliberately not the same type: it needs a
+    fourth component, `rootType`, because a `TsonValue` carries its own `typeRef()` and a bound object
+    carries nothing. Two arities are not siblings, so they are not named as such.
+    - **What it carries is what the *read* established.** The class plus its bind context already fix which
+      schema governs an object — one context per schema version is the design — so `schema` is the weakest
+      of the three. The other two are not recoverable from anything the caller holds: `!!id` is
+      per-document data (§2.2 makes it a property of the document, so a class modelling it as a field would
+      misstate its own shape), and `rootType` is a name a `DataNameBinder` cannot hand back, mapping name to
+      class where a profile lets one class serve several shapes.
+    - **Which is why `describing(schemaUri, rootTypeName)` takes two arguments** where the tree writer's
+      takes one. That is not residue of the reader dropping something — the name genuinely cannot be
+      derived — but a document carries both, so `writer.toTson(document)` replaces restating at the call
+      site what the read had just worked out.
+    - A schemaless read leaves `rootType` empty rather than guessing from a wire type-ref it never checked,
+      and a hand-assembled document naming a schema with no type is refused at write: the pair is what makes
+      a document self-describing, and the directive alone leaves a reader with a schema and no way to pick a
+      type from it.
 - **`TsonAtom.toString()` renders its value alone, and that is load-bearing.** A reader reporting on a
   decoded value stringifies whatever it decoded, and in tree mode that is a `TsonAtom` — so the record's own
   default rendering would reach a `Diagnostic`'s `expected`/`actual`, the two fields that exist precisely so

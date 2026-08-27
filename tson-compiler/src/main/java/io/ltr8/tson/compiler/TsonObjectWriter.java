@@ -119,6 +119,54 @@ public final class TsonObjectWriter {
     private final TsonTreeWriter treeWriter = new TsonTreeWriter();
 
     /**
+     * Writes {@code document} back as TSON, header and root type-ref included -- the round trip
+     * {@link TsonObjectReader#readDocument} exists for, in one call.
+     *
+     * <p><b>This is the call site {@link #describing} is awkward at.</b> Naming a schema here needs the root
+     * type as well, because a bound object carries neither and the binder cannot invert a class to a name --
+     * so writing a document back by hand means restating what the read had just worked out. A document
+     * carries both, and supplies them.
+     *
+     * <p><b>The document's own facts win over this writer's</b>, component by component and only where it
+     * has them, so reproducing a document reproduces it while a writer configured for something the document
+     * does not state still contributes it.
+     *
+     * @throws TsonWriteException if {@code document} names a schema but no root type -- the pair is what
+     *                            makes a document self-describing, and a reader given only the directive
+     *                            has a schema and no way to pick a type from it
+     */
+    public String toTson(TsonObjectDocument<?> document) {
+        return forDocument(document).toTson(document.value());
+    }
+
+    /** {@link #toTson(TsonObjectDocument)} into a stream -- UTF-8, flushed and not closed. */
+    public void write(TsonObjectDocument<?> document, OutputStream out) {
+        forDocument(document).write(document.value(), out);
+    }
+
+    /** {@link #toTson(TsonObjectDocument)} into any {@link Appendable}. */
+    public void write(TsonObjectDocument<?> document, Appendable out) {
+        forDocument(document).write(document.value(), out);
+    }
+
+    /** This writer with {@code document}'s own directives and root type applied over its own. */
+    private TsonObjectWriter forDocument(TsonObjectDocument<?> document) {
+        TsonObjectWriter writer = this;
+        if (document.schema().isPresent()) {
+            String type = document.rootType().orElseThrow(() -> new TsonWriteException(
+                    "this document names the schema \"" + document.schema().get() + "\" and no root type, so "
+                    + "there is nothing to write as the root's type-ref and a reader would have no way to pick "
+                    + "a type from that schema -- a document read against a schema carries both, so this one "
+                    + "was assembled by hand; supply the type, or drop the schema and write a bare value", null));
+            writer = writer.describing(document.schema().get(), type);
+        }
+        if (document.id().isPresent()) {
+            writer = writer.identifiedBy(document.id().get());
+        }
+        return writer;
+    }
+
+    /**
      * Writes {@code value} as TSON text -- mainly useful as a debugging tool (inspect what a bound
      * object actually contains) rather than a guaranteed-lossless serializer. Emits a {@code
      * !typeName} type-ref only where one is actually needed for the value to read back correctly:

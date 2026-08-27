@@ -325,14 +325,6 @@ surface.
 
 The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tree model" section. What's left:
 
-- [ ] **A bound object does not carry the schema or the root type its document named.** The tree half is
-  closed (`TsonDocument`); the object half is the same gap and worse, since a `TsonValue` at least names its
-  own type where a bound object names neither. It is why `TsonObjectWriter.describing` takes the root type as
-  a second argument and `TsonTreeWriter.describing` does not — an asymmetry in the public API that exists
-  only because the reader had nowhere to put the two facts. A `TsonDocument`-shaped answer cannot simply be
-  reused: it is generic in the value (`TsonDocument<Order>`), and a generic container for arbitrary bound
-  objects does not belong in `tson-tree`, which is the *tree* model.
-
 - [ ] **Copy-on-write transforms + builders (parked).** The "new tree from old" editing half —
   `TsonRecord.with(name, value)`/`without(name)`, `TsonArray.with(i, value)`/`plus(value)`/`without(i)`,
   `TsonRecord.builder()`, and a pointer-based `set("/a/b", value) → new tree`. All pure `tson-tree`
