@@ -23,6 +23,12 @@ or the test that owns the area, where the person who trips over it will actually
 Prose inside a live entry follows the same rule: say what is left to do and what constrains it. Recounting
 which halves already work turns an item into a status report, and it goes stale silently.
 
+**And an entry filed as a gap must be one.** A throw that means *your schema is wrong* is not a gap however
+it is spelled, and neither is one that means *an invariant broke*. The test is the same one the exception
+policy uses: a schema error's verdict does not change when this library improves; a gap's does. It is worth
+stating here rather than over one section, because the CLI's exit 1 against its exit 70 rides on the
+distinction, and a misfiled entry is how a wrong classification gets adopted rather than noticed.
+
 ---
 
 ## Resolution & linking generality
@@ -83,18 +89,6 @@ the proposals it answers. What is left below are consequences of holding, not sh
   holding gives a *wrong* verdict rather than a late one, and names the two spec-side answers: make
   `enum.members` a value channel in §5.10's kind table, or require the quoted spelling `e<"c">`. Which one
   lands decides what is built here, so this waits on the revision rather than on effort.
-- [ ] **Key-position annotations are lost on the resolved-form round trip.** A schema *source* carries them
-  through now: §6's name-position channel — `@doc` before a declared name, and the resolver's own derived
-  `@alias`/`@synthetic` — reaches `TsonSchema.entries()` as key annotations (`AnnotatedMap`) and survives
-  linking and the import merge. The *document* round trip is what does not: reading a resolved-form
-  `{type_name => type_definition}` document back binds the map with no key annotations at all, and nothing
-  writes them. `ResolvedFixtureTest` therefore cannot compare the marker the way it compares everything else
-  — the Revision 33 fixtures carry `@synthetic` on nine keys and `@doc` on many more, and the bound side
-  renders none of them, so the entries would compare equal for the wrong reason;
-  `theSameEntriesAreMarkedSyntheticOnBothSides` scans the fixture text instead. Fixing the read side lets that
-  test read those keys like anything else, which is the whole of the payoff — `ResolvedFixtureTest` is the
-  only consumer, and the emit side behind it has none. §8.1 settles the shape either way: derived markers
-  discarded and recomputed, author-written key annotations preserved as data.
 - [ ] **Two entries for one type, where both lift channels produce the same form.** A closed lift hashes the
   *unclosed* binding record at desugar; the open lift hashes the *closed* one at materialisation — so
   `[box<text>]` written directly and `[box<T>]` closed with `T := text` land on different names. D6
@@ -222,6 +216,19 @@ reader, a schemaless→tree reader, a schema-driven *validating* reader, a pull-
 fail-fast and collecting/diagnostics modes; the write side has only the two schemaless writers and is
 missing most of the mirror. What is left below is the schema-aware writer, diagnostics, and a public event
 surface.
+
+- [ ] **Key-position annotations are lost on the resolved-form round trip.** A schema *source* carries them
+  through now: §6's name-position channel — `@doc` before a declared name, and the resolver's own derived
+  `@alias`/`@synthetic` — reaches `TsonSchema.entries()` as key annotations (`AnnotatedMap`) and survives
+  linking and the import merge. The *document* round trip is what does not: reading a resolved-form
+  `{type_name => type_definition}` document back binds the map with no key annotations at all, and nothing
+  writes them. `ResolvedFixtureTest` therefore cannot compare the marker the way it compares everything else
+  — the Revision 33 fixtures carry `@synthetic` on nine keys and `@doc` on many more, and the bound side
+  renders none of them, so the entries would compare equal for the wrong reason;
+  `theSameEntriesAreMarkedSyntheticOnBothSides` scans the fixture text instead. Fixing the read side lets that
+  test read those keys like anything else, which is the whole of the payoff — `ResolvedFixtureTest` is the
+  only consumer, and the emit side behind it has none. §8.1 settles the shape either way: derived markers
+  discarded and recomputed, author-written key annotations preserved as data.
 
 - [ ] **No schema-aware (Class 2) writer — `TsonValueWriter`.** Only the schemaless `TsonObjectWriter`
   (object → TSON) and `TsonTreeWriter` (`TsonValue` → TSON) exist, both with documented lossy spots
