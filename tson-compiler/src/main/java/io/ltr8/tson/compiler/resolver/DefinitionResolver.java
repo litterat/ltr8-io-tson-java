@@ -1146,8 +1146,13 @@ final class DefinitionResolver {
             return TypeKind.PRODUCT;
         }
         if (baseKindsFound.size() > 1) {
-            throw new UnsupportedOperationException(
-                    "'" + name + "': multiple base kinds in transitive supertype chain: " + baseKindsFound);
+            // §4.1's base kinds are disjoint categories, not facets a type can hold several of, so a chain
+            // reaching two of them describes nothing. A verdict, not a gap: no improvement to this library
+            // makes a type both an atom and a product.
+            throw new TsonSchemaValidationException("'" + name + "' reaches " + baseKindsFound.size()
+                    + " base kinds through its supertypes (" + String.join(", ", baseKindsFound) + ") -- §4.1 "
+                    + "gives a type exactly one, so nothing can be both. Compose or refine from sources that "
+                    + "agree on their base kind");
         }
         return switch (baseKindsFound.get(0)) {
             case "atom" -> TypeKind.ATOM;
@@ -1281,7 +1286,9 @@ final class DefinitionResolver {
             // told about an unresolved reference to a parameter they never wrote.
             return io.ltr8.tson.schema.meta.TypeRef.of(closedApplication(name, generic, typeParams, "refinement source"));
         }
-        throw new UnsupportedOperationException(
+        // Not a gap and not the author's error: the two shapes above are the two §12.1's `atom-refinement`
+        // can produce, so a third means this resolver was handed a tree the grammar cannot build.
+        throw new IllegalStateException(
                 "'" + name + "': a refinement source is always a simple or generic type-ref by grammar, got " + target);
     }
 

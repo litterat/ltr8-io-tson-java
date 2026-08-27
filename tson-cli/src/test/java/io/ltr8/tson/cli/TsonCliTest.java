@@ -80,20 +80,94 @@ class TsonCliTest {
      * 70, not 1. Something went unchecked, so "invalid" is not a verdict that run is entitled to give, and
      * the two codes are what let the CLI tell them apart in one pass.
      *
-     * <p><b>Exercised over the codes rather than over a schema, because no schema reaches a gap any more.</b>
-     * The fixtures here used to be real: a parameter in a collection-valued slot, then a parameterized
-     * supertype ({@code plain & box<T>}), then one template applied to another ({@code plain &
-     * box<inner<T>>}) -- each closed in turn, and the schema pipeline now has no reachable {@code
-     * NOT_IMPLEMENTED} left. Rather than fabricate one, this pins the rule the fixtures existed to protect.
-     * {@code BACKLOG.md} carries the note to restore an end-to-end fixture the day a gap reappears; the
-     * read side still has one ({@code extern}), but it escapes as an exception rather than riding in a report.
+     * <p><b>Exercised over the codes, because the runs that would exercise it end to end cannot reach this
+     * method.</b> No <em>schema</em> reaches a gap any more -- the fixtures here used to be real, a parameter
+     * in a collection-valued slot and then a parameterized supertype and then one template applied to
+     * another, each closed in turn. The gaps that remain are all at read
+     * ({@link #aReadTimeGapIsAGapNotAVerdict}), and a read gap escapes as an exception rather than riding in
+     * the report, so it reaches {@link TsonCli#notImplemented} instead and this method never sees the mixed
+     * list. That is the defect the sibling test pins, not a shortfall in the rule stated here.
      */
+    /** A schema that loads clean and cannot be read against: {@code precision} is carried but not enforced. */
+    private static final String GAP_SCHEMA = """
+            !!id:"https://example.test/cli-gap.tn"
+            !!meta:"https://tson.io/2026/33/m/meta.tn"
+            !!import:"https://tson.io/2026/33/m/core.tn"
+            {
+              stamped => { at: dt  n: int32 }
+              dt      => !datetime ^ { precision: 3 }
+              plain   => { n: int32 }
+            }
+            """;
+
+    /** Well formed, and valid as far as anything can tell -- the field it fills has no reader. */
+    private static final String GAP_DOCUMENT = """
+            !!schema:"https://example.test/cli-gap.tn"
+            !stamped { at: "2020-01-01T00:00:00Z"  n: 1 }
+            """;
+
     @Test
     void aRunHoldingBothAGapAndAnOrdinaryErrorIsSeventyRatherThanOne() {
         assertEquals(70, TsonCli.exitCodeFor(List.of(
                 Diagnostic.Code.NOT_IMPLEMENTED, Diagnostic.Code.SCHEMA_ERROR)));
         assertEquals(70, TsonCli.exitCodeFor(List.of(Diagnostic.Code.NOT_IMPLEMENTED)));
         assertEquals(1, TsonCli.exitCodeFor(List.of(Diagnostic.Code.SCHEMA_ERROR)));
+    }
+
+    /**
+     * <b>A gap at read time is a gap, end to end.</b> The schema loads clean and the document is well
+     * formed; what cannot be done is check one field against it, so the run is entitled to no verdict at
+     * all. Exit 70 with {@code not implemented yet:} and the "gap in tson, not a problem with your document"
+     * framing -- never exit 1, which would tell a script the document was judged and rejected.
+     *
+     * <p>Six schemas reach this ({@code CLAUDE.md}); {@code datetime} with {@code precision} is the cheapest
+     * to write. The message names the workaround, which is why {@link TsonCli#notImplemented} prints it bare
+     * rather than under a please-report-it banner.
+     */
+    @Test
+    void aReadTimeGapIsAGapNotAVerdict(@TempDir Path dir) throws IOException {
+        Path schema = writeFile(dir, "gap.tn", GAP_SCHEMA);
+        Path data = writeFile(dir, "stamped.tn", GAP_DOCUMENT);
+
+        String err = captureStderr(() -> {
+            String out = captureStdout(() ->
+                    assertEquals(70, TsonCli.run(new String[] {"validate", schema.toString(), data.toString()})));
+            assertTrue(out.isBlank(), out);
+        });
+        assertTrue(err.contains("not implemented yet:"), err);
+        assertTrue(err.contains("does not enforce 'precision'"), err);
+        assertFalse(err.contains("Please report it"), err);
+    }
+
+    /**
+     * <b>A read gap destroys the report, and the other documents' verdicts with it.</b> This pins current
+     * behaviour rather than endorsing it: the gap escapes {@code runValidate} entirely and is caught at the
+     * top of {@link TsonCli#run}, so a run holding one gap document and one plainly invalid document prints
+     * <em>nothing</em> on stdout -- in either order -- and the invalid document is never judged.
+     *
+     * <p>That is the exact failure the schema pipeline gave up throwing gaps to avoid: "one unimplemented
+     * construct, and a document with three ordinary mistakes reported none of them". The exit code is right
+     * and the envelope is missing, so what is wrong here is reach, not classification. {@code BACKLOG.md}
+     * carries it; when it is fixed this test inverts, and {@link
+     * #aRunHoldingBothAGapAndAnOrdinaryErrorIsSeventyRatherThanOne} stops being unreachable end to end.
+     */
+    @Test
+    void aReadGapCurrentlyTakesEveryOtherDocumentsVerdictWithIt(@TempDir Path dir) throws IOException {
+        Path schema = writeFile(dir, "gap.tn", GAP_SCHEMA);
+        Path gap = writeFile(dir, "stamped.tn", GAP_DOCUMENT);
+        Path invalid = writeFile(dir, "plain.tn", """
+                !!schema:"https://example.test/cli-gap.tn"
+                !plain { n: "nope" }
+                """);
+
+        for (List<String> order : List.of(List.of(gap.toString(), invalid.toString()),
+                                          List.of(invalid.toString(), gap.toString()))) {
+            String[] args = {"validate", schema.toString(), order.get(0), order.get(1)};
+            captureStderr(() -> {
+                String out = captureStdout(() -> assertEquals(70, TsonCli.run(args), order::toString));
+                assertTrue(out.isBlank(), () -> "the invalid document got no verdict: " + out);
+            });
+        }
     }
 
     /**

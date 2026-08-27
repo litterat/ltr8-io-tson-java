@@ -110,12 +110,26 @@ in bind mode — startup, for anything compiling its schemas once. `docs/readers
 rules and `CLAUDE.md` the summary; what is left here is one modelling gap the check exposed.
 
 - [ ] **`precision` and `require_timezone` are carried but not enforced** (`datetime`/`time`). The bodies
-  declare them — a field with no component is one this model silently loses — and the parsers *refuse* a
-  schema that sets either, so the facet is a stated gap rather than a constraint quietly not applied. What
+  declare them — a field with no component is one this model silently loses — and the parsers refuse to
+  *read* against a schema that sets either, so the facet is a stated gap rather than a constraint quietly
+  not applied. The refusal is at read, not at load: such a schema resolves, links and compiles clean, and
+  the first document to reach the field gets `ErrorReader`'s gap and exit 70 — so it lands on whoever sends
+  data, not on the author who wrote the facet. What
   remains is enforcement, and both halves need a decision before code: `precision`'s required semantics
   (exact vs. maximum fractional-digit count) are not settled by the spec and want a `SPEC-FEEDBACK.md` entry,
   and `require_timezone: false` needs an offset-less parse path neither parser has (`true` is already the
   behaviour, RFC 3339 requiring an offset on every value these atoms accept).
+
+- [ ] **A read-time gap escapes as an exception and takes the whole report with it.** Every remaining gap
+  is at read (`unknown`, `extern`, and `datetime`/`time` with `precision` or `require_timezone`), and
+  `ErrorReader` throws where the schema pipeline reports: the `UnsupportedOperationException` is caught at
+  the top of `TsonCli.run`, not per document, so `tson validate schema.tn gap.tn invalid.tn` prints nothing
+  on stdout and the invalid document is never judged — in either order. That is the failure the schema
+  pipeline gave up throwing gaps to avoid, still present on the read side; the exit code is already right, so
+  what is missing is reach, not classification. Routing `ErrorReader`'s gap through the read's
+  `TsonDiagnosticsReceiver` as `Diagnostic.Code.NOT_IMPLEMENTED` is the shape — the code and
+  `TsonCli.exitCodeFor` already exist and are unreachable end to end without it. Pinned as it stands by
+  `TsonCliTest.aReadGapCurrentlyTakesEveryOtherDocumentsVerdictWithIt`, which inverts when this lands.
 
 ## Remaining built-in types
 
