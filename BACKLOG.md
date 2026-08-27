@@ -62,17 +62,19 @@ by a factor of six.
   absorbing position closes on demand (`vip => customer & box<text>`). What is left is only an application
   naming the enclosing declaration's own parameters — `<T> customer & box<T>`, and the same as a refinement
   source.
-  - **Blocked on a kernel slot, not on materialisation** (`SPEC-FEEDBACK.md` #8). The composition itself
-    needs no closure: the source's field set is known while the application is open, `box`'s held record
-    substituted parameter-for-parameter, giving `vip => <T> !record { fields: [ { name: id type: text }
-    { name: v type: T } ] }` — the shape a composition template already resolves to when its parameter sits
-    in its own body. What has nowhere to go is the composition's other half: §5.8 makes `vip` a subtype of
-    both operands, and `type_definition.supertypes`/`record.supertypes` are `[type_name]`, which `box<T>` is
-    not. So this waits on `supertypes: [type_ref]` landing in the kernel — building it first would mean
-    inventing a representation the spec does not have.
-  - The field-set half is then a token rewrite this codebase already performs, so the work after the slot
-    widens is small: substitute the source's held body with the arguments as written, read it as a record,
-    absorb, and leave the result open.
+  - **It is a pure composition that retains the parameter**, and nothing about it needs materialisation. The
+    source's field set is known while the application is open — `box`'s own held record, substituted
+    parameter-for-parameter — so absorbing it gives `vip => <T> !record { fields: [ { name: id type: text }
+    { name: v type: T } ] }`, the shape a composition template already resolves to when its parameter sits in
+    its own body. An open entry is an intermediate form; its `supertypes`/`subtypes` are meaningful only once
+    closed, so `box` — not a type until applied — simply does not appear in them while `vip` is open.
+  - **What decides the work is where the flattening happens.** This phase flattens a composition or
+    refinement template into a held record at the declaration, which is why it wants the source's field set
+    now and so wants the application closed now. If an open entry instead held its declaration AST
+    unflattened, closing would substitute and then run ordinary closed-declaration resolution — the path
+    `vip => customer & box<text>` already takes — and this case would need no separate handling at all. That
+    is a design question about the held form, not a defect in the resolver, and it is worth settling before
+    writing code against either answer.
 
 - [ ] **Atom-body coherence, the parts that need a parser this module doesn't have.** `Atom.coherenceCheck`
   (issue #50) now rejects an atom body whose own facets admit nothing, but three gaps are left, each

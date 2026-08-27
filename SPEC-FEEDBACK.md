@@ -12,7 +12,7 @@ revision closes.** It is an input to the next revision's adjudication, so its nu
 that revision's change log will answer against — a stable index of the open set, not an archive of
 everything ever raised.
 
-The eight below are what Revision 33 leaves open, renumbered from #1; the 55 raised against Revision 32 that
+The seven below are what Revision 33 leaves open, renumbered from #1; the 55 raised against Revision 32 that
 it resolved are gone from here, because the spec now carries their rules and that is where the answer
 belongs. **This file is the as-built record**, not a pointer to one: where an entry proposes a design this
 implementation has built, the entry states the design, what is running, and what is not, so that a reviewer
@@ -642,65 +642,3 @@ that kept a name-only body in step with `source` whenever materialisation rewrot
 
 **Status against Revision 33:** open, new against this revision. Implemented here, which makes it the first
 change to the bundled `spec/m/` artifacts' *content* — the three digests move with it.
-
----
-
-## 8. `supertypes` is typed `[type_name]`, so composing against an open application has nowhere to record what it composed
-
-**Section:** Part 2 §5.8 ("Parameterized references"), §5.7 (refinement), §8.1
-(`type_definition.supertypes`/`subtypes`, `record.supertypes`), §9 (a slot holding a type reference MUST be
-typed `type_ref`). **Read with #5 and #7** — same defect as #7, at a second slot, and reachable only because
-#5's held form makes the shape resolvable at all.
-
-**Problem:** `vip => <T> customer & box<T>` looks like it needs materialisation and does not. Composition
-copies the source's field set (§5.8), and under a held body that field set is *already known* while the
-application is still open: `box => <T> { v: T }` holds `!record { fields: [ { name: v type: T } ] }`, and
-binding `box`'s parameter to the token `T` is the same token rewrite substitution performs everywhere else.
-The result is an ordinary flattened record that still mentions `T` —
-
-```
-vip => <T> !record { fields: [ { name: id type: text } { name: v type: T } ] }
-```
-
-— which is exactly the shape a composition template already resolves to when its parameter sits in its own
-body (`<T> base & { value: T }`, resolved and pinned here). Nothing about the *fields* needs closing.
-
-What cannot be written is the other half of what composition produces. §5.8 makes `vip` a subtype of both
-operands, and both slots that record it are names:
-
-```
-type_definition => { ... supertypes: [type_name]?  subtypes: [type_name]? ... }
-record          => ~product & { ... supertypes: [type_name]? }
-```
-
-`box<T>` is not a `type_name`, and there is no entry to name instead — an open application denotes no entry,
-and naming the bare template `box` would name something §5.10 says is not a type. So the composition can be
-performed and cannot be recorded. Dropping the operand is not available either: it is what populates the
-subtype lattice, and §5.4's discrimination rules consume it.
-
-This is #7's finding at a second slot. §9 tells an extension meta-schema that "a slot holding a type
-reference MUST be typed `type_ref`", and the kernel's own supertype slots are exactly that and are not.
-
-**Interpretation chosen:** refused at the declaration, at both absorbing positions, as a stated library gap
-(`NOT_IMPLEMENTED`, §5.8/§5.10) rather than an author error — the schema is well-formed and this
-implementation cannot record its result. The refusal's *reason* is being corrected alongside this entry: it
-read "an open application has no field set", which is the thing this entry shows to be false.
-
-**Suggested resolution:** declare `supertypes: [type_ref]?` on both `type_definition` and `record`.
-
-- **`subtypes` does not move.** It is derived at link time over registered entries, so it only ever names
-  closed ones. Only the authored direction can hold an open operand.
-- **Closed schemas are unaffected in practice**, a no-argument `type_ref` being spelled bare — but #5's
-  one-spelling rule applies here too, and §8.1 should say that a supertype with no arguments is written
-  positionally, so a serialiser cannot produce a second spelling of the same entry.
-- **A refinement source needs nothing**, which is worth noting because it shows the gap is the slot and not
-  the feature: `type_definition.source` is already `type_ref`, so `<T> box<T> ^ { ... }` can record what it
-  refined — and is refused today only because refinement puts its source into `supertypes` as well.
-- **What this does not settle** is whether `vip<text>` and a hand-written `customer & box<text>` land on one
-  entry. They have the same fields, and their supertype lists agree only if the open one's `box<T>` closes to
-  the same instantiation the closed one names. That is the D6 merge question #5 raises, arriving from a third
-  direction.
-
-**Status against Revision 33:** open, new against this revision. Not implemented here — the field-set half is
-a token rewrite this codebase already performs, and the recording half is blocked on the kernel declaration
-above, so building it before the slot widens would mean inventing a representation the spec does not have.

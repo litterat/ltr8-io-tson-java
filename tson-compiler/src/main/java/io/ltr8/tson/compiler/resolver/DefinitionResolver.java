@@ -957,8 +957,10 @@ final class DefinitionResolver {
 
         for (TypeRef supertypeRef : construction.supertypes()) {
             if (supertypeRef instanceof GenericRef generic) {
-                // §5.8's "Parameterized references". Closed here so the supertype is an entry this can name:
-                // `supertypes` is a list of type *names* (§8.1), and an open application denotes no entry.
+                // §5.8's "Parameterized references", closed here because this phase flattens a composition
+                // template into a held record and so needs the supertype's field set now. Holding the
+                // declaration itself instead would defer the whole question to materialisation -- see
+                // closedApplication.
                 supertypeRef = new SimpleRef(closedApplication(name, generic, parameters, "supertype"));
             }
             if (!(supertypeRef instanceof SimpleRef simple)) {
@@ -1249,11 +1251,10 @@ final class DefinitionResolver {
             return io.ltr8.tson.schema.meta.TypeRef.of(simple.name());
         }
         if (target instanceof GenericRef generic) {
-            // Closed, not carried, for the reason composition closes its supertypes: a refinement records its
-            // source in `supertypes` as well as in `source`, and `supertypes` holds type *names* (§8.1).
-            // `source` itself is a `type_ref` and could carry the application. Carrying it in both instead
-            // copied the template's body with its parameters unbound, and the author was told about an
-            // unresolved reference to a parameter they never wrote.
+            // Closed, not carried, for the reason composition closes its supertypes: §5.7 re-emits the
+            // source's whole field set, and this phase needs that field set to flatten. Carrying the
+            // application instead copied the template's body with its parameters unbound, and the author was
+            // told about an unresolved reference to a parameter they never wrote.
             return io.ltr8.tson.schema.meta.TypeRef.of(closedApplication(name, generic, typeParams, "refinement source"));
         }
         throw new UnsupportedOperationException(
@@ -1264,12 +1265,12 @@ final class DefinitionResolver {
      * A fully-bound application at one of the two field-absorbing positions, closed to the entry it denotes.
      *
      * <p><b>An application that still references the declaration's own parameters is refused.</b>
-     * {@code vip => <T> customer & box<T>} cannot close while {@code T} is unbound. Note this is a limit of
-     * what the resolved form can <em>record</em>, not of what can be computed: the source's field set is
-     * known while the application is still open (a held record body, substituted parameter-for-parameter),
-     * and absorbing it would yield an ordinary flattened record still mentioning {@code T}. What has nowhere
-     * to go is the composition's other half -- {@code supertypes} is a list of type names (§8.1) and an open
-     * application denotes no entry to name. {@code SPEC-FEEDBACK.md} #8 carries the slot this needs.
+     * {@code vip => <T> customer & box<T>} cannot close while {@code T} is unbound, and this phase needs it
+     * closed because it flattens a composition or refinement template into a held record here, which takes
+     * the source's field set. Nothing deeper than that is missing: the field set is computable while the
+     * application is open -- the source's own held record, substituted parameter-for-parameter -- so the
+     * absorbed result would be an ordinary flattened record still mentioning {@code T}. What decides the work
+     * is where the flattening happens, not whether it can; {@code BACKLOG.md} carries the question.
      */
     private String closedApplication(String name, GenericRef application, List<String> typeParams, String position) {
         for (TypeArg arg : application.args()) {
